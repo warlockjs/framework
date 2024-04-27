@@ -2,19 +2,18 @@ import { ensureDirectoryAsync } from "@mongez/fs";
 import dayjs from "dayjs";
 import fs from "fs";
 import { EOL } from "os";
-import { LogChannel } from "../LogChannel";
-import { LogContract, LogLevel } from "../types";
+import { LogChannel } from "../log-channel";
+import {
+  BasicLogConfigurations,
+  LogContract,
+  LogLevel,
+  LogMessage,
+} from "../types";
 import path from "path";
 
 // TODO: Add max messages per file before rotation
 
-export type FilteringOptions = {
-  level: LogLevel;
-  module: string;
-  action: string;
-};
-
-export type FileLogConfig = {
+export type FileLogConfig = BasicLogConfigurations & {
   storagePath?: string;
   /**
    * File name, without extension
@@ -73,12 +72,6 @@ export type FileLogConfig = {
    */
   levels?: LogLevel[];
   /**
-   * Filter what logs should be logged
-   *
-   * @default all
-   */
-  filter?: (options: FilteringOptions) => boolean;
-  /**
    * Date and time format
    */
   dateFormat?: {
@@ -87,16 +80,7 @@ export type FileLogConfig = {
   };
 };
 
-export type LogMessage = {
-  content: string;
-  level: LogLevel;
-  date: string;
-  module: string;
-  action: string;
-  stack: string;
-};
-
-export class FileLog extends LogChannel implements LogContract {
+export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
   /**
    * {@inheritdoc}
    */
@@ -122,6 +106,7 @@ export class FileLog extends LogChannel implements LogContract {
     extension: "log",
     chunk: "single",
     maxMessagesToWrite: 100,
+    filter: () => true,
     // maxFileSize: 10 * 1024 * 1024, // 10MB
     maxFileSize: 10, // 10MB
     get rotateFileName() {
@@ -139,36 +124,9 @@ export class FileLog extends LogChannel implements LogContract {
   protected lastWriteTime = Date.now();
 
   /**
-   * Channel configurations
-   */
-  protected channelConfigurations: FileLogConfig = {};
-
-  /**
    * A flag to determine if the file is being written
    */
   protected isWriting = false;
-
-  /**
-   * Get config value
-   */
-  protected config<K extends keyof FileLogConfig>(key: K): FileLogConfig[K] {
-    return this.channelConfigurations[key] ?? this.defaultConfigurations[key];
-  }
-
-  /**
-   * Constructor
-   */
-  public constructor(configurations?: FileLogConfig) {
-    super();
-
-    if (configurations) {
-      this.configurations(configurations);
-    }
-
-    this.init();
-
-    this.initMessageFlush();
-  }
 
   /**
    * Check file size for file rotation
@@ -289,22 +247,8 @@ export class FileLog extends LogChannel implements LogContract {
     const logsDirectory = this.storagePath;
 
     await ensureDirectoryAsync(logsDirectory);
-  }
 
-  /**
-   * Set configurations
-   */
-  public configurations(configurations: FileLogConfig) {
-    this.channelConfigurations = {
-      ...this.channelConfigurations,
-      ...configurations,
-      dateFormat: {
-        ...this.channelConfigurations.dateFormat,
-        ...configurations.dateFormat,
-      },
-    };
-
-    return this;
+    this.initMessageFlush();
   }
 
   /**
@@ -316,18 +260,7 @@ export class FileLog extends LogChannel implements LogContract {
     message: any,
     level: LogLevel
   ) {
-    // check for debug mode
-    const allowedLevels = this.config("levels");
-
-    if (allowedLevels && !allowedLevels.includes(level)) return;
-
-    const filter = this.config("filter");
-
-    if (filter) {
-      const shouldBeLogged = filter({ level, module, action });
-
-      if (!shouldBeLogged) return;
-    }
+    if (!this.shouldBeLogged({ module, action, level })) return;
 
     const date = dayjs().format(
       (this.channelConfigurations.dateFormat!.date || "DD-MM-YYY") +

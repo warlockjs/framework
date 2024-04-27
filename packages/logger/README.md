@@ -48,7 +48,7 @@ import { log } from "@warlock.js/logger";
 log("request", "create", "user created successfully", "info");
 ```
 
-You can also use `log.info` `log.warn` `log.error` `log.debug` functions to log the message.
+You can also use `log.info` `log.warn` `log.error` `log.debug` `log.success` functions to log the message.
 
 ```ts
 import { log } from "@warlock.js/logger";
@@ -66,7 +66,7 @@ database.on("connection", () => {
 
 ## Console Log Channel
 
-The console log channel will log all the logs to the console, the message appears in the console will be colored based on the log level using [chalk](https://www.npmjs.com/package/chalk).
+The console log channel will log all the logs to the console, the message appears in the console will be colored based on the log level using [copper](https://www.npmjs.com/package/@mongez/copper).
 
 ```ts
 import logger, { ConsoleLog } from "@warlock.js/logger";
@@ -126,11 +126,11 @@ In the file log channel, there are three types of chunk modes:
 > Please note the hourly mode is set to 24 hours mode.
 
 ```ts
-import logger, { ChunkFileLog } from "@warlock.js/logger";
+import logger, { FileLog } from "@warlock.js/logger";
 
 logger.configure({
   channels: [
-    new ChunkFileLog({
+    new FileLog({
       chunk: "daily", // default is single
     }),
   ],
@@ -138,6 +138,42 @@ logger.configure({
 ```
 
 For better performance, the file will be created in the `logs` directory in `/storage`, each file will be named based on the date, for example, if the date is `2021-01-01`, the file name will be `2021-01-01.log`, and the message time is stored by default prefixed with current date/time in this format `YYYY-MM-DD HH:mm:ss`, however, you can change the format by passing the `dateFormat` option.
+
+## Allow certain levels
+
+You can allow certain levels to be logged, for example, if you want to log only the `info` and `error` messages, you can use the `levels` option.
+
+```ts
+import logger, { FileLog } from "@warlock.js/logger";
+
+logger.configure({
+  channels: [
+    new FileLog({
+      levels: ["info", "error"],
+    }),
+  ],
+});
+```
+
+This allows only the `info` and `error` messages to be logged.
+
+## Advanced Filter messages
+
+Another way to filter the messages is to use the `filter` option, the filter function will receive the message info and you can return `true` to log the message or `false` to ignore it.
+
+```ts
+import logger, { FileLog } from "@warlock.js/logger";
+
+logger.configure({
+  channels: [
+    new FileLog({
+      filter: ({ level, module, action }) => level !== "debug",
+    }),
+  ],
+});
+```
+
+This will log all the messages except the `debug` messages.
 
 ## JSON File Log Channel
 
@@ -153,7 +189,7 @@ logger.configure({
 
 Example of output log file
 
-`/storage/logs/01-04-2023.json`
+`/storage/logs/app.json`
 
 ```json
 {
@@ -282,10 +318,19 @@ logs
 You can create your own log channel by extending the `LogChannel` class
 
 ```ts
-import { type LogContract, LogChannel, LogLevel } from "@warlock.js/logger";
+import {
+  LogChannel,
+  type LogContract,
+  type LogLevel,
+  type BasicLogConfigurations,
+} from "@warlock.js/logger";
+
+export type CustomLogOptions = BasicLogConfigurations & {
+  // your custom options
+};
 
 export default class CustomLogChannel
-  extends LogChannel
+  extends LogChannel<CustomLogOptions>
   implements LogContract
 {
   /**
@@ -307,10 +352,22 @@ export default class CustomLogChannel
     message: string,
     level: LogLevel
   ) {
+    // first check if the message should be logged or not
+    if (!this.shouldBeLogged({ module, action, level })) return;
+
     // log the message
   }
 }
 ```
+
+The `CustomLogChannel` class extends the `LogChannel` class and implements the `LogContract` interface, you can add your custom options by extending the `BasicLogConfigurations` interface.
+
+The `BasicLogConfigurations` interface has the following options:
+
+- `levels`: an array of levels to log, the default is `["info", "warn", "error", "debug"]`.
+- `filter`: a function to filter the messages, the default is `() => true`.
+
+These options are used in `shouldBeLogged` method to check if the message should be logged or not.
 
 If the log channel will output something in the terminal, mark the `terminal` property as `true`.
 
@@ -330,23 +387,7 @@ export default class CustomLogChannel
    * Channel name
    */
   public name = "custom";
-
-  /**
-   * Log the message
-   *
-   * @param module
-   * @param action
-   * @param message
-   * @param level
-   */
-  public async log(
-    module: string,
-    action: string,
-    message: string,
-    level: LogLevel
-  ) {
-    // log the message
-  }
+  // ...
 }
 ```
 

@@ -1,8 +1,8 @@
 import { colors } from "@mongez/copper";
-import { LogChannel } from "../LogChannel";
-import { LogLevel } from "../types";
+import { LogChannel } from "../log-channel";
+import { BasicLogConfigurations, LogLevel } from "../types";
 
-export class ConsoleLog extends LogChannel {
+export class ConsoleLog extends LogChannel<BasicLogConfigurations> {
   /**
    * {@inheritdoc}
    */
@@ -17,6 +17,8 @@ export class ConsoleLog extends LogChannel {
    * {@inheritdoc}
    */
   public log(module: string, action: string, message: any, level: LogLevel) {
+    if (!this.shouldBeLogged({ module, action, level })) return;
+
     // display date and time with milliseconds
     const date = new Date().toISOString(); // i.e 2021-01-01T00:00:00.000Z
     switch (level) {

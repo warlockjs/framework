@@ -2,6 +2,32 @@ export type LogLevel = "debug" | "info" | "warn" | "error" | "success";
 
 export type DebugMode = "daily" | "monthly" | "yearly" | "hourly";
 
+export type BasicLogConfigurations = {
+  /**
+   * Set what level of logs should be logged
+   *
+   * @default all
+   */
+  levels?: LogLevel[];
+  /**
+   * Advanced filter to determine if the message should be logged or not
+   */
+  filter: (options: {
+    level: LogLevel;
+    module: string;
+    action: string;
+  }) => boolean;
+};
+
+export type LogMessage = {
+  content: string;
+  level: LogLevel;
+  date: string;
+  module: string;
+  action: string;
+  stack: string;
+};
+
 export interface LogContract {
   /**
    * Channel name

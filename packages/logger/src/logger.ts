@@ -1,4 +1,4 @@
-import { LogChannel } from "./LogChannel";
+import { LogChannel } from "./log-channel";
 import { LogLevel } from "./types";
 import { clearMessage } from "./utils";
 
