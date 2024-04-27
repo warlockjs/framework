@@ -1,4 +1,4 @@
-import logger from "./logger";
+import { logger } from "./logger";
 export * from "./channels";
 export * from "./log-channel";
 export * from "./logger";

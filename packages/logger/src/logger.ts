@@ -98,9 +98,7 @@ export class Logger {
   }
 }
 
-const logger = new Logger();
-
-export default logger;
+export const logger = new Logger();
 
 export interface Log {
   (
@@ -110,20 +108,20 @@ export interface Log {
     level: LogLevel
   ): Promise<Logger>;
   /**
-   * Make info log 
+   * Make info log
    */
   info(module: string, action: string, message: any): Promise<Logger>;
   /**
-   * Make debug log 
+   * Make debug log
    */
   debug(module: string, action: string, message: any): Promise<Logger>;
   warn(module: string, action: string, message: any): Promise<Logger>;
   /**
-   * Make error log 
+   * Make error log
    */
   error(module: string, action: string, message: any): Promise<Logger>;
   /**
-   * Make success log 
+   * Make success log
    */
   success(module: string, action: string, message: any): Promise<Logger>;
 }
