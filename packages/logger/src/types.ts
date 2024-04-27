@@ -10,6 +10,13 @@ export type BasicLogConfigurations = {
    */
   levels?: LogLevel[];
   /**
+   * Date and time format
+   */
+  dateFormat?: {
+    date?: string;
+    time?: string;
+  };
+  /**
    * Advanced filter to determine if the message should be logged or not
    */
   filter: (options: {
@@ -25,7 +32,7 @@ export type LogMessage = {
   date: string;
   module: string;
   action: string;
-  stack: string;
+  stack?: string;
 };
 
 export interface LogContract {
@@ -51,6 +58,6 @@ export interface LogContract {
     module: string,
     action: string,
     message: any,
-    level: LogLevel
+    level: LogLevel,
   ): void | Promise<void>;
 }

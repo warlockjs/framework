@@ -7,7 +7,7 @@ export function captureAnyUnhandledRejection() {
     // console.trace();
   });
 
-  process.on("uncaughtException", (error) => {
+  process.on("uncaughtException", error => {
     log.error("app", "error", error);
     // console.trace();
     console.log(error);

@@ -29,7 +29,7 @@ export class ConsoleLog extends LogChannel<BasicLogConfigurations> {
           colors.yellow(`(${date})`),
           colors.cyan(`[${module}]`),
           colors.magenta(`[${action}]`),
-          colors.magentaBright(message)
+          colors.magentaBright(message),
         );
         break;
       case "info":
@@ -39,7 +39,7 @@ export class ConsoleLog extends LogChannel<BasicLogConfigurations> {
           colors.yellow(`(${date})`),
           colors.cyan(`[${module}]`),
           colors.magenta(`[${action}]`),
-          colors.blueBright(message)
+          colors.blueBright(message),
         );
         break;
       case "warn":
@@ -49,7 +49,7 @@ export class ConsoleLog extends LogChannel<BasicLogConfigurations> {
           colors.green(`(${date})`),
           colors.cyan(`[${module}]`),
           colors.magenta(`[${action}]`),
-          colors.yellowBright(message)
+          colors.yellowBright(message),
         );
         break;
       case "error":
@@ -59,7 +59,7 @@ export class ConsoleLog extends LogChannel<BasicLogConfigurations> {
           colors.yellow(`(${date})`),
           colors.cyan(`[${module}]`),
           colors.magenta(`[${action}]`),
-          colors.redBright(message)
+          colors.redBright(message),
         );
         break;
 
@@ -70,7 +70,7 @@ export class ConsoleLog extends LogChannel<BasicLogConfigurations> {
           colors.yellow(`(${date})`),
           colors.cyan(`[${module}]`),
           colors.magenta(`[${action}]`),
-          colors.greenBright(message)
+          colors.greenBright(message),
         );
         break;
 
@@ -80,7 +80,7 @@ export class ConsoleLog extends LogChannel<BasicLogConfigurations> {
           colors.yellow(`(${date})`),
           colors.cyan(`[${module}]`),
           colors.magenta(`[${action}]`),
-          message
+          message,
         );
     }
 

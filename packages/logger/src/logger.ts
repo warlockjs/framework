@@ -42,7 +42,7 @@ export class Logger {
     module: string,
     action: string,
     message: any,
-    level: LogLevel = "info"
+    level: LogLevel = "info",
   ) {
     for (const channel of this.channels) {
       if (channel.terminal === false) {
@@ -94,7 +94,7 @@ export class Logger {
    * Get channel by name
    */
   public channel(name: string) {
-    return this.channels.find((channel) => channel.name === name);
+    return this.channels.find(channel => channel.name === name);
   }
 }
 
@@ -105,7 +105,7 @@ export interface Log {
     module: string,
     action: string,
     message: any,
-    level: LogLevel
+    level: LogLevel,
   ): Promise<Logger>;
   /**
    * Make info log
@@ -124,13 +124,17 @@ export interface Log {
    * Make success log
    */
   success(module: string, action: string, message: any): Promise<Logger>;
+  /**
+   * Get channel by name
+   */
+  channel(name: string): LogChannel | undefined;
 }
 
 export const log: Log = (
   module: string,
   action: string,
   message: any,
-  level: LogLevel
+  level: LogLevel,
 ) => {
   return logger.log(module, action, message, level);
 };
@@ -140,3 +144,5 @@ log.debug = logger.debug.bind(logger);
 log.warn = logger.warn.bind(logger);
 log.error = logger.error.bind(logger);
 log.success = logger.success.bind(logger);
+
+log.channel = logger.channel.bind(logger);

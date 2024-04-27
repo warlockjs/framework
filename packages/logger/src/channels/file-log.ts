@@ -2,6 +2,7 @@ import { ensureDirectoryAsync } from "@mongez/fs";
 import dayjs from "dayjs";
 import fs from "fs";
 import { EOL } from "os";
+import path from "path";
 import { LogChannel } from "../log-channel";
 import {
   BasicLogConfigurations,
@@ -9,7 +10,6 @@ import {
   LogLevel,
   LogMessage,
 } from "../types";
-import path from "path";
 
 // TODO: Add max messages per file before rotation
 
@@ -107,8 +107,7 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
     chunk: "single",
     maxMessagesToWrite: 100,
     filter: () => true,
-    // maxFileSize: 10 * 1024 * 1024, // 10MB
-    maxFileSize: 10, // 10MB
+    maxFileSize: 10 * 1024 * 1024, // 10MB
     get rotateFileName() {
       return dayjs().format("DD-MM-YYYY");
     },
@@ -153,18 +152,18 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
    * Rotate log file
    */
   protected async rotateLogFile() {
-    let fileName = `${this.fileName}-${this.config(
-      "rotateFileName"
+    const fileName = `${this.fileName}-${this.config(
+      "rotateFileName",
     )}-${Date.now()}`;
 
     const extension = this.extension;
 
     const rotatedFilePath = path.join(
       this.storagePath,
-      `${fileName}.${extension}`
+      `${fileName}.${extension}`,
     );
 
-    await fs.promises.rename(this.filePath, rotatedFilePath).catch((error) => {
+    await fs.promises.rename(this.filePath, rotatedFilePath).catch(error => {
       console.error("Error rotating file:", error);
     });
   }
@@ -188,7 +187,7 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
    * Get file path
    */
   public get filePath() {
-    let fileName = this.fileName;
+    const fileName = this.fileName;
 
     const extension = this.extension;
 
@@ -230,7 +229,7 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
    * Get content
    */
   protected get content() {
-    return this.messages.map((message) => message.content).join(EOL) + EOL;
+    return this.messages.map(message => message.content).join(EOL) + EOL;
   }
 
   /**
@@ -258,19 +257,17 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
     module: string,
     action: string,
     message: any,
-    level: LogLevel
+    level: LogLevel,
   ) {
     if (!this.shouldBeLogged({ module, action, level })) return;
 
-    const date = dayjs().format(
-      (this.channelConfigurations.dateFormat!.date || "DD-MM-YYY") +
-        " " +
-        (this.channelConfigurations.dateFormat!.time || "HH:mm:ss")
-    );
+    const { date: dateFormat, time } = this.getDateAndTimeFormat();
+
+    const date = dayjs().format(dateFormat + " " + time);
 
     let content = `[${date}] [${level}] [${module}][${action}]: `;
 
-    let stack = "";
+    let stack: string | undefined;
 
     // check if message is an instance of Error
     if (message instanceof Error) {
@@ -278,7 +275,7 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
       content += message.message + EOL;
       content += `[trace]` + EOL;
       content += message.stack;
-      stack = message.stack ?? "";
+      stack = message.stack;
     } else {
       content += message;
     }
@@ -328,7 +325,8 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
    * Write messages to the file
    */
   protected async writeMessagesToFile() {
-    if (this.messages.length === 0 || this.isWriting) return;
+    if (this.messages.length === 0 || this.isWriting || !this.isInitialized)
+      return;
 
     this.isWriting = true;
 
@@ -363,16 +361,14 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
 
       const filePath = path.join(
         directoryPath,
-        `${this.fileName}.${this.extension}`
+        `${this.fileName}.${this.extension}`,
       );
 
       await this.checkAndRotateFile(filePath); // Ensure we check file size before writing
 
       const content =
-        this.groupedMessages[key].map((message) => message.content).join(EOL) +
+        this.groupedMessages[key].map(message => message.content).join(EOL) +
         EOL;
-
-      console.log("content", content);
 
       try {
         await this.write(filePath, content);
@@ -389,9 +385,9 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
    * Prepare grouped messages
    */
   protected prepareGroupedMessages(): void {
-    this.messages.forEach((message) => {
+    this.messages.forEach(message => {
       const key = this.config("groupBy")!
-        .map((groupKey) => encodeURIComponent(message[groupKey]))
+        .map(groupKey => encodeURIComponent(message[groupKey]))
         .join("/");
 
       this.groupedMessages[key] = this.groupedMessages[key] || [];
@@ -406,7 +402,7 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
     return new Promise((resolve, reject) => {
       const writer = fs.createWriteStream(filePath, { flags: "a" });
 
-      writer.write(content, (error) => {
+      writer.write(content, error => {
         writer.end();
         if (error) {
           reject(error);

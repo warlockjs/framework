@@ -1,11 +1,13 @@
-import { FileLog } from "./file-log";
 import {
   ensureDirectoryAsync,
+  fileExistsAsync,
   getJsonFileAsync,
   putJsonFileAsync,
 } from "@mongez/fs";
+import dayjs from "dayjs";
 import path from "path";
-import { LogContract } from "../types";
+import { LogContract, LogLevel, LogMessage } from "../types";
+import { FileLog } from "./file-log";
 
 export class JSONFileLog extends FileLog implements LogContract {
   /**
@@ -30,6 +32,40 @@ export class JSONFileLog extends FileLog implements LogContract {
   }
 
   /**
+   * {@inheritdoc}
+   */
+  public async log(
+    module: string,
+    action: string,
+    message: any,
+    level: LogLevel,
+  ) {
+    if (!this.shouldBeLogged({ module, action, level })) return;
+
+    const { date: dateFormat, time } = this.getDateAndTimeFormat();
+
+    const date = dayjs().format(dateFormat + " " + time);
+
+    let stack: string[] | undefined;
+
+    if (message instanceof Error) {
+      stack = message.stack?.split("\n");
+      message = message.message;
+    }
+
+    this.messages.push({
+      content: message,
+      level,
+      date,
+      module,
+      action,
+      stack,
+    } as LogMessage);
+
+    await this.checkIfMessagesShouldBeWritten(); // Immediate check on buffer size
+  }
+
+  /**
    * Write messages to the file
    */
   protected async writeMessagesToFile(): Promise<void> {
@@ -44,10 +80,14 @@ export class JSONFileLog extends FileLog implements LogContract {
     await this.checkAndRotateFile(); // Ensure file rotation is handled
 
     let fileContents;
-    try {
-      fileContents = await getJsonFileAsync(this.filePath);
-    } catch (error) {
-      console.error("Error reading log file, reinitializing:", error);
+    if (await fileExistsAsync(this.filePath)) {
+      try {
+        fileContents = await getJsonFileAsync(this.filePath);
+      } catch (error) {
+        console.error("Error reading log file, reinitializing:", error);
+        fileContents = { messages: [] }; // Reinitialize the file if corrupted
+      }
+    } else {
       fileContents = { messages: [] }; // Reinitialize the file if corrupted
     }
 
@@ -79,7 +119,7 @@ export class JSONFileLog extends FileLog implements LogContract {
 
       const filePath = path.join(
         directoryPath,
-        `${this.fileName}.${this.extension}`
+        `${this.fileName}.${this.extension}`,
       );
 
       await this.checkAndRotateFile(filePath); // Ensure we check file size before writing

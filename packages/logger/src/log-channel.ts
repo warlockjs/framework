@@ -1,7 +1,7 @@
 import { BasicLogConfigurations, LogContract, LogLevel } from "./types";
 
 export abstract class LogChannel<
-  Options extends BasicLogConfigurations = BasicLogConfigurations
+  Options extends BasicLogConfigurations = BasicLogConfigurations,
 > implements LogContract
 {
   /**
@@ -27,14 +27,12 @@ export abstract class LogChannel<
   /**
    * Channel configurations
    */
-  protected channelConfigurations: Options = {} as Options;
+  protected channelConfigurations: Options = {} as Options; //
 
   /**
-   * Get config value
+   * Determine whether the channel is fully initialized
    */
-  protected config<K extends keyof Options>(key: K): Options[K] {
-    return this.channelConfigurations[key] ?? this.defaultConfigurations[key];
-  }
+  protected isInitialized = false;
 
   /**
    * Constructor
@@ -44,7 +42,27 @@ export abstract class LogChannel<
       this.setConfigurations(configurations);
     }
 
-    this.init();
+    setTimeout(async () => {
+      if (this.init) {
+        await this.init();
+      }
+
+      this.isInitialized = true;
+    }, 0);
+  }
+
+  /**
+   * Initialize the channel
+   */
+  protected init?(): void | Promise<void>;
+
+  /**
+   * Get config value
+   */
+  protected config<K extends keyof Options>(key: K): Options[K] {
+    return (
+      this.channelConfigurations[key] ?? (this.defaultConfigurations ?? {})[key]
+    );
   }
 
   /**
@@ -57,13 +75,6 @@ export abstract class LogChannel<
     };
 
     return this;
-  }
-
-  /**
-   * Initialize channel
-   */
-  protected async init(): Promise<void> {
-    //
   }
 
   /**
@@ -99,6 +110,27 @@ export abstract class LogChannel<
     module: string,
     action: string,
     message: any,
-    level: LogLevel
+    level: LogLevel,
   ): void | Promise<void>;
+
+  /**
+   * Get date and time formats
+   */
+  protected getDateAndTimeFormat() {
+    const dateFormat = this.config("dateFormat");
+    const date = dateFormat?.date ?? "DD-MM-YYYY";
+    const time = dateFormat?.time ?? "HH:mm:ss";
+
+    return { date, time };
+  }
+
+  /**
+   * get basic configurations with the given ones
+   */
+  protected withBasicConfigurations(configurations: Partial<Options>): Options {
+    return {
+      filter: () => true,
+      ...configurations,
+    } as any as Options;
+  }
 }
