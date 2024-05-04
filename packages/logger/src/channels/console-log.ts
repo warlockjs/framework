@@ -1,6 +1,6 @@
 import { colors } from "@mongez/copper";
 import { LogChannel } from "../log-channel";
-import { BasicLogConfigurations, LogLevel } from "../types";
+import type { BasicLogConfigurations, LogLevel } from "../types";
 
 export class ConsoleLog extends LogChannel<BasicLogConfigurations> {
   /**

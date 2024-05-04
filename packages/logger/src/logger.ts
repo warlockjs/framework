@@ -1,5 +1,5 @@
-import { LogChannel } from "./log-channel";
-import { LogLevel } from "./types";
+import type { LogChannel } from "./log-channel";
+import type { LogLevel } from "./types";
 import { clearMessage } from "./utils/clear-message";
 
 export class Logger {

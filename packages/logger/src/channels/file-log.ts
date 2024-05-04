@@ -4,7 +4,7 @@ import fs from "fs";
 import { EOL } from "os";
 import path from "path";
 import { LogChannel } from "../log-channel";
-import {
+import type {
   BasicLogConfigurations,
   LogContract,
   LogLevel,

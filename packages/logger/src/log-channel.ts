@@ -1,4 +1,4 @@
-import { BasicLogConfigurations, LogContract, LogLevel } from "./types";
+import type { BasicLogConfigurations, LogContract, LogLevel } from "./types";
 
 export abstract class LogChannel<
   Options extends BasicLogConfigurations = BasicLogConfigurations,

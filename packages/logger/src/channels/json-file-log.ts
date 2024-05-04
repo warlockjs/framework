@@ -6,7 +6,7 @@ import {
 } from "@mongez/fs";
 import dayjs from "dayjs";
 import path from "path";
-import { LogContract, LogLevel, LogMessage } from "../types";
+import type { LogContract, LogLevel, LogMessage } from "../types";
 import { FileLog } from "./file-log";
 
 export class JSONFileLog extends FileLog implements LogContract {
