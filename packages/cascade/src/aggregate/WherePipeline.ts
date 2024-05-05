@@ -1,7 +1,7 @@
-import { GenericObject } from "@mongez/reinforcements";
+import type { GenericObject } from "@mongez/reinforcements";
 import { WhereExpression } from "./WhereExpression";
 import { Pipeline } from "./pipeline";
-import { WhereOperator } from "./types";
+import type { WhereOperator } from "./types";
 
 export class WherePipeline extends Pipeline {
   /**

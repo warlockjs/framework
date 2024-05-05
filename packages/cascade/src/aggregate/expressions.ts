@@ -1,4 +1,5 @@
-import { GenericObject, ltrim } from "@mongez/reinforcements";
+import type { GenericObject } from "@mongez/reinforcements";
+import { ltrim } from "@mongez/reinforcements";
 import { isScalar } from "@mongez/supportive-is";
 
 /**

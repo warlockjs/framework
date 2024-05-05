@@ -1,8 +1,8 @@
 import { isPlainObject } from "@mongez/supportive-is";
 import { toUTC } from "@mongez/time-wizard";
-import { Filter } from "../model";
+import type { Filter } from "../model";
 import { $agg } from "./expressions";
-import { MongoDBOperator, WhereOperator } from "./types";
+import type { MongoDBOperator, WhereOperator } from "./types";
 
 function escapeString(value: string) {
   return String(value).replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");

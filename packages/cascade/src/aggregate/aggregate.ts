@@ -1,20 +1,23 @@
-import { log } from "@mongez/logger";
-import { GenericObject, get } from "@mongez/reinforcements";
+import type { GenericObject } from "@mongez/reinforcements";
+import { get } from "@mongez/reinforcements";
+import { log } from "@warlock.js/logger";
 import { ObjectId } from "mongodb";
-import { ChunkCallback, Filter, PaginationListing } from "../model";
+import type { ChunkCallback, Filter, PaginationListing } from "../model";
 import { ModelEvents } from "../model/model-events";
 import { query } from "../query";
 import { DeselectPipeline } from "./DeselectPipeline";
 import { GroupByPipeline } from "./GroupByPipeline";
 import { LimitPipeline } from "./LimitPipeline";
-import { LookupPipeline, LookupPipelineOptions } from "./LookupPipeline";
+import type { LookupPipelineOptions } from "./LookupPipeline";
+import { LookupPipeline } from "./LookupPipeline";
 import { OrWherePipeline } from "./OrWherePipeline";
 import { SelectPipeline } from "./SelectPipeline";
 import { SkipPipeline } from "./SkipPipeline";
 import { SortByPipeline } from "./SortByPipeline";
 import { SortPipeline } from "./SortPipeline";
 import { SortRandomPipeline } from "./SortRandomPipeline";
-import { UnwindOptions, UnwindPipeline } from "./UnwindPipeline";
+import type { UnwindOptions } from "./UnwindPipeline";
+import { UnwindPipeline } from "./UnwindPipeline";
 import {
   WhereExpression,
   parseValuesInObject,
@@ -31,14 +34,14 @@ import {
   year,
 } from "./expressions";
 import { parsePipelines } from "./parsePipelines";
-import { Pipeline } from "./pipeline";
-import { WhereOperator } from "./types";
+import type { Pipeline } from "./pipeline";
+import type { WhereOperator } from "./types";
 
 export class Aggregate {
   /**
    * Collection pipelines
    */
-  public pipelines: Pipeline[] = [];
+  public pipelines: (Pipeline | GenericObject)[] = [];
 
   /**
    * Aggregate events
@@ -429,6 +432,26 @@ export class Aggregate {
   }
 
   /**
+   * Perform a text search
+   * Please note that this method will add the `match` stage to the beginning of the pipeline
+   * Also it will add `score` field to the result automatically
+   *
+   * @warning This method will not work if the collection is not indexed for text search
+   */
+  public textSearch(query: string, moreFilters?: GenericObject) {
+    this.pipelines.unshift({
+      $match: {
+        $text: { $search: query },
+        ...moreFilters,
+      },
+    });
+
+    this.addField("score", { $meta: "textScore" });
+
+    return this;
+  }
+
+  /**
    * Where null
    */
   public whereNull(column: string) {
@@ -641,6 +664,15 @@ export class Aggregate {
    */
   public pipeline(...pipelines: Pipeline[]) {
     this.pipelines.push(...pipelines);
+
+    return this;
+  }
+
+  /**
+   * Unshift pipeline to the beginning of the pipelines
+   */
+  public unshiftPipelines(pipelines: Pipeline[]) {
+    this.pipelines.unshift(...pipelines);
 
     return this;
   }

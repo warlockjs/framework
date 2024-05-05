@@ -1,11 +1,11 @@
 {
     "name": "@warlock.js/cascade",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "ORM for managing databases",
     "main": "src/index.ts",
     "dependencies": {
         "@mongez/events": "^2.1.0",
-        "@mongez/logger": "^1.0.10",
+        "@warlock.js/logger": "^1.0.3",
         "@mongez/reinforcements": "^2.3.8",
         "@mongez/supportive-is": "^2.0.0",
         "@mongez/time-wizard": "^1.0.6",
@@ -25,7 +25,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/hassanzohdy/monpulse"
+        "url": "https://github.com/warlockjs/cascade"
     },
     "devDependencies": {
         "@types/jest": "^29.5.3",

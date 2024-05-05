@@ -1,5 +1,5 @@
 import { Pipeline } from "./pipeline";
-import { GeoLocation } from "./types";
+import type { GeoLocation } from "./types";
 
 export class GeoNearPipeline extends Pipeline {
   /**

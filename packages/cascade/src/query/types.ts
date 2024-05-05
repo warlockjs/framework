@@ -1,5 +1,5 @@
-import { GenericObject } from "@mongez/reinforcements";
-import { Collection, Document } from "mongodb";
+import type { GenericObject } from "@mongez/reinforcements";
+import type { Collection, Document } from "mongodb";
 
 /** Collection name */
 type CollectionName = string;

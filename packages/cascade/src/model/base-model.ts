@@ -1,17 +1,13 @@
 import { faker, type Faker } from "@faker-js/faker";
-import { clone, Random } from "@mongez/reinforcements";
+import { Random, clone } from "@mongez/reinforcements";
 import { modelBlueprint } from "../blueprint/model-blueprint";
 import { database, type Database } from "../database";
 import { query } from "../query/query";
 import { masterMind } from "./master-mind";
 import type { Model } from "./model";
 import { ModelEvents } from "./model-events";
-import {
-  FactoryCreatorCallback,
-  ModelDeleteStrategy,
-  type ChildModel,
-  type Document,
-} from "./types";
+import type { FactoryCreatorCallback } from "./types";
+import { ModelDeleteStrategy, type ChildModel, type Document } from "./types";
 
 const modelEvents = new Map<string, ModelEvents>();
 
@@ -60,7 +56,16 @@ export abstract class BaseModel {
   /**
    * Primary id column
    */
-  public static primaryIdColumn = "id";
+  public static get primaryIdColumn() {
+    return "id";
+  }
+
+  /**
+   * A flag to determine whether to auto generate id on insertion or not
+   *
+   * @default true
+   */
+  public static autoGenerateId = true;
 
   /**
    * Query instance

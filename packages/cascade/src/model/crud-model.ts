@@ -1,16 +1,16 @@
 import { ObjectId } from "mongodb";
 import { BaseModel } from "./base-model";
-import {
+import type {
   ChildModel,
   ChunkCallback,
   Document,
   Filter,
   FindOrCreateOptions,
-  ModelDeleteStrategy,
   ModelDocument,
   PaginationListing,
   PrimaryIdType,
 } from "./types";
+import { ModelDeleteStrategy } from "./types";
 
 export abstract class CrudModel extends BaseModel {
   /**
@@ -277,7 +277,13 @@ export abstract class CrudModel extends BaseModel {
    * Find document by id
    */
   public static async find<T>(this: ChildModel<T>, id: PrimaryIdType) {
-    return this.findBy(this.primaryIdColumn, Number(id));
+    if (this.primaryIdColumn === "id") {
+      id = Number(id);
+    } else if (this.primaryIdColumn === "_id" && typeof id === "string") {
+      id = new ObjectId(id);
+    }
+
+    return this.findBy(this.primaryIdColumn, id);
   }
 
   /**
@@ -366,7 +372,7 @@ export abstract class CrudModel extends BaseModel {
     this: ChildModel<T>,
     filter: Filter,
     data: Document,
-    { merge = true }: FindOrCreateOptions = {},
+    { merge = false }: FindOrCreateOptions = {},
   ): Promise<T> {
     filter = await this.prepareFilters(filter);
 

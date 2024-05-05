@@ -6,7 +6,7 @@ import { RelationshipWithMany } from "./RelationshipWithMany";
 import { CrudModel } from "./crud-model";
 import { Joinable } from "./joinable";
 import { Model } from "./model";
-import { ChildModel, ModelDocument } from "./types";
+import type { ChildModel, ModelDocument } from "./types";
 
 export abstract class RelationshipModel extends CrudModel {
   /**
@@ -27,7 +27,7 @@ export abstract class RelationshipModel extends CrudModel {
   /**
    * Get new aggregate for current model
    */
-  public static aggregate<T>(this: ChildModel<T>) {
+  public static aggregate<T extends Model = Model>(this: ChildModel<T>) {
     return new ModelAggregate<T>(this);
   }
 
@@ -35,7 +35,7 @@ export abstract class RelationshipModel extends CrudModel {
    * Get query builder
    * @alias aggregate
    */
-  public static queryBuilder<T>(this: ChildModel<T>) {
+  public static queryBuilder<T extends Model = Model>(this: ChildModel<T>) {
     return new ModelAggregate<T>(this);
   }
 

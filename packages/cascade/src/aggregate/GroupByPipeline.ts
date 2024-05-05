@@ -1,4 +1,4 @@
-import { GenericObject } from "@mongez/reinforcements";
+import type { GenericObject } from "@mongez/reinforcements";
 import { $agg } from "./expressions";
 import { Pipeline } from "./pipeline";
 

@@ -1,4 +1,5 @@
-import dayjs, { ManipulateType } from "dayjs";
+import type { ManipulateType } from "dayjs";
+import dayjs from "dayjs";
 
 export function expiresAfter(duration: number, unit: ManipulateType) {
   return () => {

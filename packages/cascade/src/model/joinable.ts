@@ -1,7 +1,8 @@
-import { GenericObject } from "@mongez/reinforcements";
+import type { GenericObject } from "@mongez/reinforcements";
 import pluralize from "pluralize";
-import { Aggregate, LookupPipelineOptions, Pipeline } from "../aggregate";
-import { Model } from "../model";
+import type { LookupPipelineOptions, Pipeline } from "../aggregate";
+import { Aggregate } from "../aggregate";
+import type { Model } from "../model";
 
 export type JoinableProxy = Joinable & Aggregate;
 

@@ -1,9 +1,10 @@
 import { colors } from "@mongez/copper";
 import events from "@mongez/events";
-import { log } from "@mongez/logger";
-import { MongoClient, MongoClientOptions } from "mongodb";
+import { log } from "@warlock.js/logger";
+import type { MongoClientOptions } from "mongodb";
+import { MongoClient } from "mongodb";
 import { Database, database } from "./database";
-import { DatabaseConfigurations } from "./types";
+import type { DatabaseConfigurations } from "./types";
 
 export type ConnectionEvent = "connected" | "error" | "close";
 

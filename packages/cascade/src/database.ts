@@ -1,6 +1,11 @@
 import { AsyncLocalStorage } from "async_hooks";
-import { ClientSession, ClientSessionOptions, Collection, Db } from "mongodb";
-import { Connection } from "./connection";
+import type {
+  ClientSession,
+  ClientSessionOptions,
+  Collection,
+  Db,
+} from "mongodb";
+import type { Connection } from "./connection";
 
 export type DatabaseSessionTransaction = {
   session: ClientSession;

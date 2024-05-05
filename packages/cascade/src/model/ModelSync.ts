@@ -1,6 +1,6 @@
 import { areEqual } from "@mongez/reinforcements";
-import { ModelAggregate } from "./ModelAggregate";
-import { Model } from "./model";
+import type { ModelAggregate } from "./ModelAggregate";
+import type { Model } from "./model";
 
 type OnDelete = "unset" | "remove" | "ignore";
 

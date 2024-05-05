@@ -4,7 +4,7 @@ export * from "./base-model";
 export * from "./crud-model";
 export * from "./joinable";
 export * from "./master-mind";
-export * from "./migration-office";
+export * from "../migration/migration-office";
 export * from "./model";
 export * from "./relationships";
 export * from "./types";

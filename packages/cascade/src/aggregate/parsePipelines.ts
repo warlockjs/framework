@@ -1,5 +1,5 @@
-import { GenericObject } from "@mongez/reinforcements";
-import { Pipeline } from "./pipeline";
+import type { GenericObject } from "@mongez/reinforcements";
+import type { Pipeline } from "./pipeline";
 
 export function parsePipelines(pipelines: (Pipeline | GenericObject)[]) {
   return pipelines.map(parsePipeline);

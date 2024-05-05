@@ -1,4 +1,4 @@
-import { Filter } from "./types";
+import type { Filter } from "./types";
 
 export class ModelEvents {
   /**

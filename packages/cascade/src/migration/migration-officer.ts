@@ -1,8 +1,9 @@
 import { colors } from "@mongez/copper";
-import { Query, query } from "../query";
-import { Model } from "./model";
+import { Model } from "../model/model";
+import type { Query } from "../query";
+import { query } from "../query";
 
-export class MigrationOffice {
+export class MigrationOfficer {
   /**
    * Master Mind Collection name
    */
@@ -76,4 +77,4 @@ export class MigrationOffice {
   }
 }
 
-export const migrationOffice = new MigrationOffice();
+export const migrationOfficer = new MigrationOfficer();

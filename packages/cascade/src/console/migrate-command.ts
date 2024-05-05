@@ -1,15 +1,14 @@
-import { Command } from "commander";
-import { listMigrations, migrate, setMigrationsList } from "./../migrate";
+import { command } from "@warlock.js/core";
+import { listMigrations, migrate } from "../migration/migrate";
 import { connectToDatabase } from "./../utils";
 
-export function registerMigrationCommand(migrationsList: any[]) {
-  return new Command("migrate")
+export function registerMigrationCommand() {
+  return command("migrate")
     .description("Generate Database Migrations")
     .option("-f, --fresh", "Drop all migrations and generate fresh migrations")
     .option("-l, --list", "List all migrations")
-    .action(options => {
+    .action(({ options }) => {
       connectToDatabase();
-      setMigrationsList(migrationsList);
       if (options.list) {
         return listMigrations();
       }

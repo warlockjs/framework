@@ -1,5 +1,5 @@
-import { Database } from "../database";
-import { Model } from "../model";
+import type { Database } from "../database";
+import type { Model } from "../model";
 import { Blueprint } from "./blueprint";
 
 export class ModelBlueprint extends Blueprint {

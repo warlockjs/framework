@@ -1,6 +1,6 @@
-import { GenericObject } from "@mongez/reinforcements";
+import type { GenericObject } from "@mongez/reinforcements";
 import { Model } from "./model";
-import { Filter, ModelDocument } from "./types";
+import type { Filter, ModelDocument } from "./types";
 
 export class RelationshipWithMany<T> {
   /**

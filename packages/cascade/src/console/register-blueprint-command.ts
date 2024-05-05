@@ -1,8 +1,5 @@
 import { isPlainObject } from "@mongez/supportive-is";
-import { Command } from "commander";
 import { Blueprint } from "../blueprint/blueprint";
-import { setMigrationsList } from "./../migrate";
-import { connectToDatabase } from "./../utils";
 
 export function parseBlueprint(data: any) {
   const schema: any = {};
@@ -24,13 +21,4 @@ export function parseBlueprint(data: any) {
   }
 
   return schema;
-}
-
-export function registerBlueprintsCommand(migrationsList: any[]) {
-  return new Command("blueprints")
-    .description("List all blueprints")
-    .action(() => {
-      setMigrationsList(migrationsList);
-      connectToDatabase();
-    });
 }

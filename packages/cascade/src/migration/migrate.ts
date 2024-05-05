@@ -1,29 +1,12 @@
 import { colors } from "@mongez/copper";
-import { capitalize } from "@mongez/reinforcements";
 import dayjs from "dayjs";
-import { Blueprint } from "./blueprint/blueprint";
-import { migrationOffice } from "./model/migration-office";
-import { onceConnected } from "./utils";
+import { onceConnected } from "../utils";
+import { migrationOffice } from "./migration-office";
+import { migrationOfficer } from "./migration-officer";
 
-let currentMigrations: any[] = [];
-
-export function setMigrationsList(migrations: any[]) {
-  currentMigrations = migrations;
-}
-
-export function getBlueprintsList() {
-  const blueprints: (typeof Blueprint)[] = [];
-
-  for (const migration of currentMigrations) {
-    if (!migration.blueprint || blueprints.includes(migration.blueprint))
-      continue;
-
-    blueprints.push(migration.blueprint);
-  }
-
-  return blueprints;
-}
-
+/**
+ * List all created migrations
+ */
 export function listMigrations() {
   onceConnected(async () => {
     console.log(
@@ -32,7 +15,8 @@ export function listMigrations() {
       colors.yellow('"Listing all migrations"'),
     );
 
-    const migrations = await migrationOffice.list();
+    // get migrations from database
+    const migrations = await migrationOfficer.list();
 
     if (!migrations.length) {
       console.log(
@@ -41,6 +25,8 @@ export function listMigrations() {
         colors.cyan("[migration]"),
         "No migrations found",
       );
+
+      return;
     }
 
     for (const migration of migrations) {
@@ -57,29 +43,14 @@ export function listMigrations() {
   });
 }
 
-export function getMigrationName(migration: any) {
-  let migrationName = migration;
-
-  migrationName = migrationName.replace(
-    new RegExp(`migrations|migration`, "i"),
-    "",
-  );
-
-  // migration name can be something like usersGroupMigration
-  // so we need to split it using camel case
-  migrationName = migrationName.replace(/([A-Z])/g, " $1");
-
-  // now capitalize the first letter of each word
-  migrationName = capitalize(migrationName);
-
-  return migrationName;
-}
-
+/**
+ * Drop all migrations
+ */
 export async function dropMigrations() {
-  for (const migration of currentMigrations) {
-    if (!migration.name) continue;
+  for (const migration of migrationOffice.list()) {
+    const migrationName = migration.name;
 
-    const migrationName = getMigrationName(migration.name);
+    const blueprint = migration.blueprint.clone();
 
     console.log(
       colors.blue("→"),
@@ -89,9 +60,10 @@ export async function dropMigrations() {
       colors.yellowBright(`${migrationName} migration`),
     );
     try {
-      await migrationOffice.dropMigration(migrationName);
+      await migration.down(blueprint);
+      await blueprint.execute();
 
-      await migration.down();
+      await migrationOfficer.dropMigration(migrationName);
 
       console.log(
         colors.green("✓"),
@@ -114,29 +86,30 @@ export async function dropMigrations() {
   }
 }
 
+/**
+ * Run migrations
+ */
 export async function migrate(fresh = false) {
   if (fresh) {
     await dropMigrations();
   }
 
-  for (const migration of currentMigrations) {
-    const index = currentMigrations.indexOf(migration);
-    if (!migration.name) continue;
+  const migrations = migrationOffice.list();
 
-    const migrationName = getMigrationName(migration.name);
+  for (const migration of migrations) {
+    const migrationName = migration.name;
+    const index = migrations.indexOf(migration);
 
     console.log(
       // add blue arrow mark
       colors.blue("→"),
-      colors.cyan(
-        "[migration] " + (index + 1) + "/" + currentMigrations.length,
-      ),
+      colors.cyan("[migration] " + (index + 1) + "/" + migrations.length),
       colors.magenta("[migrating]"),
       "Creating " + colors.yellowBright(`${migrationName} migration`),
     );
 
     try {
-      const isMigrated = await migrationOffice.isMigrated(migrationName);
+      const isMigrated = await migrationOfficer.isMigrated(migrationName);
 
       if (isMigrated) {
         console.log(
@@ -151,13 +124,13 @@ export async function migrate(fresh = false) {
         continue;
       }
 
-      await migration();
+      const blueprint = migration.blueprint.clone();
 
-      const blueprint: Blueprint = migration.blueprint;
+      await migration.up(blueprint);
 
-      await blueprint.executeCommands();
+      await blueprint.execute();
 
-      await migrationOffice.migrate(migrationName);
+      await migrationOfficer.migrate(migrationName);
       console.log(
         // add green check mark
         colors.green("✓"),

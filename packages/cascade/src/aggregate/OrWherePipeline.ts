@@ -1,4 +1,4 @@
-import { GenericObject } from "@mongez/reinforcements";
+import type { GenericObject } from "@mongez/reinforcements";
 import { WhereExpression } from "./WhereExpression";
 import { WherePipeline } from "./WherePipeline";
 

@@ -1,6 +1,7 @@
-import { GenericObject } from "@mongez/reinforcements";
-import { CollStats, CreateIndexesOptions, ObjectId } from "mongodb";
-import { Database } from "../database";
+import type { GenericObject } from "@mongez/reinforcements";
+import type { CollStats, CreateIndexesOptions } from "mongodb";
+import { ObjectId } from "mongodb";
+import type { Database } from "../database";
 import { masterMind } from "../model/master-mind";
 
 export class Blueprint {
@@ -76,8 +77,6 @@ export class Blueprint {
     column: string | string[],
     options: CreateIndexesOptions = {},
   ) {
-    options.unique = true;
-
     if (!Array.isArray(column)) {
       column = [column];
     }
@@ -107,8 +106,6 @@ export class Blueprint {
     column: string | string[],
     options: CreateIndexesOptions = {},
   ) {
-    options.unique = true;
-
     if (!Array.isArray(column)) {
       column = [column];
     }
@@ -382,6 +379,20 @@ export class Blueprint {
         await this.collection().dropIndex(options.name);
       }
     }
+  }
+
+  /**
+   * @alias executeCommands
+   */
+  public async execute() {
+    return await this.executeCommands();
+  }
+
+  /**
+   * @alias executeCommands
+   */
+  public async run() {
+    return await this.executeCommands();
   }
 
   /**

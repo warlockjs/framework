@@ -1,10 +1,18 @@
-import { GenericObject, toStudlyCase } from "@mongez/reinforcements";
-import { $agg, Aggregate, Pipeline, selectPipeline } from "../aggregate";
+import type { GenericObject } from "@mongez/reinforcements";
+import { toStudlyCase } from "@mongez/reinforcements";
+import type { Pipeline } from "../aggregate";
+import { $agg, Aggregate, selectPipeline } from "../aggregate";
+import type { Model } from "../model/model";
 import { joinableProxy } from "../utils/joinable-proxy";
-import { Joinable, JoinableProxy } from "./joinable";
-import { ChunkCallback, Filter, PaginationListing } from "./types";
+import type { Joinable, JoinableProxy } from "./joinable";
+import type {
+  ChunkCallback,
+  Document,
+  Filter,
+  PaginationListing,
+} from "./types";
 
-export class ModelAggregate<T> extends Aggregate {
+export class ModelAggregate<T extends Model> extends Aggregate {
   /**
    * Joining list
    * Each key will have the model as a value reference to it
@@ -14,7 +22,7 @@ export class ModelAggregate<T> extends Aggregate {
   /**
    * Constructor
    */
-  public constructor(protected readonly model: any) {
+  public constructor(protected readonly model: typeof Model) {
     super(model.collection);
     this.query = model.query;
   }
@@ -22,7 +30,9 @@ export class ModelAggregate<T> extends Aggregate {
   /**
    * {@inheritDoc}
    */
-  public async get<Output = T>(mapData?: (record: any) => any) {
+  public async get<Output = T>(
+    mapData?: (record: any) => any,
+  ): Promise<Output[]> {
     if (!mapData) {
       mapData = (record: any) => {
         const model = new this.model(record);
@@ -39,6 +49,31 @@ export class ModelAggregate<T> extends Aggregate {
       };
     }
     return (await super.get(mapData)) as Output[];
+  }
+
+  /**
+   * Find or create
+   */
+  public async findOrCreate<Data extends Document = Document>(
+    data: Data,
+  ): Promise<T> {
+    return (await this.first()) || ((await this.model.create(data)) as T);
+  }
+
+  /**
+   * Find and update the given data
+   * Please note that the filter should be done via where() methods
+   * This method returns the updated records
+   * If you need just to update the records directly in the database, then use `update` method directly.
+   */
+  public async findAndUpdate<Data extends Document = Document>(
+    data: Data,
+  ): Promise<T[]> {
+    const records = await this.get();
+
+    await Promise.all(records.map(async model => await model.save(data)));
+
+    return records;
   }
 
   /**
@@ -172,7 +207,7 @@ export class ModelAggregate<T> extends Aggregate {
   public with(alias: string, ...moreParams: any[]) {
     const method = `with${toStudlyCase(alias)}`;
 
-    const relation = this.model[method];
+    const relation = (this.model as any)[method];
 
     if (!relation) {
       throw new Error(`Relation ${alias} not found`);

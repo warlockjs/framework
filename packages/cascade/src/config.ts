@@ -1,4 +1,4 @@
-import { DatabaseConfigurations } from "./types";
+import type { DatabaseConfigurations } from "./types";
 
 let configurations: Partial<DatabaseConfigurations> = {};
 
