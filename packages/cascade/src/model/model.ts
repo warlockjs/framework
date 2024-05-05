@@ -11,8 +11,8 @@ import { isEmpty, isPlainObject } from "@mongez/supportive-is";
 import { toUTC } from "@mongez/time-wizard";
 import dayjs from "dayjs";
 import { MongoServerError, ObjectId } from "mongodb";
-import type { Joinable } from "src/cascade/model/joinable";
 import { castEnum, castModel } from "../casts";
+import type { Joinable } from "./joinable";
 import { RelationshipModel } from "./relationships";
 import type {
   CastType,
