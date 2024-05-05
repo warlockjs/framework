@@ -11,15 +11,22 @@ import { isEmpty, isPlainObject } from "@mongez/supportive-is";
 import { toUTC } from "@mongez/time-wizard";
 import dayjs from "dayjs";
 import { MongoServerError, ObjectId } from "mongodb";
-import { castEnum, castModel } from "../casts";
-import type { Joinable } from "./joinable";
-import { RelationshipModel } from "./relationships";
+import { castModel } from "../casts/castModel";
+import { castEnum } from "../casts/oneOf";
+import { joinableProxy } from "../utils/joinable-proxy";
+import { ModelAggregate } from "./ModelAggregate";
+import { ModelSync } from "./ModelSync";
+import { RelationshipWithMany } from "./RelationshipWithMany";
+import { CrudModel } from "./crud-model";
+import { Joinable } from "./joinable";
 import type {
   CastType,
   Casts,
+  ChildModel,
   CustomCastType,
   CustomCasts,
   Document,
+  ModelDocument,
 } from "./types";
 import { ModelDeleteStrategy } from "./types";
 
@@ -33,14 +40,13 @@ export type Schema<ModelSchema = Document> = ModelSchema & {
 };
 
 type ModelSchema = Schema;
-type ModelDocument = Document;
 
 export class Model
   // <
   //   ModelDocument extends Document = any,
   //   ModelSchema extends Schema<ModelDocument> = any,
   // >
-  extends RelationshipModel
+  extends CrudModel
 {
   /**
    * Model Initial Document data
@@ -72,6 +78,11 @@ export class Model
    * Model casts types
    */
   protected casts: Casts = {};
+
+  /**
+   * Sync with list
+   */
+  public syncWith: ModelSync[] = [];
 
   /**
    * Set custom casts that will be used to cast the model's data are not related to the current value of the collection's column
@@ -1083,6 +1094,209 @@ export class Model
    */
   public clone(data: Document = this.data) {
     return new (this.constructor as any)(clone(data)) as this;
+  }
+
+  /**
+   * Get relationship with the given model class
+   */
+  public hasMany<T extends Model = Model>(
+    modelClass: typeof Model,
+    column: string,
+  ) {
+    return new RelationshipWithMany<T>(this as any, modelClass, column);
+  }
+
+  /**
+   * Get new aggregate for current model
+   */
+  public static aggregate<T extends Model = Model>(this: ChildModel<T>) {
+    return new ModelAggregate<T>(this);
+  }
+
+  /**
+   * Get query builder
+   * @alias aggregate
+   */
+  public static queryBuilder<T extends Model = Model>(this: ChildModel<T>) {
+    return new ModelAggregate<T>(this);
+  }
+
+  /**
+   * Sync with the given model
+   */
+  public static sync(columns: string | string[], embedMethod = "embedData") {
+    return new ModelSync(this as typeof Model, columns, embedMethod);
+  }
+
+  /**
+   * Sync data on saving
+   */
+  public startSyncing(saveMode: "create" | "update", oldModel?: Model) {
+    for (const modelSync of this.syncWith) {
+      modelSync.sync(this as any, saveMode, oldModel);
+    }
+  }
+
+  /**
+   * Sync destruction
+   * Called when destroy method is called
+   */
+  public syncDestruction() {
+    for (const modelSync of this.syncWith) {
+      modelSync.syncDestruction(this as any);
+    }
+  }
+
+  /**
+   * The syncing model (That calls startSyncing) is being embedded in multiple documents of current model
+   * I.e Country.syncMany('cities') while current model is City
+   */
+  public static syncMany(
+    columns: string | string[],
+    embedMethod = "embedData",
+  ) {
+    return new ModelSync(this as typeof Model, columns, embedMethod).syncMany();
+  }
+
+  /**
+   * Reassociate a model/object/document with the current model
+   * If the model is already associated, it will be updated
+   * If not, it will be associated
+   * the model/document must have an id
+   *
+   * If it is a model, you can set the embed method to use
+   */
+  public reassociate(
+    this: Model,
+    column: string,
+    model: Model | ModelDocument | any,
+    embedWith?: string,
+  ) {
+    const columnValue =
+      model instanceof Model
+        ? embedWith
+          ? (model as any)[embedWith]()
+          : model.embeddedData
+        : model;
+
+    if (columnValue === undefined) return this;
+
+    // make a deep copy so when changing the data, it won't affect the original data
+    const documentsList = clone(this.get(column, []));
+
+    const index = documentsList.findIndex(
+      (doc: any) => (doc?.id || doc) === (columnValue?.id || columnValue),
+    );
+
+    if (index === -1) {
+      documentsList.push(columnValue);
+    } else {
+      documentsList[index] = columnValue;
+    }
+
+    this.set(column, [...documentsList]);
+
+    return this;
+  }
+
+  /**
+   * Associate a model with the current model
+   */
+  public associate(
+    this: Model,
+    column: string,
+    model: Model | ModelDocument | any,
+    embedWith?: string,
+  ) {
+    const columnValue =
+      model instanceof Model
+        ? embedWith
+          ? (model as any)[embedWith]()
+          : model.embeddedData
+        : model;
+
+    if (columnValue === undefined) return this;
+
+    const documentsList = this.get(column, []);
+
+    documentsList.push(columnValue);
+
+    this.set(column, documentsList);
+
+    return this;
+  }
+
+  /**
+   * Disassociate a model with the current model
+   */
+  public disassociate(
+    this: Model,
+    column: string,
+    model: Model | ModelDocument | any,
+  ) {
+    const columnValue = model instanceof Model ? model.embeddedData : model;
+
+    if (columnValue === undefined) return this;
+
+    const documentsList = this.get(column, []);
+
+    if (!Array.isArray(documentsList)) return this;
+
+    const index = documentsList.findIndex(
+      (doc: any) => (doc?.id || doc) === (columnValue?.id || columnValue),
+    );
+
+    if (index !== -1) {
+      documentsList.splice(index, 1);
+    }
+
+    this.set(column, documentsList);
+
+    return this;
+  }
+
+  /**
+   * Make a wrapper to list when models should be updated when only one of the given columns is updated
+   */
+  public syncUpdateWhenChange(
+    columns: string | string[],
+    syncModels: ModelSync[],
+  ) {
+    return syncModels.map(syncModel => {
+      syncModel.updateWhenChange(columns);
+
+      return syncModel;
+    });
+  }
+
+  /**
+   * Get a Joinable instance for current model
+   */
+  public static joinable(
+    localField?: string,
+    foreignField?: string,
+    single?: boolean,
+    as?: string,
+  ) {
+    const joinable = new Joinable(this as any);
+
+    if (localField) {
+      joinable.localField(localField);
+    }
+
+    if (foreignField) {
+      joinable.foreignField(foreignField);
+    }
+
+    if (single) {
+      joinable.single(single);
+    }
+
+    if (as) {
+      joinable.as(as);
+    }
+
+    return joinableProxy(joinable);
   }
 }
 

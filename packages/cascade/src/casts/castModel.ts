@@ -1,5 +1,5 @@
 import { isEmpty } from "@mongez/supportive-is";
-import { Model } from "../model";
+import { Model } from "../model/model";
 
 export function castModel(
   model: typeof Model,
