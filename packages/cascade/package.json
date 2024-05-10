@@ -1,6 +1,6 @@
 {
     "name": "@warlock.js/cascade",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "ORM for managing databases",
     "main": "src/index.ts",
     "dependencies": {
@@ -8,6 +8,7 @@
         "@warlock.js/logger": "^1.0.3",
         "@mongez/reinforcements": "^2.3.8",
         "@mongez/supportive-is": "^2.0.0",
+        "@faker-js/faker": "^8.4.1",
         "@mongez/time-wizard": "^1.0.6",
         "dayjs": "^1.11.9",
         "console-table-printer": "^2.11.2",
