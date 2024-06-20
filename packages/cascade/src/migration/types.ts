@@ -22,3 +22,14 @@ export type Migration = {
    */
   down: (blueprint: Blueprint) => Promise<void> | void;
 };
+
+export type RegisteredMigration = Migration & {
+  /**
+   * Execute the up method
+   */
+  executeUp: () => Promise<void>;
+  /**
+   * Execute the down method
+   */
+  executeDown: () => Promise<void>;
+};

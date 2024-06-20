@@ -50,8 +50,6 @@ export async function dropMigrations() {
   for (const migration of migrationOffice.list()) {
     const migrationName = migration.name;
 
-    const blueprint = migration.blueprint.clone();
-
     console.log(
       colors.blue("→"),
       colors.cyan("[migration]"),
@@ -60,8 +58,7 @@ export async function dropMigrations() {
       colors.yellowBright(`${migrationName} migration`),
     );
     try {
-      await migration.down(blueprint);
-      await blueprint.execute();
+      await migration.executeDown();
 
       await migrationOfficer.dropMigration(migrationName);
 
@@ -124,11 +121,7 @@ export async function migrate(fresh = false) {
         continue;
       }
 
-      const blueprint = migration.blueprint.clone();
-
-      await migration.up(blueprint);
-
-      await blueprint.execute();
+      await migration.executeUp();
 
       await migrationOfficer.migrate(migrationName);
       console.log(

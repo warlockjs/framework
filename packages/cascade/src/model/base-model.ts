@@ -97,8 +97,15 @@ export abstract class BaseModel {
   public static getIncrementIdBy() {
     if (this.incrementIdBy) return this.incrementIdBy;
 
-    // return Random number
-    return Random.int(1, 999);
+    const modelConfigurations = database.connection.configurations?.model || {};
+
+    const autoIncrementBy = modelConfigurations.autoIncrementBy;
+
+    if (autoIncrementBy) return autoIncrementBy;
+
+    if (modelConfigurations.randomIncrement) return Random.int(1, 999);
+
+    return 1;
   }
 
   /**
@@ -107,8 +114,15 @@ export abstract class BaseModel {
   public static getInitialId() {
     if (this.initialId) return this.initialId;
 
-    // return Random number
-    return Random.int(10000, 499999);
+    const modelConfigurations = database.connection.configurations?.model || {};
+
+    const initialId = modelConfigurations.initialId;
+
+    if (initialId) return initialId;
+
+    if (modelConfigurations.randomInitialId) return Random.int(10000, 499999);
+
+    return 1;
   }
 
   /**

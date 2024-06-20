@@ -1,16 +1,36 @@
-import type { Migration } from "./types";
+import type { Migration, RegisteredMigration } from "./types";
 
 export class MigrationOffice {
   /**
    * Migrations list
    */
-  protected migrations: Migration[] = [];
+  protected migrations: RegisteredMigration[] = [];
 
   /**
    * Register a migration
    */
   public register(migration: Migration) {
-    this.migrations.push(migration);
+    const registeredMigration = {
+      ...migration,
+      async executeUp() {
+        const blueprint = migration.blueprint.clone();
+
+        await migration.up(blueprint);
+
+        await blueprint.execute();
+      },
+      async executeDown() {
+        const blueprint = migration.blueprint.clone();
+
+        console.log(blueprint.collectionName);
+
+        await migration.down(blueprint);
+
+        await blueprint.execute();
+      },
+    };
+
+    this.migrations.push(registeredMigration);
 
     return this;
   }

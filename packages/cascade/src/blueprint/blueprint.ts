@@ -19,8 +19,8 @@ export class Blueprint {
    * Constructor
    */
   public constructor(
-    protected readonly collectionName: string,
-    protected readonly database: Database = database,
+    public collectionName: string,
+    public database: Database = database,
   ) {
     //
   }
@@ -407,6 +407,8 @@ export class Blueprint {
 
     blueprint.schema = this.schema;
     blueprint.commands = this.commands;
+    blueprint.database = this.database;
+    blueprint.collectionName = this.collectionName;
 
     return blueprint;
   }

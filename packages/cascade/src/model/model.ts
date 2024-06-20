@@ -13,6 +13,7 @@ import dayjs from "dayjs";
 import { MongoServerError, ObjectId } from "mongodb";
 import { castModel } from "../casts/castModel";
 import { castEnum } from "../casts/oneOf";
+import { deepDiff } from "../utils/deep-diff";
 import { joinableProxy } from "../utils/joinable-proxy";
 import { ModelAggregate } from "./ModelAggregate";
 import { ModelSync } from "./ModelSync";
@@ -54,9 +55,9 @@ export class Model
   public initialData: Partial<ModelSchema> = {};
 
   /**
-   * Joinings list
+   * Relations list
    */
-  public static joinings: Record<string, Joinable> = {};
+  public static relations: Record<string, Joinable> = {};
 
   /**
    * Model Document data
@@ -167,6 +168,17 @@ export class Model
   public originalData: ModelSchema = {} as ModelSchema;
 
   /**
+   * List of dirty columns
+   */
+  public dirtyColumns: Record<
+    string,
+    {
+      oldValue: any;
+      newValue: any;
+    }
+  > = {};
+
+  /**
    * Constructor
    */
   public constructor(originalData: Partial<ModelSchema> = {}) {
@@ -259,7 +271,15 @@ export class Model
    * Set a column in the model data
    */
   public set(column: keyof ModelSchema, value: any) {
+    const currentValue = this.get(column);
     this.data = set(this.data, column as string, value) as ModelSchema;
+
+    if (currentValue !== value) {
+      set(this.dirtyColumns, column as string, {
+        oldValue: currentValue,
+        newValue: value,
+      });
+    }
 
     return this;
   }
@@ -362,7 +382,15 @@ export class Model
    * Unset or remove the given columns from the data
    */
   public unset(...columns: (keyof ModelSchema)[]) {
+    const currentValues = this.only(columns);
     this.data = except(this.data, columns as string[]);
+
+    for (const column in currentValues) {
+      set(this.dirtyColumns, column, {
+        oldValue: currentValues[column],
+        newValue: undefined,
+      });
+    }
 
     return this;
   }
@@ -379,7 +407,13 @@ export class Model
       data._id = this.data._id;
     }
 
+    const currentData = clone(this.data);
+
     this.data = data;
+
+    const dirtyValues = deepDiff(currentData, this.data);
+
+    merge(this.dirtyColumns, dirtyValues);
 
     return this;
   }
@@ -388,7 +422,21 @@ export class Model
    * Merge the given documents to current document
    */
   public merge(data: Document) {
+    const currentData = clone(this.data);
     this.data = merge(this.data, data);
+
+    const dirtyValues = deepDiff(currentData, this.data);
+
+    merge(this.dirtyColumns, dirtyValues);
+
+    for (const column in this.data) {
+      if (this.data[column] !== currentData[column]) {
+        set(this.dirtyColumns, column, {
+          oldValue: currentData[column],
+          newValue: this.data[column],
+        });
+      }
+    }
 
     return this;
   }
@@ -1111,6 +1159,13 @@ export class Model
    */
   public static aggregate<T extends Model = Model>(this: ChildModel<T>) {
     return new ModelAggregate<T>(this);
+  }
+
+  /**
+   * @alias aggregate
+   */
+  public static $(): ModelAggregate<Model> {
+    return this.aggregate();
   }
 
   /**

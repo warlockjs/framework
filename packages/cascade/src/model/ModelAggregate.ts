@@ -172,7 +172,7 @@ export class ModelAggregate<T extends Model> extends Aggregate {
    */
   protected getJoinable(joinable: string | Joinable) {
     if (typeof joinable === "string") {
-      joinable = this.model.joinings[joinable] as Joinable;
+      joinable = this.model.relations[joinable] as Joinable;
     }
 
     return joinableProxy(joinable.clone());
