@@ -16,17 +16,16 @@ export function deepDiff<T>(obj1: T, obj2: T): Diff<T> {
   }
 
   function findDifferences(o1: any, o2: any, result: any): void {
+    if (typeof o1 !== "object" || o1 === null) o1 = {};
+    if (typeof o2 !== "object" || o2 === null) o2 = {};
+
     for (const key in o1) {
       if (Object.prototype.hasOwnProperty.call(o1, key)) {
         if (
           !Object.prototype.hasOwnProperty.call(o2, key) ||
           !compareValues(o1[key], o2[key])
         ) {
-          if (
-            typeof o1[key] === "object" &&
-            o1[key] !== null &&
-            o2[key] !== null
-          ) {
+          if (typeof o1[key] === "object" && o1[key] !== null) {
             result[key] = deepDiff(o1[key], o2[key]);
           } else {
             result[key] = {

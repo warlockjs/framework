@@ -69,7 +69,7 @@ export class Connection {
         `Connecting to the database ${colors.goldBright(databaseName)}`,
       );
 
-      const connectionOptions = otherConnectionOptions;
+      const { model: _, ...connectionOptions } = otherConnectionOptions;
 
       if (dbAuth) {
         connectionOptions.authSource = dbAuth;
