@@ -1,14 +1,17 @@
-import React from "react";
-import ReactDOMServer from "react-dom/server";
+import {
+  createElement,
+  type ComponentType,
+  type ReactElement,
+  type ReactNode,
+} from "react";
+import { renderToString } from "react-dom/server";
 
-export function render(
-  reactElement: React.ReactElement | React.ComponentType | React.ReactNode,
-) {
+export function render(reactElement: ReactElement | ComponentType | ReactNode) {
   if (typeof reactElement === "function") {
-    reactElement = React.createElement(reactElement);
+    reactElement = createElement(reactElement);
   }
 
-  const output = ReactDOMServer.renderToString(reactElement);
+  const output = renderToString(reactElement);
 
   return output;
 }

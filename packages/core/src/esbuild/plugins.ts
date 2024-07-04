@@ -1,8 +1,15 @@
-import { getJsonFile, putJsonFile } from "@mongez/fs";
+import {
+  fileExistsAsync,
+  getJsonFile,
+  moveFileAsync,
+  putJsonFile,
+} from "@mongez/fs";
 import type { ChildProcess } from "child_process";
 import { spawn } from "child_process";
 import type { PluginBuild } from "esbuild";
-import { rootPath, srcPath, warlockPath } from "./../utils";
+import fs from "fs";
+import path from "path";
+import { publicPath, rootPath, srcPath, warlockPath } from "./../utils";
 
 // Keep track of the active server process.
 let serverProcess: ChildProcess | null = null;
@@ -90,6 +97,18 @@ export const startServerPlugin = {
 
       putJsonFile(warlockPath("http.js.map"), mapFileContent);
 
+      const cssFilePathBundle = warlockPath("http.css");
+
+      fileExistsAsync(cssFilePathBundle).then(found => {
+        if (found) {
+          moveFileAsync(cssFilePathBundle, publicPath(`http.css`));
+          moveFileAsync(
+            warlockPath("http.css.map"),
+            publicPath(`http.css.map`),
+          );
+        }
+      });
+
       // Start a new server process.
       serverProcess = spawn(
         "node",
@@ -106,4 +125,43 @@ export const startServerPlugin = {
       });
     });
   },
+};
+
+function appendImportPath(code: string, relativePath: string): string {
+  // Regex to find the component name from the "export default function ComponentName"
+  const componentNameRegex = /export default function (\w+)/;
+  const match = code.match(componentNameRegex);
+
+  // Check if a component name was found
+  if (!match) {
+    return code;
+  }
+
+  const componentName = match[1];
+
+  // Append the __importPath property to the code
+  const output = `${code}\n${componentName}.__importPath = '${relativePath}';`;
+
+  return output;
+}
+
+export const injectImportPathPlugin = () => {
+  return {
+    name: "inject-import-path",
+    setup(build: PluginBuild) {
+      build.onLoad({ filter: /\.tsx$/ }, async args => {
+        const source = await fs.promises.readFile(args.path, "utf8");
+        const relativePath = path
+          .relative(process.cwd(), args.path)
+          .replace(/\\/g, "/");
+
+        const modifiedSource = appendImportPath(source, relativePath);
+
+        return {
+          contents: modifiedSource,
+          loader: "tsx",
+        };
+      });
+    },
+  };
 };

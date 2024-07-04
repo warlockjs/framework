@@ -1,14 +1,16 @@
-// import nodemon from "nodemon";
 import { typecheckPlugin } from "@jgoz/esbuild-plugin-typecheck";
 import esbuild from "esbuild";
+import path from "path";
 import { buildHttpApp } from "../builder/build-http-app";
 import { command } from "../console/command-builder";
 import { srcPath, warlockPath } from "../utils";
-import { nativeNodeModulesPlugin, startServerPlugin } from "./../esbuild";
+import {
+  injectImportPathPlugin,
+  nativeNodeModulesPlugin,
+  startServerPlugin,
+} from "./../esbuild";
 
 export async function startHttpApp() {
-  // use esbuild to watch and rebuild the project
-
   const httpPath = await buildHttpApp();
 
   const builder = await esbuild.context({
@@ -21,11 +23,12 @@ export async function startHttpApp() {
     sourceRoot: srcPath(),
     format: "cjs",
     target: ["esnext"],
-    outdir: warlockPath(),
+    outdir: path.resolve(warlockPath()),
     plugins: [
       typecheckPlugin({
         watch: true,
       }),
+      injectImportPathPlugin(),
       nativeNodeModulesPlugin,
       startServerPlugin,
     ],

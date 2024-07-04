@@ -1,4 +1,5 @@
 // export * from "./_database-log";
+export * from "./app-log";
 export * from "./date-output";
 export * from "./environment";
 export * from "./get-localized";

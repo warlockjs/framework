@@ -516,6 +516,18 @@ export class Output {
   }
 
   /**
+   * Cast all keys in object
+   */
+  public castArrayObjectWithRandomKeys(
+    object: GenericObject,
+    options: FinalOutput,
+  ) {
+    for (const key in object) {
+      object[key] = this.arrayOf(options);
+    }
+  }
+
+  /**
    * Return only the values of the given keys
    */
   public outputOnly(...keys: string[]) {

@@ -90,6 +90,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
   public async get(request: Request, response: Response) {
     try {
       if (await this.callMiddleware("get", request, response)) return;
+
       const record = await this.find(request.int("id"));
 
       if (!record) {
@@ -246,6 +247,9 @@ export abstract class Restful<T extends Model> implements RouteResource {
         return response.notFound();
       }
 
+      if (await this.callMiddleware("delete", request, response, record))
+        return;
+
       await this.beforeDelete(request, response, record);
 
       await record.destroy();
@@ -284,6 +288,10 @@ export abstract class Restful<T extends Model> implements RouteResource {
     });
 
     for (const record of records) {
+      if (await this.callMiddleware("delete", request, response, record)) {
+        return;
+      }
+
       await this.beforeDelete(request, response, record);
       record.destroy();
       this.onDelete(request, response, record);
@@ -422,6 +430,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
     method: string,
     request: Request,
     response: Response,
+    record?: any,
   ) {
     if (!this.middleware[method]) return;
 
