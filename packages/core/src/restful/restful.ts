@@ -261,8 +261,12 @@ export abstract class Restful<T extends Model> implements RouteResource {
       }
 
       return response.success();
-    } catch (error) {
+    } catch (error: Error | any) {
       log.error("restful", "delete", error);
+
+      return response.badRequest({
+        error: error.message,
+      });
     }
   }
 
@@ -270,40 +274,48 @@ export abstract class Restful<T extends Model> implements RouteResource {
    * Bulk delete records
    */
   public async bulkDelete(request: Request, response: Response) {
-    const ids = request.input("id");
+    try {
+      const ids = request.input("id");
 
-    if (!Array.isArray(ids)) {
-      return response.badRequest({
-        error: "id must be an array",
-      });
-    }
-
-    const { documents: records } = await this.repository.list({
-      paginate: false,
-      perform: query =>
-        query.whereIn(
-          "id",
-          ids.map(id => parseInt(id)),
-        ),
-    });
-
-    for (const record of records) {
-      if (await this.callMiddleware("delete", request, response, record)) {
-        return;
+      if (!Array.isArray(ids)) {
+        return response.badRequest({
+          error: "id must be an array",
+        });
       }
 
-      await this.beforeDelete(request, response, record);
-      record.destroy();
-      this.onDelete(request, response, record);
-    }
+      const records = await this.repository.all({
+        perform: query =>
+          query.whereIn(
+            "id",
+            ids.map(id => parseInt(id)),
+          ),
+      });
 
-    if (this.returnOn.delete === "records") {
-      return this.list(request, response);
-    }
+      await Promise.all(
+        records.map(async record => {
+          if (await this.callMiddleware("delete", request, response, record)) {
+            return;
+          }
 
-    return response.success({
-      deleted: records.length,
-    });
+          await this.beforeDelete(request, response, record);
+          await record.destroy();
+          this.onDelete(request, response, record);
+        }),
+      );
+
+      if (this.returnOn.delete === "records") {
+        return this.list(request, response);
+      }
+
+      return response.success({
+        deleted: records.length,
+      });
+    } catch (error: Error | any) {
+      log.error("restful", "bulkDelete", error);
+      return response.badRequest({
+        error: error.message,
+      });
+    }
   }
 
   /**
