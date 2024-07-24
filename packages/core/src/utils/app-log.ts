@@ -1,4 +1,4 @@
-import { log } from "@mongez/logger";
+import { log } from "@warlock.js/logger";
 
 export const appLog = {
   info: (module: string, message: string) => log.info("app", module, message),

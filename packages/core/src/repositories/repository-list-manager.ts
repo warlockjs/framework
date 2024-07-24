@@ -963,7 +963,7 @@ export abstract class RepositoryListManager<
    * Find by the given column and cache it
    * @alias getCached
    */
-  public async findCached(id: number | string | T) {
+  public async findCached(id: number | string | T): Promise<T | undefined> {
     if (id instanceof Model) return id;
 
     return await this.getCached(id);
