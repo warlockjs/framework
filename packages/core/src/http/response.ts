@@ -306,7 +306,13 @@ export class Response {
       this.parsedBody = data;
     }
 
-    this.baseResponse.status(this.currentStatusCode).send(this.parsedBody);
+    const response = this.baseResponse
+      .status(this.currentStatusCode)
+      .send(this.parsedBody);
+
+    if (response.sent) {
+      this.log("Response Actually sent");
+    }
 
     this.log("Response sent");
 

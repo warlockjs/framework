@@ -44,7 +44,11 @@ export function createRequestStore(request: Request<any>, response: Response) {
 
           const handler = request.getHandler();
 
+          request.log("Executing Handler", "info");
+
           await handler(request, response);
+
+          request.log("Handler Executed Successfully", "success");
 
           // call executedAction event
           request.trigger("executedAction", request.route);

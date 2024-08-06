@@ -1,3 +1,4 @@
+import { log } from "@warlock.js/logger";
 import nodemailer from "nodemailer";
 import type { Options } from "nodemailer/lib/mailer";
 import type React from "react";
@@ -14,6 +15,17 @@ export function newMailer(
   const { auth, username, password, requireTLS, tls, ...config } =
     configurations;
 
+  log.info("mail", "init", "Initializing mailer");
+
+  console.log({
+    requireTLS: requireTLS ?? tls,
+    ...config,
+    auth: auth ?? {
+      user: username,
+      pass: password,
+    },
+  });
+
   return nodemailer.createTransport({
     requireTLS: requireTLS ?? tls,
     ...config,
@@ -27,15 +39,29 @@ export function newMailer(
 /**
  * Send mail
  */
-export async function sendMail(
-  options: Options & {
-    configurations?: Partial<MailConfigurations>;
-  },
-) {
-  return newMailer(options?.configurations).sendMail({
+export async function sendMail({
+  configurations,
+  from,
+  ...options
+}: Options & {
+  configurations?: Partial<MailConfigurations>;
+}) {
+  const mailer = newMailer(configurations);
+
+  log.info("mail", "send", "Sending mail");
+
+  const output = await mailer.sendMail({
     ...options,
-    from: parseFrom(options),
+    from: parseFrom(from),
   });
+
+  if (output.accepted) {
+    log.success("mail", "success", "Mail sent successfully");
+  } else if (output.rejected) {
+    log.error("mail", "rejected", output.response);
+  }
+
+  return output;
 }
 
 export async function sendReactMail(
@@ -45,7 +71,7 @@ export async function sendReactMail(
     configurations?: Partial<MailConfigurations>;
   },
 ) {
-  return sendMail({
+  return await sendMail({
     ...options,
     html: renderReactMail(options.render),
   });
@@ -54,10 +80,12 @@ export async function sendReactMail(
 /**
  * Parse from
  */
-function parseFrom(options: Options) {
-  const from = options.from ?? getMailConfigurations().from;
+function parseFrom(from: Options["from"]) {
+  if (!from) return getMailConfigurations().from;
 
-  if (!from) return undefined;
+  if (typeof from === "string") return from;
+
+  if (!from?.address) return getMailConfigurations().from;
 
   return from;
 }

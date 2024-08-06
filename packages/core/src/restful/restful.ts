@@ -442,7 +442,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
     method: string,
     request: Request,
     response: Response,
-    record?: any,
+    _record?: any,
   ) {
     if (!this.middleware[method]) return;
 

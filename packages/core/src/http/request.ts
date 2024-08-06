@@ -358,7 +358,7 @@ export class Request<User = any> {
         }
 
         if (Array.isArray(value)) {
-          body[key] = value.map(this.parseInputValue.bind(this));
+          set(body, key, value.map(this.parseInputValue.bind(this)));
         } else if (isArrayKey) {
           if (body[key]) {
             body[key].push(this.parseInputValue(value));
@@ -368,7 +368,7 @@ export class Request<User = any> {
             continue;
           }
         } else {
-          body[key] = this.parseInputValue(value);
+          set(body, key, this.parseInputValue(value));
         }
       }
 

@@ -1,5 +1,4 @@
 import type { GenericObject } from "@mongez/reinforcements";
-import type { FindOrCreateOptions } from "@warlock.js/cascade";
 import { Model } from "@warlock.js/cascade";
 import { Request } from "../http";
 import { RepositoryDestroyManager } from "./repository-destroyer-manager";
@@ -74,16 +73,23 @@ export abstract class RepositoryFillerManager<
   public async findOrCreate(
     where: GenericObject,
     data: GenericObject,
-    options?: FindOrCreateOptions,
   ): Promise<T> {
-    return (await this.model.findOrCreate(where, data, options)) as T;
+    const model = await this.first(where);
+
+    return model || (await this.create(data));
   }
 
   /**
    * Update or create
    */
   public async updateOrCreate(where: GenericObject, data: GenericObject) {
-    return this.model.updateOrCreate(where, data) as Promise<T>;
+    const model = await this.first(where);
+
+    if (model) {
+      return await this.update(model, data);
+    }
+
+    return await this.create(data);
   }
 
   /**
