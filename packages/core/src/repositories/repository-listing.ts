@@ -1,5 +1,5 @@
 import { get } from "@mongez/reinforcements";
-import { isIterable } from "@mongez/supportive-is";
+import { isIterable, isNumeric } from "@mongez/supportive-is";
 import type {
   Model,
   ModelAggregate,
@@ -1007,6 +1007,10 @@ export class RepositoryListing<
    */
   protected parseDate(value: any, format = this.dateFormat) {
     if (value instanceof Date) return value;
+
+    if (isNumeric(value)) {
+      return new Date(parseInt(value));
+    }
 
     if (typeof value === "string") {
       return dayjs(value, format);

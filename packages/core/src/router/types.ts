@@ -1,7 +1,13 @@
 import type { GenericObject } from "@mongez/reinforcements";
 import type { RouteShorthandOptions } from "fastify";
+import type {
+  PostmanExample,
+  PostmanRequestEvent,
+  PostmanVariable,
+} from "src/postman";
 import type { Request, Response, ReturnedResponse } from "../http";
 import type { Rule, Validation, ValidationSchema } from "../validator";
+import type { ObjectValidator } from "../validator/v";
 
 /**
  * Middleware response
@@ -15,6 +21,20 @@ export type MiddlewareResponse = ReturnedResponse | undefined | void;
  */
 export type Middleware = {
   (request: Request, response: Response): MiddlewareResponse;
+  /**
+   * Postman configurations
+   * Used only when generating postman
+   */
+  postman?: {
+    /**
+     * Called when collecting variables
+     */
+    onCollectingVariables?: (variables: PostmanVariable[]) => void;
+    /**
+     * Called when adding the request to the collection
+     */
+    onAddingRequest?: (postmanRequest: PostmanRequestEvent) => void;
+  };
 };
 
 export type RouterGroupCallback = () => void;
@@ -37,6 +57,8 @@ export type RestfulMiddleware = Record<string, [Middleware]>;
 export type RouteHandlerValidation = {
   /**
    * Validation rules
+   *
+   * @deprecated use schema instead
    */
   rules?:
     | ValidationSchema
@@ -46,6 +68,10 @@ export type RouteHandlerValidation = {
    * Validation custom message
    */
   validate?: Middleware;
+  /**
+   * Validation schema
+   */
+  schema?: ObjectValidator;
 };
 
 /**
@@ -182,6 +208,28 @@ export type Route = RouteOptions & {
    * this will be used for generating the documentation
    */
   $prefixStack: string[];
+  /**
+   * Route configurations
+   * Used only when generating postman
+   */
+  postman?: {
+    /**
+     * Define examples for the response
+     */
+    examples?: PostmanExample[];
+    /**
+     * Postman label
+     */
+    label?: string;
+    /**
+     * Postman description
+     */
+    description?: string;
+    /**
+     * Postman folder path (namespace)
+     */
+    namespace?: string;
+  };
 };
 export type PartialPick<T, F extends keyof T> = Omit<T, F> &
   Partial<Pick<T, F>>;

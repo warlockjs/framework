@@ -156,4 +156,20 @@ export class UploadedFile {
 
     return relativeFilePath;
   }
+
+  /**
+   * When called toJSON, convert it into base64
+   */
+  public async toJSON() {
+    // convert it into base64
+    return {
+      name: this.name,
+      mimeType: this.mimeType,
+      extension: this.extension,
+      size: await this.size(),
+      isImage: this.isImage,
+      dimensions: this.isImage ? await this.dimensions() : undefined,
+      base64: (await this.buffer()).toString("base64"),
+    };
+  }
 }

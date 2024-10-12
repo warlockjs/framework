@@ -2,6 +2,7 @@ import config from "@mongez/config";
 import { log } from "@warlock.js/logger";
 import type { Request, Response } from "../http";
 import type { Route } from "../router";
+import { v } from "./v";
 import { Validator } from "./validator";
 
 /**
@@ -24,6 +25,25 @@ export async function validateAll(
         return response.validationFailed(validator);
       }
     } catch (error) {
+      log.error("app.validation", "error", error);
+      throw error;
+    }
+  }
+
+  if (validation.schema) {
+    try {
+      const result = await v.validate(validation.schema, request.all());
+
+      if (result.data) {
+        request.setValidatedData(result.data);
+      }
+
+      if (!result.isValid) {
+        return response.failedSchema(result);
+      }
+    } catch (error) {
+      console.log(error);
+
       log.error("app.validation", "error", error);
       throw error;
     }

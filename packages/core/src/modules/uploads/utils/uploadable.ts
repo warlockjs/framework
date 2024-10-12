@@ -1,4 +1,3 @@
-import config from "@mongez/config";
 import { copyFile, ensureDirectory } from "@mongez/fs";
 import Endpoint from "@mongez/http";
 import type { GenericObject } from "@mongez/reinforcements";
@@ -10,6 +9,7 @@ import dayjs from "dayjs";
 import { writeFileSync } from "fs";
 import path from "path";
 import { Upload } from "../models/upload";
+import { getUploadsDirectory } from "../utils/get-uploads-directory";
 import { Image } from "./../../../image";
 import { sanitizePath, uploadsPath } from "./../../../utils/paths";
 import { File } from "./file";
@@ -69,24 +69,7 @@ async function getUpload(hash: any) {
   return await Upload.findBy("hash", hash);
 }
 
-async function getDirectory() {
-  const configDirectory = config.get("uploads.saveTo");
-
-  const hash = Random.string(32);
-
-  const path = dayjs().format("DD-MM-YYYY") + "/" + hash;
-
-  if (configDirectory) {
-    if (typeof configDirectory === "function") {
-      return await configDirectory(path);
-    }
-
-    return configDirectory;
-  }
-
-  return path;
-}
-export async function uploadFromUrl(url: string) {
+export async function uploadFromUrl(url: string, saveTo?: string) {
   const urlHandler = new URL(url);
   // get file name from url
   const fileName =
@@ -101,7 +84,7 @@ export async function uploadFromUrl(url: string) {
   // const filePath = fileName + "." + fileExtension;
   const filePath = fileName;
 
-  const directoryPath = await getDirectory();
+  const directoryPath = await getUploadsDirectory(saveTo);
 
   const uploadPath = uploadsPath(directoryPath);
 

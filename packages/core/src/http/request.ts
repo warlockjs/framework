@@ -2,7 +2,15 @@ import config from "@mongez/config";
 import { colors } from "@mongez/copper";
 import events from "@mongez/events";
 import { trans, transFrom } from "@mongez/localization";
-import { except, get, only, rtrim, set, unset } from "@mongez/reinforcements";
+import {
+  except,
+  get,
+  only,
+  rtrim,
+  set,
+  unset,
+  type GenericObject,
+} from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
 import type { LogLevel } from "@warlock.js/logger";
 import { log } from "@warlock.js/logger";
@@ -83,6 +91,11 @@ export class Request<User = any> {
    * Locale code
    */
   protected _locale = "";
+
+  /**
+   * Validated data
+   */
+  protected validatedData?: GenericObject;
 
   /**
    * Set request handler
@@ -337,7 +350,7 @@ export class Request<User = any> {
             const keyName2 = keyNameParts2[0];
 
             arrayOfObjectValues[keyName][index][keyName2] =
-              this.parseInputValue(value);
+              this.parseValue(value);
 
             continue;
           }
@@ -350,25 +363,25 @@ export class Request<User = any> {
             body,
             keyName + "." + keyNameParts[0],
             Array.isArray(value)
-              ? value.map(this.parseInputValue.bind(this))
-              : this.parseInputValue(value),
+              ? value.map(this.parseValue.bind(this))
+              : this.parseValue(value),
           );
 
           continue;
         }
 
         if (Array.isArray(value)) {
-          set(body, key, value.map(this.parseInputValue.bind(this)));
+          set(body, key, value.map(this.parseValue.bind(this)));
         } else if (isArrayKey) {
           if (body[key]) {
-            body[key].push(this.parseInputValue(value));
+            body[key].push(this.parseValue(value));
           } else {
-            body[key] = [this.parseInputValue(value)];
+            body[key] = [this.parseValue(value)];
 
             continue;
           }
         } else {
-          set(body, key, this.parseInputValue(value));
+          set(body, key, this.parseValue(value));
         }
       }
 
@@ -379,8 +392,6 @@ export class Request<User = any> {
 
       return body;
     } catch (error) {
-      console.log("WTF");
-
       console.log(error);
       this.log(error, "error");
     }
@@ -389,10 +400,10 @@ export class Request<User = any> {
   /**
    * Parse the given data
    */
-  protected parseInputValue(data: any) {
+  protected parseValue(data: any) {
     // data.value appears only in the multipart form data
     // if it json, then just return the data
-    if (data?.file) return data;
+    if (data?.file) return new UploadedFile(data);
 
     // this should not be considered used because the value key could be used as an actual input key
     // if (data.value !== undefined) return data.value;
@@ -407,7 +418,8 @@ export class Request<User = any> {
 
     if (typeof data === "string") return data.trim();
 
-    if (data?.value && data?.fields && data?.type) return data.value;
+    if (data?.value !== undefined && data?.fields && data?.type)
+      return data.value;
 
     return data;
   }
@@ -514,6 +526,10 @@ export class Request<User = any> {
    * You can also pass an array of inputs to get only the validated inputs
    */
   public validated(inputs?: string[]) {
+    if (this.validatedData) {
+      return inputs ? only(this.validatedData, inputs) : this.validatedData;
+    }
+
     let rules = this.getHandler()?.validation?.rules || {};
 
     if (rules instanceof ValidationSchema) {
@@ -525,6 +541,13 @@ export class Request<User = any> {
     return this.only(
       inputs ? inputsList.filter(input => inputs.includes(input)) : inputsList,
     );
+  }
+
+  /**
+   * Set validated data
+   */
+  public setValidatedData(data: GenericObject) {
+    this.validatedData = data;
   }
 
   /**
@@ -725,9 +748,7 @@ export class Request<User = any> {
   public file(key: string): UploadedFile | undefined {
     const file = this.input(key);
 
-    if (!file?.file) return;
-
-    return new UploadedFile(file);
+    return file;
   }
 
   /**
@@ -735,18 +756,7 @@ export class Request<User = any> {
    * If the given name is not present in the request, return an empty array
    */
   public files(name: string): UploadedFile[] {
-    const files = this.input(name);
-
-    if (
-      !files ||
-      !Array.isArray(files) ||
-      !files.every(file => Boolean(file.file))
-    )
-      return [];
-
-    return Array.isArray(files)
-      ? files.map(file => new UploadedFile(file))
-      : [];
+    return this.input(name) || [];
   }
 
   /**
@@ -826,6 +836,17 @@ export class Request<User = any> {
   }
 
   /**
+   * Pluck the given keys from the request data
+   */
+  public pluck(keys: string[]) {
+    const data = this.only(keys);
+
+    this.unset(...keys);
+
+    return data;
+  }
+
+  /**
    * Get all request inputs except the given keys
    */
   public except(keys: string[]) {
@@ -844,6 +865,10 @@ export class Request<User = any> {
 
     if (value === "false") {
       return false;
+    }
+
+    if (value === 0) {
+      return true;
     }
 
     return Boolean(value);

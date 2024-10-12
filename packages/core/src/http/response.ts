@@ -12,7 +12,7 @@ import type React from "react";
 import { type ReactNode } from "react";
 import send from "send";
 import type { Route } from "../router";
-import type { Validator } from "../validator";
+import type { ValidationResult, Validator } from "../validator";
 import { render } from "./../react";
 import type { Request } from "./request";
 import type { ResponseEvent } from "./types";
@@ -216,7 +216,7 @@ export class Response {
   /**
    * Parse the given value
    */
-  protected async parse(value: any): Promise<any> {
+  public async parse(value: any): Promise<any> {
     // if it is a falsy value, return it
     if (!value || isScalar(value)) return value;
 
@@ -692,6 +692,28 @@ export class Response {
     return this.send(
       {
         [responseErrorsKey]: validator.errors(),
+      },
+      responseStatus,
+    );
+  }
+
+  /**
+   * Mark the response as failed
+   */
+  public failedSchema(result: ValidationResult) {
+    const responseErrorsKey = config.get("validation.keys.response", "errors");
+    const inputKey = config.get("validation.keys.inputKey", "input");
+    const inputError = config.get("validation.keys.inputError", "error");
+    const responseStatus = config.get("validation.responseStatus", 400);
+
+    log.error("request", "validation", "Validation failed");
+
+    return this.send(
+      {
+        [responseErrorsKey]: result.errors.map(error => ({
+          [inputKey]: error.input,
+          [inputError]: error.error,
+        })),
       },
       responseStatus,
     );

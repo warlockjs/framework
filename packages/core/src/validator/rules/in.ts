@@ -18,7 +18,7 @@ export class InRule extends Rule {
    */
   public error() {
     return this.trans("in", {
-      values: this.options.join("|"),
+      options: this.options.join("|"),
     });
   }
 

@@ -74,8 +74,8 @@ groupedTranslations("validation", {
     ar: ":input يجب أن يكون مصفوفة من الكائنات، كل كائن يحتوي على خصائص localeCode و text.",
   },
   in: {
-    en: ":input accepts only the following values: :values.",
-    ar: ":input يقبل القيم التالية فقط: :values.",
+    en: ":input accepts only the following values: :options.",
+    ar: ":input يقبل القيم التالية فقط: :options.",
   },
   string: {
     en: ":input must be a string.",
@@ -124,5 +124,9 @@ groupedTranslations("validation", {
   stringify: {
     en: ":input must be number, string",
     ar: ":input يجب أن يكون رقم أو نص ",
+  },
+  unknownKey: {
+    en: "unknown key :key",
+    ar: "مفتاح غير معروف :key",
   },
 });

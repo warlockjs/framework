@@ -3,19 +3,15 @@ import { Random, ltrim } from "@mongez/reinforcements";
 import type { Request, Response, UploadedFile } from "../../../http";
 import { uploadsPath } from "../../../utils";
 import { Upload } from "../models/upload";
+import { uploadFromUrl } from "../utils";
 import { getUploadsDirectory } from "../utils/get-uploads-directory";
 
-export async function uploadFiles(request: Request, response: Response) {
-  const files = request.files("uploads");
-
-  const directory = request.input("directory");
-
-  const uploads: Upload[] = [];
-
-  const isRandom = request.bool("random");
-
-  const baseDirectoryPath = await getUploadsDirectory(directory);
-
+async function uploadFilesList(
+  files: UploadedFile[],
+  uploads: Upload[],
+  baseDirectoryPath: string,
+  isRandom: boolean,
+) {
   const addFile = async (file: UploadedFile) => {
     const hash = Random.string(64);
     const fileDirectoryPath = baseDirectoryPath + "/" + hash;
@@ -62,6 +58,44 @@ export async function uploadFiles(request: Request, response: Response) {
   } else {
     await addFile(files as UploadedFile);
   }
+}
+
+async function uploadFromUrlsList(
+  urls: string[],
+  uploads: Upload[],
+  baseDirectoryPath: string,
+) {
+  await Promise.all(
+    urls.map(async url => {
+      const upload = await uploadFromUrl(url, baseDirectoryPath);
+
+      uploads.push(upload);
+    }),
+  );
+}
+
+export async function uploadFiles(request: Request, response: Response) {
+  const files = request.files("uploads");
+  const urls = request.input("urls");
+  const directory = request.input("directory");
+  const isRandom = request.bool("random");
+
+  if (!files && !urls) {
+    return response.badRequest({
+      error: "No files or urls provided",
+    });
+  }
+
+  const uploads: Upload[] = [];
+  const baseDirectoryPath = await getUploadsDirectory(directory);
+
+  if (urls) {
+    await uploadFromUrlsList(urls, uploads, baseDirectoryPath);
+  }
+
+  if (files) {
+    await uploadFilesList(files, uploads, baseDirectoryPath, isRandom);
+  }
 
   return response.success({
     uploads,
@@ -70,7 +104,8 @@ export async function uploadFiles(request: Request, response: Response) {
 
 uploadFiles.validation = {
   rules: {
-    uploads: ["required", "array", "file"],
+    uploads: ["array", "file"],
+    urls: ["array", "arrayOf:string"],
     directory: ["string"],
     random: ["boolean"],
   },

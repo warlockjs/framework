@@ -118,6 +118,14 @@ export class Router {
       }
     }
 
+    if (handler.validation?.rules) {
+      log.warn(
+        "route",
+        "deprecated",
+        `${method} ${path} "validation.rules" property is deprecated, use "validation.schema" instead`,
+      );
+    }
+
     const routeData: Route = {
       method,
       path,
