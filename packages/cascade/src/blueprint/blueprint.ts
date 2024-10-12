@@ -1,5 +1,5 @@
 import type { GenericObject } from "@mongez/reinforcements";
-import type { CollStats, CreateIndexesOptions } from "mongodb";
+import type { CreateIndexesOptions } from "mongodb";
 import { ObjectId } from "mongodb";
 import type { Database } from "../database";
 import { masterMind } from "../model/master-mind";
@@ -248,7 +248,7 @@ export class Blueprint {
           },
         ])
         .toArray()
-    )[0] as CollStats;
+    )[0];
   }
 
   /**

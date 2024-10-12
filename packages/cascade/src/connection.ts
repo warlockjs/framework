@@ -3,6 +3,7 @@ import events from "@mongez/events";
 import { log } from "@warlock.js/logger";
 import type { MongoClientOptions } from "mongodb";
 import { MongoClient } from "mongodb";
+import { setDatabaseConfigurations } from "src/cascade/config";
 import { Database, database } from "./database";
 import type { DatabaseConfigurations } from "./types";
 
@@ -49,6 +50,8 @@ export class Connection {
         ...this.configurations,
         ...databaseConfigurations,
       };
+
+      setDatabaseConfigurations(this.configurations);
     }
 
     const {

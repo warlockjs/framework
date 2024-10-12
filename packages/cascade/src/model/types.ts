@@ -77,6 +77,48 @@ export type PaginationListing<T> = {
 };
 
 /**
+ * Cursor Pagination
+ */
+export type CursorPagination = {
+  /**
+   * Cursor column
+   *
+   * @default id
+   */
+  column?: string;
+  /**
+   * The cursor id
+   */
+  cursorId?: string | number;
+  /**
+   * The cursor direction
+   */
+  direction: "next" | "prev";
+  /**
+   * The cursor limit
+   */
+  limit: number;
+};
+
+/**
+ * Cursor pagination result
+ */
+export type CursorPaginationResults<T> = {
+  /**
+   * The documents
+   */
+  documents: T[];
+  /**
+   * Whether there is more documents
+   */
+  hasMore: boolean;
+  /**
+   * The next cursor id
+   */
+  nextCursorId?: string | number;
+};
+
+/**
  * Filter object
  */
 export type Filter = Record<string, any>;

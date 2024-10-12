@@ -168,7 +168,7 @@ export class Query {
       },
     );
 
-    const output = result.ok ? result.value : null;
+    const output = result?.ok ? result.value : null;
 
     await this.trigger("updated saved", {
       collection,
@@ -245,7 +245,7 @@ export class Query {
       session,
     });
 
-    const output = result.ok ? result.value : null;
+    const output = result?.ok ? result.value : null;
 
     await this.trigger("replaced saved", {
       collection,
@@ -290,7 +290,7 @@ export class Query {
       },
     );
 
-    const output = result.ok ? result.value : null;
+    const output = result?.ok ? result.value : null;
 
     await this.trigger("upserted saved", {
       collection,

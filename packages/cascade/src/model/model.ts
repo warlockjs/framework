@@ -423,6 +423,7 @@ export class Model
    */
   public merge(data: Document) {
     const currentData = clone(this.data);
+
     this.data = merge(this.data, data);
 
     const dirtyValues = deepDiff(currentData, this.data);
@@ -528,6 +529,8 @@ export class Model
         this.merge(mergedData);
       }
 
+      // const logLevel = getDatabaseDebugLevel();
+
       let mode: "create" | "update" = "create";
 
       let currentModel;
@@ -539,7 +542,9 @@ export class Model
         // if not changed, then do not do anything
 
         if (cast) {
+          // this.logInfo("Casting data before saving");
           await this.castData(forceUpdate);
+          // this.logInfo("Data has been casted");
         }
 
         if (this.shouldUpdate(this.originalData, this.data) === false) {

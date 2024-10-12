@@ -30,6 +30,12 @@ export type DatabaseConfigurations = {
    */
   url?: string;
   /**
+   * Debug level
+   * Could be one of the following values: `error`, `warn`, `info`
+   * @default `warn`
+   */
+  debugLevel?: "error" | "warn" | "info";
+  /**
    * Model configurations
    */
   model?: {

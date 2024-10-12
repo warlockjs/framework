@@ -2,7 +2,13 @@ import type { GenericObject } from "@mongez/reinforcements";
 import { get } from "@mongez/reinforcements";
 import { log } from "@warlock.js/logger";
 import { ObjectId } from "mongodb";
-import type { ChunkCallback, Filter, PaginationListing } from "../model";
+import type {
+  ChunkCallback,
+  CursorPagination,
+  CursorPaginationResults,
+  Filter,
+  PaginationListing,
+} from "../model";
 import { ModelEvents } from "../model/model-events";
 import { query } from "../query";
 import { DeselectPipeline } from "./DeselectPipeline";
@@ -800,6 +806,50 @@ export class Aggregate {
     };
 
     return result;
+  }
+
+  /**
+   * Use cursor pagination-based for better performance
+   */
+  public async cursorPaginate<T = any>(
+    options: CursorPagination,
+    mapData?: (data: any) => T,
+  ): Promise<CursorPaginationResults<T>> {
+    if (options.cursorId) {
+      this.where(
+        options.column ?? "id",
+        options.direction === "next" ? ">" : "<",
+        options.cursorId,
+      );
+    }
+
+    // now set the limit
+    // we need to increase the limit by 1 to check if we have more records
+    this.limit(options.limit + 1);
+
+    const records = await this.execute();
+
+    // now let's check if we have more records
+
+    const hasMore = records.length > options.limit;
+    let nextCursorId = null;
+
+    if (hasMore) {
+      // Remove the extra fetched record depending on the pagination direction
+      const record =
+        options.direction === "next"
+          ? records.pop() // Forward: pop the last record
+          : records.shift(); // Backward: shift the first record
+
+      // Get the next cursor id from the popped or shifted record
+      nextCursorId = get(record, options.column ?? "id");
+    }
+
+    return {
+      documents: mapData ? records.map(mapData) : (records as T[]),
+      hasMore,
+      nextCursorId,
+    };
   }
 
   /**

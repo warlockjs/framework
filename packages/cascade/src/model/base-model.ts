@@ -1,5 +1,6 @@
 import { faker, type Faker } from "@faker-js/faker";
 import { Random, clone } from "@mongez/reinforcements";
+import { getDatabaseConfig } from "src/cascade/config";
 import { modelBlueprint } from "../blueprint/model-blueprint";
 import { database, type Database } from "../database";
 import { query } from "../query/query";
@@ -97,9 +98,9 @@ export abstract class BaseModel {
   public static getIncrementIdBy() {
     if (this.incrementIdBy) return this.incrementIdBy;
 
-    const modelConfigurations = database.connection.configurations?.model || {};
+    const modelConfigurations = getDatabaseConfig("model") || {};
 
-    const autoIncrementBy = modelConfigurations.autoIncrementBy;
+    const autoIncrementBy = modelConfigurations?.autoIncrementBy;
 
     if (autoIncrementBy) return autoIncrementBy;
 
@@ -114,7 +115,7 @@ export abstract class BaseModel {
   public static getInitialId() {
     if (this.initialId) return this.initialId;
 
-    const modelConfigurations = database.connection.configurations?.model || {};
+    const modelConfigurations = getDatabaseConfig("model") || {};
 
     const initialId = modelConfigurations.initialId;
 
