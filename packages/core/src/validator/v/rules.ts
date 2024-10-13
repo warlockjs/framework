@@ -5,8 +5,8 @@ import {
   isNumeric,
   isPlainObject,
 } from "@mongez/supportive-is";
-import { Aggregate } from "src/cascade";
-import { UploadedFile } from "src/warlock/http";
+import { Aggregate } from "@warlock.js/cascade";
+import { UploadedFile } from "./../../http/UploadedFile";
 import type { SchemaRule } from "./types";
 import { VALID_RULE, invalidRule, setKeyPath } from "./utils";
 

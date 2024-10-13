@@ -1,4 +1,4 @@
-import { type BaseValidator } from "src/warlock/validator/v/schema";
+import { type BaseValidator } from "./schema";
 
 export type Schema = Record<string, BaseValidator>;
 

@@ -1,7 +1,7 @@
 import { trans } from "@mongez/localization";
 import { clone } from "@mongez/reinforcements";
 import { isPlainObject } from "@mongez/supportive-is";
-import { type BaseModel } from "src/cascade";
+import { type BaseModel } from "@warlock.js/cascade";
 import {
   dateMutator,
   flipArrayMutator,

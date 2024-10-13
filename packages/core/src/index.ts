@@ -6,6 +6,7 @@ export * from "./bootstrap/setup";
 export * from "./builder";
 export * from "./config/index";
 export * from "./console";
+export * from "./postman";
 export * from "./database";
 export * from "./esbuild";
 export * from "./http";
