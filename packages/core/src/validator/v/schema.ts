@@ -489,7 +489,7 @@ export class StringValidator extends BaseValidator {
     return this;
   }
 
-  public matches(field: RegExp, errorMessage?: string) {
+  public matches(field: string, errorMessage?: string) {
     const rule = this.addRule(matchesRule, errorMessage);
 
     rule.context.options.field = field;
