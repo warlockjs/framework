@@ -1,9 +1,9 @@
 import { faker, type Faker } from "@faker-js/faker";
 import { Random, clone } from "@mongez/reinforcements";
-import { getDatabaseConfig } from "src/cascade/config";
 import { modelBlueprint } from "../blueprint/model-blueprint";
 import { database, type Database } from "../database";
 import { query } from "../query/query";
+import { getDatabaseConfig } from "./../config";
 import { masterMind } from "./master-mind";
 import type { Model } from "./model";
 import { ModelEvents } from "./model-events";
