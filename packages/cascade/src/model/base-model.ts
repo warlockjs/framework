@@ -40,6 +40,16 @@ export abstract class BaseModel {
   public static output?: any;
 
   /**
+   * Define list of columns that should be serialized
+   */
+  protected static serializeOnly?: string[];
+
+  /**
+   * Define list of columns that should not be serialized
+   */
+  protected static serializeExcept?: string[];
+
+  /**
    * Missing key symbol
    */
   public static MISSING_KEY = Symbol("MISSING_KEY");
@@ -50,9 +60,22 @@ export abstract class BaseModel {
   public static initialId?: number;
 
   /**
+   * Randomly generate first id
+   * if initial id is defined, this option will be ignored
+   * @default false
+   */
+  public static randomInitialId?: boolean | (() => number);
+
+  /**
    * Define the amount to eb incremented by for the next generated id
    */
   public static incrementIdBy?: number;
+
+  /**
+   * Randomly generate increment id
+   * @default false
+   */
+  public static randomIncrement?: boolean | (() => number);
 
   /**
    * Primary id column
@@ -95,7 +118,7 @@ export abstract class BaseModel {
   /**
    * Get increment id by
    */
-  public static getIncrementIdBy() {
+  public static getIncrementIdBy(): number {
     if (this.incrementIdBy) return this.incrementIdBy;
 
     const modelConfigurations = getDatabaseConfig("model") || {};
@@ -104,7 +127,17 @@ export abstract class BaseModel {
 
     if (autoIncrementBy) return autoIncrementBy;
 
-    if (modelConfigurations.randomIncrement) return Random.int(1, 999);
+    if (this.randomIncrement) {
+      return typeof this.randomIncrement === "function"
+        ? this.randomIncrement()
+        : Random.int(1, 999);
+    }
+
+    if (modelConfigurations.randomIncrement) {
+      return typeof modelConfigurations.randomIncrement === "function"
+        ? modelConfigurations.randomIncrement()
+        : Random.int(1, 999);
+    }
 
     return 1;
   }
@@ -112,7 +145,7 @@ export abstract class BaseModel {
   /**
    * Get initial id
    */
-  public static getInitialId() {
+  public static getInitialId(): number {
     if (this.initialId) return this.initialId;
 
     const modelConfigurations = getDatabaseConfig("model") || {};
@@ -121,7 +154,17 @@ export abstract class BaseModel {
 
     if (initialId) return initialId;
 
-    if (modelConfigurations.randomInitialId) return Random.int(10000, 499999);
+    if (this.randomInitialId) {
+      return typeof this.randomInitialId === "function"
+        ? this.randomInitialId()
+        : Random.int(10000, 499999);
+    }
+
+    if (modelConfigurations.randomInitialId) {
+      return typeof modelConfigurations.randomInitialId === "function"
+        ? modelConfigurations.randomInitialId()
+        : Random.int(10000, 499999);
+    }
 
     return 1;
   }
@@ -192,8 +235,33 @@ export abstract class BaseModel {
       return await new Output(clone((this as any as Model).data)).toJSON();
     }
 
+    // check if there a `serialize` object in the model
+    const serialize = this.getStaticProperty("serialize" as any);
+
+    // if there is a serialize object
+    if (serialize) {
+      // then return the serialized data
+      return await serialize(this);
+    }
+
     // otherwise return the data object
     return (this as any).publicData;
+  }
+
+  protected static async serialize(model: Model) {
+    const serializeOnly = this.serializeOnly;
+
+    if (serializeOnly) {
+      return model.only(serializeOnly);
+    }
+
+    const serializeExcept = this.serializeExcept;
+
+    if (serializeExcept) {
+      return model.except(serializeExcept);
+    }
+
+    return model.publicData;
   }
 
   /**

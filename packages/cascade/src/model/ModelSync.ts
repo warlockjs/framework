@@ -1,14 +1,15 @@
 import { areEqual } from "@mongez/reinforcements";
+import { getDatabaseConfig } from "./../config";
 import type { ModelAggregate } from "./ModelAggregate";
 import type { Model } from "./model";
-
-type OnDelete = "unset" | "remove" | "ignore";
+import type { CascadeOnDelete } from "./types";
 
 export class ModelSync {
   /**
    * What do do when model is deleted
    */
-  protected whenDelete: OnDelete = "unset";
+  protected whenDelete: CascadeOnDelete =
+    getDatabaseConfig("model")?.cascadeOnDelete || "unset";
 
   /**
    * Embed on create

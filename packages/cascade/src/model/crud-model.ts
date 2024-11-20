@@ -1,4 +1,5 @@
 import { ObjectId } from "mongodb";
+import { type SimpleFetchOptions } from "../query/types";
 import { BaseModel } from "./base-model";
 import type {
   ChildModel,
@@ -29,6 +30,38 @@ export abstract class CrudModel extends BaseModel {
     await model.onCreate();
 
     return model;
+  }
+
+  /**
+   * Create many records in the database for the current model (child class of this one)
+   */
+  public static async createMany<T>(
+    this: ChildModel<T>,
+    data: Document[],
+  ): Promise<T[]> {
+    // prepare data for creating
+    const models = await Promise.all(
+      data.map(async record => {
+        const model = this.self(record);
+
+        await model.prepareDataForCreating();
+
+        return model;
+      }),
+    );
+
+    // now we need to make bulk create in database and return the models
+    const documents = await this.query.createMany(
+      this.collection,
+      models.map(model => model.data),
+    );
+
+    return models.map(model => {
+      model.data = documents.find(document => document.id === model.id);
+
+      model.triggerCreatedEvents();
+      return model;
+    });
   }
 
   /**
@@ -260,13 +293,9 @@ export abstract class CrudModel extends BaseModel {
   ): Promise<T> {
     filter = await this.prepareFilters(filter);
 
-    let model = (await this.first(filter)) as any;
+    const model = (await this.first(filter)) || this.self(data);
 
-    if (!model) {
-      model = this.self(data);
-    } else {
-      model.merge(data);
-    }
+    model.merge(data);
 
     await model.save();
 
@@ -307,23 +336,30 @@ export abstract class CrudModel extends BaseModel {
   /**
    * Create an explain plan for the given filter
    */
-  public static async explain<T>(this: ChildModel<T>, filter: Filter = {}) {
+  public static async explain<T>(
+    this: ChildModel<T>,
+    filter: Filter = {},
+    options?: SimpleFetchOptions,
+  ) {
     return await this.query.explain(
       this.collection,
       await this.prepareFilters(filter),
+      options,
     );
   }
 
   /**
    * List multiple documents based on the given filter
    */
-  public static async list<T>(
+  public static async list<T extends Document = Document>(
     this: ChildModel<T>,
     filter: Filter = {},
+    options?: SimpleFetchOptions,
   ): Promise<T[]> {
-    const documents = await this.query.list(
+    const documents = await this.query.list<T>(
       this.collection,
       await this.prepareFilters(filter),
+      options,
     );
 
     return documents.map(document => this.self(document));
@@ -340,8 +376,9 @@ export abstract class CrudModel extends BaseModel {
   ): Promise<PaginationListing<T>> {
     filter = await this.prepareFilters(filter);
 
-    const documents = await this.query.list(this.collection, filter, query => {
-      query.skip((page - 1) * limit).limit(limit);
+    const documents = await this.query.list(this.collection, filter, {
+      skip: (page - 1) * limit,
+      limit,
     });
 
     const totalDocumentsOfFilter = await this.query.count(

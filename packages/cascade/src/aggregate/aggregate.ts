@@ -709,6 +709,20 @@ export class Aggregate {
   }
 
   /**
+   * Determine if record exists
+   */
+  public async exists() {
+    return (await this.limit(1).count()) > 0;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public toJSON() {
+    return this.parse();
+  }
+
+  /**
    * Get only first result
    */
   public async first(mapData?: (data: any) => any): Promise<any> {
@@ -892,6 +906,172 @@ export class Aggregate {
       return results.modifiedCount;
     } catch (error: any) {
       log.error("database", "aggregate.update", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Increment the given column
+   */
+  public async increment(
+    column: string | string[] | Record<string, number>,
+    value: number = 1,
+  ) {
+    try {
+      const query: any[] = [];
+      const filters = {};
+
+      this.parse().forEach(pipeline => {
+        if (pipeline.$match) {
+          Object.assign(filters, pipeline.$match);
+        } else {
+          query.push(pipeline);
+        }
+      });
+
+      Aggregate._events.trigger("updating", this);
+
+      let incrementData: Record<string, number>;
+
+      if (typeof column === "string") {
+        incrementData = { [column]: value };
+      } else if (Array.isArray(column)) {
+        incrementData = column.reduce(
+          (acc, col) => {
+            acc[col] = value;
+            return acc;
+          },
+          {} as Record<string, number>,
+        );
+      } else {
+        incrementData = column;
+      }
+
+      const results = await this.query.updateMany(this.collection, filters, [
+        ...query,
+        {
+          $inc: incrementData,
+        },
+      ]);
+
+      return results.modifiedCount;
+    } catch (error: any) {
+      log.error("database", "aggregate.increment", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Decrement the given column(s)
+   */
+  public async decrement(column: string, value = 1) {
+    return this.increment(column, -value);
+  }
+
+  /**
+   * Multiply the given column(s)
+   */
+  public async multiply(
+    column: string | string[] | Record<string, number>,
+    value: number,
+  ) {
+    try {
+      const query: any[] = [];
+      const filters = {};
+
+      this.parse().forEach(pipeline => {
+        if (pipeline.$match) {
+          Object.assign(filters, pipeline.$match);
+        } else {
+          query.push(pipeline);
+        }
+      });
+
+      Aggregate._events.trigger("updating", this);
+
+      let multiplyData: Record<string, number>;
+
+      if (typeof column === "string") {
+        multiplyData = { [column]: value };
+      } else if (Array.isArray(column)) {
+        multiplyData = column.reduce(
+          (acc, col) => {
+            acc[col] = value;
+            return acc;
+          },
+          {} as Record<string, number>,
+        );
+      } else {
+        multiplyData = column;
+      }
+
+      const results = await this.query.updateMany(this.collection, filters, [
+        ...query,
+        {
+          $mul: multiplyData,
+        },
+      ]);
+
+      return results.modifiedCount;
+    } catch (error: any) {
+      log.error("database", "aggregate.multiply", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Divide the given column(s)
+   */
+  public async divide(
+    column: string | string[] | Record<string, number>,
+    value: number,
+  ) {
+    if (value === 0) {
+      throw new Error("Division by zero is not allowed.");
+    }
+
+    try {
+      const query: any[] = [];
+      const filters = {};
+
+      this.parse().forEach(pipeline => {
+        if (pipeline.$match) {
+          Object.assign(filters, pipeline.$match);
+        } else {
+          query.push(pipeline);
+        }
+      });
+
+      Aggregate._events.trigger("updating", this);
+
+      let divideData: Record<string, number>;
+
+      if (typeof column === "string") {
+        divideData = { [column]: 1 / value };
+      } else if (Array.isArray(column)) {
+        divideData = column.reduce(
+          (acc, col) => {
+            acc[col] = 1 / value;
+            return acc;
+          },
+          {} as Record<string, number>,
+        );
+      } else {
+        divideData = Object.fromEntries(
+          Object.entries(column).map(([key, val]) => [key, 1 / val]),
+        );
+      }
+
+      const results = await this.query.updateMany(this.collection, filters, [
+        ...query,
+        {
+          $mul: divideData,
+        },
+      ]);
+
+      return results.modifiedCount;
+    } catch (error: any) {
+      log.error("database", "aggregate.divide", error);
       throw error;
     }
   }

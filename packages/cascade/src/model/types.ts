@@ -167,6 +167,8 @@ export type EmbeddedModel = {
   embedKey?: string;
 };
 
+export type CascadeOnDelete = "unset" | "remove" | "ignore";
+
 export type CastType =
   | "string"
   | "localized"

@@ -1,4 +1,5 @@
 import type { GenericObject } from "@mongez/reinforcements";
+import { isEmpty } from "@mongez/supportive-is";
 import pluralize from "pluralize";
 import type { LookupPipelineOptions, Pipeline } from "../aggregate";
 import { Aggregate } from "../aggregate";
@@ -168,7 +169,11 @@ export class Joinable {
       lookupData.localField = name + ".id";
     }
 
-    lookupData.pipeline = this.query.parse();
+    const pipeline = this.query.parse();
+
+    if (!isEmpty(pipeline)) {
+      lookupData.pipeline = pipeline;
+    }
 
     // reset the pipelines
     this.reset();

@@ -1,5 +1,5 @@
 import type { GenericObject } from "@mongez/reinforcements";
-import type { Collection, Document } from "mongodb";
+import type { Collection, Document, FindOptions } from "mongodb";
 
 /** Collection name */
 type CollectionName = string;
@@ -71,3 +71,8 @@ export type ExplainingEventPayload = GenericObject;
 export type ExplainedEventPayload = GenericObject;
 export type AggregatingEventPayload = GenericObject;
 export type AggregatedEventPayload = GenericObject;
+
+export type SimpleFetchOptions = FindOptions & {
+  select?: string[];
+  deselect?: string[]; // alias to projection
+};

@@ -22,8 +22,6 @@ export class MigrationOffice {
       async executeDown() {
         const blueprint = migration.blueprint.clone();
 
-        console.log(blueprint.collectionName);
-
         await migration.down(blueprint);
 
         await blueprint.execute();

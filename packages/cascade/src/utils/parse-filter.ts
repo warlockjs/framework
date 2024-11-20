@@ -1,4 +1,4 @@
-import { Aggregate, type WhereOperator } from "./../aggregate";
+import { type Aggregate, type WhereOperator } from "./../aggregate";
 import { type ModelAggregate } from "./../model";
 
 export type FilterOptionType =
@@ -48,7 +48,7 @@ export type FilterByOptions = {
   [key: string]: FilterByType;
 };
 
-const filterMap = {};
+const _filterMap = {};
 
 function prepareFilter(filterStructure: FilterByOptions) {
   const filter = {};
@@ -63,9 +63,9 @@ function prepareFilter(filterStructure: FilterByOptions) {
 }
 
 export function parseFilterBy(filterStructure: FilterByOptions) {
-  const filter = prepareFilter(filterStructure);
+  const _filter = prepareFilter(filterStructure);
   return {
-    filter: (query: Aggregate, data: any) => {
+    filter: (_query: Aggregate, _data: any) => {
       //
     },
   };

@@ -1,4 +1,5 @@
 import type { GenericObject } from "@mongez/reinforcements";
+import { isEmpty } from "@mongez/supportive-is";
 import { parsePipelines } from "./parsePipelines";
 import { Pipeline } from "./pipeline";
 
@@ -21,13 +22,20 @@ export class LookupPipeline extends Pipeline {
 
     const { from, localField, foreignField, as, pipeline = [] } = options;
 
-    this.data({
+    const parsedPipelines = parsePipelines(pipeline);
+
+    const data: GenericObject = {
       from,
       localField,
       foreignField,
       as,
-      pipeline: parsePipelines(pipeline),
-    });
+    };
+
+    if (!isEmpty(parsedPipelines)) {
+      data.pipeline = parsedPipelines;
+    }
+
+    this.data(data);
   }
 }
 

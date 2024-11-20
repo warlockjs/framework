@@ -4,11 +4,15 @@ import type {
   AggregateOptions,
   ClientSession,
   CountDocumentsOptions,
+  DeleteOptions,
+  DistinctOptions,
   ExplainVerbosityLike,
-  FindCursor,
+  FindOneAndReplaceOptions,
+  FindOneAndUpdateOptions,
   FindOptions,
   UpdateFilter,
   UpdateOptions,
+  WithId,
 } from "mongodb";
 import { database, type Database } from "../database";
 import type { Document, Filter, ModelDocument } from "../model/types";
@@ -27,6 +31,7 @@ import type {
   ReplacingEventPayload,
   SavedEventPayload,
   SavingEventPayload,
+  SimpleFetchOptions,
   UpdatedEventPayload,
   UpdatingEventPayload,
   UpsertedEventPayload,
@@ -56,8 +61,8 @@ export class Query {
   /**
    * Get collection query for the given collection name
    */
-  public query(collection: string) {
-    return this.database.collection(collection);
+  public query<TSchema extends Document = Document>(collection: string) {
+    return this.database.collection<TSchema>(collection);
   }
 
   /**
@@ -109,7 +114,7 @@ export class Query {
     collection: string,
     data: Document[],
     { session = this.getCurrentSession() }: { session?: ClientSession } = {},
-  ) {
+  ): Promise<ModelDocument[]> {
     const query = this.query(collection);
 
     await this.trigger("creating saving", {
@@ -144,16 +149,19 @@ export class Query {
     collection: string,
     filter: Filter,
     data: Document,
-    { session = this.getCurrentSession() }: { session?: ClientSession } = {},
+    options?: FindOneAndUpdateOptions,
   ): Promise<Partial<ModelDocument> | null> {
     // get the query of the current collection
     const query = this.query(collection);
+
+    options = this.prepareQueryOptions(options);
 
     await this.trigger("updating saving", {
       collection,
       filter,
       data,
       query,
+      options,
       isMany: false,
     });
 
@@ -164,7 +172,7 @@ export class Query {
       },
       {
         returnDocument: "after",
-        session,
+        ...options,
       },
     );
 
@@ -189,15 +197,9 @@ export class Query {
     filter: Filter,
     updateOptions: UpdateFilter<Document>,
     options?: UpdateOptions,
-    { session = this.getCurrentSession() }: { session?: ClientSession } = {},
   ) {
     const query = this.query(collection);
-    if (!options?.session) {
-      options = {
-        ...options,
-        session,
-      };
-    }
+    options = this.prepareQueryOptions(options);
 
     await this.trigger("updating saving", {
       collection,
@@ -229,9 +231,10 @@ export class Query {
     collection: string,
     filter: Filter,
     data: Document,
-    { session = this.getCurrentSession() }: { session?: ClientSession } = {},
+    options?: FindOneAndReplaceOptions,
   ): Promise<Partial<ModelDocument> | null> {
     const query = this.query(collection);
+    options = this.prepareQueryOptions(options);
 
     await this.trigger("replacing saving", {
       collection,
@@ -242,7 +245,7 @@ export class Query {
 
     const result = await query.findOneAndReplace(filter, data, {
       returnDocument: "after",
-      session,
+      ...options,
     });
 
     const output = result?.ok ? result.value : null;
@@ -265,16 +268,18 @@ export class Query {
     collection: string,
     filter: Filter,
     data: Document,
-    { session = this.getCurrentSession() }: { session?: ClientSession } = {},
+    options?: FindOneAndUpdateOptions,
   ): Promise<Partial<ModelDocument> | null> {
     // get the query of the current collection
     const query = this.query(collection);
+    options = this.prepareQueryOptions(options);
 
     await this.trigger("upserting saving", {
       collection,
       filter,
       data,
       query,
+      options,
     });
 
     // execute the update operation
@@ -286,7 +291,7 @@ export class Query {
       {
         returnDocument: "after",
         upsert: true,
-        session,
+        ...options,
       },
     );
 
@@ -308,20 +313,21 @@ export class Query {
   public async deleteOne(
     collection: string,
     filter?: Filter,
-    { session = this.getCurrentSession() }: { session?: ClientSession } = {},
+    options?: DeleteOptions,
   ): Promise<boolean> {
     const query = this.query(collection);
+
+    options = this.prepareQueryOptions(options);
 
     await this.trigger("deleting", {
       collection,
       filter,
       query,
+      options,
       isMany: false,
     });
 
-    const result = await query.deleteOne(filter, {
-      session,
-    });
+    const result = await query.deleteOne(filter, options);
 
     const isDeleted = result.deletedCount > 0;
 
@@ -343,9 +349,11 @@ export class Query {
   public async delete(
     collection: string,
     filter: Filter = {},
-    { session = this.getCurrentSession() }: { session?: ClientSession } = {},
+    options?: DeleteOptions,
   ): Promise<number> {
     const query = this.query(collection);
+
+    options = this.prepareQueryOptions(options);
 
     await this.trigger("deleting", {
       collection,
@@ -354,9 +362,7 @@ export class Query {
       isMany: true,
     });
 
-    const result = await query.deleteMany(filter, {
-      session,
-    });
+    const result = await query.deleteMany(filter, options);
 
     const output = result.deletedCount;
 
@@ -374,13 +380,15 @@ export class Query {
 
   /**
    * Alias to delete
+   *
+   * @alias delete
    */
   public async deleteMany(
     collection: string,
     filter: Filter = {},
-    { session = this.getCurrentSession() }: { session?: ClientSession } = {},
+    options?: DeleteOptions,
   ) {
-    return this.delete(collection, filter, { session });
+    return this.delete(collection, filter, options);
   }
 
   /**
@@ -389,19 +397,19 @@ export class Query {
   public async exists(
     collection: string,
     filter: Filter = {},
-    { session = this.getCurrentSession() }: { session?: ClientSession } = {},
+    options?: CountDocumentsOptions,
   ) {
     const query = this.query(collection);
+    options = this.prepareQueryOptions(options);
 
     await this.trigger("counting", {
       collection,
       filter,
       query,
+      options,
     });
 
-    const output = await query.countDocuments(filter, {
-      session,
-    });
+    const output = await query.countDocuments(filter, options);
 
     await this.trigger("counted", {
       collection,
@@ -415,57 +423,59 @@ export class Query {
   /**
    * Find a single document for the given collection with the given filter
    */
-  public async first<T = Document>(
+  public async first<T extends Document = Document>(
     collection: string,
     filter: Filter = {},
-    findOptions?: FindOptions,
-    { session = this.getCurrentSession() }: { session?: ClientSession } = {},
+    findOptions?: Omit<SimpleFetchOptions, "limit">,
   ) {
-    const query = this.query(collection);
-    if (!findOptions?.session) {
-      findOptions = {
-        ...findOptions,
-        session,
-      };
-    }
-
-    await this.trigger("fetching", {
-      collection,
-      filter,
-      query,
-      findOptions,
-      isMany: false,
+    const documents = await this.list<T>(collection, filter, {
+      limit: 1,
+      ...findOptions,
     });
 
-    const output = await query.findOne<T>(filter, findOptions);
-
-    await this.trigger("fetched", {
-      collection,
-      filter,
-      output,
-      isMany: false,
-      count: output ? 1 : 0,
-    });
-
-    return output;
+    return documents[0];
   }
 
   /**
    * Find last document for the given collection with the given filter
    */
-  public async last(
+  public async last<T extends Document = Document>(
     collection: string,
     filter: Filter = {},
-    options?: FindOptions,
-    { session = this.getCurrentSession() }: { session?: ClientSession } = {},
+    findOptions?: Omit<SimpleFetchOptions, "limit">,
   ) {
-    const query = this.query(collection);
+    const documents = await this.latest<T>(collection, filter, {
+      limit: 1,
+      ...findOptions,
+    });
 
-    if (!options?.session) {
-      options = {
-        ...options,
-        session,
-      };
+    return documents[0];
+  }
+
+  /**
+   * Find multiple document for the given collection with the given filter
+   */
+  public async list<T extends Document = Document>(
+    collection: string,
+    filter: Filter = {},
+    options?: SimpleFetchOptions,
+  ): Promise<WithId<T>[]> {
+    const query = this.query<T>(collection);
+
+    options = this.prepareQueryOptions(options);
+
+    if (options?.deselect || options?.select) {
+      const projection: Record<string, any> = {};
+      (options?.deselect || []).forEach(field => {
+        projection[field] = 0;
+      });
+
+      (options?.select || []).forEach(field => {
+        projection[field] = 1;
+      });
+
+      delete options.deselect;
+      delete options.select;
     }
 
     await this.trigger("fetching", {
@@ -473,62 +483,10 @@ export class Query {
       filter,
       query,
       options,
-      isMany: false,
-    });
-
-    const results = await query
-      .find(filter, options)
-      .sort({
-        id: "desc",
-      })
-      .limit(1)
-      .toArray();
-
-    const output = results.length > 0 ? results[0] : null;
-
-    await this.trigger("fetched", {
-      collection,
-      filter,
-      output,
-      isMany: false,
-      count: results.length,
-    });
-
-    return output;
-  }
-
-  /**
-   * Find multiple document for the given collection with the given filter
-   */
-  public async list(
-    collection: string,
-    filter: Filter = {},
-    queryHandler?: (query: FindCursor) => void,
-    findOptions?: FindOptions,
-    { session = this.getCurrentSession() }: { session?: ClientSession } = {},
-  ) {
-    const query = this.query(collection);
-
-    if (!findOptions?.session) {
-      findOptions = {
-        ...findOptions,
-        session,
-      };
-    }
-
-    await this.trigger("fetching", {
-      collection,
-      filter,
-      query,
-      findOptions,
       isMany: true,
     });
 
-    const findOperation = query.find(filter, findOptions);
-
-    if (queryHandler) {
-      queryHandler(findOperation);
-    }
+    const findOperation = query.find(filter, options);
 
     const documents = await findOperation.toArray();
 
@@ -536,7 +494,7 @@ export class Query {
       collection,
       filter,
       documents,
-      findOptions,
+      options,
       isMany: true,
       count: documents.length,
     });
@@ -547,46 +505,17 @@ export class Query {
   /**
    * Find latest documents for the given collection with the given filter
    */
-  public async latest(
+  public async latest<T extends Document = Document>(
     collection: string,
     filter: Filter = {},
-    findOptions?: FindOptions,
-    { session = this.getCurrentSession() }: { session?: ClientSession } = {},
-  ) {
-    const query = this.query(collection);
-
-    if (!findOptions?.session) {
-      findOptions = {
-        ...findOptions,
-        session,
-      };
-    }
-
-    await this.trigger("fetching", {
-      collection,
-      filter,
-      query,
-      findOptions,
-      isMany: true,
-    });
-
-    const documents = await query
-      .find(filter, findOptions)
-      .sort({
+    findOptions?: SimpleFetchOptions,
+  ): Promise<WithId<T>[]> {
+    return this.list(collection, filter, {
+      sort: {
         id: "desc",
-      })
-      .toArray();
-
-    await this.trigger("fetched", {
-      collection,
-      filter,
-      documents,
-      findOptions,
-      isMany: true,
-      count: documents.length,
+      },
+      ...findOptions,
     });
-
-    return documents;
   }
 
   /**
@@ -595,28 +524,22 @@ export class Query {
   public async oldest(
     collection: string,
     filter: Filter = {},
-    findOptions?: FindOptions,
-    { session = this.getCurrentSession() }: { session?: ClientSession } = {},
+    options?: FindOptions,
   ) {
     const query = this.query(collection);
 
-    if (!findOptions?.session) {
-      findOptions = {
-        ...findOptions,
-        session,
-      };
-    }
+    options = this.prepareQueryOptions(options);
 
     await this.trigger("fetching", {
       collection,
       filter,
       query,
-      findOptions,
+      options,
       isMany: true,
     });
 
     const documents = await query
-      .find(filter, findOptions)
+      .find(filter, options)
       .sort({
         id: "asc",
       })
@@ -626,7 +549,7 @@ export class Query {
       collection,
       filter,
       documents,
-      findOptions,
+      options,
       count: documents.length,
       isMany: true,
     });
@@ -641,9 +564,10 @@ export class Query {
     collection: string,
     field: string,
     filter: Filter = {},
-    { session = this.getCurrentSession() }: { session?: ClientSession } = {},
+    options?: DistinctOptions,
   ) {
     const query = this.query(collection);
+    options = this.prepareQueryOptions(options);
 
     await this.trigger("fetching", {
       collection,
@@ -652,9 +576,7 @@ export class Query {
       isMany: true,
     });
 
-    const data = await query.distinct(field, filter, {
-      session,
-    });
+    const data = await query.distinct(field, filter, options);
 
     await this.trigger("fetched", {
       collection,
@@ -674,16 +596,10 @@ export class Query {
     collection: string,
     filter: Filter = {},
     options?: CountDocumentsOptions,
-    { session = this.getCurrentSession() }: { session?: ClientSession } = {},
   ) {
     const query = this.query(collection);
 
-    if (!options?.session) {
-      options = {
-        ...options,
-        session,
-      };
-    }
+    options = this.prepareQueryOptions(options);
 
     await this.trigger("counting", {
       collection,
@@ -708,18 +624,12 @@ export class Query {
   public async explain(
     collection: string,
     filter: Filter = {},
-    findOptions?: FindOptions,
+    options?: FindOptions,
     verbosity?: ExplainVerbosityLike,
-    { session = this.getCurrentSession() }: { session?: ClientSession } = {},
   ) {
     const query = this.query(collection);
 
-    if (!findOptions?.session) {
-      findOptions = {
-        ...findOptions,
-        session,
-      };
-    }
+    options = this.prepareQueryOptions(options);
 
     await this.trigger("explaining", {
       collection,
@@ -729,8 +639,8 @@ export class Query {
 
     const result = await query
       .find(filter, {
-        ...(findOptions || {}),
         explain: true,
+        ...options,
       })
       .explain(verbosity);
 
@@ -750,16 +660,10 @@ export class Query {
     collection: string,
     pipeline: Document[],
     options?: AggregateOptions,
-    { session = this.getCurrentSession() }: { session?: ClientSession } = {},
   ) {
     const query = this.query(collection);
 
-    if (!options?.session) {
-      options = {
-        ...options,
-        session,
-      };
-    }
+    options = this.prepareQueryOptions(options);
 
     await this.trigger("aggregating", {
       collection,
@@ -960,6 +864,17 @@ export class Query {
    */
   public on(event: string, callback: (payload: any) => void) {
     events.on(this.eventName + "." + event, callback);
+  }
+
+  /**
+   * Prepare query options and add session if not exists
+   */
+  protected prepareQueryOptions(options: Record<string, any> = {}) {
+    if (!options?.session) {
+      options.session = this.getCurrentSession();
+    }
+
+    return options;
   }
 }
 

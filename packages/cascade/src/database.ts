@@ -4,6 +4,7 @@ import type {
   ClientSessionOptions,
   Collection,
   Db,
+  Document,
 } from "mongodb";
 import type { Connection } from "./connection";
 
@@ -11,6 +12,19 @@ export type DatabaseSessionTransaction = {
   session: ClientSession;
   database: Database;
 };
+
+const ROLLBACK_SYMBOL = Symbol("rollback");
+const COMMIT_SYMBOL = Symbol("commit");
+
+export type DatabaseTransactionCallbackOptions = {
+  rollback: symbol;
+  commit: symbol;
+  session: ClientSession;
+};
+
+export type DatabaseTransactionCallback = (
+  options: DatabaseTransactionCallbackOptions,
+) => Promise<symbol | void>;
 
 export class Database {
   /**
@@ -25,6 +39,62 @@ export class Database {
 
   public sessionsContainer =
     new AsyncLocalStorage<DatabaseSessionTransaction>();
+
+  /**
+   * Perform a database transaction
+   *
+   * @todo There is an issue when executing models with writing ops that have events on abort, it will not rollback the transaction
+   */
+  public async transaction(
+    callback: DatabaseTransactionCallback,
+    sessionOptions: ClientSessionOptions = {
+      defaultTransactionOptions: {
+        readPreference: "primary",
+        readConcern: { level: "local" },
+        writeConcern: { w: "majority" },
+      },
+    },
+  ) {
+    return new Promise((resolve, reject) => {
+      const session = this.connection.client.startSession(sessionOptions);
+      this.sessionsContainer.run(
+        {
+          session,
+          database: this,
+        },
+        async () => {
+          try {
+            // Begin transaction using withTransaction
+            await session.withTransaction(async () => {
+              // Execute the callback and let it control rollback/commit
+              const output = await callback({
+                session,
+                commit: COMMIT_SYMBOL,
+                rollback: ROLLBACK_SYMBOL,
+              });
+
+              if (output === ROLLBACK_SYMBOL) {
+                // If the callback explicitly returns rollback, rollback
+                await session.abortTransaction();
+                await session.endSession(); // Always end the session
+                resolve(false);
+              } else {
+                // If the callback explicitly returns commit, commit
+                await session.commitTransaction();
+                await session.endSession(); // Always end the session
+                resolve(true); // Resolve promise successfully
+              }
+            });
+          } catch (error) {
+            console.log("Transaction failed, rolling back...", error);
+            await session.abortTransaction(); // Rollback on any error
+            await session.endSession(); // Always end the session
+            reject(error); // Reject promise with error
+          }
+        },
+      );
+    });
+  }
 
   /**
    * Create a new transaction session and wrap it with a context
@@ -96,8 +166,10 @@ export class Database {
   /**
    * Get database collection instance
    */
-  public collection(collection: string): Collection {
-    return this.database.collection(collection);
+  public collection<TSchema extends Document = Document>(
+    collection: string,
+  ): Collection<TSchema> {
+    return this.database.collection<TSchema>(collection);
   }
 
   /**

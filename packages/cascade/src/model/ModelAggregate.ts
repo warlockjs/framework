@@ -1,3 +1,4 @@
+import { colors } from "@mongez/copper";
 import type { GenericObject } from "@mongez/reinforcements";
 import { toStudlyCase } from "@mongez/reinforcements";
 import type { Pipeline } from "../aggregate";
@@ -171,11 +172,19 @@ export class ModelAggregate<T extends Model> extends Aggregate {
    * Get joinable instance for current model
    */
   protected getJoinable(joinable: string | Joinable) {
+    let joinableObject: Joinable;
     if (typeof joinable === "string") {
-      joinable = this.model.relations[joinable] as Joinable;
+      joinableObject = this.model.relations[joinable] as Joinable;
+      if (!joinableObject) {
+        throw new Error(
+          `Call to undefined joinable ${colors.redBright(joinable)} in ${this.model.name} model relations`,
+        );
+      }
+    } else {
+      joinableObject = joinable;
     }
 
-    return joinableProxy(joinable.clone());
+    return joinableProxy(joinableObject.clone());
   }
 
   /**
@@ -190,15 +199,17 @@ export class ModelAggregate<T extends Model> extends Aggregate {
       as?: string;
     },
   ) {
-    joining = this.getJoinable(joining);
+    const joiningObject = this.getJoinable(joining);
 
-    const as = joining.get("as");
+    const as = joiningObject.get("as");
 
-    const returnAs = options?.as || as + "Count";
+    const returnAs = options?.as || (as || "document") + "Count";
 
-    return this.joining(joining, options).addField(returnAs, {
-      $size: $agg.columnName(as),
-    });
+    return this.joining(joiningObject, options)
+      .addField(returnAs, {
+        $size: $agg.columnName(as),
+      })
+      .deselect([as]);
   }
 
   /**

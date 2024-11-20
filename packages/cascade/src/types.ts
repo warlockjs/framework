@@ -1,4 +1,5 @@
 import type { MongoClientOptions } from "mongodb";
+import type { CascadeOnDelete } from "./model/types";
 
 export type DatabaseConfigurations = {
   /**
@@ -45,13 +46,13 @@ export type DatabaseConfigurations = {
      *
      * @default false
      */
-    randomIncrement?: boolean;
+    randomIncrement?: boolean | (() => number);
     /**
      * Randomly generate first id
      * if initial id is defined, this option will be ignored
      * @default false
      */
-    randomInitialId?: boolean;
+    randomInitialId?: boolean | (() => number);
     /**
      * Define the initial value of the id
      *
@@ -64,5 +65,11 @@ export type DatabaseConfigurations = {
      * @default 1
      */
     autoIncrementBy?: number;
+    /**
+     * What to do when a model is deleted for the related model
+     * This will be called when calling `Model.sync` or `Model.syncMany``
+     * @default "unset"
+     */
+    cascadeOnDelete?: CascadeOnDelete;
   };
 } & Partial<MongoClientOptions>;
