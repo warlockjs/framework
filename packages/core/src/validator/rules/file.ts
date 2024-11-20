@@ -21,8 +21,6 @@ export class FileRule extends Rule {
 
     this.value = value;
 
-    console.log({ value });
-
     this.isValid = Array.isArray(this.value)
       ? this.value.length > 0
       : Boolean(this.value);

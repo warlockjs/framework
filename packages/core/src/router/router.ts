@@ -1,17 +1,13 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
+import fastifyStatic, { type FastifyStaticOptions } from "@fastify/static";
 import concatRoute from "@mongez/concat-route";
-import {
-  Random,
-  ltrim,
-  merge,
-  toCamelCase,
-  trim,
-} from "@mongez/reinforcements";
+import { ltrim, merge, toCamelCase, trim } from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
 import { log } from "@warlock.js/logger";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { Request } from "../http/request";
 import { Response } from "../http/response";
+import { type FastifyInstance } from "../http/server";
 import type {
   GroupedRoutesOptions,
   ResourceMethod,
@@ -36,7 +32,10 @@ export class Router {
    */
   private static instance: Router;
 
-  public id = Random.string();
+  /**
+   * Static paths
+   */
+  protected staticDirectories: FastifyStaticOptions[] = [];
 
   /**
    * Stacks
@@ -61,6 +60,68 @@ export class Router {
 
   private constructor() {
     //
+  }
+
+  /**
+   * Redirect path to another path
+   */
+  public redirect(
+    from: string,
+    to: string,
+    redirectMode: "temporary" | "permanent" = "temporary",
+  ) {
+    return this.get(from, (_request, response) => {
+      response.redirect(to, redirectMode === "temporary" ? 302 : 301);
+    });
+  }
+
+  /**
+   * Server static folder
+   */
+  public directory(options: FastifyStaticOptions) {
+    this.staticDirectories.push(options);
+
+    return this;
+  }
+
+  /**
+   * Serve file
+   */
+  public file(path: string, location: string, cacheTime?: number) {
+    return this.get(path, (_request, response) => {
+      response.sendFile(location, cacheTime);
+    });
+  }
+
+  /**
+   * Serve cached file, it will cache the file to 1 year by default
+   */
+  public cachedFile(path: string, location: string, cacheTime?: number) {
+    return this.get(path, (_request, response) => {
+      response.sendCachedFile(location, cacheTime);
+    });
+  }
+
+  /**
+   * Serve list of files
+   */
+  public files(files: Record<string, string>, cacheTime?: number) {
+    for (const [path, location] of Object.entries(files)) {
+      this.get(path, (_request, response) => {
+        response.sendFile(location, cacheTime);
+      });
+    }
+  }
+
+  /**
+   * Serve list of cached files, it will cache the file to 1 year by default
+   */
+  public cachedFiles(files: Record<string, string>, cacheTime?: number) {
+    for (const [path, location] of Object.entries(files)) {
+      this.get(path, (_request, response) => {
+        response.sendCachedFile(location, cacheTime);
+      });
+    }
   }
 
   /**
@@ -112,6 +173,10 @@ export class Router {
           handler.validation.rules = controller[`${action}ValidationRules`]();
         }
 
+        if (controller[`${action}ValidationSchema`]) {
+          handler.validation.schema = controller[`${action}ValidationSchema`]();
+        }
+
         if (controller[`${action}Validate`]) {
           handler.validation.validate = controller[`${action}Validate`];
         }
@@ -121,7 +186,7 @@ export class Router {
     if (handler.validation?.rules) {
       log.warn(
         "route",
-        "deprecated",
+        "DEPRECATED",
         `${method} ${path} "validation.rules" property is deprecated, use "validation.schema" instead`,
       );
     }
@@ -535,7 +600,7 @@ export class Router {
   /**
    * Register routes to the server
    */
-  public scan(server: any) {
+  public scan(server: FastifyInstance) {
     this.routes.forEach(route => {
       const requestMethod = route.method.toLowerCase();
       const requestMethodFunction = server[requestMethod].bind(server);
@@ -548,6 +613,13 @@ export class Router {
         this.handleRoute(route),
       );
     });
+
+    for (const directoryOptions of this.staticDirectories) {
+      server.register(fastifyStatic, {
+        ...directoryOptions,
+        decorateReply: false,
+      });
+    }
   }
 
   /**

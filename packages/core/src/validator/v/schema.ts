@@ -1,8 +1,10 @@
+/* eslint-disable @typescript-eslint/no-this-alias */
 import { trans } from "@mongez/localization";
 import { clone } from "@mongez/reinforcements";
 import { isPlainObject } from "@mongez/supportive-is";
-import { type BaseModel } from "@warlock.js/cascade";
+import { type Model } from "@warlock.js/cascade";
 import {
+  capitalizeMutator,
   dateMutator,
   flipArrayMutator,
   lowercaseMutator,
@@ -15,28 +17,55 @@ import {
   uppercaseMutator,
 } from "./mutators";
 import {
+  allowedValuesRule,
+  alphaNumericRule,
+  alphaRule,
   arrayRule,
   booleanRule,
+  colorRule,
+  containsRule,
+  darkColorRule,
   dateRule,
   emailRule,
+  endsWithRule,
   enumRule,
   equalRule,
   existsRule,
-  fileRile,
+  fileExtensionRule,
+  fileRule,
+  fileTypeRule,
   floatRule,
+  forbiddenRule,
+  hexColorRule,
+  hslColorRule,
   imageRule,
+  inRule,
   intRule,
+  ip4Rule,
+  ip6Rule,
+  ipRule,
+  isCreditCardRule,
+  isNumericRule,
   lengthRule,
+  lightColorRule,
   matchesRule,
+  maxDateRule,
   maxFileSizeRule,
+  maxHeightRule,
   maxLengthRule,
   maxRule,
   maxWidthRule,
+  maxWordsRule,
+  minDateRule,
   minFileSizeRule,
   minHeightRule,
   minLengthRule,
   minRule,
   minWidthRule,
+  minWordsRule,
+  moduloRule,
+  notAllowedValuesRule,
+  notContainsRule,
   numberRule,
   objectRule,
   patternRule,
@@ -44,16 +73,26 @@ import {
   requiredIfAbsentRule,
   requiredIfEmptyRule,
   requiredIfFieldRule,
+  requiredIfSiblingFieldAllAbsentRule,
+  requiredIfSiblingFieldEmptyRule,
+  requiredIfSiblingFieldRule,
   requiredRule,
+  requiredUnlessSiblingFieldRule,
   requiredWithRule,
+  rgbColorRule,
+  rgbaColorRule,
   scalarRule,
+  startsWithRule,
   stringRule,
   uniqueArrayRule,
   uniqueRule,
   unknownKeyRule,
+  uploadableRule,
   urlRule,
+  whenRule,
+  withoutWhitespaceRule,
+  wordsRule,
   type ExistsRuleOptions,
-  type UniqueRuleOptions,
 } from "./rules";
 import type {
   ContextualSchemaRule,
@@ -62,21 +101,54 @@ import type {
   Schema,
   SchemaContext,
   SchemaRule,
+  SchemaRuleOptions,
+  UniqueRuleOptions,
   ValidationResult,
+  WhenRuleOptions,
 } from "./types";
 import { setKeyPath } from "./utils";
+
+// TODO: Allow developer to extend the validator with custom rules and custom validators
 
 export class BaseValidator {
   public rules: ContextualSchemaRule[] = [];
   public mutators: ContextualizedMutator[] = [];
   protected defaultValue: any;
 
-  public addRule(rule: SchemaRule, errorMessage?: string) {
-    const newRule: ContextualSchemaRule = {
-      ...clone(rule),
+  protected description?: string;
+
+  /**
+   * Add description to the validator
+   */
+  public describe(description: string) {
+    this.description = description;
+
+    return this;
+  }
+
+  /**
+   * Value must be equal to the given value
+   */
+  public equal(value: any, errorMessage?: string) {
+    const rule = this.addRule(equalRule, errorMessage);
+
+    rule.context.options.value = value;
+
+    return this;
+  }
+
+  /**
+   * Add rule to the schema
+   */
+  public addRule<T extends SchemaRuleOptions = SchemaRuleOptions>(
+    rule: SchemaRule<T>,
+    errorMessage?: string,
+  ): ContextualSchemaRule<T> {
+    const newRule: ContextualSchemaRule<T> = {
+      ...(clone(rule) as ContextualSchemaRule<T>),
       context: {
         errorMessage,
-        options: {},
+        options: {} as T,
       },
     };
 
@@ -93,6 +165,20 @@ export class BaseValidator {
     return newRule;
   }
 
+  /**
+   * Define custom rule
+   */
+  public refine(rule: SchemaRule) {
+    this.addRule(rule);
+
+    return this;
+  }
+
+  /**
+   * Add mutator to the schema
+   *
+   * A mutator is a function that mutates the value of the field before validation
+   */
   public addMutator(mutator: Mutator, options: any = {}) {
     this.mutators.push({
       mutate: mutator,
@@ -105,48 +191,104 @@ export class BaseValidator {
     return this;
   }
 
+  /**
+   * Set default value for the field
+   */
   public default(value: any) {
     this.defaultValue = value;
 
     return this;
   }
 
+  /**
+   * Value must be present but not necessarily has a value
+   */
   public present(errorMessage?: string) {
     this.addRule(requiredRule, errorMessage);
 
     return this;
   }
 
+  /**
+   * This value must be present and has a value
+   */
   public required(errorMessage?: string) {
     this.addRule(requiredRule, errorMessage);
 
     return this;
   }
 
+  /**
+   * This value must be present if the given input is present
+   */
   public requiredWith(input: string, errorMessage?: string) {
     const rule = this.addRule(requiredWithRule, errorMessage);
 
-    rule.context.options.input = input;
+    rule.context.options.field = input;
 
     return this;
   }
 
+  /**
+   * Mark this field as required if the given input field is absent
+   */
   public requiredIfAbsent(input: string, errorMessage?: string) {
     const rule = this.addRule(requiredIfAbsentRule, errorMessage);
 
-    rule.context.options.input = input;
+    rule.context.options.field = input;
 
     return this;
   }
 
+  /**
+   * Value is required if all given input fields in same parent context are absent
+   */
+  public requiredIfSiblingFieldAllAbsent(
+    fields: string[],
+    errorMessage?: string,
+  ) {
+    const rule = this.addRule(
+      requiredIfSiblingFieldAllAbsentRule,
+      errorMessage,
+    );
+
+    rule.context.options.fields = fields;
+
+    return this;
+  }
+
+  /**
+   * @alias requiredIfAbsent
+   */
+  public requiredIfMissing(input: string, errorMessage?: string) {
+    return this.requiredIfAbsent(input, errorMessage);
+  }
+
+  /**
+   * Value is required if and only if the given input field is empty
+   */
   public requiredIfEmpty(input: string, errorMessage?: string) {
     const rule = this.addRule(requiredIfEmptyRule, errorMessage);
 
-    rule.context.options.input = input;
+    rule.context.options.field = input;
 
     return this;
   }
 
+  /**
+   * Value is required if and only if the given input field in same parent context is empty
+   */
+  public requiredIfSiblingFieldEmpty(input: string, errorMessage?: string) {
+    const rule = this.addRule(requiredIfSiblingFieldEmptyRule, errorMessage);
+
+    rule.context.options.field = input;
+
+    return this;
+  }
+
+  /**
+   * Value is required if and only if the given input field has the given value
+   */
   public requiredIfField(input: string, value: any, errorMessage?: string) {
     const rule = this.addRule(requiredIfFieldRule, errorMessage);
 
@@ -156,6 +298,42 @@ export class BaseValidator {
     return this;
   }
 
+  /**
+   * Value is required if and only if the given input field in same parent context has the given value
+   */
+  public requiredIfSiblingField(
+    input: string,
+    value: any,
+    errorMessage?: string,
+  ) {
+    const rule = this.addRule(requiredIfSiblingFieldRule, errorMessage);
+
+    rule.context.options.field = input;
+    rule.context.options.value = value;
+
+    return this;
+  }
+
+  /**
+   * Value is required unless the given input field in same parent context has the given value
+   */
+  public requiredUnlessSiblingField(
+    input: string,
+    value: any,
+    errorMessage?: string,
+  ) {
+    const rule = this.addRule(requiredUnlessSiblingFieldRule, errorMessage);
+
+    rule.context.options.field = input;
+    rule.context.options.value = value;
+
+    return this;
+  }
+
+  /**
+   * Mutate the data
+   * Please note this method should not be called directly, as it is used internally by the `validate` method
+   */
   public async mutate(data: any, context: SchemaContext) {
     let mutatedData = data;
 
@@ -167,6 +345,44 @@ export class BaseValidator {
     return mutatedData;
   }
 
+  /**
+   * Value is forbidden to be present
+   */
+  public forbidden(errorMessage?: string) {
+    this.addRule(forbiddenRule, errorMessage);
+
+    return this;
+  }
+
+  /**
+   * Apply conditional validation rules based on another field value
+   *
+   * @example
+   * ```ts
+   * v.object({
+   *   status: v.when("type", {
+   *     is: {
+   *       post: v.string().required().in(["active", "inactive"]),
+   *       news: v.string().required().in(["published", "draft"]),
+   *     },
+   *     otherwise: v.forbidden(),
+   *   }),
+   * })
+   * ```
+   */
+  public when(field: string, options: Omit<WhenRuleOptions, "field">) {
+    const rule = this.addRule(whenRule);
+
+    rule.context.options.field = field;
+    rule.context.options.is = options.is;
+    rule.context.options.otherwise = options.otherwise;
+
+    return this;
+  }
+
+  /**
+   * Validate the data
+   */
   public async validate(
     data: any,
     context: SchemaContext,
@@ -205,9 +421,7 @@ export class BaseValidator {
   }
 }
 
-export class AnyValidator extends BaseValidator {
-  //
-}
+export class AnyValidator extends BaseValidator {}
 
 export class ObjectValidator extends BaseValidator {
   /**
@@ -231,10 +445,16 @@ export class ObjectValidator extends BaseValidator {
     this.addRule(objectRule, errorMessage);
   }
 
+  /**
+   * Strip unknown keys from the data
+   *
+   * @mutate
+   */
   public stripUnknown() {
+    const validator = this;
     this.addMutator(stripUnknownMutator, {
       get allowedKeys() {
-        return this.allowedKeys;
+        return validator.allowedKeys;
       },
     });
 
@@ -259,18 +479,31 @@ export class ObjectValidator extends BaseValidator {
     return this;
   }
 
+  /**
+   * Whether to allow unknown properties
+   *
+   * @default false
+   */
   public allowUnknown(allow = true) {
     this.shouldAllowUnknown = allow;
 
     return this;
   }
 
+  /**
+   * Mutate the data
+   *
+   * Please note this method should not be called directly, as it is used internally by the `validate` method
+   */
   public mutate(data: any, context: SchemaContext) {
     if (!isPlainObject(data)) return data;
 
     return super.mutate({ ...data }, context);
   }
 
+  /**
+   * Validate the data
+   */
   public async validate(
     data: any,
     context: SchemaContext,
@@ -324,7 +557,7 @@ export class ObjectValidator extends BaseValidator {
   }
 }
 
-export class ArrayValidator extends AnyValidator {
+export class ArrayValidator extends BaseValidator {
   public constructor(
     public validator: BaseValidator,
     errorMessage?: string,
@@ -334,11 +567,10 @@ export class ArrayValidator extends AnyValidator {
     this.addRule(arrayRule, errorMessage);
   }
 
-  // Start of mutators
-  //   Mutators methods should start with `m` prefix
-
   /**
    * Reverse array order
+   *
+   * @mutate
    */
   public flip() {
     return this.addMutator(flipArrayMutator);
@@ -346,6 +578,8 @@ export class ArrayValidator extends AnyValidator {
 
   /**
    * Reverse array order
+   *
+   * @mutate
    */
   public reverse() {
     return this.addMutator(flipArrayMutator);
@@ -353,6 +587,8 @@ export class ArrayValidator extends AnyValidator {
 
   /**
    * Make it has only unique values
+   *
+   * @mutate
    */
   public onlyUnique() {
     return this.addMutator(uniqueArrayMutator);
@@ -362,6 +598,8 @@ export class ArrayValidator extends AnyValidator {
    * Sort array
    *
    * If key is passed, it will sort by the key value
+   *
+   * @mutate
    * @supports dot notation
    */
   public sort(direction: "asc" | "desc" = "asc", key?: string) {
@@ -374,6 +612,9 @@ export class ArrayValidator extends AnyValidator {
 
   //   Start of rules
 
+  /**
+   * Array length must be greater than the given length
+   */
   public minLength(length: number, errorMessage?: string) {
     const rule = this.addRule(minLengthRule, errorMessage);
 
@@ -382,6 +623,9 @@ export class ArrayValidator extends AnyValidator {
     return this;
   }
 
+  /**
+   * Array length must be less than the given length
+   */
   public maxLength(length: number, errorMessage?: string) {
     const rule = this.addRule(maxLengthRule, errorMessage);
 
@@ -390,6 +634,9 @@ export class ArrayValidator extends AnyValidator {
     return this;
   }
 
+  /**
+   * Array length must be of the given length
+   */
   public length(length: number, errorMessage?: string) {
     const rule = this.addRule(lengthRule, errorMessage);
 
@@ -407,17 +654,25 @@ export class ArrayValidator extends AnyValidator {
     return this;
   }
 
+  /**
+   * Mutate the data
+   *
+   * Please note this method should not be called directly, as it is used internally by the `validate` method
+   */
   public mutate(data: any, context: SchemaContext) {
     if (!Array.isArray(data)) return data;
 
     return super.mutate([...data], context);
   }
 
+  /**
+   * Validate array
+   */
   public async validate(
     data: any,
     context: SchemaContext,
   ): Promise<ValidationResult> {
-    const mutatedData = await this.mutate(data, context);
+    const mutatedData = (await this.mutate(data, context)) || [];
     const result = await super.validate(data, context);
 
     if (result.isValid === false) return result;
@@ -465,30 +720,60 @@ export class StringValidator extends BaseValidator {
     this.addMutator(stringMutator);
   }
 
+  /**
+   * Convert string to lowercase
+   *
+   * @mutate
+   */
   public lowercase() {
     this.addMutator(lowercaseMutator);
 
     return this;
   }
 
+  /**
+   * Convert string to uppercase
+   *
+   * @mutate
+   */
   public uppercase() {
     this.addMutator(uppercaseMutator);
 
     return this;
   }
 
+  /**
+   * Capitalize the first letter of the string
+   *
+   * @mutate
+   */
+  public capitalize() {
+    this.addMutator(capitalizeMutator);
+
+    return this;
+  }
+
+  /**
+   * Value must be a valid email
+   */
   public email(errorMessage?: string) {
     this.addRule(emailRule, errorMessage);
 
     return this;
   }
 
+  /**
+   * Value must be a valid URL
+   */
   public url(errorMessage?: string) {
     this.addRule(urlRule, errorMessage);
 
     return this;
   }
 
+  /**
+   * Value must match the value of the given field
+   */
   public matches(field: string, errorMessage?: string) {
     const rule = this.addRule(matchesRule, errorMessage);
 
@@ -497,7 +782,19 @@ export class StringValidator extends BaseValidator {
     return this;
   }
 
-  public pattern(pattern: string, errorMessage?: string) {
+  /**
+   * Value can not have whitespace
+   */
+  public withoutWhitespace(errorMessage?: string) {
+    this.addRule(withoutWhitespaceRule, errorMessage);
+
+    return this;
+  }
+
+  /**
+   * Value must match the given pattern
+   */
+  public pattern(pattern: RegExp, errorMessage?: string) {
     const rule = this.addRule(patternRule, errorMessage);
 
     rule.context.options.pattern = pattern;
@@ -505,6 +802,51 @@ export class StringValidator extends BaseValidator {
     return this;
   }
 
+  /**
+   * Validate the current string as an uploadable hash id
+   */
+  public uploadable(errorMessage?: string) {
+    this.addRule(uploadableRule, errorMessage);
+
+    return this;
+  }
+
+  /**
+   * Value must be exactly the given number of words
+   */
+  public words(words: number, errorMessage?: string) {
+    const rule = this.addRule(wordsRule, errorMessage);
+
+    rule.context.options.words = words;
+
+    return this;
+  }
+
+  /**
+   * Value must be at least the given number of words
+   */
+  public minWords(words: number, errorMessage?: string) {
+    const rule = this.addRule(minWordsRule, errorMessage);
+
+    rule.context.options.minWords = words;
+
+    return this;
+  }
+
+  /**
+   * Value must be at most the given number of words
+   */
+  public maxWords(words: number, errorMessage?: string) {
+    const rule = this.addRule(maxWordsRule, errorMessage);
+
+    rule.context.options.maxWords = words;
+
+    return this;
+  }
+
+  /**
+   * Value length must be greater than the given length
+   */
   public minLength(length: number, errorMessage?: string) {
     const rule = this.addRule(minLengthRule, errorMessage);
 
@@ -513,6 +855,16 @@ export class StringValidator extends BaseValidator {
     return this;
   }
 
+  /**
+   * @alias minLength
+   */
+  public min(min: number, errorMessage?: string) {
+    return this.minLength(min, errorMessage);
+  }
+
+  /**
+   * Value length must be less than the given length
+   */
   public maxLength(length: number, errorMessage?: string) {
     const rule = this.addRule(maxLengthRule, errorMessage);
 
@@ -521,6 +873,16 @@ export class StringValidator extends BaseValidator {
     return this;
   }
 
+  /**
+   * @alias maxLength
+   */
+  public max(max: number, errorMessage?: string) {
+    return this.maxLength(max, errorMessage);
+  }
+
+  /**
+   * Value must be of the given length
+   */
   public length(length: number, errorMessage?: string) {
     const rule = this.addRule(lengthRule, errorMessage);
 
@@ -529,72 +891,258 @@ export class StringValidator extends BaseValidator {
     return this;
   }
 
-  public enum(values: any[], errorMessage?: string) {
-    const rule = this.addRule(enumRule, errorMessage);
-
-    rule.context.options.values = values;
+  /**
+   * Allow only alphabetic characters
+   */
+  public alpha(errorMessage?: string) {
+    this.addRule(alphaRule, errorMessage);
 
     return this;
   }
 
-  public in(values: any[], errorMessage?: string) {
-    return this.enum(values, errorMessage);
+  /**
+   * Allow only alphanumeric characters
+   */
+  public alphanumeric(errorMessage?: string) {
+    this.addRule(alphaNumericRule, errorMessage);
+
+    return this;
   }
 
-  public equal(value: any, errorMessage?: string) {
-    const rule = this.addRule(equalRule, errorMessage);
+  /**
+   * Allow only numeric characters
+   */
+  public numeric(errorMessage?: string) {
+    this.addRule(isNumericRule, errorMessage);
+
+    return this;
+  }
+
+  /**
+   * Value must starts with the given string
+   */
+  public startsWith(value: string, errorMessage?: string) {
+    const rule = this.addRule(startsWithRule, errorMessage);
 
     rule.context.options.value = value;
 
     return this;
   }
 
-  public unique(
-    model: typeof BaseModel | string,
-    {
-      errorMessage,
-      ...options
-    }: UniqueRuleOptions & {
-      errorMessage?: string;
-    } = {},
-  ) {
-    const rule = this.addRule(uniqueRule, errorMessage);
+  /**
+   * Value must ends with the given string
+   */
+  public endsWith(value: string, errorMessage?: string) {
+    const rule = this.addRule(endsWithRule, errorMessage);
 
-    rule.context.options = {
-      ...options,
-      Model: model,
-    };
+    rule.context.options.value = value;
 
     return this;
   }
 
-  public exists(
-    model: typeof BaseModel | string,
-    {
-      errorMessage,
-      ...options
-    }: ExistsRuleOptions & {
-      errorMessage?: string;
-    } = {},
-  ) {
-    const rule = this.addRule(existsRule, errorMessage);
+  /**
+   * Value must contain the given string
+   */
+  public contains(value: string, errorMessage?: string) {
+    const rule = this.addRule(containsRule, errorMessage);
 
-    rule.context.options = {
-      ...options,
-      Model: model,
-    };
+    rule.context.options.value = value;
 
     return this;
   }
+
+  /**
+   * Value must not contain the given string
+   */
+  public notContains(value: string, errorMessage?: string) {
+    const rule = this.addRule(notContainsRule, errorMessage);
+
+    rule.context.options.value = value;
+
+    return this;
+  }
+
+  /**
+   * Value must be a valid IP address
+   */
+  public ip(errorMessage?: string) {
+    this.addRule(ipRule, errorMessage);
+
+    return this;
+  }
+
+  /**
+   * Value must be a valid IPv4 address
+   */
+  public ip4(errorMessage?: string) {
+    this.addRule(ip4Rule, errorMessage);
+
+    return this;
+  }
+
+  /**
+   * Value must be a valid IPv6 address
+   */
+  public ip6(errorMessage?: string) {
+    this.addRule(ip6Rule, errorMessage);
+
+    return this;
+  }
+
+  /**
+   * Check if the string matches a credit card number
+   */
+  public creditCard(errorMessage?: string) {
+    this.addRule(isCreditCardRule, errorMessage);
+
+    return this;
+  }
+
+  /**
+   * Determine if the value is a valid color
+   * This validation rule will check for hex, rgb, rgba, hsl colors
+   */
+  public color(errorMessage?: string) {
+    this.addRule(colorRule, errorMessage);
+
+    return this;
+  }
+
+  /**
+   * Determine if the value is a valid hex color
+   */
+  public hexColor(errorMessage?: string) {
+    this.addRule(hexColorRule, errorMessage);
+
+    return this;
+  }
+
+  /**
+   * Determine if the value is a valid HSL color
+   */
+  public hslColor(errorMessage?: string) {
+    this.addRule(hslColorRule, errorMessage);
+
+    return this;
+  }
+
+  /**
+   * Determine if the value is a valid RGB color
+   */
+  public rgbColor(errorMessage?: string) {
+    this.addRule(rgbColorRule, errorMessage);
+
+    return this;
+  }
+
+  /**
+   * Determine if the value is a valid RGBA color
+   */
+  public rgbaColor(errorMessage?: string) {
+    this.addRule(rgbaColorRule, errorMessage);
+
+    return this;
+  }
+
+  /**
+   * Determine if the value is a valid light color
+   */
+  public lightColor(errorMessage?: string) {
+    this.addRule(lightColorRule, errorMessage);
+
+    return this;
+  }
+
+  /**
+   * Determine if the value is a valid dark color
+   */
+  public darkColor(errorMessage?: string) {
+    this.addRule(darkColorRule, errorMessage);
+
+    return this;
+  }
+
+  /**
+   * Value must be one of the given values
+   */
+  public enum: typeof ScalarValidator.prototype.enum =
+    ScalarValidator.prototype.enum;
+
+  /**
+   * Value must be one of the given values
+   */
+  public in: typeof ScalarValidator.prototype.in = ScalarValidator.prototype.in;
+
+  /**
+   * @alias in
+   */
+  public oneOf: typeof ScalarValidator.prototype.in =
+    ScalarValidator.prototype.in;
+
+  /**
+   * Value must be unique
+   */
+  public unique: typeof ScalarValidator.prototype.unique =
+    ScalarValidator.prototype.unique;
+
+  /**
+   * Value must exist
+   */
+  public exists: typeof ScalarValidator.prototype.exists =
+    ScalarValidator.prototype.exists;
+
+  /**
+   * Add rule to check if the value is one of the allowed values
+   */
+  public allowsOnly: typeof ScalarValidator.prototype.allowsOnly =
+    ScalarValidator.prototype.allowsOnly;
+
+  /**
+   * Add rule to forbid the value from being one of the given values
+   */
+  public forbids: typeof ScalarValidator.prototype.forbids =
+    ScalarValidator.prototype.forbids;
+
+  /**
+   * @alias forbids
+   */
+  public notIn: typeof ScalarValidator.prototype.forbids =
+    ScalarValidator.prototype.forbids;
 }
 
 export class DateValidator extends BaseValidator {
-  public constructor(errorMessage?: string) {
+  public constructor(format?: string, errorMessage?: string) {
     super();
 
-    this.addRule(dateRule, errorMessage);
+    const rule = this.addRule(dateRule, errorMessage);
+
+    if (format) {
+      rule.context.options.format = format;
+    }
 
     this.addMutator(dateMutator);
+  }
+
+  /**
+   * Date must be before the given date
+   */
+  public before(date: Date, errorMessage?: string) {
+    const rule = this.addRule(maxDateRule, errorMessage);
+
+    rule.context.options.maxDate = date;
+
+    return this;
+  }
+
+  /**
+   * Date must be after the given date
+   */
+  public after(date: Date, errorMessage?: string) {
+    const rule = this.addRule(minDateRule, errorMessage);
+
+    rule.context.options.minDate = date;
+
+    return this;
   }
 }
 
@@ -607,6 +1155,9 @@ class NumberValidator extends BaseValidator {
     this.addMutator(numberMutator);
   }
 
+  /**
+   * Value must be equal or higher than the given number
+   */
   public min(min: number, errorMessage?: string) {
     const rule = this.addRule(minRule, errorMessage);
 
@@ -615,6 +1166,9 @@ class NumberValidator extends BaseValidator {
     return this;
   }
 
+  /**
+   * Value must be equal or less than the given number
+   */
   public max(max: number, errorMessage?: string) {
     const rule = this.addRule(maxRule, errorMessage);
 
@@ -623,57 +1177,72 @@ class NumberValidator extends BaseValidator {
     return this;
   }
 
-  public equal(value: number, errorMessage?: string) {
-    const rule = this.addRule(equalRule, errorMessage);
+  /**
+   * Value must be a modulo of the given number
+   */
+  public modulo(value: number, errorMessage?: string) {
+    const rule = this.addRule(moduloRule, errorMessage);
 
     rule.context.options.value = value;
 
     return this;
   }
 
+  /**
+   * Accept only numbers higher than 0
+   */
   public positive(errorMessage?: string) {
     this.addRule(positiveRule, errorMessage);
 
     return this;
   }
 
-  public unique(
-    model: typeof BaseModel | string,
-    {
-      errorMessage,
-      ...options
-    }: UniqueRuleOptions & {
-      errorMessage?: string;
-    } = {},
-  ) {
-    const rule = this.addRule(uniqueRule, errorMessage);
+  /**
+   * Value must be unique and not exist in database
+   */
+  public unique: typeof ScalarValidator.prototype.unique =
+    ScalarValidator.prototype.unique;
 
-    rule.context.options = {
-      ...options,
-      Model: model,
-    };
+  /**
+   * Value must exist in database
+   */
+  public exists: typeof ScalarValidator.prototype.exists =
+    ScalarValidator.prototype.exists;
 
-    return this;
-  }
+  /**
+   * Value must be one of the given values
+   */
+  public enum: typeof ScalarValidator.prototype.enum =
+    ScalarValidator.prototype.enum;
 
-  public exists(
-    model: typeof BaseModel | string,
-    {
-      errorMessage,
-      ...options
-    }: ExistsRuleOptions & {
-      errorMessage?: string;
-    } = {},
-  ) {
-    const rule = this.addRule(existsRule, errorMessage);
+  /**
+   * Value must be one of the given values
+   */
+  public in: typeof ScalarValidator.prototype.in = ScalarValidator.prototype.in;
 
-    rule.context.options = {
-      ...options,
-      Model: model,
-    };
+  /**
+   * @alias in
+   */
+  public oneOf: typeof ScalarValidator.prototype.in =
+    ScalarValidator.prototype.in;
 
-    return;
-  }
+  /**
+   * Add rule to check if the value is one of the allowed values
+   */
+  public allowsOnly: typeof ScalarValidator.prototype.allowsOnly =
+    ScalarValidator.prototype.allowsOnly;
+
+  /**
+   * Add rule to forbid the value from being one of the given values
+   */
+  public forbids: typeof ScalarValidator.prototype.forbids =
+    ScalarValidator.prototype.forbids;
+
+  /**
+   * @alias forbids
+   */
+  public notIn: typeof ScalarValidator.prototype.forbids =
+    ScalarValidator.prototype.forbids;
 }
 
 export class IntValidator extends NumberValidator {
@@ -707,8 +1276,11 @@ export class ScalarValidator extends BaseValidator {
     this.addRule(scalarRule, errorMessage);
   }
 
+  /**
+   * Value must be unique
+   */
   public unique(
-    model: typeof BaseModel | string,
+    model: typeof Model | string,
     {
       errorMessage,
       ...options
@@ -726,8 +1298,11 @@ export class ScalarValidator extends BaseValidator {
     return this;
   }
 
+  /**
+   * Value must exist in database
+   */
   public exists(
-    model: typeof BaseModel | string,
+    model: typeof Model | string,
     {
       errorMessage,
       ...options
@@ -742,7 +1317,57 @@ export class ScalarValidator extends BaseValidator {
       Model: model,
     };
 
-    return;
+    return this;
+  }
+
+  /**
+   * Value must be one of the given values
+   */
+  public enum(values: any, errorMessage?: string) {
+    const rule = this.addRule(enumRule, errorMessage);
+
+    rule.context.options.enum = values;
+
+    return this;
+  }
+
+  /**
+   * Value must be one of the given values
+   */
+  public in(values: any[], errorMessage?: string) {
+    const rule = this.addRule(inRule, errorMessage);
+
+    rule.context.options.values = values;
+
+    return this;
+  }
+
+  /**
+   * @alias in
+   */
+  public oneOf: typeof ScalarValidator.prototype.in =
+    ScalarValidator.prototype.in;
+
+  /**
+   * Add rule to check if the value is one of the allowed values
+   */
+  public allowsOnly(values: any[], errorMessage?: string) {
+    const rule = this.addRule(allowedValuesRule, errorMessage);
+
+    rule.context.options.allowedValues = values;
+
+    return this;
+  }
+
+  /**
+   * Forbid the value from being one of the given values
+   */
+  public forbids(values: any[], errorMessage?: string) {
+    const rule = this.addRule(notAllowedValuesRule, errorMessage);
+
+    rule.context.options.notAllowedValues = values;
+
+    return this;
   }
 }
 
@@ -750,7 +1375,7 @@ export class FileValidator extends BaseValidator {
   public constructor(errorMessage?: string) {
     super();
 
-    this.addRule(fileRile, errorMessage);
+    this.addRule(fileRule, errorMessage);
   }
 
   public image(errorMessage?: string) {
@@ -759,7 +1384,56 @@ export class FileValidator extends BaseValidator {
     return this;
   }
 
-  public minFileSize(size: number, errorMessage?: string) {
+  public accept(extensions: string | string[], errorMessage?: string) {
+    const rule = this.addRule(fileExtensionRule, errorMessage);
+
+    rule.context.options.extensions = extensions;
+
+    return this;
+  }
+
+  public mimeType(mimeTypes: string | string[], errorMessage?: string) {
+    const rule = this.addRule(fileTypeRule, errorMessage);
+
+    rule.context.options.mimeTypes = mimeTypes;
+
+    return this;
+  }
+
+  /**
+   * Allow only pdf files
+   */
+  public pdf(errorMessage?: string) {
+    return this.mimeType("application/pdf", errorMessage);
+  }
+
+  /**
+   * Allow only excel files
+   */
+  public excel(errorMessage?: string) {
+    return this.mimeType(
+      [
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      ],
+      errorMessage,
+    );
+  }
+
+  /**
+   * Allow only word files
+   */
+  public word(errorMessage?: string) {
+    return this.mimeType(
+      [
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ],
+      errorMessage,
+    );
+  }
+
+  public minSize(size: number, errorMessage?: string) {
     const rule = this.addRule(minFileSizeRule, errorMessage);
 
     rule.context.options.minFileSize = size;
@@ -767,12 +1441,20 @@ export class FileValidator extends BaseValidator {
     return this;
   }
 
-  public maxFileSize(size: number, errorMessage?: string) {
+  public min(size: number, errorMessage?: string) {
+    return this.minSize(size, errorMessage);
+  }
+
+  public maxSize(size: number, errorMessage?: string) {
     const rule = this.addRule(maxFileSizeRule, errorMessage);
 
     rule.context.options.maxFileSize = size;
 
     return this;
+  }
+
+  public max(size: number, errorMessage?: string) {
+    return this.maxSize(size, errorMessage);
   }
 
   public minWidth(width: number, errorMessage?: string) {
@@ -800,7 +1482,7 @@ export class FileValidator extends BaseValidator {
   }
 
   public maxHeight(height: number, errorMessage?: string) {
-    const rule = this.addRule(minHeightRule, errorMessage);
+    const rule = this.addRule(maxHeightRule, errorMessage);
 
     rule.context.options.maxHeight = height;
 
@@ -826,8 +1508,12 @@ export const validate = async (schema: BaseValidator, data: any) => {
 export const v = {
   object: (schema: Schema, errorMessage?: string) =>
     new ObjectValidator(schema, errorMessage),
+  any: () => new AnyValidator(),
+  forbidden: () => v.any().forbidden(),
   array: (validator: BaseValidator, errorMessage?: string) =>
     new ArrayValidator(validator, errorMessage),
+  date: (format?: string, errorMessage?: string) =>
+    new DateValidator(format, errorMessage),
   string: (errorMessage?: string) => new StringValidator(errorMessage),
   number: (errorMessage?: string) => new NumberValidator(errorMessage),
   int: (errorMessage?: string) => new IntValidator(errorMessage),
@@ -835,5 +1521,13 @@ export const v = {
   boolean: (errorMessage?: string) => new BooleanValidator(errorMessage),
   scalar: (errorMessage?: string) => new ScalarValidator(errorMessage),
   file: (errorMessage?: string) => new FileValidator(errorMessage),
+  localized: (valueValidator?: BaseValidator, errorMessage?: string) =>
+    v.array(
+      v.object({
+        localeCode: v.string().required(),
+        value: (valueValidator || v.string()).required(),
+      }),
+      errorMessage,
+    ),
   validate,
 };

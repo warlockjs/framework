@@ -17,15 +17,6 @@ export function newMailer(
 
   log.info("mail", "init", "Initializing mailer");
 
-  console.log({
-    requireTLS: requireTLS ?? tls,
-    ...config,
-    auth: auth ?? {
-      user: username,
-      pass: password,
-    },
-  });
-
   return nodemailer.createTransport({
     requireTLS: requireTLS ?? tls,
     ...config,

@@ -2,7 +2,12 @@ import type { CommandBuilder } from "../console/command-builder";
 import type { CommandOptions } from "../console/types";
 
 export type WarlockConfigServe = {
-  //
+  /**
+   * Whether to try another port if the default port is already in use.
+   *
+   * @todo Implement this feature
+   */
+  retryOtherPort?: boolean;
 };
 
 export type WarlockConfigBuild = {

@@ -58,12 +58,12 @@ groupedTranslations("validation", {
     ar: ":input يجب أن يكون على الأكثر :max.",
   },
   minLength: {
-    en: ":input must be at least :min characters.",
-    ar: ":input يجب أن يكون على الأقل :min حرف.",
+    en: ":input must be at least :minLength characters.",
+    ar: ":input يجب أن يكون على الأقل :minLength حرف.",
   },
   maxLength: {
-    en: ":input must be at most :max characters.",
-    ar: ":input يجب أن يكون على الأكثر :max حرف.",
+    en: ":input must be at most :maxLength characters.",
+    ar: ":input يجب أن يكون على الأكثر :maxLength حرف.",
   },
   email: {
     en: "The :input must be a valid email address.",
@@ -128,5 +128,13 @@ groupedTranslations("validation", {
   unknownKey: {
     en: "unknown key :key",
     ar: "مفتاح غير معروف :key",
+  },
+  forbidden: {
+    en: "The :input can not be present.",
+    ar: ":input لا يمكن أن يكون موجود.",
+  },
+  enum: {
+    en: ":input must be one of the following values: :enum.",
+    ar: ":input يجب أن يكون أحد القيم التالية: :enum.",
   },
 });

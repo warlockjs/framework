@@ -1,6 +1,5 @@
 import type { GenericObject } from "@mongez/reinforcements";
 import { Model } from "@warlock.js/cascade";
-import { Request } from "../http";
 import { RepositoryDestroyManager } from "./repository-destroyer-manager";
 import { RepositoryFiller } from "./repository-filler";
 import type { Fillable, SaveMode } from "./types";
@@ -26,10 +25,6 @@ export abstract class RepositoryFillerManager<
   public create(data: any, model?: T): Promise<T> {
     const filler = this.makeFiller();
 
-    if (data instanceof Request) {
-      data = data.all();
-    }
-
     return filler.create(data, model) as Promise<T>;
   }
 
@@ -40,10 +35,6 @@ export abstract class RepositoryFillerManager<
     const model = id instanceof Model ? id : await this.find(id);
 
     if (!model) return;
-
-    if (data instanceof Request) {
-      data = data.all();
-    }
 
     const filler = this.makeFiller();
 

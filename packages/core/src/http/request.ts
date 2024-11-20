@@ -674,6 +674,13 @@ export class Request<User = any> {
   }
 
   /**
+   * Get email input value, this will lowercase the value
+   */
+  public email(key: string = "email", defaultValue: string = ""): string {
+    return this.input(key, defaultValue)?.toLowerCase() || defaultValue;
+  }
+
+  /**
    * @alias input
    */
   public get(key: string, defaultValue?: any) {

@@ -9,6 +9,8 @@ import { Upload } from "./../models";
 export async function compressUploadingFile(file: Upload) {
   if (file.get("mimeType").startsWith("image/") === false) return;
 
+  if (file.get("compress") === false) return;
+
   // skip if file is webp
   if (file.get("extension") === "webp") return;
   try {

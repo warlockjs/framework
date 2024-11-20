@@ -2,11 +2,11 @@ import type { GenericObject } from "@mongez/reinforcements";
 import { readFileSync } from "fs";
 import type { Info, SwaggerStructure } from "./types";
 
-class Postman2Swagger {
+export class Postman2Swagger {
   /**
    * Target and main function
    */
-  public async convert(inputPath: string, outputPath: string) {
+  public async convert(inputPath: string, _outputPath: string) {
     // postman content
     const postmanFileContent = this.cleanInput(inputPath);
 
@@ -14,12 +14,12 @@ class Postman2Swagger {
     const postmanFileContentJson = JSON.parse(postmanFileContent);
 
     // get item and variables
-    const { info, item: items, variables } = postmanFileContentJson;
+    const { info } = postmanFileContentJson;
 
     // get swagger info
     const swaggerInfo: Info = this.getSwaggerInfo(info);
 
-    const swaggerStructure: SwaggerStructure = {
+    const _swaggerStructure: SwaggerStructure = {
       openapi: "3.0.0",
       info: swaggerInfo,
     };
@@ -28,7 +28,7 @@ class Postman2Swagger {
   /**
    * Prepare Swagger Paths
    */
-  public prepareSwaggerPaths(items: GenericObject[]) {}
+  public prepareSwaggerPaths(_items: GenericObject[]) {}
 
   /**
    * Get Swagger info

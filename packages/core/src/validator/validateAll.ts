@@ -34,7 +34,7 @@ export async function validateAll(
     try {
       const result = await v.validate(validation.schema, request.all());
 
-      if (result.data) {
+      if (result.data && result.isValid) {
         request.setValidatedData(result.data);
       }
 
@@ -42,8 +42,6 @@ export async function validateAll(
         return response.failedSchema(result);
       }
     } catch (error) {
-      console.log(error);
-
       log.error("app.validation", "error", error);
       throw error;
     }

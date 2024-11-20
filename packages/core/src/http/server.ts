@@ -10,6 +10,8 @@ export function startServer() {
     trustProxy: true,
     // logger: true,
     bodyLimit: 200 * 1024 * 1024 * 1024, // 200GB
+    ignoreTrailingSlash: true,
+    ignoreDuplicateSlashes: true,
   }));
 }
 

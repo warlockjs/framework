@@ -1,7 +1,9 @@
 import { fileSize } from "@mongez/fs";
 import { Random, ltrim } from "@mongez/reinforcements";
 import type { Request, Response, UploadedFile } from "../../../http";
+import type { RequestHandler } from "../../../router";
 import { uploadsPath } from "../../../utils";
+import { v } from "../../../validator";
 import { Upload } from "../models/upload";
 import { uploadFromUrl } from "../utils";
 import { getUploadsDirectory } from "../utils/get-uploads-directory";
@@ -11,6 +13,7 @@ async function uploadFilesList(
   uploads: Upload[],
   baseDirectoryPath: string,
   isRandom: boolean,
+  compress: boolean,
 ) {
   const addFile = async (file: UploadedFile) => {
     const hash = Random.string(64);
@@ -30,6 +33,7 @@ async function uploadFilesList(
       size: fileSize(uploadsPath(filePath)),
       mimeType: file.mimeType,
       extension: file.extension,
+      compress,
     };
 
     if (file.isImage) {
@@ -74,17 +78,13 @@ async function uploadFromUrlsList(
   );
 }
 
-export async function uploadFiles(request: Request, response: Response) {
-  const files = request.files("uploads");
-  const urls = request.input("urls");
-  const directory = request.input("directory");
-  const isRandom = request.bool("random");
+export const uploadFiles: RequestHandler = async (
+  request: Request,
+  response: Response,
+) => {
+  const { urls, directory, isRandom, compress } = request.validated();
 
-  if (!files && !urls) {
-    return response.badRequest({
-      error: "No files or urls provided",
-    });
-  }
+  const files = request.files("uploads");
 
   const uploads: Upload[] = [];
   const baseDirectoryPath = await getUploadsDirectory(directory);
@@ -94,19 +94,26 @@ export async function uploadFiles(request: Request, response: Response) {
   }
 
   if (files) {
-    await uploadFilesList(files, uploads, baseDirectoryPath, isRandom);
+    await uploadFilesList(
+      files,
+      uploads,
+      baseDirectoryPath,
+      isRandom,
+      compress,
+    );
   }
 
   return response.success({
     uploads,
   });
-}
+};
 
 uploadFiles.validation = {
-  rules: {
-    uploads: ["array", "file"],
-    urls: ["array", "arrayOf:string"],
-    directory: ["string"],
-    random: ["boolean"],
-  },
+  schema: v.object({
+    uploads: v.array(v.file()).requiredIfAbsent("urls"),
+    urls: v.array(v.string().url()),
+    directory: v.string(),
+    random: v.boolean(),
+    compress: v.boolean().default(true),
+  }),
 };

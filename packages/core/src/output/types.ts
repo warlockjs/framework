@@ -16,6 +16,8 @@ export type OutputCastType =
   | "int"
   | "double"
   | "date"
+  | "dateFormat"
+  | "dateIso"
   | "birthDate"
   | "url"
   | "any"
@@ -31,12 +33,15 @@ export type OutputValue =
   | typeof Output
   | ((value: any) => Promise<any> | any);
 
-/**
- * Advanced output transformer
- */
-export type OutputTransformer = {
-  transformer: (value: any) => Promise<any> | any;
-  settings?: any;
+export type OutputFormatter = {
+  type?: OutputCastType;
+  format?: (
+    value: any,
+    options: OutputFormatter,
+    output: Output,
+  ) => any | Promise<any>;
+  options?: any;
+  input?: string;
 };
 
 /**
@@ -44,7 +49,7 @@ export type OutputTransformer = {
  */
 export type FinalOutput = Record<
   string,
-  OutputValue | [string, OutputValue] | OutputTransformer
+  OutputValue | [string, OutputValue] | OutputFormatter
 >;
 
 /**

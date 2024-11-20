@@ -10,7 +10,7 @@ export function getResource<T extends Model = Model>(
   returnAs = "record",
 ) {
   return async function _getResource(request: Request, response: Response) {
-    const record = await repository.find(request.input("id"));
+    const record = await repository.find(request.int("id"));
 
     if (!record) {
       return response.notFound();
@@ -33,7 +33,7 @@ export function getActiveResource<T extends Model = Model>(
     request: Request,
     response: Response,
   ) {
-    const record = await repository.getActive(request.input("id"));
+    const record = await repository.getActive(request.int("id"));
 
     if (!record) {
       return response.notFound();
@@ -55,7 +55,7 @@ export function getActiveCachedResource<T extends Model = Model>(
     request: Request,
     response: Response,
   ) {
-    const record = await repository.getActiveCached(request.input("id"));
+    const record = await repository.getActiveCached(request.int("id"));
 
     if (!record) {
       return response.notFound();
@@ -78,7 +78,7 @@ export function getOwnedResource<T extends Model = Model>(
     request: Request,
     response: Response,
   ) {
-    const record = await repository.find(request.input("id"));
+    const record = await repository.find(request.int("id"));
 
     if (!record) {
       return response.notFound();
@@ -105,7 +105,7 @@ export function getOwnedActiveResource<T extends Model = Model>(
     request: Request,
     response: Response,
   ) {
-    const record = await repository.getActive(request.input("id"));
+    const record = await repository.getActive(request.int("id"));
 
     if (!record) {
       return response.notFound();

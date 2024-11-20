@@ -11,13 +11,13 @@ import { Model } from "@warlock.js/cascade";
 import dayjs from "dayjs";
 import { type Request } from "../http";
 import { useRequestStore } from "../http/middleware/inject-request-context";
-import { dateOutput } from "../utils/date-output";
+import { dateOutput, type DateOutputOptions } from "../utils/date-output";
 import { assetsUrl, uploadsUrl, url } from "../utils/urls";
 import type {
   FinalOutput,
   OutputCastType,
+  OutputFormatter,
   OutputResource,
-  OutputTransformer,
   OutputValue,
 } from "./types";
 
@@ -51,6 +51,13 @@ export class Output {
    * Default date format
    */
   protected dateFormat = "DD-MM-YYYY hh:mm:ss A";
+
+  /**
+   * Date format options
+   */
+  protected dateOptions: DateOutputOptions = {
+    format: this.dateFormat,
+  };
 
   /**
    * Original resource data
@@ -226,7 +233,7 @@ export class Output {
    */
   protected localized(output: typeof Output) {
     return {
-      transformer: async value => {
+      format: async value => {
         if (Array.isArray(value)) {
           const { request } = useRequestStore();
 
@@ -257,7 +264,7 @@ export class Output {
 
         return await new output(value).toJSON();
       },
-    } as OutputTransformer;
+    } as OutputFormatter;
   }
 
   /**
@@ -300,7 +307,10 @@ export class Output {
         get(this.defaults, key, undefined),
       );
 
-      if (value === undefined || value === null) {
+      if (
+        (value === undefined || value === null) &&
+        typeof valueType !== "object"
+      ) {
         continue;
       }
 
@@ -308,21 +318,46 @@ export class Output {
         if (!isPlainObject(value) && !isEmpty(value)) {
           continue;
         }
-      } else if (isEmpty(value)) continue;
+      } else if (isEmpty(value) && typeof valueType !== "object") continue;
 
       const customTransformer = async (
         value: any,
-        valueType: OutputTransformer,
+        valueType: OutputFormatter,
       ) => {
-        const transformer = valueType.transformer;
+        if (valueType.type && valueType.format) {
+          throw new Error(
+            "You can't use both type and format in the same output formatter",
+          );
+        }
 
-        return await transformer(value);
+        if (valueType.input) {
+          value = get(this.resource, valueType.input, value);
+        }
+
+        const outputOptions: OutputFormatter = {
+          ...valueType,
+          input: valueType.input || key,
+        };
+
+        if (outputOptions.format) {
+          return await outputOptions.format(value, valueType, this);
+        }
+
+        return this.cast(
+          value,
+          outputOptions.type || "any",
+          outputOptions.options,
+        );
       };
 
       if (typeof valueType === "object") {
-        const output = await customTransformer(value, valueType);
+        const output = await customTransformer(
+          value,
+          valueType as OutputFormatter,
+        );
+
         if (output !== undefined) {
-          set(this.data, key, await customTransformer(value, valueType));
+          set(this.data, key, output);
         }
       } else if (Array.isArray(value) && valueType !== "localized") {
         set(
@@ -434,7 +469,7 @@ export class Output {
   /**
    * Builtin casts
    */
-  protected cast(value: any, type: OutputValue) {
+  protected cast(value: any, type: OutputValue, options?: any) {
     switch (type) {
       case "number":
         return Number(value);
@@ -449,7 +484,11 @@ export class Output {
       case "boolean":
         return Boolean(value);
       case "date":
-        return this.parseDate(value);
+        return this.parseDate(value, options);
+      case "dateFormat":
+        return dayjs(value).format(this.dateFormat);
+      case "dateIso":
+        return dayjs(value).toISOString();
       case "birthDate": {
         const dateData: any = this.parseDate(value);
         dateData.age = dayjs().diff(value, "years");
@@ -499,9 +538,12 @@ export class Output {
   /**
    * Parse the given value
    */
-  protected parseDate(value: any, format = this.dateFormat) {
+  protected parseDate(
+    value: any,
+    options: DateOutputOptions = this.dateOptions,
+  ) {
     return dateOutput(value, {
-      format,
+      ...options,
       locale: useRequestStore()?.request?.locale,
     });
   }
@@ -532,11 +574,11 @@ export class Output {
    */
   public outputOnly(...keys: string[]) {
     return {
-      transformer: value => {
+      format: value => {
         if (!value) return undefined;
         return only(value, keys);
       },
-    } as OutputTransformer;
+    } as OutputFormatter;
   }
 
   /**
@@ -544,13 +586,13 @@ export class Output {
    */
   public onlyId() {
     return {
-      transformer: value => {
+      format: value => {
         if (!value?.id) return undefined;
 
         return {
           id: value.id,
         };
       },
-    } as OutputTransformer;
+    } as OutputFormatter;
   }
 }

@@ -1,4 +1,4 @@
-import { get, round, trim } from "@mongez/reinforcements";
+import { capitalize, get, round, trim } from "@mongez/reinforcements";
 import { isEmpty, isPlainObject } from "@mongez/supportive-is";
 import { type Mutator } from "./types";
 
@@ -16,6 +16,10 @@ export const lowercaseMutator: Mutator = async value => {
 
 export const uppercaseMutator: Mutator = async value => {
   return value.toString().toUpperCase();
+};
+
+export const capitalizeMutator: Mutator = async value => {
+  return capitalize(value);
 };
 
 export const numberMutator: Mutator = async value => {

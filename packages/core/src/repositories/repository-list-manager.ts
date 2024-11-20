@@ -164,8 +164,6 @@ export abstract class RepositoryListManager<
     }
 
     setTimeout(() => {
-      if (!this.model) console.log(this);
-
       this.model
         .events()
         .onSaved(async model => {
