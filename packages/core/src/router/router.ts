@@ -38,6 +38,14 @@ export class Router {
   protected staticDirectories: FastifyStaticOptions[] = [];
 
   /**
+   * Event listeners
+   */
+  protected eventListeners: Record<
+    string,
+    ((router: Router, server: FastifyInstance) => void)[]
+  > = {};
+
+  /**
    * Stacks
    * Stacks will be used for grouping routes to add prefix, name or middleware
    */
@@ -60,6 +68,34 @@ export class Router {
 
   private constructor() {
     //
+  }
+
+  /**
+   * Listen to router before scan
+   */
+  public beforeScanning(
+    callback: (router: Router, server: FastifyInstance) => void,
+  ) {
+    this.eventListeners.beforeScan = [
+      ...(this.eventListeners.beforeScan || []),
+      callback,
+    ];
+
+    return this;
+  }
+
+  /**
+   * Listen to router after scanning
+   */
+  public afterScanning(
+    callback: (router: Router, server: FastifyInstance) => void,
+  ) {
+    this.eventListeners.afterScanning = [
+      ...(this.eventListeners.afterScanning || []),
+      callback,
+    ];
+
+    return this;
   }
 
   /**
@@ -601,6 +637,8 @@ export class Router {
    * Register routes to the server
    */
   public scan(server: FastifyInstance) {
+    this.eventListeners.beforeScan?.forEach(callback => callback(this, server));
+
     this.routes.forEach(route => {
       const requestMethod = route.method.toLowerCase();
       const requestMethodFunction = server[requestMethod].bind(server);
@@ -620,6 +658,10 @@ export class Router {
         decorateReply: false,
       });
     }
+
+    this.eventListeners.afterScanning?.forEach(callback =>
+      callback(this, server),
+    );
   }
 
   /**

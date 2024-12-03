@@ -931,6 +931,13 @@ export abstract class RepositoryListManager<
   }
 
   /**
+   * Find Active cached content for the given id
+   */
+  public async findActiveCached(id: number | string) {
+    return await this.getActiveCached(id);
+  }
+
+  /**
    * Find by the given column
    */
   public async findBy(column: string, value: any) {

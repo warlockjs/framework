@@ -19,11 +19,11 @@ export function newMailer(
 
   return nodemailer.createTransport({
     requireTLS: requireTLS ?? tls,
-    ...config,
     auth: auth ?? {
       user: username,
       pass: password,
     },
+    ...config,
   });
 }
 
@@ -71,12 +71,6 @@ export async function sendReactMail(
 /**
  * Parse from
  */
-function parseFrom(from: Options["from"]) {
-  if (!from) return getMailConfigurations().from;
-
-  if (typeof from === "string") return from;
-
-  if (!from?.address) return getMailConfigurations().from;
-
+function parseFrom(from: Options["from"] = getMailConfigurations().from) {
   return from;
 }
