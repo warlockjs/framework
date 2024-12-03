@@ -1,6 +1,6 @@
 {
     "name": "@warlock.js/logger",
-    "version": "2.1.1",
+    "version": "2.2.0",
     "description": "A powerful logging system  for messages and errors in nodejs.",
     "main": "src/index.ts",
     "scripts": {
