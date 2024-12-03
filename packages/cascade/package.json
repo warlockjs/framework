@@ -1,23 +1,20 @@
 {
     "name": "@warlock.js/cascade",
-    "version": "2.1.1",
+    "version": "2.2.0",
     "description": "ORM for managing databases",
     "main": "src/index.ts",
     "dependencies": {
         "@mongez/events": "^2.1.0",
-        "@warlock.js/logger": "2.1.1",
+        "@warlock.js/logger": "2.2.0",
         "@mongez/reinforcements": "^2.3.10",
         "@mongez/supportive-is": "^2.0.0",
-        "@faker-js/faker": "^8.4.1",
         "@mongez/time-wizard": "^1.0.6",
         "dayjs": "^1.11.9",
         "console-table-printer": "^2.11.2",
         "pluralize": "^8.0.0",
         "@mongez/copper": "^1.0.1",
+        "@faker-js/faker": "^8 | ^9.2.0",
         "mongodb": "^5.7.0"
-    },
-    "peerDependencies": {
-        "@faker-js/faker": "^9.2.0"
     },
     "scripts": {
         "update": "npx ncu -u",

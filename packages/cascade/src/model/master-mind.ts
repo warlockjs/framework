@@ -137,49 +137,30 @@ export class MasterMind {
   ): Promise<number> {
     const query = this.database.collection(this.collection);
 
-    const collectionDocument = await query.findOne(
+    const result = await query.findOneAndUpdate(
+      { collection },
+      [
+        {
+          $set: {
+            id: {
+              $cond: {
+                if: { $eq: ["$id", null] },
+                then: initialId,
+                else: { $add: ["$id", incrementIdBy] },
+              },
+            },
+            collection: collection,
+          },
+        },
+      ],
       {
-        collection: collection,
-      },
-      {
+        upsert: true,
         session,
+        returnDocument: "after",
       },
     );
 
-    if (collectionDocument) {
-      const nextId = collectionDocument.id + incrementIdBy;
-
-      // update the collection with the latest id
-      await query.updateOne(
-        {
-          collection: collection,
-        },
-        {
-          $set: {
-            id: nextId,
-          },
-        },
-        {
-          // session,
-        },
-      );
-
-      return nextId;
-    } else {
-      // if the collection is not found in the master mind table
-      // create a new record for it
-      await query.insertOne(
-        {
-          collection: collection,
-          id: initialId,
-        },
-        {
-          session,
-        },
-      );
-
-      return initialId;
-    }
+    return result.value?.id ?? initialId;
   }
 }
 
