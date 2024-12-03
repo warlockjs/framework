@@ -1,11 +1,11 @@
 {
     "name": "@warlock.js/cascade",
-    "version": "2.2.1",
+    "version": "2.3.0",
     "description": "ORM for managing databases",
     "main": "src/index.ts",
     "dependencies": {
         "@mongez/events": "^2.1.0",
-        "@warlock.js/logger": "2.2.1",
+        "@warlock.js/logger": "2.3.0",
         "@mongez/reinforcements": "^2.3.10",
         "@mongez/supportive-is": "^2.0.0",
         "@mongez/time-wizard": "^1.0.6",
