@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
+import proxy, { type FastifyHttpProxyOptions } from "@fastify/http-proxy";
 import fastifyStatic, { type FastifyStaticOptions } from "@fastify/static";
 import concatRoute from "@mongez/concat-route";
 import { ltrim, merge, toCamelCase, trim } from "@mongez/reinforcements";
@@ -158,6 +159,17 @@ export class Router {
         response.sendCachedFile(location, cacheTime);
       });
     }
+  }
+
+  /**
+   * Add proxy route
+   */
+  public proxy(options: FastifyHttpProxyOptions) {
+    this.beforeScanning((_router, server) => {
+      server.register(proxy, options);
+    });
+
+    return this;
   }
 
   /**
