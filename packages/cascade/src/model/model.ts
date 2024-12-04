@@ -1139,12 +1139,12 @@ export class Model
   public isNewModel() {
     // Check initial data instead of current data since it represents
     // the original state when the model was instantiated
-    const hasMongoId = Boolean(this.initialData._id) && !this.isRestored;
+    const hasMongoId = Boolean(this.data._id) && !this.isRestored;
 
     // Check for numeric id in initial data
-    const hasNumericId = Boolean(this.initialData?.id) && !this.isRestored;
+    // const hasNumericId = Boolean(this.data?.id) && !this.isRestored;
 
-    return !(hasMongoId || hasNumericId);
+    return !hasMongoId;
   }
 
   /**
