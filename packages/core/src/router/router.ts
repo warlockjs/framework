@@ -199,10 +199,19 @@ export class Router {
 
     path = concatRoute(prefix, path);
 
-    options.middleware = [
-      ...(options.middleware || []),
-      ...this.stacks.middleware,
-    ];
+    const middlewarePrecedence = options.middlewarePrecedence || "after";
+
+    if (middlewarePrecedence === "before") {
+      options.middleware = [
+        ...(options.middleware || []),
+        ...this.stacks.middleware,
+      ];
+    } else {
+      options.middleware = [
+        ...this.stacks.middleware,
+        ...(options.middleware || []),
+      ];
+    }
 
     if (Array.isArray(handler)) {
       const [controller, action] = handler;

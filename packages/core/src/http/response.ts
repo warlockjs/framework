@@ -482,7 +482,7 @@ export class Response {
    * Redirect the user to another route
    */
   public redirect(url: string, statusCode = 302) {
-    this.baseResponse.redirect(statusCode, url);
+    this.baseResponse.redirect(url, statusCode);
 
     return this;
   }
@@ -491,7 +491,7 @@ export class Response {
    * Permanent redirect
    */
   public permanentRedirect(url: string) {
-    this.baseResponse.redirect(301, url);
+    this.baseResponse.redirect(url, 301);
 
     return this;
   }
@@ -500,7 +500,7 @@ export class Response {
    * Get the response time
    */
   public getResponseTime() {
-    return this.baseResponse.getResponseTime();
+    return this.baseResponse.elapsedTime;
   }
 
   /**

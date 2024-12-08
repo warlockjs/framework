@@ -146,6 +146,10 @@ export type RouteOptions = {
    */
   middleware?: Middleware[];
   /**
+   * Middleware precedence to be applied before grouped middleware or after it
+   */
+  middlewarePrecedence?: "before" | "after";
+  /**
    * Route name
    */
   name?: string;

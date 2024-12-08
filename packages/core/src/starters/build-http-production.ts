@@ -22,7 +22,7 @@ export async function buildHttpForProduction() {
     platform: "node",
     entryPoints: [httpPath],
     bundle: true,
-    // packages: config.build.bundle ? undefined : "external",
+    // packages: config.build.bundle ?? "external",
     packages: "external",
     minify: true,
     legalComments: "linked",
