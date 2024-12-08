@@ -164,7 +164,7 @@ export class Response {
    * Get the status code
    */
   public get statusCode(): number {
-    return this.baseResponse.statusCode;
+    return this.currentStatusCode ?? this.baseResponse.statusCode;
   }
 
   /**
