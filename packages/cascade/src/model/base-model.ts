@@ -229,6 +229,10 @@ export abstract class BaseModel {
     // get static output class
     const Output = this.getStaticProperty("output");
 
+    if (Output.toJSON) {
+      return await Output.toJSON((this as any).publicData);
+    }
+
     // if the model has a Output class
     if (Output) {
       // then return the Output instance and call `toJSON` method

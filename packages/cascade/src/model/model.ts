@@ -1343,6 +1343,42 @@ export class Model
   }
 
   /**
+   * Refresh the model with new data from database
+   * This method will update the current data with the new data from database
+   */
+  public async refresh() {
+    const key = this.data._id ? "_id" : "id";
+    const value = this.data._id ?? this.data.id;
+    const data = await this.getQuery().first(this.getCollection(), {
+      [key]: value,
+    });
+
+    if (!data) return;
+
+    this.data = data;
+
+    return this;
+  }
+
+  /**
+   * Fetch data from database and return it in a new model
+   */
+  public async reload(): Promise<this> {
+    const key = this.data._id ? "_id" : "id";
+    const value = this.data._id ?? this.data.id;
+
+    if (!value) {
+      throw new Error("Model ID is required to reload the model");
+    }
+
+    const data = await this.getQuery().first(this.getCollection(), {
+      [key]: value,
+    });
+
+    return new (this.constructor as any)(data);
+  }
+
+  /**
    * Make a wrapper to list when models should be updated when only one of the given columns is updated
    */
   public syncUpdateWhenChange(
