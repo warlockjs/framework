@@ -9,7 +9,7 @@ import {
 import { isEmpty, isObject, isPlainObject } from "@mongez/supportive-is";
 import { Model } from "@warlock.js/cascade";
 import dayjs from "dayjs";
-import { getAWSConfig } from "src/warlock/aws";
+import { getAWSConfig } from "../aws/get-aws-configurations";
 import { currentRequest, type Request } from "../http";
 import { useRequestStore } from "../http/middleware/inject-request-context";
 import { dateOutput, type DateOutputOptions } from "../utils/date-output";
