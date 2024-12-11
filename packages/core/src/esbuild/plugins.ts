@@ -65,6 +65,7 @@ export const startServerPlugin = {
       () => {
         return {
           watchDirs: [srcPath()],
+          path: rootPath(),
           watchFiles: [
             rootPath(".env"),
             rootPath(".env.local"),
@@ -122,6 +123,13 @@ export const startServerPlugin = {
       // Optionally, you can add error handling for the server process.
       serverProcess.on("error", err => {
         console.error("Server process error:", err);
+      });
+
+      // exit main the process of serverProcess exists
+      serverProcess.on("exit", state => {
+        if (state !== null) {
+          process.exit(state);
+        }
       });
     });
   },

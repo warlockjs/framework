@@ -74,6 +74,13 @@ export function requestContext<UserType extends Model = Model>() {
 }
 
 /**
+ * Get current request object
+ */
+export function currentRequest() {
+  return useRequestStore().request;
+}
+
+/**
  * Get the request store
  */
 export function useRequestStore<UserType extends Model = Model>() {
@@ -82,7 +89,7 @@ export function useRequestStore<UserType extends Model = Model>() {
 }
 
 export function t(keyword: string, placeholders?: any) {
-  const { request } = requestContext();
+  const { request } = useRequestStore();
 
   return request?.trans(keyword, placeholders) || trans(keyword);
 }
@@ -95,7 +102,7 @@ export async function fromRequest<T>(
   key: string,
   callback: (request: Request) => Promise<T>,
 ): Promise<T> {
-  const request = requestContext().request;
+  const request = currentRequest();
 
   if (!request) return await callback(request);
 

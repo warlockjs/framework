@@ -64,6 +64,10 @@ export function registerCommand(
     }
   }
 
+  if (options.description) {
+    command.description(options.description);
+  }
+
   command.action(async () => {
     // we need to get the args and options
     const args = command.args;

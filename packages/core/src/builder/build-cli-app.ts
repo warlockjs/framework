@@ -48,6 +48,8 @@ main();
     optionalImports.push(loadMigrationsFiles());
   } else if (command.includes("seed")) {
     optionalImports.push(loadSeedsFiles());
+  } else {
+    lastImports.push(loadCommandFiles());
   }
 
   const list = [...initialImports, ...optionalImports, ...lastImports];

@@ -106,7 +106,7 @@ import type {
   ValidationResult,
   WhenRuleOptions,
 } from "./types";
-import { setKeyPath } from "./utils";
+import { VALID_RULE, invalidRule, setKeyPath } from "./utils";
 
 // TODO: Allow developer to extend the validator with custom rules and custom validators
 
@@ -168,8 +168,25 @@ export class BaseValidator {
   /**
    * Define custom rule
    */
-  public refine(rule: SchemaRule) {
-    this.addRule(rule);
+  public refine(
+    callback: (
+      value: any,
+      context: SchemaContext,
+    ) => Promise<string | undefined> | string | undefined,
+  ) {
+    this.addRule({
+      name: "custom",
+      async validate(value, context) {
+        const result = await callback(value, context);
+
+        if (result) {
+          this.context.errorMessage = result;
+          return invalidRule(this, context);
+        }
+
+        return VALID_RULE;
+      },
+    });
 
     return this;
   }

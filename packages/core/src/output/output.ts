@@ -9,7 +9,8 @@ import {
 import { isEmpty, isObject, isPlainObject } from "@mongez/supportive-is";
 import { Model } from "@warlock.js/cascade";
 import dayjs from "dayjs";
-import { type Request } from "../http";
+import { getAWSConfig } from "src/warlock/aws";
+import { currentRequest, type Request } from "../http";
 import { useRequestStore } from "../http/middleware/inject-request-context";
 import { dateOutput, type DateOutputOptions } from "../utils/date-output";
 import { assetsUrl, uploadsUrl, url } from "../utils/urls";
@@ -235,7 +236,7 @@ export class Output {
     return {
       format: async value => {
         if (Array.isArray(value)) {
-          const { request } = useRequestStore();
+          const request = currentRequest();
 
           if (!request) return value;
 
@@ -596,3 +597,267 @@ export class Output {
     } as OutputFormatter;
   }
 }
+
+type OutputHelpers = {
+  transform: (value: any, rule: OutputValue, options?: any) => Promise<any>;
+  opt: (key: string, type: OutputValue, setAs?: string) => any;
+};
+
+export type OutputOptions = {
+  transform?: Record<string, any>;
+  before?: (
+    resource: any,
+    output: Record<string, any>,
+    helpers: OutputHelpers,
+  ) => Promise<void>;
+  after?: (
+    resource: any,
+    output: Record<string, any>,
+    helpers: OutputHelpers,
+  ) => Promise<void>;
+  settings?: {
+    dateFormat?: string;
+    [key: string]: any;
+  };
+};
+
+export function output(options: OutputOptions) {
+  return {
+    async toJSON(resource: any) {
+      if (resource instanceof Model) {
+        resource = resource.data;
+      }
+
+      const output = {};
+
+      const helpers: OutputHelpers = {
+        transform: async (value, rule, options) => {
+          return await directTransform({ value, rule, options });
+        },
+        opt: (key, type, setAs) => {
+          const finalValue = directTransform({
+            rule: type,
+            value: get(resource, key),
+            options,
+          });
+
+          set(output, setAs ?? key, finalValue);
+        },
+      };
+
+      if (options.before) {
+        await options.before(resource, output, helpers);
+      }
+
+      if (options.transform) {
+        await transform(resource, options, output);
+      }
+
+      if (options.after) {
+        await options.after(resource, output, helpers);
+      }
+
+      return output;
+    },
+  };
+}
+
+// Helper function to perform transformation
+async function transform(
+  resource: any,
+  options: OutputOptions,
+  results: Record<string, any>,
+) {
+  for (const key in options.transform) {
+    const rule = options.transform[key];
+    if (typeof rule === "function") {
+      set(results, key, await rule(resource, results, options));
+    } else if (rule.toJSON) {
+      const value = get(resource, key);
+      if (Array.isArray(value)) {
+        set(
+          results,
+          key,
+          await Promise.all(value.map(async item => await rule.toJSON(item))),
+        );
+      } else {
+        set(results, key, await rule.toJSON(value));
+      }
+    } else if (isPlainObject(rule)) {
+      // If it is a plain object, then it means it is a nested results
+      const value = get(resource, key);
+
+      if (!value) continue;
+
+      // if value is array, then it will be treated as a collection of objects
+      if (Array.isArray(value)) {
+        set(
+          results,
+          key,
+          await Promise.all(
+            value.map(async item => await output(rule).toJSON(item)),
+          ),
+        );
+      } else {
+        set(results, key, await output(rule).toJSON(value));
+      }
+    } else {
+      const value = get(resource, key);
+      if (Array.isArray(rule)) {
+        const [key, value] = rule;
+        set(
+          results,
+          key,
+          await directTransform({ rule: value, value, options }),
+        );
+      } else {
+        set(
+          results,
+          key,
+          await directTransform({
+            rule,
+            value,
+            options,
+          }),
+        );
+      }
+    }
+  }
+}
+
+function parseDate(value: any, options?: OutputOptions) {
+  return dateOutput(value, {
+    ...options?.settings,
+    locale: currentRequest()?.locale,
+  });
+}
+
+function directTransform({
+  rule,
+  value,
+  options,
+}: {
+  rule: OutputValue;
+  value: any;
+  options: OutputOptions;
+}) {
+  switch (rule) {
+    case "number":
+      return Number(value);
+    case "float":
+    case "double":
+      return parseFloat(value);
+    case "int":
+    case "integer":
+      return parseInt(value);
+    case "string":
+      return String(value);
+    case "boolean":
+      return Boolean(value);
+    case "date":
+      return parseDate(value);
+    case "dateFormat":
+      return dayjs(value).format(
+        options.settings?.dateFormat ?? "DD-MM-YYYY hh:mm:ss A",
+      );
+    case "dateIso":
+      return dayjs(value).toISOString();
+    case "birthDate": {
+      const dateData: any = parseDate(value);
+      dateData.age = dayjs().diff(value, "years");
+
+      return dateData;
+    }
+    case "url":
+      return url(value);
+    case "uploadsUrl":
+      return uploadsUrl(value);
+    case "assetsUrl":
+      return assetsUrl(value);
+    case "localized":
+      // check if the request has
+      // eslint-disable-next-line no-case-declarations
+      const localeCode = currentRequest()?.localized;
+
+      if (!localeCode) return value;
+
+      if (!Array.isArray(value)) return value;
+
+      const localizedValue = value.find(
+        item => item.localeCode === localeCode,
+      )?.value;
+
+      if (localizedValue || localizedValue === "") return localizedValue;
+
+      return value;
+    case "location":
+      if (!value) return null;
+
+      return {
+        lat: value.coordinates?.[0],
+        lng: value.coordinates?.[1],
+        address: value.address,
+      };
+    case "any":
+    case "mixed":
+    default:
+      return value;
+  }
+}
+
+const _uploadOutput = output({
+  transform: {
+    name: "string",
+    hash: "string",
+    mimeType: "string",
+    extension: "string",
+    size: "number",
+    url: ["path", "uploadsUrl"],
+    id: ["hash", "string"],
+    width: "number",
+    height: "number",
+    path: "string",
+  },
+  after: async (resource: any, output: Record<string, any>) => {
+    if (resource?.provider?.url) {
+      const cloudfront = await getAWSConfig("cloudfront");
+      if (cloudfront) {
+        set(output, "url", cloudfront + "/" + resource?.provider?.fileName);
+      } else {
+        set(output, "url", resource?.provider?.url);
+      }
+    }
+  },
+});
+
+const _postOutput = output({
+  transform: {
+    id: "number",
+    title: "string",
+    content: "string",
+    images: _uploadOutput,
+    user: {
+      image: _uploadOutput,
+      name: "string",
+    },
+    fullName: (resource: any, output: Record<string, any>) => {
+      return `${resource.firstName} ${resource.lastName}`;
+    },
+  },
+  before: async (
+    resource: any,
+    output: Record<string, any>,
+    helpers: OutputHelpers,
+  ) => {
+    output.title = "Hello World";
+
+    helpers.opt("title", "string");
+  },
+  after: async (
+    resource: any,
+    output: Record<string, any>,
+    helpers: OutputHelpers,
+  ) => {
+    output.title = "Hello World";
+  },
+});

@@ -14,9 +14,9 @@ export const invalidRule = (
   attributes.path = context.path;
 
   const error =
-    rule.context.errorMessage ??
-    context.translator(rule.name, attributes) ??
-    rule.errorMessage;
+    rule.context.errorMessage ||
+    rule.errorMessage ||
+    context.translator(rule.name, attributes)!;
 
   return {
     isValid: false,
