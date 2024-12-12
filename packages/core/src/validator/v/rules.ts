@@ -5,14 +5,14 @@ import {
   isNumeric,
   isPlainObject,
 } from "@mongez/supportive-is";
-import { Aggregate, type Model } from "@warlock.js/cascade";
 import dayjs from "dayjs";
 import { isIP } from "net";
 import { UploadedFile } from "./../../http/UploadedFile";
 import { Upload } from "./../../modules/uploads/models/upload";
 import { type BaseValidator } from "./schema";
-import type { SchemaRule, UniqueRuleOptions } from "./types";
+import type { SchemaRule } from "./types";
 import { VALID_RULE, invalidRule, setKeyPath } from "./utils";
+export * from "./database";
 
 export const requiredRule: SchemaRule = {
   name: "required",
@@ -1140,61 +1140,6 @@ export const domainUrl: SchemaRule = {
   },
 };
 
-/**
- * Unique rule works with database
- */
-export const uniqueRule: SchemaRule<
-  UniqueRuleOptions & {
-    Model: typeof Model | string;
-  }
-> = {
-  name: "unique",
-  errorMessage: "The :input must be unique",
-  async validate(value: any, context) {
-    const {
-      Model,
-      except,
-      column = context.key,
-      exceptColumnName,
-      exceptValue,
-      query,
-    } = this.context.options;
-
-    const dbQuery: Aggregate =
-      typeof Model !== "string" ? Model.aggregate() : new Aggregate(Model);
-
-    dbQuery.where(column, value);
-
-    if (except) {
-      const exceptValue = get(context.allValues, except);
-
-      if (exceptValue !== undefined) {
-        dbQuery.where(except, "!=", exceptValue);
-      }
-    }
-
-    if (exceptValue !== undefined) {
-      dbQuery.where(exceptColumnName ?? context.key, "!=", exceptValue);
-    }
-
-    if (query) {
-      await query({
-        query: dbQuery,
-        value,
-        allValues: context.allValues,
-      });
-    }
-
-    const document = await dbQuery.first();
-
-    if (!document) {
-      return VALID_RULE;
-    }
-
-    return invalidRule(this, context);
-  },
-};
-
 export const uploadableRule: SchemaRule = {
   name: "uploadable",
   errorMessage: "The :input must be a valid uploadable hash id",
@@ -1202,48 +1147,6 @@ export const uploadableRule: SchemaRule = {
     const hashExists = await Upload.aggregate().where("hash", value).exists();
 
     if (hashExists) {
-      return VALID_RULE;
-    }
-
-    return invalidRule(this, context);
-  },
-};
-
-export type ExistsRuleOptions = {
-  column?: string;
-  query?: (options: {
-    query: Aggregate;
-    value: any;
-    allValues: any;
-  }) => void | Promise<void>;
-};
-
-export const existsRule: SchemaRule<
-  ExistsRuleOptions & {
-    Model: typeof Model | string;
-  }
-> = {
-  name: "exists",
-  errorMessage: "The :input must exist",
-  async validate(value: any, context) {
-    const { Model, query, column = context.key } = this.context.options;
-
-    const dbQuery: Aggregate =
-      typeof Model !== "string" ? Model.aggregate() : new Aggregate(Model);
-
-    dbQuery.where(column, value);
-
-    if (query) {
-      await query({
-        query: dbQuery,
-        value,
-        allValues: context.allValues,
-      });
-    }
-
-    const document = await dbQuery.first();
-
-    if (document) {
       return VALID_RULE;
     }
 

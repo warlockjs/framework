@@ -76,7 +76,7 @@ export function requestContext<UserType extends Model = Model>() {
 /**
  * Get current request object
  */
-export function currentRequest() {
+export function currentRequest(): Request | undefined {
   return useRequestStore().request;
 }
 
@@ -100,11 +100,11 @@ export function t(keyword: string, placeholders?: any) {
  */
 export async function fromRequest<T>(
   key: string,
-  callback: (request: Request) => Promise<T>,
+  callback: (request?: Request) => Promise<T>,
 ): Promise<T> {
   const request = currentRequest();
 
-  if (!request) return await callback(request);
+  if (!request) return await callback();
 
   if (request[key]) return request[key];
 

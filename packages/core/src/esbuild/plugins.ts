@@ -65,7 +65,7 @@ export const startServerPlugin = {
       () => {
         return {
           watchDirs: [srcPath()],
-          path: rootPath(),
+          // path: rootPath(),
           watchFiles: [
             rootPath(".env"),
             rootPath(".env.local"),

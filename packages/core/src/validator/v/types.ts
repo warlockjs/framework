@@ -1,4 +1,4 @@
-import { type Aggregate } from "@warlock.js/cascade";
+import type { Aggregate, Model } from "@warlock.js/cascade";
 import { type BaseValidator } from "./schema";
 
 export type Schema = Record<string, BaseValidator>;
@@ -83,16 +83,124 @@ export type ValidationResult = {
   }[];
 };
 
-export type UniqueRuleOptions = {
+export type BaseUniqueRuleOptions = {
+  /**
+   * The Model to query against
+   */
+  Model: typeof Model | string;
+
+  /**
+   * A callback function that will be used to manage the query
+   */
   query?: (options: {
     query: Aggregate;
     value: any;
     allValues: any;
   }) => void | Promise<void>;
-  except?: string;
+
+  /**
+   * The column that will be used to filter by the value
+   *
+   * @default the key
+   */
   column?: string;
+};
+
+export type UniqueRuleOptions = BaseUniqueRuleOptions & {
+  /**
+   * If set, then filter the query where the value is not equal to the value of the field
+   * The key is taken from the all values object not the parent
+   */
+  except?: string;
+
+  /**
+   * The column that will be used with the `except` value
+   *
+   * @default the key
+   */
   exceptColumnName?: string;
+
+  /**
+   * The value that will be used to filter by the value
+   *
+   * @default the value
+   */
   exceptValue?: any;
+};
+
+export type UniqueExceptCurrentUserRuleOptions = BaseUniqueRuleOptions & {
+  /**
+   * The column that will be used to filter by current user
+   *
+   * @default id
+   */
+  exceptCurrentUserColumn?: string;
+
+  /**
+   * The value that will be taken from current user model
+   *
+   * @default id
+   */
+  exceptCurrentUserValue?: string;
+};
+
+export type UniqueExceptCurrentIdRuleOptions = BaseUniqueRuleOptions & {
+  /**
+   * The column that will be used to filter by current id
+   *
+   * @default id
+   */
+  exceptCurrentIdColumn?: string;
+};
+
+export type BaseQueryRuleOptions = {
+  /**
+   * The Model to query against
+   */
+  Model: typeof Model | string;
+
+  /**
+   * A callback function that will be used to manage the query
+   */
+  query?: (options: {
+    query: Aggregate;
+    value: any;
+    allValues: any;
+  }) => void | Promise<void>;
+
+  /**
+   * The column that will be used to filter by the value
+   *
+   * @default the key
+   */
+  column?: string;
+};
+
+export type ExistsRuleOptions = BaseQueryRuleOptions;
+
+export type ExistsExceptCurrentUserRuleOptions = BaseQueryRuleOptions & {
+  /**
+   * The column that will be used to filter by current user
+   *
+   * @default id
+   */
+  exceptCurrentUserColumn?: string;
+
+  /**
+   * The value that will be taken from current user model
+   *
+   * @default id
+   */
+  exceptCurrentUserValue?: string;
+};
+
+export type ExistsExceptCurrentIdRuleOptions = BaseQueryRuleOptions & {
+  /**
+   * The column that will be used to filter by current id
+   *
+   * @default id
+   */
+  exceptCurrentIdColumn?: string;
 };
 
 export type WhenRuleOptions = {

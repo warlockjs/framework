@@ -30,6 +30,8 @@ import {
   endsWithRule,
   enumRule,
   equalRule,
+  existsExceptCurrentIdRule,
+  existsExceptCurrentUserRule,
   existsRule,
   fileExtensionRule,
   fileRule,
@@ -85,6 +87,8 @@ import {
   startsWithRule,
   stringRule,
   uniqueArrayRule,
+  uniqueExceptCurrentIdRule,
+  uniqueExceptCurrentUserRule,
   uniqueRule,
   unknownKeyRule,
   uploadableRule,
@@ -92,16 +96,20 @@ import {
   whenRule,
   withoutWhitespaceRule,
   wordsRule,
-  type ExistsRuleOptions,
 } from "./rules";
 import type {
   ContextualSchemaRule,
   ContextualizedMutator,
+  ExistsExceptCurrentIdRuleOptions,
+  ExistsExceptCurrentUserRuleOptions,
+  ExistsRuleOptions,
   Mutator,
   Schema,
   SchemaContext,
   SchemaRule,
   SchemaRuleOptions,
+  UniqueExceptCurrentIdRuleOptions,
+  UniqueExceptCurrentUserRuleOptions,
   UniqueRuleOptions,
   ValidationResult,
   WhenRuleOptions,
@@ -1103,10 +1111,34 @@ export class StringValidator extends BaseValidator {
     ScalarValidator.prototype.unique;
 
   /**
+   * Value must be unique except current user
+   */
+  public uniqueExceptCurrentUser: typeof ScalarValidator.prototype.uniqueExceptCurrentUser =
+    ScalarValidator.prototype.uniqueExceptCurrentUser;
+
+  /**
+   * Value must be unique except current id
+   */
+  public uniqueExceptCurrentId: typeof ScalarValidator.prototype.uniqueExceptCurrentId =
+    ScalarValidator.prototype.uniqueExceptCurrentId;
+
+  /**
    * Value must exist
    */
   public exists: typeof ScalarValidator.prototype.exists =
     ScalarValidator.prototype.exists;
+
+  /**
+   * Value must exist except current user
+   */
+  public existsExceptCurrentUser: typeof ScalarValidator.prototype.existsExceptCurrentUser =
+    ScalarValidator.prototype.existsExceptCurrentUser;
+
+  /**
+   * Value must exist except current id
+   */
+  public existsExceptCurrentId: typeof ScalarValidator.prototype.existsExceptCurrentId =
+    ScalarValidator.prototype.existsExceptCurrentId;
 
   /**
    * Add rule to check if the value is one of the allowed values
@@ -1294,18 +1326,56 @@ export class ScalarValidator extends BaseValidator {
   }
 
   /**
-   * Value must be unique
+   * Value must be unique in database
    */
   public unique(
     model: typeof Model | string,
-    {
-      errorMessage,
-      ...options
-    }: UniqueRuleOptions & {
+    optionsList?: Partial<UniqueRuleOptions> & {
       errorMessage?: string;
-    } = {},
+    },
   ) {
+    const { errorMessage, ...options } = optionsList || {};
     const rule = this.addRule(uniqueRule, errorMessage);
+
+    rule.context.options = {
+      ...options,
+      Model: model,
+    };
+
+    return this;
+  }
+
+  /**
+   * Value must be unique in database except current user
+   */
+  public uniqueExceptCurrentUser(
+    model: typeof Model | string,
+    optionsList?: Partial<UniqueExceptCurrentUserRuleOptions> & {
+      errorMessage?: string;
+    },
+  ) {
+    const { errorMessage, ...options } = optionsList || {};
+    const rule = this.addRule(uniqueExceptCurrentUserRule, errorMessage);
+
+    rule.context.options = {
+      ...options,
+      Model: model,
+    };
+
+    return this;
+  }
+
+  /**
+   * Value must be unique in database except current id
+   */
+  public uniqueExceptCurrentId(
+    model: typeof Model | string,
+    optionsList?: Partial<UniqueExceptCurrentIdRuleOptions> & {
+      errorMessage?: string;
+    },
+  ) {
+    const { errorMessage, ...options } = optionsList || {};
+    const rule = this.addRule(uniqueExceptCurrentIdRule, errorMessage);
 
     rule.context.options = {
       ...options,
@@ -1320,14 +1390,53 @@ export class ScalarValidator extends BaseValidator {
    */
   public exists(
     model: typeof Model | string,
-    {
-      errorMessage,
-      ...options
-    }: ExistsRuleOptions & {
+    optionsList?: Partial<ExistsRuleOptions> & {
       errorMessage?: string;
-    } = {},
+    },
   ) {
+    const { errorMessage, ...options } = optionsList || {};
+
     const rule = this.addRule(existsRule, errorMessage);
+
+    rule.context.options = {
+      ...options,
+      Model: model,
+    };
+
+    return this;
+  }
+
+  /**
+   * Value must exist in database except current user
+   */
+  public existsExceptCurrentUser(
+    model: typeof Model | string,
+    optionsList?: Partial<ExistsExceptCurrentUserRuleOptions> & {
+      errorMessage?: string;
+    },
+  ) {
+    const { errorMessage, ...options } = optionsList || {};
+    const rule = this.addRule(existsExceptCurrentUserRule, errorMessage);
+
+    rule.context.options = {
+      ...options,
+      Model: model,
+    };
+
+    return this;
+  }
+
+  /**
+   * Value must exists in database except current id
+   */
+  public existsExceptCurrentId(
+    model: typeof Model | string,
+    optionsList?: Partial<ExistsExceptCurrentIdRuleOptions> & {
+      errorMessage?: string;
+    },
+  ) {
+    const { errorMessage, ...options } = optionsList || {};
+    const rule = this.addRule(existsExceptCurrentIdRule, errorMessage);
 
     rule.context.options = {
       ...options,
