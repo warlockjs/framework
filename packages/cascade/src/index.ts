@@ -1,4 +1,5 @@
 export * from "./aggregate";
+export * from "./aggregate/filters";
 export * from "./blueprint";
 export * from "./casts";
 export * from "./config";

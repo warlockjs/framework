@@ -39,6 +39,8 @@ import {
   week,
   year,
 } from "./expressions";
+import { applyFilters } from "./filters/apply-filters";
+import type { FilterOptions, FilterStructure } from "./filters/types";
 import { parsePipelines } from "./parsePipelines";
 import type { Pipeline } from "./pipeline";
 import type { WhereOperator } from "./types";
@@ -462,6 +464,53 @@ export class Aggregate {
    */
   public whereNull(column: string) {
     return this.where(column, null);
+  }
+
+  /**
+   * Check if the given column array has the given value or it is empty
+   * Empty means either the array column does not exists or exists but empty
+   *
+   * @usecase for when to use this method is when you have lessons collection and you want to get all lessons that either does not have column `allowedStudents`
+   * or has an empty array of `allowedStudents` or the `allowedStudents` column has the given student id
+   *
+   * Passing third argument empty means we will check directly in the given array (not array of objects in this case)
+   */
+  public whereArrayHasOrEmpty(column: string, value: any, key = "id") {
+    const keyName = key ? `.${key}` : "";
+
+    return this.orWhere([
+      {
+        [`${column}${keyName}`]: value,
+      },
+      {
+        [column]: { $size: 0 },
+      },
+      {
+        [column]: { $exists: false },
+      },
+    ]);
+  }
+
+  /**
+   * Check if the given column array does not have the given value or it is empty.
+   * Empty means either the array column does not exist or exists but is empty.
+   *
+   * @usecase This method is useful when you have a collection, such as `lessons`, and you want to retrieve all lessons that either column `excludedStudents` does not contain the specified student id,
+   * have an empty array for `excludedStudents`, or the `excludedStudents` does not exist.
+   */
+  public whereArrayNotHaveOrEmpty(column: string, value: any, key = "id") {
+    const keyName = key ? `.${key}` : "";
+    return this.orWhere([
+      {
+        [`${column}${keyName}`]: { $ne: value },
+      },
+      {
+        [column]: { $size: 0 },
+      },
+      {
+        [column]: { $exists: false },
+      },
+    ]);
   }
 
   /**
@@ -1159,5 +1208,22 @@ export class Aggregate {
     aggregate.pipelines = this.pipelines.slice();
 
     return aggregate as this;
+  }
+
+  /**
+   * Apply filters to the query
+   */
+  public applyFilters(
+    filters: FilterStructure,
+    data: Record<string, any> = {},
+    options: FilterOptions = {},
+  ): this {
+    applyFilters({
+      query: this,
+      filters,
+      data,
+      options,
+    });
+    return this;
   }
 }

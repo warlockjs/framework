@@ -144,7 +144,7 @@ export class MasterMind {
           $set: {
             id: {
               $cond: {
-                if: { $eq: ["$id", null] },
+                if: { $or: [{ $eq: ["$id", null] }, { $not: "$id" }] },
                 then: initialId,
                 else: { $add: ["$id", incrementIdBy] },
               },

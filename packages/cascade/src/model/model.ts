@@ -1196,7 +1196,7 @@ export class Model
   /**
    * @alias aggregate
    */
-  public static $(): ModelAggregate<Model> {
+  public static newQuery(): ModelAggregate<Model> {
     return this.aggregate();
   }
 

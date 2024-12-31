@@ -1,6 +1,6 @@
 import type { GenericObject } from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
-import pluralize from "pluralize";
+import pluralize from "pluralize-esm";
 import type { LookupPipelineOptions, Pipeline } from "../aggregate";
 import { Aggregate } from "../aggregate";
 import type { Model } from "../model";
