@@ -1,5 +1,4 @@
 import { ensureDirectoryAsync, putFileAsync } from "@mongez/fs";
-import { transpile } from "../esbuild/transpile";
 import { warlockPath } from "../utils/paths";
 import {
   createAppBuilder,
@@ -32,12 +31,7 @@ export async function buildHttpApp() {
   // First, build all modules and save their outputs
   for (const [name, builder] of Object.entries(moduleBuilders)) {
     try {
-      // Execute the builder and get its output
       await builder();
-
-      // The builder functions now handle their own saving
-      // We just need to transpile the saved file
-      await transpile(warlockPath(`${name}.ts`), `${name}.js`);
     } catch (error) {
       console.error(`Failed to build module ${name}:`, error);
       throw error;
@@ -51,7 +45,7 @@ import "./bootstrap";
 import "./environment";
 
 // Load config before other modules
-import "./config";
+import "./config-loader";
 
 // Load core modules
 import "./main";
@@ -60,7 +54,7 @@ import "./events";
 import "./routes";
 
 // Start the application
-import "./starter";
+import "./start-http-application";
 
 // Export a timestamp to ensure the file is not cached
 export const timestamp = ${Date.now()};`;

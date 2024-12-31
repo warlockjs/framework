@@ -43,7 +43,6 @@ export const startServerPlugin: Plugin = {
       );
 
       if (requiresRestart) {
-        console.log("Core files changed, restarting server...");
         if (serverProcess) {
           serverProcess.kill();
           serverProcess = null;

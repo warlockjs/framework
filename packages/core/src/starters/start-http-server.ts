@@ -4,7 +4,6 @@ import path from "path";
 import { buildHttpApp } from "../builder/build-http-app";
 import { command } from "../console/command-builder";
 import { srcPath, warlockPath } from "../utils";
-import { cleanupTempFiles } from "../utils/cleanup-temp-files";
 import {
   injectImportPathPlugin,
   nativeNodeModulesPlugin,
@@ -12,9 +11,6 @@ import {
 } from "./../esbuild";
 
 export async function startHttpApp() {
-  // Clean up old temp files before starting
-  await cleanupTempFiles();
-
   const httpPath = await buildHttpApp();
 
   const builder = await esbuild.context({
@@ -38,6 +34,11 @@ export async function startHttpApp() {
     treeShaking: true,
     // Generate metafile for analysis
     metafile: true,
+    // Deduplicate modules
+    mainFields: ["module", "main"],
+    conditions: ["import", "module"],
+    // Preserve imports structure
+    preserveSymlinks: true,
     plugins: [
       typecheckPlugin({
         watch: true,
@@ -45,7 +46,6 @@ export async function startHttpApp() {
       injectImportPathPlugin(),
       nativeNodeModulesPlugin,
       startServerPlugin,
-      // buildReporterPlugin,
     ],
   });
 

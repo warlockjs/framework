@@ -176,6 +176,23 @@ export interface RouteOptions {
    * Mark this route as a page route that will be handled by React SSR
    */
   isPage?: boolean;
+  /**
+   * Rate limit options for this route
+   */
+  rateLimit?: {
+    /**
+     * Max number of requests within the time window
+     */
+    max: number;
+    /**
+     * Time window in milliseconds
+     */
+    timeWindow: number;
+    /**
+     * Error message when rate limit is exceeded
+     */
+    errorMessage?: string;
+  };
 }
 
 export type RequestMethod =

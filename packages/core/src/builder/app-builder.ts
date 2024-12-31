@@ -99,7 +99,7 @@ export function createAppBuilder() {
       imports.push(...importsList);
     },
     async addImportPath(path: string) {
-      if (!path.endsWith(".ts")) {
+      if (!path.endsWith(".ts") && !path.endsWith(".tsx")) {
         path += ".ts";
       }
 
@@ -124,11 +124,11 @@ export async function createBootstrapFile() {
 
 export async function createEnvironmentModeDisplayFile() {
   await createWarlockFile(
-    "environment-mode.ts",
+    "environment.ts",
     `import { displayEnvironmentMode } from "@warlock.js/core";\n displayEnvironmentMode();`,
   );
 
-  return "import './environment-mode'";
+  return "import './environment'";
 }
 
 export async function loadMainFiles() {
