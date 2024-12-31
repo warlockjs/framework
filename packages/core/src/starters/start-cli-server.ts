@@ -27,10 +27,9 @@ export async function startCliServer() {
     packages: "external",
     sourcemap: "linked",
     sourceRoot: srcPath(),
-    format: "cjs",
+    format: "esm",
     target: ["esnext"],
     outfile: outputCliPath,
-    // plugins: [typecheckPlugin(), nativeNodeModulesPlugin],
     plugins: [nativeNodeModulesPlugin],
   });
 
@@ -38,6 +37,7 @@ export async function startCliServer() {
 
   const processChild = spawn("node", [outputCliPath, ...args], {
     stdio: "inherit",
+    cwd: process.cwd(),
   });
 
   processChild.on("exit", code => {

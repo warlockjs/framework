@@ -559,7 +559,7 @@ export class Request<User = any> {
 
       this.log("Executing the request");
 
-      await createRequestStore(this, this.response);
+      return await createRequestStore(this, this.response);
     } catch (error) {
       this.log(error, "error");
 

@@ -27,6 +27,7 @@ export async function buildHttpForProduction() {
     minify: true,
     legalComments: "linked",
     target: ["esnext"],
+    format: "esm",
     outfile: path.resolve(config.build.outDirectory, config.build.outFile),
     plugins: [nativeNodeModulesPlugin],
   });

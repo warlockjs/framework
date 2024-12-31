@@ -13,7 +13,7 @@ import {
   router,
 } from "@warlock.js/core";
 import { log } from "@warlock.js/logger";
-import { plural, singular } from "pluralize";
+import pluralize from "pluralize-esm";
 import { PostmanEvents } from "./postman-events";
 import type {
   PostmanInput,
@@ -365,12 +365,12 @@ export function renderGetMethodRoute(path: string) {
 
     const lastSegment = segments.pop() as string;
 
-    return `Get ${capitalize(singular(lastSegment))}`;
+    return `Get ${capitalize(pluralize.singular(lastSegment))}`;
   }
 
   const lastSegment = path.split("/").pop() as string;
 
-  return `Get ${capitalize(plural(lastSegment))} list`;
+  return `Get ${capitalize(pluralize.plural(lastSegment))} list`;
 }
 
 export function namedMethodRoute(path: string, method: string) {
@@ -379,20 +379,20 @@ export function namedMethodRoute(path: string, method: string) {
       return renderGetMethodRoute(path);
     case "POST":
       path = prepareSegment(path);
-      return `Create New ${singular(path)}`;
+      return `Create New ${pluralize.singular(path)}`;
     case "PUT":
       path = prepareSegment(path);
-      return `Update ${singular(removeId(path))}`;
+      return `Update ${pluralize.singular(removeId(path))}`;
     case "DELETE":
       path = prepareSegment(path);
       if (path.includes(":")) {
-        return `Delete ${singular(removeId(path))}`;
+        return `Delete ${pluralize.singular(removeId(path))}`;
       }
 
-      return `Delete ${plural(removeId(path))} list`;
+      return `Delete ${pluralize.plural(removeId(path))} list`;
     case "PATCH":
       path = prepareSegment(path);
-      return `Patch ${singular(removeId(path))}`;
+      return `Patch ${pluralize.singular(removeId(path))}`;
 
     default:
       return path;

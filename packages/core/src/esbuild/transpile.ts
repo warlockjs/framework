@@ -8,15 +8,18 @@ export async function transpile(file: string, exportAs: string) {
   await esbuild.build({
     platform: "node",
     entryPoints: [file],
-    bundle: true,
-    minify: true,
+    bundle: false,
+    minify: false,
     packages: "external",
     outfile,
     sourcemap: "linked",
     sourceRoot: srcPath(),
-    format: "cjs",
+    format: "esm",
     target: ["esnext"],
     plugins: [nativeNodeModulesPlugin],
+    resolveExtensions: [".ts", ".tsx", ".js", ".jsx", ".json"],
+    mainFields: ["module", "main"],
+    keepNames: true,
   });
 
   return outfile;

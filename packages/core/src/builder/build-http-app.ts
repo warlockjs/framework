@@ -1,4 +1,5 @@
-import { ensureDirectoryAsync } from "@mongez/fs";
+import { ensureDirectoryAsync, putFileAsync } from "@mongez/fs";
+import { transpile } from "../esbuild/transpile";
 import { warlockPath } from "../utils/paths";
 import {
   createAppBuilder,
@@ -11,27 +12,63 @@ import {
 } from "./app-builder";
 import { createConfigLoader } from "./config-loader-builder";
 
-export async function buildHttpApp() {
-  const { addImport, saveAs } = createAppBuilder();
+type ModuleBuilder = () => Promise<string>;
 
+// Order matters: bootstrap and environment must be first
+const moduleBuilders: Record<string, ModuleBuilder> = {
+  bootstrap: createBootstrapFile,
+  environment: createEnvironmentModeDisplayFile,
+  config: createConfigLoader,
+  main: loadMainFiles,
+  locales: loadLocalesFiles,
+  events: loadEventFiles,
+  routes: loadRoutesFiles,
+  starter: createHttpApplicationStarter,
+};
+
+export async function buildHttpApp() {
   await ensureDirectoryAsync(warlockPath());
 
-  const data = await Promise.all([
-    createBootstrapFile(),
-    createEnvironmentModeDisplayFile(),
-    createConfigLoader(),
-    loadMainFiles(),
-    loadLocalesFiles(),
-    loadEventFiles(),
-    loadRoutesFiles(),
-    createHttpApplicationStarter(),
-  ]);
+  // First, build all modules and save their outputs
+  for (const [name, builder] of Object.entries(moduleBuilders)) {
+    try {
+      // Execute the builder and get its output
+      await builder();
 
-  addImport(...data);
+      // The builder functions now handle their own saving
+      // We just need to transpile the saved file
+      await transpile(warlockPath(`${name}.ts`), `${name}.js`);
+    } catch (error) {
+      console.error(`Failed to build module ${name}:`, error);
+      throw error;
+    }
+  }
 
-  await saveAs("http");
+  // Create the main entry point that imports all modules in order
+  const mainEntryContent = `
+// Load environment first
+import "./bootstrap";
+import "./environment";
 
-  return warlockPath("http.ts");
+// Load config before other modules
+import "./config";
+
+// Load core modules
+import "./main";
+import "./locales";
+import "./events";
+import "./routes";
+
+// Start the application
+import "./starter";
+
+// Export a timestamp to ensure the file is not cached
+export const timestamp = ${Date.now()};`;
+
+  const mainEntry = warlockPath("http.ts");
+  await putFileAsync(mainEntry, mainEntryContent);
+
+  return mainEntry;
 }
 
 export async function createHttpApplicationStarter() {

@@ -5,6 +5,14 @@ import {
   type ReactNode,
 } from "react";
 import { renderToString } from "react-dom/server";
+import { type ViteDevServer } from "vite";
+
+declare module "fastify" {
+  interface FastifyInstance {
+    vite: ViteDevServer;
+    id: string;
+  }
+}
 
 export function render(reactElement: ReactElement | ComponentType | ReactNode) {
   if (typeof reactElement === "function") {
@@ -17,3 +25,5 @@ export function render(reactElement: ReactElement | ComponentType | ReactNode) {
 }
 
 export const renderReact = render;
+
+export * from "./plugin";

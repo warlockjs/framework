@@ -1,6 +1,6 @@
 import config from "@mongez/config";
 import { sha1 } from "@mongez/encryption";
-import { fileExists, fileExistsAsync } from "@mongez/fs";
+import { fileExistsAsync } from "@mongez/fs";
 import systemPath from "path";
 import type { Request, Response } from "../../../http";
 import type { ImageFormat } from "../../../image";
@@ -56,7 +56,7 @@ export async function getUploadedFile(request: Request, response: Response) {
     // make sure it is sent as an image using response header Content-Disposition
     response.header("Content-Disposition", "inline");
 
-    if (fileExists(cacheFullPath)) {
+    if (await fileExistsAsync(cacheFullPath)) {
       return response.sendFile(cacheFullPath);
     }
 

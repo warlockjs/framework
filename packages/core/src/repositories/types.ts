@@ -1,5 +1,10 @@
 import type { GenericObject } from "@mongez/reinforcements";
-import type { Model, ModelAggregate, WhereOperator } from "@warlock.js/cascade";
+import type {
+  FilterStructure,
+  Model,
+  ModelAggregate,
+  WhereOperator,
+} from "@warlock.js/cascade";
 
 export type RepositoryEvent =
   | "listing"
@@ -127,10 +132,6 @@ export type FilterByType =
   | [FilterOptionType]
   | [FilterOptionType, string | string[]];
 
-export type FilterByOptions = {
-  [key: string]: FilterByType;
-};
-
 export type SaveMode = "create" | "update" | "patch";
 
 export type RepositoryOptions = AllRepositoryOptions & {
@@ -206,3 +207,5 @@ export type CachedRepositoryOptions = RepositoryOptions & {
   cacheCurrentLocale?: boolean;
   cacheKey?: string | GenericObject;
 };
+
+export type FilterByOptions = FilterStructure;

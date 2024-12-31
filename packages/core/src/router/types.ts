@@ -140,7 +140,7 @@ export type RequestHandler = {
   description?: string;
 };
 
-export type RouteOptions = {
+export interface RouteOptions {
   /**
    * Route middleware
    */
@@ -172,7 +172,11 @@ export type RouteOptions = {
    * Whether it is part of restful routes
    */
   restful?: boolean;
-};
+  /**
+   * Mark this route as a page route that will be handled by React SSR
+   */
+  isPage?: boolean;
+}
 
 export type RequestMethod =
   | "GET"

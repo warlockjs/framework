@@ -9,6 +9,7 @@ import type { Model } from "@warlock.js/cascade";
 import { AsyncLocalStorage } from "async_hooks";
 import { type Request } from "../request";
 import { type Response } from "../response";
+import { type ReturnedResponse } from "./../types";
 
 export type Context<User extends Model = Model> = {
   request: Request<User>;
@@ -20,9 +21,12 @@ export type Context<User extends Model = Model> = {
 
 const asyncLocalStorage = new AsyncLocalStorage<Context>();
 
-export function createRequestStore(request: Request<any>, response: Response) {
+export function createRequestStore(
+  request: Request<any>,
+  response: Response,
+): Promise<ReturnedResponse> {
   // store the request and response in the context
-  return new Promise((resolve, reject) => {
+  return new Promise<ReturnedResponse>((resolve, reject) => {
     asyncLocalStorage.run(
       {
         request,
@@ -46,12 +50,14 @@ export function createRequestStore(request: Request<any>, response: Response) {
 
           request.log("Executing Handler", "info");
 
-          await handler(request, response);
+          const output = await handler(request, response);
 
           request.log("Handler Executed Successfully", "success");
 
           // call executedAction event
           request.trigger("executedAction", request.route);
+
+          resolve(output as ReturnedResponse);
         } catch (error: any) {
           reject(error);
           return response.badRequest({

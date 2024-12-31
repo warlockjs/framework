@@ -1,5 +1,5 @@
 import { colors } from "@mongez/copper";
-import { ensureDirectory, fileExistsAsync, putFile } from "@mongez/fs";
+import { ensureDirectory, fileExistsAsync, putFileAsync } from "@mongez/fs";
 import { ltrim, rtrim } from "@mongez/reinforcements";
 import { ConsoleLog } from "@warlock.js/logger";
 import glob from "fast-glob";
@@ -48,7 +48,7 @@ export function ensureWarlockPath() {
 }
 
 export async function createWarlockFile(filePath: string, content: string) {
-  putFile(
+  await putFileAsync(
     warlockPath(filePath),
     await prettier.format(content, {
       parser: "typescript",
@@ -68,22 +68,27 @@ export function createAppBuilder() {
     return "\n" + contents.join("\n");
   };
 
+  const getContent = () => {
+    return importsToString() + contentsToString();
+  };
+
   const saveAs = async (fileName: string) => {
     fileName += ".ts";
 
-    await createWarlockFile(fileName, importsToString() + contentsToString());
+    await createWarlockFile(fileName, getContent());
+    return fileName;
   };
 
   const transpileFile = async (fileName: string) => {
-    await saveAs(fileName);
-
-    return await transpile(warlockPath(fileName + ".ts"), fileName + ".js");
+    // Don't save again, just transpile the existing file
+    const tsFile = fileName + ".ts";
+    const jsFile = fileName + ".js";
+    return await transpile(warlockPath(tsFile), jsFile);
   };
 
   const execute = async (fileName: string) => {
     const file = await transpileFile(fileName);
-
-    require(file);
+    await import(file);
   };
 
   return {
@@ -129,15 +134,20 @@ export async function createEnvironmentModeDisplayFile() {
 export async function loadMainFiles() {
   const { addImportPath, saveAs } = createAppBuilder();
 
-  addImportPath(srcPath("main.ts"));
+  // First add the root main file
+  await addImportPath("main.ts");
 
+  // Then add all module main files
   const paths = await globModule("main");
 
-  await Promise.all(paths.map(async path => await addImportPath(path)));
+  // Add each main file as an import
+  await Promise.all(
+    paths.map(async path => {
+      await addImportPath(path);
+    }),
+  );
 
-  await saveAs("main");
-
-  return `import "./main"`;
+  return await saveAs("main");
 }
 
 export async function loadLocalesFiles() {
@@ -145,11 +155,13 @@ export async function loadLocalesFiles() {
 
   const paths = await globModule("utils/locales");
 
-  await Promise.all(paths.map(async path => await addImportPath(path)));
+  await Promise.all(
+    paths.map(async path => {
+      await addImportPath(path);
+    }),
+  );
 
-  await saveAs("locales");
-
-  return `import "./locales"`;
+  return await saveAs("locales");
 }
 
 export async function loadEventFiles() {
@@ -171,11 +183,13 @@ export async function loadEventFiles() {
     }
   }
 
-  await Promise.all(paths.map(async path => await addImportPath(path)));
+  await Promise.all(
+    paths.map(async path => {
+      await addImportPath(path);
+    }),
+  );
 
-  await saveAs("events");
-
-  return `import "./events"`;
+  return await saveAs("events");
 }
 
 export async function loadRoutesFiles() {
@@ -183,9 +197,11 @@ export async function loadRoutesFiles() {
 
   const paths = await globModule("routes");
 
-  await Promise.all(paths.map(async path => await addImportPath(path)));
+  await Promise.all(
+    paths.map(async path => {
+      await addImportPath(path);
+    }),
+  );
 
-  await saveAs("routes");
-
-  return `import "./routes"`;
+  return await saveAs("routes");
 }

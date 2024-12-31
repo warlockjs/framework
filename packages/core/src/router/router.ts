@@ -6,6 +6,8 @@ import { ltrim, merge, toCamelCase, trim } from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
 import { log } from "@warlock.js/logger";
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { type ReactElement } from "react";
+import { renderPage } from "src/warlock/react/page-renderer";
 import { Request } from "../http/request";
 import { Response } from "../http/response";
 import { type FastifyInstance } from "../http/server";
@@ -241,11 +243,11 @@ export class Router {
     }
 
     if (handler.validation?.rules) {
-      log.warn(
-        "route",
-        "DEPRECATED",
-        `${method} ${path} "validation.rules" property is deprecated, use "validation.schema" instead`,
-      );
+      // log.warn(
+      //   "route",
+      //   "DEPRECATED",
+      //   `${method} ${path} "validation.rules" property is deprecated, use "validation.schema" instead`,
+      // );
     }
 
     const routeData: Route = {
@@ -655,6 +657,23 @@ export class Router {
   }
 
   /**
+   * Get page routes
+   */
+  public getPageRoutes(): Route[] {
+    return this.routes.filter(route => route.isPage === true);
+  }
+
+  /**
+   * Register a page route
+   */
+  public page(path: string, handler: RouteHandler, options: RouteOptions = {}) {
+    return this.get(path, handler, {
+      ...options,
+      isPage: true,
+    });
+  }
+
+  /**
    * Register routes to the server
    */
   public scan(server: FastifyInstance) {
@@ -666,10 +685,28 @@ export class Router {
 
       requestMethodFunction(
         route.path,
-        {
-          ...(route.serverOptions || {}),
+        route.serverOptions || {},
+        async (baseRequest: FastifyRequest, reply: FastifyReply) => {
+          const { output, response, request } = await this.handleRoute(route)(
+            baseRequest,
+            reply,
+          );
+
+          if (!route.isPage) return output;
+
+          try {
+            const renderedPage = await renderPage({
+              page: output as ReactElement,
+              response,
+              request,
+              server,
+            });
+            reply.type("text/html").send(renderedPage);
+          } catch (error) {
+            console.log(error);
+            reply.status(500).send(error);
+          }
         },
-        this.handleRoute(route),
       );
     });
 
@@ -735,7 +772,11 @@ export class Router {
 
       const result = await request.execute();
 
-      return result;
+      return {
+        output: result,
+        response,
+        request,
+      };
     };
   }
 }

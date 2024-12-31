@@ -59,7 +59,7 @@ export async function createConfigLoader() {
   for (const locale of locales) {
     if (locale === "en") continue;
 
-    require(\`dayjs/locale/\${locale}\`);
+    import(\`dayjs/locale/\${locale}.js\`);
   }
 `);
 

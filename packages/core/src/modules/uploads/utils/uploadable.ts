@@ -66,6 +66,8 @@ async function getUpload(hash: any) {
     return await uploadFromFile(hash);
   }
 
+  if (hash.hash) return hash;
+
   return await Upload.findBy("hash", hash);
 }
 

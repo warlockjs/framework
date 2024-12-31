@@ -1,6 +1,7 @@
 import type { FastifyCorsOptions } from "@fastify/cors";
 import fastifyMultipart from "@fastify/multipart";
 import config from "@mongez/config";
+import { useReact } from "../react";
 import { rootPath } from "../utils";
 import type { FastifyInstance } from "./server";
 
@@ -34,6 +35,15 @@ export async function registerHttpPlugins(server: FastifyInstance) {
       fileSize: config.get("http.fileUploadLimit", 10 * 1024 * 1024),
     },
   });
+
+  // Register React plugin
+  await server.register(
+    useReact({
+      root: rootPath(),
+      entryPath: "src/client/entry-client.tsx",
+      template: "index.html",
+    }),
+  );
 
   server.register(import("@fastify/static"), {
     root: rootPath("public"),

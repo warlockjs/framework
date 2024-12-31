@@ -26,8 +26,8 @@ test("invalid-date-output", () => {
   expect(output).toStrictEqual({});
 });
 
-test("date-output-with-different-locale-code", () => {
-  require("dayjs/locale/ar");
+test("date-output-with-different-locale-code", async () => {
+  await import("dayjs/locale/ar");
   const output = dateOutput(new Date(), {
     locale: "ar",
   });
