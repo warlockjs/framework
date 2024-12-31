@@ -1,8 +1,8 @@
+import { type FastifyInstance } from "fastify";
 import fs from "fs";
 import path from "path";
 import type { ReactElement, ReactNode } from "react";
 import ReactDOMServer from "react-dom/server";
-import { type FastifyInstance } from "src/warlock/http";
 import type { Request } from "../http/request";
 import type { Response } from "../http/response";
 import { type PageHandlerOptions } from "./types";

@@ -1,7 +1,7 @@
 import reactSWCPlugin from "@vitejs/plugin-react-swc";
 import type { FastifyInstance } from "fastify";
-import { getServer } from "src/warlock/http";
 import { createServer, type ViteDevServer } from "vite";
+import { getServer } from "./../http";
 
 export interface ViteOptions {
   root?: string;
