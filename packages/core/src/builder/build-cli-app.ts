@@ -16,33 +16,15 @@ export async function buildCliApp() {
 
   const command = process.argv[2];
 
-  // to make the development process is faster, we will check for this certain command and add only the needed imports
-  if (command === "dev") {
-    const { addImport, saveAs, addContent } = createAppBuilder();
-
-    addImport(
-      `import { startConsoleApplication, $registerBuiltInCommands } from "@warlock.js/core"`,
-    );
-
-    addContent(`
-async function main() {
-  await $registerBuiltInCommands();
-  startConsoleApplication();
-}
-
-main();
-    `);
-
-    await saveAs("cli");
-
-    return warlockPath("cli.ts");
-  }
-
-  const initialImports = [createBootstrapFile(), createConfigLoader()];
+  const initialImports = [
+    createBootstrapFile(),
+    createConfigLoader(),
+    createWarlockConfigLoader(),
+  ];
 
   const optionalImports: any[] = [];
 
-  const lastImports = [createCliApplicationStarter()];
+  const lastImports = [];
 
   if (command.includes("migrate")) {
     optionalImports.push(loadMigrationsFiles());
@@ -51,6 +33,8 @@ main();
   } else {
     lastImports.push(loadCommandFiles());
   }
+
+  lastImports.push(createCliApplicationStarter());
 
   const list = [...initialImports, ...optionalImports, ...lastImports];
 
@@ -61,6 +45,24 @@ main();
   await saveAs("cli");
 
   return warlockPath("cli.ts");
+}
+
+async function createWarlockConfigLoader() {
+  const { addImport, addContent, saveAs } = createAppBuilder();
+
+  addImport(
+    `import warlockConfig from "warlock.config";`,
+    `import { setWarlockConfig } from "@warlock.js/core";`,
+  );
+
+  addContent(`
+    // Load warlock config
+    setWarlockConfig(warlockConfig);
+  `);
+
+  await saveAs("warlock-config");
+
+  return `import "./warlock-config";`;
 }
 
 export async function createCliApplicationStarter() {

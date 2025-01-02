@@ -13,7 +13,12 @@ export async function executeTsFile(
   ensureDirectory(warlockPath());
 
   const timestamp = Date.now();
-  const tempFilePath = warlockPath(`warlock.${timestamp}.tmp.js`);
+  // let enhance the temp file name to include some of the filePath
+  // we need to get only the file name and its direct parent folder
+  const enhancedFilePath = filePath.split(/\/|\\/).slice(-2).join(".");
+  const tempFilePath = warlockPath(
+    `warlock.${timestamp}.${enhancedFilePath}.js`,
+  );
 
   try {
     const result = await esbuild.build({
@@ -24,6 +29,7 @@ export async function executeTsFile(
       minify: false,
       write: false,
       packages: "external",
+      treeShaking: true,
       format,
       target: ["node18"],
       sourcemap: "inline",
@@ -46,7 +52,7 @@ export async function executeTsFile(
   } finally {
     // Fire and forget cleanup - no need to await
     try {
-      unlinkAsync(tempFilePath);
+      await unlinkAsync(tempFilePath);
     } catch {
       // Ignore cleanup errors
     }

@@ -12,9 +12,9 @@ export async function buildHttpForProduction() {
 
   console.log(colors.yellow("Scanning project files..."));
 
-  const config = await getWarlockConfig();
-
   const httpPath = await buildHttpApp();
+
+  const config = getWarlockConfig();
 
   console.log(colors.magenta("Bundling project files..."));
 

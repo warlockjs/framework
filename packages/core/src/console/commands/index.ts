@@ -9,7 +9,7 @@ import { registerDatabaseSeedsCommand } from "./database/seeds";
 export * from "./database/seeder";
 
 export async function $registerBuiltInCommands() {
-  const config = await getWarlockConfig();
+  const config = getWarlockConfig();
   registerCommands([
     registerMigrationCommand(),
     registerDatabaseSeedsCommand(),

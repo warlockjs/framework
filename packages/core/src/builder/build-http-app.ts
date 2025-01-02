@@ -54,10 +54,7 @@ import "./events";
 import "./routes";
 
 // Start the application
-import "./start-http-application";
-
-// Export a timestamp to ensure the file is not cached
-export const timestamp = ${Date.now()};`;
+import "./start-http-application";`;
 
   const mainEntry = warlockPath("http.ts");
   await putFileAsync(mainEntry, mainEntryContent);
