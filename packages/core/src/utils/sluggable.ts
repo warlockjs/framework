@@ -16,6 +16,8 @@ export function sluggable(generateFrom: string, slugLocaleCode = "en") {
       )?.value;
     }
 
-    return slug(String(value));
+    const slugFunction = (slug as any).default || slug;
+
+    return slugFunction(String(value));
   };
 }

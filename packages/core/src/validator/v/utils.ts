@@ -12,11 +12,13 @@ export const invalidRule = (
 
   attributes.input = context.key;
   attributes.path = context.path;
+  attributes.value = context.value;
 
   const error =
     rule.context.errorMessage ||
     rule.errorMessage ||
-    context.translator(rule.name, attributes)!;
+    context.translator?.(rule.name, attributes) ||
+    rule.defaultErrorMessage!;
 
   return {
     isValid: false,

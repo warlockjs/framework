@@ -1,6 +1,6 @@
 {
     "name": "@warlock.js/core",
-    "version": "2.7.4",
+    "version": "2.7.5",
     "description": "A robust nodejs framework for building blazing fast applications",
     "main": "src/index.ts",
     "bin": {
@@ -29,8 +29,8 @@
         "@mongez/fs": "^3.0.5",
         "@mongez/http": "^2.2.10",
         "@mongez/localization": "^3.0.0",
-        "@warlock.js/logger": "2.7.4",
-        "@warlock.js/cascade": "2.7.4",
+        "@warlock.js/logger": "2.7.5",
+        "@warlock.js/cascade": "2.7.5",
         "@mongez/reinforcements": "^2.3.10",
         "commander": "^12.0.0",
         "@mongez/slug": "^1.0.7",

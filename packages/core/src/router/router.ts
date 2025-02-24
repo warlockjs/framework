@@ -692,7 +692,13 @@ export class Router {
             reply,
           );
 
-          if (!route.isPage) return output;
+          if (!route.isPage) {
+            if (!output) {
+              return response.baseResponse;
+            }
+
+            return output;
+          }
 
           try {
             const renderedPage = await renderPage({

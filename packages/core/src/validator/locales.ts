@@ -134,7 +134,7 @@ groupedTranslations("validation", {
     ar: ":input لا يمكن أن يكون موجود.",
   },
   enum: {
-    en: ":input must be one of the following values: :enum.",
-    ar: ":input يجب أن يكون أحد القيم التالية: :enum.",
+    en: ":input must be one of the following values: :enum, given value :value.",
+    ar: ":input يجب أن يكون أحد القيم التالية: :enum, القيمة المعطاة :value.",
   },
 });

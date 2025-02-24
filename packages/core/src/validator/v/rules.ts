@@ -35,7 +35,7 @@ export const requiredWithRule: SchemaRule<{
   description: "The field is required if another field is present",
   sortOrder: -2,
   requiresValue: false,
-  errorMessage: "The :input is required",
+  defaultErrorMessage: "The :input is required",
   async validate(value: any, context) {
     const otherField = this.context.options.field;
 
@@ -60,7 +60,7 @@ export const requiredWithAllRule: SchemaRule<{
   description: "The field is required if all other fields are present",
   sortOrder: -2,
   requiresValue: false,
-  errorMessage: "The :input is required",
+  defaultErrorMessage: "The :input is required",
   async validate(value: any, context) {
     const fields = this.context.options.fields;
 
@@ -87,7 +87,7 @@ export const requiredIfAbsentRule: SchemaRule<{
   description: "The field is required if another field is absent",
   sortOrder: -2,
   requiresValue: false,
-  errorMessage: "The :input is required",
+  defaultErrorMessage: "The :input is required",
   async validate(value: any, context) {
     const otherField = this.context.options.field;
 
@@ -110,7 +110,7 @@ export const requiredIfSiblingFieldAbsentRule: SchemaRule<{
     "The field is required if another field in same parent context is absent",
   sortOrder: -2,
   requiresValue: false,
-  errorMessage: "The :input is required",
+  defaultErrorMessage: "The :input is required",
   async validate(value: any, context) {
     const otherField = this.context.options.field;
 
@@ -131,7 +131,7 @@ export const requiredIfAllAbsentRule: SchemaRule<{
   description: "The field is required if all other fields are absent",
   sortOrder: -2,
   requiresValue: false,
-  errorMessage: "The :input is required",
+  defaultErrorMessage: "The :input is required",
   async validate(value: any, context) {
     const fields = this.context.options.fields;
 
@@ -160,7 +160,7 @@ export const requiredIfSiblingFieldAllAbsentRule: SchemaRule<{
   description: "The field is required if all other fields are absent",
   sortOrder: -2,
   requiresValue: false,
-  errorMessage: "The :input is required",
+  defaultErrorMessage: "The :input is required",
   async validate(value: any, context) {
     const fields = this.context.options.fields;
 
@@ -190,7 +190,7 @@ export const requiredIfEmptyRule: SchemaRule<{
   description: "The field is required if another field is empty",
   sortOrder: -2,
   requiresValue: false,
-  errorMessage: "The :input is required",
+  defaultErrorMessage: "The :input is required",
   async validate(value: any, context) {
     const otherField = this.context.options.field;
 
@@ -213,7 +213,7 @@ export const requiredIfSiblingFieldEmptyRule: SchemaRule<{
     "The field is required if another field in same parent context is empty",
   sortOrder: -2,
   requiresValue: false,
-  errorMessage: "The :input is required",
+  defaultErrorMessage: "The :input is required",
   async validate(value: any, context) {
     const otherField = this.context.options.field;
 
@@ -234,7 +234,7 @@ export const requiredIfAllEmptyRule: SchemaRule<{
   description: "The field is required if all other fields are empty",
   sortOrder: -2,
   requiresValue: false,
-  errorMessage: "The :input is required",
+  defaultErrorMessage: "The :input is required",
   async validate(value: any, context) {
     const fields = this.context.options.fields;
 
@@ -265,7 +265,7 @@ export const requiredIfFieldRule: SchemaRule<{
   description: "The field is required if another field has a specific value",
   sortOrder: -2,
   requiresValue: false,
-  errorMessage: "The :input is required",
+  defaultErrorMessage: "The :input is required",
   async validate(value: any, context) {
     const otherField = this.context.options.field;
     const otherFieldValue = this.context.options.value;
@@ -293,7 +293,7 @@ export const requiredIfSiblingFieldRule: SchemaRule<{
     "The field is required if another field in same parent context has a specific value",
   sortOrder: -2,
   requiresValue: false,
-  errorMessage: "The :input is required",
+  defaultErrorMessage: "The :input is required",
   async validate(value: any, context) {
     const otherField = this.context.options.field;
     const otherFieldValue = this.context.options.value;
@@ -319,7 +319,7 @@ export const requiredUnlessFieldRule: SchemaRule<{
     "The field is required unless another field has a specific value",
   sortOrder: -2,
   requiresValue: false,
-  errorMessage: "The :input is required",
+  defaultErrorMessage: "The :input is required",
   async validate(value: any, context) {
     const otherField = this.context.options.field;
     const otherFieldValue = this.context.options.value;
@@ -343,7 +343,7 @@ export const requiredUnlessSiblingFieldRule: SchemaRule<{
     "The field is required unless another field in same parent context has a specific value",
   sortOrder: -2,
   requiresValue: false,
-  errorMessage: "The :input is required",
+  defaultErrorMessage: "The :input is required",
   async validate(value: any, context) {
     const otherField = this.context.options.field;
     const otherFieldValue = this.context.options.value;
@@ -374,7 +374,7 @@ export const objectRule: SchemaRule = {
 
 export const stringRule: SchemaRule = {
   name: "string",
-  errorMessage: "The :input must be a string",
+  defaultErrorMessage: "The :input must be a string",
   async validate(value: any, context) {
     if (typeof value === "string") {
       return VALID_RULE;
@@ -386,7 +386,7 @@ export const stringRule: SchemaRule = {
 
 export const numberRule: SchemaRule = {
   name: "number",
-  errorMessage: "The :input must be a number",
+  defaultErrorMessage: "The :input must be a number",
   async validate(value: any, context) {
     if (typeof value === "number") {
       return VALID_RULE;
@@ -398,7 +398,7 @@ export const numberRule: SchemaRule = {
 
 export const booleanRule: SchemaRule = {
   name: "boolean",
-  errorMessage: "The :input must be a boolean",
+  defaultErrorMessage: "The :input must be a boolean",
   async validate(value: any, context) {
     if (typeof value === "boolean") {
       return VALID_RULE;
@@ -410,7 +410,7 @@ export const booleanRule: SchemaRule = {
 
 export const intRule: SchemaRule = {
   name: "int",
-  errorMessage: "The :input must be an integer",
+  defaultErrorMessage: "The :input must be an integer",
   async validate(value: any, context) {
     if (Number.isInteger(value)) {
       return VALID_RULE;
@@ -422,7 +422,7 @@ export const intRule: SchemaRule = {
 
 export const floatRule: SchemaRule = {
   name: "float",
-  errorMessage: "The :input must be a float",
+  defaultErrorMessage: "The :input must be a float",
   async validate(value: any, context) {
     if (Number.isFinite(value) && !Number.isInteger(value)) {
       return VALID_RULE;
@@ -436,7 +436,8 @@ export const inRule: SchemaRule<{
   values: any[];
 }> = {
   name: "in",
-  errorMessage: "The :input must be one of the following values: :options",
+  defaultErrorMessage:
+    "The :input must be one of the following values: :options",
   async validate(value: any[], context) {
     if (this.context.options.values.includes(value)) {
       return VALID_RULE;
@@ -450,7 +451,8 @@ export const enumRule: SchemaRule<{
   enum: any;
 }> = {
   name: "enum",
-  errorMessage: "The :input must be one of the following values: :options",
+  defaultErrorMessage:
+    "The :input must be one of the following values: :options",
   async validate(value: any, context) {
     const enumObject = this.context.options.enum;
     const enumValues = Object.values(enumObject);
@@ -469,7 +471,8 @@ export const notInRule: SchemaRule<{
   values: any[];
 }> = {
   name: "notIn",
-  errorMessage: "The :input must not be one of the following values: :options",
+  defaultErrorMessage:
+    "The :input must not be one of the following values: :options",
   async validate(value: any, context) {
     if (!this.context.options.values.includes(value)) {
       return VALID_RULE;
@@ -481,7 +484,7 @@ export const notInRule: SchemaRule<{
 
 export const withoutWhitespaceRule: SchemaRule = {
   name: "withoutWhitespace",
-  errorMessage: "The :input must not contain whitespace",
+  defaultErrorMessage: "The :input must not contain whitespace",
   async validate(value: any, context) {
     if (!/\s/.test(value)) {
       return VALID_RULE;
@@ -495,7 +498,7 @@ export const minWordsRule: SchemaRule<{
   minWords: number;
 }> = {
   name: "minWords",
-  errorMessage: `The :input must be at least :minWords words`,
+  defaultErrorMessage: `The :input must be at least :minWords words`,
   async validate(value: any, context) {
     if (value?.split(" ").length >= this.context.options.minWords) {
       return VALID_RULE;
@@ -509,7 +512,7 @@ export const maxWordsRule: SchemaRule<{
   maxWords: number;
 }> = {
   name: "maxWords",
-  errorMessage: `The :input must be at most :maxWords words`,
+  defaultErrorMessage: `The :input must be at most :maxWords words`,
   async validate(value: any, context) {
     if (value?.split(" ").length <= this.context.options.maxWords) {
       return VALID_RULE;
@@ -523,7 +526,7 @@ export const wordsRule: SchemaRule<{
   words: number;
 }> = {
   name: "words",
-  errorMessage: `The :input must be exactly :words words`,
+  defaultErrorMessage: `The :input must be exactly :words words`,
   async validate(value: any, context) {
     if (value?.split(" ").length === this.context.options.words) {
       return VALID_RULE;
@@ -537,7 +540,7 @@ export const minLengthRule: SchemaRule<{
   minLength: number;
 }> = {
   name: "minLength",
-  errorMessage: `The :input must be at least :minLength characters long`,
+  defaultErrorMessage: `The :input must be at least :minLength characters long`,
   async validate(value: any, context) {
     if (value?.length >= this.context.options.minLength) {
       return VALID_RULE;
@@ -551,7 +554,7 @@ export const maxLengthRule: SchemaRule<{
   maxLength: number;
 }> = {
   name: "maxLength",
-  errorMessage: `The :input must not exceed :maxLength characters`,
+  defaultErrorMessage: `The :input must not exceed :maxLength characters`,
   async validate(value: any, context) {
     if (value?.length <= this.context.options.maxLength) {
       return VALID_RULE;
@@ -565,7 +568,7 @@ export const lengthRule: SchemaRule<{
   length: number;
 }> = {
   name: "length",
-  errorMessage: `The :input must be exactly :length characters long`,
+  defaultErrorMessage: `The :input must be exactly :length characters long`,
   async validate(value: any, context) {
     if (value?.length === this.context.options.length) {
       return VALID_RULE;
@@ -579,7 +582,7 @@ export const minRule: SchemaRule<{
   min: number;
 }> = {
   name: "min",
-  errorMessage: `The :input must be at least :min`,
+  defaultErrorMessage: `The :input must be at least :min`,
   async validate(value: any, context) {
     if (value >= this.context.options.min) {
       return VALID_RULE;
@@ -593,7 +596,7 @@ export const maxRule: SchemaRule<{
   max: number;
 }> = {
   name: "max",
-  errorMessage: `The :input must equal to or less than :max`,
+  defaultErrorMessage: `The :input must equal to or less than :max`,
   async validate(value: any, context) {
     if (value <= this.context.options.max) {
       return VALID_RULE;
@@ -608,7 +611,7 @@ export const betweenRule: SchemaRule<{
   max: number;
 }> = {
   name: "between",
-  errorMessage: `The :input must be between :min and :max`,
+  defaultErrorMessage: `The :input must be between :min and :max`,
   async validate(value: any, context) {
     if (
       value >= this.context.options.min &&
@@ -623,7 +626,7 @@ export const betweenRule: SchemaRule<{
 
 export const presentRule: SchemaRule = {
   name: "present",
-  errorMessage: "The :input must be present",
+  defaultErrorMessage: "The :input must be present",
   async validate(value: any, context) {
     if (value !== undefined) {
       return VALID_RULE;
@@ -637,7 +640,7 @@ export const equalRule: SchemaRule<{
   value: any;
 }> = {
   name: "equal",
-  errorMessage: `The :input must be equal to :value`,
+  defaultErrorMessage: `The :input must be equal to :value`,
   async validate(input: any, context) {
     if (input === this.context.options.value) {
       return VALID_RULE;
@@ -649,7 +652,7 @@ export const equalRule: SchemaRule<{
 
 export const emailRule: SchemaRule = {
   name: "email",
-  errorMessage: "The :input must be a valid email address",
+  defaultErrorMessage: "The :input must be a valid email address",
   async validate(value: any, context) {
     if (isEmail(value)) {
       return VALID_RULE;
@@ -661,7 +664,7 @@ export const emailRule: SchemaRule = {
 
 export const scalarRule: SchemaRule = {
   name: "scalar",
-  errorMessage: "The :input must be a scalar value",
+  defaultErrorMessage: "The :input must be a scalar value",
   async validate(value: any, context) {
     // a valid value considered to beb either a string, number, or boolean
     if (["string", "number", "boolean"].includes(typeof value)) {
@@ -679,7 +682,7 @@ export const unknownKeyRule: SchemaRule<{
 }> = {
   name: "unknownKey",
   sortOrder: -1,
-  errorMessage: "The :input contains unknown properties",
+  defaultErrorMessage: "The :input contains unknown properties",
   async validate(value: any, context) {
     const schema = this.context.options.schema;
     const allowedKeys = this.context.options.allowedKeys || [];
@@ -705,7 +708,7 @@ export const matchesRule: SchemaRule<{
   field: string;
 }> = {
   name: "matches",
-  errorMessage: "The :input must match the :field",
+  defaultErrorMessage: "The :input must match the :field",
   async validate(value: any, context) {
     const otherField = this.context.options.field;
 
@@ -721,7 +724,7 @@ export const confirmedRule: SchemaRule<{
   field: string;
 }> = {
   name: "confirmed",
-  errorMessage: "The :input must be confirmed",
+  defaultErrorMessage: "The :input must be confirmed",
   async validate(value: any, context) {
     const otherField = `${this.context.options.field}_confirmation`;
 
@@ -737,7 +740,7 @@ export const differentRule: SchemaRule<{
   field: string;
 }> = {
   name: "different",
-  errorMessage: "The :input must be different from :field",
+  defaultErrorMessage: "The :input must be different from :field",
   async validate(value: any, context) {
     const otherField = this.context.options.field;
 
@@ -753,7 +756,7 @@ export const dateRule: SchemaRule<{
   format?: string;
 }> = {
   name: "date",
-  errorMessage: "The :input must be a valid date",
+  defaultErrorMessage: "The :input must be a valid date",
   async validate(value: any, context) {
     const format = this.context.options.format;
 
@@ -782,7 +785,7 @@ export const minDateRule: SchemaRule<{
 }> = {
   name: "minDate",
   description: "The field must be at least the given date",
-  errorMessage: `The :input must be at least :minDate`,
+  defaultErrorMessage: `The :input must be at least :minDate`,
   async validate(value: Date, context) {
     if (value >= this.context.options.minDate) {
       return VALID_RULE;
@@ -797,7 +800,7 @@ export const maxDateRule: SchemaRule<{
   maxDate: Date;
 }> = {
   name: "maxDate",
-  errorMessage: `The :input must be at most :maxDate`,
+  defaultErrorMessage: `The :input must be at most :maxDate`,
   async validate(value: Date, context) {
     if (value <= this.context.options.maxDate) {
       return VALID_RULE;
@@ -809,7 +812,7 @@ export const maxDateRule: SchemaRule<{
 
 export const urlRule: SchemaRule = {
   name: "url",
-  errorMessage: "The :input must be a valid URL",
+  defaultErrorMessage: "The :input must be a valid URL",
   async validate(value: any, context) {
     try {
       new URL(value);
@@ -822,7 +825,7 @@ export const urlRule: SchemaRule = {
 
 export const ipRule: SchemaRule = {
   name: "ip",
-  errorMessage: "The :input must be a valid IP address",
+  defaultErrorMessage: "The :input must be a valid IP address",
   async validate(value: any, context) {
     const result = isIP(value);
 
@@ -836,7 +839,7 @@ export const ipRule: SchemaRule = {
 
 export const ip4Rule: SchemaRule = {
   name: "ip4",
-  errorMessage: "The :input must be a valid IPv4 address",
+  defaultErrorMessage: "The :input must be a valid IPv4 address",
   async validate(value: any, context) {
     const result = isIP(value);
 
@@ -850,7 +853,7 @@ export const ip4Rule: SchemaRule = {
 
 export const ip6Rule: SchemaRule = {
   name: "ip6",
-  errorMessage: "The :input must be a valid IPv6 address",
+  defaultErrorMessage: "The :input must be a valid IPv6 address",
   async validate(value: any, context) {
     const result = isIP(value);
 
@@ -864,7 +867,7 @@ export const ip6Rule: SchemaRule = {
 
 export const isNumericRule: SchemaRule = {
   name: "isNumeric",
-  errorMessage: "The :input must be a numeric value",
+  defaultErrorMessage: "The :input must be a numeric value",
   async validate(value: any, context) {
     if (isNumeric(value)) {
       return VALID_RULE;
@@ -878,7 +881,7 @@ export const startsWithRule: SchemaRule<{
   value: string;
 }> = {
   name: "startsWith",
-  errorMessage: "The :input must start with :value",
+  defaultErrorMessage: "The :input must start with :value",
   async validate(value: any, context) {
     if (value.startsWith(this.context.options.value)) {
       return VALID_RULE;
@@ -892,7 +895,7 @@ export const endsWithRule: SchemaRule<{
   value: string;
 }> = {
   name: "endsWith",
-  errorMessage: "The :input must end with :value",
+  defaultErrorMessage: "The :input must end with :value",
   async validate(value: any, context) {
     if (value.endsWith(this.context.options.value)) {
       return VALID_RULE;
@@ -906,7 +909,7 @@ export const containsRule: SchemaRule<{
   value: string;
 }> = {
   name: "contains",
-  errorMessage: "The :input must contain :value",
+  defaultErrorMessage: "The :input must contain :value",
   async validate(value: any, context) {
     if (value.includes(this.context.options.value)) {
       return VALID_RULE;
@@ -920,7 +923,7 @@ export const notContainsRule: SchemaRule<{
   value: string;
 }> = {
   name: "notContains",
-  errorMessage: "The :input must not contain :value",
+  defaultErrorMessage: "The :input must not contain :value",
   async validate(value: any, context) {
     if (!value.includes(this.context.options.value)) {
       return VALID_RULE;
@@ -932,7 +935,7 @@ export const notContainsRule: SchemaRule<{
 
 export const alphaRule: SchemaRule = {
   name: "alpha",
-  errorMessage: "The :input must contain only alphabetic characters",
+  defaultErrorMessage: "The :input must contain only alphabetic characters",
   async validate(value: any, context) {
     if (/^[a-zA-Z]+$/.test(value)) {
       return VALID_RULE;
@@ -957,7 +960,7 @@ export const alphaNumericRule: SchemaRule = {
 
 export const jsonRule: SchemaRule = {
   name: "json",
-  errorMessage: "The :input must be a valid JSON string",
+  defaultErrorMessage: "The :input must be a valid JSON string",
   async validate(value: string, context) {
     try {
       JSON.parse(value);
@@ -972,7 +975,7 @@ export const patternRule: SchemaRule<{
   pattern: RegExp;
 }> = {
   name: "pattern",
-  errorMessage: "The :input does not match the pattern",
+  defaultErrorMessage: "The :input does not match the pattern",
   async validate(value: any, context) {
     if (this.context.options.pattern.test(value)) {
       return VALID_RULE;
@@ -987,7 +990,7 @@ export const sumOfRule: SchemaRule<{
 }> = {
   name: "sumOf",
   description: "The sum of the fields must be equal to the given value",
-  errorMessage: "The sum of the fields must be equal to :value",
+  defaultErrorMessage: "The sum of the fields must be equal to :value",
   async validate(value: any, context) {
     const fields = this.context.options.fields;
 
@@ -1009,7 +1012,7 @@ export const unionRule: SchemaRule<{
   types: BaseValidator[];
 }> = {
   name: "union",
-  errorMessage: "The :input must match one of the specified types",
+  defaultErrorMessage: "The :input must match one of the specified types",
   async validate(value: any, context) {
     for (const type of this.context.options.types) {
       const result = await type.validate(value, context);
@@ -1026,7 +1029,7 @@ export const intersectionRule: SchemaRule<{
   types: BaseValidator[];
 }> = {
   name: "intersection",
-  errorMessage: "The :input must match all of the specified types",
+  defaultErrorMessage: "The :input must match all of the specified types",
   async validate(value: any, context) {
     for (const type of this.context.options.types) {
       const result = await type.validate(value, context);
@@ -1044,7 +1047,7 @@ export const moduloRule: SchemaRule<{
   value: number;
 }> = {
   name: "modulo",
-  errorMessage: "The :input must be a multiple of :value",
+  defaultErrorMessage: "The :input must be a multiple of :value",
   async validate(value: any, context) {
     if (value % this.context.options.value === 0) {
       return VALID_RULE;
@@ -1057,7 +1060,7 @@ export const moduloRule: SchemaRule<{
 export const isCreditCardRule: SchemaRule = {
   name: "isCreditCard",
   description: "The field must be a valid credit card number",
-  errorMessage: "The :input must be a valid credit card number",
+  defaultErrorMessage: "The :input must be a valid credit card number",
   async validate(value: any, context) {
     // Luhn algorithm
     const cardNumber = value.toString().replace(/\D/g, "");
@@ -1089,7 +1092,7 @@ export const isCreditCardRule: SchemaRule = {
 
 export const positiveRule: SchemaRule = {
   name: "positive",
-  errorMessage: "The :input must be a positive number",
+  defaultErrorMessage: "The :input must be a positive number",
   async validate(value: any, context) {
     if (value > 0) {
       return VALID_RULE;
@@ -1101,7 +1104,7 @@ export const positiveRule: SchemaRule = {
 
 export const negativeRule: SchemaRule = {
   name: "negative",
-  errorMessage: "The :input must be a negative number",
+  defaultErrorMessage: "The :input must be a negative number",
   async validate(value: any, context) {
     if (value < 0) {
       return VALID_RULE;
@@ -1115,7 +1118,7 @@ export const negativeRule: SchemaRule = {
 export const uniqueArrayRule: SchemaRule = {
   name: "uniqueArray",
   description: "The array must contain unique values",
-  errorMessage: "The :input must contain unique values",
+  defaultErrorMessage: "The :input must contain unique values",
   async validate(value: any, context) {
     const uniqueValues = new Set(value);
 
@@ -1130,7 +1133,7 @@ export const uniqueArrayRule: SchemaRule = {
 export const domainUrl: SchemaRule = {
   name: "domainUrl",
   description: "The input must be a valid domain not a full URL",
-  errorMessage: "The :input must be a valid domain",
+  defaultErrorMessage: "The :input must be a valid domain",
   async validate(value: any, context) {
     if (value.match(/^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$/)) {
       return VALID_RULE;
@@ -1142,7 +1145,7 @@ export const domainUrl: SchemaRule = {
 
 export const uploadableRule: SchemaRule = {
   name: "uploadable",
-  errorMessage: "The :input must be a valid uploadable hash id",
+  defaultErrorMessage: "The :input must be a valid uploadable hash id",
   async validate(value: any, context) {
     const hashExists = await Upload.aggregate().where("hash", value).exists();
 
@@ -1156,7 +1159,7 @@ export const uploadableRule: SchemaRule = {
 
 export const fileRule: SchemaRule = {
   name: "file",
-  errorMessage: "The :input must be a file",
+  defaultErrorMessage: "The :input must be a file",
   async validate(value: any, context) {
     if (value instanceof UploadedFile) {
       return VALID_RULE;
@@ -1170,7 +1173,7 @@ export const fileTypeRule: SchemaRule<{
   mimeTypes: string | string[];
 }> = {
   name: "fileType",
-  errorMessage: "The :input must be a :types file",
+  defaultErrorMessage: "The :input must be a :types file",
   async validate(value: any, context) {
     let mimeTypes = this.context.options.mimeTypes;
 
@@ -1211,7 +1214,7 @@ export const maxFileSizeRule: SchemaRule<{
   maxFileSize: number;
 }> = {
   name: "maxFileSize",
-  errorMessage: "The :input must not exceed :maxFileSize",
+  defaultErrorMessage: "The :input must not exceed :maxFileSize",
   async validate(value: any, context) {
     if (value.size <= this.context.options.maxFileSize) {
       return VALID_RULE;
@@ -1225,7 +1228,7 @@ export const minFileSizeRule: SchemaRule<{
   minFileSize: number;
 }> = {
   name: "minFileSize",
-  errorMessage: "The :input must be at least :minFileSize",
+  defaultErrorMessage: "The :input must be at least :minFileSize",
   async validate(value: any, context) {
     if (value.size >= this.context.options.minFileSize) {
       return VALID_RULE;
@@ -1237,7 +1240,7 @@ export const minFileSizeRule: SchemaRule<{
 
 export const imageRule: SchemaRule = {
   name: "image",
-  errorMessage: "The :input must be an image",
+  defaultErrorMessage: "The :input must be an image",
   async validate(value: any, context) {
     if (value instanceof UploadedFile && value.isImage) {
       return VALID_RULE;
@@ -1249,7 +1252,7 @@ export const imageRule: SchemaRule = {
 
 export const minWidthRule: SchemaRule = {
   name: "minWidth",
-  errorMessage: "The :input must be at least :minWidth pixels wide",
+  defaultErrorMessage: "The :input must be at least :minWidth pixels wide",
   async validate(value: any, context) {
     const dimensions = await value.dimensions();
 
@@ -1265,7 +1268,7 @@ export const maxWidthRule: SchemaRule<{
   maxWidth: number;
 }> = {
   name: "maxWidth",
-  errorMessage: "The :input must be at most :maxWidth pixels wide",
+  defaultErrorMessage: "The :input must be at most :maxWidth pixels wide",
   async validate(value: any, context) {
     const dimensions = await value.dimensions();
 
@@ -1281,7 +1284,7 @@ export const minHeightRule: SchemaRule<{
   minHeight: number;
 }> = {
   name: "minHeight",
-  errorMessage: "The :input must be at least :minHeight pixels tall",
+  defaultErrorMessage: "The :input must be at least :minHeight pixels tall",
   async validate(value: any, context) {
     const dimensions = await value.dimensions();
 
@@ -1297,7 +1300,7 @@ export const maxHeightRule: SchemaRule<{
   maxHeight: number;
 }> = {
   name: "maxHeight",
-  errorMessage: "The :input must be at most :maxHeight pixels tall",
+  defaultErrorMessage: "The :input must be at most :maxHeight pixels tall",
   async validate(value: any, context) {
     const dimensions = await value.dimensions();
 
@@ -1375,7 +1378,8 @@ export const containsAllRule: SchemaRule<{
   values: any[];
 }> = {
   name: "containsAll",
-  errorMessage: "The :input must contain all of the following values: :values",
+  defaultErrorMessage:
+    "The :input must contain all of the following values: :values",
   async validate(value: any, context) {
     const values = this.context.options.values;
 
@@ -1422,7 +1426,7 @@ const colorValidationRegex = {
 
 export const rgbColorRule: SchemaRule = {
   name: "rgbColor",
-  errorMessage: "The :input must be a valid RGB color",
+  defaultErrorMessage: "The :input must be a valid RGB color",
   async validate(value: any, context) {
     if (value.match(colorValidationRegex.rgb)) {
       return VALID_RULE;
@@ -1434,7 +1438,7 @@ export const rgbColorRule: SchemaRule = {
 
 export const rgbaColorRule: SchemaRule = {
   name: "rgbaColor",
-  errorMessage: "The :input must be a valid RGBA color",
+  defaultErrorMessage: "The :input must be a valid RGBA color",
   async validate(value: any, context) {
     if (value.match(colorValidationRegex.rgba)) {
       return VALID_RULE;
@@ -1446,7 +1450,7 @@ export const rgbaColorRule: SchemaRule = {
 
 export const hexColorRule: SchemaRule = {
   name: "hexColor",
-  errorMessage: "The :input must be a valid hex color",
+  defaultErrorMessage: "The :input must be a valid hex color",
   async validate(value: any, context) {
     if (value.match(colorValidationRegex.hex)) {
       return VALID_RULE;
@@ -1458,7 +1462,7 @@ export const hexColorRule: SchemaRule = {
 
 export const hslColorRule: SchemaRule = {
   name: "hslColor",
-  errorMessage: "The :input must be a valid HSL color",
+  defaultErrorMessage: "The :input must be a valid HSL color",
   async validate(value: any, context) {
     if (value.match(colorValidationRegex.hsl)) {
       return VALID_RULE;
@@ -1470,7 +1474,7 @@ export const hslColorRule: SchemaRule = {
 
 export const lightColorRule: SchemaRule = {
   name: "lightColor",
-  errorMessage: "The :input must be a light color",
+  defaultErrorMessage: "The :input must be a light color",
   async validate(value: any, context) {
     if (value.match(colorValidationRegex.light)) {
       return VALID_RULE;
@@ -1482,7 +1486,7 @@ export const lightColorRule: SchemaRule = {
 
 export const darkColorRule: SchemaRule = {
   name: "darkColor",
-  errorMessage: "The :input must be a dark color",
+  defaultErrorMessage: "The :input must be a dark color",
   async validate(value: any, context) {
     if (value.match(colorValidationRegex.dark)) {
       return VALID_RULE;
@@ -1494,7 +1498,7 @@ export const darkColorRule: SchemaRule = {
 
 export const colorRule: SchemaRule = {
   name: "color",
-  errorMessage: "The :input must be a valid color",
+  defaultErrorMessage: "The :input must be a valid color",
   async validate(value: any, context) {
     if (
       value.match(colorValidationRegex.hex) ||
@@ -1511,7 +1515,7 @@ export const colorRule: SchemaRule = {
 
 export const forbiddenRule: SchemaRule = {
   name: "forbidden",
-  errorMessage: "The :input is forbidden",
+  defaultErrorMessage: "The :input is forbidden",
   async validate(_value: any, context) {
     return invalidRule(this, context);
   },

@@ -1,4 +1,5 @@
 /* eslint-disable no-case-declarations */
+import config from "@mongez/config";
 import {
   get,
   only,
@@ -21,6 +22,14 @@ import type {
   OutputResource,
   OutputValue,
 } from "./types";
+
+export type OutputConfigurations = {
+  dateOptions?(options: {
+    output: Output;
+    value: any;
+    options: DateOutputOptions;
+  }): DateOutputOptions;
+};
 
 export class Output {
   /**
@@ -543,10 +552,25 @@ export class Output {
     value: any,
     options: DateOutputOptions = this.dateOptions,
   ) {
-    return dateOutput(value, {
+    options.locale ??= useRequestStore()?.request?.locale;
+
+    const dateOptions = config.get(
+      "output.dateOptions",
+    ) as OutputConfigurations["dateOptions"];
+
+    if (dateOptions) {
+      options = dateOptions({
+        output: this,
+        value,
+        options,
+      });
+    }
+
+    const date = dateOutput(value, {
       ...options,
-      locale: useRequestStore()?.request?.locale,
     });
+
+    return date;
   }
 
   /**
