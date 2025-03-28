@@ -55,7 +55,26 @@ export class Model
   public initialData: Partial<ModelSchema> = {};
 
   /**
-   * Relations list
+   * Model relationships defined using the joinable API.
+   *
+   * Each key represents a relationship name that can be referenced when running queries.
+   * Each value defines how to join another collection to the current model.
+   *
+   * @example
+   * Basic definition:
+   * ```ts
+   * public static relations = {
+   *   // Join users collection where local createdBy.id matches user's id
+   *   author: User.joinable("createdBy.id", "id").single().as("author"),
+   * }
+   * ```
+   *
+   * @usage
+   * Example of calling:
+   * ```ts
+   * Post.aggregate().joining("author").get(); // use `joining` method to join the `author` relationship
+   * // Where `author` is the name of the relationship defined in the `relations` property
+   * ```
    */
   public static relations: Record<string, Joinable> = {};
 

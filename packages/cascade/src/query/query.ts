@@ -397,27 +397,33 @@ export class Query {
   public async exists(
     collection: string,
     filter: Filter = {},
-    options?: CountDocumentsOptions,
+    options?: FindOptions,
   ) {
     const query = this.query(collection);
     options = this.prepareQueryOptions(options);
 
-    await this.trigger("counting", {
+    await this.trigger("fetching", {
       collection,
       filter,
       query,
       options,
+      isMany: false,
     });
 
-    const output = await query.countDocuments(filter, options);
+    // Use findOne with projection to minimize data transfer
+    const document = await query.findOne(filter, {
+      ...options,
+      projection: { _id: 1 }, // Only return the _id field
+    });
 
-    await this.trigger("counted", {
+    await this.trigger("fetched", {
       collection,
       filter,
-      output,
+      document,
+      exists: !!document,
     });
 
-    return output > 0;
+    return !!document;
   }
 
   /**

@@ -1,4 +1,5 @@
 import type { GenericObject } from "@mongez/reinforcements";
+import { ModelAggregate } from "src/cascade/model";
 import { type Aggregate } from "../aggregate";
 import type { WhereOperator } from "../types";
 
@@ -42,7 +43,7 @@ type FilterOperator =
 
 type FilterFunction = (
   value: any,
-  query: Aggregate,
+  query: ModelAggregate<any>,
   context: Record<string, any>,
 ) => void;
 

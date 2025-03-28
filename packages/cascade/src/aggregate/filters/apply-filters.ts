@@ -50,7 +50,7 @@ export function applyFilters({
   options = {},
 }: ApplyFiltersParams) {
   for (const key in filters) {
-    const value = data[key];
+    let value = data[key];
     if (value === undefined) continue;
 
     const rule = prepareFilterRule(key, filters[key]);
@@ -71,6 +71,14 @@ export function applyFilters({
         options,
       });
       continue;
+    }
+
+    if (
+      rule.type.startsWith("in") &&
+      rule.type !== "int" &&
+      !Array.isArray(value)
+    ) {
+      value = [value];
     }
 
     // Handle where operators if not a predefined filter type

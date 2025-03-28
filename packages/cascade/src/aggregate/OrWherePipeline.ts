@@ -12,6 +12,7 @@ export class OrWherePipeline extends WherePipeline {
   public constructor(expression: GenericObject) {
     super(expression);
   }
+
   /**
    * {@inheritDoc}
    */
@@ -23,7 +24,28 @@ export class OrWherePipeline extends WherePipeline {
     // we have three types of where
     // first one is an array of arrays, each array contains two items, column and value
     // second one is an array of objects, each object contains column and value
-    // third one is an object, each key is the column and the value is the value
+    // third one is an object, each key is the column and the value is the value (Recommended for simple multiple value checks)
+    /**
+     * Examples
+     *
+     * Example 1:
+     * query.orWhere([
+     *  ["name", "hasan"],
+     * ["age", 20]
+     * ])
+     *
+     * Example 2
+     * query.orWhere([
+     *  {bedrooms: $agg.in([20, 30, 40])},
+     *  {bedrooms: $agg.gte(7)}
+     * ])
+     *
+     * Example 3
+     * query.orWhere({
+     *  name: "hasan",
+     *  age: 20
+     * })
+     */
 
     if (Array.isArray(this.pipelineData)) {
       for (const operation of this.pipelineData) {
@@ -52,12 +74,6 @@ export class OrWherePipeline extends WherePipeline {
 }
 
 export function orWherePipeline(column: string, value: any): OrWherePipeline;
-export function orWherePipeline(
-  column: string,
-  operator: string,
-  value: any,
-): OrWherePipeline;
-export function orWherePipeline(column: any): OrWherePipeline;
 export function orWherePipeline(...args: any[]) {
   return new OrWherePipeline(WhereExpression.parse.apply(null, args as any));
 }

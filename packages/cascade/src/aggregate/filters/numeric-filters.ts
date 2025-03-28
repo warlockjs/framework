@@ -73,6 +73,7 @@ export const numericFilters: Record<string, FilterHandler> = {
     const values = returnAsArray(value).map(v => parseInt(v));
     if (column) {
       query.whereIn(column, values);
+      query.whereIn(column, values);
     } else if (columns) {
       query.orWhere(createColumnsObject(columns, { $in: values }));
     }

@@ -6,10 +6,14 @@ import dayjs from "dayjs";
 export function returnAsArray(value: any): any[] {
   if (!Array.isArray(value)) {
     if (value && typeof value === "object" && "toArray" in value) {
-      return value.toArray();
+      const result = value.toArray();
+      return result;
     }
-    return [value];
+
+    const result = [value];
+    return result;
   }
+
   return value;
 }
 

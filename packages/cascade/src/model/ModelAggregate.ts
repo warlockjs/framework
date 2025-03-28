@@ -1,8 +1,7 @@
 import { colors } from "@mongez/copper";
 import type { GenericObject } from "@mongez/reinforcements";
-import { toStudlyCase } from "@mongez/reinforcements";
 import type { Pipeline } from "../aggregate";
-import { $agg, Aggregate, selectPipeline } from "../aggregate";
+import { $agg, Aggregate } from "../aggregate";
 import type { Model } from "../model/model";
 import { joinableProxy } from "../utils/joinable-proxy";
 import type { Joinable, JoinableProxy } from "./joinable";
@@ -12,6 +11,15 @@ import type {
   Filter,
   PaginationListing,
 } from "./types";
+
+type JoiningOptions = {
+  where?: GenericObject;
+  query?: (query: JoinableProxy) => any;
+  as?: string;
+  select?: string[];
+  pipeline?: (GenericObject | Pipeline)[];
+  joining?: (string | JoinableProxy | JoiningOptions)[];
+};
 
 export class ModelAggregate<T extends Model> extends Aggregate {
   /**
@@ -126,18 +134,41 @@ export class ModelAggregate<T extends Model> extends Aggregate {
   }
 
   /**
-   * Perform a join
+   * Include a related collection in the query results based on a defined relationship.
+   *
+   * @param relationName - The name of the relationship as defined in the static relations property
+   * @param options - Optional. Override or extend the base relationship configuration
+   * @returns The query builder for chaining
+   *
+   * @example
+   * // Basic usage with defaults from relation definition
+   * Post.aggregate().joining("author").get();
+   *
+   * // With overrides
+   * Post.aggregate().joining("author", {
+   *   select: ["id", "name", "avatar"],
+   *   where: { isActive: true }
+   * }).get();
+   *
+   * @example
+   * // Using a function to override the query
+   * Post.aggregate().joining("author", query => {
+   *   query.where("id", 1);
+   * }).get();
+   *
+   * @example
+   * // Using multiple options
+   * Post.aggregate().joining("author", {
+   *   select: ["id", "name", "avatar"],
+   *   where: { isActive: true },
+   *   query: query => {
+   *     query.where("id", 1);
+   *   }
+   * }).get();
    */
   public joining(
     joining: string | JoinableProxy,
-    options?:
-      | {
-          where?: GenericObject;
-          select?: string[];
-          pipeline: (GenericObject | Pipeline)[];
-          as?: string;
-        }
-      | ((query: JoinableProxy) => any),
+    options?: JoiningOptions | ((query: JoinableProxy) => any),
   ) {
     joining = this.getJoinable(joining);
 
@@ -148,12 +179,20 @@ export class ModelAggregate<T extends Model> extends Aggregate {
         joining.where(options.where);
       }
 
+      if (options?.query) {
+        options.query(joining);
+      }
+
       if (options?.select) {
         joining.select(...options.select);
       }
 
       if (options?.as) {
         joining.as(options.as);
+      }
+
+      if (options?.joining) {
+        // Perform the joining
       }
 
       if (options?.pipeline) {
@@ -210,46 +249,6 @@ export class ModelAggregate<T extends Model> extends Aggregate {
         $size: $agg.columnName(as),
       })
       .deselect([as]);
-  }
-
-  /**
-   * Join the given alias
-   */
-  public with(alias: string, ...moreParams: any[]) {
-    const method = `with${toStudlyCase(alias)}`;
-
-    const relation = (this.model as any)[method];
-
-    if (!relation) {
-      throw new Error(`Relation ${alias} not found`);
-    }
-
-    const {
-      model,
-      localField,
-      as,
-      foreignField,
-      single = false,
-      select: selectColumns,
-      pipeline = [],
-    } = relation.call(this.model, ...moreParams);
-
-    if (selectColumns) {
-      pipeline.push(selectPipeline(selectColumns));
-    }
-
-    this.lookup({
-      as,
-      single,
-      from: model.collection,
-      // related to from field
-      foreignField: foreignField || `${as}.id`,
-      // related to current model
-      localField: localField || "id",
-      pipeline,
-    });
-
-    return this;
   }
 
   /**
