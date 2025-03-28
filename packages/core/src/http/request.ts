@@ -124,6 +124,7 @@ export class Request<User = any> {
    */
   public get locale() {
     if (this._locale) return this._locale;
+
     return this.header("translation-locale-code") || this.localized;
   }
 

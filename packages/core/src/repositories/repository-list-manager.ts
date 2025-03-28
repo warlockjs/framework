@@ -15,6 +15,10 @@ import type {
 } from "./types";
 import { defaultRepositoryOptions } from "./utils";
 
+// @TODO: Split the listing class into multiple classes for each type of listing, like general listing, active listing, cached listing, etc.
+// @TODO: Use Proxy to handle the methods and properties of the class
+// @TODO: Add container object to add the methods inside it instead of making multiple checks inside the proxy, so it can be more performant.
+// @TODO: Make sure to fully handle Cursor pagination
 export abstract class RepositoryListManager<
   T extends Model,
   M extends typeof Model = typeof Model,
@@ -825,6 +829,62 @@ export abstract class RepositoryListManager<
     });
 
     return documents[0] ?? null;
+  }
+
+  /**
+   * Check if document exists for the given filter
+   */
+  public async exists(filter: RepositoryOptions = {}) {
+    return !!(await this.first(filter));
+  }
+
+  /**
+   * Check if the document exists and is active
+   */
+  public async existsActive(filter: RepositoryOptions = {}) {
+    return !!(await this.firstActive(filter));
+  }
+
+  /**
+   * Check if the document exists and is active and cached
+   */
+  public async existsActiveCached(filter: RepositoryOptions = {}) {
+    return !!(await this.firstActiveCached(filter));
+  }
+
+  /**
+   * Check if document exists and is cached
+   */
+  public async existsCached(filter: RepositoryOptions = {}) {
+    return !!(await this.firstCached(filter));
+  }
+
+  /**
+   * Check if document exists for the given id
+   */
+  public async idExists(id: number | string) {
+    return !!(await this.get(Number(id)));
+  }
+
+  /**
+   * Check if document exists for the given id and is active
+   */
+  public async idExistsActive(id: number | string) {
+    return !!(await this.getActive(Number(id)));
+  }
+
+  /**
+   * Check if document exists for the given id and is active and cached
+   */
+  public async idExistsActiveCached(id: number | string) {
+    return !!(await this.getActiveCached(Number(id)));
+  }
+
+  /**
+   * Check if document exists for the given id and is cached
+   */
+  public async idExistsCached(id: number | string) {
+    return !!(await this.getCached(Number(id)));
   }
 
   /**
