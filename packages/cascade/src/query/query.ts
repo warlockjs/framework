@@ -190,6 +190,41 @@ export class Query {
   }
 
   /**
+   * Update a single document in the given collection
+   */
+  public async updateOne(
+    collection: string,
+    filter: Filter,
+    update: UpdateFilter<Document>,
+    options?: UpdateOptions,
+  ) {
+    const query = this.query(collection);
+    options = this.prepareQueryOptions(options);
+
+    await this.trigger("updating saving", {
+      collection,
+      filter,
+      update,
+      options,
+      query,
+      isMany: false,
+    });
+
+    const result = await query.updateOne(filter, update, options);
+
+    await this.trigger("updated saved", {
+      collection,
+      filter,
+      update,
+      options,
+      result,
+      isMany: false,
+    });
+
+    return result;
+  }
+
+  /**
    * Update many documents
    */
   public async updateMany(
@@ -219,6 +254,78 @@ export class Query {
       options,
       result: result,
       isMany: true,
+    });
+
+    return result;
+  }
+
+  /**
+   * Increment the value of the given field by the given amount
+   */
+  public async increment(
+    collection: string,
+    filter: Filter,
+    field: string,
+    amount: number = 1,
+  ) {
+    const query = this.query(collection);
+
+    const result = await query.findOneAndUpdate(filter, {
+      $inc: { [field]: amount },
+    });
+
+    return result;
+  }
+
+  /**
+   * Decrement the value of the given field by the given amount
+   */
+  public async decrement(
+    collection: string,
+    filter: Filter,
+    field: string,
+    amount: number = 1,
+  ) {
+    const query = this.query(collection);
+
+    const result = await query.updateOne(filter, {
+      $inc: { [field]: -amount },
+    });
+
+    return result;
+  }
+
+  /**
+   * Find and increment the value of the given field by the given amount
+   */
+  public async findAndIncrement(
+    collection: string,
+    filter: Filter,
+    field: string,
+    amount: number = 1,
+  ) {
+    const query = this.query(collection);
+
+    const result = await query.findOneAndUpdate(filter, {
+      $inc: { [field]: amount },
+    });
+
+    return result;
+  }
+
+  /**
+   * Find and decrement the value of the given field by the given amount
+   */
+  public async findAndDecrement(
+    collection: string,
+    filter: Filter,
+    field: string,
+    amount: number = 1,
+  ) {
+    const query = this.query(collection);
+
+    const result = await query.findOneAndUpdate(filter, {
+      $inc: { [field]: -amount },
     });
 
     return result;
