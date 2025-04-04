@@ -255,7 +255,13 @@ export class BaseValidator {
   }
 
   /**
-   * Mark this field as required if the given input field is absent
+   * Mark this field as required if the given input field is present
+   */
+  public requiredIfPresent(input: string, errorMessage?: string) {
+    return this.requiredWith(input, errorMessage);
+  }
+
+  /**
    */
   public requiredIfAbsent(input: string, errorMessage?: string) {
     const rule = this.addRule(requiredIfAbsentRule, errorMessage);
@@ -548,11 +554,14 @@ export class ObjectValidator extends BaseValidator {
 
     if (result.isValid === false) return result;
 
+    // if no data and the object is valid, then return it as-is, nothing to do
+    if (data === undefined) return result;
+
     // now we need to validate the object properties
     const errors: ValidationResult["errors"] = [];
 
     const validationPromises = Object.keys(this.schema).map(async key => {
-      const value = mutatedData[key];
+      const value = mutatedData?.[key];
       const validator = this.schema[key];
 
       const childContext: SchemaContext = {
@@ -1655,5 +1664,20 @@ export const v = {
       }),
       errorMessage,
     ),
+  /**
+   * TODO: Added validateCallback to declare a schema and the second argument is a callback that will be only executed if schema validation passes
+   * This will return a new callback that will be executed with the validated data
+   *
+   * @example
+   * ```ts
+   * export const createNewUser = v.validateCallback(schema, (data) => {
+   *  // Do something with the validated data
+   * })
+   * ```
+   */
+  // validateCallback: (
+  //   schema: BaseValidator,
+  //   callback: (data: InferType<BaseValidator>) => Promise<any> | any,
+  // ) => v.validate(schema, callback),
   validate,
 };

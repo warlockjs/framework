@@ -40,7 +40,7 @@ export class Upload extends Model {
   /**
    * {@inheritDoc}
    */
-  public embedded = Object.keys(this.casts);
+  public embedded = [...Object.keys(this.casts), "createdAt"];
 
   /**
    * Get file full path

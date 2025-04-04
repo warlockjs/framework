@@ -10,7 +10,7 @@ import { isIP } from "net";
 import { UploadedFile } from "./../../http/UploadedFile";
 import { Upload } from "./../../modules/uploads/models/upload";
 import { type BaseValidator } from "./schema";
-import type { SchemaRule } from "./types";
+import type { SchemaContext, SchemaRule } from "./types";
 import { VALID_RULE, invalidRule, setKeyPath } from "./utils";
 export * from "./database";
 
@@ -117,6 +117,106 @@ export const requiredIfSiblingFieldAbsentRule: SchemaRule<{
     const fieldValue = get(context.parent, otherField);
 
     if (![undefined, null].includes(fieldValue) && isEmpty(value)) {
+      return invalidRule(this, context);
+    }
+
+    return VALID_RULE;
+  },
+};
+
+export const requiredIfSiblingFieldIsOneOf: SchemaRule<{
+  field: string;
+  values: any[];
+}> = {
+  name: "requiredIfSiblingFieldIsOneOf",
+  description:
+    "The field is required if another field in same parent context is one of the following values",
+  sortOrder: -2,
+  requiresValue: false,
+  defaultErrorMessage: "The :input is required",
+  async validate(value: any, context) {
+    const otherField = this.context.options.field;
+    const otherFieldValue = get(context.parent, otherField);
+
+    if (
+      this.context.options.values.includes(otherFieldValue) &&
+      isEmpty(value)
+    ) {
+      return invalidRule(this, context);
+    }
+
+    return VALID_RULE;
+  },
+};
+
+export const requiredIfSiblingFieldIsNotOneOf: SchemaRule<{
+  field: string;
+  values: any[];
+}> = {
+  name: "requiredIfSiblingFieldIsNotOneOf",
+  description:
+    "The field is required if another field in same parent context is not one of the following values",
+  sortOrder: -2,
+  requiresValue: false,
+  defaultErrorMessage: "The :input is required",
+  async validate(value: any, context) {
+    const otherField = this.context.options.field;
+    const otherFieldValue = get(context.parent, otherField);
+
+    if (
+      !this.context.options.values.includes(otherFieldValue) &&
+      isEmpty(value)
+    ) {
+      return invalidRule(this, context);
+    }
+
+    return VALID_RULE;
+  },
+};
+
+export const requiredIfSiblingFieldIsOneOfAbsentRule: SchemaRule<{
+  field: string;
+  values: any[];
+}> = {
+  name: "requiredIfSiblingFieldIsOneOfAbsent",
+  description:
+    "The field is required if another field in same parent context is one of the following values and is absent",
+  sortOrder: -2,
+  requiresValue: false,
+  defaultErrorMessage: "The :input is required",
+  async validate(value: any, context) {
+    const otherField = this.context.options.field;
+    const otherFieldValue = get(context.parent, otherField);
+
+    if (
+      this.context.options.values.includes(otherFieldValue) &&
+      isEmpty(value)
+    ) {
+      return invalidRule(this, context);
+    }
+
+    return VALID_RULE;
+  },
+};
+
+export const requiredIfSiblingFieldIsNotOneOfAbsentRule: SchemaRule<{
+  field: string;
+  values: any[];
+}> = {
+  name: "requiredIfSiblingFieldIsNotOneOfAbsent",
+  description:
+    "The field is required if another field in same parent context is not one of the following values and is absent",
+  sortOrder: -2,
+  requiresValue: false,
+  defaultErrorMessage: "The :input is required",
+  async validate(value: any, context) {
+    const otherField = this.context.options.field;
+    const otherFieldValue = get(context.parent, otherField);
+
+    if (
+      !this.context.options.values.includes(otherFieldValue) &&
+      isEmpty(value)
+    ) {
       return invalidRule(this, context);
     }
 
@@ -1554,5 +1654,158 @@ export const whenRule: SchemaRule<{
     }
 
     return VALID_RULE;
+  },
+};
+
+const compare = (
+  value: any,
+  expectedValue: any,
+  comparisonType: "gt" | "lt" | "gte" | "lte",
+  type: "number" | "date",
+) => {
+  if (type === "number") {
+    if (comparisonType === "gt") {
+      return value > expectedValue;
+    } else if (comparisonType === "lt") {
+      return value < expectedValue;
+    } else if (comparisonType === "gte") {
+      return value >= expectedValue;
+    } else if (comparisonType === "lte") {
+      return value <= expectedValue;
+    }
+  } else if (type === "date") {
+    if (comparisonType === "gt") {
+      return value > expectedValue;
+    } else if (comparisonType === "lt") {
+      return value < expectedValue;
+    } else if (comparisonType === "gte") {
+      return value >= expectedValue;
+    } else if (comparisonType === "lte") {
+      return value <= expectedValue;
+    }
+  }
+
+  return false;
+};
+
+const getComparedValueFrom = (
+  expectedValue: any,
+  context: SchemaContext,
+  compareTo: "value" | "siblingField" | "globalField",
+  field?: string,
+): any => {
+  if (compareTo === "siblingField") {
+    return get(context.parent, field!);
+  } else if (compareTo === "globalField") {
+    return get(context.allValues, field!);
+  }
+
+  return expectedValue;
+};
+
+// Now let's add less than | greater than | less than or equal to | greater than or equal to rules
+// also we need to declare them with compared to sibling fields and global fields, so each one of them will have three rules
+
+export const lessThanRule: SchemaRule<{
+  expectedValue?: number | Date;
+  compareTo: "value" | "siblingField" | "globalField";
+  field?: string;
+  type: "number" | "date";
+}> = {
+  name: "lessThan",
+  defaultErrorMessage: "The :input must be less than :number",
+  async validate(value: any, context) {
+    const { expectedValue, compareTo, field, type } = this.context.options;
+
+    const comparedToValue = getComparedValueFrom(
+      expectedValue,
+      context,
+      compareTo,
+      field,
+    );
+
+    if (compare(value, comparedToValue, "lt", type)) {
+      return VALID_RULE;
+    }
+
+    return invalidRule(this, context);
+  },
+};
+
+export const greaterThanRule: SchemaRule<{
+  expectedValue?: number | Date;
+  compareTo: "value" | "siblingField" | "globalField";
+  field?: string;
+  type: "number" | "date";
+}> = {
+  name: "greaterThan",
+  defaultErrorMessage: "The :input must be greater than :number",
+  async validate(value: any, context) {
+    const { expectedValue, compareTo, field, type } = this.context.options;
+
+    const comparedToValue = getComparedValueFrom(
+      expectedValue,
+      context,
+      compareTo,
+      field,
+    );
+
+    if (compare(value, comparedToValue, "gt", type)) {
+      return VALID_RULE;
+    }
+
+    return invalidRule(this, context);
+  },
+};
+
+export const lessThanOrEqualRule: SchemaRule<{
+  expectedValue?: number | Date;
+  compareTo: "value" | "siblingField" | "globalField";
+  field?: string;
+  type: "number" | "date";
+}> = {
+  name: "lessThanOrEqual",
+  defaultErrorMessage: "The :input must be less than or equal to :number",
+  async validate(value: any, context) {
+    const { expectedValue, compareTo, field, type } = this.context.options;
+
+    const comparedToValue = getComparedValueFrom(
+      expectedValue,
+      context,
+      compareTo,
+      field,
+    );
+
+    if (compare(value, comparedToValue, "lte", type)) {
+      return VALID_RULE;
+    }
+
+    return invalidRule(this, context);
+  },
+};
+
+export const greaterThanOrEqualRule: SchemaRule<{
+  expectedValue?: number | Date;
+  compareTo: "value" | "siblingField" | "globalField";
+  field?: string;
+  type: "number" | "date";
+}> = {
+  name: "greaterThanOrEqual",
+  defaultErrorMessage: "The :input must be greater than or equal to :number",
+  async validate(value: any, context) {
+    const { expectedValue, compareTo, field, type } = this.context.options;
+
+    const comparedToValue = getComparedValueFrom(
+      expectedValue,
+      context,
+      compareTo,
+      field,
+    );
+
+    if (compare(value, comparedToValue, "gte", type)) {
+      return VALID_RULE;
+    }
+
+    return invalidRule(this, context);
   },
 };

@@ -467,7 +467,7 @@ export abstract class RepositoryListManager<
     purge?: boolean;
     expiresAfter?: number;
     options?: CachedRepositoryOptions;
-  }) {
+  }): Promise<PaginationListing<T>> {
     if (!this.isCacheable) return this.list(options);
 
     // generate cache key for the list method
