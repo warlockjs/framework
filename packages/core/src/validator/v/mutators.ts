@@ -23,6 +23,8 @@ export const capitalizeMutator: Mutator = async value => {
 };
 
 export const numberMutator: Mutator = async value => {
+  if (!value) return value;
+
   return Number(value);
 };
 

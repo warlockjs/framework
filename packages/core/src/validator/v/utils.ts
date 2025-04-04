@@ -1,3 +1,4 @@
+import { plainConverter } from "@mongez/localization";
 import type { ContextualSchemaRule, RuleResult, SchemaContext } from "./types";
 
 export const VALID_RULE: RuleResult = {
@@ -10,8 +11,11 @@ export const invalidRule = (
 ): RuleResult => {
   const attributes = { ...rule.context.options, ...context.allValues };
 
-  attributes.input = context.key;
+  // attributes.input = context.key;
+  attributes.input = context.path;
   attributes.path = context.path;
+  attributes.key = context.key;
+  attributes.field = context.key;
   attributes.value = context.value;
 
   const error =
@@ -22,7 +26,10 @@ export const invalidRule = (
 
   return {
     isValid: false,
-    error,
+    error:
+      error === `validation.${rule.name}` && rule.defaultErrorMessage
+        ? plainConverter(rule.defaultErrorMessage, attributes)
+        : error,
     input: context.key,
     path: context.path,
   };

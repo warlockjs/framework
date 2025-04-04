@@ -102,6 +102,27 @@ export const requiredIfAbsentRule: SchemaRule<{
   },
 };
 
+export const requiredIfSiblingFieldIsAbsentRule: SchemaRule<{
+  field: string;
+}> = {
+  name: "requiredIfSiblingFieldIsAbsent",
+  description: "The :input is required",
+  sortOrder: -2,
+  requiresValue: false,
+  defaultErrorMessage: ":input field is required",
+  async validate(value: any, context) {
+    const otherField = this.context.options.field;
+
+    const otherFieldValue = get(context.parent, otherField);
+
+    if (![undefined, null].includes(otherFieldValue) && isEmpty(value)) {
+      return invalidRule(this, context);
+    }
+
+    return VALID_RULE;
+  },
+};
+
 export const requiredIfSiblingFieldAbsentRule: SchemaRule<{
   field: string;
 }> = {

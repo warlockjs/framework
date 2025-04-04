@@ -77,6 +77,7 @@ import {
   requiredIfFieldRule,
   requiredIfSiblingFieldAllAbsentRule,
   requiredIfSiblingFieldEmptyRule,
+  requiredIfSiblingFieldIsAbsentRule,
   requiredIfSiblingFieldRule,
   requiredRule,
   requiredUnlessSiblingFieldRule,
@@ -262,11 +263,23 @@ export class BaseValidator {
   }
 
   /**
+   * Value is required if the given field (global) is absent
    */
   public requiredIfAbsent(input: string, errorMessage?: string) {
     const rule = this.addRule(requiredIfAbsentRule, errorMessage);
 
     rule.context.options.field = input;
+
+    return this;
+  }
+
+  /**
+   * Value is required if given sibling field is absent
+   */
+  public requireIfSiblingIsAbsent(field: string, errorMessage?: string) {
+    const rule = this.addRule(requiredIfSiblingFieldIsAbsentRule, errorMessage);
+
+    rule.context.options.field = field;
 
     return this;
   }
@@ -1633,6 +1646,7 @@ export const validate = async (schema: BaseValidator, data: any) => {
     key: "",
     path: "",
     translator(rule, attributes) {
+      console.log({ rule, attributes, data, schema });
       return trans(`validation.${rule}`, attributes);
     },
   };
