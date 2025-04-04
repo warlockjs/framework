@@ -1646,7 +1646,6 @@ export const validate = async (schema: BaseValidator, data: any) => {
     key: "",
     path: "",
     translator(rule, attributes) {
-      console.log({ rule, attributes, data, schema });
       return trans(`validation.${rule}`, attributes);
     },
   };

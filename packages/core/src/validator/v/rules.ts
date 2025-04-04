@@ -114,8 +114,9 @@ export const requiredIfSiblingFieldIsAbsentRule: SchemaRule<{
     const otherField = this.context.options.field;
 
     const otherFieldValue = get(context.parent, otherField);
+    const isPresent = ![undefined, null].includes(otherFieldValue);
 
-    if (![undefined, null].includes(otherFieldValue) && isEmpty(value)) {
+    if (!isPresent && isEmpty(value)) {
       return invalidRule(this, context);
     }
 
@@ -136,8 +137,9 @@ export const requiredIfSiblingFieldAbsentRule: SchemaRule<{
     const otherField = this.context.options.field;
 
     const fieldValue = get(context.parent, otherField);
+    const isPresent = ![undefined, null].includes(fieldValue);
 
-    if (![undefined, null].includes(fieldValue) && isEmpty(value)) {
+    if (!isPresent && isEmpty(value)) {
       return invalidRule(this, context);
     }
 
