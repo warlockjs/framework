@@ -127,6 +127,13 @@ export class BaseValidator {
   protected description?: string;
 
   /**
+   * Get the default value
+   */
+  public getDefaultValue(): any {
+    return this.defaultValue;
+  }
+
+  /**
    * Add description to the validator
    */
   public describe(description: string) {
@@ -201,6 +208,19 @@ export class BaseValidator {
   }
 
   /**
+   * Add custom rule to the schema
+   * @alias refine
+   */
+  public custom(
+    callback: (
+      value: any,
+      context: SchemaContext,
+    ) => Promise<string | undefined> | string | undefined,
+  ) {
+    return this.refine(callback);
+  }
+
+  /**
    * Add mutator to the schema
    *
    * A mutator is a function that mutates the value of the field before validation
@@ -263,7 +283,7 @@ export class BaseValidator {
   }
 
   /**
-   * Value is required if the given field (global) is absent
+   * Value is required if the given input field (global) is absent
    */
   public requiredIfAbsent(input: string, errorMessage?: string) {
     const rule = this.addRule(requiredIfAbsentRule, errorMessage);
@@ -467,6 +487,27 @@ export class BaseValidator {
 
 export class AnyValidator extends BaseValidator {}
 
+/**
+ * Recursively remove undefined values from an object
+ */
+function removeUndefinedValues(obj: any): any {
+  if (Array.isArray(obj)) {
+    return obj.map(item => removeUndefinedValues(item));
+  }
+
+  if (obj !== null && typeof obj === "object") {
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        result[key] = removeUndefinedValues(value);
+      }
+    }
+    return result;
+  }
+
+  return obj;
+}
+
 export class ObjectValidator extends BaseValidator {
   /**
    * Whether to allow unknown properties
@@ -572,34 +613,43 @@ export class ObjectValidator extends BaseValidator {
 
     // now we need to validate the object properties
     const errors: ValidationResult["errors"] = [];
+    const finalData: any = {};
 
     const validationPromises = Object.keys(this.schema).map(async key => {
       const value = mutatedData?.[key];
       const validator = this.schema[key];
 
-      const childContext: SchemaContext = {
-        ...context,
-        parent: mutatedData,
-        value,
-        key,
-        path: setKeyPath(context.path, key),
-      };
+      // Only process fields that were provided in the input or have explicit defaults
+      if (key in data || validator.getDefaultValue() !== undefined) {
+        const childContext: SchemaContext = {
+          ...context,
+          parent: mutatedData,
+          value,
+          key,
+          path: setKeyPath(context.path, key),
+        };
 
-      const childResult = await validator.validate(value, childContext);
+        const childResult = await validator.validate(value, childContext);
 
-      mutatedData[key] = childResult.data;
+        if (childResult.data !== undefined) {
+          finalData[key] = childResult.data;
+        }
 
-      if (childResult.isValid === false) {
-        errors.push(...childResult.errors);
+        if (childResult.isValid === false) {
+          errors.push(...childResult.errors);
+        }
       }
     });
 
     await Promise.all(validationPromises);
 
+    // Remove undefined values from the final data
+    const cleanedData = removeUndefinedValues(finalData);
+
     return {
       isValid: errors.length === 0,
       errors,
-      data: mutatedData,
+      data: cleanedData,
     };
   }
 }
@@ -1663,6 +1713,8 @@ export const v = {
   date: (format?: string, errorMessage?: string) =>
     new DateValidator(format, errorMessage),
   string: (errorMessage?: string) => new StringValidator(errorMessage),
+  enum: (values: any, errorMessage?: string) =>
+    new StringValidator().enum(values, errorMessage),
   number: (errorMessage?: string) => new NumberValidator(errorMessage),
   int: (errorMessage?: string) => new IntValidator(errorMessage),
   float: (errorMessage?: string) => new FloatValidator(errorMessage),
