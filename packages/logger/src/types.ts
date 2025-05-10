@@ -23,6 +23,7 @@ export type BasicLogConfigurations = {
     level: LogLevel;
     module: string;
     action: string;
+    message: any;
   }) => boolean;
 };
 

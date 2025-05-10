@@ -84,10 +84,12 @@ export abstract class LogChannel<
     module,
     action,
     level,
+    message,
   }: {
     module: string;
     action: string;
     level: LogLevel;
+    message: any;
   }): boolean {
     // check for debug mode
     const allowedLevels = this.config("levels");
@@ -97,7 +99,7 @@ export abstract class LogChannel<
     const filter = this.config("filter");
 
     if (filter) {
-      return filter({ level, module, action });
+      return filter({ level, module, action, message });
     }
 
     return true;

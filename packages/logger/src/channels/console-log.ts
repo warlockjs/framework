@@ -17,7 +17,7 @@ export class ConsoleLog extends LogChannel<BasicLogConfigurations> {
    * {@inheritdoc}
    */
   public log(module: string, action: string, message: any, level: LogLevel) {
-    if (!this.shouldBeLogged({ module, action, level })) return;
+    if (!this.shouldBeLogged({ module, action, level, message })) return;
 
     // display date and time with milliseconds
     const date = new Date().toISOString(); // i.e 2021-01-01T00:00:00.000Z

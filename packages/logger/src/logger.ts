@@ -1,3 +1,4 @@
+import { Random } from "@mongez/reinforcements";
 import type { LogChannel } from "./log-channel";
 import type { LogLevel } from "./types";
 import { clearMessage } from "./utils/clear-message";
@@ -6,7 +7,9 @@ export class Logger {
   /**
    * Current channel
    */
-  protected channels: LogChannel[] = [];
+  public channels: LogChannel[] = [];
+
+  public id = "logger-" + Random.string(32);
 
   /**
    * Add a new channel
