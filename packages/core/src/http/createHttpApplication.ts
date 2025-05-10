@@ -18,13 +18,15 @@ export async function createHttpApplication() {
   try {
     log.info("http", "server", "Connecting to the server");
     // 👇🏻 We can use the url of the server
-    const baseUrl = await server.listen({
+    await server.listen({
       port,
       host: httpConfig("host"),
     });
 
+    const baseUrl = config.get("app.baseUrl");
+
     // update base url
-    setBaseUrl(config.get("app.baseUrl"));
+    setBaseUrl(baseUrl);
 
     log.success("http", "server", `Server is listening on ${baseUrl}`);
   } catch (error) {

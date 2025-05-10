@@ -1,10 +1,10 @@
-import config from "@mongez/config";
 import type { AWSConnectionOptions } from ".";
+import { config } from "../config";
 
 export async function getAWSConfigurations(): Promise<
   AWSConnectionOptions | undefined
 > {
-  const awsConfigurations = config.get("uploads.aws.connectionOptions");
+  const awsConfigurations = config("uploads.aws.connectionOptions");
 
   if (!awsConfigurations) return;
 

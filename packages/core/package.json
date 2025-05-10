@@ -1,6 +1,6 @@
 {
     "name": "@warlock.js/core",
-    "version": "2.8.8",
+    "version": "2.8.9",
     "description": "A robust nodejs framework for building blazing fast applications",
     "main": "src/index.ts",
     "bin": {
@@ -10,13 +10,13 @@
         "update": "ncu -u"
     },
     "dependencies": {
-        "esbuild": "^0.24.2",
+        "esbuild": "^0.25.4",
         "@jgoz/esbuild-plugin-typecheck": "^4.0.2",
         "@aws-sdk/client-s3": "^3.451.0",
-        "fastify": "^5.1.0",
+        "fastify": "^5.2.1",
         "@fastify/cors": "^10.0.1",
         "@fastify/http-proxy": "^11.0.0",
-        "@vitejs/plugin-react-swc": "^3.7.2",
+        "@vitejs/plugin-react-swc": "^3.9.0",
         "@fastify/multipart": "^9.0.1",
         "@fastify/rate-limit": "^10.2.1",
         "@fastify/static": "^8.0.3",
@@ -29,8 +29,8 @@
         "@mongez/fs": "^3.0.5",
         "@mongez/http": "^2.2.10",
         "@mongez/localization": "^3.0.0",
-        "@warlock.js/logger": "2.8.8",
-        "@warlock.js/cascade": "2.8.8",
+        "@warlock.js/logger": "2.8.9",
+        "@warlock.js/cascade": "2.8.9",
         "@mongez/reinforcements": "^2.3.10",
         "commander": "^12.0.0",
         "@mongez/slug": "^1.0.7",
@@ -65,7 +65,9 @@
         "eslint-plugin-unused-imports": "^3.0.0",
         "npm-check-updates": "^16.14.6",
         "prettier-plugin-organize-imports": "^3.2.4",
-        "typescript": "^5.2.2"
+        "typescript": "^5.2.2",
+        "vite": "^6.3.5",
+        "vitest": "^3.1.3"
     },
     "repository": {
         "type": "git",

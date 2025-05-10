@@ -1,9 +1,11 @@
 import { typecheckPlugin } from "@jgoz/esbuild-plugin-typecheck";
+import { debounce } from "@mongez/reinforcements";
+import chokidar from "chokidar";
 import esbuild from "esbuild";
 import path from "path";
 import { buildHttpApp } from "../builder/build-http-app";
 import { command } from "../console/command-builder";
-import { srcPath, warlockPath } from "../utils";
+import { rootPath, srcPath, warlockPath } from "../utils";
 import {
   injectImportPathPlugin,
   nativeNodeModulesPlugin,
@@ -49,8 +51,29 @@ export async function startHttpApp() {
     ],
   });
 
-  // Just watch without callback, the plugin will handle reporting
-  builder.watch();
+  // Set up chokidar to watch additional files (e.g., .env)
+  const watcher = chokidar.watch(
+    [
+      rootPath(".env"),
+      rootPath(".env.shared"),
+      srcPath(),
+      // Add other files or patterns as needed
+    ],
+    {
+      persistent: true,
+      ignoreInitial: false,
+      ignored: ["node_modules/**", "dist/**"], // Ignore irrelevant paths
+    },
+  );
+
+  const rebuild = debounce(() => {
+    builder.rebuild();
+  }, 500);
+
+  watcher.on("add", rebuild);
+  watcher.on("change", rebuild);
+  watcher.on("unlink", rebuild);
+  watcher.on("unlinkDir", rebuild);
 }
 
 export function registerHttpDevelopmentServerCommand() {
