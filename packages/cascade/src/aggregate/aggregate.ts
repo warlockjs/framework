@@ -1219,7 +1219,7 @@ export class Aggregate {
     options: FilterOptions = {},
   ): this {
     applyFilters({
-      query: this,
+      query: this as any,
       filters,
       data,
       options,

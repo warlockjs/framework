@@ -1,5 +1,5 @@
 import type { GenericObject } from "@mongez/reinforcements";
-import { ModelAggregate } from "src/cascade/model";
+import { type ModelAggregate } from "src/cascade/model";
 import { type Aggregate } from "../aggregate";
 import type { WhereOperator } from "../types";
 
@@ -81,7 +81,7 @@ interface ApplyFiltersParams {
   /**
    * The query instance to apply filters to
    */
-  query: Aggregate;
+  query: ModelAggregate<any>;
   /**
    * The filter structure defining how to filter
    */
