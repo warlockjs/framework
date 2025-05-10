@@ -2,7 +2,7 @@
 import { ensureDirectoryAsync } from "@mongez/fs";
 import { spawn } from "child_process";
 import esbuild from "esbuild";
-import { srcPath, warlockPath } from "../utils";
+import { srcPath, storagePath, warlockPath } from "../utils";
 import { nativeNodeModulesPlugin } from "./../esbuild";
 import { startHttpApp } from "./start-http-server";
 
@@ -10,6 +10,8 @@ export async function startCliServer() {
   const command = process.argv[2];
 
   await ensureDirectoryAsync(warlockPath());
+
+  ensureDirectoryAsync(storagePath("cache/images"));
 
   // make a special check for the development command
   if (command === "dev") {

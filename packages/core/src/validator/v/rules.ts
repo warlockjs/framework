@@ -623,7 +623,9 @@ export const minWordsRule: SchemaRule<{
   name: "minWords",
   defaultErrorMessage: `The :input must be at least :minWords words`,
   async validate(value: any, context) {
-    if (value?.split(" ").length >= this.context.options.minWords) {
+    if (
+      String(value || "").split(" ").length >= this.context.options.minWords
+    ) {
       return VALID_RULE;
     }
 
@@ -637,7 +639,9 @@ export const maxWordsRule: SchemaRule<{
   name: "maxWords",
   defaultErrorMessage: `The :input must be at most :maxWords words`,
   async validate(value: any, context) {
-    if (value?.split(" ").length <= this.context.options.maxWords) {
+    if (
+      String(value || "").split(" ").length <= this.context.options.maxWords
+    ) {
       return VALID_RULE;
     }
 
@@ -651,7 +655,7 @@ export const wordsRule: SchemaRule<{
   name: "words",
   defaultErrorMessage: `The :input must be exactly :words words`,
   async validate(value: any, context) {
-    if (value?.split(" ").length === this.context.options.words) {
+    if (String(value || "").split(" ").length === this.context.options.words) {
       return VALID_RULE;
     }
 
@@ -665,7 +669,7 @@ export const minLengthRule: SchemaRule<{
   name: "minLength",
   defaultErrorMessage: `The :input must be at least :minLength characters long`,
   async validate(value: any, context) {
-    if (value?.length >= this.context.options.minLength) {
+    if (String(value || "").length >= this.context.options.minLength) {
       return VALID_RULE;
     }
 
@@ -679,7 +683,7 @@ export const maxLengthRule: SchemaRule<{
   name: "maxLength",
   defaultErrorMessage: `The :input must not exceed :maxLength characters`,
   async validate(value: any, context) {
-    if (value?.length <= this.context.options.maxLength) {
+    if (String(value || "").length <= this.context.options.maxLength) {
       return VALID_RULE;
     }
 
@@ -693,7 +697,7 @@ export const lengthRule: SchemaRule<{
   name: "length",
   defaultErrorMessage: `The :input must be exactly :length characters long`,
   async validate(value: any, context) {
-    if (value?.length === this.context.options.length) {
+    if (String(value || "").length === this.context.options.length) {
       return VALID_RULE;
     }
 

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-this-alias */
 import { trans } from "@mongez/localization";
 import { clone } from "@mongez/reinforcements";
-import { isPlainObject } from "@mongez/supportive-is";
+import { isObject, isPlainObject } from "@mongez/supportive-is";
 import { type Model } from "@warlock.js/cascade";
 import {
   capitalizeMutator,
@@ -491,6 +491,10 @@ export class AnyValidator extends BaseValidator {}
  * Recursively remove undefined values from an object
  */
 function removeUndefinedValues(obj: any): any {
+  if (isObject(obj) && !isPlainObject(obj)) {
+    return obj;
+  }
+
   if (Array.isArray(obj)) {
     return obj.map(item => removeUndefinedValues(item));
   }
@@ -1364,6 +1368,24 @@ class NumberValidator extends BaseValidator {
    */
   public notIn: typeof ScalarValidator.prototype.forbids =
     ScalarValidator.prototype.forbids;
+
+  /**
+   * Validate number length
+   */
+  public length: typeof StringValidator.prototype.length =
+    StringValidator.prototype.length;
+
+  /**
+   * Validate number min length
+   */
+  public minLength: typeof StringValidator.prototype.minLength =
+    StringValidator.prototype.minLength;
+
+  /**
+   * Validate number max length
+   */
+  public maxLength: typeof StringValidator.prototype.maxLength =
+    StringValidator.prototype.maxLength;
 }
 
 export class IntValidator extends NumberValidator {

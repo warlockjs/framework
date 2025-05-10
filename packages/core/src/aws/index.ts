@@ -7,6 +7,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { log } from "@warlock.js/logger";
 import fs from "fs";
+import { normalize } from "path";
 export * from "./get-aws-configurations";
 
 export type AWSConnectionOptions = {
@@ -24,7 +25,7 @@ export type AWSConnectionOptions = {
 } & Partial<S3ClientConfig>;
 
 export type AWSConfigurations = {
-  parseFileName?: (options: { fileName: string; hash: string }) => string;
+  parseFileName?: (options: { fileName: string; hash?: string }) => string;
   connectionOptions:
     | AWSConnectionOptions
     | (() => Promise<AWSConnectionOptions>);
@@ -34,10 +35,30 @@ export type AWSUploadOptions = {
   filePath?: string;
   fileBuffer?: Buffer;
   fileName: string;
-  hash: string;
-  mimeType: string;
+  hash?: string;
+  mimeType?: string;
   isCachedFile?: boolean;
 } & AWSConfigurations;
+
+function getObjectUrl({
+  bucketName,
+  fileName,
+  providerUrl,
+  providerName,
+  // connectionOptions,
+}: {
+  bucketName: string;
+  fileName: string;
+  providerUrl: string;
+  providerName: string;
+  // connectionOptions: AWSConfigurations["connectionOptions"];
+}) {
+  if (providerName === "r2") {
+    // return `https://${accountId}.r2.cloudflarestorage.com/${bucketName}/${fileName}`;
+  }
+
+  return `https://${bucketName}.${providerUrl}/${fileName}`;
+}
 
 export async function createAWSClient(
   connectionOptions: AWSConfigurations["connectionOptions"],
@@ -85,7 +106,8 @@ export async function uploadToAWS({
   hash,
   mimeType,
   isCachedFile = false,
-  parseFileName = ({ fileName, hash }) => hash + "-" + fileName,
+  parseFileName = ({ fileName, hash }) =>
+    (hash ? hash + "/" : "") + normalize(fileName).replace(/\\/g, "/"),
   connectionOptions,
 }: AWSUploadOptions) {
   const finalFleName =
@@ -130,7 +152,12 @@ export async function uploadToAWS({
       bucket: bucketName,
       region,
       fileName: finalFleName,
-      url: `https://${bucketName}.${providerUrl}/${finalFleName}`,
+      url: getObjectUrl({
+        bucketName,
+        fileName: finalFleName,
+        providerUrl,
+        providerName,
+      }),
     };
   } catch (err) {
     console.log("Error", err);

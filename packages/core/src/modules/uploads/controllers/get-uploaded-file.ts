@@ -7,80 +7,138 @@ import type { ImageFormat } from "../../../image";
 import { Image } from "../../../image";
 import { cachePath, uploadsPath } from "../../../utils";
 
-// TODO: Add Watermark options
-export async function getUploadedFile(request: Request, response: Response) {
-  const path = request.input("*");
+// Maximum dimensions to prevent memory issues
+const MAX_DIMENSIONS = {
+  width: 4096,
+  height: 4096,
+};
 
-  const fullPath = uploadsPath(path);
+// Maximum file size in bytes (10MB)
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-  const cacheTime = config.get("uploads.cacheTime", 31536000); // default is 1 year
+// Cache time in seconds (default is 1 year)
+const DEFAULT_CACHE_TIME = 31536000;
 
-  if (!(await fileExistsAsync(fullPath))) {
-    return response.notFound({
-      error: "File not found",
-    });
-  }
-
-  // cache the file for 1 year
+/**
+ * Set cache headers for the response
+ */
+function setCacheHeaders(response: Response, cacheTime: number): void {
   response.header("Cache-Control", `public, max-age=${cacheTime}`);
-  // set expires header to 1 year
   response.header(
     "Expires",
     new Date(Date.now() + cacheTime * 1000).toUTCString(),
   );
+}
 
+/**
+ * Generate cache key for image options
+ */
+function generateCacheKey(
+  path: string,
+  imageOptions: any,
+  format?: ImageFormat,
+): string {
+  return sha1(
+    JSON.stringify({
+      imageOptions,
+      path,
+      format,
+    }),
+  );
+}
+
+/**
+ * Process image with the given options
+ */
+async function processImage(
+  fullPath: string,
+  cacheFullPath: string,
+  imageOptions: any,
+  format?: ImageFormat,
+  quality?: number,
+): Promise<boolean> {
+  try {
+    const image = new Image(fullPath);
+
+    // Apply resize if dimensions are provided
+    if (imageOptions.width || imageOptions.height) {
+      image.resize(imageOptions);
+    }
+
+    // Apply format if specified
+    if (format) {
+      image.format(format);
+    }
+
+    // Apply quality if specified
+    if (quality) {
+      image.quality(quality);
+    }
+
+    await image.save(cacheFullPath);
+    return true;
+  } catch (error) {
+    console.error("Error processing image:", error);
+    return false;
+  }
+}
+
+/**
+ * Get uploaded file with optional image processing
+ */
+export async function getUploadedFile(request: Request, response: Response) {
+  const path = request.input("*");
+  const fullPath = uploadsPath(path);
+
+  // Get image processing parameters
   const height = request.int("h");
   const width = request.int("w");
   const quality = request.int("q", 100);
   const format: ImageFormat | undefined = request.input("f");
 
-  if (height || width || quality || format) {
-    const imageOptions = {
-      height: height || undefined,
-      width: width || undefined,
-      quality: quality,
-    };
+  // Set cache headers
+  const cacheTime = config.get("uploads.cacheTime", DEFAULT_CACHE_TIME);
+  setCacheHeaders(response, cacheTime);
 
-    const fileCachePathKey = sha1(
-      JSON.stringify({
-        imageOptions,
-        path,
-        format,
-      }),
-    );
+  // If no image processing is needed, return the original file
+  // Fastify will handle 404 if file doesn't exist
+  if (!height && !width && !quality && !format) {
+    return response.sendFile(fullPath);
+  }
 
-    const cacheFullPath = cachePath(
-      `images/${fileCachePathKey}${systemPath.extname(path)}`,
-    );
+  // Apply dimension limits
+  const imageOptions = {
+    height: height ? Math.min(height, MAX_DIMENSIONS.height) : undefined,
+    width: width ? Math.min(width, MAX_DIMENSIONS.width) : undefined,
+    quality,
+  };
 
-    // make sure it is sent as an image using response header Content-Disposition
-    response.header("Content-Disposition", "inline");
+  // Generate cache key and path
+  const fileCachePathKey = generateCacheKey(path, imageOptions, format);
+  const cacheFullPath = cachePath(
+    `images/${fileCachePathKey}${systemPath.extname(path)}`,
+  );
 
-    if (await fileExistsAsync(cacheFullPath)) {
-      return response.sendFile(cacheFullPath);
-    }
+  // Set content disposition for inline display
+  response.header("Content-Disposition", "inline");
 
-    try {
-      const image = new Image(fullPath);
+  // First check if cached file exists - this is faster than checking original file
+  if (await fileExistsAsync(cacheFullPath)) {
+    return response.sendFile(cacheFullPath);
+  }
 
-      image.resize(imageOptions);
+  // Process the image - Fastify will handle 404 if original file doesn't exist
+  const success = await processImage(
+    fullPath,
+    cacheFullPath,
+    imageOptions,
+    format,
+    quality,
+  );
 
-      if (format) {
-        image.format(format);
-      }
-
-      if (quality) {
-        image.quality(quality);
-      }
-
-      await image.save(cacheFullPath);
-
-      return response.sendFile(cacheFullPath);
-    } catch (error) {
-      console.log("Error", error);
-
-      return response.sendFile(fullPath);
-    }
+  // Return processed file if successful, otherwise return original
+  if (success) {
+    return response.sendFile(cacheFullPath);
   }
 
   return response.sendFile(fullPath);
