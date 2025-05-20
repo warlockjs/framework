@@ -44,7 +44,7 @@ export class DatabaseLog
 
     if (!model.database?.connection?.isConnected()) return;
 
-    if (!this.shouldBeLogged({ module, action, level })) return;
+    if (!this.shouldBeLogged({ module, action, level, message })) return;
 
     const data: LogMessage = {
       module,

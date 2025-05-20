@@ -11,10 +11,8 @@ import {
 } from "./app-builder";
 import { createConfigLoader } from "./config-loader-builder";
 
-type ModuleBuilder = () => Promise<string>;
-
 // Order matters: bootstrap and environment must be first
-const moduleBuilders: Record<string, ModuleBuilder> = {
+export const moduleBuilders = {
   bootstrap: createBootstrapFile,
   environment: createEnvironmentModeDisplayFile,
   config: createConfigLoader,

@@ -3,12 +3,13 @@ import { debounce } from "@mongez/reinforcements";
 import chokidar from "chokidar";
 import esbuild from "esbuild";
 import path from "path";
-import { buildHttpApp } from "../builder/build-http-app";
+import { buildHttpApp, moduleBuilders } from "../builder/build-http-app";
 import { command } from "../console/command-builder";
 import { rootPath, srcPath, warlockPath } from "../utils";
 import {
   injectImportPathPlugin,
   nativeNodeModulesPlugin,
+  startHttpServerDev,
   startServerPlugin,
 } from "./../esbuild";
 
@@ -42,12 +43,12 @@ export async function startHttpApp() {
     // Preserve imports structure
     preserveSymlinks: true,
     plugins: [
-      typecheckPlugin({
-        watch: true,
-      }),
       injectImportPathPlugin(),
       nativeNodeModulesPlugin,
       startServerPlugin,
+      typecheckPlugin({
+        watch: true,
+      }),
     ],
   });
 
@@ -66,14 +67,30 @@ export async function startHttpApp() {
     },
   );
 
-  const rebuild = debounce(() => {
-    builder.rebuild();
+  const restartServer = debounce(async () => {
+    await builder.rebuild();
+    startHttpServerDev();
   }, 500);
 
-  watcher.on("add", rebuild);
-  watcher.on("change", rebuild);
-  watcher.on("unlink", rebuild);
-  watcher.on("unlinkDir", rebuild);
+  const rebuild = async (
+    mode: "add" | "change" | "unlink" | "unlinkDir",
+    filePath: string,
+  ) => {
+    if (["add", "unlink"].includes(mode)) {
+      // check if it is a routes.ts file
+      if (filePath.includes("routes.ts")) {
+        await moduleBuilders.routes();
+      } else if (filePath.endsWith("main.ts")) {
+        await moduleBuilders.main();
+      }
+    }
+    restartServer();
+  };
+
+  watcher.on("add", filePath => rebuild("add", filePath));
+  watcher.on("change", filePath => rebuild("change", filePath));
+  watcher.on("unlink", filePath => rebuild("unlink", filePath));
+  watcher.on("unlinkDir", filePath => rebuild("unlinkDir", filePath));
 }
 
 export function registerHttpDevelopmentServerCommand() {
