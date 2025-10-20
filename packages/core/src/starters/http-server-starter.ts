@@ -24,6 +24,7 @@ export async function restartServer() {
 
   serverProcess = fork("./.warlock/http.ts", {
     execArgv: [
+      "--trace-warnings",
       "--import",
       `data:text/javascript,import { register } from "node:module";
        import { pathToFileURL } from "node:url";

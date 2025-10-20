@@ -1,10 +1,19 @@
 import baseConfig from "@mongez/config";
 
 /**
- * Default config keys type
- * This will be overridden by module augmentation in user's project
+ * Augmentable config keys interface
+ * Users augment this to add their config keys
  */
-export type ConfigKeys = string;
+export interface ConfigKeysRegistry {
+  // Empty by default - augmented by generated types
+}
+
+/**
+ * Config keys type - derived from registry or fallback to string
+ */
+export type ConfigKeys = keyof ConfigKeysRegistry extends never
+  ? string
+  : keyof ConfigKeysRegistry;
 
 /**
  * Config type mapping interface

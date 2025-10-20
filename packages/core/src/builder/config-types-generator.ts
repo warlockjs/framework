@@ -5,7 +5,7 @@ import { rootPath, warlockPath } from "../utils/paths";
 
 /**
  * Generate TypeScript types for config keys using module augmentation
- * This enables autocomplete and type safety for config.get()
+ * Links to user's src/config/config-types.ts for deep typing
  */
 export async function generateConfigTypes() {
   try {
@@ -22,41 +22,34 @@ export async function generateConfigTypes() {
         // Remove extension (.ts, .tsx, .js)
         return fileName.replace(/\.(ts|tsx|js)$/, "");
       })
-      .filter(key => key !== "index") // Skip index files
+      .filter(key => key !== "index" && key !== "config-types") // Skip index and config-types files
       .sort(); // Alphabetical order for consistency
 
-    // Generate module augmentation file
+    // Generate module augmentation file that links to user's config-types.ts
     const typeDefinition = `/**
  * Auto-generated config types via Module Augmentation
  * DO NOT EDIT MANUALLY - This file is regenerated on every build
  *
- * Add new config files to src/config/ and they will be automatically detected
- * 
- * For deep type inference, augment ConfigTypeMap:
- * 
- * declare module "@warlock.js/core" {
- *   interface ConfigTypeMap {
- *     database: import("@warlock.js/cascade").DatabaseConfigurations;
- *     app: import("@warlock.js/core").AppConfigurations;
- *   }
- * }
+ * Config keys are auto-detected from src/config/
+ * Type mappings are defined in src/config/config-types.ts (you can edit that file!)
  */
+
+import type { ConfigTypeMap as UserConfigTypeMap } from "../src/config/config-types";
 
 declare module "@warlock.js/core" {
   /**
-   * Project-specific config keys (autocomplete in config.get())
+   * Augment ConfigKeysRegistry with project-specific config keys
+   * ConfigKeys type is automatically derived from this interface
    */
-  export type ConfigKeys = ${configKeys.map(key => `"${key}"`).join(" | ")};
+  interface ConfigKeysRegistry {
+${configKeys.map(key => `    ${key}: true;`).join("\n")}
+  }
   
   /**
-   * Augment this interface to add return types for config.get()
-   * 
-   * Example:
-   *   interface ConfigTypeMap {
-   *     database: import("@warlock.js/cascade").DatabaseConfigurations;
-   *   }
+   * Extend ConfigTypeMap with user's type mappings
+   * Edit src/config/config-types.ts to add/modify types!
    */
-  // interface ConfigTypeMap {} // Uncomment and add your types here
+  interface ConfigTypeMap extends UserConfigTypeMap {}
 }
 `;
 
