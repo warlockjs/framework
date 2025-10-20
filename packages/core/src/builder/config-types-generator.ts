@@ -1,12 +1,38 @@
-import { putFileAsync } from "@mongez/fs";
+import { getFileAsync, putFileAsync } from "@mongez/fs";
 import path from "path";
 import { globFiles } from "../utils/glob";
 import { rootPath, warlockPath } from "../utils/paths";
 
 /**
- * Generate TypeScript types for config keys using module augmentation
- * Links to user's src/config/config-types.ts for deep typing
+ * Check if tsconfig.json includes .warlock types
+ * If not, log a warning to help the user
  */
+async function checkTsConfigIncludes() {
+  try {
+    const tsconfigPath = rootPath("tsconfig.json");
+    const tsconfigContent = await getFileAsync(tsconfigPath);
+
+    if (!tsconfigContent) return;
+
+    // Check if .warlock types are in the include array
+    const warlockPattern = ".warlock/**/*.d.ts";
+    const hasWarlockTypes =
+      tsconfigContent.includes(`"${warlockPattern}"`) ||
+      tsconfigContent.includes(`'${warlockPattern}'`);
+
+    if (!hasWarlockTypes) {
+      console.warn(
+        `⚠️  [config types] Add "${warlockPattern}" to tsconfig.json "include" array for config autocomplete`,
+      );
+      console.info(
+        `ℹ️  [config types] Example: "include": ["src", "${warlockPattern}"]`,
+      );
+    }
+  } catch (error) {
+    // Silently fail - tsconfig.json might not exist or be malformed
+  }
+}
+
 export async function generateConfigTypes() {
   try {
     // Find all config files in src/config/
@@ -34,6 +60,7 @@ export async function generateConfigTypes() {
  * Type mappings are defined in src/config/config-types.ts (you can edit that file!)
  */
 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 import type { ConfigTypeMap as UserConfigTypeMap } from "../src/config/config-types";
 
 declare module "@warlock.js/core" {
@@ -56,6 +83,9 @@ ${configKeys.map(key => `    ${key}: true;`).join("\n")}
     // Write type augmentation file
     const outputPath = warlockPath("config-augmentation.d.ts");
     await putFileAsync(outputPath, typeDefinition);
+
+    // Check if tsconfig.json includes .warlock/**/*.d.ts
+    await checkTsConfigIncludes();
 
     return configKeys;
   } catch (error) {
