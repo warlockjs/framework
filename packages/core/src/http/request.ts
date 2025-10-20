@@ -3,6 +3,7 @@ import { colors } from "@mongez/copper";
 import events from "@mongez/events";
 import { trans, transFrom } from "@mongez/localization";
 import {
+  Random,
   except,
   get,
   only,
@@ -96,6 +97,11 @@ export class Request<User = any> {
    * Validated data
    */
   protected validatedData?: GenericObject;
+
+  /**
+   * Request id
+   */
+  public id = Random.string(32);
 
   /**
    * Set request handler
@@ -457,12 +463,19 @@ export class Request<User = any> {
   public log(message: any, level: LogLevel = "info") {
     if (!config.get("http.log")) return;
 
-    log(
-      "request",
-      this.route.method + " " + this.route.path.replace("/*", ""),
+    log({
+      module: "request",
+      action:
+        this.route.method +
+        " " +
+        this.route.path.replace("/*", "") +
+        `:${this.id}`,
       message,
-      level,
-    );
+      type: level,
+      context: {
+        request: this,
+      },
+    });
   }
 
   /**

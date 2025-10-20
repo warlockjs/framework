@@ -1,96 +1,116 @@
-import { typecheckPlugin } from "@jgoz/esbuild-plugin-typecheck";
+import { colors } from "@mongez/copper";
+import { getFileAsync, putFileAsync } from "@mongez/fs";
 import { debounce } from "@mongez/reinforcements";
 import chokidar from "chokidar";
-import esbuild from "esbuild";
+import dayjs from "dayjs";
+import { transform } from "esbuild";
 import path from "path";
 import { buildHttpApp, moduleBuilders } from "../builder/build-http-app";
-import { command } from "../console/command-builder";
-import { rootPath, srcPath, warlockPath } from "../utils";
 import {
-  injectImportPathPlugin,
-  nativeNodeModulesPlugin,
-  startHttpServerDev,
-  startServerPlugin,
-} from "./../esbuild";
+  checkSingleFile,
+  configure as configureCodeQuality,
+  scanProject,
+} from "../code-quality";
+import { command } from "../console/command-builder";
+import { srcPath } from "../utils";
+import { restartServer } from "./http-server-starter";
+import { httpLog } from "./serve-log";
 
-export async function startHttpApp() {
-  const httpPath = await buildHttpApp();
+// Configure code quality checker (you can change these settings)
+configureCodeQuality({
+  displayStrategy: "sequential", // Options: "sequential", "combined", "typescript-only", "eslint-only", "silent"
+  showSuccessMessages: true,
+  showWarnings: true,
+  showErrors: true,
+  showCodeSnippets: true,
+  contextLines: 2,
+  enableInitialScan: true, // Run full scan on startup
+});
 
-  const builder = await esbuild.context({
-    platform: "node",
-    entryPoints: [httpPath],
-    bundle: true,
-    minify: false,
-    packages: "external",
-    sourcemap: "linked",
-    sourceRoot: srcPath(),
-    format: "esm",
-    target: ["esnext"],
-    outdir: path.resolve(warlockPath()),
-    // Enable code splitting
-    splitting: true,
-    // Output chunks to a separate directory with meaningful names
-    chunkNames: "chunks/[name]",
-    // Ensure each entry point generates its own chunk
-    outbase: warlockPath(),
-    // Tree shaking for smaller bundles
-    treeShaking: true,
-    // Generate metafile for analysis
-    metafile: true,
-    // Deduplicate modules
-    mainFields: ["module", "main"],
-    conditions: ["import", "module"],
-    // Preserve imports structure
-    preserveSymlinks: true,
-    plugins: [
-      injectImportPathPlugin(),
-      nativeNodeModulesPlugin,
-      startServerPlugin,
-      typecheckPlugin({
-        watch: true,
-      }),
-    ],
-  });
-
-  // Set up chokidar to watch additional files (e.g., .env)
-  const watcher = chokidar.watch(
-    [
-      rootPath(".env"),
-      rootPath(".env.shared"),
-      srcPath(),
-      // Add other files or patterns as needed
-    ],
-    {
-      persistent: true,
-      ignoreInitial: false,
-      ignored: ["node_modules/**", "dist/**"], // Ignore irrelevant paths
-    },
+export async function transformSingleFileAndCacheIt(filePath: string) {
+  const relativePath = path
+    .relative(process.cwd(), filePath)
+    .replace(/\\/g, "/");
+  const cacheFileName = relativePath.replace(/^\./, "").replace(/\//g, "-");
+  const cacheFilePath = path.resolve(
+    process.cwd(),
+    ".warlock/.cache",
+    cacheFileName,
   );
 
-  const restartServer = debounce(async () => {
-    await builder.rebuild();
-    startHttpServerDev();
-  }, 500);
+  const content = await getFileAsync(filePath);
 
-  const rebuild = async (
-    mode: "add" | "change" | "unlink" | "unlinkDir",
-    filePath: string,
-  ) => {
-    if (["add", "unlink"].includes(mode)) {
-      // check if it is a routes.ts file
-      if (filePath.includes("routes.ts")) {
-        await moduleBuilders.routes();
-      } else if (filePath.endsWith("main.ts")) {
-        await moduleBuilders.main();
+  // Check code quality (TypeScript + ESLint, async, non-blocking)
+  checkSingleFile(filePath);
+
+  const { code } = await transform(content, {
+    loader: filePath.endsWith(".tsx") ? "tsx" : "ts",
+    format: "esm",
+    sourcemap: undefined,
+    target: "node20",
+    jsx: "automatic", // React/JSX support
+    logLevel: "silent", // Prevent esbuild spam in console
+  });
+
+  // if code length is zero, it means this was just an empty file or a types only file
+  let finalCode = code;
+  if (code.length === 0) {
+    finalCode = "/*_EMPTY_FILE_*/";
+  }
+
+  // Write to individual cache file
+  await putFileAsync(cacheFilePath, finalCode, "utf8");
+}
+
+const log = httpLog;
+
+export async function startHttpApp() {
+  log.info("http", "server", "Starting development server...");
+  await buildHttpApp();
+
+  await restartServer();
+
+  // Run initial code quality scan (async, background)
+  scanProject(srcPath());
+
+  const watcher = chokidar.watch(srcPath(), {
+    ignoreInitial: true,
+    ignored: ["node_modules/**", "dist/**"],
+  });
+
+  const rebuild = debounce(async (event, filePath) => {
+    console.log(
+      colors.yellowBright(
+        `${dayjs().format("YYYY-MM-DD HH:mm:ss")} Restarting development server...`,
+      ),
+    );
+    if (["add", "unlink"].includes(event)) {
+      // Rebuild manifest when files are added or removed
+      moduleBuilders.mainfest();
+      if (filePath.includes("routes.ts")) await moduleBuilders.routes();
+      if (filePath.endsWith("main.ts")) await moduleBuilders.main();
+      // Regenerate config types when config files change
+      if (
+        filePath.includes("src/config/") ||
+        filePath.includes("src\\config\\")
+      ) {
+        moduleBuilders.configTypes();
       }
     }
-    restartServer();
-  };
 
-  watcher.on("add", filePath => rebuild("add", filePath));
-  watcher.on("change", filePath => rebuild("change", filePath));
-  watcher.on("unlink", filePath => rebuild("unlink", filePath));
-  watcher.on("unlinkDir", filePath => rebuild("unlinkDir", filePath));
+    if (["add", "change"].includes(event)) {
+      // recache the file
+      await transformSingleFileAndCacheIt(filePath);
+    }
+
+    await restartServer();
+  }, 50);
+
+  watcher
+    .on("add", filePath => rebuild("add", filePath))
+    .on("change", filePath => rebuild("change", filePath))
+    .on("unlink", filePath => rebuild("unlink", filePath))
+    .on("unlinkDir", filePath => rebuild("unlinkDir", filePath));
 }
 
 export function registerHttpDevelopmentServerCommand() {

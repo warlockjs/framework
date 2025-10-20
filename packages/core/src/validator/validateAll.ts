@@ -32,7 +32,10 @@ export async function validateAll(
 
   if (validation.schema) {
     try {
-      const result = await v.validate(validation.schema, request.all());
+      const result = await v.validate(
+        validation.schema,
+        request.allExceptParams(),
+      );
 
       if (result.data && result.isValid) {
         request.setValidatedData(result.data);

@@ -258,12 +258,20 @@ export class Response {
   public log(message: string, level: LogLevel = "info") {
     if (!config.get("http.log")) return;
 
-    log(
-      "response",
-      this.route.method + " " + this.route.path.replace("/*", ""),
+    log({
+      module: "response",
+      action:
+        this.route.method +
+        " " +
+        this.route.path.replace("/*", "") +
+        `:${this.request.id}`,
       message,
-      level,
-    );
+      type: level,
+      context: {
+        request: this.request,
+        response: this,
+      },
+    });
   }
 
   /**
@@ -685,7 +693,11 @@ export class Response {
 
     const responseStatus = config.get("validation.responseStatus", 400);
 
-    log.error("request", "validation", "Validation failed");
+    log.error(
+      "request",
+      "validation",
+      `${this.request.id} - Validation failed`,
+    );
 
     return this.send(
       {
@@ -704,7 +716,11 @@ export class Response {
     const inputError = config.get("validation.keys.inputError", "error");
     const responseStatus = config.get("validation.responseStatus", 400);
 
-    log.error("request", "validation", "Validation failed");
+    log.error(
+      "request",
+      "validation",
+      `${this.request.id} - Validation failed`,
+    );
 
     return this.send(
       {

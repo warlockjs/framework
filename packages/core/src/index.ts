@@ -24,3 +24,7 @@ export * from "./store";
 export * from "./tests";
 export * from "./utils";
 export * from "./validator";
+
+// Export typed config with autocomplete support
+export { config } from "./config/typed-config";
+export type { ConfigKeys, ConfigTypeMap } from "./config/typed-config";

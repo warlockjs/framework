@@ -757,17 +757,9 @@ export class Router {
       fastifyRequest: FastifyRequest,
       fastifyResponse: FastifyReply,
     ) => {
-      log.info(
-        "route",
-        route.method + " " + route.path.replace("/*", ""),
-        "Starting Request",
-      );
-
       const request = new Request();
       const response = new Response();
-
       response.setResponse(fastifyResponse);
-
       request.response = response;
 
       response.request = request;
@@ -775,6 +767,16 @@ export class Router {
       request.setRequest(fastifyRequest).setRoute(route);
 
       Request.current = request;
+
+      log.info({
+        module: "route",
+        action: route.method + " " + route.path.replace("/*", ""),
+        message: `Starting Request: ${request.id}`,
+        context: {
+          request,
+          response,
+        },
+      });
 
       const result = await request.execute();
 

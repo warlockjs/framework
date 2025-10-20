@@ -58,6 +58,7 @@ export async function createViteServer(
       url.startsWith("/@") ||
       url.endsWith(".tsx") ||
       url.endsWith(".ts") ||
+      url.endsWith(".mts") ||
       url.endsWith(".js") ||
       url.endsWith(".mjs") ||
       url.endsWith(".css") ||
