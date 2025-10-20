@@ -1,7 +1,7 @@
 import { fileExistsAsync, getFileAsync, putFileAsync } from "@mongez/fs";
 import { fork, type ChildProcess } from "child_process";
-import { warlockCorePackagePath } from "src/warlock/utils/internal";
 import { warlockPath } from "../utils";
+import { warlockCorePackagePath } from "./../utils/internal";
 
 export let serverProcess: ChildProcess | null = null;
 
