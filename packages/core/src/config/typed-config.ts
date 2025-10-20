@@ -11,7 +11,7 @@ export interface ConfigKeysRegistry {
 /**
  * Config keys type - derived from registry or fallback to string
  */
-export type ConfigKeys = keyof ConfigKeysRegistry extends never
+export type ConfigKeys = [keyof ConfigKeysRegistry] extends [never]
   ? string
   : keyof ConfigKeysRegistry;
 

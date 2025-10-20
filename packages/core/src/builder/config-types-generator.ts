@@ -1,4 +1,4 @@
-import { ensureDirectoryAsync, putFileAsync } from "@mongez/fs";
+import { putFileAsync } from "@mongez/fs";
 import path from "path";
 import { globFiles } from "../utils/glob";
 import { rootPath, warlockPath } from "../utils/paths";
@@ -53,16 +53,9 @@ ${configKeys.map(key => `    ${key}: true;`).join("\n")}
 }
 `;
 
-    // Ensure .warlock directory exists
-    await ensureDirectoryAsync(warlockPath());
-
     // Write type augmentation file
     const outputPath = warlockPath("config-augmentation.d.ts");
     await putFileAsync(outputPath, typeDefinition);
-
-    console.log(
-      `✓ Generated config types for ${configKeys.length} configurations: ${configKeys.join(", ")}`,
-    );
 
     return configKeys;
   } catch (error) {
