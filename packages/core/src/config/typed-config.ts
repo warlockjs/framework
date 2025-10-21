@@ -50,6 +50,9 @@ export const config = {
     return baseConfig.get(key, defaultValue);
   },
 
+  key(fullKey: string, defaultValue?: any) {
+    return baseConfig.get(fullKey, defaultValue);
+  },
   set<K extends ConfigKeys>(key: K, value: any): void {
     baseConfig.set(key, value);
   },

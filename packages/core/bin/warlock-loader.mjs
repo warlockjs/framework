@@ -231,7 +231,7 @@ export async function load(url, context, nextLoad) {
         format: "esm",
         // sourcemap: "inline",
         sourcemap: undefined,
-        target: "node20",
+        target: "esnext",
         jsx: "automatic", // React/JSX support
         logLevel: "silent", // Prevent esbuild spam in console
       });
