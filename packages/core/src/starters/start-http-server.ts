@@ -1,10 +1,12 @@
 import { colors } from "@mongez/copper";
 import { getFileAsync, putFileAsync } from "@mongez/fs";
-import { debounce } from "@mongez/reinforcements";
+import { debounce, type GenericObject } from "@mongez/reinforcements";
 import chokidar from "chokidar";
 import dayjs from "dayjs";
 import { transform } from "esbuild";
+import fs from "fs/promises";
 import path from "path";
+import ts from "typescript";
 import { buildHttpApp, moduleBuilders } from "../builder/build-http-app";
 import {
   checkSingleFile,
@@ -27,6 +29,22 @@ configureCodeQuality({
   enableInitialScan: true, // Run full scan on startup
 });
 
+let tsconfigRaw: GenericObject = {};
+
+async function loadTsconfig() {
+  const configText = await fs.readFile(
+    process.cwd() + "/tsconfig.json",
+    "utf8",
+  );
+
+  const { config } = ts.parseConfigFileTextToJson(
+    process.cwd() + "/tsconfig.json",
+    configText,
+  );
+
+  tsconfigRaw = config;
+}
+
 export async function transformSingleFileAndCacheIt(filePath: string) {
   const relativePath = path
     .relative(process.cwd(), filePath)
@@ -46,10 +64,8 @@ export async function transformSingleFileAndCacheIt(filePath: string) {
   const { code } = await transform(content, {
     loader: filePath.endsWith(".tsx") ? "tsx" : "ts",
     format: "esm",
-    sourcemap: undefined,
-    target: "esnext",
-    jsx: "automatic", // React/JSX support
-    logLevel: "silent", // Prevent esbuild spam in console
+    sourcemap: false,
+    tsconfigRaw,
   });
 
   // if code length is zero, it means this was just an empty file or a types only file
@@ -69,6 +85,8 @@ export async function startHttpApp() {
   await buildHttpApp();
 
   await restartServer();
+
+  loadTsconfig();
 
   // Run initial code quality scan (async, background)
   scanProject(srcPath());

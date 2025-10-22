@@ -1,20 +1,23 @@
 import { fileExistsAsync, isDirectoryAsync } from "@mongez/fs";
-import dayjs from "dayjs";
 import { transform } from "esbuild";
 import fs from "fs/promises";
 import path from "path";
+import ts from "typescript";
 import { fileURLToPath, pathToFileURL } from "url";
+const configText = await fs.readFile(process.cwd() + "/tsconfig.json", "utf8");
+
+const { config: tsconfigRaw } = ts.parseConfigFileTextToJson(
+  process.cwd() + "/tsconfig.json",
+  configText,
+);
 
 let manifest = {
   aliases: {},
   importLookup: {},
   directoryIndexLookup: {},
 };
-const time = () => dayjs().format("YYYY-MM-DD HH:mm:ss");
-1;
 
 const manifestPath = path.resolve(process.cwd(), ".warlock/manifest.json");
-let lastManifestLoaded = 0;
 
 const supportedExtensions = [".ts", ".tsx"];
 
@@ -43,7 +46,6 @@ async function loadManifest(force = false) {
       importLookup: manifestRaw.importLookup ?? {},
       directoryIndexLookup: manifestRaw.directoryIndexLookup ?? {},
     };
-    lastManifestLoaded = Date.now();
   } catch (err) {
     console.warn(
       "⚠️ Warlock loader: could not load manifest.json — using empty lookups.",
@@ -230,10 +232,8 @@ export async function load(url, context, nextLoad) {
         loader: url.endsWith(".tsx") ? "tsx" : "ts",
         format: "esm",
         // sourcemap: "inline",
-        sourcemap: undefined,
-        target: "esnext",
-        jsx: "automatic", // React/JSX support
-        logLevel: "silent", // Prevent esbuild spam in console
+        sourcemap: false,
+        tsconfigRaw,
       });
 
       // if code length is zero, it means this was just an empty file or a types only file
