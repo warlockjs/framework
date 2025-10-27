@@ -10,7 +10,6 @@ import {
   rtrim,
   set,
   unset,
-  type GenericObject,
 } from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
 import type { LogLevel } from "@warlock.js/logger";
@@ -41,7 +40,7 @@ type StandardHeaders = {
 
 type HeaderKeys = keyof StandardHeaders;
 
-export class Request<User = any> {
+export class Request<User = any, RequestValidation = any> {
   /**
    * Fastify Request object
    */
@@ -96,7 +95,7 @@ export class Request<User = any> {
   /**
    * Validated data
    */
-  protected validatedData?: GenericObject;
+  protected validatedData?: RequestValidation;
 
   /**
    * Request id
@@ -539,9 +538,11 @@ export class Request<User = any> {
    * Get inputs that has been validated only
    * You can also pass an array of inputs to get only the validated inputs
    */
-  public validated(inputs?: string[]) {
+  public validated<Output = RequestValidation>(inputs?: string[]): Output {
     if (this.validatedData) {
-      return inputs ? only(this.validatedData, inputs) : this.validatedData;
+      return inputs
+        ? only(this.validatedData as Output, inputs)
+        : (this.validatedData as Output);
     }
 
     let rules = this.getHandler()?.validation?.rules || {};
@@ -558,9 +559,16 @@ export class Request<User = any> {
   }
 
   /**
+   * Get inputs that has been validated except the given inputs
+   */
+  public validatedExcept(...inputs: string[]): RequestValidation {
+    return except(this.validated(), inputs);
+  }
+
+  /**
    * Set validated data
    */
-  public setValidatedData(data: GenericObject) {
+  public setValidatedData(data: RequestValidation) {
     this.validatedData = data;
   }
 
@@ -599,7 +607,10 @@ export class Request<User = any> {
     for (const middleware of middlewares) {
       this.log("Executing middleware " + colors.yellowBright(middleware.name));
       const output = await middleware(this, this.response);
-      this.log("Executed middleware " + colors.yellowBright(middleware.name));
+      this.log(
+        "Executed middleware " + colors.yellowBright(middleware.name),
+        "success",
+      );
 
       if (output !== undefined) {
         this.log(
@@ -610,13 +621,13 @@ export class Request<User = any> {
 
         this.trigger("executedMiddleware");
 
-        this.log("Request middlewares executed");
+        this.log("Request middlewares executed", "success");
 
         return output;
       }
     }
 
-    this.log("Request middlewares executed");
+    this.log("Request middlewares executed", "success");
 
     // trigger the executedMiddleware event
     this.trigger("executedMiddleware", middlewares, this.route);
@@ -745,6 +756,15 @@ export class Request<User = any> {
   }
 
   /**
+   * Set request body value
+   */
+  public setBody(key: string, value: any) {
+    set(this.payload.body, key, value);
+
+    return this;
+  }
+
+  /**
    * Get body inputs except files
    */
   public get bodyInputs() {
@@ -788,10 +808,28 @@ export class Request<User = any> {
   }
 
   /**
+   * Set request params value
+   */
+  public setParam(key: string, value: any) {
+    set(this.payload.params, key, value);
+
+    return this;
+  }
+
+  /**
    * Get request query
    */
   public get query() {
     return this.payload.query;
+  }
+
+  /**
+   * Set request query value
+   */
+  public setQuery(key: string, value: any) {
+    set(this.payload.query, key, value);
+
+    return this;
   }
 
   /**

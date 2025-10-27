@@ -6,11 +6,9 @@ import { ltrim, merge, toCamelCase, trim } from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
 import { log } from "@warlock.js/logger";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { type ReactElement } from "react";
 import { Request } from "../http/request";
 import { Response } from "../http/response";
 import { type FastifyInstance } from "../http/server";
-import { renderPage } from "./../react/page-renderer";
 import type {
   GroupedRoutesOptions,
   ResourceMethod,
@@ -657,23 +655,6 @@ export class Router {
   }
 
   /**
-   * Get page routes
-   */
-  public getPageRoutes(): Route[] {
-    return this.routes.filter(route => route.isPage === true);
-  }
-
-  /**
-   * Register a page route
-   */
-  public page(path: string, handler: RouteHandler, options: RouteOptions = {}) {
-    return this.get(path, handler, {
-      ...options,
-      isPage: true,
-    });
-  }
-
-  /**
    * Register routes to the server
    */
   public scan(server: FastifyInstance) {
@@ -687,31 +668,12 @@ export class Router {
         route.path,
         route.serverOptions || {},
         async (baseRequest: FastifyRequest, reply: FastifyReply) => {
-          const { output, response, request } = await this.handleRoute(route)(
+          const { output, response } = await this.handleRoute(route)(
             baseRequest,
             reply,
           );
 
-          if (!route.isPage) {
-            if (!output) {
-              return response.baseResponse;
-            }
-
-            return output;
-          }
-
-          try {
-            const renderedPage = await renderPage({
-              page: output as ReactElement,
-              response,
-              request,
-              server,
-            });
-            reply.type("text/html").send(renderedPage);
-          } catch (error) {
-            console.log(error);
-            reply.status(500).send(error);
-          }
+          return output || response.baseResponse;
         },
       );
     });

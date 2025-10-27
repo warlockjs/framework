@@ -1,5 +1,5 @@
 import { colors } from "@mongez/copper";
-import { getFileAsync, putFileAsync } from "@mongez/fs";
+import { getFileAsync, putFileAsync, removeDirectoryAsync } from "@mongez/fs";
 import { debounce, type GenericObject } from "@mongez/reinforcements";
 import chokidar from "chokidar";
 import dayjs from "dayjs";
@@ -13,8 +13,9 @@ import {
   configure as configureCodeQuality,
   scanProject,
 } from "../code-quality";
+import type { CommandActionData } from "../console";
 import { command } from "../console/command-builder";
-import { srcPath } from "../utils";
+import { rootPath, srcPath, warlockPath } from "../utils";
 import { restartServer } from "./http-server-starter";
 import { httpLog } from "./serve-log";
 
@@ -80,7 +81,11 @@ export async function transformSingleFileAndCacheIt(filePath: string) {
 
 const log = httpLog;
 
-export async function startHttpApp() {
+export async function startHttpApp(data: CommandActionData) {
+  if (data?.options?.fresh) {
+    await removeDirectoryAsync(warlockPath());
+  }
+
   log.info("http", "server", "Starting development server...");
   await buildHttpApp();
 
@@ -91,10 +96,13 @@ export async function startHttpApp() {
   // Run initial code quality scan (async, background)
   scanProject(srcPath());
 
-  const watcher = chokidar.watch(srcPath(), {
-    ignoreInitial: true,
-    ignored: ["node_modules/**", "dist/**"],
-  });
+  const watcher = chokidar.watch(
+    [`${srcPath()}/**/*.{ts,tsx}`, rootPath(".env")],
+    {
+      ignoreInitial: true,
+      ignored: ["node_modules/**", "dist/**"],
+    },
+  );
 
   const rebuild = debounce(async (event, filePath) => {
     console.log(
@@ -132,5 +140,8 @@ export async function startHttpApp() {
 }
 
 export function registerHttpDevelopmentServerCommand() {
-  return command("dev").action(startHttpApp).preload("watch");
+  return command("dev")
+    .action(startHttpApp)
+    .preload("watch")
+    .option("--fresh -f", "Clear the previous cache and run it again.");
 }

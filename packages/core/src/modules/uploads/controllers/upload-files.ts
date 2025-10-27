@@ -1,9 +1,9 @@
 import { fileSize } from "@mongez/fs";
 import { Random, ltrim } from "@mongez/reinforcements";
+import { v } from "@warlock.js/seal";
 import type { Request, Response, UploadedFile } from "../../../http";
 import type { RequestHandler } from "../../../router";
 import { uploadsPath } from "../../../utils";
-import { v } from "../../../validator";
 import { Upload } from "../models/upload";
 import { uploadFromUrl } from "../utils";
 import { getUploadsDirectory } from "../utils/get-uploads-directory";
@@ -110,7 +110,7 @@ export const uploadFiles: RequestHandler = async (
 
 uploadFiles.validation = {
   schema: v.object({
-    uploads: v.array(v.file()).requiredIfAbsent("urls"),
+    uploads: v.array(v.file()).requiredWithout("urls"),
     urls: v.array(v.string().url()),
     directory: v.string(),
     random: v.boolean(),
