@@ -23,8 +23,10 @@ import {
   beforeTodayRule,
   betweenAgeRule,
   betweenDatesRule,
+  betweenDaysRule,
   betweenHoursRule,
   betweenMinutesRule,
+  betweenMonthsRule,
   betweenTimesRule,
   betweenYearsRule,
   birthdayRule,
@@ -37,8 +39,14 @@ import {
   leapYearRule,
   maxAgeRule,
   maxDateRule,
+  maxDayRule,
+  maxMonthRule,
+  maxYearRule,
   minAgeRule,
   minDateRule,
+  minDayRule,
+  minMonthRule,
+  minYearRule,
   monthRule,
   pastRule,
   quarterRule,
@@ -551,15 +559,258 @@ export class DateValidator extends BaseValidator {
     return this;
   }
 
-  /** Date must be between start and end years */
+  /**
+   * Date must be between start and end years
+   * Smart detection: number or field name
+   *
+   * @category Validation Rule
+   */
   public betweenYears(
-    startYear: number,
-    endYear: number,
+    startYear: number | string,
+    endYear: number | string,
     errorMessage?: string,
   ) {
     const rule = this.addRule(betweenYearsRule, errorMessage);
     rule.context.options.startYear = startYear;
     rule.context.options.endYear = endYear;
+    rule.context.options.scope = "global";
+    return this;
+  }
+
+  /**
+   * Date must be between start and end months (1-12)
+   * Smart detection: number or field name
+   *
+   * @category Validation Rule
+   */
+  public betweenMonths(
+    startMonth: number | string,
+    endMonth: number | string,
+    errorMessage?: string,
+  ) {
+    const rule = this.addRule(betweenMonthsRule, errorMessage);
+    rule.context.options.startMonth = startMonth;
+    rule.context.options.endMonth = endMonth;
+    rule.context.options.scope = "global";
+    return this;
+  }
+
+  /**
+   * Date must be between start and end days (1-31)
+   * Smart detection: number or field name
+   *
+   * @category Validation Rule
+   */
+  public betweenDays(
+    startDay: number | string,
+    endDay: number | string,
+    errorMessage?: string,
+  ) {
+    const rule = this.addRule(betweenDaysRule, errorMessage);
+    rule.context.options.startDay = startDay;
+    rule.context.options.endDay = endDay;
+    rule.context.options.scope = "global";
+    return this;
+  }
+
+  /**
+   * Date must be between sibling field years
+   * @category Validation Rule
+   */
+  public betweenYearsSibling(
+    startYearField: string,
+    endYearField: string,
+    errorMessage?: string,
+  ) {
+    const rule = this.addRule(betweenYearsRule, errorMessage);
+    rule.context.options.startYear = startYearField;
+    rule.context.options.endYear = endYearField;
+    rule.context.options.scope = "sibling";
+    return this;
+  }
+
+  /**
+   * Date must be between sibling field months
+   * @category Validation Rule
+   */
+  public betweenMonthsSibling(
+    startMonthField: string,
+    endMonthField: string,
+    errorMessage?: string,
+  ) {
+    const rule = this.addRule(betweenMonthsRule, errorMessage);
+    rule.context.options.startMonth = startMonthField;
+    rule.context.options.endMonth = endMonthField;
+    rule.context.options.scope = "sibling";
+    return this;
+  }
+
+  /**
+   * Date must be between sibling field days
+   * @category Validation Rule
+   */
+  public betweenDaysSibling(
+    startDayField: string,
+    endDayField: string,
+    errorMessage?: string,
+  ) {
+    const rule = this.addRule(betweenDaysRule, errorMessage);
+    rule.context.options.startDay = startDayField;
+    rule.context.options.endDay = endDayField;
+    rule.context.options.scope = "sibling";
+    return this;
+  }
+
+  /**
+   * Year must be >= given year or field
+   * Smart detection: number or field name
+   *
+   * @example
+   * ```ts
+   * // Value comparison
+   * v.date().minYear(2024)
+   *
+   * // Field comparison
+   * v.date().minYear('startYear')
+   * ```
+   *
+   * @category Validation Rule
+   */
+  public minYear(yearOrField: number | string, errorMessage?: string): this {
+    const rule = this.addRule(minYearRule, errorMessage);
+    rule.context.options.yearOrField = yearOrField;
+    rule.context.options.scope = "global";
+    return this;
+  }
+
+  /**
+   * Year must be <= given year or field
+   * Smart detection: number or field name
+   *
+   * @category Validation Rule
+   */
+  public maxYear(yearOrField: number | string, errorMessage?: string): this {
+    const rule = this.addRule(maxYearRule, errorMessage);
+    rule.context.options.yearOrField = yearOrField;
+    rule.context.options.scope = "global";
+    return this;
+  }
+
+  /**
+   * Month must be >= given month or field (1-12)
+   * Smart detection: number or field name
+   *
+   * @category Validation Rule
+   */
+  public minMonth(monthOrField: number | string, errorMessage?: string): this {
+    const rule = this.addRule(minMonthRule, errorMessage);
+    rule.context.options.monthOrField = monthOrField;
+    rule.context.options.scope = "global";
+    return this;
+  }
+
+  /**
+   * Month must be <= given month or field (1-12)
+   * Smart detection: number or field name
+   *
+   * @category Validation Rule
+   */
+  public maxMonth(monthOrField: number | string, errorMessage?: string): this {
+    const rule = this.addRule(maxMonthRule, errorMessage);
+    rule.context.options.monthOrField = monthOrField;
+    rule.context.options.scope = "global";
+    return this;
+  }
+
+  /**
+   * Day must be >= given day or field (1-31)
+   * Smart detection: number or field name
+   *
+   * @category Validation Rule
+   */
+  public minDay(dayOrField: number | string, errorMessage?: string): this {
+    const rule = this.addRule(minDayRule, errorMessage);
+    rule.context.options.dayOrField = dayOrField;
+    rule.context.options.scope = "global";
+    return this;
+  }
+
+  /**
+   * Day must be <= given day or field (1-31)
+   * Smart detection: number or field name
+   *
+   * @category Validation Rule
+   */
+  public maxDay(dayOrField: number | string, errorMessage?: string): this {
+    const rule = this.addRule(maxDayRule, errorMessage);
+    rule.context.options.dayOrField = dayOrField;
+    rule.context.options.scope = "global";
+    return this;
+  }
+
+  /**
+   * Year must be >= sibling field year
+   * @category Validation Rule
+   */
+  public minYearSibling(field: string, errorMessage?: string): this {
+    const rule = this.addRule(minYearRule, errorMessage);
+    rule.context.options.yearOrField = field;
+    rule.context.options.scope = "sibling";
+    return this;
+  }
+
+  /**
+   * Year must be <= sibling field year
+   * @category Validation Rule
+   */
+  public maxYearSibling(field: string, errorMessage?: string): this {
+    const rule = this.addRule(maxYearRule, errorMessage);
+    rule.context.options.yearOrField = field;
+    rule.context.options.scope = "sibling";
+    return this;
+  }
+
+  /**
+   * Month must be >= sibling field month
+   * @category Validation Rule
+   */
+  public minMonthSibling(field: string, errorMessage?: string): this {
+    const rule = this.addRule(minMonthRule, errorMessage);
+    rule.context.options.monthOrField = field;
+    rule.context.options.scope = "sibling";
+    return this;
+  }
+
+  /**
+   * Month must be <= sibling field month
+   * @category Validation Rule
+   */
+  public maxMonthSibling(field: string, errorMessage?: string): this {
+    const rule = this.addRule(maxMonthRule, errorMessage);
+    rule.context.options.monthOrField = field;
+    rule.context.options.scope = "sibling";
+    return this;
+  }
+
+  /**
+   * Day must be >= sibling field day
+   * @category Validation Rule
+   */
+  public minDaySibling(field: string, errorMessage?: string): this {
+    const rule = this.addRule(minDayRule, errorMessage);
+    rule.context.options.dayOrField = field;
+    rule.context.options.scope = "sibling";
+    return this;
+  }
+
+  /**
+   * Day must be <= sibling field day
+   * @category Validation Rule
+   */
+  public maxDaySibling(field: string, errorMessage?: string): this {
+    const rule = this.addRule(maxDayRule, errorMessage);
+    rule.context.options.dayOrField = field;
+    rule.context.options.scope = "sibling";
     return this;
   }
 

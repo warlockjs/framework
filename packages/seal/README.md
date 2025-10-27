@@ -79,16 +79,18 @@ Output Data
 ### Example: Date Validation
 
 ```typescript
-const schema = v.date()
-  .toStartOfDay()        // 🔧 Mutator: normalize to 00:00:00
-  .after("2024-01-01")   // ✅ Validator: check Date object
-  .toISOString();        // 🎨 Transformer: output as ISO string
+const schema = v
+  .date()
+  .toStartOfDay() // 🔧 Mutator: normalize to 00:00:00
+  .after("2024-01-01") // ✅ Validator: check Date object
+  .toISOString(); // 🎨 Transformer: output as ISO string
 
 const result = await v.validate(schema, "2024-06-15 14:30:00");
 // result.data = "2024-06-15T00:00:00.000Z"
 ```
 
 **Why this matters:**
+
 - Mutators prepare data for validation (no more string comparison issues!)
 - Validators check constraints on normalized data
 - Transformers format output without affecting validation
@@ -117,20 +119,11 @@ type User = Infer<typeof schema>;
 Readable, chainable methods:
 
 ```typescript
-v.string()
-  .required()
-  .email()
-  .min(5)
-  .max(100);
+v.string().required().email().min(5).max(100);
 
-v.int()
-  .min(0)
-  .max(100)
-  .positive();
+v.int().min(0).max(100).positive();
 
-v.array(v.string())
-  .minLength(1)
-  .unique();
+v.array(v.string()).minLength(1).unique();
 ```
 
 ### ✅ Conditional Validation
@@ -159,14 +152,10 @@ Compare fields against each other (global or sibling scope):
 ```typescript
 const schema = v.object({
   password: v.string().required().min(8),
-  confirmPassword: v.string()
-    .required()
-    .sameAs("password"), // Compare with password field
-  
+  confirmPassword: v.string().required().sameAs("password"), // Compare with password field
+
   startDate: v.date().required(),
-  endDate: v.date()
-    .required()
-    .after("startDate"), // Compare with startDate field
+  endDate: v.date().required().after("startDate"), // Compare with startDate field
 });
 ```
 
@@ -175,7 +164,7 @@ const schema = v.object({
 Add your own validation logic:
 
 ```typescript
-v.string().refine(async (value) => {
+v.string().refine(async value => {
   const exists = await checkUsername(value);
   if (exists) return "Username already taken";
 });
@@ -188,16 +177,16 @@ Normalize input and format output:
 ```typescript
 // String mutators
 v.string()
-  .trim()           // Remove whitespace
-  .lowercase()      // Convert to lowercase
-  .email()          // Validate email
-  .toJSON();        // Transform to JSON string
+  .trim() // Remove whitespace
+  .lowercase() // Convert to lowercase
+  .email() // Validate email
+  .toJSON(); // Transform to JSON string
 
 // Date mutators & transformers
 v.date()
-  .toStartOfDay()   // Normalize to midnight
+  .toStartOfDay() // Normalize to midnight
   .after("2024-01-01")
-  .toISOString();   // Output as ISO string
+  .toISOString(); // Output as ISO string
 ```
 
 ---
@@ -208,33 +197,33 @@ For complete documentation, visit: **[https://warlock.js.org/seal](https://warlo
 
 ### Available Validators
 
-| Validator | Purpose | Example |
-|-----------|---------|---------|
-| `v.string()` | String validation | `v.string().email().min(3)` |
-| `v.int()` | Integer validation | `v.int().min(0).max(100)` |
-| `v.float()` | Float validation | `v.float().positive()` |
-| `v.number()` | Number validation | `v.number().min(0)` |
-| `v.boolean()` | Boolean validation | `v.boolean().accepted()` |
-| `v.date()` | Date validation | `v.date().after(new Date())` |
-| `v.array()` | Array validation | `v.array(v.string()).min(1)` |
-| `v.object()` | Object validation | `v.object({ name: v.string() })` |
-| `v.scalar()` | Scalar values | `v.scalar().in([1, "2", true])` |
+| Validator     | Purpose            | Example                          |
+| ------------- | ------------------ | -------------------------------- |
+| `v.string()`  | String validation  | `v.string().email().min(3)`      |
+| `v.int()`     | Integer validation | `v.int().min(0).max(100)`        |
+| `v.float()`   | Float validation   | `v.float().positive()`           |
+| `v.number()`  | Number validation  | `v.number().min(0)`              |
+| `v.boolean()` | Boolean validation | `v.boolean().accepted()`         |
+| `v.date()`    | Date validation    | `v.date().after(new Date())`     |
+| `v.array()`   | Array validation   | `v.array(v.string()).min(1)`     |
+| `v.object()`  | Object validation  | `v.object({ name: v.string() })` |
+| `v.scalar()`  | Scalar values      | `v.scalar().in([1, "2", true])`  |
 
 ### Common Methods
 
 Available on all validators:
 
-| Method | Purpose |
-|--------|---------|
-| `.required()` | Value must be present |
-| `.optional()` | Value is optional |
-| `.forbidden()` | Value must not be present |
-| `.equals(value)` | Must equal specific value |
-| `.default(value)` | Set default value |
-| `.allowsEmpty()` | Skip validation if empty |
-| `.when(field, conditions)` | Conditional validation |
-| `.omit()` | Validate but exclude from output |
-| `.refine(callback)` | Custom validation logic |
+| Method                     | Purpose                          |
+| -------------------------- | -------------------------------- |
+| `.required()`              | Value must be present            |
+| `.optional()`              | Value is optional                |
+| `.forbidden()`             | Value must not be present        |
+| `.equals(value)`           | Must equal specific value        |
+| `.default(value)`          | Set default value                |
+| `.allowsEmpty()`           | Skip validation if empty         |
+| `.when(field, conditions)` | Conditional validation           |
+| `.omit()`                  | Validate but exclude from output |
+| `.refine(callback)`        | Custom validation logic          |
 
 ---
 
@@ -257,15 +246,17 @@ const registerSchema = v.object({
 ```typescript
 const formSchema = v.object({
   accountType: v.string().required().in(["personal", "business"]),
-  
+
   // Required only if accountType is "business"
-  companyName: v.string()
-    .requiredIf("accountType", { is: "business" }),
-  
+  companyName: v.string().requiredIf("accountType", { is: "business" }),
+
   // Conditional validation
   taxId: v.string().when("accountType", {
     is: {
-      business: v.string().required().pattern(/^[0-9]{9}$/),
+      business: v
+        .string()
+        .required()
+        .pattern(/^[0-9]{9}$/),
       personal: v.string().forbidden(),
     },
   }),
@@ -276,32 +267,34 @@ const formSchema = v.object({
 
 ```typescript
 const bookingSchema = v.object({
-  checkIn: v.date()
+  checkIn: v.date().required().afterToday(),
+
+  checkOut: v
+    .date()
     .required()
-    .afterToday(),
-  
-  checkOut: v.date()
-    .required()
-    .after("checkIn")  // Compare with checkIn field
-    .withinDays(30),   // Max 30 days from checkIn
+    .after("checkIn") // Compare with checkIn field
+    .withinDays(30), // Max 30 days from checkIn
 });
 ```
 
 ### Array Validation
 
 ```typescript
-const tagsSchema = v.array(v.string())
+const tagsSchema = v
+  .array(v.string())
   .required()
   .minLength(1)
   .maxLength(10)
   .unique();
 
-const usersSchema = v.array(
-  v.object({
-    name: v.string().required(),
-    email: v.string().email(),
-  })
-).minLength(1);
+const usersSchema = v
+  .array(
+    v.object({
+      name: v.string().required(),
+      email: v.string().email(),
+    }),
+  )
+  .minLength(1);
 ```
 
 ---
@@ -314,9 +307,9 @@ For Warlock.js projects, framework-specific validators are available:
 import { v } from "@warlock.js/core/v";
 
 const schema = v.object({
-  email: v.string().email().unique(User),        // Database validation
-  avatar: v.file().image().maxSize(5000000),     // File upload validation
-  uploadId: v.string().uploadable(),              // Upload hash validation
+  email: v.string().email().unique(User), // Database validation
+  avatar: v.file().image().maxSize(5000000), // File upload validation
+  uploadId: v.string().uploadable(), // Upload hash validation
 });
 ```
 
@@ -355,6 +348,7 @@ await v.validate(seal, data);     // Verify with the seal
 For complete documentation, visit: **[https://warlock.js.org/seal](https://warlock.js.org/seal)**
 
 The documentation includes:
+
 - 📘 [Getting Started Guide](https://warlock.js.org/seal/getting-started/introduction)
 - 🎯 [Core Concepts](https://warlock.js.org/seal/concepts/three-layer-architecture)
 - 📝 [Validator Reference](https://warlock.js.org/seal/base-validator)

@@ -23,4 +23,3 @@ export function isDateValue(value: any): boolean {
   }
   return false;
 }
-

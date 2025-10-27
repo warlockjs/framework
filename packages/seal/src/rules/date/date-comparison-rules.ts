@@ -65,11 +65,11 @@ export const futureRule: SchemaRule = {
   defaultErrorMessage: "The :input must be in the future",
   async validate(value: Date, context) {
     const now = new Date();
-    const inputDate = new Date(value);
 
-    if (inputDate > now) {
+    if (value > now) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };

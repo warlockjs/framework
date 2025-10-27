@@ -1,6 +1,6 @@
-    {
+{
     "name": "@warlock.js/seal",
-    "version": "3.0.12",
+    "version": "3.0.14",
     "description": "Comprehensive Validation library",
     "main": "src/index.ts",
     "dependencies": {

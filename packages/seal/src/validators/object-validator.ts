@@ -73,6 +73,7 @@ export class ObjectValidator extends BaseValidator {
     }
 
     const result = await super.validate(mutatedData, context);
+
     if (result.isValid === false) return result;
     if (data === undefined) return result;
 
@@ -81,28 +82,26 @@ export class ObjectValidator extends BaseValidator {
     const finalData: any = {};
 
     const validationPromises = Object.keys(this.schema).map(async key => {
-      const value = mutatedData?.[key];
       const validator = this.schema[key];
+      const value = mutatedData?.[key] ?? validator.getDefaultValue();
 
-      if (key in data || validator.getDefaultValue() !== undefined) {
-        const childContext: SchemaContext = {
-          ...context,
-          parent: mutatedData,
-          value,
-          key,
-          path: setKeyPath(context.path, key),
-        };
+      const childContext: SchemaContext = {
+        ...context,
+        parent: mutatedData,
+        value,
+        key,
+        path: setKeyPath(context.path, key),
+      };
 
-        const childResult = await validator.validate(value, childContext);
+      const childResult = await validator.validate(value, childContext);
 
-        // Only include in final data if not omitted
-        if (childResult.data !== undefined && !validator.isOmitted()) {
-          finalData[key] = childResult.data;
-        }
+      // Only include in final data if not omitted
+      if (childResult.data !== undefined && !validator.isOmitted()) {
+        finalData[key] = childResult.data;
+      }
 
-        if (childResult.isValid === false) {
-          errors.push(...childResult.errors);
-        }
+      if (childResult.isValid === false) {
+        errors.push(...childResult.errors);
       }
     });
 
@@ -120,20 +119,39 @@ export class ObjectValidator extends BaseValidator {
 }
 
 /** Recursively remove undefined values from an object */
-function removeUndefinedValues(obj: any): any {
+function removeUndefinedValues(
+  obj: any,
+  visited = new WeakMap<object, any>(),
+): any {
+  // Handle primitives and null
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  // Handle arrays
   if (Array.isArray(obj)) {
-    return obj.map(item => removeUndefinedValues(item));
+    return obj.map(item => removeUndefinedValues(item, visited));
   }
 
-  if (obj !== null && typeof obj === "object") {
-    const result: any = {};
-    for (const [key, value] of Object.entries(obj)) {
-      if (value !== undefined) {
-        result[key] = removeUndefinedValues(value);
-      }
+  // Skip non-plain objects (class instances, Dates, Buffers, etc.)
+  if (!isPlainObject(obj)) {
+    return obj;
+  }
+
+  // Handle circular references - return already processed result
+  if (visited.has(obj)) {
+    return visited.get(obj);
+  }
+
+  // Process plain objects
+  const result: any = {};
+  visited.set(obj, result); // Mark as processing BEFORE recursion
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      result[key] = removeUndefinedValues(value, visited);
     }
-    return result;
   }
 
-  return obj;
+  return result;
 }
