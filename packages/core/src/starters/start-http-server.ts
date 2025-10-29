@@ -65,7 +65,7 @@ export async function transformSingleFileAndCacheIt(filePath: string) {
   const { code } = await transform(content, {
     loader: filePath.endsWith(".tsx") ? "tsx" : "ts",
     format: "esm",
-    sourcemap: false,
+    sourcemap: true,
     tsconfigRaw,
   });
 
@@ -81,10 +81,10 @@ export async function transformSingleFileAndCacheIt(filePath: string) {
 
 const log = httpLog;
 
-export async function startHttpApp(data: CommandActionData) {
-  if (data?.options?.fresh) {
-    await removeDirectoryAsync(warlockPath());
-  }
+export async function startHttpApp(_data: CommandActionData) {
+  await removeDirectoryAsync(warlockPath());
+  // if (data?.options?.fresh) {
+  // }
 
   log.info("http", "server", "Starting development server...");
   await buildHttpApp();

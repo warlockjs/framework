@@ -38,6 +38,7 @@ export async function restartServer() {
       `data:text/javascript,import { register } from "node:module";
        import { pathToFileURL } from "node:url";
        register("./.warlock/warlock-loader.mjs", pathToFileURL("./"));`,
+      "--enable-source-maps",
     ],
     stdio: "inherit",
     cwd: process.cwd(),

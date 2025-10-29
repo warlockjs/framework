@@ -232,7 +232,7 @@ export async function load(url, context, nextLoad) {
         loader: url.endsWith(".tsx") ? "tsx" : "ts",
         format: "esm",
         // sourcemap: "inline",
-        sourcemap: false,
+        sourcemap: true,
         tsconfigRaw,
       });
 

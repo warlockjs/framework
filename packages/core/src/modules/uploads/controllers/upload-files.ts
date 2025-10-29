@@ -51,14 +51,8 @@ async function uploadFilesList(
     return upload;
   };
 
-  const uploadedFiles: Promise<Upload>[] = [];
-
   if (Array.isArray(files)) {
-    for (const file of files) {
-      uploadedFiles.push(addFile(file));
-    }
-
-    await Promise.all(uploadedFiles);
+    await Promise.all(files.map(addFile));
   } else {
     await addFile(files as UploadedFile);
   }
@@ -111,7 +105,7 @@ export const uploadFiles: RequestHandler = async (
 uploadFiles.validation = {
   schema: v.object({
     uploads: v.array(v.file()).requiredWithout("urls"),
-    urls: v.array(v.string().url()),
+    urls: v.array(v.string().url()).requiredWithout("uploads"),
     directory: v.string(),
     random: v.boolean(),
     compress: v.boolean().default(true),
