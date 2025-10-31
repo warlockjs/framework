@@ -4,6 +4,7 @@ import * as eslintChecker from "./checkers/eslint-checker";
 import * as tsChecker from "./checkers/typescript-checker";
 import { getConfig } from "./config";
 import * as summaryFormatter from "./formatters/summary-formatter";
+import * as issueTracker from "./issue-tracker";
 
 /**
  * Run a full project scan (async, background process)
@@ -98,8 +99,22 @@ export async function scanProject(projectPath: string) {
       summary.typescript.filesWithIssues.sort((a, b) => b.errors - a.errors);
       summary.eslint.filesWithIssues.sort((a, b) => b.errors - a.errors);
 
-      // Display summary
-      summaryFormatter.displayScanSummary(summary);
+      // Calculate progress against baseline
+      const progress = await issueTracker.calculateProgress(
+        summary.typescript.filesWithIssues,
+        summary.eslint.filesWithIssues,
+      );
+
+      // Save baseline if this is the first scan
+      if (!progress.hasBaseline) {
+        await issueTracker.saveBaseline(
+          summary.typescript.filesWithIssues,
+          summary.eslint.filesWithIssues,
+        );
+      }
+
+      // Display summary with progress
+      summaryFormatter.displayScanSummary(summary, progress);
     } catch (error) {
       console.log(
         colors.red(

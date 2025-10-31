@@ -2,6 +2,12 @@ import { colors } from "@mongez/copper";
 import path from "path";
 import ts from "typescript";
 
+/**
+ * Maximum number of files to display in the summary
+ * Prevents overwhelming the terminal with too many files
+ */
+const MAX_FILES_TO_DISPLAY = 50;
+
 type ScanSummary = {
   typescript: {
     errorCount: number;
@@ -17,10 +23,31 @@ type ScanSummary = {
   scanTime: number;
 };
 
+type ProgressInfo = {
+  typescript: {
+    fixedFiles: number;
+    remainingFiles: number;
+    totalFilesInBaseline: number;
+    fixedErrors: number;
+    fixedWarnings: number;
+  };
+  eslint: {
+    fixedFiles: number;
+    remainingFiles: number;
+    totalFilesInBaseline: number;
+    fixedErrors: number;
+    fixedWarnings: number;
+  };
+  hasBaseline: boolean;
+};
+
 /**
  * Display project scan summary
  */
-export function displayScanSummary(summary: ScanSummary) {
+export function displayScanSummary(
+  summary: ScanSummary,
+  progress?: ProgressInfo,
+) {
   console.log(
     colors.cyanBright(
       `\n${"=".repeat(60)}\n${colors.bold("📊 Code Quality Scan Complete")}\n${"=".repeat(60)}`,
@@ -36,9 +63,43 @@ export function displayScanSummary(summary: ScanSummary) {
     `\n${colors.bold("⚡ TypeScript")} ${colors.dim("→")} ${summary.typescript.errorCount > 0 ? colors.red(`${summary.typescript.errorCount} errors`) : colors.green("0 errors")}${colors.dim(", ")}${summary.typescript.warningCount > 0 ? colors.yellow(`${summary.typescript.warningCount} warnings`) : colors.dim("0 warnings")}`,
   );
 
+  // Display TypeScript progress if available
+  if (progress?.hasBaseline && progress.typescript.totalFilesInBaseline > 0) {
+    const tsProgress = progress.typescript;
+    const progressPercent =
+      tsProgress.totalFilesInBaseline > 0
+        ? Math.round(
+            (tsProgress.fixedFiles / tsProgress.totalFilesInBaseline) * 100,
+          )
+        : 0;
+
+    if (tsProgress.fixedFiles > 0) {
+      console.log(
+        `  ${colors.greenBright("✓")} ${colors.green(`Progress:`)} ${colors.bold(`${tsProgress.fixedFiles}/${tsProgress.totalFilesInBaseline}`)} ${colors.green("files fixed")} ${colors.dim(`(${progressPercent}%)`)} ${colors.dim("→")} ${colors.yellow(`${tsProgress.remainingFiles} remaining`)}`,
+      );
+      if (tsProgress.fixedErrors > 0 || tsProgress.fixedWarnings > 0) {
+        const fixedParts = [];
+        if (tsProgress.fixedErrors > 0)
+          fixedParts.push(colors.green(`${tsProgress.fixedErrors} errors`));
+        if (tsProgress.fixedWarnings > 0)
+          fixedParts.push(colors.green(`${tsProgress.fixedWarnings} warnings`));
+        console.log(
+          `  ${colors.dim("└─")} Fixed: ${fixedParts.join(colors.dim(", "))}`,
+        );
+      }
+    } else {
+      console.log(
+        `  ${colors.dim("Progress:")} ${colors.yellow(`0/${tsProgress.totalFilesInBaseline}`)} ${colors.dim("files fixed")} ${colors.dim("→")} ${colors.yellow(`${tsProgress.remainingFiles} remaining`)}`,
+      );
+    }
+  }
+
   if (summary.typescript.filesWithIssues.length > 0) {
-    const topFiles = summary.typescript.filesWithIssues.slice(0, 5);
-    for (const file of topFiles) {
+    const filesToDisplay = summary.typescript.filesWithIssues.slice(
+      0,
+      MAX_FILES_TO_DISPLAY,
+    );
+    for (const file of filesToDisplay) {
       const fileName = path.relative(process.cwd(), file.file);
       const issues = [];
       if (file.errors > 0) issues.push(colors.red(`${file.errors} errors`));
@@ -50,10 +111,10 @@ export function displayScanSummary(summary: ScanSummary) {
       );
     }
 
-    if (summary.typescript.filesWithIssues.length > 5) {
+    if (summary.typescript.filesWithIssues.length > MAX_FILES_TO_DISPLAY) {
       console.log(
         colors.dim(
-          `  └─ ... and ${summary.typescript.filesWithIssues.length - 5} more files`,
+          `  └─ ... and ${summary.typescript.filesWithIssues.length - MAX_FILES_TO_DISPLAY} more files`,
         ),
       );
     }
@@ -64,9 +125,46 @@ export function displayScanSummary(summary: ScanSummary) {
     `\n${colors.bold("📏 ESLint")} ${colors.dim("→")} ${summary.eslint.errorCount > 0 ? colors.red(`${summary.eslint.errorCount} errors`) : colors.green("0 errors")}${colors.dim(", ")}${summary.eslint.warningCount > 0 ? colors.yellow(`${summary.eslint.warningCount} warnings`) : colors.dim("0 warnings")}`,
   );
 
+  // Display ESLint progress if available
+  if (progress?.hasBaseline && progress.eslint.totalFilesInBaseline > 0) {
+    const eslintProgress = progress.eslint;
+    const progressPercent =
+      eslintProgress.totalFilesInBaseline > 0
+        ? Math.round(
+            (eslintProgress.fixedFiles / eslintProgress.totalFilesInBaseline) *
+              100,
+          )
+        : 0;
+
+    if (eslintProgress.fixedFiles > 0) {
+      console.log(
+        `  ${colors.greenBright("✓")} ${colors.green(`Progress:`)} ${colors.bold(`${eslintProgress.fixedFiles}/${eslintProgress.totalFilesInBaseline}`)} ${colors.green("files fixed")} ${colors.dim(`(${progressPercent}%)`)} ${colors.dim("→")} ${colors.yellow(`${eslintProgress.remainingFiles} remaining`)}`,
+      );
+      if (eslintProgress.fixedErrors > 0 || eslintProgress.fixedWarnings > 0) {
+        const fixedParts = [];
+        if (eslintProgress.fixedErrors > 0)
+          fixedParts.push(colors.green(`${eslintProgress.fixedErrors} errors`));
+        if (eslintProgress.fixedWarnings > 0)
+          fixedParts.push(
+            colors.green(`${eslintProgress.fixedWarnings} warnings`),
+          );
+        console.log(
+          `  ${colors.dim("└─")} Fixed: ${fixedParts.join(colors.dim(", "))}`,
+        );
+      }
+    } else {
+      console.log(
+        `  ${colors.dim("Progress:")} ${colors.yellow(`0/${eslintProgress.totalFilesInBaseline}`)} ${colors.dim("files fixed")} ${colors.dim("→")} ${colors.yellow(`${eslintProgress.remainingFiles} remaining`)}`,
+      );
+    }
+  }
+
   if (summary.eslint.filesWithIssues.length > 0) {
-    const topFiles = summary.eslint.filesWithIssues.slice(0, 5);
-    for (const file of topFiles) {
+    const filesToDisplay = summary.eslint.filesWithIssues.slice(
+      0,
+      MAX_FILES_TO_DISPLAY,
+    );
+    for (const file of filesToDisplay) {
       const fileName = path.relative(process.cwd(), file.file);
       const issues = [];
       if (file.errors > 0) issues.push(colors.red(`${file.errors} errors`));
@@ -78,10 +176,10 @@ export function displayScanSummary(summary: ScanSummary) {
       );
     }
 
-    if (summary.eslint.filesWithIssues.length > 5) {
+    if (summary.eslint.filesWithIssues.length > MAX_FILES_TO_DISPLAY) {
       console.log(
         colors.dim(
-          `  └─ ... and ${summary.eslint.filesWithIssues.length - 5} more files`,
+          `  └─ ... and ${summary.eslint.filesWithIssues.length - MAX_FILES_TO_DISPLAY} more files`,
         ),
       );
     }

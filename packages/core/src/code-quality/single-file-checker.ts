@@ -5,6 +5,7 @@ import * as tsChecker from "./checkers/typescript-checker";
 import { getConfig } from "./config";
 import * as eslintFormatter from "./formatters/eslint-formatter";
 import * as tsFormatter from "./formatters/typescript-formatter";
+import * as issueTracker from "./issue-tracker";
 
 /**
  * Check a single file for code quality issues
@@ -51,6 +52,27 @@ export async function checkSingleFile(filePath: string) {
         tsFormatter.displayErrors(tsResult);
       } else if (config.displayStrategy === "eslint-only" && eslintResult) {
         eslintFormatter.displayErrors(eslintResult);
+      }
+
+      // Update tracking if file is now fixed
+      let progressUpdated = false;
+      if (tsResult && tsResult.diagnostics.length === 0) {
+        await issueTracker.updateBaselineOnFileFix(filePath, "typescript");
+        progressUpdated = true;
+      }
+
+      if (
+        eslintResult &&
+        eslintResult.results.errorCount === 0 &&
+        eslintResult.results.warningCount === 0
+      ) {
+        await issueTracker.updateBaselineOnFileFix(filePath, "eslint");
+        progressUpdated = true;
+      }
+
+      // Display progress if any fixes were made
+      if (progressUpdated) {
+        await displayProgressAfterFix();
       }
     } catch (error) {
       console.log(
@@ -111,4 +133,95 @@ function displayCombinedSummary(tsResult: any, eslintResult: any) {
   console.log(
     `\n${colors.dim("╰─")} ${colors.bold("Summary")} ${colors.dim("→")} ${totalErrors > 0 ? colors.red(`${totalErrors} error${totalErrors !== 1 ? "s" : ""}`) : colors.green("✓ No errors")}${colors.dim(", ")}${totalWarnings > 0 ? colors.yellow(`${totalWarnings} warning${totalWarnings !== 1 ? "s" : ""}`) : colors.dim("0 warnings")}\n`,
   );
+}
+
+/**
+ * Display progress after a file is fixed
+ */
+async function displayProgressAfterFix() {
+  const baseline = await issueTracker.loadBaseline();
+  if (!baseline) {
+    return;
+  }
+
+  const tsTotal = baseline.typescript.filesWithIssues.length;
+  const eslintTotal = baseline.eslint.filesWithIssues.length;
+
+  if (tsTotal === 0 && eslintTotal === 0) {
+    console.log(
+      colors.greenBright(
+        `\n🎉 ${colors.bold("Congratulations!")} All tracked issues have been fixed!\n`,
+      ),
+    );
+    return;
+  }
+
+  console.log(colors.dim("\n" + "─".repeat(60)));
+  console.log(colors.bold(colors.cyanBright("📊 Remaining Issues to Fix")));
+  console.log(colors.dim("─".repeat(60)));
+
+  // Display TypeScript files
+  if (tsTotal > 0) {
+    const tsErrors = baseline.typescript.totalErrors;
+    const tsWarnings = baseline.typescript.totalWarnings;
+    console.log(
+      `\n${colors.bold("⚡ TypeScript:")} ${colors.yellow(`${tsTotal} files`)} ${colors.dim("→")} ${tsErrors > 0 ? colors.red(`${tsErrors} errors`) : ""}${tsErrors > 0 && tsWarnings > 0 ? colors.dim(", ") : ""}${tsWarnings > 0 ? colors.yellow(`${tsWarnings} warnings`) : ""}`,
+    );
+
+    // Display up to 50 files
+    const maxFiles = 50;
+    const filesToDisplay = baseline.typescript.filesWithIssues.slice(
+      0,
+      maxFiles,
+    );
+
+    for (const file of filesToDisplay) {
+      const fileName = path.relative(process.cwd(), file.file);
+      const issues = [];
+      if (file.errors > 0) issues.push(colors.red(`${file.errors} errors`));
+      if (file.warnings > 0)
+        issues.push(colors.yellow(`${file.warnings} warnings`));
+
+      console.log(
+        `  ${colors.dim("├─")} ${colors.cyan(fileName)} ${colors.dim("→")} ${issues.join(colors.dim(", "))}`,
+      );
+    }
+
+    if (tsTotal > maxFiles) {
+      console.log(colors.dim(`  └─ ... and ${tsTotal - maxFiles} more files`));
+    }
+  }
+
+  // Display ESLint files
+  if (eslintTotal > 0) {
+    const eslintErrors = baseline.eslint.totalErrors;
+    const eslintWarnings = baseline.eslint.totalWarnings;
+    console.log(
+      `\n${colors.bold("📏 ESLint:")} ${colors.yellow(`${eslintTotal} files`)} ${colors.dim("→")} ${eslintErrors > 0 ? colors.red(`${eslintErrors} errors`) : ""}${eslintErrors > 0 && eslintWarnings > 0 ? colors.dim(", ") : ""}${eslintWarnings > 0 ? colors.yellow(`${eslintWarnings} warnings`) : ""}`,
+    );
+
+    // Display up to 50 files
+    const maxFiles = 50;
+    const filesToDisplay = baseline.eslint.filesWithIssues.slice(0, maxFiles);
+
+    for (const file of filesToDisplay) {
+      const fileName = path.relative(process.cwd(), file.file);
+      const issues = [];
+      if (file.errors > 0) issues.push(colors.red(`${file.errors} errors`));
+      if (file.warnings > 0)
+        issues.push(colors.yellow(`${file.warnings} warnings`));
+
+      console.log(
+        `  ${colors.dim("├─")} ${colors.cyan(fileName)} ${colors.dim("→")} ${issues.join(colors.dim(", "))}`,
+      );
+    }
+
+    if (eslintTotal > maxFiles) {
+      console.log(
+        colors.dim(`  └─ ... and ${eslintTotal - maxFiles} more files`),
+      );
+    }
+  }
+
+  console.log(colors.dim("─".repeat(60) + "\n"));
 }

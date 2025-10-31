@@ -23,3 +23,6 @@ export * as TypeScriptChecker from "./checkers/typescript-checker";
 export * as ESLintFormatter from "./formatters/eslint-formatter";
 export * as SummaryFormatter from "./formatters/summary-formatter";
 export * as TypeScriptFormatter from "./formatters/typescript-formatter";
+
+// Issue tracking (progress tracking)
+export * as IssueTracker from "./issue-tracker";
