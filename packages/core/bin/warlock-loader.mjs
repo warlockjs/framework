@@ -134,7 +134,7 @@ export async function resolve(specifier, context, nextResolve) {
         };
       }
 
-      throw new Error(`Failed to resolve file: ${resolvedPath}`);
+      throw new Error(`Failed to resolve file: ${specifier}`);
     }
   }
 
@@ -231,8 +231,8 @@ export async function load(url, context, nextLoad) {
       const { code } = await transform(source, {
         loader: url.endsWith(".tsx") ? "tsx" : "ts",
         format: "esm",
-        // sourcemap: "inline",
-        sourcemap: true,
+        sourcemap: "inline",
+        sourcefile: filePath,
         tsconfigRaw,
       });
 

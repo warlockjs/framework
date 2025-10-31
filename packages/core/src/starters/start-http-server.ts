@@ -65,7 +65,8 @@ export async function transformSingleFileAndCacheIt(filePath: string) {
   const { code } = await transform(content, {
     loader: filePath.endsWith(".tsx") ? "tsx" : "ts",
     format: "esm",
-    sourcemap: true,
+    sourcemap: "inline",
+    sourcefile: filePath,
     tsconfigRaw,
   });
 
