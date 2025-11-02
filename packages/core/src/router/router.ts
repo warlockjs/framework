@@ -608,6 +608,11 @@ export class Router {
         );
       }
 
+      if (resource.validation.all.schema || methodValidation?.schema) {
+        validation.schema =
+          methodValidation?.schema || resource.validation.all.schema;
+      }
+
       if (validationMethods.all || validationMethods[method]) {
         validation.validate = async (request: Request, response: Response) => {
           if (validationMethods.all) {
