@@ -57,7 +57,6 @@ export class BaseValidator {
   public mutators: ContextualizedMutator[] = [];
   protected defaultValue: any;
   protected description?: string;
-  protected shouldAllowEmpty = false;
   protected shouldOmit = false;
   /**
    * Pipeline to transform the mutated/original data before returning it
@@ -212,10 +211,13 @@ export class BaseValidator {
   }
 
   /**
-   * Allow empty values and skip validation if the value is empty
+   * @deprecated This method is no longer needed and does nothing.
+   * Empty values are now automatically skipped for validation rules by default.
+   * Only presence validators (required, present, etc.) will check empty values.
+   * You can safely remove this call from your code.
    */
-  public allowsEmpty() {
-    this.shouldAllowEmpty = true;
+  public ignoreEmptyValue(_ignoreEmptyValue = true) {
+    // No-op for backward compatibility
     return this;
   }
 
@@ -1101,22 +1103,13 @@ export class BaseValidator {
     data: any,
     context: SchemaContext,
   ): Promise<ValidationResult> {
-    // If allowsEmpty is enabled and the value is empty, skip validation
-    if (this.shouldAllowEmpty && isEmpty(data)) {
-      return {
-        isValid: true,
-        errors: [],
-        data,
-      };
-    }
-
     const mutatedData = await this.mutate(data ?? this.defaultValue, context);
     const errors: ValidationResult["errors"] = [];
     let isValid = true;
     const isFirstErrorOnly = context.configurations?.firstErrorOnly ?? true;
 
     for (const rule of this.rules) {
-      if ((rule.requiresValue ?? true) && data === undefined) continue;
+      if ((rule.requiresValue ?? true) && isEmpty(data)) continue;
 
       this.setRuleAttributesList(rule);
 

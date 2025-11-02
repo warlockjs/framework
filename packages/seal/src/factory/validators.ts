@@ -46,7 +46,7 @@ export const v: ValidatorV = {
 
   /** Create an enum validator */
   enum: (values: any, errorMessage?: string) =>
-    new StringValidator().enum(values, errorMessage),
+    new ScalarValidator().enum(values, errorMessage),
 
   /** Create a number validator */
   number: (errorMessage?: string) => new NumberValidator(errorMessage),

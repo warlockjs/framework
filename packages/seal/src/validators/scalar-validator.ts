@@ -149,7 +149,7 @@ export class ScalarValidator extends BaseValidator {
   /** Value must be one of the given values */
   public enum(values: any, errorMessage?: string) {
     const rule = this.addRule(enumRule, errorMessage);
-    rule.context.options.enum = values;
+    rule.context.options.enum = Object.values(values);
     return this;
   }
 

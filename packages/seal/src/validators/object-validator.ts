@@ -1,3 +1,4 @@
+import { except } from "@mongez/reinforcements";
 import { isPlainObject } from "@mongez/supportive-is";
 import { setKeyPath } from "../helpers";
 import { objectTrimMutator, stripUnknownMutator } from "../mutators";
@@ -44,7 +45,9 @@ export class ObjectValidator extends BaseValidator {
     return this;
   }
 
-  /** Whether to allow unknown properties */
+  /** Whether to allow unknown properties
+   * Please note it will allow only unknown direct children keys, not nested children keys
+   */
   public allowUnknown(allow = true) {
     this.shouldAllowUnknown = allow;
     return this;
@@ -110,10 +113,23 @@ export class ObjectValidator extends BaseValidator {
     // Remove undefined values
     const cleanedData = removeUndefinedValues(finalData);
 
+    const transformedData = await this.startTransformationPipeline(
+      cleanedData,
+      context,
+    );
+
+    const output =
+      this.shouldAllowUnknown === false
+        ? transformedData
+        : {
+            ...transformedData,
+            ...except(mutatedData, Object.keys(this.schema)),
+          };
+
     return {
       isValid: errors.length === 0,
       errors,
-      data: await this.startTransformationPipeline(cleanedData, context),
+      data: output,
     };
   }
 }
