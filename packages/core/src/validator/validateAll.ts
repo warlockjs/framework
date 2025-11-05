@@ -43,13 +43,13 @@ export async function validateAll(
       }
 
       if (!result.isValid) {
-        log.error("validation", "schema", "Schema Validation failed");
+        log.warn("validation", "schema", "Schema Validation failed");
         return response.failedSchema(result);
       }
 
       log.success("validation", "schema", "Schema Validation passed");
     } catch (error) {
-      log.error("app.validation", "error", error);
+      log.warn("app.validation", "error", error);
       throw error;
     }
   }

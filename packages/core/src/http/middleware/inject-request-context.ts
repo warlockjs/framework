@@ -7,6 +7,12 @@
 import { trans } from "@mongez/localization";
 import type { Model } from "@warlock.js/cascade";
 import { AsyncLocalStorage } from "async_hooks";
+import {
+  BadRequestError,
+  ForbiddenError,
+  ResourceNotFoundError,
+  UnAuthorizedError,
+} from "../errors";
 import { type Request } from "../request";
 import { type Response } from "../response";
 import { type ReturnedResponse } from "./../types";
@@ -59,7 +65,30 @@ export function createRequestStore(
 
           resolve(output as ReturnedResponse);
         } catch (error: any) {
-          reject(error);
+          if (error instanceof ResourceNotFoundError) {
+            return response.notFound({
+              error: error.message,
+            });
+          }
+
+          if (error instanceof UnAuthorizedError) {
+            return response.unauthorized({
+              error: error.message,
+            });
+          }
+
+          if (error instanceof ForbiddenError) {
+            return response.forbidden({
+              error: error.message,
+            });
+          }
+
+          if (error instanceof BadRequestError) {
+            return response.badRequest({
+              error: error.message,
+            });
+          }
+
           return response.badRequest({
             error: error.message,
           });

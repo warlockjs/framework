@@ -7,6 +7,7 @@ import {
   minHeightRule,
   minWidthRule,
 } from "@warlock.js/seal";
+import { UploadedFile } from "../../http";
 import { fileExtensionRule, fileRule, fileTypeRule, imageRule } from "../file";
 
 /**
@@ -16,6 +17,13 @@ export class FileValidator extends BaseValidator {
   public constructor(errorMessage?: string) {
     super();
     this.addRule(fileRule, errorMessage);
+  }
+
+  /**
+   * Check if value is a File type
+   */
+  public matchesType(value: any): boolean {
+    return value instanceof UploadedFile;
   }
 
   /** Value must be an image */

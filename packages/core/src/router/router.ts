@@ -609,8 +609,22 @@ export class Router {
       }
 
       if (resource.validation.all.schema || methodValidation?.schema) {
-        validation.schema =
-          methodValidation?.schema || resource.validation.all.schema;
+        if (!methodValidation?.schema && resource.validation.all.schema) {
+          // Case 2: Only all.schema exists - clone it for this method
+          validation.schema = resource.validation.all.schema;
+        } else if (methodValidation?.schema && resource.validation.all.schema) {
+          // Case 3: Both exist - merge them (all is base, method overrides)
+          validation.schema = resource.validation.all.schema.merge(
+            methodValidation.schema,
+          );
+        } else if (
+          methodValidation?.schema &&
+          !resource.validation.all.schema
+        ) {
+          // Case 1: Only method schema exists - use it directly
+          validation.schema = methodValidation.schema;
+        }
+        // Case 4: Neither exists - handled by outer if being false
       }
 
       if (validationMethods.all || validationMethods[method]) {
