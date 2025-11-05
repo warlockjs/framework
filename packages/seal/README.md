@@ -292,7 +292,7 @@ const usersSchema = v
     v.object({
       name: v.string().required(),
       email: v.string().email(),
-    }),
+    })
   )
   .minLength(1);
 ```

@@ -80,6 +80,13 @@ export class StringValidator extends BaseValidator {
     this.addRule(stringRule, errorMessage);
   }
 
+  /**
+   * Check if value is a string type
+   */
+  public matchesType(value: any): boolean {
+    return typeof value === "string";
+  }
+
   // ==================== Mutators ====================
 
   /**

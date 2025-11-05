@@ -211,6 +211,67 @@ export class BaseValidator {
   }
 
   /**
+   * Check if this validator can handle the given value's type
+   * Override this in specific validators to enable type-based routing in union validators
+   *
+   * Default: returns true (validator will attempt to validate any type)
+   *
+   * @param value - The value to check
+   * @returns True if this validator can handle this type
+   *
+   * @example
+   * ```ts
+   * // StringValidator
+   * public matchesType(value: any): boolean {
+   *   return typeof value === 'string';
+   * }
+   *
+   * // Custom FileValidator
+   * public matchesType(value: any): boolean {
+   *   return value instanceof UploadedFile;
+   * }
+   * ```
+   */
+  public matchesType(_value: any): boolean {
+    return true; // Default: permissive, attempt to validate any type
+  }
+
+  /**
+   * Create a copy of this validator with the same configuration
+   * Copies all rules, mutators, transformers, default values, and settings
+   *
+   * @returns A new validator instance with copied configuration
+   *
+   * @example
+   * ```ts
+   * // Create reusable validator templates
+   * const baseString = v.string().required().trim().min(3);
+   * const emailField = baseString.clone().email();
+   * const usernameField = baseString.clone().alphanumeric().max(20);
+   *
+   * // Works with all validators
+   * const positiveInt = v.int().positive().required();
+   * const ageField = positiveInt.clone().min(18).max(120);
+   * ```
+   */
+  public clone(): this {
+    // Create a new instance using Object.create to preserve the prototype chain
+    const Constructor = this.constructor as new (...args: any[]) => this;
+    const cloned = Object.create(Constructor.prototype);
+
+    // Copy all BaseValidator properties
+    cloned.rules = [...this.rules];
+    cloned.mutators = [...this.mutators];
+    cloned.dataTransformers = [...this.dataTransformers];
+    cloned.defaultValue = this.defaultValue;
+    cloned.shouldOmit = this.shouldOmit;
+    cloned.description = this.description;
+    cloned.attributesText = { ...this.attributesText };
+
+    return cloned;
+  }
+
+  /**
    * @deprecated This method is no longer needed and does nothing.
    * Empty values are now automatically skipped for validation rules by default.
    * Only presence validators (required, present, etc.) will check empty values.

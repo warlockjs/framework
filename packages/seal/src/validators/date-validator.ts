@@ -61,6 +61,7 @@ import {
   yearRule,
 } from "../rules";
 import type { WeekDay } from "../types/date-types";
+import { isDateValue } from "./../helpers/date-helpers";
 import { BaseValidator } from "./base-validator";
 
 /**
@@ -71,6 +72,13 @@ export class DateValidator extends BaseValidator {
     super();
     this.addMutator(dateMutator); // Normalize to Date object first
     this.addRule(dateRule, errorMessage);
+  }
+
+  /**
+   * Check if value is a Date type
+   */
+  public matchesType(value: any): boolean {
+    return isDateValue(value);
   }
 
   // ==================== Output Transformers ====================

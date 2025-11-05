@@ -28,6 +28,24 @@ export class ArrayValidator extends BaseValidator {
     this.addRule(arrayRule, errorMessage);
   }
 
+  /**
+   * Check if value is an array type
+   */
+  public matchesType(value: any): boolean {
+    return Array.isArray(value);
+  }
+
+  /**
+   * Clone the validator
+   */
+  public override clone(): this {
+    const cloned = super.clone();
+
+    cloned.validator = this.validator.clone();
+
+    return cloned;
+  }
+
   /** Reverse array order */
   public flip() {
     return this.addMutator(flipArrayMutator);
@@ -129,28 +147,30 @@ export class ArrayValidator extends BaseValidator {
 
     const errors: ValidationResult["errors"] = [];
 
-    for (let index = 0; index < mutatedData.length; index++) {
-      const value = mutatedData[index];
+    // Validate all items in parallel (consistent with ObjectValidator)
+    const validationPromises = mutatedData.map(
+      async (value: any, index: number) => {
+        const childContext: SchemaContext = {
+          ...context,
+          parent: mutatedData,
+          value,
+          key: index.toString(),
+          path: setKeyPath(context.path, index.toString()),
+        };
 
-      const childContext: SchemaContext = {
-        ...context,
-        parent: mutatedData,
-        value,
-        key: index.toString(),
-        path: setKeyPath(context.path, index.toString()),
-      };
+        const childResult = await this.validator.validate(value, childContext);
 
-      const childResult = await this.validator.validate(value, childContext);
-      mutatedData[index] = childResult.data;
+        // Update mutated data with validated result
+        mutatedData[index] = childResult.data;
 
-      if (childResult.isValid === false) {
-        errors.push(...childResult.errors);
-      }
+        // Collect errors from this element
+        if (childResult.isValid === false) {
+          errors.push(...childResult.errors);
+        }
+      },
+    );
 
-      if (context.configurations?.firstErrorOnly && errors.length) {
-        break;
-      }
-    }
+    await Promise.all(validationPromises);
 
     return {
       isValid: errors.length === 0,

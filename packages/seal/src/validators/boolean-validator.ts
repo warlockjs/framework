@@ -11,6 +11,13 @@ export class BooleanValidator extends BaseValidator {
     this.addRule(booleanRule, errorMessage);
   }
 
+  /**
+   * Check if value is a boolean type
+   */
+  public matchesType(value: any): boolean {
+    return typeof value === "boolean";
+  }
+
   // Accepted/Declined methods from ScalarValidator
   /** Value must be accepted (true, "yes", 1, "on", etc.) */
   public accepted = ScalarValidator.prototype.accepted;

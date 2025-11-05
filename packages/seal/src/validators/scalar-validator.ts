@@ -1,3 +1,4 @@
+import { numberMutator } from "../mutators";
 import {
   allowedValuesRule,
   enumRule,
@@ -32,6 +33,15 @@ export class ScalarValidator extends BaseValidator {
   public constructor(errorMessage?: string) {
     super();
     this.addRule(scalarRule, errorMessage);
+  }
+
+  /**
+   * Mutate the scalar value to be number
+   */
+  public asNumber() {
+    this.addMutator(numberMutator);
+
+    return this;
   }
 
   /**

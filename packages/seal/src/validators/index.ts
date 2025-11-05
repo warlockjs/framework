@@ -18,3 +18,4 @@ export * from "./number-validator";
 export * from "./object-validator";
 export * from "./scalar-validator";
 export * from "./string-validator";
+export * from "./union-validator";

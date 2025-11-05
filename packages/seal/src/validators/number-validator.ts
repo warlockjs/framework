@@ -27,6 +27,13 @@ export class NumberValidator extends BaseValidator {
   }
 
   /**
+   * Check if value is a number type
+   */
+  public matchesType(value: any): boolean {
+    return typeof value === "number" && !isNaN(value);
+  }
+
+  /**
    * Value must be equal or higher than the given number or field
    * Smart detection: number or field name
    *

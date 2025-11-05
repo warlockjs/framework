@@ -11,6 +11,7 @@ import {
   ObjectValidator,
   ScalarValidator,
   StringValidator,
+  UnionValidator,
 } from "../validators";
 import { validate as validateFunction } from "./validate";
 
@@ -73,6 +74,10 @@ export const v: ValidatorV = {
       errorMessage,
     ),
 
+  /** Create a union validator - validates against multiple types */
+  union: (validators: BaseValidator[], errorMessage?: string) =>
+    new UnionValidator().union(validators, errorMessage),
+
   /** Validate data against a schema */
   validate: validateFunction,
 } as unknown as ValidatorV;
@@ -106,6 +111,7 @@ export interface ValidatorV {
   ) => ArrayValidator & {
     validator: BaseValidator;
   };
+  union: (validators: BaseValidator[], errorMessage?: string) => UnionValidator;
   validate: <T extends BaseValidator>(
     schema: T,
     data: any,

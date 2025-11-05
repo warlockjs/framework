@@ -14,12 +14,8 @@
  */
 export function isDateValue(value: any): boolean {
   if (value instanceof Date) return true;
-  if (typeof value === "number") return true;
-  if (
-    typeof value === "string" &&
-    (value.includes("-") || value.includes("/"))
-  ) {
-    return true;
-  }
-  return false;
+
+  const date = new Date(value);
+
+  return !isNaN(date.getTime());
 }
