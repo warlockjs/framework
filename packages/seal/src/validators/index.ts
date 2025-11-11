@@ -16,6 +16,8 @@ export * from "./float-validator";
 export * from "./int-validator";
 export * from "./number-validator";
 export * from "./object-validator";
+export * from "./record-validator";
 export * from "./scalar-validator";
 export * from "./string-validator";
+export * from "./tuple-validator";
 export * from "./union-validator";

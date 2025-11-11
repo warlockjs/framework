@@ -9,3 +9,6 @@ export * from "./present-if-rules";
 export * from "./present-unless-rules";
 export * from "./present-with-rules";
 export * from "./present-without-rules";
+
+// Forbidden rules
+export * from "./forbidden-if-rules";

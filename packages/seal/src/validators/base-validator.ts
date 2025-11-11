@@ -4,6 +4,12 @@ import { VALID_RULE, invalidRule } from "../helpers";
 import {
   equalRule,
   equalsFieldRule,
+  forbiddenIfEmptyRule,
+  forbiddenIfInRule,
+  forbiddenIfNotEmptyRule,
+  forbiddenIfNotInRule,
+  forbiddenIfNotRule,
+  forbiddenIfRule,
   forbiddenRule,
   notEqualsFieldRule,
   presentIfEmptyRule,
@@ -58,6 +64,8 @@ export class BaseValidator {
   protected defaultValue: any;
   protected description?: string;
   protected shouldOmit = false;
+  protected isNullable = false;
+
   /**
    * Pipeline to transform the mutated/original data before returning it
    */
@@ -75,6 +83,22 @@ export class BaseValidator {
    */
   public getDefaultValue(): any {
     return this.defaultValue;
+  }
+
+  /**
+   * Determine if value accepts null value
+   */
+  public nullable(): this {
+    this.isNullable = true;
+    return this;
+  }
+
+  /**
+   * Explicitly disallow null values after calling nullable
+   */
+  public notNullable(): this {
+    this.isNullable = false;
+    return this;
   }
 
   /**
@@ -267,6 +291,7 @@ export class BaseValidator {
     cloned.shouldOmit = this.shouldOmit;
     cloned.description = this.description;
     cloned.attributesText = { ...this.attributesText };
+    cloned.isNullable = this.isNullable;
 
     return cloned;
   }
@@ -1066,6 +1091,146 @@ export class BaseValidator {
   }
 
   /**
+   * Value is forbidden if another field equals a specific value (global scope)
+   */
+  public forbiddenIf(field: string, value: any, errorMessage?: string) {
+    const rule = this.addRule(forbiddenIfRule, errorMessage);
+    rule.context.options.field = field;
+    rule.context.options.value = value;
+    rule.context.options.scope = "global";
+    return this;
+  }
+
+  /**
+   * Value is forbidden if another field equals a specific value (sibling scope)
+   */
+  public forbiddenIfSibling(field: string, value: any, errorMessage?: string) {
+    const rule = this.addRule(forbiddenIfRule, errorMessage);
+    rule.context.options.field = field;
+    rule.context.options.value = value;
+    rule.context.options.scope = "sibling";
+    return this;
+  }
+
+  /**
+   * Value is forbidden if another field does NOT equal a specific value (global scope)
+   */
+  public forbiddenIfNot(field: string, value: any, errorMessage?: string) {
+    const rule = this.addRule(forbiddenIfNotRule, errorMessage);
+    rule.context.options.field = field;
+    rule.context.options.value = value;
+    rule.context.options.scope = "global";
+    return this;
+  }
+
+  /**
+   * Value is forbidden if another field does NOT equal a specific value (sibling scope)
+   */
+  public forbiddenIfNotSibling(
+    field: string,
+    value: any,
+    errorMessage?: string,
+  ) {
+    const rule = this.addRule(forbiddenIfNotRule, errorMessage);
+    rule.context.options.field = field;
+    rule.context.options.value = value;
+    rule.context.options.scope = "sibling";
+    return this;
+  }
+
+  /**
+   * Value is forbidden if another field is empty (global scope)
+   */
+  public forbiddenIfEmpty(field: string, errorMessage?: string) {
+    const rule = this.addRule(forbiddenIfEmptyRule, errorMessage);
+    rule.context.options.field = field;
+    rule.context.options.scope = "global";
+    return this;
+  }
+
+  /**
+   * Value is forbidden if another field is empty (sibling scope)
+   */
+  public forbiddenIfEmptySibling(field: string, errorMessage?: string) {
+    const rule = this.addRule(forbiddenIfEmptyRule, errorMessage);
+    rule.context.options.field = field;
+    rule.context.options.scope = "sibling";
+    return this;
+  }
+
+  /**
+   * Value is forbidden if another field is not empty (global scope)
+   */
+  public forbiddenIfNotEmpty(field: string, errorMessage?: string) {
+    const rule = this.addRule(forbiddenIfNotEmptyRule, errorMessage);
+    rule.context.options.field = field;
+    rule.context.options.scope = "global";
+    return this;
+  }
+
+  /**
+   * Value is forbidden if another field is not empty (sibling scope)
+   */
+  public forbiddenIfNotEmptySibling(field: string, errorMessage?: string) {
+    const rule = this.addRule(forbiddenIfNotEmptyRule, errorMessage);
+    rule.context.options.field = field;
+    rule.context.options.scope = "sibling";
+    return this;
+  }
+
+  /**
+   * Value is forbidden if another field's value is in the given array (global scope)
+   */
+  public forbiddenIfIn(field: string, values: any[], errorMessage?: string) {
+    const rule = this.addRule(forbiddenIfInRule, errorMessage);
+    rule.context.options.field = field;
+    rule.context.options.values = values;
+    rule.context.options.scope = "global";
+    return this;
+  }
+
+  /**
+   * Value is forbidden if another field's value is in the given array (sibling scope)
+   */
+  public forbiddenIfInSibling(
+    field: string,
+    values: any[],
+    errorMessage?: string,
+  ) {
+    const rule = this.addRule(forbiddenIfInRule, errorMessage);
+    rule.context.options.field = field;
+    rule.context.options.values = values;
+    rule.context.options.scope = "sibling";
+    return this;
+  }
+
+  /**
+   * Value is forbidden if another field's value is NOT in the given array (global scope)
+   */
+  public forbiddenIfNotIn(field: string, values: any[], errorMessage?: string) {
+    const rule = this.addRule(forbiddenIfNotInRule, errorMessage);
+    rule.context.options.field = field;
+    rule.context.options.values = values;
+    rule.context.options.scope = "global";
+    return this;
+  }
+
+  /**
+   * Value is forbidden if another field's value is NOT in the given array (sibling scope)
+   */
+  public forbiddenIfNotInSibling(
+    field: string,
+    values: any[],
+    errorMessage?: string,
+  ) {
+    const rule = this.addRule(forbiddenIfNotInRule, errorMessage);
+    rule.context.options.field = field;
+    rule.context.options.values = values;
+    rule.context.options.scope = "sibling";
+    return this;
+  }
+
+  /**
    * Apply different validation rules based on another field's value (global scope)
    *
    * Use this when you need to apply completely different validators
@@ -1164,13 +1329,20 @@ export class BaseValidator {
     data: any,
     context: SchemaContext,
   ): Promise<ValidationResult> {
-    const mutatedData = await this.mutate(data ?? this.defaultValue, context);
+    if (data === null && this.isNullable) {
+      return { isValid: true, errors: [], data: null };
+    }
+
+    const valueForMutation = data ?? this.defaultValue;
+    const mutatedData = await this.mutate(valueForMutation, context);
+    const valueForRules = valueForMutation;
+
     const errors: ValidationResult["errors"] = [];
     let isValid = true;
     const isFirstErrorOnly = context.configurations?.firstErrorOnly ?? true;
 
     for (const rule of this.rules) {
-      if ((rule.requiresValue ?? true) && isEmpty(data)) continue;
+      if ((rule.requiresValue ?? true) && isEmpty(valueForRules)) continue;
 
       this.setRuleAttributesList(rule);
 

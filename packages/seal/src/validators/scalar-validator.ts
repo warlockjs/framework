@@ -36,6 +36,17 @@ export class ScalarValidator extends BaseValidator {
   }
 
   /**
+   * Add matches type
+   */
+  public matchesType(value: any) {
+    return (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    );
+  }
+
+  /**
    * Mutate the scalar value to be number
    */
   public asNumber() {

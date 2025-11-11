@@ -1,4 +1,3 @@
-import { numberMutator } from "../mutators";
 import {
   betweenNumbersRule,
   evenRule,
@@ -23,7 +22,6 @@ export class NumberValidator extends BaseValidator {
   public constructor(errorMessage?: string) {
     super();
     this.addRule(numberRule, errorMessage);
-    this.addMutator(numberMutator);
   }
 
   /**

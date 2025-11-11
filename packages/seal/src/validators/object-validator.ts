@@ -73,15 +73,17 @@ export class ObjectValidator extends BaseValidator {
    * // userCopy has the same schema and allowUnknown setting
    * ```
    */
-  public override clone(): this {
+  public override clone(keys?: string[]): this {
     // Get cloned instance with all BaseValidator properties
     const cloned = super.clone();
 
     // Clone schema with deep copy of validators
     const newSchema: Schema = {};
     for (const key in this.schema) {
+      if (keys && !keys.includes(key)) continue;
       newSchema[key] = this.schema[key].clone();
     }
+
     cloned.schema = newSchema;
 
     // Add ObjectValidator-specific properties
@@ -333,7 +335,10 @@ export class ObjectValidator extends BaseValidator {
 
     const validationPromises = Object.keys(this.schema).map(async key => {
       const validator = this.schema[key];
-      const value = mutatedData?.[key] ?? validator.getDefaultValue();
+      const value =
+        mutatedData?.[key] !== undefined
+          ? mutatedData[key]
+          : validator.getDefaultValue();
 
       const childContext: SchemaContext = {
         ...context,

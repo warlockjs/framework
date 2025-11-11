@@ -9,8 +9,10 @@ import {
   IntValidator,
   NumberValidator,
   ObjectValidator,
+  RecordValidator,
   ScalarValidator,
   StringValidator,
+  TupleValidator,
   UnionValidator,
 } from "../validators";
 import { validate as validateFunction } from "./validate";
@@ -30,13 +32,22 @@ export const v: ValidatorV = {
   /** Create an any validator */
   any: () => new AnyValidator(),
 
-  /** Create a forbidden validator */
-  forbidden: () => v.any().forbidden(),
-
   /** Create an array validator */
   array: <T extends BaseValidator>(validator: T, errorMessage?: string) =>
     new ArrayValidator(validator, errorMessage) as ArrayValidator & {
       validator: T;
+    },
+
+  /** Create a record validator - object with dynamic keys and consistent value types */
+  record: <T extends BaseValidator>(validator: T, errorMessage?: string) =>
+    new RecordValidator(validator, errorMessage) as RecordValidator & {
+      valueValidator: T;
+    },
+
+  /** Create a tuple validator - fixed-length array with position-specific types */
+  tuple: <T extends BaseValidator[]>(validators: T, errorMessage?: string) =>
+    new TupleValidator(validators, errorMessage) as TupleValidator & {
+      validators: T;
     },
 
   /** Create a date validator */
@@ -64,16 +75,6 @@ export const v: ValidatorV = {
   /** Create a scalar validator */
   scalar: (errorMessage?: string) => new ScalarValidator(errorMessage),
 
-  /** Create a localized array validator */
-  localized: (valueValidator?: BaseValidator, errorMessage?: string) =>
-    v.array(
-      v.object({
-        localeCode: v.string().required(),
-        value: (valueValidator || v.string()).required(),
-      }),
-      errorMessage,
-    ),
-
   /** Create a union validator - validates against multiple types */
   union: (validators: BaseValidator[], errorMessage?: string) =>
     new UnionValidator().union(validators, errorMessage),
@@ -90,12 +91,23 @@ export interface ValidatorV {
     schema: T;
   };
   any: () => AnyValidator;
-  forbidden: () => AnyValidator;
   array: <T extends BaseValidator>(
     validator: T,
     errorMessage?: string,
   ) => ArrayValidator & {
     validator: T;
+  };
+  record: <T extends BaseValidator>(
+    validator: T,
+    errorMessage?: string,
+  ) => RecordValidator & {
+    valueValidator: T;
+  };
+  tuple: <T extends BaseValidator[]>(
+    validators: T,
+    errorMessage?: string,
+  ) => TupleValidator & {
+    validators: T;
   };
   date: (errorMessage?: string) => DateValidator;
   string: (errorMessage?: string) => StringValidator;
@@ -105,12 +117,6 @@ export interface ValidatorV {
   float: (errorMessage?: string) => FloatValidator;
   boolean: (errorMessage?: string) => BooleanValidator;
   scalar: (errorMessage?: string) => ScalarValidator;
-  localized: (
-    valueValidator?: BaseValidator,
-    errorMessage?: string,
-  ) => ArrayValidator & {
-    validator: BaseValidator;
-  };
   union: (validators: BaseValidator[], errorMessage?: string) => UnionValidator;
   validate: <T extends BaseValidator>(
     schema: T,
