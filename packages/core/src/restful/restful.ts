@@ -159,7 +159,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
   public async update(request: Request, response: Response) {
     try {
       // Find record
-      const record = await this.repository.find(request.int("id"));
+      const record = await this.find(request.int("id"));
 
       if (!record) {
         return response.notFound({
@@ -206,7 +206,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
    */
   public async patch(request: Request, response: Response) {
     try {
-      const record = await this.repository.find(request.int("id"));
+      const record = await this.find(request.int("id"));
 
       if (!record) {
         return response.notFound({
@@ -224,7 +224,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
       this.onPatch(request, response, record, oldRecord);
       this.onSave(request, response, record, oldRecord);
 
-      if (this.returnOn.delete === "records") {
+      if (this.returnOn.patch === "records") {
         return this.list(request, response);
       }
 
@@ -241,7 +241,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
    */
   public async delete(request: Request, response: Response) {
     try {
-      const record = await this.repository.find(request.int("id"));
+      const record = await this.find(request.int("id"));
 
       if (!record) {
         return response.notFound();

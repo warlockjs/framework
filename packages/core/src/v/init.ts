@@ -8,7 +8,7 @@
 import { trans } from "@mongez/localization";
 import { configureSeal, registerPlugin } from "@warlock.js/seal";
 import { config } from "./../config";
-import { databasePlugin, filePlugin } from "./plugins";
+import { databasePlugin, filePlugin, localizedPlugin } from "./plugins";
 
 // Configure Seal to use Warlock's localization
 configureSeal({
@@ -60,3 +60,4 @@ configureSeal({
 // Register plugins to inject methods
 registerPlugin(databasePlugin);
 registerPlugin(filePlugin);
+registerPlugin(localizedPlugin);

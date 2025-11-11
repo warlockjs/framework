@@ -593,6 +593,13 @@ export class Response {
   }
 
   /**
+   * Send a service unavailable response with status code 503
+   */
+  public serviceUnavailable(data: any) {
+    return this.send(data, 503);
+  }
+
+  /**
    * Send an unauthorized response with status code 401
    */
   public unauthorized(

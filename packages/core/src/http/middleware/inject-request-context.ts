@@ -32,7 +32,7 @@ export function createRequestStore(
   response: Response,
 ): Promise<ReturnedResponse> {
   // store the request and response in the context
-  return new Promise<ReturnedResponse>((resolve, reject) => {
+  return new Promise<ReturnedResponse>(resolve => {
     asyncLocalStorage.run(
       {
         request,

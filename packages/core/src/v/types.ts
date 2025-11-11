@@ -5,6 +5,7 @@
  */
 
 import type { Model } from "@warlock.js/cascade";
+import type { ArrayValidator, BaseValidator } from "@warlock.js/seal";
 import type {
   ExistsExceptCurrentIdRuleOptions,
   ExistsExceptCurrentUserRuleOptions,
@@ -20,6 +21,12 @@ declare module "@warlock.js/seal" {
   // Augment the v factory with file() method
   export interface ValidatorV {
     file: (errorMessage?: string) => FileValidator;
+    localized: (
+      valueValidator?: BaseValidator,
+      errorMessage?: string,
+    ) => ArrayValidator & {
+      validator: BaseValidator;
+    };
   }
 
   interface ScalarValidator {

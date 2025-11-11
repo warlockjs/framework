@@ -201,6 +201,10 @@ groupedTranslations("validation", {
     en: ":input must be an array of :type.",
     ar: ":input يجب أن يكون مصفوفة من :type.",
   },
+  tupleLengthMismatch: {
+    en: "The :input must have exactly :expected items, but got :actual.",
+    ar: ":input يجب أن يحتوي على :expected عناصر بالضبط، لكن تم استلام :actual.",
+  },
   uniqueArray: {
     en: ":input array must contain unique values.",
     ar: ":input يجب أن يحتوي على قيم فريدة.",
@@ -232,6 +236,30 @@ groupedTranslations("validation", {
   forbidden: {
     en: "The :input can not be present.",
     ar: ":input لا يمكن أن يكون موجود.",
+  },
+  forbiddenIf: {
+    en: "The :input is forbidden when :field equals :value.",
+    ar: "يُحظر إدخال :input عندما :field يساوي :value.",
+  },
+  forbiddenIfNot: {
+    en: "The :input is forbidden when :field does not equal :value.",
+    ar: "يُحظر إدخال :input عندما :field لا يساوي :value.",
+  },
+  forbiddenIfEmpty: {
+    en: "The :input is forbidden when :field is empty.",
+    ar: "يُحظر إدخال :input عندما :field فارغ.",
+  },
+  forbiddenIfNotEmpty: {
+    en: "The :input is forbidden when :field is not empty.",
+    ar: "يُحظر إدخال :input عندما :field غير فارغ.",
+  },
+  forbiddenIfIn: {
+    en: "The :input is forbidden when :field is one of the specified values.",
+    ar: "يُحظر إدخال :input عندما :field يكون أحد القيم المحددة.",
+  },
+  forbiddenIfNotIn: {
+    en: "The :input is forbidden when :field is not one of the specified values.",
+    ar: "يُحظر إدخال :input عندما :field ليس أحد القيم المحددة.",
   },
   enum: {
     en: ":input must be one of the following values: :enum, given value :value.",
