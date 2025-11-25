@@ -222,7 +222,10 @@ export class BaseValidator {
   public attributes(
     attributes: Record<string, string | Record<string, string>>,
   ) {
-    this.attributesText = attributes;
+    for (const key in attributes) {
+      this.attributesText[key] = attributes[key];
+    }
+
     return this;
   }
 
@@ -404,7 +407,7 @@ export class BaseValidator {
       context: {
         errorMessage,
         options: {} as T,
-        attributesList: {},
+        attributesList: this.attributesText,
       },
     };
 

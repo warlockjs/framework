@@ -35,6 +35,7 @@ export const invalidRule = (
       const value = attributes[key];
       attributes[key] =
         rule.context.attributesList?.[value] ||
+        rule.context.attributesList?.[key] ||
         translator({ attribute: value, context, rule }) ||
         value;
     }
