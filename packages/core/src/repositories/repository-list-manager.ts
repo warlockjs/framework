@@ -192,7 +192,7 @@ export abstract class RepositoryListManager<
   public async cacheModel(model: T) {
     const cacheKey = this.cacheKey(`id.${model.id}`);
 
-    await this.cache(cacheKey, model.data);
+    await this.cache(cacheKey, await model.serialize());
   }
 
   /**
@@ -279,7 +279,7 @@ export abstract class RepositoryListManager<
 
     if (!model) return null;
 
-    this.cache(cacheKey, await model);
+    this.cache(cacheKey, await model.serialize());
 
     return model;
   }
@@ -348,7 +348,7 @@ export abstract class RepositoryListManager<
 
     if (!model) return;
 
-    this.cache(cacheKey, model.data);
+    this.cache(cacheKey, await model.serialize());
 
     return model;
   }

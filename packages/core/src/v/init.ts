@@ -25,8 +25,9 @@ configureSeal({
 
     const translationKey = `${translationGroup}.${rule.name}`;
     const translation = trans(translationKey, attributes);
+
     return translation === translationKey
-      ? rule.defaultErrorMessage || rule.errorMessage
+      ? rule.errorMessage || rule.defaultErrorMessage
       : translation;
   },
 

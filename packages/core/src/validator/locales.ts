@@ -61,6 +61,22 @@ groupedTranslations("validation", {
     en: ":input must be at most :max.",
     ar: ":input يجب أن يكون على الأكثر :max.",
   },
+  greaterThan: {
+    en: ":input must be greater than :value.",
+    ar: ":input يجب أن يكون أكثر من :value.",
+  },
+  greaterThanOrEqual: {
+    en: ":input must be greater than or equal to :value.",
+    ar: ":input يجب أن يكون أكثر من أو يساوي :value.",
+  },
+  lessThan: {
+    en: ":input must be less than :value.",
+    ar: ":input يجب أن يكون أقل من :value.",
+  },
+  lessThanOrEqual: {
+    en: ":input must be less than or equal to :value.",
+    ar: ":input يجب أن يكون أقل من أو يساوي :value.",
+  },
   betweenNumbers: {
     en: ":input must be between :min and :max.",
     ar: ":input يجب أن يكون بين :min و :max.",
