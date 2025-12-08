@@ -2,23 +2,12 @@ import type { GenericObject } from "@mongez/reinforcements";
 import { Model } from "@warlock.js/cascade";
 import { RepositoryDestroyManager } from "./repository-destroyer-manager";
 import { RepositoryFiller } from "./repository-filler";
-import type { Fillable, SaveMode } from "./types";
+import type { SaveMode } from "./types";
 
 export abstract class RepositoryFillerManager<
   T extends Model,
   M extends typeof Model = typeof Model,
 > extends RepositoryDestroyManager<T, M> {
-  /**
-   * Data to be filled in the model during creation|update|patch
-   */
-  protected fillable?: Fillable;
-
-  /**
-   * Filled inputs
-   * Will be used with create or update to only get the inputs that are fillable
-   */
-  protected filled?: string[];
-
   /**
    * Create new record
    */
@@ -94,14 +83,7 @@ export abstract class RepositoryFillerManager<
    * Make new instance of the filler
    */
   public makeFiller(): RepositoryFiller {
-    return new RepositoryFiller(this, this.getFillable(), this.filled);
-  }
-
-  /**
-   * Get fillable data
-   */
-  public getFillable() {
-    return this.fillable;
+    return new RepositoryFiller(this);
   }
 
   /**
