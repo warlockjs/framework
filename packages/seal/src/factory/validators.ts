@@ -117,6 +117,7 @@ export interface ValidatorV {
   string: (errorMessage?: string) => StringValidator;
   enum: (values: any, errorMessage?: string) => ScalarValidator;
   number: (errorMessage?: string) => NumberValidator;
+  numeric: (errorMessage?: string) => NumericValidator;
   int: (errorMessage?: string) => IntValidator;
   float: (errorMessage?: string) => FloatValidator;
   boolean: (errorMessage?: string) => BooleanValidator;
