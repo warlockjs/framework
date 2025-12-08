@@ -68,29 +68,34 @@ export function createRequestStore(
           if (error instanceof ResourceNotFoundError) {
             return response.notFound({
               error: error.message,
+              ...error.payload,
             });
           }
 
           if (error instanceof UnAuthorizedError) {
             return response.unauthorized({
               error: error.message,
+              ...error.payload,
             });
           }
 
           if (error instanceof ForbiddenError) {
             return response.forbidden({
               error: error.message,
+              ...error.payload,
             });
           }
 
           if (error instanceof BadRequestError) {
             return response.badRequest({
               error: error.message,
+              ...error.payload,
             });
           }
 
           return response.badRequest({
             error: error.message,
+            ...error.payload,
           });
         }
       },

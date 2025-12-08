@@ -180,11 +180,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
 
       const oldRecord = record.clone();
 
-      if (record.filled.length > 0) {
-        await record.save(request.only(record.filled as string[]));
-      } else {
-        await record.save(request.allExceptParams());
-      }
+      await record.save(request.allExceptParams());
 
       this.onUpdate(request, response, record, oldRecord);
       this.onSave(request, response, record, oldRecord);
