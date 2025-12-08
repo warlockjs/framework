@@ -8,6 +8,7 @@ import {
   FloatValidator,
   IntValidator,
   NumberValidator,
+  NumericValidator,
   ObjectValidator,
   RecordValidator,
   ScalarValidator,
@@ -62,6 +63,9 @@ export const v: ValidatorV = {
 
   /** Create a number validator */
   number: (errorMessage?: string) => new NumberValidator(errorMessage),
+
+  /** Create a numeric validator */
+  numeric: (errorMessage?: string) => new NumericValidator(errorMessage),
 
   /** Create an integer validator */
   int: (errorMessage?: string) => new IntValidator(errorMessage),

@@ -1,4 +1,5 @@
 import { round } from "@mongez/reinforcements";
+import { isNumeric } from "@mongez/supportive-is";
 import type { Mutator } from "../types";
 
 /** Convert value to number */
@@ -17,4 +18,9 @@ export const booleanMutator: Mutator = async value => {
   if (value === "true") return true;
   if (value === "false") return false;
   return Boolean(value);
+};
+
+export const numericMutator: Mutator = async value => {
+  if (!isNumeric(value)) return value;
+  return Number(value);
 };
