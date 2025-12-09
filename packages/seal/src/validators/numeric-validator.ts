@@ -1,5 +1,5 @@
 import { isNumeric } from "@mongez/supportive-is";
-import { numericMutator } from "src/seal/mutators";
+import { numericMutator } from "../mutators/number-mutators";
 import { NumberValidator } from "./number-validator";
 
 /**
