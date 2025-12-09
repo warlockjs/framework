@@ -329,7 +329,7 @@ export abstract class RepositoryListManager<
     value: any,
     cacheKeyOptions?: GenericObject,
   ): Promise<T | undefined> {
-    const { request } = useRequestStore() || {};
+    const { request } = useRequestStore();
 
     const localeCode = request?.locale ? `locale.${request.locale}.` : "";
 
@@ -351,6 +351,19 @@ export abstract class RepositoryListManager<
     this.cache(cacheKey, await model.serialize());
 
     return model;
+  }
+
+  /**
+   * Clear model cache
+   */
+  public async clearModelCache(model: T) {
+    const { request } = useRequestStore();
+
+    const localeCode = request?.locale ? `locale.${request.locale}.` : "";
+
+    const cacheKey = this.cacheKey(`data.${localeCode}id.${model.id}`);
+
+    await this.cacheDriver.remove(cacheKey);
   }
 
   /**
