@@ -37,6 +37,14 @@ groupedTranslations("validation", {
     en: "The :input has already been taken.",
     ar: ":input مستخدم من قبل.",
   },
+  uniqueExceptCurrentUser: {
+    en: "The :input has already been taken.",
+    ar: ":input مستخدم من قبل.",
+  },
+  uniqueExceptCurrentId: {
+    en: "The :input has already been taken.",
+    ar: ":input مستخدم من قبل.",
+  },
   object: {
     en: ":input must be an object.",
     ar: ":input يجب أن يكون كائن.",

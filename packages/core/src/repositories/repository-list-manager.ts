@@ -506,9 +506,10 @@ export abstract class RepositoryListManager<
     const { documents, paginationInfo } = await this.list(options);
 
     if (!purge) {
-      const cachedDocuments = documents.map(document => document.data);
+      const cachedDocuments = documents.map(document => document.serialize());
       // cache the data
       // please note that models can not be serialized, thus we need to store only the document data itself
+
       this.cacheDriver.set(
         cacheKey,
         {
@@ -557,7 +558,7 @@ export abstract class RepositoryListManager<
     const documents = await this.all(options);
 
     if (!purge) {
-      const cachedDocuments = documents.map(document => document.data);
+      const cachedDocuments = documents.map(document => document.serialize());
       // cache the data
       // please note that models can not be serialized, thus we need to store only the document data itself
       this.cacheDriver.set(cacheKey, cachedDocuments, expiresAfter);

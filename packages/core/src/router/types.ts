@@ -7,7 +7,7 @@ import type {
   PostmanExample,
   PostmanRequestEvent,
   PostmanVariable,
-} from "./../postman";
+} from "../postman";
 
 /**
  * Middleware response

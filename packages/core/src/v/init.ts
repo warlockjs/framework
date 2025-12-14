@@ -7,6 +7,7 @@
 // Auto-register framework plugins
 import { trans } from "@mongez/localization";
 import { configureSeal, registerPlugin } from "@warlock.js/seal";
+import { t } from "../http/middleware/inject-request-context";
 import { config } from "./../config";
 import { databasePlugin, filePlugin, localizedPlugin } from "./plugins";
 
@@ -35,25 +36,12 @@ configureSeal({
     const translateAttribute = config.key(
       "validation.schema.translateAttribute",
     );
+
     if (translateAttribute) {
       return translateAttribute({ attribute, context, rule });
     }
 
-    const translationGroup = config.key(
-      "validation.schema.translationGroup",
-      "validation",
-    );
-
-    let translationKey = `${translationGroup}.attributes.${rule.name}.${attribute}`;
-    let translation = trans(translationKey, context.allValues);
-
-    if (translation === translationKey) {
-      // now check if there is a global attribute translation
-      translationKey = `${translationGroup}.attributes.${attribute}`;
-      translation = trans(translationKey, context.allValues);
-    }
-
-    return translation === translationKey ? attribute : translation;
+    return t(attribute, context.allValues);
   },
   firstErrorOnly: config.key("validation.schema.firstErrorOnly", true),
 });

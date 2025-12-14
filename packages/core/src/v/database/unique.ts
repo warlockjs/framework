@@ -44,6 +44,7 @@ export const uniqueRule: SchemaRule<UniqueRuleOptions> = {
     }
 
     const document = await dbQuery.first();
+
     return document ? invalidRule(this, context) : VALID_RULE;
   },
 };
