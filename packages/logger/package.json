@@ -1,8 +1,8 @@
 {
     "name": "@warlock.js/logger",
-    "version": "3.0.35",
+    "version": "3.0.40",
     "description": "A powerful logging system  for messages and errors in nodejs.",
-    "main": "src/index.ts",
+    "main": "./cjs/index.js",
     "scripts": {
         "test:coverage": "jest ./tests --coverage",
         "test:watch": "jest ./tests --watch",
@@ -33,5 +33,7 @@
         "url": "https://github.com/hassanzohdy/mongez-password"
     },
     "author": "hassanzohdy",
-    "license": "MIT"
+    "license": "MIT",
+    "module": "./esm/index.js",
+    "typings": "./cjs/index.d.ts"
 }
