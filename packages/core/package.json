@@ -1,8 +1,8 @@
 {
     "name": "@warlock.js/core",
-    "version": "3.0.35",
+    "version": "3.0.40",
     "description": "A robust nodejs framework for building blazing fast applications",
-    "main": "src/index.ts",
+    "main": "./cjs/index.js",
     "bin": {
         "warlock": "./bin/warlock.js"
     },
@@ -30,8 +30,8 @@
         "@mongez/fs": "^3.0.5",
         "@mongez/http": "^2.2.10",
         "@mongez/localization": "^3.0.0",
-        "@warlock.js/logger": "3.0.35",
-        "@warlock.js/cascade": "3.0.35",
+        "@warlock.js/logger": "3.0.40",
+        "@warlock.js/cascade": "3.0.40",
         "@mongez/reinforcements": "^2.3.12",
         "commander": "^12.0.0",
         "@mongez/slug": "^1.0.7",
@@ -87,5 +87,7 @@
         "mongodb"
     ],
     "author": "hassanzohdy",
-    "license": "MIT"
+    "license": "MIT",
+    "module": "./esm/index.js",
+    "typings": "./cjs/index.d.ts"
 }
