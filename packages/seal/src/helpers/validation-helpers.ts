@@ -24,7 +24,11 @@ export const invalidRule = (
       if (key === "input") {
         const translation =
           rule.context.attributesList?.input ||
-          translator({ attribute: "input", context, rule });
+          translator({
+            attribute: rule.context.translatedAttributes.input || "input",
+            context,
+            rule,
+          });
 
         if (translation !== "input") {
           attributes.input = translation;
@@ -36,7 +40,11 @@ export const invalidRule = (
       attributes[key] =
         rule.context.attributesList?.[value] ||
         rule.context.attributesList?.[key] ||
-        translator({ attribute: value, context, rule }) ||
+        translator({
+          attribute: rule.context.translatedAttributes[key] || value,
+          context,
+          rule,
+        }) ||
         value;
     }
   }

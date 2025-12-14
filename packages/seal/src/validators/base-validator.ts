@@ -79,6 +79,11 @@ export class BaseValidator {
   protected attributesText: ValidationAttributesList = {};
 
   /**
+   * Attributed that will be always using the attribute translator
+   */
+  protected translatedAttributes: Record<string, string> = {};
+
+  /**
    * Get the default value
    */
   public getDefaultValue(): any {
@@ -224,6 +229,17 @@ export class BaseValidator {
   ) {
     for (const key in attributes) {
       this.attributesText[key] = attributes[key];
+    }
+
+    return this;
+  }
+
+  /**
+   * Define a lazy getter property for each attribute in the given object and use the config attribute translator
+   */
+  public transAttributes(attributes: Record<string, string>) {
+    for (const key in attributes) {
+      this.translatedAttributes[key] = attributes[key];
     }
 
     return this;
@@ -408,6 +424,7 @@ export class BaseValidator {
         errorMessage,
         options: {} as T,
         attributesList: this.attributesText,
+        translatedAttributes: this.translatedAttributes,
       },
     };
 

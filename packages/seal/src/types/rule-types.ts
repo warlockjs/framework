@@ -65,5 +65,6 @@ export type ContextualSchemaRule<
     errorMessage?: string;
     options: Options;
     attributesList: ValidationAttributesList;
+    translatedAttributes: Record<string, string>;
   };
 };
