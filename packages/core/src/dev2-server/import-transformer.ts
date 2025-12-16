@@ -1,0 +1,287 @@
+import { devLogError } from "./dev-logger";
+import type { FileManager } from "./file-manager";
+import { Path } from "./path";
+import { tsconfigManager } from "./tsconfig-manager";
+
+/**
+ * Transform imports in transpiled code to use cache paths
+ * This is called AFTER all files are transpiled
+ *
+ * Strategy:
+ * - All cached files are in the same directory (.warlock/cache/)
+ * - So all imports become: "./${cachePath}"
+ * - We use fileManager.dependencies (already resolved by parseImports)
+ *
+ * @param fileManager FileManager with transpiled code and dependencies
+ * @param filesMap Map of all FileManager instances
+ * @returns Transformed code with cache-relative imports
+ */
+export function transformImports(
+  fileManager: FileManager,
+  filesMap: Map<string, FileManager>,
+): string {
+  const code = fileManager.transpiled;
+
+  // Pattern to match ES6 import statements
+  // Matches: import ... from "..."
+  const importRegex =
+    /import\s+((?:\{[^}]*\}|\*\s+as\s+\w+|\w+)(?:\s*,\s*(?:\{[^}]*\}|\*\s+as\s+\w+|\w+))*)\s+from\s+["']([^"']+)["'];?/g;
+
+  // Pattern to match side-effect imports: import "module";
+  const sideEffectImportRegex = /import\s+["']([^"']+)["'];?/g;
+
+  // Pattern to match ES6 export statements
+  // Matches: export * from "..." and export { ... } from "..."
+  const exportRegex =
+    /export\s+((?:\*|\{[^}]*\}))\s+from\s+["']([^"']+)["'];?/g;
+
+  let transformedCode = code;
+  const unresolvedImports: string[] = [];
+
+  // Process imports first
+  const importMatches = Array.from(code.matchAll(importRegex));
+  
+  for (let i = importMatches.length - 1; i >= 0; i--) {
+    const match = importMatches[i];
+    const fullImport = match[0];
+    const importSpecifier = match[1]; // What's being imported (e.g., "{ foo }", "* as bar", "default")
+    const importPath = match[2]; // The module path
+
+    // Only transform relative imports and alias imports
+    // Skip external packages (node_modules, node built-ins)
+    const isRelativeImport =
+      importPath.startsWith(".") || importPath.startsWith("/");
+    const isAliasImport = tsconfigManager.isAlias(importPath);
+
+    if (!isRelativeImport && !isAliasImport) {
+      // This is an external package - keep as-is
+      continue;
+    }
+
+    // Check if this import was resolved by parseImports (exists in importMap)
+    // If not in importMap, it means parseImports skipped it (external package), so we skip it too
+    if (!fileManager.importMap.has(importPath)) {
+      // Not in importMap = external package, skip transformation
+      continue;
+    }
+
+    // Find the cache path for this import from dependencies
+    const cachePath = findCachePathForImport(importPath, fileManager, filesMap);
+
+    if (!cachePath) {
+      // Could not resolve - track it (this is a local file that should exist but doesn't)
+      unresolvedImports.push(importPath);
+      continue;
+    }
+
+
+    // Build the correct replacement depending on the import shape
+    const newImport = buildImportReplacement(importSpecifier, cachePath);
+
+    // Replace in code
+    const startIndex = match.index!;
+    const endIndex = startIndex + fullImport.length;
+    transformedCode =
+      transformedCode.slice(0, startIndex) +
+      newImport +
+      transformedCode.slice(endIndex);
+  }
+
+  // Process side-effect imports: import "module";
+  const sideEffectMatches = Array.from(transformedCode.matchAll(sideEffectImportRegex));
+
+  for (let i = sideEffectMatches.length - 1; i >= 0; i--) {
+    const match = sideEffectMatches[i];
+    const fullImport = match[0];
+    const importPath = match[1];
+
+    // Only transform relative imports and alias imports
+    // Skip external packages (node_modules, node built-ins)
+    const isRelativeImport =
+      importPath.startsWith(".") || importPath.startsWith("/");
+    const isAliasImport = tsconfigManager.isAlias(importPath);
+
+    if (!isRelativeImport && !isAliasImport) {
+      continue;
+    }
+
+    if (!fileManager.importMap.has(importPath)) {
+      continue;
+    }
+
+    const cachePath = findCachePathForImport(importPath, fileManager, filesMap);
+
+    if (!cachePath) {
+      unresolvedImports.push(importPath);
+      continue;
+    }
+
+    // FROM: import "./themes";
+    // TO:   await __import("./src-app-mail-themes.js");
+    const newImport = `await __import("./${cachePath}")`;
+
+    const startIndex = match.index!;
+    const endIndex = startIndex + fullImport.length;
+    transformedCode =
+      transformedCode.slice(0, startIndex) +
+      newImport +
+      transformedCode.slice(endIndex);
+  }
+
+  // Process exports (need to re-process after imports to get updated string positions)
+  const exportMatches = Array.from(transformedCode.matchAll(exportRegex));
+  for (let i = exportMatches.length - 1; i >= 0; i--) {
+    const match = exportMatches[i];
+    const fullExport = match[0];
+    const exportSpecifier = match[1]; // "*" or "{ foo, bar }"
+    const importPath = match[2]; // The module path
+
+    // Only transform relative imports and alias imports
+    // Skip external packages (node_modules, node built-ins)
+    const isRelativeImport =
+      importPath.startsWith(".") || importPath.startsWith("/");
+    const isAliasImport = tsconfigManager.isAlias(importPath);
+
+    if (!isRelativeImport && !isAliasImport) {
+      // This is an external package - keep as-is
+      continue;
+    }
+
+    // Check if this import was resolved by parseImports (exists in importMap)
+    // If not in importMap, it means parseImports skipped it (external package), so we skip it too
+    if (!fileManager.importMap.has(importPath)) {
+      // Not in importMap = external package, skip transformation
+      continue;
+    }
+
+    // Find the cache path for this import from dependencies
+    const cachePath = findCachePathForImport(importPath, fileManager, filesMap);
+
+    if (!cachePath) {
+      console.log("Could not resolve import", importPath);
+
+      // Could not resolve - track it (this is a local file that should exist but doesn't)
+      unresolvedImports.push(importPath);
+      continue;
+    }
+
+    // Transform export to use cache path
+    // Note: export * from requires a static string literal in ES modules
+    // So we can't use __import with timestamps. We rely on module loader cache clearing.
+    // For export { ... }, we can use __import and individual exports
+
+    if (exportSpecifier === "*") {
+      // export * from "./module"
+      // Keep as static export but use cache path
+      // Cache busting is handled by module loader clearing cache
+      const newExport = `export * from "./${cachePath}"`;
+
+      // Replace in code
+      const startIndex = match.index!;
+      const endIndex = startIndex + fullExport.length;
+      transformedCode =
+        transformedCode.slice(0, startIndex) +
+        newExport +
+        transformedCode.slice(endIndex);
+    } else {
+      // export { foo, bar } from "./module"
+      // Transform to individual exports using __import
+      const moduleVar = `__module_${i}`;
+      const namedExports = exportSpecifier; // e.g., "{ foo, bar }"
+      // Extract export names from the specifier
+      const exportNames =
+        namedExports
+          .match(/\{([^}]+)\}/)?.[1]
+          ?.split(",")
+          .map(s => s.trim()) || [];
+      const exportStatements = exportNames
+        .map(name => `export const ${name} = ${moduleVar}.${name};`)
+        .join("\n");
+      const newExport = `const ${moduleVar} = await __import("./${cachePath}");\n${exportStatements}`;
+
+      // Replace in code
+      const startIndex = match.index!;
+      const endIndex = startIndex + fullExport.length;
+      transformedCode =
+        transformedCode.slice(0, startIndex) +
+        newExport +
+        transformedCode.slice(endIndex);
+    }
+  }
+
+  // If there are unresolved imports, throw an error
+  if (unresolvedImports.length > 0) {
+    devLogError(
+      `Failed to transform imports in ${fileManager.relativePath}:\n` +
+        `Unresolved imports: ${unresolvedImports.join(", ")}\n` +
+        `These files may not exist or are not being tracked.`,
+    );
+    return "";
+  }
+
+  return transformedCode;
+}
+
+/**
+ * Build a replacement statement for different import syntaxes
+ */
+function buildImportReplacement(
+  importSpecifier: string,
+  cachePath: string,
+): string {
+  // Namespace import: import * as Foo from "module";
+  if (importSpecifier.startsWith("* as ")) {
+    const identifier = importSpecifier.replace("* as ", "").trim();
+    return `const ${identifier} = await __import("./${cachePath}")`;
+  }
+
+  // Destructured / named imports (including default alias): import { a, default as X } from "module";
+  if (importSpecifier.startsWith("{")) {
+    // Normalize `{ default as X }` to `{ default: X }` for valid destructuring
+    const normalized = importSpecifier.replace(/default\s+as\s+/g, "default: ");
+    return `const ${normalized} = await __import("./${cachePath}")`;
+  }
+
+  // Default import: import Foo from "module";
+  // Use destructuring to pull default, with fallback to module object if default is missing
+  // Note: single await, reuses the same import for both destructuring and fallback
+  const moduleVar = `__module_${Math.random().toString(36).slice(2, 8)}`;
+  return `const ${moduleVar} = await __import("./${cachePath}");\nconst ${importSpecifier} = ${moduleVar}?.default ?? ${moduleVar};`;
+}
+
+/**
+ * Find the cache path for an import
+ * Uses the fileManager's importMap which maps original imports to resolved paths
+ *
+ * @param importPath The import path from the import statement
+ * @param fileManager The file that contains this import
+ * @param filesMap Map of all FileManager instances
+ */
+function findCachePathForImport(
+  importPath: string,
+  fileManager: FileManager,
+  filesMap: Map<string, FileManager>,
+): string | null {
+  // Look up the resolved absolute path from the import map
+  const resolvedAbsPath = fileManager.importMap.get(importPath);
+
+  if (!resolvedAbsPath) {
+    return null;
+  }
+
+  // Convert to relative path
+  const relativePath = Path.toRelative(resolvedAbsPath);
+
+  // Find the FileManager for this dependency
+  const depFileManager = filesMap.get(relativePath);
+
+  if (!depFileManager) {
+    return null;
+  }
+
+  if (depFileManager && depFileManager.cachePath) {
+    return depFileManager.cachePath;
+  }
+
+  return null;
+}

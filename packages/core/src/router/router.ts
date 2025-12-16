@@ -2,7 +2,13 @@
 import proxy, { type FastifyHttpProxyOptions } from "@fastify/http-proxy";
 import fastifyStatic, { type FastifyStaticOptions } from "@fastify/static";
 import concatRoute from "@mongez/concat-route";
-import { ltrim, merge, toCamelCase, trim } from "@mongez/reinforcements";
+import {
+  ltrim,
+  merge,
+  Random,
+  toCamelCase,
+  trim,
+} from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
 import { log } from "@warlock.js/logger";
 import type { FastifyReply, FastifyRequest } from "fastify";
@@ -34,6 +40,8 @@ export class Router {
    */
   private static instance: Router;
 
+  public id = Random.id();
+
   /**
    * Static paths
    */
@@ -42,8 +50,10 @@ export class Router {
   /**
    * Event listeners
    */
-  protected eventListeners: Record<string, ((router: Router, server: FastifyInstance) => void)[]> =
-    {};
+  protected eventListeners: Record<
+    string,
+    ((router: Router, server: FastifyInstance) => void)[]
+  > = {};
 
   /**
    * Stacks
@@ -54,11 +64,6 @@ export class Router {
     name: [],
     middleware: [],
   };
-
-  /**
-   * Route registry for dev server (HMR support)
-   */
-  private routeRegistry: RouteRegistry | null = null;
 
   /**
    * Get router instance
@@ -78,8 +83,13 @@ export class Router {
   /**
    * Listen to router before scan
    */
-  public beforeScanning(callback: (router: Router, server: FastifyInstance) => void) {
-    this.eventListeners.beforeScan = [...(this.eventListeners.beforeScan || []), callback];
+  public beforeScanning(
+    callback: (router: Router, server: FastifyInstance) => void,
+  ) {
+    this.eventListeners.beforeScan = [
+      ...(this.eventListeners.beforeScan || []),
+      callback,
+    ];
 
     return this;
   }
@@ -87,8 +97,13 @@ export class Router {
   /**
    * Listen to router after scanning
    */
-  public afterScanning(callback: (router: Router, server: FastifyInstance) => void) {
-    this.eventListeners.afterScanning = [...(this.eventListeners.afterScanning || []), callback];
+  public afterScanning(
+    callback: (router: Router, server: FastifyInstance) => void,
+  ) {
+    this.eventListeners.afterScanning = [
+      ...(this.eventListeners.afterScanning || []),
+      callback,
+    ];
 
     return this;
   }
@@ -96,7 +111,11 @@ export class Router {
   /**
    * Redirect path to another path
    */
-  public redirect(from: string, to: string, redirectMode: "temporary" | "permanent" = "temporary") {
+  public redirect(
+    from: string,
+    to: string,
+    redirectMode: "temporary" | "permanent" = "temporary",
+  ) {
     return this.get(from, (_request, response) => {
       response.redirect(to, redirectMode === "temporary" ? 302 : 301);
     });
@@ -172,7 +191,7 @@ export class Router {
     options: RouteOptions = {},
   ) {
     if (Array.isArray(path)) {
-      path.forEach((p) => this.add(method, p, handler, options));
+      path.forEach(p => this.add(method, p, handler, options));
       return this;
     }
 
@@ -192,9 +211,15 @@ export class Router {
     const middlewarePrecedence = options.middlewarePrecedence || "after";
 
     if (middlewarePrecedence === "before") {
-      options.middleware = [...(options.middleware || []), ...this.stacks.middleware];
+      options.middleware = [
+        ...(options.middleware || []),
+        ...this.stacks.middleware,
+      ];
     } else {
-      options.middleware = [...this.stacks.middleware, ...(options.middleware || [])];
+      options.middleware = [
+        ...this.stacks.middleware,
+        ...(options.middleware || []),
+      ];
     }
 
     if (Array.isArray(handler)) {
@@ -241,11 +266,13 @@ export class Router {
       $prefix: prefix || "/",
       // it must be a new array to avoid modifying the original array
       $prefixStack: [...this.stacks.prefix],
+      // Inject source file from stacks if set
+      sourceFile: this.stacks.sourceFile || "",
     };
 
     if (routeData.name) {
       // check if the name exists
-      const route = this.routes.find((route) => route.name === routeData.name);
+      const route = this.routes.find(route => route.name === routeData.name);
 
       if (route) {
         // check again if the route name exists with the same method
@@ -265,56 +292,88 @@ export class Router {
   /**
    * Add a request that accepts all methods
    */
-  public any(path: string, handler: RouteHandlerType, options: RouteOptions = {}) {
+  public any(
+    path: string,
+    handler: RouteHandlerType,
+    options: RouteOptions = {},
+  ) {
     return this.add("all" as Route["method"], path, handler, options);
   }
 
   /**
    * Add get request method
    */
-  public get(path: string, handler: RouteHandlerType, options: RouteOptions = {}) {
+  public get(
+    path: string,
+    handler: RouteHandlerType,
+    options: RouteOptions = {},
+  ) {
     return this.add("GET", path, handler, options);
   }
 
   /**
    * Add post request method
    */
-  public post(path: string | string[], handler: RouteHandlerType, options: RouteOptions = {}) {
+  public post(
+    path: string | string[],
+    handler: RouteHandlerType,
+    options: RouteOptions = {},
+  ) {
     return this.add("POST", path, handler, options);
   }
 
   /**
    * Add put request method
    */
-  public put(path: string, handler: RouteHandlerType, options: RouteOptions = {}) {
+  public put(
+    path: string,
+    handler: RouteHandlerType,
+    options: RouteOptions = {},
+  ) {
     return this.add("PUT", path, handler, options);
   }
 
   /**
    * Add delete request method
    */
-  public delete(path: string | string[], handler: RouteHandlerType, options: RouteOptions = {}) {
+  public delete(
+    path: string | string[],
+    handler: RouteHandlerType,
+    options: RouteOptions = {},
+  ) {
     return this.add("DELETE", path, handler, options);
   }
 
   /**
    * Add patch request method
    */
-  public patch(path: string, handler: RouteHandlerType, options: RouteOptions = {}) {
+  public patch(
+    path: string,
+    handler: RouteHandlerType,
+    options: RouteOptions = {},
+  ) {
     return this.add("PATCH", path, handler, options);
   }
 
   /**
    * Add head request method
    */
-  public head(path: string, handler: RouteHandlerType, options: RouteOptions = {}) {
+  public head(
+    path: string,
+    handler: RouteHandlerType,
+    options: RouteOptions = {},
+  ) {
     return this.add("HEAD", path, handler, options);
   }
 
   /**
    * Add options request method
    */
-  public options(path: string, handler: RouteHandlerType, options: RouteOptions = {}) {
+  public options(
+    path: string,
+    handler: RouteHandlerType,
+    options: RouteOptions = {},
+  ) {
     return this.add("OPTIONS", path, handler, options);
   }
 
@@ -351,34 +410,44 @@ export class Router {
         return Boolean(
           // check if the route is not excluded
           (!options.except || !options.except.includes(type)) &&
-          // check if the only option is set and the route is included
-          (!options.only || options.only.includes(type)),
+            // check if the only option is set and the route is included
+            (!options.only || options.only.includes(type)),
         );
       };
 
       if (routeResource.list && isAcceptableResource("list")) {
         const resourceName = baseResourceName + ".list";
-        this.get(path, options.replace?.list || routeResource.list.bind(routeResource), {
-          ...options,
-          name: resourceName,
-          restful: true,
-        });
+        this.get(
+          path,
+          options.replace?.list || routeResource.list.bind(routeResource),
+          {
+            ...options,
+            name: resourceName,
+            restful: true,
+          },
+        );
       }
 
       if (routeResource.get && isAcceptableResource("get")) {
         const resourceName = baseResourceName + ".single";
 
-        this.get(path + "/:id", options.replace?.get || routeResource.get.bind(routeResource), {
-          ...options,
-          name: resourceName,
-          restful: true,
-        });
+        this.get(
+          path + "/:id",
+          options.replace?.get || routeResource.get.bind(routeResource),
+          {
+            ...options,
+            name: resourceName,
+            restful: true,
+          },
+        );
       }
 
       if (routeResource.create && isAcceptableResource("create")) {
         const resourceName = baseResourceName + ".create";
 
-        const handler = options.replace?.create || this.manageValidation(routeResource, "create");
+        const handler =
+          options.replace?.create ||
+          this.manageValidation(routeResource, "create");
 
         this.post(path, handler, {
           ...options,
@@ -390,7 +459,9 @@ export class Router {
       if (routeResource.update && isAcceptableResource("update")) {
         const resourceName = baseResourceName + ".update";
 
-        const handler = options.replace?.update || this.manageValidation(routeResource, "update");
+        const handler =
+          options.replace?.update ||
+          this.manageValidation(routeResource, "update");
 
         this.put(path + "/:id", handler, {
           ...options,
@@ -402,7 +473,9 @@ export class Router {
       if (routeResource.patch && isAcceptableResource("patch")) {
         const resourceName = baseResourceName + ".patch";
 
-        const handler = options.replace?.patch || this.manageValidation(routeResource, "patch");
+        const handler =
+          options.replace?.patch ||
+          this.manageValidation(routeResource, "patch");
 
         this.patch(path + "/:id", handler, {
           ...options,
@@ -430,7 +503,8 @@ export class Router {
 
         this.delete(
           path,
-          options.replace?.bulkDelete || routeResource.bulkDelete.bind(routeResource),
+          options.replace?.bulkDelete ||
+            routeResource.bulkDelete.bind(routeResource),
           {
             ...options,
             name: resourceName,
@@ -499,9 +573,48 @@ export class Router {
   }
 
   /**
+   * Wrap route additions with a source file path
+   * Used for tracking which routes come from which file (for HMR)
+   * @param sourceFile Relative path to the source file (e.g., "src/app/users/routes.ts")
+   * @param callback Function that adds routes (will have sourceFile injected)
+   */
+  public async withSourceFile(
+    sourceFile: string,
+    callback: () => void | Promise<void>,
+  ): Promise<void> {
+    // Set source file in stacks
+    this.stacks.sourceFile = sourceFile;
+
+    try {
+      console.log(callback);
+      
+      // Execute callback (routes added here will have sourceFile injected)
+      await callback();
+    } catch (error) {
+      console.log("Error in withSourceFile", error);
+    } finally {
+      console.log("Clearing source file from stacks");
+      // Always clear source file from stacks
+      delete this.stacks.sourceFile;
+    }
+  }
+
+  /**
+   * Remove all routes that belong to a specific source file
+   * Used when reloading routes files via HMR
+   * @param sourceFile Relative path to the source file
+   */
+  public removeRoutesBySourceFile(sourceFile: string): void {
+    this.routes = this.routes.filter(route => route.sourceFile !== sourceFile);
+  }
+
+  /**
    * Manage validation system for the given resource
    */
-  private manageValidation(resource: RouteResource, method: "create" | "update" | "patch") {
+  private manageValidation(
+    resource: RouteResource,
+    method: "create" | "update" | "patch",
+  ) {
     const handler = resource[method]?.bind(resource) as RouteHandler;
 
     const methodValidation = resource?.validation?.[method];
@@ -510,17 +623,22 @@ export class Router {
       handler.validation = methodValidation;
 
       if (handler.validation?.validate) {
-        handler.validation.validate = handler.validation.validate.bind(resource);
+        handler.validation.validate =
+          handler.validation.validate.bind(resource);
       }
 
       if (resource.validation?.patch) {
-        handler.validation = merge(resource.validation.patch, handler.validation);
+        handler.validation = merge(
+          resource.validation.patch,
+          handler.validation,
+        );
       }
 
       return handler;
     }
 
-    if (!resource.validation || (!methodValidation && !resource.validation.all)) return handler;
+    if (!resource.validation || (!methodValidation && !resource.validation.all))
+      return handler;
 
     if (resource.validation.all) {
       const validationMethods = {
@@ -531,7 +649,10 @@ export class Router {
       const validation: RouteHandlerValidation = {};
 
       if (resource.validation.all.rules || methodValidation?.rules) {
-        validation.rules = merge(resource.validation.all.rules, methodValidation?.rules);
+        validation.rules = merge(
+          resource.validation.all.rules,
+          methodValidation?.rules,
+        );
       }
 
       if (resource.validation.all.schema || methodValidation?.schema) {
@@ -540,8 +661,13 @@ export class Router {
           validation.schema = resource.validation.all.schema;
         } else if (methodValidation?.schema && resource.validation.all.schema) {
           // Case 3: Both exist - merge them (all is base, method overrides)
-          validation.schema = resource.validation.all.schema.merge(methodValidation.schema);
-        } else if (methodValidation?.schema && !resource.validation.all.schema) {
+          validation.schema = resource.validation.all.schema.merge(
+            methodValidation.schema,
+          );
+        } else if (
+          methodValidation?.schema &&
+          !resource.validation.all.schema
+        ) {
           // Case 1: Only method schema exists - use it directly
           validation.schema = methodValidation.schema;
         }
@@ -551,13 +677,21 @@ export class Router {
       if (validationMethods.all || validationMethods[method]) {
         validation.validate = async (request: Request, response: Response) => {
           if (validationMethods.all) {
-            const output = await validationMethods.all.call(resource, request, response);
+            const output = await validationMethods.all.call(
+              resource,
+              request,
+              response,
+            );
 
             if (output) return output;
           }
 
           if (validationMethods[method]) {
-            return await validationMethods[method]?.call(resource, request, response);
+            return await validationMethods[method]?.call(
+              resource,
+              request,
+              response,
+            );
           }
 
           return;
@@ -571,7 +705,8 @@ export class Router {
       handler.validation = resource.validation[method];
 
       if (handler.validation?.validate) {
-        handler.validation.validate = handler.validation.validate.bind(resource);
+        handler.validation.validate =
+          handler.validation.validate.bind(resource);
       }
     }
 
@@ -589,9 +724,9 @@ export class Router {
    * Register routes to the server
    */
   public scan(server: FastifyInstance) {
-    this.eventListeners.beforeScan?.forEach((callback) => callback(this, server));
+    this.eventListeners.beforeScan?.forEach(callback => callback(this, server));
 
-    this.routes.forEach((route) => {
+    this.routes.forEach(route => {
       const requestMethod = route.method.toLowerCase();
       const requestMethodFunction = server[requestMethod].bind(server);
 
@@ -599,7 +734,10 @@ export class Router {
         route.path,
         route.serverOptions || {},
         async (baseRequest: FastifyRequest, reply: FastifyReply) => {
-          const { output, response } = await this.handleRoute(route)(baseRequest, reply);
+          const { output, response } = await this.handleRoute(route)(
+            baseRequest,
+            reply,
+          );
 
           return output || response.baseResponse;
         },
@@ -613,7 +751,9 @@ export class Router {
       });
     }
 
-    this.eventListeners.afterScanning?.forEach((callback) => callback(this, server));
+    this.eventListeners.afterScanning?.forEach(callback =>
+      callback(this, server),
+    );
   }
 
   /**
@@ -621,19 +761,27 @@ export class Router {
    * Uses wildcard routing with find-my-way for HMR support
    */
   public scanDevServer(server: FastifyInstance) {
-    this.eventListeners.beforeScan?.forEach((callback) => callback(this, server));
+    this.eventListeners.beforeScan?.forEach(callback => callback(this, server));
 
-    
     // Shared handler for wildcard routing
     const wildcardHandler = async (
       fastifyRequest: FastifyRequest,
       fastifyReply: FastifyReply,
     ) => {
       // Initialize route registry once (will be rebuilt on HMR via rebuildRouteRegistry)
-      this.routeRegistry = new RouteRegistry();
-      this.routeRegistry.register(this.routes);
+      const routeRegistry = new RouteRegistry();
+      console.log(
+        "Routes list",
+        this.id,
+        this.routes.map(route => route.path),
+      );
+
+      routeRegistry.register(this.routes);
       // Find matching route using find-my-way
-      const match = this.routeRegistry!.find(fastifyRequest.method, fastifyRequest.url);
+      const match = routeRegistry.find(
+        fastifyRequest.method,
+        fastifyRequest.url,
+      );
 
       // No match found - return 404
       if (!match) {
@@ -675,23 +823,16 @@ export class Router {
       });
     }
 
-    this.eventListeners.afterScanning?.forEach((callback) => callback(this, server));
-  }
-
-  /**
-   * Rebuild route registry (called after routes are reloaded via HMR)
-   */
-  public rebuildRouteRegistry(): void {
-    if (this.routeRegistry) {
-      this.routeRegistry.register(this.routes);
-    }
+    this.eventListeners.afterScanning?.forEach(callback =>
+      callback(this, server),
+    );
   }
 
   /**
    * Get the route path for the given route name
    */
   public route(name: string, params: any = {}) {
-    const route = this.routes.find((route) => route.name === name);
+    const route = this.routes.find(route => route.name === name);
 
     if (!route) {
       throw new Error(`Route name "${name}" not found`);
@@ -700,7 +841,7 @@ export class Router {
     let path = route.path;
 
     if (route.path.includes(":")) {
-      Object.keys(params).forEach((key) => {
+      Object.keys(params).forEach(key => {
         path = path.replace(":" + key, params[key]);
       });
     }
@@ -712,7 +853,10 @@ export class Router {
    * Handle the given route
    */
   private handleRoute(route: Route) {
-    return async (fastifyRequest: FastifyRequest, fastifyResponse: FastifyReply) => {
+    return async (
+      fastifyRequest: FastifyRequest,
+      fastifyResponse: FastifyReply,
+    ) => {
       const request = new Request();
       const response = new Response();
       response.setResponse(fastifyResponse);

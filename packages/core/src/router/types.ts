@@ -213,6 +213,10 @@ export type Route = RouteOptions & {
    */
   method: RequestMethod;
   /**
+   * Route source file (Relative path)
+   */
+  sourceFile: string;
+  /**
    * Route path
    */
   path: string;
@@ -335,4 +339,8 @@ export type RouterStacks = {
   prefix: string[];
   name: string[];
   middleware: Middleware[];
+  /**
+   * Source file path for routes being added (for HMR route tracking)
+   */
+  sourceFile?: string;
 };

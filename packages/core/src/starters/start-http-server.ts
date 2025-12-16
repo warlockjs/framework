@@ -16,6 +16,7 @@ import {
 } from "../code-quality";
 import type { CommandActionData } from "../console";
 import { command } from "../console/command-builder";
+import { startDevelopmentServer } from "../dev2-server/start-development-server";
 import { rootPath, srcPath, warlockPath } from "../utils";
 import { restartServer } from "./http-server-starter";
 import { httpLog } from "./serve-log";
@@ -101,6 +102,8 @@ export async function transformSingleFileAndCacheIt(filePath: string) {
 const log = httpLog;
 
 export async function startHttpApp(_data: CommandActionData) {
+  startDevelopmentServer();
+  return;
   // Smart cache management: only delete .warlock if --fresh flag or cache is stale
   if (_data?.options?.fresh) {
     log.info("cache", "fresh", "Fresh build requested - clearing .warlock");
