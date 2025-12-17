@@ -1,6 +1,6 @@
 {
     "name": "@warlock.js/core",
-    "version": "4.0.2",
+    "version": "4.0.4",
     "description": "A robust nodejs framework for building blazing fast applications",
     "main": "./cjs/index.js",
     "bin": {
@@ -30,8 +30,8 @@
         "@mongez/fs": "^3.0.5",
         "@mongez/http": "^2.2.10",
         "@mongez/localization": "^3.0.0",
-        "@warlock.js/logger": "4.0.2",
-        "@warlock.js/cascade": "4.0.2",
+        "@warlock.js/logger": "4.0.4",
+        "@warlock.js/cascade": "4.0.4",
         "@mongez/reinforcements": "^2.3.12",
         "commander": "^12.0.0",
         "@mongez/slug": "^1.0.7",
@@ -48,7 +48,8 @@
         "send": "^0.18.0",
         "prettier": "^3.1.0",
         "sharp": "^0.32.6",
-        "@mongez/copper": "^1.0.1"
+        "@mongez/copper": "^1.0.1",
+        "fast-glob": "^3.3.3"
     },
     "devDependencies": {
         "fast-glob": "^3.3.3",
