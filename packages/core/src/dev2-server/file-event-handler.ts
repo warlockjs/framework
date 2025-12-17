@@ -1,6 +1,6 @@
 import events from "@mongez/events";
 import { debounce } from "@mongez/reinforcements";
-import { devLogInfo, devLogSuccess } from "./dev-logger";
+import { devLogSuccess } from "./dev-logger";
 import type { FileOperations } from "./file-operations";
 import { FILE_PROCESSING_BATCH_SIZE } from "./flags";
 import type { ManifestManager } from "./manifest-manager";
@@ -100,9 +100,10 @@ export class FileEventHandler {
 
     // Process in order: adds first (so new files are available for import transformation),
     // then changes (can reference newly added files), then deletes
-    await this.processBatchAdds(adds);
-    await this.processBatchChanges(changes);
-    await this.processBatchDeletes(deletes);
+    const addedFiles = await this.processBatchAdds(adds);
+    // TODO: If changed files are just saves, then skip triggering the batch completion event
+    const changedFiles = await this.processBatchChanges(changes);
+    const deletedFiles = await this.processBatchDeletes(deletes);
 
     // Update dependency graph and manifest once
     this.fileOperations.updateFileDependents();

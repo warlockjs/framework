@@ -104,7 +104,7 @@ export class FileOperations {
         if (dependentFile) {
           try {
             // Force reprocess to re-parse imports and resolve to new file (with bundle awareness)
-            await dependentFile.forceReprocess(this.bundler);
+            await dependentFile.forceReprocess();
 
             // Update dependency graph
             this.dependencyGraph.updateFile(dependentPath, dependentFile.dependencies);
@@ -138,7 +138,7 @@ export class FileOperations {
 
     try {
       // Update the file (with bundle awareness)
-      const hasChanged = await fileManager.update(this.bundler);
+      const hasChanged = await fileManager.update();
 
       if (!hasChanged) {
         return false;

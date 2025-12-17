@@ -49,9 +49,13 @@ export function devLogDim(message: string) {
 // HMR update log (like Vite)
 export function devLogHMR(file: string, dependents?: number) {
   const relativePath = Path.toRelative(file);
-  const depInfo = dependents ? colors.dim(` +${dependents} module${dependents > 1 ? "s" : ""}`) : "";
+  const depInfo = dependents
+    ? colors.dim(` +${dependents} module${dependents > 1 ? "s" : ""}`)
+    : "";
   // console.log(`${timestamp()} ✨ ${colors.green("hmr update")}✨ ${colors.dim(relativePath)}${depInfo}`);
-  console.log(`${timestamp()} 🔥 ${colors.green("hmr update")} ${colors.dim(relativePath)}${depInfo}`);
+  console.log(
+    `${timestamp()} 🔥 ${colors.green("hmr update")} ${colors.dim(relativePath)}${depInfo}`,
+  );
 }
 
 // FSR log
@@ -62,10 +66,11 @@ export function devLogFSR(reason: string) {
 // Config reload log
 export function devLogConfig(file: string, connectors?: string[]) {
   const relativePath = Path.toRelative(file);
-  const connectorInfo = connectors && connectors.length > 0 
-    ? colors.dim(` → restarting ${connectors.join(", ")}`) 
-    : "";
-  console.log(`${timestamp()} ${colors.cyan("config reload")} ${colors.dim(relativePath)}${connectorInfo}`);
+  const connectorInfo =
+    connectors && connectors.length > 0 ? colors.dim(` → restarting ${connectors.join(", ")}`) : "";
+  console.log(
+    `${timestamp()} ${colors.cyan("config reload")} ${colors.dim(relativePath)}${connectorInfo}`,
+  );
 }
 
 // Ready log (like Vite's ready message)
@@ -85,19 +90,19 @@ function cleanErrorStack(stack: string): string {
     // Replace absolute cache paths with relative source paths
     // Pattern: D:\...\dev-server\.warlock\cache\src-app-users-main.js
     // Replace with: src/app/users/main.ts
-    
+
     let cleanedLine = line;
-    
+
     // Remove cache directory references
     cleanedLine = cleanedLine.replace(/\.warlock[\\\/]cache[\\\/]/g, "");
-    
+
     // Convert cache file names back to source paths
     // src-app-users-main.js → src/app/users/main.ts
     cleanedLine = cleanedLine.replace(/([a-zA-Z0-9_-]+(?:-[a-zA-Z0-9_-]+)+)\.js/g, (match, p1) => {
       const sourcePath = p1.replace(/-/g, "/") + ".ts";
       return sourcePath;
     });
-    
+
     // Make paths relative
     try {
       const absolutePathMatch = cleanedLine.match(/([A-Z]:\\[^:]+|\/[^:]+)(?=:|\))/);
@@ -109,40 +114,46 @@ function cleanErrorStack(stack: string): string {
     } catch {
       // If path conversion fails, keep original
     }
-    
+
     return cleanedLine;
   });
-  
+
   return cleaned.join("\n");
 }
 
 // Format module not found errors
 export function formatModuleNotFoundError(error: Error): string {
   const message = error.message;
-  
+
   // Extract paths from error message
   // Pattern: Cannot find module 'D:\...\cache\src-app-users-utils.js' imported from 'D:\...\main.js'
   const match = message.match(/Cannot find module '([^']+)' imported from '([^']+)'/);
-  
+
   if (match) {
     const [, modulePath, importerPath] = match;
-    
+
     // Convert cache paths to source paths
     const cleanModulePath = modulePath
       .replace(/\.warlock[\\\/]cache[\\\/]/, "")
-      .replace(/([a-zA-Z0-9_-]+(?:-[a-zA-Z0-9_-]+)+)\.js/, (m, p1) => p1.replace(/-/g, "/") + ".ts");
-    
+      .replace(
+        /([a-zA-Z0-9_-]+(?:-[a-zA-Z0-9_-]+)+)\.js/,
+        (m, p1) => p1.replace(/-/g, "/") + ".ts",
+      );
+
     const cleanImporterPath = importerPath
       .replace(/\.warlock[\\\/]cache[\\\/]/, "")
-      .replace(/([a-zA-Z0-9_-]+(?:-[a-zA-Z0-9_-]+)+)\.js/, (m, p1) => p1.replace(/-/g, "/") + ".ts");
-    
+      .replace(
+        /([a-zA-Z0-9_-]+(?:-[a-zA-Z0-9_-]+)+)\.js/,
+        (m, p1) => p1.replace(/-/g, "/") + ".ts",
+      );
+
     // Make paths relative
     const relativeModule = Path.toRelative(cleanModulePath);
     const relativeImporter = Path.toRelative(cleanImporterPath);
-    
+
     return `[MODULE_NOT_FOUND] Cannot find module ${colors.cyan(relativeModule)} imported from ${colors.cyan(relativeImporter)}`;
   }
-  
+
   return message;
 }
 

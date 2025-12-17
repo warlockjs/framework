@@ -1,11 +1,6 @@
 import { pathToFileURL } from "node:url";
 import { router } from "../router/router";
-import {
-  devLogError,
-  devLogInfo,
-  devLogSuccess,
-  formatModuleNotFoundError,
-} from "./dev-logger";
+import { devLogError, devLogInfo, devLogSuccess, formatModuleNotFoundError } from "./dev-logger";
 import type { FileManager } from "./file-manager";
 import type { SpecialFilesCollector } from "./special-files-collector";
 import { warlockCachePath } from "./utils";
@@ -162,9 +157,7 @@ export class ModuleLoader {
         devLogError(formatModuleNotFoundError(error));
       } else {
         console.log("Failed to load module", fileUrl);
-        devLogError(
-          `Failed to load ${type}: ${file.relativePath} - ${error.message || error}`,
-        );
+        devLogError(`Failed to load ${type}: ${file.relativePath} - ${error.message || error}`);
       }
     }
   }
@@ -174,9 +167,7 @@ export class ModuleLoader {
    * @param file FileManager instance
    */
   public async reloadModule(file: FileManager): Promise<void> {
-    const moduleType = this.specialFilesCollector.getFileType(
-      file.relativePath,
-    );
+    const moduleType = this.specialFilesCollector.getFileType(file.relativePath);
 
     if (!moduleType) {
       // Not a special file, no need to reload
@@ -191,6 +182,7 @@ export class ModuleLoader {
 
       // Clear module cache
       this.clearModuleCache(file.absolutePath);
+      __clearModuleVersion(file.cachePath);
 
       // Reload the module with cache busting
       await this.loadModule(file, moduleType, true);

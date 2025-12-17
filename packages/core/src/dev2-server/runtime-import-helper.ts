@@ -37,9 +37,7 @@ const modulePromises = new Map<string, Promise<any>>();
  * if not found set it then return it
  */
 function useModuleVersion(modulePath: string): number {
-  const cleanPath = modulePath.startsWith("./")
-    ? modulePath.slice(2)
-    : modulePath;
+  const cleanPath = modulePath.startsWith("./") ? modulePath.slice(2) : modulePath;
 
   if (!moduleVersions.has(cleanPath)) {
     moduleVersions.set(cleanPath, Date.now());
@@ -49,9 +47,7 @@ function useModuleVersion(modulePath: string): number {
 }
 
 function getModuleVersion(modulePath: string): number {
-  const cleanPath = modulePath.startsWith("./")
-    ? modulePath.slice(2)
-    : modulePath;
+  const cleanPath = modulePath.startsWith("./") ? modulePath.slice(2) : modulePath;
 
   return moduleVersions.get(cleanPath) || Date.now();
 }
@@ -64,9 +60,7 @@ function getModuleVersion(modulePath: string): number {
  */
 async function __import(modulePath: string): Promise<any> {
   // Normalize the module path (remove leading "./" if present)
-  const cleanPath = modulePath.startsWith("./")
-    ? modulePath.slice(2)
-    : modulePath;
+  const cleanPath = modulePath.startsWith("./") ? modulePath.slice(2) : modulePath;
 
   // Check if this module is already being loaded (circular dependency detected)
   if (loadingModules.has(cleanPath)) {
@@ -129,9 +123,7 @@ async function __import(modulePath: string): Promise<any> {
  */
 function __updateModuleVersion(modulePath: string, timestamp?: number): void {
   // Normalize the module path
-  const cleanPath = modulePath.startsWith("./")
-    ? modulePath.slice(2)
-    : modulePath;
+  const cleanPath = modulePath.startsWith("./") ? modulePath.slice(2) : modulePath;
 
   // Update the version timestamp
   moduleVersions.set(modulePath, timestamp || Date.now());
@@ -149,9 +141,7 @@ function __updateModuleVersion(modulePath: string, timestamp?: number): void {
  * @param modulePath - The path to the module
  */
 function __clearModuleVersion(modulePath: string): void {
-  const cleanPath = modulePath.startsWith("./")
-    ? modulePath.slice(2)
-    : modulePath;
+  const cleanPath = modulePath.startsWith("./") ? modulePath.slice(2) : modulePath;
 
   moduleVersions.delete(modulePath);
 

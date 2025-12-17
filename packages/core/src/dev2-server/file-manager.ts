@@ -110,14 +110,12 @@ export class FileManager {
    */
   protected async loadFromManifest(fileManifest: Partial<FileManifest>) {
     // Set basic properties from manifest
-    this.relativePath =
-      fileManifest.relativePath || Path.toRelative(this.absolutePath);
+    this.relativePath = fileManifest.relativePath || Path.toRelative(this.absolutePath);
     this.version = fileManifest.version || 0;
     this.type = fileManifest.type;
     this.layer = fileManifest.layer;
     this.cachePath =
-      fileManifest.cachePath ||
-      this.relativePath.replace(/\//g, "-").replace(/\.(ts|tsx)$/, ".js");
+      fileManifest.cachePath || this.relativePath.replace(/\//g, "-").replace(/\.(ts|tsx)$/, ".js");
 
     // Check if file still exists
     try {
@@ -128,13 +126,8 @@ export class FileManager {
     }
 
     // Calculate current hash
-    const currentHash = crypto
-      .createHash("sha256")
-      .update(this.source)
-      .digest("hex");
-    const currentLastModified = (
-      await lastModifiedAsync(this.absolutePath)
-    ).getTime();
+    const currentHash = crypto.createHash("sha256").update(this.source).digest("hex");
+    const currentLastModified = (await lastModifiedAsync(this.absolutePath)).getTime();
 
     // Compare with manifest data
     const hasChanged = currentHash !== fileManifest.hash;
@@ -182,9 +175,7 @@ export class FileManager {
     this.detectFileTypeAndLayer();
 
     // Generate cache path (replace / with - and change extension to .js)
-    this.cachePath = this.relativePath
-      .replace(/\//g, "-")
-      .replace(/\.(ts|tsx)$/, ".js");
+    this.cachePath = this.relativePath.replace(/\//g, "-").replace(/\.(ts|tsx)$/, ".js");
 
     await this.processFile();
 
@@ -201,7 +192,7 @@ export class FileManager {
 
     // Store dependencies as relative paths
     this.dependencies = new Set(
-      Array.from(importMap.values()).map(absPath => Path.toRelative(absPath)),
+      Array.from(importMap.values()).map((absPath) => Path.toRelative(absPath)),
     );
 
     // Store import map for later use in import transformation
@@ -219,10 +210,7 @@ export class FileManager {
    */
   protected detectFileTypeAndLayer() {
     // Main entry files
-    if (
-      this.relativePath.includes("main.ts") ||
-      this.relativePath.includes("main.tsx")
-    ) {
+    if (this.relativePath.includes("main.ts") || this.relativePath.includes("main.tsx")) {
       this.type = "main";
       this.layer = "HMR";
       return;
@@ -236,10 +224,7 @@ export class FileManager {
     }
 
     // Routes files
-    if (
-      this.relativePath.endsWith("routes.ts") ||
-      this.relativePath.endsWith("routes.tsx")
-    ) {
+    if (this.relativePath.endsWith("routes.ts") || this.relativePath.endsWith("routes.tsx")) {
       this.type = "route";
       this.layer = "HMR"; // For now FSR, will be HMR with wildcard routing
       return;
