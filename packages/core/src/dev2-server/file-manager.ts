@@ -65,6 +65,12 @@ export class FileManager {
   public importsTransformed = false;
 
   /**
+   * Whether this file contains only type definitions (no runtime code)
+   * Used to exclude from circular dependency detection
+   */
+  public isTypeOnlyFile = false;
+
+  /**
    * File state
    */
   public state: FileState = "idle";
@@ -295,7 +301,7 @@ export class FileManager {
     // Reprocess file
     await this.processFile();
 
-    // Transform imports if filesMap is provided
+    // Transform imports
     if (this.dependencies.size > 0) {
       this.importsTransformed = false;
 
@@ -329,7 +335,7 @@ export class FileManager {
   /**
    * Transform imports in transpiled code to use cache paths
    */
-  private async transformImports() {
+  public async transformImports() {
     if (this.importsTransformed) {
       return; // Already transformed
     }

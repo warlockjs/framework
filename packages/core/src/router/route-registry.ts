@@ -8,7 +8,7 @@ import type { Route } from "./types";
 export class RouteRegistry {
   private router: Instance<any>;
 
-  constructor() {
+  public constructor() {
     this.router = FindMyWay({
       ignoreTrailingSlash: true,
       caseSensitive: false,
@@ -19,20 +19,32 @@ export class RouteRegistry {
    * Register all routes from the router's internal list
    */
   public register(routes: Route[]): void {
-    // Reset the router (clear all existing routes)
-    this.router.reset();
-
     // Register each route
     for (const route of routes) {
-      this.router.on(
-        route.method as HTTPMethod,
-        route.path,
-        (req, params) => {
-          // Store the route and params for later use
-          return { route, params };
-        },
-      );
+      if (route.method === "all") {
+        this.registerRoute({
+          ...route,
+          method: "GET",
+        });
+
+        this.registerRoute({
+          ...route,
+          method: "POST",
+        });
+      } else {
+        this.registerRoute(route);
+      }
     }
+  }
+
+  /**
+   * Register a single route
+   */
+  public registerRoute(route: Route): void {
+    this.router.on(route.method as HTTPMethod, route.path, (req, params) => {
+      // Store the route and params for later use
+      return { route, params };
+    });
   }
 
   /**
@@ -54,14 +66,22 @@ export class RouteRegistry {
 
     // find-my-way handler expects (req, res, params, store, searchParams)
     // We only care about the return value which contains { route, params }
-    return match.handler(null as any, null as any, match.params, match.store, {});
+    return match.handler(
+      null as any,
+      null as any,
+      match.params,
+      match.store,
+      {},
+    );
   }
 
   /**
    * Get all registered routes count (for debugging)
    */
   public getRouteCount(): number {
-    return this.router.prettyPrint().split("\n").filter((line) => line.trim()).length;
+    return this.router
+      .prettyPrint()
+      .split("\n")
+      .filter(line => line.trim()).length;
   }
 }
-

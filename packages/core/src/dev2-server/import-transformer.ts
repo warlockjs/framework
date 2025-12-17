@@ -24,8 +24,13 @@ export function transformImports(
 
   // Pattern to match ES6 import statements
   // Matches: import ... from "..."
+  // Handles: 
+  //   - import { a, b } from "module" (named imports, can span multiple lines)
+  //   - import * as Foo from "module" (namespace imports)
+  //   - import Foo from "module" (default imports)
+  //   - import Foo, { a, b } from "module" (mixed imports)
   const importRegex =
-    /import\s+((?:\{[^}]*\}|\*\s+as\s+\w+|\w+)(?:\s*,\s*(?:\{[^}]*\}|\*\s+as\s+\w+|\w+))*)\s+from\s+["']([^"']+)["'];?/g;
+    /import\s+(\{[\s\S]*?\}|\*\s+as\s+\w+|\w+(?:\s*,\s*\{[\s\S]*?\})?)\s+from\s+["']([^"']+)["'];?/gm;
 
   // Pattern to match side-effect imports: import "module";
   const sideEffectImportRegex = /import\s+["']([^"']+)["'];?/g;
@@ -73,7 +78,6 @@ export function transformImports(
       unresolvedImports.push(importPath);
       continue;
     }
-
 
     // Build the correct replacement depending on the import shape
     const newImport = buildImportReplacement(importSpecifier, cachePath);
@@ -224,29 +228,56 @@ export function transformImports(
 
 /**
  * Build a replacement statement for different import syntaxes
+ * @param importSpecifier The import specifier (e.g., "Foo", "{ a, b }", "Foo, { a, b }", "* as Bar")
+ * @param cachePath The path to the cached file
  */
 function buildImportReplacement(
   importSpecifier: string,
   cachePath: string,
 ): string {
+  const trimmed = importSpecifier.trim();
+  
   // Namespace import: import * as Foo from "module";
-  if (importSpecifier.startsWith("* as ")) {
-    const identifier = importSpecifier.replace("* as ", "").trim();
+  if (trimmed.startsWith("* as ")) {
+    const identifier = trimmed.replace("* as ", "").trim();
     return `const ${identifier} = await __import("./${cachePath}")`;
   }
 
+  // Mixed import: import Foo, { a, b } from "module";
+  // Transform to: const __module = await __import(...); const Foo = __module?.default ?? __module; const { a, b } = __module;
+  // Handle multiline: import Foo, {\n  a,\n  b\n} from "module";
+  if (trimmed.match(/^(\w+)\s*,\s*\{/)) {
+    const match = trimmed.match(/^(\w+)\s*,\s*(\{[\s\S]*?\})/);
+    if (match) {
+      const defaultImport = match[1];
+      let namedImports = match[2];
+      const moduleVar = `__module_${Math.random().toString(36).slice(2, 8)}`;
+      
+      // Clean up whitespace and normalize
+      namedImports = namedImports.replace(/\s+/g, " ").trim();
+      // Normalize `{ default as X }` to `{ default: X }` for valid destructuring
+      const normalized = namedImports.replace(/default\s+as\s+/g, "default: ");
+      
+      // Generate correct syntax with proper separators
+      return `const ${moduleVar} = await __import("./${cachePath}");
+const ${defaultImport} = ${moduleVar}?.default ?? ${moduleVar};
+const ${normalized} = ${moduleVar};`;
+    }
+  }
+
   // Destructured / named imports (including default alias): import { a, default as X } from "module";
-  if (importSpecifier.startsWith("{")) {
+  if (trimmed.startsWith("{")) {
+    // Clean up multiline formatting
+    let cleanedImports = trimmed.replace(/\s+/g, " ").trim();
     // Normalize `{ default as X }` to `{ default: X }` for valid destructuring
-    const normalized = importSpecifier.replace(/default\s+as\s+/g, "default: ");
+    const normalized = cleanedImports.replace(/default\s+as\s+/g, "default: ");
     return `const ${normalized} = await __import("./${cachePath}")`;
   }
 
   // Default import: import Foo from "module";
-  // Use destructuring to pull default, with fallback to module object if default is missing
-  // Note: single await, reuses the same import for both destructuring and fallback
+  // Use default with fallback to module object
   const moduleVar = `__module_${Math.random().toString(36).slice(2, 8)}`;
-  return `const ${moduleVar} = await __import("./${cachePath}");\nconst ${importSpecifier} = ${moduleVar}?.default ?? ${moduleVar};`;
+  return `const ${moduleVar} = await __import("./${cachePath}");\nconst ${trimmed} = ${moduleVar}?.default ?? ${moduleVar};`;
 }
 
 /**
@@ -256,6 +287,7 @@ function buildImportReplacement(
  * @param importPath The import path from the import statement
  * @param fileManager The file that contains this import
  * @param filesMap Map of all FileManager instances
+ * @returns The cache path string, or null if not found
  */
 function findCachePathForImport(
   importPath: string,

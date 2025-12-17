@@ -14,7 +14,11 @@ export class DatabaseConnector extends BaseConnector {
   /**
    * Files that trigger database restart
    */
-  protected readonly watchedFiles = [".env", "src/config/database.ts", "src/config/database.tsx"];
+  protected readonly watchedFiles = [
+    ".env",
+    "src/config/database.ts",
+    "src/config/database.tsx",
+  ];
 
   /**
    * Initialize database connection

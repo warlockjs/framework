@@ -2,6 +2,7 @@ import config from "@mongez/config";
 import { pathToFileURL } from "node:url";
 import { devLogInfo } from "./dev-logger";
 import type { FileManager } from "./file-manager";
+import { warlockCachePath } from "./utils";
 
 /**
  * Special Config Handler
@@ -42,12 +43,16 @@ export class ConfigLoader {
       return;
     }
 
+
     // Load all configs in parallel
-    await Promise.all(
-      configFiles.map(async file => {
-        await this.loadConfig(file);
-      }),
-    );
+    // await Promise.all(
+    //   configFiles.map(async file => {
+    //     await this.loadConfig(file);
+    //   }),
+    // );
+    for (const file of configFiles) {
+      await this.loadConfig(file);
+    }
   }
 
   /**
@@ -64,7 +69,7 @@ export class ConfigLoader {
 
     try {
       // Convert absolute path to file:// URL for cross-platform compatibility
-      let fileUrl = pathToFileURL(file.absolutePath).href;
+      let fileUrl = pathToFileURL(warlockCachePath(file.cachePath)).href;
 
       // Add timestamp for cache busting (forces re-import for HMR)
       if (bustCache) {

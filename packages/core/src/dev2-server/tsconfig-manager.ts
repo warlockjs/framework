@@ -32,8 +32,8 @@ export class TSConfigManager {
    * Check if the given path is an alias
    * This checks if it's a REAL path alias (not an external package alias)
    * 
-   * Real aliases map to local paths (e.g., app/* -> src/app/*)
-   * External package aliases map to themselves (e.g., @warlock.js/core -> @warlock.js/core)
+   * Real aliases map to local paths (e.g., app/* -> src/app/*, src/* -> src/*)
+   * External package aliases map to themselves with @ prefix (e.g., @warlock.js/core -> @warlock.js/core)
    */
   public isAlias(path: string) {
     return Object.keys(this.aliases).some((alias) => {
@@ -52,14 +52,15 @@ export class TSConfigManager {
       
       const targetPattern = aliasTargets[0].replace("/*", "");
       
-      // If the target is the same as the alias (or starts with the alias),
-      // it's an external package, not a real path alias
+      // If the alias starts with @, it's likely an external package alias
       // Example: "@warlock.js/core" -> "@warlock.js/core" (external package)
-      // Example: "app/*" -> "src/app/*" (real alias)
-      if (targetPattern === aliasPattern || targetPattern.startsWith(aliasPattern)) {
+      if (aliasPattern.startsWith("@")) {
         return false;
       }
       
+      // Otherwise, it's a real path alias (including self-referencing ones like src/* -> src/*)
+      // Example: "app/*" -> "src/app/*" (real alias)
+      // Example: "src/*" -> "src/*" (self-referencing alias, still valid)
       return true;
     });
   }

@@ -1,6 +1,11 @@
 import { pathToFileURL } from "node:url";
 import { router } from "../router/router";
-import { devLogError, formatModuleNotFoundError } from "./dev-logger";
+import {
+  devLogError,
+  devLogInfo,
+  devLogSuccess,
+  formatModuleNotFoundError,
+} from "./dev-logger";
 import type { FileManager } from "./file-manager";
 import type { SpecialFilesCollector } from "./special-files-collector";
 import { warlockCachePath } from "./utils";
@@ -27,12 +32,10 @@ export class ModuleLoader {
    */
   public async loadAll(): Promise<void> {
     // Load in specific order
-    await Promise.all([
-      this.loadLocaleFiles(),
-      this.loadEventFiles(),
-      this.loadMainFiles(),
-      this.loadRouteFiles(),
-    ]);
+    await this.loadLocaleFiles();
+    await this.loadEventFiles();
+    await this.loadMainFiles();
+    await this.loadRouteFiles();
   }
 
   /**
@@ -48,11 +51,9 @@ export class ModuleLoader {
     }
 
     // Load all main files in parallel
-    await Promise.all(
-      mainFiles.map(async file => {
-        await this.loadModule(file, "main");
-      }),
-    );
+    for (const file of mainFiles) {
+      await this.loadModule(file, "main");
+    }
   }
 
   /**
@@ -68,11 +69,9 @@ export class ModuleLoader {
     }
 
     // Load all locale files in parallel
-    await Promise.all(
-      localeFiles.map(async file => {
-        await this.loadModule(file, "locale");
-      }),
-    );
+    for (const file of localeFiles) {
+      await this.loadModule(file, "locale");
+    }
   }
 
   /**
@@ -88,11 +87,9 @@ export class ModuleLoader {
     }
 
     // Load all event files in parallel
-    await Promise.all(
-      eventFiles.map(async file => {
-        await this.loadModule(file, "event");
-      }),
-    );
+    for (const file of eventFiles) {
+      await this.loadModule(file, "event");
+    }
   }
 
   /**
@@ -103,16 +100,12 @@ export class ModuleLoader {
   public async loadRouteFiles(): Promise<void> {
     const routeFiles = this.specialFilesCollector.getRouteFiles();
 
-    console.log(
-      "Loading route files",
-      routeFiles.map(file => file.relativePath),
-    );
-
     if (routeFiles.length === 0) {
       return;
     }
 
     // Load route files sequentially
+    // because we are registering the source file, we must load routes sequentially
     for (const file of routeFiles) {
       await this.loadModule(file, "route");
     }
@@ -132,6 +125,10 @@ export class ModuleLoader {
     // Get the cached transpiled file path
     const cachedFilePath = warlockCachePath(file.cachePath);
 
+    devLogInfo(`Loading module: ${file.relativePath} (${type})`);
+
+    let now = performance.now();
+
     // Convert to file:// URL for cross-platform compatibility
     let fileUrl = pathToFileURL(cachedFilePath).href;
     try {
@@ -144,12 +141,10 @@ export class ModuleLoader {
       // For route files, wrap the import with source file tracking
       if (type === "route") {
         await router.withSourceFile(file.relativePath, async () => {
-          console.log("Loading route file", file.relativePath);
           // Dynamic import the module (routes will be registered with sourceFile)
           const module = await import(fileUrl);
           // Store in cache (use source path as key for consistency)
           this.loadedModules.set(file.absolutePath, module);
-          console.log("Loaded route file", file.relativePath);
         });
       } else {
         // Dynamic import the module
@@ -157,6 +152,10 @@ export class ModuleLoader {
         // Store in cache (use source path as key for consistency)
         this.loadedModules.set(file.absolutePath, module);
       }
+
+      devLogSuccess(
+        `Module loaded: ${file.relativePath} (${type}) in ${performance.now() - now}ms`,
+      );
     } catch (error: any) {
       // Format error message (especially for MODULE_NOT_FOUND)
       if (error.code === "ERR_MODULE_NOT_FOUND") {

@@ -77,19 +77,19 @@ export class SpecialFilesCollector {
 
   /**
    * Check if file is a config file
-   * Pattern: src/config slash star star slash star dot (ts or tsx)
+   * Pattern: src/config/$config.ts
    */
   private isConfigFile(path: string): boolean {
-    return new RegExp("^src/config/.*\\.(ts|tsx)$").test(path);
+    return /^src\/config\/.*\.(ts|tsx)$/.test(path);
   }
 
   /**
    * Check if file is a main file
-   * Pattern: src/app/star-star/main.ts
+   * Pattern: src/app/$module/main.ts
    */
   private isMainFile(path: string): boolean {
     return (
-      new RegExp("^src/app/.*/main\\.(ts|tsx)$").test(path) ||
+      /^src\/app\/[^/]+\/main\.(ts|tsx)$/.test(path) ||
       ["src/app/main.ts", "src/app/main.tsx"].includes(path)
     );
   }
@@ -99,23 +99,23 @@ export class SpecialFilesCollector {
    * Pattern: src/app/$module/routes.ts
    */
   private isRouteFile(path: string): boolean {
-    return new RegExp("^src/app/.*/routes\\.(ts|tsx)$").test(path);
+    return /^src\/app\/[^/]+\/routes\.(ts|tsx)$/.test(path);
   }
 
   /**
    * Check if file is an event file
-   * Pattern: src/app/star-star/events/star-star/star.ts
+   * Pattern: src/app/$module/events/$event.ts
    */
   private isEventFile(path: string): boolean {
-    return new RegExp("^src/app/.*/events/.*/.*\\.(ts|tsx)$").test(path);
+    return /^src\/app\/[^/]+\/events\/[^/]+\.(ts|tsx)$/.test(path);
   }
 
   /**
    * Check if file is a locale file
-   * Pattern: src/app/star-star/utils/locales.ts
+   * Pattern: src/app/$module/utils/locales.ts
    */
   private isLocaleFile(path: string): boolean {
-    return new RegExp("^src/app/.*/utils/locales\\.(ts|tsx)$").test(path);
+    return /^src\/app\/[^/]+\/utils\/locales\.(ts|tsx)$/.test(path);
   }
 
   /**

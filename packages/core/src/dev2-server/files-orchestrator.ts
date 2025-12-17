@@ -15,7 +15,11 @@ import { packageJsonManager } from "./package-json-manager";
 import { Path } from "./path";
 import type { SpecialFilesCollector } from "./special-files-collector";
 import { tsconfigManager } from "./tsconfig-manager";
-import { createFreshWarlockDirectory, getFilesFromDirectory, warlockCachePath } from "./utils";
+import {
+  createFreshWarlockDirectory,
+  getFilesFromDirectory,
+  warlockCachePath,
+} from "./utils";
 
 export class FilesOrchestrator {
   private readonly files = new Map<string, FileManager>();
@@ -43,7 +47,10 @@ export class FilesOrchestrator {
     );
 
     // Recreate event handler with updated file operations
-    this.eventHandler = new FileEventHandler(this.fileOperations, this.manifest);
+    this.eventHandler = new FileEventHandler(
+      this.fileOperations,
+      this.manifest,
+    );
   }
 
   /**
@@ -53,6 +60,7 @@ export class FilesOrchestrator {
   public getDependencyGraph(): DependencyGraph {
     return this.dependencyGraph;
   }
+
 
   /**
    * Get invalidation chain for a file
@@ -121,7 +129,7 @@ export class FilesOrchestrator {
   private async getAllFilesFromFilesystem(): Promise<string[]> {
     const absolutePaths = await getFilesFromDirectory();
     // Convert to relative paths for consistency throughout the system
-    return absolutePaths.map((absPath) => Path.toRelative(absPath));
+    return absolutePaths.map(absPath => Path.toRelative(absPath));
   }
 
   /**
@@ -142,7 +150,7 @@ export class FilesOrchestrator {
       const batch = filePaths.slice(i, i + BATCH_SIZE);
 
       await Promise.all(
-        batch.map(async (relativePath) => {
+        batch.map(async relativePath => {
           // Convert to absolute path for FileManager
           const absolutePath = Path.toAbsolute(relativePath);
           const fileManager = new FileManager(absolutePath, this.files);
@@ -165,21 +173,29 @@ export class FilesOrchestrator {
     const filesInFilesystemSet = new Set(filesInFilesystem);
 
     // Find new files (in filesystem but not in manifest)
-    const newFiles = filesInFilesystem.filter((file) => !filesInManifest.has(file));
+    const newFiles = filesInFilesystem.filter(
+      file => !filesInManifest.has(file),
+    );
 
     // Find deleted files (in manifest but not in filesystem)
     const deletedFiles = Array.from(filesInManifest).filter(
-      (file) => !filesInFilesystemSet.has(file),
+      file => !filesInFilesystemSet.has(file),
     );
 
     // Find existing files (in both)
-    const existingFiles = filesInFilesystem.filter((file) => filesInManifest.has(file));
+    const existingFiles = filesInFilesystem.filter(file =>
+      filesInManifest.has(file),
+    );
 
     if (newFiles.length > 0 || deletedFiles.length > 0) {
       const newText = newFiles.length > 0 ? colors.green(newFiles.length) : 0;
-      const deletedText = deletedFiles.length > 0 ? colors.red(deletedFiles.length) : 0;
-      const existingText = existingFiles.length > 0 ? colors.blue(existingFiles.length) : 0;
-      devLogDim(`reconciling: ${newText} new, ${deletedText} deleted, ${existingText} existing`);
+      const deletedText =
+        deletedFiles.length > 0 ? colors.red(deletedFiles.length) : 0;
+      const existingText =
+        existingFiles.length > 0 ? colors.blue(existingFiles.length) : 0;
+      devLogDim(
+        `reconciling: ${newText} new, ${deletedText} deleted, ${existingText} existing`,
+      );
     }
 
     // Process new files
@@ -205,7 +221,7 @@ export class FilesOrchestrator {
       const batch = filePaths.slice(i, i + BATCH_SIZE);
 
       await Promise.all(
-        batch.map(async (relativePath) => {
+        batch.map(async relativePath => {
           // Convert to absolute path for FileManager
           const absolutePath = Path.toAbsolute(relativePath);
           const fileManager = new FileManager(absolutePath, this.files);
@@ -258,7 +274,7 @@ export class FilesOrchestrator {
       const batch = filePaths.slice(i, i + BATCH_SIZE);
 
       await Promise.all(
-        batch.map(async (relativePath) => {
+        batch.map(async relativePath => {
           // Get manifest data using relative path
           const manifestData = this.manifest.getFile(relativePath);
           // Convert to absolute path for FileManager
@@ -301,15 +317,15 @@ export class FilesOrchestrator {
     devLogSuccess("watching for file changes");
 
     // Connect file watcher to event handler
-    this.filesWatcher.onFileChange((absolutePath) => {
+    this.filesWatcher.onFileChange(absolutePath => {
       this.eventHandler.handleFileChange(absolutePath);
     });
 
-    this.filesWatcher.onFileAdd((absolutePath) => {
+    this.filesWatcher.onFileAdd(absolutePath => {
       this.eventHandler.handleFileAdd(absolutePath);
     });
 
-    this.filesWatcher.onFileDelete((absolutePath) => {
+    this.filesWatcher.onFileDelete(absolutePath => {
       this.eventHandler.handleFileDelete(absolutePath);
     });
 
@@ -345,13 +361,21 @@ export class FilesOrchestrator {
         fileManager.transpiled = transformedCode;
 
         // Save the transformed code back to cache
-        await putFileAsync(warlockCachePath(fileManager.cachePath), transformedCode);
+        await putFileAsync(
+          warlockCachePath(fileManager.cachePath),
+          transformedCode,
+        );
 
         // Mark as transformed
         fileManager.importsTransformed = true;
 
         transformedCount++;
-      } catch (error) {}
+      } catch (error) {
+        console.error(
+          `Error transforming imports for ${relativePath}:`,
+          error
+        );
+      }
     }
   }
 }

@@ -20,20 +20,74 @@ import { warlockCachePath } from "./utils";
 const moduleVersions = new Map<string, number>();
 
 /**
- * Dynamic import with cache busting
+ * Modules currently being loaded
+ * Used to detect and handle circular dependencies
+ */
+const loadingModules = new Set<string>();
+
+/**
+ * Module import promise cache
+ * Maps module paths to their import promises
+ * Prevents duplicate imports and handles circular dependencies
+ */
+const modulePromises = new Map<string, Promise<any>>();
+
+/**
+ * Get last version of timestamp for a module
+ * if not found set it then return it
+ */
+function useModuleVersion(modulePath: string): number {
+  const cleanPath = modulePath.startsWith("./")
+    ? modulePath.slice(2)
+    : modulePath;
+
+  if (!moduleVersions.has(cleanPath)) {
+    moduleVersions.set(cleanPath, Date.now());
+  }
+
+  return moduleVersions.get(cleanPath)!;
+}
+
+function getModuleVersion(modulePath: string): number {
+  const cleanPath = modulePath.startsWith("./")
+    ? modulePath.slice(2)
+    : modulePath;
+
+  return moduleVersions.get(cleanPath) || Date.now();
+}
+
+/**
+ * Dynamic import with cache busting and circular dependency protection
  *
  * @param modulePath - The relative cache path (e.g., "./src-app-users-shared-utils.js")
  * @returns The imported module
  */
 async function __import(modulePath: string): Promise<any> {
-  // Get the current version timestamp for this module
-  const timestamp = moduleVersions.get(modulePath) || Date.now();
-
-  // Resolve the module path relative to the cache directory
-  // Remove leading "./" if present
+  // Normalize the module path (remove leading "./" if present)
   const cleanPath = modulePath.startsWith("./")
     ? modulePath.slice(2)
     : modulePath;
+
+  // Check if this module is already being loaded (circular dependency detected)
+  if (loadingModules.has(cleanPath)) {
+    // Return the existing promise - this prevents deadlock
+    // The promise should already be cached since we cache it before marking as loading
+    const existingPromise = modulePromises.get(cleanPath);
+    if (existingPromise) {
+      return existingPromise;
+    }
+
+    // This should rarely happen, but handle the edge case where promise isn't cached yet
+    // This can occur in a race condition scenario
+    throw new Error(
+      `Circular dependency detected: Module "${cleanPath}" is being loaded but no promise is cached. This may indicate a timing issue in module loading.`,
+    );
+  }
+
+  // Get the current version timestamp for this module
+  const timestamp = useModuleVersion(modulePath);
+
+  // Resolve the module path relative to the cache directory
   const absolutePath = warlockCachePath(cleanPath);
 
   // Convert to file:// URL for cross-platform compatibility
@@ -42,8 +96,28 @@ async function __import(modulePath: string): Promise<any> {
   // Append timestamp as query parameter to bust cache
   const moduleUrl = `${fileUrl}?t=${timestamp}`;
 
-  // Dynamic import with cache busting
-  return await import(moduleUrl);
+  // Create the import promise and cache it BEFORE marking as loading
+  // This ensures circular dependencies can always find the promise
+  const importPromise = import(moduleUrl);
+  modulePromises.set(cleanPath, importPromise);
+
+  // Mark module as loading AFTER caching the promise
+  // This order is critical for circular dependency handling
+  loadingModules.add(cleanPath);
+
+  try {
+    // Wait for the import to complete
+    const module = await importPromise;
+
+    return module;
+  } catch (error) {
+    // Remove from cache on error so it can be retried
+    modulePromises.delete(cleanPath);
+    throw error;
+  } finally {
+    // Mark module as no longer loading
+    loadingModules.delete(cleanPath);
+  }
 }
 
 /**
@@ -54,7 +128,19 @@ async function __import(modulePath: string): Promise<any> {
  * @param timestamp - Optional timestamp (defaults to current time)
  */
 function __updateModuleVersion(modulePath: string, timestamp?: number): void {
+  // Normalize the module path
+  const cleanPath = modulePath.startsWith("./")
+    ? modulePath.slice(2)
+    : modulePath;
+
+  // Update the version timestamp
   moduleVersions.set(modulePath, timestamp || Date.now());
+
+  // Clear the cached promise so the new version gets loaded
+  // Only clear if the module is not currently loading (to avoid breaking circular deps)
+  if (!loadingModules.has(cleanPath)) {
+    modulePromises.delete(cleanPath);
+  }
 }
 
 /**
@@ -63,14 +149,30 @@ function __updateModuleVersion(modulePath: string, timestamp?: number): void {
  * @param modulePath - The path to the module
  */
 function __clearModuleVersion(modulePath: string): void {
+  const cleanPath = modulePath.startsWith("./")
+    ? modulePath.slice(2)
+    : modulePath;
+
   moduleVersions.delete(modulePath);
+
+  // Clear cached promise if not currently loading
+  if (!loadingModules.has(cleanPath)) {
+    modulePromises.delete(cleanPath);
+  }
 }
 
 /**
- * Clear all module versions
+ * Clear all module versions and caches
  */
 function __clearAllModuleVersions(): void {
   moduleVersions.clear();
+
+  // Clear all cached promises that aren't currently loading
+  for (const [path] of modulePromises) {
+    if (!loadingModules.has(path)) {
+      modulePromises.delete(path);
+    }
+  }
 }
 
 /**

@@ -2,13 +2,7 @@
 import proxy, { type FastifyHttpProxyOptions } from "@fastify/http-proxy";
 import fastifyStatic, { type FastifyStaticOptions } from "@fastify/static";
 import concatRoute from "@mongez/concat-route";
-import {
-  ltrim,
-  merge,
-  Random,
-  toCamelCase,
-  trim,
-} from "@mongez/reinforcements";
+import { ltrim, merge, toCamelCase, trim } from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
 import { log } from "@warlock.js/logger";
 import type { FastifyReply, FastifyRequest } from "fastify";
@@ -39,8 +33,6 @@ export class Router {
    * Router Instance
    */
   private static instance: Router;
-
-  public id = Random.id();
 
   /**
    * Static paths
@@ -586,14 +578,11 @@ export class Router {
     this.stacks.sourceFile = sourceFile;
 
     try {
-      console.log(callback);
-      
       // Execute callback (routes added here will have sourceFile injected)
       await callback();
     } catch (error) {
       console.log("Error in withSourceFile", error);
     } finally {
-      console.log("Clearing source file from stacks");
       // Always clear source file from stacks
       delete this.stacks.sourceFile;
     }
@@ -770,11 +759,6 @@ export class Router {
     ) => {
       // Initialize route registry once (will be rebuilt on HMR via rebuildRouteRegistry)
       const routeRegistry = new RouteRegistry();
-      console.log(
-        "Routes list",
-        this.id,
-        this.routes.map(route => route.path),
-      );
 
       routeRegistry.register(this.routes);
       // Find matching route using find-my-way

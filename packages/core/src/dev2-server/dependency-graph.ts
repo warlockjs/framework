@@ -49,10 +49,7 @@ export class DependencyGraph {
     // Detect circular dependencies
     const cycles = this.detectCircularDependencies();
     if (cycles.length > 0) {
-      console.warn(`⚠️  Found ${cycles.length} circular dependency chain(s)`);
-      for (const cycle of cycles) {
-        console.warn(`   ${cycle.join(" → ")}`);
-      }
+      this.displayCircularDependencyWarnings(cycles);
     }
   }
 
@@ -180,8 +177,10 @@ export class DependencyGraph {
   }
 
   /**
-   * Detect circular dependencies
-   * @returns Array of circular dependency chains
+   * Detect circular dependencies in the dependency graph
+   * Uses depth-first search to find cycles
+   * Note: Type-only imports are already excluded at the parsing level (parse-imports.ts)
+   * @returns Array of circular dependency chains (each chain is an array of file paths)
    */
   public detectCircularDependencies(): string[][] {
     const cycles: string[][] = [];
@@ -215,6 +214,62 @@ export class DependencyGraph {
     }
 
     return cycles;
+  }
+
+  /**
+   * Display circular dependency warnings in a formatted, user-friendly way
+   * Shows each cycle with visual tree structure and helpful recommendations
+   */
+  private displayCircularDependencyWarnings(cycles: string[][]): void {
+    const colors = {
+      yellow: (text: string) => `\x1b[33m${text}\x1b[0m`,
+      cyan: (text: string) => `\x1b[36m${text}\x1b[0m`,
+      dim: (text: string) => `\x1b[2m${text}\x1b[0m`,
+      bold: (text: string) => `\x1b[1m${text}\x1b[0m`,
+    };
+
+    console.log("");
+    console.log(colors.yellow("⚠️  Circular Dependencies Detected"));
+    console.log(colors.dim("━".repeat(60)));
+    console.log("");
+    console.log(
+      colors.dim(
+        `Found ${colors.bold(cycles.length.toString())} circular dependency chain${cycles.length > 1 ? "s" : ""}`,
+      ),
+    );
+    console.log("");
+
+    cycles.forEach((cycle, index) => {
+      console.log(colors.cyan(`  ${index + 1}. Cycle with ${cycle.length - 1} files:`));
+      console.log("");
+
+      // Display the cycle chain
+      cycle.forEach((file, fileIndex) => {
+        const isLast = fileIndex === cycle.length - 1;
+        const arrow = isLast ? colors.dim("   └─→ ") : colors.dim("   ├─→ ");
+        const fileName = file.split("/").pop() || file;
+        const filePath = colors.dim(file.replace(fileName, ""));
+
+        if (isLast) {
+          // Last item is the same as first (completes the cycle)
+          console.log(arrow + colors.yellow(`${filePath}${colors.bold(fileName)} (cycle completes)`));
+        } else {
+          console.log(arrow + filePath + colors.bold(fileName));
+        }
+      });
+
+      console.log("");
+    });
+
+    console.log(colors.dim("━".repeat(60)));
+    console.log(colors.yellow("💡 Recommendation:"));
+    console.log(
+      colors.dim(
+        "   Refactor your code to remove circular dependencies for better",
+      ),
+    );
+    console.log(colors.dim("   maintainability and HMR performance."));
+    console.log("");
   }
 
   /**

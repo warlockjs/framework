@@ -14,58 +14,102 @@ function extractImportPathsWithRegex(
   const imports: Array<{ path: string; originalLine: string }> = [];
   const seenPaths = new Set<string>();
 
-  // Skip type-only imports
-  const skipTypeOnlyImports = (line: string): boolean => {
+  /**
+   * Check if an import line is type-only
+   * Handles:
+   * - import type { Foo } from "module"
+   * - import type Foo from "module"
+   * - import type * as Foo from "module"
+   */
+  const isTypeOnlyImport = (line: string): boolean => {
     const trimmed = line.trim();
     return (
       trimmed.startsWith("import type ") ||
-      !!trimmed.match(/import\s+type\s+\{/)
+      !!trimmed.match(/^import\s+type\s+[\{\*]/)
     );
   };
 
-  // Pattern 1: Standard ES module imports - look for "from" followed by quoted string
-  // Also handle side-effect imports: import "path"
-  const lines = source.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  /**
+   * Check if an import has any runtime (non-type) imports
+   * Handles mixed imports: import { type Foo, runtimeBar } from "module"
+   * Returns true if there are runtime imports (should be tracked)
+   */
+  const hasRuntimeImports = (line: string): boolean => {
     const trimmed = line.trim();
+    
+    // If it's a pure type-only import, no runtime imports
+    if (isTypeOnlyImport(trimmed)) {
+      return false;
+    }
 
+    // Extract the import specifiers part: import { ... } from "module"
+    const specifiersMatch = trimmed.match(/import\s+\{([^}]+)\}/);
+    if (!specifiersMatch) {
+      // Not a destructured import, or it's a default/namespace import
+      // These are runtime imports unless marked with "import type"
+      return true;
+    }
+
+    const specifiers = specifiersMatch[1];
+    
+    // Split by comma and check each specifier
+    const items = specifiers.split(',').map(s => s.trim());
+    
+    // Check if ALL items are type-only (prefixed with "type ")
+    const allTypeOnly = items.every(item => {
+      // Match: "type Foo" or "type Foo as Bar"
+      return /^type\s+\w+/.test(item);
+    });
+
+    // If all are type-only, this import has no runtime imports
+    // Otherwise, it has at least one runtime import
+    return !allTypeOnly;
+  };
+
+  // Pattern 1: Standard ES module imports (handles multiline)
+  // Matches: import { ... } from "path", import Foo from "path", import Foo, { ... } from "path"
+  const importRegex = /import\s+(?:type\s+)?(\{[\s\S]*?\}|\*\s+as\s+\w+|\w+(?:\s*,\s*\{[\s\S]*?\})?)\s+from\s+['"]([^'"]+)['"]/g;
+  
+  let match;
+  while ((match = importRegex.exec(source)) !== null) {
+    const fullMatch = match[0];
+    const importSpecifier = match[1];
+    const importPath = match[2];
+    
     // Skip type-only imports
-    if (skipTypeOnlyImports(trimmed)) {
+    if (fullMatch.match(/^import\s+type\s+/)) {
       continue;
     }
-
-    // Match: ... from "path" or ... from 'path'
-    const fromMatch = trimmed.match(/\s+from\s+['"]([^'"]+)['"]/);
-    if (fromMatch && trimmed.startsWith("import")) {
-      const importPath = fromMatch[1];
-      if (importPath && !seenPaths.has(importPath)) {
-        seenPaths.add(importPath);
-        imports.push({
-          path: importPath,
-          originalLine: line,
-        });
-      }
+    
+    // Skip if it's a mixed import with only types
+    if (!hasRuntimeImports(fullMatch)) {
       continue;
     }
-
-    // Match: import "path" (side-effect imports)
-    const sideEffectMatch = trimmed.match(/^import\s+['"]([^'"]+)['"]/);
-    if (sideEffectMatch) {
-      const importPath = sideEffectMatch[1];
-      if (importPath && !seenPaths.has(importPath)) {
-        seenPaths.add(importPath);
-        imports.push({
-          path: importPath,
-          originalLine: line,
-        });
-      }
+    
+    if (importPath && !seenPaths.has(importPath)) {
+      seenPaths.add(importPath);
+      imports.push({
+        path: importPath,
+        originalLine: fullMatch,
+      });
+    }
+  }
+  
+  // Pattern 1b: Side-effect imports - import "path"
+  const sideEffectRegex = /import\s+['"]([^'"]+)['"]/g;
+  while ((match = sideEffectRegex.exec(source)) !== null) {
+    const importPath = match[1];
+    if (importPath && !seenPaths.has(importPath)) {
+      seenPaths.add(importPath);
+      imports.push({
+        path: importPath,
+        originalLine: match[0],
+      });
     }
   }
 
   // Pattern 2: Dynamic imports - import("path")
   const dynamicImportPattern = /import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
-  let match;
   while ((match = dynamicImportPattern.exec(source)) !== null) {
     const importPath = match[1];
     if (importPath && !seenPaths.has(importPath)) {
@@ -78,15 +122,23 @@ function extractImportPathsWithRegex(
   }
 
   // Pattern 3: Export from - export ... from "path"
+  // Skip export type statements (e.g., export type { Foo } from "module")
   const exportFromPattern =
     /export\s+(?:\{[^}]*\}|\*|\w+)\s+from\s+['"]([^'"]+)['"]/g;
   while ((match = exportFromPattern.exec(source)) !== null) {
+    const fullMatch = match[0];
+    
+    // Skip type-only exports: export type ... from "module"
+    if (/^export\s+type\s+/.test(fullMatch)) {
+      continue;
+    }
+    
     const importPath = match[1];
     if (importPath && !seenPaths.has(importPath)) {
       seenPaths.add(importPath);
       imports.push({
         path: importPath,
-        originalLine: match[0],
+        originalLine: fullMatch,
       });
     }
   }
@@ -233,6 +285,18 @@ async function resolveRelativeImport(
  * @TODO: For better performance, we need to check the files in files orchestrator
  * instead of using the file system as we will be fetching all project files anyway.
  */
+// Cache for file existence checks to avoid redundant filesystem calls
+const fileExistsCache = new Map<string, boolean>();
+
+async function cachedFileExists(filePath: string): Promise<boolean> {
+  if (fileExistsCache.has(filePath)) {
+    return fileExistsCache.get(filePath)!;
+  }
+  const exists = await fileExistsAsync(filePath);
+  fileExistsCache.set(filePath, exists);
+  return exists;
+}
+
 async function tryResolveWithExtensions(
   basePath: string,
 ): Promise<string | null> {
@@ -246,27 +310,38 @@ async function tryResolveWithExtensions(
   // If the path already has a VALID code file extension, check if it exists
   const ext = path.extname(normalizedBase);
   if (ext && validExtensions.has(ext)) {
-    if (await fileExistsAsync(normalizedBase)) {
+    if (await cachedFileExists(normalizedBase)) {
       return normalizedBase;
     }
     // If explicit extension doesn't exist, return null
     return null;
   }
 
-  // Try each extension (even if there's already a non-code extension like .service or .repository)
-  for (const extension of extensions) {
-    const pathWithExt = normalizedBase + extension;
-    if (await fileExistsAsync(pathWithExt)) {
-      return pathWithExt;
+  // Try all extensions in parallel for better performance
+  const pathsToCheck = extensions.map(extension => normalizedBase + extension);
+  const results = await Promise.all(
+    pathsToCheck.map(async p => ({ path: p, exists: await cachedFileExists(p) }))
+  );
+  
+  // Return the first one that exists (in order of preference)
+  for (const result of results) {
+    if (result.exists) {
+      return result.path;
     }
   }
 
   // Try index files in directory
   if (await isDirectoryAsync(normalizedBase)) {
-    for (const extension of extensions) {
-      const indexPath = Path.join(normalizedBase, `index${extension}`);
-      if (await fileExists(indexPath)) {
-        return indexPath;
+    const indexPaths = extensions.map(extension => 
+      Path.join(normalizedBase, `index${extension}`)
+    );
+    const indexResults = await Promise.all(
+      indexPaths.map(async p => ({ path: p, exists: await cachedFileExists(p) }))
+    );
+    
+    for (const result of indexResults) {
+      if (result.exists) {
+        return result.path;
       }
     }
   }

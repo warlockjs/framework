@@ -2,12 +2,12 @@ import type { GenericObject } from "@mongez/reinforcements";
 import type { ObjectValidator } from "@warlock.js/seal";
 import type { RouteShorthandOptions } from "fastify";
 import type { Request, Response, ReturnedResponse } from "../http";
-import type { Rule, Validation, ValidationSchema } from "../validator";
 import type {
   PostmanExample,
   PostmanRequestEvent,
   PostmanVariable,
 } from "../postman";
+import type { Rule, Validation, ValidationSchema } from "../validator";
 
 /**
  * Middleware response
@@ -202,7 +202,8 @@ export type RequestMethod =
   | "DELETE"
   | "PATCH"
   | "OPTIONS"
-  | "HEAD";
+  | "HEAD"
+  | "all";
 
 /**
  * Route Object

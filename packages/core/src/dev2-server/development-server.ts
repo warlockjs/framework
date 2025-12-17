@@ -7,7 +7,12 @@ import type { Connector } from "./connectors";
 import { CacheConnector } from "./connectors/cache-connector";
 import { DatabaseConnector } from "./connectors/database-connector";
 import { HttpConnector } from "./connectors/http-connector";
-import { devLogInfo, devLogReady, devLogSection, devServeLog } from "./dev-logger";
+import {
+  devLogInfo,
+  devLogReady,
+  devLogSection,
+  devServeLog,
+} from "./dev-logger";
 import { FilesOrchestrator } from "./files-orchestrator";
 import { LayerExecutor } from "./layer-executor";
 import { ModuleLoader } from "./module-loader";
@@ -28,7 +33,9 @@ export class DevelopmentServer {
   /**
    * Files orchestrator - manages file discovery, watching, and dependency graph
    */
-  private readonly filesOrchestrator = new FilesOrchestrator(this.specialFilesCollector);
+  private readonly filesOrchestrator = new FilesOrchestrator(
+    this.specialFilesCollector,
+  );
 
   /**
    * Config loader - dynamically loads configuration files
@@ -82,32 +89,32 @@ export class DevelopmentServer {
    */
   public async start(): Promise<void> {
     try {
-      // STEP 1: Initialize file system (discover and process files)
+      const now = performance.now();
+      devLogInfo("Bootstrapping...");
+      // STEP 1: Bootstrap (load environment variables)
+      await bootstrap();
+
+      // STEP 2: Initialize file system (discover and process files)
       await this.filesOrchestrator.init();
 
       devLogInfo("Initializing special files...");
-      // STEP 2: Collect special files
+      // STEP 3: Collect special files
       this.specialFilesCollector.collect(this.filesOrchestrator.getFiles());
 
-      devLogInfo("Bootstrapping...");
-      // STEP 3: Bootstrap (load environment variables)
-      await bootstrap();
-
-      devLogInfo("Initializing runtime import helper...");
       // STEP 4: Initialize runtime import helper (for HMR cache busting)
+      devLogInfo("Initializing runtime import helper...");
       initializeRuntimeImportHelper();
 
       devLogInfo("Loading configuration files...");
       // STEP 5: Load configuration files
       const configFiles = this.specialFilesCollector.getConfigFiles();
-      
+
       await this.configLoader.loadAll(configFiles);
 
       devLogInfo("Setting up event listeners...");
       // STEP 6: Setup event listeners
       this.setupEventListeners();
 
-      
       // STEP 7: Load application modules
       devLogInfo("Loading application modules...");
       this.moduleLoader = new ModuleLoader(this.specialFilesCollector);
@@ -115,7 +122,7 @@ export class DevelopmentServer {
 
       // STEP 8: Initialize connectors
       devLogInfo("Initializing connectors...");
-      this.initConnectors();
+      await this.initConnectors();
 
       // STEP 9: Initialize layer executor
       devLogInfo("Initializing layer executor...");
@@ -130,9 +137,15 @@ export class DevelopmentServer {
       // Mark as running
       this.running = true;
 
-      devLogReady("Development Server is ready!");
+      const duration = performance.now() - now;
+
+      devLogReady(
+        `Development Server is ready in ${colors.greenBright(parseDuration(duration))}`,
+      );
     } catch (error) {
-      devServeLog(colors.redBright(`❌ Failed to start Development Server: ${error}`));
+      devServeLog(
+        colors.redBright(`❌ Failed to start Development Server: ${error}`),
+      );
       await this.shutdown();
       throw error;
     }
@@ -142,11 +155,8 @@ export class DevelopmentServer {
    * Initialize all registered connectors in priority order
    */
   private async initConnectors(): Promise<void> {
-    devLogInfo("Initializing connectors...");
     for (const connector of this.connectors) {
-      connector.start().catch((error) => {
-        devServeLog(colors.redBright(`❌ Failed to initialize ${connector.name}: ${error}`));
-      });
+      await connector.start();
     }
   }
 
@@ -178,7 +188,11 @@ export class DevelopmentServer {
     }
 
     // Get all changed files (added + changed + deleted)
-    const allChangedPaths = [...batch.added, ...batch.changed, ...batch.deleted];
+    const allChangedPaths = [
+      ...batch.added,
+      ...batch.changed,
+      ...batch.deleted,
+    ];
 
     if (allChangedPaths.length === 0) {
       return;
@@ -191,7 +205,9 @@ export class DevelopmentServer {
         this.filesOrchestrator.getFiles(),
       );
     } catch (error) {
-      devServeLog(colors.redBright(`❌ Failed to execute batch reload: ${error}`));
+      devServeLog(
+        colors.redBright(`❌ Failed to execute batch reload: ${error}`),
+      );
     }
   }
 
@@ -203,15 +219,21 @@ export class DevelopmentServer {
     affectedFiles: string[],
   ): Promise<void> {
     devServeLog(
-      colors.yellowBright(`🔄 FSR: Restarting ${connectorsToRestart.length} connector(s)...`),
+      colors.yellowBright(
+        `🔄 FSR: Restarting ${connectorsToRestart.length} connector(s)...`,
+      ),
     );
-    devServeLog(colors.yellowBright(`   Affected files: ${affectedFiles.length} file(s)`));
+    devServeLog(
+      colors.yellowBright(`   Affected files: ${affectedFiles.length} file(s)`),
+    );
 
     for (const connector of connectorsToRestart) {
       try {
         await connector.restart();
       } catch (error) {
-        devServeLog(colors.redBright(`❌ Failed to restart ${connector.name}: ${error}`));
+        devServeLog(
+          colors.redBright(`❌ Failed to restart ${connector.name}: ${error}`),
+        );
       }
     }
 
@@ -237,7 +259,9 @@ export class DevelopmentServer {
       try {
         await connector.shutdown();
       } catch (error) {
-        devServeLog(colors.redBright(`❌ Failed to shutdown ${connector.name}: ${error}`));
+        devServeLog(
+          colors.redBright(`❌ Failed to shutdown ${connector.name}: ${error}`),
+        );
       }
     }
 
@@ -285,4 +309,16 @@ export class DevelopmentServer {
   public getConnectors(): Connector[] {
     return [...this.connectors];
   }
+}
+
+function parseDuration(diffInMilliseconds: number): string {
+  if (diffInMilliseconds < 1000) {
+    return `${diffInMilliseconds.toFixed(2)}ms`;
+  }
+
+  if (diffInMilliseconds > 60_000) {
+    return `${(diffInMilliseconds / 60_000).toFixed(2)}m`;
+  }
+
+  return `${(diffInMilliseconds / 1000).toFixed(2)}s`;
 }

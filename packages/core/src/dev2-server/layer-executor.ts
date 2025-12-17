@@ -1,7 +1,7 @@
 import type { ConfigLoader } from "./config-loader";
 import type { Connector } from "./connectors/types";
 import type { DependencyGraph } from "./dependency-graph";
-import { devLogConfig, devLogFSR, devLogHMR } from "./dev-logger";
+import { devLogHMR } from "./dev-logger";
 import type { FileManager } from "./file-manager";
 import type { ModuleLoader } from "./module-loader";
 import type { SpecialFilesCollector } from "./special-files-collector";
@@ -46,13 +46,18 @@ export class LayerExecutor {
       if (!fileManager) continue;
 
       // Get invalidation chain for this file
-      const invalidationChain = this.dependencyGraph.getInvalidationChain(relativePath);
+      const invalidationChain =
+        this.dependencyGraph.getInvalidationChain(relativePath);
 
       // Add to combined set
-      invalidationChain.forEach((file) => allInvalidatedFiles.add(file));
+      invalidationChain.forEach(file => allInvalidatedFiles.add(file));
 
       // Determine strategy for this file
-      const strategy = this.determineReloadStrategy(invalidationChain, filesMap);
+      const strategy = this.determineReloadStrategy(
+        invalidationChain,
+        filesMap,
+      );
+
       if (strategy === "FSR") {
         fsrFiles.push(relativePath);
       } else {
@@ -60,69 +65,51 @@ export class LayerExecutor {
       }
     }
 
-    // Separate config files from other FSR files
-    const configFiles = fsrFiles.filter((path) => {
-      const file = filesMap.get(path);
-      return file?.type === "config";
-    });
-    const nonConfigFsrFiles = fsrFiles.filter((path) => {
-      const file = filesMap.get(path);
-      return file?.type !== "config";
-    });
+    try {
+      if (hmrFiles.length > 0 && fsrFiles.length === 0) {
+        if (hmrFiles.length === 1) {
+          const dependentCount =
+            this.dependencyGraph.getInvalidationChain(hmrFiles[0]).length - 1;
+          devLogHMR(
+            hmrFiles[0],
+            dependentCount > 0 ? dependentCount : undefined,
+          );
+        } else {
+          hmrFiles.forEach(file => {
+            const dependentCount =
+              this.dependencyGraph.getInvalidationChain(file).length - 1;
+            devLogHMR(file, dependentCount > 0 ? dependentCount : undefined);
+          });
+        }
+      }
+    } catch (error) {
+      console.log("ERRor in devLogHMR: ", error);
+    }
 
-    // Log once for the entire batch
-    if (configFiles.length > 0) {
-      // Get affected connectors
-      const affectedConnectors = this.connectors.filter((connector) =>
-        connector.shouldRestart(configFiles),
-      );
+    try {
+      // Execute reload once for all files
+      const invalidationChain = Array.from(allInvalidatedFiles);
 
-      if (configFiles.length === 1) {
-        devLogConfig(
-          configFiles[0],
-          affectedConnectors.map((connector) => connector.name),
+      if (fsrFiles.length > 0) {
+        // If any file requires FSR, do FSR for all
+        const firstFsrFile = filesMap.get(fsrFiles[0])!;
+        await this.executeFullServerRestart(
+          firstFsrFile,
+          invalidationChain,
+          filesMap,
         );
       } else {
-        devLogConfig(
-          `${configFiles.length} files`,
-          affectedConnectors.map((connector) => connector.name),
+        // All files are HMR
+        const firstHmrFile = filesMap.get(hmrFiles[0])!;
+        await this.executeHotModuleReplacement(
+          firstHmrFile,
+          invalidationChain,
+          filesMap,
+          hmrFiles,
         );
       }
-
-      // await Promise.all(affectedConnectors.map((connector) => connector.restart()));
-    }
-
-    if (nonConfigFsrFiles.length > 0) {
-      if (nonConfigFsrFiles.length === 1) {
-        devLogFSR(nonConfigFsrFiles[0]);
-      } else {
-        devLogFSR(`${nonConfigFsrFiles.length} files`);
-      }
-    }
-
-    if (hmrFiles.length > 0 && fsrFiles.length === 0) {
-      if (hmrFiles.length === 1) {
-        const dependentCount = this.dependencyGraph.getInvalidationChain(hmrFiles[0]).length - 1;
-        devLogHMR(hmrFiles[0], dependentCount > 0 ? dependentCount : undefined);
-      } else {
-        hmrFiles.forEach(file => {
-          const dependentCount = this.dependencyGraph.getInvalidationChain(file).length - 1;
-          devLogHMR(file, dependentCount > 0 ? dependentCount : undefined);
-        });
-      }
-    }
-
-    // Execute reload once for all files
-    const invalidationChain = Array.from(allInvalidatedFiles);
-
-    if (fsrFiles.length > 0) {
-      // If any file requires FSR, do FSR for all
-      const firstFsrFile = filesMap.get(fsrFiles[0])!;
-      await this.executeFullServerRestart(firstFsrFile, invalidationChain, filesMap);
-    } else {
-      // All files are HMR
-      const firstHmrFile = filesMap.get(hmrFiles[0])!;
-      await this.executeHotModuleReplacement(firstHmrFile, invalidationChain, filesMap);
+    } catch (error) {
+      console.log("ERRor in executeFullServerRestart: ", error);
     }
   }
 
@@ -137,7 +124,6 @@ export class LayerExecutor {
     for (const relativePath of invalidationChain) {
       const file = filesMap.get(relativePath);
       if (file && file.layer === "FSR") {
-
         return "FSR";
       }
     }
@@ -155,8 +141,11 @@ export class LayerExecutor {
   ): Promise<void> {
     // Step 1: Handle config files specially
     const configFiles = invalidationChain
-      .map((path) => filesMap.get(path))
-      .filter((file): file is FileManager => file !== undefined && file.type === "config");
+      .map(path => filesMap.get(path))
+      .filter(
+        (file): file is FileManager =>
+          file !== undefined && file.type === "config",
+      );
 
     if (configFiles.length > 0) {
       // Reload config files first
@@ -193,19 +182,24 @@ export class LayerExecutor {
     changedFile: FileManager,
     invalidationChain: string[],
     filesMap: Map<string, FileManager>,
+    hmrFiles: string[],
   ): Promise<void> {
     // Step 1: Clear module cache for invalidation chain
     this.clearModuleCacheForChain(invalidationChain, filesMap);
 
     // Step 2: Reload affected modules
     await this.reloadAffectedModules(invalidationChain, filesMap);
+
+    await this.restartAffectedConnectors(hmrFiles);
   }
 
   /**
    * Restart connectors that are affected by the changed files
    */
-  private async restartAffectedConnectors(affectedFiles: string[]): Promise<void> {
-    const connectorsToRestart = this.connectors.filter((connector) =>
+  private async restartAffectedConnectors(
+    affectedFiles: string[],
+  ): Promise<void> {
+    const connectorsToRestart = this.connectors.filter(connector =>
       connector.shouldRestart(affectedFiles),
     );
 
@@ -215,7 +209,7 @@ export class LayerExecutor {
 
     // Restart in priority order
     for (const connector of connectorsToRestart) {
-      await connector.restart();
+      connector.restart();
     }
   }
 
@@ -232,9 +226,7 @@ export class LayerExecutor {
         this.moduleLoader.clearModuleCache(file.absolutePath);
 
         // Update module version for HMR cache busting
-        if (typeof (global as any).__updateModuleVersion === "function") {
-          (global as any).__updateModuleVersion(`./${file.cachePath}`, Date.now());
-        }
+        __updateModuleVersion(`./${file.cachePath}`, Date.now());
       }
     }
   }
@@ -244,7 +236,9 @@ export class LayerExecutor {
    * This includes main, routes, events, locales
    * Special files are reloaded if they are in the invalidation chain OR if they depend on files in the chain
    */
-  private async reloadAffectedSpecialFiles(invalidationChain: string[]): Promise<void> {
+  private async reloadAffectedSpecialFiles(
+    invalidationChain: string[],
+  ): Promise<void> {
     // Helper to check if a file is affected (either in chain or depends on chain)
     const isAffected = (file: FileManager): boolean => {
       // Direct match: file itself is in the chain
@@ -261,13 +255,21 @@ export class LayerExecutor {
     };
 
     // Check which special files are affected
-    const affectedMainFiles = this.specialFilesCollector.getMainFiles().filter(isAffected);
+    const affectedMainFiles = this.specialFilesCollector
+      .getMainFiles()
+      .filter(isAffected);
 
-    const affectedRouteFiles = this.specialFilesCollector.getRouteFiles().filter(isAffected);
+    const affectedRouteFiles = this.specialFilesCollector
+      .getRouteFiles()
+      .filter(isAffected);
 
-    const affectedEventFiles = this.specialFilesCollector.getEventFiles().filter(isAffected);
+    const affectedEventFiles = this.specialFilesCollector
+      .getEventFiles()
+      .filter(isAffected);
 
-    const affectedLocaleFiles = this.specialFilesCollector.getLocaleFiles().filter(isAffected);
+    const affectedLocaleFiles = this.specialFilesCollector
+      .getLocaleFiles()
+      .filter(isAffected);
 
     // Reload affected special files
     if (affectedMainFiles.length > 0) {
@@ -320,22 +322,41 @@ export class LayerExecutor {
     };
 
     // Check which special files are affected
-    const affectedMainFiles = this.specialFilesCollector.getMainFiles().filter(isAffected);
+    const affectedMainFiles = this.specialFilesCollector
+      .getMainFiles()
+      .filter(isAffected);
 
-    const affectedRouteFiles = this.specialFilesCollector.getRouteFiles().filter(isAffected);
+    const affectedConfigFiles = this.specialFilesCollector
+      .getConfigFiles()
+      .filter(isAffected);
 
-    const affectedEventFiles = this.specialFilesCollector.getEventFiles().filter(isAffected);
+    const affectedRouteFiles = this.specialFilesCollector
+      .getRouteFiles()
+      .filter(isAffected);
 
-    const affectedLocaleFiles = this.specialFilesCollector.getLocaleFiles().filter(isAffected);
+    const affectedEventFiles = this.specialFilesCollector
+      .getEventFiles()
+      .filter(isAffected);
+
+    const affectedLocaleFiles = this.specialFilesCollector
+      .getLocaleFiles()
+      .filter(isAffected);
 
     const hasSpecialFiles =
       affectedMainFiles.length > 0 ||
       affectedRouteFiles.length > 0 ||
       affectedEventFiles.length > 0 ||
-      affectedLocaleFiles.length > 0;
+      affectedLocaleFiles.length > 0 ||
+      affectedConfigFiles.length > 0;
 
     if (!hasSpecialFiles) {
       return;
+    }
+
+    if (affectedConfigFiles.length > 0) {
+      for (const file of affectedConfigFiles) {
+        await this.configLoader.reloadConfig(file);
+      }
     }
 
     // Reload special files
