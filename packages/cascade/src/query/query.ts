@@ -264,8 +264,8 @@ export class Query {
    */
   public async increment(
     collection: string,
-    filter: Filter,
     field: string,
+    filter: Filter,
     amount: number = 1,
   ) {
     const query = this.query(collection);
@@ -282,8 +282,8 @@ export class Query {
    */
   public async decrement(
     collection: string,
-    filter: Filter,
     field: string,
+    filter: Filter,
     amount: number = 1,
   ) {
     const query = this.query(collection);
@@ -354,6 +354,10 @@ export class Query {
       returnDocument: "after",
       ...options,
     });
+
+    // if (collection === "products") {
+    //   console.log("Replace result", filter, result);
+    // }
 
     const output = result?.ok ? result.value : null;
 

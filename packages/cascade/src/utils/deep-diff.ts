@@ -9,9 +9,11 @@ export function deepDiff<T>(obj1: T, obj2: T): Diff<T> {
 
   function compareValues(value1: any, value2: any): boolean {
     if (typeof value1 !== typeof value2) return false;
+
     if (typeof value1 === "object" && value1 !== null && value2 !== null) {
       return JSON.stringify(value1) === JSON.stringify(value2);
     }
+
     return value1 === value2;
   }
 

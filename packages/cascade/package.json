@@ -1,12 +1,12 @@
 {
     "name": "@warlock.js/cascade",
-    "version": "2.8.10",
+    "version": "4.0.2",
     "description": "ORM for managing databases",
-    "main": "src/index.ts",
+    "main": "./cjs/index.js",
     "dependencies": {
         "@mongez/events": "^2.1.0",
-        "@warlock.js/logger": "2.8.10",
-        "@mongez/reinforcements": "^2.3.10",
+        "@warlock.js/logger": "4.0.2",
+        "@mongez/reinforcements": "^2.3.12",
         "@mongez/supportive-is": "^2.0.0",
         "@mongez/time-wizard": "^1.0.6",
         "dayjs": "^1.11.9",
@@ -56,5 +56,7 @@
         "aggregate-framework"
     ],
     "author": "hassanzohdy",
-    "license": "MIT"
+    "license": "MIT",
+    "module": "./esm/index.js",
+    "typings": "./cjs/index.d.ts"
 }

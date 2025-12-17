@@ -121,6 +121,19 @@ export class Connection {
   }
 
   /**
+   * Disconnect from the database
+   */
+  public async disconnect() {
+    if (!this.isConnectionEstablished) return;
+
+    await this.client.close();
+
+    this.isConnectionEstablished = false;
+
+    this.trigger("close", this);
+  }
+
+  /**
    * Check if the connection is established
    */
   public isConnected() {

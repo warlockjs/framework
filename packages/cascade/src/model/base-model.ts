@@ -240,7 +240,7 @@ export abstract class BaseModel {
     }
 
     // check if there a `serialize` object in the model
-    const serialize = this.getStaticProperty("serialize" as any);
+    const serialize = this.getStaticProperty("serializeModel" as any);
 
     // if there is a serialize object
     if (serialize) {
@@ -252,7 +252,7 @@ export abstract class BaseModel {
     return (this as any).publicData;
   }
 
-  protected static async serialize(model: Model) {
+  protected static async serializeModel(model: Model) {
     const serializeOnly = this.serializeOnly;
 
     if (serializeOnly) {
