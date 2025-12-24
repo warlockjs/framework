@@ -1,6 +1,6 @@
 {
     "name": "@warlock.js/core",
-    "version": "4.0.13",
+    "version": "4.0.14",
     "description": "A robust nodejs framework for building blazing fast applications",
     "main": "./esm/index.js",
     "bin": {
