@@ -5,10 +5,7 @@ export const VALID_RULE: RuleResult = {
   isValid: true,
 };
 
-export const invalidRule = (
-  rule: ContextualSchemaRule,
-  context: SchemaContext,
-): RuleResult => {
+export const invalidRule = (rule: ContextualSchemaRule, context: SchemaContext): RuleResult => {
   const attributes = { ...rule.context.options, ...context.allValues };
 
   attributes.input = context.path || context.key || "data";
@@ -40,7 +37,7 @@ export const invalidRule = (
       attributes[key] =
         rule.context.attributesList?.[value] ||
         rule.context.attributesList?.[key] ||
-        translator({
+        translator?.({
           attribute: rule.context.translatedAttributes[key] || value,
           context,
           rule,
