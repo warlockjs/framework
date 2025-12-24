@@ -10,6 +10,7 @@ export * from "./cli";
 export * from "./config";
 export * from "./database";
 export * from "./dev2-server/connectors";
+export * from "./dev2-server/health-checker";
 export * from "./http";
 export * from "./image";
 export * from "./logger";
