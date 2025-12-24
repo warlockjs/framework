@@ -217,6 +217,8 @@ async function resolveImports(imports: ImportSpecifier[], filePath: string) {
       continue;
     }
 
+    // console.log(importPath, tsconfigManager.isAlias(importPath));
+
     // Skip external node_modules packages (not starting with . or alias)
     if (!importPath.startsWith(".") && !tsconfigManager.isAlias(importPath)) {
       continue;

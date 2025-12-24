@@ -16,15 +16,18 @@ export class TSConfigManager {
   /**
    * TSConfig
    */
-  public tsconfig: any = {};
+  public tsconfig: any;
 
   public async init() {
+    if (this.tsconfig) return;
+
     // use typescript to load the tsconfig.json file
     const output = await ts.readConfigFile(Path.toAbsolute("tsconfig.json"), ts.sys.readFile);
 
     this.tsconfig = output.config!;
 
     this.aliases = output.config?.compilerOptions?.paths || {};
+
     this.baseUrl = output.config?.compilerOptions?.baseUrl || ".";
   }
 
@@ -36,6 +39,10 @@ export class TSConfigManager {
    * External package aliases map to themselves with @ prefix (e.g., @warlock.js/core -> @warlock.js/core)
    */
   public isAlias(path: string) {
+    if (!this.tsconfig) {
+      throw new Error("TSConfigManager is not initialized, please initialize it first");
+    }
+
     return Object.keys(this.aliases).some((alias) => {
       // Remove /* from alias pattern for matching
       const aliasPattern = alias.replace("/*", "");

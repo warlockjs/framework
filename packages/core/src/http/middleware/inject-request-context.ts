@@ -11,6 +11,7 @@ import {
   BadRequestError,
   ForbiddenError,
   ResourceNotFoundError,
+  ServerError,
   UnAuthorizedError,
 } from "../errors";
 import { type Request } from "../request";
@@ -32,7 +33,7 @@ export function createRequestStore(
   response: Response,
 ): Promise<ReturnedResponse> {
   // store the request and response in the context
-  return new Promise<ReturnedResponse>(resolve => {
+  return new Promise<ReturnedResponse>((resolve) => {
     asyncLocalStorage.run(
       {
         request,
@@ -88,6 +89,13 @@ export function createRequestStore(
 
           if (error instanceof BadRequestError) {
             return response.badRequest({
+              error: error.message,
+              ...error.payload,
+            });
+          }
+
+          if (error instanceof ServerError) {
+            return response.serverError({
               error: error.message,
               ...error.payload,
             });
