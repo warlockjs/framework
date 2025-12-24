@@ -1,4 +1,3 @@
-import type { Faker } from "@faker-js/faker";
 import type { ObjectId, WithId } from "mongodb";
 import type { Model } from "./model";
 
@@ -11,11 +10,6 @@ export type PrimaryIdType = string | number | ObjectId;
  * Base model to be extended with Child Models
  */
 export type ChildModel<T> = typeof Model & (new () => T);
-
-/**
- * Factory creator callback
- */
-export type FactoryCreatorCallback = (faker: Faker, index: number) => Document;
 
 /**
  * Find or create options

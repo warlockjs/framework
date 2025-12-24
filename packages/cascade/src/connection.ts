@@ -40,9 +40,7 @@ export class Connection {
   /**
    * Connect to the database
    */
-  public async connect(
-    databaseConfigurations?: DatabaseConfigurations & MongoClientOptions,
-  ) {
+  public async connect(databaseConfigurations?: DatabaseConfigurations & MongoClientOptions) {
     if (this.isConnectionEstablished) return;
 
     if (databaseConfigurations) {
@@ -106,7 +104,7 @@ export class Connection {
         log.warn(
           "database",
           "connection",
-          "Connected, but you are not making a secure authenticated connection!",
+          "Connected without authentication, It's highly recommended to use username and password for authentication!",
         );
       } else {
         log.success("database", "connection", "Connected to the database");
@@ -158,9 +156,7 @@ export class Connection {
    * Use another database
    */
   public useDatabase(name: string) {
-    return new Database()
-      .setDatabase((this.client as MongoClient).db(name))
-      .setConnection(this);
+    return new Database().setDatabase((this.client as MongoClient).db(name)).setConnection(this);
   }
 }
 
