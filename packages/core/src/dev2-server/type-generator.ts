@@ -689,7 +689,7 @@ ${keyEntries}
 
     const childProcess = spawn(
       isDevServeCore ? "yarn" : "npx",
-      [isDevServeCore ? "cli" : "warlock", "generate.typings", "--files=" + files.join(",")],
+      [isDevServeCore ? "cli" : "warlock", "generate.typings"],
       {
         stdio: "inherit",
         cwd: process.cwd(),

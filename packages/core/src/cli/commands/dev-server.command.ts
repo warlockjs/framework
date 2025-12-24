@@ -1,4 +1,4 @@
-import { DevelopmentServer } from "../../dev2-server/development-server";
+import { startDevelopmentServer } from "../../dev2-server/start-development-server";
 import { command } from "../cli-command";
 import { displayStartupBanner } from "../cli-commands.utils";
 
@@ -15,8 +15,6 @@ export const devServerCommand = command({
     await displayStartupBanner();
   },
   action: async () => {
-    const server = new DevelopmentServer();
-
-    await server.start();
+    await startDevelopmentServer();
   },
 }).option("--fresh", "Start Fresh Development server");
