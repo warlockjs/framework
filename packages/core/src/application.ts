@@ -1,12 +1,3 @@
-import { setupCache, setupDatabase } from "./bootstrap/setup";
-import { createHttpApplication } from "./http";
-
-export async function startHttpApplication() {
-  setupCache();
-  setupDatabase();
-  createHttpApplication();
-}
-
 export type AppConfigurations = {
   /**
    * App name

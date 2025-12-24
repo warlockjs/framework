@@ -2,6 +2,7 @@ import config from "@mongez/config";
 import { registerHttpPlugins } from "../../http/plugins";
 import { getServer, startServer } from "../../http/server";
 import { router } from "../../router/router";
+import { environment } from "../../utils";
 import { setBaseUrl } from "../../utils/urls";
 import { devLogError, devLogInfo, devLogSuccess } from "../dev-logger";
 import { BaseConnector } from "./base-connector";
@@ -12,7 +13,7 @@ import { ConnectorPriority } from "./types";
  * Manages HTTP server (Fastify) lifecycle
  */
 export class HttpConnector extends BaseConnector {
-  public readonly name = "HTTP Server";
+  public readonly name = "http";
   public readonly priority = ConnectorPriority.HTTP;
 
   /**
@@ -25,13 +26,6 @@ export class HttpConnector extends BaseConnector {
    * Initialize HTTP server
    */
   public async start(): Promise<void> {
-    // TODO: Implement actual HTTP server initialization
-    // - Check if config/http.ts exists
-    // - Load HTTP configuration
-    // - Initialize Fastify
-    // - Setup wildcard route for internal routing
-    // - Start listening on configured port
-    // - Handle startup errors
     const httpConfig = config.get("http");
 
     if (!httpConfig) return;
@@ -43,13 +37,17 @@ export class HttpConnector extends BaseConnector {
 
     await registerHttpPlugins(server);
 
-    router.scanDevServer(server);
+    if (environment() === "production") {
+      router.scan(server);
+    } else {
+      router.scanDevServer(server);
+    }
 
     try {
       // 👇🏻 We can use the url of the server
       await server.listen({
         port,
-        host: httpConfig.host,
+        host: httpConfig.host || "localhost",
       });
 
       const baseUrl = config.get("app.baseUrl");

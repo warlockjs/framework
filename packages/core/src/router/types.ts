@@ -2,12 +2,6 @@ import type { GenericObject } from "@mongez/reinforcements";
 import type { ObjectValidator } from "@warlock.js/seal";
 import type { RouteShorthandOptions } from "fastify";
 import type { Request, Response, ReturnedResponse } from "../http";
-import type {
-  PostmanExample,
-  PostmanRequestEvent,
-  PostmanVariable,
-} from "../postman";
-import type { Rule, Validation, ValidationSchema } from "../validator";
 
 /**
  * Middleware response
@@ -21,20 +15,6 @@ export type MiddlewareResponse = ReturnedResponse | undefined | void;
  */
 export type Middleware = {
   (request: Request, response: Response): MiddlewareResponse;
-  /**
-   * Postman configurations
-   * Used only when generating postman
-   */
-  postman?: {
-    /**
-     * Called when collecting variables
-     */
-    onCollectingVariables?: (variables: PostmanVariable[]) => void;
-    /**
-     * Called when adding the request to the collection
-     */
-    onAddingRequest?: (postmanRequest: PostmanRequestEvent) => void;
-  };
 };
 
 export type RouterGroupCallback = () => void;
@@ -44,26 +24,11 @@ export type RouteHandlerType = RouteHandler | [GenericObject, string];
 /**
  * Resource standard methods
  */
-export type ResourceMethod =
-  | "list"
-  | "get"
-  | "create"
-  | "update"
-  | "delete"
-  | "patch";
+export type ResourceMethod = "list" | "get" | "create" | "update" | "delete" | "patch";
 
 export type RestfulMiddleware = Record<string, [Middleware]>;
 
 export type RouteHandlerValidation = {
-  /**
-   * Validation rules
-   *
-   * @deprecated use schema instead
-   */
-  rules?:
-    | ValidationSchema
-    | Validation
-    | Record<string, ValidationSchema | (string | Rule)[]>;
   /**
    * Validation custom message
    */
@@ -113,10 +78,6 @@ export interface RequestControllerContract {
    * Request description
    */
   description?: string;
-  /**
-   * Request validation rules
-   */
-  rules?: () => ValidationSchema | Validation;
   /**
    * Request validation middleware
    */
@@ -238,31 +199,8 @@ export type Route = RouteOptions & {
    * this will be used for generating the documentation
    */
   $prefixStack: string[];
-  /**
-   * Route configurations
-   * Used only when generating postman
-   */
-  postman?: {
-    /**
-     * Define examples for the response
-     */
-    examples?: PostmanExample[];
-    /**
-     * Postman label
-     */
-    label?: string;
-    /**
-     * Postman description
-     */
-    description?: string;
-    /**
-     * Postman folder path (namespace)
-     */
-    namespace?: string;
-  };
 };
-export type PartialPick<T, F extends keyof T> = Omit<T, F> &
-  Partial<Pick<T, F>>;
+export type PartialPick<T, F extends keyof T> = Omit<T, F> & Partial<Pick<T, F>>;
 
 /**
  * Grouped routes options

@@ -1,11 +1,13 @@
 import events from "@mongez/events";
 import { getFileAsync, lastModifiedAsync, putFileAsync } from "@mongez/fs";
 import crypto from "crypto";
+import { pathToFileURL } from "url";
 import { DEV_SERVER_EVENTS } from "./events";
+import { type FileOperations } from "./file-operations";
 import { transformImports } from "./import-transformer";
 import { parseImports } from "./parse-imports";
 import { Path } from "./path";
-import { transpile } from "./transpile-file";
+import { transpileFile } from "./transpile-file";
 import type { FileManifest, FileState, FileType, LayerType } from "./types";
 import { warlockCachePath } from "./utils";
 
@@ -60,6 +62,11 @@ export class FileManager {
    */
   public cachePath = "";
   /**
+   * File cleanup function
+   */
+  public cleanup?: () => void;
+
+  /**
    * Whether imports have been transformed to cache paths
    */
   public importsTransformed = false;
@@ -81,6 +88,7 @@ export class FileManager {
   public constructor(
     public readonly absolutePath: string,
     public files: Map<string, FileManager>,
+    public fileOperations: FileOperations,
   ) {}
 
   /**
@@ -103,6 +111,15 @@ export class FileManager {
     await this.loadFromManifest(fileManifest);
     // Import transformation will happen later in FilesOrchestrator.transformAllImports()
     // for files that were reprocessed (importsTransformed = false)
+  }
+
+  /**
+   * Get cached file path ready for dynamic import
+   */
+  public get cachePathUrl() {
+    if (!this.cachePath) return "";
+
+    return pathToFileURL(warlockCachePath(this.cachePath)).href;
   }
 
   /**
@@ -191,18 +208,98 @@ export class FileManager {
     const importMap = await parseImports(this.source, this.absolutePath);
 
     // Store dependencies as relative paths
-    this.dependencies = new Set(
-      Array.from(importMap.values()).map((absPath) => Path.toRelative(absPath)),
+    const importsRelativePaths = Array.from(importMap.values()).map((absPath) =>
+      Path.toRelative(absPath),
     );
+
+    this.dependencies = new Set(importsRelativePaths);
 
     // Store import map for later use in import transformation
     this.importMap = importMap;
 
+    const missingImports = Array.from(this.dependencies.values()).filter(
+      (relativePath) => !this.files.has(relativePath),
+    );
+
+    if (missingImports.length > 0) {
+      // if missing, try to find them first in their locations
+      await Promise.all(
+        missingImports.map((relativePath) => this.fileOperations.addFile(relativePath)),
+      );
+    }
+
     // STEP 2: Transpile source code
-    this.transpiled = await transpile(this);
+    this.transpiled = await transpileFile(this);
 
     // STEP 3: Save transpiled code to cache
     await putFileAsync(warlockCachePath(this.cachePath), this.transpiled);
+  }
+
+  /**
+   * Phase 1: Parse the file to discover dependencies
+   * Does NOT write cache yet - used for batch file processing
+   * to determine processing order
+   */
+  public async parseOnly(): Promise<void> {
+    this.state = "loading";
+
+    // Load source
+    this.source = await getFileAsync(this.absolutePath);
+    this.hash = crypto.createHash("sha256").update(this.source).digest("hex");
+    this.relativePath = Path.toRelative(this.absolutePath);
+    this.lastModified = (await lastModifiedAsync(this.absolutePath)).getTime();
+    this.version = 0;
+
+    // Detect type and layer
+    this.detectFileTypeAndLayer();
+    this.cachePath = this.relativePath.replace(/\//g, "-").replace(/\.(ts|tsx)$/, ".js");
+
+    // Parse imports to discover dependencies
+    const importMap = await parseImports(this.source, this.absolutePath);
+    this.dependencies = new Set(
+      Array.from(importMap.values()).map((absPath) => Path.toRelative(absPath)),
+    );
+
+    this.importMap = importMap;
+
+    this.state = "parsed";
+  }
+
+  /**
+   * Phase 2: Complete processing (transpile, transform, write cache)
+   * Called after dependencies are ready
+   */
+  public async finalize(): Promise<void> {
+    // Re-parse imports to ensure importMap is populated correctly
+    // (During parseOnly(), some batch files may not have existed on disk yet)
+    const importMap = await parseImports(this.source, this.absolutePath);
+    this.dependencies = new Set(
+      Array.from(importMap.values()).map((absPath) => Path.toRelative(absPath)),
+    );
+
+    this.importMap = importMap;
+
+    // Check and add any missing dependencies first
+    const missingImports = Array.from(this.dependencies.values()).filter(
+      (relativePath) => !this.files.has(relativePath),
+    );
+
+    if (missingImports.length > 0) {
+      await Promise.all(
+        missingImports.map((relativePath) => this.fileOperations.addFile(relativePath)),
+      );
+    }
+
+    // Transpile
+    this.transpiled = await transpileFile(this);
+
+    this.importsTransformed = false;
+
+    // Transform imports to cache paths
+    await this.transformImports();
+
+    this.state = "ready";
+    events.trigger(DEV_SERVER_EVENTS.FILE_READY, this);
   }
 
   /**
@@ -267,7 +364,6 @@ export class FileManager {
    * Update file when changed during development
    */
   public async update() {
-    const now = performance.now();
     const newSource = await getFileAsync(this.absolutePath);
 
     // No change in content

@@ -13,6 +13,10 @@ export type AppConfigurations = {
    * @default en
    */
   localeCode?: string;
+  /**
+   * List of allowed locale codes in the app
+   */
+  locales?: string[];
 };
 
 export type Preload = "database" | "cache" | "http" | "watch";

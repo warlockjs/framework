@@ -1,23 +1,12 @@
 import { colors } from "@mongez/copper";
 import events from "@mongez/events";
-import { bootstrap } from "../bootstrap";
-import { registerConfigHandlers } from "./config-handlers";
-import { ConfigLoader } from "./config-loader";
-import type { Connector } from "./connectors";
-import { CacheConnector } from "./connectors/cache-connector";
-import { DatabaseConnector } from "./connectors/database-connector";
-import { HttpConnector } from "./connectors/http-connector";
-import {
-  devLogInfo,
-  devLogReady,
-  devLogSection,
-  devServeLog,
-} from "./dev-logger";
-import { FilesOrchestrator } from "./files-orchestrator";
+import { connectorsManager } from "./connectors/connectors-manager";
+import { devLogReady, devLogSection, devServeLog } from "./dev-logger";
+import { filesOrchestrator } from "./files-orchestrator";
 import { LayerExecutor } from "./layer-executor";
 import { ModuleLoader } from "./module-loader";
 import { initializeRuntimeImportHelper } from "./runtime-import-helper";
-import { SpecialFilesCollector } from "./special-files-collector";
+import { typeGenerator } from "./type-generator";
 
 /**
  * Development Server
@@ -25,23 +14,6 @@ import { SpecialFilesCollector } from "./special-files-collector";
  * Manages file system, connectors, and hot reloading
  */
 export class DevelopmentServer {
-  /**
-   * Special files collector - categorizes and provides access to special files
-   */
-  private readonly specialFilesCollector = new SpecialFilesCollector();
-
-  /**
-   * Files orchestrator - manages file discovery, watching, and dependency graph
-   */
-  private readonly filesOrchestrator = new FilesOrchestrator(
-    this.specialFilesCollector,
-  );
-
-  /**
-   * Config loader - dynamically loads configuration files
-   */
-  private readonly configLoader = new ConfigLoader();
-
   /**
    * Module loader - dynamically loads application modules
    */
@@ -53,35 +25,12 @@ export class DevelopmentServer {
   private layerExecutor?: LayerExecutor;
 
   /**
-   * Registered connectors (Database, HTTP, Cache, etc.)
-   * Sorted by priority
-   */
-  private readonly connectors: Connector[] = [];
-
-  /**
    * Whether the server is currently running
    */
   private running: boolean = false;
 
   public constructor() {
     devLogSection("Starting Development Server...");
-    // Register special config handlers
-    registerConfigHandlers(this.configLoader);
-
-    // Register default connectors
-    this.registerConnector(new DatabaseConnector());
-    this.registerConnector(new CacheConnector());
-    this.registerConnector(new HttpConnector());
-  }
-
-  /**
-   * Register a connector
-   * Connectors are automatically sorted by priority
-   */
-  public registerConnector(connector: Connector): void {
-    this.connectors.push(connector);
-    // Sort by priority (lower numbers first)
-    this.connectors.sort((a, b) => a.priority - b.priority);
   }
 
   /**
@@ -90,48 +39,36 @@ export class DevelopmentServer {
   public async start(): Promise<void> {
     try {
       const now = performance.now();
-      devLogInfo("Bootstrapping...");
-      // STEP 1: Bootstrap (load environment variables)
-      await bootstrap();
 
-      // STEP 2: Initialize file system (discover and process files)
-      await this.filesOrchestrator.init();
+      // STEP 1: Initialize file system (discover and process files)
+      await filesOrchestrator.init();
+      await filesOrchestrator.initiaizeAll();
 
-      devLogInfo("Initializing special files...");
+      // Start file watcher
+      await filesOrchestrator.watchFiles();
+
+      // devLogInfo("Initializing special files...");
       // STEP 3: Collect special files
-      this.specialFilesCollector.collect(this.filesOrchestrator.getFiles());
+      filesOrchestrator.specialFilesCollector.collect(filesOrchestrator.getFiles());
 
       // STEP 4: Initialize runtime import helper (for HMR cache busting)
-      devLogInfo("Initializing runtime import helper...");
+      // devLogInfo("Initializing runtime import helper...");
       initializeRuntimeImportHelper();
 
-      devLogInfo("Loading configuration files...");
-      // STEP 5: Load configuration files
-      const configFiles = this.specialFilesCollector.getConfigFiles();
-
-      await this.configLoader.loadAll(configFiles);
-
-      devLogInfo("Setting up event listeners...");
+      // devLogInfo("Setting up event listeners...");
       // STEP 6: Setup event listeners
       this.setupEventListeners();
 
       // STEP 7: Load application modules
-      devLogInfo("Loading application modules...");
-      this.moduleLoader = new ModuleLoader(this.specialFilesCollector);
-      await this.moduleLoader.loadAll();
-
-      // STEP 8: Initialize connectors
-      devLogInfo("Initializing connectors...");
-      await this.initConnectors();
+      // devLogInfo("Loading application modules...");
+      await filesOrchestrator.moduleLoader.loadAll();
 
       // STEP 9: Initialize layer executor
-      devLogInfo("Initializing layer executor...");
+      // devLogInfo("Initializing layer executor...");
       this.layerExecutor = new LayerExecutor(
-        this.filesOrchestrator.getDependencyGraph(),
-        this.specialFilesCollector,
-        this.connectors,
-        this.moduleLoader,
-        this.configLoader,
+        filesOrchestrator.getDependencyGraph(),
+        filesOrchestrator.specialFilesCollector,
+        filesOrchestrator.moduleLoader,
       );
 
       // Mark as running
@@ -139,24 +76,18 @@ export class DevelopmentServer {
 
       const duration = performance.now() - now;
 
-      devLogReady(
-        `Development Server is ready in ${colors.greenBright(parseDuration(duration))}`,
-      );
+      devLogReady(`Development Server is ready in ${colors.greenBright(parseDuration(duration))}`);
+
+      // Generate type definitions in background (non-blocking)
+      // Runs after server ready for fast startup
+      // typeGenerator.generateAll();
+      typeGenerator.executeGenerateAllCommand();
+      // Start health checks (non-blocking)
+      filesOrchestrator.startCheckingHealth();
     } catch (error) {
-      devServeLog(
-        colors.redBright(`❌ Failed to start Development Server: ${error}`),
-      );
+      devServeLog(colors.redBright(`❌ Failed to start Development Server: ${error}`));
       await this.shutdown();
       throw error;
-    }
-  }
-
-  /**
-   * Initialize all registered connectors in priority order
-   */
-  private async initConnectors(): Promise<void> {
-    for (const connector of this.connectors) {
-      await connector.start();
     }
   }
 
@@ -188,11 +119,7 @@ export class DevelopmentServer {
     }
 
     // Get all changed files (added + changed + deleted)
-    const allChangedPaths = [
-      ...batch.added,
-      ...batch.changed,
-      ...batch.deleted,
-    ];
+    const allChangedPaths = [...batch.added, ...batch.changed, ...batch.deleted];
 
     if (allChangedPaths.length === 0) {
       return;
@@ -201,49 +128,30 @@ export class DevelopmentServer {
     // Delegate to layer executor for batch reload
     try {
       await this.layerExecutor.executeBatchReload(
-        allChangedPaths,
-        this.filesOrchestrator.getFiles(),
+        [...batch.added, ...batch.changed],
+        filesOrchestrator.getFiles(),
+        batch.deleted,
       );
+
+      // Regenerate types if config files changed
+      typeGenerator.executeTypingsGenerator([...batch.added, ...batch.changed]);
+
+      filesOrchestrator.checkHealth({
+        added: batch.added,
+        changed: batch.changed,
+        deleted: batch.deleted,
+      });
     } catch (error) {
-      devServeLog(
-        colors.redBright(`❌ Failed to execute batch reload: ${error}`),
-      );
+      devServeLog(colors.redBright(`❌ Failed to execute batch reload: ${error}`));
     }
-  }
-
-  /**
-   * @deprecated Use LayerExecutor instead
-   */
-  private async handleFullServerRestart(
-    connectorsToRestart: Connector[],
-    affectedFiles: string[],
-  ): Promise<void> {
-    devServeLog(
-      colors.yellowBright(
-        `🔄 FSR: Restarting ${connectorsToRestart.length} connector(s)...`,
-      ),
-    );
-    devServeLog(
-      colors.yellowBright(`   Affected files: ${affectedFiles.length} file(s)`),
-    );
-
-    for (const connector of connectorsToRestart) {
-      try {
-        await connector.restart();
-      } catch (error) {
-        devServeLog(
-          colors.redBright(`❌ Failed to restart ${connector.name}: ${error}`),
-        );
-      }
-    }
-
-    devServeLog(colors.greenBright(`✅ FSR completed`));
   }
 
   /**
    * Gracefully shutdown the development server
    */
   public async shutdown(): Promise<void> {
+    console.log("Shutting down...");
+
     if (!this.running) {
       return;
     }
@@ -253,17 +161,7 @@ export class DevelopmentServer {
     this.running = false;
 
     // Shutdown connectors in reverse priority order
-    const reversedConnectors = [...this.connectors].reverse();
-
-    for (const connector of reversedConnectors) {
-      try {
-        await connector.shutdown();
-      } catch (error) {
-        devServeLog(
-          colors.redBright(`❌ Failed to shutdown ${connector.name}: ${error}`),
-        );
-      }
-    }
+    await connectorsManager.shutdown();
 
     devServeLog(colors.greenBright("✅ Development Server stopped"));
   }
@@ -276,38 +174,10 @@ export class DevelopmentServer {
   }
 
   /**
-   * Get files orchestrator (for advanced usage)
-   */
-  public getFilesOrchestrator(): FilesOrchestrator {
-    return this.filesOrchestrator;
-  }
-
-  /**
-   * Get special files collector
-   */
-  public getSpecialFilesCollector(): SpecialFilesCollector {
-    return this.specialFilesCollector;
-  }
-
-  /**
-   * Get config loader
-   */
-  public getConfigLoader(): ConfigLoader {
-    return this.configLoader;
-  }
-
-  /**
    * Get module loader
    */
   public getModuleLoader(): ModuleLoader | undefined {
     return this.moduleLoader;
-  }
-
-  /**
-   * Get registered connectors
-   */
-  public getConnectors(): Connector[] {
-    return [...this.connectors];
   }
 }
 

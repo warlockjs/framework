@@ -1,0 +1,82 @@
+import type { CLICommand } from "../cli/cli-command";
+import type { FileHealthCheckerContract } from "../dev2-server/health-checker/file-health-checker.contract";
+
+/**
+ * Resolved Warlock Configuration
+ *
+ * This is the final configuration after merging user config with defaults
+ */
+export type WarlockConfig = {
+  /**
+   * Server configuration
+   */
+  server?: {
+    port?: number;
+    host?: string;
+    retryOtherPort?: boolean;
+  };
+
+  /**
+   * Build configuration
+   */
+  build?: {
+    /**
+     * Output directory
+     *
+     * @default dist
+     */
+    outDirectory?: string;
+    /**
+     * Output file
+     *
+     * @default app.js
+     */
+    outFile?: string;
+    /**
+     * Minify output
+     *
+     * @default true
+     */
+    minify?: boolean;
+    /**
+     * Generate sourcemap
+     *
+     * @default true
+     */
+    sourcemap?: boolean | "inline" | "linked";
+  };
+
+  /**
+   * CLI configuration
+   */
+  cli?: {
+    commands?: CLICommand[];
+  };
+
+  /**
+   * Development server configuration
+   */
+  devServer?: {
+    /**
+     * Watch configuration
+     */
+    watch?: {
+      /**
+       * Glob patterns to include in file watching
+       *
+       * @default ["**\/*.{ts,tsx}"]
+       */
+      include?: string[];
+      /**
+       * Glob patterns to exclude from file watching
+       *
+       * @default ["**\/node_modules\/**", "**\/dist\/**", "**\/.warlock\/**", "**\/.git\/**"]
+       */
+      exclude?: string[];
+    };
+    /**
+     * Custom health checkers
+     */
+    healthCheckers?: FileHealthCheckerContract[];
+  };
+};

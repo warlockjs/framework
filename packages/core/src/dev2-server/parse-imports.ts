@@ -1,4 +1,4 @@
-import { fileExists, fileExistsAsync, isDirectoryAsync } from "@mongez/fs";
+import { fileExistsAsync, isDirectoryAsync } from "@mongez/fs";
 import { ImportSpecifier, parse } from "es-module-lexer";
 import path from "node:path";
 import { Path } from "./path";
@@ -23,10 +23,7 @@ function extractImportPathsWithRegex(
    */
   const isTypeOnlyImport = (line: string): boolean => {
     const trimmed = line.trim();
-    return (
-      trimmed.startsWith("import type ") ||
-      !!trimmed.match(/^import\s+type\s+[\{\*]/)
-    );
+    return trimmed.startsWith("import type ") || !!trimmed.match(/^import\s+type\s+[\{\*]/);
   };
 
   /**
@@ -36,7 +33,7 @@ function extractImportPathsWithRegex(
    */
   const hasRuntimeImports = (line: string): boolean => {
     const trimmed = line.trim();
-    
+
     // If it's a pure type-only import, no runtime imports
     if (isTypeOnlyImport(trimmed)) {
       return false;
@@ -51,12 +48,12 @@ function extractImportPathsWithRegex(
     }
 
     const specifiers = specifiersMatch[1];
-    
+
     // Split by comma and check each specifier
-    const items = specifiers.split(',').map(s => s.trim());
-    
+    const items = specifiers.split(",").map((s) => s.trim());
+
     // Check if ALL items are type-only (prefixed with "type ")
-    const allTypeOnly = items.every(item => {
+    const allTypeOnly = items.every((item) => {
       // Match: "type Foo" or "type Foo as Bar"
       return /^type\s+\w+/.test(item);
     });
@@ -68,24 +65,25 @@ function extractImportPathsWithRegex(
 
   // Pattern 1: Standard ES module imports (handles multiline)
   // Matches: import { ... } from "path", import Foo from "path", import Foo, { ... } from "path"
-  const importRegex = /import\s+(?:type\s+)?(\{[\s\S]*?\}|\*\s+as\s+\w+|\w+(?:\s*,\s*\{[\s\S]*?\})?)\s+from\s+['"]([^'"]+)['"]/g;
-  
+  const importRegex =
+    /import\s+(?:type\s+)?(\{[\s\S]*?\}|\*\s+as\s+\w+|\w+(?:\s*,\s*\{[\s\S]*?\})?)\s+from\s+['"]([^'"]+)['"]/g;
+
   let match;
   while ((match = importRegex.exec(source)) !== null) {
     const fullMatch = match[0];
     const importSpecifier = match[1];
     const importPath = match[2];
-    
+
     // Skip type-only imports
     if (fullMatch.match(/^import\s+type\s+/)) {
       continue;
     }
-    
+
     // Skip if it's a mixed import with only types
     if (!hasRuntimeImports(fullMatch)) {
       continue;
     }
-    
+
     if (importPath && !seenPaths.has(importPath)) {
       seenPaths.add(importPath);
       imports.push({
@@ -94,7 +92,7 @@ function extractImportPathsWithRegex(
       });
     }
   }
-  
+
   // Pattern 1b: Side-effect imports - import "path"
   const sideEffectRegex = /import\s+['"]([^'"]+)['"]/g;
   while ((match = sideEffectRegex.exec(source)) !== null) {
@@ -123,16 +121,15 @@ function extractImportPathsWithRegex(
 
   // Pattern 3: Export from - export ... from "path"
   // Skip export type statements (e.g., export type { Foo } from "module")
-  const exportFromPattern =
-    /export\s+(?:\{[^}]*\}|\*|\w+)\s+from\s+['"]([^'"]+)['"]/g;
+  const exportFromPattern = /export\s+(?:\{[^}]*\}|\*|\w+)\s+from\s+['"]([^'"]+)['"]/g;
   while ((match = exportFromPattern.exec(source)) !== null) {
     const fullMatch = match[0];
-    
+
     // Skip type-only exports: export type ... from "module"
     if (/^export\s+type\s+/.test(fullMatch)) {
       continue;
     }
-    
+
     const importPath = match[1];
     if (importPath && !seenPaths.has(importPath)) {
       seenPaths.add(importPath);
@@ -288,18 +285,24 @@ async function resolveRelativeImport(
 // Cache for file existence checks to avoid redundant filesystem calls
 const fileExistsCache = new Map<string, boolean>();
 
+/**
+ * Clear the file exists cache
+ * Should be called when new files are created to ensure fresh lookups
+ */
+export function clearFileExistsCache(): void {
+  fileExistsCache.clear();
+}
+
 async function cachedFileExists(filePath: string): Promise<boolean> {
   if (fileExistsCache.has(filePath)) {
     return fileExistsCache.get(filePath)!;
   }
-  const exists = await fileExistsAsync(filePath);
+  const exists = (await fileExistsAsync(filePath)) as boolean;
   fileExistsCache.set(filePath, exists);
   return exists;
 }
 
-async function tryResolveWithExtensions(
-  basePath: string,
-): Promise<string | null> {
+async function tryResolveWithExtensions(basePath: string): Promise<string | null> {
   // Normalize the base path first (handle Windows paths)
   const normalizedBase = Path.normalize(basePath);
 
@@ -318,11 +321,11 @@ async function tryResolveWithExtensions(
   }
 
   // Try all extensions in parallel for better performance
-  const pathsToCheck = extensions.map(extension => normalizedBase + extension);
+  const pathsToCheck = extensions.map((extension) => normalizedBase + extension);
   const results = await Promise.all(
-    pathsToCheck.map(async p => ({ path: p, exists: await cachedFileExists(p) }))
+    pathsToCheck.map(async (p) => ({ path: p, exists: await cachedFileExists(p) })),
   );
-  
+
   // Return the first one that exists (in order of preference)
   for (const result of results) {
     if (result.exists) {
@@ -332,13 +335,13 @@ async function tryResolveWithExtensions(
 
   // Try index files in directory
   if (await isDirectoryAsync(normalizedBase)) {
-    const indexPaths = extensions.map(extension => 
-      Path.join(normalizedBase, `index${extension}`)
+    const indexPaths = extensions.map((extension) =>
+      Path.join(normalizedBase, `index${extension}`),
     );
     const indexResults = await Promise.all(
-      indexPaths.map(async p => ({ path: p, exists: await cachedFileExists(p) }))
+      indexPaths.map(async (p) => ({ path: p, exists: await cachedFileExists(p) })),
     );
-    
+
     for (const result of indexResults) {
       if (result.exists) {
         return result.path;

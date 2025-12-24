@@ -4,6 +4,7 @@ import type { DependencyGraph } from "./dependency-graph";
 import { DEV_SERVER_EVENTS } from "./events";
 import { FileManager } from "./file-manager";
 import type { ManifestManager } from "./manifest-manager";
+import { parseImports } from "./parse-imports";
 import { Path } from "./path";
 import type { SpecialFilesCollector } from "./special-files-collector";
 import { areSetsEqual, warlockCachePath } from "./utils";
@@ -39,10 +40,7 @@ export class FileOperations {
     }
 
     const absolutePath = Path.toAbsolute(relativePath);
-    const fileManager = new FileManager(absolutePath, this.files);
-
-    // Add to tracking
-    this.files.set(relativePath, fileManager);
+    const fileManager = new FileManager(absolutePath, this.files, this);
 
     // Initialize the file (load, transpile, transform imports)
     await fileManager.init();
@@ -53,11 +51,14 @@ export class FileOperations {
     }
 
     // Add to special files collector
-    this.specialFilesCollector?.addFile(fileManager);
+    this.specialFilesCollector.addFile(fileManager);
 
     // Check if any existing files were waiting for this dependency
     // (i.e., they have broken imports that can now be resolved)
     await this.reloadFilesWaitingForDependency(relativePath);
+
+    // Add to tracking
+    this.files.set(relativePath, fileManager);
 
     // Trigger event
     events.trigger(DEV_SERVER_EVENTS.FILE_READY, fileManager);
@@ -66,12 +67,54 @@ export class FileOperations {
   }
 
   /**
+   * Phase 1: Parse a new file (discover dependencies)
+   * Does NOT write cache or register in graph yet
+   * Used for batch file processing to determine processing order
+   */
+  public async parseNewFile(relativePath: string): Promise<FileManager> {
+    // Return existing if already tracked
+    if (this.files.has(relativePath)) {
+      return this.files.get(relativePath)!;
+    }
+
+    const absolutePath = Path.toAbsolute(relativePath);
+    const fileManager = new FileManager(absolutePath, this.files, this);
+
+    // Parse only - read source, parse imports, detect type
+    await fileManager.parseOnly();
+
+    // Add to files map early so other files can find it during import resolution
+    this.files.set(relativePath, fileManager);
+
+    return fileManager;
+  }
+
+  /**
+   * Phase 2: Finalize a new file (transpile, write cache, register)
+   * Called after dependencies are ready
+   */
+  public async finalizeNewFile(fileManager: FileManager): Promise<void> {
+    // Complete processing (transpile, transform imports, write cache)
+    await fileManager.finalize();
+
+    // Add to dependency graph
+    for (const dependency of fileManager.dependencies) {
+      this.dependencyGraph.addDependency(fileManager.relativePath, dependency);
+    }
+
+    // Add to special files collector
+    this.specialFilesCollector.addFile(fileManager);
+
+    // Check if any existing files were waiting for this dependency
+    await this.reloadFilesWaitingForDependency(fileManager.relativePath);
+  }
+
+  /**
    * Reload files that might have been waiting for this dependency
    * When a file is added, check if any existing files have imports
    * that could now resolve to this new file
    */
   private async reloadFilesWaitingForDependency(newFilePath: string): Promise<void> {
-    const { parseImports } = await import("./parse-imports");
     const newFileRelativePath = newFilePath;
     const potentialDependents: string[] = [];
 
@@ -84,7 +127,7 @@ export class FileOperations {
         const importMap = await parseImports(existingFile.source, existingFile.absolutePath);
 
         // Check if any import in the map resolves to the new file
-        for (const [importPath, resolvedPath] of importMap) {
+        for (const [_importPath, resolvedPath] of importMap) {
           if (resolvedPath && Path.toRelative(resolvedPath) === newFileRelativePath) {
             // This import could now be resolved! Add to dependents
             potentialDependents.push(existingPath);
@@ -193,7 +236,6 @@ export class FileOperations {
     this.specialFilesCollector.removeFile(relativePath);
 
     // Remove from tracking
-    this.files.delete(relativePath);
     this.manifest.removeFile(relativePath);
 
     // Trigger reload of dependents so they see the broken import error
@@ -204,6 +246,12 @@ export class FileOperations {
         events.trigger(DEV_SERVER_EVENTS.FILE_READY, dependentFile);
       }
     }
+
+    setTimeout(() => {
+      // wait some time begore removing it from the files map
+      // so that other operations could use the existing file manager there
+      this.files.delete(relativePath);
+    }, 300);
   }
 
   /**

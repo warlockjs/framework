@@ -8,13 +8,12 @@ import { log } from "@warlock.js/logger";
 import type { ValidationResult } from "@warlock.js/seal";
 import type { FastifyReply } from "fastify";
 import fs from "fs";
+import mime from "mime";
 import path from "path";
 import type React from "react";
 import { type ReactNode } from "react";
-import send from "send";
 import type { Route } from "../router";
 import { renderReact } from "./../react";
-import type { Validator } from "./../validator";
 import type { Request } from "./request";
 import type { ResponseEvent } from "./types";
 
@@ -101,10 +100,7 @@ export class Response {
    * Add event on sending response
    */
   public onSending(callback: any) {
-    this.events.set("sending", [
-      ...(this.events.get("sending") || []),
-      callback,
-    ]);
+    this.events.set("sending", [...(this.events.get("sending") || []), callback]);
 
     return this;
   }
@@ -197,7 +193,7 @@ export class Response {
    */
   protected static async trigger(event: ResponseEvent, ...args: any[]) {
     // make a timeout to make sure the request events is executed first
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       setTimeout(async () => {
         await events.triggerAllAsync(`response.${event}`, ...args);
         resolve(true);
@@ -259,11 +255,7 @@ export class Response {
 
     log({
       module: "response",
-      action:
-        this.route.method +
-        " " +
-        this.route.path.replace("/*", "") +
-        `:${this.request.id}`,
+      action: this.route.method + " " + this.route.path.replace("/*", "") + `:${this.request.id}`,
       message,
       type: level,
       context: {
@@ -404,10 +396,7 @@ export class Response {
   /**
    * Render the given react component
    */
-  public render(
-    element: React.ReactElement | React.ComponentType,
-    status = 200,
-  ) {
+  public render(element: React.ReactElement | React.ComponentType, status = 200) {
     return this.setStatusCode(status).html(renderReact(element));
   }
 
@@ -686,10 +675,7 @@ export class Response {
       filename = path.basename(filePath);
     }
 
-    this.baseResponse.header(
-      "Content-Disposition",
-      `attachment; filename="${filename}"`,
-    );
+    this.baseResponse.header("Content-Disposition", `attachment; filename="${filename}"`);
 
     // this.baseResponse.header("Content-Type", this.getFileContentType(filePath));
     this.baseResponse.header("Content-Type", "application/octet-stream");
@@ -700,35 +686,9 @@ export class Response {
   /**
    * Get content type of the given path
    */
-  public getFileContentType(path: string) {
-    const type = send.mime.lookup(path);
-    const charset = send.mime.charsets.lookup(type, "");
-    if (!charset) {
-      return type;
-    }
-    return `${type}; charset=${charset}`;
-  }
-
-  /**
-   * Return validation error to response
-   */
-  public validationFailed(validator: Validator) {
-    const responseErrorsKey = config.get("validation.keys.response", "errors");
-
-    const responseStatus = config.get("validation.responseStatus", 400);
-
-    log.error(
-      "request",
-      "validation",
-      `${this.request.id} - Validation failed`,
-    );
-
-    return this.send(
-      {
-        [responseErrorsKey]: validator.errors(),
-      },
-      responseStatus,
-    );
+  public getFileContentType(filePath: string) {
+    const type = mime.getType(filePath) || "application/octet-stream";
+    return type;
   }
 
   /**
@@ -740,15 +700,11 @@ export class Response {
     const inputError = config.get("validation.keys.inputError", "error");
     const responseStatus = config.get("validation.responseStatus", 400);
 
-    log.error(
-      "request",
-      "validation",
-      `${this.request.id} - Validation failed`,
-    );
+    log.error("request", "validation", `${this.request.id} - Validation failed`);
 
     return this.send(
       {
-        [responseErrorsKey]: result.errors.map(error => ({
+        [responseErrorsKey]: result.errors.map((error) => ({
           [inputKey]: error.input,
           [inputError]: error.error,
         })),

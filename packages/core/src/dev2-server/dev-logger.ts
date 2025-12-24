@@ -121,8 +121,8 @@ function cleanErrorStack(stack: string): string {
   return cleaned.join("\n");
 }
 
-// Format module not found errors
-export function formatModuleNotFoundError(error: Error): string {
+// Format module not found errors with enhanced context
+export function formatModuleNotFoundError(error: Error, suggestions?: string[]): string {
   const message = error.message;
 
   // Extract paths from error message
@@ -151,7 +151,29 @@ export function formatModuleNotFoundError(error: Error): string {
     const relativeModule = Path.toRelative(cleanModulePath);
     const relativeImporter = Path.toRelative(cleanImporterPath);
 
-    return `[MODULE_NOT_FOUND] Cannot find module ${colors.cyan(relativeModule)} imported from ${colors.cyan(relativeImporter)}`;
+    // Build formatted message
+    const lines: string[] = [
+      "",
+      `${colors.red("❌ MODULE NOT FOUND")}`,
+      "",
+      `${colors.dim("Cannot find:")} ${colors.cyan(relativeModule)}`,
+      "",
+      `${colors.dim("Imported by:")}`,
+      `  ${colors.yellow("→")} ${colors.white(relativeImporter)}`,
+    ];
+
+    // Add suggestions if provided
+    if (suggestions && suggestions.length > 0) {
+      lines.push("");
+      lines.push(`${colors.dim("Did you mean?")}`);
+      suggestions.forEach((s) => {
+        lines.push(`  ${colors.cyan("→")} ${colors.green(s)}`);
+      });
+    }
+
+    lines.push("");
+
+    return lines.join("\n");
   }
 
   return message;

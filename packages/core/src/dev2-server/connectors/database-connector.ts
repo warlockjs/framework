@@ -8,17 +8,13 @@ import { ConnectorPriority } from "./types";
  * Manages database connection lifecycle
  */
 export class DatabaseConnector extends BaseConnector {
-  public readonly name = "Database";
+  public readonly name = "database";
   public readonly priority = ConnectorPriority.DATABASE;
 
   /**
    * Files that trigger database restart
    */
-  protected readonly watchedFiles = [
-    ".env",
-    "src/config/database.ts",
-    "src/config/database.tsx",
-  ];
+  protected readonly watchedFiles = [".env", "src/config/database.ts", "src/config/database.tsx"];
 
   /**
    * Initialize database connection

@@ -1,4 +1,4 @@
-import Endpoint from "@mongez/http";
+import { Endpoint } from "@mongez/http";
 import type { AxiosResponse } from "axios";
 import crypto from "crypto";
 import { createWriteStream } from "fs";
@@ -10,9 +10,7 @@ export async function downloadFileFromUrl(
 ): Promise<AxiosResponse> {
   const fileExtension = (fileName || fileUrl).split(".").pop();
   fileName ??= crypto.randomBytes(16).toString("hex");
-  const writer = createWriteStream(
-    outputLocationPath + "/" + fileName + "." + fileExtension,
-  );
+  const writer = createWriteStream(outputLocationPath + "/" + fileName + "." + fileExtension);
 
   const request = new Endpoint({ baseURL: "" });
 
@@ -20,14 +18,14 @@ export async function downloadFileFromUrl(
     .get(fileUrl, {
       responseType: "stream",
     })
-    .then(response => {
+    .then((response) => {
       //ensure that the user can call `then()` only when the file has
       //been downloaded entirely.
 
       return new Promise((resolve, reject) => {
         response.data.pipe(writer);
         let error: any = null;
-        writer.on("error", err => {
+        writer.on("error", (err) => {
           error = err;
           writer.close();
           reject(err);

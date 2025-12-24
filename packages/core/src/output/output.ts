@@ -1,16 +1,9 @@
 /* eslint-disable no-case-declarations */
 import config from "@mongez/config";
-import {
-  get,
-  only,
-  set,
-  unset,
-  type GenericObject,
-} from "@mongez/reinforcements";
+import { get, only, set, unset, type GenericObject } from "@mongez/reinforcements";
 import { isEmpty, isObject, isPlainObject } from "@mongez/supportive-is";
 import { Model } from "@warlock.js/cascade";
 import dayjs from "dayjs";
-import { getAWSConfig } from "../aws/get-aws-configurations";
 import { currentRequest, type Request } from "../http";
 import { useRequestStore } from "../http/middleware/inject-request-context";
 import { dateOutput, type DateOutputOptions } from "../utils/date-output";
@@ -103,7 +96,7 @@ export class Output {
    * return list of resources for the given array ouf data
    */
   public static collect(data: OutputResource[]) {
-    return data.map(item => {
+    return data.map((item) => {
       return new this(item);
     });
   }
@@ -243,7 +236,7 @@ export class Output {
    */
   protected localized(output: typeof Output) {
     return {
-      format: async value => {
+      format: async (value) => {
         if (Array.isArray(value)) {
           const request = currentRequest();
 
@@ -253,7 +246,7 @@ export class Output {
 
           if (!localeCode) {
             return await Promise.all(
-              value.map(async item => {
+              value.map(async (item) => {
                 if (item?.value) {
                   item.value = await new output(item.value).toJSON();
                 }
@@ -263,9 +256,7 @@ export class Output {
             );
           }
 
-          const singleOutput = value.find(
-            item => item?.localeCode === localeCode,
-          )?.value;
+          const singleOutput = value.find((item) => item?.localeCode === localeCode)?.value;
 
           if (!singleOutput) return value;
 
@@ -311,16 +302,9 @@ export class Output {
       }
 
       // now get the value from the given resource data
-      const value = get(
-        this.resource,
-        resourceInput,
-        get(this.defaults, key, undefined),
-      );
+      const value = get(this.resource, resourceInput, get(this.defaults, key, undefined));
 
-      if (
-        (value === undefined || value === null) &&
-        typeof valueType !== "object"
-      ) {
+      if ((value === undefined || value === null) && typeof valueType !== "object") {
         continue;
       }
 
@@ -330,14 +314,9 @@ export class Output {
         }
       } else if (isEmpty(value) && typeof valueType !== "object") continue;
 
-      const customTransformer = async (
-        value: any,
-        valueType: OutputFormatter,
-      ) => {
+      const customTransformer = async (value: any, valueType: OutputFormatter) => {
         if (valueType.type && valueType.format) {
-          throw new Error(
-            "You can't use both type and format in the same output formatter",
-          );
+          throw new Error("You can't use both type and format in the same output formatter");
         }
 
         if (valueType.input) {
@@ -353,18 +332,11 @@ export class Output {
           return await outputOptions.format(value, valueType, this);
         }
 
-        return this.cast(
-          value,
-          outputOptions.type || "any",
-          outputOptions.options,
-        );
+        return this.cast(value, outputOptions.type || "any", outputOptions.options);
       };
 
       if (typeof valueType === "object") {
-        const output = await customTransformer(
-          value,
-          valueType as OutputFormatter,
-        );
+        const output = await customTransformer(value, valueType as OutputFormatter);
 
         if (output !== undefined) {
           set(this.data, key, output);
@@ -374,10 +346,7 @@ export class Output {
           this.data,
           key,
           await Promise.all(
-            value.map(
-              async item =>
-                await this.transformValue(item, valueType as OutputCastType),
-            ),
+            value.map(async (item) => await this.transformValue(item, valueType as OutputCastType)),
           ),
         );
       } else {
@@ -391,9 +360,7 @@ export class Output {
    */
   protected isValidResourceValue(value: any) {
     return (
-      (isPlainObject(value) && !isEmpty(value)) ||
-      value instanceof Output ||
-      value instanceof Model
+      (isPlainObject(value) && !isEmpty(value)) || value instanceof Output || value instanceof Model
     );
   }
 
@@ -415,10 +382,7 @@ export class Output {
   /**
    * Transform value
    */
-  protected async transformValue(
-    value: any,
-    valueType: OutputValue | [string, OutputValue],
-  ) {
+  protected async transformValue(value: any, valueType: OutputValue | [string, OutputValue]) {
     if (typeof valueType === "string") {
       value = this.cast(value, valueType);
     } else if ((valueType as any).prototype instanceof Output) {
@@ -454,10 +418,7 @@ export class Output {
       return this.set(
         setAs,
         await Promise.all(
-          value.map(
-            async item =>
-              await this.transformValue(item, type as OutputCastType),
-          ),
+          value.map(async (item) => await this.transformValue(item, type as OutputCastType)),
         ),
       );
     }
@@ -523,9 +484,7 @@ export class Output {
 
         if (!Array.isArray(value)) return value;
 
-        const localizedValue = value.find(
-          item => item.localeCode === localeCode,
-        )?.value;
+        const localizedValue = value.find((item) => item.localeCode === localeCode)?.value;
 
         if (localizedValue || localizedValue === "") return localizedValue;
 
@@ -548,15 +507,10 @@ export class Output {
   /**
    * Parse the given value
    */
-  protected parseDate(
-    value: any,
-    options: DateOutputOptions = this.dateOptions,
-  ) {
+  protected parseDate(value: any, options: DateOutputOptions = this.dateOptions) {
     options.locale ??= useRequestStore()?.request?.locale;
 
-    const dateOptions = config.get(
-      "output.dateOptions",
-    ) as OutputConfigurations["dateOptions"];
+    const dateOptions = config.get("output.dateOptions") as OutputConfigurations["dateOptions"];
 
     if (dateOptions) {
       options = dateOptions({
@@ -585,10 +539,7 @@ export class Output {
   /**
    * Cast all keys in object
    */
-  public castArrayObjectWithRandomKeys(
-    object: GenericObject,
-    options: FinalOutput,
-  ) {
+  public castArrayObjectWithRandomKeys(object: GenericObject, options: FinalOutput) {
     for (const key in object) {
       object[key] = this.arrayOf(options);
     }
@@ -599,7 +550,7 @@ export class Output {
    */
   public outputOnly(...keys: string[]) {
     return {
-      format: value => {
+      format: (value) => {
         if (!value) return undefined;
         return only(value, keys);
       },
@@ -611,7 +562,7 @@ export class Output {
    */
   public onlyId() {
     return {
-      format: value => {
+      format: (value) => {
         if (!value?.id) return undefined;
 
         return {
@@ -629,16 +580,8 @@ type OutputHelpers = {
 
 export type OutputOptions = {
   transform?: Record<string, any>;
-  before?: (
-    resource: any,
-    output: Record<string, any>,
-    helpers: OutputHelpers,
-  ) => Promise<void>;
-  after?: (
-    resource: any,
-    output: Record<string, any>,
-    helpers: OutputHelpers,
-  ) => Promise<void>;
+  before?: (resource: any, output: Record<string, any>, helpers: OutputHelpers) => Promise<void>;
+  after?: (resource: any, output: Record<string, any>, helpers: OutputHelpers) => Promise<void>;
   settings?: {
     dateFormat?: string;
     [key: string]: any;
@@ -687,11 +630,7 @@ export function output(options: OutputOptions) {
 }
 
 // Helper function to perform transformation
-async function transform(
-  resource: any,
-  options: OutputOptions,
-  results: Record<string, any>,
-) {
+async function transform(resource: any, options: OutputOptions, results: Record<string, any>) {
   for (const key in options.transform) {
     const rule = options.transform[key];
     if (typeof rule === "function") {
@@ -699,11 +638,7 @@ async function transform(
     } else if (rule.toJSON) {
       const value = get(resource, key);
       if (Array.isArray(value)) {
-        set(
-          results,
-          key,
-          await Promise.all(value.map(async item => await rule.toJSON(item))),
-        );
+        set(results, key, await Promise.all(value.map(async (item) => await rule.toJSON(item))));
       } else {
         set(results, key, await rule.toJSON(value));
       }
@@ -718,9 +653,7 @@ async function transform(
         set(
           results,
           key,
-          await Promise.all(
-            value.map(async item => await output(rule).toJSON(item)),
-          ),
+          await Promise.all(value.map(async (item) => await output(rule).toJSON(item))),
         );
       } else {
         set(results, key, await output(rule).toJSON(value));
@@ -729,11 +662,7 @@ async function transform(
       const value = get(resource, key);
       if (Array.isArray(rule)) {
         const [key, value] = rule;
-        set(
-          results,
-          key,
-          await directTransform({ rule: value, value, options }),
-        );
+        set(results, key, await directTransform({ rule: value, value, options }));
       } else {
         set(
           results,
@@ -781,9 +710,7 @@ function directTransform({
     case "date":
       return parseDate(value);
     case "dateFormat":
-      return dayjs(value).format(
-        options.settings?.dateFormat ?? "DD-MM-YYYY hh:mm:ss A",
-      );
+      return dayjs(value).format(options.settings?.dateFormat ?? "DD-MM-YYYY hh:mm:ss A");
     case "dateIso":
       return dayjs(value).toISOString();
     case "birthDate": {
@@ -807,9 +734,7 @@ function directTransform({
 
       if (!Array.isArray(value)) return value;
 
-      const localizedValue = value.find(
-        item => item.localeCode === localeCode,
-      )?.value;
+      const localizedValue = value.find((item) => item.localeCode === localeCode)?.value;
 
       if (localizedValue || localizedValue === "") return localizedValue;
 
@@ -828,60 +753,3 @@ function directTransform({
       return value;
   }
 }
-
-const _uploadOutput = output({
-  transform: {
-    name: "string",
-    hash: "string",
-    mimeType: "string",
-    extension: "string",
-    size: "number",
-    url: ["path", "uploadsUrl"],
-    id: ["hash", "string"],
-    width: "number",
-    height: "number",
-    path: "string",
-  },
-  after: async (resource: any, output: Record<string, any>) => {
-    if (resource?.provider?.url) {
-      const cloudfront = await getAWSConfig("cloudfront");
-      if (cloudfront) {
-        set(output, "url", cloudfront + "/" + resource?.provider?.fileName);
-      } else {
-        set(output, "url", resource?.provider?.url);
-      }
-    }
-  },
-});
-
-const _postOutput = output({
-  transform: {
-    id: "number",
-    title: "string",
-    content: "string",
-    images: _uploadOutput,
-    user: {
-      image: _uploadOutput,
-      name: "string",
-    },
-    fullName: (resource: any, _output: Record<string, any>) => {
-      return `${resource.firstName} ${resource.lastName}`;
-    },
-  },
-  before: async (
-    resource: any,
-    output: Record<string, any>,
-    helpers: OutputHelpers,
-  ) => {
-    output.title = "Hello World";
-
-    helpers.opt("title", "string");
-  },
-  after: async (
-    resource: any,
-    output: Record<string, any>,
-    _helpers: OutputHelpers,
-  ) => {
-    output.title = "Hello World";
-  },
-});

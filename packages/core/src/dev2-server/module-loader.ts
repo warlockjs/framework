@@ -1,9 +1,7 @@
-import { pathToFileURL } from "node:url";
 import { router } from "../router/router";
-import { devLogError, devLogInfo, devLogSuccess, formatModuleNotFoundError } from "./dev-logger";
+import { devLogError, formatModuleNotFoundError } from "./dev-logger";
 import type { FileManager } from "./file-manager";
 import type { SpecialFilesCollector } from "./special-files-collector";
-import { warlockCachePath } from "./utils";
 
 /**
  * Module Loader
@@ -112,52 +110,65 @@ export class ModuleLoader {
    * @param type Module type for logging
    * @param bustCache Whether to add timestamp for cache busting (for HMR)
    */
-  private async loadModule(
+  public async loadModule<T = any>(
     file: FileManager,
     type: string,
     bustCache: boolean = false,
-  ): Promise<void> {
-    // Get the cached transpiled file path
-    const cachedFilePath = warlockCachePath(file.cachePath);
+  ): Promise<T | undefined> {
+    if (file.relativePath.endsWith(".env")) {
+      // do nothing
+      return;
+    }
 
-    devLogInfo(`Loading module: ${file.relativePath} (${type})`);
-
-    let now = performance.now();
+    // devLogInfo(`Loading module: ${file.relativePath} (${type})`);
 
     // Convert to file:// URL for cross-platform compatibility
-    let fileUrl = pathToFileURL(cachedFilePath).href;
     try {
-      // Add timestamp for cache busting (forces re-import for HMR)
-      if (bustCache) {
-        const timestamp = Date.now();
-        fileUrl += `?t=${timestamp}`;
-      }
-
       // For route files, wrap the import with source file tracking
       if (type === "route") {
-        await router.withSourceFile(file.relativePath, async () => {
+        return await router.withSourceFile(file.relativePath, async () => {
           // Dynamic import the module (routes will be registered with sourceFile)
-          const module = await import(fileUrl);
+
+          const module =
+            typeof __import !== "undefined"
+              ? await __import(file.cachePath)
+              : await import(file.cachePathUrl);
+
           // Store in cache (use source path as key for consistency)
           this.loadedModules.set(file.absolutePath, module);
+
+          if (module?.cleanup && typeof module.cleanup === "function") {
+            file.cleanup = module.cleanup;
+          }
+
+          return module;
         });
       } else {
         // Dynamic import the module
-        const module = await import(fileUrl);
+        const module =
+          typeof __import !== "undefined"
+            ? await __import(file.cachePath)
+            : await import(file.cachePathUrl);
         // Store in cache (use source path as key for consistency)
         this.loadedModules.set(file.absolutePath, module);
+
+        if (module?.cleanup && typeof module.cleanup === "function") {
+          file.cleanup = module.cleanup;
+        }
+
+        return module;
       }
 
-      devLogSuccess(
-        `Module loaded: ${file.relativePath} (${type}) in ${performance.now() - now}ms`,
-      );
+      // devLogSuccess(
+      //   `Module loaded: ${file.relativePath} (${type}) in ${(performance.now() - now).toFixed(2)}ms`,
+      // );
     } catch (error: any) {
+      console.log(error);
       // Format error message (especially for MODULE_NOT_FOUND)
       if (error.code === "ERR_MODULE_NOT_FOUND") {
         devLogError(formatModuleNotFoundError(error));
       } else {
-        console.log("Failed to load module", fileUrl);
-        devLogError(`Failed to load ${type}: ${file.relativePath} - ${error.message || error}`);
+        devLogError(`Failed to load ${type}: ${file.relativePath} - ${error?.message || error}`);
       }
     }
   }
@@ -205,6 +216,22 @@ export class ModuleLoader {
   public clearModuleCache(absolutePath: string): void {
     // Remove from our cache
     this.loadedModules.delete(absolutePath);
+  }
+
+  /**
+   * We need a way to cleanup a module execution if it's deleted
+   */
+  public cleanupDeletedModule(file: FileManager): void {
+    this.clearModuleCache(file.absolutePath);
+    __clearModuleVersion(file.cachePath);
+
+    if (file.type === "route") {
+      router.removeRoutesBySourceFile(file.relativePath);
+    }
+
+    if (file.cleanup) {
+      file.cleanup();
+    }
   }
 
   /**

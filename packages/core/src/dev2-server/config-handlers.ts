@@ -12,7 +12,7 @@ export function registerConfigHandlers(configLoader: ConfigLoader): void {
    * App Config Handler
    * Handles locale loading for dayjs
    */
-  configLoader.registerSpecialHandler("app", async appConfig => {
+  configLoader.registerSpecialHandler("app", async (appConfig) => {
     // Load dayjs locales based on app.localeCodes
     const locales = appConfig.localeCodes || ["en"];
 
@@ -31,7 +31,7 @@ export function registerConfigHandlers(configLoader: ConfigLoader): void {
    * Log Config Handler
    * Sets log configurations in @warlock.js/core
    */
-  configLoader.registerSpecialHandler("log", async logConfig => {
+  configLoader.registerSpecialHandler("log", async (logConfig) => {
     try {
       setLogConfigurations(logConfig);
     } catch (error) {
@@ -44,7 +44,7 @@ export function registerConfigHandlers(configLoader: ConfigLoader): void {
    * Mail Config Handler
    * Sets mail configurations in @warlock.js/core
    */
-  configLoader.registerSpecialHandler("mail", async mailConfig => {
+  configLoader.registerSpecialHandler("mail", async (mailConfig) => {
     try {
       setMailConfigurations(mailConfig);
     } catch (error) {

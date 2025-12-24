@@ -1,4 +1,3 @@
-export { cleanStaleCache } from "./cache-manager";
 export { DatabaseCacheDriver } from "./database-cache-driver";
 export type { DatabaseCacheOptions } from "./database-cache-driver";
 

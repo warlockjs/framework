@@ -1,32 +1,20 @@
-import config from "@mongez/config";
 import { colors } from "@mongez/copper";
 import events from "@mongez/events";
 import { trans, transFrom } from "@mongez/localization";
-import {
-  Random,
-  except,
-  get,
-  only,
-  rtrim,
-  set,
-  unset,
-} from "@mongez/reinforcements";
+import { Random, except, get, only, rtrim, set, unset } from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
 import type { LogLevel } from "@warlock.js/logger";
 import { log } from "@warlock.js/logger";
+import { BaseValidator, v } from "@warlock.js/seal";
 import type { FastifyRequest } from "fastify";
 import { type IncomingHttpHeaders } from "node:http2";
+import { config } from "../config/config-getter";
 import type { Middleware, Route } from "../router";
-import type { Validation } from "../validator";
-import { validateAll } from "../validator";
-import { getValidationSchema } from "../validator/utils";
-import { ValidationSchema } from "../validator/validation-schema";
-import { Validator } from "../validator/validator";
-import { UploadedFile } from "./UploadedFile";
-import { httpConfig } from "./config";
+import { validateAll } from "../validation/validateAll";
 import { createRequestStore } from "./middleware/inject-request-context";
 import { Response } from "./response";
 import type { RequestEvent } from "./types";
+import { UploadedFile } from "./uploaded-file";
 
 type StandardHeaders = {
   // copy every declared property from http.IncomingHttpHeaders
@@ -64,7 +52,12 @@ export class Request<User = any, RequestValidation = any> {
   /**
    * Current user
    */
-  public user!: User;
+  public user?: User;
+
+  /**
+   * Decoded access token payload (set by auth middleware)
+   */
+  public decodedAccessToken?: any;
 
   /**
    * Current request instance
@@ -83,7 +76,20 @@ export class Request<User = any, RequestValidation = any> {
   public t: ReturnType<typeof trans> = trans;
 
   /**
-   * Allow the request instance to accept dynamic properties
+   * Dynamic properties index signature
+   *
+   * This allows attaching custom properties to the request instance,
+   * commonly used during validation middleware to attach fetched models.
+   *
+   * @example
+   * // In validation middleware:
+   * const post = await Post.find(request.int("id"));
+   * if (!post) return response.notFound();
+   * request.post = post; // Attach the model to the request
+   *
+   * // In route handler:
+   * const post = request.post;
+   * // Work with the pre-fetched model
    */
   [key: string]: any;
 
@@ -149,9 +155,7 @@ export class Request<User = any, RequestValidation = any> {
     return (this._locale =
       this.header("locale-code") ||
       this.header("locale") ||
-      this.header("localeCode") ||
       this.query["locale"] ||
-      this.query["localeCode"] ||
       this.query["locale-code"]);
   }
 
@@ -167,9 +171,7 @@ export class Request<User = any, RequestValidation = any> {
   /**
    * Get current locale code or return default locale code
    */
-  public getLocaleCode(
-    defaultLocaleCode: string = config.get("app.localeCode") || "en",
-  ) {
+  public getLocaleCode(defaultLocaleCode: string = config.key("app.localeCode") || "en") {
     return this.locale || defaultLocaleCode;
   }
 
@@ -183,23 +185,15 @@ export class Request<User = any, RequestValidation = any> {
   /**
    * Validate the given validation schema
    */
-  public async validate(validation: Validation | ValidationSchema) {
-    const validationSchema = getValidationSchema(validation);
-
-    const validator = new Validator(this);
-    validator.setValidationSchema(validationSchema);
-
-    await validator.scan();
-    validator.triggerValidationUpdateEvent();
-
-    return validator;
+  public async validate(validation: BaseValidator, selectedInputs?: string[]) {
+    return await v.validate(validation, selectedInputs ? this.only(selectedInputs) : this.all());
   }
 
   /**
    * Clear current user
    */
   public clearCurrentUser() {
-    (this.user as any) = undefined;
+    this.user = undefined;
   }
 
   /**
@@ -249,10 +243,10 @@ export class Request<User = any, RequestValidation = any> {
   /**
    * Get authorization header value
    */
-  public get authorizationValue() {
+  public get authorizationValue(): string {
     const authorization = this.header("authorization");
 
-    if (!authorization) return null;
+    if (!authorization) return "";
 
     const [type, value] = authorization.split(" ");
 
@@ -266,14 +260,14 @@ export class Request<User = any, RequestValidation = any> {
    *
    * If the Authorization header does not start with `Bearer` value then return null
    */
-  public get accessToken() {
+  public get accessToken(): string | undefined {
     const authorization = this.header("authorization");
 
-    if (!authorization) return null;
+    if (!authorization) return;
 
     const [type, value] = authorization.split(" ");
 
-    if (type.toLowerCase() !== "bearer") return null;
+    if (type.toLowerCase() !== "bearer") return;
 
     return value;
   }
@@ -299,7 +293,7 @@ export class Request<User = any, RequestValidation = any> {
     this.payload.body = this.parseBody(this.baseRequest.body);
 
     this.payload.query = this.parseBody(this.baseRequest.query);
-    this.payload.params = { ...(this.baseRequest.params as any) };
+    this.payload.params = { ...(this.baseRequest.params || {}) };
     this.payload.all = {
       ...this.payload.body,
       ...this.payload.query,
@@ -355,8 +349,7 @@ export class Request<User = any, RequestValidation = any> {
             const keyNameParts2 = keyParts[2].split("]");
             const keyName2 = keyNameParts2[0];
 
-            arrayOfObjectValues[keyName][index][keyName2] =
-              this.parseValue(value);
+            arrayOfObjectValues[keyName][index][keyName2] = this.parseValue(value);
 
             continue;
           }
@@ -368,9 +361,7 @@ export class Request<User = any, RequestValidation = any> {
           set(
             body,
             keyName + "." + keyNameParts[0],
-            Array.isArray(value)
-              ? value.map(this.parseValue.bind(this))
-              : this.parseValue(value),
+            Array.isArray(value) ? value.map(this.parseValue.bind(this)) : this.parseValue(value),
           );
 
           continue;
@@ -424,8 +415,7 @@ export class Request<User = any, RequestValidation = any> {
 
     if (typeof data === "string") return data.trim();
 
-    if (data?.value !== undefined && data?.fields && data?.type)
-      return data.value;
+    if (data?.value !== undefined && data?.fields && data?.type) return data.value;
 
     return data;
   }
@@ -453,22 +443,18 @@ export class Request<User = any, RequestValidation = any> {
    * Listen to the given event
    */
   public on(eventName: RequestEvent, callback: any) {
-    return this.trigger(eventName, callback);
+    return this.subscribe(eventName, callback);
   }
 
   /**
    * Make a log message
    */
   public log(message: any, level: LogLevel = "info") {
-    if (!config.get("http.log")) return;
+    if (!config.key("http.log")) return;
 
     log({
       module: "request",
-      action:
-        this.route.method +
-        " " +
-        this.route.path.replace("/*", "") +
-        `:${this.id}`,
+      action: this.route.method + " " + this.route.path.replace("/*", "") + `:${this.id}`,
       message,
       type: level,
       context: {
@@ -518,11 +504,7 @@ export class Request<User = any, RequestValidation = any> {
     if (!handler.validation) return;
 
     // 👇🏻 check for validation using validateAll helper function
-    const validationOutput = await validateAll(
-      handler.validation,
-      this,
-      this.response,
-    );
+    const validationOutput = await validateAll(handler.validation, this, this.response);
 
     return validationOutput;
   }
@@ -540,22 +522,10 @@ export class Request<User = any, RequestValidation = any> {
    */
   public validated<Output = RequestValidation>(inputs?: string[]): Output {
     if (this.validatedData) {
-      return inputs
-        ? only(this.validatedData as Output, inputs)
-        : (this.validatedData as Output);
+      return inputs ? only(this.validatedData as Output, inputs) : (this.validatedData as Output);
     }
 
-    let rules = this.getHandler()?.validation?.rules || {};
-
-    if (rules instanceof ValidationSchema) {
-      rules = rules.inputs;
-    }
-
-    const inputsList = Object.keys(rules);
-
-    return this.only(
-      inputs ? inputsList.filter(input => inputs.includes(input)) : inputsList,
-    );
+    return {} as Output;
   }
 
   /**
@@ -607,15 +577,11 @@ export class Request<User = any, RequestValidation = any> {
     for (const middleware of middlewares) {
       this.log("Executing middleware " + colors.yellowBright(middleware.name));
       const output = await middleware(this, this.response);
-      this.log(
-        "Executed middleware " + colors.yellowBright(middleware.name),
-        "success",
-      );
+      this.log("Executed middleware " + colors.yellowBright(middleware.name), "success");
 
       if (output !== undefined) {
         this.log(
-          colors.yellow("request intercepted by middleware ") +
-            colors.cyanBright(middleware.name),
+          colors.yellow("request intercepted by middleware ") + colors.cyanBright(middleware.name),
           "warn",
         );
 
@@ -637,53 +603,9 @@ export class Request<User = any, RequestValidation = any> {
    * Collect middlewares for current route
    */
   protected collectMiddlewares(): Middleware[] {
-    // we'll collect middlewares from 4 places
-    // We'll collect from http configurations under `http.middleware` config
-    // it has 3 middlewares types, `all` `only` and `except`
-    // and the final one will be the middlewares in the route itself
-    // so the order of collecting and executing will be: `all` `only` `except` and `route`
     const middlewaresList: Middleware[] = [];
 
-    // 1- collect all middlewares as they will be executed first
-    const allMiddlewaresConfigurations = httpConfig("middleware.all");
-
-    // check if it has middleware list
-    if (allMiddlewaresConfigurations) {
-      // now just push everything there
-      middlewaresList.push(...allMiddlewaresConfigurations);
-    }
-
-    // 2- check if there is `only` property
-    const onlyMiddlewaresConfigurations = httpConfig("middleware.only");
-
-    if (onlyMiddlewaresConfigurations?.middleware) {
-      // check if current route exists in the `routes` property
-      // or the route has a name and exists in `namedRoutes` property
-      if (
-        onlyMiddlewaresConfigurations.routes?.includes(this.route.path) ||
-        (this.route.name &&
-          onlyMiddlewaresConfigurations.namedRoutes?.includes(this.route.name))
-      ) {
-        middlewaresList.push(...onlyMiddlewaresConfigurations.middleware);
-      }
-    }
-
-    // 3- collect routes from except middlewares
-    const exceptMiddlewaresConfigurations = httpConfig("middleware.except");
-
-    if (exceptMiddlewaresConfigurations?.middleware) {
-      // first check if there is `routes` property and route path is not listed there
-      // then check if route has name and that name is not listed in `namedRoutes` property
-      if (
-        !exceptMiddlewaresConfigurations.routes?.includes(this.route.path) &&
-        this.route.name &&
-        !exceptMiddlewaresConfigurations.namedRoutes?.includes(this.route.name)
-      ) {
-        middlewaresList.push(...exceptMiddlewaresConfigurations.middleware);
-      }
-    }
-
-    // 4- collect routes from route middlewares
+    // collect route middlewares
     if (this.route.middleware) {
       middlewaresList.push(...this.route.middleware);
     }
@@ -887,7 +809,7 @@ export class Request<User = any, RequestValidation = any> {
     return heavyInputs;
   }
 
-  /**jobssr41@gmail.com
+  /**
    * Get only the given keys from the request data
    */
   public only(keys: string[]) {
@@ -927,7 +849,7 @@ export class Request<User = any, RequestValidation = any> {
     }
 
     if (value === 0) {
-      return true;
+      return false;
     }
 
     return Boolean(value);

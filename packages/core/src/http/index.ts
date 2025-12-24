@@ -1,10 +1,12 @@
 // Uploaded file
-export * from "./UploadedFile";
 export * from "./config";
 export * from "./createHttpApplication";
 export * from "./database/RequestLog";
 export * from "./events";
 export * from "./request-controller";
+export * from "./uploaded-file";
+export * from "./uploads-config";
+export * from "./uploads-types";
 // errors
 export * from "./errors";
 // middleware

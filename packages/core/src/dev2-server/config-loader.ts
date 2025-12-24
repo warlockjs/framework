@@ -1,6 +1,5 @@
 import config from "@mongez/config";
 import { pathToFileURL } from "node:url";
-import { devLogInfo } from "./dev-logger";
 import type { FileManager } from "./file-manager";
 import { warlockCachePath } from "./utils";
 
@@ -27,10 +26,7 @@ export class ConfigLoader {
    * @param configName Name of the config (e.g., "log", "mail")
    * @param handler Function to handle the config value
    */
-  public registerSpecialHandler(
-    configName: string,
-    handler: SpecialConfigHandler,
-  ): void {
+  public registerSpecialHandler(configName: string, handler: SpecialConfigHandler): void {
     this.specialHandlers.set(configName, handler);
   }
 
@@ -42,7 +38,6 @@ export class ConfigLoader {
     if (configFiles.length === 0) {
       return;
     }
-
 
     // Load all configs in parallel
     // await Promise.all(
@@ -60,12 +55,9 @@ export class ConfigLoader {
    * @param file FileManager instance for the config file
    * @param bustCache Whether to bust the cache (add timestamp to URL)
    */
-  public async loadConfig(
-    file: FileManager,
-    bustCache: boolean = false,
-  ): Promise<void> {
+  public async loadConfig(file: FileManager, bustCache: boolean = false): Promise<void> {
     const configName = this.getConfigName(file.relativePath);
-    devLogInfo(`Loading configuration file: ${configName}`);
+    // devLogInfo(`Loading configuration file: ${configName}`);
 
     try {
       // Convert absolute path to file:// URL for cross-platform compatibility
@@ -84,20 +76,18 @@ export class ConfigLoader {
       const configValue = configModule.default;
 
       if (configValue === undefined) {
-        throw new Error(
-          `Config file ${file.relativePath} does not have a default export`,
-        );
+        throw new Error(`Config file ${file.relativePath} does not have a default export`);
       }
 
       // Store in @mongez/config
       // @mongez/config automatically handles nested access (e.g., config.get("database.host"))
       config.set(configName, configValue);
 
-      devLogInfo(`Configuration file loaded: ${file.relativePath}`);
+      // devLogInfo(`Configuration file loaded: ${file.relativePath}`);
 
       // Handle special configs if handler is registered
       await this.handleSpecialConfig(configName, configValue);
-      devLogInfo(`Special configuration handled: ${configName}`);
+      // devLogInfo(`Special configuration handled: ${configName}`);
     } catch (error) {
       throw error; // Abort on config errors
     }
@@ -116,10 +106,7 @@ export class ConfigLoader {
    * Handle special configuration
    * Calls registered handler if one exists for this config
    */
-  private async handleSpecialConfig(
-    configName: string,
-    configValue: any,
-  ): Promise<void> {
+  private async handleSpecialConfig(configName: string, configValue: any): Promise<void> {
     const handler = this.specialHandlers.get(configName);
 
     if (handler) {

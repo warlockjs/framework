@@ -1,6 +1,7 @@
 # Development Server v2 - Complete Overview
 
 ## Table of Contents
+
 1. [Architecture Overview](#architecture-overview)
 2. [Core Components](#core-components)
 3. [File Processing Pipeline](#file-processing-pipeline)
@@ -69,27 +70,32 @@ The Development Server v2 is a sophisticated hot-reloading system for Node.js ba
 ## Core Components
 
 ### 1. DevelopmentServer
+
 **File**: `development-server.ts`
 
 The main coordinator class that manages the entire development server lifecycle.
 
 **Responsibilities**:
+
 - Initialize all subsystems in correct order
 - Coordinate file changes with reload execution
 - Manage connector lifecycle
 - Handle graceful shutdown
 
 **Key Methods**:
+
 - `start()`: Initialize and start the server
 - `shutdown()`: Gracefully stop all services
 - `handleFileReady()`: Delegate file changes to LayerExecutor
 
 ### 2. FilesOrchestrator
+
 **File**: `files-orchestrator.ts`
 
 Central hub for file system management and coordination.
 
 **Responsibilities**:
+
 - Discover and track all project files
 - Reconcile filesystem state with manifest
 - Build and maintain dependency graph
@@ -97,16 +103,19 @@ Central hub for file system management and coordination.
 - Manage file operations (add, update, delete)
 
 **Key Methods**:
+
 - `init()`: Initialize file system, manifest, and watchers
 - `getFiles()`: Access to FileManager instances
 - `getDependencyGraph()`: Access to dependency tracking
 
 ### 3. FileManager
+
 **File**: `file-manager.ts`
 
 Manages individual file state and processing.
 
 **Properties**:
+
 - `source`: Original TypeScript/JavaScript source code
 - `transpiled`: Transpiled JavaScript code
 - `dependencies`: Set of files this file imports
@@ -119,6 +128,7 @@ Manages individual file state and processing.
 - `importMap`: Map of original imports to resolved absolute paths
 
 **Key Methods**:
+
 - `init()`: Load, parse, transpile, and transform imports
 - `update()`: Reload and reprocess on file change
 - `forceReprocess()`: Retranspile even if source unchanged (for dependency resolution)
@@ -126,11 +136,13 @@ Manages individual file state and processing.
 - `transformImports()`: Convert static imports to dynamic `__import()` calls
 
 ### 4. ManifestManager
+
 **File**: `manifest-manager.ts`
 
 Manages persistent caching via `.warlock/manifest.json`.
 
 **Structure**:
+
 ```json
 {
   "version": "1.0.0",
@@ -155,16 +167,19 @@ Manages persistent caching via `.warlock/manifest.json`.
 ```
 
 **Key Methods**:
+
 - `init()`: Load manifest from disk
 - `save()`: Persist manifest (debounced)
 - `getFile()`, `setFile()`, `removeFile()`: CRUD operations
 
 ### 5. DependencyGraph
+
 **File**: `dependency-graph.ts`
 
 Bidirectional graph tracking file relationships.
 
 **Structure**:
+
 ```typescript
 {
   dependencies: Map<string, Set<string>>,  // file → files it imports
@@ -173,17 +188,20 @@ Bidirectional graph tracking file relationships.
 ```
 
 **Key Methods**:
+
 - `addDependency(file, dependency)`: Add relationship
 - `updateFile(file, newDeps)`: Update dependencies for a file
 - `removeFile(file)`: Remove file and all relationships
 - `getInvalidationChain(file)`: Get all files affected by a change (BFS traversal)
 
 ### 6. FileOperations
+
 **File**: `file-operations.ts`
 
 Encapsulates all file lifecycle operations (SRP compliance).
 
 **Responsibilities**:
+
 - Add new files to the system
 - Update existing files
 - Delete files and cleanup cache
@@ -193,34 +211,40 @@ Encapsulates all file lifecycle operations (SRP compliance).
 - Handle broken imports during file addition
 
 **Key Methods**:
+
 - `addFile(relativePath)`: Create FileManager, init, add to graph
 - `updateFile(relativePath)`: Reload file, update graph
 - `deleteFile(relativePath)`: Remove from graph, delete cache, notify dependents
 - `reloadFilesWaitingForDependency()`: Re-process files when missing dependencies are added
 
 ### 7. FileEventHandler
+
 **File**: `file-event-handler.ts`
 
 Slim coordinator for file system events with batching and debouncing.
 
 **Responsibilities**:
+
 - Collect file system events (add, change, unlink)
 - Debounce events (default: 100ms)
 - Batch process events in parallel
 - Delegate to FileOperations
 
 **Event Flow**:
+
 ```
-Chokidar Event → handleFileAdd/Change/Delete → pendingSets → 
+Chokidar Event → handleFileAdd/Change/Delete → pendingSets →
 debounce → processBatch → FileOperations → Manifest Save
 ```
 
 ### 8. LayerExecutor
+
 **File**: `layer-executor.ts`
 
 Orchestrates HMR or FSR execution based on file changes.
 
 **Responsibilities**:
+
 - Determine reload strategy (FSR vs HMR)
 - Build invalidation chain
 - Clear module cache
@@ -228,10 +252,12 @@ Orchestrates HMR or FSR execution based on file changes.
 - Reload special files
 
 **Reload Strategies**:
+
 - **FSR (Full Server Restart)**: Config files, `.env`, routes (currently)
 - **HMR (Hot Module Replacement)**: Main files, events, controllers, services, models
 
 **Key Methods**:
+
 - `executeReload(changedFile)`: Main entry point
 - `determineReloadStrategy()`: Check if any file in chain is FSR layer
 - `executeFullServerRestart()`: Restart connectors + reload special files
@@ -239,11 +265,13 @@ Orchestrates HMR or FSR execution based on file changes.
 - `reloadAffectedModules()`: Reload special files that depend on changed files
 
 ### 9. SpecialFilesCollector
+
 **File**: `special-files-collector.ts`
 
 Identifies and categorizes special files.
 
 **Categories**:
+
 - **Config**: `src/config/*.ts` (FSR layer)
 - **Main**: `**/main.ts` (HMR layer)
 - **Routes**: `**/routes.ts` (FSR layer, will be HMR with wildcard routing)
@@ -251,15 +279,18 @@ Identifies and categorizes special files.
 - **Locales**: `**/utils/locales.ts` (HMR layer)
 
 **Key Methods**:
+
 - `addFile()`, `updateFile()`, `removeFile()`: Maintain categorization
 - `getConfigFiles()`, `getMainFiles()`, etc.: Access categorized files
 
 ### 10. ConfigLoader
+
 **File**: `config-loader.ts`
 
 Dynamically loads and registers configuration files.
 
 **Features**:
+
 - Parallel config loading
 - Convention-based special handlers (database, http, cache)
 - Integration with `@mongez/config`
@@ -268,26 +299,31 @@ Dynamically loads and registers configuration files.
 **Loading Order**: All configs loaded in parallel
 
 **Key Methods**:
+
 - `loadConfigs()`: Load all config files
 - `reloadConfig(file)`: Reload single config
 
 ### 11. ModuleLoader
+
 **File**: `module-loader.ts`
 
 Manages dynamic module imports and Node.js module cache.
 
 **Features**:
+
 - Cache busting with timestamps (`?t=timestamp`)
 - Module cache clearing
 - Special file loading with specific order
 
 **Loading Order**:
+
 1. Locales (parallel)
 2. Events (parallel)
 3. Main files (parallel)
 4. Routes (sequential, 5-second delay between)
 
 **Key Methods**:
+
 - `loadModules()`: Load all special modules
 - `reloadModule(file)`: Reload single module
 - `clearModuleCache(path)`: Remove from Node.js cache
@@ -434,6 +470,7 @@ function __updateModuleVersion(modulePath: string, timestamp?: number): void {
 ### Import Transformation Example
 
 **Before** (Original TypeScript):
+
 ```typescript
 import { helloWorld } from "./shared/utils";
 import { User } from "../models/user";
@@ -444,6 +481,7 @@ export function main() {
 ```
 
 **After** (Transpiled & Transformed):
+
 ```javascript
 const { helloWorld } = await __import("./src-app-users-shared-utils.js");
 const { User } = await __import("./src-app-users-models-user-index.js");
@@ -508,13 +546,13 @@ export function main() {
 
 ### Supported Import Types
 
-| Type | Example | Resolved |
-|------|---------|----------|
-| Relative | `./utils` | ✅ Yes |
-| Relative Parent | `../models/user` | ✅ Yes |
-| Alias | `app/users/services` | ✅ Yes |
-| Node Built-in | `fs`, `node:path` | ❌ Skipped |
-| External Package | `@warlock.js/core` | ❌ Skipped |
+| Type             | Example              | Resolved   |
+| ---------------- | -------------------- | ---------- |
+| Relative         | `./utils`            | ✅ Yes     |
+| Relative Parent  | `../models/user`     | ✅ Yes     |
+| Alias            | `app/users/services` | ✅ Yes     |
+| Node Built-in    | `fs`, `node:path`    | ❌ Skipped |
+| External Package | `@warlock.js/core`   | ❌ Skipped |
 
 ---
 
@@ -522,19 +560,19 @@ export function main() {
 
 ### File Type Classification
 
-| Type | Pattern | Layer | Description |
-|------|---------|-------|-------------|
-| **config** | `src/config/*.ts` | FSR | Configuration files |
-| **main** | `**/main.ts` | HMR | Module entry points |
-| **route** | `**/routes.ts` | FSR* | Route definitions |
-| **event** | `**/events/**/*.ts` | HMR | Event handlers |
-| **locale** | `**/utils/locales.ts` | HMR | Translations |
-| **controller** | `**/*controller*.ts` | HMR | Request handlers |
-| **service** | `**/*service*.ts` | HMR | Business logic |
-| **model** | `**/*model*.ts` | HMR | Data models |
-| **other** | Everything else | HMR | Utilities, helpers |
+| Type           | Pattern               | Layer | Description         |
+| -------------- | --------------------- | ----- | ------------------- |
+| **config**     | `src/config/*.ts`     | FSR   | Configuration files |
+| **main**       | `**/main.ts`          | HMR   | Module entry points |
+| **route**      | `**/routes.ts`        | FSR\* | Route definitions   |
+| **event**      | `**/events/**/*.ts`   | HMR   | Event handlers      |
+| **locale**     | `**/utils/locales.ts` | HMR   | Translations        |
+| **controller** | `**/*controller*.ts`  | HMR   | Request handlers    |
+| **service**    | `**/*service*.ts`     | HMR   | Business logic      |
+| **model**      | `**/*model*.ts`       | HMR   | Data models         |
+| **other**      | Everything else       | HMR   | Utilities, helpers  |
 
-*Will be HMR with wildcard routing implementation
+\*Will be HMR with wildcard routing implementation
 
 ### Special File Loading Order
 
@@ -555,7 +593,7 @@ export function main() {
 interface Connector {
   readonly name: string;
   readonly priority: number;
-  
+
   isActive(): boolean;
   init(): Promise<void>;
   restart(): Promise<void>;
@@ -652,7 +690,7 @@ Bidirectional graph with two maps:
     "src/app/users/main.ts" => Set(["src/app/users/shared/utils.ts"]),
     "src/app/users/shared/utils.ts" => Set([])
   },
-  
+
   // Backward: file → files that import it
   dependents: Map<string, Set<string>> {
     "src/app/users/shared/utils.ts" => Set(["src/app/users/main.ts"]),
@@ -704,7 +742,7 @@ Invalidation chain:
 export default {
   host: "localhost",
   port: 5432,
-  database: "myapp"
+  database: "myapp",
 };
 
 // Registered as: config.set("database", { host, port, database })
@@ -766,6 +804,7 @@ import { foo } from "./does-not-exist";
 ```
 
 **Handling**:
+
 1. `parseImports()` can't resolve path → not added to dependencies
 2. `transformImports()` can't find in `importMap` → throws error
 3. `FileOperations.updateFile()` catches error → logs, doesn't trigger `FILE_READY`
@@ -776,6 +815,7 @@ import { foo } from "./does-not-exist";
 **Scenario**: File A imports File B, File B is deleted
 
 **Handling**:
+
 1. `FileOperations.deleteFile(B)` removes B from graph
 2. Triggers `FILE_READY` for dependents (File A)
 3. `LayerExecutor` tries to reload File A
@@ -787,7 +827,8 @@ import { foo } from "./does-not-exist";
 **Scenario**: TypeScript syntax error
 
 **Handling**:
-1. `transpile()` calls esbuild → throws error
+
+1. `transpileFile()` calls esbuild → throws error
 2. Error bubbles up to `FileManager.processFile()`
 3. `FileOperations` catches and logs
 4. File not added to system, old version remains
@@ -905,7 +946,7 @@ The Development Server v2 is a production-ready, high-performance hot-reloading 
 ✅ **Extensible Architecture**: Pluggable connectors  
 ✅ **Type Safety**: Full TypeScript support  
 ✅ **Single Process**: No IPC overhead  
-✅ **Production-Ready**: Battle-tested patterns  
+✅ **Production-Ready**: Battle-tested patterns
 
 ### Key Metrics
 
@@ -938,6 +979,7 @@ npm run build
 ```
 
 The server will:
+
 1. Load manifest (if exists)
 2. Discover and process files
 3. Start file watcher
@@ -951,4 +993,3 @@ The server will:
 **Last Updated**: December 2024  
 **Version**: 2.0.0  
 **Status**: ✅ Production Ready
-

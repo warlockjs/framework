@@ -1,24 +1,35 @@
-import { createDirectoryAsync, directoryExists, removeDirectoryAsync } from "@mongez/fs";
-import { srcPath, warlockPath } from "../utils";
+import { createDirectoryAsync, removeDirectoryAsync } from "@mongez/fs";
 import glob from "fast-glob";
+import { srcPath, warlockPath } from "../utils";
 import { Path } from "./path";
 
-const directoryPath = warlockPath();
-
 export async function createFreshWarlockDirectory() {
-  if (await directoryExists(directoryPath)) {
-    await removeDirectoryAsync(directoryPath);
+  const cacheDirectory = warlockPath("cache");
+  try {
+    await removeDirectoryAsync(cacheDirectory);
+  } catch {
+    // ignore
   }
 
-  await createDirectoryAsync(directoryPath + "/cache", { recursive: true });
+  await createDirectoryAsync(cacheDirectory, { recursive: true });
 }
 
+/**
+ * Get files from directory
+ * @param directoryPath
+ * @param pattern
+ * @returns array of files full paths
+ */
 export async function getFilesFromDirectory(directoryPath = srcPath(), pattern = "**/*.{ts,tsx}") {
   const files = await glob(`${Path.normalize(directoryPath)}/${pattern}`, {
     absolute: true, // Return absolute paths
   });
 
   return files.map((file) => Path.normalize(file));
+}
+
+export async function getCertainFilesFromDirectory(directoryPath: string, filesNames: string[]) {
+  return getFilesFromDirectory(directoryPath, "(" + filesNames.join("|") + ").{ts,tsx}");
 }
 
 export function warlockCachePath(relativePath: string) {

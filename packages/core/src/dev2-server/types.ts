@@ -22,4 +22,4 @@ export type FileManifest = {
   cachePath: string;
 };
 
-export type FileState = "idle" | "loading" | "ready" | "error" | "updating" | "deleted";
+export type FileState = "idle" | "loading" | "parsed" | "ready" | "error" | "updating" | "deleted";

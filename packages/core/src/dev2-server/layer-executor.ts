@@ -1,12 +1,11 @@
 import { loadEnv } from "@mongez/dotenv";
-import type { ConfigLoader } from "./config-loader";
-import type { Connector } from "./connectors/types";
+import { configManager } from "../config/config-manager";
+import { connectorsManager } from "./connectors/connectors-manager";
 import type { DependencyGraph } from "./dependency-graph";
 import { devLogHMR } from "./dev-logger";
-import type { FileManager } from "./file-manager";
+import { FileManager } from "./file-manager";
 import type { ModuleLoader } from "./module-loader";
 import type { SpecialFilesCollector } from "./special-files-collector";
-
 /**
  * LayerExecutor handles the execution of file reloads based on their layer type
  *
@@ -19,9 +18,7 @@ export class LayerExecutor {
   public constructor(
     private readonly dependencyGraph: DependencyGraph,
     private readonly specialFilesCollector: SpecialFilesCollector,
-    private readonly connectors: Connector[],
     private readonly moduleLoader: ModuleLoader,
-    private readonly configLoader: ConfigLoader,
   ) {}
 
   /**
@@ -32,8 +29,17 @@ export class LayerExecutor {
   public async executeBatchReload(
     changedPaths: string[],
     filesMap: Map<string, FileManager>,
+    deletedFiles: string[],
   ): Promise<void> {
     if (changedPaths.length === 0) {
+      if (deletedFiles.length > 0) {
+        deletedFiles.forEach((file) => {
+          const fileSystem = filesMap.get(file);
+          if (fileSystem) {
+            this.moduleLoader.cleanupDeletedModule(fileSystem);
+          }
+        });
+      }
       return;
     }
 
@@ -93,6 +99,17 @@ export class LayerExecutor {
     } catch (error) {
       console.log("ERRor in executeFullServerRestart: ", error);
     }
+
+    try {
+      deletedFiles.forEach((file) => {
+        const fileSystem = filesMap.get(file);
+        if (fileSystem) {
+          this.moduleLoader.cleanupDeletedModule(fileSystem);
+        }
+      });
+    } catch (error) {
+      console.log("ERRor in deleteFiles: ", error);
+    }
   }
 
   /**
@@ -129,7 +146,7 @@ export class LayerExecutor {
     if (configFiles.length > 0) {
       // Reload config files first
       for (const configFile of configFiles) {
-        await this.configLoader.reloadConfig(configFile);
+        await configManager.reload(configFile);
       }
 
       // Restart only affected connectors
@@ -176,9 +193,9 @@ export class LayerExecutor {
    * Restart connectors that are affected by the changed files
    */
   private async restartAffectedConnectors(affectedFiles: string[]): Promise<void> {
-    const connectorsToRestart = this.connectors.filter((connector) =>
-      connector.shouldRestart(affectedFiles),
-    );
+    const connectorsToRestart = connectorsManager
+      .list()
+      .filter((connector) => connector.shouldRestart(affectedFiles));
 
     if (connectorsToRestart.length === 0) {
       return;
@@ -203,7 +220,8 @@ export class LayerExecutor {
         this.moduleLoader.clearModuleCache(file.absolutePath);
 
         // Update module version for HMR cache busting
-        __updateModuleVersion(`./${file.cachePath}`, Date.now());
+
+        __clearModuleVersion(`./${file.cachePath}`);
       }
     }
   }
@@ -314,13 +332,28 @@ export class LayerExecutor {
       affectedLocaleFiles.length > 0 ||
       affectedConfigFiles.length > 0;
 
+    // For future me:
+    // why we are only allowing special files?
+    // because they act as entry points
+    // so for example of a service file is changed
+    // but not called within a controller that's called
+    // within a router, then it's useless to reload it
+    // since it will not be executed.
     if (!hasSpecialFiles) {
+      // however, we could just reload the last file in the chain
+      // since it's the main dependent file instead of reloading all of them.
+      const lastFileInChain = invalidationChain[invalidationChain.length - 1];
+      const file = filesMap.get(lastFileInChain);
+      if (!file) {
+        return;
+      }
+      await this.moduleLoader.reloadModule(file);
       return;
     }
 
     if (affectedConfigFiles.length > 0) {
       for (const file of affectedConfigFiles) {
-        await this.configLoader.reloadConfig(file);
+        await configManager.reload(file);
       }
     }
 

@@ -1,14 +1,174 @@
-import Endpoint from "@mongez/http";
+import { Endpoint } from "@mongez/http";
 import type { FormatEnum } from "sharp";
 import sharp from "sharp";
 
 export type ImageFormat = keyof FormatEnum;
 
+export type ImageInput = Parameters<typeof sharp>[0];
+
+/**
+ * Watermark configuration for deferred execution
+ */
+export type WatermarkConfig = {
+  image: ImageInput | Image;
+  options: sharp.OverlayOptions;
+};
+
+/**
+ * Operation descriptor for deferred pipeline execution.
+ * All operations are stored and executed at save/toBuffer time.
+ */
+type ImageOperation =
+  | { type: "resize"; options: sharp.ResizeOptions }
+  | { type: "crop"; options: sharp.Region }
+  | { type: "rotate"; angle: number }
+  | { type: "flip" }
+  | { type: "flop" }
+  | { type: "blur"; sigma: number }
+  | { type: "sharpen"; options?: sharp.SharpenOptions }
+  | { type: "blackAndWhite" }
+  | { type: "opacity"; value: number }
+  | { type: "negate"; options?: sharp.NegateOptions }
+  | { type: "tint"; color: sharp.Color }
+  | { type: "trim"; options?: sharp.TrimOptions }
+  | { type: "watermark"; config: WatermarkConfig }
+  | { type: "watermarks"; configs: WatermarkConfig[] };
+
+/**
+ * Transformation options that can be applied in batch via `apply()` method.
+ *
+ * **Execution Order (when using apply()):**
+ * 1. resize - Resize first to work with correct dimensions
+ * 2. crop - Crop after resize to extract the desired region
+ * 3. rotate - Rotation after sizing
+ * 4. flip/flop - Mirror operations
+ * 5. blackAndWhite/grayscale - Color space conversion
+ * 6. blur - Blur effect
+ * 7. sharpen - Sharpen effect
+ * 8. tint - Color overlay
+ * 9. negate - Invert colors
+ * 10. opacity - Transparency (applied via composite)
+ * 11. format/quality - Applied on save/export
+ */
+export type ImageTransformOptions = {
+  /**
+   * Output quality (1-100), applied based on final format
+   */
+  quality?: number;
+  /**
+   * Output format (jpeg, png, webp, avif, etc.)
+   */
+  format?: ImageFormat;
+  /**
+   * Resize options
+   */
+  resize?: sharp.ResizeOptions;
+  /**
+   * Crop/extract region
+   */
+  crop?: sharp.Region;
+  /**
+   * Rotation angle in degrees
+   */
+  rotate?: number;
+  /**
+   * Flip vertically (top to bottom)
+   */
+  flip?: boolean;
+  /**
+   * Flop horizontally (left to right)
+   */
+  flop?: boolean;
+  /**
+   * Convert to black and white
+   */
+  blackAndWhite?: boolean;
+  /**
+   * Alias for blackAndWhite
+   */
+  grayscale?: boolean;
+  /**
+   * Blur sigma (must be >= 0.3)
+   */
+  blur?: number;
+  /**
+   * Sharpen options
+   */
+  sharpen?: sharp.SharpenOptions | boolean;
+  /**
+   * Tint color
+   */
+  tint?: sharp.Color;
+  /**
+   * Negate/invert colors
+   */
+  negate?: sharp.NegateOptions | boolean;
+  /**
+   * Opacity (0-100)
+   */
+  opacity?: number;
+  /**
+   * Trim options
+   */
+  trim?: sharp.TrimOptions | boolean;
+  /**
+   * Single watermark
+   */
+  watermark?: WatermarkConfig;
+  /**
+   * Multiple watermarks
+   */
+  watermarks?: WatermarkConfig[];
+};
+
+/**
+ * Internal options stored for deferred application
+ */
+type InternalOptions = {
+  quality?: number;
+  format?: ImageFormat;
+};
+
+/**
+ * Image manipulation class with deferred pipeline execution.
+ *
+ * All operations are synchronous and stored as descriptors.
+ * The pipeline is executed only when calling output methods:
+ * - `save()` - Save to file
+ * - `toBuffer()` - Get as buffer
+ * - `toBase64()` - Get as base64 string
+ * - `toDataUrl()` - Get as data URL
+ *
+ * @example
+ * ```typescript
+ * // All chaining is synchronous - single await at the end
+ * await Image.fromFile("photo.jpg")
+ *   .resize({ width: 800 })
+ *   .watermark({ image: "logo.png", options: { gravity: "southeast" } })
+ *   .quality(85)
+ *   .save("output.jpg");
+ * ```
+ */
 export class Image {
   /**
-   * More options
+   * Image options that will be applied on save/export
    */
-  protected options: any = {};
+  protected options: InternalOptions = {};
+
+  /**
+   * Deferred operations pipeline
+   */
+  protected operations: ImageOperation[] = [];
+
+  /**
+   * Cached metadata to avoid repeated async calls
+   */
+  protected cachedMetadata: sharp.Metadata | null = null;
+
+  /**
+   * Whether the pipeline has been executed
+   */
+  protected pipelineExecuted = false;
 
   /**
    * Sharp image object
@@ -16,209 +176,619 @@ export class Image {
   public readonly image: sharp.Sharp;
 
   /**
+   * Formats that support quality option
+   */
+  protected static readonly QUALITY_FORMATS = ["jpeg", "jpg", "webp", "avif", "tiff", "heif"];
+
+  /**
    * Constructor
    */
-  public constructor(image: Parameters<typeof sharp>[0]) {
-    this.image = sharp(image);
-  }
-
-  /**
-   * Set image opacity (0-100)
-   */
-  public opacity(opacity: number) {
-    if (opacity < 0 || opacity > 100) {
-      throw new Error("Opacity must be between 0 and 100");
+  public constructor(image: ImageInput | sharp.Sharp) {
+    // Check if it's already a sharp instance
+    if (image instanceof Object && "clone" in image && typeof image.clone === "function") {
+      this.image = image as sharp.Sharp;
+    } else {
+      this.image = sharp(image as ImageInput);
     }
-
-    const alpha = Math.round((opacity / 100) * 255);
-
-    const alphaPixel = Buffer.from([255, 255, 255, alpha]);
-
-    this.image.composite([
-      {
-        blend: "dest-in",
-        input: alphaPixel,
-      },
-    ]);
-
-    return this;
   }
 
   /**
-   * Convert image to black and white
+   * Create image instance from file path
    */
-  public blackAndWhite() {
-    this.image.toColourspace("b-w");
-
-    return this;
+  public static fromFile(path: string): Image {
+    return new Image(path);
   }
 
   /**
-   * Get image dimensions
+   * Create image instance from buffer
    */
-  public async dimensions() {
-    const { width, height } = await this.image.metadata();
-
-    return { width, height };
-  }
-
-  /**
-   * Get image metadata
-   */
-  public async metadata() {
-    return this.image.metadata();
+  public static fromBuffer(buffer: Buffer): Image {
+    return new Image(buffer);
   }
 
   /**
    * Create image instance from url
    */
-  public static async fromUrl(url: string) {
-    // download image from url as buffer
-    const request = new Endpoint();
-    const response = await request.get(url, {
-      responseType: "arraybuffer",
-    });
+  public static async fromUrl(url: string): Promise<Image> {
+    try {
+      const request = new Endpoint();
+      const response = await request.get(url, {
+        responseType: "arraybuffer",
+      });
 
-    const buffer = Buffer.from(response.data, "binary");
+      if (!response.data) {
+        throw new Error("Empty response received");
+      }
 
-    return new Image(buffer);
+      const buffer = Buffer.from(response.data, "binary");
+
+      return new Image(buffer);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      throw new Error(`Failed to load image from URL "${url}": ${message}`);
+    }
+  }
+
+  /**
+   * Add an operation to the deferred pipeline
+   */
+  protected addOperation(operation: ImageOperation): this {
+    this.operations.push(operation);
+
+    return this;
+  }
+
+  /**
+   * Apply multiple transformations at once with a predefined execution order.
+   *
+   * This method ensures transformations are applied in a logical order:
+   * resize → crop → rotate → flip/flop → colorspace → effects → opacity → format
+   *
+   * For custom ordering, use individual chained methods instead.
+   */
+  public apply(options: ImageTransformOptions): this {
+    // 1. Resize first to work with correct dimensions
+    if (options.resize) {
+      this.resize(options.resize);
+    }
+
+    // 2. Crop after resize
+    if (options.crop) {
+      this.crop(options.crop);
+    }
+
+    // 3. Rotation
+    if (options.rotate !== undefined) {
+      this.rotate(options.rotate);
+    }
+
+    // 4. Mirror operations
+    if (options.flip) {
+      this.flip();
+    }
+
+    if (options.flop) {
+      this.flop();
+    }
+
+    // 5. Color space conversion
+    if (options.blackAndWhite || options.grayscale) {
+      this.blackAndWhite();
+    }
+
+    // 6. Blur effect
+    if (options.blur !== undefined) {
+      this.blur(options.blur);
+    }
+
+    // 7. Sharpen effect
+    if (options.sharpen) {
+      const sharpenOptions = typeof options.sharpen === "boolean" ? undefined : options.sharpen;
+      this.sharpen(sharpenOptions);
+    }
+
+    // 8. Tint color
+    if (options.tint) {
+      this.tint(options.tint);
+    }
+
+    // 9. Negate/invert
+    if (options.negate) {
+      const negateOptions = typeof options.negate === "boolean" ? undefined : options.negate;
+      this.negate(negateOptions);
+    }
+
+    // 10. Trim edges
+    if (options.trim) {
+      const trimOptions = typeof options.trim === "boolean" ? undefined : options.trim;
+      this.trim(trimOptions);
+    }
+
+    // 11. Watermarks
+    if (options.watermark) {
+      this.watermark(options.watermark.image, options.watermark.options);
+    }
+
+    if (options.watermarks) {
+      this.watermarks(options.watermarks);
+    }
+
+    // 12. Opacity (applied via composite)
+    if (options.opacity !== undefined) {
+      this.opacity(options.opacity);
+    }
+
+    // 13. Store format/quality for deferred application
+    if (options.format) {
+      this.format(options.format);
+    }
+
+    if (options.quality !== undefined) {
+      this.quality(options.quality);
+    }
+
+    return this;
+  }
+
+  /**
+   * Set image opacity (0-100)
+   */
+  public opacity(value: number): this {
+    if (value < 0 || value > 100) {
+      throw new Error("Opacity must be between 0 and 100");
+    }
+
+    return this.addOperation({ type: "opacity", value });
+  }
+
+  /**
+   * Convert image to black and white
+   */
+  public blackAndWhite(): this {
+    return this.addOperation({ type: "blackAndWhite" });
+  }
+
+  /**
+   * Alias for blackAndWhite
+   */
+  public grayscale(): this {
+    return this.blackAndWhite();
+  }
+
+  /**
+   * Get image dimensions (cached after first call)
+   */
+  public async dimensions(): Promise<{
+    width: number | undefined;
+    height: number | undefined;
+  }> {
+    const metadata = await this.metadata();
+
+    return { width: metadata.width, height: metadata.height };
+  }
+
+  /**
+   * Get image metadata (cached after first call)
+   *
+   * The metadata is cached to avoid repeated async operations.
+   * Use `refreshMetadata()` to force a fresh fetch.
+   */
+  public async metadata(): Promise<sharp.Metadata> {
+    if (!this.cachedMetadata) {
+      this.cachedMetadata = await this.image.metadata();
+    }
+
+    return this.cachedMetadata;
+  }
+
+  /**
+   * Force refresh of cached metadata
+   *
+   * Call this after transformations if you need updated metadata.
+   */
+  public async refreshMetadata(): Promise<sharp.Metadata> {
+    this.cachedMetadata = await this.image.metadata();
+
+    return this.cachedMetadata;
+  }
+
+  /**
+   * Clear cached metadata
+   */
+  public clearMetadataCache(): this {
+    this.cachedMetadata = null;
+
+    return this;
   }
 
   /**
    * Resize image
    */
-  public resize(options: sharp.ResizeOptions) {
-    this.image.resize(options);
+  public resize(options: sharp.ResizeOptions): this {
+    return this.addOperation({ type: "resize", options });
+  }
+
+  /**
+   * Crop/extract a region from the image
+   */
+  public crop(options: sharp.Region): this {
+    return this.addOperation({ type: "crop", options });
+  }
+
+  /**
+   * Set image quality (1-100)
+   * Quality is stored and applied when saving/exporting
+   * based on the final format.
+   */
+  public quality(quality: number): this {
+    if (quality < 1 || quality > 100) {
+      throw new Error("Quality must be between 1 and 100");
+    }
+
+    this.options.quality = quality;
 
     return this;
   }
 
   /**
-   * Set image quality
+   * Execute the deferred pipeline - apply all stored operations
    */
-  public quality(quality: number) {
-    this.image.webp({
-      quality,
-    });
+  protected async executePipeline(): Promise<void> {
+    if (this.pipelineExecuted) {
+      return;
+    }
 
-    return this;
+    for (const operation of this.operations) {
+      await this.executeOperation(operation);
+    }
+
+    await this.applyFormatAndQuality();
+
+    this.pipelineExecuted = true;
+  }
+
+  /**
+   * Execute a single operation
+   */
+  protected async executeOperation(operation: ImageOperation): Promise<void> {
+    switch (operation.type) {
+      case "resize":
+        this.image.resize(operation.options);
+        break;
+
+      case "crop":
+        this.image.extract(operation.options);
+        break;
+
+      case "rotate":
+        this.image.rotate(operation.angle);
+        break;
+
+      case "flip":
+        this.image.flip();
+        break;
+
+      case "flop":
+        this.image.flop();
+        break;
+
+      case "blur":
+        this.image.blur(operation.sigma);
+        break;
+
+      case "sharpen":
+        this.image.sharpen(operation.options);
+        break;
+
+      case "blackAndWhite":
+        this.image.toColourspace("b-w");
+        break;
+
+      case "opacity": {
+        const alpha = Math.round((operation.value / 100) * 255);
+        const alphaPixel = Buffer.from([255, 255, 255, alpha]);
+        this.image.composite([
+          {
+            blend: "dest-in",
+            input: alphaPixel,
+          },
+        ]);
+        break;
+      }
+
+      case "negate":
+        this.image.negate(operation.options);
+        break;
+
+      case "tint":
+        this.image.tint(operation.color);
+        break;
+
+      case "trim":
+        this.image.trim(operation.options);
+        break;
+
+      case "watermark": {
+        const buffer = await this.resolveImageBuffer(operation.config.image);
+        this.image.composite([
+          {
+            input: buffer,
+            ...operation.config.options,
+          },
+        ]);
+        break;
+      }
+
+      case "watermarks": {
+        const buffers = await Promise.all(
+          operation.configs.map((config) => this.resolveImageBuffer(config.image)),
+        );
+        this.image.composite(
+          operation.configs.map((config, index) => ({
+            input: buffers[index],
+            ...config.options,
+          })),
+        );
+        break;
+      }
+    }
+  }
+
+  /**
+   * Resolve an image input to a buffer
+   */
+  protected async resolveImageBuffer(input: ImageInput | Image): Promise<Buffer> {
+    if (input instanceof Image) {
+      // For Image instances, get buffer without applying options (raw buffer)
+      return input.image.toBuffer();
+    }
+
+    // For other inputs (path, buffer, etc.), create temp Image and get buffer
+    const tempImage = new Image(input);
+
+    return tempImage.image.toBuffer();
+  }
+
+  /**
+   * Apply format and quality options.
+   * If no format is explicitly set, preserves the original format and applies
+   * quality appropriately based on the format type.
+   */
+  protected async applyFormatAndQuality(): Promise<void> {
+    const { quality, format } = this.options;
+
+    if (format) {
+      // Explicit format specified
+      const formatOptions = quality ? { quality } : undefined;
+      this.image.toFormat(format, formatOptions);
+      return;
+    }
+
+    if (quality === undefined) {
+      // No quality or format set, nothing to apply
+      return;
+    }
+
+    // Quality is set but no format specified - detect original format
+    const metadata = await this.metadata();
+    const originalFormat = metadata.format;
+
+    if (!originalFormat) {
+      // Cannot detect format, default to webp with quality
+      this.image.webp({ quality });
+      return;
+    }
+
+    // Apply quality based on original format
+    if (Image.QUALITY_FORMATS.includes(originalFormat)) {
+      // Format supports quality option
+      this.image.toFormat(originalFormat as ImageFormat, { quality });
+    } else if (originalFormat === "png") {
+      // PNG uses compressionLevel (0-9) instead of quality
+      // Map quality 1-100 to compressionLevel 9-0 (higher quality = lower compression)
+      const compressionLevel = Math.round(9 - (quality / 100) * 9);
+      this.image.png({ compressionLevel });
+    } else if (originalFormat === "gif") {
+      // GIF doesn't support quality, just preserve format
+      this.image.gif();
+    }
+    // Unknown format: preserve as-is (no quality applied)
   }
 
   /**
    * Save to file
    */
-  public async save(path: string) {
+  public async save(path: string): Promise<sharp.OutputInfo> {
+    await this.executePipeline();
+
     return this.image.toFile(path);
   }
 
   /**
    * Convert to webp and save to file
    */
-  public async saveAsWebp(path: string) {
-    return this.image.toFormat("webp").toFile(path);
+  public async saveAsWebp(path: string): Promise<sharp.OutputInfo> {
+    // Override format to webp
+    this.options.format = "webp";
+    await this.executePipeline();
+
+    return this.image.toFile(path);
   }
 
   /**
    * Change the file format
    */
-  public format(format: ImageFormat) {
-    this.image.toFormat(format);
+  public format(format: ImageFormat): this {
+    this.options.format = format;
 
     return this;
   }
 
   /**
-   * Add watermark
+   * Add watermark (deferred - executed at save time)
    */
-  public async watermark(
-    watermarkImage: Parameters<typeof sharp>[0] | Image,
-    options: sharp.OverlayOptions = {},
-  ) {
-    // now check if the watermark is an image instance
-    // if not, create a new instance from the image
-    if (!(watermarkImage instanceof Image)) {
-      watermarkImage = new Image(watermarkImage);
-    }
-
-    this.image.composite([
-      {
-        input: await watermarkImage.toBuffer(),
-        ...options,
-      },
-    ]);
-
-    return this;
+  public watermark(image: ImageInput | Image, options: sharp.OverlayOptions = {}): this {
+    return this.addOperation({
+      type: "watermark",
+      config: { image, options },
+    });
   }
 
   /**
-   * Add multiple watermarks
+   * Add multiple watermarks (deferred - executed at save time)
    */
-  public async watermarks(
-    watermarks: {
-      image: Parameters<typeof sharp>[0] | Image;
-      options: sharp.OverlayOptions;
-    }[],
-  ) {
-    const images = await Promise.all(
-      watermarks.map(async ({ image }) => {
-        if (!(image instanceof Image)) {
-          image = new Image(image);
-        }
-
-        return await image.toBuffer();
-      }),
-    );
-
-    this.image.composite(
-      watermarks.map(({ options }, index) => ({
-        input: images[index],
-        ...options,
-      })),
-    );
-
-    return this;
+  public watermarks(configs: WatermarkConfig[]): this {
+    return this.addOperation({
+      type: "watermarks",
+      configs,
+    });
   }
 
   /**
    * Rotate image
    */
-  public rotate(angle: number) {
-    this.image.rotate(angle);
+  public rotate(angle: number): this {
+    return this.addOperation({ type: "rotate", angle });
+  }
 
-    return this;
+  /**
+   * Flip image vertically (top to bottom)
+   */
+  public flip(): this {
+    return this.addOperation({ type: "flip" });
+  }
+
+  /**
+   * Flop image horizontally (left to right)
+   */
+  public flop(): this {
+    return this.addOperation({ type: "flop" });
   }
 
   /**
    * Blur image
    */
-  public blur(sigma: number) {
-    this.image.blur(sigma);
+  public blur(sigma: number): this {
+    if (sigma < 0.3) {
+      throw new Error("Blur sigma must be at least 0.3");
+    }
 
-    return this;
+    return this.addOperation({ type: "blur", sigma });
   }
 
   /**
    * Convert to base64
    */
-  public async toBase64() {
+  public async toBase64(): Promise<string> {
+    await this.executePipeline();
     const buffer = await this.image.toBuffer();
 
     return buffer.toString("base64");
   }
 
   /**
+   * Convert to data URL (base64 with mime type prefix)
+   */
+  public async toDataUrl(): Promise<string> {
+    const metadata = await this.metadata();
+    const format = this.options.format || metadata.format || "png";
+    const mimeType = `image/${format === "jpg" ? "jpeg" : format}`;
+    const base64 = await this.toBase64();
+
+    return `data:${mimeType};base64,${base64}`;
+  }
+
+  /**
    * Sharpen image
    */
-  public sharpen(options?: sharp.SharpenOptions) {
-    this.image.sharpen(options);
+  public sharpen(options?: sharp.SharpenOptions): this {
+    return this.addOperation({ type: "sharpen", options });
+  }
 
-    return this;
+  /**
+   * Negate/invert image colors
+   */
+  public negate(options?: sharp.NegateOptions): this {
+    return this.addOperation({ type: "negate", options });
+  }
+
+  /**
+   * Tint image with a color
+   */
+  public tint(color: sharp.Color): this {
+    return this.addOperation({ type: "tint", color });
+  }
+
+  /**
+   * Trim edges from the image
+   */
+  public trim(options?: sharp.TrimOptions): this {
+    return this.addOperation({ type: "trim", options });
   }
 
   /**
    * Convert to buffer
    */
-  public toBuffer() {
+  public async toBuffer(): Promise<Buffer> {
+    await this.executePipeline();
+
     return this.image.toBuffer();
+  }
+
+  /**
+   * Clone the image for separate transformations
+   */
+  public clone(): Image {
+    const clonedImage = new Image(this.image.clone());
+    clonedImage.options = { ...this.options };
+    clonedImage.operations = [...this.operations];
+    clonedImage.cachedMetadata = this.cachedMetadata ? { ...this.cachedMetadata } : null;
+
+    return clonedImage;
+  }
+
+  /**
+   * Get the current stored options
+   */
+  public getOptions(): Readonly<InternalOptions> {
+    return { ...this.options };
+  }
+
+  /**
+   * Get the pending operations count
+   */
+  public getPendingOperationsCount(): number {
+    return this.operations.length;
+  }
+
+  /**
+   * Reset all stored options
+   */
+  public resetOptions(): this {
+    this.options = {};
+
+    return this;
+  }
+
+  /**
+   * Clear all pending operations
+   */
+  public clearOperations(): this {
+    this.operations = [];
+    this.pipelineExecuted = false;
+
+    return this;
+  }
+
+  /**
+   * Reset the image to its initial state (clear operations and options)
+   */
+  public reset(): this {
+    this.operations = [];
+    this.options = {};
+    this.pipelineExecuted = false;
+    this.cachedMetadata = null;
+
+    return this;
   }
 }

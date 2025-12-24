@@ -40,10 +40,28 @@ export class Route {
   }
 
   /**
-   * Postman options
+   * Set route path
    */
-  public postman(options: RouteData["postman"]) {
-    this.data.postman = options;
+  public path(path: string) {
+    this.data.path = path;
+
+    return this;
+  }
+
+  /**
+   * Set route method
+   */
+  public method(method: RouteData["method"]) {
+    this.data.method = method;
+
+    return this;
+  }
+
+  /**
+   * Set route handler
+   */
+  public handler(handler: RouteData["handler"]) {
+    this.data.handler = handler;
 
     return this;
   }

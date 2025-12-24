@@ -1,9 +1,11 @@
 import events from "@mongez/events";
 import { debounce } from "@mongez/reinforcements";
 import { devLogSuccess } from "./dev-logger";
+import type { FileManager } from "./file-manager";
 import type { FileOperations } from "./file-operations";
 import { FILE_PROCESSING_BATCH_SIZE } from "./flags";
 import type { ManifestManager } from "./manifest-manager";
+import { clearFileExistsCache } from "./parse-imports";
 import { Path } from "./path";
 
 /**
@@ -96,6 +98,15 @@ export class FileEventHandler {
       return;
     }
 
+    // For batch operations (multiple files), add extra delay to let filesystem settle
+    const totalFiles = adds.length + changes.length;
+    if (totalFiles > 1) {
+      // Wait 500ms for filesystem to fully write all files
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Clear file exists cache so we get fresh lookups
+      clearFileExistsCache();
+    }
+
     // Silent batch processing
 
     // Process in order: adds first (so new files are available for import transformation),
@@ -139,25 +150,65 @@ export class FileEventHandler {
 
   /**
    * Process batch of added files
+   * Uses push-to-end strategy: files that depend on other batch files are processed last
    */
   private async processBatchAdds(relativePaths: string[]) {
     if (relativePaths.length === 0) return;
 
-    const BATCH_SIZE = FILE_PROCESSING_BATCH_SIZE;
+    const batchSet = new Set(relativePaths);
 
-    for (let i = 0; i < relativePaths.length; i += BATCH_SIZE) {
-      const batch = relativePaths.slice(i, i + BATCH_SIZE);
+    // PHASE 1: Parse all files in parallel to discover dependencies
+    const parsedFiles = await Promise.all(
+      relativePaths.map(async (relativePath) => {
+        try {
+          const fileManager = await this.fileOperations.parseNewFile(relativePath);
+          return fileManager;
+        } catch (error) {
+          return null; // Skip files that can't be parsed
+        }
+      }),
+    );
 
-      await Promise.all(
-        batch.map(async (relativePath) => {
-          try {
-            await this.fileOperations.addFile(relativePath);
-            devLogSuccess(`Added file: ${relativePath}`);
-          } catch (error) {
-            // File might already exist, ignore
-          }
-        }),
-      );
+    // Filter out nulls
+    const validFiles = parsedFiles.filter((f): f is FileManager => f !== null);
+
+    // PHASE 2: Reorder - push files with batch dependencies to the end
+    const noDeps: FileManager[] = [];
+    const hasDeps: FileManager[] = [];
+
+    for (const file of validFiles) {
+      const dependsOnBatch = [...file.dependencies].some((dep) => batchSet.has(dep));
+      if (dependsOnBatch) {
+        hasDeps.push(file);
+      } else {
+        noDeps.push(file);
+      }
+    }
+
+    // Combine: no-deps first, has-deps last
+    const orderedFiles = [...noDeps, ...hasDeps];
+
+    // PHASE 3: Process sequentially with retry for failures
+    const failed: FileManager[] = [];
+
+    for (const file of orderedFiles) {
+      try {
+        await this.fileOperations.finalizeNewFile(file);
+        devLogSuccess(`Added file: ${file.relativePath}`);
+      } catch (error) {
+        failed.push(file);
+      }
+    }
+
+    // Retry failed files once (their dependencies might be ready now)
+    for (const file of failed) {
+      try {
+        await this.fileOperations.finalizeNewFile(file);
+        devLogSuccess(`Added file: ${file.relativePath}`);
+      } catch (error) {
+        // Log error but continue - file may have other issues
+        console.error(`Failed to add file ${file.relativePath}:`, error);
+      }
     }
   }
 

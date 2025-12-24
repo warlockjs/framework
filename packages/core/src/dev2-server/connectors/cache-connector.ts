@@ -8,7 +8,7 @@ import { ConnectorPriority } from "./types";
  * Manages cache engine connection lifecycle
  */
 export class CacheConnector extends BaseConnector {
-  public readonly name = "Cache";
+  public readonly name = "cache";
   public readonly priority = ConnectorPriority.CACHE;
 
   /**

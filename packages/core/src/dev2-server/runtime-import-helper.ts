@@ -32,24 +32,22 @@ const loadingModules = new Set<string>();
  */
 const modulePromises = new Map<string, Promise<any>>();
 
+function normalizePath(modulePath: string) {
+  return modulePath.startsWith("./") ? modulePath.slice(2) : modulePath;
+}
+
 /**
  * Get last version of timestamp for a module
  * if not found set it then return it
  */
 function useModuleVersion(modulePath: string): number {
-  const cleanPath = modulePath.startsWith("./") ? modulePath.slice(2) : modulePath;
+  const cleanPath = normalizePath(modulePath);
 
   if (!moduleVersions.has(cleanPath)) {
     moduleVersions.set(cleanPath, Date.now());
   }
 
   return moduleVersions.get(cleanPath)!;
-}
-
-function getModuleVersion(modulePath: string): number {
-  const cleanPath = modulePath.startsWith("./") ? modulePath.slice(2) : modulePath;
-
-  return moduleVersions.get(cleanPath) || Date.now();
 }
 
 /**
@@ -59,8 +57,7 @@ function getModuleVersion(modulePath: string): number {
  * @returns The imported module
  */
 async function __import(modulePath: string): Promise<any> {
-  // Normalize the module path (remove leading "./" if present)
-  const cleanPath = modulePath.startsWith("./") ? modulePath.slice(2) : modulePath;
+  const cleanPath = normalizePath(modulePath);
 
   // Check if this module is already being loaded (circular dependency detected)
   if (loadingModules.has(cleanPath)) {
@@ -122,11 +119,10 @@ async function __import(modulePath: string): Promise<any> {
  * @param timestamp - Optional timestamp (defaults to current time)
  */
 function __updateModuleVersion(modulePath: string, timestamp?: number): void {
-  // Normalize the module path
-  const cleanPath = modulePath.startsWith("./") ? modulePath.slice(2) : modulePath;
+  const cleanPath = normalizePath(modulePath);
 
   // Update the version timestamp
-  moduleVersions.set(modulePath, timestamp || Date.now());
+  moduleVersions.set(cleanPath, timestamp || Date.now());
 
   // Clear the cached promise so the new version gets loaded
   // Only clear if the module is not currently loading (to avoid breaking circular deps)
@@ -141,9 +137,9 @@ function __updateModuleVersion(modulePath: string, timestamp?: number): void {
  * @param modulePath - The path to the module
  */
 function __clearModuleVersion(modulePath: string): void {
-  const cleanPath = modulePath.startsWith("./") ? modulePath.slice(2) : modulePath;
+  const cleanPath = normalizePath(modulePath);
 
-  moduleVersions.delete(modulePath);
+  moduleVersions.delete(cleanPath);
 
   // Clear cached promise if not currently loading
   if (!loadingModules.has(cleanPath)) {

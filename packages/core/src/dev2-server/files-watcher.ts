@@ -20,6 +20,25 @@ type OnFileEventCallback =
   | FileAddDirCallback
   | FileUnlinkDirCallback;
 
+/**
+ * Watch configuration options
+ */
+export type WatchConfig = {
+  /**
+   * Glob patterns to include
+   */
+  include?: string[];
+  /**
+   * Glob patterns to exclude
+   */
+  exclude?: string[];
+};
+
+/**
+ * Default patterns to exclude from watching
+ */
+const DEFAULT_EXCLUDE = ["**/node_modules/**", "**/dist/**", "**/.warlock/**", "**/.git/**"];
+
 export class FilesWatcher {
   /**
    * File watcher id
@@ -28,14 +47,18 @@ export class FilesWatcher {
 
   /**
    * Watch for files changes
+   * @param config Optional watch configuration
    */
-  public async watch() {
+  public async watch(config?: WatchConfig) {
     // watch for .env file change and any changes in the src directory
     const paths = [rootPath(".env"), srcPath()].map((path) => Path.normalize(path));
 
+    // Merge default exclude with config exclude
+    const ignored = [...DEFAULT_EXCLUDE, ...(config?.exclude || [])];
+
     const watcher = chokidar.watch(paths, {
       ignoreInitial: true,
-      ignored: ["**/node_modules/**", "**/dist/**", "**/.warlock/**", "**/.git/**"],
+      ignored,
       persistent: true,
       usePolling: false, // Try native first, will fallback if needed
       interval: 100,

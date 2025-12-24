@@ -1,3 +1,3 @@
-import { startCliServer } from "../starters/start-cli-server";
+export * from "./cli-command";
 
-startCliServer();
+export * from "./types";
