@@ -1,4 +1,5 @@
 // Initialize Seal with Warlock configuration (localization, etc.)
+import { env } from "@mongez/dotenv";
 import "./validation/init";
 
 import { colors } from "@mongez/copper";
@@ -26,4 +27,5 @@ export * from "./tests";
 export * from "./utils";
 export * from "./validation";
 export * from "./warlock-config";
-export { colors };
+
+export { colors, env };
