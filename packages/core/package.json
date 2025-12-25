@@ -1,6 +1,6 @@
 {
     "name": "@warlock.js/core",
-    "version": "4.0.25",
+    "version": "4.0.28",
     "description": "A robust nodejs framework for building blazing fast applications",
     "main": "./esm/index.js",
     "bin": {
@@ -25,7 +25,7 @@
         "@mongez/events": "^2.1.0",
         "@mongez/fs": "^3.0.5",
         "@mongez/http": "^2.2.10",
-        "@mongez/localization": "^3.2.1",
+        "@mongez/localization": "3.2.1",
         "@mongez/reinforcements": "^2.3.12",
         "@mongez/slug": "^1.0.7",
         "@mongez/supportive-is": "^2.0.4",
@@ -62,5 +62,6 @@
     "author": "hassanzohdy",
     "license": "MIT",
     "module": "./esm/index.js",
-    "typings": "./esm/index.d.ts"
+    "typings": "./esm/index.d.ts",
+    "type": "module"
 }
