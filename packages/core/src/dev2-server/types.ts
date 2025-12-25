@@ -22,4 +22,26 @@ export type FileManifest = {
   cachePath: string;
 };
 
-export type FileState = "idle" | "loading" | "parsed" | "ready" | "error" | "updating" | "deleted";
+/**
+ * File processing state in the unified pipeline
+ *
+ * Lifecycle: idle → loading → parsed → transpiled → ready
+ *
+ * - `idle`: Initial state, no processing started
+ * - `loading`: Reading source from disk
+ * - `parsed`: Source loaded and imports discovered
+ * - `transpiled`: TypeScript compiled to JavaScript
+ * - `ready`: Fully processed and available for use
+ * - `updating`: Being reprocessed after a change
+ * - `deleted`: File has been removed from disk
+ * - `error`: Processing failed
+ */
+export type FileState =
+  | "idle"
+  | "loading"
+  | "parsed"
+  | "transpiled"
+  | "ready"
+  | "error"
+  | "updating"
+  | "deleted";

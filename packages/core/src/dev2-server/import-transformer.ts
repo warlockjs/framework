@@ -5,26 +5,24 @@ import { tsconfigManager } from "./tsconfig-manager";
 
 /**
  * Transform imports in transpiled code to use cache paths
- * This is called AFTER all files are transpiled
+ *
+ * This can be called immediately after transpilation - no need to wait for
+ * other files to be processed because cache paths are computed deterministically.
  *
  * Strategy:
  * - All cached files are in the same directory (.warlock/cache/)
  * - So all imports become: "./${cachePath}"
- * - We use fileManager.dependencies (already resolved by parseImports)
+ * - Cache path is computed from the resolved import path
  *
- * @param fileManager FileManager with transpiled code and dependencies
- * @param filesMap Map of all FileManager instances
+ * @param fileManager FileManager with transpiled code and importMap
  * @returns Transformed code with cache-relative imports
  */
-export function transformImports(
-  fileManager: FileManager,
-  filesMap: Map<string, FileManager>,
-): string {
+export function transformImports(fileManager: FileManager): string {
   const code = fileManager.transpiled;
 
   // Pattern to match ES6 import statements
   // Matches: import ... from "..."
-  // Handles: 
+  // Handles:
   //   - import { a, b } from "module" (named imports, can span multiple lines)
   //   - import * as Foo from "module" (namespace imports)
   //   - import Foo from "module" (default imports)
@@ -37,15 +35,14 @@ export function transformImports(
 
   // Pattern to match ES6 export statements
   // Matches: export * from "..." and export { ... } from "..."
-  const exportRegex =
-    /export\s+((?:\*|\{[^}]*\}))\s+from\s+["']([^"']+)["'];?/g;
+  const exportRegex = /export\s+((?:\*|\{[^}]*\}))\s+from\s+["']([^"']+)["'];?/g;
 
   let transformedCode = code;
   const unresolvedImports: string[] = [];
 
   // Process imports first
   const importMatches = Array.from(code.matchAll(importRegex));
-  
+
   for (let i = importMatches.length - 1; i >= 0; i--) {
     const match = importMatches[i];
     const fullImport = match[0];
@@ -54,8 +51,7 @@ export function transformImports(
 
     // Only transform relative imports and alias imports
     // Skip external packages (node_modules, node built-ins)
-    const isRelativeImport =
-      importPath.startsWith(".") || importPath.startsWith("/");
+    const isRelativeImport = importPath.startsWith(".") || importPath.startsWith("/");
     const isAliasImport = tsconfigManager.isAlias(importPath);
 
     if (!isRelativeImport && !isAliasImport) {
@@ -70,8 +66,8 @@ export function transformImports(
       continue;
     }
 
-    // Find the cache path for this import from dependencies
-    const cachePath = findCachePathForImport(importPath, fileManager, filesMap);
+    // Find the cache path for this import
+    const cachePath = findCachePathForImport(importPath, fileManager);
 
     if (!cachePath) {
       // Could not resolve - track it (this is a local file that should exist but doesn't)
@@ -86,9 +82,7 @@ export function transformImports(
     const startIndex = match.index!;
     const endIndex = startIndex + fullImport.length;
     transformedCode =
-      transformedCode.slice(0, startIndex) +
-      newImport +
-      transformedCode.slice(endIndex);
+      transformedCode.slice(0, startIndex) + newImport + transformedCode.slice(endIndex);
   }
 
   // Process side-effect imports: import "module";
@@ -101,8 +95,7 @@ export function transformImports(
 
     // Only transform relative imports and alias imports
     // Skip external packages (node_modules, node built-ins)
-    const isRelativeImport =
-      importPath.startsWith(".") || importPath.startsWith("/");
+    const isRelativeImport = importPath.startsWith(".") || importPath.startsWith("/");
     const isAliasImport = tsconfigManager.isAlias(importPath);
 
     if (!isRelativeImport && !isAliasImport) {
@@ -113,7 +106,7 @@ export function transformImports(
       continue;
     }
 
-    const cachePath = findCachePathForImport(importPath, fileManager, filesMap);
+    const cachePath = findCachePathForImport(importPath, fileManager);
 
     if (!cachePath) {
       unresolvedImports.push(importPath);
@@ -127,9 +120,7 @@ export function transformImports(
     const startIndex = match.index!;
     const endIndex = startIndex + fullImport.length;
     transformedCode =
-      transformedCode.slice(0, startIndex) +
-      newImport +
-      transformedCode.slice(endIndex);
+      transformedCode.slice(0, startIndex) + newImport + transformedCode.slice(endIndex);
   }
 
   // Process exports (need to re-process after imports to get updated string positions)
@@ -142,8 +133,7 @@ export function transformImports(
 
     // Only transform relative imports and alias imports
     // Skip external packages (node_modules, node built-ins)
-    const isRelativeImport =
-      importPath.startsWith(".") || importPath.startsWith("/");
+    const isRelativeImport = importPath.startsWith(".") || importPath.startsWith("/");
     const isAliasImport = tsconfigManager.isAlias(importPath);
 
     if (!isRelativeImport && !isAliasImport) {
@@ -158,12 +148,10 @@ export function transformImports(
       continue;
     }
 
-    // Find the cache path for this import from dependencies
-    const cachePath = findCachePathForImport(importPath, fileManager, filesMap);
+    // Find the cache path for this import
+    const cachePath = findCachePathForImport(importPath, fileManager);
 
     if (!cachePath) {
-      console.log("Could not resolve import", importPath);
-
       // Could not resolve - track it (this is a local file that should exist but doesn't)
       unresolvedImports.push(importPath);
       continue;
@@ -184,9 +172,7 @@ export function transformImports(
       const startIndex = match.index!;
       const endIndex = startIndex + fullExport.length;
       transformedCode =
-        transformedCode.slice(0, startIndex) +
-        newExport +
-        transformedCode.slice(endIndex);
+        transformedCode.slice(0, startIndex) + newExport + transformedCode.slice(endIndex);
     } else {
       // export { foo, bar } from "./module"
       // Transform to individual exports using __import
@@ -197,9 +183,9 @@ export function transformImports(
         namedExports
           .match(/\{([^}]+)\}/)?.[1]
           ?.split(",")
-          .map(s => s.trim()) || [];
+          .map((s) => s.trim()) || [];
       const exportStatements = exportNames
-        .map(name => `export const ${name} = ${moduleVar}.${name};`)
+        .map((name) => `export const ${name} = ${moduleVar}.${name};`)
         .join("\n");
       const newExport = `const ${moduleVar} = await __import("./${cachePath}");\n${exportStatements}`;
 
@@ -207,9 +193,7 @@ export function transformImports(
       const startIndex = match.index!;
       const endIndex = startIndex + fullExport.length;
       transformedCode =
-        transformedCode.slice(0, startIndex) +
-        newExport +
-        transformedCode.slice(endIndex);
+        transformedCode.slice(0, startIndex) + newExport + transformedCode.slice(endIndex);
     }
   }
 
@@ -231,12 +215,9 @@ export function transformImports(
  * @param importSpecifier The import specifier (e.g., "Foo", "{ a, b }", "Foo, { a, b }", "* as Bar")
  * @param cachePath The path to the cached file
  */
-function buildImportReplacement(
-  importSpecifier: string,
-  cachePath: string,
-): string {
+function buildImportReplacement(importSpecifier: string, cachePath: string): string {
   const trimmed = importSpecifier.trim();
-  
+
   // Namespace import: import * as Foo from "module";
   if (trimmed.startsWith("* as ")) {
     const identifier = trimmed.replace("* as ", "").trim();
@@ -252,12 +233,12 @@ function buildImportReplacement(
       const defaultImport = match[1];
       let namedImports = match[2];
       const moduleVar = `__module_${Math.random().toString(36).slice(2, 8)}`;
-      
+
       // Clean up whitespace and normalize
       namedImports = namedImports.replace(/\s+/g, " ").trim();
       // Normalize `{ default as X }` to `{ default: X }` for valid destructuring
       const normalized = namedImports.replace(/default\s+as\s+/g, "default: ");
-      
+
       // Generate correct syntax with proper separators
       return `const ${moduleVar} = await __import("./${cachePath}");
 const ${defaultImport} = ${moduleVar}?.default ?? ${moduleVar};
@@ -282,18 +263,16 @@ const ${normalized} = ${moduleVar};`;
 
 /**
  * Find the cache path for an import
- * Uses the fileManager's importMap which maps original imports to resolved paths
+ *
+ * Uses the fileManager's importMap which maps original imports to resolved paths.
+ * The cache path is computed deterministically from the resolved path,
+ * so we don't need to look up the dependency in the files map.
  *
  * @param importPath The import path from the import statement
  * @param fileManager The file that contains this import
- * @param filesMap Map of all FileManager instances
- * @returns The cache path string, or null if not found
+ * @returns The cache path string, or null if not resolved
  */
-function findCachePathForImport(
-  importPath: string,
-  fileManager: FileManager,
-  filesMap: Map<string, FileManager>,
-): string | null {
+function findCachePathForImport(importPath: string, fileManager: FileManager): string | null {
   // Look up the resolved absolute path from the import map
   const resolvedAbsPath = fileManager.importMap.get(importPath);
 
@@ -304,16 +283,7 @@ function findCachePathForImport(
   // Convert to relative path
   const relativePath = Path.toRelative(resolvedAbsPath);
 
-  // Find the FileManager for this dependency
-  const depFileManager = filesMap.get(relativePath);
-
-  if (!depFileManager) {
-    return null;
-  }
-
-  if (depFileManager && depFileManager.cachePath) {
-    return depFileManager.cachePath;
-  }
-
-  return null;
+  // Compute cache path deterministically - no need for filesMap!
+  // This is the same formula used in FileManager.cachePath
+  return relativePath.replace(/\//g, "-").replace(/\.(ts|tsx)$/, ".js");
 }

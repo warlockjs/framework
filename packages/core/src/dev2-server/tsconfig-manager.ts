@@ -18,11 +18,11 @@ export class TSConfigManager {
    */
   public tsconfig: any;
 
-  public async init() {
+  public init() {
     if (this.tsconfig) return;
 
     // use typescript to load the tsconfig.json file
-    const output = await ts.readConfigFile(Path.toAbsolute("tsconfig.json"), ts.sys.readFile);
+    const output = ts.readConfigFile(Path.toAbsolute("tsconfig.json"), ts.sys.readFile);
 
     this.tsconfig = output.config!;
 
@@ -40,7 +40,7 @@ export class TSConfigManager {
    */
   public isAlias(path: string) {
     if (!this.tsconfig) {
-      throw new Error("TSConfigManager is not initialized, please initialize it first");
+      this.init();
     }
 
     return Object.keys(this.aliases).some((alias) => {

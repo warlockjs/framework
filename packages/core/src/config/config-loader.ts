@@ -1,4 +1,5 @@
 import config from "@mongez/config";
+import { colors } from "@mongez/copper";
 import { pathToFileURL } from "node:url";
 import type { FileManager } from "../dev2-server/file-manager";
 import { warlockCachePath } from "../dev2-server/utils";
@@ -62,7 +63,11 @@ export class ConfigLoader {
       const configValue = configModule.default;
 
       if (configValue === undefined) {
-        throw new Error(`Config file ${file.relativePath} does not have a default export`);
+        console.log(
+          colors.red(`config error: `),
+          `Config file ${colors.yellow(file.relativePath)} does not have a default export`,
+        );
+        return;
       }
 
       // Store in @mongez/config

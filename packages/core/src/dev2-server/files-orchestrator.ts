@@ -1,5 +1,5 @@
 import { colors } from "@mongez/copper";
-import { putFileAsync, unlinkAsync } from "@mongez/fs";
+import { unlinkAsync } from "@mongez/fs";
 import { init } from "es-module-lexer";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 import { DependencyGraph } from "./dependency-graph";
@@ -12,11 +12,11 @@ import { FILE_PROCESSING_BATCH_SIZE } from "./flags";
 import { EslintHealthChecker } from "./health-checker/checkers/eslint-health-checker";
 import { TypescriptHealthChecker } from "./health-checker/checkers/typescript-health-checker";
 import { FilesHealthcareManager } from "./health-checker/files-healthcare.manager";
-import { transformImports } from "./import-transformer";
 import { ManifestManager } from "./manifest-manager";
 import { ModuleLoader } from "./module-loader";
 import { packageJsonManager } from "./package-json-manager";
 import { Path } from "./path";
+import { initializeRuntimeImportHelper } from "./runtime-import-helper";
 import { SpecialFilesCollector } from "./special-files-collector";
 import { tsconfigManager } from "./tsconfig-manager";
 import { createFreshWarlockDirectory, getFilesFromDirectory, warlockCachePath } from "./utils";
@@ -33,11 +33,14 @@ export class FilesOrchestrator {
   public readonly moduleLoader = new ModuleLoader(this.specialFilesCollector);
 
   /**
-   * Set the special files collector
-   * This should be called before starting file watching
+   * Creates the FilesOrchestrator instance
+   *
+   * Initializes all subsystems:
+   * - FileOperations for file lifecycle management
+   * - FileEventHandler for processing file system events
    */
   public constructor() {
-    // Recreate file operations with the collector
+    // Create file operations with all dependencies
     this.fileOperations = new FileOperations(
       this.files,
       this.dependencyGraph,
@@ -45,8 +48,13 @@ export class FilesOrchestrator {
       this.specialFilesCollector,
     );
 
-    // Recreate event handler with updated file operations
-    this.eventHandler = new FileEventHandler(this.fileOperations, this.manifest);
+    // Create event handler with all required dependencies
+    this.eventHandler = new FileEventHandler(
+      this.fileOperations,
+      this.manifest,
+      this.dependencyGraph,
+      this.files,
+    );
   }
 
   /**
@@ -104,10 +112,30 @@ export class FilesOrchestrator {
 
     // Initialize configuration managers
     await Promise.all([tsconfigManager.init(), packageJsonManager.init()]);
+
+    // Initialize runtime import helper (for HMR cache busting)
+    initializeRuntimeImportHelper();
   }
 
   /**
-   * Initialize other features for developemnt server
+   * Initialize all development server features
+   *
+   * This is the main initialization sequence that:
+   * 1. Discovers all TypeScript/JavaScript files in the project
+   * 2. Reconciles filesystem state with cached manifest
+   * 3. Builds the dependency graph for HMR
+   * 4. Persists file metadata to manifest
+   *
+   * Each file is fully processed (including import transforms) during
+   * reconciliation because transforms compute cache paths deterministically
+   * and don't depend on other files being processed first.
+   *
+   * @example
+   * ```typescript
+   * await filesOrchestrator.init();
+   * await filesOrchestrator.initiaizeAll();
+   * await filesOrchestrator.watchFiles();
+   * ```
    */
   public async initiaizeAll() {
     const [filesInFilesystem, manifestExists] = await Promise.all([
@@ -116,27 +144,23 @@ export class FilesOrchestrator {
     ]);
 
     // STEP 1: Reconcile filesystem with manifest
+    // Each file is fully processed (transpile + transform + save)
     if (!manifestExists) {
-      // No manifest = fresh start
+      // No manifest = fresh start, process all files
       await this.processAllFilesFresh(filesInFilesystem);
     } else {
       // Manifest exists = reconcile differences
       await this.reconcileFiles(filesInFilesystem);
     }
 
-    // STEP 2: Build dependency graph from all files
+    // STEP 2: Build dependency graph from all processed files
     this.dependencyGraph.build(this.files);
 
     // STEP 3: Update dependents in FileManager instances
     this.updateFileDependents();
 
-    // STEP 4: Sync all files to manifest
+    // STEP 4: Sync all files to manifest and save
     this.syncFilesToManifest();
-
-    // STEP 5: Transform all imports to use cache paths
-    await this.transformAllImports();
-
-    // STEP 6: Save updated manifest
     await this.manifest.save();
   }
 
@@ -188,7 +212,10 @@ export class FilesOrchestrator {
 
   /**
    * Process all files fresh (no manifest exists)
-   * This happens on first run or when manifest is deleted
+   *
+   * This happens on first run or when manifest is deleted.
+   * Each file is fully processed including import transforms.
+   *
    * @param filePaths Array of relative file paths
    */
   public async processAllFilesFresh(filePaths: string[]) {
@@ -197,7 +224,6 @@ export class FilesOrchestrator {
     // Ensure .warlock directory exists
     await createFreshWarlockDirectory();
 
-    // Process files in batches for optimal performance
     const BATCH_SIZE = FILE_PROCESSING_BATCH_SIZE;
 
     for (let i = 0; i < filePaths.length; i += BATCH_SIZE) {
@@ -205,12 +231,11 @@ export class FilesOrchestrator {
 
       await Promise.all(
         batch.map(async (relativePath) => {
-          // Convert to absolute path for FileManager
           const absolutePath = Path.toAbsolute(relativePath);
           const fileManager = new FileManager(absolutePath, this.files, this.fileOperations);
-          // Store in map using relative path as key
           this.files.set(relativePath, fileManager);
-          await fileManager.init(); // No manifest data
+          // Full processing (transforms work because cache paths are deterministic)
+          await fileManager.process();
         }),
       );
     }
@@ -255,7 +280,10 @@ export class FilesOrchestrator {
   }
 
   /**
-   * Process newly discovered files
+   * Process newly discovered files (in filesystem but not in manifest)
+   *
+   * Each file is fully processed including import transforms.
+   *
    * @param filePaths Array of relative file paths
    */
   private async processNewFiles(filePaths: string[]) {
@@ -268,12 +296,11 @@ export class FilesOrchestrator {
 
       await Promise.all(
         batch.map(async (relativePath) => {
-          // Convert to absolute path for FileManager
           const absolutePath = Path.toAbsolute(relativePath);
           const fileManager = new FileManager(absolutePath, this.files, this.fileOperations);
-          // Store in map using relative path as key
           this.files.set(relativePath, fileManager);
-          await fileManager.init(); // No manifest data = process fresh
+          // Full processing
+          await fileManager.process();
         }),
       );
     }
@@ -309,6 +336,10 @@ export class FilesOrchestrator {
 
   /**
    * Process existing files (check if they changed since last run)
+   *
+   * For unchanged files, loads from cache.
+   * For changed files, reprocesses fully.
+   *
    * @param filePaths Array of relative file paths
    */
   private async processExistingFiles(filePaths: string[]) {
@@ -321,15 +352,11 @@ export class FilesOrchestrator {
 
       await Promise.all(
         batch.map(async (relativePath) => {
-          // Get manifest data using relative path
           const manifestData = this.manifest.getFile(relativePath);
-          // Convert to absolute path for FileManager
           const absolutePath = Path.toAbsolute(relativePath);
           const fileManager = new FileManager(absolutePath, this.files, this.fileOperations);
-          // Store in map using relative path as key
           this.files.set(relativePath, fileManager);
-
-          // Pass manifest data to FileManager for comparison
+          // Initialize with manifest (uses cache if unchanged, reprocesses if changed)
           await fileManager.init(manifestData);
         }),
       );
@@ -376,52 +403,9 @@ export class FilesOrchestrator {
     });
 
     // Get watch config from warlock.config.ts (if loaded)
-    const watchConfig = warlockConfigManager.isLoaded
-      ? warlockConfigManager.get("devServer")?.watch
-      : undefined;
+    const watchConfig = warlockConfigManager.get("devServer")?.watch;
 
     await this.filesWatcher.watch(watchConfig);
-  }
-
-  /**
-   * Transform all imports to use cache paths
-   * This is called AFTER all files are processed and transpiled
-   * Only transforms files that haven't been transformed yet (freshly transpiled)
-   */
-  private async transformAllImports() {
-    let transformedCount = 0;
-
-    for (const [relativePath, fileManager] of this.files) {
-      // Skip files that already have transformed imports (loaded from cache)
-      if (fileManager.importsTransformed) {
-        continue;
-      }
-
-      // Only transform files that have dependencies
-      if (fileManager.dependencies.size === 0) {
-        // Mark as transformed even if no dependencies
-        fileManager.importsTransformed = true;
-        continue;
-      }
-
-      try {
-        // Transform imports in transpiled code
-        const transformedCode = transformImports(fileManager, this.files);
-
-        // Update the transpiled code
-        fileManager.transpiled = transformedCode;
-
-        // Save the transformed code back to cache
-        await putFileAsync(warlockCachePath(fileManager.cachePath), transformedCode);
-
-        // Mark as transformed
-        fileManager.importsTransformed = true;
-
-        transformedCount++;
-      } catch (error) {
-        console.error(`Error transforming imports for ${relativePath}:`, error);
-      }
-    }
   }
 }
 

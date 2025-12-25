@@ -4,7 +4,7 @@ import { ensureDirectoryAsync } from "@mongez/fs";
 import { bootstrap } from "../bootstrap";
 import { loadConfigFiles } from "../config/load-config-files";
 import { connectorsManager } from "../dev2-server/connectors/connectors-manager";
-import { tsconfigManager } from "../dev2-server/tsconfig-manager";
+import { filesOrchestrator } from "../dev2-server/files-orchestrator";
 import { manifestManager } from "../manifest/manifest-manager";
 import { warlockPath } from "../utils";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
@@ -446,11 +446,9 @@ export class CLICommandsManager {
   protected async loadPreloaders(command: CLICommand) {
     const preloaders = command.commandPreload || {};
 
-    if (preloaders.warlockConfig) {
-      await tsconfigManager.init();
-
-      await warlockConfigManager.load();
-    }
+    await warlockConfigManager.load();
+    // if (preloaders.warlockConfig) {
+    // }
 
     if (preloaders.env && !preloaders.bootstrap) {
       await loadEnv();
@@ -460,8 +458,7 @@ export class CLICommandsManager {
 
     // Load configuration files
     if (preloaders.config) {
-      await tsconfigManager.init();
-
+      await filesOrchestrator.init();
       await loadConfigFiles(preloaders.config);
     }
 

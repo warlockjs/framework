@@ -97,7 +97,7 @@ export class LayerExecutor {
         await this.executeHotModuleReplacement(firstHmrFile, invalidationChain, filesMap, hmrFiles);
       }
     } catch (error) {
-      console.log("ERRor in executeFullServerRestart: ", error);
+      console.log("Error in executeFullServerRestart: ", error);
     }
 
     try {

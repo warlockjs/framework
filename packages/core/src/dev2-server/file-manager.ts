@@ -11,79 +11,198 @@ import { transpileFile } from "./transpile-file";
 import type { FileManifest, FileState, FileType, LayerType } from "./types";
 import { warlockCachePath } from "./utils";
 
+/**
+ * Options for the process() method
+ */
+export interface ProcessOptions {
+  /**
+   * Force reprocessing even if file hasn't changed
+   * @default false
+   */
+  force?: boolean;
+
+  /**
+   * Whether to transform imports to cache paths
+   * Set to false during batch operations where imports are transformed later
+   * @default true
+   */
+  transformImports?: boolean;
+
+  /**
+   * Whether to save to cache after processing
+   * Set to false if you need to do additional transformations before saving
+   * @default true
+   */
+  saveToCache?: boolean;
+}
+
+/**
+ * FileManager - Manages the lifecycle of a single source file
+ *
+ * ## Lifecycle States
+ *
+ * ```
+ * idle → loading → parsed → transpiled → ready
+ *   ↑                                      │
+ *   └──────────── (file changed) ──────────┘
+ * ```
+ *
+ * ## Processing Pipeline
+ *
+ * All file processing flows through a unified pipeline:
+ * 1. **Load** - Read source from disk
+ * 2. **Hash** - Calculate content hash for change detection
+ * 3. **Parse** - Discover imports and dependencies
+ * 4. **Transpile** - Convert TypeScript to JavaScript
+ * 5. **Transform** - Rewrite import paths to cache locations
+ * 6. **Save** - Write transformed code to cache (ONCE)
+ *
+ * ## Usage Examples
+ *
+ * ```typescript
+ * // Standard processing (full pipeline)
+ * const file = new FileManager(absolutePath, filesMap, fileOps);
+ * await file.process();
+ *
+ * // Batch processing (parse first, complete later)
+ * await file.parse();
+ * // ... after dependencies are ready ...
+ * await file.complete();
+ *
+ * // Check for changes and reprocess if needed
+ * const changed = await file.process(); // returns false if unchanged
+ *
+ * // Force reprocessing
+ * await file.process({ force: true });
+ * ```
+ *
+ * @class FileManager
+ */
 export class FileManager {
   /**
-   * Relative path to root directory
+   * Relative path from the project root directory
+   * Used as the primary identifier for files throughout the system
+   * @example "src/app/users/controllers/get-user.controller.ts"
    */
   public relativePath = "";
+
   /**
-   * Last modified timestamp
+   * Unix timestamp of the last modification time
+   * Used with hash for change detection
    */
   public lastModified = 0;
+
   /**
-   * Hash of the file content
+   * SHA-256 hash of the source content
+   * Primary mechanism for detecting file changes
    */
   public hash = "";
+
   /**
-   * Source code of the file
+   * Original TypeScript/JavaScript source code
+   * Loaded from disk during processing
    */
   public source = "";
+
   /**
-   * Transpiled code of the file
+   * Transpiled JavaScript code with transformed imports
+   * This is the final output that gets saved to cache and loaded at runtime
    */
   public transpiled = "";
+
   /**
-   * Dependencies of the file (relative paths)
+   * Set of relative paths that this file depends on (imports)
+   * Used to build the dependency graph for HMR invalidation
+   * @example Set(["src/app/users/models/user.model.ts", "src/config/database.ts"])
    */
   public dependencies = new Set<string>();
+
   /**
-   * Import map: original import path -> resolved absolute path
-   * Used for import transformation
+   * Map of original import specifiers to resolved absolute paths
+   * Key: the exact import string from source (e.g., "./user.model")
+   * Value: resolved absolute path (e.g., "D:/project/src/app/users/models/user.model.ts")
+   *
+   * Used during import transformation to rewrite paths to cache locations
    */
   public importMap = new Map<string, string>();
+
   /**
-   * Dependents of the file
+   * Set of relative paths that depend on this file
+   * Populated from the dependency graph after initial processing
+   * Used to determine what needs reloading when this file changes
    */
   public dependents = new Set<string>();
+
   /**
-   * Version of the file
+   * Version number incremented on each change
+   * Used for cache busting in dynamic imports
    */
   public version = 0;
+
   /**
-   * Type of the file
+   * Semantic type of the file based on its path/content
+   * Used to determine reload behavior and special handling
    */
   public type: FileType | undefined;
+
   /**
-   * Layer of the file
+   * Reload layer: HMR (hot module replacement) or FSR (full server restart)
+   * Determines how changes to this file are applied at runtime
    */
   public layer: LayerType | undefined;
+
   /**
-   * Cache path of the file
+   * Path to the cached transpiled file (relative to .warlock/cache/)
+   * @example "src-app-users-controllers-get-user.controller.js"
    */
   public cachePath = "";
+
   /**
-   * File cleanup function
+   * Cleanup function called before the file is unloaded
+   * Set by module loader for files that export cleanup handlers
    */
   public cleanup?: () => void;
 
   /**
    * Whether imports have been transformed to cache paths
+   * Prevents double transformation and tracks processing state
    */
   public importsTransformed = false;
 
   /**
    * Whether this file contains only type definitions (no runtime code)
-   * Used to exclude from circular dependency detection
+   * Type-only files are excluded from circular dependency detection
    */
   public isTypeOnlyFile = false;
 
   /**
-   * File state
+   * Current processing state of the file
+   *
+   * - `idle`: Initial state, no processing started
+   * - `loading`: Reading source from disk
+   * - `parsed`: Source loaded and imports discovered
+   * - `transpiled`: TypeScript compiled to JavaScript
+   * - `ready`: Fully processed and available for use
+   * - `updating`: Being reprocessed after a change
+   * - `deleted`: File has been removed from disk
    */
   public state: FileState = "idle";
 
   /**
-   * Constructor
+   * Creates a new FileManager instance
+   *
+   * @param absolutePath - Full filesystem path to the source file
+   * @param files - Map of all tracked files (for import resolution)
+   * @param fileOperations - FileOperations instance (for adding missing dependencies)
+   *
+   * @example
+   * ```typescript
+   * const fileManager = new FileManager(
+   *   "D:/project/src/app/users/controllers/get-user.controller.ts",
+   *   filesMap,
+   *   fileOperations
+   * );
+   * ```
    */
   public constructor(
     public readonly absolutePath: string,
@@ -92,155 +211,192 @@ export class FileManager {
   ) {}
 
   /**
-   * Initialize the file manager
-   * @param fileManifest Optional manifest data from previous build
-   * @param filesMap Optional map of all FileManager instances (for import transformation)
+   * Initialize the file manager from disk or manifest cache
+   *
+   * This is the primary entry point for file initialization.
+   * If manifest data is provided, it will attempt to use cached data
+   * and only reprocess if the file has changed.
+   *
+   * @param fileManifest - Optional cached manifest data from previous build
+   *
+   * @example
+   * ```typescript
+   * // Fresh initialization (no cache)
+   * await fileManager.init();
+   *
+   * // Initialize with cached manifest data
+   * await fileManager.init(manifestEntry);
+   * ```
    */
-  public async init(fileManifest?: Partial<FileManifest>) {
-    this.state = "loading";
+  public async init(fileManifest?: Partial<FileManifest>): Promise<void> {
+    // Set up basic paths
+    this.relativePath = Path.toRelative(this.absolutePath);
+    this.cachePath = this.relativePath.replace(/\//g, "-").replace(/\.(ts|tsx)$/, ".js");
+    this.detectFileTypeAndLayer();
 
-    // No manifest = fresh file, load from disk
-    if (!fileManifest) {
-      await this.loadFromDisk();
-      // Import transformation will happen later in FilesOrchestrator.transformAllImports()
-      // after all files are processed and available in the files map
-      return;
+    if (fileManifest) {
+      await this.initFromManifest(fileManifest);
+    } else {
+      // Fresh file - run full processing pipeline
+      await this.process();
     }
-
-    // Manifest exists = check if file changed since last build
-    await this.loadFromManifest(fileManifest);
-    // Import transformation will happen later in FilesOrchestrator.transformAllImports()
-    // for files that were reprocessed (importsTransformed = false)
   }
 
   /**
-   * Get cached file path ready for dynamic import
+   * Get the cache path as a file:// URL for dynamic import
+   * Includes cache busting query parameter based on version
+   *
+   * @returns File URL ready for dynamic import, or empty string if no cache
+   *
+   * @example
+   * ```typescript
+   * const module = await import(fileManager.cachePathUrl);
+   * ```
    */
-  public get cachePathUrl() {
+  public get cachePathUrl(): string {
     if (!this.cachePath) return "";
-
     return pathToFileURL(warlockCachePath(this.cachePath)).href;
   }
 
   /**
-   * Load file with manifest data (check if changed)
+   * Process the file through the unified pipeline
+   *
+   * This is the core method that handles all file processing.
+   * It implements a single-pass pipeline that:
+   * 1. Loads source from disk
+   * 2. Checks if content changed (skip if unchanged)
+   * 3. Parses imports to discover dependencies
+   * 4. Ensures all dependencies exist
+   * 5. Transpiles TypeScript to JavaScript
+   * 6. Transforms imports to cache paths
+   * 7. Saves to cache (ONCE - no duplicate writes)
+   *
+   * @param options - Processing options
+   * @param options.force - Force reprocessing even if unchanged
+   * @param options.transformImports - Whether to transform import paths (default: true)
+   * @param options.saveToCache - Whether to save to cache file (default: true)
+   *
+   * @returns True if file was processed, false if unchanged and skipped
+   *
+   * @example
+   * ```typescript
+   * // Normal processing
+   * const changed = await fileManager.process();
+   *
+   * // Force reprocess
+   * await fileManager.process({ force: true });
+   *
+   * // Batch mode: transform imports later
+   * await fileManager.process({ transformImports: false });
+   * ```
    */
-  protected async loadFromManifest(fileManifest: Partial<FileManifest>) {
-    // Set basic properties from manifest
-    this.relativePath = fileManifest.relativePath || Path.toRelative(this.absolutePath);
-    this.version = fileManifest.version || 0;
-    this.type = fileManifest.type;
-    this.layer = fileManifest.layer;
-    this.cachePath =
-      fileManifest.cachePath || this.relativePath.replace(/\//g, "-").replace(/\.(ts|tsx)$/, ".js");
+  public async process(options: ProcessOptions = {}): Promise<boolean> {
+    const { force = false, transformImports: shouldTransform = true, saveToCache = true } = options;
 
-    // Check if file still exists
+    // Ensure paths are initialized (in case process() is called directly)
+    if (!this.relativePath) {
+      this.relativePath = Path.toRelative(this.absolutePath);
+    }
+    if (!this.cachePath) {
+      this.cachePath = this.relativePath.replace(/\//g, "-").replace(/\.(ts|tsx)$/, ".js");
+    }
+    if (!this.type) {
+      this.detectFileTypeAndLayer();
+    }
+
+    this.state = "loading";
+
+    // Step 1: Load source from disk
+    let newSource: string;
     try {
-      this.source = await getFileAsync(this.absolutePath);
+      newSource = await getFileAsync(this.absolutePath);
     } catch (error) {
       this.state = "deleted";
-      return;
+      return false;
     }
 
-    // Calculate current hash
-    const currentHash = crypto.createHash("sha256").update(this.source).digest("hex");
-    const currentLastModified = (await lastModifiedAsync(this.absolutePath)).getTime();
+    // Step 2: Calculate hash and check for changes
+    const newHash = crypto.createHash("sha256").update(newSource).digest("hex");
 
-    // Compare with manifest data
-    const hasChanged = currentHash !== fileManifest.hash;
-
-    if (hasChanged) {
-      // File changed - reprocess it
-      this.hash = currentHash;
-      this.lastModified = currentLastModified;
-      this.version++;
-      await this.processFile();
-    } else {
-      // File unchanged - load from cache
-      this.hash = fileManifest.hash!;
-      this.lastModified = fileManifest.lastModified!;
-      this.dependencies = new Set(fileManifest.dependencies || []);
-      this.dependents = new Set(fileManifest.dependents || []);
-
-      // Load cached transpiled code
-      try {
-        this.transpiled = await getFileAsync(warlockCachePath(this.cachePath));
-        // Cached files already have transformed imports
-        this.importsTransformed = true;
-      } catch (error) {
-        // Cache missing - retranspile
-        await this.processFile();
-        // Will need import transformation
-        this.importsTransformed = false;
-      }
+    if (!force && newHash === this.hash && this.transpiled && this.importsTransformed) {
+      // File unchanged and already processed
+      this.state = "ready";
+      return false;
     }
 
-    this.state = "ready";
-    events.trigger(DEV_SERVER_EVENTS.FILE_READY, this);
-  }
-
-  /**
-   * Load file from disk (fresh, no manifest)
-   */
-  protected async loadFromDisk() {
-    this.source = await getFileAsync(this.absolutePath);
-    this.hash = crypto.createHash("sha256").update(this.source).digest("hex");
-    this.relativePath = Path.toRelative(this.absolutePath);
+    // Update source and metadata
+    this.source = newSource;
+    this.hash = newHash;
     this.lastModified = (await lastModifiedAsync(this.absolutePath)).getTime();
-    this.version = 0;
+    this.version++;
 
-    this.detectFileTypeAndLayer();
-
-    // Generate cache path (replace / with - and change extension to .js)
-    this.cachePath = this.relativePath.replace(/\//g, "-").replace(/\.(ts|tsx)$/, ".js");
-
-    await this.processFile();
-
-    this.state = "ready";
-    events.trigger(DEV_SERVER_EVENTS.FILE_READY, this);
-  }
-
-  /**
-   * Process file: parse imports first, then transpile
-   */
-  protected async processFile() {
-    // STEP 1: Parse imports from source (must be first to get dependencies)
-    const importMap = await parseImports(this.source, this.absolutePath);
-
-    // Store dependencies as relative paths
-    const importsRelativePaths = Array.from(importMap.values()).map((absPath) =>
-      Path.toRelative(absPath),
+    // Step 3: Parse imports to discover dependencies
+    this.state = "parsed";
+    this.importMap = await parseImports(this.source, this.absolutePath);
+    this.dependencies = new Set(
+      Array.from(this.importMap.values()).map((absPath) => Path.toRelative(absPath)),
     );
 
-    this.dependencies = new Set(importsRelativePaths);
+    // Note: Dependency existence is handled at orchestrator level, not here
+    // This keeps FM focused on single-file processing
 
-    // Store import map for later use in import transformation
-    this.importMap = importMap;
-
-    const missingImports = Array.from(this.dependencies.values()).filter(
-      (relativePath) => !this.files.has(relativePath),
-    );
-
-    if (missingImports.length > 0) {
-      // if missing, try to find them first in their locations
-      await Promise.all(
-        missingImports.map((relativePath) => this.fileOperations.addFile(relativePath)),
-      );
-    }
-
-    // STEP 2: Transpile source code
+    // Step 4: Transpile TypeScript to JavaScript
+    this.state = "transpiled";
     this.transpiled = await transpileFile(this);
 
-    // STEP 3: Save transpiled code to cache
-    await putFileAsync(warlockCachePath(this.cachePath), this.transpiled);
+    // Step 5: Transform imports to cache paths
+    if (shouldTransform && this.dependencies.size > 0) {
+      this.transpiled = transformImports(this);
+      this.importsTransformed = true;
+    } else {
+      this.importsTransformed = false;
+    }
+
+    // Step 6: Save to cache (ONCE - after all transformations)
+    if (saveToCache) {
+      await putFileAsync(warlockCachePath(this.cachePath), this.transpiled);
+    }
+
+    // Step 7: Mark as ready
+    this.state = "ready";
+    events.trigger(DEV_SERVER_EVENTS.FILE_READY, this);
+
+    return true;
   }
 
   /**
-   * Phase 1: Parse the file to discover dependencies
-   * Does NOT write cache yet - used for batch file processing
-   * to determine processing order
+   * Parse the file to discover dependencies (Phase 1 of batch processing)
+   *
+   * This method only performs the first half of processing:
+   * - Loads source from disk
+   * - Calculates hash
+   * - Parses imports to discover dependencies
+   * - Sets up file metadata
+   *
+   * Use this for batch file operations where you need to know
+   * dependencies before deciding processing order.
+   *
+   * **Important**: After calling parse(), you must call complete()
+   * to finish processing and make the file usable.
+   *
+   * @example
+   * ```typescript
+   * // Batch processing pattern
+   * const files = await Promise.all(
+   *   paths.map(async (path) => {
+   *     const file = new FileManager(path, filesMap, fileOps);
+   *     await file.parse();
+   *     return file;
+   *   })
+   * );
+   *
+   * // Order by dependencies, then complete
+   * for (const file of orderedFiles) {
+   *   await file.complete();
+   * }
+   * ```
    */
-  public async parseOnly(): Promise<void> {
+  public async parse(): Promise<void> {
     this.state = "loading";
 
     // Load source
@@ -250,62 +406,183 @@ export class FileManager {
     this.lastModified = (await lastModifiedAsync(this.absolutePath)).getTime();
     this.version = 0;
 
-    // Detect type and layer
-    this.detectFileTypeAndLayer();
+    // Set up cache path
     this.cachePath = this.relativePath.replace(/\//g, "-").replace(/\.(ts|tsx)$/, ".js");
 
-    // Parse imports to discover dependencies
-    const importMap = await parseImports(this.source, this.absolutePath);
-    this.dependencies = new Set(
-      Array.from(importMap.values()).map((absPath) => Path.toRelative(absPath)),
-    );
+    // Detect type and layer
+    this.detectFileTypeAndLayer();
 
-    this.importMap = importMap;
+    // Parse imports to discover dependencies
+    this.importMap = await parseImports(this.source, this.absolutePath);
+    this.dependencies = new Set(
+      Array.from(this.importMap.values()).map((absPath) => Path.toRelative(absPath)),
+    );
 
     this.state = "parsed";
   }
 
   /**
-   * Phase 2: Complete processing (transpile, transform, write cache)
-   * Called after dependencies are ready
+   * Complete file processing after parse() (Phase 2 of batch processing)
+   *
+   * This method completes the processing pipeline:
+   * - Ensures dependencies exist
+   * - Transpiles TypeScript to JavaScript
+   * - Transforms imports to cache paths
+   * - Saves to cache
+   *
+   * **Important**: This must be called after parse() to finish processing.
+   * The file is not usable until complete() has been called.
+   *
+   * @example
+   * ```typescript
+   * await file.parse();
+   * // ... after dependencies are ready ...
+   * await file.complete();
+   * // File is now ready for use
+   * ```
    */
-  public async finalize(): Promise<void> {
-    // Re-parse imports to ensure importMap is populated correctly
-    // (During parseOnly(), some batch files may not have existed on disk yet)
-    const importMap = await parseImports(this.source, this.absolutePath);
-    this.dependencies = new Set(
-      Array.from(importMap.values()).map((absPath) => Path.toRelative(absPath)),
-    );
-
-    this.importMap = importMap;
-
-    // Check and add any missing dependencies first
-    const missingImports = Array.from(this.dependencies.values()).filter(
-      (relativePath) => !this.files.has(relativePath),
-    );
-
-    if (missingImports.length > 0) {
-      await Promise.all(
-        missingImports.map((relativePath) => this.fileOperations.addFile(relativePath)),
-      );
+  public async complete(): Promise<void> {
+    // Ensure we're in the right state
+    if (this.state !== "parsed") {
+      throw new Error(`Cannot complete file in state "${this.state}". Call parse() first.`);
     }
 
+    // Note: Dependency existence is handled at orchestrator/batch level
+    // by the time complete() is called, dependencies should already exist
+
     // Transpile
+    this.state = "transpiled";
     this.transpiled = await transpileFile(this);
 
-    this.importsTransformed = false;
+    // Transform imports
+    if (this.dependencies.size > 0) {
+      this.transpiled = transformImports(this);
+    }
 
-    // Transform imports to cache paths
-    await this.transformImports();
+    this.importsTransformed = true;
 
+    // Save to cache (ONCE)
+    await putFileAsync(warlockCachePath(this.cachePath), this.transpiled);
+
+    // Mark as ready
     this.state = "ready";
     events.trigger(DEV_SERVER_EVENTS.FILE_READY, this);
   }
 
   /**
-   * Detect file type and layer based on path
+   * Update the file after a change during development
+   *
+   * This is a convenience method that delegates to process().
+   * It checks if the file has actually changed and only reprocesses if needed.
+   *
+   * @returns True if file was reprocessed, false if unchanged
+   *
+   * @example
+   * ```typescript
+   * // Called by file watcher
+   * const changed = await fileManager.update();
+   * if (changed) {
+   *   console.log("File was updated");
+   * }
+   * ```
    */
-  protected detectFileTypeAndLayer() {
+  public async update(): Promise<boolean> {
+    return this.process();
+  }
+
+  /**
+   * Force reprocess the file regardless of hash match
+   *
+   * Use this when:
+   * - A dependency that was previously missing is now available
+   * - Import transformation needs to be redone
+   * - Cache is corrupted or missing
+   *
+   * @example
+   * ```typescript
+   * // After a missing dependency is added
+   * await fileManager.forceReprocess();
+   * ```
+   */
+  public async forceReprocess(): Promise<void> {
+    await this.process({ force: true });
+  }
+
+  /**
+   * Initialize from cached manifest data
+   *
+   * Attempts to use cached data from a previous build.
+   * If the file has changed (hash mismatch) or cache is missing,
+   * falls back to full processing.
+   *
+   * @param fileManifest - Cached manifest entry
+   * @internal
+   */
+  protected async initFromManifest(fileManifest: Partial<FileManifest>): Promise<void> {
+    // Apply manifest properties
+    this.version = fileManifest.version || 0;
+    this.type = fileManifest.type;
+    this.layer = fileManifest.layer;
+    this.cachePath =
+      fileManifest.cachePath || this.relativePath.replace(/\//g, "-").replace(/\.(ts|tsx)$/, ".js");
+
+    // Load source and check for changes
+    this.state = "loading";
+    try {
+      this.source = await getFileAsync(this.absolutePath);
+    } catch (error) {
+      this.state = "deleted";
+      return;
+    }
+
+    const currentHash = crypto.createHash("sha256").update(this.source).digest("hex");
+    const hasChanged = currentHash !== fileManifest.hash;
+
+    if (hasChanged) {
+      // File changed - full reprocess
+      this.hash = currentHash;
+      this.lastModified = (await lastModifiedAsync(this.absolutePath)).getTime();
+      this.version++;
+      await this.process({ force: true });
+    } else {
+      // File unchanged - load from cache
+      this.hash = fileManifest.hash!;
+      this.lastModified = fileManifest.lastModified!;
+      this.dependencies = new Set(fileManifest.dependencies || []);
+      this.dependents = new Set(fileManifest.dependents || []);
+
+      try {
+        this.transpiled = await getFileAsync(warlockCachePath(this.cachePath));
+        this.importsTransformed = true;
+        this.state = "ready";
+        events.trigger(DEV_SERVER_EVENTS.FILE_READY, this);
+      } catch (error) {
+        // Cache missing - reprocess
+        await this.process({ force: true });
+      }
+    }
+  }
+
+  /**
+   * Detect the file type and reload layer based on path patterns
+   *
+   * File types determine special handling:
+   * - `main`: Application entry point
+   * - `config`: Configuration files
+   * - `route`: Route definitions
+   * - `controller`: HTTP controllers
+   * - `service`: Business logic services
+   * - `model`: Database models
+   * - `event`: Event handlers
+   * - `other`: Everything else
+   *
+   * Layers determine reload behavior:
+   * - `HMR`: Hot module replacement (instant reload)
+   * - `FSR`: Full server restart (required for some changes)
+   *
+   * @internal
+   */
+  protected detectFileTypeAndLayer(): void {
     // Main entry files
     if (this.relativePath.includes("main.ts") || this.relativePath.includes("main.tsx")) {
       this.type = "main";
@@ -313,7 +590,7 @@ export class FileManager {
       return;
     }
 
-    // Config files - FSR but handled specially (reload config + restart affected connectors)
+    // Config files
     if (this.relativePath.startsWith("src/config/")) {
       this.type = "config";
       this.layer = "HMR";
@@ -323,7 +600,7 @@ export class FileManager {
     // Routes files
     if (this.relativePath.endsWith("routes.ts") || this.relativePath.endsWith("routes.tsx")) {
       this.type = "route";
-      this.layer = "HMR"; // For now FSR, will be HMR with wildcard routing
+      this.layer = "HMR";
       return;
     }
 
@@ -361,89 +638,24 @@ export class FileManager {
   }
 
   /**
-   * Update file when changed during development
-   */
-  public async update() {
-    const newSource = await getFileAsync(this.absolutePath);
-
-    // No change in content
-    if (newSource.trim() === this.source.trim()) {
-      return false;
-    }
-
-    this.state = "updating";
-    this.source = newSource;
-    this.version++;
-
-    // Update hash and last modified
-    this.hash = crypto.createHash("sha256").update(this.source).digest("hex");
-    this.lastModified = (await lastModifiedAsync(this.absolutePath)).getTime();
-
-    // Reprocess file
-    await this.processFile();
-
-    // Transform imports
-    if (this.dependencies.size > 0) {
-      this.importsTransformed = false;
-
-      await this.transformImports();
-    }
-
-    this.state = "ready";
-    return true;
-  }
-
-  /**
-   * Force reprocess file even if source hasn't changed
-   * Useful when dependencies become available (e.g., missing file is added back)
-   */
-  public async forceReprocess(): Promise<void> {
-    this.state = "updating";
-    this.version++;
-
-    // Reprocess file (re-parse imports, retranspile, transform imports)
-    await this.processFile();
-
-    // Transform imports
-    if (this.dependencies.size > 0) {
-      this.importsTransformed = false;
-      await this.transformImports();
-    }
-
-    this.state = "ready";
-  }
-
-  /**
-   * Transform imports in transpiled code to use cache paths
-   */
-  public async transformImports() {
-    if (this.importsTransformed) {
-      return; // Already transformed
-    }
-
-    try {
-      // Transform imports in transpiled code
-      const transformedCode = transformImports(this, this.files);
-
-      // Update the transpiled code
-      this.transpiled = transformedCode;
-
-      // Save the transformed code back to cache
-      await putFileAsync(warlockCachePath(this.cachePath), transformedCode);
-
-      // Mark as transformed
-      this.importsTransformed = true;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Export file data as manifest entry
-   * Note: source and transpiled code are NOT stored in manifest
-   * - Source code is in the original file
-   * - Transpiled code is in .warlock/cache/
-   * - Hash is used to detect changes
+   * Export file data as a manifest entry for caching
+   *
+   * The manifest stores metadata about each file to enable:
+   * - Fast startup by skipping unchanged files
+   * - Dependency tracking across restarts
+   * - Cache validation via hash comparison
+   *
+   * Note: Source code and transpiled output are NOT stored in manifest.
+   * - Source is always read from disk
+   * - Transpiled code is stored in .warlock/cache/
+   *
+   * @returns Manifest entry for this file
+   *
+   * @example
+   * ```typescript
+   * const entry = fileManager.toManifest();
+   * manifest.setFile(fileManager.relativePath, entry);
+   * ```
    */
   public toManifest(): FileManifest {
     return {

@@ -5,7 +5,6 @@ import { devLogReady, devLogSection, devServeLog } from "./dev-logger";
 import { filesOrchestrator } from "./files-orchestrator";
 import { LayerExecutor } from "./layer-executor";
 import { ModuleLoader } from "./module-loader";
-import { initializeRuntimeImportHelper } from "./runtime-import-helper";
 import { typeGenerator } from "./type-generator";
 
 /**
@@ -50,10 +49,6 @@ export class DevelopmentServer {
       // devLogInfo("Initializing special files...");
       // STEP 3: Collect special files
       filesOrchestrator.specialFilesCollector.collect(filesOrchestrator.getFiles());
-
-      // STEP 4: Initialize runtime import helper (for HMR cache busting)
-      // devLogInfo("Initializing runtime import helper...");
-      initializeRuntimeImportHelper();
 
       // devLogInfo("Setting up event listeners...");
       // STEP 6: Setup event listeners

@@ -107,7 +107,7 @@ export class TypeGenerator {
     // Generate storage types
     const storageConfigPath = await this.findConfigFile("storage");
     if (storageConfigPath) {
-      await this.generateStorageTypes(storageConfigPath);
+      this.generateStorageTypes(storageConfigPath);
     }
 
     // Generate config types
@@ -148,14 +148,13 @@ export class TypeGenerator {
       if (!manifestEntry || manifestEntry.sourceHash !== fileManager.hash) {
         // File changed or new - regenerate
         configChanged = true;
-        const typeInfo = await this.extractConfigTypeInfo(fileManager.absolutePath);
-        const keys = await this.extractConfigKeys(fileManager.absolutePath, configName);
+        const info = await this.extractConfigInfo(fileManager.absolutePath, configName);
 
         this.configCache.set(configName, {
           sourceHash: fileManager.hash,
-          typeName: typeInfo?.typeName || null,
-          importSource: typeInfo?.importSource || null,
-          keys,
+          typeName: info.typeName,
+          importSource: info.importSource,
+          keys: info.keys,
         });
       } else {
         // Unchanged - load from manifest
@@ -257,18 +256,17 @@ ${interfaceContent}
     const fileManager = filesOrchestrator.getFiles().get(changedPath);
     const sourceHash = fileManager?.hash || Date.now().toString();
 
-    // Update only the changed config in cache
+    // Update only the changed config in cache (use optimized combined extraction)
     const configDir = join(process.cwd(), "src/config");
     const configPath = join(configDir, `${configName}.ts`);
 
-    const typeInfo = await this.extractConfigTypeInfo(configPath);
-    const keys = await this.extractConfigKeys(configPath, configName);
+    const info = await this.extractConfigInfo(configPath, configName);
 
     this.configCache.set(configName, {
       sourceHash,
-      typeName: typeInfo?.typeName || null,
-      importSource: typeInfo?.importSource || null,
-      keys,
+      typeName: info.typeName,
+      importSource: info.importSource,
+      keys: info.keys,
     });
 
     // Regenerate config.d.ts from cache
@@ -293,14 +291,14 @@ ${interfaceContent}
         // Extract config name
         const configName = path.replace("src/config/", "").replace(/\.[^.]+$/, "");
 
-        const typeInfo = await this.extractConfigTypeInfo(fileManager.absolutePath);
-        const keys = await this.extractConfigKeys(fileManager.absolutePath, configName);
+        // Use optimized combined extraction (single ts.createProgram call)
+        const info = await this.extractConfigInfo(fileManager.absolutePath, configName);
 
         this.configCache.set(configName, {
           sourceHash: fileManager.hash,
-          typeName: typeInfo?.typeName || null,
-          importSource: typeInfo?.importSource || null,
-          keys,
+          typeName: info.typeName,
+          importSource: info.importSource,
+          keys: info.keys,
         });
       }
 
@@ -435,15 +433,29 @@ ${keyEntries}
   // ============================================================
 
   /**
-   * Extract type annotation info from a config file
+   * Extract BOTH type info AND keys in a single pass
+   *
+   * This is optimized to create ts.createProgram() only ONCE per file
+   * instead of twice (once for type extraction, once for keys).
+   * This reduces parsing time by ~50%.
+   *
+   * @param configPath Absolute path to the config file
+   * @param configName Config name (e.g., "auth", "notifications")
+   * @returns Combined result with type info and keys
    */
-  private async extractConfigTypeInfo(
+  private async extractConfigInfo(
     configPath: string,
-  ): Promise<{ typeName: string; importSource: string } | null> {
+    configName: string,
+  ): Promise<{
+    typeName: string | null;
+    importSource: string | null;
+    keys: string[];
+  }> {
     if (!(await this.exists(configPath))) {
-      return null;
+      return { typeName: null, importSource: null, keys: [] };
     }
 
+    // Create program ONCE (this is the expensive operation)
     const program = ts.createProgram([configPath], {
       target: ts.ScriptTarget.ESNext,
       module: ts.ModuleKind.ESNext,
@@ -452,98 +464,94 @@ ${keyEntries}
 
     const sourceFile = program.getSourceFile(configPath);
     if (!sourceFile) {
-      return null;
+      return { typeName: null, importSource: null, keys: [] };
     }
 
-    const importMap = new Map<string, string>();
+    // === Type Info Extraction ===
+    const importedTypes = new Map<string, string>();
+    const localExportedTypes = new Set<string>();
     let foundTypeName: string | null = null;
 
-    const visit = (node: ts.Node): void => {
+    // === Keys Extraction ===
+    const keys: string[] = [];
+
+    const visitForTypes = (node: ts.Node): void => {
+      // Collect imported types
       if (ts.isImportDeclaration(node)) {
         const moduleSpecifier = node.moduleSpecifier;
         if (ts.isStringLiteral(moduleSpecifier)) {
           const source = moduleSpecifier.text;
           const importClause = node.importClause;
-
           if (importClause?.namedBindings && ts.isNamedImports(importClause.namedBindings)) {
             for (const element of importClause.namedBindings.elements) {
-              importMap.set(element.name.text, source);
+              importedTypes.set(element.name.text, source);
             }
           }
         }
       }
 
-      if (ts.isVariableDeclaration(node) && node.type) {
-        if (ts.isTypeReferenceNode(node.type)) {
-          const typeName = node.type.typeName.getText(sourceFile);
-          foundTypeName = typeName;
+      // Collect locally exported types
+      if (ts.isTypeAliasDeclaration(node)) {
+        const modifiers = ts.getModifiers(node);
+        if (modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
+          localExportedTypes.add(node.name.text);
         }
       }
 
-      ts.forEachChild(node, visit);
-    };
+      // Collect locally exported interfaces
+      if (ts.isInterfaceDeclaration(node)) {
+        const modifiers = ts.getModifiers(node);
+        if (modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
+          localExportedTypes.add(node.name.text);
+        }
+      }
 
-    ts.forEachChild(sourceFile, visit);
+      // Find type used on config variable + extract keys
+      if (ts.isVariableDeclaration(node)) {
+        // Type info
+        if (node.type && ts.isTypeReferenceNode(node.type)) {
+          foundTypeName = node.type.typeName.getText(sourceFile);
+        }
 
-    if (foundTypeName && importMap.has(foundTypeName)) {
-      return {
-        typeName: foundTypeName,
-        importSource: importMap.get(foundTypeName)!,
-      };
-    }
-
-    return null;
-  }
-
-  /**
-   * Extract flattened key paths from a config file
-   */
-  private async extractConfigKeys(configPath: string, configName: string): Promise<string[]> {
-    if (!(await this.exists(configPath))) {
-      return [];
-    }
-
-    const program = ts.createProgram([configPath], {
-      target: ts.ScriptTarget.ESNext,
-      module: ts.ModuleKind.ESNext,
-      moduleResolution: ts.ModuleResolutionKind.NodeJs,
-    });
-
-    const sourceFile = program.getSourceFile(configPath);
-    if (!sourceFile) {
-      return [];
-    }
-
-    const keys: string[] = [];
-
-    const visit = (node: ts.Node, prefix: string): void => {
-      if (ts.isObjectLiteralExpression(node)) {
-        for (const prop of node.properties) {
-          if (ts.isPropertyAssignment(prop) && prop.name) {
-            const keyName = prop.name.getText(sourceFile);
-            const fullKey = prefix ? `${prefix}.${keyName}` : keyName;
-            keys.push(fullKey);
-
-            if (ts.isObjectLiteralExpression(prop.initializer)) {
-              visit(prop.initializer, fullKey);
+        // Keys extraction
+        if (node.initializer && ts.isObjectLiteralExpression(node.initializer)) {
+          const visitKeys = (objNode: ts.ObjectLiteralExpression, prefix: string): void => {
+            for (const prop of objNode.properties) {
+              if (ts.isPropertyAssignment(prop) && prop.name) {
+                const keyName = prop.name.getText(sourceFile);
+                const fullKey = prefix ? `${prefix}.${keyName}` : keyName;
+                keys.push(fullKey);
+                if (ts.isObjectLiteralExpression(prop.initializer)) {
+                  visitKeys(prop.initializer, fullKey);
+                }
+              }
             }
-          }
+          };
+          visitKeys(node.initializer, configName);
         }
       }
+
+      ts.forEachChild(node, visitForTypes);
     };
 
-    const walkAST = (node: ts.Node): void => {
-      if (ts.isVariableDeclaration(node) && node.initializer) {
-        if (ts.isObjectLiteralExpression(node.initializer)) {
-          visit(node.initializer, configName);
-        }
+    ts.forEachChild(sourceFile, visitForTypes);
+
+    // Resolve type info
+    let typeName: string | null = null;
+    let importSource: string | null = null;
+
+    if (foundTypeName) {
+      if (importedTypes.has(foundTypeName)) {
+        typeName = foundTypeName;
+        importSource = importedTypes.get(foundTypeName)!;
+      } else if (localExportedTypes.has(foundTypeName)) {
+        typeName = foundTypeName;
+        const relativePath = Path.toRelative(configPath).replace(/\.(ts|tsx)$/, "");
+        importSource = `../../${relativePath}`;
       }
-      ts.forEachChild(node, walkAST);
-    };
+    }
 
-    ts.forEachChild(sourceFile, walkAST);
-
-    return keys;
+    return { typeName, importSource, keys };
   }
 
   /**
