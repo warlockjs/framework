@@ -3,9 +3,9 @@ import type { SchemaContext } from "./context-types";
 /**
  * Mutator context
  */
-export type MutatorContext = {
+export type MutatorContext<Options = any> = {
   /** Mutator options */
-  options: any;
+  options: Options;
   /** Global validation context */
   ctx: SchemaContext;
 };
@@ -13,17 +13,17 @@ export type MutatorContext = {
 /**
  * Mutator function - transforms data before validation
  */
-export type Mutator = (data: any, context: MutatorContext) => Promise<any>;
+export type Mutator<Options = any> = (data: any, context: MutatorContext<Options>) => Promise<any>;
 
 /**
  * Contextualized mutator - mutator with runtime context
  */
-export type ContextualizedMutator = {
+export type ContextualizedMutator<Options = any> = {
   /** Mutation function */
-  mutate: Mutator;
+  mutate: Mutator<Options>;
   /** Mutator context */
   context: {
-    options: any;
+    options: Options;
     ctx: SchemaContext;
   };
 };

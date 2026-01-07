@@ -1,6 +1,6 @@
 import { get } from "@mongez/reinforcements";
-import { isEmpty } from "@mongez/supportive-is";
 import { getFieldValue, invalidRule, VALID_RULE } from "../../helpers";
+import { isEmptyValue } from "../../helpers/is-empty-value";
 import type { SchemaRule } from "../../types";
 
 /**
@@ -20,7 +20,7 @@ export const requiredWithRule: SchemaRule<{
     const fieldValue = getFieldValue(this, context);
 
     // Field is required if the other field is present
-    if (isEmpty(value) && fieldValue !== undefined) {
+    if (isEmptyValue(value) && fieldValue !== undefined) {
       return invalidRule(this, context);
     }
 
@@ -46,10 +46,10 @@ export const requiredWithAllRule: SchemaRule<{
     const source = scope === "sibling" ? context.parent : context.allValues;
 
     // Check if all fields are present
-    const allPresent = fields.every(field => get(source, field) !== undefined);
+    const allPresent = fields.every((field) => get(source, field) !== undefined);
 
     // Field is required if all other fields are present
-    if (isEmpty(value) && allPresent) {
+    if (isEmptyValue(value) && allPresent) {
       return invalidRule(this, context);
     }
 
@@ -66,8 +66,7 @@ export const requiredWithAnyRule: SchemaRule<{
   scope?: "global" | "sibling";
 }> = {
   name: "requiredWithAny",
-  description:
-    "The field is required if any of the specified fields is present",
+  description: "The field is required if any of the specified fields is present",
   sortOrder: -2,
   requiresValue: false,
   defaultErrorMessage: "The :input is required",
@@ -76,10 +75,10 @@ export const requiredWithAnyRule: SchemaRule<{
     const source = scope === "sibling" ? context.parent : context.allValues;
 
     // Check if any field is present
-    const anyPresent = fields.some(field => get(source, field) !== undefined);
+    const anyPresent = fields.some((field) => get(source, field) !== undefined);
 
     // Field is required if any other field is present
-    if (isEmpty(value) && anyPresent) {
+    if (isEmptyValue(value) && anyPresent) {
       return invalidRule(this, context);
     }
 

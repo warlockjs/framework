@@ -1,6 +1,6 @@
-import { isEmpty } from "@mongez/supportive-is";
 import { getFieldValue, invalidRule, VALID_RULE } from "../../helpers";
 import type { SchemaRule } from "../../types";
+import { isEmptyValue } from "./../../helpers/is-empty-value";
 
 /**
  * Present if rule - field must be present if another field equals a specific value
@@ -12,8 +12,7 @@ export const presentIfRule: SchemaRule<{
   scope?: "global" | "sibling";
 }> = {
   name: "presentIf",
-  description:
-    "The field must be present if another field equals a specific value",
+  description: "The field must be present if another field equals a specific value",
   sortOrder: -2,
   requiresValue: false,
   defaultErrorMessage: "The :input field must be present",
@@ -47,7 +46,7 @@ export const presentIfEmptyRule: SchemaRule<{
     const fieldValue = getFieldValue(this, context);
 
     // Field must be present if the other field is empty
-    if (value === undefined && isEmpty(fieldValue)) {
+    if (value === undefined && isEmptyValue(fieldValue)) {
       return invalidRule(this, context);
     }
 
@@ -72,7 +71,7 @@ export const presentIfNotEmptyRule: SchemaRule<{
     const fieldValue = getFieldValue(this, context);
 
     // Field must be present if the other field is not empty
-    if (value === undefined && !isEmpty(fieldValue)) {
+    if (value === undefined && !isEmptyValue(fieldValue)) {
       return invalidRule(this, context);
     }
 
@@ -90,8 +89,7 @@ export const presentIfInRule: SchemaRule<{
   scope?: "global" | "sibling";
 }> = {
   name: "presentIfIn",
-  description:
-    "The field must be present if another field's value is in the given array",
+  description: "The field must be present if another field's value is in the given array",
   sortOrder: -2,
   requiresValue: false,
   defaultErrorMessage: "The :input field must be present",
@@ -118,8 +116,7 @@ export const presentIfNotInRule: SchemaRule<{
   scope?: "global" | "sibling";
 }> = {
   name: "presentIfNotIn",
-  description:
-    "The field must be present if another field's value is NOT in the given array",
+  description: "The field must be present if another field's value is NOT in the given array",
   sortOrder: -2,
   requiresValue: false,
   defaultErrorMessage: "The :input field must be present",

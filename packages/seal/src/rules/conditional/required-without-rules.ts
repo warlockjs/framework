@@ -1,7 +1,7 @@
 import { get } from "@mongez/reinforcements";
-import { isEmpty } from "@mongez/supportive-is";
 import { getFieldValue, invalidRule, VALID_RULE } from "../../helpers";
 import type { SchemaRule } from "../../types";
+import { isEmptyValue } from "./../../helpers/is-empty-value";
 
 /**
  * Required without rule - field is required if another field is missing
@@ -20,7 +20,7 @@ export const requiredWithoutRule: SchemaRule<{
     const fieldValue = getFieldValue(this, context);
 
     // Field is required if the other field is missing
-    if (isEmpty(value) && fieldValue === undefined) {
+    if (isEmptyValue(value) && fieldValue === undefined) {
       return invalidRule(this, context);
     }
 
@@ -46,10 +46,10 @@ export const requiredWithoutAllRule: SchemaRule<{
     const source = scope === "sibling" ? context.parent : context.allValues;
 
     // Check if all fields are missing
-    const allMissing = fields.every(field => get(source, field) === undefined);
+    const allMissing = fields.every((field) => get(source, field) === undefined);
 
     // Field is required if all other fields are missing
-    if (isEmpty(value) && allMissing) {
+    if (isEmptyValue(value) && allMissing) {
       return invalidRule(this, context);
     }
 
@@ -66,8 +66,7 @@ export const requiredWithoutAnyRule: SchemaRule<{
   scope?: "global" | "sibling";
 }> = {
   name: "requiredWithoutAny",
-  description:
-    "The field is required if any of the specified fields is missing",
+  description: "The field is required if any of the specified fields is missing",
   sortOrder: -2,
   requiresValue: false,
   defaultErrorMessage: "The :input is required",
@@ -76,10 +75,10 @@ export const requiredWithoutAnyRule: SchemaRule<{
     const source = scope === "sibling" ? context.parent : context.allValues;
 
     // Check if any field is missing
-    const anyMissing = fields.some(field => get(source, field) === undefined);
+    const anyMissing = fields.some((field) => get(source, field) === undefined);
 
     // Field is required if any other field is missing
-    if (isEmpty(value) && anyMissing) {
+    if (isEmptyValue(value) && anyMissing) {
       return invalidRule(this, context);
     }
 

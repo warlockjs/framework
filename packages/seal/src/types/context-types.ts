@@ -36,6 +36,10 @@ export type SchemaContext = {
   path: string;
   /** Schema definition if object validator */
   schema?: Schema;
+  /** Additional context */
+  context?: Record<string, any>;
+  /** Root context */
+  rootContext?: Record<string, any>;
   /** Translation function for error messages */
   translateRule: (ruleTranslation: RuleTranslation) => string;
   translateAttribute: (attributeTranslation: AttributeTranslation) => string;

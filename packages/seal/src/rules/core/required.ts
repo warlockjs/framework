@@ -1,5 +1,5 @@
-import { isEmpty } from "@mongez/supportive-is";
 import { invalidRule, VALID_RULE } from "../../helpers";
+import { isEmptyValue } from "../../helpers/is-empty-value";
 import type { SchemaRule } from "../../types";
 
 /**
@@ -11,7 +11,7 @@ export const requiredRule: SchemaRule = {
   requiresValue: false,
   sortOrder: -2,
   async validate(value: any, context) {
-    if (isEmpty(value)) {
+    if (isEmptyValue(value)) {
       return invalidRule(this, context);
     }
     return VALID_RULE;

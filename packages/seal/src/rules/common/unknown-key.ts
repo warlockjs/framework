@@ -12,17 +12,14 @@ export const unknownKeyRule: SchemaRule<{
   defaultErrorMessage: "The :input contains unknown keys: :unknownKeys",
   async validate(value: any, context) {
     const schema = this.context.options.schema;
-    const allowedKeys = [
-      ...Object.keys(schema),
-      ...(this.context.options.allowedKeys || []),
-    ];
+    const allowedKeys = [...Object.keys(schema), ...(this.context.options.allowedKeys || [])];
 
-    const unknownKeys = Object.keys(value).filter(
-      key => !allowedKeys.includes(key),
-    );
+    const unknownKeys = Object.keys(value).filter((key) => !allowedKeys.includes(key));
 
     if (unknownKeys.length > 0) {
       (this.context.options as any).unknownKeys = unknownKeys.join(", ");
+      console.log("Options", this.context.options);
+
       return invalidRule(this, context);
     }
 

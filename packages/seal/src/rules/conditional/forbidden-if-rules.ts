@@ -1,5 +1,5 @@
-import { isEmpty } from "@mongez/supportive-is";
 import { getFieldValue, invalidRule, VALID_RULE } from "../../helpers";
+import { isEmptyValue } from "../../helpers/is-empty-value";
 import type { SchemaRule } from "../../types";
 
 /**
@@ -12,8 +12,7 @@ export const forbiddenIfRule: SchemaRule<{
   scope?: "global" | "sibling";
 }> = {
   name: "forbiddenIf",
-  description:
-    "The field is forbidden if another field equals a specific value",
+  description: "The field is forbidden if another field equals a specific value",
   sortOrder: -2,
   defaultErrorMessage: "The :input is forbidden",
   async validate(value: any, context) {
@@ -21,7 +20,7 @@ export const forbiddenIfRule: SchemaRule<{
     const fieldValue = getFieldValue(this, context);
 
     // Field is forbidden if it has a value and the other field equals the expected value
-    if (!isEmpty(value) && fieldValue === expectedValue) {
+    if (!isEmptyValue(value) && fieldValue === expectedValue) {
       return invalidRule(this, context);
     }
 
@@ -39,8 +38,7 @@ export const forbiddenIfNotRule: SchemaRule<{
   scope?: "global" | "sibling";
 }> = {
   name: "forbiddenIfNot",
-  description:
-    "The field is forbidden if another field does NOT equal a specific value",
+  description: "The field is forbidden if another field does NOT equal a specific value",
   sortOrder: -2,
   defaultErrorMessage: "The :input is forbidden",
   async validate(value: any, context) {
@@ -48,7 +46,7 @@ export const forbiddenIfNotRule: SchemaRule<{
     const fieldValue = getFieldValue(this, context);
 
     // Field is forbidden if it has a value and the other field does NOT equal the expected value
-    if (!isEmpty(value) && fieldValue !== expectedValue) {
+    if (!isEmptyValue(value) && fieldValue !== expectedValue) {
       return invalidRule(this, context);
     }
 
@@ -72,7 +70,7 @@ export const forbiddenIfEmptyRule: SchemaRule<{
     const fieldValue = getFieldValue(this, context);
 
     // Field is forbidden if it has a value and the other field is empty
-    if (!isEmpty(value) && isEmpty(fieldValue)) {
+    if (!isEmptyValue(value) && isEmptyValue(fieldValue)) {
       return invalidRule(this, context);
     }
 
@@ -96,7 +94,7 @@ export const forbiddenIfNotEmptyRule: SchemaRule<{
     const fieldValue = getFieldValue(this, context);
 
     // Field is forbidden if it has a value and the other field is not empty
-    if (!isEmpty(value) && !isEmpty(fieldValue)) {
+    if (!isEmptyValue(value) && !isEmptyValue(fieldValue)) {
       return invalidRule(this, context);
     }
 
@@ -114,8 +112,7 @@ export const forbiddenIfInRule: SchemaRule<{
   scope?: "global" | "sibling";
 }> = {
   name: "forbiddenIfIn",
-  description:
-    "The field is forbidden if another field's value is in the given array",
+  description: "The field is forbidden if another field's value is in the given array",
   sortOrder: -2,
   defaultErrorMessage: "The :input is forbidden",
   async validate(value: any, context) {
@@ -123,7 +120,7 @@ export const forbiddenIfInRule: SchemaRule<{
     const fieldValue = getFieldValue(this, context);
 
     // Field is forbidden if it has a value and the other field's value is in the array
-    if (!isEmpty(value) && values.includes(fieldValue)) {
+    if (!isEmptyValue(value) && values.includes(fieldValue)) {
       return invalidRule(this, context);
     }
 
@@ -141,8 +138,7 @@ export const forbiddenIfNotInRule: SchemaRule<{
   scope?: "global" | "sibling";
 }> = {
   name: "forbiddenIfNotIn",
-  description:
-    "The field is forbidden if another field's value is NOT in the given array",
+  description: "The field is forbidden if another field's value is NOT in the given array",
   sortOrder: -2,
   defaultErrorMessage: "The :input is forbidden",
   async validate(value: any, context) {
@@ -150,7 +146,7 @@ export const forbiddenIfNotInRule: SchemaRule<{
     const fieldValue = getFieldValue(this, context);
 
     // Field is forbidden if it has a value and the other field's value is NOT in the array
-    if (!isEmpty(value) && !values.includes(fieldValue)) {
+    if (!isEmptyValue(value) && !values.includes(fieldValue)) {
       return invalidRule(this, context);
     }
 

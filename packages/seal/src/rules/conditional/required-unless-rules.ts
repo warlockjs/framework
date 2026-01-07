@@ -1,6 +1,6 @@
-import { isEmpty } from "@mongez/supportive-is";
 import { getFieldValue, invalidRule, VALID_RULE } from "../../helpers";
 import type { SchemaRule } from "../../types";
+import { isEmptyValue } from "./../../helpers/is-empty-value";
 
 /**
  * Required unless rule - field is required unless another field equals a specific value
@@ -12,8 +12,7 @@ export const requiredUnlessRule: SchemaRule<{
   scope?: "global" | "sibling";
 }> = {
   name: "requiredUnless",
-  description:
-    "The field is required unless another field equals a specific value",
+  description: "The field is required unless another field equals a specific value",
   sortOrder: -2,
   requiresValue: false,
   defaultErrorMessage: "The :input is required",
@@ -22,7 +21,7 @@ export const requiredUnlessRule: SchemaRule<{
     const fieldValue = getFieldValue(this, context);
 
     // Field is required unless the other field equals the expected value
-    if (isEmpty(value) && fieldValue !== expectedValue) {
+    if (isEmptyValue(value) && fieldValue !== expectedValue) {
       return invalidRule(this, context);
     }
 

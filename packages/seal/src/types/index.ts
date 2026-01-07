@@ -24,3 +24,6 @@ export * from "./inference-types";
 
 // Date types
 export * from "./date-types";
+
+// File types
+export * from "./file.types";

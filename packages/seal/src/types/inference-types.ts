@@ -3,9 +3,11 @@ import type {
   ArrayValidator,
   BaseValidator,
   BooleanValidator,
+  ComputedValidator,
   DateValidator,
   FloatValidator,
   IntValidator,
+  ManagedValidator,
   ObjectValidator,
   ScalarValidator,
   StringValidator,
@@ -32,28 +34,31 @@ import type {
  * ```
  */
 
-export type Infer<T> = T extends ObjectValidator
-  ? T extends { schema: infer S extends Record<string, BaseValidator> }
+export type Infer<T> =
+  T extends ObjectValidator<infer S>
     ? {
         [K in keyof S]: Infer<S[K]>;
       }
-    : never
-  : T extends ArrayValidator
-    ? T extends { validator: infer V extends BaseValidator }
-      ? Array<Infer<V>>
-      : never
-    : T extends StringValidator
-      ? string
-      : T extends IntValidator
-        ? number
-        : T extends FloatValidator
-          ? number
-          : T extends BooleanValidator
-            ? boolean
-            : T extends DateValidator
-              ? Date
-              : T extends ScalarValidator
-                ? string | number | boolean
-                : T extends AnyValidator
-                  ? any
-                  : unknown;
+    : T extends ArrayValidator
+      ? T extends { validator: infer V extends BaseValidator }
+        ? Array<Infer<V>>
+        : never
+      : T extends ComputedValidator<infer R>
+        ? R
+        : T extends ManagedValidator<infer R>
+          ? R
+          : T extends StringValidator
+            ? string
+            : T extends IntValidator
+              ? number
+              : T extends FloatValidator
+                ? number
+                : T extends BooleanValidator
+                  ? boolean
+                  : T extends DateValidator
+                    ? Date
+                    : T extends ScalarValidator
+                      ? string | number | boolean
+                      : T extends AnyValidator
+                        ? any
+                        : unknown;

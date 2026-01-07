@@ -1,6 +1,6 @@
 import { clone } from "@mongez/reinforcements";
-import { isEmpty } from "@mongez/supportive-is";
 import { VALID_RULE, invalidRule } from "../helpers";
+import { isEmptyValue } from "../helpers/is-empty-value";
 import {
   equalRule,
   equalsFieldRule,
@@ -85,9 +85,10 @@ export class BaseValidator {
 
   /**
    * Get the default value
+   * Supports lazy evaluation via callbacks
    */
   public getDefaultValue(): any {
-    return this.defaultValue;
+    return typeof this.defaultValue === "function" ? this.defaultValue() : this.defaultValue;
   }
 
   /**
@@ -185,10 +186,9 @@ export class BaseValidator {
    * @category Transformer
    */
   public toJSON(indent?: number) {
-    this.addTransformer(
-      (data, { options }) => JSON.stringify(data, null, options.indent),
-      { indent: indent ?? 0 },
-    );
+    this.addTransformer((data, { options }) => JSON.stringify(data, null, options.indent), {
+      indent: indent ?? 0,
+    });
     return this;
   }
 
@@ -224,9 +224,7 @@ export class BaseValidator {
    *   },
    * });
    */
-  public attributes(
-    attributes: Record<string, string | Record<string, string>>,
-  ) {
+  public attributes(attributes: Record<string, string | Record<string, string>>) {
     for (const key in attributes) {
       this.attributesText[key] = attributes[key];
     }
@@ -448,7 +446,7 @@ export class BaseValidator {
    *
    * @example
    * ```ts
-   * import { hexColorRule } from "@warlock.js/seal-plugins/colors";
+   * import { hexColorRule } from "@warlock.js/seal";
    *
    * v.string().useRule(hexColorRule, { errorMessage: "Invalid color" });
    * ```
@@ -628,11 +626,7 @@ export class BaseValidator {
   /**
    * Value is required unless another sibling field equals a specific value
    */
-  public requiredUnlessSibling(
-    field: string,
-    value: any,
-    errorMessage?: string,
-  ) {
+  public requiredUnlessSibling(field: string, value: any, errorMessage?: string) {
     const rule = this.addRule(requiredUnlessRule, errorMessage);
     rule.context.options.field = field;
     rule.context.options.value = value;
@@ -696,11 +690,7 @@ export class BaseValidator {
   /**
    * Value is required if another sibling field's value is in the given array
    */
-  public requiredIfInSibling(
-    field: string,
-    values: any[],
-    errorMessage?: string,
-  ) {
+  public requiredIfInSibling(field: string, values: any[], errorMessage?: string) {
     const rule = this.addRule(requiredIfInRule, errorMessage);
     rule.context.options.field = field;
     rule.context.options.values = values;
@@ -722,11 +712,7 @@ export class BaseValidator {
   /**
    * Value is required if another sibling field's value is NOT in the given array
    */
-  public requiredIfNotInSibling(
-    field: string,
-    values: any[],
-    errorMessage?: string,
-  ) {
+  public requiredIfNotInSibling(field: string, values: any[], errorMessage?: string) {
     const rule = this.addRule(requiredIfNotInRule, errorMessage);
     rule.context.options.field = field;
     rule.context.options.values = values;
@@ -898,11 +884,7 @@ export class BaseValidator {
   /**
    * Field must be present unless another sibling field equals a specific value
    */
-  public presentUnlessSibling(
-    field: string,
-    value: any,
-    errorMessage?: string,
-  ) {
+  public presentUnlessSibling(field: string, value: any, errorMessage?: string) {
     const rule = this.addRule(presentUnlessRule, errorMessage);
     rule.context.options.field = field;
     rule.context.options.value = value;
@@ -966,11 +948,7 @@ export class BaseValidator {
   /**
    * Field must be present if another sibling field's value is in the given array
    */
-  public presentIfInSibling(
-    field: string,
-    values: any[],
-    errorMessage?: string,
-  ) {
+  public presentIfInSibling(field: string, values: any[], errorMessage?: string) {
     const rule = this.addRule(presentIfInRule, errorMessage);
     rule.context.options.field = field;
     rule.context.options.values = values;
@@ -992,11 +970,7 @@ export class BaseValidator {
   /**
    * Field must be present if another sibling field's value is NOT in the given array
    */
-  public presentIfNotInSibling(
-    field: string,
-    values: any[],
-    errorMessage?: string,
-  ) {
+  public presentIfNotInSibling(field: string, values: any[], errorMessage?: string) {
     const rule = this.addRule(presentIfNotInRule, errorMessage);
     rule.context.options.field = field;
     rule.context.options.values = values;
@@ -1146,11 +1120,7 @@ export class BaseValidator {
   /**
    * Value is forbidden if another field does NOT equal a specific value (sibling scope)
    */
-  public forbiddenIfNotSibling(
-    field: string,
-    value: any,
-    errorMessage?: string,
-  ) {
+  public forbiddenIfNotSibling(field: string, value: any, errorMessage?: string) {
     const rule = this.addRule(forbiddenIfNotRule, errorMessage);
     rule.context.options.field = field;
     rule.context.options.value = value;
@@ -1212,11 +1182,7 @@ export class BaseValidator {
   /**
    * Value is forbidden if another field's value is in the given array (sibling scope)
    */
-  public forbiddenIfInSibling(
-    field: string,
-    values: any[],
-    errorMessage?: string,
-  ) {
+  public forbiddenIfInSibling(field: string, values: any[], errorMessage?: string) {
     const rule = this.addRule(forbiddenIfInRule, errorMessage);
     rule.context.options.field = field;
     rule.context.options.values = values;
@@ -1238,11 +1204,7 @@ export class BaseValidator {
   /**
    * Value is forbidden if another field's value is NOT in the given array (sibling scope)
    */
-  public forbiddenIfNotInSibling(
-    field: string,
-    values: any[],
-    errorMessage?: string,
-  ) {
+  public forbiddenIfNotInSibling(field: string, values: any[], errorMessage?: string) {
     const rule = this.addRule(forbiddenIfNotInRule, errorMessage);
     rule.context.options.field = field;
     rule.context.options.values = values;
@@ -1286,10 +1248,7 @@ export class BaseValidator {
    * ```
    * @category Conditional Validation
    */
-  public when(
-    field: string,
-    options: Omit<WhenRuleOptions, "field" | "scope">,
-  ) {
+  public when(field: string, options: Omit<WhenRuleOptions, "field" | "scope">) {
     const rule = this.addRule(whenRule);
     rule.context.options.field = field;
     rule.context.options.is = options.is;
@@ -1322,10 +1281,7 @@ export class BaseValidator {
    * ```
    * @category Conditional Validation
    */
-  public whenSibling(
-    siblingField: string,
-    options: Omit<WhenRuleOptions, "field" | "scope">,
-  ) {
+  public whenSibling(siblingField: string, options: Omit<WhenRuleOptions, "field" | "scope">) {
     const rule = this.addRule(whenRule);
     rule.context.options.field = siblingField;
     rule.context.options.is = options.is;
@@ -1345,10 +1301,7 @@ export class BaseValidator {
   /**
    * Validate the data
    */
-  public async validate(
-    data: any,
-    context: SchemaContext,
-  ): Promise<ValidationResult> {
+  public async validate(data: any, context: SchemaContext): Promise<ValidationResult> {
     if (data === null && this.isNullable) {
       return { isValid: true, errors: [], data: null };
     }
@@ -1361,8 +1314,10 @@ export class BaseValidator {
     let isValid = true;
     const isFirstErrorOnly = context.configurations?.firstErrorOnly ?? true;
 
+    const isEmpty = isEmptyValue(valueForRules);
+
     for (const rule of this.rules) {
-      if ((rule.requiresValue ?? true) && isEmpty(valueForRules)) continue;
+      if ((rule.requiresValue ?? true) && isEmpty) continue;
 
       this.setRuleAttributesList(rule);
 
@@ -1385,7 +1340,10 @@ export class BaseValidator {
     return {
       isValid,
       errors,
-      data: await this.startTransformationPipeline(mutatedData, context),
+      data:
+        mutatedData !== undefined
+          ? await this.startTransformationPipeline(mutatedData, context)
+          : undefined,
     };
   }
 

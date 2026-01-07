@@ -22,7 +22,7 @@ export const invalidRule = (rule: ContextualSchemaRule, context: SchemaContext):
         const translation =
           rule.context.attributesList?.input ||
           translator({
-            attribute: rule.context.translatedAttributes.input || "input",
+            attribute: rule.context.translatedAttributes?.input || context.key,
             context,
             rule,
           });
@@ -34,11 +34,12 @@ export const invalidRule = (rule: ContextualSchemaRule, context: SchemaContext):
       }
 
       const value = attributes[key];
+
       attributes[key] =
         rule.context.attributesList?.[value] ||
         rule.context.attributesList?.[key] ||
         translator?.({
-          attribute: rule.context.translatedAttributes[key] || value,
+          attribute: rule.context.translatedAttributes?.[key] || value,
           context,
           rule,
         }) ||

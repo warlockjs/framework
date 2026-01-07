@@ -1,5 +1,5 @@
-import { isEmpty } from "@mongez/supportive-is";
 import { getFieldValue, invalidRule, VALID_RULE } from "../../helpers";
+import { isEmptyValue } from "../../helpers/is-empty-value";
 import type { SchemaRule } from "../../types";
 
 /**
@@ -21,7 +21,7 @@ export const requiredIfRule: SchemaRule<{
     const fieldValue = getFieldValue(this, context);
 
     // Field is required if the other field equals the expected value
-    if (isEmpty(value) && fieldValue === expectedValue) {
+    if (isEmptyValue(value) && fieldValue === expectedValue) {
       return invalidRule(this, context);
     }
 
@@ -46,7 +46,7 @@ export const requiredIfEmptyRule: SchemaRule<{
     const fieldValue = getFieldValue(this, context);
 
     // Field is required if the other field is empty
-    if (isEmpty(value) && isEmpty(fieldValue)) {
+    if (isEmptyValue(value) && isEmptyValue(fieldValue)) {
       return invalidRule(this, context);
     }
 
@@ -71,7 +71,7 @@ export const requiredIfNotEmptyRule: SchemaRule<{
     const fieldValue = getFieldValue(this, context);
 
     // Field is required if the other field is not empty
-    if (isEmpty(value) && !isEmpty(fieldValue)) {
+    if (isEmptyValue(value) && !isEmptyValue(fieldValue)) {
       return invalidRule(this, context);
     }
 
@@ -89,8 +89,7 @@ export const requiredIfInRule: SchemaRule<{
   scope?: "global" | "sibling";
 }> = {
   name: "requiredIfIn",
-  description:
-    "The field is required if another field's value is in the given array",
+  description: "The field is required if another field's value is in the given array",
   sortOrder: -2,
   requiresValue: false,
   defaultErrorMessage: "The :input is required",
@@ -99,7 +98,7 @@ export const requiredIfInRule: SchemaRule<{
     const fieldValue = getFieldValue(this, context);
 
     // Field is required if the other field's value is in the array
-    if (isEmpty(value) && values.includes(fieldValue)) {
+    if (isEmptyValue(value) && values.includes(fieldValue)) {
       return invalidRule(this, context);
     }
 
@@ -117,8 +116,7 @@ export const requiredIfNotInRule: SchemaRule<{
   scope?: "global" | "sibling";
 }> = {
   name: "requiredIfNotIn",
-  description:
-    "The field is required if another field's value is NOT in the given array",
+  description: "The field is required if another field's value is NOT in the given array",
   sortOrder: -2,
   requiresValue: false,
   defaultErrorMessage: "The :input is required",
@@ -127,7 +125,7 @@ export const requiredIfNotInRule: SchemaRule<{
     const fieldValue = getFieldValue(this, context);
 
     // Field is required if the other field's value is NOT in the array
-    if (isEmpty(value) && !values.includes(fieldValue)) {
+    if (isEmptyValue(value) && !values.includes(fieldValue)) {
       return invalidRule(this, context);
     }
 

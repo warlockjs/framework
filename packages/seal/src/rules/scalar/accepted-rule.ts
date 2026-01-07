@@ -1,11 +1,9 @@
-import { isEmpty } from "@mongez/supportive-is";
 import { getFieldValue, invalidRule, VALID_RULE } from "../../helpers";
+import { isEmptyValue } from "../../helpers/is-empty-value";
 import type { SchemaRule } from "../../types";
 
 const isAcceptedValue = (value: any) => {
-  return ["1", "true", "yes", "y", "on", 1, true, "Yes", "Y", "On"].includes(
-    value,
-  );
+  return ["1", "true", "yes", "y", "on", 1, true, "Yes", "Y", "On"].includes(value);
 };
 
 /**
@@ -31,8 +29,7 @@ export const acceptedRule: SchemaRule = {
  */
 export const acceptedIfRule: SchemaRule<{ field: string; value: any }> = {
   name: "acceptedIf",
-  description:
-    "The field must be accepted if another field's value equals to a specific value",
+  description: "The field must be accepted if another field's value equals to a specific value",
   defaultErrorMessage: "The :input must be accepted",
   async validate(value: any, context) {
     const fieldValue = getFieldValue(this, context);
@@ -83,7 +80,7 @@ export const acceptedIfRequiredRule: SchemaRule<{ field: string }> = {
   defaultErrorMessage: "The :input must be accepted",
   async validate(value: any, context) {
     const fieldValue = getFieldValue(this, context);
-    if (isEmpty(fieldValue)) {
+    if (isEmptyValue(fieldValue)) {
       return invalidRule(this, context);
     }
 

@@ -1,6 +1,7 @@
-import { getSealConfig, type SealConfig } from "../config";
+import { getSealConfig } from "../config";
 import type { SchemaContext, ValidationResult } from "../types";
 import type { BaseValidator } from "../validators";
+import { ValidateOptions } from "./validators";
 
 /**
  * Validate data against a schema
@@ -8,7 +9,7 @@ import type { BaseValidator } from "../validators";
 export const validate = async <T extends BaseValidator>(
   schema: T,
   data: any, // Temporarily use any - will fix type inference
-  configurations: SealConfig = getSealConfig(),
+  { context: extendedContext, ...configurations }: ValidateOptions = getSealConfig() || {},
 ): Promise<ValidationResult> => {
   const context: SchemaContext = {
     allValues: data,
@@ -16,6 +17,8 @@ export const validate = async <T extends BaseValidator>(
     value: data,
     key: "",
     path: "",
+    context: extendedContext,
+    rootContext: extendedContext,
     translateRule(ruleTranslation) {
       return configurations.translateRule?.(ruleTranslation) ?? "";
     },

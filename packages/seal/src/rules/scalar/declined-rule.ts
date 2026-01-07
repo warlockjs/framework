@@ -1,11 +1,9 @@
-import { isEmpty } from "@mongez/supportive-is";
 import { getFieldValue, invalidRule, VALID_RULE } from "../../helpers";
+import { isEmptyValue } from "../../helpers/is-empty-value";
 import type { SchemaRule } from "../../types";
 
 const isDeclinedValue = (value: any) => {
-  return ["0", "false", "no", "n", "off", 0, false, "No", "N", "Off"].includes(
-    value,
-  );
+  return ["0", "false", "no", "n", "off", 0, false, "No", "N", "Off"].includes(value);
 };
 
 /**
@@ -31,8 +29,7 @@ export const declinedRule: SchemaRule = {
  */
 export const declinedIfRule: SchemaRule<{ field: string; value: any }> = {
   name: "declinedIf",
-  description:
-    "The field must be declined if another field's value equals to a specific value",
+  description: "The field must be declined if another field's value equals to a specific value",
   defaultErrorMessage: "The :input must be declined",
   async validate(value: any, context) {
     const fieldValue = getFieldValue(this, context);
@@ -81,7 +78,7 @@ export const declinedIfRequiredRule: SchemaRule<{ field: string }> = {
   defaultErrorMessage: "The :input must be declined",
   async validate(value: any, context) {
     const fieldValue = getFieldValue(this, context);
-    if (isEmpty(fieldValue)) {
+    if (isEmptyValue(fieldValue)) {
       return invalidRule(this, context);
     }
 

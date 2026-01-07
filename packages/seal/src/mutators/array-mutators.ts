@@ -1,14 +1,14 @@
 import { get } from "@mongez/reinforcements";
-import { isEmpty } from "@mongez/supportive-is";
+import { isEmptyValue } from "../helpers/is-empty-value";
 import type { Mutator } from "../types";
 
 /** Reverse array order */
-export const flipArrayMutator: Mutator = async value => {
+export const flipArrayMutator: Mutator = async (value) => {
   return value.reverse();
 };
 
 /** Reverse array order (alias) */
-export const reverseArrayMutator: Mutator = async value => {
+export const reverseArrayMutator: Mutator = async (value) => {
   return value.reverse();
 };
 
@@ -38,11 +38,11 @@ export const sortArrayMutator: Mutator = async (value, context) => {
 };
 
 /** Make array have only unique values */
-export const uniqueArrayMutator: Mutator = async value => {
+export const uniqueArrayMutator: Mutator = async (value) => {
   return [...new Set(value)];
 };
 
 /** Remove empty elements from array */
-export const removeEmptyArrayElementsMutator: Mutator = async value => {
-  return value.filter((item: any) => !isEmpty(item));
+export const removeEmptyArrayElementsMutator: Mutator = async (value) => {
+  return value.filter((item: any) => !isEmptyValue(item));
 };

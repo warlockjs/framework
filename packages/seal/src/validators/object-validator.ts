@@ -5,16 +5,17 @@ import { objectTrimMutator, stripUnknownMutator } from "../mutators";
 import { objectRule, unknownKeyRule } from "../rules";
 import type { Schema, SchemaContext, ValidationResult } from "../types";
 import { BaseValidator } from "./base-validator";
+import { ComputedValidator } from "./computed-validator";
 
 /**
- * Object validator class
+ * Object validator class with generic schema type for proper type inference
  */
-export class ObjectValidator extends BaseValidator {
+export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValidator {
   protected shouldAllowUnknown = false;
   protected allowedKeys: string[] = [];
 
   public constructor(
-    public schema: Schema,
+    public schema: TSchema,
     errorMessage?: string,
   ) {
     super();
@@ -78,10 +79,10 @@ export class ObjectValidator extends BaseValidator {
     const cloned = super.clone();
 
     // Clone schema with deep copy of validators
-    const newSchema: Schema = {};
+    const newSchema = {} as TSchema;
     for (const key in this.schema) {
       if (keys && !keys.includes(key)) continue;
-      newSchema[key] = this.schema[key].clone();
+      (newSchema as any)[key] = this.schema[key].clone();
     }
 
     cloned.schema = newSchema;
@@ -134,22 +135,22 @@ export class ObjectValidator extends BaseValidator {
    *   .extend({ metadata: v.object({}) });
    * ```
    */
-  public extend(schemaOrValidator: Schema | ObjectValidator): this {
+  public extend<TExtension extends Schema>(
+    schemaOrValidator: TExtension | ObjectValidator<TExtension>,
+  ): ObjectValidator<TSchema & TExtension> {
     // Clone current validator to preserve original
-    const extended = this.clone();
+    const extended = this.clone() as any;
 
     // Extract schema from parameter
     const schemaToAdd =
-      schemaOrValidator instanceof ObjectValidator
-        ? schemaOrValidator.schema
-        : schemaOrValidator;
+      schemaOrValidator instanceof ObjectValidator ? schemaOrValidator.schema : schemaOrValidator;
 
     // Merge schemas with cloned validators (later fields override earlier ones)
     for (const key in schemaToAdd) {
       extended.schema[key] = schemaToAdd[key].clone();
     }
 
-    return extended;
+    return extended as ObjectValidator<TSchema & TExtension>;
   }
 
   /**
@@ -181,9 +182,11 @@ export class ObjectValidator extends BaseValidator {
    * const full = baseUser.merge(timestamps).merge(softDeleteSchema);
    * ```
    */
-  public merge(validator: ObjectValidator): this {
+  public merge<TMerge extends Schema>(
+    validator: ObjectValidator<TMerge>,
+  ): ObjectValidator<TSchema & TMerge> {
     // Clone current validator
-    const merged = this.clone();
+    const merged = this.clone() as any;
 
     // Merge schemas with cloned validators (later fields override earlier ones)
     for (const key in validator.schema) {
@@ -205,7 +208,12 @@ export class ObjectValidator extends BaseValidator {
       ...validator.attributesText,
     };
 
-    return merged;
+    merged.translatedAttributes = {
+      ...merged.translatedAttributes,
+      ...validator.translatedAttributes,
+    };
+
+    return merged as ObjectValidator<TSchema & TMerge>;
   }
 
   /**
@@ -236,21 +244,21 @@ export class ObjectValidator extends BaseValidator {
    * // publicSchema has: { id, name, role }
    * ```
    */
-  public pick(...keys: string[]): this {
+  public pick<K extends keyof TSchema>(...keys: K[]): ObjectValidator<Pick<TSchema, K>> {
     // Clone current validator
-    const picked = this.clone();
+    const picked = this.clone() as any;
 
     // Create new schema with only picked keys
-    const newSchema: Schema = {};
+    const newSchema = {} as Pick<TSchema, K>;
     for (const key of keys) {
       if (key in picked.schema) {
-        newSchema[key] = picked.schema[key];
+        (newSchema as any)[key] = picked.schema[key];
       }
     }
 
     picked.schema = newSchema;
 
-    return picked;
+    return picked as ObjectValidator<Pick<TSchema, K>>;
   }
 
   /**
@@ -285,21 +293,21 @@ export class ObjectValidator extends BaseValidator {
    * // patchSchema has: { name, email, role }
    * ```
    */
-  public without(...keys: string[]): this {
+  public without<K extends keyof TSchema>(...keys: K[]): ObjectValidator<Omit<TSchema, K>> {
     // Clone current validator
-    const filtered = this.clone();
+    const filtered = this.clone() as any;
 
     // Create new schema excluding specified keys
-    const newSchema: Schema = {};
+    const newSchema = {} as Omit<TSchema, K>;
     for (const key in filtered.schema) {
-      if (!keys.includes(key)) {
-        newSchema[key] = filtered.schema[key];
+      if (!keys.includes(key as any)) {
+        (newSchema as any)[key] = filtered.schema[key];
       }
     }
 
     filtered.schema = newSchema;
 
-    return filtered;
+    return filtered as ObjectValidator<Omit<TSchema, K>>;
   }
 
   /** Mutate the data */
@@ -309,10 +317,7 @@ export class ObjectValidator extends BaseValidator {
   }
 
   /** Validate the data */
-  public async validate(
-    data: any,
-    context: SchemaContext,
-  ): Promise<ValidationResult> {
+  public async validate(data: any, context: SchemaContext): Promise<ValidationResult> {
     context.schema = this.schema;
     const mutatedData = await this.mutate(data, context);
 
@@ -321,6 +326,7 @@ export class ObjectValidator extends BaseValidator {
       const rule = this.addRule(unknownKeyRule);
       rule.context.options.allowedKeys = this.allowedKeys;
       rule.context.options.schema = this.schema;
+
       this.setRuleAttributesList(rule);
     }
 
@@ -329,16 +335,20 @@ export class ObjectValidator extends BaseValidator {
     if (result.isValid === false) return result;
     if (data === undefined) return result;
 
-    // Validate object properties
+    // ═══════════════════════════════════════════════════════════
+    // PHASE 1: Validate user input fields (skip computed/managed)
+    // ═══════════════════════════════════════════════════════════
     const errors: ValidationResult["errors"] = [];
-    const finalData: any = {};
+    const validatedData: any = {};
 
-    const validationPromises = Object.keys(this.schema).map(async key => {
+    const userInputKeys = Object.keys(this.schema).filter(
+      (key) => !this.isComputedValidator(this.schema[key]),
+    );
+
+    const validationPromises = userInputKeys.map(async (key) => {
       const validator = this.schema[key];
       const value =
-        mutatedData?.[key] !== undefined
-          ? mutatedData[key]
-          : validator.getDefaultValue();
+        mutatedData?.[key] !== undefined ? mutatedData[key] : validator.getDefaultValue();
 
       const childContext: SchemaContext = {
         ...context,
@@ -350,9 +360,9 @@ export class ObjectValidator extends BaseValidator {
 
       const childResult = await validator.validate(value, childContext);
 
-      // Only include in final data if not omitted
+      // Only include in validated data if not omitted
       if (childResult.data !== undefined && !validator.isOmitted()) {
-        finalData[key] = childResult.data;
+        validatedData[key] = childResult.data;
       }
 
       if (childResult.isValid === false) {
@@ -362,13 +372,57 @@ export class ObjectValidator extends BaseValidator {
 
     await Promise.all(validationPromises);
 
-    // Remove undefined values
-    const cleanedData = removeUndefinedValues(finalData);
+    // If Phase 1 failed, return early
+    if (errors.length > 0) {
+      return {
+        isValid: false,
+        errors,
+        data: undefined,
+      };
+    }
 
-    const transformedData = await this.startTransformationPipeline(
-      cleanedData,
-      context,
-    );
+    // ═══════════════════════════════════════════════════════════
+    // PHASE 2: Execute computed/managed fields with validated data
+    // ═══════════════════════════════════════════════════════════
+    const computedFields = this.getComputedFields();
+
+    const computedPromises = Object.keys(computedFields).map(async (key) => {
+      const validator = computedFields[key];
+
+      const childContext: SchemaContext = {
+        ...context,
+        parent: validatedData,
+        value: undefined, // Computed fields don't have input value
+      };
+
+      // Execute computed callback with validated data
+      const childResult = await validator.validate(validatedData, childContext);
+
+      // Only include in final data if not omitted
+      if (childResult.data !== undefined && !validator.isOmitted()) {
+        validatedData[key] = childResult.data;
+      }
+
+      if (childResult.isValid === false) {
+        errors.push(...childResult.errors);
+      }
+    });
+
+    await Promise.all(computedPromises);
+
+    // If Phase 2 failed, return early
+    if (errors.length > 0) {
+      return {
+        isValid: false,
+        errors,
+        data: undefined,
+      };
+    }
+
+    // Remove undefined values
+    const cleanedData = removeUndefinedValues(validatedData);
+
+    const transformedData = await this.startTransformationPipeline(cleanedData, context);
 
     const output =
       this.shouldAllowUnknown === false
@@ -379,26 +433,46 @@ export class ObjectValidator extends BaseValidator {
           };
 
     return {
-      isValid: errors.length === 0,
-      errors,
+      isValid: true,
+      errors: [],
       data: output,
     };
+  }
+
+  /**
+   * Check if a validator is a computed or managed field
+   * ManagedValidator extends ComputedValidator, so instanceof catches both
+   */
+  private isComputedValidator(validator: BaseValidator): boolean {
+    return validator instanceof ComputedValidator;
+  }
+
+  /**
+   * Get all computed/managed fields from the schema
+   */
+  private getComputedFields(): Record<string, ComputedValidator> {
+    const computed: Record<string, any> = {};
+
+    for (const [key, validator] of Object.entries(this.schema)) {
+      if (validator instanceof ComputedValidator) {
+        computed[key] = validator;
+      }
+    }
+
+    return computed;
   }
 }
 
 /** Recursively remove undefined values from an object */
-function removeUndefinedValues(
-  obj: any,
-  visited = new WeakMap<object, any>(),
-): any {
+function removeUndefinedValues(obj: any, visited = new WeakMap<object, any>()): any {
   // Handle primitives and null
-  if (obj === null || obj === undefined) {
+  if (obj === null) {
     return obj;
   }
 
   // Handle arrays
   if (Array.isArray(obj)) {
-    return obj.map(item => removeUndefinedValues(item, visited));
+    return obj.map((item) => removeUndefinedValues(item, visited));
   }
 
   // Skip non-plain objects (class instances, Dates, Buffers, etc.)
