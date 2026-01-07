@@ -23,6 +23,10 @@ export type BasicLogConfigurations = {
    * Advanced filter to determine if the message should be logged or not
    */
   filter: (data: LoggingData) => boolean;
+  /**
+   * Add additional context to the log
+   */
+  context?: (data: LoggingData) => Promise<Record<string, any>>;
 };
 
 export type LogMessage = {

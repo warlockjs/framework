@@ -48,7 +48,7 @@ export class ConsoleLog extends LogChannel<BasicLogConfigurations> {
         // add a warning icon
         console.log(
           colors.yellow("⚠"),
-          colors.green(`(${date})`),
+          colors.yellow(`(${date})`),
           colors.cyan(`[${module}]`),
           colors.magenta(`[${action}]`),
           colors.yellowBright(message),
