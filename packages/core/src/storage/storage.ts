@@ -1,7 +1,10 @@
 import events, { type EventSubscription } from "@mongez/events";
+import fs from "fs";
+import path from "path";
 import type { Readable } from "stream";
 import type { UploadedFile } from "../http";
 import { storageConfig } from "./config";
+import { storageDriverContext } from "./context/storage-driver-context";
 import { DOSpacesDriver } from "./drivers/do-spaces-driver";
 import { LocalDriver } from "./drivers/local-driver";
 import { R2Driver } from "./drivers/r2-driver";
@@ -111,15 +114,15 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * Ensure storage is initialized (lazy initialization)
    *
    * Called automatically on first driver access.
-   * @internal
    */
-  private ensureInitialized(): void {
+  public async init(): Promise<void> {
     if (this.initialized) return;
 
     // Mark as initialized FIRST to prevent infinite recursion
     this.initialized = true;
 
     // Get default driver name from config
+
     const defaultName = storageConfig("default", "local");
 
     this.defaultDriverName = defaultName as StorageDriverName;
@@ -130,12 +133,30 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
   }
 
   /**
-   * Get the underlying driver instance (triggers lazy init)
-   *
-   * @returns The raw storage driver
+   * Reset storage defaults
    */
-  public override get driver(): StorageDriverContract {
-    this.ensureInitialized();
+  public reset(): void {
+    this.initialized = false;
+    this.drivers.clear();
+    this.configs.clear();
+    this.defaultDriverName = null as unknown as StorageDriverName;
+    this._driver = null as unknown as StorageDriverContract;
+  }
+
+  /**
+   * Get the currently active driver (context-aware in future)
+   *
+   * Currently returns the default driver.
+   * Will be enhanced to check AsyncLocalStorage context for multi-tenant support.
+   *
+   * @returns The active storage driver
+   */
+  public override get activeDriver(): StorageDriverContract {
+    // Check context for tenant-specific driver
+    const contextDriver = storageDriverContext.getDriver();
+
+    if (contextDriver) return contextDriver;
+
     return this._driver;
   }
 
@@ -200,6 +221,15 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    */
   public getDriver(name: StorageDriverName): StorageDriverContract {
     return this.resolveDriver(name);
+  }
+
+  /**
+   * Get root directory of current driver
+   */
+  public root(apepndedPath?: string): string {
+    const rootPath = this.activeDriver.options?.root || "";
+
+    return path.join(rootPath, apepndedPath || "");
   }
 
   /**
@@ -273,26 +303,12 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
   }
 
   /**
-   * Get current driver instance after resolving (async, respects resolver)
-   *
-   * Resolves the driver based on configuration, including any async
-   * resolver for multi-tenancy support.
-   *
-   * @returns Promise resolving to the current driver
-   */
-  public async currentDriver(): Promise<StorageDriverContract> {
-    const driverName = await this.resolveDefaultDriver();
-    return this.getDriver(driverName);
-  }
-
-  /**
    * Check if current driver is a cloud driver
    *
    * @returns Promise resolving to true if the current driver supports cloud operations
    */
   public async isCloud(): Promise<boolean> {
-    const driver = await this.currentDriver();
-    return this.isCloudDriver(driver);
+    return this.isCloudDriver(this.activeDriver);
   }
 
   /**
@@ -382,7 +398,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
     location: string,
     options?: PutOptions,
   ): Promise<StorageFile> {
-    const driver = await this.currentDriver();
+    const driver = this.activeDriver;
     const buffer = await this.toBuffer(file);
 
     await this.emit<StoragePutEventPayload>("beforePut", {
@@ -415,17 +431,21 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @returns StorageFile instance with cached metadata
    */
   public override async putStream(
-    stream: Readable,
+    stream: Readable | string,
     location: string,
     options?: PutOptions,
   ): Promise<StorageFile> {
-    const driver = await this.currentDriver();
+    const driver = this.activeDriver;
 
     await this.emit<StoragePutEventPayload>("beforePut", {
       driver: driver.name,
       location,
       timestamp: new Date(),
     });
+
+    if (typeof stream === "string") {
+      stream = fs.createReadStream(stream);
+    }
 
     const result = await driver.putStream(stream, location, options);
 
@@ -526,8 +546,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @returns Buffer containing file contents
    */
   public override async get(location: string): Promise<Buffer> {
-    const driver = await this.currentDriver();
-    return driver.get(location);
+    return this.activeDriver.get(location);
   }
 
   /**
@@ -556,8 +575,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @returns Readable stream of file contents
    */
   public override async getStream(location: string): Promise<Readable> {
-    const driver = await this.currentDriver();
-    return driver.getStream(location);
+    return this.activeDriver.getStream(location);
   }
 
   /**
@@ -569,7 +587,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @returns true if deleted, false if not found
    */
   public override async delete(location: string | StorageFile): Promise<boolean> {
-    const driver = await this.currentDriver();
+    const driver = this.activeDriver;
     const path = typeof location === "string" ? location : location.path;
 
     await this.emit<StorageEventPayload>("beforeDelete", {
@@ -596,8 +614,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @returns Array of delete results with status for each file
    */
   public override async deleteMany(locations: string[]): Promise<DeleteManyResult[]> {
-    const driver = await this.currentDriver();
-    return driver.deleteMany(locations);
+    return this.activeDriver.deleteMany(locations);
   }
 
   /**
@@ -607,8 +624,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @returns true if file exists
    */
   public override async exists(location: string): Promise<boolean> {
-    const driver = await this.currentDriver();
-    return driver.exists(location);
+    return this.activeDriver.exists(location);
   }
 
   /**
@@ -621,7 +637,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @returns StorageFile instance at destination
    */
   public override async copy(from: string | StorageFile, to: string): Promise<StorageFile> {
-    const driver = await this.currentDriver();
+    const driver = this.activeDriver;
     const fromPath = typeof from === "string" ? from : from.path;
 
     await this.emit<StorageCopyEventPayload>("beforeCopy", {
@@ -656,7 +672,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @returns StorageFile instance at destination
    */
   public override async move(from: string | StorageFile, to: string): Promise<StorageFile> {
-    const driver = await this.currentDriver();
+    const driver = this.activeDriver;
     const fromPath = typeof from === "string" ? from : from.path;
 
     await this.emit<StorageCopyEventPayload>("beforeMove", {
@@ -692,8 +708,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
     directory?: string,
     options?: ListOptions,
   ): Promise<StorageFileInfo[]> {
-    const driver = await this.currentDriver();
-    return driver.list(directory || "", options);
+    return this.activeDriver.list(directory || "", options);
   }
 
   // ============================================================
@@ -707,8 +722,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @returns File information object
    */
   public override async getInfo(location: string): Promise<StorageFileInfo> {
-    const driver = await this.currentDriver();
-    return driver.getInfo(location);
+    return this.activeDriver.getInfo(location);
   }
 
   /**
@@ -718,8 +732,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @returns File size in bytes
    */
   public override async size(location: string): Promise<number> {
-    const driver = await this.currentDriver();
-    return driver.size(location);
+    return this.activeDriver.size(location);
   }
 
   /**
@@ -729,8 +742,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @returns StorageFile instance
    */
   public override async file(location: string): Promise<StorageFile> {
-    const driver = await this.currentDriver();
-    return new StorageFile(location, driver);
+    return new StorageFile(location, this.activeDriver);
   }
 
   // ============================================================
@@ -747,7 +759,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @returns Absolute filesystem path
    */
   public async path(location: string): Promise<string> {
-    const driver = await this.currentDriver();
+    const driver = this.activeDriver;
 
     if (!("path" in driver) || typeof driver.path !== "function") {
       throw new Error("path() is only available for local storage drivers");
@@ -778,7 +790,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * ```
    */
   public async getPresignedUrl(location: string, options?: PresignedOptions): Promise<string> {
-    const driver = await this.currentDriver();
+    const driver = this.activeDriver;
 
     if (!this.isCloudDriver(driver)) {
       throw new Error("Presigned URLs are only available for cloud storage drivers");
@@ -811,7 +823,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
     location: string,
     options?: PresignedUploadOptions,
   ): Promise<string> {
-    const driver = await this.currentDriver();
+    const driver = this.activeDriver;
 
     if (!this.isCloudDriver(driver)) {
       throw new Error("Presigned upload URLs are only available for cloud storage drivers");
@@ -829,7 +841,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @returns Bucket name
    */
   public async getBucket(): Promise<string> {
-    const driver = await this.currentDriver();
+    const driver = this.activeDriver;
 
     if (!this.isCloudDriver(driver)) {
       throw new Error("Bucket information is only available for cloud storage drivers");
@@ -847,7 +859,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @returns Region name
    */
   public async getRegion(): Promise<string> {
-    const driver = await this.currentDriver();
+    const driver = this.activeDriver;
 
     if (!this.isCloudDriver(driver)) {
       throw new Error("Region information is only available for cloud storage drivers");
@@ -866,7 +878,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @throws Error if current driver is not a cloud driver
    */
   public async setStorageClass(location: string, storageClass: string): Promise<void> {
-    const driver = await this.currentDriver();
+    const driver = this.activeDriver;
 
     if (!this.isCloudDriver(driver)) {
       throw new Error("Storage class is only available for cloud storage drivers");
@@ -885,7 +897,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @throws Error if current driver is not a cloud driver
    */
   public async setVisibility(location: string, visibility: FileVisibility): Promise<void> {
-    const driver = await this.currentDriver();
+    const driver = this.activeDriver;
 
     if (!this.isCloudDriver(driver)) {
       throw new Error("Visibility is only available for cloud storage drivers");
@@ -904,7 +916,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @returns Current visibility setting
    */
   public async getVisibility(location: string): Promise<FileVisibility> {
-    const driver = await this.currentDriver();
+    const driver = this.activeDriver;
 
     if (!this.isCloudDriver(driver)) {
       throw new Error("Visibility is only available for cloud storage drivers");
@@ -923,8 +935,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @returns Signed URL string
    */
   public override async temporaryUrl(location: string, expiresIn?: number): Promise<string> {
-    const driver = await this.currentDriver();
-    return driver.temporaryUrl(location, expiresIn);
+    return this.activeDriver.temporaryUrl(location, expiresIn);
   }
 
   /**
@@ -955,12 +966,10 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * ```
    */
   public async validateTemporaryToken(token: string): Promise<TemporaryTokenValidation> {
-    const driver = await this.currentDriver();
-
     // Check if driver supports token validation
     if (
-      !("validateTemporaryToken" in driver) ||
-      typeof driver.validateTemporaryToken !== "function"
+      !("validateTemporaryToken" in this.activeDriver) ||
+      typeof this.activeDriver.validateTemporaryToken !== "function"
     ) {
       // For cloud drivers, temporary URLs are presigned and validated by the cloud provider
       return {
@@ -969,7 +978,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
       };
     }
 
-    return (driver as LocalDriver).validateTemporaryToken(token);
+    return this.activeDriver.validateTemporaryToken(token);
   }
 
   // ============================================================
@@ -996,6 +1005,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
       case "s3":
         this.validateCloudConfig(config, "s3");
         return {
+          ...options,
           bucket: options.bucket!,
           region: options.region!,
           accessKeyId: options.accessKeyId!,
@@ -1009,9 +1019,11 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
         if (!options.accountId) {
           throw new Error('R2 driver requires "accountId" configuration');
         }
+
         return {
-          bucket: options.bucket!,
+          ...options,
           region: options.region || "auto",
+          bucket: options.bucket!,
           accessKeyId: options.accessKeyId!,
           secretAccessKey: options.secretAccessKey!,
           endpoint: options.endpoint,
@@ -1023,6 +1035,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
       case "spaces":
         this.validateCloudConfig(config, "spaces");
         return {
+          ...options,
           bucket: options.bucket!,
           region: options.region!,
           accessKeyId: options.accessKeyId!,
@@ -1060,7 +1073,6 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    */
   protected resolveDriver(name: string): StorageDriverContract {
     // Ensure configs are loaded
-    this.ensureInitialized();
 
     if (this.drivers.has(name)) {
       return this.drivers.get(name)!;

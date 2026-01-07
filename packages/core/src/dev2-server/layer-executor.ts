@@ -3,6 +3,7 @@ import { configManager } from "../config/config-manager";
 import { connectorsManager } from "./connectors/connectors-manager";
 import type { DependencyGraph } from "./dependency-graph";
 import { devLogHMR } from "./dev-logger";
+import { exportAnalyzer } from "./export-analyzer";
 import { FileManager } from "./file-manager";
 import type { ModuleLoader } from "./module-loader";
 import type { SpecialFilesCollector } from "./special-files-collector";
@@ -74,7 +75,9 @@ export class LayerExecutor {
         const fileSystem = filesMap.get(file);
         if (fileSystem) {
           this.moduleLoader.clearModuleCache(fileSystem.absolutePath);
+          this.moduleLoader.cleanupFileModule(fileSystem);
           __clearModuleVersion(fileSystem.cachePath);
+          exportAnalyzer.clearCache(fileSystem.relativePath);
         }
 
         devLogHMR(file, dependentCount > 0 ? dependentCount : undefined);
@@ -87,17 +90,17 @@ export class LayerExecutor {
       // Execute reload once for all files
       const invalidationChain = Array.from(allInvalidatedFiles);
 
-      if (fsrFiles.length > 0) {
-        // If any file requires FSR, do FSR for all
-        const firstFsrFile = filesMap.get(fsrFiles[0])!;
-        await this.executeFullServerRestart(firstFsrFile, invalidationChain, filesMap);
-      } else {
-        // All files are HMR
-        const firstHmrFile = filesMap.get(hmrFiles[0])!;
-        await this.executeHotModuleReplacement(firstHmrFile, invalidationChain, filesMap, hmrFiles);
-      }
+      // if (fsrFiles.length > 0) {
+      //   // If any file requires FSR, do FSR for all
+      //   const firstFsrFile = filesMap.get(fsrFiles[0])!;
+      //   await this.executeFullServerRestart(firstFsrFile, invalidationChain, filesMap);
+      // } else {
+      //   // All files are HMR
+      // }
+      const firstHmrFile = filesMap.get(hmrFiles[0])!;
+      await this.executeHotModuleReplacement(firstHmrFile, invalidationChain, filesMap, hmrFiles);
     } catch (error) {
-      console.log("Error in executeFullServerRestart: ", error);
+      console.log("Error in execute HotModuleReplacement: ", error);
     }
 
     try {
@@ -153,7 +156,7 @@ export class LayerExecutor {
       await this.restartAffectedConnectors(invalidationChain);
 
       // Clear module cache for invalidation chain
-      this.clearModuleCacheForChain(invalidationChain, filesMap);
+      await this.clearModuleCacheForChain(invalidationChain, filesMap);
 
       // Reload special files if affected
       await this.reloadAffectedSpecialFiles(invalidationChain);
@@ -164,7 +167,7 @@ export class LayerExecutor {
     await this.restartAffectedConnectors(invalidationChain);
 
     // Step 3: Clear module cache for invalidation chain
-    this.clearModuleCacheForChain(invalidationChain, filesMap);
+    await this.clearModuleCacheForChain(invalidationChain, filesMap);
 
     // Step 4: Reload special files if affected
     await this.reloadAffectedSpecialFiles(invalidationChain);
@@ -181,7 +184,7 @@ export class LayerExecutor {
     hmrFiles: string[],
   ): Promise<void> {
     // Step 1: Clear module cache for invalidation chain
-    this.clearModuleCacheForChain(invalidationChain, filesMap);
+    await this.clearModuleCacheForChain(invalidationChain, filesMap);
 
     // Step 2: Reload affected modules
     await this.reloadAffectedModules(invalidationChain, filesMap);
@@ -209,19 +212,27 @@ export class LayerExecutor {
 
   /**
    * Clear Node.js module cache for the invalidation chain
+   * and re-process files to pick up export changes
    */
-  private clearModuleCacheForChain(
+  private async clearModuleCacheForChain(
     invalidationChain: string[],
     filesMap: Map<string, FileManager>,
-  ): void {
+  ): Promise<void> {
     for (const relativePath of invalidationChain) {
       const file = filesMap.get(relativePath);
       if (file) {
         this.moduleLoader.clearModuleCache(file.absolutePath);
 
         // Update module version for HMR cache busting
-
         __clearModuleVersion(`./${file.cachePath}`);
+
+        // Clear export analyzer cache for proper re-export transformation
+        exportAnalyzer.clearCache(file.relativePath);
+
+        // Re-process the file to pick up export changes
+        // This is crucial for files that re-export from changed dependencies
+        // Skip saving to cache since we'll reload the module anyway
+        await file.process({ force: true, saveToCache: true });
       }
     }
   }

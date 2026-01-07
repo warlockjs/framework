@@ -1,3 +1,5 @@
+import { fileExistsAsync } from "@mongez/fs";
+import fs from "fs/promises";
 import type { Readable } from "stream";
 import type { UploadedFile } from "../http";
 import { StorageFile } from "./storage-file";
@@ -57,17 +59,29 @@ export class ScopedStorage {
    * @returns The name identifier of the underlying driver (e.g., "local", "s3", "r2")
    */
   public get name(): StorageDriverType {
-    return this._driver.name;
+    return this.activeDriver.name;
   }
 
   /**
-   * Get the underlying driver instance
+   * Get the default driver instance
    *
    * Use this for advanced operations that require direct driver access.
    *
    * @returns The raw storage driver
    */
-  public get driver(): StorageDriverContract {
+  public get defaultDriver(): StorageDriverContract {
+    return this._driver;
+  }
+
+  /**
+   * Get the currently active driver
+   *
+   * Returns the driver being used for storage operations.
+   * Can be overridden in subclasses for dynamic driver resolution (e.g., multi-tenant contexts).
+   *
+   * @returns The active storage driver
+   */
+  public get activeDriver(): StorageDriverContract {
     return this._driver;
   }
 
@@ -107,8 +121,8 @@ export class ScopedStorage {
     options?: PutOptions,
   ): Promise<StorageFile> {
     const buffer = await this.toBuffer(file);
-    const data = await this._driver.put(buffer, location, options);
-    return StorageFile.fromData(data, this._driver);
+    const data = await this.activeDriver.put(buffer, location, options);
+    return StorageFile.fromData(data, this.activeDriver);
   }
 
   /**
@@ -135,8 +149,78 @@ export class ScopedStorage {
     location: string,
     options?: PutOptions,
   ): Promise<StorageFile> {
-    const data = await this._driver.putStream(stream, location, options);
-    return StorageFile.fromData(data, this._driver);
+    const data = await this.activeDriver.putStream(stream, location, options);
+    return StorageFile.fromData(data, this.activeDriver);
+  }
+
+  /**
+   * Store a file from a URL
+   *
+   * Downloads the file from the URL and stores it.
+   *
+   * @param url - URL to download from
+   * @param location - Destination path in storage
+   * @param options - Optional storage options
+   * @returns StorageFile instance
+   *
+   * @example
+   * ```typescript
+   * const file = await storage.putFromUrl(
+   *   "https://example.com/image.jpg",
+   *   "images/downloaded.jpg"
+   * );
+   * ```
+   */
+  public async putFromUrl(
+    url: string,
+    location: string,
+    options?: PutOptions,
+  ): Promise<StorageFile> {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch file from ${url}: ${response.statusText}`);
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return this.put(buffer, location, options);
+  }
+
+  /**
+   * Store a file from base64 data URL
+   *
+   * @param dataUrl - Data URL (data:image/png;base64,iVBORw0KG...)
+   * @param location - Destination path in storage
+   * @param options - Optional storage options
+   * @returns StorageFile instance
+   *
+   * @example
+   * ```typescript
+   * const file = await storage.putFromBase64(
+   *   "data:image/png;base64,iVBORw0KGgoAAAANS...",
+   *   "images/upload.png"
+   * );
+   * ```
+   */
+  public async putFromBase64(
+    dataUrl: string,
+    location: string,
+    options?: PutOptions,
+  ): Promise<StorageFile> {
+    // Parse data URL: data:image/png;base64,iVBORw0KG...
+    const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+
+    if (!matches) {
+      throw new Error("Invalid base64 data URL format. Expected: data:mime/type;base64,<data>");
+    }
+
+    const [, mimeType, base64Data] = matches;
+    const buffer = Buffer.from(base64Data, "base64");
+
+    return this.put(buffer, location, {
+      ...options,
+      mimeType: options?.mimeType || mimeType,
+    });
   }
 
   /**
@@ -156,7 +240,7 @@ export class ScopedStorage {
    * ```
    */
   public async get(location: string): Promise<Buffer> {
-    return this._driver.get(location);
+    return this.activeDriver.get(location);
   }
 
   /**
@@ -176,7 +260,7 @@ export class ScopedStorage {
    * ```
    */
   public async getStream(location: string): Promise<Readable> {
-    return this._driver.getStream(location);
+    return this.activeDriver.getStream(location);
   }
 
   /**
@@ -197,7 +281,7 @@ export class ScopedStorage {
    */
   public async delete(location: string | StorageFile): Promise<boolean> {
     const path = typeof location === "string" ? location : location.path;
-    return this._driver.delete(path);
+    return this.activeDriver.delete(path);
   }
 
   /**
@@ -223,7 +307,16 @@ export class ScopedStorage {
    * ```
    */
   public async deleteMany(locations: string[]): Promise<DeleteManyResult[]> {
-    return this._driver.deleteMany(locations);
+    return this.activeDriver.deleteMany(locations);
+  }
+
+  /**
+   * Delete a directory
+   *
+   * @param directoryPath - Path to the directory
+   */
+  public async deleteDirectory(directoryPath: string): Promise<boolean> {
+    return await this.activeDriver.deleteDirectory(directoryPath);
   }
 
   /**
@@ -240,7 +333,7 @@ export class ScopedStorage {
    * ```
    */
   public async exists(location: string): Promise<boolean> {
-    return this._driver.exists(location);
+    return this.activeDriver.exists(location);
   }
 
   /**
@@ -265,8 +358,8 @@ export class ScopedStorage {
    */
   public async copy(from: string | StorageFile, to: string): Promise<StorageFile> {
     const fromPath = typeof from === "string" ? from : from.path;
-    const data = await this._driver.copy(fromPath, to);
-    return StorageFile.fromData(data, this._driver);
+    const data = await this.activeDriver.copy(fromPath, to);
+    return StorageFile.fromData(data, this.activeDriver);
   }
 
   /**
@@ -291,8 +384,120 @@ export class ScopedStorage {
    */
   public async move(from: string | StorageFile, to: string): Promise<StorageFile> {
     const fromPath = typeof from === "string" ? from : from.path;
-    const data = await this._driver.move(fromPath, to);
-    return StorageFile.fromData(data, this._driver);
+    const data = await this.activeDriver.move(fromPath, to);
+    return StorageFile.fromData(data, this.activeDriver);
+  }
+
+  /**
+   * Copy an entire directory recursively
+   *
+   * Copies all files from the source directory to the destination directory,
+   * preserving the directory structure.
+   *
+   * @param from - Source directory path
+   * @param to - Destination directory path
+   * @param options - Optional concurrency control
+   * @returns Number of files copied
+   *
+   * @example
+   * ```typescript
+   * // Copy entire directory
+   * const count = await storage.copyDirectory("uploads/temp", "uploads/final");
+   * console.log(`Copied ${count} files`);
+   *
+   * // With concurrency limit
+   * const count = await storage.copyDirectory("large-dir", "backup", {
+   *   concurrency: 10
+   * });
+   * ```
+   */
+  public async copyDirectory(
+    from: string,
+    to: string,
+    options?: { concurrency?: number },
+  ): Promise<number> {
+    const concurrency = options?.concurrency || 5;
+
+    // List all files recursively
+    const files = await this.list(from, { recursive: true });
+    const filesToCopy = files.filter((f) => !f.isDirectory);
+
+    // Copy files in batches for efficiency
+    let copied = 0;
+    for (let i = 0; i < filesToCopy.length; i += concurrency) {
+      const batch = filesToCopy.slice(i, i + concurrency);
+      await Promise.all(
+        batch.map(async (file) => {
+          // Calculate relative path and new destination
+          const relativePath = file.path.substring(from.length).replace(/^\//, "");
+          const newPath = `${to}/${relativePath}`;
+          await this.copy(file.path, newPath);
+          copied++;
+        }),
+      );
+    }
+
+    return copied;
+  }
+
+  /**
+   * Move an entire directory recursively
+   *
+   * Moves all files from the source directory to the destination directory,
+   * then deletes the source directory.
+   *
+   * @param from - Source directory path
+   * @param to - Destination directory path
+   * @param options - Optional concurrency control
+   * @returns Number of files moved
+   *
+   * @example
+   * ```typescript
+   * const count = await storage.moveDirectory("uploads/temp", "uploads/final");
+   * console.log(`Moved ${count} files`);
+   * ```
+   */
+  public async moveDirectory(
+    from: string,
+    to: string,
+    options?: { concurrency?: number },
+  ): Promise<number> {
+    // Copy all files first
+    const count = await this.copyDirectory(from, to, options);
+
+    // Delete source directory
+    await this.deleteDirectory(from);
+
+    return count;
+  }
+
+  /**
+   * Empty a directory without deleting the directory itself
+   *
+   * Deletes all files within the directory but preserves the directory structure.
+   *
+   * @param path - Directory path to empty
+   * @returns Number of files deleted
+   *
+   * @example
+   * ```typescript
+   * const count = await storage.emptyDirectory("uploads/temp");
+   * console.log(`Deleted ${count} files`);
+   * ```
+   */
+  public async emptyDirectory(path: string): Promise<number> {
+    // List all files in directory
+    const files = await this.list(path, { recursive: true });
+    const filePaths = files.filter((f) => !f.isDirectory).map((f) => f.path);
+
+    if (filePaths.length === 0) {
+      return 0;
+    }
+
+    // Delete all files
+    await this.deleteMany(filePaths);
+
+    return filePaths.length;
   }
 
   /**
@@ -318,7 +523,7 @@ export class ScopedStorage {
    * ```
    */
   public async list(directory?: string, options?: ListOptions): Promise<StorageFileInfo[]> {
-    return this._driver.list(directory || "", options);
+    return this.activeDriver.list(directory || "", options);
   }
 
   // ============================================================
@@ -343,7 +548,7 @@ export class ScopedStorage {
    * ```
    */
   public url(location: string): string {
-    return this._driver.url(location);
+    return this.activeDriver.url(location);
   }
 
   /**
@@ -367,7 +572,7 @@ export class ScopedStorage {
    * ```
    */
   public async temporaryUrl(location: string, expiresIn?: number): Promise<string> {
-    return this._driver.temporaryUrl(location, expiresIn);
+    return this.activeDriver.temporaryUrl(location, expiresIn);
   }
 
   // ============================================================
@@ -393,7 +598,7 @@ export class ScopedStorage {
    * ```
    */
   public async getInfo(location: string): Promise<StorageFileInfo> {
-    return this._driver.getInfo(location);
+    return this.activeDriver.getInfo(location);
   }
 
   /**
@@ -406,7 +611,7 @@ export class ScopedStorage {
    * @throws Error if file not found
    */
   public async size(location: string): Promise<number> {
-    return this._driver.size(location);
+    return this.activeDriver.size(location);
   }
 
   /**
@@ -432,7 +637,7 @@ export class ScopedStorage {
    * ```
    */
   public async file(location: string): Promise<StorageFile> {
-    return new StorageFile(location, this._driver);
+    return new StorageFile(location, this.activeDriver);
   }
 
   // ============================================================
@@ -452,14 +657,18 @@ export class ScopedStorage {
       return file;
     }
 
-    // String content
-    if (typeof file === "string") {
-      return Buffer.from(file);
-    }
-
     // Readable stream - collect into buffer
     if (this.isReadable(file)) {
       return this.streamToBuffer(file as Readable);
+    }
+
+    // String content
+    if (typeof file === "string") {
+      if (await fileExistsAsync(file)) {
+        return fs.readFile(file);
+      }
+
+      return Buffer.from(file);
     }
 
     // UploadedFile

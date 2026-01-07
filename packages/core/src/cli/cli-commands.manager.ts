@@ -26,7 +26,7 @@ import { cliCommandsLoader } from "./commands-loader";
 import { frameworkCommands } from "./framework-cli-commands";
 import { parseCliArgs } from "./parse-cli-args";
 import { findSimilar } from "./string-similarity";
-import { CLICommandOption, CommandActionData } from "./types";
+import { CommandActionData, ResolvedCLICommandOption } from "./types";
 
 export class CLICommandsManager {
   /**
@@ -358,8 +358,8 @@ export class CLICommandsManager {
   protected validateOptions(
     command: CLICommand,
     options: Record<string, string | boolean | number>,
-  ): CLICommandOption[] {
-    const missing: CLICommandOption[] = [];
+  ): ResolvedCLICommandOption[] {
+    const missing: ResolvedCLICommandOption[] = [];
 
     command.commandOptions.forEach((opt) => {
       if (opt.required) {
@@ -391,6 +391,10 @@ export class CLICommandsManager {
         if (!hasOption) {
           result[opt.name] = opt.defaultValue;
         }
+      }
+
+      if (opt.alias !== undefined && result[opt.alias] && result[opt.name] === undefined) {
+        result[opt.name] = result[opt.alias];
       }
     });
 

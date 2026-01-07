@@ -220,6 +220,7 @@ export class Router {
       handler,
       ...options,
       name,
+      rateLimit: options.rateLimit,
       $prefix: prefix || "/",
       // it must be a new array to avoid modifying the original array
       $prefixStack: [...this.stacks.prefix],
@@ -608,9 +609,17 @@ export class Router {
       const requestMethod = route.method.toLowerCase();
       const requestMethodFunction = server[requestMethod].bind(server);
 
+      const options = {
+        ...route.serverOptions,
+        config: {
+          ...route.serverOptions?.config,
+          ...(route.rateLimit && { rateLimit: route.rateLimit }),
+        },
+      };
+
       requestMethodFunction(
         route.path,
-        route.serverOptions || {},
+        options,
         async (baseRequest: FastifyRequest, reply: FastifyReply) => {
           const { output, response } = await this.handleRoute(route)(baseRequest, reply);
 
@@ -657,13 +666,18 @@ export class Router {
       // Inject extracted params into the request
       fastifyRequest.params = match.params;
 
-      // Call the matched route handler
-      const { output, response } = await this.handleRoute(match.route)(
-        fastifyRequest,
-        fastifyReply,
-      );
+      try {
+        // Call the matched route handler
+        const { output, response } = await this.handleRoute(match.route)(
+          fastifyRequest,
+          fastifyReply,
+        );
 
-      return output || response.baseResponse;
+        return output || response.baseResponse;
+      } catch (error) {
+        console.log(error);
+        throw error;
+      }
     };
 
     // Register wildcard route for all methods EXCEPT OPTIONS (to avoid conflict with CORS)

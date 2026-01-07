@@ -1,20 +1,24 @@
-import type { Casts } from "@warlock.js/cascade";
 import { Model } from "@warlock.js/cascade";
+import { Infer, v } from "@warlock.js/seal";
 
-export class DatabaseLogModel extends Model {
+const schema = v.object({
+  module: v.string(),
+  action: v.string(),
+  message: v.string(),
+  trace: v.record(v.any()),
+  level: v.string(),
+});
+
+type LogSchema = Infer<typeof schema>;
+
+export class DatabaseLogModel extends Model<LogSchema> {
   /**
-   * Collection name
+   * Table name
    */
-  public static collection = "logs";
+  public static table = "logs";
 
   /**
    * {@inheritdoc}
    */
-  protected casts: Casts = {
-    module: "string",
-    action: "string",
-    message: "string",
-    trace: "object",
-    level: "string",
-  };
+  public static schema = schema;
 }

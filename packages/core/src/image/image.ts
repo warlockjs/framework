@@ -1,10 +1,60 @@
-import { Endpoint } from "@mongez/http";
+import axios from "axios";
+import type sharp from "sharp";
 import type { FormatEnum } from "sharp";
-import sharp from "sharp";
+
+// ============================================================
+// Eager-loaded Sharp Module
+// ============================================================
+
+/**
+ * Installation instructions for sharp
+ */
+const SHARP_INSTALL_INSTRUCTIONS = `
+Image processing requires the sharp package.
+Install it with:
+
+  warlock add image
+
+Or manually:
+
+  npm install sharp
+  pnpm add sharp
+  yarn add sharp
+`.trim();
+
+/**
+ * Module availability flag
+ */
+let moduleExists: boolean | null = null;
+
+/**
+ * Cached sharp function (loaded at import time)
+ */
+let sharpFn: typeof sharp;
+
+/**
+ * Eagerly load sharp module at import time
+ */
+async function loadSharpModule() {
+  try {
+    const module = await import("sharp");
+    sharpFn = module.default;
+    moduleExists = true;
+  } catch {
+    moduleExists = false;
+  }
+}
+
+// Kick off eager loading immediately
+loadSharpModule();
+
+// ============================================================
+// Types
+// ============================================================
 
 export type ImageFormat = keyof FormatEnum;
 
-export type ImageInput = Parameters<typeof sharp>[0];
+export type ImageInput = string | Buffer | Uint8Array | ArrayBuffer;
 
 /**
  * Watermark configuration for deferred execution
@@ -132,6 +182,12 @@ type InternalOptions = {
 /**
  * Image manipulation class with deferred pipeline execution.
  *
+ * **Important:** This class requires the `sharp` package to be installed.
+ * Install it with: `warlock add image` or `npm install sharp`
+ *
+ * Sharp is lazy-loaded on the first async operation (save, toBuffer, etc.),
+ * so the constructor and all chainable methods remain synchronous.
+ *
  * All operations are synchronous and stored as descriptors.
  * The pipeline is executed only when calling output methods:
  * - `save()` - Save to file
@@ -142,9 +198,9 @@ type InternalOptions = {
  * @example
  * ```typescript
  * // All chaining is synchronous - single await at the end
- * await Image.fromFile("photo.jpg")
+ * await new Image("photo.jpg")
  *   .resize({ width: 800 })
- *   .watermark({ image: "logo.png", options: { gravity: "southeast" } })
+ *   .watermark("logo.png", { gravity: "southeast" })
  *   .quality(85)
  *   .save("output.jpg");
  * ```
@@ -184,11 +240,15 @@ export class Image {
    * Constructor
    */
   public constructor(image: ImageInput | sharp.Sharp) {
+    if (moduleExists === false) {
+      throw new Error(`sharp is not installed.\n\n${SHARP_INSTALL_INSTRUCTIONS}`);
+    }
+
     // Check if it's already a sharp instance
     if (image instanceof Object && "clone" in image && typeof image.clone === "function") {
       this.image = image as sharp.Sharp;
     } else {
-      this.image = sharp(image as ImageInput);
+      this.image = sharpFn(image as ImageInput);
     }
   }
 
@@ -211,8 +271,7 @@ export class Image {
    */
   public static async fromUrl(url: string): Promise<Image> {
     try {
-      const request = new Endpoint();
-      const response = await request.get(url, {
+      const response = await axios.get(url, {
         responseType: "arraybuffer",
       });
 
@@ -433,61 +492,63 @@ export class Image {
   /**
    * Execute the deferred pipeline - apply all stored operations
    */
-  protected async executePipeline(): Promise<void> {
+  protected async executePipeline(): Promise<sharp.Sharp> {
     if (this.pipelineExecuted) {
-      return;
+      return this.image;
     }
 
     for (const operation of this.operations) {
-      await this.executeOperation(operation);
+      await this.executeOperation(this.image, operation);
     }
 
-    await this.applyFormatAndQuality();
+    await this.applyFormatAndQuality(this.image);
 
     this.pipelineExecuted = true;
+
+    return this.image;
   }
 
   /**
    * Execute a single operation
    */
-  protected async executeOperation(operation: ImageOperation): Promise<void> {
+  protected async executeOperation(image: sharp.Sharp, operation: ImageOperation): Promise<void> {
     switch (operation.type) {
       case "resize":
-        this.image.resize(operation.options);
+        image.resize(operation.options);
         break;
 
       case "crop":
-        this.image.extract(operation.options);
+        image.extract(operation.options);
         break;
 
       case "rotate":
-        this.image.rotate(operation.angle);
+        image.rotate(operation.angle);
         break;
 
       case "flip":
-        this.image.flip();
+        image.flip();
         break;
 
       case "flop":
-        this.image.flop();
+        image.flop();
         break;
 
       case "blur":
-        this.image.blur(operation.sigma);
+        image.blur(operation.sigma);
         break;
 
       case "sharpen":
-        this.image.sharpen(operation.options);
+        image.sharpen(operation.options);
         break;
 
       case "blackAndWhite":
-        this.image.toColourspace("b-w");
+        image.toColourspace("b-w");
         break;
 
       case "opacity": {
         const alpha = Math.round((operation.value / 100) * 255);
         const alphaPixel = Buffer.from([255, 255, 255, alpha]);
-        this.image.composite([
+        image.composite([
           {
             blend: "dest-in",
             input: alphaPixel,
@@ -497,20 +558,20 @@ export class Image {
       }
 
       case "negate":
-        this.image.negate(operation.options);
+        image.negate(operation.options);
         break;
 
       case "tint":
-        this.image.tint(operation.color);
+        image.tint(operation.color);
         break;
 
       case "trim":
-        this.image.trim(operation.options);
+        image.trim(operation.options);
         break;
 
       case "watermark": {
         const buffer = await this.resolveImageBuffer(operation.config.image);
-        this.image.composite([
+        image.composite([
           {
             input: buffer,
             ...operation.config.options,
@@ -523,7 +584,7 @@ export class Image {
         const buffers = await Promise.all(
           operation.configs.map((config) => this.resolveImageBuffer(config.image)),
         );
-        this.image.composite(
+        image.composite(
           operation.configs.map((config, index) => ({
             input: buffers[index],
             ...config.options,
@@ -543,10 +604,10 @@ export class Image {
       return input.image.toBuffer();
     }
 
-    // For other inputs (path, buffer, etc.), create temp Image and get buffer
-    const tempImage = new Image(input);
+    // For other inputs (path, buffer, etc.), create temp sharp instance
+    const tempImage = sharpFn(input);
 
-    return tempImage.image.toBuffer();
+    return tempImage.toBuffer();
   }
 
   /**
@@ -554,13 +615,13 @@ export class Image {
    * If no format is explicitly set, preserves the original format and applies
    * quality appropriately based on the format type.
    */
-  protected async applyFormatAndQuality(): Promise<void> {
+  protected async applyFormatAndQuality(image: sharp.Sharp): Promise<void> {
     const { quality, format } = this.options;
 
     if (format) {
       // Explicit format specified
       const formatOptions = quality ? { quality } : undefined;
-      this.image.toFormat(format, formatOptions);
+      image.toFormat(format, formatOptions);
       return;
     }
 
@@ -575,22 +636,22 @@ export class Image {
 
     if (!originalFormat) {
       // Cannot detect format, default to webp with quality
-      this.image.webp({ quality });
+      image.webp({ quality });
       return;
     }
 
     // Apply quality based on original format
     if (Image.QUALITY_FORMATS.includes(originalFormat)) {
       // Format supports quality option
-      this.image.toFormat(originalFormat as ImageFormat, { quality });
+      image.toFormat(originalFormat as ImageFormat, { quality });
     } else if (originalFormat === "png") {
       // PNG uses compressionLevel (0-9) instead of quality
       // Map quality 1-100 to compressionLevel 9-0 (higher quality = lower compression)
       const compressionLevel = Math.round(9 - (quality / 100) * 9);
-      this.image.png({ compressionLevel });
+      image.png({ compressionLevel });
     } else if (originalFormat === "gif") {
       // GIF doesn't support quality, just preserve format
-      this.image.gif();
+      image.gif();
     }
     // Unknown format: preserve as-is (no quality applied)
   }
@@ -599,9 +660,9 @@ export class Image {
    * Save to file
    */
   public async save(path: string): Promise<sharp.OutputInfo> {
-    await this.executePipeline();
+    const image = await this.executePipeline();
 
-    return this.image.toFile(path);
+    return image.toFile(path);
   }
 
   /**
@@ -610,9 +671,9 @@ export class Image {
   public async saveAsWebp(path: string): Promise<sharp.OutputInfo> {
     // Override format to webp
     this.options.format = "webp";
-    await this.executePipeline();
+    const image = await this.executePipeline();
 
-    return this.image.toFile(path);
+    return image.toFile(path);
   }
 
   /**
@@ -680,8 +741,8 @@ export class Image {
    * Convert to base64
    */
   public async toBase64(): Promise<string> {
-    await this.executePipeline();
-    const buffer = await this.image.toBuffer();
+    const image = await this.executePipeline();
+    const buffer = await image.toBuffer();
 
     return buffer.toString("base64");
   }
@@ -730,9 +791,9 @@ export class Image {
    * Convert to buffer
    */
   public async toBuffer(): Promise<Buffer> {
-    await this.executePipeline();
+    const image = await this.executePipeline();
 
-    return this.image.toBuffer();
+    return image.toBuffer();
   }
 
   /**

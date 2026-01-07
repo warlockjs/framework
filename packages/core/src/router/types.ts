@@ -34,6 +34,11 @@ export type RouteHandlerValidation = {
    */
   validate?: Middleware;
   /**
+   * Define what should be validated
+   * If not passed, it will be validating only body and query
+   */
+  validating?: ("body" | "query" | "params" | "headers")[];
+  /**
    * Validation schema
    */
   schema?: ObjectValidator;
@@ -199,7 +204,12 @@ export type Route = RouteOptions & {
    * this will be used for generating the documentation
    */
   $prefixStack: string[];
+  /**
+   * Rate limit
+   */
+  rateLimit?: RouteOptions["rateLimit"];
 };
+
 export type PartialPick<T, F extends keyof T> = Omit<T, F> & Partial<Pick<T, F>>;
 
 /**

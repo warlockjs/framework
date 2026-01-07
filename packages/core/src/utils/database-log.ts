@@ -1,4 +1,4 @@
-import type { Model } from "@warlock.js/cascade";
+import type { ChildModel, Model } from "@warlock.js/cascade";
 import type { BasicLogConfigurations, LoggingData } from "@warlock.js/logger";
 import { LogChannel, type LogContract, type LogMessage } from "@warlock.js/logger";
 import { DatabaseLogModel } from "../database/models/database-log";
@@ -19,7 +19,7 @@ export class DatabaseLog extends LogChannel<DatabaseLogOptions> implements LogCo
   /**
    * Database model
    */
-  public get model(): typeof Model {
+  public get model(): ChildModel<Model> {
     return this.config("model") ?? DatabaseLogModel;
   }
 
@@ -28,9 +28,8 @@ export class DatabaseLog extends LogChannel<DatabaseLogOptions> implements LogCo
    */
   public async log(log: LoggingData) {
     const { module, action, message, type: level } = log;
-    const model = this.model;
 
-    if (!model.database?.connection?.isConnected()) return;
+    if (!this.model.getDataSource().driver?.isConnected) return;
 
     if (!this.shouldBeLogged(log)) return;
 
@@ -51,7 +50,7 @@ export class DatabaseLog extends LogChannel<DatabaseLogOptions> implements LogCo
     }
 
     try {
-      await model.create(data);
+      await this.model.create(data);
     } catch (error) {
       console.log("Error", error);
     }

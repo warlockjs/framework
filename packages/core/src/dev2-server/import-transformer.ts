@@ -1,5 +1,7 @@
 import { devLogError } from "./dev-logger";
+import { exportAnalyzer } from "./export-analyzer";
 import type { FileManager } from "./file-manager";
+import { filesOrchestrator } from "./files-orchestrator";
 import { Path } from "./path";
 import { tsconfigManager } from "./tsconfig-manager";
 
@@ -164,15 +166,69 @@ export function transformImports(fileManager: FileManager): string {
 
     if (exportSpecifier === "*") {
       // export * from "./module"
-      // Keep as static export but use cache path
-      // Cache busting is handled by module loader clearing cache
-      const newExport = `export * from "./${cachePath}"`;
+      // Transform to dynamic re-export for HMR cache busting
 
-      // Replace in code
-      const startIndex = match.index!;
-      const endIndex = startIndex + fullExport.length;
-      transformedCode =
-        transformedCode.slice(0, startIndex) + newExport + transformedCode.slice(endIndex);
+      // Get the resolved absolute path for the import
+      const resolvedAbsPath = fileManager.importMap.get(importPath);
+
+      if (!resolvedAbsPath) {
+        unresolvedImports.push(importPath);
+        continue;
+      }
+
+      // Get the FileManager for the target file to reuse its source
+      const relativePath = Path.toRelative(resolvedAbsPath);
+      const targetFileManager = filesOrchestrator.files.get(relativePath);
+
+      if (!targetFileManager) {
+        // Target file not in files map - fall back to static export
+        const newExport = `export * from "./${cachePath}"`;
+        const startIndex = match.index!;
+        const endIndex = startIndex + fullExport.length;
+        transformedCode =
+          transformedCode.slice(0, startIndex) + newExport + transformedCode.slice(endIndex);
+        continue;
+      }
+
+      // Analyze the target file to get export information
+      const exportInfo = exportAnalyzer.analyzeExports(targetFileManager);
+
+      // If we have exports to re-export, generate dynamic re-export code
+      if (exportInfo.namedExports.length > 0 || exportInfo.hasDefaultExport) {
+        const moduleVar = `__reexport_${i}`;
+        const statements: string[] = [];
+
+        // Import the module dynamically
+        statements.push(`const ${moduleVar} = await __import("./${cachePath}");`);
+
+        // Re-export named exports
+        for (const exportName of exportInfo.namedExports) {
+          statements.push(`export const ${exportName} = ${moduleVar}.${exportName};`);
+        }
+
+        // Re-export default if exists
+        if (exportInfo.hasDefaultExport) {
+          statements.push(`export default ${moduleVar}.default;`);
+        }
+
+        const newExport = statements.join("\n");
+
+        // Replace in code
+        const startIndex = match.index!;
+        const endIndex = startIndex + fullExport.length;
+        transformedCode =
+          transformedCode.slice(0, startIndex) + newExport + transformedCode.slice(endIndex);
+      } else {
+        // Fallback to static export if no exports found (shouldn't happen normally)
+        // This handles edge cases where analysis might fail
+        const newExport = `export * from "./${cachePath}"`;
+
+        // Replace in code
+        const startIndex = match.index!;
+        const endIndex = startIndex + fullExport.length;
+        transformedCode =
+          transformedCode.slice(0, startIndex) + newExport + transformedCode.slice(endIndex);
+      }
     } else {
       // export { foo, bar } from "./module"
       // Transform to individual exports using __import

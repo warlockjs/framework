@@ -1,8 +1,11 @@
 // Storage manager
-export { storageConfig } from "./config";
-export { ScopedStorage } from "./scoped-storage";
+export * from "./config";
+export * from "./scoped-storage";
 export * from "./storage";
-export { StorageFile } from "./storage-file";
+export * from "./storage-file";
+
+// storage context
+export * from "./context/storage-driver-context";
 
 // Types
 export * from "./types";

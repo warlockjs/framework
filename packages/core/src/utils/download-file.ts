@@ -1,5 +1,4 @@
-import { Endpoint } from "@mongez/http";
-import type { AxiosResponse } from "axios";
+import axios, { type AxiosResponse } from "axios";
 import crypto from "crypto";
 import { createWriteStream } from "fs";
 
@@ -12,9 +11,7 @@ export async function downloadFileFromUrl(
   fileName ??= crypto.randomBytes(16).toString("hex");
   const writer = createWriteStream(outputLocationPath + "/" + fileName + "." + fileExtension);
 
-  const request = new Endpoint({ baseURL: "" });
-
-  return request
+  return axios
     .get(fileUrl, {
       responseType: "stream",
     })

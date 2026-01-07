@@ -68,8 +68,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
 
       const listMethod = this.cache ? "listCached" : "list";
 
-      const { documents, paginationInfo } =
-        await this.repository[listMethod](data);
+      const { documents, paginationInfo } = await this.repository[listMethod](data);
 
       responseDocument[this.recordsListName] = documents;
 
@@ -243,8 +242,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
         return response.notFound();
       }
 
-      if (await this.callMiddleware("delete", request, response, record))
-        return;
+      if (await this.callMiddleware("delete", request, response, record)) return;
 
       await this.beforeDelete(request, response, record);
 
@@ -280,15 +278,15 @@ export abstract class Restful<T extends Model> implements RouteResource {
       }
 
       const records = await this.repository.all({
-        perform: query =>
+        perform: (query) =>
           query.whereIn(
             "id",
-            ids.map(id => parseInt(id)),
+            ids.map((id) => parseInt(id)),
           ),
       });
 
       await Promise.all(
-        records.map(async record => {
+        records.map(async (record) => {
           if (await this.callMiddleware("delete", request, response, record)) {
             return;
           }
@@ -317,22 +315,14 @@ export abstract class Restful<T extends Model> implements RouteResource {
   /**
    * Before create
    */
-  protected async beforeCreate(
-    _request: Request,
-    _response: Response,
-    _record: T,
-  ): Promise<any> {
+  protected async beforeCreate(_request: Request, _response: Response, _record: T): Promise<any> {
     //
   }
 
   /**
    * On create
    */
-  protected async onCreate(
-    _request: Request,
-    _response: Response,
-    _record: T,
-  ): Promise<any> {
+  protected async onCreate(_request: Request, _response: Response, _record: T): Promise<any> {
     //
   }
 
@@ -363,22 +353,14 @@ export abstract class Restful<T extends Model> implements RouteResource {
   /**
    * Before delete
    */
-  protected async beforeDelete(
-    _request: Request,
-    _response: Response,
-    _record: T,
-  ): Promise<any> {
+  protected async beforeDelete(_request: Request, _response: Response, _record: T): Promise<any> {
     //
   }
 
   /**
    * On delete
    */
-  protected async onDelete(
-    _request: Request,
-    _response: Response,
-    _record: T,
-  ): Promise<any> {
+  protected async onDelete(_request: Request, _response: Response, _record: T): Promise<any> {
     //
   }
 

@@ -5,7 +5,6 @@
  */
 
 // Auto-register framework plugins
-import { trans } from "@mongez/localization";
 import { configureSeal, registerPlugin } from "@warlock.js/seal";
 import { config } from "../config";
 import { t } from "../http/middleware/inject-request-context";
@@ -13,6 +12,7 @@ import { databasePlugin, filePlugin, localizedPlugin } from "./plugins";
 
 // Configure Seal to use Warlock's localization
 configureSeal({
+  firstErrorOnly: config.key("validation.firstErrorOnly", true),
   translateRule({ rule, attributes }) {
     const translateRule = config.key("validation.translateRule");
     if (translateRule) {
@@ -22,7 +22,7 @@ configureSeal({
     const translationGroup = config.key("validation.translationGroup", "validation");
 
     const translationKey = `${translationGroup}.${rule.name}`;
-    const translation = trans(translationKey, attributes);
+    const translation = t(translationKey, attributes);
 
     return translation === translationKey
       ? rule.errorMessage || rule.defaultErrorMessage
@@ -31,15 +31,18 @@ configureSeal({
 
   translateAttribute({ attribute, context, rule }) {
     const translateAttribute = config.key("validation.translateAttribute");
-    const attributeGroup = config.key("validation.attributeGroup") ?? "attributes";
 
     if (translateAttribute) {
       return translateAttribute({ attribute, context, rule });
     }
 
-    return t(`${attributeGroup ? attributeGroup + "." : ""}${attribute}`, context.allValues);
+    const attributeGroup = config.key("validation.attributeGroup") ?? "attributes";
+
+    const translationKey = `${attributeGroup ? attributeGroup + "." : ""}${attribute}`;
+
+    const output = t(translationKey, context.allValues);
+    return output === translationKey ? attribute : output;
   },
-  firstErrorOnly: config.key("validation.firstErrorOnly", true),
 });
 
 // Register plugins to inject methods

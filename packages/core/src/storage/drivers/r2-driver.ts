@@ -41,25 +41,26 @@ export class R2Driver extends CloudDriver<R2StorageDriverOptions> {
   /**
    * Get public URL for file
    *
-   * URL formats (in priority order):
-   * 1. With urlPrefix: {urlPrefix}/{key}
-   * 2. With publicDomain: https://{publicDomain}/{key}
-   * 3. Default R2 public bucket: https://pub-{accountId}.r2.dev/{key}
+   * Priority: urlPrefix > publicDomain > default R2 URL
    *
    * Note: For R2 public access, you typically need to:
    * - Enable public access on the bucket
    * - Or use a custom domain through Cloudflare
    */
   public url(location: string): string {
+    // 1. Use urlPrefix if configured
     if (this.options.urlPrefix) {
-      return `${this.options.urlPrefix}/${location}`;
+      const prefix = this.options.urlPrefix.replace(/\/+$/, "");
+      return `${prefix}/${location}`;
     }
 
+    // 2. Use publicDomain if configured
     if (this.options.publicDomain) {
-      return `https://${this.options.publicDomain}/${location}`;
+      const domain = this.options.publicDomain.replace(/\/+$/, "");
+      return `${domain}/${location}`;
     }
 
-    // R2 public bucket URL format
+    // 3. Fallback to R2 public bucket URL
     // Note: Public access must be enabled on the bucket for this to work
     return `https://pub-${this.options.accountId}.r2.dev/${location}`;
   }

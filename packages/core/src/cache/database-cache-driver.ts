@@ -10,7 +10,7 @@ export type DatabaseCacheOptions = {
   /**
    * Database model class
    */
-  model?: typeof Model;
+  model?: typeof CacheModel;
   /**
    * Global prefix for the cache key
    */
@@ -24,7 +24,7 @@ export type DatabaseCacheOptions = {
 };
 
 export class CacheModel extends Model {
-  public static collection = "cache";
+  public static table = "cache";
 }
 
 export class DatabaseCacheDriver
@@ -39,7 +39,7 @@ export class DatabaseCacheDriver
   /**
    * Database model class
    */
-  public model!: typeof Model;
+  public model!: typeof CacheModel;
 
   /**
    * {@inheritdoc}
@@ -85,17 +85,26 @@ export class DatabaseCacheDriver
     const keyParts = parsedKey.split(".");
     const namespace = keyParts.slice(0, -1).join(".") || parsedKey;
 
-    // Use upsert to prevent duplicate key entries
-    await this.model.upsert(
-      { key: parsedKey },
-      {
+    // Find existing cache entry or create new one (upsert pattern)
+    let cacheEntry = await this.model.first({ key: parsedKey });
+
+    if (cacheEntry) {
+      // Update existing entry
+      cacheEntry.set("namespace", namespace);
+      cacheEntry.set("data", value);
+      cacheEntry.set("ttl", ttl);
+      cacheEntry.set("expiresAt", this.getExpiresAt(ttl) || null);
+      await cacheEntry.save();
+    } else {
+      // Create new entry
+      await this.model.create({
         key: parsedKey,
         namespace,
         data: value,
         ttl,
         expiresAt: this.getExpiresAt(ttl) || null,
-      },
-    );
+      });
+    }
 
     this.log("cached", parsedKey);
 
@@ -119,7 +128,11 @@ export class DatabaseCacheDriver
       return null;
     }
 
-    const data = model.only<CacheData>(["data", "expiresAt", "ttl"]);
+    const data: CacheData = {
+      data: model.get("data"),
+      expiresAt: model.get("expiresAt") as number | undefined,
+      ttl: model.get("ttl") as number | undefined,
+    };
 
     return this.parseCachedData(parsedKey, data);
   }

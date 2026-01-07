@@ -1,6 +1,5 @@
 export * from "./app-log";
 export * from "./database-log";
-export * from "./date-output";
 export * from "./environment";
 export * from "./get-localized";
 export * from "./paths";

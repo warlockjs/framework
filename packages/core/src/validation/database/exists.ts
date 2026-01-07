@@ -1,4 +1,3 @@
-import { Aggregate } from "@warlock.js/cascade";
 import { invalidRule, VALID_RULE, type SchemaRule } from "@warlock.js/seal";
 import type { ExistsRuleOptions } from "../types";
 
@@ -11,8 +10,7 @@ export const existsRule: SchemaRule<ExistsRuleOptions> = {
   async validate(value: any, context) {
     const { Model, query, column = context.key } = this.context.options;
 
-    const dbQuery: Aggregate =
-      typeof Model !== "string" ? Model.aggregate() : new Aggregate(Model);
+    const dbQuery = Model.query();
 
     dbQuery.where(column, value);
 

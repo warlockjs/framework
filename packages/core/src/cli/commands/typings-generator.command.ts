@@ -10,9 +10,6 @@ export const typingsGeneratorCommand = command({
   description: "Generate type definitions for the project",
   options: [
     {
-      name: "files",
-      alias: "f",
-      type: "string",
       text: "--files, -f",
       description:
         "Files to generate typings for, if not passed, it will generate typings for all files",

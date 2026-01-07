@@ -41,18 +41,16 @@ export class DOSpacesDriver extends CloudDriver<CloudStorageDriverOptions> {
   /**
    * Get public URL for file
    *
-   * URL formats (in priority order):
-   * 1. With urlPrefix: {urlPrefix}/{key}
-   * 2. CDN URL: https://{bucket}.{region}.cdn.digitaloceanspaces.com/{key}
-   *
    * Note: DO Spaces includes automatic CDN with the `.cdn.` subdomain
    */
   public url(location: string): string {
+    // 1. Use urlPrefix if configured
     if (this.options.urlPrefix) {
-      return `${this.options.urlPrefix}/${location}`;
+      const prefix = this.options.urlPrefix.replace(/\/+$/, "");
+      return `${prefix}/${location}`;
     }
 
-    // Use CDN URL for better performance
+    // 2. Default Spaces CDN URL
     return `https://${this.options.bucket}.${this.options.region}.cdn.digitaloceanspaces.com/${location}`;
   }
 }

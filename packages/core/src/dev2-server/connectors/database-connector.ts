@@ -1,11 +1,11 @@
 import config from "@mongez/config";
-import { connection, connectToDatabase } from "@warlock.js/cascade";
+import { connectToDatabase, dataSourceRegistry } from "@warlock.js/cascade";
 import { BaseConnector } from "./base-connector";
 import { ConnectorPriority } from "./types";
 
 /**
  * Database Connector
- * Manages database connection lifecycle
+ * Manages database connection lifecycle using @warlock.js/cascade
  */
 export class DatabaseConnector extends BaseConnector {
   public readonly name = "database";
@@ -20,18 +20,19 @@ export class DatabaseConnector extends BaseConnector {
    * Initialize database connection
    */
   public async start(): Promise<void> {
-    // TODO: Implement actual database connection
-    // - Check if config/database.ts exists
-    // - Load database configuration
-    // - Connect to database using @warlock.js/cascade or similar
-    // - Handle connection errors
     const databaseConfig = config.get("database");
 
-    if (!databaseConfig) return;
+    if (!databaseConfig) {
+      return;
+    }
 
-    await connectToDatabase(databaseConfig);
-
-    this.active = true;
+    try {
+      await connectToDatabase(databaseConfig);
+      this.active = true;
+    } catch (error) {
+      console.error("Failed to connect to database:", error);
+      throw error;
+    }
   }
 
   /**
@@ -42,16 +43,20 @@ export class DatabaseConnector extends BaseConnector {
       return;
     }
 
-    // TODO: Implement actual database disconnection
-    // - Close all active connections
-    // - Clean up resources
+    try {
+      // Disconnect all registered data sources
+      const dataSources = dataSourceRegistry.getAllDataSources();
 
-    // await disconnectDatabase();
+      for (const dataSource of dataSources) {
+        if (dataSource.driver.isConnected) {
+          await dataSource.driver.disconnect();
+        }
+      }
 
-    await connection.client?.close();
-
-    (connection as any).isConnectionEstablished = false;
-
-    this.active = false;
+      this.active = false;
+    } catch (error) {
+      console.error("Failed to disconnect from database:", error);
+      throw error;
+    }
   }
 }

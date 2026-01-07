@@ -7,14 +7,14 @@ import type { UploadsConfigurations } from "./uploads-types";
  * These defaults are used when no configuration is provided
  * or when specific keys are missing from the app config.
  */
-export const UPLOADS_DEFAULTS: Required<UploadsConfigurations> = {
+export const UPLOADS_DEFAULTS: UploadsConfigurations = {
   name: "random",
   randomLength: 32,
   prefix: {
     as: "directory",
-    format: "dd-mm-yyyy-HH-ii-ss",
+    format: "DD-MM-YYYY",
   },
-  defaultPrefixFormat: "dd-mm-yyyy-HH-ii-ss",
+  // defaultPrefixFormat: "DD-MM-YYYY-HH-II-SS",
 };
 
 /**
@@ -36,7 +36,7 @@ export const UPLOADS_DEFAULTS: Required<UploadsConfigurations> = {
 export function uploadsConfig<K extends keyof UploadsConfigurations>(
   key: K,
   defaultValue?: UploadsConfigurations[K],
-): Required<UploadsConfigurations[K]> {
+): UploadsConfigurations[K] {
   const fallback = defaultValue ?? UPLOADS_DEFAULTS[key];
   return config.key(`uploads.${key}`, fallback);
 }

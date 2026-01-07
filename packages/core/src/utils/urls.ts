@@ -1,4 +1,4 @@
-import { ltrim } from "@mongez/reinforcements";
+import { ltrim, rtrim } from "@mongez/reinforcements";
 
 let baseUrl = "";
 
@@ -13,7 +13,7 @@ export function setBaseUrl(url: string) {
  * Get full path for the given path
  */
 export function url(path = "") {
-  return baseUrl + path;
+  return rtrim(baseUrl, "/") + "/" + ltrim(path, "/");
 }
 
 /**

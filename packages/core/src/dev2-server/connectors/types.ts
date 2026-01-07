@@ -6,7 +6,7 @@ export interface Connector {
   /**
    * Unique name of the connector
    */
-  readonly name: string;
+  readonly name: ConnectorName;
 
   /**
    * Priority for initialization order
@@ -45,6 +45,8 @@ export interface Connector {
   shouldRestart(changedFiles: string[]): boolean;
 }
 
+export type ConnectorName = "http" | "database" | "cache" | "storage";
+
 /**
  * Connector priority constants
  */
@@ -52,5 +54,5 @@ export enum ConnectorPriority {
   DATABASE = 1,
   CACHE = 2,
   HTTP = 3,
+  STORAGE = 4,
 }
-

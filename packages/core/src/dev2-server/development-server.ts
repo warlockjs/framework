@@ -1,5 +1,6 @@
 import { colors } from "@mongez/copper";
 import events from "@mongez/events";
+import { getFileAsync } from "@mongez/fs";
 import { connectorsManager } from "./connectors/connectors-manager";
 import { devLogReady, devLogSection, devServeLog } from "./dev-logger";
 import { filesOrchestrator } from "./files-orchestrator";
@@ -111,6 +112,28 @@ export class DevelopmentServer {
     // Only execute reload if server is running (skip during initial startup)
     if (!this.running || !this.layerExecutor) {
       return;
+    }
+
+    if (batch.changed.length > 0) {
+      // if they are the same, then ignore the trigger
+      batch.changed = (
+        await Promise.all(
+          batch.changed.map(async (relativePath) => {
+            const file = filesOrchestrator.files.get(relativePath);
+
+            if (!file) return null;
+
+            const content = await getFileAsync(file.absolutePath);
+            if (content.trim() === file.source) {
+              return null;
+            }
+
+            file.source = content;
+
+            return relativePath;
+          }),
+        )
+      ).filter((file) => file !== null);
     }
 
     // Get all changed files (added + changed + deleted)

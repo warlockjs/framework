@@ -4,6 +4,8 @@
  * These types define the structure for commands, options, preloading, and actions.
  */
 
+import { ConnectorName } from "../dev2-server/connectors";
+
 /**
  * Indicates the origin/source of a CLI command.
  *
@@ -87,9 +89,9 @@ export type CLICommandPreload = {
    * - `true` - Initialize all connectors (http, database, cache)
    * - `string[]` - Initialize only specified connectors
    *
-   * Available connectors: `"http"`, `"database"`, `"cache"`
+   * Available connectors: `"http"`, `"database"`, `"cache"`, `"storage"`
    */
-  connectors?: ("http" | "database" | "cache")[] | true;
+  connectors?: ConnectorName[] | true;
 };
 
 /**
@@ -107,16 +109,16 @@ export type CLICommandPreload = {
  */
 export type CLICommandOption = {
   /**
-   * The camelCase name of the option (auto-extracted from `text`).
-   * This is the key used in `CommandActionData.options`.
-   */
-  name: string;
-
-  /**
    * The raw option text as it appears in help output.
    * Supports formats: `"--port"`, `"-p"`, `"--port, -p"`, `"-p, --port"`
    */
   text: string;
+
+  /**
+   * The camelCase name of the option (auto-extracted from `text`).
+   * This is the key used in `CommandActionData.options`.
+   */
+  name?: string;
 
   /**
    * Short alias for the option (auto-extracted from `text`).
@@ -145,6 +147,11 @@ export type CLICommandOption = {
    * If true and not provided, command will fail with an error.
    */
   required?: boolean;
+};
+
+export type ResolvedCLICommandOption = Omit<CLICommandOption, "alias" | "name"> & {
+  name: string;
+  alias: string;
 };
 
 /**

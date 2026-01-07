@@ -7,13 +7,9 @@
  * - And variants (exceptCurrentUser, exceptCurrentId)
  */
 
-import type { Model } from "@warlock.js/cascade";
+import type { ChildModel, Model } from "@warlock.js/cascade";
 import type { SealPlugin } from "@warlock.js/seal";
-import {
-  NumberValidator,
-  ScalarValidator,
-  StringValidator,
-} from "@warlock.js/seal";
+import { NumberValidator, ScalarValidator, StringValidator } from "@warlock.js/seal";
 import type {
   ExistsExceptCurrentIdRuleOptions,
   ExistsExceptCurrentUserRuleOptions,
@@ -37,8 +33,7 @@ import {
 export const databasePlugin: SealPlugin = {
   name: "database",
   version: "1.0.0",
-  description:
-    "Adds database validation methods (unique, exists) to validators",
+  description: "Adds database validation methods (unique, exists) to validators",
 
   install() {
     // Inject database methods into ScalarValidator
@@ -46,7 +41,7 @@ export const databasePlugin: SealPlugin = {
       /** Value must be unique in database */
       unique(
         this: ScalarValidator,
-        model: typeof Model | string,
+        model: ChildModel<Model>,
         optionsList?: Partial<UniqueRuleOptions> & {
           errorMessage?: string;
         },
@@ -63,7 +58,7 @@ export const databasePlugin: SealPlugin = {
       /** Value must be unique in database except current user */
       uniqueExceptCurrentUser(
         this: ScalarValidator,
-        model: typeof Model | string,
+        model: ChildModel<Model>,
         optionsList?: Partial<UniqueExceptCurrentUserRuleOptions> & {
           errorMessage?: string;
         },
@@ -80,7 +75,7 @@ export const databasePlugin: SealPlugin = {
       /** Value must be unique in database except current id */
       uniqueExceptCurrentId(
         this: ScalarValidator,
-        model: typeof Model | string,
+        model: ChildModel<Model>,
         optionsList?: Partial<UniqueExceptCurrentIdRuleOptions> & {
           errorMessage?: string;
         },
@@ -97,7 +92,7 @@ export const databasePlugin: SealPlugin = {
       /** Value must exist in database */
       exists(
         this: ScalarValidator,
-        model: typeof Model | string,
+        model: ChildModel<Model>,
         optionsList?: Partial<ExistsRuleOptions> & {
           errorMessage?: string;
         },
@@ -114,7 +109,7 @@ export const databasePlugin: SealPlugin = {
       /** Value must exist in database except current user */
       existsExceptCurrentUser(
         this: ScalarValidator,
-        model: typeof Model | string,
+        model: ChildModel<Model>,
         optionsList?: Partial<ExistsExceptCurrentUserRuleOptions> & {
           errorMessage?: string;
         },
@@ -131,7 +126,7 @@ export const databasePlugin: SealPlugin = {
       /** Value must exists in database except current id */
       existsExceptCurrentId(
         this: ScalarValidator,
-        model: typeof Model | string,
+        model: ChildModel<Model>,
         optionsList?: Partial<ExistsExceptCurrentIdRuleOptions> & {
           errorMessage?: string;
         },
@@ -149,12 +144,10 @@ export const databasePlugin: SealPlugin = {
     // Inject database methods into StringValidator
     Object.assign(StringValidator.prototype, {
       unique: ScalarValidator.prototype.unique,
-      uniqueExceptCurrentUser:
-        ScalarValidator.prototype.uniqueExceptCurrentUser,
+      uniqueExceptCurrentUser: ScalarValidator.prototype.uniqueExceptCurrentUser,
       uniqueExceptCurrentId: ScalarValidator.prototype.uniqueExceptCurrentId,
       exists: ScalarValidator.prototype.exists,
-      existsExceptCurrentUser:
-        ScalarValidator.prototype.existsExceptCurrentUser,
+      existsExceptCurrentUser: ScalarValidator.prototype.existsExceptCurrentUser,
       existsExceptCurrentId: ScalarValidator.prototype.existsExceptCurrentId,
     });
 

@@ -1,3 +1,4 @@
+import type { FileSizeOption } from "@warlock.js/seal";
 import {
   BaseValidator,
   maxFileSizeRule,
@@ -6,9 +7,21 @@ import {
   minFileSizeRule,
   minHeightRule,
   minWidthRule,
+  resolveFileSize,
+  v,
 } from "@warlock.js/seal";
 import { UploadedFile } from "../../http";
 import { fileExtensionRule, fileRule, fileTypeRule, imageRule } from "../file";
+
+export const uploadedFileMetadataSchema = v.object({
+  location: v.string().oneOf(["local", "cloud"]),
+  width: v.int().positive(),
+  height: v.int().positive(),
+  size: v.int().positive(),
+  mimeType: v.string(),
+  extension: v.string(),
+  name: v.string(),
+});
 
 /**
  * File validator class
@@ -74,21 +87,21 @@ export class FileValidator extends BaseValidator {
   }
 
   /** Minimum file size */
-  public minSize(size: number, errorMessage?: string) {
+  public minSize(size: number | FileSizeOption, errorMessage?: string) {
     const rule = this.addRule(minFileSizeRule, errorMessage);
-    rule.context.options.minFileSize = size;
+    rule.context.options.minSize = resolveFileSize(size);
     return this;
   }
 
   /** @alias minSize */
-  public min(size: number, errorMessage?: string) {
+  public min(size: number | FileSizeOption, errorMessage?: string) {
     return this.minSize(size, errorMessage);
   }
 
   /** Maximum file size */
-  public maxSize(size: number, errorMessage?: string) {
+  public maxSize(size: number | FileSizeOption, errorMessage?: string) {
     const rule = this.addRule(maxFileSizeRule, errorMessage);
-    rule.context.options.maxFileSize = size;
+    rule.context.options.maxSize = resolveFileSize(size);
     return this;
   }
 
@@ -123,5 +136,16 @@ export class FileValidator extends BaseValidator {
     const rule = this.addRule(maxHeightRule, errorMessage);
     rule.context.options.maxHeight = height;
     return this;
+  }
+
+  /**
+   * Save the file and return it as a string
+   */
+  public saveTo(relativeDirectory: string) {
+    return this.addTransformer(async (file: UploadedFile) => {
+      const output = await file.save(relativeDirectory);
+
+      return output.path;
+    });
   }
 }

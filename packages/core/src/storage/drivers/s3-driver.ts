@@ -30,10 +30,13 @@ export class S3Driver extends CloudDriver<CloudStorageDriverOptions> {
    * - Default: https://{bucket}.s3.{region}.amazonaws.com/{key}
    */
   public url(location: string): string {
+    // 1. Use urlPrefix if configured
     if (this.options.urlPrefix) {
-      return `${this.options.urlPrefix}/${location}`;
+      const prefix = this.options.urlPrefix.replace(/\/+$/, "");
+      return `${prefix}/${location}`;
     }
 
+    // 2. Default S3 URL
     return `https://${this.options.bucket}.s3.${this.options.region}.amazonaws.com/${location}`;
   }
 }

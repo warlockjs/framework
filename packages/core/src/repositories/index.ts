@@ -1,7 +1,13 @@
-export * from "./base-repository-manager";
-export * from "./repository-destroyer-manager";
-export * from "./repository-filler-manager";
-export * from "./repository-list-manager";
-export * from "./repository-manager";
-export * from "./types";
-export * from "./utils";
+/**
+ * Repository v2 - ORM-agnostic repository layer
+ * @module @warlock.js/core/repositories2
+ */
+
+// Contracts
+export * from "./contracts";
+
+// Adapters
+export * from "./adapters/cascade";
+
+// Core
+export * from "./repository.manager";

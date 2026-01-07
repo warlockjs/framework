@@ -1,8 +1,35 @@
 import config from "@mongez/config";
+import { merge } from "@mongez/reinforcements";
 import { log } from "@warlock.js/logger";
 import { v } from "@warlock.js/seal";
 import type { Request, Response } from "../http";
-import type { Route } from "../router";
+import type { Route, RouteHandlerValidation } from "../router";
+
+function resolveDataToParse(validating: RouteHandlerValidation["validating"], request: Request) {
+  if (!validating || validating.length === 0) return request.allExceptParams();
+
+  let data: any = {};
+
+  for (const validatingType of validating) {
+    if (validatingType === "body") {
+      data = merge(data, request.body);
+    }
+
+    if (validatingType === "query") {
+      data = merge(data, request.query);
+    }
+
+    if (validatingType === "params") {
+      data = merge(data, request.params);
+    }
+
+    if (validatingType === "headers") {
+      data = merge(data, request.headers);
+    }
+  }
+
+  return data;
+}
 
 /**
  * Validate the request route
@@ -19,7 +46,8 @@ export async function validateAll(
   if (validation.schema) {
     log.info("validation", "schema", "Validating request schema");
     try {
-      const result = await v.validate(validation.schema, request.allExceptParams());
+      const data = resolveDataToParse(validation.validating, request);
+      const result = await v.validate(validation.schema, data);
 
       if (result.data && result.isValid) {
         request.setValidatedData(result.data);

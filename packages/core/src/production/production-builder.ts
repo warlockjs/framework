@@ -1,5 +1,5 @@
 import { colors } from "@mongez/copper";
-import { ensureDirectoryAsync, putFileAsync } from "@mongez/fs";
+import { ensureDirectoryAsync, putFileAsync, removeDirectoryAsync } from "@mongez/fs";
 import esbuild from "esbuild";
 import glob from "fast-glob";
 import path from "path";
@@ -34,6 +34,9 @@ export class ProductionBuilder {
 
     // Step 4: Bundle with esbuild
     await this.bundle();
+
+    // Step 5: Remove production folder
+    await removeDirectoryAsync(this.productionDir);
 
     console.log(colors.green("\n✅ Build complete!"));
     console.log(`Start production server by running ${colors.cyan("warlock start")}`);

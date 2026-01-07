@@ -4,7 +4,7 @@
  * Augments core validators with framework-specific methods
  */
 
-import type { Model } from "@warlock.js/cascade";
+import type { ChildModel, Model } from "@warlock.js/cascade";
 import type {
   ArrayValidator,
   BaseValidator,
@@ -37,7 +37,7 @@ declare module "@warlock.js/seal" {
   interface ScalarValidator {
     /** Value must be unique in database */
     unique(
-      model: typeof Model | string,
+      model: ChildModel<Model>,
       optionsList?: Partial<UniqueRuleOptions> & {
         errorMessage?: string;
       },
@@ -45,7 +45,7 @@ declare module "@warlock.js/seal" {
 
     /** Value must be unique in database except current user */
     uniqueExceptCurrentUser(
-      model: typeof Model | string,
+      model: ChildModel<Model>,
       optionsList?: Partial<UniqueExceptCurrentUserRuleOptions> & {
         errorMessage?: string;
       },
@@ -53,7 +53,7 @@ declare module "@warlock.js/seal" {
 
     /** Value must be unique in database except current id */
     uniqueExceptCurrentId(
-      model: typeof Model | string,
+      model: ChildModel<Model>,
       optionsList?: Partial<UniqueExceptCurrentIdRuleOptions> & {
         errorMessage?: string;
       },
@@ -61,7 +61,7 @@ declare module "@warlock.js/seal" {
 
     /** Value must exist in database */
     exists(
-      model: typeof Model | string,
+      model: ChildModel<Model>,
       optionsList?: Partial<ExistsRuleOptions> & {
         errorMessage?: string;
       },
@@ -69,7 +69,7 @@ declare module "@warlock.js/seal" {
 
     /** Value must exist in database except current user */
     existsExceptCurrentUser(
-      model: typeof Model | string,
+      model: ChildModel<Model>,
       optionsList?: Partial<ExistsExceptCurrentUserRuleOptions> & {
         errorMessage?: string;
       },
@@ -77,7 +77,7 @@ declare module "@warlock.js/seal" {
 
     /** Value must exists in database except current id */
     existsExceptCurrentId(
-      model: typeof Model | string,
+      model: ChildModel<Model>,
       optionsList?: Partial<ExistsExceptCurrentIdRuleOptions> & {
         errorMessage?: string;
       },

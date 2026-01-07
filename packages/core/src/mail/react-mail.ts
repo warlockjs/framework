@@ -24,6 +24,9 @@ function createHtmlPage(html: string): string {
 
 /**
  * Render a React element to HTML for email
+ *
+ * **Note:** This function requires React packages to be installed.
+ * Install them with: `warlock add react` or `npm install react react-dom`
  */
 export function renderReactMail(element: React.ReactElement | React.ComponentType): string {
   const content = renderReact(element);

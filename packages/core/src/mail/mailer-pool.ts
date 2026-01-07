@@ -1,6 +1,57 @@
 import { log } from "@warlock.js/logger";
-import nodemailer, { type Transporter } from "nodemailer";
+import type nodemailer from "nodemailer";
+import type { Transporter } from "nodemailer";
 import type { MailConfigurations } from "./types";
+
+// ============================================================
+// Eager-loaded Nodemailer Module
+// ============================================================
+
+/**
+ * Installation instructions for nodemailer
+ */
+const NODEMAILER_INSTALL_INSTRUCTIONS = `
+Email functionality requires the nodemailer package.
+Install it with:
+
+  warlock add mailer
+
+Or manually:
+
+  npm install nodemailer
+  pnpm add nodemailer
+  yarn add nodemailer
+`.trim();
+
+/**
+ * Module availability flag
+ */
+let moduleExists: boolean | null = null;
+
+/**
+ * Cached nodemailer module (loaded at import time)
+ */
+let nodemailerModule: typeof nodemailer;
+
+/**
+ * Eagerly load nodemailer module at import time
+ */
+async function loadNodemailerModule() {
+  try {
+    const module = await import("nodemailer");
+    nodemailerModule = module.default;
+    moduleExists = true;
+  } catch {
+    moduleExists = false;
+  }
+}
+
+// Kick off eager loading immediately
+loadNodemailerModule();
+
+// ============================================================
+// Mailer Pool
+// ============================================================
 
 /**
  * Mailer pool for connection reuse
@@ -34,15 +85,20 @@ function createConfigHash(config: MailConfigurations): string {
 
 /**
  * Get or create a mailer transporter from the pool
+ * Nodemailer is eagerly loaded at import time
  */
 export function getMailer(config: MailConfigurations): Transporter {
+  if (moduleExists === false) {
+    throw new Error(`nodemailer is not installed.\n\n${NODEMAILER_INSTALL_INSTRUCTIONS}`);
+  }
+
   const hash = createConfigHash(config);
 
   // Return existing transporter if available
-  let transporter = mailerPool.get(hash);
+  const existingTransporter = mailerPool.get(hash);
 
-  if (transporter) {
-    return transporter;
+  if (existingTransporter) {
+    return existingTransporter;
   }
 
   // Create new transporter
@@ -50,7 +106,7 @@ export function getMailer(config: MailConfigurations): Transporter {
 
   const { auth, username, password, requireTLS, tls, ...transportConfig } = config;
 
-  transporter = nodemailer.createTransport({
+  const transporter = nodemailerModule.createTransport({
     requireTLS: requireTLS ?? tls,
     auth: auth ?? {
       user: username,

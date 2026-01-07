@@ -12,7 +12,7 @@ export const startProductionCommand = command({
     warlockConfig: true,
   },
   preAction: async () => {
-    displayStartupBanner();
+    displayStartupBanner({ environment: "production" });
   },
   action: async () => {
     const buildConfig = warlockConfigManager.get("build");

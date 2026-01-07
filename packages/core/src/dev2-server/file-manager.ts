@@ -161,7 +161,7 @@ export class FileManager {
    * Cleanup function called before the file is unloaded
    * Set by module loader for files that export cleanup handlers
    */
-  public cleanup?: () => void;
+  public cleanup?: (() => void)[] | (() => void);
 
   /**
    * Whether imports have been transformed to cache paths

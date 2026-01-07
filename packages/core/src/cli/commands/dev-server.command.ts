@@ -12,7 +12,7 @@ export const devServerCommand = command({
     connectors: true, // load all connectors
   },
   preAction: async () => {
-    await displayStartupBanner();
+    await displayStartupBanner({ environment: "development" });
   },
   action: async () => {
     await startDevelopmentServer();

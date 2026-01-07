@@ -5,6 +5,7 @@ import type {
   CLICommandPreload,
   CLICommandSource,
   CommandActionData,
+  ResolvedCLICommandOption,
 } from "./types";
 
 export class CLICommand {
@@ -37,7 +38,7 @@ export class CLICommand {
   /**
    * Command options
    */
-  public commandOptions: CLICommandOption[] = [];
+  public commandOptions: ResolvedCLICommandOption[] = [];
 
   /**
    * Command relative path
@@ -124,7 +125,8 @@ export class CLICommand {
    * Add command options
    */
   public options(options: CLICommandOption[]): this {
-    this.commandOptions.push(...options);
+    options.map((option) => this.option(option));
+
     return this;
   }
 
@@ -170,14 +172,14 @@ export class CLICommand {
    * - "--port" → name: "port", alias: undefined
    * - "-p" → name: "p", alias: undefined
    */
-  protected parseOption(option: CLICommandOption): CLICommandOption {
+  protected parseOption(option: CLICommandOption): ResolvedCLICommandOption {
     const text = option.text.trim();
 
     // Split by comma to check for alias
     const parts = text.split(",").map((part) => part.trim());
 
     let name = "";
-    let alias: string | undefined;
+    let alias = "";
 
     if (parts.length === 1) {
       // Single option: "--port" or "-p"
@@ -195,6 +197,10 @@ export class CLICommand {
         name = this.extractOptionName(second);
         alias = this.extractOptionName(first);
       }
+    }
+
+    if (alias === "h" || name === "help") {
+      throw new Error("Help option is not allowed, it's reserved for displaying command help");
     }
 
     return {

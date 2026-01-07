@@ -25,6 +25,7 @@ export const imageRule: SchemaRule = {
     if (value instanceof UploadedFile && value.isImage) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };
@@ -36,8 +37,7 @@ export const fileExtensionRule: SchemaRule<{
   extensions: string | string[];
 }> = {
   name: "fileExtension",
-  errorMessage:
-    "The :input must have one of the following extensions: :extensions",
+  errorMessage: "The :input must have one of the following extensions: :extensions",
   async validate(value: any, context) {
     let extensions = this.context.options.extensions;
 

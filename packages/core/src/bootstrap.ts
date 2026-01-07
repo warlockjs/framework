@@ -4,6 +4,7 @@ import { captureAnyUnhandledRejection } from "@warlock.js/logger";
 
 export async function bootstrap() {
   await loadEnv();
+
   initializeDayjs();
   captureAnyUnhandledRejection();
 }

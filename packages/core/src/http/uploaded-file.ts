@@ -7,12 +7,22 @@ import { storage, type ScopedStorage, type StorageDriverName, type StorageFile }
 import { sanitizePath } from "../utils/paths";
 import { uploadsConfig } from "./uploads-config";
 import type {
+  FileNamingStrategy,
   ImageTransformCallback,
   PrefixConfig,
   SaveAsOptions,
   SaveOptions,
   UploadedFileImageOptions,
 } from "./uploads-types";
+
+type UploadedFileMetadata = {
+  name: string;
+  mimeType: string;
+  extension: string;
+  size: number;
+  width?: number;
+  height?: number;
+};
 
 /**
  * Options for validating file before saving
@@ -147,6 +157,26 @@ export class UploadedFile {
    */
   public get extension(): string {
     return path.extname(this.fileData.filename).replace(".", "").toLowerCase();
+  }
+
+  /**
+   * Get file metadata
+   */
+  public async metadata(): Promise<UploadedFileMetadata> {
+    const data: UploadedFileMetadata = {
+      name: this.name,
+      mimeType: this.mimeType,
+      extension: this.extension,
+      size: await this.size(),
+    };
+
+    if (this.isImage) {
+      const dimensions = await this.dimensions();
+      data.width = dimensions.width;
+      data.height = dimensions.height;
+    }
+
+    return data;
   }
 
   /**
@@ -457,7 +487,8 @@ export class UploadedFile {
 
   /**
    * Save the file to a directory with automatic naming
-   *
+   * Keep in mind to use only relative path to the root of storage
+   * If you are using local driver
    * Uses the configured naming strategy and prefix options to generate
    * the final path. Returns a StorageFile for accessing file metadata.
    *
@@ -642,13 +673,11 @@ export class UploadedFile {
    * @internal
    */
   protected resolveStorage(driver?: StorageDriverName): ScopedStorage | typeof storage {
-    if (this._storage) {
-      return this._storage;
-    }
     if (driver) {
       return storage.use(driver);
     }
-    return storage;
+
+    return this._storage || storage;
   }
 
   /**
@@ -656,7 +685,7 @@ export class UploadedFile {
    * @internal
    */
   protected resolveFilename(options?: SaveOptions): string {
-    const namingStrategy = options?.name ?? uploadsConfig("name") ?? "random";
+    const namingStrategy: FileNamingStrategy = options?.name ?? uploadsConfig("name") ?? "random";
     let baseName: string;
 
     if (namingStrategy === "original") {
@@ -687,12 +716,12 @@ export class UploadedFile {
         return "";
       }
       // Use config prefix if no explicit prefix provided
-      return this.resolvePrefix(configPrefix);
+      prefix = configPrefix;
     }
 
     // Boolean true = use default format
     if (prefix === true) {
-      const format = uploadsConfig("defaultPrefixFormat") ?? "dd-mm-yyyy-HH-ii-ss";
+      const format = uploadsConfig("defaultPrefixFormat")!;
       return this.formatDatePrefix(format, "file");
     }
 

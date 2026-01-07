@@ -41,7 +41,7 @@ export class RouteRegistry {
    * Register a single route
    */
   public registerRoute(route: Route): void {
-    this.router.on(route.method as HTTPMethod, route.path, (req, params) => {
+    this.router.on(route.method as HTTPMethod, route.path, (req, res, params) => {
       // Store the route and params for later use
       return { route, params };
     });
@@ -66,13 +66,7 @@ export class RouteRegistry {
 
     // find-my-way handler expects (req, res, params, store, searchParams)
     // We only care about the return value which contains { route, params }
-    return match.handler(
-      null as any,
-      null as any,
-      match.params,
-      match.store,
-      {},
-    );
+    return match.handler(null as any, null as any, match.params, match.store, {});
   }
 
   /**
@@ -82,6 +76,6 @@ export class RouteRegistry {
     return this.router
       .prettyPrint()
       .split("\n")
-      .filter(line => line.trim()).length;
+      .filter((line) => line.trim()).length;
   }
 }

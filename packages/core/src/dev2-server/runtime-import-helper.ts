@@ -1,4 +1,5 @@
 import { pathToFileURL } from "node:url";
+import { filesOrchestrator } from "./files-orchestrator";
 import { warlockCachePath } from "./utils";
 
 /**
@@ -100,34 +101,42 @@ async function __import(modulePath: string): Promise<any> {
     // Wait for the import to complete
     const module = await importPromise;
 
+    if (module) {
+      const fileManager = Array.from(filesOrchestrator.files.values()).find((fileManager) => {
+        return fileManager.cachePath === cleanPath;
+      });
+
+      if (fileManager) {
+        if (module.cleanup) {
+          fileManager.cleanup = module.cleanup;
+        } else {
+          // another workaround is to auto detect if any of the imports has a $cleanup methods
+          // if yes, then execute them all
+          const cleanups: (() => void)[] = [];
+          for (const exportedValue of Object.values(module)) {
+            const cleanup = (exportedValue as any)?.$cleanup;
+            if (cleanup) {
+              cleanups.push(cleanup.bind(exportedValue));
+            }
+          }
+
+          if (cleanups.length > 0) {
+            fileManager.cleanup = cleanups;
+          }
+        }
+      }
+    }
+
     return module;
   } catch (error) {
+    console.log("Error while importing", error);
+
     // Remove from cache on error so it can be retried
     modulePromises.delete(cleanPath);
     throw error;
   } finally {
     // Mark module as no longer loading
     loadingModules.delete(cleanPath);
-  }
-}
-
-/**
- * Update the version timestamp for a module
- * This forces the next import to load a fresh version
- *
- * @param modulePath - The path to the module
- * @param timestamp - Optional timestamp (defaults to current time)
- */
-function __updateModuleVersion(modulePath: string, timestamp?: number): void {
-  const cleanPath = normalizePath(modulePath);
-
-  // Update the version timestamp
-  moduleVersions.set(cleanPath, timestamp || Date.now());
-
-  // Clear the cached promise so the new version gets loaded
-  // Only clear if the module is not currently loading (to avoid breaking circular deps)
-  if (!loadingModules.has(cleanPath)) {
-    modulePromises.delete(cleanPath);
   }
 }
 
@@ -174,7 +183,6 @@ function __getModuleVersion(modulePath: string): number | undefined {
 // Make functions available globally
 declare global {
   var __import: (modulePath: string) => Promise<any>;
-  var __updateModuleVersion: (modulePath: string, timestamp?: number) => void;
   var __clearModuleVersion: (modulePath: string) => void;
   var __clearAllModuleVersions: () => void;
   var __getModuleVersion: (modulePath: string) => number | undefined;
@@ -183,7 +191,6 @@ declare global {
 // Export for initialization
 export function initializeRuntimeImportHelper(): void {
   (global as any).__import = __import;
-  (global as any).__updateModuleVersion = __updateModuleVersion;
   (global as any).__clearModuleVersion = __clearModuleVersion;
   (global as any).__clearAllModuleVersions = __clearAllModuleVersions;
   (global as any).__getModuleVersion = __getModuleVersion;

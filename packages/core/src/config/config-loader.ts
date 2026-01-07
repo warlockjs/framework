@@ -48,16 +48,21 @@ export class ConfigLoader {
 
     try {
       // Convert absolute path to file:// URL for cross-platform compatibility
-      let fileUrl = pathToFileURL(warlockCachePath(file.cachePath)).href;
+      let fileUrl =
+        typeof __import !== "undefined"
+          ? file.cachePath
+          : pathToFileURL(warlockCachePath(file.cachePath)).href;
 
       // Add timestamp for cache busting (forces re-import for HMR)
-      if (bustCache) {
+      if (bustCache && typeof __import === "undefined") {
         const timestamp = Date.now();
         fileUrl += `?t=${timestamp}`;
       }
 
       // Dynamic import the config file
-      const configModule = await import(fileUrl);
+
+      const configModule =
+        typeof __import !== "undefined" ? await __import(fileUrl) : await import(fileUrl);
 
       // Get the default export (the config value)
       const configValue = configModule.default;

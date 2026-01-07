@@ -1,6 +1,7 @@
 import { colors } from "@mongez/copper";
 import { getJsonFileAsync } from "@mongez/fs";
 import path from "path";
+import { Environment } from "../utils";
 
 export function isMatchingCommandName(commandName: string, targetingCommandName: string) {
   return commandName.split(" ")[0] === targetingCommandName;
@@ -18,7 +19,7 @@ export async function getWarlockVersion(): Promise<string> {
   if (cachedVersion) return cachedVersion;
 
   const frameworkPackageJson = await getJsonFileAsync(
-    path.join(import.meta.dirname, "../../package.json"),
+    path.join(import.meta.dirname, "./../../package.json"),
   );
 
   const version = frameworkPackageJson.version.replace(/\^|\~/g, "");
@@ -34,14 +35,30 @@ export async function displayWarlockVersionInTerminal() {
   console.log(`⚡ ${colors.bold("Warlock.js")} ${colors.greenBright(`v${version}`)}`);
 }
 
+type StartBannerOptions = {
+  environment: Environment;
+};
+
+function getTextColorMethod(environment: Environment) {
+  switch (environment) {
+    case "development":
+      return colors.yellowBright;
+    case "production":
+      return colors.greenBright;
+    case "test":
+      return colors.blueBright;
+    default:
+      return colors.whiteBright;
+  }
+}
+
 /**
  * Display CLI startup banner
  */
-export async function displayStartupBanner() {
+export async function displayStartupBanner({ environment }: StartBannerOptions) {
   const version = await getWarlockVersion();
-  console.log(
-    `  ⚡ ${colors.bold(colors.yellowBright("Warlock.js"))} ${colors.dim(`v${version}`)}`,
-  );
+  const textColorMethod = getTextColorMethod(environment);
+  console.log(`  ⚡ ${colors.bold(textColorMethod("Warlock.js"))} ${colors.dim(`v${version}`)}`);
   console.log();
 }
 

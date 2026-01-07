@@ -1,4 +1,10 @@
-import { ensureDirectoryAsync, fileExistsAsync, unlinkAsync } from "@mongez/fs";
+import {
+  ensureDirectoryAsync,
+  fileExistsAsync,
+  removeDirectoryAsync,
+  unlinkAsync,
+} from "@mongez/fs";
+import { ltrim } from "@mongez/reinforcements";
 import crypto from "crypto";
 import { createReadStream, createWriteStream } from "fs";
 import { copyFile, readFile, readdir, rename, stat, writeFile } from "fs/promises";
@@ -7,12 +13,15 @@ import type { Readable } from "stream";
 import { pipeline } from "stream/promises";
 import { UploadedFile } from "../../http";
 import { storagePath } from "../../utils/paths";
+import { url } from "../../utils/urls";
+import { storageDriverContext } from "../context/storage-driver-context";
 import type {
   DeleteManyResult,
   ListOptions,
   LocalStorageDriverOptions,
   PutOptions,
   StorageDriverContract,
+  StorageDriverType,
   StorageFileData,
   StorageFileInfo,
   TemporaryTokenPayload,
@@ -33,7 +42,7 @@ export class LocalDriver implements StorageDriverContract {
   /**
    * Driver name
    */
-  public readonly name = "local";
+  public readonly name: StorageDriverType = "local";
 
   /**
    * Root path for storage
@@ -43,7 +52,7 @@ export class LocalDriver implements StorageDriverContract {
   /**
    * URL prefix for file URLs
    */
-  protected urlPrefix: string;
+  protected urlPrefix: string = "";
 
   /**
    * URL prefix for temporary file URLs
@@ -55,11 +64,47 @@ export class LocalDriver implements StorageDriverContract {
    */
   protected signatureKey?: string;
 
-  public constructor(options: LocalStorageDriverOptions = {}) {
+  public constructor(public options: LocalStorageDriverOptions = {}) {
     this.root = options.root || storagePath();
-    this.urlPrefix = options.urlPrefix || "/uploads";
+    if (options.urlPrefix) {
+      this.urlPrefix = options.urlPrefix;
+    }
+
     this.temporaryUrlPrefix = options.temporaryUrlPrefix || "/temp-files";
     this.signatureKey = options.signatureKey;
+  }
+
+  // ============================================================
+  // Prefix Operations
+  // ============================================================
+
+  /**
+   * Apply prefix to location path
+   *
+   * Priority: context prefix > driver options prefix > no prefix
+   * This allows multi-tenant scenarios where context overrides driver config.
+   *
+   * @param location - Original location path
+   * @returns Location with prefix applied if one exists
+   */
+  public applyPrefix(location: string): string {
+    // Check context prefix first (highest priority)
+    const contextPrefix = storageDriverContext.getPrefix();
+    const prefix = contextPrefix || this.options.prefix;
+
+    if (!prefix) {
+      return location;
+    }
+
+    const cleanPrefix = prefix.replace(/\/+$/, "");
+    const cleanLocation = location.replace(/^\/+/, "");
+
+    // Avoid double-prefixing
+    if (cleanLocation.startsWith(cleanPrefix + "/") || cleanLocation === cleanPrefix) {
+      return cleanLocation;
+    }
+
+    return `${cleanPrefix}/${cleanLocation}`;
   }
 
   // ============================================================
@@ -191,6 +236,15 @@ export class LocalDriver implements StorageDriverContract {
   }
 
   /**
+   * Delete directory
+   */
+  public async deleteDirectory(directoryPath: string) {
+    await removeDirectoryAsync(directoryPath);
+
+    return true;
+  }
+
+  /**
    * Check if file exists
    */
   public async exists(location: string): Promise<boolean> {
@@ -206,7 +260,7 @@ export class LocalDriver implements StorageDriverContract {
    * Get public URL for file
    */
   public url(location: string): string {
-    return `${this.urlPrefix}/${location}`;
+    return url(this.urlPrefix + "/" + ltrim(location, "/"));
   }
 
   /**
@@ -495,7 +549,8 @@ export class LocalDriver implements StorageDriverContract {
    * Get absolute file path
    */
   protected getAbsolutePath(location: string): string {
-    return join(this.root, location);
+    const prefixedLocation = this.applyPrefix(location);
+    return join(this.root, prefixedLocation);
   }
 
   /**

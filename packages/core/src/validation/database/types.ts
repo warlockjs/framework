@@ -1,14 +1,14 @@
-import type { Aggregate, Model } from "@warlock.js/cascade";
+import type { ChildModel, Model, QueryBuilderContract } from "@warlock.js/cascade";
 
 /**
  * Base options for database query rules
  */
 export type BaseQueryRuleOptions = {
   /** The Model to query against */
-  Model: typeof Model | string;
+  Model: ChildModel<Model>;
   /** Callback to customize the query */
   query?: (options: {
-    query: Aggregate;
+    query: QueryBuilderContract;
     value: any;
     allValues: any;
   }) => void | Promise<void>;

@@ -39,6 +39,24 @@ export enum ResponseStatus {
   SERVICE_UNAVAILABLE = 503,
 }
 
+/**
+ * Options for sending files
+ */
+export type SendFileOptions = {
+  cacheTime?: number;
+  immutable?: boolean;
+  inline?: boolean;
+  filename?: string;
+};
+
+/**
+ * Options for sending buffers
+ */
+export type SendBufferOptions = SendFileOptions & {
+  contentType?: string;
+  etag?: string;
+};
+
 export class Response {
   /**
    * Current route
@@ -274,8 +292,11 @@ export class Response {
 
   /**
    * Send the response
+   * @param data - Response data
+   * @param statusCode - HTTP status code
+   * @param triggerEvents - Whether to trigger response events (default: true)
    */
-  public async send(data?: any, statusCode?: number): Promise<Response> {
+  public async send(data?: any, statusCode?: number, triggerEvents = true): Promise<Response> {
     if (statusCode) {
       this.currentStatusCode = statusCode;
     }
@@ -296,22 +317,24 @@ export class Response {
       this.setContentType("application/json");
     }
 
-    await Response.trigger("sending", this);
+    if (triggerEvents) {
+      await Response.trigger("sending", this);
 
-    for (const callback of this.events.get("sending") || []) {
-      await callback(this);
-    }
-
-    if (this.isJson) {
-      await Response.trigger("sendingJson", this);
-      for (const callback of this.events.get("sendingJson") || []) {
+      for (const callback of this.events.get("sending") || []) {
         await callback(this);
       }
 
-      if (this.isOk) {
-        await Response.trigger("sendingSuccessJson", this);
-        for (const callback of this.events.get("sendingSuccessJson") || []) {
+      if (this.isJson) {
+        await Response.trigger("sendingJson", this);
+        for (const callback of this.events.get("sendingJson") || []) {
           await callback(this);
+        }
+
+        if (this.isOk) {
+          await Response.trigger("sendingSuccessJson", this);
+          for (const callback of this.events.get("sendingSuccessJson") || []) {
+            await callback(this);
+          }
         }
       }
     }
@@ -331,56 +354,58 @@ export class Response {
 
     this.log("Response sent");
 
-    // trigger the sent event
-    Response.trigger("sent", this);
+    if (triggerEvents) {
+      // trigger the sent event
+      Response.trigger("sent", this);
 
-    for (const callback of this.events.get("sent") || []) {
-      callback(this);
-    }
+      for (const callback of this.events.get("sent") || []) {
+        callback(this);
+      }
 
-    // trigger the success event if the status code is 2xx
-    if (this.currentStatusCode >= 200 && this.currentStatusCode < 300) {
-      Response.trigger("success", this);
-    }
+      // trigger the success event if the status code is 2xx
+      if (this.currentStatusCode >= 200 && this.currentStatusCode < 300) {
+        Response.trigger("success", this);
+      }
 
-    // trigger the successCreate event if the status code is 201
-    if (this.currentStatusCode === 201) {
-      Response.trigger("successCreate", this);
-    }
+      // trigger the successCreate event if the status code is 201
+      if (this.currentStatusCode === 201) {
+        Response.trigger("successCreate", this);
+      }
 
-    // trigger the badRequest event if the status code is 400
-    if (this.currentStatusCode === 400) {
-      Response.trigger("badRequest", this);
-    }
+      // trigger the badRequest event if the status code is 400
+      if (this.currentStatusCode === 400) {
+        Response.trigger("badRequest", this);
+      }
 
-    // trigger the unauthorized event if the status code is 401
-    if (this.currentStatusCode === 401) {
-      Response.trigger("unauthorized", this);
-    }
+      // trigger the unauthorized event if the status code is 401
+      if (this.currentStatusCode === 401) {
+        Response.trigger("unauthorized", this);
+      }
 
-    // trigger the forbidden event if the status code is 403
-    if (this.currentStatusCode === 403) {
-      Response.trigger("forbidden", this);
-    }
+      // trigger the forbidden event if the status code is 403
+      if (this.currentStatusCode === 403) {
+        Response.trigger("forbidden", this);
+      }
 
-    // trigger the notFound event if the status code is 404
-    if (this.currentStatusCode === 404) {
-      Response.trigger("notFound", this);
-    }
+      // trigger the notFound event if the status code is 404
+      if (this.currentStatusCode === 404) {
+        Response.trigger("notFound", this);
+      }
 
-    // trigger the throttled event if the status code is 429
-    if (this.currentStatusCode === 429) {
-      Response.trigger("throttled", this);
-    }
+      // trigger the throttled event if the status code is 429
+      if (this.currentStatusCode === 429) {
+        Response.trigger("throttled", this);
+      }
 
-    // trigger the serverError event if the status code is 500
-    if (this.currentStatusCode === 500) {
-      Response.trigger("serverError", this);
-    }
+      // trigger the serverError event if the status code is 500
+      if (this.currentStatusCode === 500) {
+        Response.trigger("serverError", this);
+      }
 
-    // trigger the error event if the status code is 4xx or 5xx
-    if (this.currentStatusCode >= 400) {
-      Response.trigger("error", this);
+      // trigger the error event if the status code is 4xx or 5xx
+      if (this.currentStatusCode >= 400) {
+        Response.trigger("error", this);
+      }
     }
 
     return this;
@@ -415,70 +440,249 @@ export class Response {
   }
 
   /**
-   * send stream response
-   * @TODO: check this later as it is not working in some how
+   * Create a streaming response for progressive/chunked data sending
+   *
+   * This method allows you to send data in chunks and control when the response ends.
+   * Perfect for Server-Sent Events (SSE), progressive rendering, or streaming large responses.
+   *
+   * @example
+   * ```ts
+   * const stream = response.stream("text/html");
+   * stream.send("<html><body>");
+   * stream.send("<h1>Hello</h1>");
+   * stream.render(<MyComponent />);
+   * stream.send("</body></html>");
+   * stream.end();
+   * ```
+   *
+   * @param contentType - The content type for the stream (default: "text/plain")
+   * @returns Stream controller with send(), render(), and end() methods
    */
   public stream(contentType = "text/plain") {
-    // we need to return an object with two methods
-    // send: to send the data to the client
-    // end: to end the stream
-    // by default the content type will be set to text/html
-    // we will use fastify response raw to send the data
-    // and we will use the stream to end the stream
-    // set the content type to text/html
-    // we need also to add the charset to be utf-8
+    // Set headers using the response API
+    this.setContentType(contentType);
+    this.header("Transfer-Encoding", "chunked");
+    this.header("Cache-Control", "no-cache");
+    this.header("Connection", "keep-alive");
+    this.header("X-Content-Type-Options", "nosniff");
 
-    this.baseResponse.raw.writeHead(this.statusCode, {
-      "Content-Type": contentType,
-      "Transfer-Encoding": "chunked",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-      "X-Content-Type-Options": "nosniff",
-    });
+    // Trigger sending events
+    Response.trigger("sending", this);
+    for (const callback of this.events.get("sending") || []) {
+      callback(this);
+    }
 
-    // return the stream object
+    this.log("Starting stream");
+
+    // Track stream state
+    let isEnded = false;
+    const chunks: any[] = [];
+
+    // Write headers to start the stream
+    // Note: We use raw here because we need chunked encoding control
+    // This is the only valid use case for bypassing Fastify's abstraction
+    this.baseResponse.raw.writeHead(this.statusCode, this.getHeaders() as any);
+
     return {
+      /**
+       * Send a chunk of data to the client
+       * @param data - Data to send (string, Buffer, or any serializable data)
+       */
       send: (data: any) => {
+        if (isEnded) {
+          throw new Error("Cannot send data: stream has already ended");
+        }
+
         this.baseResponse.raw.write(data);
+
+        return this;
       },
-      end: () => {
-        this.baseResponse.raw.end();
-      },
+
+      /**
+       * Render a React component and send it as a chunk
+       * @param element - React element or component to render
+       */
       render: (element: ReactNode) => {
+        if (isEnded) {
+          throw new Error("Cannot render: stream has already ended");
+        }
+
         const html = renderReact(element);
+        chunks.push(html);
         this.baseResponse.raw.write(html);
+
+        return this;
+      },
+
+      /**
+       * End the stream and trigger completion events
+       */
+      end: () => {
+        if (isEnded) {
+          return this;
+        }
+
+        isEnded = true;
+
+        // Store the streamed content for logging/debugging
+        this.currentBody = chunks;
+        this.parsedBody = chunks;
+
+        // End the response
+        this.baseResponse.raw.end();
+
+        this.log("Stream ended");
+
+        // Trigger sent events
+        Response.trigger("sent", this);
+        for (const callback of this.events.get("sent") || []) {
+          callback(this);
+        }
+
+        // Trigger success event if status is 2xx
+        if (this.isOk) {
+          Response.trigger("success", this);
+        }
+
+        // Trigger status-specific events
+        if (this.currentStatusCode === 201) {
+          Response.trigger("successCreate", this);
+        }
+
+        return this;
+      },
+
+      /**
+       * Check if the stream has ended
+       */
+      get ended() {
+        return isEnded;
       },
     };
   }
 
   /**
-   * Stream file
+   * Create a Server-Sent Events (SSE) stream
    *
-   * @todo: Still in progress specially with large files
+   * SSE is a standard for pushing real-time updates from server to client.
+   * Perfect for live notifications, progress updates, or real-time data feeds.
+   *
+   * @example
+   * ```ts
+   * const sse = response.sse();
+   *
+   * // Send events
+   * sse.send("message", { text: "Hello!" });
+   * sse.send("notification", { type: "info", message: "Update available" }, "msg-123");
+   *
+   * // Keep connection alive
+   * const keepAlive = setInterval(() => sse.comment("ping"), 30000);
+   *
+   * // Clean up when done
+   * clearInterval(keepAlive);
+   * sse.end();
+   * ```
+   *
+   * @returns SSE controller with send(), comment(), and end() methods
    */
-  private async streamFile(filePath: string) {
-    if (!(await fileExistsAsync(filePath))) {
-      return this.notFound({
-        error: "File Not Found",
-      });
+  public sse() {
+    // Set SSE-specific headers
+    this.setContentType("text/event-stream");
+    this.header("Cache-Control", "no-cache, no-store, must-revalidate");
+    this.header("Connection", "keep-alive");
+    this.header("X-Accel-Buffering", "no"); // Disable nginx buffering
+
+    // Trigger sending events
+    Response.trigger("sending", this);
+    for (const callback of this.events.get("sending") || []) {
+      callback(this);
     }
 
-    try {
-      const reply = this.baseResponse;
+    this.log("Starting SSE stream");
 
-      reply.raw.writeHead(this.statusCode, {
-        "Content-Type": this.getFileContentType(filePath),
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-        "Transfer-Encoding": "chunked",
-      });
+    // Track stream state
+    let isEnded = false;
+    const events: any[] = [];
 
-      const readStream = fs.createReadStream(filePath);
+    // Write headers to start the stream
+    this.baseResponse.raw.writeHead(this.statusCode, this.getHeaders() as any);
 
-      return this.baseResponse.send(readStream);
-    } catch (error: any) {
-      return this.serverError(error.message);
-    }
+    return {
+      /**
+       * Send an SSE event
+       * @param event - Event name (e.g., "message", "notification")
+       * @param data - Event data (will be JSON stringified)
+       * @param id - Optional event ID for client-side tracking
+       */
+      send: (event: string, data: any, id?: string) => {
+        if (isEnded) {
+          throw new Error("Cannot send event: SSE stream has already ended");
+        }
+
+        let message = "";
+        if (id) message += `id: ${id}\n`;
+        message += `event: ${event}\n`;
+        message += `data: ${JSON.stringify(data)}\n\n`;
+
+        events.push({ event, data, id });
+        this.baseResponse.raw.write(message);
+
+        return this;
+      },
+
+      /**
+       * Send a comment (keeps connection alive, invisible to client)
+       * Useful for preventing timeout on long-lived connections
+       * @param text - Comment text
+       */
+      comment: (text: string) => {
+        if (isEnded) {
+          throw new Error("Cannot send comment: SSE stream has already ended");
+        }
+
+        this.baseResponse.raw.write(`: ${text}\n\n`);
+
+        return this;
+      },
+
+      /**
+       * End the SSE stream and trigger completion events
+       */
+      end: () => {
+        if (isEnded) {
+          return;
+        }
+
+        isEnded = true;
+
+        // Store the events for logging/debugging
+        this.currentBody = events;
+        this.parsedBody = events;
+
+        // End the response
+        this.baseResponse.raw.end();
+
+        this.log("SSE stream ended");
+
+        // Trigger sent events
+        Response.trigger("sent", this);
+        for (const callback of this.events.get("sent") || []) {
+          callback(this);
+        }
+
+        // Trigger success event if status is 2xx
+        if (this.isOk) {
+          Response.trigger("success", this);
+        }
+      },
+
+      /**
+       * Check if the stream has ended
+       */
+      get ended() {
+        return isEnded;
+      },
+    };
   }
 
   /**
@@ -632,23 +836,212 @@ export class Response {
   }
 
   /**
-   * Send a file as a response
+   * Send a no content response with status code 204
    */
-  public sendFile(path: string, cacheTime?: number) {
-    this.log(`Sending file: ${path}`);
+  public noContent() {
+    return this.baseResponse.status(204).send();
+  }
 
-    const fileContent = fs.readFileSync(path);
+  /**
+   * Send an accepted response with status code 202
+   * Used for async operations that have been accepted but not yet processed
+   */
+  public accepted(data: any = { message: "Request accepted for processing" }) {
+    return this.send(data, 202);
+  }
 
-    if (cacheTime) {
-      // cache the file for 1 year
-      this.header("Cache-Control", "public, max-age=" + cacheTime);
-      // set expires header to 1 year
-      this.header("Expires", new Date(Date.now() + cacheTime).toUTCString());
+  /**
+   * Send a conflict response with status code 409
+   */
+  public conflict(data: any = { error: "Resource conflict" }) {
+    return this.send(data, 409);
+  }
+
+  /**
+   * Send an unprocessable entity response with status code 422
+   * Used for semantic validation errors
+   */
+  public unprocessableEntity(data: any) {
+    return this.send(data, 422);
+  }
+
+  /**
+   * Apply response options (cache, disposition, etag)
+   * Shared helper for sendFile and sendBuffer
+   */
+  private applyResponseOptions(options: SendBufferOptions, defaultFilename?: string): boolean {
+    // Set content type if provided
+    if (options.contentType) {
+      this.baseResponse.type(options.contentType);
     }
 
-    this.baseResponse.type(this.getFileContentType(path));
-    this.baseResponse.send(fileContent);
-    return this;
+    // Set cache headers if specified
+    if (options.cacheTime) {
+      const cacheControl = options.immutable
+        ? `public, max-age=${options.cacheTime}, immutable`
+        : `public, max-age=${options.cacheTime}`;
+      this.header("Cache-Control", cacheControl);
+      this.header("Expires", new Date(Date.now() + options.cacheTime * 1000).toUTCString());
+    }
+
+    // Set ETag if provided (for conditional requests)
+    if (options.etag) {
+      this.header("ETag", options.etag);
+
+      // Check If-None-Match for conditional request
+      const ifNoneMatch = this.request.header("if-none-match");
+      if (ifNoneMatch && ifNoneMatch === options.etag) {
+        this.log("Content not modified (ETag match), sending 304");
+        this.baseResponse.status(304).send();
+        return true; // Indicates 304 was sent
+      }
+    }
+
+    // Set Content-Disposition if inline or filename is specified
+    if (options.inline !== undefined || options.filename) {
+      const disposition = options.inline ? "inline" : "attachment";
+      const filename = options.filename || defaultFilename || "file";
+      this.header("Content-Disposition", `${disposition}; filename=\"${filename}\"`);
+    }
+
+    return false; // No 304 sent
+  }
+
+  /**
+   * Send a file as a response
+   */
+  public async sendFile(filePath: string, options?: number | SendFileOptions) {
+    this.log(`Sending file: ${filePath}`);
+
+    // Check if file exists first
+    if (!(await fileExistsAsync(filePath))) {
+      return this.notFound({
+        error: "File Not Found",
+      });
+    }
+
+    try {
+      // Normalize options to object format
+      const opts = typeof options === "number" ? { cacheTime: options } : options || {};
+
+      // Get file stats for ETag and Last-Modified
+      const stats = await fs.promises.stat(filePath);
+      const lastModified = stats.mtime;
+
+      // Generate ETag based on file size and modification time
+      const etag = `"${stats.size}-${stats.mtime.getTime()}"`;
+
+      // Set Last-Modified header
+      this.header("Last-Modified", lastModified.toUTCString());
+      this.header("ETag", etag);
+
+      // Set content type
+      const contentType = this.getFileContentType(filePath);
+      this.baseResponse.type(contentType);
+
+      // Apply common response options (cache, disposition)
+      const defaultFilename = path.basename(filePath);
+      const sent304 = this.applyResponseOptions({ ...opts, etag, contentType }, defaultFilename);
+      if (sent304) return this.baseResponse;
+
+      // Check conditional request headers
+      const ifNoneMatch = this.request.header("if-none-match");
+      const ifModifiedSince = this.request.header("if-modified-since");
+
+      // Handle If-None-Match (ETag validation)
+      if (ifNoneMatch && ifNoneMatch === etag) {
+        this.log("File not modified (ETag match), sending 304");
+        return this.baseResponse.status(304).send();
+      }
+
+      // Handle If-Modified-Since (Last-Modified validation)
+      if (ifModifiedSince) {
+        const modifiedSinceDate = new Date(ifModifiedSince);
+        if (lastModified.getTime() <= modifiedSinceDate.getTime()) {
+          this.log("File not modified (Last-Modified check), sending 304");
+          return this.baseResponse.status(304).send();
+        }
+      }
+
+      // Use streaming for efficient file sending
+      const stream = fs.createReadStream(filePath);
+
+      // Handle stream errors
+      stream.on("error", (error) => {
+        this.log(`Error reading file: ${error.message}`, "error");
+        if (!this.baseResponse.sent) {
+          this.serverError({
+            error: "Error reading file",
+            message: error.message,
+          });
+        }
+      });
+
+      // Send the stream
+      return this.baseResponse.send(stream);
+    } catch (error: any) {
+      this.log(`Error sending file: ${error.message}`, "error");
+      return this.serverError({
+        error: "Error sending file",
+        message: error.message,
+      });
+    }
+  }
+
+  /**
+   * Send buffer as a response
+   * Useful for dynamically generated content (e.g., resized images, generated PDFs)
+   */
+  public sendBuffer(buffer: Buffer, options?: number | SendBufferOptions) {
+    this.log("Sending buffer");
+
+    // Normalize options to object format
+    const opts = typeof options === "number" ? { cacheTime: options } : options || {};
+
+    // Apply common response options (cache, disposition, etag)
+    const sent304 = this.applyResponseOptions(opts);
+    if (sent304) return this.baseResponse;
+
+    return this.baseResponse.send(buffer);
+  }
+
+  /**
+   * Send an Image instance as a response
+   * Automatically detects image format and sets content type
+   */
+  public async sendImage(
+    image: any, // Type as 'any' to avoid circular dependency with Image class
+    options?: number | (Omit<SendBufferOptions, "contentType"> & { contentType?: string }),
+  ) {
+    this.log("Sending image");
+
+    // Normalize options to object format
+    const opts = typeof options === "number" ? { cacheTime: options } : options || {};
+
+    // Get image metadata to determine format
+    const metadata = await image.metadata();
+    const format = metadata.format || "jpeg";
+
+    // Convert image to buffer
+    const buffer = await image.toBuffer();
+
+    // Auto-set content type if not provided
+    const contentType = opts.contentType || `image/${format}`;
+
+    // Auto-generate ETag if not provided
+    // Format: "format-widthxheight-size" (e.g., "jpeg-800x600-45231")
+    // This catches changes in dimensions, quality, filters, and format
+    if (!opts.etag) {
+      const width = metadata.width || 0;
+      const height = metadata.height || 0;
+      opts.etag = `"${format}-${width}x${height}-${buffer.length}"`;
+    }
+
+    // Apply common response options with auto-detected content type
+    const sent304 = this.applyResponseOptions({ ...opts, contentType });
+    if (sent304) return this.baseResponse;
+
+    return this.baseResponse.send(buffer);
   }
 
   /**
@@ -670,17 +1063,45 @@ export class Response {
   /**
    * Download the given file path
    */
-  public downloadFile(filePath: string, filename?: string) {
-    if (!filename) {
-      filename = path.basename(filePath);
+  public async downloadFile(filePath: string, filename?: string) {
+    // Check if file exists first
+    if (!(await fileExistsAsync(filePath))) {
+      return this.notFound({
+        error: "File Not Found",
+      });
     }
 
-    this.baseResponse.header("Content-Disposition", `attachment; filename="${filename}"`);
+    try {
+      if (!filename) {
+        filename = path.basename(filePath);
+      }
 
-    // this.baseResponse.header("Content-Type", this.getFileContentType(filePath));
-    this.baseResponse.header("Content-Type", "application/octet-stream");
+      this.baseResponse.header("Content-Disposition", `attachment; filename="${filename}"`);
 
-    this.baseResponse.send(fs.createReadStream(filePath));
+      // this.baseResponse.header("Content-Type", this.getFileContentType(filePath));
+      this.baseResponse.header("Content-Type", "application/octet-stream");
+
+      const stream = fs.createReadStream(filePath);
+
+      // Handle stream errors
+      stream.on("error", (error) => {
+        this.log(`Error reading file for download: ${error.message}`, "error");
+        if (!this.baseResponse.sent) {
+          this.serverError({
+            error: "Error reading file",
+            message: error.message,
+          });
+        }
+      });
+
+      return this.baseResponse.send(stream);
+    } catch (error: any) {
+      this.log(`Error downloading file: ${error.message}`, "error");
+      return this.serverError({
+        error: "Error downloading file",
+        message: error.message,
+      });
+    }
   }
 
   /**
@@ -695,21 +1116,23 @@ export class Response {
    * Mark the response as failed
    */
   public failedSchema(result: ValidationResult) {
-    const responseErrorsKey = config.get("validation.keys.response", "errors");
-    const inputKey = config.get("validation.keys.inputKey", "input");
-    const inputError = config.get("validation.keys.inputError", "error");
-    const responseStatus = config.get("validation.responseStatus", 400);
+    const { errors, inputKey, inputError, status } = config.get("validation.response", {
+      errors: "errors",
+      inputKey: "input",
+      inputError: "error",
+      status: 400,
+    });
 
     log.error("request", "validation", `${this.request.id} - Validation failed`);
 
     return this.send(
       {
-        [responseErrorsKey]: result.errors.map((error) => ({
+        [errors]: result.errors.map((error) => ({
           [inputKey]: error.input,
           [inputError]: error.error,
         })),
       },
-      responseStatus,
+      status,
     );
   }
 }

@@ -401,9 +401,9 @@ export class Request<User = any, RequestValidation = any> {
     // data.value appears only in the multipart form data
     // if it json, then just return the data
     if (data?.file) return new UploadedFile(data);
-
-    // this should not be considered used because the value key could be used as an actual input key
-    // if (data.value !== undefined) return data.value;
+    if (data?.value !== undefined && data?.fields && data?.type) {
+      data = data.value;
+    }
 
     if (data === "false") return false;
 
@@ -411,11 +411,7 @@ export class Request<User = any, RequestValidation = any> {
 
     if (data === "null") return null;
 
-    // if (isNumeric(data) && !String(data).startsWith("0")) return Number(data);
-
     if (typeof data === "string") return data.trim();
-
-    if (data?.value !== undefined && data?.fields && data?.type) return data.value;
 
     return data;
   }
@@ -862,6 +858,13 @@ export class Request<User = any, RequestValidation = any> {
     const value = this.input(key, defaultValue);
 
     return parseInt(value);
+  }
+
+  /**
+   * Shorthand getter to get id param
+   */
+  public get idParam() {
+    return this.int("id");
   }
 
   /**

@@ -1,5 +1,4 @@
 import { get } from "@mongez/reinforcements";
-import { Aggregate } from "@warlock.js/cascade";
 import { invalidRule, VALID_RULE, type SchemaRule } from "@warlock.js/seal";
 import type { UniqueRuleOptions } from "../types";
 
@@ -19,8 +18,7 @@ export const uniqueRule: SchemaRule<UniqueRuleOptions> = {
       query,
     } = this.context.options;
 
-    const dbQuery: Aggregate =
-      typeof Model !== "string" ? Model.aggregate() : new Aggregate(Model);
+    const dbQuery = Model.query();
 
     dbQuery.where(column, value);
 

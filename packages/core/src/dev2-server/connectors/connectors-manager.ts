@@ -3,7 +3,8 @@ import { devServeLog } from "../dev-logger";
 import { CacheConnector } from "./cache-connector";
 import { DatabaseConnector } from "./database-connector";
 import { HttpConnector } from "./http-connector";
-import type { Connector } from "./types";
+import { StorageConnector } from "./storage.connector";
+import type { Connector, ConnectorName } from "./types";
 
 export class ConnectorsManager {
   /**
@@ -18,6 +19,7 @@ export class ConnectorsManager {
     this.register(new HttpConnector());
     this.register(new DatabaseConnector());
     this.register(new CacheConnector());
+    this.register(new StorageConnector());
   }
 
   /**
@@ -39,7 +41,7 @@ export class ConnectorsManager {
   /**
    * start all connectors
    */
-  public async start(connectorsNames?: string[]): Promise<void> {
+  public async start(connectorsNames?: ConnectorName[]): Promise<void> {
     for (const connector of this.connectors) {
       if (connectorsNames && !connectorsNames.includes(connector.name)) continue;
 

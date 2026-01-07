@@ -13,9 +13,21 @@ export type LocalStorageDriverOptions = {
    * Defaults to storagePath() utility
    */
   root?: string;
+
   /**
-   * URL prefix for file URLs
-   * @default "/uploads"
+   * Storage path prefix auto-prepended to all file operations
+   * Applied when: put, putStream, copy, move, get, delete, exists, etc.
+   * Only applied if the path doesn't already start with this prefix.
+   *
+   * @example "production" → files stored in production/...
+   */
+  prefix?: string;
+
+  /**
+   * URL prefix prepended when generating public URLs via url() method
+   * Applied to: url() method only, always prepended
+   *
+   * @example "/uploads" → URLs like /uploads/production/file.jpg
    */
   urlPrefix?: string;
   /**
@@ -58,16 +70,44 @@ export type CloudStorageDriverOptions = {
    * Optional - derived from provider if not specified
    */
   endpoint?: string;
+
   /**
-   * Custom URL prefix for public URLs (e.g., CDN domain)
+   * Storage path prefix (S3 key prefix) auto-prepended to all file operations
+   * Applied when: put, putStream, copy, move, get, delete, exists, etc.
+   * Only applied if the path doesn't already start with this prefix.
+   *
+   * @example "production/app-name" → S3 keys like production/app-name/uploads/file.jpg
+   */
+  prefix?: string;
+
+  /**
+   * URL prefix prepended when generating public URLs via url() method
+   * Applied to: url() method only, always prepended
+   *
+   * Use cases:
+   * - CDN domain: "https://cdn.example.com"
+   * - Custom path: "/static"
+   * - API endpoint: "https://api.example.com/files"
+   *
+   * Note: For R2, this takes precedence over publicDomain
    */
   urlPrefix?: string;
+
+  /**
+   * Retry configuration for cloud operations
+   */
+  retry?: {
+    maxRetries?: number; // Default: 3
+    initialDelayMs?: number; // Default: 1000
+    maxDelayMs?: number; // Default: 10000
+    backoffMultiplier?: number; // Default: 2
+  };
 };
 
 /**
  * Options specific to Cloudflare R2 driver
  */
-export type R2StorageDriverOptions = CloudStorageDriverOptions & {
+export type R2StorageDriverOptions = Omit<CloudStorageDriverOptions, "region"> & {
   /**
    * Cloudflare account ID
    */
@@ -77,6 +117,12 @@ export type R2StorageDriverOptions = CloudStorageDriverOptions & {
    * If using Cloudflare CDN with custom domain
    */
   publicDomain?: string;
+  /**
+   * Region
+   *
+   * @default auto
+   */
+  region?: string;
 };
 
 // === DATA TYPES ===
@@ -85,11 +131,29 @@ export type R2StorageDriverOptions = CloudStorageDriverOptions & {
  * Base storage file data returned from operations
  */
 export type StorageFileData = {
+  /**
+   * File storage path (relative to storage root)
+   */
   path: string;
+  /**
+   * file full url, mostly used with cloud storage drivers
+   */
   url: string;
+  /**
+   * File size in bits
+   */
   size: number;
+  /**
+   * File hash
+   */
   hash: string;
+  /**
+   * File mime type
+   */
   mimeType: string;
+  /**
+   * Storage driver name
+   */
   driver: string;
 };
 
@@ -97,14 +161,41 @@ export type StorageFileData = {
  * Extended storage file data with cloud-specific metadata
  */
 export type CloudStorageFileData = StorageFileData & {
+  /**
+   * Cloud storage bucket name
+   */
   bucket: string;
+  /**
+   * Cloud storage region
+   */
   region: string;
+  /**
+   * ETag (cloud storage version identifier)
+   */
   etag?: string;
+  /**
+   * Version ID (cloud storage version identifier)
+   */
   versionId?: string;
+  /**
+   * Storage class (e.g., STANDARD, GLACIER)
+   */
   storageClass?: string;
+  /**
+   * Last modified date
+   */
   lastModified?: Date;
+  /**
+   * Content encoding
+   */
   contentEncoding?: string;
+  /**
+   * Cache control
+   */
   cacheControl?: string;
+  /**
+   * Custom metadata
+   */
   metadata?: Record<string, string>;
 };
 
@@ -112,13 +203,37 @@ export type CloudStorageFileData = StorageFileData & {
  * Storage file info for list and getInfo operations
  */
 export type StorageFileInfo = {
+  /**
+   * File storage path (relative to storage root)
+   */
   path: string;
+  /**
+   * File name
+   */
   name: string;
+  /**
+   * File size in bits
+   */
   size: number;
+  /**
+   * Whether the file is a directory
+   */
   isDirectory: boolean;
+  /**
+   * Last modified date
+   */
   lastModified?: Date;
+  /**
+   * File mime type
+   */
   mimeType?: string;
+  /**
+   * ETag (cloud storage version identifier)
+   */
   etag?: string;
+  /**
+   * Storage class (e.g., STANDARD, GLACIER)
+   */
   storageClass?: string;
 };
 
@@ -126,9 +241,21 @@ export type StorageFileInfo = {
  * Options for list operations
  */
 export type ListOptions = {
+  /**
+   * Whether to list files recursively
+   */
   recursive?: boolean;
+  /**
+   * Maximum number of files to return
+   */
   limit?: number;
+  /**
+   * Storage prefix to filter files
+   */
   prefix?: string;
+  /**
+   * Cursor for pagination
+   */
   cursor?: string;
 };
 
@@ -136,6 +263,9 @@ export type ListOptions = {
  * Options for presigned URLs
  */
 export type PresignedOptions = {
+  /**
+   * Expiration time in seconds
+   */
   expiresIn?: number;
 };
 
@@ -143,8 +273,17 @@ export type PresignedOptions = {
  * Options for presigned upload URLs
  */
 export type PresignedUploadOptions = PresignedOptions & {
+  /**
+   * File content type
+   */
   contentType?: string;
+  /**
+   * Maximum file size in bytes
+   */
   maxSize?: number;
+  /**
+   * Custom metadata to store with the file (cloud drivers only)
+   */
   metadata?: Record<string, string>;
 };
 
@@ -273,8 +412,17 @@ export type StorageEventType =
  * Storage event payload base
  */
 export type StorageEventPayload = {
+  /**
+   * Storage driver name
+   */
   driver: string;
+  /**
+   * File storage path (relative to storage root)
+   */
   location: string;
+  /**
+   * Event timestamp
+   */
   timestamp: Date;
 };
 
@@ -282,8 +430,17 @@ export type StorageEventPayload = {
  * Put event payload
  */
 export type StoragePutEventPayload = StorageEventPayload & {
+  /**
+   * Storage file data
+   */
   file?: StorageFileData;
+  /**
+   * File size in bits
+   */
   size?: number;
+  /**
+   * File mime type
+   */
   mimeType?: string;
 };
 
@@ -291,8 +448,17 @@ export type StoragePutEventPayload = StorageEventPayload & {
  * Copy/Move event payload
  */
 export type StorageCopyEventPayload = StorageEventPayload & {
+  /**
+   * Source file storage path
+   */
   from: string;
+  /**
+   * Destination file storage path
+   */
   to: string;
+  /**
+   * Storage file data
+   */
   file?: StorageFileData;
 };
 
@@ -309,8 +475,17 @@ export type StorageEventHandler<T extends StorageEventPayload = StorageEventPayl
  * Result of a batch delete operation
  */
 export type DeleteManyResult = {
+  /**
+   * File storage path (relative to storage root)
+   */
   location: string;
+  /**
+   * Whether the file was deleted
+   */
   deleted: boolean;
+  /**
+   * Error message if deletion failed
+   */
   error?: string;
 };
 
@@ -419,11 +594,11 @@ export type StorageConfigurations = {
   /**
    * Driver configurations
    */
-  drivers: Record<StorageDriverName, StorageDriverConfig>;
+  drivers: Record<string, StorageDriverConfig>;
   /**
    * Optional resolver for dynamic driver selection (e.g., multi-tenancy)
    */
-  resolver?: () => Promise<StorageDriverName> | StorageDriverName;
+  resolver?: () => Promise<string> | string;
 };
 
 // === CONTRACTS ===
@@ -440,6 +615,11 @@ export interface StorageDriverContract {
    * Driver name identifier (e.g., "local", "s3", "r2", "spaces")
    */
   readonly name: StorageDriverType;
+
+  /**
+   * Storage options
+   */
+  readonly options: Omit<StorageDriverConfig, "driver">;
 
   // ==== Core Operations ====
 
@@ -502,6 +682,13 @@ export interface StorageDriverContract {
    * @returns Array of results with status for each file
    */
   deleteMany(locations: string[]): Promise<DeleteManyResult[]>;
+
+  /**
+   * Delete a directory
+   *
+   * @param directoryPath - Path to the directory
+   */
+  deleteDirectory(directoryPath: string): Promise<boolean>;
 
   /**
    * Check if a file exists
@@ -578,6 +765,19 @@ export interface StorageDriverContract {
    * @returns Array of file information objects
    */
   list(directory: string, options?: ListOptions): Promise<StorageFileInfo[]>;
+
+  // ==== Prefix Operations ====
+
+  /**
+   * Apply prefix to a location path
+   *
+   * Checks storage context prefix first, then falls back to driver options prefix.
+   * This ensures proper hierarchy for multi-tenant scenarios.
+   *
+   * @param location - Original location path
+   * @returns Location with prefix applied if one exists
+   */
+  applyPrefix(location: string): string;
 
   // ==== Path Operations (local driver) ====
 
@@ -829,18 +1029,6 @@ export interface StorageManagerContract extends ScopedStorageContract {
    * @returns This instance for chaining
    */
   setDefault(name: StorageDriverName): this;
-
-  // ==== Resolution ====
-
-  /**
-   * Get the current driver instance
-   *
-   * Resolves the driver based on configuration, including
-   * any async resolver for multi-tenancy support.
-   *
-   * @returns Promise resolving to the current driver
-   */
-  currentDriver(): Promise<StorageDriverContract>;
 
   /**
    * Check if the current driver is a cloud driver

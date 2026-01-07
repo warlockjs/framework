@@ -37,10 +37,10 @@ export class HttpConnector extends BaseConnector {
 
     await registerHttpPlugins(server);
 
-    if (environment() === "production") {
-      router.scan(server);
-    } else {
+    if (environment() === "development") {
       router.scanDevServer(server);
+    } else {
+      router.scan(server);
     }
 
     try {

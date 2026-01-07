@@ -1,5 +1,6 @@
 import { router } from "../router/router";
 import { devLogError, formatModuleNotFoundError } from "./dev-logger";
+import { exportAnalyzer } from "./export-analyzer";
 import type { FileManager } from "./file-manager";
 import type { SpecialFilesCollector } from "./special-files-collector";
 
@@ -137,7 +138,7 @@ export class ModuleLoader {
           // Store in cache (use source path as key for consistency)
           this.loadedModules.set(file.absolutePath, module);
 
-          if (module?.cleanup && typeof module.cleanup === "function") {
+          if (module?.cleanup) {
             file.cleanup = module.cleanup;
           }
 
@@ -152,7 +153,7 @@ export class ModuleLoader {
         // Store in cache (use source path as key for consistency)
         this.loadedModules.set(file.absolutePath, module);
 
-        if (module?.cleanup && typeof module.cleanup === "function") {
+        if (module?.cleanup) {
           file.cleanup = module.cleanup;
         }
 
@@ -174,11 +175,29 @@ export class ModuleLoader {
   }
 
   /**
+   * Perform Clean up the file
+   */
+  public cleanupFileModule(file: FileManager): void {
+    const cleanupFunction = (cleanupFunction: Function | { unsubscribe: () => void }) => {
+      const fn = (cleanupFunction as { unsubscribe: () => void })?.unsubscribe || cleanupFunction;
+      fn();
+    };
+
+    if (file.cleanup) {
+      Array.isArray(file.cleanup)
+        ? file.cleanup.forEach((fn) => cleanupFunction(fn))
+        : cleanupFunction(file.cleanup);
+    }
+  }
+
+  /**
    * Reload a single module (for HMR)
    * @param file FileManager instance
    */
   public async reloadModule(file: FileManager): Promise<void> {
     const moduleType = this.specialFilesCollector.getFileType(file.relativePath);
+
+    this.cleanupFileModule(file);
 
     if (!moduleType) {
       // Not a special file, no need to reload
@@ -194,6 +213,7 @@ export class ModuleLoader {
       // Clear module cache
       this.clearModuleCache(file.absolutePath);
       __clearModuleVersion(file.cachePath);
+      exportAnalyzer.clearCache(file.relativePath);
 
       // Reload the module with cache busting
       await this.loadModule(file, moduleType, true);
@@ -224,14 +244,13 @@ export class ModuleLoader {
   public cleanupDeletedModule(file: FileManager): void {
     this.clearModuleCache(file.absolutePath);
     __clearModuleVersion(file.cachePath);
+    exportAnalyzer.clearCache(file.relativePath);
 
     if (file.type === "route") {
       router.removeRoutesBySourceFile(file.relativePath);
     }
 
-    if (file.cleanup) {
-      file.cleanup();
-    }
+    this.cleanupFileModule(file);
   }
 
   /**
