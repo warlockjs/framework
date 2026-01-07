@@ -40,9 +40,6 @@ export * from "./drivers/mongo/mongo-sync-adapter";
 export * from "./drivers/mongo/mongodb-driver";
 export * from "./drivers/mongo/types";
 
-// Re-export MongoDB client types for convenience
-export type { MongoClientOptions, TransactionOptions } from "mongodb";
-
 // Sync system
 export { modelSync } from "./sync/model-sync";
 export { ModelSyncOperation } from "./sync/model-sync-operation";
