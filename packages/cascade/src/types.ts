@@ -1,75 +1,45 @@
-import type { MongoClientOptions } from "mongodb";
-import type { CascadeOnDelete } from "./model/types";
+/**
+ * Strict mode configuration for handling unknown fields during validation.
+ *
+ * Controls how the model behaves when encountering fields not defined in the schema.
+ *
+ * - `"strip"` - Remove unknown fields silently (default, recommended for APIs)
+ * - `"fail"` - Throw validation error on unknown fields (strict validation)
+ * - `"allow"` - Allow unknown fields to pass through (permissive)
+ *
+ * @example
+ * ```typescript
+ * import { Model, type StrictMode } from "@warlock.js/cascade";
+ *
+ * class User extends Model {
+ *   public static strictMode: StrictMode = "fail";
+ * }
+ * ```
+ */
+export type StrictMode = "strip" | "fail" | "allow";
 
-export type DatabaseConfigurations = {
-  /**
-   * Database host
-   */
-  host?: string;
-  /**
-   * Database port
-   */
-  port?: number;
-  /**
-   * Database username
-   */
-  username?: string;
-  /**
-   * Database password
-   */
-  password?: string;
-  /**
-   * Database name
-   */
-  database?: string;
-  /**
-   * Database authentication
-   */
-  dbAuth?: string;
-  /**
-   * Database URL string
-   */
-  url?: string;
-  /**
-   * Debug level
-   * Could be one of the following values: `error`, `warn`, `info`
-   * @default `warn`
-   */
-  debugLevel?: "error" | "warn" | "info";
-  /**
-   * Model configurations
-   */
-  model?: {
-    /**
-     * Randomly increment the id
-     * If initial id is defined, this option will be ignored
-     *
-     * @default false
-     */
-    randomIncrement?: boolean | (() => number);
-    /**
-     * Randomly generate first id
-     * if initial id is defined, this option will be ignored
-     * @default false
-     */
-    randomInitialId?: boolean | (() => number);
-    /**
-     * Define the initial value of the id
-     *
-     * @default 1
-     */
-    initialId?: number;
-    /**
-     * Define the amount to be incremented by for the next generated id
-     *
-     * @default 1
-     */
-    autoIncrementBy?: number;
-    /**
-     * What to do when a model is deleted for the related model
-     * This will be called when calling `Model.sync` or `Model.syncMany``
-     * @default "unset"
-     */
-    cascadeOnDelete?: CascadeOnDelete;
-  };
-} & Partial<MongoClientOptions>;
+/**
+ * Delete strategy for model destruction.
+ *
+ * Controls how models are deleted from the database:
+ *
+ * - `"trash"` - Moves document to a trash/recycle bin collection, then deletes
+ * - `"permanent"` - Actually deletes the document from the database (hard delete)
+ * - `"soft"` - Sets a `deletedAt` timestamp instead of deleting (soft delete)
+ *
+ * Priority order (highest to lowest):
+ * 1. destroy() method options
+ * 2. Model static property (deleteStrategy)
+ * 3. Data source default configuration
+ *
+ * @example
+ * ```typescript
+ * class User extends Model {
+ *   public static deleteStrategy: DeleteStrategy = "soft";
+ * }
+ *
+ * // Override at call time
+ * await user.destroy({ strategy: "permanent" });
+ * ```
+ */
+export type DeleteStrategy = "trash" | "permanent" | "soft";

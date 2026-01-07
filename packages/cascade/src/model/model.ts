@@ -1,1467 +1,1860 @@
+import { get, merge, only, set, unset } from "@mongez/reinforcements";
+import type { ObjectValidator } from "@warlock.js/seal";
+import type { RemoverResult, WriterOptions } from "../contracts";
+import { QueryBuilderContract, WhereCallback, WhereObject, WhereOperator } from "../contracts";
+import type { DataSource } from "../data-source/data-source";
+import { dataSourceRegistry } from "../data-source/data-source-registry";
+import { DatabaseDirtyTracker } from "../database-dirty-tracker";
+import type { ModelEventListener, ModelEventName } from "../events/model-events";
+import { ModelEvents, globalModelEvents } from "../events/model-events";
+import { DatabaseRemover } from "../remover/database-remover";
+import { DatabaseRestorer } from "../restorer/database-restorer";
+import { modelSync } from "../sync/model-sync";
+import type { ModelSyncOperationContract } from "../sync/types";
+import type { DeleteStrategy, StrictMode } from "../types";
+import { DatabaseWriter } from "../writer/database-writer";
 import {
-  areEqual,
-  clone,
-  except,
-  GenericObject,
-  get,
-  merge,
-  only,
-  set,
-} from "@mongez/reinforcements";
-import { isEmpty, isPlainObject } from "@mongez/supportive-is";
-import { toUTC } from "@mongez/time-wizard";
-import dayjs from "dayjs";
-import { MongoServerError, ObjectId } from "mongodb";
-import { castModel } from "../casts/castModel";
-import { castEnum } from "../casts/oneOf";
-import { deepDiff } from "../utils/deep-diff";
-import { joinableProxy } from "../utils/joinable-proxy";
-import { CrudModel } from "./crud-model";
-import { Joinable } from "./joinable";
-import { ModelAggregate } from "./ModelAggregate";
-import { ModelSync } from "./ModelSync";
-import { RelationshipWithMany } from "./RelationshipWithMany";
-import type {
-  Casts,
-  CastType,
-  ChildModel,
-  CustomCasts,
-  CustomCastType,
-  Document,
-  ModelDocument,
-} from "./types";
-import { ModelDeleteStrategy } from "./types";
+  getAllModelsFromRegistry,
+  getModelFromRegistry,
+  removeModelFromRegistery,
+} from "./register-model";
 
-// type Schema = Document | ModelDocument;
+/**
+ * Timing control for global scopes
+ */
+export type ScopeTiming = "before" | "after";
 
-export type Schema<ModelSchema = Document> = ModelSchema & {
-  _id?: ObjectId;
-  id?: number;
-  createdAt?: Date;
-  updatedAt?: Date;
+/**
+ * Global scope definition with callback and timing
+ */
+export type GlobalScopeDefinition = {
+  callback: (query: QueryBuilderContract) => void;
+  timing: ScopeTiming;
 };
 
-export class Model
-  // <
-  //   ModelDocument extends Document = any,
-  //   Schema extends Schema<ModelDocument> = any,
-  // >
-  extends CrudModel
-{
-  /**
-   * Model Initial Document data
-   */
-  public initialData: Partial<Schema> = {};
+/**
+ * Local scope callback function
+ */
+export type LocalScopeCallback = (query: QueryBuilderContract) => void;
 
+/**
+ * Options for adding global scopes
+ */
+export type GlobalScopeOptions = {
+  timing?: ScopeTiming;
+};
+
+export type ChildModel<TModel extends Model> = (new (...args: any[]) => TModel) &
+  Pick<
+    typeof Model,
+    | "table"
+    | "primaryKey"
+    | "dataSource"
+    | "schema"
+    | "strictMode"
+    | "autoGenerateId"
+    | "initialId"
+    | "randomInitialId"
+    | "incrementIdBy"
+    | "resource"
+    | "resourceColumns"
+    | "toJsonColumns"
+    | "randomIncrement"
+    | "getDataSource"
+    | "query"
+    | "find"
+    | "first"
+    | "last"
+    | "all"
+    | "latest"
+    | "count"
+    | "where"
+    | "increase"
+    | "decrease"
+    | "atomic"
+    | "events"
+    | "on"
+    | "once"
+    | "off"
+    | "globalEvents"
+    | "delete"
+    | "deleteOne"
+    | "deleteStrategy"
+    | "trashTable"
+    | "restore"
+    | "restoreAll"
+    | "deletedAtColumn"
+    | "createdAtColumn"
+    | "updatedAtColumn"
+    | "create"
+    | "createMany"
+    | "sync"
+    | "embed"
+    | "deserialize"
+    | "syncMany"
+    | "addGlobalScope"
+    | "removeGlobalScope"
+    | "addScope"
+    | "removeScope"
+    | "localScopes"
+    | "globalScopes"
+    | "newQueryBuilder"
+    | "builder"
+  >;
+
+/**
+ * Generic schema type representing the structure of model data.
+ */
+export type ModelSchema = Record<string, any>;
+
+/**
+ * Sentinel value used to distinguish between undefined and missing fields.
+ */
+const MISSING_VALUE = Symbol("missing");
+
+/**
+ * WeakMap registry that associates each model constructor with its own event emitter.
+ */
+const modelEventsRegistry = new WeakMap<any, any>();
+
+/**
+ * Base class that powers all Cascade models.
+ *
+ * Provides:
+ * - Type-safe value accessors with dot-notation support (get, set, has, unset, merge)
+ * - Automatic dirty tracking for efficient partial updates
+ * - Lifecycle event hooks (saving, created, deleting, etc.)
+ * - Integration with the data-source registry for multi-database support
+ * - Support for both per-model and global event listeners
+ *
+ * @template TSchema - The shape of the model's underlying data
+ *
+ * @example
+ * ```typescript
+ * interface UserSchema {
+ *   id: number;
+ *   name: string;
+ *   email: string;
+ * }
+ *
+ * class User extends Model<UserSchema> {
+ *   public static table = "users";
+ * }
+ *
+ * const user = new User({ name: "Alice" });
+ * user.set("email", "alice@example.com");
+ * console.log(user.hasChanges()); // true
+ * ```
+ */
+export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   /**
-   * Model relationships defined using the joinable API.
+   * The database table or collection name associated with this model.
    *
-   * Each key represents a relationship name that can be referenced when running queries.
-   * Each value defines how to join another collection to the current model.
+   * Must be defined by each concrete model subclass.
    *
    * @example
-   * Basic definition:
-   * ```ts
-   * public static relations = {
-   *   // Join users collection where local createdBy.id matches user's id
-   *   author: User.joinable("createdBy.id", "id").single().as("author"),
+   * ```typescript
+   * class User extends Model {
+   *   public static table = "users";
    * }
    * ```
-   * @usage
-   * Example of calling:
-   * ```ts
-   * Post.aggregate().joining("author").get(); // use `joining` method to join the `author` relationship
-   * // Where `author` is the name of the relationship defined in the `relations` property
+   */
+  public static table: string;
+
+  /**
+   * Resource for this model.
+   * It is a class that holds a toJSON function
+   * Called when the model is being converted to JSON (by calling toJSON or JSON.stringify(model))
+   *
+   * @example
+   * ```typescript
+   * class User extends Model {
+   *   public static resource = UserResource;
+   * }
    * ```
    */
-  public static relations: Record<string, Joinable> = {};
+  public static resource?: any;
 
   /**
-   * Model Document data
+   * Resource columns
+   * Define what columns should be sent to the resource (if any) when converting to JSON
    */
-  public data!: Schema;
+  public static resourceColumns?: string[];
 
   /**
-   * Define Default value data that will be merged with the models' data
-   * on the create process
+   * JSON keys for this model.
+   * This could be used if resource is not passed
+   * It will select only these keys from the model
+   * @example
+   * ```typescript
+   * class User extends Model {
+   *   public static toJsonColumns = ["id", "name"];
+   * }
+   * ```
    */
-  public defaultValue: Partial<Schema> = {};
+  public static toJsonColumns?: string[];
 
   /**
-   * A flag to determine if the model is being restored
-   */
-  protected isRestored = false;
-
-  /**
-   * Model casts types
-   */
-  protected casts: Casts = {};
-
-  /**
-   * Sync with list
-   */
-  public syncWith: ModelSync[] = [];
-
-  /**
-   * Set custom casts that will be used to cast the model's data are not related to the current value of the collection's column
+   * Data source reference for this model.
    *
-   * For example: `name` is not a column in the given data, but it will be concatenation of `firstName` and `lastName`
+   * Can be:
+   * - A string name registered in the data-source registry
+   * - A DataSource instance
+   * - Undefined (falls back to the default data source)
+   *
+   * @example
+   * ```typescript
+   * class User extends Model {
+   *   public static dataSource = "primary";
+   * }
+   * ```
    */
-  protected customCasts: CustomCasts<string> = {};
+  public static dataSource?: string | DataSource;
 
   /**
-   * Guarded fields
+   * Query builder class
    */
-  public guarded: (keyof ModelDocument)[] = [];
+  public static builder?: new (...args: any[]) => QueryBuilderContract<Model>;
 
   /**
-   * Fillable fields
+   * Primary key field name used to identify records.
+   *
+   * @default "id"
+   *
+   * @example
+   * ```typescript
+   * class User extends Model {
+   *   public static primaryKey = "_id"; // MongoDB
+   * }
+   *
+   * class Product extends Model {
+   *   public static primaryKey = "id"; // SQL
+   * }
+   * ```
    */
-  public filled: (keyof ModelDocument)[] = [];
+  public static primaryKey: string = "id";
 
   /**
-   * Embedded columns
+   * Embeded fields when document is Being embeded
    */
-  public embedded: (keyof Schema)[] = [];
+  public static embed?: string[];
 
   /**
-   * Embed all columns except the given columns
+   * Validation and casting schema using @warlock.js/seal.
+   *
+   * Defines validation rules and data transformations for the model.
+   * Used automatically during save operations.
+   *
+   * @example
+   * ```typescript
+   * import { v } from "@warlock.js/seal";
+   *
+   * class User extends Model {
+   *   public static schema = v.object({
+   *     name: v.string().required().trim(),
+   *     age: v.number().min(0).max(120),
+   *     email: v.string().email().required().toLowerCase(),
+   *     createdAt: v.date().default(() => new Date()),
+   *   });
+   * }
+   * ```
    */
-  public embedAllExcept: (keyof ModelDocument)[] = [];
+  public static schema?: ObjectValidator;
 
   /**
-   * Embed all columns except timestamps and created|updated|deleted by columns
+   * Strict mode behavior for unknown fields.
+   *
+   * - `"strip"`: Remove unknown fields silently (default, recommended for APIs)
+   * - `"fail"`: Throw validation error on unknown fields (strict validation)
+   * - `"allow"`: Allow unknown fields to pass through (permissive)
+   *
+   * @default "strip"
+   *
+   * @example
+   * ```typescript
+   * import { Model, type StrictMode } from "@warlock.js/cascade";
+   *
+   * class User extends Model {
+   *   public static strictMode: StrictMode = "fail"; // Throw on unknown fields
+   * }
+   *
+   * const user = new User({ name: "Alice", unknownField: "value" });
+   * await user.save(); // DatabaseWriterValidationError: unknown field
+   * ```
    */
-  public embedAllExceptTimestampsAndUserColumns = false;
+  public static strictMode: StrictMode = "strip";
 
   /**
-   * Created at column
+   * Auto-generate incremental `id` field on insert (NoSQL only).
+   *
+   * When enabled, the ID generator creates a sequential integer ID
+   * separate from the database's native ID (_id for MongoDB).
+   *
+   * **Note:** SQL databases use native AUTO_INCREMENT and don't need this.
+   *
+   * @default true
+   *
+   * @example
+   * ```typescript
+   * class User extends Model {
+   *   public static autoGenerateId = true;
+   * }
+   *
+   * const user = new User({ name: "Alice" });
+   * await user.save();
+   * console.log(user.get("_id")); // ObjectId("...") - MongoDB
+   * console.log(user.get("id")); // 1 - Generated
+   * ```
    */
-  public createdAtColumn = "createdAt";
+  public static autoGenerateId = true;
 
   /**
-   * Updated at column
+   * Initial ID value for the first record.
+   *
+   * If not set, defaults to 1 or uses `randomInitialId`.
+   *
+   * @example
+   * ```typescript
+   * class User extends Model {
+   *   public static initialId = 1000; // Start from 1000
+   * }
+   * ```
    */
-  public updatedAtColumn = "updatedAt";
+  public static initialId?: number;
 
   /**
-   * Deleted at column
+   * Randomly generate the initial ID.
+   *
+   * Can be:
+   * - `true`: Generate random ID between 10000-499999
+   * - Function: Custom random ID generator
+   * - `false`: Use `initialId` or default to 1
+   *
+   * @default false
+   *
+   * @example
+   * ```typescript
+   * class User extends Model {
+   *   public static randomInitialId = true; // Random 10000-499999
+   * }
+   *
+   * class Product extends Model {
+   *   public static randomInitialId = () => Math.floor(Math.random() * 1000000);
+   * }
+   * ```
    */
-  public deletedAtColumn = "deletedAt";
+  public static randomInitialId?: boolean | (() => number);
 
   /**
-   * Created by column
+   * Amount to increment ID by for each new record.
+   *
+   * If not set, defaults to 1 or uses `randomIncrement`.
+   *
+   * @default 1
+   *
+   * @example
+   * ```typescript
+   * class User extends Model {
+   *   public static incrementIdBy = 5; // Increment by 5
+   * }
+   * ```
    */
-  public createdByColumn = "createdBy";
+  public static incrementIdBy?: number = 1;
 
   /**
-   * Updated by column
+   * Randomly generate the increment amount.
+   *
+   * Can be:
+   * - `true`: Generate random increment between 1-10
+   * - Function: Custom random increment generator
+   * - `false`: Use `incrementIdBy` or default to 1
+   *
+   * @default false
+   *
+   * @example
+   * ```typescript
+   * class User extends Model {
+   *   public static randomIncrement = true; // Random 1-10
+   * }
+   *
+   * class Product extends Model {
+   *   public static randomIncrement = () => Math.floor(Math.random() * 100);
+   * }
+   * ```
    */
-  public updatedByColumn = "updatedBy";
+  public static randomIncrement?: boolean | (() => number);
 
   /**
-   * Deleted by column
+   * Created at column name.
    */
-  public deletedByColumn = "deletedBy";
+  public static createdAtColumn?: string | false = "createdAt";
 
   /**
-   * Date format
+   * Updated at column name.
    */
-  public dateFormat = "DD-MM-YYYY";
+  public static updatedAtColumn?: string | false = "updatedAt";
 
   /**
-   * A flag to determine if the id is auto generated not added manually
+   * Delete strategy for this model.
+   *
+   * Controls how models are deleted:
+   * - `"trash"` - Moves to trash collection, then deletes
+   * - `"permanent"` - Direct deletion (hard delete)
+   * - `"soft"` - Sets deletedAt timestamp (soft delete)
+   *
+   * Can be overridden by destroy() options.
+   * Falls back to data source default if not set.
+   *
+   * @example
+   * ```typescript
+   * class User extends Model {
+   *   public static deleteStrategy: DeleteStrategy = "soft";
+   * }
+   * ```
    */
-  protected autoGeneratedId = false;
+  public static deleteStrategy?: DeleteStrategy;
 
   /**
-   * Is active column
+   * Column name for soft delete timestamp.
+   *
+   * Used when delete strategy is "soft".
+   *
+   * @default "deletedAt"
+   *
+   * @example
+   * ```typescript
+   * class User extends Model {
+   *   public static deletedAtColumn = "archivedAt";
+   * }
+   * ```
    */
-  protected isActiveColumn = "isActive";
+  public static deletedAtColumn: string = "deletedAt";
 
   /**
-   * Original data
+   * Trash table/collection name override.
+   *
+   * If not set, defaults to `{table}Trash` or data source default.
+   * Used when delete strategy is "trash".
+   *
+   * @example
+   * ```typescript
+   * class User extends Model {
+   *   public static trashTable = "userRecycleBin";
+   * }
+   * ```
    */
-  public originalData: Schema = {} as Schema;
+  public static trashTable?: string;
 
   /**
-   * List of dirty columns
+   * Global scopes that are automatically applied to all queries.
+   * These scopes are inherited by child models.
    */
-  public dirtyColumns: Record<
-    string,
-    {
-      oldValue: any;
-      newValue: any;
-    }
-  > = {};
+  public static globalScopes = new Map<string, GlobalScopeDefinition>();
 
   /**
-   * Constructor
+   * Local scopes that can be manually applied to queries.
+   * These are reusable query snippets that developers opt into.
    */
-  public constructor(originalData: Partial<Schema> = {}) {
-    super();
+  public static localScopes = new Map<string, LocalScopeCallback>();
 
-    if (originalData instanceof Model) {
-      this.originalData = clone(originalData.data) as Schema;
-    } else {
-      this.originalData = clone(originalData) as Schema;
-    }
+  /**
+   * Flag indicating whether this model instance represents a new (unsaved) record.
+   *
+   * - `true`: The model has not been persisted to the database yet
+   * - `false`: The model represents an existing database record
+   *
+   * This flag is used by the writer to determine whether to perform an insert or update.
+   */
+  public isNew = true;
 
-    if (typeof this.originalData._id === "string") {
-      this.originalData._id = new ObjectId(this.originalData._id);
-    }
+  /**
+   * The raw mutable data backing this model instance.
+   *
+   * All field accessors (get, set, merge, etc.) operate on this object.
+   */
+  public data: TSchema;
 
-    this.data = clone(this.originalData);
+  /**
+   * Dirty tracker that monitors changes to the model's data.
+   *
+   * Tracks:
+   * - Which fields have been modified (dirty columns)
+   * - Which fields have been removed
+   * - Original vs. current values for each dirty field
+   *
+   * Used by the writer to generate efficient partial update payloads.
+   */
+  public readonly dirtyTracker: DatabaseDirtyTracker;
 
-    this.initialData = clone(this.originalData);
+  /**
+   * Constructs a new model instance with optional initial data.
+   *
+   * Initializes the dirty tracker with a snapshot of the provided data.
+   *
+   * @param initialData - Partial data to populate the model
+   *
+   * @example
+   * ```typescript
+   * const user = new User({ name: "Alice", email: "alice@example.com" });
+   * ```
+   */
+  public constructor(initialData: Partial<TSchema> = {}) {
+    this.data = initialData as TSchema;
+    this.dirtyTracker = new DatabaseDirtyTracker(this.data);
   }
 
   /**
-   * Get save columns which are the casts keys
+   * Get a model class by its name from the global registry.
+   *
+   * Models must be decorated with @RegisterModel() to be available in the registry.
+   *
+   * @param name - The model class name
+   * @returns The model class or undefined if not found
+   *
+   * @example
+   * ```typescript
+   * const UserModel = Model.getModel("User");
+   * if (UserModel) {
+   *   const user = await UserModel.find(1);
+   * }
+   * ```
    */
-  public get castColumns() {
-    return Object.keys(this.casts);
+  public static getModel(name: string) {
+    return getModelFromRegistry(name);
   }
 
   /**
-   * Get value from original data
+   * Get all registered models from the global registry.
+   *
+   * Only models decorated with @RegisterModel() will appear here.
+   *
+   * @returns A Map of all registered model classes by name
+   *
+   * @example
+   * ```typescript
+   * const allModels = Model.getAllModels();
+   * for (const [name, ModelClass] of allModels) {
+   *   console.log(`Found model: ${name} with table: ${ModelClass.table}`);
+   * }
+   * ```
    */
-  public original(key: string, defaultValue?: any) {
-    return get(this.originalData, key, defaultValue);
+  public static getAllModels() {
+    return getAllModelsFromRegistry();
+  }
+
+  // ============================================================================
+  // STATIC SYNC METHODS
+  // ============================================================================
+
+  /**
+   * Create a sync operation for a single embedded document.
+   *
+   * When this model is updated, the target model's field
+   * will be updated with the embedded data.
+   *
+   * @param TargetModel - Target model class that receives data
+   * @param targetField - Field path in target model
+   * @returns Sync operation for chaining configuration
+   *
+   * @example
+   * ```typescript
+   * // When Category updates, update Product.category
+   * Category.sync(Product, "category");
+   * ```
+   */
+  public static sync<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    TargetModel: ChildModel<Model>,
+    targetField: string,
+  ): ModelSyncOperationContract {
+    return modelSync.sync(this, TargetModel, targetField);
   }
 
   /**
-   * Get all data except the guarded fields
+   * Create a sync operation for an array of embedded documents.
+   *
+   * When this model is updated, the corresponding element
+   * in the target model's array field will be updated.
+   *
+   * @param TargetModel - Target model class that receives data
+   * @param targetField - Array field path in target model
+   * @returns Sync operation for chaining configuration
+   *
+   * @example
+   * ```typescript
+   * // When Tag updates, update Post.tags[i] where tags[i].id matches
+   * Tag.syncMany(Post, "tags").identifyBy("id");
+   * ```
    */
-  public get publicData() {
-    return except(this.data, this.guarded as string[]);
+  public static syncMany<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    TargetModel: ChildModel<Model>,
+    targetField: string,
+  ): ModelSyncOperationContract {
+    return modelSync.syncMany(this, TargetModel, targetField);
   }
 
   /**
-   * Get guarded data
+   * Get model id
    */
-  public get guardedData() {
-    return only(this.data, this.guarded as string[]);
-  }
-
-  /**
-   * Get the model's id
-   */
-  public get id(): number {
+  public get id(): number | undefined {
     return this.get("id");
   }
 
   /**
-   * Check if current model is active
+   * Retrieves a field value from the model's data.
+   *
+   * Supports both top-level keys and dot-notation paths for nested access.
+   *
+   * @param field - The field name or dot-notation path (e.g., "address.city")
+   * @param defaultValue - Value to return if the field is missing
+   * @returns The field value or the default value if not found
+   *
+   * @example
+   * ```typescript
+   * user.get("name"); // "Alice"
+   * user.get("address.city", "Unknown"); // "Unknown" if address.city is missing
+   * ```
    */
-  public get isActive() {
-    return this.bool(this.isActiveColumn);
+  public get<TKey extends keyof TSchema & string>(field: TKey): TSchema[TKey];
+  public get<TKey extends keyof TSchema & string>(
+    field: TKey,
+    defaultValue: TSchema[TKey],
+  ): TSchema[TKey];
+  public get(field: string): unknown;
+  public get(field: string, defaultValue: unknown): unknown;
+  public get(field: string, defaultValue?: unknown): unknown {
+    return get(this.data, field, defaultValue);
   }
 
   /**
-   * Check if current model created by the given user (user model)
+   * Get only the values of the given fields
    */
-  public isCreatedBy(user: Model) {
-    return this.get("createdBy.id") === user.id;
+  public only<TKey extends keyof TSchema & string>(fields: TKey[]): Record<TKey, TSchema[TKey]>;
+  public only(fields: string[]): Record<string, unknown>;
+  public only(fields: string[]): Record<string, unknown> {
+    return only(this.data, fields);
   }
 
   /**
-   * Check if current model last updated by the given user (user model)
+   * Get a string value
    */
-  public isUpdatedBy(user: Model) {
-    return this.get("updatedBy.id") === user.id;
+  public string(key: string, defaultValue?: string): string | undefined {
+    return this.get(key, defaultValue) as string | undefined;
   }
 
   /**
-   * Get mongodb id
+   * Get a number value
    */
-  public get _id(): ObjectId {
-    return this.get("_id");
+  public number(key: string, defaultValue?: number): number | undefined {
+    return this.get(key, defaultValue) as number | undefined;
   }
 
   /**
-   * Mark the current model as being restored
+   * Get a boolean value
    */
-  public markAsRestored() {
-    this.isRestored = true;
+  public boolean(key: string, defaultValue?: boolean): boolean | undefined {
+    return this.get(key, defaultValue) as boolean | undefined;
   }
 
   /**
-   * Set a column in the model data
+   * Sets a field value in the model's data and marks it as dirty.
+   *
+   * Supports both top-level keys and dot-notation paths for nested assignment.
+   * Automatically updates the dirty tracker to reflect the change.
+   *
+   * @param field - The field name or dot-notation path (e.g., "address.city")
+   * @param value - The value to assign
+   * @returns The model instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * user.set("name", "Bob").set("address.city", "NYC");
+   * ```
    */
-  public set(column: keyof Schema, value: any) {
-    const currentValue = this.get(column);
-    this.data = set(this.data, column as string, value) as Schema;
+  public set<TKey extends keyof TSchema & string>(field: TKey, value: TSchema[TKey]): this;
+  public set(field: string, value: unknown): this;
+  public set(field: string, value: unknown): this {
+    const path = String(field);
+    set(this.data, path, value);
 
-    if (currentValue !== value) {
-      set(this.dirtyColumns, column as string, {
-        oldValue: currentValue,
-        newValue: value,
-      });
-    }
+    const partial: Record<string, unknown> = {};
+    set(partial, path, value);
+    this.dirtyTracker.mergeChanges(partial);
 
     return this;
   }
 
   /**
-   * Increment the given column by the given value
+   * Checks whether a field exists in the model's data.
+   *
+   * Supports both top-level keys and dot-notation paths.
+   *
+   * @param field - The field name or dot-notation path
+   * @returns `true` if the field exists, `false` otherwise
+   *
+   * @example
+   * ```typescript
+   * user.has("name"); // true
+   * user.has("address.zipCode"); // false
+   * ```
    */
-  public increment(column: keyof Schema, value = 1) {
-    return this.set(column, this.get(column, 0) + value);
+  public has<TKey extends keyof TSchema & string>(field: TKey): boolean;
+  public has(field: string): boolean;
+  public has(field: string): boolean {
+    return get(this.data, field, MISSING_VALUE) !== MISSING_VALUE;
   }
 
   /**
-   * Decrement the given column by the given value
+   * Increment the given field by the given amount
    */
-  public decrement(column: keyof Schema, value = 1) {
-    return this.set(column, this.get(column, 0) - value);
+  public increment<TKey extends keyof TSchema & string>(field: TKey, amount: number): this;
+  public increment(field: string, amount: number): this;
+  public increment(field: string, amount: number): this {
+    const value = this.get(field, 0) as number;
+    const incrementedValue = value + amount;
+    return this.set(field, incrementedValue);
   }
 
   /**
-   * Get initial value of the given column
+   * Decrement the given field by the given amount
    */
-  public getInitial(column: keyof Schema, defaultValue?: any) {
-    return get(this.initialData, column as string, defaultValue);
+  public decrement<TKey extends keyof TSchema & string>(field: TKey, amount: number): this;
+  public decrement(field: string, amount: number): this;
+  public decrement(field: string, amount: number): this {
+    const value = this.get(field, 0) as number;
+    const decrementedValue = value - amount;
+    return this.set(field, decrementedValue);
   }
 
   /**
-   * Get value of the given column
+   * Removes one or more fields from the model's data and marks them as removed.
+   *
+   * Supports both top-level keys and dot-notation paths.
+   * Automatically updates the dirty tracker to reflect the removal.
+   *
+   * @param fields - One or more field names or dot-notation paths to remove
+   * @returns The model instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * user.unset("tempField", "address.oldZip");
+   * ```
    */
-  public get<ValueType = any>(
-    column: keyof Schema,
-    defaultValue?: any,
-  ): ValueType {
-    return get(this.data, column as string, defaultValue);
-  }
-
-  /**
-   * Return the value of the given column as a string
-   */
-  public string(column: keyof Schema, defaultValue?: any) {
-    return String(this.get(column, defaultValue));
-  }
-
-  /**
-   * Return the value of the given column as an integer
-   */
-  public int(column: keyof Schema, defaultValue?: any) {
-    return parseInt(this.get(column, defaultValue));
-  }
-
-  /**
-   * Return the value of the given column as a float
-   */
-  public float(column: keyof Schema, defaultValue?: any) {
-    return parseFloat(this.get(column, defaultValue));
-  }
-
-  /**
-   * Return the value of the given column as a number
-   */
-  public number(column: keyof Schema, defaultValue?: any) {
-    return Number(this.get(column, defaultValue));
-  }
-
-  /**
-   * Return the value of the given column as a boolean
-   */
-  public bool(column: keyof Schema, defaultValue?: any) {
-    return Boolean(this.get(column, defaultValue));
-  }
-
-  /**
-   * Determine whether the given column exists in the document
-   */
-  public has(column: keyof Schema) {
-    return get(this.data, column as string) !== undefined;
-  }
-
-  /**
-   * Get all columns except the given ones
-   */
-  public except(columns: (keyof Schema)[]): Document {
-    return except(this.data, columns as string[]);
-  }
-
-  /**
-   * Get only the given columns
-   */
-  public only<T extends Document = Document>(columns: (keyof Schema)[]): T {
-    return only(this.data, columns as string[]);
-  }
-
-  /**
-   * Get only id
-   */
-  public get onlyId() {
-    return this.only(["id"]);
-  }
-
-  /**
-   * Unset or remove the given columns from the data
-   */
-  public unset(...columns: (keyof Schema)[]) {
-    const currentValues = this.only(columns);
-    this.data = except(this.data, columns as string[]);
-
-    for (const column in currentValues) {
-      set(this.dirtyColumns, column, {
-        oldValue: currentValues[column],
-        newValue: undefined,
-      });
-    }
+  public unset(...fields: (keyof TSchema & string)[]): this;
+  public unset(...fields: string[]): this;
+  public unset(...fields: string[]): this {
+    this.data = unset(this.data, fields);
+    this.dirtyTracker.unset(fields);
 
     return this;
   }
 
   /**
-   * Get the value of the given column and remove it from the data
+   * Merges new values into the model's data and marks changed fields as dirty.
+   *
+   * Performs a deep merge, preserving existing nested structures.
+   * Automatically updates the dirty tracker to reflect all changes.
+   *
+   * @param values - Partial data to merge into the model
+   * @returns The model instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * user.merge({ name: "Charlie", address: { city: "LA" } });
+   * ```
    */
-  public pluck(column: keyof Schema) {
-    const value = this.get(column);
-    this.unset(column);
-    return value;
-  }
-
-  /**
-   * Replace the entire document data with the given new data
-   */
-  public replaceWith(data: Schema) {
-    if (!data.id && this.data.id) {
-      data.id = this.data.id;
-    }
-
-    if (!data._id && this.data._id) {
-      data._id = this.data._id;
-    }
-
-    const currentData = clone(data);
-
-    this.data = data;
-
-    const dirtyValues = deepDiff(currentData, this.data);
-
-    merge(this.dirtyColumns, dirtyValues);
-
+  public merge(values: Partial<TSchema>): this;
+  public merge(values: Record<string, unknown>): this;
+  public merge(values: Record<string, unknown>): this {
+    this.data = merge(this.data, values) as TSchema;
+    this.dirtyTracker.mergeChanges(values);
     return this;
   }
 
   /**
-   * Merge the given documents to current document
+   * Checks whether the model's data has changed since instantiation or last reset.
+   *
+   * @returns `true` if any fields have been modified or removed, `false` otherwise
+   *
+   * @example
+   * ```typescript
+   * const user = new User({ name: "Alice" });
+   * user.hasChanges(); // false
+   * user.set("name", "Bob");
+   * user.hasChanges(); // true
+   * ```
    */
-  public merge(data: Document) {
-    const currentData = clone(this.data);
-
-    this.data = merge(this.data, data);
-
-    const dirtyValues = deepDiff(currentData, this.data);
-
-    merge(this.dirtyColumns, dirtyValues);
-
-    for (const column in this.data) {
-      if (this.data[column] !== currentData[column]) {
-        set(this.dirtyColumns, column, {
-          oldValue: currentData[column],
-          newValue: this.data[column],
-        });
-      }
-    }
-
-    return this;
+  public hasChanges(): boolean {
+    return this.dirtyTracker.hasChanges();
   }
 
   /**
-   * Push the given values to the given column
-   * If the given column does not exists, it will be created
-   * If the given value exists but not an array it will be ignored
+   * Check if the given column has been modified.
+   *
+   * @param column - The column name to check
+   * @returns `true` if the column has been modified, `false` otherwise
+   *
+   * @example
+   * ```typescript
+   * user.set("name", "Bob");
+   * user.isDirty("name"); // true
+   * ```
    */
-  public push(column: keyof Schema, ...values: any[]) {
-    const currentValue = this.get(column);
-
-    if (Array.isArray(currentValue)) {
-      this.set(column, [...currentValue, ...values]);
-    } else if (!currentValue) {
-      this.set(column, values);
-    }
-
-    return this;
+  public isDirty(column: string): boolean {
+    return this.dirtyTracker.isDirty(column);
   }
 
   /**
-   * Push the given values to the given column only if not exists
+   * Retrieves all dirty columns with their old and new values.
+   *
+   * @returns A record mapping each dirty column to its previous and current value
+   *
+   * @example
+   * ```typescript
+   * user.set("name", "Bob");
+   * user.getDirtyColumnsWithValues();
+   * // { name: { oldValue: "Alice", newValue: "Bob" } }
+   * ```
    */
-  public pushOnce(column: keyof Schema, ...values: any[]) {
-    const currentValue = this.get(column);
-
-    if (Array.isArray(currentValue)) {
-      const newValues = Array.from(new Set([...currentValue, ...values]));
-      this.set(column, newValues);
-    } else if (!currentValue) {
-      this.set(column, values);
-    }
-
-    return this;
+  public getDirtyColumnsWithValues(): Record<string, { oldValue: unknown; newValue: unknown }> {
+    return this.dirtyTracker.getDirtyColumnsWithValues();
   }
 
   /**
-   * Add the given values to the beginning of the given column
-   * If the given column does not exists, it will be created
-   * If the given value exists but not an array it will be ignored
+   * Lists all columns that have been removed from the model's data.
+   *
+   * @returns An array of field names that were present initially but have been unset
+   *
+   * @example
+   * ```typescript
+   * user.unset("tempField");
+   * user.getRemovedColumns(); // ["tempField"]
+   * ```
    */
-  public unshift(column: keyof Schema, ...values: any[]) {
-    const currentValue = this.get(column);
-
-    if (Array.isArray(currentValue)) {
-      this.set(column, [...values, ...currentValue]);
-    } else if (!currentValue) {
-      this.set(column, values);
-    }
-
-    return this;
+  public getRemovedColumns(): string[] {
+    return this.dirtyTracker.getRemovedColumns();
   }
 
   /**
-   * Add the given values to the beginning of the given column only if not exists
+   * Lists all columns that have been modified since instantiation or last reset.
+   *
+   * @returns An array of field names that have changed
+   *
+   * @example
+   * ```typescript
+   * user.set("name", "Bob");
+   * user.getDirtyColumns(); // ["name"]
+   * ```
    */
-  public unshiftOnce(column: keyof Schema, ...values: any[]) {
-    const currentValue = this.get(column);
-
-    if (Array.isArray(currentValue)) {
-      const newValues = Array.from(new Set([...values, ...currentValue]));
-      this.set(column, newValues);
-    } else if (!currentValue) {
-      this.set(column, values);
-    }
-
-    return this;
+  public getDirtyColumns(): string[] {
+    return this.dirtyTracker.getDirtyColumns();
   }
 
-  protected async prepareDataForCreating(
-    cast: boolean = true,
-    triggerEvents: boolean = true,
-  ) {
-    // await this.getDatabase().startSessionContext(async ({ session }) => {
-    // check for default values and merge it with the data
-    await this.checkDefaultValues();
+  /**
+   * Emits a lifecycle event to both per-model and global listeners.
+   *
+   * This method is public so that external services (like the writer) can trigger
+   * lifecycle events when appropriate.
+   *
+   * @param event - The event name (e.g., "saving", "created", "deleting")
+   * @param context - Optional context data to pass to listeners
+   *
+   * @example
+   * ```typescript
+   * await user.emitEvent("saving");
+   * await user.emitEvent("validated", { errors: [] });
+   * ```
+   */
+  public async emitEvent<TContext = unknown>(
+    event: ModelEventName,
+    context?: TContext,
+  ): Promise<void> {
+    const ctor = this.constructor as any;
+    await ctor.events().emit(event, this, context as TContext);
+    await globalModelEvents.emit(event, this, context as TContext);
+  }
 
-    // if the column does not exist, then create it
-    if (
-      (!this.data.id || !this.autoGeneratedId) &&
-      this.getStaticProperty("autoGenerateId")
-    ) {
-      this.autoGeneratedId = true;
-      await this.generateNextId();
+  /**
+   * Resolves the data source associated with this model.
+   *
+   * Resolution order:
+   * 1. If `dataSource` is a string, looks it up in the data-source registry
+   * 2. If `dataSource` is a DataSource instance, returns it directly
+   * 3. Otherwise, returns the default data source from the registry
+   *
+   * @returns The resolved DataSource instance
+   * @throws Error if no data source is found
+   *
+   * @example
+   * ```typescript
+   * class User extends Model {
+   *   public static dataSource = "primary";
+   * }
+   *
+   * const ds = User.getDataSource();
+   * ```
+   */
+  public static getDataSource(): DataSource {
+    const ref = this.dataSource;
+    let dataSource: DataSource;
+
+    if (typeof ref === "string") {
+      dataSource = dataSourceRegistry.get(ref);
+    } else if (ref) {
+      dataSource = ref;
+    } else {
+      dataSource = dataSourceRegistry.get();
     }
 
-    const now = new Date();
-
-    const createdAtColumn = this.createdAtColumn;
-
-    // if the column does not exist, then create it
-    if (createdAtColumn && !this.data[createdAtColumn]) {
-      this.data[createdAtColumn] = now;
+    // Apply model defaults from data source (only once per model class)
+    if (!this.hasOwnProperty("_defaultsApplied") && dataSource.modelDefaults) {
+      (this as any).applyModelDefaults(dataSource.modelDefaults);
+      (this as any)._defaultsApplied = true;
     }
 
-    // if the column does not exist, then create it
-    const updatedAtColumn = this.updatedAtColumn;
+    return dataSource;
+  }
 
-    if (updatedAtColumn) {
-      this.data[updatedAtColumn] = now;
+  /**
+   * Apply model defaults from data source configuration.
+   *
+   * This is called automatically by getDataSource() the first time
+   * a model accesses its data source. Defaults are only applied if
+   * the model doesn't already have its own value set.
+   *
+   * @param defaults - Model default configuration from data source
+   * @private
+   */
+  public static applyModelDefaults(defaults: any): void {
+    // Only apply defaults if model doesn't have its own value
+    // Note: autoGenerateId is not applied here as it's a driver-level setting
+    if (defaults.initialId !== undefined && this.initialId === undefined) {
+      this.initialId = defaults.initialId;
     }
-
-    if (cast) {
-      await this.castData();
+    if (defaults.randomInitialId !== undefined && this.randomInitialId === undefined) {
+      this.randomInitialId = defaults.randomInitialId;
     }
-
-    if (triggerEvents) {
-      const selfModelEvents = this.getModelEvents();
-
-      const ModelEvents = this.getBaseModelEvents();
-
-      await this.onSaving();
-      await this.onCreating();
-      await selfModelEvents.trigger("creating", this);
-      await selfModelEvents.trigger("saving", this);
-      await ModelEvents.trigger("creating", this);
-      await ModelEvents.trigger("saving", this);
+    if (defaults.incrementIdBy !== undefined && this.incrementIdBy === undefined) {
+      this.incrementIdBy = defaults.incrementIdBy;
+    }
+    if (defaults.randomIncrement !== undefined && this.randomIncrement === undefined) {
+      this.randomIncrement = defaults.randomIncrement;
+    }
+    if (defaults.deleteStrategy !== undefined && this.deleteStrategy === undefined) {
+      this.deleteStrategy = defaults.deleteStrategy;
+    }
+    if (defaults.strictMode !== undefined && this.strictMode === undefined) {
+      this.strictMode = defaults.strictMode;
     }
   }
 
   /**
-   * Perform saving operation either by updating or creating a new record in database
+   * Add a global scope that is automatically applied to all queries.
+   *
+   * Global scopes are inherited by child models and applied before query execution.
+   * Use for security filters, multi-tenancy, soft deletes, etc.
+   *
+   * @param name - Unique name for the scope
+   * @param callback - Function that modifies the query
+   * @param options - Scope options (timing: 'before' | 'after')
+   *
+   * @example
+   * ```typescript
+   * // Multi-tenancy scope
+   * Model.addGlobalScope('tenant', (query) => {
+   *   query.where('tenantId', getCurrentTenant());
+   * }, { timing: 'before' });
+   *
+   * // Soft delete scope
+   * User.addGlobalScope('notDeleted', (query) => {
+   *   query.whereNull('deletedAt');
+   * });
+   * ```
    */
-  public async save(
-    mergedData?: Omit<Schema, "id" | "_id">,
-    {
-      triggerEvents = true,
-      cast = true,
-      forceUpdate = false,
-    }: {
-      triggerEvents?: boolean;
-      cast?: boolean;
-      forceUpdate?: boolean;
-    } = {},
-  ) {
-    const isNewModel = this.isNewModel();
-    try {
-      if (mergedData) {
-        this.merge(mergedData);
-      }
+  public static addGlobalScope(
+    name: string,
+    callback: (query: QueryBuilderContract) => void,
+    options: GlobalScopeOptions = {},
+  ): void {
+    this.globalScopes.set(name, {
+      callback,
+      timing: options.timing || "before",
+    });
+  }
 
-      // const logLevel = getDatabaseDebugLevel();
+  /**
+   * Remove a global scope by name.
+   *
+   * @param name - Name of the scope to remove
+   *
+   * @example
+   * ```typescript
+   * Model.removeGlobalScope('tenant');
+   * ```
+   */
+  public static removeGlobalScope(name: string): void {
+    this.globalScopes.delete(name);
+  }
 
-      let currentModel;
+  /**
+   * Add a local scope that can be manually applied to queries.
+   *
+   * Local scopes are reusable query snippets that developers opt into.
+   * They are not automatically applied.
+   *
+   * @param name - Unique name for the scope
+   * @param callback - Function that modifies the query
+   *
+   * @example
+   * ```typescript
+   * // Define reusable scopes
+   * User.addScope('active', (query) => {
+   *   query.where('isActive', true);
+   * });
+   *
+   * User.addScope('admins', (query) => {
+   *   query.where('role', 'admin');
+   * });
+   *
+   * // Use explicitly
+   * await User.query().scope('active').get();
+   * await User.query().scope('admins').get();
+   * ```
+   */
+  public static addScope(name: string, callback: LocalScopeCallback): void {
+    this.localScopes.set(name, callback);
+  }
 
-      // check if the data contains the primary id column
-      if (!isNewModel) {
-        // perform an update operation
-        // check if the data has changed
-        // if not changed, then do not do anything
+  /**
+   * Remove a local scope by name.
+   *
+   * @param name - Name of the scope to remove
+   *
+   * @example
+   * ```typescript
+   * User.removeScope('active');
+   * ```
+   */
+  public static removeScope(name: string): void {
+    this.localScopes.delete(name);
+  }
 
-        if (cast) {
-          // this.logInfo("Casting data before saving");
-          await this.castData(forceUpdate);
-          // this.logInfo("Data has been casted");
-        }
+  /**
+   * Create a new query builder for this model
+   */
+  public static query<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+  ): ReturnType<ChildModel<TModel>["newQueryBuilder"]> {
+    // Call newQueryBuilder as a static method (may be overridden in child classes)
+    const queryBuilder = this.newQueryBuilder<TModel>();
+    const ModelClass = this as new (...args: any[]) => TModel;
 
-        if (this.shouldUpdate(this.originalData, this.data) === false) {
-          return this;
-        }
+    // Collect global scopes from base Model and child model
+    const allGlobalScopes = new Map<string, GlobalScopeDefinition>([
+      ...Model.globalScopes,
+      ...this.globalScopes,
+    ]);
 
-        currentModel = new (this.constructor as any)(this.originalData);
+    // Pass scopes to query builder
+    queryBuilder.pendingGlobalScopes = allGlobalScopes;
 
-        const updatedAtColumn = this.updatedAtColumn;
+    queryBuilder.availableLocalScopes = this.localScopes;
+    queryBuilder.disabledGlobalScopes = new Set();
 
-        if (updatedAtColumn) {
-          // updateAtColumn is supposed to be part of the Schema
-          (this.data as any)[updatedAtColumn] = new Date();
-        }
+    // Emit fetching event
+    this.events().emitFetching(queryBuilder, { table: this.table, modelClass: this });
 
-        if (triggerEvents) {
-          const selfModelEvents = this.getModelEvents();
+    queryBuilder.hydrate((data: any) => {
+      const model = new ModelClass(data);
+      model.isNew = false;
+      return model;
+    });
 
-          const ModelEvents = this.getBaseModelEvents();
+    // Wire up onFetched callback to emit model-level event
+    queryBuilder.onFetched(async (models: any, context: any) => {
+      await this.events().emit("fetched", models as any, context);
+    });
 
-          await this.onSaving();
-          await this.onUpdating();
-          await selfModelEvents.trigger("updating", this, currentModel);
-          await selfModelEvents.trigger("saving", this, currentModel);
-          await ModelEvents.trigger("updating", this, currentModel);
-          await ModelEvents.trigger("saving", this, currentModel);
-        }
+    return queryBuilder;
+  }
 
-        // const data = { ...this.data };
+  /**
+   * Create new query builder.
+   *
+   * If the model has a static `builder` property set to a query builder class,
+   * it will be instantiated instead of the default driver query builder.
+   *
+   * @example
+   * ```typescript
+   * class UserQueryBuilder<T = User> extends MongoQueryBuilder<T> {
+   *   active() { return this.where("isActive", true); }
+   * }
+   *
+   * class User extends Model {
+   *   static builder = UserQueryBuilder;  // That's it! ✨
+   * }
+   *
+   * // Now User.query() returns UserQueryBuilder<User> with autocomplete!
+   * ```
+   */
+  public static newQueryBuilder<TModel extends Model = Model>(this: ChildModel<TModel>) {
+    const dataSource = this.getDataSource();
 
-        // if (isPlainObject(data._id)) {
-        //   delete data._id;
-        // }
-
-        const filter: GenericObject = {};
-
-        if (isEmpty(this._id)) {
-          filter._id = this.data._id;
-        } else {
-          filter.id = this.id;
-        }
-
-        await this.getQuery().replace(this.getCollection(), filter, this.data);
-
-        if (triggerEvents) {
-          this.triggerUpdatedEvents(currentModel);
-        }
-      } else {
-        let tries = 3;
-
-        while (tries > 0) {
-          try {
-            await this.prepareDataForCreating(cast, triggerEvents);
-
-            this.data = (await this.getQuery().create(
-              this.getCollection(),
-              this.data,
-            )) as Schema;
-
-            if (triggerEvents) {
-              this.triggerCreatedEvents();
-            }
-
-            break;
-          } catch (error: MongoServerError | any) {
-            console.log(error);
-            // Handle duplicate key error
-            if (error instanceof MongoServerError && error.code === 11000) {
-              if (tries < 2) {
-                const duplicateField = error.keyValue;
-                const fieldName = Object.keys(duplicateField)[0];
-
-                const errorMessage = `A record with the same ${fieldName} already exists.`;
-                if (this.autoGeneratedId) {
-                  this.unset("id");
-                }
-
-                throw new Error(errorMessage);
-              } else {
-                tries--;
-              }
-            }
-
-            throw error;
-          }
-        }
-      }
-
-      if (!this.data.id) return this;
-
-      this.originalData = clone(this.data);
-
-      // @see constructor
-      this.originalData._id = this.data._id;
-
-      return this;
-    } catch (error) {
-      console.log("Error in " + this.constructor.name + ".save()");
-
-      console.log(error);
-      throw error;
+    // Check if model has a custom builder class
+    if (this.builder) {
+      const BuilderClass = this.builder;
+      return new BuilderClass(this.table, dataSource);
     }
+
+    // Use default driver query builder
+    const queryBuilder = dataSource.driver.queryBuilder<TModel>(this.table);
+    return queryBuilder;
+  }
+
+  /**
+   * Get First matched record for the given filter
+   */
+  public static async first<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    filter?: Record<string, unknown>,
+  ): Promise<TModel | null> {
+    const query = this.query();
+    if (filter) {
+      query.where(filter);
+    }
+
+    return query.first();
+  }
+
+  /**
+   * Get last matched record for the given filter
+   */
+  public static async last<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    filter?: Record<string, unknown>,
+  ): Promise<TModel | null> {
+    const query = this.query();
+    if (filter) {
+      query.where(filter);
+    }
+
+    return query.last();
+  }
+
+  /**
+   * Use where clause directly
+   */
+  public static where<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    field: string,
+    value: unknown,
+  ): QueryBuilderContract<TModel>;
+  public static where<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    field: string,
+    operator: WhereOperator,
+    value: unknown,
+  ): QueryBuilderContract<TModel>;
+  public static where<TModel extends Model = Model>(
+    this: (new (...args: any[]) => TModel) &
+      Pick<typeof Model, "query" | "getDataSource" | "table">,
+    conditions: WhereObject,
+  ): QueryBuilderContract<TModel>;
+  public static where<TModel extends Model = Model>(
+    this: (new (...args: any[]) => TModel) &
+      Pick<typeof Model, "query" | "getDataSource" | "table">,
+    callback: WhereCallback<TModel>,
+  ): QueryBuilderContract<TModel>;
+  public static where<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    ...args: any[]
+  ): QueryBuilderContract<TModel> {
+    return (this.query().where as any)(...args);
+  }
+
+  /**
+   * Count the number of records in the table
+   * @param filter - The filter to apply to the query
+   */
+  public static count<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    filter?: Record<string, unknown>,
+  ): Promise<number> {
+    const query = this.query();
+    if (filter) {
+      query.where(filter);
+    }
+
+    return query.count();
+  }
+
+  /**
+   * Find record by id
+   */
+  public static async find<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    id: string | number,
+  ): Promise<TModel | null> {
+    const query = this.query();
+    return query.where(this.primaryKey, id).first();
+  }
+
+  /**
+   * Get all records from the table
+   *
+   * @param filter - The filter to apply to the query
+   * @returns All records from the table
+   */
+  public static async all<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    filter?: Record<string, unknown>,
+  ): Promise<TModel[]> {
+    const query = this.query();
+    if (filter) {
+      query.where(filter);
+    }
+    return query.get();
+  }
+
+  /**
+   * Get latest records from the table
+   *
+   * @param filter - The filter to apply to the query
+   */
+  public static async latest<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    filter?: Record<string, unknown>,
+  ): Promise<TModel[]> {
+    const query = this.query();
+    if (filter) {
+      query.where(filter);
+    }
+
+    return (await query.latest()) as unknown as TModel[];
+  }
+
+  /**
+   * Increment the given field by the given amount
+   *
+   * @example ```typescript
+   * // Increase age by 1 for user id 1
+   * User.increment({id: 1}, "age", 1);
+   * // Increase age by 1 and views by 2 for user id 1
+   * User.increment({id: 1}, {age: 1, views: 2});
+   * ```
+   */
+  public static increase<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    filter: Record<string, unknown>,
+    field: string,
+    amount: number,
+  ): Promise<number> {
+    const query = this.query().where(filter);
+
+    return query.increment(field, amount);
+  }
+
+  /**
+   * Decrement the given field by the given amount
+   * @example ```typescript
+   * // Decrease age by 1 for user id 1
+   * User.decrement({id: 1}, "age", 1);
+   * // Decrease age by 1 and views by 2 for user id 1
+   * User.decrement({id: 1}, {age: 1, views: 2});
+   * ```
+   */
+  public static decrease<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    filter: Record<string, unknown>,
+    field: string,
+    amount: number,
+  ): Promise<number> {
+    const query = this.query().where(filter);
+    return query.decrement(field, amount);
+  }
+
+  /**
+   * Perform atomic operation
+   */
+  public static async atomic<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    filter: Record<string, unknown>,
+    operations: Record<string, unknown>,
+  ): Promise<number> {
+    const dataSource = this.getDataSource();
+    const result = await dataSource.driver.atomic(this.table, filter, operations);
+    return result.modifiedCount;
+  }
+
+  /**
+   * Destroy (delete) the current model instance from the database.
+   *
+   * Emits lifecycle events:
+   * - `deleting` - Before deletion
+   * - `deleted` - After successful deletion
+   *
+   * @param options - Destroy options (strategy override, skipEvents)
+   * @throws {Error} If the model is new (not saved) or if deletion fails
+   *
+   * @example
+   * ```typescript
+   * const user = await User.find(1);
+   * await user.destroy(); // Uses default strategy
+   * await user.destroy({ strategy: "permanent" }); // Override strategy
+   * await user.destroy({ skipEvents: true }); // Silent delete
+   * ```
+   */
+  public async destroy(options?: {
+    strategy?: DeleteStrategy;
+    skipEvents?: boolean;
+  }): Promise<RemoverResult> {
+    const remover = new DatabaseRemover(this);
+    return await remover.destroy(options);
+  }
+
+  /**
+   * Get the class constructor from an instance.
+   *
+   * This helper method allows instance methods to access static properties
+   * and methods of the model class in a type-safe way.
+   *
+   * @returns The model class constructor
+   *
+   * @example
+   * ```typescript
+   * const constructor = this.self();
+   * const table = constructor.table;
+   * await constructor.deleteOne({ id: 1 });
+   * ```
+   */
+  protected self<TModel extends Model = this>(): ChildModel<TModel> {
+    return this.constructor as any as ChildModel<TModel>;
+  }
+
+  /**
+   * Get table name
+   */
+  public getTableName(): string {
+    return this.self().table;
+  }
+
+  /**
+   * Get primary key name
+   */
+  public getPrimaryKey(): string {
+    return this.self().primaryKey;
+  }
+
+  /**
+   * Get model schema
+   */
+  public getSchema() {
+    return this.self().schema;
+  }
+
+  /**
+   * Check if schema has the given key
+   */
+  public schemaHas(key: string): boolean {
+    return this.self().schema?.schema[key] !== undefined;
+  }
+
+  /**
+   * Get strict mode
+   */
+  public getStrictMode(): StrictMode {
+    return this.self().strictMode;
+  }
+
+  /**
+   * Get data source (Connection)
+   */
+  public getConnection(): DataSource {
+    return this.self().getDataSource();
+  }
+
+  /**
+   * Delete all matching documents from the table.
+   */
+  public static async delete<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    filter?: Record<string, unknown>,
+  ): Promise<number> {
+    return await this.getDataSource().driver.deleteMany(this.table, filter);
+  }
+
+  /**
+   * Delete a single matching document from the table.
+   */
+  public static async deleteOne<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    filter?: Record<string, unknown>,
+  ): Promise<number> {
+    return await this.getDataSource().driver.delete(this.table, filter);
+  }
+
+  /**
+   * Restore a single deleted record by its ID.
+   *
+   * Automatically detects whether the record was deleted via "trash" or "soft" strategy.
+   * Handles ID conflicts based on options.
+   *
+   * @param id - The primary key value of the record to restore
+   * @param options - Restorer options (onIdConflict, skipEvents)
+   * @returns The restored model instance
+   *
+   * @throws {Error} If record not found in trash or soft-deleted records
+   * @throws {Error} If ID conflict and onIdConflict is "fail"
+   *
+   * @example
+   * ```typescript
+   * // Restore with default options (assign new ID if conflict)
+   * const user = await User.restore(123);
+   *
+   * // Restore and fail if ID conflict
+   * const user = await User.restore(123, { onIdConflict: "fail" });
+   *
+   * // Silent restore (skip events)
+   * const user = await User.restore(123, { skipEvents: true });
+   * ```
+   */
+  public static async restore<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    id: string | number,
+    options?: {
+      onIdConflict?: "fail" | "assignNew";
+      skipEvents?: boolean;
+    },
+  ): Promise<TModel> {
+    const restorer = new DatabaseRestorer(this as unknown as typeof Model);
+    const result = await restorer.restore(id, options);
+
+    if (!result.restoredRecord) {
+      throw new Error(
+        `Failed to restore ${this.name} with ${this.primaryKey} ${id}: no record returned.`,
+      );
+    }
+
+    return result.restoredRecord as TModel;
+  }
+
+  /**
+   * Restore all deleted records for the model's table.
+   *
+   * Restores all records from the trash table (if using trash strategy)
+   * or all soft-deleted records (if using soft strategy).
+   *
+   * @param options - Restorer options (onIdConflict, skipEvents)
+   * @returns Array of restored model instances
+   *
+   * @example
+   * ```typescript
+   * // Restore all with default options
+   * const users = await User.restoreAll();
+   *
+   * // Restore all and fail on any ID conflict
+   * const users = await User.restoreAll({ onIdConflict: "fail" });
+   * ```
+   */
+  public static async restoreAll<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    options?: {
+      onIdConflict?: "fail" | "assignNew";
+      skipEvents?: boolean;
+    },
+  ): Promise<TModel[]> {
+    const restorer = new DatabaseRestorer(this as unknown as typeof Model);
+    const result = await restorer.restoreAll(options);
+
+    if (result.restoredCount === 0) {
+      return [];
+    }
+
+    return result.restoredRecords as TModel[];
+  }
+
+  /**
+   * Create a new record in database and return the model instance.
+   *
+   * The data type is automatically inferred from the model's schema type.
+   *
+   * @param data - Partial data matching the model's schema type
+   * @returns The created model instance
+   *
+   * @example
+   * ```typescript
+   * // TypeScript automatically infers UserSchema from User model
+   * const user = await User.create({
+   *   name: "Alice",
+   *   email: "alice@example.com",
+   *   age: 30
+   * });
+   * // Type: User (with UserSchema inferred)
+   * ```
+   */
+  public static async create<
+    TModel extends Model = Model,
+    TSchema extends ModelSchema = TModel extends Model<infer S> ? S : ModelSchema,
+  >(this: ChildModel<TModel>, data: Partial<TSchema>): Promise<TModel> {
+    const model = new this(data);
+    await model.save();
+    return model;
+  }
+
+  /**
+   * Create many documents and return an array of created models
+   */
+  public static async createMany<
+    TModel extends Model = Model,
+    TSchema extends ModelSchema = TModel extends Model<infer S> ? S : ModelSchema,
+  >(this: ChildModel<TModel>, data: Partial<TSchema>[]): Promise<TModel[]> {
+    return await Promise.all(data.map((data) => this.create(data)));
+  }
+
+  /**
+   * Find a record or create it if not found.
+   *
+   * Does NOT update existing records - returns them as-is.
+   * Useful when you want to ensure a record exists without modifying it.
+   *
+   * @param filter - Conditions to find by
+   * @param data - Data to create if not found (merged with filter)
+   * @returns Promise resolving to found or created model
+   *
+   * @example
+   * ```typescript
+   * // Ensure default admin exists (don't modify if exists)
+   * const admin = await User.findOrCreate(
+   *   { email: "admin@example.com" },
+   *   { email: "admin@example.com", name: "Admin", role: "admin" }
+   * );
+   * // If admin exists, returns existing (password unchanged)
+   * // If not found, creates new admin
+   * ```
+   */
+  public static async findOrCreate<
+    TModel extends Model = Model,
+    TSchema extends ModelSchema = TModel extends Model<infer S> ? S : ModelSchema,
+  >(this: ChildModel<TModel>, filter: Partial<TSchema>, data: Partial<TSchema>): Promise<TModel> {
+    // Try to find existing record
+    const existing = await this.first(filter);
+
+    if (existing) {
+      return existing; // Return as-is, no update
+    }
+
+    // Create new record with merged data
+    return await this.create({ ...filter, ...data } as Partial<TSchema>);
+  }
+
+  /**
+   * Update a record or create it if not found (upsert).
+   *
+   * DOES update existing records with new data.
+   * Useful when you want to ensure a record exists with the latest data.
+   *
+   * Includes full Model features:
+   * - ID generation (if creating)
+   * - createdAt timestamp (if creating)
+   * - updatedAt timestamp (always)
+   * - Validation & casting
+   * - Lifecycle events
+   * - Sync operations
+   *
+   * @param filter - Conditions to find by
+   * @param data - Data to update or create (merged with filter)
+   * @returns Promise resolving to updated or created model
+   *
+   * @example
+   * ```typescript
+   * // Sync user from external API (update if exists, create if not)
+   * const user = await User.updateOrCreate(
+   *   { externalId: "ext-123" },
+   *   {
+   *     externalId: "ext-123",
+   *     name: "John Updated",
+   *     email: "john.new@example.com",
+   *     lastSyncedAt: new Date()
+   *   }
+   * );
+   * // User always has latest data from API
+   * ```
+   */
+  public static async updateOrCreate<
+    TModel extends Model = Model,
+    TSchema extends ModelSchema = TModel extends Model<infer S> ? S : ModelSchema,
+  >(this: ChildModel<TModel>, filter: Partial<TSchema>, data: Partial<TSchema>): Promise<TModel> {
+    // Try to find existing record
+    const existing = await this.first(filter);
+
+    if (existing) {
+      // Update existing record
+      await existing.save({ merge: data });
+      return existing;
+    }
+
+    // Create new record with merged data
+    return await this.create({ ...filter, ...data } as Partial<TSchema>);
+  }
+
+  /**
+   * Returns embedded data for sync operations.
+   * Excludes internal MongoDB fields and ensures proper date serialization.
+   *
+   * @returns Embedded data object suitable for syncing
+   *
+   * @example
+   * ```typescript
+   * const user = await User.find(1);
+   * const embedData = user.embedData;
+   * // Returns: { id: 1, name: "Alice", email: "alice@example.com", ... }
+   * // Excludes: _id
+   * ```
+   */
+  public get embedData(): Record<string, unknown> {
+    return this.self().embed ? this.only(this.self().embed as any) : this.data;
+  }
+
+  /**
+   * Accesses the event emitter dedicated to this model constructor.
+   *
+   * Each model subclass gets its own isolated event emitter, allowing you to
+   * register lifecycle hooks that only apply to that specific model.
+   *
+   * @returns The ModelEvents instance for this model constructor
+   *
+   * @example
+   * ```typescript
+   * User.events().onSaving((user) => {
+   *   console.log("User is being saved:", user);
+   * });
+   * ```
+   */
+  public static events<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+  ): ModelEvents<TModel> {
+    let events = modelEventsRegistry.get(this);
+    if (!events) {
+      events = new ModelEvents<TModel>();
+      modelEventsRegistry.set(this, events);
+    }
+
+    return events as ModelEvents<TModel>;
+  }
+
+  /**
+   * Cleanup model events
+   */
+  public static $cleanup() {
+    modelEventsRegistry.delete(this);
+    removeModelFromRegistery(this.name);
+  }
+
+  /**
+   * Registers an event listener for this model constructor.
+   *
+   * Convenience shorthand for `Model.events().on(...)`.
+   *
+   * @param event - The event name (e.g., "saving", "created")
+   * @param listener - The callback to invoke when the event fires
+   * @returns An unsubscribe function
+   *
+   * @example
+   * ```typescript
+   * const unsubscribe = User.on("saving", (user) => {
+   *   console.log("Saving user:", user);
+   * });
+   * ```
+   */
+  public static on<TModel extends Model = Model, TContext = unknown>(
+    this: ChildModel<TModel>,
+    event: ModelEventName,
+    listener: ModelEventListener<TModel, TContext>,
+  ): () => void {
+    return this.events<TModel>().on(event, listener);
+  }
+
+  /**
+   * Registers a one-time event listener for this model constructor.
+   *
+   * The listener will automatically unsubscribe after its first invocation.
+   * Convenience shorthand for `Model.events().once(...)`.
+   *
+   * @param event - The event name (e.g., "saving", "created")
+   * @param listener - The callback to invoke when the event fires
+   * @returns An unsubscribe function
+   *
+   * @example
+   * ```typescript
+   * User.once("created", (user) => {
+   *   console.log("First user created:", user);
+   * });
+   * ```
+   */
+  public static once<TModel extends Model = Model, TContext = unknown>(
+    this: ChildModel<TModel>,
+    event: ModelEventName,
+    listener: ModelEventListener<TModel, TContext>,
+  ): () => void {
+    return this.events<TModel>().once(event, listener);
+  }
+
+  /**
+   * Removes an event listener from this model constructor.
+   *
+   * Convenience shorthand for `Model.events().off(...)`.
+   *
+   * @param event - The event name
+   * @param listener - The callback to remove
+   *
+   * @example
+   * ```typescript
+   * const listener = (user) => console.log(user);
+   * User.on("saving", listener);
+   * User.off("saving", listener);
+   * ```
+   */
+  public static off<TModel extends Model = Model, TContext = unknown>(
+    this: ChildModel<TModel>,
+    event: ModelEventName,
+    listener: ModelEventListener<TModel, TContext>,
+  ): void {
+    this.events<TModel>().off(event, listener);
+  }
+
+  /**
+   * Accesses the global event emitter shared by all model instances.
+   *
+   * Use this for cross-cutting concerns like auditing, logging, or injecting
+   * common fields (e.g., `createdBy`, `updatedBy`) across all models.
+   *
+   * @returns The global ModelEvents instance
+   *
+   * @example
+   * ```typescript
+   * Model.globalEvents().onSaving((model) => {
+   *   model.set("updatedAt", new Date());
+   * });
+   * ```
+   */
+  public static globalEvents(): ModelEvents<Model> {
+    return globalModelEvents;
+  }
+
+  /**
+   * Replace the model's data entirely.
+   *
+   * Used internally by the writer after validation to update the model
+   * with validated/casted data.
+   *
+   * **Warning:** This replaces all data and updates the dirty tracker.
+   * Use with caution in application code.
+   *
+   * @param data - New data to replace current data
+   *
+   * @example
+   * ```typescript
+   * // Internal usage by writer
+   * model.replaceData(validatedData);
+   * ```
+   */
+  public replaceData(data: Record<string, unknown>): void {
+    this.data = data as TSchema;
+    this.dirtyTracker.replaceCurrentData(data);
+  }
+
+  /**
+   * Save the model to the database.
+   *
+   * Performs insert if `isNew === true`, otherwise performs update.
+   * Automatically validates, casts, generates IDs, and emits lifecycle events.
+   *
+   * **Features:**
+   * - Validation via @warlock.js/seal schema
+   * - Data casting (string → number, etc.)
+   * - ID generation (NoSQL only)
+   * - Partial updates (only changed fields)
+   * - Lifecycle events (validating, saving, created/updated, saved)
+   *
+   * @param data - Optional data to merge before saving
+   * @param options - Save options
+   * @returns The model instance for method chaining
+   *
+   * @throws {ValidationError} If validation fails
+   * @throws {Error} If database operation fails
+   *
+   * @example
+   * ```typescript
+   * // Simple save
+   * const user = new User({ name: "Alice" });
+   * await user.save();
+   *
+   * // Merge data before saving
+   * await user.save({ age: 31, email: "alice@example.com" });
+   *
+   * // Silent save (no events)
+   * await user.save(null, { skipEvents: true });
+   *
+   * // Skip validation
+   * await user.save(null, { skipValidation: true });
+   *
+   * // Method chaining
+   * await user.set("name", "Bob").save();
+   * ```
+   */
+  public async save(options?: WriterOptions & { merge?: Partial<TSchema> }): Promise<this> {
+    if (options?.merge) {
+      this.merge(options.merge);
+    }
+
+    const writer = new DatabaseWriter(this);
+    await writer.save(options);
+    return this;
   }
 
   /**
    * Serialize the model data for storage in database
    */
   public serialize() {
-    return {
-      ...this.data,
-      _id: this.data._id ? this.data._id.toString() : undefined,
-    };
+    return this.self().getDataSource().driver.serialize(this.data);
   }
 
   /**
-   * Generate and return next id
+   * Deseriaze the given data
    */
-  public async generateNextId() {
-    this.set(
-      "id",
-      await this.getStaticProperty("genNextId").bind(this.constructor)(),
-    );
+  public static deserialize<TModel extends Model>(this: ChildModel<TModel>, data: any) {
+    const deserializedData = this.getDataSource().driver.deserialize(data);
 
-    return this.id;
+    const model = new this(deserializedData as any);
+    model.isNew = false;
+
+    return model;
   }
 
   /**
-   * Trigger created events
+   * Convert the model into JSON
    */
-  public triggerCreatedEvents() {
-    const selfModelEvents = this.getModelEvents();
-    const ModelEvents = this.getBaseModelEvents();
+  public toJSON() {
+    const resource = this.self().resource;
 
-    this.onSaved();
-    this.onCreated();
-    selfModelEvents.trigger("created", this);
-    selfModelEvents.trigger("saved", this);
-    ModelEvents.trigger("created", this);
-    ModelEvents.trigger("saved", this);
+    if (!resource) {
+      const toJsonColumns = this.self().toJsonColumns;
 
-    this.startSyncing("create");
-  }
-
-  /**
-   * Trigger updated events
-   */
-  public triggerUpdatedEvents(oldModel: Model) {
-    const selfModelEvents = this.getModelEvents();
-    const ModelEvents = this.getBaseModelEvents();
-
-    this.onSaved();
-    this.onUpdated();
-    selfModelEvents.trigger("updated", this, oldModel);
-    selfModelEvents.trigger("saved", this, oldModel);
-    ModelEvents.trigger("updated", this, oldModel);
-    ModelEvents.trigger("saved", this, oldModel);
-
-    this.startSyncing("update", oldModel);
-  }
-
-  /**
-   * Perform saving but without any events triggers
-   */
-  public async silentSaving(
-    mergedData?: Omit<Schema, "id" | "_id">,
-    options?: { cast?: boolean },
-  ) {
-    return await this.save(mergedData, {
-      triggerEvents: false,
-      ...(options || {}),
-    });
-  }
-
-  /**
-   * Determine whether the model should be updated or not
-   */
-  protected shouldUpdate(originalData: Schema, data: Schema) {
-    return areEqual(originalData, data) === false;
-  }
-
-  /**
-   * Triggered before saving the model either by creating or updating
-   */
-  protected async onSaving() {
-    //
-  }
-
-  /**
-   * Triggered after saving the model either by creating or updating
-   */
-  protected async onSaved() {
-    //
-  }
-
-  /**
-   * Triggered before creating the model
-   */
-  protected async onCreating() {
-    //
-  }
-
-  /**
-   * Triggered after creating the model
-   */
-  protected async onCreated() {
-    //
-  }
-
-  /**
-   * Triggered before updating the model
-   */
-  protected async onUpdating() {
-    //
-  }
-
-  /**
-   * Triggered after updating the model
-   */
-  protected async onUpdated() {
-    //
-  }
-
-  /**
-   * Triggered before deleting the model
-   */
-  protected async onDeleting() {
-    //
-  }
-
-  /**
-   * Triggered after deleting the model
-   */
-  protected async onDeleted() {
-    //
-  }
-
-  /**
-   * Cast data before saving
-   */
-  protected async castData(forceUpdate = false) {
-    for (const column in this.casts) {
-      if (!forceUpdate && !this.isDirty(column)) {
-        continue;
+      if (toJsonColumns && toJsonColumns.length > 0) {
+        return this.only(toJsonColumns);
       }
 
-      let value = this.get(column);
-
-      if (value === undefined) continue;
-
-      const castType = this.casts[column];
-
-      const castValue = async (value: any) => {
-        if (castType.prototype instanceof Model) {
-          // if cast type is passed as model class, then get its embedded data
-          value = await castModel(castType)(value);
-        } else if (castType?.model) {
-          // it means the user is passing a custom model embedding i.e Model.embed('embedToProduct') => Product to embed from the getter property
-          // embedToProduct
-          // @see EmbeddedModel
-
-          value = await castModel(castType.model, castType.embeddedKey)(value);
-        } else if (typeof castType === "object") {
-          // it means the user is passing an enum object
-
-          value = await castEnum(castType)(value);
-        } else if (value instanceof Model) {
-          value = value.embeddedData;
-        } else if (typeof castType === "function") {
-          value = await (castType as CustomCastType)(value, column, this);
-        } else {
-          value = this.castValue(value, castType);
-        }
-
-        return value;
-      };
-
-      // if the cast type is passed in array
-      // it means we just need to pass the value to the first function
-      // second argument will be the column name
-      // and the third argument will be the model instance
-      if (Array.isArray(castType)) {
-        value = await castType[0](value, column, this);
-      } else if (Array.isArray(value) && castType !== "localized") {
-        // if cast type is array, then we'll keep the value as it is
-
-        // now we want to add a new validation rule that to check
-        // if the value is an array of localized objects
-        // if so, then each value in the array should have `localeCode` and `value` keys
-        // if so, then it will be cast only to the value key inside each object
-        // so the final output will be localeCode and `castValue` of the value key
-        if (castType === "array") {
-          // just do nothing we're good for now
-          // TODO: Enhance the if statement
-        } else if (value[0]?.localeCode && value[0]?.value) {
-          value = await Promise.all(
-            value.map(async item => {
-              return {
-                localeCode: item.localeCode,
-                value: await castValue(item.value),
-              };
-            }),
-          );
-        } else {
-          value = await Promise.all(
-            value.map(async item => {
-              return await castValue(item);
-            }),
-          );
-        }
-      } else {
-        value = await castValue(value);
-      }
-
-      if (Array.isArray(value)) {
-        value = value.filter(value => value !== null && value !== undefined);
-      }
-
-      if (value !== undefined) {
-        this.set(column, value);
-      } else {
-        this.unset(column);
-      }
+      return this.data;
     }
 
-    for (const column in this.customCasts) {
-      const castType = this.customCasts[column];
+    const resourceColumns = this.self().resourceColumns;
 
-      const value = await castType(this, column);
+    const data =
+      resourceColumns !== undefined && resourceColumns.length > 0
+        ? this.only(resourceColumns)
+        : this.data;
 
-      if (value !== undefined) {
-        this.set(column, value);
-      } else {
-        this.unset(column);
-      }
-    }
-  }
-
-  /**
-   * Return only the given columns to be used in output
-   */
-  public outputOnly(columns: string[]) {
-    return this.clone(this.only(columns));
-  }
-
-  /**
-   * Return all columns except the given columns to be used in output
-   */
-  public outputExcept(columns: string[]) {
-    return this.clone(this.except(columns));
-  }
-
-  /**
-   * Cast the given value based on the given cast type
-   */
-  protected castValue(value: any, castType: CastType) {
-    const isEmptyValue = isEmpty(value);
-
-    if (typeof value === "object") {
-      if (value === null) return undefined;
-    } else if (isEmptyValue) return undefined;
-
-    switch (castType) {
-      case "string":
-        return isEmptyValue ? "" : String(value).trim();
-      case "localized":
-        // if (isEmptyValue) return [];
-
-        // if (!Array.isArray(value)) return [];
-        if (!Array.isArray(value)) return undefined;
-
-        return value
-          .filter(value => !isEmpty(value) && isPlainObject(value))
-          .map(item => {
-            return {
-              localeCode: item.localeCode,
-              value: item.value,
-            };
-          });
-      case "number":
-        // return isEmptyValue ? 0 : Number(value);
-        return Number(value);
-      case "int":
-      case "integer":
-        // return isEmptyValue ? 0 : parseInt(value);
-        return parseInt(value);
-      case "float":
-        // return isEmptyValue ? 0 : parseFloat(value);
-        return parseFloat(value);
-      case "bool":
-      case "boolean": {
-        // if (isEmptyValue) return false;
-
-        if (value === "true") return true;
-
-        if (value === "false" || value === "0" || value === 0) return false;
-
-        return Boolean(value);
-      }
-      case "date": {
-        if (dayjs.isDayjs(value)) {
-          value = value.toDate();
-        }
-
-        if (value instanceof Date) {
-          return toUTC(value);
-        }
-
-        return toUTC(new Date(value));
-      }
-      case "location": {
-        // if (isEmptyValue) return null;
-
-        const lat = value?.[0] || value?.lat;
-        const lng = value?.[1] || value?.lng;
-        const address = value?.address || value?.formattedAddress;
-
-        return {
-          type: "Point",
-          coordinates: [Number(lat), Number(lng)],
-          address,
-        };
-      }
-      case "object": {
-        // if (isEmptyValue) return {};
-
-        if (typeof value === "string") {
-          try {
-            return JSON.parse(value);
-          } catch (error) {
-            return undefined;
-          }
-        }
-
-        return value;
-      }
-      case "array": {
-        // if (isEmptyValue) return [];
-
-        if (typeof value === "string") {
-          return JSON.parse(value);
-        }
-
-        return value;
-      }
-      case "mixed":
-      case "any":
-      default:
-        return value;
-    }
-  }
-
-  /**
-   * Check for default values
-   */
-  protected checkDefaultValues() {
-    // if default value is empty, then do nothing
-    if (isEmpty(this.defaultValue)) return;
-
-    const defaultValue = { ...this.defaultValue };
-
-    for (const key in defaultValue) {
-      const value = defaultValue[key];
-
-      if (typeof value === "function") {
-        defaultValue[key] = value(this);
-      }
-    }
-
-    // merge the data with default value
-    this.data = merge(defaultValue, this.data);
-  }
-
-  /**
-   * Destroy the model and delete it from database collection
-   */
-  public async destroy() {
-    if (!this.data._id) return;
-
-    if (this.deletedAtColumn) {
-      this.set(this.deletedAtColumn, new Date());
-    }
-
-    const deleteStrategy: ModelDeleteStrategy =
-      this.getStaticProperty("deleteStrategy");
-
-    if (deleteStrategy === ModelDeleteStrategy.moveToTrash) {
-      const collectionName = this.getCollection();
-      class Trash extends Model {
-        public static collection = collectionName + "Trash";
-      }
-
-      // we need to wrap the trash collection inside a model class so it get a generated timestamps and id
-      Trash.create({
-        document: this.data,
-      });
-    }
-
-    const selfModelEvents = this.getModelEvents();
-
-    const ModelEvents = this.getBaseModelEvents();
-
-    await this.onDeleting();
-    await selfModelEvents.trigger("deleting", this);
-    await ModelEvents.trigger("deleting", this);
-
-    // the document will be deleted from database collection if the delete strategy is not soft delete
-    if (deleteStrategy !== ModelDeleteStrategy.softDelete) {
-      await this.getQuery().deleteOne(this.getCollection(), {
-        _id: this.data._id,
-      });
-    } else if (deleteStrategy === ModelDeleteStrategy.softDelete) {
-      await this.getQuery().updateOne(
-        this.getCollection(),
-        {
-          _id: this.data._id,
-        },
-        this.data,
-      );
-    }
-
-    this.onDeleted();
-
-    selfModelEvents.trigger("deleted", this);
-    ModelEvents.trigger("deleted", this);
-
-    this.syncDestruction();
-  }
-
-  /**
-   * Determine if the given column is dirty column
-   *
-   * Dirty columns are columns that their values have been changed from the original data
-   */
-  public isDirty(column?: string) {
-    if (!column) {
-      return areEqual(clone(this.data), clone(this.originalData)) === false;
-    }
-
-    if (this.isNewModel()) return true;
-
-    const currentValue = get(this.data, column);
-    const originalValue = get(this.originalData, column);
-
-    return areEqual(clone(currentValue), clone(originalValue)) === false;
-  }
-
-  /**
-   * Check if current model is a new model
-   */
-  public isNewModel() {
-    // Check initial data instead of current data since it represents
-    // the original state when the model was instantiated
-    const hasMongoId = Boolean(this.data._id) && !this.isRestored;
-
-    // Check for numeric id in initial data
-    // const hasNumericId = Boolean(this.data?.id) && !this.isRestored;
-
-    return !hasMongoId;
-  }
-
-  /**
-   * Get embedded data
-   */
-  public get embeddedData() {
-    if (this.embedAllExcept.length > 0) {
-      return except(this.data, this.embedAllExcept as string[]);
-    }
-
-    if (this.embedAllExceptTimestampsAndUserColumns) {
-      return except(this.data, [
-        this.createdAtColumn,
-        this.updatedAtColumn,
-        this.deletedAtColumn,
-        this.createdByColumn,
-        this.updatedByColumn,
-        this.deletedByColumn,
-      ]);
-    }
-
-    return this.embedded.length > 0 ? this.only(this.embedded) : this.data;
-  }
-
-  /**
-   * Clone the model
-   */
-  public clone(data: Document = this.data) {
-    return new (this.constructor as any)(clone(data)) as this;
-  }
-
-  /**
-   * Get relationship with the given model class
-   */
-  public hasMany<T extends Model = Model>(
-    modelClass: typeof Model,
-    column: string,
-  ) {
-    return new RelationshipWithMany<T>(this as any, modelClass, column);
-  }
-
-  /**
-   * Get new aggregate for current model
-   */
-  public static aggregate<T extends Model = Model>(this: ChildModel<T>) {
-    return new ModelAggregate<T>(this);
-  }
-
-  /**
-   * @alias aggregate
-   */
-  public static newQuery(): ModelAggregate<Model> {
-    return this.aggregate();
-  }
-
-  /**
-   * Get query builder
-   * @alias aggregate
-   */
-  public static queryBuilder<T extends Model = Model>(this: ChildModel<T>) {
-    return new ModelAggregate<T>(this);
-  }
-
-  /**
-   * Sync with the given model
-   */
-  public static sync(columns: string | string[], embedMethod = "embedData") {
-    return new ModelSync(this as typeof Model, columns, embedMethod);
-  }
-
-  /**
-   * Sync data on saving
-   */
-  public startSyncing(saveMode: "create" | "update", oldModel?: Model) {
-    for (const modelSync of this.syncWith) {
-      modelSync.sync(this as any, saveMode, oldModel);
-    }
-  }
-
-  /**
-   * Sync destruction
-   * Called when destroy method is called
-   */
-  public syncDestruction() {
-    for (const modelSync of this.syncWith) {
-      modelSync.syncDestruction(this as any);
-    }
-  }
-
-  /**
-   * The syncing model (That calls startSyncing) is being embedded in multiple documents of current model
-   * I.e Country.syncMany('cities') while current model is City
-   */
-  public static syncMany(
-    columns: string | string[],
-    embedMethod = "embedData",
-  ) {
-    return new ModelSync(this as typeof Model, columns, embedMethod).syncMany();
-  }
-
-  /**
-   * Reassociate a model/object/document with the current model
-   * If the model is already associated, it will be updated
-   * If not, it will be associated
-   * the model/document must have an id
-   *
-   * If it is a model, you can set the embed method to use
-   */
-  public reassociate(
-    this: Model,
-    column: string,
-    model: Model | ModelDocument | any,
-    embedWith?: string,
-  ) {
-    const columnValue =
-      model instanceof Model
-        ? embedWith
-          ? (model as any)[embedWith]()
-          : model.embeddedData
-        : model;
-
-    if (columnValue === undefined) return this;
-
-    // make a deep copy so when changing the data, it won't affect the original data
-    const documentsList = clone(this.get(column, []));
-
-    const index = documentsList.findIndex(
-      (doc: any) => (doc?.id || doc) === (columnValue?.id || columnValue),
-    );
-
-    if (index === -1) {
-      documentsList.push(columnValue);
-    } else {
-      documentsList[index] = columnValue;
-    }
-
-    this.set(column, [...documentsList]);
-
-    return this;
-  }
-
-  /**
-   * Associate a model with the current model
-   */
-  public associate(
-    this: Model,
-    column: string,
-    model: Model | ModelDocument | any,
-    embedWith?: string,
-  ) {
-    const columnValue =
-      model instanceof Model
-        ? embedWith
-          ? (model as any)[embedWith]()
-          : model.embeddedData
-        : model;
-
-    if (columnValue === undefined) return this;
-
-    const documentsList = this.get(column, []);
-
-    documentsList.push(columnValue);
-
-    this.set(column, documentsList);
-
-    return this;
-  }
-
-  /**
-   * Disassociate a model with the current model
-   */
-  public disassociate(
-    this: Model,
-    column: string,
-    model: Model | ModelDocument | any,
-  ) {
-    const columnValue = model instanceof Model ? model.embeddedData : model;
-
-    if (columnValue === undefined) return this;
-
-    const documentsList = this.get(column, []);
-
-    if (!Array.isArray(documentsList)) return this;
-
-    const index = documentsList.findIndex(
-      (doc: any) => (doc?.id || doc) === (columnValue?.id || columnValue),
-    );
-
-    if (index !== -1) {
-      documentsList.splice(index, 1);
-    }
-
-    this.set(column, documentsList);
-
-    return this;
-  }
-
-  /**
-   * Refresh the model with new data from database
-   * This method will update the current data with the new data from database
-   */
-  public async refresh() {
-    const key = this.data._id ? "_id" : "id";
-    const value = this.data._id ?? this.data.id;
-    const data = await this.getQuery().first(this.getCollection(), {
-      [key]: value,
-    });
-
-    if (!data) return;
-
-    this.data = data;
-
-    return this;
-  }
-
-  /**
-   * Fetch data from database and return it in a new model
-   */
-  public async reload(): Promise<this> {
-    const key = this.data._id ? "_id" : "id";
-    const value = this.data._id ?? this.data.id;
-
-    if (!value) {
-      throw new Error("Model ID is required to reload the model");
-    }
-
-    const data = await this.getQuery().first(this.getCollection(), {
-      [key]: value,
-    });
-
-    return new (this.constructor as any)(data);
-  }
-
-  /**
-   * Make a wrapper to list when models should be updated when only one of the given columns is updated
-   */
-  public syncUpdateWhenChange(
-    columns: string | string[],
-    syncModels: ModelSync[],
-  ) {
-    return syncModels.map(syncModel => {
-      syncModel.updateWhenChange(columns);
-
-      return syncModel;
-    });
-  }
-
-  /**
-   * Get a Joinable instance for current model
-   */
-  public static joinable(
-    /**
-     * Local field to the current model
-     */
-    localField?: string,
-    /**
-     * Foreign field in the joinable model
-     */
-    foreignField?: string,
-    single?: boolean,
-    as?: string,
-  ) {
-    const joinable = new Joinable(this as any);
-
-    if (localField) {
-      joinable.localField(localField);
-    }
-
-    if (foreignField) {
-      joinable.foreignField(foreignField);
-    }
-
-    if (single) {
-      joinable.single(single);
-    }
-
-    if (as) {
-      joinable.as(as);
-    }
-
-    return joinableProxy(joinable);
+    return new resource(data).toJSON();
   }
 }
-
-export type ModelType = typeof Model;
