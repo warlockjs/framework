@@ -42,7 +42,63 @@ const DEFAULT_TRANSACTION_OPTIONS: TransactionOptions = {
   writeConcern: { w: "majority" },
 };
 
+// ============================================================
+// Lazy-loaded MongoDB SDK Types
+// ============================================================
+
+/**
+ * Cached MongoDB module (loaded once, reused)
+ */
+let MongoDBClient: typeof import("mongodb");
+
 let ObjectId: typeof import("mongodb").ObjectId;
+
+let isModuleExists: boolean | null = null;
+
+let loadingPromise: Promise<any>;
+
+/**
+ * Installation instructions for MongoDB package
+ */
+const MONGODB_INSTALL_INSTRUCTIONS = `
+MongoDB driver requires the mongodb package.
+Install it with:
+
+  npm install mongodb
+
+Or with your preferred package manager:
+
+  pnpm add mongodb
+  yarn add mongodb
+`.trim();
+
+/**
+ * Load MongoDB module
+ */
+async function loadMongoDB() {
+  try {
+    loadingPromise = import("mongodb");
+    MongoDBClient = await loadingPromise;
+    ObjectId = MongoDBClient.ObjectId;
+    isModuleExists = true;
+  } catch {
+    isModuleExists = false;
+  }
+}
+
+loadMongoDB();
+
+async function assertModuleIsLoaded() {
+  if (isModuleExists === false) {
+    throw new Error(MONGODB_INSTALL_INSTRUCTIONS);
+  }
+
+  if (isModuleExists === null) {
+    await loadingPromise;
+
+    return await assertModuleIsLoaded();
+  }
+}
 
 /**
  * MongoDB driver implementation that fulfils the Cascade driver contract.
@@ -165,8 +221,10 @@ export class MongoDbDriver implements DriverContract {
       return;
     }
 
+    await assertModuleIsLoaded();
+
     const uri = this.resolveUri();
-    const { MongoClient, ObjectId: ObjectIdMongoDB } = await import("mongodb");
+    const { MongoClient, ObjectId: ObjectIdMongoDB } = MongoDBClient;
 
     ObjectId = ObjectIdMongoDB;
 

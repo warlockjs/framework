@@ -54,6 +54,442 @@ type PendingOperation = {
 };
 
 /**
+ * Contract for a migration class.
+ */
+export interface MigrationContract {
+  /**
+   * Table/collection name for this migration.
+   */
+  readonly table: string;
+
+  /**
+   * Optional data source override.
+   */
+  readonly dataSource?: string | DataSource;
+
+  /**
+   * Optional timestamp override.
+   */
+  readonly createdAt?: string;
+
+  /**
+   * Whether to wrap migration in a transaction.
+   */
+  readonly transactional?: boolean;
+
+  /**
+   * Define schema changes for the up migration.
+   */
+  up(): void | Promise<void>;
+
+  /**
+   * Define rollback operations for the down migration.
+   */
+  down(): void | Promise<void>;
+
+  /**
+   * Set the migration driver.
+   *
+   * @param driver - Migration driver instance
+   * @internal
+   */
+  setDriver(driver: MigrationDriverContract): void;
+
+  /**
+   * Get the migration driver.
+   *
+   * @returns The migration driver instance
+   */
+  getDriver(): MigrationDriverContract;
+
+  /**
+   * Execute all pending operations.
+   *
+   * @internal
+   */
+  execute(): Promise<void>;
+
+  /**
+   * Add a pending index definition.
+   *
+   * @param index - Index definition
+   * @internal
+   */
+  addPendingIndex(index: IndexDefinition): void;
+
+  /**
+   * Add a foreign key operation.
+   *
+   * @param fk - Foreign key definition
+   * @internal
+   */
+  addForeignKeyOperation(fk: ForeignKeyDefinition): void;
+
+  /**
+   * Create the table/collection.
+   */
+  createTable(): MigrationContract;
+
+  /**
+   * Create table if not exists
+   */
+  createTableIfNotExists(): MigrationContract;
+
+  /**
+   * Drop the table/collection.
+   */
+  dropTable(): MigrationContract;
+
+  /**
+   * Drop the table/collection if it exists.
+   */
+  dropTableIfExists(): MigrationContract;
+
+  /**
+   * Rename the table/collection.
+   *
+   * @param newName - New table name
+   */
+  renameTableTo(newName: string): MigrationContract;
+
+  /**
+   * Add a string/varchar column.
+   */
+  string(column: string, length?: number): ColumnBuilder;
+
+  /**
+   * Add a fixed-length char column.
+   */
+  char(column: string, length: number): ColumnBuilder;
+
+  /**
+   * Add a text column (unlimited length).
+   */
+  text(column: string): ColumnBuilder;
+
+  /**
+   * Add a medium text column.
+   */
+  mediumText(column: string): ColumnBuilder;
+
+  /**
+   * Add a long text column.
+   */
+  longText(column: string): ColumnBuilder;
+
+  /**
+   * Add an integer column.
+   */
+  integer(column: string): ColumnBuilder;
+
+  /**
+   * Alias for integer().
+   */
+  int(column: string): ColumnBuilder;
+
+  /**
+   * Add a small integer column.
+   */
+  smallInteger(column: string): ColumnBuilder;
+
+  /**
+   * Alias for smallInteger().
+   */
+  smallInt(column: string): ColumnBuilder;
+
+  /**
+   * Add a tiny integer column.
+   */
+  tinyInteger(column: string): ColumnBuilder;
+
+  /**
+   * Alias for tinyInteger().
+   */
+  tinyInt(column: string): ColumnBuilder;
+
+  /**
+   * Add a big integer column.
+   */
+  bigInteger(column: string): ColumnBuilder;
+
+  /**
+   * Alias for bigInteger().
+   */
+  bigInt(column: string): ColumnBuilder;
+
+  /**
+   * Add a float column.
+   */
+  float(column: string): ColumnBuilder;
+
+  /**
+   * Add a double precision column.
+   */
+  double(column: string): ColumnBuilder;
+
+  /**
+   * Add a decimal column with precision and scale.
+   */
+  decimal(column: string, precision?: number, scale?: number): ColumnBuilder;
+
+  /**
+   * Add a boolean column.
+   */
+  boolean(column: string): ColumnBuilder;
+
+  /**
+   * Alias for boolean().
+   */
+  bool(column: string): ColumnBuilder;
+
+  /**
+   * Add a date column (date only, no time).
+   */
+  date(column: string): ColumnBuilder;
+
+  /**
+   * Add a datetime column (date and time).
+   */
+  dateTime(column: string): ColumnBuilder;
+
+  /**
+   * Add a timestamp column.
+   */
+  timestamp(column: string): ColumnBuilder;
+
+  /**
+   * Add a time column (time only, no date).
+   */
+  time(column: string): ColumnBuilder;
+
+  /**
+   * Add a year column.
+   */
+  year(column: string): ColumnBuilder;
+
+  /**
+   * Add a JSON column.
+   */
+  json(column: string): ColumnBuilder;
+
+  /**
+   * Alias for json().
+   */
+  object(column: string): ColumnBuilder;
+
+  /**
+   * Add a binary/blob column.
+   */
+  binary(column: string): ColumnBuilder;
+
+  /**
+   * Alias for binary().
+   */
+  blob(column: string): ColumnBuilder;
+
+  /**
+   * Add a UUID column.
+   */
+  uuid(column: string): ColumnBuilder;
+
+  /**
+   * Add a ULID column.
+   */
+  ulid(column: string): ColumnBuilder;
+
+  /**
+   * Add an IP address column.
+   */
+  ipAddress(column: string): ColumnBuilder;
+
+  /**
+   * Add a MAC address column.
+   */
+  macAddress(column: string): ColumnBuilder;
+
+  /**
+   * Add a geo point column.
+   */
+  point(column: string): ColumnBuilder;
+
+  /**
+   * Add a polygon column.
+   */
+  polygon(column: string): ColumnBuilder;
+
+  /**
+   * Add a line string column.
+   */
+  lineString(column: string): ColumnBuilder;
+
+  /**
+   * Add a generic geometry column.
+   */
+  geometry(column: string): ColumnBuilder;
+
+  /**
+   * Add a vector column for AI embeddings.
+   */
+  vector(column: string, dimensions: number): ColumnBuilder;
+
+  /**
+   * Add an enum column with allowed values.
+   */
+  enum(column: string, values: string[]): ColumnBuilder;
+
+  /**
+   * Add a set column (multiple values from a set).
+   */
+  set(column: string, values: string[]): ColumnBuilder;
+
+  /**
+   * Add an auto-increment primary key column.
+   */
+  id(name?: string): ColumnBuilder;
+
+  /**
+   * Add a big integer auto-increment primary key column.
+   */
+  bigId(name?: string): ColumnBuilder;
+
+  /**
+   * Add a UUID primary key column.
+   */
+  uuidId(name?: string): ColumnBuilder;
+
+  /**
+   * Add createdAt and updatedAt timestamp columns.
+   */
+  timestamps(): MigrationContract;
+
+  /**
+   * Add a deletedAt column for soft deletes.
+   */
+  softDeletes(column?: string): ColumnBuilder;
+
+  /**
+   * Drop a column.
+   */
+  dropColumn(column: string): MigrationContract;
+
+  /**
+   * Drop multiple columns.
+   */
+  dropColumns(...columns: string[]): MigrationContract;
+
+  /**
+   * Rename a column.
+   */
+  renameColumn(from: string, to: string): MigrationContract;
+
+  /**
+   * Create an index on one or more columns.
+   */
+  index(columns: string | string[], name?: string): MigrationContract;
+
+  /**
+   * Drop an index by name or columns.
+   */
+  dropIndex(nameOrColumns: string | string[]): MigrationContract;
+
+  /**
+   * Create a unique constraint/index.
+   */
+  unique(columns: string | string[], name?: string): MigrationContract;
+
+  /**
+   * Drop a unique constraint/index.
+   */
+  dropUnique(columns: string | string[]): MigrationContract;
+
+  /**
+   * Create a full-text search index.
+   */
+  fullText(columns: string | string[], options?: FullTextIndexOptions): MigrationContract;
+
+  /**
+   * Drop a full-text search index.
+   */
+  dropFullText(name: string): MigrationContract;
+
+  /**
+   * Create a geo-spatial index.
+   */
+  geoIndex(column: string, options?: GeoIndexOptions): MigrationContract;
+
+  /**
+   * Drop a geo-spatial index.
+   */
+  dropGeoIndex(column: string): MigrationContract;
+
+  /**
+   * Create a vector search index for AI embeddings.
+   */
+  vectorIndex(column: string, options: VectorIndexOptions): MigrationContract;
+
+  /**
+   * Drop a vector search index.
+   */
+  dropVectorIndex(column: string): MigrationContract;
+
+  /**
+   * Create a TTL (time-to-live) index for automatic document expiration.
+   */
+  ttlIndex(column: string, expireAfterSeconds: number): MigrationContract;
+
+  /**
+   * Drop a TTL index.
+   */
+  dropTTLIndex(column: string): MigrationContract;
+
+  /**
+   * Add a composite primary key.
+   */
+  primaryKey(columns: string[]): MigrationContract;
+
+  /**
+   * Drop the primary key constraint.
+   */
+  dropPrimaryKey(): MigrationContract;
+
+  /**
+   * Start building a foreign key constraint.
+   */
+  foreign(column: string): ForeignKeyBuilder;
+
+  /**
+   * Drop a foreign key constraint by name.
+   */
+  dropForeign(name: string): MigrationContract;
+
+  /**
+   * Set JSON schema validation rules on the collection.
+   */
+  schemaValidation(schema: object): MigrationContract;
+
+  /**
+   * Remove schema validation rules from the collection.
+   */
+  dropSchemaValidation(): MigrationContract;
+
+  /**
+   * Execute raw operations with direct driver access.
+   */
+  raw<T>(callback: (connection: unknown) => Promise<T>): Promise<T>;
+}
+
+/**
+ * Constructor for the migration class.
+ */
+export interface MigrationConstructor {
+  new (): MigrationContract;
+  migrationName?: string;
+  createdAt?: string;
+  transactional?: boolean;
+  order?: number;
+}
+
+/**
  * Base class for all database migrations.
  *
  * Provides a fluent API for defining schema changes that work across
@@ -101,7 +537,7 @@ type PendingOperation = {
  * }
  * ```
  */
-export abstract class Migration {
+export abstract class Migration implements MigrationContract {
   /**
    * Migration name that will be labeled with
    * If record is enabled in migration, it will be stored as migration name
@@ -216,13 +652,13 @@ export abstract class Migration {
    * }
    * ```
    */
-  public static for<T extends ChildModel<Model>>(model: T): typeof Migration {
+  public static for<T extends ChildModel<Model>>(model: T): MigrationConstructor {
     abstract class BoundMigration extends Migration {
       public readonly table = model.table;
       public readonly dataSource = model.dataSource;
     }
 
-    return BoundMigration;
+    return BoundMigration as unknown as MigrationConstructor;
   }
 
   // ============================================================================
@@ -1566,11 +2002,11 @@ export function migrate(
   options?: {
     createdAt?: string;
     name?: string;
-    up?: (this: Migration) => void;
-    down?: (this: Migration) => void;
+    up?: (this: MigrationContract) => void;
+    down?: (this: MigrationContract) => void;
     transactional?: boolean;
   },
-) {
+): MigrationConstructor {
   return class AnonymousMigration extends Migration {
     public static migrationName?: string = options?.name;
     public static createdAt?: string = options?.createdAt;

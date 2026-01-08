@@ -924,7 +924,6 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * the model doesn't already have its own value set.
    *
    * @param defaults - Model default configuration from data source
-   * @private
    */
   public static applyModelDefaults(defaults: any): void {
     // Only apply defaults if model doesn't have its own value
@@ -1330,7 +1329,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * await constructor.deleteOne({ id: 1 });
    * ```
    */
-  protected self<TModel extends Model = this>(): ChildModel<TModel> {
+  public self<TModel extends Model = this>(): ChildModel<TModel> {
     return this.constructor as any as ChildModel<TModel>;
   }
 
@@ -1396,9 +1395,8 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    *
    * @param obj - The object to freeze
    * @returns The frozen object
-   * @private
    */
-  private deepFreeze<T>(obj: T): T {
+  public deepFreeze<T>(obj: T): T {
     // Freeze the object itself
     Object.freeze(obj);
 

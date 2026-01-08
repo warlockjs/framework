@@ -1,5 +1,9 @@
 export interface DriverBlueprintContract {
   /**
+   * Get tables list
+   */
+  listTables(): Promise<string[]>;
+  /**
    * Get all indexes of the given table
    */
   listIndexes(table: string): Promise<TableIndexInformation[]>;
