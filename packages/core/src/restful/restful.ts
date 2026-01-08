@@ -2,7 +2,7 @@ import type { GenericObject } from "@mongez/reinforcements";
 import type { Model } from "@warlock.js/cascade";
 import { log } from "@warlock.js/logger";
 import type { Request, Response } from "../http";
-import type { RepositoryManager } from "../repositories";
+import type { QueryBuilderContract, RepositoryManager } from "../repositories";
 import type { RestfulMiddleware, RouteResource } from "../router";
 
 export abstract class Restful<T extends Model> implements RouteResource {
@@ -68,12 +68,12 @@ export abstract class Restful<T extends Model> implements RouteResource {
 
       const listMethod = this.cache ? "listCached" : "list";
 
-      const { documents, paginationInfo } = await this.repository[listMethod](data);
+      const { data: documents, pagination } = await this.repository[listMethod](data);
 
       responseDocument[this.recordsListName] = documents;
 
-      if (paginationInfo) {
-        responseDocument.paginationInfo = paginationInfo;
+      if (pagination) {
+        responseDocument.paginationInfo = pagination;
       }
 
       return response.success(responseDocument);
@@ -122,7 +122,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
         return beforeSave;
       }
 
-      const record = await this.repository.create(request.all(), model);
+      const record = await this.repository.create(request.all());
 
       const createOutput = await this.onCreate(request, response, record);
 
@@ -278,7 +278,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
       }
 
       const records = await this.repository.all({
-        perform: (query) =>
+        perform: (query: QueryBuilderContract<T>) =>
           query.whereIn(
             "id",
             ids.map((id) => parseInt(id)),

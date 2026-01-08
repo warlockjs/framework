@@ -1,5 +1,5 @@
 import { invalidRule, VALID_RULE, type SchemaRule } from "@warlock.js/seal";
-import { useRequestStore } from "../../http";
+import { useCurrentUser } from "../../http";
 import type { UniqueExceptCurrentUserRuleOptions } from "../types";
 
 /**
@@ -17,7 +17,7 @@ export const uniqueExceptCurrentUserRule: SchemaRule<UniqueExceptCurrentUserRule
       query,
     } = this.context.options;
 
-    const { user } = useRequestStore();
+    const user = useCurrentUser();
 
     const dbQuery = Model.query();
 

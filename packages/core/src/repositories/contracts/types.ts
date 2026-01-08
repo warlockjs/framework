@@ -1,3 +1,5 @@
+import { QueryBuilderContract } from "./query-builder.contract";
+
 /**
  * Pagination result structure returned by repository list methods
  */
@@ -323,7 +325,7 @@ export type RepositoryOptions = {
   /**
    * Custom query modifications
    */
-  perform?: (query: any, options: RepositoryOptions) => void;
+  perform?: (query: QueryBuilderContract<any>, options: RepositoryOptions) => void;
 
   /**
    * Additional filter values

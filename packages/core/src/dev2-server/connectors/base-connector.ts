@@ -1,5 +1,5 @@
 import { Path } from "../path";
-import type { Connector } from "./types";
+import type { Connector, ConnectorName } from "./types";
 
 /**
  * Base Connector Class
@@ -9,7 +9,7 @@ export abstract class BaseConnector implements Connector {
   /**
    * Connector name
    */
-  public abstract readonly name: string;
+  public abstract readonly name: ConnectorName;
 
   /**
    * Initialization priority
@@ -57,7 +57,7 @@ export abstract class BaseConnector implements Connector {
    */
   public shouldRestart(changedFiles: string[]): boolean {
     // Check if any changed file matches watched files
-    return changedFiles.some(file => this.isWatchedFile(file));
+    return changedFiles.some((file) => this.isWatchedFile(file));
   }
 
   /**
@@ -66,7 +66,7 @@ export abstract class BaseConnector implements Connector {
   protected isWatchedFile(file: string): boolean {
     const relativePath = Path.toRelative(file);
 
-    return this.watchedFiles.some(watchedFile => {
+    return this.watchedFiles.some((watchedFile) => {
       // Exact match
       if (watchedFile === relativePath) {
         return true;
@@ -74,9 +74,7 @@ export abstract class BaseConnector implements Connector {
 
       // Pattern match (e.g., "config/*.ts")
       if (watchedFile.includes("*")) {
-        const pattern = new RegExp(
-          "^" + watchedFile.replace(/\*/g, ".*") + "$",
-        );
+        const pattern = new RegExp("^" + watchedFile.replace(/\*/g, ".*") + "$");
         return pattern.test(relativePath);
       }
 
