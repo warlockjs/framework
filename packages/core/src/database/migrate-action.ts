@@ -91,7 +91,7 @@ export async function migrateAction(options: CommandActionData) {
 async function loadMigrationFile(absPath: string) {
   const relativePath = Path.toRelative(absPath);
 
-  const loadedModule = await filesOrchestrator.load<typeof Migration>(relativePath);
+  const loadedModule = await filesOrchestrator.load<{ default: typeof Migration }>(relativePath);
 
   if (!loadedModule?.default) {
     throw new Error(`${Path.toRelative(absPath)} must have a default export`);

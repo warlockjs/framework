@@ -1,4 +1,4 @@
-import { Resource } from "./resource";
+import { Resource, type ResourceConstructor, type ResourceContract } from "./resource";
 import type { ResourceSchema } from "./types";
 
 /**
@@ -13,17 +13,17 @@ export type DefineResourceOptions = {
   /**
    * Optional: Boot hook - called before transformation
    */
-  boot?: (resource?: Resource) => void;
+  boot?: (resource?: ResourceContract) => void;
 
   /**
    * Optional: Extend hook - called after transformation
    */
-  extend?: (resource?: Resource) => void;
+  extend?: (resource?: ResourceContract) => void;
 
   /**
    * Optional: Transform hook - modify final output
    */
-  transform?: (data: Record<string, any>, resource: Resource) => Record<string, any>;
+  transform?: (data: Record<string, any>, resource: ResourceContract) => Record<string, any>;
 };
 
 /**
@@ -66,24 +66,24 @@ export type DefineResourceOptions = {
  * const json = new UserResource(user).toJSON();
  * ```
  */
-export function defineResource(options: DefineResourceOptions) {
+export function defineResource(options: DefineResourceOptions): ResourceConstructor {
   return class AnonymousResource extends Resource {
     public schema = options.schema;
 
     protected boot() {
       if (options.boot) {
-        options.boot.call(this, this as unknown as Resource);
+        options.boot.call(this, this as unknown as ResourceContract);
       }
     }
 
     protected extend() {
       if (options.extend) {
-        options.extend.call(this, this as unknown as Resource);
+        options.extend.call(this, this as unknown as ResourceContract);
       }
 
       if (options.transform) {
         options.transform.call(this, this.data, this);
       }
     }
-  };
+  } as any as ResourceConstructor;
 }

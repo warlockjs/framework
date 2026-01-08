@@ -9,7 +9,104 @@ import {
   ResourceSchema,
 } from "./types";
 
-export class Resource {
+/**
+ * Resource contract
+ */
+export interface ResourceContract {
+  /**
+   * Resource data
+   */
+  resource: GenericObject;
+
+  /**
+   * Resource final output
+   */
+  data: GenericObject;
+
+  /**
+   * Output shape
+   */
+  schema: ResourceSchema;
+
+  /**
+   * Convert resource to JSON
+   */
+  toJSON(): GenericObject;
+
+  /**
+   * Transform the given value with given type
+   */
+  transform(value: any, type: ResourceOutputValueCastType, locale?: string): any;
+
+  /**
+   * Get a input value for the given key
+   */
+  get(key: string, defaultValue?: any): any;
+
+  /**
+   * Set the given value for the given field
+   */
+  set(key: string, value: any): ResourceContract;
+
+  /**
+   * Create an array schema for transforming array items
+   */
+  arrayOf(schema: Record<string, ResourceFieldConfig>): ResourceArraySchema;
+
+  /**
+   * Get a string field builder
+   */
+  string(inputKey?: string): ResourceFieldBuilder;
+
+  /**
+   * Get a date field builder
+   */
+  date(inputKey?: string): ResourceFieldBuilder;
+
+  /**
+   * Get a localized field builder
+   */
+  localized(inputKey?: string): ResourceFieldBuilder;
+
+  /**
+   * Get a url field builder
+   */
+  url(inputKey?: string): ResourceFieldBuilder;
+
+  /**
+   * Get a uploadsUrl field builder
+   */
+  uploadsUrl(inputKey?: string): ResourceFieldBuilder;
+
+  /**
+   * Get a number field builder
+   */
+  number(inputKey?: string): ResourceFieldBuilder;
+
+  /**
+   * Get a boolean field builder
+   */
+  boolean(inputKey?: string): ResourceFieldBuilder;
+
+  /**
+   * Get a float field builder
+   */
+  float(inputKey?: string): ResourceFieldBuilder;
+
+  /**
+   * Get a int field builder
+   */
+  int(inputKey?: string): ResourceFieldBuilder;
+}
+
+/**
+ * Resource constructor
+ */
+export interface ResourceConstructor {
+  new (originalData: GenericObject | Resource | Model): ResourceContract;
+}
+
+export class Resource implements ResourceContract {
   /**
    * Resource data
    */
@@ -185,7 +282,7 @@ export class Resource {
   /**
    * Set the given value for the given field
    */
-  public set(key: string, value: any) {
+  public set(key: string, value: any): ResourceContract {
     set(this.data, key, value);
 
     return this;

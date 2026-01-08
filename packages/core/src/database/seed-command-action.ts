@@ -8,7 +8,7 @@ import { Seeder } from "./seeds/seeder";
 import { SeedersManager } from "./seeds/seeders.manager";
 
 async function clearAllTables(datasource: DataSource) {
-  const tables = await datasource.driver.blueprint.getTables();
+  const tables = await datasource.driver.blueprint.listTables();
 
   for (const table of tables) {
     await datasource.driver.blueprint.truncateTable(table);

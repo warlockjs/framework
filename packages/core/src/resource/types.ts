@@ -1,4 +1,4 @@
-import { type Resource } from "./resource";
+import { type ResourceConstructor, type ResourceContract } from "./resource";
 import { type ResourceFieldBuilder } from "./resource-field-builder";
 
 export type ResourceOutputValueCastType =
@@ -25,11 +25,11 @@ export type ResourceArraySchema = {
 
 export type ResourceFieldConfig =
   | ResourceOutputValueCastType
-  | typeof Resource
+  | ResourceConstructor
   | [string, ResourceOutputValueCastType]
   | ResourceFieldBuilder
   | ResourceArraySchema
-  | ((value: any, resource: Resource) => any); // Resolver function for computed/static values
+  | ((value: any, resource: ResourceContract) => any); // Resolver function for computed/static values
 
 export type ResourceSchema = Record<string, ResourceFieldConfig>;
 

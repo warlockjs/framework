@@ -1,4 +1,5 @@
 import type { FastifyCorsOptions } from "@fastify/cors";
+import React from "react";
 import type { Middleware } from "../router";
 import type { Response } from "./response";
 
@@ -180,3 +181,41 @@ export interface HttpConfigurations {
     except?: PartialMiddleware;
   };
 }
+
+export type ResponseStreamController = {
+  /**
+   * Send data to the client
+   */
+  send: (data: string) => void;
+  /**
+   * Render a view and send it to the client
+   */
+  render: (view: React.ReactNode) => void;
+  /**
+   * End the stream
+   */
+  end: () => void;
+  /**
+   * Detect whether stream is ended
+   */
+  ended: boolean;
+};
+
+export type ResponseSSEController = {
+  /**
+   * Send data to the client
+   */
+  send: (event: string, data: any) => void;
+  /**
+   * Send comment to the client
+   */
+  comment: (comment: string) => void;
+  /**
+   * End the stream
+   */
+  end: () => void;
+  /**
+   * Detect whether stream is ended
+   */
+  ended: boolean;
+};

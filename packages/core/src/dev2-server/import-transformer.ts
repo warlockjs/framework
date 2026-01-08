@@ -1,9 +1,20 @@
 import { devLogError } from "./dev-logger";
 import { exportAnalyzer } from "./export-analyzer";
 import type { FileManager } from "./file-manager";
-import { filesOrchestrator } from "./files-orchestrator";
+import { FilesOrchestrator } from "./files-orchestrator";
 import { Path } from "./path";
 import { tsconfigManager } from "./tsconfig-manager";
+
+let filesOrchestrator: FilesOrchestrator;
+
+loadFilesOrchestrator();
+
+async function loadFilesOrchestrator() {
+  try {
+    const output = await import("./files-orchestrator");
+    filesOrchestrator = output.filesOrchestrator;
+  } catch (error) {}
+}
 
 /**
  * Transform imports in transpiled code to use cache paths

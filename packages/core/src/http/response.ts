@@ -15,7 +15,7 @@ import { type ReactNode } from "react";
 import type { Route } from "../router";
 import { renderReact } from "./../react";
 import type { Request } from "./request";
-import type { ResponseEvent } from "./types";
+import type { ResponseEvent, ResponseSSEController, ResponseStreamController } from "./types";
 
 export enum ResponseStatus {
   OK = 200,
@@ -458,7 +458,7 @@ export class Response {
    * @param contentType - The content type for the stream (default: "text/plain")
    * @returns Stream controller with send(), render(), and end() methods
    */
-  public stream(contentType = "text/plain") {
+  public stream(contentType = "text/plain"): ResponseStreamController {
     // Set headers using the response API
     this.setContentType(contentType);
     this.header("Transfer-Encoding", "chunked");
@@ -585,7 +585,7 @@ export class Response {
    *
    * @returns SSE controller with send(), comment(), and end() methods
    */
-  public sse() {
+  public sse(): ResponseSSEController {
     // Set SSE-specific headers
     this.setContentType("text/event-stream");
     this.header("Cache-Control", "no-cache, no-store, must-revalidate");

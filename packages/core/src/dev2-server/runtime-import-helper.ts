@@ -1,5 +1,4 @@
 import { pathToFileURL } from "node:url";
-import { filesOrchestrator } from "./files-orchestrator";
 import { warlockCachePath } from "./utils";
 
 /**
@@ -59,6 +58,8 @@ function useModuleVersion(modulePath: string): number {
  */
 async function __import(modulePath: string): Promise<any> {
   const cleanPath = normalizePath(modulePath);
+
+  const { filesOrchestrator } = await import("./files-orchestrator");
 
   // Check if this module is already being loaded (circular dependency detected)
   if (loadingModules.has(cleanPath)) {
