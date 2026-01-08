@@ -752,7 +752,7 @@ export class SyncManager {
       }
 
       if (typeof data[config.embedKey as keyof Model] !== "function") {
-        return data[config.embedKey as keyof Model];
+        return data[config.embedKey as keyof Model] as Record<string, unknown>;
       }
       // Fallback: use embedData() if available
       if (typeof data.embedData === "function") {

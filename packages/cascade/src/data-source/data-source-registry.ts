@@ -128,7 +128,7 @@ class DataSourceRegistry {
 
   /** Retrieve a data source either by name or the default one. */
   public get(name?: string): DataSource {
-    const contextSource = name == null ? databaseDataSourceContext.get() : null;
+    const contextSource = name == null ? databaseDataSourceContext.getDataSource() : null;
 
     if (contextSource) {
       if (contextSource instanceof DataSource) {

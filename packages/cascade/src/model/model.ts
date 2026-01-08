@@ -1045,7 +1045,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    */
   public static query<TModel extends Model = Model>(
     this: ChildModel<TModel>,
-  ): ReturnType<ChildModel<TModel>["newQueryBuilder"]> {
+  ): QueryBuilderContract<TModel> {
     // Call newQueryBuilder as a static method (may be overridden in child classes)
     const queryBuilder = this.newQueryBuilder<TModel>();
     const ModelClass = this as new (...args: any[]) => TModel;
@@ -1098,13 +1098,15 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * // Now User.query() returns UserQueryBuilder<User> with autocomplete!
    * ```
    */
-  public static newQueryBuilder<TModel extends Model = Model>(this: ChildModel<TModel>) {
+  public static newQueryBuilder<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+  ): QueryBuilderContract<TModel> {
     const dataSource = this.getDataSource();
 
     // Check if model has a custom builder class
     if (this.builder) {
       const BuilderClass = this.builder;
-      return new BuilderClass(this.table, dataSource);
+      return new BuilderClass(this.table, dataSource) as QueryBuilderContract<TModel>;
     }
 
     // Use default driver query builder
@@ -1330,6 +1332,91 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    */
   protected self<TModel extends Model = this>(): ChildModel<TModel> {
     return this.constructor as any as ChildModel<TModel>;
+  }
+
+  /**
+   * Creates an immutable clone of the model with its current state.
+   *
+   * The cloned model:
+   * - Contains a deep copy of all current data
+   * - Has frozen (immutable) data that cannot be modified
+   * - Preserves the `isNew` flag from the original
+   * - Has no dirty changes (clean state)
+   * - Cannot be saved or modified
+   *
+   * This is useful for:
+   * - Creating snapshots of model state
+   * - Passing read-only model data to other parts of the application
+   * - Preventing accidental mutations
+   * - Maintaining historical records
+   *
+   * @returns A new immutable model instance with the current state
+   *
+   * @example
+   * ```typescript
+   * const user = new User({ name: "Alice", email: "alice@example.com" });
+   * await user.save();
+   *
+   * // Create an immutable snapshot
+   * const snapshot = user.clone();
+   *
+   * // This will throw an error because the clone is immutable
+   * snapshot.set("name", "Bob"); // TypeError: Cannot assign to read only property
+   *
+   * // Original can still be modified
+   * user.set("name", "Bob");
+   * await user.save();
+   * ```
+   */
+  public clone(): this {
+    // Deep copy the current data using JSON serialization
+    // This ensures nested objects are also copied
+    const clonedData = JSON.parse(JSON.stringify(this.data)) as TSchema;
+
+    // Create a new instance of the same model class
+    const ModelClass = this.self();
+    const clonedModel = new ModelClass(clonedData) as this;
+
+    // Preserve the isNew state
+    clonedModel.isNew = this.isNew;
+
+    // Freeze the data to make it immutable
+    // This recursively freezes all nested objects
+    this.deepFreeze(clonedModel.data);
+
+    // Reset the dirty tracker to have no changes
+    // The clone represents a clean snapshot
+    clonedModel.dirtyTracker.reset();
+
+    return clonedModel;
+  }
+
+  /**
+   * Recursively freezes an object and all its nested properties.
+   *
+   * @param obj - The object to freeze
+   * @returns The frozen object
+   * @private
+   */
+  private deepFreeze<T>(obj: T): T {
+    // Freeze the object itself
+    Object.freeze(obj);
+
+    // Recursively freeze all properties
+    Object.getOwnPropertyNames(obj).forEach((prop) => {
+      const value = (obj as any)[prop];
+
+      // Only freeze objects and arrays, skip primitives and null
+      if (
+        value !== null &&
+        (typeof value === "object" || typeof value === "function") &&
+        !Object.isFrozen(value)
+      ) {
+        this.deepFreeze(value);
+      }
+    });
+
+    return obj;
   }
 
   /**
