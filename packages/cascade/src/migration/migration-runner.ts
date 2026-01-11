@@ -544,6 +544,11 @@ export class MigrationRunner {
     const driver = this.getDataSource().driver;
 
     try {
+      const migrationDriver = this.getMigrationDriver();
+
+      // Ensure migrations table exists
+      await migrationDriver.ensureMigrationsTable(this.migrationsTable);
+
       const queryBuilder = driver.queryBuilder<MigrationRecord>(this.migrationsTable);
       return await queryBuilder.orderBy("batch", "asc").orderBy("name", "asc").get();
     } catch {
