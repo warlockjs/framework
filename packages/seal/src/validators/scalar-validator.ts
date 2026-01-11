@@ -1,11 +1,6 @@
-import { numberMutator } from "../mutators";
-import {
-  allowedValuesRule,
-  enumRule,
-  inRule,
-  notAllowedValuesRule,
-  scalarRule,
-} from "../rules";
+import { invalidRule, VALID_RULE } from "../helpers";
+import { numberMutator, stringMutator } from "../mutators";
+import { allowedValuesRule, enumRule, inRule, notAllowedValuesRule } from "../rules";
 import {
   acceptedIfPresentRule,
   acceptedIfRequiredRule,
@@ -20,6 +15,7 @@ import {
   declinedUnlessRule,
   declinedWithoutRule,
 } from "../rules/scalar";
+
 import { BaseValidator } from "./base-validator";
 
 /**
@@ -32,18 +28,26 @@ import { BaseValidator } from "./base-validator";
 export class ScalarValidator extends BaseValidator {
   public constructor(errorMessage?: string) {
     super();
-    this.addRule(scalarRule, errorMessage);
+    this.addRule(
+      {
+        name: "scalar",
+        defaultErrorMessage: "The :input must be a scalar value",
+        async validate(value, context) {
+          if (["string", "number", "boolean"].includes(typeof value)) {
+            return VALID_RULE;
+          }
+          return invalidRule(this, context);
+        },
+      },
+      errorMessage,
+    );
   }
 
   /**
    * Add matches type
    */
   public matchesType(value: any) {
-    return (
-      typeof value === "string" ||
-      typeof value === "number" ||
-      typeof value === "boolean"
-    );
+    return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
   }
 
   /**
@@ -51,6 +55,15 @@ export class ScalarValidator extends BaseValidator {
    */
   public asNumber() {
     this.addMutator(numberMutator);
+
+    return this;
+  }
+
+  /**
+   * Mutate the scalar value to be string
+   */
+  public asString() {
+    this.addMutator(stringMutator);
 
     return this;
   }

@@ -13,7 +13,7 @@ export type MutatorContext<Options = any> = {
 /**
  * Mutator function - transforms data before validation
  */
-export type Mutator<Options = any> = (data: any, context: MutatorContext<Options>) => Promise<any>;
+export type Mutator<Options = any> = (data: any, context?: MutatorContext<Options>) => Promise<any>;
 
 /**
  * Contextualized mutator - mutator with runtime context

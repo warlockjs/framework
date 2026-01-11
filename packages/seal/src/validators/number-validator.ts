@@ -1,3 +1,4 @@
+import { absMutator, ceilMutator, floorMutator, roundMutator, toFixedMutator } from "../mutators";
 import {
   betweenNumbersRule,
   evenRule,
@@ -166,6 +167,27 @@ export class NumberValidator extends BaseValidator {
     return this;
   }
 
+  /**
+   * Alias for modulo() - Value must be divisible by the given number
+   */
+  public divisibleBy(value: number, errorMessage?: string) {
+    return this.modulo(value, errorMessage);
+  }
+
+  /**
+   * Alias for modulo() - Value must be a multiple of the given number
+   */
+  public multipleOf(value: number, errorMessage?: string) {
+    return this.modulo(value, errorMessage);
+  }
+
+  /**
+   * Alias for modulo() - Value must be a multiple of the given number
+   */
+  public modulusOf(value: number, errorMessage?: string) {
+    return this.modulo(value, errorMessage);
+  }
+
   /** Accept only numbers higher than 0 */
   public positive(errorMessage?: string) {
     this.addRule(positiveRule, errorMessage);
@@ -196,11 +218,7 @@ export class NumberValidator extends BaseValidator {
    *
    * @category Validation Rule
    */
-  public between(
-    min: number | string,
-    max: number | string,
-    errorMessage?: string,
-  ) {
+  public between(min: number | string, max: number | string, errorMessage?: string) {
     const rule = this.addRule(betweenNumbersRule, errorMessage);
     rule.context.options.min = min;
     rule.context.options.max = max;
@@ -212,11 +230,7 @@ export class NumberValidator extends BaseValidator {
    * Value must be between sibling field values
    * @category Validation Rule
    */
-  public betweenSibling(
-    minField: string,
-    maxField: string,
-    errorMessage?: string,
-  ) {
+  public betweenSibling(minField: string, maxField: string, errorMessage?: string) {
     const rule = this.addRule(betweenNumbersRule, errorMessage);
     rule.context.options.min = minField;
     rule.context.options.max = maxField;
@@ -237,7 +251,45 @@ export class NumberValidator extends BaseValidator {
   public minLength = StringValidator.prototype.minLength;
   public maxLength = StringValidator.prototype.maxLength;
 
-  // Database methods - injected by framework
-  // When using @warlock.js/core/v, these methods are available:
-  // unique, exists
+  // Mutators
+
+  /**
+   * Convert value to its absolute value
+   */
+  public abs() {
+    this.addMutator(absMutator);
+    return this;
+  }
+
+  /**
+   * Round value up to the nearest integer
+   */
+  public ceil() {
+    this.addMutator(ceilMutator);
+    return this;
+  }
+
+  /**
+   * Round value down to the nearest integer
+   */
+  public floor() {
+    this.addMutator(floorMutator);
+    return this;
+  }
+
+  /**
+   * Round value to the nearest integer or specified decimals
+   */
+  public round(decimals = 0) {
+    this.addMutator(roundMutator, { decimals });
+    return this;
+  }
+
+  /**
+   * Format number using fixed-point notation
+   */
+  public toFixed(decimals = 2) {
+    this.addMutator(toFixedMutator, { decimals });
+    return this;
+  }
 }
