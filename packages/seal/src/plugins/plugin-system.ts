@@ -98,8 +98,6 @@ export async function unregisterPlugin(pluginName: string): Promise<void> {
   }
 
   installedPlugins.delete(pluginName);
-
-  console.log(`[Seal] ❌ Plugin "${pluginName}" uninstalled`);
 }
 
 /**

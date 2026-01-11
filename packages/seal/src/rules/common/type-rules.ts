@@ -93,9 +93,10 @@ export const objectRule: SchemaRule = {
   name: "object",
   defaultErrorMessage: "The :input must be an object",
   async validate(value: any, context) {
-    if (isPlainObject(value)) {
+    if (!!isPlainObject(value) && value !== null) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };
