@@ -53,16 +53,16 @@ export class WarlockConfigManager {
   private async doLoad(): Promise<WarlockConfig | undefined> {
     const configPath = warlockPath("cache/warlock-config.js");
 
-    if (!(await fileExistsAsync(configPath))) {
-      const result = await this.compile();
+    // if (!(await fileExistsAsync(configPath))) {
+    const result = await this.compile();
 
-      if (!result) {
-        devLogWarn(
-          "warlock.config.ts is missing, it's highly recommended to create it, run warlock init to create it",
-        );
-        return;
-      }
+    if (!result) {
+      devLogWarn(
+        "warlock.config.ts is missing, it's highly recommended to create it, run warlock init to create it",
+      );
+      return;
     }
+    // }
 
     const fileUrl = pathToFileURL(configPath).href;
     try {

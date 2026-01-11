@@ -1,3 +1,4 @@
+import type { MigrationConstructor } from "@warlock.js/cascade";
 import type { CLICommand } from "../cli/cli-command";
 import type { FileHealthCheckerContract } from "../dev2-server/health-checker/file-health-checker.contract";
 
@@ -78,5 +79,29 @@ export type WarlockConfig = {
      * Custom health checkers
      */
     healthCheckers?: FileHealthCheckerContract[];
+  };
+
+  /**
+   * Database configuration
+   */
+  database?: {
+    /**
+     * Package-level migrations to include in migration runs.
+     *
+     * Use this to register migrations from external packages
+     * (e.g., @warlock.js/auth) that are not auto-discovered.
+     *
+     * @example
+     * ```typescript
+     * import { authMigrations } from "@warlock.js/auth";
+     *
+     * export default defineConfig({
+     *   database: {
+     *     migrations: [...authMigrations],
+     *   },
+     * });
+     * ```
+     */
+    migrations?: Array<MigrationConstructor>;
   };
 };

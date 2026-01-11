@@ -8,6 +8,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { Request } from "../http/request";
 import { Response } from "../http/response";
 import { type FastifyInstance } from "../http/server";
+import { RouteBuilder } from "./route-builder";
 import { RouteRegistry } from "./route-registry";
 import type {
   GroupedRoutesOptions,
@@ -304,6 +305,13 @@ export class Router {
   }
 
   /**
+   * Get a chainable route builder for the same route path
+   */
+  public route(path: string, options: RouteOptions = {}) {
+    return new RouteBuilder(this, path, options);
+  }
+
+  /**
    * Add full restful resource routes
    * This method will generate the following routes:
    * 1. GET /path: list all resources
@@ -481,6 +489,22 @@ export class Router {
    */
   public prefix(prefix: string, callback: () => void) {
     return this.group({ prefix }, callback);
+  }
+
+  /**
+   * Add API version prefix to all routes in the given callback
+   * Automatically formats the version as /v{version}
+   * @example
+   * router.version("1", () => {
+   *   router.get("/users", getUsersV1); // /v1/users
+   * });
+   *
+   * router.version("2", () => {
+   *   router.get("/users", getUsersV2); // /v2/users
+   * });
+   */
+  public version(version: string | number, callback: () => void) {
+    return this.prefix(`/v${version}`, callback);
   }
 
   /**
@@ -705,7 +729,7 @@ export class Router {
   /**
    * Get the route path for the given route name
    */
-  public route(name: string, params: any = {}) {
+  public getRoute(name: string, params: any = {}) {
     const route = this.routes.find((route) => route.name === name);
 
     if (!route) {

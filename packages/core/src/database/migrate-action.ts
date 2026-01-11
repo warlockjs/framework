@@ -7,6 +7,7 @@ import { filesOrchestrator } from "../dev2-server/files-orchestrator";
 import { Path } from "../dev2-server/path";
 import { getFilesFromDirectory } from "../dev2-server/utils";
 import { srcPath } from "../utils";
+import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 
 async function listMigrationsAction() {
   const createdMigrations = await migrationRunner.getExecutedMigrations();
@@ -57,8 +58,6 @@ async function allMigrationsFilesAction() {
  */
 export async function migrateAction(options: CommandActionData) {
   const { fresh, path, rollback, all, list } = options.options;
-
-  console.log(options);
 
   if (list) {
     return await listMigrationsAction();
@@ -127,9 +126,24 @@ async function migrationFiles() {
 }
 
 async function loadAllMigrations() {
-  const migrations = await migrationFiles();
+  // Load config-registered migrations (from packages like @warlock.js/auth)
+  const configMigrations = warlockConfigManager.get("database")?.migrations || [];
 
-  for (const migrationFile of migrations) {
-    await loadMigrationFile(migrationFile);
+  for (const MigrationClass of configMigrations) {
+    const migration = MigrationClass;
+
+    // Use class name as migration name if not set
+    if (!migration.migrationName) {
+      migration.migrationName = MigrationClass.name;
+    }
+
+    migrationRunner.register(migration);
+
+    // Load file-based migrations from src/app
+    const migrations = await migrationFiles();
+
+    for (const migrationFile of migrations) {
+      await loadMigrationFile(migrationFile);
+    }
   }
 }

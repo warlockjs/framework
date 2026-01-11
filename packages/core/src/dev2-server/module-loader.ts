@@ -179,7 +179,9 @@ export class ModuleLoader {
    */
   public cleanupFileModule(file: FileManager): void {
     const cleanupFunction = (cleanupFunction: Function | { unsubscribe: () => void }) => {
-      const fn = (cleanupFunction as { unsubscribe: () => void })?.unsubscribe || cleanupFunction;
+      const fn =
+        (cleanupFunction as { unsubscribe: () => void })?.unsubscribe.bind(cleanupFunction) ||
+        cleanupFunction;
       fn();
     };
 
