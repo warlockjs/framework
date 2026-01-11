@@ -7,7 +7,7 @@ export const databaseModelRule: SchemaRule = {
   defaultErrorMessage: "The :input must be a valid :model model",
   async validate(value, context) {
     if (value instanceof Model === false) {
-      this.context.attributesList.model = this.context.options.model.name;
+      this.context.attributesList.model = this.context.options.model?.name;
       return invalidRule(this, context);
     }
 

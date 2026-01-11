@@ -1,13 +1,10 @@
 /**
  * MongoDB-specific sync adapter implementation.
  *
- * @module cascade-next/drivers/mongo/mongo-sync-adapter
+ * @module cascade-next/drivers/mongodb/mongodb-sync-adapter
  */
 
-import type {
-  SyncAdapterContract,
-  SyncInstruction,
-} from "../../contracts/sync-adapter.contract";
+import type { SyncAdapterContract, SyncInstruction } from "../../contracts/sync-adapter.contract";
 import type { MongoDbDriver } from "./mongodb-driver";
 
 /**
@@ -71,13 +68,9 @@ export class MongoSyncAdapter implements SyncAdapterContract {
    * @param instruction - The sync instruction with array info
    * @returns Number of documents affected
    */
-  public async executeArrayUpdate(
-    instruction: SyncInstruction,
-  ): Promise<number> {
+  public async executeArrayUpdate(instruction: SyncInstruction): Promise<number> {
     if (!instruction.arrayField || !instruction.identifierField) {
-      throw new Error(
-        "Array update requires arrayField and identifierField to be specified",
-      );
+      throw new Error("Array update requires arrayField and identifierField to be specified");
     }
 
     // Strategy 1: Try positional operator $ (simpler, faster)
@@ -116,9 +109,7 @@ export class MongoSyncAdapter implements SyncAdapterContract {
    * @param instruction - The sync instruction
    * @returns Number of documents affected
    */
-  private async executeWithArrayFilters(
-    instruction: SyncInstruction,
-  ): Promise<number> {
+  private async executeWithArrayFilters(instruction: SyncInstruction): Promise<number> {
     // Build arrayFilters to match array elements
     const arrayFilters = [
       {
@@ -196,10 +187,7 @@ export class MongoSyncAdapter implements SyncAdapterContract {
 
         for (const [field, value] of Object.entries(fields)) {
           // Replace positional $ with arrayFilters placeholder $[elem]
-          const transformedField = field.replace(
-            `${arrayField}.$`,
-            `${arrayField}.$[elem]`,
-          );
+          const transformedField = field.replace(`${arrayField}.$`, `${arrayField}.$[elem]`);
           transformedFields[transformedField] = value;
         }
 
@@ -209,5 +197,4 @@ export class MongoSyncAdapter implements SyncAdapterContract {
 
     return transformed;
   }
-
 }

@@ -202,6 +202,67 @@ export interface QueryBuilderContract<T = unknown> {
    */
   scopesApplied?: boolean;
 
+  // ============================================================================
+  // RELATIONS / EAGER LOADING
+  // ============================================================================
+
+  /**
+   * Map of relations to eagerly load.
+   * Keys are relation names, values are either:
+   * - `true` for simple loading
+   * - A callback to customize the related query
+   */
+  eagerLoadRelations?: Map<string, boolean | ((query: QueryBuilderContract) => void)>;
+
+  /**
+   * Array of relation names to count.
+   */
+  countRelations?: string[];
+
+  /**
+   * Map of relations to load via JOIN (single query).
+   * Keys are relation names, values contain join configuration.
+   */
+  joinRelations?: Map<string, { alias: string; type: "belongsTo" | "hasOne" | "hasMany" }>;
+
+  /**
+   * Relation definitions from the model class.
+   * Used by joinWith() to determine how to join tables.
+   */
+  relationDefinitions?: Record<string, any>;
+
+  /**
+   * Model class reference for resolving related models.
+   */
+  modelClass?: any;
+
+  /**
+   * Load relations using database JOINs in a single query.
+   *
+   * Unlike `with()` which uses separate queries, `joinWith()` uses
+   * LEFT JOIN (SQL) or $lookup (MongoDB) to fetch related data
+   * in a single query. The related data is hydrated into proper
+   * model instances and attached to the main model.
+   *
+   * Best for: belongsTo and hasOne relations where you need
+   * efficient single-query loading.
+   *
+   * @param relation - Relation name to load via JOIN
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * // Single relation
+   * const post = await Post.joinWith("author").first();
+   * console.log(post.author); // User model instance
+   * console.log(post.data);   // { id, title, authorId } - no author data
+   *
+   * // Multiple relations
+   * const post = await Post.joinWith("author", "category").first();
+   * ```
+   */
+  joinWith(...relations: string[]): this;
+
   /**
    * Disable one or more global scopes for this query.
    *
@@ -895,6 +956,387 @@ export interface QueryBuilderContract<T = unknown> {
   addSelect(fields: string[]): this;
 
   // ============================================================================
+  // JOINS
+  // ============================================================================
+
+  /**
+   * Add a join clause to the query.
+   *
+   * Performs an INNER JOIN by default. Use leftJoin/rightJoin for outer joins.
+   *
+   * - **SQL**: Translates to `INNER JOIN table ON localField = foreignField`
+   * - **MongoDB**: Translates to `$lookup` aggregation stage
+   *
+   * @param table - The table/collection to join
+   * @param localField - The field from the current table
+   * @param foreignField - The field from the joined table
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * // Simple join
+   * query.join('profiles', 'id', 'userId');
+   *
+   * // With options
+   * query.join({
+   *   table: 'profiles',
+   *   localField: 'id',
+   *   foreignField: 'userId',
+   *   alias: 'profile',
+   *   select: ['bio', 'avatar']
+   * });
+   * ```
+   */
+  join(table: string, localField: string, foreignField: string): this;
+  join(options: JoinOptions): this;
+
+  /**
+   * Add a LEFT JOIN clause to the query.
+   *
+   * Returns all records from the left table, and matched records from the right.
+   * If no match, NULL values are returned for right table columns.
+   *
+   * - **SQL**: Translates to `LEFT JOIN table ON localField = foreignField`
+   * - **MongoDB**: Translates to `$lookup` (always behaves like LEFT JOIN)
+   *
+   * @param table - The table/collection to join
+   * @param localField - The field from the current table
+   * @param foreignField - The field from the joined table
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * // Get users with their optional profiles
+   * query.leftJoin('profiles', 'id', 'userId');
+   * ```
+   */
+  leftJoin(table: string, localField: string, foreignField: string): this;
+  leftJoin(options: JoinOptions): this;
+
+  /**
+   * Add a RIGHT JOIN clause to the query.
+   *
+   * Returns all records from the right table, and matched records from the left.
+   * If no match, NULL values are returned for left table columns.
+   *
+   * - **SQL**: Translates to `RIGHT JOIN table ON localField = foreignField`
+   * - **MongoDB**: Not directly supported; may throw or emulate
+   *
+   * @param table - The table/collection to join
+   * @param localField - The field from the current table
+   * @param foreignField - The field from the joined table
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * // Get all profiles with their users (if any)
+   * query.rightJoin('profiles', 'id', 'userId');
+   * ```
+   */
+  rightJoin(table: string, localField: string, foreignField: string): this;
+  rightJoin(options: JoinOptions): this;
+
+  /**
+   * Add an INNER JOIN clause to the query.
+   *
+   * Returns only records that have matching values in both tables.
+   * Alias for join() with explicit intent.
+   *
+   * - **SQL**: Translates to `INNER JOIN table ON localField = foreignField`
+   * - **MongoDB**: Translates to `$lookup` + `$match` to filter unmatched
+   *
+   * @param table - The table/collection to join
+   * @param localField - The field from the current table
+   * @param foreignField - The field from the joined table
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * // Get only users that have profiles
+   * query.innerJoin('profiles', 'id', 'userId');
+   * ```
+   */
+  innerJoin(table: string, localField: string, foreignField: string): this;
+  innerJoin(options: JoinOptions): this;
+
+  /**
+   * Add a FULL OUTER JOIN clause to the query.
+   *
+   * Returns all records when there is a match in either table.
+   * NULL values for non-matching rows on either side.
+   *
+   * - **SQL**: Translates to `FULL OUTER JOIN table ON localField = foreignField`
+   * - **MongoDB**: Not supported; throws error
+   *
+   * @param table - The table/collection to join
+   * @param localField - The field from the current table
+   * @param foreignField - The field from the joined table
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * query.fullJoin('profiles', 'id', 'userId');
+   * ```
+   */
+  fullJoin(table: string, localField: string, foreignField: string): this;
+  fullJoin(options: JoinOptions): this;
+
+  /**
+   * Add a CROSS JOIN clause to the query.
+   *
+   * Returns the Cartesian product of both tables (every combination).
+   * Use with caution as this can produce very large result sets.
+   *
+   * - **SQL**: Translates to `CROSS JOIN table`
+   * - **MongoDB**: Not supported; throws error
+   *
+   * @param table - The table/collection to cross join
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * // Get all combinations of products and colors
+   * query.crossJoin('colors');
+   * ```
+   */
+  crossJoin(table: string): this;
+
+  /**
+   * Add a raw JOIN clause using native query syntax.
+   *
+   * Allows full control over the JOIN expression for complex scenarios.
+   *
+   * - **SQL**: Passed directly to the query
+   * - **MongoDB**: Passed as raw `$lookup` pipeline stage
+   *
+   * @param expression - Raw JOIN expression in driver's native syntax
+   * @param bindings - Optional parameter bindings for SQL placeholders
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * // SQL raw join
+   * query.joinRaw('LEFT JOIN profiles ON profiles.user_id = users.id AND profiles.active = $1', [true]);
+   *
+   * // MongoDB raw $lookup
+   * query.joinRaw({
+   *   $lookup: {
+   *     from: 'profiles',
+   *     let: { userId: '$_id' },
+   *     pipeline: [{ $match: { $expr: { $eq: ['$userId', '$$userId'] } } }],
+   *     as: 'profile'
+   *   }
+   * });
+   * ```
+   */
+  joinRaw(expression: RawExpression, bindings?: unknown[]): this;
+
+  // ============================================================================
+  // RELATIONS / EAGER LOADING
+  // ============================================================================
+
+  /**
+   * Eagerly load one or more relations with the query results.
+   *
+   * Relations are loaded in separate optimized queries to prevent N+1 problems.
+   * The loaded relations are attached to each model instance.
+   *
+   * @param relation - Single relation name to load
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * // Load single relation
+   * const user = await User.query().with("posts").find(1);
+   * console.log(user.posts); // Post[]
+   *
+   * // Load multiple relations
+   * const user = await User.query().with("posts", "organization").find(1);
+   *
+   * // Load nested relations
+   * const user = await User.query().with("posts.comments.author").find(1);
+   * ```
+   */
+  with(relation: string): this;
+
+  /**
+   * Eagerly load multiple relations.
+   *
+   * @param relations - Relation names to load
+   * @returns Query builder for chaining
+   */
+  with(...relations: string[]): this;
+
+  /**
+   * Eagerly load a relation with a constraint callback.
+   *
+   * The callback receives the relation query builder, allowing you to
+   * add conditions, ordering, or limits to the related query.
+   *
+   * @param relation - Relation name to load
+   * @param constraint - Callback to configure the relation query
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * const user = await User.query()
+   *   .with("posts", (query) => {
+   *     query.where("isPublished", true)
+   *       .orderBy("createdAt", "desc")
+   *       .limit(5);
+   *   })
+   *   .find(1);
+   * ```
+   */
+  with(relation: string, constraint: (query: QueryBuilderContract) => void): this;
+
+  /**
+   * Eagerly load multiple relations with constraints.
+   *
+   * Pass an object where keys are relation names and values are either:
+   * - `true` to load without constraints
+   * - A callback function to configure the relation query
+   *
+   * @param relations - Object mapping relation names to constraints
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * const user = await User.query()
+   *   .with({
+   *     posts: (query) => query.where("isPublished", true),
+   *     organization: true,
+   *     roles: (query) => query.orderBy("priority"),
+   *   })
+   *   .find(1);
+   * ```
+   */
+  with(relations: Record<string, boolean | ((query: QueryBuilderContract) => void)>): this;
+
+  /**
+   * Add a count of related models as a virtual field.
+   *
+   * The count is added as `{relationName}Count` on each result.
+   *
+   * @param relation - Single relation name to count
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * const users = await User.query().withCount("posts").get();
+   * console.log(users[0].postsCount); // number
+   * ```
+   */
+  withCount(relation: string): this;
+
+  /**
+   * Add counts of multiple related models as virtual fields.
+   *
+   * @param relations - Relation names to count
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * const users = await User.query()
+   *   .withCount("posts", "comments", "followers")
+   *   .get();
+   * ```
+   */
+  withCount(...relations: string[]): this;
+
+  /**
+   * Filter results to only those that have related models.
+   *
+   * @param relation - Relation name to check
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * // Get users who have at least one post
+   * const usersWithPosts = await User.query().has("posts").get();
+   * ```
+   */
+  has(relation: string): this;
+
+  /**
+   * Filter results based on the count of related models.
+   *
+   * @param relation - Relation name to check
+   * @param operator - Comparison operator
+   * @param count - Number to compare against
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * // Get users with at least 5 posts
+   * const prolificUsers = await User.query().has("posts", ">=", 5).get();
+   *
+   * // Get users with exactly 3 roles
+   * const users = await User.query().has("roles", "=", 3).get();
+   * ```
+   */
+  has(relation: string, operator: string, count: number): this;
+
+  /**
+   * Filter results that have related models matching specific conditions.
+   *
+   * @param relation - Relation name to check
+   * @param callback - Callback to define conditions on the related query
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * // Get users with published posts
+   * const users = await User.query()
+   *   .whereHas("posts", (query) => {
+   *     query.where("isPublished", true);
+   *   })
+   *   .get();
+   *
+   * // Get users with posts in a specific category
+   * const users = await User.query()
+   *   .whereHas("posts", (query) => {
+   *     query.where("categoryId", categoryId);
+   *   })
+   *   .get();
+   * ```
+   */
+  whereHas(relation: string, callback: (query: QueryBuilderContract) => void): this;
+
+  /**
+   * Filter results that don't have any related models.
+   *
+   * @param relation - Relation name to check
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * // Get users without any posts
+   * const usersWithoutPosts = await User.query().doesntHave("posts").get();
+   * ```
+   */
+  doesntHave(relation: string): this;
+
+  /**
+   * Filter results that don't have related models matching specific conditions.
+   *
+   * @param relation - Relation name to check
+   * @param callback - Callback to define conditions on the related query
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * // Get users without any published posts
+   * const users = await User.query()
+   *   .whereDoesntHave("posts", (query) => {
+   *     query.where("isPublished", true);
+   *   })
+   *   .get();
+   * ```
+   */
+  whereDoesntHave(relation: string, callback: (query: QueryBuilderContract) => void): this;
+
+  // ============================================================================
   // ORDERING
   // ============================================================================
 
@@ -1136,7 +1578,7 @@ export interface QueryBuilderContract<T = unknown> {
    * query.when(searchTerm, (q, term) => q.whereLike('name', term))
    */
   when<V>(
-    condition: V | boolean,
+    condition: V | boolean | (() => boolean),
     callback: (builder: this, value: V) => void,
     otherwise?: (builder: this) => void,
   ): this;

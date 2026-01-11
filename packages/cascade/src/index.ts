@@ -30,15 +30,18 @@ export * from "./types";
 export * from "./validation";
 export * from "./writer/database-writer";
 
+// Relations System
+export * from "./relations";
+
 // Expressions
 export * from "./expressions";
 
 // MongoDB Driver
-export * from "./drivers/mongo/mongo-id-generator";
-export * from "./drivers/mongo/mongo-query-builder";
-export * from "./drivers/mongo/mongo-sync-adapter";
-export * from "./drivers/mongo/mongodb-driver";
-export * from "./drivers/mongo/types";
+export * from "./drivers/mongodb/mongodb-driver";
+export * from "./drivers/mongodb/mongodb-id-generator";
+export * from "./drivers/mongodb/mongodb-query-builder";
+export * from "./drivers/mongodb/mongodb-sync-adapter";
+export * from "./drivers/mongodb/types";
 
 // Re-export MongoDB client types for convenience
 export type { MongoClientOptions, TransactionOptions } from "mongodb";
@@ -71,4 +74,10 @@ export * from "./utils/once-connected";
 export * from "./migration";
 
 // MongoDB Migration Driver
-export { MongoMigrationDriver } from "./drivers/mongo/mongo-migration-driver";
+export { MongoMigrationDriver } from "./drivers/mongodb/mongodb-migration-driver";
+
+// Shared SQL Infrastructure
+export * from "./drivers/sql";
+
+// PostgreSQL Driver
+export * from "./drivers/postgres";

@@ -25,8 +25,8 @@ export type Operation = {
   mergeable: boolean;
   /** The operation type (for processing logic) */
   type: string;
-  /** The operation payload */
-  payload: any;
+  /** The operation data */
+  data: any;
 };
 
 /**

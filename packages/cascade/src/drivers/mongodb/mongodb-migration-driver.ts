@@ -130,6 +130,25 @@ export class MongoMigrationDriver implements MigrationDriverContract {
     return collections.length > 0;
   }
 
+  /**
+   * Ensure the migrations tracking collection exists.
+   *
+   * MongoDB creates collections lazily, but we can create explicitly
+   * and add a unique index on the name field.
+   *
+   * @param tableName - Name of the migrations collection
+   */
+  public async ensureMigrationsTable(tableName: string): Promise<void> {
+    // Create collection if not exists
+    const exists = await this.tableExists(tableName);
+    if (!exists) {
+      await this.db.createCollection(tableName);
+    }
+
+    // Ensure unique index on name
+    await this.db.collection(tableName).createIndex({ name: 1 }, { unique: true });
+  }
+
   // ============================================================================
   // COLUMN OPERATIONS (No-ops for MongoDB)
   // ============================================================================

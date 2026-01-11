@@ -19,9 +19,9 @@ import type {
 } from "../../contracts";
 import { type DataSource } from "../../data-source/data-source";
 import { dataSourceRegistry } from "../../data-source/data-source-registry";
-import { MongoQueryOperations } from "./mongo-query-operations";
-import { MongoQueryParser } from "./mongo-query-parser";
 import { type MongoDbDriver } from "./mongodb-driver";
+import { MongoQueryOperations } from "./mongodb-query-operations";
+import { MongoQueryParser } from "./mongodb-query-parser";
 import type { Operation } from "./types";
 
 /**
@@ -1505,17 +1505,217 @@ export class MongoQueryBuilder<T = unknown> implements QueryBuilderContract<T> {
   // ============================================================================
 
   /**
-   * Performs a left outer join with another collection.
+   * Performs a join with another collection using MongoDB's $lookup.
+   *
+   * @param table - Target collection name
+   * @param localField - Field from the input documents
+   * @param foreignField - Field from the documents of the "from" collection
+   */
+  public join(table: string, localField: string, foreignField: string): this;
+  /**
+   * Performs a join with another collection using MongoDB's $lookup.
+   *
    * @param options - Join configuration including table, fields, and optional pipeline
    */
-  public join(options: JoinOptions): this {
+  public join(options: JoinOptions): this;
+  public join(
+    tableOrOptions: string | JoinOptions,
+    localField?: string,
+    foreignField?: string,
+  ): this {
+    const options: JoinOptions =
+      typeof tableOrOptions === "string"
+        ? {
+            table: tableOrOptions,
+            localField: localField!,
+            foreignField: foreignField!,
+            type: "left", // MongoDB $lookup is inherently a left outer join
+          }
+        : tableOrOptions;
+
     this.operationsHelper.addLookupOperation("join", options);
     return this;
   }
 
-  // ============================================================================
-  // UTILITY / EXTENSIONS
-  // ============================================================================
+  /**
+   * Performs a left outer join with another collection.
+   * In MongoDB, this is the standard $lookup behavior.
+   *
+   * @param table - Target collection name
+   * @param localField - Field from the input documents
+   * @param foreignField - Field from the documents of the "from" collection
+   */
+  public leftJoin(table: string, localField: string, foreignField: string): this;
+  /**
+   * Performs a left outer join with another collection.
+   *
+   * @param options - Join configuration
+   */
+  public leftJoin(options: JoinOptions): this;
+  public leftJoin(
+    tableOrOptions: string | JoinOptions,
+    localField?: string,
+    foreignField?: string,
+  ): this {
+    const options: JoinOptions =
+      typeof tableOrOptions === "string"
+        ? {
+            table: tableOrOptions,
+            localField: localField!,
+            foreignField: foreignField!,
+            type: "left",
+          }
+        : { ...tableOrOptions, type: "left" };
+
+    this.operationsHelper.addLookupOperation("join", options);
+    return this;
+  }
+
+  /**
+   * Performs a right outer join with another collection.
+   *
+   * Note: MongoDB doesn't natively support right joins. This is implemented
+   * as a regular left join with a warning. For true right join semantics,
+   * consider reversing the collections in your query.
+   *
+   * @param table - Target collection name
+   * @param localField - Field from the input documents
+   * @param foreignField - Field from the documents of the "from" collection
+   */
+  public rightJoin(table: string, localField: string, foreignField: string): this;
+  /**
+   * Performs a right outer join with another collection.
+   *
+   * @param options - Join configuration
+   */
+  public rightJoin(options: JoinOptions): this;
+  public rightJoin(
+    tableOrOptions: string | JoinOptions,
+    localField?: string,
+    foreignField?: string,
+  ): this {
+    // MongoDB $lookup is always a left join from the perspective of the input collection
+    // Right join semantics would require reversing the query direction
+    const options: JoinOptions =
+      typeof tableOrOptions === "string"
+        ? {
+            table: tableOrOptions,
+            localField: localField!,
+            foreignField: foreignField!,
+            type: "right",
+          }
+        : { ...tableOrOptions, type: "right" };
+
+    this.operationsHelper.addLookupOperation("join", options);
+    return this;
+  }
+
+  /**
+   * Performs an inner join with another collection.
+   *
+   * This adds a $lookup followed by a $match to filter out documents
+   * where the joined array is empty.
+   *
+   * @param table - Target collection name
+   * @param localField - Field from the input documents
+   * @param foreignField - Field from the documents of the "from" collection
+   */
+  public innerJoin(table: string, localField: string, foreignField: string): this;
+  /**
+   * Performs an inner join with another collection.
+   *
+   * @param options - Join configuration
+   */
+  public innerJoin(options: JoinOptions): this;
+  public innerJoin(
+    tableOrOptions: string | JoinOptions,
+    localField?: string,
+    foreignField?: string,
+  ): this {
+    const options: JoinOptions =
+      typeof tableOrOptions === "string"
+        ? {
+            table: tableOrOptions,
+            localField: localField!,
+            foreignField: foreignField!,
+            type: "inner",
+          }
+        : { ...tableOrOptions, type: "inner" };
+
+    this.operationsHelper.addLookupOperation("join", options);
+    return this;
+  }
+
+  /**
+   * Performs a full outer join with another collection.
+   *
+   * Note: MongoDB doesn't natively support full outer joins. This is implemented
+   * as a regular left join. For true full outer join semantics, you would need
+   * to use $unionWith and additional aggregation logic.
+   *
+   * @param table - Target collection name
+   * @param localField - Field from the input documents
+   * @param foreignField - Field from the documents of the "from" collection
+   */
+  public fullJoin(table: string, localField: string, foreignField: string): this;
+  /**
+   * Performs a full outer join with another collection.
+   *
+   * @param options - Join configuration
+   */
+  public fullJoin(options: JoinOptions): this;
+  public fullJoin(
+    tableOrOptions: string | JoinOptions,
+    localField?: string,
+    foreignField?: string,
+  ): this {
+    const options: JoinOptions =
+      typeof tableOrOptions === "string"
+        ? {
+            table: tableOrOptions,
+            localField: localField!,
+            foreignField: foreignField!,
+            type: "full",
+          }
+        : { ...tableOrOptions, type: "full" };
+
+    this.operationsHelper.addLookupOperation("join", options);
+    return this;
+  }
+
+  /**
+   * Performs a cross join with another collection.
+   *
+   * This creates a cartesian product by using $lookup with empty matching criteria.
+   *
+   * @param table - Target collection name
+   */
+  public crossJoin(table: string): this {
+    // Cross join: match every document in the foreign collection
+    this.operationsHelper.addLookupOperation("join", {
+      table,
+      localField: "_crossJoinDummy",
+      foreignField: "_crossJoinDummy",
+      type: "cross",
+      pipeline: [{ $match: {} }], // Match all documents
+    });
+    return this;
+  }
+
+  /**
+   * Performs a raw join using a custom aggregation pipeline.
+   *
+   * This allows full control over the $lookup stage for complex join scenarios.
+   *
+   * @param expression - Raw expression (typically a $lookup stage or pipeline)
+   * @param _bindings - Optional bindings (not used in MongoDB but kept for API consistency)
+   */
+  public joinRaw(expression: RawExpression, _bindings?: unknown[]): this {
+    // For MongoDB, expression should be a $lookup stage object or a simple string
+    // describing the join. We add it as a raw operation.
+    this.operationsHelper.addMatchOperation("raw", { builder: () => expression }, false);
+    return this;
+  }
 
   /**
    * Allows direct manipulation of the native MongoDB query.
@@ -2186,5 +2386,151 @@ export class MongoQueryBuilder<T = unknown> implements QueryBuilderContract<T> {
     this.operationsHelper.setOperations(this.operations);
 
     return results;
+  }
+
+  // ============================================================================
+  // RELATIONS / EAGER LOADING (Stubs)
+  // ============================================================================
+
+  /**
+   * Relations to eagerly load.
+   */
+  public eagerLoadRelations: Map<string, boolean | ((query: QueryBuilderContract) => void)> =
+    new Map();
+
+  /**
+   * Relations to count.
+   */
+  public countRelations: string[] = [];
+
+  /**
+   * Relations to load via $lookup (single query).
+   */
+  public joinRelations: Map<string, { alias: string; type: "belongsTo" | "hasOne" | "hasMany" }> =
+    new Map();
+
+  /**
+   * Relation definitions from the model.
+   */
+  public relationDefinitions?: Record<string, any>;
+
+  /**
+   * Model class reference.
+   */
+  public modelClass?: any;
+
+  /**
+   * Load relations using MongoDB $lookup in a single aggregation query.
+   *
+   * Unlike `with()` which uses separate queries, `joinWith()` uses
+   * $lookup to fetch related data in a single aggregation pipeline.
+   *
+   * @param relations - Relation names to load via $lookup
+   * @returns This builder for chaining
+   */
+  public joinWith(...relations: string[]): this {
+    for (const relation of relations) {
+      const def = this.relationDefinitions?.[relation];
+      if (def) {
+        this.joinRelations.set(relation, {
+          alias: `_rel_${relation}`,
+          type: def.type,
+        });
+      }
+    }
+    return this;
+  }
+
+  /**
+   * Eagerly load one or more relations.
+   *
+   * Supported patterns:
+   * - `with("posts")` - Load relation
+   * - `with("posts", "comments")` - Load multiple relations
+   * - `with("posts", callback)` - Load relation with constraint
+   * - `with({ posts: true, comments: callback })` - Object configuration
+   *
+   * @param args - Relation name(s), callbacks, or configuration object
+   */
+  public with(
+    ...args: (
+      | string
+      | Record<string, boolean | ((query: QueryBuilderContract) => void)>
+      | ((query: QueryBuilderContract) => void)
+    )[]
+  ): this {
+    for (let i = 0; i < args.length; i++) {
+      const arg = args[i];
+
+      if (typeof arg === "string") {
+        // Check if next argument is a callback for this relation
+        const nextArg = args[i + 1];
+        if (typeof nextArg === "function") {
+          this.eagerLoadRelations.set(arg, nextArg);
+          i++; // Skip the callback in next iteration
+        } else {
+          this.eagerLoadRelations.set(arg, true);
+        }
+      } else if (typeof arg === "object" && arg !== null) {
+        for (const [key, value] of Object.entries(arg)) {
+          this.eagerLoadRelations.set(key, value);
+        }
+      }
+      // Functions not preceded by a string are ignored (invalid usage)
+    }
+    return this;
+  }
+
+  /**
+   * Add a count of related models as a virtual field.
+   * @param relations - Relation name(s) to count
+   */
+  public withCount(...relations: string[]): this {
+    this.countRelations.push(...relations);
+    return this;
+  }
+
+  /**
+   * Filter results to only those that have related models.
+   * @param relation - Relation name
+   * @param operator - Optional comparison operator
+   * @param count - Optional count to compare against
+   */
+  public has(relation: string, operator?: string, count?: number): this {
+    // TODO: Implement has() using $lookup and $match
+    this.operationsHelper.addMatchOperation("has", { relation, operator, count });
+    return this;
+  }
+
+  /**
+   * Filter results that have related models matching specific conditions.
+   * @param relation - Relation name
+   * @param callback - Callback to define conditions
+   */
+  public whereHas(relation: string, callback: (query: QueryBuilderContract) => void): this {
+    // TODO: Implement whereHas() using $lookup with pipeline
+    this.operationsHelper.addMatchOperation("whereHas", { relation, callback });
+    return this;
+  }
+
+  /**
+   * Filter results that don't have any related models.
+   * @param relation - Relation name
+   */
+  public doesntHave(relation: string): this {
+    // TODO: Implement doesntHave() using $lookup and $match
+    this.operationsHelper.addMatchOperation("doesntHave", { relation });
+    return this;
+  }
+
+  /**
+   * Filter results that don't have related models matching specific conditions.
+   * @param relation - Relation name
+   * @param callback - Callback to define conditions
+   */
+  public whereDoesntHave(relation: string, callback: (query: QueryBuilderContract) => void): this {
+    // TODO: Implement whereDoesntHave() using $lookup with pipeline
+    this.operationsHelper.addMatchOperation("whereDoesntHave", { relation, callback });
+    return this;
   }
 }

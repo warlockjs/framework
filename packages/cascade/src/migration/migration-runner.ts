@@ -556,6 +556,10 @@ export class MigrationRunner {
    */
   private async recordMigration(name: string, batch: number, createdAt?: Date): Promise<void> {
     const driver = this.getDataSource().driver;
+    const migrationDriver = this.getMigrationDriver();
+
+    // Ensure migrations table exists
+    await migrationDriver.ensureMigrationsTable(this.migrationsTable);
 
     await driver.insert(this.migrationsTable, {
       name,

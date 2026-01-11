@@ -201,4 +201,139 @@ export interface DriverContract {
 
   /** Access the migration driver for schema operations. */
   migrationDriver(): MigrationDriverContract;
+
+  // ============================================================
+  // Database Lifecycle Operations
+  // ============================================================
+
+  /**
+   * Create a new database.
+   *
+   * Used for multi-tenant scenarios where each tenant gets their own database.
+   *
+   * @param name - Database name to create
+   * @param options - Driver-specific options (encoding, template, etc.)
+   * @returns true if created, false if already exists
+   *
+   * @example
+   * ```typescript
+   * // Create a tenant database
+   * const created = await driver.createDatabase("tenant_xyz");
+   * if (created) {
+   *   console.log("Database created successfully");
+   * }
+   * ```
+   */
+  createDatabase(name: string, options?: CreateDatabaseOptions): Promise<boolean>;
+
+  /**
+   * Drop a database.
+   *
+   * Use with caution - this permanently deletes the database and all its data.
+   *
+   * @param name - Database name to drop
+   * @param options - Driver-specific options (force, etc.)
+   * @returns true if dropped, false if didn't exist
+   *
+   * @example
+   * ```typescript
+   * // Remove a tenant database
+   * await driver.dropDatabase("tenant_xyz");
+   * ```
+   */
+  dropDatabase(name: string, options?: DropDatabaseOptions): Promise<boolean>;
+
+  /**
+   * Check if a database exists.
+   *
+   * @param name - Database name to check
+   * @returns true if database exists
+   *
+   * @example
+   * ```typescript
+   * const exists = await driver.databaseExists("tenant_xyz");
+   * if (!exists) {
+   *   await driver.createDatabase("tenant_xyz");
+   * }
+   * ```
+   */
+  databaseExists(name: string): Promise<boolean>;
+
+  /**
+   * List all databases.
+   *
+   * @returns Array of database names
+   */
+  listDatabases(): Promise<string[]>;
+
+  // ============================================================
+  // Table Management Operations
+  // ============================================================
+
+  /**
+   * Drop a table/collection.
+   *
+   * Throws an error if the table doesn't exist.
+   *
+   * @param name - Table/collection name to drop
+   *
+   * @example
+   * ```typescript
+   * await driver.dropTable("temp_data");
+   * ```
+   */
+  dropTable(name: string): Promise<void>;
+
+  /**
+   * Drop a table/collection if it exists.
+   *
+   * Does not throw an error if the table doesn't exist.
+   *
+   * @param name - Table/collection name to drop
+   *
+   * @example
+   * ```typescript
+   * await driver.dropTableIfExists("temp_data");
+   * ```
+   */
+  dropTableIfExists(name: string): Promise<void>;
+
+  /**
+   * Drop all tables/collections in the current database.
+   *
+   * Use with extreme caution - this permanently deletes all tables and data.
+   * Typically used for `migrate:fresh` command or test suite resets.
+   *
+   * @example
+   * ```typescript
+   * // Reset entire database schema
+   * await driver.dropAllTables();
+   * await runMigrations();
+   * ```
+   */
+  dropAllTables(): Promise<void>;
 }
+
+/**
+ * Options for creating a database.
+ */
+export type CreateDatabaseOptions = {
+  /** Database encoding (PostgreSQL: UTF8, LATIN1, etc.) */
+  encoding?: string;
+  /** Template database (PostgreSQL) */
+  template?: string;
+  /** Locale/collation settings */
+  locale?: string;
+  /** Owner of the new database */
+  owner?: string;
+};
+
+/**
+ * Options for dropping a database.
+ */
+export type DropDatabaseOptions = {
+  /** Force drop even if there are active connections */
+  force?: boolean;
+  /** Skip error if database doesn't exist */
+  ifExists?: boolean;
+};

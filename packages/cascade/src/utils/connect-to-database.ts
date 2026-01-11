@@ -1,7 +1,8 @@
 import { DriverContract } from "../contracts";
 import { DataSource } from "../data-source/data-source";
 import { dataSourceRegistry } from "../data-source/data-source-registry";
-import { MongoDbDriver } from "../drivers/mongo/mongodb-driver";
+import { MongoDbDriver } from "../drivers/mongodb/mongodb-driver";
+import { PostgresDriver } from "../drivers/postgres";
 import type { DeleteStrategy, StrictMode } from "../types";
 
 /**
@@ -321,8 +322,19 @@ export async function connectToDatabase<TDriverOptions = any, TClientOptions = a
       break;
     }
 
-    case "postgres":
-      throw new Error("PostgreSQL driver is not yet implemented. Coming soon!");
+    case "postgres": {
+      driver = new PostgresDriver({
+        database: options.database,
+        connectionString: options.uri,
+        host: options.host,
+        port: options.port ?? 5432,
+        user: options.username,
+        password: options.password,
+        // Spread any additional client options (pool settings, SSL, etc.)
+        ...(options.clientOptions as object),
+      });
+      break;
+    }
 
     case "mysql":
       throw new Error("MySQL driver is not yet implemented. Coming soon!");
@@ -350,6 +362,8 @@ export async function connectToDatabase<TDriverOptions = any, TClientOptions = a
   try {
     await driver.connect();
   } catch (error) {
+    console.log(error);
+
     throw new Error(
       `Failed to connect to ${driverType} database: ${error instanceof Error ? error.message : String(error)}`,
     );

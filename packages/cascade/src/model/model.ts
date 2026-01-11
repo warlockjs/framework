@@ -7,6 +7,7 @@ import { dataSourceRegistry } from "../data-source/data-source-registry";
 import { DatabaseDirtyTracker } from "../database-dirty-tracker";
 import type { ModelEventListener, ModelEventName } from "../events/model-events";
 import { ModelEvents, globalModelEvents } from "../events/model-events";
+import { RelationLoader } from "../relations/relation-loader";
 import { DatabaseRemover } from "../remover/database-remover";
 import { DatabaseRestorer } from "../restorer/database-restorer";
 import { modelSync } from "../sync/model-sync";
@@ -98,6 +99,7 @@ export type ChildModel<TModel extends Model> = (new (...args: any[]) => TModel) 
     | "removeScope"
     | "localScopes"
     | "globalScopes"
+    | "relations"
     | "newQueryBuilder"
     | "builder"
   >;
@@ -458,6 +460,37 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   public static localScopes = new Map<string, LocalScopeCallback>();
 
   /**
+   * Relation definitions for this model.
+   *
+   * Define relationships to other models using helper functions:
+   * - `hasMany()` - One-to-many (User has many Posts)
+   * - `hasOne()` - One-to-one (User has one Profile)
+   * - `belongsTo()` - Inverse of hasMany/hasOne (Post belongs to User)
+   * - `belongsToMany()` - Many-to-many with pivot table (User has many Roles)
+   *
+   * @example
+   * ```typescript
+   * import { hasMany, belongsTo, belongsToMany, hasOne } from "@warlock.js/cascade";
+   *
+   * class User extends Model {
+   *   public posts?: Post[];  // Optional: for TypeScript autocomplete
+   *
+   *   static relations = {
+   *     posts: hasMany("Post"),
+   *     profile: hasOne("Profile"),
+   *     organization: belongsTo("Organization"),
+   *     roles: belongsToMany("Role", { pivot: "user_roles" }),
+   *   };
+   * }
+   *
+   * // Usage:
+   * const users = await User.query().with("posts").get();
+   * console.log(users[0].posts); // Post[]
+   * ```
+   */
+  public static relations: Record<string, any> = {};
+
+  /**
    * Flag indicating whether this model instance represents a new (unsaved) record.
    *
    * - `true`: The model has not been persisted to the database yet
@@ -485,6 +518,100 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * Used by the writer to generate efficient partial update payloads.
    */
   public readonly dirtyTracker: DatabaseDirtyTracker;
+
+  /**
+   * Model instance events.
+   * Allows registering listeners for lifecycle events on this specific instance.
+   */
+  public events: ModelEvents<any> = new ModelEvents();
+
+  /**
+   * Map of loaded relations for this model instance.
+   *
+   * Populated automatically when using `with()` for eager loading,
+   * or when calling `load()` for lazy loading.
+   *
+   * @example
+   * ```typescript
+   * const user = await User.query().with("posts").first();
+   * console.log(user.loadedRelations.get("posts")); // Post[]
+   *
+   * // Also accessible as direct properties:
+   * console.log(user.posts); // Post[]\n   * ```
+   */
+  public loadedRelations: Map<string, any> = new Map();
+
+  /**
+   * Lazily load one or more relations for this model instance.
+   *
+   * This method loads relations on-demand after the model has been fetched.
+   * The loaded relations are attached directly to the model instance and
+   * also stored in `loadedRelations` map.
+   *
+   * @param relations - Relation name(s) to load
+   * @returns This model instance for chaining
+   *
+   * @example
+   * ```typescript
+   * const user = await User.first();
+   *
+   * // Load single relation
+   * await user.load("posts");
+   * console.log(user.posts); // Post[]
+   *
+   * // Load multiple relations
+   * await user.load("posts", "organization");
+   *
+   * // Chain with other operations
+   * const posts = await user.load("posts").then(() => user.posts);
+   * ```
+   */
+  public async load(...relations: string[]): Promise<this> {
+    const ModelClass = this.constructor as ChildModel<Model>;
+    const loader = new RelationLoader([this], ModelClass);
+    await loader.load(relations);
+    return this;
+  }
+
+  /**
+   * Check if a relation has been loaded.
+   *
+   * @param relationName - Name of the relation to check
+   * @returns True if the relation has been loaded
+   *
+   * @example
+   * ```typescript
+   * const user = await User.first();
+   *
+   * console.log(user.isLoaded("posts")); // false
+   * await user.load("posts");
+   * console.log(user.isLoaded("posts")); // true
+   * ```
+   */
+
+  public isLoaded(relationName: string): boolean {
+    return this.loadedRelations.has(relationName);
+  }
+
+  /**
+   * Get a loaded relation by name.
+   *
+   * Returns undefined if the relation has not been loaded.
+   *
+   * @param relationName - Name of the relation to get
+   * @returns The loaded relation data, or undefined
+   *
+   * @example
+   * ```typescript
+   * const user = await User.query().with("posts").first();
+   *
+   * const posts = user.getRelation<Post[]>("posts");
+   * console.log(posts?.length);
+   * ```
+   */
+  public getRelation<TRelation = any>(relationName: string): TRelation | undefined {
+    return this.loadedRelations.get(relationName) as TRelation | undefined;
+  }
 
   /**
    * Constructs a new model instance with optional initial data.
@@ -871,8 +998,53 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     context?: TContext,
   ): Promise<void> {
     const ctor = this.constructor as any;
+    // Trigger instance events
+    await this.events.emit(event, this, context as TContext);
+    // Trigger static events
     await ctor.events().emit(event, this, context as TContext);
+    // Trigger global events
     await globalModelEvents.emit(event, this, context as TContext);
+  }
+
+  /**
+   * Register a listener for a model lifecycle event on this instance.
+   *
+   * @param event - Event name (e.g., "saving", "updated")
+   * @param listener - Callback function
+   * @returns Unsubscribe function
+   */
+  public on<TContext = unknown>(
+    event: ModelEventName,
+    listener: ModelEventListener<this, TContext>,
+  ): () => void {
+    return this.events.on(event, listener as any);
+  }
+
+  /**
+   * Register a one-time listener for a model lifecycle event on this instance.
+   *
+   * @param event - Event name
+   * @param listener - Callback function
+   * @returns Unsubscribe function
+   */
+  public once<TContext = unknown>(
+    event: ModelEventName,
+    listener: ModelEventListener<this, TContext>,
+  ): () => void {
+    return this.events.once(event, listener as any);
+  }
+
+  /**
+   * Remove a listener from this instance.
+   *
+   * @param event - Event name
+   * @param listener - Callback function to remove
+   */
+  public off<TContext = unknown>(
+    event: ModelEventName,
+    listener: ModelEventListener<this, TContext>,
+  ): void {
+    this.events.off(event, listener as any);
   }
 
   /**
@@ -1047,7 +1219,8 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   ): QueryBuilderContract<TModel> {
     // Call newQueryBuilder as a static method (may be overridden in child classes)
     const queryBuilder = this.newQueryBuilder<TModel>();
-    const ModelClass = this as new (...args: any[]) => TModel;
+    const ModelClass = this as unknown as ChildModel<TModel>;
+    const qb = queryBuilder; // Capture for closure access
 
     // Collect global scopes from base Model and child model
     const allGlobalScopes = new Map<string, GlobalScopeDefinition>([
@@ -1061,21 +1234,169 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     queryBuilder.availableLocalScopes = this.localScopes;
     queryBuilder.disabledGlobalScopes = new Set();
 
+    // Pass relation definitions for joinWith() support
+    queryBuilder.relationDefinitions = this.relations;
+    queryBuilder.modelClass = ModelClass;
+
     // Emit fetching event
     this.events().emitFetching(queryBuilder, { table: this.table, modelClass: this });
 
     queryBuilder.hydrate((data: any) => {
-      const model = new ModelClass(data);
+      const model = new (ModelClass as new (...args: any[]) => TModel)(data);
       model.isNew = false;
       return model;
     });
 
-    // Wire up onFetched callback to emit model-level event
-    queryBuilder.onFetched(async (models: any, context: any) => {
-      await this.events().emit("fetched", models as any, context);
+    // Wire up onFetched callback to load relations and emit model-level event
+    queryBuilder.onFetched(async (models: any[]) => {
+      // Load eager relations if any were requested
+      const eagerRelations = qb.eagerLoadRelations;
+      if (eagerRelations && eagerRelations.size > 0 && models.length > 0) {
+        // Build constraints object from the Map
+        const constraints: Record<string, (query: QueryBuilderContract) => void> = {};
+        for (const [name, constraint] of eagerRelations) {
+          if (typeof constraint === "function") {
+            constraints[name] = constraint;
+          }
+        }
+
+        const loader = new RelationLoader(models, ModelClass);
+        await loader.load([...eagerRelations.keys()], constraints);
+      }
+      await this.events().emit("fetched", models as any, {});
     });
 
     return queryBuilder;
+  }
+
+  /**
+   * Short hand for the query builder method with
+   */
+  /**
+   * Eagerly load one or more relations with the query results.
+   *
+   * Relations are loaded in separate optimized queries to prevent N+1 problems.
+   * The loaded relations are attached to each model instance.
+   *
+   * @param relation - Single relation name to load
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * // Load single relation
+   * const user = await User.query().with("posts").find(1);
+   * console.log(user.posts); // Post[]
+   *
+   * // Load multiple relations
+   * const user = await User.query().with("posts", "organization").find(1);
+   *
+   * // Load nested relations
+   * const user = await User.query().with("posts.comments.author").find(1);
+   * ```
+   */
+  public static with<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    relation: string,
+  ): QueryBuilderContract<TModel>;
+
+  /**
+   * Eagerly load multiple relations.
+   *
+   * @param relations - Relation names to load
+   * @returns Query builder for chaining
+   */
+  public static with<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    ...relations: string[]
+  ): QueryBuilderContract<TModel>;
+
+  /**
+   * Eagerly load a relation with a constraint callback.
+   *
+   * The callback receives the relation query builder, allowing you to
+   * add conditions, ordering, or limits to the related query.
+   *
+   * @param relation - Relation name to load
+   * @param constraint - Callback to configure the relation query
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * const user = await User.query()
+   *   .with("posts", (query) => {
+   *     query.where("isPublished", true)
+   *       .orderBy("createdAt", "desc")
+   *       .limit(5);
+   *   })
+   *   .find(1);
+   * ```
+   */
+  public static with<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    relation: string,
+    constraint: (query: QueryBuilderContract) => void,
+  ): QueryBuilderContract<TModel>;
+
+  /**
+   * Eagerly load multiple relations with constraints.
+   *
+   * Pass an object where keys are relation names and values are either:
+   * - `true` to load without constraints
+   * - A callback function to configure the relation query
+   *
+   * @param relations - Object mapping relation names to constraints
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * const user = await User.query()
+   *   .with({
+   *     posts: (query) => query.where("isPublished", true),
+   *     organization: true,
+   *     roles: (query) => query.orderBy("priority"),
+   *   })
+   *   .find(1);
+   * ```
+   */
+  public static with<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    relations: Record<string, boolean | ((query: QueryBuilderContract) => void)>,
+  ): QueryBuilderContract<TModel>;
+
+  public static with<TModel extends Model = Model>(this: ChildModel<TModel>, ...args: any[]) {
+    return this.query().with(...args);
+  }
+
+  /**
+   * Load relations using database JOINs in a single query.
+   *
+   * Unlike `with()` which uses separate queries, `joinWith()` uses
+   * LEFT JOIN (SQL) or $lookup (MongoDB) to fetch related data
+   * in a single query. The related data is hydrated into proper
+   * model instances and attached to the main model.
+   *
+   * Best for: belongsTo and hasOne relations where you need
+   * efficient single-query loading.
+   *
+   * @param relations - Relation names to load via JOIN
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * // Single relation
+   * const post = await Post.joinWith("author").first();
+   * console.log(post.author); // User model instance
+   * console.log(post.data);   // { id, title, authorId } - no author data
+   *
+   * // Multiple relations
+   * const post = await Post.joinWith("author", "category").first();
+   * ```
+   */
+  public static joinWith<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    ...relations: string[]
+  ): QueryBuilderContract<TModel> {
+    return this.query().joinWith(...relations);
   }
 
   /**

@@ -61,6 +61,8 @@ export type ColumnDefinition = {
   autoIncrement?: boolean;
   /** Whether this column must be unsigned (numeric only) */
   unsigned?: boolean;
+  /** Whether this column has a unique constraint */
+  unique?: boolean;
   /** Column comment/description */
   comment?: string;
   /** Enum/set values */
@@ -207,6 +209,19 @@ export interface MigrationDriverContract {
    * @returns True if table exists
    */
   tableExists(table: string): Promise<boolean>;
+
+  /**
+   * Ensure the migrations tracking table exists.
+   *
+   * Creates the table with appropriate columns if it doesn't exist:
+   * - `name` (string, unique) - Migration name
+   * - `batch` (integer) - Batch number
+   * - `executedAt` (timestamp) - When the migration was executed
+   * - `createdAt` (timestamp, optional) - Migration creation date
+   *
+   * @param tableName - Name of the migrations table (default: "_migrations")
+   */
+  ensureMigrationsTable(tableName: string): Promise<void>;
 
   // ============================================================================
   // COLUMN OPERATIONS

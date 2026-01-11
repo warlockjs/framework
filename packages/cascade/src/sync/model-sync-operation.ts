@@ -211,7 +211,7 @@ export class ModelSyncOperation implements ModelSyncOperationContract {
    */
   public unsubscribe(): void {
     for (const subscription of this.subscriptions) {
-      subscription.unsubscribe();
+      subscription.unsubscribe?.();
     }
 
     this.subscriptions.length = 0;

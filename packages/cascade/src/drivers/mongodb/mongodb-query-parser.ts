@@ -5,7 +5,7 @@ import {
   isAggregateExpression,
   type AggregateExpression,
 } from "../../expressions/aggregate-expressions";
-import type { MongoQueryBuilder } from "./mongo-query-builder";
+import type { MongoQueryBuilder } from "./mongodb-query-builder";
 import type { Operation, PipelineStage } from "./types";
 
 /**
@@ -146,8 +146,8 @@ export class MongoQueryParser {
   ): void {
     if (stage === "$group") {
       const op = operations[0];
-      if (op.type === "groupByWithAggregates" && op.payload.fields) {
-        const fieldNames = this.extractGroupFieldNames(op.payload.fields);
+      if (op.type === "groupByWithAggregates" && op.data.fields) {
+        const fieldNames = this.extractGroupFieldNames(op.data.fields);
         if (fieldNames) {
           this.groupFieldNames.set(stageIndex, fieldNames);
         }
@@ -330,12 +330,12 @@ export class MongoQueryParser {
       case "$lookup":
         return this.buildLookupStage(operations);
       case "$limit":
-        return { $limit: operations[0].payload.value };
+        return { $limit: operations[0].data.value };
       case "$skip":
-        return { $skip: operations[0].payload.value };
+        return { $skip: operations[0].data.value };
       case "$setWindowFields":
         return {
-          $setWindowFields: operations[0].payload.spec,
+          $setWindowFields: operations[0].data.spec,
         };
       default:
         return null;
@@ -441,7 +441,7 @@ export class MongoQueryParser {
     for (const op of operations) {
       if (op.type === "where:callback" || op.type === "orWhere:callback") {
         flushPendingSimpleWhere();
-        const callbackCondition = this.buildCallbackCondition(op.payload);
+        const callbackCondition = this.buildCallbackCondition(op.data);
         if (!callbackCondition) {
           continue;
         }
@@ -463,7 +463,7 @@ export class MongoQueryParser {
       }
 
       if (op.type === "where:object") {
-        queueSimpleWhere(op.payload);
+        queueSimpleWhere(op.data);
         continue;
       }
 
@@ -474,7 +474,7 @@ export class MongoQueryParser {
         op.type === "where:notExists"
       ) {
         const negated = op.type === "where:not" || op.type === "where:notExists";
-        const nested = this.buildCallbackCondition(op.payload.callback);
+        const nested = this.buildCallbackCondition(op.data.callback);
         if (nested) {
           const condition = negated ? { $nor: [nested] } : nested;
           if (op.type.startsWith("orWhere")) {
@@ -489,7 +489,7 @@ export class MongoQueryParser {
 
       if (op.type === "orWhere:object") {
         enterTopLevelOrMode();
-        pushOr(op.payload);
+        pushOr(op.data);
         continue;
       }
 
@@ -576,7 +576,7 @@ export class MongoQueryParser {
     if (hasInternalOr) {
       for (const op of matchOps) {
         if (op.type === "where:callback" || op.type === "orWhere:callback") {
-          const nestedCondition = this.buildCallbackCondition(op.payload);
+          const nestedCondition = this.buildCallbackCondition(op.data);
           if (nestedCondition) {
             pushOr(nestedCondition);
           }
@@ -584,7 +584,7 @@ export class MongoQueryParser {
         }
 
         if (op.type === "where:object" || op.type === "orWhere:object") {
-          pushOr(op.payload);
+          pushOr(op.data);
           continue;
         }
 
@@ -599,12 +599,12 @@ export class MongoQueryParser {
 
     for (const op of matchOps) {
       if (op.type === "where:callback") {
-        const nestedCondition = this.buildCallbackCondition(op.payload);
+        const nestedCondition = this.buildCallbackCondition(op.data);
         if (nestedCondition) {
           Object.assign(andFilter, nestedCondition);
         }
       } else if (op.type === "where:object") {
-        Object.assign(andFilter, op.payload);
+        Object.assign(andFilter, op.data);
       } else {
         const condition = this.buildWhereCondition(op);
         if (condition) {
@@ -623,7 +623,7 @@ export class MongoQueryParser {
    * @returns The MongoDB filter condition
    */
   private buildWhereCondition(op: Operation): any {
-    const { field, operator, value } = op.payload;
+    const { field, operator, value } = op.data;
 
     switch (op.type) {
       case "where":
@@ -631,10 +631,10 @@ export class MongoQueryParser {
         return this.buildOperatorCondition(field, operator, value);
 
       case "whereIn":
-        return { [field]: { $in: value || op.payload.values } };
+        return { [field]: { $in: value || op.data.values } };
 
       case "whereNotIn":
-        return { [field]: { $nin: value || op.payload.values } };
+        return { [field]: { $nin: value || op.data.values } };
 
       case "whereNull":
         return { [field]: null };
@@ -645,8 +645,8 @@ export class MongoQueryParser {
       case "whereBetween":
         return {
           [field]: {
-            $gte: op.payload.range[0],
-            $lte: op.payload.range[1],
+            $gte: op.data.range[0],
+            $lte: op.data.range[1],
           },
         };
 
@@ -654,38 +654,38 @@ export class MongoQueryParser {
         return {
           [field]: {
             $not: {
-              $gte: op.payload.range[0],
-              $lte: op.payload.range[1],
+              $gte: op.data.range[0],
+              $lte: op.data.range[1],
             },
           },
         };
 
       case "whereLike": {
         const pattern =
-          typeof op.payload.pattern === "string" ? op.payload.pattern : op.payload.pattern.source;
+          typeof op.data.pattern === "string" ? op.data.pattern : op.data.pattern.source;
         return { [field]: { $regex: pattern, $options: "i" } };
       }
 
       case "whereNotLike": {
         const notPattern =
-          typeof op.payload.pattern === "string" ? op.payload.pattern : op.payload.pattern.source;
+          typeof op.data.pattern === "string" ? op.data.pattern : op.data.pattern.source;
         return { [field]: { $not: { $regex: notPattern, $options: "i" } } };
       }
 
       case "whereStartsWith":
-        return { [field]: { $regex: `^${op.payload.value}`, $options: "i" } };
+        return { [field]: { $regex: `^${op.data.value}`, $options: "i" } };
 
       case "whereNotStartsWith":
         return {
-          [field]: { $not: { $regex: `^${op.payload.value}`, $options: "i" } },
+          [field]: { $not: { $regex: `^${op.data.value}`, $options: "i" } },
         };
 
       case "whereEndsWith":
-        return { [field]: { $regex: `${op.payload.value}$`, $options: "i" } };
+        return { [field]: { $regex: `${op.data.value}$`, $options: "i" } };
 
       case "whereNotEndsWith":
         return {
-          [field]: { $not: { $regex: `${op.payload.value}$`, $options: "i" } },
+          [field]: { $not: { $regex: `${op.data.value}$`, $options: "i" } },
         };
 
       case "whereExists":
@@ -695,127 +695,127 @@ export class MongoQueryParser {
         return { [field]: { $exists: false } };
 
       case "whereSize":
-        if (op.payload.operator === "=") {
-          return { [field]: { $size: op.payload.size } };
+        if (op.data.operator === "=") {
+          return { [field]: { $size: op.data.size } };
         } else {
-          const mongoOp = this.getMongoOperator(op.payload.operator);
+          const mongoOp = this.getMongoOperator(op.data.operator);
           return {
             $expr: {
-              [mongoOp]: [{ $size: `$${field}` }, op.payload.size],
+              [mongoOp]: [{ $size: `$${field}` }, op.data.size],
             },
           };
         }
 
       case "textSearch":
         return {
-          $text: { $search: op.payload.query },
-          ...(op.payload.filters || {}),
+          $text: { $search: op.data.query },
+          ...(op.data.filters || {}),
         };
 
       case "whereRaw":
       case "orWhereRaw":
         return this.resolveRawExpression(
-          op.payload.expression as RawExpression,
-          op.payload.bindings,
+          op.data.expression as RawExpression,
+          op.data.bindings,
         );
 
       case "whereColumn":
       case "orWhereColumn":
-        return this.buildColumnComparison(op.payload.first, op.payload.operator, op.payload.second);
+        return this.buildColumnComparison(op.data.first, op.data.operator, op.data.second);
 
       case "whereBetweenColumns":
         return this.buildBetweenColumnsCondition(
-          op.payload.field,
-          op.payload.lowerColumn,
-          op.payload.upperColumn,
+          op.data.field,
+          op.data.lowerColumn,
+          op.data.upperColumn,
         );
 
       case "whereDate":
       case "whereDateEquals":
-        return this.buildDateEqualityCondition(op.payload.field, op.payload.value);
+        return this.buildDateEqualityCondition(op.data.field, op.data.value);
 
       case "whereDateBefore":
-        return this.buildDateBeforeCondition(op.payload.field, op.payload.value);
+        return this.buildDateBeforeCondition(op.data.field, op.data.value);
 
       case "whereDateAfter":
-        return this.buildDateAfterCondition(op.payload.field, op.payload.value);
+        return this.buildDateAfterCondition(op.data.field, op.data.value);
 
       case "whereTime":
-        return this.buildTimeCondition(op.payload.field, op.payload.value);
+        return this.buildTimeCondition(op.data.field, op.data.value);
 
       case "whereDay":
-        return this.buildDatePartCondition(op.payload.field, "$dayOfMonth", op.payload.value);
+        return this.buildDatePartCondition(op.data.field, "$dayOfMonth", op.data.value);
 
       case "whereMonth":
-        return this.buildDatePartCondition(op.payload.field, "$month", op.payload.value);
+        return this.buildDatePartCondition(op.data.field, "$month", op.data.value);
 
       case "whereYear":
-        return this.buildDatePartCondition(op.payload.field, "$year", op.payload.value);
+        return this.buildDatePartCondition(op.data.field, "$year", op.data.value);
 
       case "whereJsonContains":
-        return this.buildJsonContainsCondition(op.payload.path, op.payload.value);
+        return this.buildJsonContainsCondition(op.data.path, op.data.value);
 
       case "whereJsonDoesntContain":
-        return this.buildJsonDoesntContainCondition(op.payload.path, op.payload.value);
+        return this.buildJsonDoesntContainCondition(op.data.path, op.data.value);
 
       case "whereJsonContainsKey":
-        return this.buildJsonContainsKeyCondition(op.payload.path);
+        return this.buildJsonContainsKeyCondition(op.data.path);
 
       case "whereJsonLength":
         return this.buildJsonLengthCondition(
-          op.payload.path,
-          op.payload.operator,
-          op.payload.value,
+          op.data.path,
+          op.data.operator,
+          op.data.value,
         );
 
       case "whereJsonIsArray":
-        return this.buildJsonTypeCondition(op.payload.path, "array");
+        return this.buildJsonTypeCondition(op.data.path, "array");
 
       case "whereJsonIsObject":
-        return this.buildJsonTypeCondition(op.payload.path, "object");
+        return this.buildJsonTypeCondition(op.data.path, "object");
 
       case "whereArrayLength":
         return this.buildArrayLengthCondition(
-          op.payload.field,
-          op.payload.operator,
-          op.payload.value,
+          op.data.field,
+          op.data.operator,
+          op.data.value,
         );
 
       case "whereFullText":
       case "orWhereFullText":
-        return { $text: { $search: op.payload.query } };
+        return { $text: { $search: op.data.query } };
 
       case "whereSearch":
         return {
-          [op.payload.field]: {
-            $regex: op.payload.query,
+          [op.data.field]: {
+            $regex: op.data.query,
             $options: "i",
           },
         };
 
       case "where:not":
       case "orWhere:not": {
-        const nestedNot = this.buildCallbackCondition(op.payload.callback);
+        const nestedNot = this.buildCallbackCondition(op.data.callback);
         return nestedNot ? { $nor: [nestedNot] } : null;
       }
 
       case "where:exists":
-        return this.buildCallbackCondition(op.payload.callback);
+        return this.buildCallbackCondition(op.data.callback);
 
       case "where:notExists": {
-        const nestedExists = this.buildCallbackCondition(op.payload.callback);
+        const nestedExists = this.buildCallbackCondition(op.data.callback);
         return nestedExists ? { $nor: [nestedExists] } : null;
       }
 
       case "whereArrayContains":
-        if (op.payload.key) {
+        if (op.data.key) {
           return {
             [field]: {
-              $elemMatch: { [op.payload.key]: op.payload.value },
+              $elemMatch: { [op.data.key]: op.data.value },
             },
           };
         } else {
-          return { [field]: op.payload.value };
+          return { [field]: op.data.value };
         }
 
       default:
@@ -1279,91 +1279,91 @@ export class MongoQueryParser {
       switch (op.type) {
         case "select":
           // Handle new projection format with aliases
-          if (op.payload.projection) {
-            this.applyProjectionObject(projection, op.payload.projection);
-          } else if (op.payload.fields) {
-            this.applyProjectionFields(projection, op.payload.fields, 1);
+          if (op.data.projection) {
+            this.applyProjectionObject(projection, op.data.projection);
+          } else if (op.data.fields) {
+            this.applyProjectionFields(projection, op.data.fields, 1);
           }
           break;
 
         case "deselect":
-          this.applyProjectionFields(projection, op.payload.fields, 0);
+          this.applyProjectionFields(projection, op.data.fields, 0);
           break;
 
         case "addSelect":
-          this.applyProjectionFields(projection, op.payload.fields, 1);
+          this.applyProjectionFields(projection, op.data.fields, 1);
           break;
 
         case "selectRaw":
-          this.applyRawProjection(projection, op.payload.expression, op.payload.bindings);
+          this.applyRawProjection(projection, op.data.expression, op.data.bindings);
           break;
 
         case "selectSub":
         case "addSelectSub": {
-          const expr = this.resolveProjectionExpression(op.payload.expression, op.payload.bindings);
+          const expr = this.resolveProjectionExpression(op.data.expression, op.data.bindings);
           if (expr !== undefined) {
-            projection[op.payload.alias] = expr;
+            projection[op.data.alias] = expr;
           }
           break;
         }
 
         case "selectAggregate":
-          projection[op.payload.alias] = this.buildAggregateProjection(
-            op.payload.field,
-            op.payload.aggregate,
+          projection[op.data.alias] = this.buildAggregateProjection(
+            op.data.field,
+            op.data.aggregate,
           );
           break;
 
         case "selectExists":
-          projection[op.payload.alias] = this.buildExistsProjection(op.payload.field);
+          projection[op.data.alias] = this.buildExistsProjection(op.data.field);
           break;
 
         case "selectCount":
-          projection[op.payload.alias] = this.buildArraySizeExpression(op.payload.field);
+          projection[op.data.alias] = this.buildArraySizeExpression(op.data.field);
           break;
 
         case "selectCase":
-          projection[op.payload.alias] = this.buildCaseExpression(
-            op.payload.cases,
-            op.payload.otherwise,
+          projection[op.data.alias] = this.buildCaseExpression(
+            op.data.cases,
+            op.data.otherwise,
           );
           break;
 
         case "selectWhen":
-          projection[op.payload.alias] = this.buildCondExpression(
-            op.payload.condition,
-            op.payload.thenValue,
-            op.payload.elseValue,
+          projection[op.data.alias] = this.buildCondExpression(
+            op.data.condition,
+            op.data.thenValue,
+            op.data.elseValue,
           );
           break;
 
         case "selectDriverProjection":
-          driverCallbacks.push(op.payload.callback);
+          driverCallbacks.push(op.data.callback);
           break;
 
         case "selectJson": {
-          const alias = op.payload.alias ?? this.inferJsonAlias(op.payload.path);
+          const alias = op.data.alias ?? this.inferJsonAlias(op.data.path);
           projection[alias] = this.normalizeFieldReference(
-            `$${this.normalizePath(op.payload.path)}`,
+            `$${this.normalizePath(op.data.path)}`,
           );
           break;
         }
 
         case "selectJsonRaw": {
-          projection[op.payload.alias] = this.resolveProjectionExpression(op.payload.expression);
+          projection[op.data.alias] = this.resolveProjectionExpression(op.data.expression);
           break;
         }
 
         case "deselectJson":
-          projection[this.normalizePath(op.payload.path)] = 0;
+          projection[this.normalizePath(op.data.path)] = 0;
           break;
 
         case "selectConcat":
-          projection[op.payload.alias] = this.buildConcatExpression(op.payload.fields);
+          projection[op.data.alias] = this.buildConcatExpression(op.data.fields);
           break;
 
         case "selectCoalesce":
-          projection[op.payload.alias] = this.buildCoalesceExpression(op.payload.fields);
+          projection[op.data.alias] = this.buildCoalesceExpression(op.data.fields);
           break;
 
         default:
@@ -1390,11 +1390,11 @@ export class MongoQueryParser {
     for (const op of operations) {
       switch (op.type) {
         case "orderBy":
-          sort[op.payload.field] = op.payload.direction === "asc" ? 1 : -1;
+          sort[op.data.field] = op.data.direction === "asc" ? 1 : -1;
           break;
 
         case "orderByRandom":
-          return { $sample: { size: op.payload.limit } };
+          return { $sample: { size: op.data.limit } };
 
         case "orderByRaw":
           // TODO: Handle raw expressions
@@ -1416,7 +1416,7 @@ export class MongoQueryParser {
 
     switch (op.type) {
       case "groupBy": {
-        const stage = this.buildGroupByStage(op.payload.fields);
+        const stage = this.buildGroupByStage(op.data.fields);
         if (stage) {
           return stage;
         }
@@ -1424,8 +1424,8 @@ export class MongoQueryParser {
       }
       case "groupByWithAggregates": {
         const stage = this.buildGroupByWithAggregatesStage(
-          op.payload.fields,
-          op.payload.aggregates,
+          op.data.fields,
+          op.data.aggregates,
         );
         if (stage) {
           return stage;
@@ -1433,7 +1433,7 @@ export class MongoQueryParser {
         break;
       }
       case "groupByRaw": {
-        const expression = op.payload.expression;
+        const expression = op.data.expression;
         if (expression && typeof expression === "object") {
           return { $group: expression };
         }
@@ -1445,7 +1445,7 @@ export class MongoQueryParser {
         break;
       }
       case "distinct": {
-        const stage = this.buildGroupByStage(op.payload.fields);
+        const stage = this.buildGroupByStage(op.data.fields);
         if (stage) {
           return stage;
         }
@@ -1644,7 +1644,7 @@ export class MongoQueryParser {
    */
   private buildLookupStage(operations: Operation[]): any {
     const op = operations[0];
-    const options = op.payload;
+    const options = op.data;
 
     return {
       $lookup: {

@@ -11,7 +11,7 @@ import type { Operation, PipelineStage } from "./types";
  * Each operation consists of:
  * - **stage**: The MongoDB aggregation stage name (e.g., "$match", "$project")
  * - **type**: An internal identifier for the operation type
- * - **payload**: The data associated with the operation
+ * - **data**: The data associated with the operation
  * - **mergeable**: Whether this operation can be merged with adjacent similar operations
  *
  * @internal This class is for internal use within the MongoDB driver
@@ -30,8 +30,8 @@ import type { Operation, PipelineStage } from "./types";
  * // Operations array is now populated
  * console.log(operations);
  * // [
- * //   { stage: "$match", mergeable: true, type: "whereIn", payload: {...} },
- * //   { stage: "$project", mergeable: true, type: "select", payload: {...} }
+ * //   { stage: "$match", mergeable: true, type: "whereIn", data: {...} },
+ * //   { stage: "$project", mergeable: true, type: "select", data: {...} }
  * // ]
  * ```
  */
@@ -66,7 +66,7 @@ export class MongoQueryOperations {
    * by the parser for optimization.
    *
    * @param type - The operation type identifier (e.g., "where", "whereIn", "whereLike")
-   * @param payload - The operation payload data containing filter criteria
+   * @param data - The operation data data containing filter criteria
    * @param mergeable - Whether this operation can be merged with adjacent match operations (default: true)
    *
    * @example
@@ -81,12 +81,12 @@ export class MongoQueryOperations {
    * helper.addMatchOperation("having", { field: "count", operator: ">", value: 5 }, false);
    * ```
    */
-  public addMatchOperation(type: string, payload: Record<string, unknown>, mergeable = true): void {
+  public addMatchOperation(type: string, data: Record<string, unknown>, mergeable = true): void {
     this.operations.push({
       stage: "$match",
       mergeable,
       type,
-      payload,
+      data,
     });
   }
 
@@ -98,7 +98,7 @@ export class MongoQueryOperations {
    * used to compute new fields or reshape documents.
    *
    * @param type - The operation type identifier (e.g., "select", "deselect", "selectRaw")
-   * @param payload - The operation payload data containing projection specifications
+   * @param data - The operation data data containing projection specifications
    * @param mergeable - Whether this operation can be merged with adjacent project operations (default: true)
    *
    * @example
@@ -117,14 +117,14 @@ export class MongoQueryOperations {
    */
   public addProjectOperation(
     type: string,
-    payload: Record<string, unknown>,
+    data: Record<string, unknown>,
     mergeable = true,
   ): void {
     this.operations.push({
       stage: "$project",
       mergeable,
       type,
-      payload,
+      data,
     });
   }
 
@@ -136,7 +136,7 @@ export class MongoQueryOperations {
    * sorting.
    *
    * @param type - The operation type identifier (e.g., "orderBy", "orderByRandom")
-   * @param payload - The operation payload data containing sort specifications
+   * @param data - The operation data data containing sort specifications
    * @param mergeable - Whether this operation can be merged with adjacent sort operations (default: true)
    *
    * @example
@@ -153,12 +153,12 @@ export class MongoQueryOperations {
    * });
    * ```
    */
-  public addSortOperation(type: string, payload: Record<string, unknown>, mergeable = true): void {
+  public addSortOperation(type: string, data: Record<string, unknown>, mergeable = true): void {
     this.operations.push({
       stage: "$sort",
       mergeable,
       type,
-      payload,
+      data,
     });
   }
 
@@ -170,7 +170,7 @@ export class MongoQueryOperations {
    * are typically not mergeable as they represent distinct aggregation boundaries.
    *
    * @param type - The operation type identifier (e.g., "groupBy", "distinct")
-   * @param payload - The operation payload data containing grouping specifications
+   * @param data - The operation data data containing grouping specifications
    * @param mergeable - Whether this operation can be merged with adjacent group operations (default: false)
    *
    * @example
@@ -189,14 +189,14 @@ export class MongoQueryOperations {
    */
   public addGroupOperation(
     type: string,
-    payload: Record<string, unknown>,
+    data: Record<string, unknown>,
     mergeable = false,
   ): void {
     this.operations.push({
       stage: "$group",
       mergeable,
       type,
-      payload,
+      data,
     });
   }
 
@@ -208,7 +208,7 @@ export class MongoQueryOperations {
    * distinct join operation.
    *
    * @param type - The operation type identifier (typically "join")
-   * @param payload - The operation payload data containing join specifications
+   * @param data - The operation data data containing join specifications
    *
    * @example
    * ```typescript
@@ -231,12 +231,12 @@ export class MongoQueryOperations {
    * });
    * ```
    */
-  public addLookupOperation(type: string, payload: Record<string, unknown>): void {
+  public addLookupOperation(type: string, data: Record<string, unknown>): void {
     this.operations.push({
       stage: "$lookup",
       mergeable: false,
       type,
-      payload,
+      data,
     });
   }
 
@@ -249,7 +249,7 @@ export class MongoQueryOperations {
    *
    * @param stage - The MongoDB aggregation stage name (e.g., "$limit", "$skip", "$unwind")
    * @param type - The operation type identifier
-   * @param payload - The operation payload data
+   * @param data - The operation data data
    * @param mergeable - Whether this operation can be merged with adjacent operations (default: false)
    *
    * @example
@@ -276,14 +276,14 @@ export class MongoQueryOperations {
   public addOperation(
     stage: PipelineStage,
     type: string,
-    payload: Record<string, unknown>,
+    data: Record<string, unknown>,
     mergeable = false,
   ): void {
     this.operations.push({
       stage,
       mergeable,
       type,
-      payload,
+      data,
     });
   }
 }

@@ -72,6 +72,14 @@ class DataSourceRegistry {
   }
 
   /**
+   * Clean up all data sources and default one
+   */
+  public clear() {
+    this.defaultSource = undefined;
+    this.sources.clear();
+  }
+
+  /**
    * Listen for data source registry events.
    *
    * @param event - The event to listen for

@@ -29,11 +29,11 @@ import type {
   UpdateResult,
 } from "../../contracts";
 import { dataSourceRegistry } from "../../data-source/data-source-registry";
-import { MongoIdGenerator } from "./mongo-id-generator";
-import { MongoMigrationDriver } from "./mongo-migration-driver";
-import { MongoQueryBuilder } from "./mongo-query-builder";
-import { MongoSyncAdapter } from "./mongo-sync-adapter";
 import { MongoDBBlueprint } from "./mongodb-blueprint";
+import { MongoIdGenerator } from "./mongodb-id-generator";
+import { MongoMigrationDriver } from "./mongodb-migration-driver";
+import { MongoQueryBuilder } from "./mongodb-query-builder";
+import { MongoSyncAdapter } from "./mongodb-sync-adapter";
 import type { MongoDriverOptions } from "./types";
 
 const DEFAULT_TRANSACTION_OPTIONS: TransactionOptions = {
@@ -122,7 +122,7 @@ export class MongoDbDriver implements DriverContract {
       this._blueprint = new MongoDBBlueprint(this.database!);
     }
 
-    return this._blueprint;
+    return this._blueprint!;
   }
 
   /**
@@ -233,20 +233,20 @@ export class MongoDbDriver implements DriverContract {
     try {
       log.info(
         "database",
-        "connection",
+        "connection[MongoDB]",
         `Connecting to database ${colors.bold(colors.yellowBright(this.config.database))}`,
       );
       await client.connect();
       this.client = client;
       this.database = client.db(this.config.database);
       this.connected = true;
-      log.success("database", "connection", "Connected to database");
+      log.success("database", "connection[MongoDB]", "Connected to database");
 
       client.on("close", () => {
         if (this.connected) {
           this.connected = false;
           this.emit("disconnected");
-          log.warn("database", "connection", "Disconnected from database");
+          log.warn("database", "connection[MongoDB]", "Disconnected from database");
         }
       });
 
@@ -638,5 +638,140 @@ export class MongoDbDriver implements DriverContract {
     baseOptions.session = session;
 
     return baseOptions;
+  }
+
+  // ============================================================
+  // Database Lifecycle Operations
+  // ============================================================
+
+  /**
+   * Create a new database.
+   *
+   * In MongoDB, databases are created automatically when data is first written.
+   * This method creates an empty collection to ensure the database exists.
+   *
+   * @param name - Database name to create
+   * @returns true if created, false if already exists
+   */
+  public async createDatabase(name: string): Promise<boolean> {
+    const client = this.getClientInstance();
+
+    // Check if database already exists
+    if (await this.databaseExists(name)) {
+      return false;
+    }
+
+    try {
+      // MongoDB creates databases on first write, so create a system collection
+      const db = client.db(name);
+      await db.createCollection("__init__");
+      // Drop the temp collection
+      await db.collection("__init__").drop();
+
+      log.success("database", "lifecycle", `Created database ${name}`);
+      return true;
+    } catch (error) {
+      log.error("database", "lifecycle", `Failed to create database ${name}: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Drop a database.
+   *
+   * @param name - Database name to drop
+   * @returns true if dropped, false if didn't exist
+   */
+  public async dropDatabase(name: string): Promise<boolean> {
+    const client = this.getClientInstance();
+
+    // Check if database exists
+    if (!(await this.databaseExists(name))) {
+      return false;
+    }
+
+    try {
+      await client.db(name).dropDatabase();
+      log.success("database", "lifecycle", `Dropped database ${name}`);
+      return true;
+    } catch (error) {
+      log.error("database", "lifecycle", `Failed to drop database ${name}: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if a database exists.
+   *
+   * @param name - Database name to check
+   * @returns true if database exists
+   */
+  public async databaseExists(name: string): Promise<boolean> {
+    const client = this.getClientInstance();
+
+    const result = await client.db("admin").admin().listDatabases();
+    return result.databases.some((db) => db.name === name);
+  }
+
+  /**
+   * List all databases.
+   *
+   * @returns Array of database names
+   */
+  public async listDatabases(): Promise<string[]> {
+    const client = this.getClientInstance();
+
+    const result = await client.db("admin").admin().listDatabases();
+    return result.databases
+      .map((db) => db.name)
+      .filter((name) => !["admin", "local", "config"].includes(name));
+  }
+
+  // ============================================================
+  // Table/Collection Management Operations
+  // ============================================================
+
+  /**
+   * Drop a collection.
+   *
+   * @param name - Collection name to drop
+   * @throws Error if collection doesn't exist
+   */
+  public async dropTable(name: string): Promise<void> {
+    const db = this.getDatabaseInstance();
+    await db.collection(name).drop();
+    log.success("database", "collection", `Dropped collection ${name}`);
+  }
+
+  /**
+   * Drop a collection if it exists.
+   *
+   * @param name - Collection name to drop
+   */
+  public async dropTableIfExists(name: string): Promise<void> {
+    if (await this.blueprint.tableExists(name)) {
+      await this.dropTable(name);
+    }
+  }
+
+  /**
+   * Drop all collections in the current database.
+   *
+   * Useful for `migrate:fresh` command.
+   */
+  public async dropAllTables(): Promise<void> {
+    const collections = await this.blueprint.listTables();
+
+    if (collections.length === 0) {
+      return;
+    }
+
+    const db = this.getDatabaseInstance();
+
+    for (const collection of collections) {
+      await db.collection(collection).drop();
+    }
+
+    log.success("database", "collection", `Dropped ${collections.length} collections`);
   }
 }

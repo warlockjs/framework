@@ -6,7 +6,7 @@ registerPlugin(embedValidator);
 /**
  * This file registers database seal plugins as a side effect.
  * Import this file to ensure the plugins are registered.
- * 
+ *
  * @example
  * ```ts
  * import "./validation/database-seal-plugins";
