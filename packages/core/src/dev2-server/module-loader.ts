@@ -178,18 +178,23 @@ export class ModuleLoader {
    * Perform Clean up the file
    */
   public cleanupFileModule(file: FileManager): void {
+    if (!file.cleanup) return;
+
     const cleanupFunction = (cleanupFunction: Function | { unsubscribe: () => void }) => {
-      const fn =
-        (cleanupFunction as { unsubscribe: () => void })?.unsubscribe.bind(cleanupFunction) ||
-        cleanupFunction;
-      fn();
+      if (!cleanupFunction) return;
+      if (typeof cleanupFunction === "function") {
+        cleanupFunction();
+        return;
+      }
+
+      if ((cleanupFunction as { unsubscribe: () => void })?.unsubscribe) {
+        (cleanupFunction as { unsubscribe: () => void }).unsubscribe();
+      }
     };
 
-    if (file.cleanup) {
-      Array.isArray(file.cleanup)
-        ? file.cleanup.forEach((fn) => cleanupFunction(fn))
-        : cleanupFunction(file.cleanup);
-    }
+    const cleanups = Array.isArray(file.cleanup) ? file.cleanup : [file.cleanup];
+
+    cleanups.forEach((fn) => cleanupFunction(fn));
   }
 
   /**

@@ -1,8 +1,8 @@
 import { colors } from "@mongez/copper";
-import { fileExistsAsync, putFileAsync } from "@mongez/fs";
+import { fileExistsAsync, jsonFileAsync, putFileAsync } from "@mongez/fs";
 import { execSync } from "node:child_process";
 import { CommandActionData } from "../cli/types";
-import { rootPath } from "../utils";
+import { rootPath, srcPath } from "../utils";
 import { communicatorsConfigStub } from "./stubs";
 
 const featuresMap: Record<
@@ -132,8 +132,6 @@ export async function addCommandAction(options: CommandActionData) {
 
   validateFeatures(features);
 
-  const packageManagerCommand = await getPackageManagerCommand(packageManager as PackageManager);
-
   const dependencies: Record<string, string> = {};
   const devDependencies: Record<string, string> = {};
   const ejectConfigs: Record<string, { content: string; name: string }> = {};
@@ -150,7 +148,29 @@ export async function addCommandAction(options: CommandActionData) {
     }
   }
 
+  const currentPackageJson = await jsonFileAsync(rootPath("package.json"));
+
   // TODO: to reduce time of execution, check packages that are already installed
+
+  const packageManagerCommand = await getPackageManagerCommand(packageManager as PackageManager);
+
+  // check if dependencies are already installed
+  for (const dependency of Object.keys(dependencies)) {
+    if (currentPackageJson.dependencies[dependency]) {
+      console.log(`${colors.yellowBright(dependency)} is already installed, skipping...`);
+      delete dependencies[dependency];
+      continue;
+    }
+  }
+
+  // check if dev dependencies are already installed
+  for (const devDependency of Object.keys(devDependencies)) {
+    if (currentPackageJson.devDependencies[devDependency]) {
+      console.log(`${colors.yellowBright(devDependency)} is already installed, skipping...`);
+      delete devDependencies[devDependency];
+      continue;
+    }
+  }
 
   // install dependencies
   if (Object.keys(dependencies).length > 0) {
@@ -181,14 +201,14 @@ export async function addCommandAction(options: CommandActionData) {
   }
 
   for (const [name, config] of Object.entries(ejectConfigs)) {
-    if (await fileExistsAsync(rootPath(`config/${name}.ts`))) {
+    if (await fileExistsAsync(srcPath(`config/${name}.ts`))) {
       console.log(`${colors.yellowBright(name)} config already exists, skipping...`);
       continue;
     }
 
     console.log(`Creating ${colors.magenta(name)} config...`);
 
-    await putFileAsync(rootPath(`config/${name}.ts`), config.content);
+    await putFileAsync(srcPath(`config/${name}.ts`), config.content);
 
     console.log(`${colors.green(name)} config created successfully`);
   }

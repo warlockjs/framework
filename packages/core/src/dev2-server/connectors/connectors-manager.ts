@@ -9,7 +9,7 @@ import type { Connector, ConnectorName } from "./types";
 
 export class ConnectorsManager {
   /**
-   * Connectors lsit
+   * Connectors list
    */
   private readonly connectors: Connector[] = [];
 
