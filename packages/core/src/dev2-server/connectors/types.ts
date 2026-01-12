@@ -45,14 +45,15 @@ export interface Connector {
   shouldRestart(changedFiles: string[]): boolean;
 }
 
-export type ConnectorName = "http" | "database" | "cache" | "storage";
+export type ConnectorName = "http" | "database" | "cache" | "storage" | "communicator";
 
 /**
  * Connector priority constants
  */
 export enum ConnectorPriority {
   DATABASE = 1,
-  CACHE = 2,
-  HTTP = 3,
-  STORAGE = 4,
+  COMMUNICATOR = 2,
+  CACHE = 3,
+  HTTP = 4,
+  STORAGE = 5,
 }

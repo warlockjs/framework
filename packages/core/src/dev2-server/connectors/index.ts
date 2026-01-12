@@ -4,6 +4,7 @@
  */
 export * from "./base-connector";
 export * from "./cache-connector";
+export * from "./communicator-connector";
 export * from "./connectors-manager";
 export * from "./database-connector";
 export * from "./http-connector";

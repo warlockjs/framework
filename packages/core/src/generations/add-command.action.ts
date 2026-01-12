@@ -1,8 +1,9 @@
 import { colors } from "@mongez/copper";
-import { fileExistsAsync } from "@mongez/fs";
+import { fileExistsAsync, putFileAsync } from "@mongez/fs";
 import { execSync } from "node:child_process";
 import { CommandActionData } from "../cli/types";
 import { rootPath } from "../utils";
+import { communicatorsConfigStub } from "./stubs";
 
 const featuresMap: Record<
   string,
@@ -10,6 +11,10 @@ const featuresMap: Record<
     dependencies: Record<string, string>;
     devDependencies?: Record<string, string>;
     description: string;
+    ejectConfig?: {
+      content: string;
+      name: string;
+    };
   }
 > = {
   react: {
@@ -63,8 +68,8 @@ const featuresMap: Record<
       "@warlock.js/postman": "~4.0.0",
     },
   },
-  postgress: {
-    description: "Installs pg for Postgress database (Cascade Package)",
+  postgres: {
+    description: "Installs pg for Postgres database (Cascade Package)",
     dependencies: {
       pg: "^8.11.0",
     },
@@ -87,6 +92,20 @@ const featuresMap: Record<
       "@aws-sdk/client-s3": "^3.955.0",
       "@aws-sdk/lib-storage": "^3.955.0",
       "@aws-sdk/s3-request-presigner": "^3.955.0",
+    },
+  },
+  herald: {
+    description: "Installs herald for message broker (Herald Package)",
+    dependencies: {
+      "@warlock.js/herald": "~4.0.0",
+      amqplib: "^0.10.0",
+    },
+    devDependencies: {
+      "@types/amqplib": "^0.10.0",
+    },
+    ejectConfig: {
+      content: communicatorsConfigStub,
+      name: "communicator",
     },
   },
 };
@@ -117,12 +136,17 @@ export async function addCommandAction(options: CommandActionData) {
 
   const dependencies: Record<string, string> = {};
   const devDependencies: Record<string, string> = {};
+  const ejectConfigs: Record<string, { content: string; name: string }> = {};
 
   for (const feature of features) {
     const featurePackages = featuresMap[feature as keyof typeof featuresMap];
     Object.assign(dependencies, featurePackages.dependencies);
     if (featurePackages.devDependencies) {
       Object.assign(devDependencies, featurePackages.devDependencies);
+    }
+
+    if (featurePackages.ejectConfig) {
+      ejectConfigs[feature] = featurePackages.ejectConfig;
     }
   }
 
@@ -154,6 +178,19 @@ export async function addCommandAction(options: CommandActionData) {
     console.log(
       `Dev dependencies installed successfully ${colors.green(Object.keys(devDependencies).join(", "))}`,
     );
+  }
+
+  for (const [name, config] of Object.entries(ejectConfigs)) {
+    if (await fileExistsAsync(rootPath(`config/${name}.ts`))) {
+      console.log(`${colors.yellowBright(name)} config already exists, skipping...`);
+      continue;
+    }
+
+    console.log(`Creating ${colors.magenta(name)} config...`);
+
+    await putFileAsync(rootPath(`config/${name}.ts`), config.content);
+
+    console.log(`${colors.green(name)} config created successfully`);
   }
 }
 

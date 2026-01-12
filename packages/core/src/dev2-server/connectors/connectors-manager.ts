@@ -1,6 +1,7 @@
 import { colors } from "@mongez/copper";
 import { devServeLog } from "../dev-logger";
 import { CacheConnector } from "./cache-connector";
+import { CommunicatorConnector } from "./communicator-connector";
 import { DatabaseConnector } from "./database-connector";
 import { HttpConnector } from "./http-connector";
 import { StorageConnector } from "./storage.connector";
@@ -18,6 +19,7 @@ export class ConnectorsManager {
   public constructor() {
     this.register(new HttpConnector());
     this.register(new DatabaseConnector());
+    this.register(new CommunicatorConnector());
     this.register(new CacheConnector());
     this.register(new StorageConnector());
   }
