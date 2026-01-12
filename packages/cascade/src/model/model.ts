@@ -430,7 +430,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * }
    * ```
    */
-  public static deletedAtColumn: string = "deletedAt";
+  public static deletedAtColumn: string | false = "deletedAt";
 
   /**
    * Trash table/collection name override.
@@ -1080,12 +1080,36 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     }
 
     // Apply model defaults from data source (only once per model class)
-    if (!this.hasOwnProperty("_defaultsApplied") && dataSource.modelDefaults) {
-      (this as any).applyModelDefaults(dataSource.modelDefaults);
+    if (!this.hasOwnProperty("_defaultsApplied")) {
+      // Merge defaults hierarchy: driver defaults < dataSource modelDefaults
+      const driverDefaults = dataSource.driver.modelDefaults || {};
+      const dataSourceDefaults = dataSource.modelDefaults || {};
+
+      // Merge with dataSource modelDefaults taking priority over driver defaults
+      const mergedDefaults = {
+        ...driverDefaults,
+        ...dataSourceDefaults,
+      };
+
+      // Apply merged defaults to model
+      if (Object.keys(mergedDefaults).length > 0) {
+        (this as any).applyModelDefaults(mergedDefaults);
+      }
+
       (this as any)._defaultsApplied = true;
     }
 
     return dataSource;
+  }
+
+  /**
+   * Generate next id and set it to current model's id
+   */
+  public async generateNextId(): Promise<number> {
+    const writer = new DatabaseWriter(this);
+    await writer.generateNextId();
+
+    return this.id!;
   }
 
   /**
@@ -1095,11 +1119,23 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * a model accesses its data source. Defaults are only applied if
    * the model doesn't already have its own value set.
    *
+   * The hierarchy is:
+   * 1. Model static property (highest priority - skipped here)
+   * 2. Database config modelDefaults (passed here)
+   * 3. Driver modelDefaults (merged before passing here)
+   * 4. Framework defaults (fallback values in the code)
+   *
    * @param defaults - Model default configuration from data source
    */
   public static applyModelDefaults(defaults: any): void {
     // Only apply defaults if model doesn't have its own value
-    // Note: autoGenerateId is not applied here as it's a driver-level setting
+
+    // ============================================================================
+    // ID Generation
+    // ============================================================================
+    if (defaults.autoGenerateId !== undefined && this.autoGenerateId === undefined) {
+      this.autoGenerateId = defaults.autoGenerateId;
+    }
     if (defaults.initialId !== undefined && this.initialId === undefined) {
       this.initialId = defaults.initialId;
     }
@@ -1112,9 +1148,38 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     if (defaults.randomIncrement !== undefined && this.randomIncrement === undefined) {
       this.randomIncrement = defaults.randomIncrement;
     }
+
+    // ============================================================================
+    // Timestamps
+    // ============================================================================
+    if (defaults.createdAtColumn !== undefined && this.createdAtColumn === undefined) {
+      this.createdAtColumn = defaults.createdAtColumn;
+    }
+    if (defaults.updatedAtColumn !== undefined && this.updatedAtColumn === undefined) {
+      this.updatedAtColumn = defaults.updatedAtColumn;
+    }
+
+    // ============================================================================
+    // Deletion
+    // ============================================================================
     if (defaults.deleteStrategy !== undefined && this.deleteStrategy === undefined) {
       this.deleteStrategy = defaults.deleteStrategy;
     }
+    if (defaults.deletedAtColumn !== undefined && this.deletedAtColumn === undefined) {
+      this.deletedAtColumn = defaults.deletedAtColumn;
+    }
+    if (defaults.trashTable !== undefined && this.trashTable === undefined) {
+      // Handle function-based trash table
+      if (typeof defaults.trashTable === "function") {
+        this.trashTable = defaults.trashTable(this.table);
+      } else {
+        this.trashTable = defaults.trashTable;
+      }
+    }
+
+    // ============================================================================
+    // Validation
+    // ============================================================================
     if (defaults.strictMode !== undefined && this.strictMode === undefined) {
       this.strictMode = defaults.strictMode;
     }
@@ -1598,6 +1663,11 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
 
   /**
    * Perform atomic operation
+   * Example
+   *
+   * ```typescript
+   * const user = await User.atomic({id: 1}, {$inc: {age: 1}})
+   * Returns user model with updated age
    */
   public static async atomic<TModel extends Model = Model>(
     this: ChildModel<TModel>,
@@ -1607,6 +1677,22 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     const dataSource = this.getDataSource();
     const result = await dataSource.driver.atomic(this.table, filter, operations);
     return result.modifiedCount;
+  }
+
+  /**
+   * Find one and update a single record that matches the provided filter and return the updated record
+   * @param filter - Filter conditions
+   * @param update - Update operations ($set, $unset, $inc)
+   * @returns The updated record or null
+   */
+  public static async findOneAndUpdate<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    filter: Record<string, unknown>,
+    update: Record<string, unknown>,
+  ): Promise<TModel | null> {
+    const dataSource = this.getDataSource();
+    const result = await dataSource.driver.findOneAndUpdate(this.table, filter, update);
+    return result ? (new this(result) as TModel) : null;
   }
 
   /**
@@ -1955,10 +2041,10 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   }
 
   /**
-   * Update a record or create it if not found (upsert).
+   * Upsert (insert or update) a record atomically.
    *
-   * DOES update existing records with new data.
-   * Useful when you want to ensure a record exists with the latest data.
+   * Uses the driver's native upsert operation for atomic insert-or-update.
+   * More efficient than updateOrCreate as it's a single database operation.
    *
    * Includes full Model features:
    * - ID generation (if creating)
@@ -1966,42 +2052,148 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * - updatedAt timestamp (always)
    * - Validation & casting
    * - Lifecycle events
-   * - Sync operations
    *
-   * @param filter - Conditions to find by
+   * @param filter - Conditions to find by (used for conflict detection)
    * @param data - Data to update or create (merged with filter)
-   * @returns Promise resolving to updated or created model
+   * @param options - Upsert options (conflictColumns for PostgreSQL, etc.)
+   * @returns Promise resolving to upserted model
    *
    * @example
    * ```typescript
-   * // Sync user from external API (update if exists, create if not)
-   * const user = await User.updateOrCreate(
+   * // PostgreSQL: upsert on unique email
+   * const user = await User.upsert(
+   *   { email: "user@example.com" },
+   *   {
+   *     email: "user@example.com",
+   *     name: "John Updated",
+   *     lastSyncedAt: new Date()
+   *   },
+   *   { conflictColumns: ["email"] }
+   * );
+   *
+   * // MongoDB: upsert by filter
+   * const user = await User.upsert(
    *   { externalId: "ext-123" },
    *   {
    *     externalId: "ext-123",
    *     name: "John Updated",
-   *     email: "john.new@example.com",
-   *     lastSyncedAt: new Date()
+   *     email: "john.new@example.com"
    *   }
    * );
-   * // User always has latest data from API
    * ```
+   */
+  public static async upsert<
+    TModel extends Model = Model,
+    TSchema extends ModelSchema = TModel extends Model<infer S> ? S : ModelSchema,
+  >(
+    this: ChildModel<TModel>,
+    filter: Partial<TSchema>,
+    data: Partial<TSchema>,
+    options?: Record<string, unknown>,
+  ): Promise<TModel> {
+    const dataSource = this.getDataSource();
+    const mergedData = { ...filter, ...data } as Record<string, unknown>;
+
+    // Create a temporary model instance for validation and data preparation
+    const tempModel = new this(mergedData as Partial<TSchema>);
+    tempModel.isNew = true;
+
+    // Emit saving event for validation context
+    await tempModel.emitEvent("saving", {
+      isInsert: true,
+      options,
+      mode: "upsert",
+    });
+
+    // Add timestamps
+    const createdAtColumn = this.createdAtColumn;
+    const updatedAtColumn = this.updatedAtColumn;
+
+    if (createdAtColumn !== false && createdAtColumn !== undefined) {
+      // Only set createdAt if not already set (for new records)
+      const createdAtKey = createdAtColumn as string;
+      if (!mergedData[createdAtKey]) {
+        mergedData[createdAtKey] = new Date();
+      }
+    }
+
+    if (updatedAtColumn !== false && updatedAtColumn !== undefined) {
+      const updatedAtKey = updatedAtColumn as string;
+      mergedData[updatedAtKey] = new Date();
+    }
+
+    // Emit saving event (using existing event name)
+    await tempModel.emitEvent("saving", { filter, data: mergedData, options, mode: "upsert" });
+
+    // Perform upsert via driver
+    const result = await dataSource.driver.upsert(this.table, filter, mergedData, options);
+
+    // Create model instance from result
+    const model = new this(result) as TModel;
+    model.isNew = false;
+    model.dirtyTracker.reset();
+
+    // Emit saved event (using existing event name)
+    await model.emitEvent("saved", { filter, data: result, options, mode: "upsert" });
+
+    return model;
+  }
+
+  /**
+   * Update a record or create it if not found (upsert).
+   *
+   * @deprecated Use `upsert()` instead for better performance and atomicity.
+   * This method is kept for backward compatibility but uses upsert internally.
+   *
+   * @param filter - Conditions to find by
+   * @param data - Data to update or create (merged with filter)
+   * @returns Promise resolving to updated or created model
    */
   public static async updateOrCreate<
     TModel extends Model = Model,
     TSchema extends ModelSchema = TModel extends Model<infer S> ? S : ModelSchema,
-  >(this: ChildModel<TModel>, filter: Partial<TSchema>, data: Partial<TSchema>): Promise<TModel> {
-    // Try to find existing record
-    const existing = await this.first(filter);
+  >(
+    this: ChildModel<TModel>,
+    filter: Partial<TSchema>,
+    data: Partial<TSchema>,
+    options?: Record<string, unknown>,
+  ): Promise<TModel> {
+    // Use upsert internally for better performance
+    return await (this as any).upsert(filter, data, options);
+  }
 
-    if (existing) {
-      // Update existing record
-      await existing.save({ merge: data });
-      return existing;
+  /**
+   * Find one and delete a record that matches the filter and return the deleted record.
+   *
+   * @param filter - Filter conditions
+   * @param options - Optional delete options
+   * @returns The deleted model instance or null if not found
+   *
+   * @example
+   * ```typescript
+   * const deleted = await User.findOneAndDelete({ id: 1 });
+   * if (deleted) {
+   *   console.log('Deleted user:', deleted.get('name'));
+   * }
+   * ```
+   */
+  public static async findOneAndDelete<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    filter: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<TModel | null> {
+    const dataSource = this.getDataSource();
+    const result = await dataSource.driver.findOneAndDelete(this.table, filter, options);
+
+    if (!result) {
+      return null;
     }
 
-    // Create new record with merged data
-    return await this.create({ ...filter, ...data } as Partial<TSchema>);
+    const model = new this(result) as TModel;
+    model.isNew = false;
+    model.dirtyTracker.reset();
+
+    return model;
   }
 
   /**

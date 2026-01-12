@@ -3,7 +3,7 @@ import { DataSource } from "../data-source/data-source";
 import { dataSourceRegistry } from "../data-source/data-source-registry";
 import { MongoDbDriver } from "../drivers/mongodb/mongodb-driver";
 import { PostgresDriver } from "../drivers/postgres";
-import type { DeleteStrategy, StrictMode } from "../types";
+import type { DeleteStrategy, ModelDefaults, StrictMode } from "../types";
 
 /**
  * Supported database driver types.
@@ -16,54 +16,18 @@ export type DatabaseDriver = "mongodb" | "postgres" | "mysql";
  * These settings will be applied to all models using this data source,
  * unless overridden by individual model static properties.
  *
- * Note: `autoGenerateId` is NOT included here as it's a driver-level
- * setting (configured in MongoDriverOptions), not a model-level one.
+ * This is a re-export of Partial<ModelDefaults> for backward compatibility
+ * and to provide clearer naming in the connection config context.
+ *
+ * The full hierarchy is:
+ * 1. Model static property (highest priority)
+ * 2. Database config modelDefaults (this type)
+ * 3. Driver defaults (e.g., snake_case for PostgreSQL, camelCase for MongoDB)
+ * 4. Framework defaults (fallback values)
+ *
+ * @see ModelDefaults for complete type definition and documentation
  */
-export type ModelDefaultConfig = {
-  /**
-   * Initial ID value for auto-generated IDs.
-   * Can be a number or a function that returns a number.
-   * @default 1
-   */
-  initialId?: number | (() => number);
-
-  /**
-   * Randomly generate the initial ID.
-   * - `true`: Random ID between 10000-499999
-   * - Function: Custom random ID generator
-   * @default false
-   */
-  randomInitialId?: boolean | (() => number);
-
-  /**
-   * Amount to increment ID by for each new record.
-   * @default 1
-   */
-  incrementIdBy?: number;
-
-  /**
-   * Randomly generate the increment amount.
-   * - `true`: Random increment between 1-10
-   * - Function: Custom random increment generator
-   * @default false
-   */
-  randomIncrement?: boolean | (() => number);
-
-  /**
-   * Default delete strategy for models.
-   * @default undefined (uses data source default or "permanent")
-   */
-  deleteStrategy?: DeleteStrategy;
-
-  /**
-   * Default validation strict mode.
-   * - `"allow"`: Allow unknown fields
-   * - `"strip"`: Strip unknown fields
-   * - `"fail"`: Fail on unknown fields
-   * @default "strip"
-   */
-  strictMode?: StrictMode;
-};
+export type ModelDefaultConfig = Partial<ModelDefaults>;
 
 /**
  * Connection options for establishing a database connection.
@@ -204,16 +168,44 @@ export type ConnectionOptions<TDriverOptions = any, TClientOptions = any> = {
   /**
    * Default model configuration for all models using this data source.
    *
-   * These settings will be applied to models that don't have their own
-   * static property overrides.
+   * These settings override driver defaults but are overridden by
+   * individual model static properties.
+   *
+   * **Configuration Hierarchy (highest to lowest):**
+   * 1. Model static property - `User.createdAtColumn = "creation_date"`
+   * 2. **modelOptions (this)** - Database-wide overrides
+   * 3. Driver defaults - PostgreSQL: snake_case, MongoDB: camelCase
+   * 4. Framework defaults - Fallback values
    *
    * @example
    * ```typescript
+   * // PostgreSQL database with custom settings
    * {
+   *   driver: "postgres",
    *   modelOptions: {
+   *     // Override PostgreSQL default (snake_case) to use camelCase
+   *     namingConvention: "camelCase",
+   *     createdAtColumn: "createdAt",
+   *     updatedAtColumn: "updatedAt",
+   *     
+   *     // ID generation settings (for MongoDB)
    *     randomIncrement: true,
    *     initialId: 1000,
+   *     
+   *     // Deletion settings
    *     deleteStrategy: "soft",
+   *     trashTable: "archive", // All models use same trash table
+   *   }
+   * }
+   *
+   * // MongoDB database with defaults
+   * {
+   *   driver: "mongodb",
+   *   modelOptions: {
+   *     // MongoDB already uses camelCase by default
+   *     randomIncrement: true,
+   *     initialId: 10000,
+   *     deleteStrategy: "trash", // Use RecycleBin
    *   }
    * }
    * ```

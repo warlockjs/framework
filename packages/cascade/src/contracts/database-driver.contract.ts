@@ -1,3 +1,4 @@
+import type { ModelDefaults } from "../types";
 import { DriverBlueprintContract } from "./driver-blueprint.contract";
 import type { MigrationDriverContract } from "./migration-driver.contract";
 import type { QueryBuilderContract } from "./query-builder.contract";
@@ -88,6 +89,29 @@ export interface DriverContract {
    */
   readonly blueprint: DriverBlueprintContract;
 
+  /**
+   * Driver-specific model defaults.
+   *
+   * These defaults are applied to all models using this driver,
+   * unless overridden by database config or model static properties.
+   *
+   * Examples:
+   * - MongoDB: camelCase naming (createdAt, updatedAt)
+   * - PostgreSQL: snake_case naming (created_at, updated_at)
+   *
+   * @example
+   * ```typescript
+   * // PostgreSQL driver
+   * readonly modelDefaults: Partial<ModelDefaults> = {
+   *   namingConvention: "snake_case",
+   *   createdAtColumn: "created_at",
+   *   updatedAtColumn: "updated_at",
+   *   timestamps: true,
+   * };
+   * ```
+   */
+  readonly modelDefaults?: Partial<ModelDefaults>;
+
   /** Whether the underlying connection is currently established. */
   readonly isConnected: boolean;
 
@@ -144,6 +168,71 @@ export interface DriverContract {
     table: string,
     filter: Record<string, unknown>,
     document: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<T | null>;
+
+  /** Find one and update a single document that matches the provided filter and return the updated document */
+  findOneAndUpdate<T = unknown>(
+    table: string,
+    filter: Record<string, unknown>,
+    update: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<T | null>;
+
+  /**
+   * Upsert (insert or update) a single document/row.
+   *
+   * If a document matching the filter exists, it will be updated.
+   * If no document matches, a new one will be inserted.
+   *
+   * @param table - Target table/collection name
+   * @param filter - Filter conditions to find existing document
+   * @param document - Document data to insert or update
+   * @param options - Driver-specific options (conflict columns for SQL, etc.)
+   * @returns The upserted document
+   *
+   * @example
+   * ```typescript
+   * // PostgreSQL: upsert on unique email
+   * await driver.upsert('users', { email: 'user@example.com' }, {
+   *   email: 'user@example.com',
+   *   name: 'John Doe',
+   *   updatedAt: new Date()
+   * }, { conflictColumns: ['email'] });
+   *
+   * // MongoDB: upsert by filter
+   * await driver.upsert('users', { email: 'user@example.com' }, {
+   *   email: 'user@example.com',
+   *   name: 'John Doe'
+   * });
+   * ```
+   */
+  upsert<T = unknown>(
+    table: string,
+    filter: Record<string, unknown>,
+    document: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<T>;
+
+  /**
+   * Find one and delete a single document that matches the provided filter and return the deleted document.
+   *
+   * @param table - Target table/collection name
+   * @param filter - Filter conditions
+   * @param options - Optional delete options
+   * @returns The deleted document or null if not found
+   *
+   * @example
+   * ```typescript
+   * const deleted = await driver.findOneAndDelete('users', { id: 1 });
+   * if (deleted) {
+   *   console.log('Deleted user:', deleted);
+   * }
+   * ```
+   */
+  findOneAndDelete<T = unknown>(
+    table: string,
+    filter: Record<string, unknown>,
     options?: Record<string, unknown>,
   ): Promise<T | null>;
 

@@ -43,3 +43,281 @@ export type StrictMode = "strip" | "fail" | "allow";
  * ```
  */
 export type DeleteStrategy = "trash" | "permanent" | "soft";
+
+/**
+ * Naming convention for database column names.
+ *
+ * Different databases have different naming conventions:
+ * - `"camelCase"` - MongoDB standard (createdAt, updatedAt, deletedAt)
+ * - `"snake_case"` - PostgreSQL/MySQL standard (created_at, updated_at, deleted_at)
+ *
+ * This affects default column names for timestamps and other system columns.
+ *
+ * @example
+ * ```typescript
+ * // PostgreSQL driver defaults
+ * namingConvention: "snake_case"
+ * // Results in: created_at, updated_at, deleted_at
+ *
+ * // MongoDB driver defaults
+ * namingConvention: "camelCase"
+ * // Results in: createdAt, updatedAt, deletedAt
+ * ```
+ */
+export type NamingConvention = "camelCase" | "snake_case";
+
+/**
+ * Unified model default configuration.
+ *
+ * These settings define default behaviors for models. The configuration
+ * follows a 4-tier hierarchy (highest to lowest precedence):
+ *
+ * 1. Model static property (explicit override)
+ * 2. Database config modelDefaults
+ * 3. Driver defaults (SQL vs NoSQL conventions)
+ * 4. Framework defaults (fallback values)
+ *
+ * @example
+ * ```typescript
+ * // PostgreSQL driver provides defaults:
+ * const postgresDefaults: ModelDefaults = {
+ *   namingConvention: "snake_case",
+ *   createdAtColumn: "created_at",
+ *   updatedAtColumn: "updated_at",
+ *   deletedAtColumn: "deleted_at",
+ *   timestamps: true,
+ *   autoGenerateId: false, // SQL handles this
+ * };
+ *
+ * // Override in database config:
+ * {
+ *   modelDefaults: {
+ *     randomIncrement: true,
+ *     initialId: 1000,
+ *     deleteStrategy: "soft",
+ *   }
+ * }
+ *
+ * // Override in specific model:
+ * class User extends Model {
+ *   public static createdAtColumn = "creation_date"; // Highest priority
+ *   public static updatedAtColumn = false; // Disable updatedAt
+ * }
+ * ```
+ */
+export type ModelDefaults = {
+  // ============================================================================
+  // ID Generation (NoSQL only)
+  // ============================================================================
+
+  /**
+   * Auto-generate incremental `id` field on insert (NoSQL only).
+   *
+   * When enabled, the ID generator creates a sequential integer ID
+   * separate from the database's native ID (_id for MongoDB).
+   *
+   * **Note:** SQL databases use native AUTO_INCREMENT and don't need this.
+   *
+   * @default true (MongoDB), false (PostgreSQL)
+   */
+  autoGenerateId?: boolean;
+
+  /**
+   * Initial ID value for the first record.
+   *
+   * @default 1
+   *
+   * @example
+   * ```typescript
+   * initialId: 1000 // Start from 1000
+   * ```
+   */
+  initialId?: number;
+
+  /**
+   * Randomly generate the initial ID.
+   *
+   * Can be:
+   * - `true`: Generate random ID between 10000-499999
+   * - Function: Custom random ID generator
+   * - `false`: Use `initialId` or default to 1
+   *
+   * @default false
+   *
+   * @example
+   * ```typescript
+   * randomInitialId: true // Random 10000-499999
+   * randomInitialId: () => Math.floor(Math.random() * 1000000)
+   * ```
+   */
+  randomInitialId?: boolean | (() => number);
+
+  /**
+   * Amount to increment ID by for each new record.
+   *
+   * @default 1
+   *
+   * @example
+   * ```typescript
+   * incrementIdBy: 5 // Increment by 5
+   * ```
+   */
+  incrementIdBy?: number;
+
+  /**
+   * Randomly generate the increment amount.
+   *
+   * Can be:
+   * - `true`: Generate random increment between 1-10
+   * - Function: Custom random increment generator
+   * - `false`: Use `incrementIdBy` or default to 1
+   *
+   * @default false
+   *
+   * @example
+   * ```typescript
+   * randomIncrement: true // Random 1-10
+   * randomIncrement: () => Math.floor(Math.random() * 100)
+   * ```
+   */
+  randomIncrement?: boolean | (() => number);
+
+  // ============================================================================
+  // Timestamps
+  // ============================================================================
+
+  /**
+   * Enable/disable automatic timestamp management.
+   *
+   * When enabled, createdAt and updatedAt are automatically managed.
+   * When disabled, no timestamps are added.
+   *
+   * @default true
+   */
+  timestamps?: boolean;
+
+  /**
+   * Column name for creation timestamp.
+   *
+   * Set to `false` to disable createdAt entirely.
+   *
+   * @default "createdAt" (MongoDB), "created_at" (PostgreSQL)
+   *
+   * @example
+   * ```typescript
+   * createdAtColumn: "creation_date"
+   * createdAtColumn: false // Disable
+   * ```
+   */
+  createdAtColumn?: string | false;
+
+  /**
+   * Column name for update timestamp.
+   *
+   * Set to `false` to disable updatedAt entirely.
+   *
+   * @default "updatedAt" (MongoDB), "updated_at" (PostgreSQL)
+   *
+   * @example
+   * ```typescript
+   * updatedAtColumn: "last_modified"
+   * updatedAtColumn: false // Disable
+   * ```
+   */
+  updatedAtColumn?: string | false;
+
+  // ============================================================================
+  // Deletion
+  // ============================================================================
+
+  /**
+   * Delete strategy for this model.
+   *
+   * Controls how models are deleted:
+   * - `"trash"` - Moves to trash collection, then deletes
+   * - `"permanent"` - Direct deletion (hard delete)
+   * - `"soft"` - Sets deletedAt timestamp (soft delete)
+   *
+   * @default "permanent"
+   *
+   * @example
+   * ```typescript
+   * deleteStrategy: "soft"
+   * ```
+   */
+  deleteStrategy?: DeleteStrategy;
+
+  /**
+   * Column name for soft delete timestamp.
+   *
+   * Used when delete strategy is "soft".
+   * Set to `false` to use a different mechanism.
+   *
+   * @default "deletedAt" (MongoDB), "deleted_at" (PostgreSQL)
+   *
+   * @example
+   * ```typescript
+   * deletedAtColumn: "archived_at"
+   * ```
+   */
+  deletedAtColumn?: string | false;
+
+  /**
+   * Trash table/collection name override.
+   *
+   * Can be:
+   * - String: Fixed name for all models
+   * - Function: Generate trash table name based on model table
+   * - `undefined`: Use default pattern `{table}Trash`
+   *
+   * Used when delete strategy is "trash".
+   *
+   * @default undefined (uses {table}Trash pattern)
+   *
+   * @example
+   * ```typescript
+   * trashTable: "RecycleBin" // All models use same trash
+   * trashTable: (table) => `archive_${table}` // Dynamic naming
+   * ```
+   */
+  trashTable?: string | ((tableName: string) => string);
+
+  // ============================================================================
+  // Validation
+  // ============================================================================
+
+  /**
+   * Strict mode behavior for unknown fields.
+   *
+   * - `"strip"`: Remove unknown fields silently (default)
+   * - `"fail"`: Throw validation error on unknown fields
+   * - `"allow"`: Allow unknown fields to pass through
+   *
+   * @default "strip"
+   *
+   * @example
+   * ```typescript
+   * strictMode: "fail" // Strict validation
+   * ```
+   */
+  strictMode?: StrictMode;
+
+  // ============================================================================
+  // Conventions
+  // ============================================================================
+
+  /**
+   * Naming convention for database column names.
+   *
+   * Affects default names for timestamps and other system columns.
+   *
+   * @default "camelCase" (MongoDB), "snake_case" (PostgreSQL)
+   *
+   * @example
+   * ```typescript
+   * namingConvention: "snake_case"
+   * // Results in: created_at, updated_at, deleted_at
+   * ```
+   */
+  namingConvention?: NamingConvention;
+};

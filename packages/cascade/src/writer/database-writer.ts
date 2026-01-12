@@ -245,19 +245,21 @@ export class DatabaseWriter implements WriterContract {
    */
   private async performInsert(options: WriterOptions): Promise<InsertResult> {
     // Generate ID if needed (NoSQL only)
-    await this.generateIdIfNeeded();
+    await this.generateNextId();
 
     // Get data to insert (already validated and casted)
     const dataToInsert = this.model.data;
 
-    // add createdAt and updatedAt to the data
-    const createdAtColumn = this.ctor.createdAtColumn ?? "createdAt";
-    if (createdAtColumn) {
+    // Add createdAt and updatedAt to the data (using resolved column names)
+    // The column names are already resolved through the hierarchy:
+    // Model static property > Database config > Driver defaults > undefined
+    const createdAtColumn = this.ctor.createdAtColumn;
+    if (createdAtColumn !== false && createdAtColumn !== undefined) {
       dataToInsert[createdAtColumn] = new Date();
     }
 
-    const updatedAtColumn = this.ctor.updatedAtColumn ?? "updatedAt";
-    if (updatedAtColumn) {
+    const updatedAtColumn = this.ctor.updatedAtColumn;
+    if (updatedAtColumn !== false && updatedAtColumn !== undefined) {
       dataToInsert[updatedAtColumn] = new Date();
     }
 
@@ -294,8 +296,10 @@ export class DatabaseWriter implements WriterContract {
       await this.model.emitEvent("updating");
     }
 
-    if (this.ctor.updatedAtColumn !== false) {
-      this.model.set(this.ctor.updatedAtColumn ?? "updatedAt", new Date());
+    // Update the updatedAt timestamp (using resolved column name)
+    const updatedAtColumn = this.ctor.updatedAtColumn;
+    if (updatedAtColumn !== false && updatedAtColumn !== undefined) {
+      this.model.set(updatedAtColumn, new Date());
     }
 
     if (options.replace) {
@@ -329,7 +333,7 @@ export class DatabaseWriter implements WriterContract {
    *
    * @private
    */
-  private async generateIdIfNeeded(): Promise<void> {
+  public async generateNextId(): Promise<void> {
     if (!this.ctor.autoGenerateId || this.model.get("id")) {
       return;
     }

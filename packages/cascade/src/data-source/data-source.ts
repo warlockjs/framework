@@ -1,6 +1,5 @@
 import type { DriverContract, IdGeneratorContract } from "../contracts";
-import type { DeleteStrategy } from "../types";
-import type { ModelDefaultConfig } from "../utils/connect-to-database";
+import type { DeleteStrategy, ModelDefaults } from "../types";
 
 /**
  * Configuration options used when registering a data source.
@@ -39,9 +38,12 @@ export type DataSourceOptions = {
   /**
    * Default model configuration for all models using this data source.
    *
+   * These defaults override driver defaults but are overridden by
+   * individual model static properties.
+   *
    * @default undefined
    */
-  modelDefaults?: ModelDefaultConfig;
+  modelDefaults?: Partial<ModelDefaults>;
 };
 
 /**
@@ -87,7 +89,7 @@ export class DataSource {
   public readonly defaultTrashTable?: string;
 
   /** Default model configuration for all models using this data source. */
-  public readonly modelDefaults?: ModelDefaultConfig;
+  public readonly modelDefaults?: Partial<ModelDefaults>;
 
   /**
    * Create a new data source.

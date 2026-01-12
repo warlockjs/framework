@@ -27,6 +27,7 @@ import type { DriverBlueprintContract } from "../../contracts/driver-blueprint.c
 import type { MigrationDriverContract } from "../../contracts/migration-driver.contract";
 import type { QueryBuilderContract } from "../../contracts/query-builder.contract";
 import type { SyncAdapterContract } from "../../contracts/sync-adapter.contract";
+import type { ModelDefaults } from "../../types";
 import { PostgresBlueprint } from "./postgres-blueprint";
 import { PostgresDialect } from "./postgres-dialect";
 import { PostgresMigrationDriver } from "./postgres-migration-driver";
@@ -106,6 +107,26 @@ export class PostgresDriver implements DriverContract {
    * SQL dialect for PostgreSQL-specific syntax.
    */
   public readonly dialect = new PostgresDialect();
+
+  /**
+   * PostgreSQL driver model defaults.
+   *
+   * PostgreSQL follows SQL conventions:
+   * - snake_case naming for columns (created_at, updated_at, deleted_at)
+   * - Native AUTO_INCREMENT for IDs (no manual generation)
+   * - Timestamps enabled by default
+   * - Permanent delete strategy (hard deletes)
+   */
+  public readonly modelDefaults: Partial<ModelDefaults> = {
+    namingConvention: "snake_case",
+    createdAtColumn: "created_at",
+    updatedAtColumn: "updated_at",
+    deletedAtColumn: "deleted_at",
+    timestamps: true,
+    autoGenerateId: false, // PostgreSQL uses SERIAL/BIGSERIAL
+    strictMode: "strip",
+    deleteStrategy: "permanent",
+  };
 
   /**
    * Connection pool instance.
@@ -348,7 +369,7 @@ export class PostgresDriver implements DriverContract {
     const result = await this.query<Record<string, unknown>>(sql, values);
 
     return {
-      document: this.deserialize(result.rows[0]),
+      document: result.rows[0],
     };
   }
 
@@ -407,9 +428,7 @@ export class PostgresDriver implements DriverContract {
 
     const result = await this.query<Record<string, unknown>>(sql, params);
 
-    return result.rows.map((row) => ({
-      document: this.deserialize(row),
-    }));
+    return result.rows as unknown as InsertResult[];
   }
 
   /**
@@ -434,6 +453,27 @@ export class PostgresDriver implements DriverContract {
     return {
       modifiedCount: result.rowCount ?? 0,
     };
+  }
+
+  /**
+   * Find one and update a single row matching the filter and return the updated row
+   * @param table - Target table name
+   * @param filter - Filter conditions
+   * @param update - Update operations ($set, $unset, $inc)
+   * @param options - Optional update options
+   * @returns The updated row or null
+   */
+  public async findOneAndUpdate<T = unknown>(
+    table: string,
+    filter: Record<string, unknown>,
+    update: UpdateOperations,
+    _options?: Record<string, unknown>,
+  ): Promise<T | null> {
+    const { sql, params } = this.buildUpdateQuery(table, filter, update, 1);
+    // Add RETURNING * to get the updated row back
+    const sqlWithReturning = `${sql} RETURNING *`;
+    const result = await this.query<T>(sqlWithReturning, params);
+    return result.rows[0] ?? null;
   }
 
   /**
@@ -494,6 +534,97 @@ export class PostgresDriver implements DriverContract {
     const result = await this.query<T>(sql, params);
 
     return result.rows[0] ?? null;
+  }
+
+  /**
+   * Upsert (insert or update) a single row.
+   *
+   * Uses PostgreSQL's INSERT ... ON CONFLICT ... DO UPDATE syntax.
+   *
+   * @param table - Target table name
+   * @param filter - Filter conditions to find existing row (used for conflict detection)
+   * @param document - Document data to insert or update
+   * @param options - Upsert options (conflictColumns for conflict target)
+   * @returns The upserted row
+   */
+  public async upsert<T = unknown>(
+    table: string,
+    filter: Record<string, unknown>,
+    document: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<T> {
+    const serialized = this.serialize(document);
+    const columns = Object.keys(serialized);
+    const values = Object.values(serialized);
+
+    if (columns.length === 0) {
+      throw new Error("Cannot upsert empty document");
+    }
+
+    const quotedTable = this.dialect.quoteIdentifier(table);
+    const quotedColumns = columns.map((c) => this.dialect.quoteIdentifier(c)).join(", ");
+    const placeholders = columns.map((_, i) => this.dialect.placeholder(i + 1)).join(", ");
+
+    // Determine conflict columns from options or filter
+    const conflictColumns = (options?.conflictColumns as string[]) ?? Object.keys(filter);
+    if (conflictColumns.length === 0) {
+      throw new Error("Upsert requires conflictColumns option or filter with columns");
+    }
+
+    const quotedConflictColumns = conflictColumns
+      .map((c) => this.dialect.quoteIdentifier(c))
+      .join(", ");
+
+    // Build UPDATE clause for ON CONFLICT
+    // Update all columns except the conflict columns (they stay the same)
+    const updateColumns = columns.filter((col) => !conflictColumns.includes(col));
+    const setClauses = updateColumns
+      .map((col, i) => {
+        const valueIndex = columns.indexOf(col) + 1;
+        return `${this.dialect.quoteIdentifier(col)} = ${this.dialect.placeholder(valueIndex)}`;
+      })
+      .join(", ");
+
+    // If there are no columns to update (all columns are conflict columns), use EXCLUDED
+    const updateClause =
+      setClauses.length > 0
+        ? setClauses
+        : columns
+            .map(
+              (col) =>
+                `${this.dialect.quoteIdentifier(col)} = EXCLUDED.${this.dialect.quoteIdentifier(col)}`,
+            )
+            .join(", ");
+
+    const sql = `INSERT INTO ${quotedTable} (${quotedColumns}) VALUES (${placeholders}) ON CONFLICT (${quotedConflictColumns}) DO UPDATE SET ${updateClause} RETURNING *`;
+
+    const result = await this.query<T>(sql, values);
+
+    return result.rows[0]! as T;
+  }
+
+  /**
+   * Find one and delete a single row matching the filter and return the deleted row.
+   *
+   * @param table - Target table name
+   * @param filter - Filter conditions
+   * @param options - Optional delete options
+   * @returns The deleted row or null
+   */
+  public async findOneAndDelete<T = unknown>(
+    table: string,
+    filter: Record<string, unknown>,
+    _options?: Record<string, unknown>,
+  ): Promise<T | null> {
+    const quotedTable = this.dialect.quoteIdentifier(table);
+    const { whereClause, whereParams } = this.buildWhereClause(filter, 1);
+
+    // Use ctid for single row deletion with RETURNING
+    const sql = `DELETE FROM ${quotedTable} WHERE ctid IN (SELECT ctid FROM ${quotedTable} ${whereClause} LIMIT 1) RETURNING *`;
+
+    const result = await this.query<T>(sql, whereParams);
+
+    return result.rows[0] ? (result.rows[0] as T) : null;
   }
 
   /**

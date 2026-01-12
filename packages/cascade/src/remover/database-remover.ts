@@ -149,8 +149,17 @@ export class DatabaseRemover implements RemoverContract {
       }
 
       case "soft": {
-        // Set deletedAt timestamp
-        const deletedAtColumn = this.ctor.deletedAtColumn ?? "deletedAt";
+        // Set deletedAt timestamp (using resolved column name)
+        const deletedAtColumn = this.ctor.deletedAtColumn;
+        
+        // Only proceed if deletedAtColumn is configured (not false or undefined)
+        if (deletedAtColumn === false || deletedAtColumn === undefined) {
+          throw new Error(
+            `Cannot perform soft delete on ${this.ctor.name}: deletedAtColumn is not configured. ` +
+            `Set a column name or use a different delete strategy.`,
+          );
+        }
+        
         const updateOperations: UpdateOperations = {
           $set: { [deletedAtColumn]: new Date() },
         };

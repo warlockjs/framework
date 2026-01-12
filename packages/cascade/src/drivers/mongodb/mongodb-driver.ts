@@ -5,6 +5,8 @@ import type {
   ClientSession,
   Db,
   DeleteOptions,
+  FindOneAndDeleteOptions,
+  FindOneAndUpdateOptions,
   InsertManyResult,
   InsertOneOptions,
   MongoClient,
@@ -29,6 +31,7 @@ import type {
   UpdateResult,
 } from "../../contracts";
 import { dataSourceRegistry } from "../../data-source/data-source-registry";
+import type { ModelDefaults } from "../../types";
 import { MongoDBBlueprint } from "./mongodb-blueprint";
 import { MongoIdGenerator } from "./mongodb-id-generator";
 import { MongoMigrationDriver } from "./mongodb-migration-driver";
@@ -129,6 +132,27 @@ export class MongoDbDriver implements DriverContract {
    * The name of this driver.
    */
   public readonly name = "mongodb";
+
+  /**
+   * MongoDB driver model defaults.
+   *
+   * MongoDB follows NoSQL conventions:
+   * - camelCase naming for fields (createdAt, updatedAt, deletedAt)
+   * - Manual ID generation (auto-increment id field separate from _id)
+   * - Timestamps enabled by default
+   * - Trash delete strategy with per-collection trash tables
+   */
+  public readonly modelDefaults: Partial<ModelDefaults> = {
+    namingConvention: "camelCase",
+    createdAtColumn: "createdAt",
+    updatedAtColumn: "updatedAt",
+    deletedAtColumn: "deletedAt",
+    timestamps: true,
+    autoGenerateId: true, // MongoDB needs manual ID generation
+    strictMode: "strip",
+    deleteStrategy: "trash",
+    trashTable: (table) => `${table}Trash`, // Per-collection trash (usersTrash, productsTrash)
+  };
 
   /**
    * Create a new MongoDB driver using the supplied connection options.
@@ -361,6 +385,78 @@ export class MongoDbDriver implements DriverContract {
     const result = await collection.findOneAndReplace(filter, document as Record<string, unknown>);
 
     return result?.value as T | null;
+  }
+
+  /**
+   * Find one and update a single document that matches the provided filter and return the updated document
+   */
+  public async findOneAndUpdate<T = unknown>(
+    table: string,
+    filter: Record<string, unknown>,
+    update: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<T | null> {
+    const collection = this.getDatabaseInstance().collection(table);
+    const mongoOptions = this.withSession<FindOneAndUpdateOptions>(options);
+    const result = await collection.findOneAndUpdate(filter, update as Record<string, unknown>, {
+      returnDocument: "after",
+      ...mongoOptions,
+    });
+
+    return result as T | null;
+  }
+
+  /**
+   * Upsert (insert or update) a single document.
+   *
+   * Uses MongoDB's findOneAndUpdate with upsert option.
+   *
+   * @param table - Target collection name
+   * @param filter - Filter conditions to find existing document
+   * @param document - Document data to insert or update
+   * @param options - Optional upsert options
+   * @returns The upserted document
+   */
+  public async upsert<T = unknown>(
+    table: string,
+    filter: Record<string, unknown>,
+    document: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<T> {
+    const collection = this.getDatabaseInstance().collection(table);
+    const mongoOptions = this.withSession<FindOneAndUpdateOptions>(options);
+
+    // Use $set to update all fields from document
+    const update = { $set: document };
+
+    const result = await collection.findOneAndUpdate(filter, update, {
+      upsert: true,
+      returnDocument: "after",
+      ...mongoOptions,
+    });
+
+    return result as T;
+  }
+
+  /**
+   * Find one and delete a single document that matches the provided filter and return the deleted document.
+   *
+   * @param table - Target collection name
+   * @param filter - Filter conditions
+   * @param options - Optional delete options
+   * @returns The deleted document or null if not found
+   */
+  public async findOneAndDelete<T = unknown>(
+    table: string,
+    filter: Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<T | null> {
+    const collection = this.getDatabaseInstance().collection(table);
+    const mongoOptions = this.withSession<FindOneAndDeleteOptions>(options);
+
+    const result = await collection.findOneAndDelete(filter, mongoOptions || {});
+
+    return result as T | null;
   }
 
   /**
