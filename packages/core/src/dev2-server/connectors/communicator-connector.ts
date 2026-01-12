@@ -1,5 +1,4 @@
 import config from "@mongez/config";
-import { communicatorRegistry, connectToCommunicator } from "@warlock.js/herald";
 import { log } from "@warlock.js/logger";
 import { BaseConnector } from "./base-connector";
 import { ConnectorPriority } from "./types";
@@ -32,6 +31,8 @@ export class CommunicatorConnector extends BaseConnector {
     }
 
     try {
+      const { connectToCommunicator } = await import("@warlock.js/herald");
+
       log.info(
         `communicator.${communicatorConfig.driver}`,
         "connection",
@@ -64,6 +65,8 @@ export class CommunicatorConnector extends BaseConnector {
     }
 
     try {
+      const { communicatorRegistry } = await import("@warlock.js/herald");
+
       // Disconnect all registered communicators
       const communicators = communicatorRegistry.getAll();
 

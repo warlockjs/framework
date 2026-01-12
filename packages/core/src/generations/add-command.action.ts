@@ -146,7 +146,7 @@ export async function addCommandAction(options: CommandActionData) {
     }
 
     if (featurePackages.ejectConfig) {
-      ejectConfigs[feature] = featurePackages.ejectConfig;
+      ejectConfigs[featurePackages.ejectConfig.name] = featurePackages.ejectConfig;
     }
   }
 
