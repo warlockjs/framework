@@ -256,28 +256,33 @@ export class MongoDbDriver implements DriverContract {
 
     try {
       log.info(
-        "database",
-        "connection[MongoDB]",
+        "database.mongodb",
+        "connection",
         `Connecting to database ${colors.bold(colors.yellowBright(this.config.database))}`,
       );
       await client.connect();
       this.client = client;
       this.database = client.db(this.config.database);
       this.connected = true;
-      log.success("database", "connection[MongoDB]", "Connected to database");
+      log.success("database.mongodb", "connection", "Connected to database");
 
       client.on("close", () => {
         if (this.connected) {
           this.connected = false;
           this.emit("disconnected");
-          log.warn("database", "connection[MongoDB]", "Disconnected from database");
+          log.warn("database.mongodb", "connection", "Disconnected from database");
         }
       });
 
       this.emit("connected");
-    } catch (error) {
+    } catch (error: any) {
       await client.close().catch(() => undefined);
       this.emit("disconnected");
+      log.error(
+        "database.mongodb",
+        "connection",
+        `Failed to connect to database: ${error.message}`,
+      );
       throw error;
     }
   }

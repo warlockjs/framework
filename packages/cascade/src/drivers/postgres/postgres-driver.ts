@@ -224,8 +224,8 @@ export class PostgresDriver implements DriverContract {
       };
 
       log.info(
-        "database",
-        "connection[Postgress]",
+        "database.postgres",
+        "connection",
         `Connecting to database ${colors.bold(colors.yellowBright(this.config.database))}`,
       );
 
@@ -236,15 +236,15 @@ export class PostgresDriver implements DriverContract {
       client.release();
 
       log.success(
-        "database",
-        "connection[Postgress]",
+        "database.postgres",
+        "connection",
         `Connected to database ${colors.bold(colors.yellowBright(this.config.database))}`,
       );
 
       this._isConnected = true;
       this.emit("connected");
     } catch (error) {
-      log.error("database", "connection[Postgress]", "Failed to connect to database");
+      log.error("database.postgres", "connection", "Failed to connect to database");
       throw error;
     }
   }
