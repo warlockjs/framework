@@ -1,5 +1,5 @@
 import { Communicator, communicatorRegistry } from "../communicators";
-import type { CommunicatorDriverContract } from "../contracts";
+import type { ChannelContract, CommunicatorDriverContract } from "../contracts";
 import type { ConnectionOptions, RabbitMQConnectionOptions } from "../types";
 
 /**
@@ -134,4 +134,20 @@ export async function connectToCommunicator(options: ConnectionOptions): Promise
  */
 export function communicators(name?: string): Communicator {
   return communicatorRegistry.get(name);
+}
+
+/**
+ * Get channel instance for the given name from default communicator
+ * @param name - Channel name
+ * @returns Channel instance
+ * @throws MissingCommunicatorError if communicator not found
+ *
+ * @example
+ * ```typescript
+ * const channel = communicatorChannel("user.created");
+ * await channel.publish({ userId: 1 });
+ * ```
+ */
+export function communicatorChannel(name: string): ChannelContract {
+  return communicators().channel(name);
 }
