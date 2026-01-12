@@ -7,7 +7,7 @@
  * - And variants (exceptCurrentUser, exceptCurrentId)
  */
 
-import type { ChildModel, Model } from "@warlock.js/cascade";
+import { getModelFromRegistry, type ChildModel, type Model } from "@warlock.js/cascade";
 import type { SealPlugin } from "@warlock.js/seal";
 import { NumberValidator, ScalarValidator, StringValidator } from "@warlock.js/seal";
 import type {
@@ -27,6 +27,10 @@ import {
   uniqueRule,
 } from "../database";
 
+function resolveModel(model: ChildModel<Model> | string): ChildModel<Model> {
+  return typeof model === "string" ? getModelFromRegistry(model)! : model;
+}
+
 /**
  * Database validation plugin for Seal
  */
@@ -41,7 +45,7 @@ export const databasePlugin: SealPlugin = {
       /** Value must be unique in database */
       unique(
         this: ScalarValidator,
-        model: ChildModel<Model>,
+        model: ChildModel<Model> | string,
         optionsList?: Partial<UniqueRuleOptions> & {
           errorMessage?: string;
         },
@@ -50,7 +54,7 @@ export const databasePlugin: SealPlugin = {
         const rule = this.addRule(uniqueRule, errorMessage);
         rule.context.options = {
           ...options,
-          Model: model,
+          Model: resolveModel(model),
         };
         return this;
       },
@@ -58,7 +62,7 @@ export const databasePlugin: SealPlugin = {
       /** Value must be unique in database except current user */
       uniqueExceptCurrentUser(
         this: ScalarValidator,
-        model: ChildModel<Model>,
+        model: ChildModel<Model> | string,
         optionsList?: Partial<UniqueExceptCurrentUserRuleOptions> & {
           errorMessage?: string;
         },
@@ -67,7 +71,7 @@ export const databasePlugin: SealPlugin = {
         const rule = this.addRule(uniqueExceptCurrentUserRule, errorMessage);
         rule.context.options = {
           ...options,
-          Model: model,
+          Model: resolveModel(model),
         };
         return this;
       },
@@ -75,7 +79,7 @@ export const databasePlugin: SealPlugin = {
       /** Value must be unique in database except current id */
       uniqueExceptCurrentId(
         this: ScalarValidator,
-        model: ChildModel<Model>,
+        model: ChildModel<Model> | string,
         optionsList?: Partial<UniqueExceptCurrentIdRuleOptions> & {
           errorMessage?: string;
         },
@@ -84,7 +88,7 @@ export const databasePlugin: SealPlugin = {
         const rule = this.addRule(uniqueExceptCurrentIdRule, errorMessage);
         rule.context.options = {
           ...options,
-          Model: model,
+          Model: resolveModel(model),
         };
         return this;
       },
@@ -92,7 +96,7 @@ export const databasePlugin: SealPlugin = {
       /** Value must exist in database */
       exists(
         this: ScalarValidator,
-        model: ChildModel<Model>,
+        model: ChildModel<Model> | string,
         optionsList?: Partial<ExistsRuleOptions> & {
           errorMessage?: string;
         },
@@ -101,7 +105,7 @@ export const databasePlugin: SealPlugin = {
         const rule = this.addRule(existsRule, errorMessage);
         rule.context.options = {
           ...options,
-          Model: model,
+          Model: resolveModel(model),
         };
         return this;
       },
@@ -109,7 +113,7 @@ export const databasePlugin: SealPlugin = {
       /** Value must exist in database except current user */
       existsExceptCurrentUser(
         this: ScalarValidator,
-        model: ChildModel<Model>,
+        model: ChildModel<Model> | string,
         optionsList?: Partial<ExistsExceptCurrentUserRuleOptions> & {
           errorMessage?: string;
         },
@@ -118,7 +122,7 @@ export const databasePlugin: SealPlugin = {
         const rule = this.addRule(existsExceptCurrentUserRule, errorMessage);
         rule.context.options = {
           ...options,
-          Model: model,
+          Model: resolveModel(model),
         };
         return this;
       },
@@ -126,7 +130,7 @@ export const databasePlugin: SealPlugin = {
       /** Value must exists in database except current id */
       existsExceptCurrentId(
         this: ScalarValidator,
-        model: ChildModel<Model>,
+        model: ChildModel<Model> | string,
         optionsList?: Partial<ExistsExceptCurrentIdRuleOptions> & {
           errorMessage?: string;
         },
@@ -135,7 +139,7 @@ export const databasePlugin: SealPlugin = {
         const rule = this.addRule(existsExceptCurrentIdRule, errorMessage);
         rule.context.options = {
           ...options,
-          Model: model,
+          Model: resolveModel(model),
         };
         return this;
       },

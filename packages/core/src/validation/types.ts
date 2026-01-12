@@ -37,7 +37,7 @@ declare module "@warlock.js/seal" {
   interface ScalarValidator {
     /** Value must be unique in database */
     unique(
-      model: ChildModel<Model>,
+      model: ChildModel<Model> | string,
       optionsList?: Partial<UniqueRuleOptions> & {
         errorMessage?: string;
       },
@@ -45,7 +45,7 @@ declare module "@warlock.js/seal" {
 
     /** Value must be unique in database except current user */
     uniqueExceptCurrentUser(
-      model: ChildModel<Model>,
+      model: ChildModel<Model> | string,
       optionsList?: Partial<UniqueExceptCurrentUserRuleOptions> & {
         errorMessage?: string;
       },
@@ -53,7 +53,7 @@ declare module "@warlock.js/seal" {
 
     /** Value must be unique in database except current id */
     uniqueExceptCurrentId(
-      model: ChildModel<Model>,
+      model: ChildModel<Model> | string,
       optionsList?: Partial<UniqueExceptCurrentIdRuleOptions> & {
         errorMessage?: string;
       },
@@ -61,7 +61,7 @@ declare module "@warlock.js/seal" {
 
     /** Value must exist in database */
     exists(
-      model: ChildModel<Model>,
+      model: ChildModel<Model> | string,
       optionsList?: Partial<ExistsRuleOptions> & {
         errorMessage?: string;
       },
@@ -69,7 +69,7 @@ declare module "@warlock.js/seal" {
 
     /** Value must exist in database except current user */
     existsExceptCurrentUser(
-      model: ChildModel<Model>,
+      model: ChildModel<Model> | string,
       optionsList?: Partial<ExistsExceptCurrentUserRuleOptions> & {
         errorMessage?: string;
       },
@@ -77,7 +77,7 @@ declare module "@warlock.js/seal" {
 
     /** Value must exists in database except current id */
     existsExceptCurrentId(
-      model: ChildModel<Model>,
+      model: ChildModel<Model> | string,
       optionsList?: Partial<ExistsExceptCurrentIdRuleOptions> & {
         errorMessage?: string;
       },
