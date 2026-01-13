@@ -1,6 +1,6 @@
 import { get, merge, only, set, unset } from "@mongez/reinforcements";
 import type { ObjectValidator } from "@warlock.js/seal";
-import type { RemoverResult, WriterOptions } from "../contracts";
+import type { RemoverResult, UpdateOperations, WriterOptions } from "../contracts";
 import { QueryBuilderContract, WhereCallback, WhereObject, WhereOperator } from "../contracts";
 import type { DataSource } from "../data-source/data-source";
 import { dataSourceRegistry } from "../data-source/data-source-registry";
@@ -542,6 +542,11 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   public loadedRelations: Map<string, any> = new Map();
 
   /**
+   * Column name for active status.
+   */
+  protected isActiveColumn = "isActive";
+
+  /**
    * Lazily load one or more relations for this model instance.
    *
    * This method loads relations on-demand after the model has been fetched.
@@ -748,9 +753,9 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     field: TKey,
     defaultValue: TSchema[TKey],
   ): TSchema[TKey];
-  public get(field: string): unknown;
-  public get(field: string, defaultValue: unknown): unknown;
-  public get(field: string, defaultValue?: unknown): unknown {
+  public get<Type extends unknown = any>(field: string): Type;
+  public get<Type extends unknown = any>(field: string, defaultValue: Type): Type;
+  public get(field: string, defaultValue?: unknown): any {
     return get(this.data, field, defaultValue);
   }
 
@@ -897,6 +902,13 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     this.data = merge(this.data, values) as TSchema;
     this.dirtyTracker.mergeChanges(values);
     return this;
+  }
+
+  /**
+   * Determine if current model is active
+   */
+  public get isActive(): boolean {
+    return this.get<boolean>(this.isActiveColumn);
   }
 
   /**
@@ -1685,13 +1697,26 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * @param update - Update operations ($set, $unset, $inc)
    * @returns The updated record or null
    */
-  public static async findOneAndUpdate<TModel extends Model = Model>(
+  public static async findAndUpdate<TModel extends Model = Model>(
     this: ChildModel<TModel>,
     filter: Record<string, unknown>,
-    update: Record<string, unknown>,
+    update: UpdateOperations,
   ): Promise<TModel | null> {
     const dataSource = this.getDataSource();
     const result = await dataSource.driver.findOneAndUpdate(this.table, filter, update);
+    return result ? (new this(result) as TModel) : null;
+  }
+
+  /**
+   * Find and replace the entire document that matches the provided filter and return the replaced document
+   */
+  public static async findAndReplace<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    filter: Record<string, unknown>,
+    document: Record<string, unknown>,
+  ): Promise<TModel | null> {
+    const dataSource = this.getDataSource();
+    const result = await dataSource.driver.replace(this.table, filter, document);
     return result ? (new this(result) as TModel) : null;
   }
 

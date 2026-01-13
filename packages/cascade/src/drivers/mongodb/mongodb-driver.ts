@@ -28,6 +28,7 @@ import type {
   MigrationDriverContract,
   QueryBuilderContract,
   SyncAdapterContract,
+  UpdateOperations,
   UpdateResult,
 } from "../../contracts";
 import { dataSourceRegistry } from "../../data-source/data-source-registry";
@@ -398,7 +399,7 @@ export class MongoDbDriver implements DriverContract {
   public async findOneAndUpdate<T = unknown>(
     table: string,
     filter: Record<string, unknown>,
-    update: Record<string, unknown>,
+    update: UpdateOperations,
     options?: Record<string, unknown>,
   ): Promise<T | null> {
     const collection = this.getDatabaseInstance().collection(table);
