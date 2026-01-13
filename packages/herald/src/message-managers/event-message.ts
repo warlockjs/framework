@@ -7,7 +7,7 @@
 import { type ObjectValidator } from "@warlock.js/seal";
 import { randomUUID } from "crypto";
 
-export abstract class EventMessage {
+export abstract class EventMessage<TPayload = Record<string, any>> {
   /**
    * Event Name
    */
@@ -36,14 +36,24 @@ export abstract class EventMessage {
   /**
    * Data that will be sent with the event (Payload)
    */
-  public abstract toJSON(): Record<string, any>;
+  public toJSON(): TPayload {
+    return this.data as TPayload;
+  }
+
+  public constructor(protected data?: TPayload) {}
 
   /**
    * Serialize the event to be ready for publishing
    */
   public serialize() {
+    if (!this.data && !this.toJSON) {
+      throw new Error("No data or toJSON method provided");
+    }
+
+    const payload = this.toJSON();
+
     return {
-      payload: this.toJSON(),
+      payload,
       metadata: this.metadata,
       messageId: this.messageId ?? randomUUID(),
       eventName: this.eventName,
