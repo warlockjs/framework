@@ -124,7 +124,7 @@ export interface CommunicatorDriverContract {
   /**
    * Publish the given event message
    */
-  publish(event: EventMessage): void;
+  publish<TPayload = Record<string, any>>(event: EventMessage<TPayload>): void;
 
   /**
    * Get or create a channel

@@ -1,5 +1,6 @@
 import { Communicator, communicatorRegistry } from "../communicators";
 import type { ChannelContract, CommunicatorDriverContract } from "../contracts";
+import { EventConsumerClass, EventMessage } from "../message-managers";
 import type { ChannelOptions, ConnectionOptions, RabbitMQConnectionOptions } from "../types";
 
 /**
@@ -148,6 +149,45 @@ export function communicators(name?: string): Communicator {
  * await channel.publish({ userId: 1 });
  * ```
  */
-export function communicatorChannel<TPayload = unknown>(name: string, options?: ChannelOptions<TPayload>): ChannelContract<TPayload> {
+export function communicatorChannel<TPayload = unknown>(
+  name: string,
+  options?: ChannelOptions<TPayload>,
+): ChannelContract<TPayload> {
   return communicators().channel<TPayload>(name, options);
+}
+
+/**
+ * Publish the given
+ * @param event - Event message to publish
+ * @returns Promise that resolves when the event is published
+ * @throws Error if the event is not published
+ *
+ * @example
+ * ```typescript
+ * await publishEvent(new UserUpdatedEvent({ id: 1, name: "John Doe" }));
+ * ```
+ */
+export async function publishEvent<TPayload = Record<string, any>>(event: EventMessage<TPayload>) {
+  return communicators().publish(event);
+}
+
+/**
+ * Subscribe the given consumer to the default communicator
+ * @param Consumer - Event consumer class
+ * @returns Function to unsubscribe the consumer
+ * @throws Error if the consumer is not subscribed
+ *
+ * @example
+ * ```typescript
+ * await subscribeConsumer(UserUpdatedConsumer);
+ * });
+ *
+ * // Unsubscribe
+ * await unsubscribeConsumer(UserUpdatedConsumer);
+ * ```
+ */
+export async function subscribeConsumer<TPayload = Record<string, any>>(
+  Consumer: EventConsumerClass<TPayload>,
+) {
+  return communicators().subscribe(Consumer);
 }

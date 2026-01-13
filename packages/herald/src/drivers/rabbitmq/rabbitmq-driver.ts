@@ -148,7 +148,7 @@ export class RabbitMQDriver implements CommunicatorDriverContract {
   /**
    * Publish the given event message
    */
-  public publish(event: EventMessage): void {
+  public publish<TPayload = Record<string, any>>(event: EventMessage<TPayload>): void {
     this.channels.get(event.eventName)?.publish(event.serialize());
   }
 
