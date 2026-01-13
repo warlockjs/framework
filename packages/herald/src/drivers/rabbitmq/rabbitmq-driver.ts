@@ -1,5 +1,7 @@
 import { EventEmitter } from "node:events";
 import type { ChannelContract, CommunicatorDriverContract } from "../../contracts";
+import { EventMessage } from "../../message-managers/event-message";
+import { EventConsumerClass } from "../../message-managers/types";
 import type {
   ChannelOptions,
   CommunicatorEvent,
@@ -7,6 +9,7 @@ import type {
   HealthCheckResult,
   RabbitMQConnectionOptions,
 } from "../../types";
+import { prepareConsumerSubscription } from "./../../message-managers/prepare-consumer-subscription";
 import { RabbitMQChannel } from "./rabbitmq-channel";
 
 // ============================================================
@@ -83,6 +86,8 @@ loadAmqplibModule();
 export class RabbitMQDriver implements CommunicatorDriverContract {
   public readonly name = "rabbitmq" as const;
 
+  public readonly consumers: EventConsumerClass[] = [];
+
   private readonly options: RabbitMQConnectionOptions;
   private readonly events = new EventEmitter();
   private readonly channels = new Map<string, ChannelContract<any>>();
@@ -105,6 +110,46 @@ export class RabbitMQDriver implements CommunicatorDriverContract {
    */
   public get isConnected(): boolean {
     return this._isConnected;
+  }
+
+  /**
+   * Subscribe the given consumer class to the driver
+   *
+   * @param consumer - Consumer class to subscribe
+   *
+   * @example
+   * ```typescript
+   * driver.subscribe(UserUpdatedConsumer);
+   * ```
+   */
+  public subscribe(Consumer: EventConsumerClass): void {
+    if (this.isConnected) {
+      this.channel(Consumer.eventName).subscribe(prepareConsumerSubscription(Consumer), {
+        consumerId: Consumer.consumerId,
+      });
+    } else {
+      this.consumers.push(Consumer);
+    }
+  }
+
+  /**
+   * Unsubscribe the given consumer
+   */
+  public unsubscribe(Consumer: EventConsumerClass): void {
+    if (this.isConnected) {
+      this.channel(Consumer.eventName).unsubscribeById(Consumer.consumerId);
+    }
+    const index = this.consumers.indexOf(Consumer);
+    if (index > -1) {
+      this.consumers.splice(index, 1);
+    }
+  }
+
+  /**
+   * Publish the given event message
+   */
+  public publish(event: EventMessage): void {
+    this.channels.get(event.eventName)?.publish(event.serialize());
   }
 
   /**
@@ -149,6 +194,12 @@ export class RabbitMQDriver implements CommunicatorDriverContract {
 
       this._isConnected = true;
       this.events.emit("connected");
+
+      for (const consumer of this.consumers) {
+        this.subscribe(consumer);
+      }
+
+      this.consumers.length = 0;
 
       // Handle connection close
       this.connection.on("close", () => {
@@ -287,7 +338,8 @@ export class RabbitMQDriver implements CommunicatorDriverContract {
   public async stopConsuming(): Promise<void> {
     // Cancel all consumers
     for (const channel of this.channels.values()) {
-      // Channel implementations should handle this
+      // Channel implementations should handle this    // Need to add pauseAllSubscriptions() to RabbitMQChannel
+      // await channel.stopConsuming();
     }
   }
 

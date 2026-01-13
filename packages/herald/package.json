@@ -1,14 +1,14 @@
 {
     "name": "@warlock.js/herald",
-    "version": "4.0.102",
+    "version": "4.0.103",
     "description": "Message bus/communicators for RabbitMQ, Kafka, and more",
     "main": "./cjs/index.js",
     "dependencies": {
         "@mongez/copper": "^1.0.1",
         "@mongez/events": "^2.1.0",
         "@mongez/reinforcements": "^2.3.17",
-        "@warlock.js/logger": "4.0.102",
-        "@warlock.js/seal": "4.0.102"
+        "@warlock.js/logger": "4.0.103",
+        "@warlock.js/seal": "4.0.103"
     },
     "scripts": {
         "update": "npx ncu -u",

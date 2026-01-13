@@ -1,6 +1,8 @@
 import type { CommunicatorDriverContract } from "../contracts";
-import type { ChannelOptions } from "../types";
 import type { ChannelContract } from "../contracts/channel.contract";
+import { EventMessage } from "../message-managers/event-message";
+import { EventConsumerClass } from "../message-managers/types";
+import type { ChannelOptions } from "../types";
 
 /**
  * Options for creating a Communicator
@@ -50,6 +52,22 @@ export class Communicator {
     this.name = options.name;
     this.driver = options.driver;
     this.isDefault = Boolean(options.isDefault);
+  }
+
+  /**
+   * Subscribe the given consumer
+   */
+  public subscribe(consumer: EventConsumerClass) {
+    this.driver.subscribe(consumer);
+
+    return () => this.driver.unsubscribe(consumer);
+  }
+
+  /**
+   * Publish the given event message
+   */
+  public publish(event: EventMessage) {
+    this.driver.publish(event);
   }
 
   /**

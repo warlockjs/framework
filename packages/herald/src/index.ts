@@ -52,3 +52,6 @@ export * from "./drivers";
 
 // Export utilities (connectToCommunicator, communicators function)
 export * from "./utils";
+
+// Export message managers
+export * from "./message-managers";

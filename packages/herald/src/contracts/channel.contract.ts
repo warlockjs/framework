@@ -1,13 +1,12 @@
 import type {
   ChannelOptions,
   ChannelStats,
-  Message,
   MessageHandler,
   PublishOptions,
   RequestOptions,
   ResponseHandler,
-  Subscription,
   SubscribeOptions,
+  Subscription,
 } from "../types";
 
 /**
@@ -108,6 +107,18 @@ export interface ChannelContract<TPayload = unknown> {
   subscribe(handler: MessageHandler<TPayload>, options?: SubscribeOptions): Promise<Subscription>;
 
   /**
+   * Unsubscribe a consumer by its ID
+   *
+   * @param consumerId - The consumer ID to unsubscribe
+   *
+   * @example
+   * ```typescript
+   * await channel.unsubscribeById("consumer-uuid");
+   * ```
+   */
+  unsubscribeById(consumerId: string): Promise<void>;
+
+  /**
    * Request-Response pattern (RPC)
    *
    * Publishes a message and waits for a response.
@@ -143,7 +154,9 @@ export interface ChannelContract<TPayload = unknown> {
    * });
    * ```
    */
-  respond<TResponse = unknown>(handler: ResponseHandler<TPayload, TResponse>): Promise<Subscription>;
+  respond<TResponse = unknown>(
+    handler: ResponseHandler<TPayload, TResponse>,
+  ): Promise<Subscription>;
 
   /**
    * Get channel statistics

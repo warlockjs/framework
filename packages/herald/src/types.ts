@@ -92,6 +92,8 @@ export type DeadLetterOptions = {
  * Options when subscribing to a channel
  */
 export type SubscribeOptions = {
+  /** Consumer ID for tracking subscriptions (used for unsubscription) */
+  consumerId?: string;
   /** Consumer group/tag name */
   group?: string;
   /** Number of messages to prefetch (concurrency) */
@@ -207,7 +209,7 @@ export type ChannelOptions<TPayload = unknown> = {
   messageTtl?: number;
   /** Maximum number of messages in queue */
   maxLength?: number;
-  /** Seal schema for validation */
+  /** Seal schema for validation before message is published */
   schema?: BaseValidator;
 };
 

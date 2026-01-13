@@ -1,11 +1,13 @@
-import type { ChannelContract } from "./channel.contract";
+import { type EventMessage } from "../message-managers/event-message";
+import { EventConsumerClass } from "../message-managers/types";
 import type {
   ChannelOptions,
+  CommunicatorDriverType,
   CommunicatorEvent,
   CommunicatorEventListener,
-  CommunicatorDriverType,
   HealthCheckResult,
 } from "../types";
+import type { ChannelContract } from "./channel.contract";
 
 /**
  * Communicator Driver Contract
@@ -94,6 +96,35 @@ export interface CommunicatorDriverContract {
    * @param listener - Callback to remove
    */
   off(event: CommunicatorEvent, listener: CommunicatorEventListener): void;
+
+  /**
+   * Subscribe the given consumer class to the driver
+   *
+   * @param consumer - Consumer class to subscribe
+   *
+   * @example
+   * ```typescript
+   * driver.subscribe(UserUpdatedConsumer);
+   * ```
+   */
+  subscribe(consumer: EventConsumerClass): void;
+
+  /**
+   * Unsubscribe the given consumer class from the driver
+   *
+   * @param consumer - Consumer class to unsubscribe
+   *
+   * @example
+   * ```typescript
+   * driver.unsubscribe(UserUpdatedConsumer);
+   * ```
+   */
+  unsubscribe(consumer: EventConsumerClass): void;
+
+  /**
+   * Publish the given event message
+   */
+  publish(event: EventMessage): void;
 
   /**
    * Get or create a channel

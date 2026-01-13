@@ -135,7 +135,8 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
   ): Promise<Subscription> {
     await this.assert();
 
-    const subscriptionId = randomUUID();
+    // Use consumerId from options if provided, otherwise generate a random one
+    const subscriptionId = options?.consumerId ?? randomUUID();
 
     // Set prefetch if specified
     if (options?.prefetch) {
@@ -165,16 +166,11 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
 
           // Validate with schema if provided
           if (this.options.schema) {
-            const schemaContext = {
+            const context = {
               allValues: payload,
-              parent: null,
               value: payload,
-              key: "",
-              path: "",
-              translateRule: (t: any) => t.rule?.defaultErrorMessage ?? "Validation failed",
-              translateAttribute: (t: any) => t.attribute ?? "",
             };
-            const result = await this.options.schema.validate(payload, schemaContext);
+            const result = await v.validate(this.options.schema, payload, { context });
             if (!result.isValid) {
               // Reject invalid messages
               this.amqpChannel.nack(msg, false, false);
@@ -309,6 +305,24 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
     this.subscriptions.set(subscriptionId, subscription);
 
     return subscription;
+  }
+
+  /**
+   * Unsubscribe by consumer ID
+   */
+  public async unsubscribeById(consumerId: string): Promise<void> {
+    const subscription = this.subscriptions.get(consumerId);
+    if (subscription) {
+      await subscription.unsubscribe();
+      this.subscriptions.delete(consumerId);
+    }
+  }
+
+  /**
+   * Stop consuming subscriptions
+   */
+  public async stopConsuming() {
+    this.amqpChannel.pauseAllSubscriptions();
   }
 
   /**

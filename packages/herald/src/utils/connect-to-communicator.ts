@@ -1,6 +1,6 @@
 import { Communicator, communicatorRegistry } from "../communicators";
 import type { ChannelContract, CommunicatorDriverContract } from "../contracts";
-import type { ConnectionOptions, RabbitMQConnectionOptions } from "../types";
+import type { ChannelOptions, ConnectionOptions, RabbitMQConnectionOptions } from "../types";
 
 /**
  * Connect to a message broker and register the communicator.
@@ -148,6 +148,6 @@ export function communicators(name?: string): Communicator {
  * await channel.publish({ userId: 1 });
  * ```
  */
-export function communicatorChannel(name: string): ChannelContract {
-  return communicators().channel(name);
+export function communicatorChannel<TPayload = unknown>(name: string, options?: ChannelOptions<TPayload>): ChannelContract<TPayload> {
+  return communicators().channel<TPayload>(name, options);
 }
