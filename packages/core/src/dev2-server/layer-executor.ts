@@ -71,32 +71,31 @@ export class LayerExecutor {
 
     try {
       hmrFiles.forEach((file) => {
-        const dependentCount = this.dependencyGraph.getInvalidationChain(file).length - 1;
-        const fileSystem = filesMap.get(file);
-        if (fileSystem) {
-          this.moduleLoader.clearModuleCache(fileSystem.absolutePath);
-          this.moduleLoader.cleanupFileModule(fileSystem);
-          __clearModuleVersion(fileSystem.cachePath);
-          exportAnalyzer.clearCache(fileSystem.relativePath);
+        const dependentFiles = this.dependencyGraph.getInvalidationChain(file);
+        for (const dependentFile of dependentFiles) {
+          // skip the file itself as it will be cleared by reloadModule method
+          // in the module loader
+          if (dependentFile === file) continue;
+
+          const fileSystem = filesMap.get(dependentFile);
+          if (fileSystem) {
+            this.moduleLoader.clearModuleCache(fileSystem.absolutePath);
+            this.moduleLoader.cleanupFileModule(fileSystem);
+            __clearModuleVersion(fileSystem.cachePath);
+            exportAnalyzer.clearCache(fileSystem.relativePath);
+          }
         }
 
-        devLogHMR(file, dependentCount > 0 ? dependentCount : undefined);
+        devLogHMR(file, dependentFiles.length - 1);
       });
     } catch (error) {
-      console.log("ERRor in devLogHMR: ", error);
+      console.log("Error in devLogHMR: ", error);
     }
 
     try {
       // Execute reload once for all files
       const invalidationChain = Array.from(allInvalidatedFiles);
 
-      // if (fsrFiles.length > 0) {
-      //   // If any file requires FSR, do FSR for all
-      //   const firstFsrFile = filesMap.get(fsrFiles[0])!;
-      //   await this.executeFullServerRestart(firstFsrFile, invalidationChain, filesMap);
-      // } else {
-      //   // All files are HMR
-      // }
       const firstHmrFile = filesMap.get(hmrFiles[0])!;
       await this.executeHotModuleReplacement(firstHmrFile, invalidationChain, filesMap, hmrFiles);
     } catch (error) {

@@ -235,6 +235,10 @@ export type StorageFileInfo = {
    * Storage class (e.g., STANDARD, GLACIER)
    */
   storageClass?: string;
+  /**
+   * Whether the file is stored in a cloud storage
+   */
+  isCloud?: boolean;
 };
 
 /**

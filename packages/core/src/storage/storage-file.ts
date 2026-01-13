@@ -2,9 +2,11 @@ import { basename, dirname, extname } from "path";
 import type { Readable } from "stream";
 import type {
   CloudStorageDriverContract,
+  CloudStorageFileData,
   FileVisibility,
   StorageDriverContract,
   StorageFileData,
+  StorageFileInfo,
 } from "./types";
 
 /**
@@ -388,8 +390,28 @@ export class StorageFile {
    * @param data - Storage file data from put/copy/move operations
    * @param driver - Driver instance
    */
-  public static fromData(data: StorageFileData, driver: StorageDriverContract): StorageFile {
+  public static fromData(
+    data: StorageFileData | CloudStorageFileData,
+    driver: StorageDriverContract,
+  ): StorageFile {
     return new StorageFile(data.path, driver, data);
+  }
+
+  /**
+   * Get file metadata
+   */
+  public async metadata(): Promise<StorageFileInfo> {
+    return {
+      isDirectory: false,
+      lastModified: await this.lastModified(),
+      mimeType: await this.mimeType(),
+      path: this._path,
+      name: this.name,
+      size: this._data?.size ?? (await this.size()),
+      etag: await this.etag(),
+      storageClass: (this._data as CloudStorageFileData)?.storageClass,
+      isCloud: !!(this._data as CloudStorageFileData)?.bucket,
+    };
   }
 
   /**
@@ -402,6 +424,8 @@ export class StorageFile {
     driver: string;
     url: string;
     hash?: string;
+    size?: number;
+    mimeType?: string;
   } {
     return {
       path: this._path,
@@ -410,6 +434,8 @@ export class StorageFile {
       driver: this._driver.name,
       url: this._deleted ? "" : this.url,
       hash: this._data?.hash,
+      size: this._data?.size,
+      mimeType: this._data?.mimeType,
     };
   }
 

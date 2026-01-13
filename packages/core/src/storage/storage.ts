@@ -417,6 +417,10 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
       file: result,
     });
 
+    if (!result.size) {
+      result.size = buffer.length;
+    }
+
     return StorageFile.fromData(result, driver);
   }
 

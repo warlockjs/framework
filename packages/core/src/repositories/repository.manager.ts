@@ -323,6 +323,18 @@ export class RepositoryManager<T = unknown> {
   }
 
   /**
+   * Get first cached record
+   */
+  public async firstCached(options?: RepositoryOptions): Promise<T | null> {
+    const results = await this.allCached({
+      ...options,
+      limit: 1,
+    });
+
+    return results[0] || null;
+  }
+
+  /**
    * Get first active record
    * @param options - Repository options
    * @returns Promise resolving to first active record or null
@@ -330,6 +342,19 @@ export class RepositoryManager<T = unknown> {
    */
   public async firstActive(options?: RepositoryOptions): Promise<T | null> {
     return this.first({
+      ...this.getIsActiveFilter(),
+      ...options,
+    });
+  }
+
+  /**
+   * Get first active cached record
+   * @param options - Repository options
+   * @returns Promise resolving to first active cached record or null
+   * @public
+   */
+  public async firstActiveCached(options?: RepositoryOptions): Promise<T | null> {
+    return this.firstCached({
       ...this.getIsActiveFilter(),
       ...options,
     });
@@ -351,6 +376,21 @@ export class RepositoryManager<T = unknown> {
   }
 
   /**
+   * Get last cached record
+   */
+  public async lastCached(options?: RepositoryOptions): Promise<T | null> {
+    const results = await this.allCached({
+      ...options,
+      limit: 1,
+      orderBy: {
+        id: "desc",
+      },
+    });
+
+    return results[0] || null;
+  }
+
+  /**
    * Get last active record
    * @param options - Repository options
    * @returns Promise resolving to last active record or null
@@ -358,6 +398,19 @@ export class RepositoryManager<T = unknown> {
    */
   public async lastActive(options?: RepositoryOptions): Promise<T | null> {
     return this.last({
+      ...this.getIsActiveFilter(),
+      ...options,
+    });
+  }
+
+  /**
+   * Get last active cached record
+   * @param options - Repository options
+   * @returns Promise resolving to last active cached record or null
+   * @public
+   */
+  public async lastActiveCached(options?: RepositoryOptions): Promise<T | null> {
+    return this.lastCached({
       ...this.getIsActiveFilter(),
       ...options,
     });
