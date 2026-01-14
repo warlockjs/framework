@@ -173,6 +173,7 @@ export type FilterOperator =
   | "dateTime<="
   | "dateTimeBetween"
   | "location"
+  | "scope"
   | WhereOperator;
 
 /**
