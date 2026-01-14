@@ -471,7 +471,7 @@ export class MongoDbDriver implements DriverContract {
   public async updateMany(
     table: string,
     filter: Record<string, unknown>,
-    update: Record<string, unknown>,
+    update: UpdateOperations,
     options?: Record<string, unknown>,
   ): Promise<UpdateResult> {
     const collection = this.getDatabaseInstance().collection(table);

@@ -103,6 +103,8 @@ export type ChildModel<TModel extends Model> = (new (...args: any[]) => TModel) 
     | "newQueryBuilder"
     | "builder"
     | "findAndUpdate"
+    | "findOneAndUpdate"
+    | "readFrom"
     | "findAndReplace"
     | "findOneAndDelete"
     | "findOrCreate"
@@ -1323,9 +1325,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     this.events().emitFetching(queryBuilder, { table: this.table, modelClass: this });
 
     queryBuilder.hydrate((data: any) => {
-      const model = new (ModelClass as new (...args: any[]) => TModel)(data);
-      model.isNew = false;
-      return model;
+      return this.readFrom(data);
     });
 
     // Wire up onFetched callback to load relations and emit model-level event
@@ -1678,6 +1678,19 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   }
 
   /**
+   * Create a new instance from the given data
+   */
+  public static readFrom<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    data: Record<string, unknown>,
+  ): TModel {
+    const model = new this(data);
+
+    model.isNew = false;
+    return model;
+  }
+
+  /**
    * Perform atomic operation
    * Example
    *
@@ -1696,12 +1709,27 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   }
 
   /**
+   * Find one and update multiple records that matches the provided filter and return the updated record
+   * @param filter - Filter conditions
+   * @param update - Update operations ($set, $unset, $inc)
+   * @returns The updated records
+   */
+  public static async findAndUpdate<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    filter: Record<string, unknown>,
+    update: UpdateOperations,
+  ): Promise<TModel[]> {
+    await this.atomic(filter, update);
+    return await this.query().where(filter).get();
+  }
+
+  /**
    * Find one and update a single record that matches the provided filter and return the updated record
    * @param filter - Filter conditions
    * @param update - Update operations ($set, $unset, $inc)
    * @returns The updated record or null
    */
-  public static async findAndUpdate<TModel extends Model = Model>(
+  public static async findOneAndUpdate<TModel extends Model = Model>(
     this: ChildModel<TModel>,
     filter: Record<string, unknown>,
     update: UpdateOperations,
