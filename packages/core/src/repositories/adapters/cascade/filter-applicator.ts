@@ -146,6 +146,9 @@ export class FilterApplicator {
         this.handleDateTimeComparison(q, col, cols, val, opts, "<="),
       dateTimeBetween: this.handleDateTimeBetween,
       inDateTime: this.handleInDateTime,
+
+      // Scope filter - applies local scope when value is truthy
+      scope: this.handleScope,
     };
 
     return handlers[type];
@@ -381,6 +384,36 @@ export class FilterApplicator {
       for (const col of columns) {
         query.orWhere((q: any) => q.whereNotNull(col));
       }
+    }
+  }
+
+  // ============================================================================
+  // SCOPE FILTER
+  // ============================================================================
+
+  /**
+   * Handle scope filter - applies local scope and passes the filter value.
+   *
+   * Usage in filterBy:
+   * ```typescript
+   * filterBy: {
+   *   active: "scope",           // Uses the filter key as scope name
+   *   isAdmin: ["scope", "admin"] // Uses custom scope name
+   * }
+   * ```
+   *
+   * When list({ active: true }) is called, it will call query.scope("active", true)
+   * When list({ status: "pending" }) is called, it will call query.scope("status", "pending")
+   */
+  private handleScope(
+    query: QueryBuilderContract,
+    column?: string,
+    _columns?: string[],
+    value?: any,
+  ) {
+    // column holds the scope name (either the filter key or custom name from array format)
+    if (column) {
+      query.scope(column, value);
     }
   }
 
