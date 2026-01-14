@@ -58,9 +58,7 @@ export class Communicator {
    * Subscribe the given consumer
    */
   public subscribe(consumer: EventConsumerClass<any>) {
-    this.driver.subscribe(consumer);
-
-    return () => this.driver.unsubscribe(consumer);
+    return this.driver.subscribe(consumer);
   }
 
   /**

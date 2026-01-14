@@ -122,7 +122,7 @@ export class RabbitMQDriver implements CommunicatorDriverContract {
    * driver.subscribe(UserUpdatedConsumer);
    * ```
    */
-  public subscribe(Consumer: EventConsumerClass): void {
+  public subscribe(Consumer: EventConsumerClass) {
     if (this.isConnected) {
       this.channel(Consumer.eventName).subscribe(prepareConsumerSubscription(Consumer), {
         consumerId: Consumer.consumerId,
@@ -130,6 +130,10 @@ export class RabbitMQDriver implements CommunicatorDriverContract {
     } else {
       this.consumers.push(Consumer);
     }
+
+    return () => {
+      this.unsubscribe(Consumer);
+    };
   }
 
   /**

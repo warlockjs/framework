@@ -1,4 +1,5 @@
 import type { BaseValidator } from "@warlock.js/seal";
+import { CommunicatorDriverContract } from "./contracts";
 
 // ============================================================================
 // MESSAGE TYPES
@@ -493,4 +494,4 @@ export type CommunicatorRegistryEvent =
 /**
  * Listener for registry events
  */
-export type CommunicatorRegistryListener = (communicator: unknown) => void;
+export type CommunicatorRegistryListener = (communicator: CommunicatorDriverContract) => void;

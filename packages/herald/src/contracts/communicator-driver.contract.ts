@@ -101,13 +101,13 @@ export interface CommunicatorDriverContract {
    * Subscribe the given consumer class to the driver
    *
    * @param consumer - Consumer class to subscribe
-   *
+   * @returns Unsubscribe function
    * @example
    * ```typescript
    * driver.subscribe(UserUpdatedConsumer);
    * ```
    */
-  subscribe(consumer: EventConsumerClass): void;
+  subscribe(consumer: EventConsumerClass): () => void;
 
   /**
    * Unsubscribe the given consumer class from the driver

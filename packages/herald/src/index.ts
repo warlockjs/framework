@@ -55,3 +55,6 @@ export * from "./utils";
 
 // Export message managers
 export * from "./message-managers";
+
+// Export decorators
+export * from "./decorators";
