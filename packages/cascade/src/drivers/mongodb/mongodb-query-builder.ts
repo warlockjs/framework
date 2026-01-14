@@ -152,7 +152,7 @@ export class MongoQueryBuilder<T = unknown> implements QueryBuilderContract<T> {
   /**
    * Apply a local scope to this query
    */
-  public scope(scopeName: string): this {
+  public scope(scopeName: string, ...args: any[]): this {
     if (!this.availableLocalScopes) {
       throw new Error(`No local scopes available`);
     }
@@ -163,7 +163,7 @@ export class MongoQueryBuilder<T = unknown> implements QueryBuilderContract<T> {
     }
 
     // Apply scope immediately (not deferred)
-    scopeCallback(this);
+    scopeCallback(this, ...args);
     return this;
   }
 

@@ -309,7 +309,7 @@ export interface QueryBuilderContract<T = unknown> {
    * await User.query().scope('active').scope('admins').get();
    * ```
    */
-  scope(scopeName: string): this;
+  scope(scopeName: string, ...args: any[]): this;
 
   // ============================================================================
   // WHERE CLAUSES

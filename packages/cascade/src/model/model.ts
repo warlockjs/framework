@@ -36,7 +36,7 @@ export type GlobalScopeDefinition = {
 /**
  * Local scope callback function
  */
-export type LocalScopeCallback = (query: QueryBuilderContract) => void;
+export type LocalScopeCallback = (query: QueryBuilderContract, ...args: any[]) => void;
 
 /**
  * Options for adding global scopes
@@ -102,6 +102,10 @@ export type ChildModel<TModel extends Model> = (new (...args: any[]) => TModel) 
     | "relations"
     | "newQueryBuilder"
     | "builder"
+    | "findAndUpdate"
+    | "findAndReplace"
+    | "findOneAndDelete"
+    | "findOrCreate"
   >;
 
 /**
