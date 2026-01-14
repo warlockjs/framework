@@ -149,9 +149,23 @@ export class Router {
   /**
    * Add proxy route
    */
-  public proxy(options: FastifyHttpProxyOptions) {
+  public proxy(
+    path: string,
+    baseUrl: string,
+    options?: Omit<FastifyHttpProxyOptions, "prefix" | "upstream">,
+  ): this;
+  public proxy(options: FastifyHttpProxyOptions): this;
+  public proxy(...args: any[]) {
     this.beforeScanning((_router, server) => {
-      server.register(proxy, options);
+      if (args.length === 1) {
+        server.register(proxy, args[0]);
+      } else {
+        server.register(proxy, {
+          prefix: args[0],
+          upstream: args[1],
+          ...args[2],
+        });
+      }
     });
 
     return this;
