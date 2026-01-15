@@ -6,7 +6,8 @@
  */
 import { v, ValidationResult, type ObjectValidator } from "@warlock.js/seal";
 import { randomUUID } from "crypto";
-import { ConsumedEventMessage } from "./types";
+import { Consumable } from "../decorators";
+import { ConsumedEventMessage, EventConsumerClass } from "./types";
 
 export abstract class EventConsumer<Payload = Record<string, any>> {
   /**
@@ -58,4 +59,39 @@ export abstract class EventConsumer<Payload = Record<string, any>> {
 
     return await v.validate(this.schema, data);
   }
+}
+
+/**
+ * Define Consumer options
+ */
+type ConsumerOptions<Payload> = {
+  /**
+   * Payload validation to auto reject the received event before accessing it in the handle method
+   */
+  schema?: ObjectValidator;
+  /**
+   * Handle data
+   */
+  handle: (payload: Payload, event: ConsumedEventMessage) => Promise<void>;
+};
+
+/**
+ * A shorthand to define an event consumer without declaring an entire class
+ */
+export function defineConsumer<Payload = Record<string, any>>(
+  eventName: string,
+  options: ConsumerOptions<Payload>,
+): EventConsumerClass {
+  const Class = class AnnouncedConsumer extends EventConsumer<Payload> {
+    public static eventName = eventName;
+    public schema = options.schema;
+
+    public handle(payload: Payload, event: ConsumedEventMessage) {
+      return options.handle(payload, event);
+    }
+  };
+
+  Consumable()(Class as EventConsumerClass);
+
+  return Class as EventConsumerClass;
 }

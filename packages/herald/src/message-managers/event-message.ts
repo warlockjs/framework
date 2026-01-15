@@ -4,6 +4,7 @@
  *
  * It's highly recommended using it instead of declaring manual channel namd and publishing data
  */
+import { GenericObject } from "@mongez/reinforcements";
 import { type ObjectValidator } from "@warlock.js/seal";
 import { randomUUID } from "crypto";
 
@@ -37,6 +38,10 @@ export abstract class EventMessage<TPayload = Record<string, any>> {
    * Data that will be sent with the event (Payload)
    */
   public toJSON(): TPayload {
+    if (!this.data) {
+      throw new Error(`no Data is defined for Event: ${this.eventName}`);
+    }
+
     return this.data as TPayload;
   }
 
@@ -62,4 +67,34 @@ export abstract class EventMessage<TPayload = Record<string, any>> {
       __through: "EventMessage",
     };
   }
+}
+
+type EventOptions<T> = {
+  /**
+   * Shapen the data that will be used
+   */
+  toJSON?: (data: T) => GenericObject;
+  /**
+   * Validation schema
+   */
+  schema?: ObjectValidator;
+};
+
+/**
+ * A shorthand to define an event without declaring an entire class
+ */
+export function defineEvent<IncomingData = unknown, OutcomingData = unknown>(
+  eventName: string,
+  options: EventOptions<IncomingData> = {},
+): typeof EventMessage<OutcomingData> {
+  return class AnnouncedEvent extends EventMessage<OutcomingData> {
+    public eventName = eventName;
+    public schema = options.schema;
+
+    public toJSON() {
+      if (!options.toJSON) return super.toJSON();
+
+      return options.toJSON(this.data as IncomingData) as OutcomingData;
+    }
+  };
 }
