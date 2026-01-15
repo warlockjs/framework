@@ -25,6 +25,10 @@ import {
   presentWithoutAllRule,
   presentWithoutAnyRule,
   presentWithoutRule,
+  requiredIfAllEmptyRule,
+  requiredIfAllNotEmptyRule,
+  requiredIfAnyEmptyRule,
+  requiredIfAnyNotEmptyRule,
   requiredIfEmptyRule,
   requiredIfInRule,
   requiredIfNotEmptyRule,
@@ -672,6 +676,88 @@ export class BaseValidator {
   public requiredIfNotEmptySibling(field: string, errorMessage?: string) {
     const rule = this.addRule(requiredIfNotEmptyRule, errorMessage);
     rule.context.options.field = field;
+    rule.context.options.scope = "sibling";
+    return this;
+  }
+
+  // ==================== REQUIRED: BASED ON MULTIPLE FIELDS EMPTY STATE ====================
+
+  /**
+   * Value is required if ALL specified fields are empty
+   */
+  public requiredIfAllEmpty(fields: string[], errorMessage?: string) {
+    const rule = this.addRule(requiredIfAllEmptyRule, errorMessage);
+    rule.context.options.fields = fields;
+    rule.context.options.scope = "global";
+    return this;
+  }
+
+  /**
+   * Value is required if ALL specified sibling fields are empty
+   */
+  public requiredIfAllEmptySiblings(fields: string[], errorMessage?: string) {
+    const rule = this.addRule(requiredIfAllEmptyRule, errorMessage);
+    rule.context.options.fields = fields;
+    rule.context.options.scope = "sibling";
+    return this;
+  }
+
+  /**
+   * Value is required if ANY of the specified fields is empty
+   */
+  public requiredIfAnyEmpty(fields: string[], errorMessage?: string) {
+    const rule = this.addRule(requiredIfAnyEmptyRule, errorMessage);
+    rule.context.options.fields = fields;
+    rule.context.options.scope = "global";
+    return this;
+  }
+
+  /**
+   * Value is required if ANY of the specified sibling fields is empty
+   */
+  public requiredIfAnyEmptySiblings(fields: string[], errorMessage?: string) {
+    const rule = this.addRule(requiredIfAnyEmptyRule, errorMessage);
+    rule.context.options.fields = fields;
+    rule.context.options.scope = "sibling";
+    return this;
+  }
+
+  /**
+   * Value is required if ALL specified fields are NOT empty
+   */
+  public requiredIfAllNotEmpty(fields: string[], errorMessage?: string) {
+    const rule = this.addRule(requiredIfAllNotEmptyRule, errorMessage);
+    rule.context.options.fields = fields;
+    rule.context.options.scope = "global";
+    return this;
+  }
+
+  /**
+   * Value is required if ALL specified sibling fields are NOT empty
+   */
+  public requiredIfAllNotEmptySiblings(fields: string[], errorMessage?: string) {
+    const rule = this.addRule(requiredIfAllNotEmptyRule, errorMessage);
+    rule.context.options.fields = fields;
+    rule.context.options.scope = "sibling";
+    return this;
+  }
+
+  /**
+   * Value is required if ANY of the specified fields is NOT empty
+   */
+  public requiredIfAnyNotEmpty(fields: string[], errorMessage?: string) {
+    const rule = this.addRule(requiredIfAnyNotEmptyRule, errorMessage);
+    rule.context.options.fields = fields;
+    rule.context.options.scope = "global";
+    return this;
+  }
+
+  /**
+   * Value is required if ANY of the specified sibling fields is NOT empty
+   */
+  public requiredIfAnyNotEmptySiblings(fields: string[], errorMessage?: string) {
+    const rule = this.addRule(requiredIfAnyNotEmptyRule, errorMessage);
+    rule.context.options.fields = fields;
     rule.context.options.scope = "sibling";
     return this;
   }

@@ -1,3 +1,4 @@
+import { get } from "@mongez/reinforcements";
 import { getFieldValue, invalidRule, VALID_RULE } from "../../helpers";
 import { isEmptyValue } from "../../helpers/is-empty-value";
 import type { SchemaRule } from "../../types";
@@ -126,6 +127,126 @@ export const requiredIfNotInRule: SchemaRule<{
 
     // Field is required if the other field's value is NOT in the array
     if (isEmptyValue(value) && !values.includes(fieldValue)) {
+      return invalidRule(this, context);
+    }
+
+    return VALID_RULE;
+  },
+};
+
+/**
+ * Get multiple field values based on scope
+ */
+function getFieldsValues(
+  rule: SchemaRule<{ fields: string[]; scope?: "global" | "sibling" }>,
+  context: any,
+): any[] {
+  const { fields, scope = "global" } = (rule as any).context.options;
+  const source = scope === "sibling" ? context.parent : context.allValues;
+  return fields.map((field: string) => get(source, field));
+}
+
+/**
+ * Required if all empty rule - field is required if ALL specified fields are empty
+ * Supports both global and sibling scope
+ */
+export const requiredIfAllEmptyRule: SchemaRule<{
+  fields: string[];
+  scope?: "global" | "sibling";
+}> = {
+  name: "requiredIfAllEmpty",
+  description: "The field is required if all :fields are empty",
+  sortOrder: -2,
+  requiresValue: false,
+  defaultErrorMessage: "The :input is required",
+  async validate(value: any, context) {
+    const fieldValues = getFieldsValues(this, context);
+
+    // Field is required if ALL other fields are empty
+    const allEmpty = fieldValues.every((v) => isEmptyValue(v));
+    if (isEmptyValue(value) && allEmpty) {
+      this.context.attributesList.fields = this.context.options.fields.join(",");
+      return invalidRule(this, context);
+    }
+
+    return VALID_RULE;
+  },
+};
+
+/**
+ * Required if any empty rule - field is required if ANY of the specified fields is empty
+ * Supports both global and sibling scope
+ */
+export const requiredIfAnyEmptyRule: SchemaRule<{
+  fields: string[];
+  scope?: "global" | "sibling";
+}> = {
+  name: "requiredIfAnyEmpty",
+  description: "The field is required if any of the :fields is empty",
+  sortOrder: -2,
+  requiresValue: false,
+  defaultErrorMessage: "The :input is required",
+  async validate(value: any, context) {
+    const fieldValues = getFieldsValues(this, context);
+
+    // Field is required if ANY other field is empty
+    const anyEmpty = fieldValues.some((v) => isEmptyValue(v));
+    if (isEmptyValue(value) && anyEmpty) {
+      this.context.attributesList.fields = this.context.options.fields.join(",");
+      return invalidRule(this, context);
+    }
+
+    return VALID_RULE;
+  },
+};
+
+/**
+ * Required if all not empty rule - field is required if ALL specified fields are NOT empty
+ * Supports both global and sibling scope
+ */
+export const requiredIfAllNotEmptyRule: SchemaRule<{
+  fields: string[];
+  scope?: "global" | "sibling";
+}> = {
+  name: "requiredIfAllNotEmpty",
+  description: "The field is required if all :fields are not empty",
+  sortOrder: -2,
+  requiresValue: false,
+  defaultErrorMessage: "The :input is required",
+  async validate(value: any, context) {
+    const fieldValues = getFieldsValues(this, context);
+
+    // Field is required if ALL other fields are NOT empty
+    const allNotEmpty = fieldValues.every((v) => !isEmptyValue(v));
+    if (isEmptyValue(value) && allNotEmpty) {
+      this.context.attributesList.fields = this.context.options.fields.join(",");
+      return invalidRule(this, context);
+    }
+
+    return VALID_RULE;
+  },
+};
+
+/**
+ * Required if any not empty rule - field is required if ANY of the specified fields is NOT empty
+ * Supports both global and sibling scope
+ */
+export const requiredIfAnyNotEmptyRule: SchemaRule<{
+  fields: string[];
+  scope?: "global" | "sibling";
+}> = {
+  name: "requiredIfAnyNotEmpty",
+  description: "The field is required if any of the :fields is not empty",
+  sortOrder: -2,
+  requiresValue: false,
+  defaultErrorMessage: "The :input is required",
+  async validate(value: any, context) {
+    const fieldValues = getFieldsValues(this, context);
+
+    // Field is required if ANY other field is NOT empty
+    const anyNotEmpty = fieldValues.some((v) => !isEmptyValue(v));
+    if (isEmptyValue(value) && anyNotEmpty) {
+      this.context.attributesList.fields = this.context.options.fields.join(",");
       return invalidRule(this, context);
     }
 
