@@ -81,18 +81,50 @@ type EventOptions<T> = {
 };
 
 /**
- * A shorthand to define an event without declaring an entire class
+ * Represents an EventMessage class constructor.
+ *
+ * @template TIncoming - The type of data accepted by the constructor
+ * @template TOutgoing - The type of data returned by toJSON() (defaults to TIncoming)
+ */
+type EventMessageClass<TIncoming = Record<string, any>, TOutgoing = TIncoming> = new (
+  data?: TIncoming,
+) => EventMessage<TOutgoing>;
+
+/**
+ * A shorthand to define an event without declaring an entire class.
+ *
+ * This factory function creates an EventMessage subclass that transforms
+ * input data (IncomingData) into a different output format (OutcomingData).
+ *
+ * @template IncomingData - The type of data passed to the constructor
+ * @template OutcomingData - The type of data returned by toJSON()
+ *
+ * @example
+ * ```typescript
+ * const UserCreatedEvent = defineEvent<User, { id: number; name: string }>(
+ *   "user.created",
+ *   { toJSON: (user) => user.only(["id", "name"]) }
+ * );
+ *
+ * publishEvent(new UserCreatedEvent(user));
+ * ```
  */
 export function defineEvent<IncomingData = unknown, OutcomingData = unknown>(
   eventName: string,
   options: EventOptions<IncomingData> = {},
-): typeof EventMessage<OutcomingData> {
+): EventMessageClass<IncomingData, OutcomingData> {
+  // We need to use `any` here to bridge the IncomingData -> OutcomingData transformation
+  // The class accepts IncomingData in constructor but outputs OutcomingData via toJSON()
   return class AnnouncedEvent extends EventMessage<OutcomingData> {
     public eventName = eventName;
     public schema = options.schema;
 
-    public toJSON() {
-      if (!options.toJSON) return super.toJSON();
+    public constructor(data?: IncomingData) {
+      super(data as any);
+    }
+
+    public toJSON(): OutcomingData {
+      if (!options.toJSON) return this.data as OutcomingData;
 
       return options.toJSON(this.data as IncomingData) as OutcomingData;
     }
