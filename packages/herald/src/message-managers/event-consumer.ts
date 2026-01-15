@@ -73,6 +73,10 @@ type ConsumerOptions<Payload> = {
    * Handle data
    */
   handle: (payload: Payload, event: ConsumedEventMessage) => Promise<void>;
+  /**
+   * Validate the payload before executing `handle`
+   */
+  validate?: (payload: Payload) => Promise<ValidationResult | boolean>;
 };
 
 /**
@@ -86,7 +90,12 @@ export function defineConsumer<Payload = Record<string, any>>(
     public static eventName = eventName;
     public schema = options.schema;
 
-    public handle(payload: Payload, event: ConsumedEventMessage) {
+    public async handle(payload: Payload, event: ConsumedEventMessage) {
+      if (options.validate) {
+        const result = await options.validate(payload);
+        if (!result || !(result as ValidationResult).isValid) return;
+      }
+
       return options.handle(payload, event);
     }
   };
