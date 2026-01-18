@@ -190,7 +190,7 @@ export async function addCommandAction(options: CommandActionData) {
     console.log(
       `Installing dev dependencies ${colors.magenta(Object.keys(devDependencies).join(", "))}`,
     );
-    execSync(`${packageManagerCommand} ${Object.keys(devDependencies).join(" ")}`, {
+    execSync(`${packageManagerCommand} ${Object.keys(devDependencies).join(" ")} -D`, {
       cwd: process.cwd(),
       stdio: "inherit",
     });

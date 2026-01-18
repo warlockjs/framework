@@ -5,8 +5,10 @@
  * All framework contexts (request, storage, database) are available throughout the request lifecycle.
  */
 import { trans } from "@mongez/localization";
+import { GenericObject } from "@mongez/reinforcements";
 import { DatabaseWriterValidationError } from "@warlock.js/cascade";
 import { contextManager } from "@warlock.js/context";
+import { environment } from "../../utils";
 import {
   requestContext as requestContextInstance,
   useRequestStore,
@@ -14,6 +16,7 @@ import {
 import {
   BadRequestError,
   ForbiddenError,
+  HttpError,
   ResourceNotFoundError,
   ServerError,
   UnAuthorizedError,
@@ -72,6 +75,21 @@ export function createRequestStore(
  * @internal
  */
 function handleRequestError(error: any, response: Response): ReturnedResponse {
+  if (error instanceof HttpError) {
+    const payload: GenericObject = {
+      error: error.message,
+    };
+    if (error.payload) {
+      payload.payload = error.payload;
+    }
+
+    if (environment() === "development") {
+      payload.stack = error.stack;
+    }
+
+    return response.setStatusCode(error.status).send(payload);
+  }
+
   if (error instanceof ResourceNotFoundError) {
     return response.notFound({
       error: error.message,
