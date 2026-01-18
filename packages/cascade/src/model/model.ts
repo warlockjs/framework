@@ -1,6 +1,12 @@
 import { get, merge, only, set, unset } from "@mongez/reinforcements";
 import type { ObjectValidator } from "@warlock.js/seal";
-import type { RemoverResult, UpdateOperations, WriterOptions } from "../contracts";
+import type {
+  PaginationOptions,
+  PaginationResult,
+  RemoverResult,
+  UpdateOperations,
+  WriterOptions,
+} from "../contracts";
 import { QueryBuilderContract, WhereCallback, WhereObject, WhereOperator } from "../contracts";
 import type { DataSource } from "../data-source/data-source";
 import { dataSourceRegistry } from "../data-source/data-source-registry";
@@ -735,7 +741,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   /**
    * Get model id
    */
-  public get id(): number | undefined {
+  public get id(): number {
     return this.get("id");
   }
 
@@ -1618,6 +1624,30 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
       query.where(filter);
     }
     return query.get();
+  }
+
+  /**
+   * Perform pagination
+   */
+  public static async paginate<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    {
+      page,
+      limit,
+      filter,
+    }: PaginationOptions & {
+      filter?: Record<string, unknown>;
+    } = {},
+  ): Promise<PaginationResult<TModel>> {
+    const query = this.query();
+    if (filter) {
+      query.where(filter);
+    }
+
+    return query.paginate({
+      limit: limit,
+      page: page,
+    });
   }
 
   /**

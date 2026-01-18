@@ -2184,9 +2184,9 @@ export class MongoQueryBuilder<T = unknown> implements QueryBuilderContract<T> {
    * @param options - Pagination options
    * @returns pagination result with data and metadata
    */
-  public async paginate(options: PaginationOptions): Promise<PaginationResult<T>> {
-    const page = options.page ?? 1;
-    const limit = options.limit ?? 10;
+  public async paginate(options?: PaginationOptions): Promise<PaginationResult<T>> {
+    const page = options?.page ?? 1;
+    const limit = options?.limit ?? 10;
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
@@ -2211,12 +2211,12 @@ export class MongoQueryBuilder<T = unknown> implements QueryBuilderContract<T> {
    * @returns cursor pagination result with data and cursor info
    */
   public async cursorPaginate(
-    options: CursorPaginationOptions,
+    options?: CursorPaginationOptions,
   ): Promise<CursorPaginationResult<T>> {
-    const limit = options.limit;
-    const cursor = options.cursor;
-    const column = options.column ?? "_id";
-    const direction = options.direction ?? "next";
+    const limit = options?.limit ?? 10;
+    const cursor = options?.cursor;
+    const column = options?.column ?? "id";
+    const direction = options?.direction ?? "next";
 
     // Apply cursor filter
     if (cursor) {

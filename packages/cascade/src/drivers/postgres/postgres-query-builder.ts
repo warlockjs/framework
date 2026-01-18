@@ -1807,9 +1807,9 @@ export class PostgresQueryBuilder<T = unknown> implements QueryBuilderContract<T
   /**
    * Page-based pagination.
    */
-  public async paginate(options: PaginationOptions): Promise<PaginationResult<T>> {
-    const page = options.page ?? 1;
-    const limit = options.limit ?? 10;
+  public async paginate(options?: PaginationOptions): Promise<PaginationResult<T>> {
+    const page = options?.page ?? 1;
+    const limit = options?.limit ?? 10;
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
@@ -1832,9 +1832,9 @@ export class PostgresQueryBuilder<T = unknown> implements QueryBuilderContract<T
    * Cursor-based pagination.
    */
   public async cursorPaginate(
-    options: CursorPaginationOptions,
+    options?: CursorPaginationOptions,
   ): Promise<CursorPaginationResult<T>> {
-    const { limit, cursor, column = "id", direction = "next" } = options;
+    const { limit = 10, cursor, column = "id", direction = "next" } = options ?? {};
 
     if (cursor) {
       const operator = direction === "next" ? ">" : "<";
