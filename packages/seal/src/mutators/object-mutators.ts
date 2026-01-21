@@ -5,8 +5,8 @@ import type { Mutator } from "../types";
 /** Strip unknown keys from object */
 export const stripUnknownMutator: Mutator = async (value, context) => {
   const allowedKeys = [
-    ...(context.ctx.schema ? Object.keys(context.ctx.schema) : []),
-    ...(context.options.allowedKeys ?? []),
+    ...(context?.ctx.schema ? Object.keys(context.ctx.schema) : []),
+    ...(context?.options.allowedKeys ?? []),
   ];
 
   const result: Record<string, any> = {};
@@ -25,7 +25,7 @@ export const objectTrimMutator: Mutator = async (value, context) => {
   if (!isPlainObject(value)) return value;
 
   const result: Record<string, any> = {};
-  const recursive = context.options.recursive ?? false;
+  const recursive = context?.options.recursive ?? false;
 
   for (const key in value) {
     const item = value[key];
@@ -34,9 +34,7 @@ export const objectTrimMutator: Mutator = async (value, context) => {
       if (Array.isArray(item)) {
         result[key] = await Promise.all(
           item.map(async (i: any) =>
-            typeof i === "string"
-              ? trim(i)
-              : await objectTrimMutator(i, context),
+            typeof i === "string" ? trim(i) : await objectTrimMutator(i, context),
           ),
         );
       } else if (isPlainObject(item)) {
@@ -53,7 +51,7 @@ export const objectTrimMutator: Mutator = async (value, context) => {
 };
 
 /** Parse JSON string */
-export const jsonMutator: Mutator = async value => {
+export const jsonMutator: Mutator = async (value) => {
   try {
     return JSON.parse(value);
   } catch {

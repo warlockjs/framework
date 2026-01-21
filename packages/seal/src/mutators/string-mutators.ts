@@ -48,7 +48,7 @@ export const stringifyMutator: Mutator = async (value) => {
 
 /** Trim whitespace */
 export const trimMutator: Mutator = async (value, context) => {
-  return trim(value?.toString(), context.options.needle ?? " ");
+  return trim(value?.toString(), context?.options?.needle ?? " ");
 };
 
 /** Remove HTML tags (safe HTML) */
@@ -116,12 +116,12 @@ export const slugMutator: Mutator = async (value) => {
 
 /** Trim from the left/start */
 export const ltrimMutator: Mutator = async (value, context) => {
-  return ltrim(value?.toString(), context.options.needle ?? " ");
+  return ltrim(value?.toString(), context?.options?.needle ?? " ");
 };
 
 /** Trim from the right/end */
 export const rtrimMutator: Mutator = async (value, context) => {
-  return rtrim(value?.toString(), context.options.needle ?? " ");
+  return rtrim(value?.toString(), context?.options?.needle ?? " ");
 };
 
 /** Base64 encode */
@@ -136,14 +136,14 @@ export const base64DecodeMutator: Mutator = async (value) => {
 
 /** Replace substring or pattern */
 export const replaceMutator: Mutator = async (value, context) => {
-  const { search, replace } = context.options;
+  const { search, replace } = context?.options;
   if (!search) return value?.toString();
   return value?.toString().replace(search, replace ?? "");
 };
 
 /** Replace all occurrences of substring or pattern */
 export const replaceAllMutator: Mutator = async (value, context) => {
-  const { search, replace } = context.options;
+  const { search, replace } = context?.options;
   if (!search) return value?.toString();
   const searchValue = typeof search === "string" ? new RegExp(search, "g") : search;
   return value?.toString().replace(searchValue, replace ?? "");

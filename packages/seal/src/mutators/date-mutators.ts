@@ -5,7 +5,7 @@ import type { Mutator } from "../types";
  * Convert value to Date object
  * Returns Invalid Date if value cannot be converted
  */
-export const dateMutator: Mutator = async value => {
+export const dateMutator: Mutator = async (value) => {
   // Handle null/undefined
   if (!value) {
     return new Date("Invalid Date");
@@ -25,26 +25,26 @@ export const dateMutator: Mutator = async value => {
 };
 
 /** Convert date to ISO string format */
-export const toISOStringMutator: Mutator = async value => {
+export const toISOStringMutator: Mutator = async (value) => {
   const date = new Date(value);
   return date.toISOString();
 };
 
 /** Convert date to Unix timestamp (milliseconds) */
-export const toTimestampMutator: Mutator = async value => {
+export const toTimestampMutator: Mutator = async (value) => {
   const date = new Date(value);
   return date.getTime();
 };
 
 /** Convert date to start of day (00:00:00) */
-export const toStartOfDayMutator: Mutator = async value => {
+export const toStartOfDayMutator: Mutator = async (value) => {
   const date = new Date(value);
   date.setHours(0, 0, 0, 0);
   return date;
 };
 
 /** Convert date to end of day (23:59:59.999) */
-export const toEndOfDayMutator: Mutator = async value => {
+export const toEndOfDayMutator: Mutator = async (value) => {
   const date = new Date(value);
   date.setHours(23, 59, 59, 999);
   return date;
@@ -53,7 +53,7 @@ export const toEndOfDayMutator: Mutator = async value => {
 /** Add or subtract days from date */
 export const addDaysMutator: Mutator = async (value, context) => {
   const date = new Date(value);
-  const days = context.options.days ?? 0;
+  const days = context?.options.days ?? 0;
   date.setDate(date.getDate() + days);
   return date;
 };
@@ -61,7 +61,7 @@ export const addDaysMutator: Mutator = async (value, context) => {
 /** Add or subtract months from date */
 export const addMonthsMutator: Mutator = async (value, context) => {
   const date = new Date(value);
-  const months = context.options.months ?? 0;
+  const months = context?.options.months ?? 0;
   date.setMonth(date.getMonth() + months);
   return date;
 };
@@ -69,7 +69,7 @@ export const addMonthsMutator: Mutator = async (value, context) => {
 /** Add or subtract years from date */
 export const addYearsMutator: Mutator = async (value, context) => {
   const date = new Date(value);
-  const years = context.options.years ?? 0;
+  const years = context?.options.years ?? 0;
   date.setFullYear(date.getFullYear() + years);
   return date;
 };
@@ -77,37 +77,37 @@ export const addYearsMutator: Mutator = async (value, context) => {
 /** Add or subtract hours from date */
 export const addHoursMutator: Mutator = async (value, context) => {
   const date = new Date(value);
-  const hours = context.options.hours ?? 0;
+  const hours = context?.options.hours ?? 0;
   date.setHours(date.getHours() + hours);
   return date;
 };
 
 /** Convert date to UTC */
-export const toUTCMutator: Mutator = async value => {
+export const toUTCMutator: Mutator = async (value) => {
   const date = new Date(value);
   return new Date(date.toUTCString());
 };
 
 /** Convert date to specific format using dayjs */
 export const toFormatMutator: Mutator = async (value, context) => {
-  const format = context.options.format ?? "YYYY-MM-DD";
+  const format = context?.options.format ?? "YYYY-MM-DD";
   return dayjs(value).format(format);
 };
 
 /** Convert to date only (remove time) */
-export const toDateOnlyMutator: Mutator = async value => {
+export const toDateOnlyMutator: Mutator = async (value) => {
   const date = new Date(value);
   return date.toISOString().split("T")[0];
 };
 
 /** Convert to time only (HH:MM:SS) */
-export const toTimeOnlyMutator: Mutator = async value => {
+export const toTimeOnlyMutator: Mutator = async (value) => {
   const date = new Date(value);
   return date.toTimeString().split(" ")[0];
 };
 
 /** Set to start of month */
-export const toStartOfMonthMutator: Mutator = async value => {
+export const toStartOfMonthMutator: Mutator = async (value) => {
   const date = new Date(value);
   date.setDate(1);
   date.setHours(0, 0, 0, 0);
@@ -115,7 +115,7 @@ export const toStartOfMonthMutator: Mutator = async value => {
 };
 
 /** Set to end of month */
-export const toEndOfMonthMutator: Mutator = async value => {
+export const toEndOfMonthMutator: Mutator = async (value) => {
   const date = new Date(value);
   date.setMonth(date.getMonth() + 1);
   date.setDate(0);
@@ -124,7 +124,7 @@ export const toEndOfMonthMutator: Mutator = async value => {
 };
 
 /** Set to start of year */
-export const toStartOfYearMutator: Mutator = async value => {
+export const toStartOfYearMutator: Mutator = async (value) => {
   const date = new Date(value);
   date.setMonth(0);
   date.setDate(1);
@@ -133,7 +133,7 @@ export const toStartOfYearMutator: Mutator = async value => {
 };
 
 /** Set to end of year */
-export const toEndOfYearMutator: Mutator = async value => {
+export const toEndOfYearMutator: Mutator = async (value) => {
   const date = new Date(value);
   date.setMonth(11);
   date.setDate(31);

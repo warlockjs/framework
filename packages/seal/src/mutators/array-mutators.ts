@@ -16,8 +16,8 @@ export const reverseArrayMutator: Mutator = async (value) => {
 export const sortArrayMutator: Mutator = async (value, context) => {
   if (!Array.isArray(value)) return value;
 
-  const sortDirection = context.options.direction ?? "asc";
-  const sortByKey = context.options.key ?? null;
+  const sortDirection = context?.options.direction ?? "asc";
+  const sortByKey = context?.options.key ?? null;
 
   return value.sort((a: any, b: any) => {
     if (sortByKey) {
