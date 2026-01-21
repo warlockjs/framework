@@ -55,7 +55,7 @@ export class HttpConnector extends BaseConnector {
       // update base url
       setBaseUrl(baseUrl);
 
-      devLogSuccess(`Server is listening on ${baseUrl}`);
+      devLogSuccess(`🚀 Server ready at ${baseUrl}`);
     } catch (error) {
       devLogError("Error while starting http server", error);
 

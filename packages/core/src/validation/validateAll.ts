@@ -3,9 +3,9 @@ import { merge } from "@mongez/reinforcements";
 import { log } from "@warlock.js/logger";
 import { v } from "@warlock.js/seal";
 import type { Request, Response } from "../http";
-import type { Route, RouteHandlerValidation } from "../router";
+import type { RequestHandlerValidation, Route } from "../router";
 
-function resolveDataToParse(validating: RouteHandlerValidation["validating"], request: Request) {
+function resolveDataToParse(validating: RequestHandlerValidation["validating"], request: Request) {
   if (!validating || validating.length === 0) return request.allExceptParams();
 
   let data: any = {};

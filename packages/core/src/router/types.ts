@@ -19,7 +19,7 @@ export type Middleware = {
 
 export type RouterGroupCallback = () => void;
 
-export type RouteHandlerType = RouteHandler | [GenericObject, string];
+export type RequestHandlerType = RequestHandler | [GenericObject, string];
 
 /**
  * Resource standard methods
@@ -28,7 +28,7 @@ export type ResourceMethod = "list" | "get" | "create" | "update" | "delete" | "
 
 export type RestfulMiddleware = Record<string, [Middleware]>;
 
-export type RouteHandlerValidation = {
+export type RequestHandlerValidation = {
   /**
    * Validation custom message
    */
@@ -42,28 +42,6 @@ export type RouteHandlerValidation = {
    * Validation schema
    */
   schema?: ObjectValidator;
-};
-
-/**
- * Route handler receives a request and a response
- * And returns a returning response type
- */
-export type RouteHandler = {
-  /**
-   * Function Declaration
-   */
-  (request: Request, response: Response): ReturnedResponse | void;
-
-  /**
-   * Validation static object property which can be optional
-   */
-  validation?: RouteHandlerValidation;
-
-  /**
-   * Handler description
-   * Will be used for generating documentation
-   */
-  description?: string;
 };
 
 export interface RequestControllerContract {
@@ -89,16 +67,16 @@ export interface RequestControllerContract {
   middleware?: () => Promise<MiddlewareResponse> | MiddlewareResponse;
 }
 
-export type RequestHandler = {
+export type RequestHandler<TRequest extends Request = Request> = {
   /**
    * Function Declaration
    */
-  (request: Request, response: Response): ReturnedResponse | void;
+  (request: TRequest, response: Response): ReturnedResponse | void;
 
   /**
    * Validation static object property which can be optional
    */
-  validation?: RouteHandlerValidation;
+  validation?: RequestHandlerValidation;
 
   /**
    * Request Handler Description
@@ -191,7 +169,7 @@ export type Route = RouteOptions & {
    * Route handler Can be a function
    * And als can have a `validation` object as a static property of the handler
    */
-  handler: RouteHandler;
+  handler: RequestHandler;
   /**
    * Path prefix
    * Kindly note the prefix is auto added by the router and it should be added to the path itself
@@ -236,31 +214,31 @@ export type RouteResource = {
   /**
    * list route
    */
-  list?: RouteHandler;
+  list?: RequestHandler;
   /**
    * Single resource route
    */
-  get?: RouteHandler;
+  get?: RequestHandler;
   /**
    * Create resource route
    */
-  create?: RouteHandler;
+  create?: RequestHandler;
   /**
    * Update resource route
    */
-  update?: RouteHandler;
+  update?: RequestHandler;
   /**
    * Patch resource route
    */
-  patch?: RouteHandler;
+  patch?: RequestHandler;
   /**
    * Delete resource route
    */
-  delete?: RouteHandler;
+  delete?: RequestHandler;
   /**
    * Delete Multiple Records
    */
-  bulkDelete?: RouteHandler;
+  bulkDelete?: RequestHandler;
   /**
    * Validation object
    */
@@ -268,19 +246,19 @@ export type RouteResource = {
     /**
      * Apply validation on create|update|patch combined
      */
-    all?: RouteHandlerValidation;
+    all?: RequestHandlerValidation;
     /**
      * Create validation object
      */
-    create?: RouteHandlerValidation;
+    create?: RequestHandlerValidation;
     /**
      * Update validation object
      */
-    update?: RouteHandlerValidation;
+    update?: RequestHandlerValidation;
     /**
      * Patch validation object
      */
-    patch?: RouteHandlerValidation;
+    patch?: RequestHandlerValidation;
   };
 };
 

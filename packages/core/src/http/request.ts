@@ -28,7 +28,7 @@ type StandardHeaders = {
 
 type HeaderKeys = keyof StandardHeaders;
 
-export class Request<User = any, RequestValidation = any> {
+export class Request<RequestValidation = any> {
   /**
    * Fastify Request object
    */
@@ -48,11 +48,6 @@ export class Request<User = any, RequestValidation = any> {
    * Parsed Request Payload
    */
   protected payload: any = {};
-
-  /**
-   * Current user
-   */
-  public user?: User;
 
   /**
    * Decoded access token payload (set by auth middleware)

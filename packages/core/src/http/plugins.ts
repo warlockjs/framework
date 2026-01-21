@@ -36,7 +36,7 @@ export async function registerHttpPlugins(server: FastifyInstance) {
   });
 
   server.register(import("@fastify/static"), {
-    root: rootPath("public"),
-    prefix: "/public/",
+    root: config.get("storage.publicRoot", rootPath("public")),
+    prefix: config.get("storage.publicPrefix", "/public/"),
   });
 }

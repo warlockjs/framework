@@ -12,11 +12,11 @@ import { RouteBuilder } from "./route-builder";
 import { RouteRegistry } from "./route-registry";
 import type {
   GroupedRoutesOptions,
+  RequestHandler,
+  RequestHandlerType,
+  RequestHandlerValidation,
   ResourceMethod,
   Route,
-  RouteHandler,
-  RouteHandlerType,
-  RouteHandlerValidation,
   RouteOptions,
   RouteResource,
   RouterGroupCallback,
@@ -177,7 +177,7 @@ export class Router {
   public add(
     method: Route["method"],
     path: string | string[],
-    handler: RouteHandlerType,
+    handler: RequestHandlerType,
     options: RouteOptions = {},
   ) {
     if (Array.isArray(path)) {
@@ -215,7 +215,7 @@ export class Router {
         );
       }
 
-      handler = controller[action].bind(controller) as RouteHandler;
+      handler = controller[action].bind(controller) as RequestHandler;
 
       if (!handler.validation) {
         handler.validation = {};
@@ -265,56 +265,56 @@ export class Router {
   /**
    * Add a request that accepts all methods
    */
-  public any(path: string, handler: RouteHandlerType, options: RouteOptions = {}) {
+  public any(path: string, handler: RequestHandlerType, options: RouteOptions = {}) {
     return this.add("all" as Route["method"], path, handler, options);
   }
 
   /**
    * Add get request method
    */
-  public get(path: string, handler: RouteHandlerType, options: RouteOptions = {}) {
+  public get(path: string, handler: RequestHandlerType, options: RouteOptions = {}) {
     return this.add("GET", path, handler, options);
   }
 
   /**
    * Add post request method
    */
-  public post(path: string | string[], handler: RouteHandlerType, options: RouteOptions = {}) {
+  public post(path: string | string[], handler: RequestHandlerType, options: RouteOptions = {}) {
     return this.add("POST", path, handler, options);
   }
 
   /**
    * Add put request method
    */
-  public put(path: string, handler: RouteHandlerType, options: RouteOptions = {}) {
+  public put(path: string, handler: RequestHandlerType, options: RouteOptions = {}) {
     return this.add("PUT", path, handler, options);
   }
 
   /**
    * Add delete request method
    */
-  public delete(path: string | string[], handler: RouteHandlerType, options: RouteOptions = {}) {
+  public delete(path: string | string[], handler: RequestHandlerType, options: RouteOptions = {}) {
     return this.add("DELETE", path, handler, options);
   }
 
   /**
    * Add patch request method
    */
-  public patch(path: string, handler: RouteHandlerType, options: RouteOptions = {}) {
+  public patch(path: string, handler: RequestHandlerType, options: RouteOptions = {}) {
     return this.add("PATCH", path, handler, options);
   }
 
   /**
    * Add head request method
    */
-  public head(path: string, handler: RouteHandlerType, options: RouteOptions = {}) {
+  public head(path: string, handler: RequestHandlerType, options: RouteOptions = {}) {
     return this.add("HEAD", path, handler, options);
   }
 
   /**
    * Add options request method
    */
-  public options(path: string, handler: RouteHandlerType, options: RouteOptions = {}) {
+  public options(path: string, handler: RequestHandlerType, options: RouteOptions = {}) {
     return this.add("OPTIONS", path, handler, options);
   }
 
@@ -341,8 +341,8 @@ export class Router {
     options: RouteOptions & {
       only?: ResourceMethod[];
       except?: ResourceMethod[];
-      replace?: Partial<Record<ResourceMethod, RouteHandler>> & {
-        bulkDelete?: RouteHandler;
+      replace?: Partial<Record<ResourceMethod, RequestHandler>> & {
+        bulkDelete?: RequestHandler;
       };
     } = {},
   ) {
@@ -558,7 +558,7 @@ export class Router {
    * Manage validation system for the given resource
    */
   private manageValidation(resource: RouteResource, method: "create" | "update" | "patch") {
-    const handler = resource[method]?.bind(resource) as RouteHandler;
+    const handler = resource[method]?.bind(resource) as RequestHandler;
 
     const methodValidation = resource?.validation?.[method];
 
@@ -584,7 +584,7 @@ export class Router {
         [method]: methodValidation?.validate,
       };
 
-      const validation: RouteHandlerValidation = {};
+      const validation: RequestHandlerValidation = {};
 
       if (resource.validation.all.schema || methodValidation?.schema) {
         if (!methodValidation?.schema && resource.validation.all.schema) {

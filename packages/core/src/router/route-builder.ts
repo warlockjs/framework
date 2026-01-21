@@ -1,6 +1,6 @@
 import { merge } from "@mongez/reinforcements";
 import { type Router } from "./router";
-import { RouteHandlerType, RouteOptions } from "./types";
+import type { RequestHandlerType, RouteOptions } from "./types";
 
 export class RouteBuilder {
   protected addedRoutes = {
@@ -24,7 +24,7 @@ export class RouteBuilder {
   /**
    * Add a get method to the route
    */
-  public get(handler: RouteHandlerType, options: RouteOptions = {}) {
+  public get(handler: RequestHandlerType, options: RouteOptions = {}) {
     if (this.addedRoutes.get) {
       throw new Error(`Route ${this.path} already has a GET method`);
     }
@@ -38,7 +38,7 @@ export class RouteBuilder {
    * Get one resource, appends /:id to the path
    * For example: /posts/:id
    */
-  public getOne(handler: RouteHandlerType, options: RouteOptions = {}) {
+  public getOne(handler: RequestHandlerType, options: RouteOptions = {}) {
     this.router.get(`${this.path}/:id`, handler, this.withOptions(options));
     return this;
   }
@@ -46,7 +46,7 @@ export class RouteBuilder {
   /**
    * Add a post method to the route
    */
-  public post(handler: RouteHandlerType, options: RouteOptions = {}) {
+  public post(handler: RequestHandlerType, options: RouteOptions = {}) {
     if (this.addedRoutes.post) {
       throw new Error(`Route ${this.path} already has a POST method`);
     }
@@ -60,7 +60,7 @@ export class RouteBuilder {
    * Post one resource, appends /:id to the path
    * For example: /posts/:id
    */
-  public postOne(handler: RouteHandlerType, options: RouteOptions = {}) {
+  public postOne(handler: RequestHandlerType, options: RouteOptions = {}) {
     this.router.post(`${this.path}/:id`, handler, this.withOptions(options));
     return this;
   }
@@ -68,7 +68,7 @@ export class RouteBuilder {
   /**
    * Add a PUT request handler for current path
    */
-  public put(handler: RouteHandlerType, options: RouteOptions = {}) {
+  public put(handler: RequestHandlerType, options: RouteOptions = {}) {
     if (this.addedRoutes.put) {
       throw new Error(`Route ${this.path} already has a PUT method`);
     }
@@ -81,7 +81,7 @@ export class RouteBuilder {
   /**
    * Update one resource, appends /:id to the path
    */
-  public updateOne(handler: RouteHandlerType, options: RouteOptions = {}) {
+  public updateOne(handler: RequestHandlerType, options: RouteOptions = {}) {
     this.router.put(`${this.path}/:id`, handler, this.withOptions(options));
     return this;
   }
@@ -89,7 +89,7 @@ export class RouteBuilder {
   /**
    * Add a PATCH request handler for current path
    */
-  public patch(handler: RouteHandlerType, options: RouteOptions = {}) {
+  public patch(handler: RequestHandlerType, options: RouteOptions = {}) {
     if (this.addedRoutes.patch) {
       throw new Error(`Route ${this.path} already has a PATCH method`);
     }
@@ -102,7 +102,7 @@ export class RouteBuilder {
   /**
    * Patch one resource, appends /:id to the path
    */
-  public patchOne(handler: RouteHandlerType, options: RouteOptions = {}) {
+  public patchOne(handler: RequestHandlerType, options: RouteOptions = {}) {
     this.router.patch(`${this.path}/:id`, handler, this.withOptions(options));
     return this;
   }
@@ -110,7 +110,7 @@ export class RouteBuilder {
   /**
    * Add a DELETE request handler for current path
    */
-  public delete(handler: RouteHandlerType, options: RouteOptions = {}) {
+  public delete(handler: RequestHandlerType, options: RouteOptions = {}) {
     if (this.addedRoutes.delete) {
       throw new Error(`Route ${this.path} already has a DELETE method`);
     }
@@ -123,7 +123,7 @@ export class RouteBuilder {
   /**
    * Delete one resource, appends /:id to the path
    */
-  public deleteOne(handler: RouteHandlerType, options: RouteOptions = {}) {
+  public deleteOne(handler: RequestHandlerType, options: RouteOptions = {}) {
     this.router.delete(`${this.path}/:id`, handler, this.withOptions(options));
     return this;
   }
@@ -136,7 +136,7 @@ export class RouteBuilder {
    * List all resources (RESTful alias for GET collection)
    * @example router.route("/posts").list(listPosts)
    */
-  public list(handler: RouteHandlerType, options: RouteOptions = {}) {
+  public list(handler: RequestHandlerType, options: RouteOptions = {}) {
     return this.get(handler, options);
   }
 
@@ -144,7 +144,7 @@ export class RouteBuilder {
    * Create a new resource (RESTful alias for POST)
    * @example router.route("/posts").create(createPost)
    */
-  public create(handler: RouteHandlerType, options: RouteOptions = {}) {
+  public create(handler: RequestHandlerType, options: RouteOptions = {}) {
     return this.post(handler, options);
   }
 
@@ -152,7 +152,7 @@ export class RouteBuilder {
    * Show a single resource (RESTful alias for GET one)
    * @example router.route("/posts").show(showPost) // GET /posts/:id
    */
-  public show(handler: RouteHandlerType, options: RouteOptions = {}) {
+  public show(handler: RequestHandlerType, options: RouteOptions = {}) {
     return this.getOne(handler, options);
   }
 
@@ -160,7 +160,7 @@ export class RouteBuilder {
    * Update a resource (RESTful alias for PUT one)
    * @example router.route("/posts").update(updatePost) // PUT /posts/:id
    */
-  public update(handler: RouteHandlerType, options: RouteOptions = {}) {
+  public update(handler: RequestHandlerType, options: RouteOptions = {}) {
     return this.updateOne(handler, options);
   }
 
@@ -168,7 +168,7 @@ export class RouteBuilder {
    * Destroy a resource (RESTful alias for DELETE one)
    * @example router.route("/posts").destroy(deletePost) // DELETE /posts/:id
    */
-  public destroy(handler: RouteHandlerType, options: RouteOptions = {}) {
+  public destroy(handler: RequestHandlerType, options: RouteOptions = {}) {
     return this.deleteOne(handler, options);
   }
 
@@ -206,12 +206,12 @@ export class RouteBuilder {
    */
   public crud(
     handlers: {
-      list?: RouteHandlerType;
-      create?: RouteHandlerType;
-      show?: RouteHandlerType;
-      update?: RouteHandlerType;
-      destroy?: RouteHandlerType;
-      patch?: RouteHandlerType;
+      list?: RequestHandlerType;
+      create?: RequestHandlerType;
+      show?: RequestHandlerType;
+      update?: RequestHandlerType;
+      destroy?: RequestHandlerType;
+      patch?: RequestHandlerType;
     },
     options: RouteOptions = {},
   ) {
