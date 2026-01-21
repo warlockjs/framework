@@ -10,7 +10,7 @@ export const databaseModelMutator: Mutator<DatabaseModelMutatorOptions> = async 
   value,
   context,
 ) => {
-  let { model: ModelClass } = context.options;
+  let { model: ModelClass } = context?.options || {};
 
   if (typeof ModelClass === "string") {
     ModelClass = getModelFromRegistry(ModelClass)!;
@@ -37,7 +37,7 @@ export const databaseModelsMutator: Mutator<DatabaseModelMutatorOptions> = async
 ) => {
   if (!Array.isArray(value)) return value;
 
-  let { model: ModelClass } = context.options;
+  let { model: ModelClass } = context?.options || {};
 
   if (typeof ModelClass === "string") {
     ModelClass = getModelFromRegistry(ModelClass)!;

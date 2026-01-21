@@ -924,6 +924,35 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   }
 
   /**
+   * Get created at date
+   */
+  public get createdAt(): Date | undefined {
+    const createdAtColumn = this.self().createdAtColumn;
+
+    if (!createdAtColumn) return;
+
+    return this.get<Date>(createdAtColumn);
+  }
+
+  /**
+   * Get updated at date
+   */
+  public get updatedAt(): Date | undefined {
+    const updatedAtColumn = this.self().updatedAtColumn;
+
+    if (!updatedAtColumn) return;
+
+    return this.get<Date>(updatedAtColumn);
+  }
+
+  /**
+   * Check if current model record is created by the given user model
+   */
+  public isCreatedBy(user: Model): boolean {
+    return this.get(`createdBy.id`) === user.id;
+  }
+
+  /**
    * Checks whether the model's data has changed since instantiation or last reset.
    *
    * @returns `true` if any fields have been modified or removed, `false` otherwise

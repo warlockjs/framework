@@ -1,7 +1,4 @@
-import type {
-  DriverContract,
-  UpdateOperations,
-} from "../contracts/database-driver.contract";
+import type { DriverContract, UpdateOperations } from "../contracts/database-driver.contract";
 import type {
   RestorerContract,
   RestorerOptions,
@@ -106,11 +103,7 @@ export class DatabaseRestorer implements RestorerContract {
     delete restoredData.originalTable;
 
     // 5. Check for ID conflict and handle
-    const finalData = await this.handleIdConflict(
-      restoredData,
-      id,
-      onIdConflict,
-    );
+    const finalData = await this.handleIdConflict(restoredData, id, onIdConflict);
 
     // 6. Create temporary model instance for event emission
     // Note: Model is abstract, but at runtime this.ctor is a concrete subclass
@@ -134,13 +127,15 @@ export class DatabaseRestorer implements RestorerContract {
     } else if (strategy === "soft") {
       // Record still exists, just unset deletedAt (don't insert - would create duplicate!)
       const deletedAtColumn = this.ctor.deletedAtColumn ?? "deletedAt";
-      const filter = { [this.primaryKey]: id };
-      const updateOperations: UpdateOperations = {
-        $unset: { [deletedAtColumn]: 1 },
-      };
+      if (deletedAtColumn) {
+        const filter = { [this.primaryKey]: id };
+        const updateOperations: UpdateOperations = {
+          $unset: { [deletedAtColumn]: 1 },
+        };
 
-      await this.driver.update(this.table, filter, updateOperations);
-      model.isNew = false;
+        await this.driver.update(this.table, filter, updateOperations);
+        model.isNew = false;
+      }
     }
 
     // 10. Emit restored event (unless skipEvents)
@@ -162,9 +157,7 @@ export class DatabaseRestorer implements RestorerContract {
    * @param options - Restorer options
    * @returns Result containing success status, strategy used, and aggregate counts
    */
-  public async restoreAll(
-    options: RestorerOptions = {},
-  ): Promise<RestorerResult> {
+  public async restoreAll(options: RestorerOptions = {}): Promise<RestorerResult> {
     const onIdConflict = options.onIdConflict ?? "assignNew";
     const skipEvents = options.skipEvents ?? false;
 
@@ -236,12 +229,14 @@ export class DatabaseRestorer implements RestorerContract {
           } else if (strategy === "soft") {
             // Record still exists, just unset deletedAt
             const deletedAtColumn = this.ctor.deletedAtColumn ?? "deletedAt";
-            const filter = { [this.primaryKey]: id };
-            const updateOperations: UpdateOperations = {
-              $unset: { [deletedAtColumn]: 1 },
-            };
-            await this.driver.update(this.table, filter, updateOperations);
-            model.isNew = false;
+            if (deletedAtColumn) {
+              const filter = { [this.primaryKey]: id };
+              const updateOperations: UpdateOperations = {
+                $unset: { [deletedAtColumn]: 1 },
+              };
+              await this.driver.update(this.table, filter, updateOperations);
+              model.isNew = false;
+            }
           }
 
           restoredRecords.push(model);
@@ -267,12 +262,14 @@ export class DatabaseRestorer implements RestorerContract {
           } else if (strategy === "soft") {
             // Record still exists, just unset deletedAt
             const deletedAtColumn = this.ctor.deletedAtColumn ?? "deletedAt";
-            const filter = { [this.primaryKey]: id };
-            const updateOperations: UpdateOperations = {
-              $unset: { [deletedAtColumn]: 1 },
-            };
-            await this.driver.update(this.table, filter, updateOperations);
-            model.isNew = false;
+            if (deletedAtColumn) {
+              const filter = { [this.primaryKey]: id };
+              const updateOperations: UpdateOperations = {
+                $unset: { [deletedAtColumn]: 1 },
+              };
+              await this.driver.update(this.table, filter, updateOperations);
+              model.isNew = false;
+            }
           }
 
           restoredRecords.push(model);
@@ -338,10 +335,7 @@ export class DatabaseRestorer implements RestorerContract {
    * @returns The record data, or null if not found
    * @private
    */
-  private async fetchRecordByStrategy(
-    id: string | number,
-    strategy: "trash" | "soft",
-  ) {
+  private async fetchRecordByStrategy(id: string | number, strategy: "trash" | "soft") {
     if (strategy === "trash") {
       const trashTable = this.resolveTrashTable();
       try {
@@ -356,6 +350,10 @@ export class DatabaseRestorer implements RestorerContract {
       }
     } else if (strategy === "soft") {
       const deletedAtColumn = this.ctor.deletedAtColumn ?? "deletedAt";
+      if (!deletedAtColumn) {
+        return null;
+      }
+
       try {
         const softDeletedQuery = await this.driver
           .queryBuilder(this.table)
@@ -396,6 +394,10 @@ export class DatabaseRestorer implements RestorerContract {
       }
     } else if (strategy === "soft") {
       const deletedAtColumn = this.ctor.deletedAtColumn ?? "deletedAt";
+      if (!deletedAtColumn) {
+        return [];
+      }
+
       try {
         const softDeletedQuery = this.driver
           .queryBuilder(this.table)
@@ -450,10 +452,7 @@ export class DatabaseRestorer implements RestorerContract {
    */
   private async checkIdExists(id: string | number): Promise<boolean> {
     try {
-      const query = this.driver
-        .queryBuilder(this.table)
-        .where(this.primaryKey, id)
-        .exists();
+      const query = this.driver.queryBuilder(this.table).where(this.primaryKey, id).exists();
 
       return await query;
     } catch {
@@ -471,9 +470,7 @@ export class DatabaseRestorer implements RestorerContract {
    * @returns Record data with new ID assigned
    * @private
    */
-  private async assignNewId(
-    recordData: Record<string, unknown>,
-  ): Promise<Record<string, unknown>> {
+  private async assignNewId(recordData: Record<string, unknown>): Promise<Record<string, unknown>> {
     const isMongoDb = this.driver.name === "mongodb";
     const newData = { ...recordData };
 
