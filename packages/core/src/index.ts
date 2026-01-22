@@ -3,6 +3,7 @@ import { env } from "@mongez/dotenv";
 import "./validation/init";
 
 import { colors } from "@mongez/copper";
+export * from "@mongez/localization";
 export * from "./application";
 export * from "./bootstrap";
 export * from "./bootstrap/setup";

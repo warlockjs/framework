@@ -27,8 +27,8 @@ export class ConnectorsManager {
   /**
    * Register a connector
    */
-  public register(connector: Connector): void {
-    this.connectors.push(connector);
+  public register(...connectors: Connector[]): void {
+    this.connectors.push(...connectors);
     // sort connectors by priority
     this.connectors.sort((a, b) => a.priority - b.priority);
   }
@@ -55,7 +55,8 @@ export class ConnectorsManager {
    * Shutdown all connectors
    */
   public async shutdown(): Promise<void> {
-    for (const connector of this.connectors) {
+    // shut down connectors in reverse order
+    for (const connector of this.connectors.reverse()) {
       try {
         await connector.shutdown();
       } catch (error) {

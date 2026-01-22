@@ -147,11 +147,7 @@ export class Request<RequestValidation = any> {
   public get localized() {
     if (this._locale) return this._locale;
 
-    return (this._locale =
-      this.header("locale-code") ||
-      this.header("locale") ||
-      this.query["locale"] ||
-      this.query["locale-code"]);
+    return (this._locale = this.header("locale") || this.query["locale"]);
   }
 
   /**

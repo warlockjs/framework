@@ -1,5 +1,10 @@
 import { colors } from "@mongez/copper";
-import { ensureDirectoryAsync, putFileAsync, removeDirectoryAsync } from "@mongez/fs";
+import {
+  ensureDirectoryAsync,
+  fileExistsAsync,
+  putFileAsync,
+  removeDirectoryAsync,
+} from "@mongez/fs";
 import esbuild from "esbuild";
 import glob from "fast-glob";
 import path from "path";
@@ -89,7 +94,7 @@ export class ProductionBuilder {
    * Generate bootstrap.ts - ensures bootstrap() runs first and sets production environment
    */
   private async generateBootstrap(): Promise<void> {
-    const content = `import { bootstrap, setEnvironment } from "@warlock.js/core";
+    let content = `import { bootstrap, setEnvironment } from "@warlock.js/core";
 
 // Set production environment
 setEnvironment("production");
@@ -97,6 +102,10 @@ setEnvironment("production");
 // Bootstrap the application
 bootstrap();
 `;
+    if (await fileExistsAsync(appPath("bootstrap.ts"))) {
+      content += "import './../../src/app/bootstrap';\n";
+    }
+
     await putFileAsync(path.join(this.productionDir, "bootstrap.ts"), content);
   }
 
@@ -162,7 +171,7 @@ bootstrap();
       executors.push(`await configSpecialHandlers.execute("${configName}", ${varName});`);
     }
 
-    const content = [
+    let content = [
       ...imports,
       "",
       "// Config imports",
@@ -175,6 +184,10 @@ bootstrap();
       ...executors,
       "",
     ].join("\n");
+
+    if (await fileExistsAsync(appPath("prestart.ts"))) {
+      content += "import './../../src/app/prestart';\n";
+    }
 
     await putFileAsync(path.join(this.productionDir, "config-loader.ts"), content);
   }

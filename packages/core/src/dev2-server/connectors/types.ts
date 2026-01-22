@@ -45,7 +45,13 @@ export interface Connector {
   shouldRestart(changedFiles: string[]): boolean;
 }
 
-export type ConnectorName = "http" | "database" | "cache" | "storage" | "communicator";
+export type ConnectorName =
+  | "http"
+  | "database"
+  | "cache"
+  | "storage"
+  | "communicator"
+  | (string & {});
 
 /**
  * Connector priority constants

@@ -1,3 +1,4 @@
+import { get } from "@mongez/reinforcements";
 import { invalidRule, VALID_RULE, type SchemaRule } from "@warlock.js/seal";
 import { useCurrentUser } from "../../http";
 import type { UniqueExceptCurrentUserRuleOptions } from "../types";
@@ -24,7 +25,11 @@ export const uniqueExceptCurrentUserRule: SchemaRule<UniqueExceptCurrentUserRule
     dbQuery.where(column, value);
 
     if (user) {
-      dbQuery.where(exceptCurrentUserColumn, "!=", user.get(exceptCurrentUserValue));
+      const value =
+        user instanceof Model
+          ? user.get(exceptCurrentUserValue)
+          : get(user, exceptCurrentUserValue);
+      dbQuery.where(exceptCurrentUserColumn, "!=", value);
     }
 
     if (query) {

@@ -13,9 +13,16 @@ export async function transpileFile(fileManager: FileManager) {
   return transpile(fileManager.source, fileManager.absolutePath);
 }
 
+function getFileLoader(filePath: string) {
+  if (filePath.endsWith(".css")) return "css";
+  if (filePath.endsWith(".tsx")) return "tsx";
+  if (filePath.endsWith(".ts")) return "ts";
+  return "file";
+}
+
 export async function transpile(sourceCode: string, filePath: string) {
   const { code: transpiled } = await transform(sourceCode, {
-    loader: filePath.endsWith(".tsx") ? "tsx" : "ts",
+    loader: getFileLoader(filePath),
     format: "esm",
     sourcemap: "inline",
     target: "es2022",

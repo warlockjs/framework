@@ -2,7 +2,7 @@ import config from "@mongez/config";
 import { registerHttpPlugins } from "../../http/plugins";
 import { getServer, startServer } from "../../http/server";
 import { router } from "../../router/router";
-import { environment } from "../../utils";
+import { environment } from "../../utils/environment";
 import { setBaseUrl } from "../../utils/urls";
 import { devLogError, devLogInfo, devLogSuccess } from "../dev-logger";
 import { BaseConnector } from "./base-connector";
@@ -20,7 +20,7 @@ export class HttpConnector extends BaseConnector {
    * Files that trigger HTTP server restart
    * Note: routes.ts changes will be handled by HMR with wildcard routing
    */
-  protected readonly watchedFiles = ["src/config/http.ts", "src/config/http.tsx"];
+  protected readonly watchedFiles = ["src/config/http.ts", "src/config/http.tsx", ".env"];
 
   /**
    * Initialize HTTP server
@@ -44,7 +44,7 @@ export class HttpConnector extends BaseConnector {
     }
 
     try {
-      // 👇🏻 We can use the url of the server
+      // We can use the url of the server
       await server.listen({
         port,
         host: httpConfig.host || "localhost",
@@ -88,7 +88,7 @@ export class HttpConnector extends BaseConnector {
     // Only restart for config changes, not routes
     return changedFiles.some((file) => {
       const relativePath = file.replace(/\\/g, "/");
-      return relativePath === "src/config/http.ts" || relativePath === "src/config/http.tsx";
+      return this.watchedFiles.includes(relativePath);
     });
   }
 }

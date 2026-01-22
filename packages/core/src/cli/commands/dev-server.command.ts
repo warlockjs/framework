@@ -9,6 +9,7 @@ export const devServerCommand = command({
   preload: {
     config: true, // load all config
     bootstrap: true,
+    prestart: true, // load prestart file (if exists)
     connectors: true, // load all connectors
   },
   preAction: async () => {

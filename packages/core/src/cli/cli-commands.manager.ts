@@ -1,12 +1,12 @@
 import { colors } from "@mongez/copper";
 import { loadEnv } from "@mongez/dotenv";
-import { ensureDirectoryAsync } from "@mongez/fs";
+import { ensureDirectoryAsync, fileExistsAsync } from "@mongez/fs";
 import { bootstrap } from "../bootstrap";
 import { loadConfigFiles } from "../config/load-config-files";
 import { connectorsManager } from "../dev2-server/connectors/connectors-manager";
 import { filesOrchestrator } from "../dev2-server/files-orchestrator";
 import { manifestManager } from "../manifest/manifest-manager";
-import { warlockPath } from "../utils";
+import { appPath, warlockPath } from "../utils";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 import { CLICommand } from "./cli-command";
 import {
@@ -451,19 +451,30 @@ export class CLICommandsManager {
     const preloaders = command.commandPreload || {};
 
     await warlockConfigManager.load();
-    // if (preloaders.warlockConfig) {
-    // }
+
+    if (preloaders.config || preloaders.bootstrap || preloaders.prestart) {
+      await filesOrchestrator.init();
+    }
 
     if (preloaders.env && !preloaders.bootstrap) {
       await loadEnv();
     } else if (preloaders.bootstrap) {
-      bootstrap();
+      await bootstrap();
+
+      if (await fileExistsAsync(appPath("bootstrap.ts"))) {
+        await filesOrchestrator.load("src/app/bootstrap.ts");
+      }
     }
 
     // Load configuration files
     if (preloaders.config) {
-      await filesOrchestrator.init();
       await loadConfigFiles(preloaders.config);
+    }
+
+    if (preloaders.prestart) {
+      if (await fileExistsAsync(appPath("prestart.ts"))) {
+        await filesOrchestrator.load("src/app/prestart.ts");
+      }
     }
 
     // Initialize connectors

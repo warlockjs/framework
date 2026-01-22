@@ -32,6 +32,8 @@ export class FilesOrchestrator {
   public readonly specialFilesCollector = new SpecialFilesCollector();
   public readonly moduleLoader = new ModuleLoader(this.specialFilesCollector);
 
+  public isInitialized = false;
+
   /**
    * Creates the FilesOrchestrator instance
    *
@@ -107,6 +109,9 @@ export class FilesOrchestrator {
    * Initialize the files orchestrator
    */
   public async init() {
+    if (this.isInitialized) return;
+    this.isInitialized = true;
+
     // Initialize es-module-lexer (it's a promise, not a function)
     await init;
 

@@ -68,6 +68,11 @@ export type CLICommandPreload = {
   config?: true | string[];
 
   /**
+   * Load prestart file after (bootstrap and configurations are loaded).
+   */
+  prestart?: boolean;
+
+  /**
    * Load warlock config
    */
   warlockConfig?: boolean;
