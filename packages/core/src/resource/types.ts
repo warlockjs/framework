@@ -46,7 +46,7 @@ export type ResourceFieldBuilderDateOutputOptions =
       /**
        * Return human readable date
        */
-      human?: boolean;
+      humanTime?: boolean;
       /**
        * Return timezone
        */
@@ -62,5 +62,5 @@ export type ResourceFieldBuilderDateOutputOptions =
     }
   | "format"
   | "timestamp"
-  | "human"
+  | "humanTime"
   | "locale";

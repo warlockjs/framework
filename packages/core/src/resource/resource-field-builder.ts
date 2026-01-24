@@ -48,7 +48,7 @@ export class ResourceFieldBuilder {
     timezone: false,
     locale: false,
     offset: false,
-    human: true,
+    humanTime: true,
   };
 
   /**
@@ -172,7 +172,7 @@ export class ResourceFieldBuilder {
         return dayjs(value).valueOf();
       }
 
-      if (this.dateOptionsInput === "human") {
+      if (this.dateOptionsInput === "humanTime") {
         return (dayjs as any)(value).fromNow();
       }
 
@@ -189,7 +189,7 @@ export class ResourceFieldBuilder {
     const output: {
       format?: string;
       timestamp?: number;
-      human?: string;
+      humanTime?: string;
       locale?: string;
     } = {};
 
@@ -207,8 +207,8 @@ export class ResourceFieldBuilder {
       output.timestamp = dayjsObject.valueOf();
     }
 
-    if (this.dateOptionsInput.human) {
-      output.human = (dayjsObject as any).fromNow();
+    if (this.dateOptionsInput.humanTime) {
+      output.humanTime = (dayjsObject as any).fromNow();
     }
 
     if (this.dateOptionsInput.locale) {

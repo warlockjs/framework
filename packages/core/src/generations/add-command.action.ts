@@ -1,5 +1,5 @@
 import { colors } from "@mongez/copper";
-import { fileExistsAsync, jsonFileAsync, putFileAsync } from "@mongez/fs";
+import { fileExistsAsync, jsonFileAsync, putFileAsync, putJsonFileAsync } from "@mongez/fs";
 import { execSync } from "node:child_process";
 import { CommandActionData } from "../cli/types";
 import { rootPath, srcPath } from "../utils";
@@ -50,6 +50,7 @@ const featuresMap: Record<
     dependencies?: Record<string, string>;
     devDependencies?: Record<string, string>;
     description: string;
+    script?: Record<string, string>;
     onExecuting?: (options: CommandActionData) => Promise<any>;
     ejectConfig?: {
       content: string;
@@ -137,6 +138,10 @@ const featuresMap: Record<
   test: {
     description: "Installs warlock test for testing",
     onExecuting: completeTestInstallation,
+    script: {
+      test: "vitest",
+      "test:coverage": "vitest --coverage",
+    },
     devDependencies: {
       "@mongez/vite": "^2.0.4",
       vite: "^7.3.1",
@@ -184,6 +189,7 @@ export async function addCommandAction(options: CommandActionData) {
   const dependencies: Record<string, string> = {};
   const devDependencies: Record<string, string> = {};
   const ejectConfigs: Record<string, { content: string; name: string }> = {};
+  const scripts: Record<string, string> = {};
 
   for (const feature of features) {
     const featurePackages = featuresMap[feature as keyof typeof featuresMap];
@@ -194,6 +200,10 @@ export async function addCommandAction(options: CommandActionData) {
 
     if (featurePackages.ejectConfig) {
       ejectConfigs[featurePackages.ejectConfig.name] = featurePackages.ejectConfig;
+    }
+
+    if (featurePackages.script) {
+      Object.assign(scripts, featurePackages.script);
     }
   }
 
@@ -268,6 +278,16 @@ export async function addCommandAction(options: CommandActionData) {
     if (featurePackages.onExecuting) {
       await featurePackages.onExecuting(options);
     }
+  }
+
+  if (Object.keys(scripts).length > 0) {
+    console.log(`Adding scripts ${colors.magenta(Object.keys(scripts).join(", "))}`);
+    const packageJsonPath = rootPath("package.json");
+    const packageJson = await jsonFileAsync(packageJsonPath);
+    Object.assign(packageJson.scripts, scripts);
+    await putJsonFileAsync(packageJsonPath, packageJson);
+
+    console.log(`Scripts added successfully ${colors.green(Object.keys(scripts).join(", "))}`);
   }
 }
 
