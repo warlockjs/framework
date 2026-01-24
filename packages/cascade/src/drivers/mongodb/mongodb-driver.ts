@@ -263,7 +263,10 @@ export class MongoDbDriver implements DriverContract {
       );
       await client.connect();
       this.client = client;
-      this.database = client.db(this.config.database);
+      if (this.config.database) {
+        this.database = client.db(this.config.database);
+      }
+
       this.connected = true;
       log.success("database.mongodb", "connection", "Connected to database");
 
@@ -653,8 +656,8 @@ export class MongoDbDriver implements DriverContract {
   /**
    * Expose the underlying Mongo client for advanced consumers.
    */
-  public getClient(): MongoClient {
-    return this.getClientInstance();
+  public getClient<Client = MongoClient>(): Client {
+    return this.getClientInstance() as Client;
   }
 
   /**

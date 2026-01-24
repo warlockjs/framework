@@ -178,6 +178,13 @@ export class PostgresDriver implements DriverContract {
   }
 
   /**
+   * Get database native client
+   */
+  public getClient<Client = PgPool>(): Client {
+    return this.pool as Client;
+  }
+
+  /**
    * Check if the driver is currently connected.
    */
   public get isConnected(): boolean {

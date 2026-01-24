@@ -119,6 +119,8 @@ export interface DriverContract {
   connect(): Promise<void>;
   /** Close the underlying database connection/pool. */
   disconnect(): Promise<void>;
+  /** Get database native client */
+  getClient<Client = unknown>(): Client;
 
   /**
    * Serialize the given data
