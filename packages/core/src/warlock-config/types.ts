@@ -104,4 +104,27 @@ export type WarlockConfig = {
      */
     migrations?: Array<MigrationConstructor>;
   };
+
+  /**
+   * Testing configuration
+   *
+   * High-level test settings. For detailed test behavior,
+   * use config/tests.ts instead.
+   */
+  testing?: {
+    /**
+     * Additional glob patterns to include as test files.
+     * Added to the default patterns.
+     *
+     * @example ["src/shared/[ALL]/*.test.ts"]
+     */
+    include?: string[];
+
+    /**
+     * Glob patterns to exclude from test discovery.
+     *
+     * @example [[ALL]/*.integration.test.ts"]
+     */
+    exclude?: string[];
+  };
 };

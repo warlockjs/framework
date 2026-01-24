@@ -24,6 +24,7 @@ export * from "./restful";
 export * from "./router";
 export * from "./storage";
 export * from "./store";
+export * from "./tests";
 export * from "./utils";
 export * from "./validation";
 export * from "./warlock-config";

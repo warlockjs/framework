@@ -5,12 +5,52 @@ import { CommandActionData } from "../cli/types";
 import { rootPath, srcPath } from "../utils";
 import { communicatorsConfigStub } from "./stubs";
 
+async function completeTestInstallation(options: CommandActionData) {
+  // first check if `src/test-setup.ts` exists
+  const testSetupFilPath = srcPath("test-setup.ts");
+  const testSetupExists = await fileExistsAsync(testSetupFilPath);
+  // if not exists, then create it
+  if (!testSetupExists) {
+    await putFileAsync(
+      testSetupFilPath,
+      `import { setupTestVest } from "@warlock.js/core";
+
+await setupTestVest();
+`,
+    );
+
+    // now check if vite.config.ts exists
+    const viteConfigFilePath = rootPath("vite.config.ts");
+    const viteConfigExists = await fileExistsAsync(viteConfigFilePath);
+    // if not exists, then create it
+    if (!viteConfigExists) {
+      await putFileAsync(
+        viteConfigFilePath,
+        `import mongezVite from "@mongez/vite";
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  plugins: [mongezVite()],
+  test: {
+    setupFiles: ["./src/test-setup.ts"],
+    environment: "node",
+    globals: false,
+    include: ["src/app/*/**/*.test.ts", "src/app/*/**/*.test.ts"],
+  },
+});
+`,
+      );
+    }
+  }
+}
+
 const featuresMap: Record<
   string,
   {
-    dependencies: Record<string, string>;
+    dependencies?: Record<string, string>;
     devDependencies?: Record<string, string>;
     description: string;
+    onExecuting?: (options: CommandActionData) => Promise<any>;
     ejectConfig?: {
       content: string;
       name: string;
@@ -19,7 +59,7 @@ const featuresMap: Record<
 > = {
   react: {
     description:
-      "Installs React and React dom for SSR rendering, useful for sending mails using React components as well",
+      "Installs React and React dom for rendering React components (non-interactive), useful for sending mails and generating HTML",
     dependencies: {
       react: "^19.2.3",
       "react-dom": "^19.2.3",
@@ -92,6 +132,15 @@ const featuresMap: Record<
       "@aws-sdk/client-s3": "^3.955.0",
       "@aws-sdk/lib-storage": "^3.955.0",
       "@aws-sdk/s3-request-presigner": "^3.955.0",
+    },
+  },
+  test: {
+    description: "Installs warlock test for testing",
+    onExecuting: completeTestInstallation,
+    devDependencies: {
+      "@mongez/vite": "^2.0.4",
+      vite: "^7.3.1",
+      vitest: "^4.0.16",
     },
   },
   herald: {
@@ -211,6 +260,14 @@ export async function addCommandAction(options: CommandActionData) {
     await putFileAsync(srcPath(`config/${name}.ts`), config.content);
 
     console.log(`${colors.green(name)} config created successfully`);
+  }
+
+  // now loop again over features to execute onExecuting
+  for (const feature of features) {
+    const featurePackages = featuresMap[feature as keyof typeof featuresMap];
+    if (featurePackages.onExecuting) {
+      await featurePackages.onExecuting(options);
+    }
   }
 }
 
