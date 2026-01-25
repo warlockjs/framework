@@ -1,4 +1,4 @@
-import { get, merge, only, set, unset } from "@mongez/reinforcements";
+import { type GenericObject, get, merge, only, set, unset } from "@mongez/reinforcements";
 import type { ObjectValidator } from "@warlock.js/seal";
 import type {
   PaginationOptions,
@@ -853,10 +853,10 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * Increment the given field by the given amount
    */
   public increment<TKey extends keyof TSchema & string>(field: TKey, amount: number): this;
-  public increment(field: string, amount: number): this;
-  public increment(field: string, amount: number): this {
+  public increment(field: string, amount?: number): this;
+  public increment(field: string, amount?: number): this {
     const value = this.get(field, 0) as number;
-    const incrementedValue = value + amount;
+    const incrementedValue = value + (amount ?? 1);
     return this.set(field, incrementedValue);
   }
 
@@ -864,10 +864,10 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * Decrement the given field by the given amount
    */
   public decrement<TKey extends keyof TSchema & string>(field: TKey, amount: number): this;
-  public decrement(field: string, amount: number): this;
-  public decrement(field: string, amount: number): this {
+  public decrement(field: string, amount?: number): this;
+  public decrement(field: string, amount?: number): this {
     const value = this.get(field, 0) as number;
-    const decrementedValue = value - amount;
+    const decrementedValue = value - (amount ?? 1);
     return this.set(field, decrementedValue);
   }
 
@@ -917,6 +917,52 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   }
 
   /**
+   * Perform atomoic update from current model instance
+   * Please note that it would require the id to be existing in the current
+   * model instance
+   * @returns number of affected records
+   */
+  public async atomicUpdate(operations: Record<string, unknown>): Promise<number> {
+    return this.self().atomic({ id: this.id! }, operations);
+  }
+
+  /**
+   * Perform atomic increment
+   * This would issue a query update and update the given field without
+   * saving the model
+   */
+  public async atomicIncrement<T extends keyof TSchema & string>(
+    field: T,
+    amount: number = 1,
+  ): Promise<number> {
+    this.increment(field, amount);
+
+    return this.atomicUpdate({
+      $inc: {
+        [field]: amount,
+      },
+    });
+  }
+
+  /**
+   * Perform atomic decrement
+   * This would issue a query update and update the given field without
+   * saving the model
+   */
+  public async atomicDecrement<T extends keyof TSchema & string>(
+    field: T,
+    amount: number = 1,
+  ): Promise<number> {
+    this.decrement(field, amount);
+
+    return this.atomicUpdate({
+      $inc: {
+        [field]: -amount,
+      },
+    });
+  }
+
+  /**
    * Determine if current model is active
    */
   public get isActive(): boolean {
@@ -948,7 +994,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   /**
    * Check if current model record is created by the given user model
    */
-  public isCreatedBy(user: Model): boolean {
+  public isCreatedBy(user: Model | GenericObject): boolean {
     return this.get(`createdBy.id`) === user.id;
   }
 
