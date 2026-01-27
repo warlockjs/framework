@@ -1,6 +1,7 @@
 import { colors } from "@mongez/copper";
 import { loadEnv } from "@mongez/dotenv";
 import { ensureDirectoryAsync, fileExistsAsync } from "@mongez/fs";
+import { Application } from "../application";
 import { bootstrap } from "../bootstrap";
 import { loadConfigFiles } from "../config/load-config-files";
 import { connectorsManager } from "../dev2-server/connectors/connectors-manager";
@@ -449,6 +450,14 @@ export class CLICommandsManager {
    */
   protected async loadPreloaders(command: CLICommand) {
     const preloaders = command.commandPreload || {};
+
+    if (preloaders.runtimeStrategy) {
+      Application.setRuntimeStrategy(preloaders.runtimeStrategy);
+    }
+
+    if (preloaders.environemnt) {
+      Application.setEnvironment(preloaders.environemnt);
+    }
 
     await warlockConfigManager.load();
 

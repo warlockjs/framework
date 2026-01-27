@@ -78,6 +78,16 @@ export type CLICommandPreload = {
   warlockConfig?: boolean;
 
   /**
+   * Set runtime strategy
+   */
+  runtimeStrategy?: "production" | "development";
+
+  /**
+   * Override current detect environment
+   */
+  environemnt?: "production" | "development" | "test";
+
+  /**
    * Whether to load environment variables from .env files.
    * Note: If `bootstrap` is true, env is loaded automatically.
    */

@@ -9,10 +9,22 @@ export class Application {
   public static readonly startedAt = new Date(Date.now() - process.uptime() * 1000);
 
   /**
+   * Runtime strategy
+   */
+  public static runtimeStrategy: "production" | "development";
+
+  /**
    * Get framework version
    */
   public static get version() {
     return getFrameworkVersion();
+  }
+
+  /**
+   * Set the runtime strategy
+   */
+  public static setRuntimeStrategy(strategy: "production" | "development") {
+    this.runtimeStrategy = strategy;
   }
 
   /**

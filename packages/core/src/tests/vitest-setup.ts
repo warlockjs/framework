@@ -10,17 +10,21 @@ import { Application } from "../application/application";
 import { bootstrap } from "../bootstrap";
 import { config } from "../config";
 import { loadConfigFiles } from "../config/load-config-files";
-import { connectorsManager } from "../dev2-server/connectors";
+import { ConnectorName, connectorsManager } from "../dev2-server/connectors";
 import { filesOrchestrator } from "../dev2-server/files-orchestrator";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 
 // Global flag to prevent duplicate setup within the same worker
 let isSetupComplete = false;
 
+type TestSetup = {
+  connectors?: boolean | ConnectorName[];
+};
+
 /**
  * Setup function that runs once per worker thread
  */
-export async function setupTestVest() {
+export async function setupTest({ connectors = true }: TestSetup) {
   // Skip if already set up in this worker
   if (isSetupComplete) {
     return;
@@ -40,8 +44,15 @@ export async function setupTestVest() {
     const testConfig = config.get<GenericObject>("tests");
 
     // 3. Start connectors (database, cache, etc.)
-    const connectorsToStart = testConfig.connectors;
-    await connectorsManager.start(connectorsToStart);
+    const connectorsToStart = testConfig.connectors || connectors;
+
+    // force not starting http since it will be used globally over all
+    // tests files
+    if (Array.isArray(connectorsToStart)) {
+      await connectorsManager.start(connectorsToStart);
+    } else {
+      await connectorsManager.startWithout(["http"]);
+    }
 
     isSetupComplete = true;
   } catch (error) {

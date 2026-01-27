@@ -5,7 +5,7 @@ import type { ChildModel, Model, QueryBuilderContract } from "@warlock.js/cascad
  */
 export type BaseQueryRuleOptions = {
   /** The Model to query against */
-  Model: ChildModel<Model>;
+  Model: ChildModel<Model> | string;
   /** Callback to customize the query */
   query?: (options: {
     query: QueryBuilderContract;

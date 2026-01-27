@@ -94,10 +94,11 @@ export class ProductionBuilder {
    * Generate bootstrap.ts - ensures bootstrap() runs first and sets production environment
    */
   private async generateBootstrap(): Promise<void> {
-    let content = `import { bootstrap, setEnvironment } from "@warlock.js/core";
+    let content = `import { bootstrap, Application } from "@warlock.js/core";
 
 // Set production environment
-setEnvironment("production");
+Application.setRuntimeStrategy("production");
+Application.setEnviornment("production");
 
 // Bootstrap the application
 bootstrap();

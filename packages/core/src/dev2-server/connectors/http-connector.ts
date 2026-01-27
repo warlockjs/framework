@@ -1,8 +1,8 @@
 import config from "@mongez/config";
+import { Application } from "../../application";
 import { registerHttpPlugins } from "../../http/plugins";
 import { getServer, startServer } from "../../http/server";
 import { router } from "../../router/router";
-import { environment } from "../../utils/environment";
 import { setBaseUrl } from "../../utils/urls";
 import { devLogError, devLogInfo, devLogSuccess } from "../dev-logger";
 import { BaseConnector } from "./base-connector";
@@ -37,7 +37,7 @@ export class HttpConnector extends BaseConnector {
 
     await registerHttpPlugins(server);
 
-    if (environment() === "development") {
+    if (Application.runtimeStrategy === "development") {
       router.scanDevServer(server);
     } else {
       router.scan(server);

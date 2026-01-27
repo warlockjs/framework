@@ -7,7 +7,7 @@
  * - And variants (exceptCurrentUser, exceptCurrentId)
  */
 
-import { getModelFromRegistry, type ChildModel, type Model } from "@warlock.js/cascade";
+import { type ChildModel, type Model } from "@warlock.js/cascade";
 import type { SealPlugin } from "@warlock.js/seal";
 import { NumberValidator, ScalarValidator, StringValidator } from "@warlock.js/seal";
 import type {
@@ -26,10 +26,6 @@ import {
   uniqueExceptCurrentUserRule,
   uniqueRule,
 } from "../database";
-
-function resolveModel(model: ChildModel<Model> | string): ChildModel<Model> {
-  return typeof model === "string" ? getModelFromRegistry(model)! : model;
-}
 
 /**
  * Database validation plugin for Seal
@@ -54,7 +50,7 @@ export const databasePlugin: SealPlugin = {
         const rule = this.addRule(uniqueRule, errorMessage);
         rule.context.options = {
           ...options,
-          Model: resolveModel(model),
+          Model: model,
         };
         return this;
       },
@@ -71,7 +67,7 @@ export const databasePlugin: SealPlugin = {
         const rule = this.addRule(uniqueExceptCurrentUserRule, errorMessage);
         rule.context.options = {
           ...options,
-          Model: resolveModel(model),
+          Model: model,
         };
         return this;
       },
@@ -88,7 +84,7 @@ export const databasePlugin: SealPlugin = {
         const rule = this.addRule(uniqueExceptCurrentIdRule, errorMessage);
         rule.context.options = {
           ...options,
-          Model: resolveModel(model),
+          Model: model,
         };
         return this;
       },
@@ -105,7 +101,7 @@ export const databasePlugin: SealPlugin = {
         const rule = this.addRule(existsRule, errorMessage);
         rule.context.options = {
           ...options,
-          Model: resolveModel(model),
+          Model: model,
         };
         return this;
       },
@@ -122,7 +118,7 @@ export const databasePlugin: SealPlugin = {
         const rule = this.addRule(existsExceptCurrentUserRule, errorMessage);
         rule.context.options = {
           ...options,
-          Model: resolveModel(model),
+          Model: model,
         };
         return this;
       },
@@ -139,7 +135,7 @@ export const databasePlugin: SealPlugin = {
         const rule = this.addRule(existsExceptCurrentIdRule, errorMessage);
         rule.context.options = {
           ...options,
-          Model: resolveModel(model),
+          Model: model,
         };
         return this;
       },

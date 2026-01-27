@@ -52,6 +52,17 @@ export class ConnectorsManager {
   }
 
   /**
+   * Start all connectors except the given ones
+   */
+  public async startWithout(excludedConnectors: ConnectorName[]): Promise<void> {
+    await this.start(
+      this.connectors
+        .filter((connector) => !excludedConnectors.includes(connector.name))
+        .map((connector) => connector.name),
+    );
+  }
+
+  /**
    * Shutdown all connectors
    */
   public async shutdown(): Promise<void> {

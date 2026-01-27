@@ -171,7 +171,7 @@ export class Resource implements ResourceContract {
       const inputValue = this.get(fieldKey);
       let outputValue: any;
 
-      if (Array.isArray(inputValue)) {
+      if (Array.isArray(inputValue) && valueTransformType !== "array") {
         outputValue = inputValue
           .map((item) => {
             const outputValue = this.transformValue(item, valueTransformType, localeCode);

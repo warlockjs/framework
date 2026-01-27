@@ -1,3 +1,4 @@
+import { resolveModelClass } from "@warlock.js/cascade";
 import { invalidRule, VALID_RULE, type SchemaRule } from "@warlock.js/seal";
 import { useRequestStore } from "../../http";
 import type { ExistsExceptCurrentIdRuleOptions } from "../types";
@@ -18,7 +19,9 @@ export const existsExceptCurrentIdRule: SchemaRule<ExistsExceptCurrentIdRuleOpti
 
     const { request } = useRequestStore();
 
-    const dbQuery = Model.query();
+    const ResolvedModelClass = resolveModelClass(Model);
+
+    const dbQuery = ResolvedModelClass.query();
 
     dbQuery.where(column, value);
     dbQuery.where(exceptCurrentIdColumn, "!=", request.int("id"));

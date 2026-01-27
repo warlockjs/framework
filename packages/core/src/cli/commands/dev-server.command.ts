@@ -7,6 +7,7 @@ export const devServerCommand = command({
   description: "Start development server",
   persistent: true,
   preload: {
+    runtimeStrategy: "development",
     config: true, // load all config
     bootstrap: true,
     prestart: true, // load prestart file (if exists)

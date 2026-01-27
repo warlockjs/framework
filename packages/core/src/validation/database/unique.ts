@@ -1,4 +1,5 @@
 import { get } from "@mongez/reinforcements";
+import { resolveModelClass } from "@warlock.js/cascade";
 import { invalidRule, VALID_RULE, type SchemaRule } from "@warlock.js/seal";
 import type { UniqueRuleOptions } from "../types";
 
@@ -18,7 +19,9 @@ export const uniqueRule: SchemaRule<UniqueRuleOptions> = {
       query,
     } = this.context.options;
 
-    const dbQuery = Model.query();
+    const ResolvedModelClass = resolveModelClass(Model);
+
+    const dbQuery = ResolvedModelClass.query();
 
     dbQuery.where(column, value);
 

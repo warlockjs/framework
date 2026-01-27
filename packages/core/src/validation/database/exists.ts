@@ -1,3 +1,4 @@
+import { resolveModelClass } from "@warlock.js/cascade";
 import { invalidRule, VALID_RULE, type SchemaRule } from "@warlock.js/seal";
 import type { ExistsRuleOptions } from "../types";
 
@@ -10,7 +11,9 @@ export const existsRule: SchemaRule<ExistsRuleOptions> = {
   async validate(value: any, context) {
     const { Model, query, column = context.key } = this.context.options;
 
-    const dbQuery = Model.query();
+    const ResolvedModelClass = resolveModelClass(Model);
+
+    const dbQuery = ResolvedModelClass.query();
 
     dbQuery.where(column, value);
 

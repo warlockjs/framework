@@ -1,3 +1,4 @@
+import { resolveModelClass } from "@warlock.js/cascade";
 import { invalidRule, VALID_RULE, type SchemaRule } from "@warlock.js/seal";
 import { useCurrentUser } from "../../http";
 import type { ExistsExceptCurrentUserRuleOptions } from "../types";
@@ -19,7 +20,9 @@ export const existsExceptCurrentUserRule: SchemaRule<ExistsExceptCurrentUserRule
 
     const user = useCurrentUser();
 
-    const dbQuery = Model.query();
+    const ResolvedModelClass = resolveModelClass(Model);
+
+    const dbQuery = ResolvedModelClass.query();
 
     dbQuery.where(column, value);
 
