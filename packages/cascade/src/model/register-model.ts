@@ -122,3 +122,7 @@ export function cleanupModelsRegistery() {
 export function removeModelFromRegistery(name: string) {
   modelsRegistry.delete(name);
 }
+
+export function resolveModelClass(model: ChildModel<Model> | string): ChildModel<Model> {
+  return typeof model === "string" ? getModelFromRegistry(model)! : model;
+}
