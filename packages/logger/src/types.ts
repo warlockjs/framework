@@ -1,75 +1,104 @@
-/**
- * Time unit types for scheduling intervals
- */
-export type TimeType = "second" | "minute" | "hour" | "day" | "week" | "month" | "year";
+import type { LogChannel } from "./log-channel";
+import type { Logger } from "./logger";
 
-/**
- * Days of the week (lowercase for consistency)
- */
-export type Day =
-  | "sunday"
-  | "monday"
-  | "tuesday"
-  | "wednesday"
-  | "thursday"
-  | "friday"
-  | "saturday";
+export type LogLevel = "debug" | "info" | "warn" | "error" | "success";
 
-/**
- * Job interval configuration
- */
-export type JobIntervals = {
-  /** Day of week or day of month */
-  day?: Day | number;
-  /** Time of day in HH:mm format */
-  time?: string;
-  /** Recurring interval configuration */
-  every?: {
-    type?: TimeType;
-    value?: number;
+export type DebugMode = "daily" | "monthly" | "yearly" | "hourly";
+
+export type BasicLogConfigurations = {
+  /**
+   * Set what level of logs should be logged
+   *
+   * @default all
+   */
+  levels?: LogLevel[];
+  /**
+   * Date and time format
+   */
+  dateFormat?: {
+    date?: string;
+    time?: string;
   };
+  /**
+   * Advanced filter to determine if the message should be logged or not
+   */
+  filter: (data: LoggingData) => boolean;
+  /**
+   * Add additional context to the log
+   */
+  context?: (data: LoggingData) => Promise<Record<string, any>>;
 };
 
-/**
- * Result of a job execution
- */
-export type JobResult = {
-  /** Whether the job completed successfully */
-  success: boolean;
-  /** Execution duration in milliseconds */
-  duration: number;
-  /** Error if the job failed */
-  error?: unknown;
-  /** Number of retry attempts made */
-  retries?: number;
+export type LogMessage = {
+  content: string;
+  level: LogLevel;
+  date: string;
+  module: string;
+  action: string;
+  stack?: string;
 };
 
-/**
- * Job execution status
- */
-export type JobStatus = "idle" | "running" | "completed" | "failed";
+export interface LogContract {
+  /**
+   * Channel name
+   */
+  name: string;
 
-/**
- * Retry configuration for jobs
- */
-export type RetryConfig = {
-  /** Maximum number of retry attempts */
-  maxRetries: number;
-  /** Delay between retries in milliseconds */
-  delay: number;
-  /** Backoff multiplier for exponential backoff */
-  backoffMultiplier?: number;
+  /**
+   * Channel description
+   */
+  description?: string;
+
+  /**
+   * Determine if channel is logging in terminal
+   */
+  terminal?: boolean;
+
+  /**
+   * Log the given message
+   */
+  log(data: LoggingData): void | Promise<void>;
+}
+
+export type LoggingData = {
+  type: "info" | "debug" | "warn" | "error" | "success";
+  module: string;
+  action: string;
+  message: any;
+  context?: Record<string, any>;
 };
 
-/**
- * Scheduler event types for observability
- */
-export type SchedulerEvents = {
-  "job:start": [jobName: string];
-  "job:complete": [jobName: string, result: JobResult];
-  "job:error": [jobName: string, error: unknown];
-  "job:skip": [jobName: string, reason: string];
-  "scheduler:started": [];
-  "scheduler:stopped": [];
-  "scheduler:tick": [timestamp: Date];
-};
+export type OmittedLoggingData = Omit<LoggingData, "type">;
+
+export interface Log {
+  (data: LoggingData): Promise<Logger>;
+  /**
+   * Make info log
+   */
+  info(data: OmittedLoggingData): Promise<Logger>;
+  info(module: string, action: string, message: any): Promise<Logger>;
+  /**
+   * Make debug log
+   */
+  debug(data: OmittedLoggingData): Promise<Logger>;
+  debug(module: string, action: string, message: any): Promise<Logger>;
+  /**
+   * Make warn log
+   */
+  warn(data: OmittedLoggingData): Promise<Logger>;
+  warn(module: string, action: string, message: any): Promise<Logger>;
+  /**
+   * Make error log
+   */
+  error(data: OmittedLoggingData): Promise<Logger>;
+  error(module: string, action: string, message: any): Promise<Logger>;
+  /**
+   * Make success log
+   */
+  success(data: OmittedLoggingData): Promise<Logger>;
+  success(module: string, action: string, message: any): Promise<Logger>;
+  /**
+   * Get channel by name
+   */
+  channel(name: string): LogChannel | undefined;
+}
