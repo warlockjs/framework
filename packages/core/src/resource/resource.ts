@@ -24,11 +24,6 @@ export interface ResourceContract {
   data: GenericObject;
 
   /**
-   * Output shape
-   */
-  schema: ResourceSchema;
-
-  /**
    * Convert resource to JSON
    */
   toJSON(): GenericObject;
@@ -118,9 +113,39 @@ export class Resource implements ResourceContract {
   public data: GenericObject = {};
 
   /**
-   * Output shape
+   * Raw resource schema — field declarations as written by the developer.
+   * Used by doc generators for introspection.
    */
-  public schema: ResourceSchema = {};
+  public static schema: ResourceSchema = {};
+
+  /**
+   * Normalized schema — all string cast types and tuples converted to
+   * ResourceFieldBuilder instances at definition time. Used by transformOutput at runtime.
+   */
+  public static parsedSchema: Record<string, ResourceFieldConfig> = {};
+
+  /**
+   * Normalize a raw schema into parsedSchema.
+   * Converts string cast types (including suffixes) and tuples into pre-built builders.
+   * Other entry types (ResourceConstructor, resolver functions, ResourceArraySchema) are kept as-is.
+   */
+  public static normalizeSchema(schema: ResourceSchema): Record<string, ResourceFieldConfig> {
+    const parsed: Record<string, ResourceFieldConfig> = {};
+
+    for (const [key, value] of Object.entries(schema)) {
+      if (typeof value === "string") {
+        parsed[key] = ResourceFieldBuilder.fromCastType(value);
+      } else if (Array.isArray(value) && value.length === 2 && typeof value[0] === "string") {
+        const builder = ResourceFieldBuilder.fromCastType(value[1] as string);
+        builder.setInputKey(value[0]);
+        parsed[key] = builder;
+      } else {
+        parsed[key] = value;
+      }
+    }
+
+    return parsed;
+  }
 
   /**
    * Constructor
@@ -155,34 +180,17 @@ export class Resource implements ResourceContract {
   }
 
   /**
-   * Transform resource to output
+   * Transform resource to output using the pre-normalized parsedSchema.
+   * Builders handle their own array/nullable logic internally.
+   * ResourceConstructor and ResourceArraySchema handle arrays in transformValue.
    */
   protected transformOutput() {
     const localeCode = useRequestStore()?.request?.locale;
-    for (const [outputKey, outputSettings] of Object.entries(this.schema)) {
-      let fieldKey = outputKey;
-      let valueTransformType = outputSettings as ResourceFieldConfig;
+    const parsedSchema = (this.constructor as typeof Resource).parsedSchema;
 
-      if (Array.isArray(outputSettings)) {
-        fieldKey = outputSettings[0];
-        valueTransformType = outputSettings[1];
-      }
-
-      const inputValue = this.get(fieldKey);
-      let outputValue: any;
-
-      if (Array.isArray(inputValue) && valueTransformType !== "array") {
-        outputValue = inputValue
-          .map((item) => {
-            const outputValue = this.transformValue(item, valueTransformType, localeCode);
-            if (outputValue !== undefined) {
-              return outputValue;
-            }
-          })
-          .filter((value) => value !== undefined);
-      } else {
-        outputValue = this.transformValue(inputValue, valueTransformType, localeCode);
-      }
+    for (const [outputKey, outputSettings] of Object.entries(parsedSchema)) {
+      const inputValue = this.get(outputKey);
+      const outputValue = this.transformValue(inputValue, outputSettings, localeCode);
 
       if (outputValue !== undefined) {
         this.set(outputKey, outputValue);
@@ -198,23 +206,26 @@ export class Resource implements ResourceContract {
   }
 
   /**
-   * Transform the given value for the given output
+   * Transform the given value for the given output setting.
+   * After normalization, string cast types no longer reach here — they are pre-converted to builders.
    */
   protected transformValue(value: any, outputSettings: ResourceFieldConfig, locale?: string) {
     let outputValue: any;
 
-    // now check the value transform type
-    // if it's prototype instanceof Resource, then it's a nested resource
-    // if it's a function (but not a Resource class), then it's a resolver function
-    // if it's an instance of ResourceFieldBuilder, then it's a field builder
-    // if it's a ResourceArraySchema, then it's an array schema
-    // if it's a string, then it's a field cast type
     if (typeof outputSettings === "function" && outputSettings.prototype instanceof Resource) {
-      outputValue = new (outputSettings as typeof Resource)(value).toJSON();
+      // Nested resource — handle both single and array values
+      if (Array.isArray(value)) {
+        outputValue = value
+          .map((item) => new (outputSettings as typeof Resource)(item).toJSON())
+          .filter((v) => v !== undefined);
+      } else {
+        outputValue = new (outputSettings as typeof Resource)(value).toJSON();
+      }
     } else if (typeof outputSettings === "function") {
-      // Handle resolver function - bind to Resource instance for access to this.get(), etc.
+      // Resolver function - bind to Resource instance for access to this.get(), etc.
       outputValue = (outputSettings as Function).call(this, value, this);
     } else if (outputSettings instanceof ResourceFieldBuilder) {
+      // Builder — handles array mapping and nullable internally via isArrayField
       const inputKey = outputSettings.getInputKey();
       outputValue = outputSettings.transform(inputKey ? this.get(inputKey) : value, locale);
     } else if (
@@ -223,13 +234,14 @@ export class Resource implements ResourceContract {
       "__type" in outputSettings &&
       outputSettings.__type === "arrayOf"
     ) {
-      // Handle array schema - value here is a single array item, not the whole array
-      // The parent transformOutput already handles the array mapping
-      outputValue = this.transformArrayItem(value, outputSettings.schema, locale);
-    } else if (typeof outputSettings === "string") {
-      outputValue = new ResourceFieldBuilder(
-        outputSettings as ResourceOutputValueCastType,
-      ).transform(value, locale);
+      // ResourceArraySchema — structured array items with their own sub-schema
+      if (Array.isArray(value)) {
+        outputValue = value
+          .map((item) => this.transformArrayItem(item, outputSettings.schema, locale))
+          .filter((v) => v !== undefined);
+      } else {
+        outputValue = this.transformArrayItem(value, outputSettings.schema, locale);
+      }
     }
 
     return outputValue;

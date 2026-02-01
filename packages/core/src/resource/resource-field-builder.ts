@@ -18,6 +18,12 @@ export class ResourceFieldBuilder {
   protected isNullable = false;
 
   /**
+   * Whether this field is an array
+   * When true, transform() maps over each element using the base type
+   */
+  protected isArrayField = false;
+
+  /**
    * Default value
    */
   protected defaultValue?: unknown;
@@ -59,6 +65,32 @@ export class ResourceFieldBuilder {
   }
 
   /**
+   * Parse a cast type string (including suffixes) into a configured builder.
+   * Suffix order: [] before ? (e.g. "string[]?")
+   * Parsing strips right-to-left: ? first, then [].
+   */
+  public static fromCastType(castType: string): ResourceFieldBuilder {
+    let baseType = castType;
+    let nullable = false;
+    let isArray = false;
+
+    if (baseType.endsWith("?")) {
+      nullable = true;
+      baseType = baseType.slice(0, -1);
+    }
+
+    if (baseType.endsWith("[]")) {
+      isArray = true;
+      baseType = baseType.slice(0, -2);
+    }
+
+    const builder = new ResourceFieldBuilder(baseType as ResourceOutputValueCastType);
+    if (nullable) builder.nullable();
+    if (isArray) builder.array();
+    return builder;
+  }
+
+  /**
    * Set input key
    * Will be used in transformation if provided
    */
@@ -81,6 +113,15 @@ export class ResourceFieldBuilder {
    */
   public nullable() {
     this.isNullable = true;
+    return this;
+  }
+
+  /**
+   * Mark this field as an array
+   * transform() will map over each element using the base type
+   */
+  public array() {
+    this.isArrayField = true;
     return this;
   }
 
@@ -120,28 +161,52 @@ export class ResourceFieldBuilder {
   }
 
   /**
-   * Transform the value
+   * Transform the value.
+   * When isArrayField is true, maps over each element using transformSingleValue.
    */
   public transform(value: any, locale?: string) {
-    if (value === undefined) return this.defaultValue;
+    if (this.isArrayField) {
+      if (!Array.isArray(value)) {
+        return this.isNullable ? null : [];
+      }
 
-    if (this.condition && !this.condition()) return this.defaultValue;
+      return value
+        .map((item) => this.transformSingleValue(item, locale))
+        .filter((v) => v !== undefined);
+    }
 
-    if (value === null) {
+    return this.transformSingleValue(value, locale);
+  }
+
+  /**
+   * Transform a single value according to the base type.
+   */
+  protected transformSingleValue(value: any, locale?: string) {
+    if (value === undefined || value === null) {
+      return this.isNullable ? null : this.defaultValue;
+    }
+
+    if (this.condition && !this.condition()) {
       return this.isNullable ? null : this.defaultValue;
     }
 
     switch (this.type) {
       case "string":
         return String(value);
-      case "number":
-        return Number(value);
+      case "number": {
+        const num = Number(value);
+        return isNaN(num) ? (this.isNullable ? null : undefined) : num;
+      }
       case "boolean":
         return Boolean(value);
-      case "float":
-        return parseFloat(value);
-      case "int":
-        return parseInt(value);
+      case "float": {
+        const float = parseFloat(value);
+        return isNaN(float) ? (this.isNullable ? null : undefined) : float;
+      }
+      case "int": {
+        const int = parseInt(value);
+        return isNaN(int) ? (this.isNullable ? null : undefined) : int;
+      }
       case "date":
         return this.transformDate(value as string | Date, locale);
       case "localized":
@@ -153,9 +218,9 @@ export class ResourceFieldBuilder {
       case "storageUrl":
         return storage.url(value as string);
       case "object":
-        return isObject(value) && !Array.isArray(value) ? value : undefined;
+        return isObject(value) && !Array.isArray(value) ? value : (this.isNullable ? null : undefined);
       case "array":
-        return Array.isArray(value) ? value : undefined;
+        return Array.isArray(value) ? value : (this.isNullable ? null : undefined);
     }
   }
 

@@ -67,8 +67,8 @@ export type DefineResourceOptions = {
  * ```
  */
 export function defineResource(options: DefineResourceOptions): ResourceConstructor {
-  return class AnonymousResource extends Resource {
-    public schema = options.schema;
+  const resource = class AnonymousResource extends Resource {
+    static schema = options.schema;
 
     protected boot() {
       if (options.boot) {
@@ -85,5 +85,11 @@ export function defineResource(options: DefineResourceOptions): ResourceConstruc
         options.transform.call(this, this.data, this);
       }
     }
-  } as any as ResourceConstructor;
+  };
+
+  // Normalize schema once at definition time — converts string cast types
+  // (including [] and ? suffixes) into pre-built ResourceFieldBuilder instances
+  resource.parsedSchema = Resource.normalizeSchema(resource.schema);
+
+  return resource as any as ResourceConstructor;
 }

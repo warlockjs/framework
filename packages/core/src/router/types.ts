@@ -2,6 +2,7 @@ import type { GenericObject } from "@mongez/reinforcements";
 import type { ObjectValidator } from "@warlock.js/seal";
 import type { RouteShorthandOptions } from "fastify";
 import type { Request, Response, ReturnedResponse } from "../http";
+import type { ResponseSchema } from "../resource/types";
 
 /**
  * Middleware response
@@ -82,6 +83,12 @@ export type RequestHandler<TRequest extends Request = Request> = {
    * Request Handler Description
    */
   description?: string;
+
+  /**
+   * Response schema for documentation / OpenAPI generation.
+   * Keyed by HTTP status code. Each entry declares the expected response body shape.
+   */
+  responseSchema?: ResponseSchema;
 };
 
 export interface RouteOptions {
