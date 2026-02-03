@@ -7,6 +7,7 @@ import type {
   GeoIndexOptions,
   IndexDefinition,
   MigrationDriverContract,
+  TableIndexInformation,
   VectorIndexOptions,
 } from "../../contracts/migration-driver.contract";
 import type { MongoDbDriver } from "./mongodb-driver";
@@ -123,11 +124,39 @@ export class MongoMigrationDriver implements MigrationDriverContract {
   }
 
   /**
+   * Truncate a collection — remove all documents.
+   *
+   * @param table - Collection name
+   */
+  public async truncateTable(table: string): Promise<void> {
+    await this.db.collection(table).deleteMany({});
+  }
+
+  /**
    * Check if a collection exists.
    */
   public async tableExists(table: string): Promise<boolean> {
     const collections = await this.db.listCollections({ name: table }).toArray();
     return collections.length > 0;
+  }
+
+  /**
+   * List all columns in a collection.
+   *
+   * MongoDB is schema-less, so this returns an empty array.
+   * For actual schema inspection, would need to sample documents.
+   */
+  public async listColumns(_table: string): Promise<ColumnDefinition[]> {
+    // No-op: MongoDB is schema-less
+    return [];
+  }
+
+  /**
+   * List all collections in the current database.
+   */
+  public async listTables(): Promise<string[]> {
+    const collections = await this.db.listCollections().toArray();
+    return collections.map((col) => col.name);
   }
 
   /**
@@ -207,8 +236,20 @@ export class MongoMigrationDriver implements MigrationDriverContract {
 
   /**
    * Create an index on one or more columns.
+   *
+   * **Note**: Expression-based indexes, INCLUDE clause, and concurrent creation
+   * are PostgreSQL-specific features and are silently ignored by MongoDB.
    */
   public async createIndex(table: string, index: IndexDefinition): Promise<void> {
+    // Skip expression-based indexes (PostgreSQL-specific)
+    if (index.expressions && index.expressions.length > 0) {
+      // No-op: MongoDB doesn't support expression-based indexes
+      return;
+    }
+
+    // Ignore include and concurrently options (PostgreSQL-specific)
+    // MongoDB doesn't support covering indexes or concurrent creation
+
     const collection = this.db.collection(table);
 
     // Build index specification
@@ -483,6 +524,26 @@ export class MongoMigrationDriver implements MigrationDriverContract {
     }
   }
 
+  /**
+   * List all indexes on a collection.
+   *
+   * @param table - Collection name
+   * @returns Array of index metadata
+   */
+  public async listIndexes(table: string): Promise<TableIndexInformation[]> {
+    const collection = this.db.collection(table);
+    const indexes = await collection.indexes();
+
+    return indexes.map((idx) => ({
+      name: idx.name ?? "",
+      columns: Object.keys(idx.key ?? {}),
+      type: "btree",
+      unique: idx.unique ?? false,
+      partial: !!idx.partialFilterExpression,
+      options: { sparse: idx.sparse, expireAfterSeconds: idx.expireAfterSeconds },
+    }));
+  }
+
   // ============================================================================
   // CONSTRAINTS (No-ops for MongoDB)
   // ============================================================================
@@ -518,6 +579,23 @@ export class MongoMigrationDriver implements MigrationDriverContract {
    */
   public async dropPrimaryKey(_table: string): Promise<void> {
     // No-op: Cannot drop _id index in MongoDB
+  }
+
+  /**
+   * Add a CHECK constraint (no-op for MongoDB).
+   *
+   * MongoDB doesn't support CHECK constraints.
+   * Use schema validation instead.
+   */
+  public async addCheck(_table: string, _name: string, _expression: string): Promise<void> {
+    // No-op: MongoDB doesn't support CHECK constraints
+  }
+
+  /**
+   * Drop a CHECK constraint (no-op for MongoDB).
+   */
+  public async dropCheck(_table: string, _name: string): Promise<void> {
+    // No-op: MongoDB doesn't support CHECK constraints
   }
 
   // ============================================================================

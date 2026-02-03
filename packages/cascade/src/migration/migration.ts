@@ -5,6 +5,7 @@ import type {
   GeoIndexOptions,
   IndexDefinition,
   MigrationDriverContract,
+  TableIndexInformation,
   VectorIndexOptions,
 } from "../contracts/migration-driver.contract";
 import type { DataSource } from "../data-source/data-source";
@@ -37,11 +38,14 @@ type OperationType =
   | "dropForeignKey"
   | "addPrimaryKey"
   | "dropPrimaryKey"
+  | "addCheck"
+  | "dropCheck"
   | "createTable"
   | "createTableIfNotExists"
   | "dropTable"
   | "dropTableIfExists"
   | "renameTable"
+  | "truncateTable"
   | "setSchemaValidation"
   | "removeSchemaValidation";
 
@@ -151,6 +155,11 @@ export interface MigrationContract {
    * @param newName - New table name
    */
   renameTableTo(newName: string): MigrationContract;
+
+  /**
+   * Truncate the table — remove all rows without logging or firing triggers.
+   */
+  truncateTable(): MigrationContract;
 
   /**
    * Add a string/varchar column.
@@ -384,8 +393,16 @@ export interface MigrationContract {
 
   /**
    * Create an index on one or more columns.
+   *
+   * @param columns - Column(s) to index
+   * @param name - Optional index name
+   * @param options - Optional index options (include, concurrently)
    */
-  index(columns: string | string[], name?: string): MigrationContract;
+  index(
+    columns: string | string[],
+    name?: string,
+    options?: { include?: string[]; concurrently?: boolean },
+  ): MigrationContract;
 
   /**
    * Drop an index by name or columns.
@@ -394,13 +411,34 @@ export interface MigrationContract {
 
   /**
    * Create a unique constraint/index.
+   *
+   * @param columns - Column(s) to make unique
+   * @param name - Optional constraint name
+   * @param options - Optional index options (include, concurrently)
    */
-  unique(columns: string | string[], name?: string): MigrationContract;
+  unique(
+    columns: string | string[],
+    name?: string,
+    options?: { include?: string[]; concurrently?: boolean },
+  ): MigrationContract;
 
   /**
    * Drop a unique constraint/index.
    */
   dropUnique(columns: string | string[]): MigrationContract;
+
+  /**
+   * Create an expression-based index.
+   *
+   * @param expressions - SQL expression(s) to index, e.g., ['lower(email)', 'upper(name)']
+   * @param name - Optional index name
+   * @param options - Optional index options (concurrently)
+   */
+  expressionIndex(
+    expressions: string | string[],
+    name?: string,
+    options?: { concurrently?: boolean },
+  ): MigrationContract;
 
   /**
    * Create a full-text search index.
@@ -476,6 +514,36 @@ export interface MigrationContract {
    * Execute raw operations with direct driver access.
    */
   raw<T>(callback: (connection: unknown) => Promise<T>): Promise<T>;
+
+  /**
+   * Check if a table exists.
+   */
+  hasTable(tableName: string): Promise<boolean>;
+
+  /**
+   * Check if a column exists in the current table.
+   */
+  hasColumn(columnName: string): Promise<boolean>;
+
+  /**
+   * Get all columns in the current table.
+   */
+  getColumns(): Promise<ColumnDefinition[]>;
+
+  /**
+   * List all tables in the current database/connection.
+   */
+  listTables(): Promise<string[]>;
+
+  /**
+   * Get all indexes on the current table.
+   */
+  getIndexes(): Promise<TableIndexInformation[]>;
+
+  /**
+   * Check if a named index exists on the current table.
+   */
+  hasIndex(indexName: string): Promise<boolean>;
 }
 
 /**
@@ -601,11 +669,6 @@ export abstract class Migration implements MigrationContract {
    */
   private readonly pendingOperations: PendingOperation[] = [];
 
-  /**
-   * Pending indexes from column builders.
-   */
-  private readonly pendingIndexes: IndexDefinition[] = [];
-
   // ============================================================================
   // ABSTRACT METHODS
   // ============================================================================
@@ -699,23 +762,11 @@ export abstract class Migration implements MigrationContract {
    * @internal
    */
   public async execute(): Promise<void> {
-    // Execute column/table operations
     for (const op of this.pendingOperations) {
       await this.executeOperation(op);
     }
 
-    // Execute pending indexes from column builders
-    for (const index of this.pendingIndexes) {
-      if (index.unique) {
-        await this.driver.createUniqueIndex(this.table, index.columns, index.name);
-      } else {
-        await this.driver.createIndex(this.table, index);
-      }
-    }
-
-    // Clear pending operations after execution
     this.pendingOperations.length = 0;
-    this.pendingIndexes.length = 0;
   }
 
   /**
@@ -723,9 +774,19 @@ export abstract class Migration implements MigrationContract {
    */
   private async executeOperation(op: PendingOperation): Promise<void> {
     switch (op.type) {
-      case "addColumn":
-        await this.driver.addColumn(this.table, op.payload as ColumnDefinition);
+      case "addColumn": {
+        const column = op.payload as ColumnDefinition;
+        await this.driver.addColumn(this.table, column);
+
+        if (column.checkConstraint) {
+          await this.driver.addCheck(
+            this.table,
+            column.checkConstraint.name,
+            column.checkConstraint.expression,
+          );
+        }
         break;
+      }
 
       case "dropColumn":
         await this.driver.dropColumn(this.table, op.payload as string);
@@ -834,6 +895,16 @@ export abstract class Migration implements MigrationContract {
         await this.driver.dropPrimaryKey(this.table);
         break;
 
+      case "addCheck": {
+        const { name, expression } = op.payload as { name: string; expression: string };
+        await this.driver.addCheck(this.table, name, expression);
+        break;
+      }
+
+      case "dropCheck":
+        await this.driver.dropCheck(this.table, op.payload as string);
+        break;
+
       case "createTable":
         await this.driver.createTable(this.table);
         break;
@@ -854,6 +925,10 @@ export abstract class Migration implements MigrationContract {
         await this.driver.renameTable(this.table, op.payload as string);
         break;
 
+      case "truncateTable":
+        await this.driver.truncateTable(this.table);
+        break;
+
       case "setSchemaValidation":
         await this.driver.setSchemaValidation(this.table, op.payload as object);
         break;
@@ -865,6 +940,101 @@ export abstract class Migration implements MigrationContract {
   }
 
   // ============================================================================
+  // SCHEMA INSPECTION
+  // ============================================================================
+
+  /**
+   * Check if a table exists.
+   *
+   * Useful for conditional migrations and idempotent operations.
+   *
+   * @param tableName - Table name to check
+   * @returns Promise resolving to true if table exists
+   *
+   * @example
+   * ```typescript
+   * public async up() {
+   *   if (await this.hasTable("users_backup")) {
+   *     this.dropTable("users_backup");
+   *   }
+   *   // ... rest of migration
+   * }
+   * ```
+   */
+  public async hasTable(tableName: string): Promise<boolean> {
+    return this.driver.tableExists(tableName);
+  }
+
+  /**
+   * Check if a column exists in the current table.
+   *
+   * @param columnName - Column name to check
+   * @returns Promise resolving to true if column exists
+   *
+   * @example
+   * ```typescript
+   * public async up() {
+   *   if (!(await this.hasColumn("email"))) {
+   *     this.string("email").unique();
+   *   }
+   * }
+   * ```
+   */
+  public async hasColumn(columnName: string): Promise<boolean> {
+    const columns = await this.getColumns();
+    return columns.some((col) => col.name === columnName);
+  }
+
+  /**
+   * Get all columns in the current table.
+   *
+   * @returns Promise resolving to array of column definitions
+   *
+   * @example
+   * ```typescript
+   * const columns = await this.getColumns();
+   * if (columns.find(col => col.type === "string" && !col.length)) {
+   *   // migrate all unbounded strings
+   * }
+   * ```
+   */
+  public async getColumns(): Promise<ColumnDefinition[]> {
+    return this.driver.listColumns(this.table);
+  }
+
+  /**
+   * List all tables in the current database/connection.
+   *
+   * @returns Promise resolving to array of table names
+   *
+   * @example
+   * ```typescript
+   * const tables = await this.listTables();
+   * for (const table of tables) {
+   *   // process each table
+   * }
+   * ```
+   */
+  public async listTables(): Promise<string[]> {
+    return this.driver.listTables();
+  }
+
+  /**
+   * Get all indexes on the current table.
+   */
+  public async getIndexes(): Promise<TableIndexInformation[]> {
+    return this.driver.listIndexes(this.table);
+  }
+
+  /**
+   * Check if a named index exists on the current table.
+   */
+  public async hasIndex(indexName: string): Promise<boolean> {
+    const indexes = await this.getIndexes();
+    return indexes.some((idx) => idx.name === indexName);
+  }
+
+  // ============================================================================
   // INTERNAL HELPERS
   // ============================================================================
 
@@ -872,18 +1042,30 @@ export abstract class Migration implements MigrationContract {
    * Add a pending index definition.
    *
    * Called by ColumnBuilder when .unique() or .index() is chained.
+   * Routes into pendingOperations so indexes execute in definition order
+   * alongside columns and constraints.
    *
    * @param index - Index definition
    * @internal
    */
   public addPendingIndex(index: IndexDefinition): void {
-    this.pendingIndexes.push(index);
+    if (index.unique) {
+      this.pendingOperations.push({
+        type: "createUniqueIndex",
+        payload: { columns: index.columns, name: index.name },
+      });
+    } else {
+      this.pendingOperations.push({
+        type: "createIndex",
+        payload: index,
+      });
+    }
   }
 
   /**
    * Add a foreign key operation.
    *
-   * Called by ForeignKeyBuilder when .add() is called.
+   * Called by ForeignKeyBuilder or ColumnBuilder when .references() is called.
    *
    * @param fk - Foreign key definition
    * @internal
@@ -950,6 +1132,19 @@ export abstract class Migration implements MigrationContract {
    */
   public renameTableTo(newName: string): this {
     this.pendingOperations.push({ type: "renameTable", payload: newName });
+    return this;
+  }
+
+  /**
+   * Truncate the table — remove all rows without logging or firing triggers.
+   *
+   * Faster than DELETE with no WHERE clause. Resets auto-increment counters
+   * on most databases.
+   *
+   * @returns This migration for chaining
+   */
+  public truncateTable(): this {
+    this.pendingOperations.push({ type: "truncateTable", payload: null });
     return this;
   }
 
@@ -1659,19 +1854,31 @@ export abstract class Migration implements MigrationContract {
    *
    * @param columns - Column(s) to index
    * @param name - Optional index name
+   * @param options - Optional index options (include, concurrently)
    * @returns This migration for chaining
    *
    * @example
    * ```typescript
    * this.index("email");
    * this.index(["firstName", "lastName"], "name_idx");
+   * this.index("userId", "idx_user", { include: ["name", "email"] });
+   * this.index("email", "idx_email", { concurrently: true });
    * ```
    */
-  public index(columns: string | string[], name?: string): this {
+  public index(
+    columns: string | string[],
+    name?: string,
+    options?: { include?: string[]; concurrently?: boolean },
+  ): this {
     const cols = Array.isArray(columns) ? columns : [columns];
     this.pendingOperations.push({
       type: "createIndex",
-      payload: { columns: cols, name } as IndexDefinition,
+      payload: {
+        columns: cols,
+        name,
+        include: options?.include,
+        concurrently: options?.concurrently,
+      } as IndexDefinition,
     });
     return this;
   }
@@ -1701,13 +1908,30 @@ export abstract class Migration implements MigrationContract {
    *
    * @param columns - Column(s) to make unique
    * @param name - Optional constraint name
+   * @param options - Optional index options (include, concurrently)
    * @returns This migration for chaining
+   *
+   * @example
+   * ```typescript
+   * this.unique("email");
+   * this.unique(["userId", "roleId"], "unique_user_role");
+   * this.unique("email", "unique_email", { include: ["name"] });
+   * ```
    */
-  public unique(columns: string | string[], name?: string): this {
+  public unique(
+    columns: string | string[],
+    name?: string,
+    options?: { include?: string[]; concurrently?: boolean },
+  ): this {
     const cols = Array.isArray(columns) ? columns : [columns];
     this.pendingOperations.push({
       type: "createUniqueIndex",
-      payload: { columns: cols, name },
+      payload: {
+        columns: cols,
+        name,
+        include: options?.include,
+        concurrently: options?.concurrently,
+      },
     });
     return this;
   }
@@ -1721,6 +1945,49 @@ export abstract class Migration implements MigrationContract {
   public dropUnique(columns: string | string[]): this {
     const cols = Array.isArray(columns) ? columns : [columns];
     this.pendingOperations.push({ type: "dropUniqueIndex", payload: cols });
+    return this;
+  }
+
+  /**
+   * Create an expression-based index.
+   *
+   * Allows indexing on SQL expressions rather than plain columns.
+   * Useful for case-insensitive searches, computed values, etc.
+   *
+   * **Note**: PostgreSQL-specific feature. MongoDB will silently ignore this.
+   *
+   * @param expressions - SQL expression(s) to index
+   * @param name - Optional index name
+   * @param options - Optional index options (concurrently)
+   * @returns This migration for chaining
+   *
+   * @example
+   * ```typescript
+   * // Case-insensitive email index
+   * this.expressionIndex(['lower(email)'], 'idx_email_lower');
+   *
+   * // Multiple expressions
+   * this.expressionIndex(['lower(firstName)', 'lower(lastName)'], 'idx_name_lower');
+   *
+   * // With concurrent creation (requires transactional = false)
+   * this.expressionIndex(['lower(email)'], 'idx_email_lower', { concurrently: true });
+   * ```
+   */
+  public expressionIndex(
+    expressions: string | string[],
+    name?: string,
+    options?: { concurrently?: boolean },
+  ): this {
+    const exprs = Array.isArray(expressions) ? expressions : [expressions];
+    this.pendingOperations.push({
+      type: "createIndex",
+      payload: {
+        columns: [], // Empty columns for expression indexes
+        expressions: exprs,
+        name,
+        concurrently: options?.concurrently,
+      } as IndexDefinition,
+    });
     return this;
   }
 
@@ -1894,11 +2161,63 @@ export abstract class Migration implements MigrationContract {
   }
 
   // ============================================================================
+  // CHECK CONSTRAINTS
+  // ============================================================================
+
+  /**
+   * Add a CHECK constraint to the table.
+   *
+   * SQL-only feature. PostgreSQL, MySQL 8.0+, SQLite support this.
+   * Validates that rows satisfy the given SQL expression.
+   *
+   * @param name - Constraint name
+   * @param expression - SQL CHECK expression
+   * @returns This migration for chaining
+   *
+   * @example
+   * ```typescript
+   * this.check("age_positive", "age >= 0");
+   * this.check("valid_email", "email LIKE '%@%'");
+   * this.check("price_range", "price BETWEEN 0 AND 1000000");
+   * ```
+   */
+  public check(name: string, expression: string): this {
+    this.pendingOperations.push({
+      type: "addCheck",
+      payload: { name, expression },
+    });
+    return this;
+  }
+
+  /**
+   * Drop a CHECK constraint by name.
+   *
+   * @param name - Constraint name
+   * @returns This migration for chaining
+   *
+   * @example
+   * ```typescript
+   * this.dropCheck("age_positive");
+   * ```
+   */
+  public dropCheck(name: string): this {
+    this.pendingOperations.push({
+      type: "dropCheck",
+      payload: name,
+    });
+    return this;
+  }
+
+  // ============================================================================
   // FOREIGN KEYS (SQL)
   // ============================================================================
 
   /**
-   * Start building a foreign key constraint.
+   * Start building a foreign key constraint on an existing column.
+   *
+   * Use this when adding a foreign key to a column that was defined in a
+   * previous migration. For new columns, prefer the inline form:
+   * `this.integer("user_id").references("users").onDelete("cascade")`
    *
    * SQL-only feature; NoSQL drivers ignore foreign keys.
    *
@@ -1909,8 +2228,7 @@ export abstract class Migration implements MigrationContract {
    * ```typescript
    * this.foreign("user_id")
    *   .references("users", "id")
-   *   .onDelete("cascade")
-   *   .add();
+   *   .onDelete("cascade");
    * ```
    */
   public foreign(column: string): ForeignKeyBuilder {
@@ -2002,8 +2320,8 @@ export function migrate(
   options?: {
     createdAt?: string;
     name?: string;
-    up?: (this: MigrationContract) => void;
-    down?: (this: MigrationContract) => void;
+    up?: (this: MigrationContract) => void | Promise<void>;
+    down?: (this: MigrationContract) => void | Promise<void>;
     transactional?: boolean;
   },
 ): MigrationConstructor {
@@ -2014,11 +2332,11 @@ export function migrate(
     public static transactional?: boolean = options?.transactional;
 
     public async up() {
-      options?.up?.call(this);
+      await options?.up?.call(this);
     }
 
     public async down() {
-      options?.down?.call(this);
+      await options?.down?.call(this);
     }
   };
 }

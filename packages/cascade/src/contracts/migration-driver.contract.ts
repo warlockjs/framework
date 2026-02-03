@@ -1,5 +1,7 @@
 import type { DataSource } from "../data-source/data-source";
 import type { DriverContract } from "./database-driver.contract";
+import type { TableIndexInformation } from "./driver-blueprint.contract";
+export type { TableIndexInformation };
 
 /**
  * Column data types supported across all database drivers.
@@ -53,8 +55,10 @@ export type ColumnDefinition = {
   scale?: number;
   /** Whether the column allows NULL values */
   nullable?: boolean;
-  /** Default value for the column */
+  /** Default value for the column (can be a primitive, SQL string, or {__type: 'CURRENT_TIMESTAMP'}) */
   defaultValue?: unknown;
+  /** MySQL: ON UPDATE CURRENT_TIMESTAMP */
+  onUpdateCurrent?: boolean;
   /** Whether this is a primary key */
   primary?: boolean;
   /** Whether this column auto-increments */
@@ -69,6 +73,27 @@ export type ColumnDefinition = {
   values?: string[];
   /** Vector dimensions (for vector type) */
   dimensions?: number;
+
+  // Column positioning (MySQL/MariaDB only)
+  /** Position this column after another column */
+  after?: string;
+  /** Position this column as the first column in the table */
+  first?: boolean;
+
+  // Generated columns
+  /** Generated column configuration */
+  generated?: {
+    /** SQL expression to compute the value */
+    expression: string;
+    /** true = STORED (persisted), false = VIRTUAL (computed on read) */
+    stored: boolean;
+  };
+
+  /** Inline CHECK constraint on this column */
+  checkConstraint?: {
+    expression: string;
+    name: string;
+  };
 };
 
 /**
@@ -89,6 +114,12 @@ export type IndexDefinition = {
   readonly sparse?: boolean;
   /** Sort direction for each column */
   readonly directions?: Array<"asc" | "desc">;
+  /** Expression-based index (PostgreSQL) - e.g., ['lower(email)', 'upper(name)'] */
+  readonly expressions?: string[];
+  /** Covering index columns (PostgreSQL INCLUDE clause) */
+  readonly include?: string[];
+  /** Create index concurrently without blocking writes (PostgreSQL) */
+  readonly concurrently?: boolean;
 };
 
 /**
@@ -203,12 +234,34 @@ export interface MigrationDriverContract {
   renameTable(from: string, to: string): Promise<void>;
 
   /**
+   * Truncate a table — remove all rows efficiently.
+   *
+   * @param table - Table name
+   */
+  truncateTable(table: string): Promise<void>;
+
+  /**
    * Check if a table or collection exists.
    *
    * @param table - Table/collection name
    * @returns True if table exists
    */
   tableExists(table: string): Promise<boolean>;
+
+  /**
+   * List all columns in a table.
+   *
+   * @param table - Table name
+   * @returns Array of column definitions
+   */
+  listColumns(table: string): Promise<ColumnDefinition[]>;
+
+  /**
+   * List all tables in the current database/connection.
+   *
+   * @returns Array of table names
+   */
+  listTables(): Promise<string[]>;
 
   /**
    * Ensure the migrations tracking table exists.
@@ -387,6 +440,14 @@ export interface MigrationDriverContract {
    */
   dropTTLIndex(table: string, column: string): Promise<void>;
 
+  /**
+   * List all indexes on a table.
+   *
+   * @param table - Table name
+   * @returns Array of index metadata
+   */
+  listIndexes(table: string): Promise<TableIndexInformation[]>;
+
   // ============================================================================
   // CONSTRAINTS (SQL)
   // ============================================================================
@@ -423,6 +484,25 @@ export interface MigrationDriverContract {
    * @param table - Table name
    */
   dropPrimaryKey(table: string): Promise<void>;
+
+  /**
+   * Add a CHECK constraint.
+   *
+   * Validates that all rows satisfy the given SQL expression.
+   *
+   * @param table - Table name
+   * @param name - Constraint name
+   * @param expression - SQL CHECK expression
+   */
+  addCheck(table: string, name: string, expression: string): Promise<void>;
+
+  /**
+   * Drop a CHECK constraint.
+   *
+   * @param table - Table name
+   * @param name - Constraint name
+   */
+  dropCheck(table: string, name: string): Promise<void>;
 
   // ============================================================================
   // SCHEMA VALIDATION (NoSQL)

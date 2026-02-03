@@ -135,6 +135,11 @@ export class MongoDbDriver implements DriverContract {
   public readonly name = "mongodb";
 
   /**
+   * Current database name
+   */
+  protected _databaseName?: string;
+
+  /**
    * MongoDB driver model defaults.
    *
    * MongoDB follows NoSQL conventions:
@@ -178,6 +183,28 @@ export class MongoDbDriver implements DriverContract {
       ...DEFAULT_TRANSACTION_OPTIONS,
       ...driverOptions?.transactionOptions,
     };
+  }
+
+  /**
+   * Get data base name
+   */
+  public get databaseName(): string | undefined {
+    if (!this._databaseName) {
+      this.resolveDatabaseName();
+    }
+
+    return this._databaseName;
+  }
+
+  /**
+   * Resolve database name either from config or uri
+   */
+  private resolveDatabaseName() {
+    if (this.config.database) {
+      this._databaseName = this.config.database;
+    } else if (this.config.uri) {
+      this._databaseName = this.config.uri.split("/").pop()?.split("?")?.[0];
+    }
   }
 
   /**
@@ -249,6 +276,7 @@ export class MongoDbDriver implements DriverContract {
     await assertModuleIsLoaded();
 
     const uri = this.resolveUri();
+
     const { MongoClient, ObjectId: ObjectIdMongoDB } = MongoDBClient;
 
     ObjectId = ObjectIdMongoDB;
@@ -259,13 +287,11 @@ export class MongoDbDriver implements DriverContract {
       log.info(
         "database.mongodb",
         "connection",
-        `Connecting to database ${colors.bold(colors.yellowBright(this.config.database))}`,
+        `Connecting to database ${colors.bold(colors.yellowBright(this.databaseName))}`,
       );
       await client.connect();
       this.client = client;
-      if (this.config.database) {
-        this.database = client.db(this.config.database);
-      }
+      this.database = client.db(this.databaseName);
 
       this.connected = true;
       log.success("database.mongodb", "connection", "Connected to database");

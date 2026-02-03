@@ -16,6 +16,7 @@ import type {
   GeoIndexOptions,
   IndexDefinition,
   MigrationDriverContract,
+  TableIndexInformation,
   VectorIndexOptions,
 } from "../../contracts/migration-driver.contract";
 import type { PostgresDriver } from "./postgres-driver";
@@ -122,6 +123,16 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
   }
 
   /**
+   * Truncate a table — remove all rows efficiently.
+   *
+   * @param table - Table name
+   */
+  public async truncateTable(table: string): Promise<void> {
+    const quotedTable = this.driver.dialect.quoteIdentifier(table);
+    await this.execute(`TRUNCATE TABLE ${quotedTable}`);
+  }
+
+  /**
    * Check if a table exists.
    *
    * @param table - Table name
@@ -130,13 +141,71 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
   public async tableExists(table: string): Promise<boolean> {
     const result = await this.driver.query<{ exists: boolean }>(
       `SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public'
         AND table_name = $1
       )`,
       [table],
     );
     return result.rows[0]?.exists ?? false;
+  }
+
+  /**
+   * List all columns in a table.
+   *
+   * @param table - Table name
+   * @returns Array of column definitions
+   */
+  public async listColumns(table: string): Promise<ColumnDefinition[]> {
+    const result = await this.driver.query<{
+      column_name: string;
+      data_type: string;
+      character_maximum_length: number | null;
+      numeric_precision: number | null;
+      numeric_scale: number | null;
+      is_nullable: string;
+      column_default: string | null;
+    }>(
+      `SELECT
+        column_name,
+        data_type,
+        character_maximum_length,
+        numeric_precision,
+        numeric_scale,
+        is_nullable,
+        column_default
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+      AND table_name = $1
+      ORDER BY ordinal_position`,
+      [table],
+    );
+
+    return result.rows.map((row) => ({
+      name: row.column_name,
+      type: this.mapPostgresTypeToColumnType(row.data_type),
+      length: row.character_maximum_length ?? undefined,
+      precision: row.numeric_precision ?? undefined,
+      scale: row.numeric_scale ?? undefined,
+      nullable: row.is_nullable === "YES",
+      defaultValue: row.column_default ?? undefined,
+    }));
+  }
+
+  /**
+   * List all tables in the current database.
+   *
+   * @returns Array of table names
+   */
+  public async listTables(): Promise<string[]> {
+    const result = await this.driver.query<{ table_name: string }>(
+      `SELECT table_name
+       FROM information_schema.tables
+       WHERE table_schema = 'public'
+       ORDER BY table_name`,
+    );
+
+    return result.rows.map((row) => row.table_name);
   }
 
   /**
@@ -192,29 +261,46 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
 
     let sql = `ALTER TABLE ${quotedTable} ADD COLUMN ${quotedColumn} ${sqlType}`;
 
-    // SERIAL/BIGSERIAL are always NOT NULL, so skip for those
-    if (!column.autoIncrement && column.nullable === false) {
-      sql += " NOT NULL";
-    }
-
-    if (column.defaultValue !== undefined) {
-      if (typeof column.defaultValue === "string") {
-        sql += ` DEFAULT '${column.defaultValue}'`;
-      } else if (typeof column.defaultValue === "boolean") {
-        sql += ` DEFAULT ${column.defaultValue ? "TRUE" : "FALSE"}`;
-      } else {
-        sql += ` DEFAULT ${column.defaultValue}`;
+    // Handle generated columns
+    if (column.generated) {
+      sql += ` GENERATED ALWAYS AS (${column.generated.expression})`;
+      if (column.generated.stored) {
+        sql += " STORED";
       }
-    }
+      // PostgreSQL only supports STORED, not VIRTUAL
+      // If virtual is requested, it's simply ignored (PostgreSQL doesn't support it)
+    } else {
+      // SERIAL/BIGSERIAL are always NOT NULL, so skip for those
+      if (!column.autoIncrement && column.nullable === false) {
+        sql += " NOT NULL";
+      }
 
-    // Handle primary key
-    if (column.primary) {
-      sql += " PRIMARY KEY";
-    }
+      if (column.defaultValue !== undefined) {
+        // Check for special CURRENT_TIMESTAMP marker
+        if (
+          typeof column.defaultValue === "object" &&
+          column.defaultValue !== null &&
+          (column.defaultValue as any).__type === "CURRENT_TIMESTAMP"
+        ) {
+          sql += " DEFAULT NOW()";
+        } else if (typeof column.defaultValue === "string") {
+          sql += ` DEFAULT '${column.defaultValue}'`;
+        } else if (typeof column.defaultValue === "boolean") {
+          sql += ` DEFAULT ${column.defaultValue ? "TRUE" : "FALSE"}`;
+        } else {
+          sql += ` DEFAULT ${column.defaultValue}`;
+        }
+      }
 
-    // Handle unique constraint
-    if (column.unique) {
-      sql += " UNIQUE";
+      // Handle primary key
+      if (column.primary) {
+        sql += " PRIMARY KEY";
+      }
+
+      // Handle unique constraint
+      if (column.unique) {
+        sql += " UNIQUE";
+      }
     }
 
     await this.execute(sql);
@@ -283,8 +369,21 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
     }
 
     if (column.defaultValue !== undefined) {
-      const defaultVal =
-        typeof column.defaultValue === "string" ? `'${column.defaultValue}'` : column.defaultValue;
+      let defaultVal: string;
+
+      // Check for special CURRENT_TIMESTAMP marker
+      if (
+        typeof column.defaultValue === "object" &&
+        column.defaultValue !== null &&
+        (column.defaultValue as any).__type === "CURRENT_TIMESTAMP"
+      ) {
+        defaultVal = "NOW()";
+      } else if (typeof column.defaultValue === "string") {
+        defaultVal = `'${column.defaultValue}'`;
+      } else {
+        defaultVal = String(column.defaultValue);
+      }
+
       await this.execute(
         `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedColumn} SET DEFAULT ${defaultVal}`,
       );
@@ -298,6 +397,12 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
   /**
    * Create an index on one or more columns.
    *
+   * Supports:
+   * - Regular column indexes
+   * - Expression-based indexes (e.g., `lower(email)`)
+   * - Covering indexes (INCLUDE clause)
+   * - Concurrent index creation (CONCURRENTLY keyword)
+   *
    * @param table - Table name
    * @param index - Index definition
    */
@@ -306,14 +411,33 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
     const indexName = index.name ?? `idx_${table}_${index.columns.join("_")}`;
     const quotedIndexName = this.driver.dialect.quoteIdentifier(indexName);
     const uniqueKeyword = index.unique ? "UNIQUE " : "";
+    const concurrentlyKeyword = index.concurrently ? "CONCURRENTLY " : "";
 
-    const columns = index.columns.map((col, i) => {
-      const quotedCol = this.driver.dialect.quoteIdentifier(col);
-      const direction = index.directions?.[i]?.toUpperCase() ?? "";
-      return direction ? `${quotedCol} ${direction}` : quotedCol;
-    });
+    let columnsPart: string;
 
-    let sql = `CREATE ${uniqueKeyword}INDEX ${quotedIndexName} ON ${quotedTable} (${columns.join(", ")})`;
+    // Handle expression-based indexes
+    if (index.expressions && index.expressions.length > 0) {
+      // Wrap each expression in parentheses
+      columnsPart = index.expressions.map((expr) => `(${expr})`).join(", ");
+    } else {
+      // Regular column indexes
+      const columns = index.columns.map((col, i) => {
+        const quotedCol = this.driver.dialect.quoteIdentifier(col);
+        const direction = index.directions?.[i]?.toUpperCase() ?? "";
+        return direction ? `${quotedCol} ${direction}` : quotedCol;
+      });
+      columnsPart = columns.join(", ");
+    }
+
+    let sql = `CREATE ${uniqueKeyword}INDEX ${concurrentlyKeyword}${quotedIndexName} ON ${quotedTable} (${columnsPart})`;
+
+    // Add INCLUDE clause for covering indexes
+    if (index.include && index.include.length > 0) {
+      const includeCols = index.include
+        .map((col) => this.driver.dialect.quoteIdentifier(col))
+        .join(", ");
+      sql += ` INCLUDE (${includeCols})`;
+    }
 
     // Add partial index condition
     if (index.where && Object.keys(index.where).length > 0) {
@@ -525,6 +649,43 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
     await this.dropIndex(table, `idx_${table}_ttl_${column}`);
   }
 
+  /**
+   * List all indexes on a table.
+   *
+   * @param table - Table name
+   * @returns Array of index metadata
+   */
+  public async listIndexes(table: string): Promise<TableIndexInformation[]> {
+    const result = await this.driver.query<{ indexname: string; indexdef: string }>(
+      `SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = 'public' AND tablename = $1`,
+      [table],
+    );
+
+    return result.rows.map((row) => {
+      const isUnique = row.indexdef.includes("UNIQUE");
+      const isPrimary = row.indexname.endsWith("_pkey");
+      const columnsMatch = row.indexdef.match(/\(([^)]+)\)/);
+      const columns = columnsMatch
+        ? columnsMatch[1].split(",").map((c) => c.trim().replace(/"/g, ""))
+        : [];
+
+      let type = "btree";
+      if (row.indexdef.includes("USING GIN")) type = "gin";
+      else if (row.indexdef.includes("USING GIST")) type = "gist";
+      else if (row.indexdef.includes("USING HASH")) type = "hash";
+      else if (row.indexdef.includes("USING ivfflat")) type = "ivfflat";
+
+      return {
+        name: row.indexname,
+        columns,
+        type,
+        unique: isUnique || isPrimary,
+        partial: row.indexdef.includes("WHERE"),
+        options: { primary: isPrimary, definition: row.indexdef },
+      };
+    });
+  }
+
   // ============================================================================
   // CONSTRAINTS
   // ============================================================================
@@ -598,6 +759,32 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
     const quotedConstraint = this.driver.dialect.quoteIdentifier(constraintName);
 
     await this.execute(`ALTER TABLE ${quotedTable} DROP CONSTRAINT ${quotedConstraint}`);
+  }
+
+  /**
+   * Add a CHECK constraint.
+   *
+   * @param table - Table name
+   * @param name - Constraint name
+   * @param expression - SQL CHECK expression
+   */
+  public async addCheck(table: string, name: string, expression: string): Promise<void> {
+    const quotedTable = this.driver.dialect.quoteIdentifier(table);
+    const quotedName = this.driver.dialect.quoteIdentifier(name);
+    const sql = `ALTER TABLE ${quotedTable} ADD CONSTRAINT ${quotedName} CHECK (${expression})`;
+    await this.execute(sql);
+  }
+
+  /**
+   * Drop a CHECK constraint.
+   *
+   * @param table - Table name
+   * @param name - Constraint name
+   */
+  public async dropCheck(table: string, name: string): Promise<void> {
+    const quotedTable = this.driver.dialect.quoteIdentifier(table);
+    const quotedName = this.driver.dialect.quoteIdentifier(name);
+    await this.execute(`ALTER TABLE ${quotedTable} DROP CONSTRAINT ${quotedName}`);
   }
 
   // ============================================================================
@@ -691,5 +878,48 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
       noAction: "NO ACTION",
     };
     return mapping[action] ?? "NO ACTION";
+  }
+
+  /**
+   * Map PostgreSQL data type to ColumnType.
+   */
+  private mapPostgresTypeToColumnType(
+    pgType: string,
+  ): import("../../contracts/migration-driver.contract").ColumnType {
+    const typeMap: Record<string, import("../../contracts/migration-driver.contract").ColumnType> =
+      {
+        "character varying": "string",
+        varchar: "string",
+        character: "char",
+        char: "char",
+        text: "text",
+        integer: "integer",
+        int: "integer",
+        smallint: "smallInteger",
+        bigint: "bigInteger",
+        real: "float",
+        "double precision": "double",
+        numeric: "decimal",
+        decimal: "decimal",
+        boolean: "boolean",
+        date: "date",
+        timestamp: "dateTime",
+        "timestamp without time zone": "dateTime",
+        "timestamp with time zone": "timestamp",
+        time: "time",
+        "time without time zone": "time",
+        json: "json",
+        jsonb: "json",
+        bytea: "binary",
+        uuid: "uuid",
+        inet: "ipAddress",
+        macaddr: "macAddress",
+        point: "point",
+        polygon: "polygon",
+        line: "lineString",
+        geometry: "geometry",
+      };
+
+    return typeMap[pgType.toLowerCase()] ?? "string";
   }
 }

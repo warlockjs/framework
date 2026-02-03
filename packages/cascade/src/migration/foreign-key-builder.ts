@@ -25,13 +25,16 @@ interface MutableForeignKeyDefinition {
  * Allows building foreign key definitions with a chainable API.
  * SQL-only feature; NoSQL drivers ignore foreign keys.
  *
+ * The operation is pushed when `.references()` is called using a mutable
+ * reference — subsequent `.onDelete()` / `.onUpdate()` calls mutate the
+ * same definition already queued in pendingOperations.
+ *
  * @example
  * ```typescript
  * this.foreign("user_id")
  *   .references("users", "id")
  *   .onDelete("cascade")
- *   .onUpdate("cascade")
- *   .add();
+ *   .onUpdate("cascade");
  * ```
  */
 export class ForeignKeyBuilder {
@@ -69,7 +72,11 @@ export class ForeignKeyBuilder {
   }
 
   /**
-   * Set the referenced table and column.
+   * Set the referenced table and column, and register the foreign key operation.
+   *
+   * Pushes the operation immediately using a mutable reference — any
+   * `.onDelete()` / `.onUpdate()` calls after this will mutate the same
+   * definition already queued in pendingOperations.
    *
    * @param table - Referenced table name
    * @param column - Referenced column name (default: "id")
@@ -84,6 +91,7 @@ export class ForeignKeyBuilder {
   public references(table: string, column = "id"): this {
     this.definition.referencesTable = table;
     this.definition.referencesColumn = column;
+    this.migration.addForeignKeyOperation(this.definition as ForeignKeyDefinition);
     return this;
   }
 
@@ -139,20 +147,4 @@ export class ForeignKeyBuilder {
     return this;
   }
 
-  /**
-   * Finalize and add the foreign key constraint to the migration.
-   *
-   * This must be called to register the foreign key.
-   *
-   * @example
-   * ```typescript
-   * this.foreign("user_id")
-   *   .references("users")
-   *   .onDelete("cascade")
-   *   .add(); // Required!
-   * ```
-   */
-  public add(): void {
-    this.migration.addForeignKeyOperation(this.definition as ForeignKeyDefinition);
-  }
 }
