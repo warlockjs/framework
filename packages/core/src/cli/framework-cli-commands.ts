@@ -14,6 +14,8 @@ import {
 } from "./commands/generate/generate.command";
 import { migrateCommand } from "./commands/migrate.command";
 import { seedCommand } from "./commands/seed.command";
+
+import { createDatabaseCommand } from "./commands/create-database.command";
 import { startProductionCommand } from "./commands/start-production.command";
 import { typingsGeneratorCommand } from "./commands/typings-generator.command";
 
@@ -26,6 +28,7 @@ export const frameworkCommands = [
   // database commands
   migrateCommand,
   seedCommand,
+  createDatabaseCommand,
 
   // generation/installation commands
   addCommand,
