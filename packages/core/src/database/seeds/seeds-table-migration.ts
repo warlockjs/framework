@@ -3,13 +3,13 @@ import { seedsTableName } from "./utils";
 
 export class SeedsTableMigration extends Migration {
   public static migrationName = "seeds-table-migration";
-  public static table = seedsTableName;
+  public table = seedsTableName;
 
   public up() {
     this.createTableIfNotExists();
 
     this.id();
-    this.string("name").unique();
+    this.text("name").unique();
     this.int("runCount").default(0);
     this.dateTime("createdAt").useCurrent();
     this.dateTime("firstRunAt").useCurrent();
