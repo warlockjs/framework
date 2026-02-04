@@ -8,14 +8,14 @@ export class SeedsTableMigration extends Migration {
   public up() {
     this.createTableIfNotExists();
 
-    this.int("id").unique().autoIncrement();
+    this.id();
     this.string("name").unique();
-    this.int("runCount").defaultTo(0);
-    this.dateTime("createdAt").defaultToNow();
-    this.dateTime("firstRunAt").defaultToNow();
-    this.dateTime("lastRunAt").defaultToNow();
-    this.int("totalRecordsCreated").defaultTo(0);
-    this.int("lastRunRecordsCreated").defaultTo(0);
+    this.int("runCount").default(0);
+    this.dateTime("createdAt").useCurrent();
+    this.dateTime("firstRunAt").useCurrent();
+    this.dateTime("lastRunAt").useCurrent();
+    this.int("totalRecordsCreated").default(0);
+    this.int("lastRunRecordsCreated").default(0);
   }
 
   public down() {

@@ -103,14 +103,14 @@ export class RepositoryManager<T = unknown> {
    * @default "isActive"
    * @protected
    */
-  protected isActiveColumn = "isActive";
+  protected isActiveColumn?: string;
 
   /**
    * Active column value
    * @default true
    * @protected
    */
-  protected isActiveValue: any = true;
+  protected isActiveValue?: any;
 
   /**
    * Repository name (for events)
@@ -222,6 +222,20 @@ export class RepositoryManager<T = unknown> {
   }
 
   /**
+   * Get is active column
+   */
+  protected getIsActiveColumn(): string {
+    return this.isActiveColumn || config.key("repository.isActiveColumn") || "isActive";
+  }
+
+  /**
+   * Get is active value
+   */
+  protected getIsActiveValue(): any {
+    return this.isActiveValue ?? config.key("repository.isActiveValue") ?? true;
+  }
+
+  /**
    * Create new query builder instance
    * @returns Query builder
    * @public
@@ -247,7 +261,7 @@ export class RepositoryManager<T = unknown> {
    */
   protected getIsActiveFilter() {
     return {
-      [this.isActiveColumn]: this.isActiveValue,
+      [this.getIsActiveColumn()]: this.getIsActiveValue(),
     };
   }
 
@@ -1196,7 +1210,7 @@ export class RepositoryManager<T = unknown> {
     if (!model) return undefined;
 
     // Check if model is active
-    const isActive = (model as any)[this.isActiveColumn] === this.isActiveValue;
+    const isActive = (model as any)[this.getIsActiveColumn()] === this.getIsActiveValue();
     return isActive ? model : undefined;
   }
 
