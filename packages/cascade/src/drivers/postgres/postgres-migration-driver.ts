@@ -283,11 +283,18 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
           (column.defaultValue as any).__type === "CURRENT_TIMESTAMP"
         ) {
           sql += " DEFAULT NOW()";
-        } else if (typeof column.defaultValue === "string") {
-          sql += ` DEFAULT '${column.defaultValue}'`;
+        } else if (column.isRawDefault === false) {
+          // Explicit string literal - escape it properly
+          const escaped = String(column.defaultValue).replace(/'/g, "''");
+          sql += ` DEFAULT '${escaped}'`;
         } else if (typeof column.defaultValue === "boolean") {
+          // Boolean values
           sql += ` DEFAULT ${column.defaultValue ? "TRUE" : "FALSE"}`;
+        } else if (typeof column.defaultValue === "number") {
+          // Numeric values
+          sql += ` DEFAULT ${column.defaultValue}`;
         } else {
+          // Raw SQL expression (default behavior when isRawDefault is true or undefined)
           sql += ` DEFAULT ${column.defaultValue}`;
         }
       }
@@ -388,6 +395,31 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
         `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedColumn} SET DEFAULT ${defaultVal}`,
       );
     }
+  }
+
+  /**
+   * Create standard timestamp columns (created_at, updated_at).
+   *
+   * PostgreSQL implementation creates TIMESTAMPTZ columns with NOW() defaults.
+   *
+   * @param table - Table name
+   */
+  public async createTimestampColumns(table: string): Promise<void> {
+    await this.addColumn(table, {
+      name: "created_at",
+      type: "timestamp",
+      nullable: false,
+      defaultValue: "NOW()",
+      isRawDefault: true,
+    });
+
+    await this.addColumn(table, {
+      name: "updated_at",
+      type: "timestamp",
+      nullable: false,
+      defaultValue: "NOW()",
+      isRawDefault: true,
+    });
   }
 
   // ============================================================================

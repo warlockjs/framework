@@ -230,6 +230,18 @@ export class MongoMigrationDriver implements MigrationDriverContract {
     // No-op: MongoDB is schema-less
   }
 
+  /**
+   * Create standard timestamp columns (created_at, updated_at).
+   *
+   * MongoDB implementation is a no-op since timestamps are handled
+   * at the application level via Model hooks.
+   *
+   * @param _table - Collection name (unused)
+   */
+  public async createTimestampColumns(_table: string): Promise<void> {
+    // No-op: MongoDB handles timestamps at application level
+  }
+
   // ============================================================================
   // INDEX OPERATIONS
   // ============================================================================

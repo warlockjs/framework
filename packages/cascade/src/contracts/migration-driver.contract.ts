@@ -73,6 +73,8 @@ export type ColumnDefinition = {
   values?: string[];
   /** Vector dimensions (for vector type) */
   dimensions?: number;
+  /** Whether defaultValue should be treated as raw SQL (true) or escaped literal (false) */
+  isRawDefault?: boolean;
 
   // Column positioning (MySQL/MariaDB only)
   /** Position this column after another column */
@@ -324,6 +326,17 @@ export interface MigrationDriverContract {
    * @param column - New column definition (name must match existing)
    */
   modifyColumn(table: string, column: ColumnDefinition): Promise<void>;
+
+  /**
+   * Create standard timestamp columns (created_at, updated_at).
+   *
+   * Implementation varies by database driver:
+   * - PostgreSQL: Creates TIMESTAMPTZ columns with NOW() defaults
+   * - MongoDB: No-op or schema validation (application handles timestamps)
+   *
+   * @param table - Table name
+   */
+  createTimestampColumns(table: string): Promise<void>;
 
   // ============================================================================
   // INDEX OPERATIONS

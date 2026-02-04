@@ -46,6 +46,8 @@ type OperationType =
   | "dropTableIfExists"
   | "renameTable"
   | "truncateTable"
+  | "createTimestamps"
+  | "rawStatement"
   | "setSchemaValidation"
   | "removeSchemaValidation";
 
@@ -929,6 +931,26 @@ export abstract class Migration implements MigrationContract {
         await this.driver.truncateTable(this.table);
         break;
 
+      case "createTimestamps":
+        await this.driver.createTimestampColumns(this.table);
+        break;
+
+      case "rawStatement":
+        await this.driver.raw(async (client: any) => {
+          const sql = op.payload as string;
+          // Handle different driver APIs
+          if (typeof client.query === "function") {
+            // PostgreSQL, MySQL - client is the driver instance
+            await client.query(sql);
+          } else if (typeof client.command === "function") {
+            // MongoDB - client is the Db instance
+            await client.command({ $eval: sql });
+          } else {
+            throw new Error("Unsupported database driver for statement execution");
+          }
+        });
+        break;
+
       case "setSchemaValidation":
         await this.driver.setSchemaValidation(this.table, op.payload as object);
         break;
@@ -1779,18 +1801,40 @@ export abstract class Migration implements MigrationContract {
   }
 
   /**
+   * Add a UUID primary key column with automatic generation.
+   *
+   * PostgreSQL: Uses gen_random_uuid() (built-in since PG 13)
+   * MongoDB: Application-level UUID generation
+   *
+   * @param name - Column name (default: "id")
+   * @returns Column builder for chaining modifiers
+   *
+   * @example
+   * ```typescript
+   * this.primaryUuid(); // id UUID PRIMARY KEY DEFAULT gen_random_uuid()
+   * this.primaryUuid("organization_id"); // Custom column name
+   * ```
+   */
+  public primaryUuid(name = "id"): ColumnBuilder {
+    return this.uuid(name).primary().default("gen_random_uuid()");
+  }
+
+  /**
    * Add createdAt and updatedAt timestamp columns.
+   *
+   * Behavior varies by database driver:
+   * - PostgreSQL: Creates TIMESTAMPTZ columns with NOW() defaults
+   * - MongoDB: No-op (timestamps handled at application level)
    *
    * @returns This migration for chaining
    *
    * @example
    * ```typescript
-   * this.timestamps(); // Creates createdAt and updatedAt
+   * this.timestamps(); // Driver-specific implementation
    * ```
    */
   public timestamps(): this {
-    this.dateTime("createdAt");
-    this.dateTime("updatedAt");
+    this.pendingOperations.push({ type: "createTimestamps", payload: null });
     return this;
   }
 
@@ -2312,6 +2356,43 @@ export abstract class Migration implements MigrationContract {
    */
   public async raw<T>(callback: (connection: unknown) => Promise<T>): Promise<T> {
     return this.driver.raw(callback);
+  }
+
+  /**
+   * Queue a raw SQL statement for execution.
+   *
+   * Convenient shorthand for executing SQL statements. The statement is queued
+   * and executed in order with other migration operations, within the transaction
+   * context if the migration is transactional.
+   *
+   * Works with PostgreSQL, MySQL, etc. For MongoDB, uses $eval command.
+   *
+   * @param sql - SQL statement to execute
+   * @returns This migration for chaining
+   *
+   * @example
+   * ```typescript
+   * // Enable PostgreSQL extension
+   * this.statement('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
+   *
+   * // Create custom type
+   * this.statement('CREATE TYPE mood AS ENUM (\'happy\', \'sad\', \'neutral\')');
+   *
+   * // Execute complex DDL
+   * this.statement(`
+   *   CREATE TABLE custom_table (
+   *     id SERIAL PRIMARY KEY,
+   *     data JSONB NOT NULL
+   *   )
+   * `);
+   * ```
+   */
+  public statement(sql: string): this {
+    this.pendingOperations.push({
+      type: "rawStatement",
+      payload: sql,
+    });
+    return this;
   }
 }
 

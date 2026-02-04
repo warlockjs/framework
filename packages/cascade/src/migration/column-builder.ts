@@ -1,4 +1,8 @@
-import type { ColumnDefinition, ColumnType, ForeignKeyDefinition } from "../contracts/migration-driver.contract";
+import type {
+  ColumnDefinition,
+  ColumnType,
+  ForeignKeyDefinition,
+} from "../contracts/migration-driver.contract";
 
 /**
  * Reference to the Migration type to avoid circular imports.
@@ -113,19 +117,46 @@ export class ColumnBuilder {
   // ============================================================================
 
   /**
-   * Set default value for the column.
+   * Set default value for the column as a raw SQL expression.
    *
-   * @param value - Default value (can be a literal or expression)
+   * The value will be used as-is in the SQL statement without escaping.
+   * Use this for database functions and expressions.
+   *
+   * @param value - Default value (SQL expression, number, or boolean)
    * @returns This builder for chaining
    *
    * @example
    * ```typescript
-   * this.boolean("isActive").default(true);
-   * this.dateTime("createdAt").default("NOW()");
+   * this.uuid("id").default("gen_random_uuid()");
+   * this.timestamp("created_at").default("NOW()");
+   * this.integer("version").default(1);
+   * this.boolean("is_active").default(true);
    * ```
    */
-  public default(value: unknown): this {
+  public default(value: string | number | boolean): this {
     this.definition.defaultValue = value;
+    this.definition.isRawDefault = true;
+    return this;
+  }
+
+  /**
+   * Set default value for the column as a literal string.
+   *
+   * The value will be properly escaped and quoted in the SQL statement.
+   * Use this for literal string values, not SQL expressions.
+   *
+   * @param value - Default string value (will be escaped)
+   * @returns This builder for chaining
+   *
+   * @example
+   * ```typescript
+   * this.text("status").defaultString("active");
+   * this.text("greeting").defaultString("Hello, World!");
+   * ```
+   */
+  public defaultString(value: string): this {
+    this.definition.defaultValue = value;
+    this.definition.isRawDefault = false;
     return this;
   }
 
