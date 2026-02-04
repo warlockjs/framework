@@ -470,6 +470,7 @@ export class MigrationRunner {
     } catch (err) {
       success = false;
       error = err instanceof Error ? err.message : String(err);
+      console.log(err);
       log.error("database", "migration", `${colors.magenta(name)}: ✗ Failed: ${error}`);
     }
 

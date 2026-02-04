@@ -1,6 +1,6 @@
 {
     "name": "@warlock.js/cascade",
-    "version": "4.0.134",
+    "version": "4.0.135",
     "description": "ORM for managing databases",
     "main": "./cjs/index.js",
     "dependencies": {
@@ -8,9 +8,9 @@
         "@mongez/events": "^2.1.0",
         "@mongez/reinforcements": "^2.3.17",
         "@mongez/supportive-is": "^2.0.0",
-        "@warlock.js/context": "4.0.134",
-        "@warlock.js/logger": "4.0.134",
-        "@warlock.js/seal": "4.0.134"
+        "@warlock.js/context": "4.0.135",
+        "@warlock.js/logger": "4.0.135",
+        "@warlock.js/seal": "4.0.135"
     },
     "scripts": {
         "update": "npx ncu -u",
