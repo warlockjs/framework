@@ -10,6 +10,7 @@ import type {
   TableIndexInformation,
   VectorIndexOptions,
 } from "../../contracts/migration-driver.contract";
+import type { MigrationDefaults } from "../../types";
 import type { MongoDbDriver } from "./mongodb-driver";
 
 /**
@@ -41,7 +42,7 @@ export class MongoMigrationDriver implements MigrationDriverContract {
    *
    * @param driver - The MongoDB driver instance
    */
-  public constructor(private readonly driver: MongoDbDriver) {}
+  public constructor(public readonly driver: MongoDbDriver) {}
 
   /**
    * Get the MongoDB database instance.
@@ -692,6 +693,36 @@ export class MongoMigrationDriver implements MigrationDriverContract {
    */
   public supportsTransactions(): boolean {
     return true;
+  }
+
+  /**
+   * Get the default transactional behavior for MongoDB.
+   *
+   * MongoDB DDL operations (createCollection, createIndex, etc.) cannot
+   * be wrapped in transactions, even with replica sets. Transactions only
+   * work for document CRUD operations.
+   *
+   * @returns false (MongoDB DDL is not transactional)
+   */
+  public getDefaultTransactional(): boolean {
+    return false;
+  }
+
+  // ============================================================================
+  // DEFAULTS
+  // ============================================================================
+
+  /**
+   * Get the default UUID generation expression for MongoDB.
+   *
+   * MongoDB does not use SQL-level UUID defaults — UUID generation
+   * is handled at the application level. Always returns `undefined`.
+   *
+   * @param _migrationDefaults - Ignored (MongoDB handles UUIDs at app level)
+   * @returns undefined
+   */
+  public getUuidDefault(_migrationDefaults?: MigrationDefaults): undefined {
+    return undefined;
   }
 
   // ============================================================================

@@ -1,6 +1,7 @@
-import { type GenericObject, get, merge, only, set, unset } from "@mongez/reinforcements";
+import { type GenericObject } from "@mongez/reinforcements";
 import type { ObjectValidator } from "@warlock.js/seal";
 import type {
+  DriverContract,
   PaginationOptions,
   PaginationResult,
   RemoverResult,
@@ -9,127 +10,116 @@ import type {
 } from "../contracts";
 import { QueryBuilderContract, WhereCallback, WhereObject, WhereOperator } from "../contracts";
 import type { DataSource } from "../data-source/data-source";
-import { dataSourceRegistry } from "../data-source/data-source-registry";
 import { DatabaseDirtyTracker } from "../database-dirty-tracker";
 import type { ModelEventListener, ModelEventName } from "../events/model-events";
-import { ModelEvents, globalModelEvents } from "../events/model-events";
+import { ModelEvents } from "../events/model-events";
+import type { ModelSnapshot } from "../relations/relation-hydrator";
 import { RelationLoader } from "../relations/relation-loader";
-import { DatabaseRemover } from "../remover/database-remover";
-import { DatabaseRestorer } from "../restorer/database-restorer";
 import { modelSync } from "../sync/model-sync";
 import type { ModelSyncOperationContract } from "../sync/types";
 import type { DeleteStrategy, StrictMode } from "../types";
-import { DatabaseWriter } from "../writer/database-writer";
 import {
-  getAllModelsFromRegistry,
-  getModelFromRegistry,
-  removeModelFromRegistery,
-} from "./register-model";
-
-/**
- * Timing control for global scopes
- */
-export type ScopeTiming = "before" | "after";
-
-/**
- * Global scope definition with callback and timing
- */
-export type GlobalScopeDefinition = {
-  callback: (query: QueryBuilderContract) => void;
-  timing: ScopeTiming;
-};
-
-/**
- * Local scope callback function
- */
-export type LocalScopeCallback = (query: QueryBuilderContract, ...args: any[]) => void;
-
-/**
- * Options for adding global scopes
- */
-export type GlobalScopeOptions = {
-  timing?: ScopeTiming;
-};
-
-export type ChildModel<TModel extends Model> = (new (...args: any[]) => TModel) &
-  Pick<
-    typeof Model,
-    | "table"
-    | "primaryKey"
-    | "dataSource"
-    | "schema"
-    | "strictMode"
-    | "autoGenerateId"
-    | "initialId"
-    | "randomInitialId"
-    | "incrementIdBy"
-    | "resource"
-    | "resourceColumns"
-    | "toJsonColumns"
-    | "randomIncrement"
-    | "getDataSource"
-    | "query"
-    | "find"
-    | "first"
-    | "last"
-    | "all"
-    | "latest"
-    | "count"
-    | "where"
-    | "increase"
-    | "decrease"
-    | "atomic"
-    | "events"
-    | "on"
-    | "once"
-    | "off"
-    | "globalEvents"
-    | "delete"
-    | "deleteOne"
-    | "deleteStrategy"
-    | "trashTable"
-    | "restore"
-    | "restoreAll"
-    | "deletedAtColumn"
-    | "createdAtColumn"
-    | "updatedAtColumn"
-    | "create"
-    | "createMany"
-    | "sync"
-    | "embed"
-    | "deserialize"
-    | "syncMany"
-    | "addGlobalScope"
-    | "removeGlobalScope"
-    | "addScope"
-    | "removeScope"
-    | "localScopes"
-    | "globalScopes"
-    | "relations"
-    | "newQueryBuilder"
-    | "builder"
-    | "findAndUpdate"
-    | "findOneAndUpdate"
-    | "readFrom"
-    | "findAndReplace"
-    | "findOneAndDelete"
-    | "findOrCreate"
-  >;
-
-/**
- * Generic schema type representing the structure of model data.
- */
-export type ModelSchema = Record<string, any>;
-
-/**
- * Sentinel value used to distinguish between undefined and missing fields.
- */
-const MISSING_VALUE = Symbol("missing");
-
-/**
- * WeakMap registry that associates each model constructor with its own event emitter.
- */
-const modelEventsRegistry = new WeakMap<any, any>();
+  decrementField,
+  getBooleanField,
+  getFieldValue,
+  getNumberField,
+  getOnlyFields,
+  getStringField,
+  hasField,
+  incrementField,
+  mergeFields,
+  setFieldValue,
+  unsetFields,
+} from "./methods/accessor-methods";
+import { deleteOneRecord, deleteRecords, destroyModel } from "./methods/delete-methods";
+import {
+  checkHasChanges,
+  checkIsDirty,
+  getDirtyColumns,
+  getDirtyColumnsWithValues,
+  getRemovedColumns,
+} from "./methods/dirty-methods";
+import {
+  cloneModel,
+  deepFreezeObject,
+  hydrateModel,
+  modelFromSnapshot,
+  modelToSnapshot,
+  replaceModelData,
+  serializeModel,
+} from "./methods/hydration-methods";
+import {
+  emitModelEvent,
+  offModelEvent,
+  onceModelEvent,
+  onModelEvent,
+} from "./methods/instance-event-methods";
+import {
+  applyDefaultsToModel,
+  generateModelNextId,
+  performAtomicDecrement,
+  performAtomicIncrement,
+  performAtomicUpdate,
+} from "./methods/meta-methods";
+import {
+  buildNewQueryBuilder,
+  buildQuery,
+  countRecords,
+  decreaseField,
+  findAll,
+  findAndReplaceRecord,
+  findAndUpdateRecords,
+  findById,
+  findFirst,
+  findLast,
+  findLatest,
+  findOneAndDeleteRecord,
+  findOneAndUpdateRecord,
+  increaseField,
+  paginateRecords,
+  performAtomic,
+  resolveDataSource,
+  updateById,
+} from "./methods/query-methods";
+import { restoreAllRecords, restoreRecord } from "./methods/restore-methods";
+import {
+  addGlobalModelScope,
+  addLocalModelScope,
+  removeGlobalModelScope,
+  removeLocalModelScope,
+} from "./methods/scope-methods";
+import { modelToJSON } from "./methods/serialization-methods";
+import {
+  cleanupModelEvents,
+  getGlobalEvents,
+  getModelEvents,
+  offStaticEvent,
+  onceStaticEvent,
+  onStaticEvent,
+} from "./methods/static-event-methods";
+import {
+  createManyRecords,
+  createRecord,
+  findOrCreateRecord,
+  saveModel,
+  upsertRecord,
+} from "./methods/write-methods";
+import type {
+  ChildModel,
+  GlobalScopeDefinition,
+  GlobalScopeOptions,
+  LocalScopeCallback,
+  ModelSchema,
+} from "./model.types";
+import { getAllModelsFromRegistry, getModelFromRegistry } from "./register-model";
+export type {
+  ChildModel,
+  GlobalScopeDefinition,
+  GlobalScopeOptions,
+  LocalScopeCallback,
+  ModelSchema,
+  ScopeTiming,
+} from "./model.types";
 
 /**
  * Base class that powers all Cascade models.
@@ -401,12 +391,12 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   /**
    * Created at column name.
    */
-  public static createdAtColumn?: string | false = "createdAt";
+  public static createdAtColumn?: string | false;
 
   /**
    * Updated at column name.
    */
-  public static updatedAtColumn?: string | false = "updatedAt";
+  public static updatedAtColumn?: string | false;
 
   /**
    * Delete strategy for this model.
@@ -559,6 +549,23 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   protected isActiveColumn = "isActive";
 
   /**
+   * Constructs a new model instance with optional initial data.
+   *
+   * Initializes the dirty tracker with a snapshot of the provided data.
+   *
+   * @param initialData - Partial data to populate the model
+   *
+   * @example
+   * ```typescript
+   * const user = new User({ name: "Alice", email: "alice@example.com" });
+   * ```
+   */
+  public constructor(initialData: Partial<TSchema> = {}) {
+    this.data = initialData as TSchema;
+    this.dirtyTracker = this.self().getDriver().getDirtyTracker(this.data);
+  }
+
+  /**
    * Lazily load one or more relations for this model instance.
    *
    * This method loads relations on-demand after the model has been fetched.
@@ -628,23 +635,6 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    */
   public getRelation<TRelation = any>(relationName: string): TRelation | undefined {
     return this.loadedRelations.get(relationName) as TRelation | undefined;
-  }
-
-  /**
-   * Constructs a new model instance with optional initial data.
-   *
-   * Initializes the dirty tracker with a snapshot of the provided data.
-   *
-   * @param initialData - Partial data to populate the model
-   *
-   * @example
-   * ```typescript
-   * const user = new User({ name: "Alice", email: "alice@example.com" });
-   * ```
-   */
-  public constructor(initialData: Partial<TSchema> = {}) {
-    this.data = initialData as TSchema;
-    this.dirtyTracker = new DatabaseDirtyTracker(this.data);
   }
 
   /**
@@ -741,7 +731,14 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   /**
    * Get model id
    */
-  public get id(): number {
+  public get id(): number | string {
+    return this.get("id");
+  }
+
+  /**
+   * Get uuid
+   */
+  public get uuid(): string {
     return this.get("id");
   }
 
@@ -768,7 +765,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   public get<Type extends unknown = any>(field: string): Type;
   public get<Type extends unknown = any>(field: string, defaultValue: Type): Type;
   public get(field: string, defaultValue?: unknown): any {
-    return get(this.data, field, defaultValue);
+    return getFieldValue(this, field, defaultValue);
   }
 
   /**
@@ -777,28 +774,28 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   public only<TKey extends keyof TSchema & string>(fields: TKey[]): Record<TKey, TSchema[TKey]>;
   public only(fields: string[]): Record<string, unknown>;
   public only(fields: string[]): Record<string, unknown> {
-    return only(this.data, fields);
+    return getOnlyFields(this, fields);
   }
 
   /**
    * Get a string value
    */
   public string(key: string, defaultValue?: string): string | undefined {
-    return this.get(key, defaultValue) as string | undefined;
+    return getStringField(this, key, defaultValue);
   }
 
   /**
    * Get a number value
    */
   public number(key: string, defaultValue?: number): number | undefined {
-    return this.get(key, defaultValue) as number | undefined;
+    return getNumberField(this, key, defaultValue);
   }
 
   /**
    * Get a boolean value
    */
   public boolean(key: string, defaultValue?: boolean): boolean | undefined {
-    return this.get(key, defaultValue) as boolean | undefined;
+    return getBooleanField(this, key, defaultValue);
   }
 
   /**
@@ -819,14 +816,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   public set<TKey extends keyof TSchema & string>(field: TKey, value: TSchema[TKey]): this;
   public set(field: string, value: unknown): this;
   public set(field: string, value: unknown): this {
-    const path = String(field);
-    set(this.data, path, value);
-
-    const partial: Record<string, unknown> = {};
-    set(partial, path, value);
-    this.dirtyTracker.mergeChanges(partial);
-
-    return this;
+    return setFieldValue(this, field, value) as this;
   }
 
   /**
@@ -846,7 +836,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   public has<TKey extends keyof TSchema & string>(field: TKey): boolean;
   public has(field: string): boolean;
   public has(field: string): boolean {
-    return get(this.data, field, MISSING_VALUE) !== MISSING_VALUE;
+    return hasField(this, field);
   }
 
   /**
@@ -855,9 +845,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   public increment<TKey extends keyof TSchema & string>(field: TKey, amount: number): this;
   public increment(field: string, amount?: number): this;
   public increment(field: string, amount?: number): this {
-    const value = this.get(field, 0) as number;
-    const incrementedValue = value + (amount ?? 1);
-    return this.set(field, incrementedValue);
+    return incrementField(this, field, amount) as this;
   }
 
   /**
@@ -866,9 +854,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   public decrement<TKey extends keyof TSchema & string>(field: TKey, amount: number): this;
   public decrement(field: string, amount?: number): this;
   public decrement(field: string, amount?: number): this {
-    const value = this.get(field, 0) as number;
-    const decrementedValue = value - (amount ?? 1);
-    return this.set(field, decrementedValue);
+    return decrementField(this, field, amount) as this;
   }
 
   /**
@@ -888,10 +874,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   public unset(...fields: (keyof TSchema & string)[]): this;
   public unset(...fields: string[]): this;
   public unset(...fields: string[]): this {
-    this.data = unset(this.data, fields);
-    this.dirtyTracker.unset(fields);
-
-    return this;
+    return unsetFields(this, ...fields) as this;
   }
 
   /**
@@ -911,9 +894,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   public merge(values: Partial<TSchema>): this;
   public merge(values: Record<string, unknown>): this;
   public merge(values: Record<string, unknown>): this {
-    this.data = merge(this.data, values) as TSchema;
-    this.dirtyTracker.mergeChanges(values);
-    return this;
+    return mergeFields(this, values) as this;
   }
 
   /**
@@ -923,7 +904,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * @returns number of affected records
    */
   public async atomicUpdate(operations: Record<string, unknown>): Promise<number> {
-    return this.self().atomic({ id: this.id! }, operations);
+    return performAtomicUpdate(this, operations);
   }
 
   /**
@@ -935,13 +916,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     field: T,
     amount: number = 1,
   ): Promise<number> {
-    this.increment(field, amount);
-
-    return this.atomicUpdate({
-      $inc: {
-        [field]: amount,
-      },
-    });
+    return performAtomicIncrement(this, field, amount);
   }
 
   /**
@@ -953,13 +928,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     field: T,
     amount: number = 1,
   ): Promise<number> {
-    this.decrement(field, amount);
-
-    return this.atomicUpdate({
-      $inc: {
-        [field]: -amount,
-      },
-    });
+    return performAtomicDecrement(this, field, amount);
   }
 
   /**
@@ -1012,7 +981,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * ```
    */
   public hasChanges(): boolean {
-    return this.dirtyTracker.hasChanges();
+    return checkHasChanges(this);
   }
 
   /**
@@ -1028,7 +997,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * ```
    */
   public isDirty(column: string): boolean {
-    return this.dirtyTracker.isDirty(column);
+    return checkIsDirty(this, column);
   }
 
   /**
@@ -1044,7 +1013,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * ```
    */
   public getDirtyColumnsWithValues(): Record<string, { oldValue: unknown; newValue: unknown }> {
-    return this.dirtyTracker.getDirtyColumnsWithValues();
+    return getDirtyColumnsWithValues(this);
   }
 
   /**
@@ -1059,7 +1028,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * ```
    */
   public getRemovedColumns(): string[] {
-    return this.dirtyTracker.getRemovedColumns();
+    return getRemovedColumns(this);
   }
 
   /**
@@ -1074,7 +1043,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * ```
    */
   public getDirtyColumns(): string[] {
-    return this.dirtyTracker.getDirtyColumns();
+    return getDirtyColumns(this);
   }
 
   /**
@@ -1096,13 +1065,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     event: ModelEventName,
     context?: TContext,
   ): Promise<void> {
-    const ctor = this.constructor as any;
-    // Trigger instance events
-    await this.events.emit(event, this, context as TContext);
-    // Trigger static events
-    await ctor.events().emit(event, this, context as TContext);
-    // Trigger global events
-    await globalModelEvents.emit(event, this, context as TContext);
+    return emitModelEvent(this, event, context);
   }
 
   /**
@@ -1116,7 +1079,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     event: ModelEventName,
     listener: ModelEventListener<this, TContext>,
   ): () => void {
-    return this.events.on(event, listener as any);
+    return onModelEvent(this, event, listener as any);
   }
 
   /**
@@ -1130,7 +1093,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     event: ModelEventName,
     listener: ModelEventListener<this, TContext>,
   ): () => void {
-    return this.events.once(event, listener as any);
+    return onceModelEvent(this, event, listener as any);
   }
 
   /**
@@ -1143,7 +1106,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     event: ModelEventName,
     listener: ModelEventListener<this, TContext>,
   ): void {
-    this.events.off(event, listener as any);
+    offModelEvent(this, event, listener as any);
   }
 
   /**
@@ -1167,48 +1130,21 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * ```
    */
   public static getDataSource(): DataSource {
-    const ref = this.dataSource;
-    let dataSource: DataSource;
+    return resolveDataSource(this as any);
+  }
 
-    if (typeof ref === "string") {
-      dataSource = dataSourceRegistry.get(ref);
-    } else if (ref) {
-      dataSource = ref;
-    } else {
-      dataSource = dataSourceRegistry.get();
-    }
-
-    // Apply model defaults from data source (only once per model class)
-    if (!this.hasOwnProperty("_defaultsApplied")) {
-      // Merge defaults hierarchy: driver defaults < dataSource modelDefaults
-      const driverDefaults = dataSource.driver.modelDefaults || {};
-      const dataSourceDefaults = dataSource.modelDefaults || {};
-
-      // Merge with dataSource modelDefaults taking priority over driver defaults
-      const mergedDefaults = {
-        ...driverDefaults,
-        ...dataSourceDefaults,
-      };
-
-      // Apply merged defaults to model
-      if (Object.keys(mergedDefaults).length > 0) {
-        (this as any).applyModelDefaults(mergedDefaults);
-      }
-
-      (this as any)._defaultsApplied = true;
-    }
-
-    return dataSource;
+  /**
+   * Get driver instance
+   */
+  public static getDriver(): DriverContract {
+    return this.getDataSource().driver;
   }
 
   /**
    * Generate next id and set it to current model's id
    */
-  public async generateNextId(): Promise<number> {
-    const writer = new DatabaseWriter(this);
-    await writer.generateNextId();
-
-    return this.id!;
+  public async generateNextId(): Promise<number | string> {
+    return generateModelNextId(this);
   }
 
   /**
@@ -1227,61 +1163,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * @param defaults - Model default configuration from data source
    */
   public static applyModelDefaults(defaults: any): void {
-    // Only apply defaults if model doesn't have its own value
-
-    // ============================================================================
-    // ID Generation
-    // ============================================================================
-    if (defaults.autoGenerateId !== undefined && this.autoGenerateId === undefined) {
-      this.autoGenerateId = defaults.autoGenerateId;
-    }
-    if (defaults.initialId !== undefined && this.initialId === undefined) {
-      this.initialId = defaults.initialId;
-    }
-    if (defaults.randomInitialId !== undefined && this.randomInitialId === undefined) {
-      this.randomInitialId = defaults.randomInitialId;
-    }
-    if (defaults.incrementIdBy !== undefined && this.incrementIdBy === undefined) {
-      this.incrementIdBy = defaults.incrementIdBy;
-    }
-    if (defaults.randomIncrement !== undefined && this.randomIncrement === undefined) {
-      this.randomIncrement = defaults.randomIncrement;
-    }
-
-    // ============================================================================
-    // Timestamps
-    // ============================================================================
-    if (defaults.createdAtColumn !== undefined && this.createdAtColumn === undefined) {
-      this.createdAtColumn = defaults.createdAtColumn;
-    }
-    if (defaults.updatedAtColumn !== undefined && this.updatedAtColumn === undefined) {
-      this.updatedAtColumn = defaults.updatedAtColumn;
-    }
-
-    // ============================================================================
-    // Deletion
-    // ============================================================================
-    if (defaults.deleteStrategy !== undefined && this.deleteStrategy === undefined) {
-      this.deleteStrategy = defaults.deleteStrategy;
-    }
-    if (defaults.deletedAtColumn !== undefined && this.deletedAtColumn === undefined) {
-      this.deletedAtColumn = defaults.deletedAtColumn;
-    }
-    if (defaults.trashTable !== undefined && this.trashTable === undefined) {
-      // Handle function-based trash table
-      if (typeof defaults.trashTable === "function") {
-        this.trashTable = defaults.trashTable(this.table);
-      } else {
-        this.trashTable = defaults.trashTable;
-      }
-    }
-
-    // ============================================================================
-    // Validation
-    // ============================================================================
-    if (defaults.strictMode !== undefined && this.strictMode === undefined) {
-      this.strictMode = defaults.strictMode;
-    }
+    applyDefaultsToModel(this, defaults);
   }
 
   /**
@@ -1312,10 +1194,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     callback: (query: QueryBuilderContract) => void,
     options: GlobalScopeOptions = {},
   ): void {
-    this.globalScopes.set(name, {
-      callback,
-      timing: options.timing || "before",
-    });
+    addGlobalModelScope(this as any, name, callback, options);
   }
 
   /**
@@ -1329,7 +1208,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * ```
    */
   public static removeGlobalScope(name: string): void {
-    this.globalScopes.delete(name);
+    removeGlobalModelScope(this as any, name);
   }
 
   /**
@@ -1358,7 +1237,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * ```
    */
   public static addScope(name: string, callback: LocalScopeCallback): void {
-    this.localScopes.set(name, callback);
+    addLocalModelScope(this as any, name, callback);
   }
 
   /**
@@ -1372,7 +1251,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * ```
    */
   public static removeScope(name: string): void {
-    this.localScopes.delete(name);
+    removeLocalModelScope(this as any, name);
   }
 
   /**
@@ -1381,54 +1260,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   public static query<TModel extends Model = Model>(
     this: ChildModel<TModel>,
   ): QueryBuilderContract<TModel> {
-    // Call newQueryBuilder as a static method (may be overridden in child classes)
-    const queryBuilder = this.newQueryBuilder<TModel>();
-    const ModelClass = this as unknown as ChildModel<TModel>;
-    const qb = queryBuilder; // Capture for closure access
-
-    // Collect global scopes from base Model and child model
-    const allGlobalScopes = new Map<string, GlobalScopeDefinition>([
-      ...Model.globalScopes,
-      ...this.globalScopes,
-    ]);
-
-    // Pass scopes to query builder
-    queryBuilder.pendingGlobalScopes = allGlobalScopes;
-
-    queryBuilder.availableLocalScopes = this.localScopes;
-    queryBuilder.disabledGlobalScopes = new Set();
-
-    // Pass relation definitions for joinWith() support
-    queryBuilder.relationDefinitions = this.relations;
-    queryBuilder.modelClass = ModelClass;
-
-    // Emit fetching event
-    this.events().emitFetching(queryBuilder, { table: this.table, modelClass: this });
-
-    queryBuilder.hydrate((data: any) => {
-      return this.readFrom(data);
-    });
-
-    // Wire up onFetched callback to load relations and emit model-level event
-    queryBuilder.onFetched(async (models: any[]) => {
-      // Load eager relations if any were requested
-      const eagerRelations = qb.eagerLoadRelations;
-      if (eagerRelations && eagerRelations.size > 0 && models.length > 0) {
-        // Build constraints object from the Map
-        const constraints: Record<string, (query: QueryBuilderContract) => void> = {};
-        for (const [name, constraint] of eagerRelations) {
-          if (typeof constraint === "function") {
-            constraints[name] = constraint;
-          }
-        }
-
-        const loader = new RelationLoader(models, ModelClass);
-        await loader.load([...eagerRelations.keys()], constraints);
-      }
-      await this.events().emit("fetched", models as any, {});
-    });
-
-    return queryBuilder;
+    return buildQuery(this, Model);
   }
 
   /**
@@ -1583,17 +1415,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   public static newQueryBuilder<TModel extends Model = Model>(
     this: ChildModel<TModel>,
   ): QueryBuilderContract<TModel> {
-    const dataSource = this.getDataSource();
-
-    // Check if model has a custom builder class
-    if (this.builder) {
-      const BuilderClass = this.builder;
-      return new BuilderClass(this.table, dataSource) as QueryBuilderContract<TModel>;
-    }
-
-    // Use default driver query builder
-    const queryBuilder = dataSource.driver.queryBuilder<TModel>(this.table);
-    return queryBuilder;
+    return buildNewQueryBuilder(this);
   }
 
   /**
@@ -1603,12 +1425,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     this: ChildModel<TModel>,
     filter?: Record<string, unknown>,
   ): Promise<TModel | null> {
-    const query = this.query();
-    if (filter) {
-      query.where(filter);
-    }
-
-    return query.first();
+    return findFirst(this, filter);
   }
 
   /**
@@ -1618,12 +1435,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     this: ChildModel<TModel>,
     filter?: Record<string, unknown>,
   ): Promise<TModel | null> {
-    const query = this.query();
-    if (filter) {
-      query.where(filter);
-    }
-
-    return query.last();
+    return findLast(this, filter);
   }
 
   /**
@@ -1665,12 +1477,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     this: ChildModel<TModel>,
     filter?: Record<string, unknown>,
   ): Promise<number> {
-    const query = this.query();
-    if (filter) {
-      query.where(filter);
-    }
-
-    return query.count();
+    return countRecords(this, filter);
   }
 
   /**
@@ -1680,8 +1487,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     this: ChildModel<TModel>,
     id: string | number,
   ): Promise<TModel | null> {
-    const query = this.query();
-    return query.where(this.primaryKey, id).first();
+    return findById(this, id);
   }
 
   /**
@@ -1694,11 +1500,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     this: ChildModel<TModel>,
     filter?: Record<string, unknown>,
   ): Promise<TModel[]> {
-    const query = this.query();
-    if (filter) {
-      query.where(filter);
-    }
-    return query.get();
+    return findAll(this, filter);
   }
 
   /**
@@ -1706,23 +1508,11 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    */
   public static async paginate<TModel extends Model = Model>(
     this: ChildModel<TModel>,
-    {
-      page,
-      limit,
-      filter,
-    }: PaginationOptions & {
+    options: PaginationOptions & {
       filter?: Record<string, unknown>;
     } = {},
   ): Promise<PaginationResult<TModel>> {
-    const query = this.query();
-    if (filter) {
-      query.where(filter);
-    }
-
-    return query.paginate({
-      limit: limit,
-      page: page,
-    });
+    return paginateRecords(this, options);
   }
 
   /**
@@ -1734,16 +1524,11 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     this: ChildModel<TModel>,
     filter?: Record<string, unknown>,
   ): Promise<TModel[]> {
-    const query = this.query();
-    if (filter) {
-      query.where(filter);
-    }
-
-    return (await query.latest()) as unknown as TModel[];
+    return findLatest(this, filter);
   }
 
   /**
-   * Increment the given field by the given amount
+   * Increment the given field by the given amount using atomic update
    *
    * @example ```typescript
    * // Increase age by 1 for user id 1
@@ -1758,13 +1543,11 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     field: string,
     amount: number,
   ): Promise<number> {
-    const query = this.query().where(filter);
-
-    return query.increment(field, amount);
+    return increaseField(this, filter, field, amount);
   }
 
   /**
-   * Decrement the given field by the given amount
+   * Decrement the given field by the given amount using atomic update
    * @example ```typescript
    * // Decrease age by 1 for user id 1
    * User.decrement({id: 1}, "age", 1);
@@ -1778,21 +1561,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     field: string,
     amount: number,
   ): Promise<number> {
-    const query = this.query().where(filter);
-    return query.decrement(field, amount);
-  }
-
-  /**
-   * Create a new instance from the given data
-   */
-  public static readFrom<TModel extends Model = Model>(
-    this: ChildModel<TModel>,
-    data: Record<string, unknown>,
-  ): TModel {
-    const model = new this(data);
-
-    model.isNew = false;
-    return model;
+    return decreaseField(this, filter, field, amount);
   }
 
   /**
@@ -1806,11 +1575,20 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   public static async atomic<TModel extends Model = Model>(
     this: ChildModel<TModel>,
     filter: Record<string, unknown>,
-    operations: Record<string, unknown>,
+    operations: UpdateOperations,
   ): Promise<number> {
-    const dataSource = this.getDataSource();
-    const result = await dataSource.driver.atomic(this.table, filter, operations);
-    return result.modifiedCount;
+    return performAtomic(this, filter, operations);
+  }
+
+  /**
+   * Perform a direct update $set for the given id
+   */
+  public static async update<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    id: string | number,
+    data: Record<string, unknown>,
+  ): Promise<number> {
+    return updateById(this, id, data);
   }
 
   /**
@@ -1824,8 +1602,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     filter: Record<string, unknown>,
     update: UpdateOperations,
   ): Promise<TModel[]> {
-    await this.atomic(filter, update);
-    return await this.query().where(filter).get();
+    return findAndUpdateRecords(this, filter, update);
   }
 
   /**
@@ -1839,9 +1616,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     filter: Record<string, unknown>,
     update: UpdateOperations,
   ): Promise<TModel | null> {
-    const dataSource = this.getDataSource();
-    const result = await dataSource.driver.findOneAndUpdate(this.table, filter, update);
-    return result ? (new this(result) as TModel) : null;
+    return findOneAndUpdateRecord(this, filter, update);
   }
 
   /**
@@ -1852,9 +1627,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     filter: Record<string, unknown>,
     document: Record<string, unknown>,
   ): Promise<TModel | null> {
-    const dataSource = this.getDataSource();
-    const result = await dataSource.driver.replace(this.table, filter, document);
-    return result ? (new this(result) as TModel) : null;
+    return findAndReplaceRecord(this, filter, document);
   }
 
   /**
@@ -1879,8 +1652,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     strategy?: DeleteStrategy;
     skipEvents?: boolean;
   }): Promise<RemoverResult> {
-    const remover = new DatabaseRemover(this);
-    return await remover.destroy(options);
+    return destroyModel(this, options);
   }
 
   /**
@@ -1937,26 +1709,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * ```
    */
   public clone(): this {
-    // Deep copy the current data using JSON serialization
-    // This ensures nested objects are also copied
-    const clonedData = JSON.parse(JSON.stringify(this.data)) as TSchema;
-
-    // Create a new instance of the same model class
-    const ModelClass = this.self();
-    const clonedModel = new ModelClass(clonedData) as this;
-
-    // Preserve the isNew state
-    clonedModel.isNew = this.isNew;
-
-    // Freeze the data to make it immutable
-    // This recursively freezes all nested objects
-    this.deepFreeze(clonedModel.data);
-
-    // Reset the dirty tracker to have no changes
-    // The clone represents a clean snapshot
-    clonedModel.dirtyTracker.reset();
-
-    return clonedModel;
+    return cloneModel(this);
   }
 
   /**
@@ -1966,24 +1719,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * @returns The frozen object
    */
   public deepFreeze<T>(obj: T): T {
-    // Freeze the object itself
-    Object.freeze(obj);
-
-    // Recursively freeze all properties
-    Object.getOwnPropertyNames(obj).forEach((prop) => {
-      const value = (obj as any)[prop];
-
-      // Only freeze objects and arrays, skip primitives and null
-      if (
-        value !== null &&
-        (typeof value === "object" || typeof value === "function") &&
-        !Object.isFrozen(value)
-      ) {
-        this.deepFreeze(value);
-      }
-    });
-
-    return obj;
+    return deepFreezeObject(obj);
   }
 
   /**
@@ -2035,7 +1771,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     this: ChildModel<TModel>,
     filter?: Record<string, unknown>,
   ): Promise<number> {
-    return await this.getDataSource().driver.deleteMany(this.table, filter);
+    return deleteRecords(this, filter);
   }
 
   /**
@@ -2045,7 +1781,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     this: ChildModel<TModel>,
     filter?: Record<string, unknown>,
   ): Promise<number> {
-    return await this.getDataSource().driver.delete(this.table, filter);
+    return deleteOneRecord(this, filter);
   }
 
   /**
@@ -2081,16 +1817,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
       skipEvents?: boolean;
     },
   ): Promise<TModel> {
-    const restorer = new DatabaseRestorer(this as unknown as typeof Model);
-    const result = await restorer.restore(id, options);
-
-    if (!result.restoredRecord) {
-      throw new Error(
-        `Failed to restore ${this.name} with ${this.primaryKey} ${id}: no record returned.`,
-      );
-    }
-
-    return result.restoredRecord as TModel;
+    return restoreRecord(this, id, options);
   }
 
   /**
@@ -2118,14 +1845,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
       skipEvents?: boolean;
     },
   ): Promise<TModel[]> {
-    const restorer = new DatabaseRestorer(this as unknown as typeof Model);
-    const result = await restorer.restoreAll(options);
-
-    if (result.restoredCount === 0) {
-      return [];
-    }
-
-    return result.restoredRecords as TModel[];
+    return restoreAllRecords(this, options);
   }
 
   /**
@@ -2151,9 +1871,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     TModel extends Model = Model,
     TSchema extends ModelSchema = TModel extends Model<infer S> ? S : ModelSchema,
   >(this: ChildModel<TModel>, data: Partial<TSchema>): Promise<TModel> {
-    const model = new this(data);
-    await model.save();
-    return model;
+    return createRecord(this, data);
   }
 
   /**
@@ -2163,7 +1881,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     TModel extends Model = Model,
     TSchema extends ModelSchema = TModel extends Model<infer S> ? S : ModelSchema,
   >(this: ChildModel<TModel>, data: Partial<TSchema>[]): Promise<TModel[]> {
-    return await Promise.all(data.map((data) => this.create(data)));
+    return createManyRecords(this, data);
   }
 
   /**
@@ -2191,15 +1909,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     TModel extends Model = Model,
     TSchema extends ModelSchema = TModel extends Model<infer S> ? S : ModelSchema,
   >(this: ChildModel<TModel>, filter: Partial<TSchema>, data: Partial<TSchema>): Promise<TModel> {
-    // Try to find existing record
-    const existing = await this.first(filter);
-
-    if (existing) {
-      return existing; // Return as-is, no update
-    }
-
-    // Create new record with merged data
-    return await this.create({ ...filter, ...data } as Partial<TSchema>);
+    return findOrCreateRecord(this, filter, data);
   }
 
   /**
@@ -2253,52 +1963,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     data: Partial<TSchema>,
     options?: Record<string, unknown>,
   ): Promise<TModel> {
-    const dataSource = this.getDataSource();
-    const mergedData = { ...filter, ...data } as Record<string, unknown>;
-
-    // Create a temporary model instance for validation and data preparation
-    const tempModel = new this(mergedData as Partial<TSchema>);
-    tempModel.isNew = true;
-
-    // Emit saving event for validation context
-    await tempModel.emitEvent("saving", {
-      isInsert: true,
-      options,
-      mode: "upsert",
-    });
-
-    // Add timestamps
-    const createdAtColumn = this.createdAtColumn;
-    const updatedAtColumn = this.updatedAtColumn;
-
-    if (createdAtColumn !== false && createdAtColumn !== undefined) {
-      // Only set createdAt if not already set (for new records)
-      const createdAtKey = createdAtColumn as string;
-      if (!mergedData[createdAtKey]) {
-        mergedData[createdAtKey] = new Date();
-      }
-    }
-
-    if (updatedAtColumn !== false && updatedAtColumn !== undefined) {
-      const updatedAtKey = updatedAtColumn as string;
-      mergedData[updatedAtKey] = new Date();
-    }
-
-    // Emit saving event (using existing event name)
-    await tempModel.emitEvent("saving", { filter, data: mergedData, options, mode: "upsert" });
-
-    // Perform upsert via driver
-    const result = await dataSource.driver.upsert(this.table, filter, mergedData, options);
-
-    // Create model instance from result
-    const model = new this(result) as TModel;
-    model.isNew = false;
-    model.dirtyTracker.reset();
-
-    // Emit saved event (using existing event name)
-    await model.emitEvent("saved", { filter, data: result, options, mode: "upsert" });
-
-    return model;
+    return upsertRecord(this, filter, data, options);
   }
 
   /**
@@ -2344,18 +2009,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     filter: Record<string, unknown>,
     options?: Record<string, unknown>,
   ): Promise<TModel | null> {
-    const dataSource = this.getDataSource();
-    const result = await dataSource.driver.findOneAndDelete(this.table, filter, options);
-
-    if (!result) {
-      return null;
-    }
-
-    const model = new this(result) as TModel;
-    model.isNew = false;
-    model.dirtyTracker.reset();
-
-    return model;
+    return findOneAndDeleteRecord(this, filter, options);
   }
 
   /**
@@ -2377,6 +2031,13 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   }
 
   /**
+   * Cleanup model events
+   */
+  public static $cleanup() {
+    cleanupModelEvents(this);
+  }
+
+  /**
    * Accesses the event emitter dedicated to this model constructor.
    *
    * Each model subclass gets its own isolated event emitter, allowing you to
@@ -2394,21 +2055,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   public static events<TModel extends Model = Model>(
     this: ChildModel<TModel>,
   ): ModelEvents<TModel> {
-    let events = modelEventsRegistry.get(this);
-    if (!events) {
-      events = new ModelEvents<TModel>();
-      modelEventsRegistry.set(this, events);
-    }
-
-    return events as ModelEvents<TModel>;
-  }
-
-  /**
-   * Cleanup model events
-   */
-  public static $cleanup() {
-    modelEventsRegistry.delete(this);
-    removeModelFromRegistery(this.name);
+    return getModelEvents<TModel>(this);
   }
 
   /**
@@ -2432,7 +2079,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     event: ModelEventName,
     listener: ModelEventListener<TModel, TContext>,
   ): () => void {
-    return this.events<TModel>().on(event, listener);
+    return onStaticEvent<TModel, TContext>(this, event, listener);
   }
 
   /**
@@ -2457,7 +2104,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     event: ModelEventName,
     listener: ModelEventListener<TModel, TContext>,
   ): () => void {
-    return this.events<TModel>().once(event, listener);
+    return onceStaticEvent<TModel, TContext>(this, event, listener);
   }
 
   /**
@@ -2480,7 +2127,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     event: ModelEventName,
     listener: ModelEventListener<TModel, TContext>,
   ): void {
-    this.events<TModel>().off(event, listener);
+    offStaticEvent<TModel, TContext>(this, event, listener);
   }
 
   /**
@@ -2499,7 +2146,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * ```
    */
   public static globalEvents(): ModelEvents<Model> {
-    return globalModelEvents;
+    return getGlobalEvents();
   }
 
   /**
@@ -2520,8 +2167,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * ```
    */
   public replaceData(data: Record<string, unknown>): void {
-    this.data = data as TSchema;
-    this.dirtyTracker.replaceCurrentData(data);
+    replaceModelData(this, data);
   }
 
   /**
@@ -2564,57 +2210,85 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * ```
    */
   public async save(options?: WriterOptions & { merge?: Partial<TSchema> }): Promise<this> {
-    if (options?.merge) {
-      this.merge(options.merge);
-    }
-
-    const writer = new DatabaseWriter(this);
-    await writer.save(options);
-    return this;
+    return saveModel(this as any, options) as Promise<this>;
   }
 
   /**
-   * Serialize the model data for storage in database
+   * Serialize the model data for storage in the database.
+   *
+   * Uses the driver's `serialize` to apply driver-specific type transformations
+   * (e.g. Date → ISO string, BigInt → string for Postgres).
+   *
+   * **Not** the same as `toSnapshot` — this is a DB write concern, not a cache concern.
    */
   public serialize() {
-    return this.self().getDataSource().driver.serialize(this.data);
+    return serializeModel(this);
   }
 
   /**
-   * Deseriaze the given data
+   * Produce a plain-object snapshot of this model suitable for cache storage.
+   *
+   * - `data`: The model's own fields, serialized via the driver (handles Dates, BigInt, ObjectId).
+   * - `relations`: Each entry in `loadedRelations` recursively snapshotted via `toSnapshot`.
+   *   A relation that was loaded but resolved to `null` is stored as `null` (not omitted),
+   *   so that `fromSnapshot` can distinguish "loaded + null" from "never loaded".
+   *
+   * Use `Model.fromSnapshot(snapshot)` to reconstruct.
+   *
+   * @example
+   * ```typescript
+   * await cache.set(key, chat.toSnapshot());
+   * ```
    */
-  public static deserialize<TModel extends Model>(this: ChildModel<TModel>, data: any) {
-    const deserializedData = this.getDataSource().driver.deserialize(data);
+  public toSnapshot(): ModelSnapshot {
+    return modelToSnapshot(this);
+  }
 
-    const model = new this(deserializedData as any);
-    model.isNew = false;
+  /**
+   * Reconstruct a model instance (with relations) from a cache snapshot.
+   *
+   * Counterpart to `toSnapshot`. Applies driver deserialization (e.g. ISO string → Date)
+   * and recursively hydrates any nested relation snapshots via `RelationHydrator`.
+   *
+   * @example
+   * ```typescript
+   * const snapshot = await cache.get(key);
+   * const chat = Chat.fromSnapshot(snapshot);
+   * chat.unit; // Unit model instance, fully hydrated
+   * ```
+   */
+  public static fromSnapshot<TModel extends Model>(
+    this: ChildModel<TModel>,
+    snapshot: ModelSnapshot,
+  ): TModel {
+    return modelFromSnapshot(this, snapshot);
+  }
 
-    return model;
+  /**
+   * Create a model instance from raw data (no relations).
+   *
+   * This is the data-only hydration path, used by the query builder when
+   * converting a raw DB row into a model instance. Relations are NOT restored
+   * here — use `fromSnapshot` when restoring from a cache snapshot that
+   * includes relation data.
+   *
+   * @example
+   * ```typescript
+   * // Query builder internals:
+   * const user = User.hydrate(rawRow);
+   * ```
+   */
+  public static hydrate<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    data: Record<string, unknown>,
+  ): TModel {
+    return hydrateModel(this, data);
   }
 
   /**
    * Convert the model into JSON
    */
   public toJSON() {
-    const resource = this.self().resource;
-
-    if (!resource) {
-      const toJsonColumns = this.self().toJsonColumns;
-
-      if (toJsonColumns && toJsonColumns.length > 0) {
-        return this.only(toJsonColumns);
-      }
-
-      return this.data;
-    }
-
-    const resourceColumns = this.self().resourceColumns;
-
-    const data =
-      resourceColumns !== undefined && resourceColumns.length > 0
-        ? this.only(resourceColumns)
-        : this.data;
-
-    return new resource(data).toJSON();
+    return modelToJSON(this);
   }
 }

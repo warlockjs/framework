@@ -8,9 +8,13 @@
  * @module cascade/drivers/postgres
  */
 
-import type { JoinOptions, WhereOperator } from "../../contracts/query-builder.contract";
+import type {
+  DriverQuery,
+  JoinOptions,
+  WhereOperator,
+} from "../../contracts/query-builder.contract";
 import type { SqlDialectContract } from "../sql/sql-dialect.contract";
-import type { SqlQueryResult } from "../sql/sql-types";
+
 import { PostgresDialect } from "./postgres-dialect";
 
 /**
@@ -155,7 +159,7 @@ export class PostgresQueryParser {
   /**
    * SELECT columns.
    */
-  private selectColumns: string[] = [];
+  public selectColumns: string[] = [];
 
   /**
    * Deselected (excluded) columns.
@@ -170,7 +174,7 @@ export class PostgresQueryParser {
   /**
    * WHERE clauses.
    */
-  private whereClauses: string[] = [];
+  public whereClauses: string[] = [];
 
   /**
    * JOIN clauses.
@@ -180,7 +184,7 @@ export class PostgresQueryParser {
   /**
    * ORDER BY clauses.
    */
-  private orderClauses: string[] = [];
+  public orderClauses: string[] = [];
 
   /**
    * GROUP BY columns.
@@ -195,17 +199,23 @@ export class PostgresQueryParser {
   /**
    * LIMIT value.
    */
-  private limitValue?: number;
+  public limitValue?: number;
 
   /**
    * OFFSET value.
    */
-  private offsetValue?: number;
+  public offsetValue?: number;
 
   /**
    * DISTINCT flag.
    */
   private isDistinct = false;
+
+  /**
+   * Whether the query has any JOIN operations (pre-scanned before processing).
+   * Used by qualifyColumn() to decide whether to prefix columns with the main table.
+   */
+  private hasJoins = false;
 
   /**
    * Tracked joined tables (for table reference detection).
@@ -227,28 +237,55 @@ export class PostgresQueryParser {
   /**
    * Parse all operations and build the SQL query.
    *
-   * @returns Object with SQL string and parameter values
+   * @returns DriverQuery with `query` (SQL string) and `bindings` (parameter values)
    */
-  public parse(): SqlQueryResult {
+  public parse(): DriverQuery {
+    // Pre-scan for any join operations so qualifyColumn() can prefix columns
+    // correctly even when WHERE clauses appear before JOINs in the operations list.
+    const JOIN_TYPES = new Set([
+      "join",
+      "leftJoin",
+      "rightJoin",
+      "innerJoin",
+      "fullJoin",
+      "crossJoin",
+      "joinRaw",
+    ]);
+
+    this.hasJoins = false;
+
+    // First pass: locate all joins and populate joinedTables for accurate JSON path detection
+    for (const operation of this.operations) {
+      if (JOIN_TYPES.has(operation.type)) {
+        this.hasJoins = true;
+        const data = operation.data as any;
+        const joinTable = data.table as string;
+        const alias = data.alias as string;
+
+        if (joinTable) this.joinedTables.add(joinTable);
+        if (alias) this.joinedTables.add(alias);
+      }
+    }
+
     // Process each operation
     for (const operation of this.operations) {
       this.processOperation(operation);
     }
 
     // Build the final SQL query
-    const sql = this.buildSql();
+    const query = this.buildSql();
 
-    return { sql, params: this.params };
+    return { query, bindings: this.params };
   }
 
   /**
    * Get a formatted string representation of the query.
    *
-   * @returns Formatted SQL with parameters
+   * @returns Formatted SQL with bindings
    */
   public toPrettyString(): string {
-    const { sql, params } = this.parse();
-    return `${sql}\n-- Parameters: ${JSON.stringify(params)}`;
+    const { query = "", bindings } = this.parse();
+    return `${query}\n-- Bindings: ${JSON.stringify(bindings ?? [])}`;
   }
 
   /**
@@ -449,19 +486,19 @@ export class PostgresQueryParser {
   private buildSelectClause(): string {
     const distinct = this.isDistinct ? "DISTINCT " : "";
 
-    // If no specific columns, select all
+    // If no specific columns, select all — qualify with main table when joins present
     if (this.selectColumns.length === 0 && this.selectRaw.length === 0) {
-      // Handle deselect by explicitly listing columns (would need schema info)
-      // For now, just use *
-      return `SELECT ${distinct}*`;
+      return this.hasJoins
+        ? `SELECT ${distinct}${this.dialect.quoteIdentifier(this.table)}.*`
+        : `SELECT ${distinct}*`;
     }
 
     const columns: string[] = [];
 
-    // Add selected columns
+    // Add selected columns — prefix with main table when joins present to avoid ambiguity
     for (const col of this.selectColumns) {
       if (!this.deselectColumns.includes(col)) {
-        columns.push(this.dialect.quoteIdentifier(col));
+        columns.push(this.parseColumnIdentifier(col, this.table, this.alias));
       }
     }
 
@@ -484,17 +521,49 @@ export class PostgresQueryParser {
 
   /**
    * Process a basic WHERE operation.
+   *
+   * Delegates to specialised processors for operators that require more than a
+   * single placeholder (between, in, like-variants, exists, etc.).
    */
   private processWhere(data: Record<string, unknown>, boolean: "AND" | "OR"): void {
     const field = data.field as string;
     const operator = (data.operator as WhereOperator) ?? "=";
     const value = data.value;
 
-    const quotedField = this.dialect.quoteIdentifier(field);
-    const placeholder = this.addParam(value);
+    // Delegate to specialised processors for operators that need it
+    switch (operator) {
+      case "between":
+        return this.processWhereBetween(
+          { field, range: value as [unknown, unknown] },
+          false,
+        );
+      case "notBetween":
+        return this.processWhereBetween(
+          { field, range: value as [unknown, unknown] },
+          true,
+        );
+      case "in":
+        return this.processWhereIn({ field, values: value as unknown[] }, false);
+      case "notIn":
+        return this.processWhereIn({ field, values: value as unknown[] }, true);
+      case "like":
+      case "ilike":
+      case "startsWith":
+      case "endsWith":
+        return this.processWhereLike({ field, pattern: value as string }, false);
+      case "notLike":
+      case "notStartsWith":
+      case "notEndsWith":
+        return this.processWhereLike({ field, pattern: value as string }, true);
+      case "exists":
+        // EXISTS expects value to be a raw sub-query string
+        return this.addWhereClause(`EXISTS (${value})`, boolean);
+    }
 
-    const clause = `${quotedField} ${this.mapOperator(operator)} ${placeholder}`;
-    this.addWhereClause(clause, boolean);
+    // Simple single-value operator — fall through to generic path
+    const quotedField = this.parseColumnIdentifier(field, this.table, this.alias);
+    const placeholder = this.addParam(value);
+    this.addWhereClause(`${quotedField} ${this.mapOperator(operator)} ${placeholder}`, boolean);
   }
 
   /**
@@ -520,7 +589,7 @@ export class PostgresQueryParser {
     const field = data.field as string;
     const values = data.values as unknown[];
 
-    const quotedField = this.dialect.quoteIdentifier(field);
+    const quotedField = this.parseColumnIdentifier(field, this.table, this.alias);
     const operator = negate ? "!= ALL" : "= ANY";
     const placeholder = this.addParam(values);
 
@@ -532,7 +601,7 @@ export class PostgresQueryParser {
    */
   private processWhereNull(data: Record<string, unknown>, negate: boolean): void {
     const field = data.field as string;
-    const quotedField = this.dialect.quoteIdentifier(field);
+    const quotedField = this.parseColumnIdentifier(field, this.table, this.alias);
     const clause = negate ? `${quotedField} IS NOT NULL` : `${quotedField} IS NULL`;
     this.addWhereClause(clause, "AND");
   }
@@ -544,7 +613,7 @@ export class PostgresQueryParser {
     const field = data.field as string;
     const range = data.range as [unknown, unknown];
 
-    const quotedField = this.dialect.quoteIdentifier(field);
+    const quotedField = this.parseColumnIdentifier(field, this.table, this.alias);
     const placeholder1 = this.addParam(range[0]);
     const placeholder2 = this.addParam(range[1]);
     const keyword = negate ? "NOT BETWEEN" : "BETWEEN";
@@ -559,7 +628,7 @@ export class PostgresQueryParser {
     const field = data.field as string;
     const pattern = data.pattern as string;
 
-    const quotedField = this.dialect.quoteIdentifier(field);
+    const quotedField = this.parseColumnIdentifier(field, this.table, this.alias);
     const { operator } = this.dialect.likePattern(pattern, true);
     const placeholder = this.addParam(pattern);
     const keyword = negate ? `NOT ${operator}` : operator;
@@ -575,8 +644,9 @@ export class PostgresQueryParser {
     const operator = (data.operator as string) ?? "=";
     const second = data.second as string;
 
-    const quotedFirst = this.dialect.quoteIdentifier(first);
-    const quotedSecond = this.dialect.quoteIdentifier(second);
+    // Both sides may need qualification if unambiguous table is unclear
+    const quotedFirst = this.parseColumnIdentifier(first, this.table, this.alias);
+    const quotedSecond = this.parseColumnIdentifier(second, this.table, this.alias);
 
     this.addWhereClause(`${quotedFirst} ${operator} ${quotedSecond}`, boolean);
   }
@@ -588,7 +658,7 @@ export class PostgresQueryParser {
     const path = data.path as string;
     const value = data.value;
 
-    const quotedPath = this.dialect.quoteIdentifier(path);
+    const quotedPath = this.parseColumnIdentifier(path, this.table, this.alias);
     const jsonValue = JSON.stringify(value);
     const operator = negate ? "NOT @>" : "@>";
 
@@ -634,9 +704,15 @@ export class PostgresQueryParser {
    */
   private processSelectRaw(data: Record<string, unknown>): void {
     const expression = data.expression as string | Record<string, unknown>;
+    const bindings = (data.bindings as unknown[]) ?? [];
 
     if (typeof expression === "string") {
-      this.selectRaw.push(expression);
+      // Replace ? placeholders with $n positional params (same as processWhereRaw)
+      let processed = expression;
+      for (const binding of bindings) {
+        processed = processed.replace("?", this.addParam(binding));
+      }
+      this.selectRaw.push(processed);
     } else {
       // Handle object expressions (for compatibility)
       for (const [alias, expr] of Object.entries(expression)) {
@@ -655,22 +731,118 @@ export class PostgresQueryParser {
 
   /**
    * Process SELECT for related columns (joinWith).
-   * Uses row_to_json to package all related columns into a single JSON column.
-   * Also ensures main table columns are selected.
+   *
+   * - hasOne / belongsTo  → LEFT JOIN + row_to_json  (single object)
+   * - hasMany             → correlated subquery with json_agg (array, no row explosion)
+   *
+   * @example hasMany correlated subquery:
+   *   (SELECT json_agg(row_to_json(a.*))
+   *    FROM "chat_message_actions" a
+   *    WHERE a."chat_message_id" = "chat_messages"."id") AS "actions"
+   *
+   * @example hasOne/belongsTo row_to_json:
+   *   row_to_json("organizationAiModel".*) AS "organizationAiModel"
    */
   private processSelectRelatedColumns(data: Record<string, unknown>): void {
     const alias = data.alias as string;
+    const select = data.select as string[] | undefined;
+    const relationType = data.type as string | undefined;
+    const constraintOps = data.constraintOps as PostgresParserOperation[] | undefined;
     const quotedAlias = this.dialect.quoteIdentifier(alias);
     const quotedTable = this.dialect.quoteIdentifier(this.table);
 
-    // Ensure main table columns are selected (only add once)
-    if (!this.selectRaw.includes(`${quotedTable}.*`)) {
-      this.selectRaw.unshift(`${quotedTable}.*`);
-    }
+    if (relationType === "hasMany") {
+      // Correlated subquery — no JOIN, no row explosion, returns a JSON array.
+      const relatedTable = data.table as string;
+      const foreignKey = data.foreignKey as string;
+      const localKey = data.localKey as string;
+      const quotedRelatedTable = this.dialect.quoteIdentifier(relatedTable);
+      const quotedForeignKey = this.dialect.quoteIdentifier(foreignKey);
+      const quotedLocalKey = this.dialect.quoteIdentifier(localKey);
+      const quotedMainTable = this.dialect.quoteIdentifier(this.table);
 
-    // Use row_to_json to get all columns from the joined table as a single JSON object
-    // The column will be named like "_rel_author" and contain { id, name, email, ... }
-    this.selectRaw.push(`row_to_json(${quotedAlias}.*) AS ${quotedAlias}`);
+      let innerSelect: string;
+      if (select && select.length > 0) {
+        // Pick specific columns: json_agg(json_build_object('id', a."id", ...))
+        const fields = select
+          .map((col) => `'${col}', a.${this.dialect.quoteIdentifier(col)}`)
+          .join(", ");
+        innerSelect = `json_agg(json_build_object(${fields}))`;
+      } else {
+        innerSelect = `json_agg(row_to_json(a.*))`;
+      }
+
+      // Build the base FK condition
+      const fkCondition = `a.${quotedForeignKey} = ${quotedMainTable}.${quotedLocalKey}`;
+
+      // Merge constraint ops (where / order / limit) from a sub-parser
+      let extraWhere = "";
+      let orderBy = "";
+      let limitClause = "";
+
+      if (constraintOps && constraintOps.length > 0) {
+        const subParser = new PostgresQueryParser({
+          table: relatedTable,
+          alias: "a",
+          operations: constraintOps,
+        });
+        subParser.parse();
+
+        if (subParser.whereClauses.length > 0) {
+          extraWhere = ` AND ${subParser.whereClauses.join(" ")}`;
+        }
+        if (subParser.orderClauses.length > 0) {
+          orderBy = ` ORDER BY ${subParser.orderClauses.join(", ")}`;
+        }
+        if (subParser.limitValue !== undefined) {
+          limitClause = ` LIMIT ${subParser.limitValue}`;
+        }
+      }
+
+      // Wrap with ORDER/LIMIT only when constraints are present (json_agg ignores ORDER)
+      const innerQuery =
+        orderBy || limitClause
+          ? `SELECT row_to_json(sub.*) FROM (SELECT * FROM ${quotedRelatedTable} a WHERE ${fkCondition}${extraWhere}${orderBy}${limitClause}) sub`
+          : `SELECT ${innerSelect.replace("json_agg(", "").replace(/\)$/, "")} FROM ${quotedRelatedTable} a WHERE ${fkCondition}${extraWhere}`;
+
+      const aggregated =
+        orderBy || limitClause
+          ? `(SELECT json_agg(row_to_json(sub.*)) FROM (SELECT * FROM ${quotedRelatedTable} a WHERE ${fkCondition}${extraWhere}${orderBy}${limitClause}) sub) AS ${quotedAlias}`
+          : `(SELECT ${innerSelect} FROM ${quotedRelatedTable} a WHERE ${fkCondition}${extraWhere}) AS ${quotedAlias}`;
+
+      this.selectRaw.push(aggregated);
+    } else {
+      // hasOne / belongsTo — single object via LEFT JOIN + row_to_json.
+      const hasExplicitSelect = this.selectColumns.length > 0;
+      if (!hasExplicitSelect && !this.selectRaw.includes(`${quotedTable}.*`)) {
+        this.selectRaw.unshift(`${quotedTable}.*`);
+      }
+
+      // If constraint provides an explicit select list, prefer it over data.select
+      let effectiveSelect = select;
+      if (constraintOps && constraintOps.length > 0) {
+        const subParser = new PostgresQueryParser({
+          table: (data.table as string) ?? alias,
+          alias,
+          operations: constraintOps,
+        });
+        subParser.parse();
+        if (subParser.selectColumns.length > 0) {
+          effectiveSelect = subParser.selectColumns;
+        }
+      }
+
+      if (effectiveSelect && effectiveSelect.length > 0) {
+        const selectedColumns = effectiveSelect
+          .map((col) => `${quotedAlias}.${this.dialect.quoteIdentifier(col)}`)
+          .join(", ");
+        this.selectRaw.push(
+          `row_to_json((SELECT d FROM (SELECT ${selectedColumns}) d)) AS ${quotedAlias}`,
+        );
+      } else {
+        this.selectRaw.push(`row_to_json(${quotedAlias}.*) AS ${quotedAlias}`);
+      }
+    }
   }
 
   /**
@@ -705,23 +877,23 @@ export class PostgresQueryParser {
     }
 
     // Parse local field (belongs to main table)
-    const quotedLocal = this.parseJoinField(localField!, this.table, this.alias);
+    const quotedLocal = this.parseColumnIdentifier(localField!, this.table, this.alias);
 
     // Parse foreign field (belongs to join table)
-    const quotedForeign = this.parseJoinField(foreignField!, joinTable, tableAlias);
+    const quotedForeign = this.parseColumnIdentifier(foreignField!, joinTable, tableAlias);
 
     this.joinClauses.push(`${type} JOIN ${tableRef} ON ${quotedLocal} = ${quotedForeign}`);
   }
 
   /**
-   * Parse a join field with smart detection for table prefixes and JSONB paths.
+   * Parse a column identifier with smart detection for table prefixes and JSONB paths.
    *
    * @param field - The field string (e.g., "id", "users.id", "createdBy.id")
    * @param defaultTable - Default table to use if no prefix
    * @param tableAlias - Table alias to use if provided
    * @returns Properly quoted SQL expression
    */
-  private parseJoinField(field: string, defaultTable: string, tableAlias?: string): string {
+  private parseColumnIdentifier(field: string, defaultTable: string, tableAlias?: string): string {
     if (!field) return "";
 
     const effectiveTable = tableAlias ?? defaultTable;
@@ -845,7 +1017,7 @@ export class PostgresQueryParser {
     const field = data.field as string;
     const direction = ((data.direction as string) ?? "asc").toUpperCase();
 
-    const quotedField = this.dialect.quoteIdentifier(field);
+    const quotedField = this.parseColumnIdentifier(field, this.table, this.alias);
     this.orderClauses.push(`${quotedField} ${direction}`);
   }
 
@@ -854,7 +1026,14 @@ export class PostgresQueryParser {
    */
   private processOrderByRaw(data: Record<string, unknown>): void {
     const expression = data.expression as string;
-    this.orderClauses.push(expression);
+    const bindings = (data.bindings as unknown[]) ?? [];
+
+    // Replace ? placeholders with $n positional params (same as processWhereRaw)
+    let processed = expression;
+    for (const binding of bindings) {
+      processed = processed.replace("?", this.addParam(binding));
+    }
+    this.orderClauses.push(processed);
   }
 
   /**
@@ -900,7 +1079,10 @@ export class PostgresQueryParser {
   }
 
   /**
-   * Map Cascade operators to SQL operators.
+   * Map simple Cascade operators to their SQL equivalents.
+   *
+   * Complex operators (between, in, like-variants, exists) are handled by
+   * dedicated processors and should never reach this method.
    */
   private mapOperator(operator: WhereOperator): string {
     const mapping: Record<string, string> = {
@@ -912,7 +1094,7 @@ export class PostgresQueryParser {
       "<": "<",
       "<=": "<=",
       like: "LIKE",
-      notLike: "NOT LIKE",
+      notlike: "NOT LIKE",
       ilike: "ILIKE",
     };
 

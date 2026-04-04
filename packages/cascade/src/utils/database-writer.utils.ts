@@ -9,7 +9,7 @@ type transformCallbackOptions = {
   isNew: boolean;
 };
 
-type ModelTransformCallback = (options: transformCallbackOptions) => string;
+export type ModelTransformCallback = (options: transformCallbackOptions) => string;
 
 /**
  * Transfer value before saving it into the database

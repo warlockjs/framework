@@ -19,6 +19,13 @@ class DatabaseTransactionContext extends Context<TransactionContextStore> {
   }
 
   /**
+   * Check if there's an active transaction in the current context
+   */
+  public hasActiveTransaction(): boolean {
+    return this.getSession() !== undefined;
+  }
+
+  /**
    * Set the transaction session in context
    */
   public setSession(session: unknown): void {

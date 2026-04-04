@@ -73,49 +73,39 @@ export class DatabaseDirtyTracker {
    * The initial raw data snapshot taken at construction or last reset.
    * Used as the baseline for comparison.
    */
-  private initialRaw: Record<string, unknown>;
+  protected initialRaw: Record<string, unknown>;
 
   /**
    * The current raw data snapshot reflecting all changes made via merge/unset.
    */
-  private currentRaw: Record<string, unknown>;
+  protected currentRaw: Record<string, unknown>;
 
   /**
    * Flattened version of the initial data using dot-notation keys.
    * Example: { "address.city": "NYC" }
    */
-  private initialFlattened: FlatRecord;
+  protected initialFlattened: FlatRecord;
 
   /**
    * Flattened version of the current data using dot-notation keys.
    */
-  private currentFlattened: FlatRecord;
+  protected currentFlattened: FlatRecord;
 
   /**
    * Set of column names (dot-notation paths) that have been modified.
    */
-  private readonly dirtyColumns = new Set<string>();
+  protected readonly dirtyColumns = new Set<string>();
 
   /**
    * Set of column names (dot-notation paths) that existed initially but have been removed.
    */
-  private readonly removedColumns = new Set<string>();
+  protected readonly removedColumns = new Set<string>();
 
-  /**
-   * Constructs a new dirty tracker with the provided initial data.
-   *
-   * @param data - The initial data to track
-   *
-   * @example
-   * ```typescript
-   * const tracker = new DatabaseDirtyTracker({ name: "Alice", email: "alice@example.com" });
-   * ```
-   */
   public constructor(data: Record<string, unknown>) {
     this.initialRaw = this.cloneData(data);
     this.currentRaw = this.cloneData(data);
 
-    this.initialFlattened = flatten(this.initialRaw);
+    this.initialFlattened = this.flattenData(this.initialRaw);
     this.currentFlattened = { ...this.initialFlattened };
 
     this.updateDirtyState();
@@ -234,7 +224,7 @@ export class DatabaseDirtyTracker {
    */
   public replaceCurrentData(data: Record<string, unknown>): void {
     this.currentRaw = this.cloneData(data);
-    this.currentFlattened = flatten(this.currentRaw);
+    this.currentFlattened = this.flattenData(this.currentRaw);
     this.updateDirtyState();
   }
 
@@ -256,7 +246,7 @@ export class DatabaseDirtyTracker {
    */
   public mergeChanges(partial: Record<string, unknown>): void {
     this.mergeIntoRaw(this.currentRaw, partial);
-    this.currentFlattened = flatten(this.currentRaw);
+    this.currentFlattened = this.flattenData(this.currentRaw);
     this.updateDirtyState();
   }
 
@@ -282,7 +272,7 @@ export class DatabaseDirtyTracker {
       this.deleteFromRaw(path);
     }
 
-    this.currentFlattened = flatten(this.currentRaw);
+    this.currentFlattened = this.flattenData(this.currentRaw);
     this.updateDirtyState();
   }
 
@@ -311,11 +301,19 @@ export class DatabaseDirtyTracker {
     this.initialRaw = this.cloneData(source);
     this.currentRaw = this.cloneData(source);
 
-    this.initialFlattened = flatten(this.initialRaw);
-    this.currentFlattened = flatten(this.currentRaw);
+    this.initialFlattened = this.flattenData(this.initialRaw);
+    this.currentFlattened = this.flattenData(this.currentRaw);
 
     this.dirtyColumns.clear();
     this.removedColumns.clear();
+  }
+
+  /**
+   * Flattens the given data object.
+   * Can be overridden by subclasses to change flattening behavior.
+   */
+  protected flattenData(data: Record<string, unknown>): FlatRecord {
+    return flatten(data);
   }
 
   /**
@@ -325,9 +323,9 @@ export class DatabaseDirtyTracker {
    * It iterates through all keys in both flattened snapshots and determines which columns
    * have been modified or removed.
    *
-   * @private
+   * @protected
    */
-  private updateDirtyState(): void {
+  protected updateDirtyState(): void {
     this.dirtyColumns.clear();
     this.removedColumns.clear();
 
@@ -363,7 +361,7 @@ export class DatabaseDirtyTracker {
    * @param source - The object to merge from
    * @private
    */
-  private mergeIntoRaw(target: Record<string, unknown>, source: Record<string, unknown>): void {
+  protected mergeIntoRaw(target: Record<string, unknown>, source: Record<string, unknown>): void {
     for (const [key, value] of Object.entries(source)) {
       if (
         value &&
@@ -390,7 +388,7 @@ export class DatabaseDirtyTracker {
    * @param path - The dot-notation path to the field to delete
    * @private
    */
-  private deleteFromRaw(path: string): void {
+  protected deleteFromRaw(path: string): void {
     const segments = path.split(".");
     let container: unknown = this.currentRaw;
 
@@ -430,7 +428,7 @@ export class DatabaseDirtyTracker {
    * @returns The value at the specified segment, or undefined if not found
    * @private
    */
-  private resolveSegment(container: unknown, segment: string): unknown {
+  protected resolveSegment(container: unknown, segment: string): unknown {
     if (Array.isArray(container)) {
       const numericIndex = Number(segment);
       if (Number.isNaN(numericIndex)) {
@@ -454,7 +452,7 @@ export class DatabaseDirtyTracker {
    * @returns A deep clone of the data
    * @private
    */
-  private cloneData<T>(data: T): T {
+  protected cloneData<T>(data: T): T {
     return clone(data);
   }
 }

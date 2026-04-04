@@ -50,5 +50,9 @@ export { belongsTo, belongsToMany, hasMany, hasOne } from "./helpers";
 // Relation loader
 export { RelationLoader } from "./relation-loader";
 
+// Relation hydrator (cache snapshot restoration)
+export { RelationHydrator } from "./relation-hydrator";
+export type { ModelSnapshot, SerializedRelation } from "./relation-hydrator";
+
 // Pivot operations
 export { PivotOperations, createPivotOperations } from "./pivot-operations";

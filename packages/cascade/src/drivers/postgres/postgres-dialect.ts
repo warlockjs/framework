@@ -199,7 +199,7 @@ export class PostgresDialect implements SqlDialectContract {
    */
   public getSqlType(
     type: string,
-    options?: { length?: number; precision?: number; scale?: number },
+    options?: { length?: number; precision?: number; scale?: number; dimensions?: number },
   ): string {
     switch (type) {
       case "string":
@@ -262,11 +262,34 @@ export class PostgresDialect implements SqlDialectContract {
       case "geometry":
         return "GEOMETRY"; // Requires PostGIS
       case "vector":
-        return options?.length ? `VECTOR(${options.length})` : "VECTOR"; // Requires pgvector
+        return options?.dimensions ? `VECTOR(${options.dimensions})` : "VECTOR"; // Requires pgvector
       case "enum":
         return "TEXT"; // PostgreSQL enums need CREATE TYPE first
       case "set":
         return "TEXT[]"; // Use array for set-like behavior
+      // PostgreSQL native array types
+      case "arrayInt":
+        return "INTEGER[]";
+      case "arrayBigInt":
+        return "BIGINT[]";
+      case "arrayFloat":
+        return "REAL[]";
+      case "arrayDecimal":
+        if (options?.precision !== undefined) {
+          const scale = options.scale ?? 0;
+          return `DECIMAL(${options.precision}, ${scale})[]`;
+        }
+        return "DECIMAL[]";
+      case "arrayBoolean":
+        return "BOOLEAN[]";
+      case "arrayText":
+        return "TEXT[]";
+      case "arrayDate":
+        return "DATE[]";
+      case "arrayTimestamp":
+        return "TIMESTAMPTZ[]";
+      case "arrayUuid":
+        return "UUID[]";
       default:
         return type.toUpperCase();
     }

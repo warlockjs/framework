@@ -73,10 +73,7 @@ import { dataSourceRegistry } from "../data-source/data-source-registry";
  * ```
  */
 export function onceConnected(
-  dataSourceOrNameOrCallback:
-    | DataSource
-    | string
-    | ((dataSource: DataSource) => void),
+  dataSourceOrNameOrCallback: DataSource | string | ((dataSource: DataSource) => void),
   callback?: (dataSource: DataSource) => void,
 ): void {
   // Determine if first parameter is a callback
@@ -90,9 +87,7 @@ export function onceConnected(
   } else {
     // First param is data source name or instance
     if (!callback) {
-      throw new Error(
-        "Callback is required when providing a data source name or instance.",
-      );
+      throw new Error("Callback is required when providing a data source name or instance.");
     }
     actualCallback = callback;
     targetDataSource = dataSourceOrNameOrCallback;
@@ -129,14 +124,14 @@ export function onceConnected(
         : ds === targetDataSource;
 
     if (matches) {
+      // Remove the listener once our condition is met
+      dataSourceRegistry.off("connected", listener);
       actualCallback(ds);
-    } else {
-      // Not the one we're looking for, keep listening
-      dataSourceRegistry.once("connected", listener);
     }
+    // If it doesn't match, we do nothing and just wait for the next "connected" event targeting our DB
   };
 
-  dataSourceRegistry.once("connected", listener);
+  dataSourceRegistry.on("connected", listener);
 }
 
 /**
@@ -211,10 +206,7 @@ export function onceConnected(
  * ```
  */
 export function onceDisconnected(
-  dataSourceOrNameOrCallback:
-    | DataSource
-    | string
-    | ((dataSource: DataSource) => void),
+  dataSourceOrNameOrCallback: DataSource | string | ((dataSource: DataSource) => void),
   callback?: (dataSource: DataSource) => void,
 ): void {
   // Determine if first parameter is a callback
@@ -228,9 +220,7 @@ export function onceDisconnected(
   } else {
     // First param is data source name or instance
     if (!callback) {
-      throw new Error(
-        "Callback is required when providing a data source name or instance.",
-      );
+      throw new Error("Callback is required when providing a data source name or instance.");
     }
     actualCallback = callback;
     targetDataSource = dataSourceOrNameOrCallback;

@@ -1,4 +1,6 @@
+import type { DatabaseDirtyTracker } from "../database-dirty-tracker";
 import type { ModelDefaults } from "../types";
+import { DatabaseDriver } from "../utils/connect-to-database";
 import { DriverBlueprintContract } from "./driver-blueprint.contract";
 import type { MigrationDriverContract } from "./migration-driver.contract";
 import type { QueryBuilderContract } from "./query-builder.contract";
@@ -10,7 +12,7 @@ export type DriverEvent = "connected" | "disconnected" | string;
 /** Listener signature for driver lifecycle events. */
 export type DriverEventListener = (...args: unknown[]) => void;
 
-/** Representation of an opened transaction. */
+/** Representation of an opened transaction (manual pattern). */
 export interface DriverTransactionContract<TContext = unknown> {
   /** Driver-specific transaction context (session, connection, ...). */
   context: TContext;
@@ -18,6 +20,34 @@ export interface DriverTransactionContract<TContext = unknown> {
   commit(): Promise<void>;
   /** Rollback the transaction. */
   rollback(): Promise<void>;
+}
+
+/**
+ * Transaction context passed to callback-based transaction functions.
+ *
+ * Provides explicit rollback capability - calling rollback() will
+ * throw a TransactionRollbackError to exit the transaction scope.
+ */
+export interface TransactionContext {
+  /**
+   * Explicitly rollback the transaction.
+   *
+   * Throws TransactionRollbackError to immediately exit the transaction callback.
+   * The transaction will be rolled back and the error will be re-thrown.
+   *
+   * @param reason - Optional reason for rollback (for logging/debugging)
+   * @throws {TransactionRollbackError}
+   *
+   * @example
+   * ```typescript
+   * await driver.transaction(async (ctx) => {
+   *   if (!isValid) {
+   *     ctx.rollback("Invalid data");
+   *   }
+   * });
+   * ```
+   */
+  rollback(reason?: string): never;
 }
 
 /** Result returned after insert operations. */
@@ -82,7 +112,7 @@ export interface DriverContract {
    *
    * @example "mongodb", "postgres", "mysql"
    */
-  readonly name: string;
+  readonly name: DatabaseDriver;
 
   /**
    * Database blueprint (Information Schema)
@@ -131,6 +161,13 @@ export interface DriverContract {
    * Deserialize the given data
    */
   deserialize(data: Record<string, unknown>): Record<string, unknown>;
+
+  /**
+   * Get the dirty tracker for this driver.
+   *
+   * @param data The initial data snapshot to track
+   */
+  getDirtyTracker(data: Record<string, unknown>): DatabaseDirtyTracker;
 
   /** Register event listeners (connected/disconnected/custom). */
   on(event: DriverEvent, listener: DriverEventListener): void;
@@ -276,8 +313,79 @@ export interface DriverContract {
   /** Obtain a query builder for custom querying. */
   queryBuilder<T = unknown>(table: string): QueryBuilderContract<T>;
 
-  /** Start a new transaction scope. */
-  beginTransaction(): Promise<DriverTransactionContract>;
+  /**
+   * Start a new transaction scope (manual pattern).
+   *
+   * Returns a transaction object with commit/rollback methods.
+   * You are responsible for calling commit() or rollback() and handling cleanup.
+   *
+   * For most use cases, prefer the `transaction()` method which handles
+   * commit/rollback/cleanup automatically.
+   *
+   * @param options - Driver-specific transaction options
+   * @returns Transaction contract with commit/rollback methods
+   *
+   * @example
+   * ```typescript
+   * const tx = await driver.beginTransaction();
+   * try {
+   *   await driver.insert('users', { name: 'Alice' });
+   *   await tx.commit();
+   * } catch (error) {
+   *   await tx.rollback();
+   *   throw error;
+   * }
+   * ```
+   */
+  beginTransaction(options?: Record<string, unknown>): Promise<DriverTransactionContract>;
+
+  /**
+   * Execute a function within a transaction scope (recommended pattern).
+   *
+   * Automatically commits on success, rolls back on any error, and guarantees
+   * resource cleanup. This is the recommended way to use transactions.
+   *
+   * **Features:**
+   * - Auto-commit on successful callback completion
+   * - Auto-rollback on any thrown error
+   * - Explicit rollback via `ctx.rollback()`
+   * - Guaranteed resource cleanup (connection/session release)
+   * - Returns the callback's return value
+   *
+   * **Limitations:**
+   * - Nested `transaction()` calls are not supported (use `beginTransaction()` with savepoints)
+   * - MongoDB: Requires replica set configuration
+   *
+   * @param fn - Async function to execute within transaction
+   * @param options - Driver-specific transaction options (same as beginTransaction)
+   * @returns The return value of the callback function
+   * @throws {Error} If transaction fails or is explicitly rolled back
+   *
+   * @example
+   * ```typescript
+   * // Auto-commit on success
+   * const user = await driver.transaction(async (ctx) => {
+   *   const result = await driver.insert('users', { name: 'Alice' });
+   *   return result.document;
+   * });
+   *
+   * // Explicit rollback
+   * await driver.transaction(async (ctx) => {
+   *   if (!isValid) {
+   *     ctx.rollback('Validation failed');
+   *   }
+   * });
+   *
+   * // Auto-rollback on error
+   * await driver.transaction(async (ctx) => {
+   *   throw new Error('Oops'); // Automatically rolls back
+   * });
+   * ```
+   */
+  transaction<T>(
+    fn: (ctx: TransactionContext) => Promise<T>,
+    options?: Record<string, unknown>,
+  ): Promise<T>;
 
   /** Perform atomic updates matching the filter. */
   atomic(

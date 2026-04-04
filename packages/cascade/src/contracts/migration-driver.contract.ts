@@ -1,4 +1,5 @@
 import type { DataSource } from "../data-source/data-source";
+import type { MigrationDefaults } from "../types";
 import type { DriverContract } from "./database-driver.contract";
 import type { TableIndexInformation } from "./driver-blueprint.contract";
 export type { TableIndexInformation };
@@ -37,7 +38,17 @@ export type ColumnType =
   | "geometry"
   | "vector"
   | "enum"
-  | "set";
+  | "set"
+  // PostgreSQL array types
+  | "arrayInt"
+  | "arrayBigInt"
+  | "arrayFloat"
+  | "arrayDecimal"
+  | "arrayBoolean"
+  | "arrayText"
+  | "arrayDate"
+  | "arrayTimestamp"
+  | "arrayUuid";
 
 /**
  * Column definition used when adding or modifying columns.
@@ -562,6 +573,55 @@ export interface MigrationDriverContract {
    */
   supportsTransactions(): boolean;
 
+  /**
+   * Get the default transactional behavior for this driver.
+   *
+   * This determines whether migrations should be wrapped in transactions
+   * by default when no explicit configuration is provided.
+   *
+   * - **PostgreSQL**: Returns `true` (DDL operations are transactional)
+   * - **MongoDB**: Returns `false` (DDL operations cannot be transactional)
+   *
+   * Can be overridden by:
+   * 1. Migration-level `transactional` property
+   * 2. Config-level `migrations.transactional` option
+   *
+   * @returns true if migrations should be transactional by default
+   */
+  getDefaultTransactional(): boolean;
+
+  // ============================================================================
+  // DEFAULTS
+  // ============================================================================
+
+  /**
+   * Get the default UUID generation expression for this driver.
+   *
+   * Used by `Migration.primaryUuid()` to set driver-appropriate defaults.
+   * SQL drivers return a native expression (e.g., `gen_random_uuid()`).
+   * NoSQL drivers return `undefined` (application-level UUID generation).
+   *
+   * @param migrationDefaults - Optional overrides from DataSource config
+   * @returns SQL expression string, or undefined for schema-less DBs
+   *
+   * @example
+   * ```typescript
+   * // PostgreSQL with default v4
+   * driver.getUuidDefault(); // "gen_random_uuid()"
+   *
+   * // PostgreSQL with v7 override
+   * driver.getUuidDefault({ uuidStrategy: "v7" }); // "uuid_generate_v7()"
+   *
+   * // PostgreSQL with raw expression escape hatch
+   * driver.getUuidDefault({ uuidExpression: "uuid_generate_v1mc()" });
+   * // "uuid_generate_v1mc()"
+   *
+   * // MongoDB
+   * driver.getUuidDefault(); // undefined
+   * ```
+   */
+  getUuidDefault(migrationDefaults?: MigrationDefaults): string | undefined;
+
   // ============================================================================
   // RAW ACCESS
   // ============================================================================
@@ -573,6 +633,11 @@ export interface MigrationDriverContract {
    * @returns Result from callback
    */
   raw<T>(callback: (connection: unknown) => Promise<T>): Promise<T>;
+
+  /**
+   * Get database driver
+   */
+  driver: DriverContract;
 }
 
 /**

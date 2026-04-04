@@ -11,6 +11,7 @@
 import { databaseTransactionContext } from "../../context/database-transaction-context";
 import type {
   ColumnDefinition,
+  ColumnType,
   ForeignKeyDefinition,
   FullTextIndexOptions,
   GeoIndexOptions,
@@ -19,6 +20,7 @@ import type {
   TableIndexInformation,
   VectorIndexOptions,
 } from "../../contracts/migration-driver.contract";
+import type { MigrationDefaults, UuidStrategy } from "../../types";
 import type { PostgresDriver } from "./postgres-driver";
 
 /**
@@ -62,7 +64,7 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
    *
    * @param driver - The PostgreSQL driver instance
    */
-  public constructor(private readonly driver: PostgresDriver) {}
+  public constructor(public readonly driver: PostgresDriver) {}
 
   // ============================================================================
   // TABLE OPERATIONS
@@ -97,7 +99,7 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
    */
   public async dropTable(table: string): Promise<void> {
     const quotedTable = this.driver.dialect.quoteIdentifier(table);
-    await this.execute(`DROP TABLE ${quotedTable}`);
+    await this.execute(`DROP TABLE ${quotedTable} CASCADE`);
   }
 
   /**
@@ -107,7 +109,7 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
    */
   public async dropTableIfExists(table: string): Promise<void> {
     const quotedTable = this.driver.dialect.quoteIdentifier(table);
-    await this.execute(`DROP TABLE IF EXISTS ${quotedTable}`);
+    await this.execute(`DROP TABLE IF EXISTS ${quotedTable} CASCADE`);
   }
 
   /**
@@ -256,6 +258,7 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
         length: column.length,
         precision: column.precision,
         scale: column.scale,
+        dimensions: column.dimensions,
       });
     }
 
@@ -364,6 +367,7 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
       length: column.length,
       precision: column.precision,
       scale: column.scale,
+      dimensions: column.dimensions,
     });
 
     // PostgreSQL requires separate ALTER statements for type and nullability
@@ -872,6 +876,56 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
     return true;
   }
 
+  /**
+   * Get the default transactional behavior for PostgreSQL.
+   *
+   * PostgreSQL supports transactional DDL operations, so migrations
+   * are wrapped in transactions by default for atomicity and safety.
+   *
+   * @returns true (PostgreSQL DDL is transactional)
+   */
+  public getDefaultTransactional(): boolean {
+    return true;
+  }
+
+  // ============================================================================
+  // DEFAULTS
+  // ============================================================================
+
+  /**
+   * Get the default UUID generation expression for PostgreSQL.
+   *
+   * Resolution order:
+   * 1. `migrationDefaults.uuidExpression` → raw expression (escape hatch)
+   * 2. `migrationDefaults.uuidStrategy` → mapped to PG function
+   * 3. Fallback → `gen_random_uuid()` (v4, PG 13+)
+   *
+   * @param migrationDefaults - Optional overrides from DataSource config
+   * @returns PostgreSQL SQL expression for UUID generation
+   *
+   * @example
+   * ```typescript
+   * driver.getUuidDefault(); // "gen_random_uuid()"
+   * driver.getUuidDefault({ uuidStrategy: "v7" }); // "uuid_generate_v7()"
+   * driver.getUuidDefault({ uuidExpression: "uuid_generate_v1mc()" }); // "uuid_generate_v1mc()"
+   * ```
+   */
+  public getUuidDefault(migrationDefaults?: MigrationDefaults): string {
+    // Escape hatch: raw expression takes highest precedence
+    if (migrationDefaults?.uuidExpression) {
+      return migrationDefaults.uuidExpression;
+    }
+
+    const strategy = migrationDefaults?.uuidStrategy ?? "v4";
+
+    const strategyMap: Record<UuidStrategy, string> = {
+      v4: "gen_random_uuid()",
+      v7: "uuidv7()",
+    };
+
+    return strategyMap[strategy];
+  }
+
   // ============================================================================
   // RAW ACCESS
   // ============================================================================
@@ -915,42 +969,52 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
   /**
    * Map PostgreSQL data type to ColumnType.
    */
-  private mapPostgresTypeToColumnType(
-    pgType: string,
-  ): import("../../contracts/migration-driver.contract").ColumnType {
-    const typeMap: Record<string, import("../../contracts/migration-driver.contract").ColumnType> =
-      {
-        "character varying": "string",
-        varchar: "string",
-        character: "char",
-        char: "char",
-        text: "text",
-        integer: "integer",
-        int: "integer",
-        smallint: "smallInteger",
-        bigint: "bigInteger",
-        real: "float",
-        "double precision": "double",
-        numeric: "decimal",
-        decimal: "decimal",
-        boolean: "boolean",
-        date: "date",
-        timestamp: "dateTime",
-        "timestamp without time zone": "dateTime",
-        "timestamp with time zone": "timestamp",
-        time: "time",
-        "time without time zone": "time",
-        json: "json",
-        jsonb: "json",
-        bytea: "binary",
-        uuid: "uuid",
-        inet: "ipAddress",
-        macaddr: "macAddress",
-        point: "point",
-        polygon: "polygon",
-        line: "lineString",
-        geometry: "geometry",
-      };
+  private mapPostgresTypeToColumnType(pgType: string): ColumnType {
+    const typeMap: Record<string, ColumnType> = {
+      "character varying": "string",
+      varchar: "string",
+      character: "char",
+      char: "char",
+      text: "text",
+      integer: "integer",
+      int: "integer",
+      smallint: "smallInteger",
+      bigint: "bigInteger",
+      real: "float",
+      "double precision": "double",
+      numeric: "decimal",
+      decimal: "decimal",
+      boolean: "boolean",
+      date: "date",
+      timestamp: "dateTime",
+      "timestamp without time zone": "dateTime",
+      "timestamp with time zone": "timestamp",
+      time: "time",
+      "time without time zone": "time",
+      json: "json",
+      jsonb: "json",
+      bytea: "binary",
+      uuid: "uuid",
+      inet: "ipAddress",
+      macaddr: "macAddress",
+      point: "point",
+      polygon: "polygon",
+      line: "lineString",
+      geometry: "geometry",
+      // PostgreSQL array types
+      "integer[]": "arrayInt",
+      "int[]": "arrayInt",
+      "bigint[]": "arrayBigInt",
+      "real[]": "arrayFloat",
+      "decimal[]": "arrayDecimal",
+      "numeric[]": "arrayDecimal",
+      "boolean[]": "arrayBoolean",
+      "text[]": "arrayText",
+      "date[]": "arrayDate",
+      "timestamp with time zone[]": "arrayTimestamp",
+      "timestamptz[]": "arrayTimestamp",
+      "uuid[]": "arrayUuid",
+    };
 
     return typeMap[pgType.toLowerCase()] ?? "string";
   }

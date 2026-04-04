@@ -5,6 +5,7 @@ import { databaseTransactionContext } from "../../context/database-transaction-c
 import type {
   CursorPaginationOptions,
   CursorPaginationResult,
+  DriverQuery,
   GroupByInput,
   HavingInput,
   JoinOptions,
@@ -19,6 +20,7 @@ import type {
 } from "../../contracts";
 import { type DataSource } from "../../data-source/data-source";
 import { dataSourceRegistry } from "../../data-source/data-source-registry";
+import { QueryBuilder } from "../../query-builder/query-builder";
 import { type MongoDbDriver } from "./mongodb-driver";
 import { MongoQueryOperations } from "./mongodb-query-operations";
 import { MongoQueryParser } from "./mongodb-query-parser";
@@ -27,12 +29,18 @@ import type { Operation } from "./types";
 /**
  * MongoDB-specific query builder implementation using aggregation pipeline.
  */
-export class MongoQueryBuilder<T = unknown> implements QueryBuilderContract<T> {
+export class MongoQueryBuilder<T = unknown>
+  extends QueryBuilder<T>
+  implements QueryBuilderContract<T>
+{
   /**
    * Ordered list of operations to be converted to MongoDB aggregation pipeline.
-   * Public to allow parser access.
+   * Public to allow parser access. Uses MongoDB's own Operation type.
+   *
+   * NOTE: This shadows the base `operations: Op[]` field intentionally — the Mongo
+   * Operation type carries an extra `stage` discriminator used by the pipeline assembler.
    */
-  public operations: Operation[] = [];
+  public override operations: Operation[] = [];
 
   /**
    * Data source instance
@@ -50,11 +58,8 @@ export class MongoQueryBuilder<T = unknown> implements QueryBuilderContract<T> {
   private hydratingCallback?: (records: any[], context: any) => void | Promise<void>;
   private fetchedCallback?: (records: any[], context: any) => void | Promise<void>;
 
-  // Scope properties
-  public pendingGlobalScopes?: Map<string, any>;
-  public availableLocalScopes?: Map<string, any>;
-  public disabledGlobalScopes = new Set<string>();
-  public scopesApplied = false;
+  // scopesApplied, pendingGlobalScopes, availableLocalScopes, disabledGlobalScopes
+  // are inherited from QueryBuilder base class.
 
   /**
    * Create a new query builder for the given collection.
@@ -64,6 +69,7 @@ export class MongoQueryBuilder<T = unknown> implements QueryBuilderContract<T> {
     public readonly table: string,
     dataSource?: DataSource,
   ) {
+    super();
     this.dataSource = dataSource || dataSourceRegistry.get()!;
     // TODO: Trigger the fetching event
   }
@@ -1864,6 +1870,13 @@ export class MongoQueryBuilder<T = unknown> implements QueryBuilderContract<T> {
   }
 
   /**
+   * Find a document by its primary key (id field).
+   */
+  public async find<Output = T>(id: number | string): Promise<Output | null> {
+    return this.where("id", id).first<Output>();
+  }
+
+  /**
    * Configures the query to retrieve the last matching document.
    */
   public last<Output = T>(field: string = "createdAt"): Promise<Output | null> {
@@ -2288,10 +2301,9 @@ export class MongoQueryBuilder<T = unknown> implements QueryBuilderContract<T> {
 
   /**
    * Returns the MongoDB aggregation pipeline that will be executed.
-   * @returns The MongoDB aggregation pipeline array
    */
-  public parse() {
-    return this.buildPipeline();
+  public parse(): DriverQuery {
+    return { pipeline: this.buildPipeline() };
   }
 
   /**
@@ -2412,12 +2424,12 @@ export class MongoQueryBuilder<T = unknown> implements QueryBuilderContract<T> {
   /**
    * Relation definitions from the model.
    */
-  public relationDefinitions?: Record<string, any>;
+  declare public relationDefinitions?: Record<string, any>;
 
   /**
    * Model class reference.
    */
-  public modelClass?: any;
+  declare public modelClass?: any;
 
   /**
    * Load relations using MongoDB $lookup in a single aggregation query.
@@ -2533,4 +2545,63 @@ export class MongoQueryBuilder<T = unknown> implements QueryBuilderContract<T> {
     this.operationsHelper.addMatchOperation("whereDoesntHave", { relation, callback });
     return this;
   }
+
+  /**
+   * Nearest-neighbour vector similarity search via MongoDB Atlas $vectorSearch.
+   *
+   * Adds two pipeline stages:
+   * 1. `$vectorSearch` — runs the ANN search using the Atlas vector index.
+   *    Must be the first stage in the pipeline. Limit is embedded here.
+   * 2. `$addFields` — exposes `{ $meta: "vectorSearchScore" }` under `alias`
+   *    so callers can filter by minimum score after `.get()`.
+   *
+   * **Prerequisites:**
+   * - MongoDB Atlas cluster (local/Community MongoDB does NOT support $vectorSearch)
+   * - A vector search index on the collection, e.g.:
+   *   `{ "fields": [{ "type": "vector", "path": "embedding", "numDimensions": 1536, "similarity": "cosine" }] }`
+   * - The index name convention used here is `"${column}_index"` (override via `alias` if needed).
+   *
+   * @param column    - Vector column name (e.g. `"embedding"`)
+   * @param embedding - Query embedding as a plain number array
+   * @param alias     - Score alias added to each result row (default: `"score"`)
+   *
+   * @example
+   * ```typescript
+   * const results = await Vector.query()
+   *   .where({ organization_id: "org-123" })
+   *   .nearestTo("embedding", queryEmbedding)
+   *   .limit(5)
+   *   .get<VectorRow & { score: number }>();
+   * ```
+   */
+  public nearestTo(column: string, embedding: number[], alias = "score"): this {
+    // Grab the limit op recorded so far (default to 10 if not set yet)
+    const limitOp = this.operations.find((op) => op.type === "limit");
+    const limit = (limitOp?.data?.value as number) ?? 10;
+
+    // Stage 1: $vectorSearch — ANN search via Atlas vector index
+    this.operationsHelper.addOperation(
+      "$vectorSearch",
+      "vectorSearch",
+      {
+        index: `${column}_index`,
+        path: column,
+        queryVector: embedding,
+        numCandidates: limit * 10, // Atlas recommendation: 10–20x the limit
+        limit,
+      },
+      false, // Not mergeable — must stay as its own stage
+    );
+
+    // Stage 2: $addFields — expose vectorSearchScore as the score alias
+    this.operationsHelper.addOperation(
+      "$addFields",
+      "vectorSearchScore",
+      { [alias]: { $meta: "vectorSearchScore" } },
+      false,
+    );
+
+    return this;
+  }
 }
+

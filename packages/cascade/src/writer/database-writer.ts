@@ -193,10 +193,10 @@ export class DatabaseWriter implements WriterContract {
     const validationSchema = isInsert
       ? this.schema.clone()
       : this.schema.clone(Object.keys(this.model.data)).extend({
-          id: v.int(),
+          id: v.scalar(),
           _id: v.any(),
-          createdAt: v.date(),
-          updatedAt: v.date(),
+          [this.ctor.createdAtColumn as string]: v.date(),
+          [this.ctor.updatedAtColumn as string]: v.date(),
         });
 
     // Apply strict mode
@@ -217,6 +217,8 @@ export class DatabaseWriter implements WriterContract {
     });
 
     if (!result.isValid) {
+      console.trace(result.errors);
+
       const error = new DatabaseWriterValidationError(
         `[${this.model.constructor.name} Model] ${isInsert ? "Insert" : "Update"} Validation failed`,
         result.errors,
@@ -254,12 +256,13 @@ export class DatabaseWriter implements WriterContract {
     // The column names are already resolved through the hierarchy:
     // Model static property > Database config > Driver defaults > undefined
     const createdAtColumn = this.ctor.createdAtColumn;
-    if (createdAtColumn !== false && createdAtColumn !== undefined) {
+
+    if (createdAtColumn) {
       dataToInsert[createdAtColumn] = new Date();
     }
 
     const updatedAtColumn = this.ctor.updatedAtColumn;
-    if (updatedAtColumn !== false && updatedAtColumn !== undefined) {
+    if (updatedAtColumn) {
       dataToInsert[updatedAtColumn] = new Date();
     }
 
@@ -298,7 +301,7 @@ export class DatabaseWriter implements WriterContract {
 
     // Update the updatedAt timestamp (using resolved column name)
     const updatedAtColumn = this.ctor.updatedAtColumn;
-    if (updatedAtColumn !== false && updatedAtColumn !== undefined) {
+    if (updatedAtColumn) {
       this.model.set(updatedAtColumn, new Date());
     }
 

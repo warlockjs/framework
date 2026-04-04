@@ -138,6 +138,34 @@ export type HavingInput =
 export type RawExpression = string | Record<string, unknown> | unknown;
 
 /**
+ * Driver-agnostic representation of a parsed query.
+ *
+ * Each driver populates only the fields it understands:
+ *
+ * - **SQL/CQL/Cypher** drivers → `query` + `bindings`
+ * - **MongoDB** → `pipeline`
+ * - **Elasticsearch** → `pipeline` (JSON DSL body)
+ * - **DynamoDB / Redis / custom** → `native`
+ *
+ * @example
+ * // PostgreSQL result:
+ * { query: "SELECT * FROM users WHERE id = $1", bindings: [42] }
+ *
+ * // MongoDB result:
+ * { pipeline: [{ $match: { status: "active" } }, { $limit: 10 }] }
+ */
+export type DriverQuery = {
+  /** Text-based query string: SQL, CQL, Cypher, etc. */
+  query?: string;
+  /** Positional or named parameter bindings for the text query. */
+  bindings?: unknown[];
+  /** Document pipeline: MongoDB aggregation stages, Elasticsearch DSL body, etc. */
+  pipeline?: unknown[];
+  /** Full escape hatch for drivers that don't fit any shape above. */
+  native?: unknown;
+};
+
+/**
  * Contract that all query builders must implement for building queries in a
  * database-agnostic way. This interface provides a fluent, chainable API
  * for constructing complex database queries.
@@ -223,7 +251,21 @@ export interface QueryBuilderContract<T = unknown> {
    * Map of relations to load via JOIN (single query).
    * Keys are relation names, values contain join configuration.
    */
-  joinRelations?: Map<string, { alias: string; type: "belongsTo" | "hasOne" | "hasMany" }>;
+  joinRelations?: Map<
+    string,
+    {
+      alias: string;
+      type: "belongsTo" | "hasOne" | "hasMany";
+      model?: any;
+      localKey?: string;
+      foreignKey?: string;
+      ownerKey?: string;
+      parentPath?: string | null;
+      relationName?: string;
+      parentModel?: any;
+      select?: string[];
+    }
+  >;
 
   /**
    * Relation definitions from the model class.
@@ -1783,13 +1825,20 @@ export interface QueryBuilderContract<T = unknown> {
   // ============================================================================
 
   /**
-   * Return the native query representation (SQL string, Mongo Pipeline, etc.).
+   * Return the driver-native query representation without executing it.
+   * SQL drivers populate `query` + `bindings`; MongoDB populates `pipeline`;
+   * exotic drivers use `native`.
    *
    * @example
-   * const mongoFilter = query.parse();
-   * console.log(mongoFilter); // { age: { $gt: 18 }, isActive: true }
+   * // PostgreSQL:
+   * const { query, bindings } = builder.parse();
+   * console.log(query, bindings);
+   *
+   * // MongoDB:
+   * const { pipeline } = builder.parse();
+   * console.log(pipeline); // [{ $match: { age: { $gt: 18 } } }, ...]
    */
-  parse(): Promise<unknown> | unknown;
+  parse(): DriverQuery;
 
   /**
    * Returns a formatted string representation of the query pipeline | SQL string.
@@ -1804,4 +1853,35 @@ export interface QueryBuilderContract<T = unknown> {
    * const plan = await query.explain();
    */
   explain(): Promise<unknown>;
+
+  /**
+   * Nearest-neighbour vector similarity search.
+   *
+   * Simultaneously:
+   *  1. Adds `1 - (column <=> $n::vector) AS score` to the SELECT clause
+   *     so the similarity value is available on every returned row.
+   *  2. Adds `ORDER BY column <=> $n::vector` so the database can use
+   *     the vector index (IVFFlat / HNSW) rather than doing a sequential scan.
+   *
+   * The two expressions MUST reference the same embedding literal so pgvector
+   * plans the nearest-neighbour scan correctly. Calling `.orderBy()` on the
+   * alias afterwards would break index usage.
+   *
+   * Drivers that do not support vector search (e.g. MongoDB without Atlas)
+   * should throw an `UnsupportedOperationError`.
+   *
+   * @param column   - Name of the vector column (e.g. `"embedding"`)
+   * @param embedding - Query embedding as a plain number array
+   * @param alias    - Alias for the similarity score column (default: `"score"`)
+   *
+   * @example
+   * ```typescript
+   * const results = await Vector.query()
+   *   .where({ organization_id: "org-123", content_type: "summary" })
+   *   .nearestTo("embedding", queryEmbedding)
+   *   .limit(5)
+   *   .get<VectorRow & { score: number }>();
+   * ```
+   */
+  nearestTo(column: string, embedding: number[], alias?: string): this;
 }

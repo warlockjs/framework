@@ -1,5 +1,5 @@
 import type { DriverContract, IdGeneratorContract } from "../contracts";
-import type { DeleteStrategy, ModelDefaults } from "../types";
+import type { DeleteStrategy, MigrationDefaults, ModelDefaults } from "../types";
 
 /**
  * Configuration options used when registering a data source.
@@ -44,6 +44,41 @@ export type DataSourceOptions = {
    * @default undefined
    */
   modelDefaults?: Partial<ModelDefaults>;
+
+  /**
+   * Migration-level defaults (UUID strategy, etc.).
+   *
+   * These defaults override driver migration defaults but can be
+   * overridden by individual migration calls.
+   *
+   * @default undefined (uses driver defaults)
+   */
+  migrationDefaults?: MigrationDefaults;
+
+  /**
+   * Migration configuration options.
+   */
+  migrations?: {
+    /**
+     * Whether to wrap migrations in database transactions.
+     *
+     * Overrides driver defaults:
+     * - PostgreSQL default: `true` (DDL is transactional)
+     * - MongoDB default: `false` (DDL cannot be transactional)
+     *
+     * Individual migrations can override this with their own `transactional` property.
+     *
+     * @default undefined (uses driver default)
+     */
+    transactional?: boolean;
+
+    /**
+     * Name of the migrations tracking table/collection.
+     *
+     * @default "_migrations"
+     */
+    table?: string;
+  };
 };
 
 /**
@@ -91,6 +126,15 @@ export class DataSource {
   /** Default model configuration for all models using this data source. */
   public readonly modelDefaults?: Partial<ModelDefaults>;
 
+  /** Migration-level defaults (UUID strategy, etc.). */
+  public readonly migrationDefaults?: MigrationDefaults;
+
+  /** Migration configuration options. */
+  public readonly migrations?: {
+    transactional?: boolean;
+    table?: string;
+  };
+
   /**
    * Create a new data source.
    *
@@ -103,6 +147,8 @@ export class DataSource {
     this.defaultDeleteStrategy = options.defaultDeleteStrategy;
     this.defaultTrashTable = options.defaultTrashTable;
     this.modelDefaults = options.modelDefaults;
+    this.migrationDefaults = options.migrationDefaults;
+    this.migrations = options.migrations;
   }
 
   /**

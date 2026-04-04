@@ -95,6 +95,13 @@ export type RelationDefinition = {
    * Only applicable for belongsToMany relationships.
    */
   readonly pivotForeignKey?: string;
+
+  /**
+   * List of specific columns to select.
+   *
+   * If not provided, defaults to all columns.
+   */
+  readonly select?: string[];
 };
 
 // ============================================================================
@@ -126,6 +133,13 @@ export type HasManyOptions = {
    * @default "id"
    */
   readonly localKey?: string;
+
+  /**
+   * List of specific columns to select.
+   *
+   * If not provided, defaults to all columns.
+   */
+  readonly select?: string[];
 };
 
 /**
@@ -153,6 +167,13 @@ export type HasOneOptions = {
    * @default "id"
    */
   readonly localKey?: string;
+
+  /**
+   * List of specific columns to select.
+   *
+   * If not provided, defaults to all columns.
+   */
+  readonly select?: string[];
 };
 
 /**
@@ -180,6 +201,11 @@ export type BelongsToOptions = {
    * @default "id"
    */
   readonly ownerKey?: string;
+
+  /**
+   * List of specific columns to select from the related model.
+   */
+  readonly select?: string[];
 };
 
 /**
@@ -231,6 +257,11 @@ export type BelongsToManyOptions = {
    * @default "id"
    */
   readonly pivotForeignKey?: string;
+
+  /**
+   * List of specific columns to select from the related model.
+   */
+  readonly select?: string[];
 };
 
 // ============================================================================

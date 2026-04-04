@@ -11,7 +11,7 @@
  */
 
 import { colors } from "@mongez/copper";
-import { log } from "@warlock.js/logger";
+import { log, logger } from "@warlock.js/logger";
 import { databaseTransactionContext } from "../../context/database-transaction-context";
 import type {
   CreateDatabaseOptions,
@@ -20,6 +20,7 @@ import type {
   DriverTransactionContract,
   DropDatabaseOptions,
   InsertResult,
+  TransactionContext,
   UpdateOperations,
   UpdateResult,
 } from "../../contracts/database-driver.contract";
@@ -27,7 +28,11 @@ import type { DriverBlueprintContract } from "../../contracts/driver-blueprint.c
 import type { MigrationDriverContract } from "../../contracts/migration-driver.contract";
 import type { QueryBuilderContract } from "../../contracts/query-builder.contract";
 import type { SyncAdapterContract } from "../../contracts/sync-adapter.contract";
+import { TransactionRollbackError } from "../../errors/transaction-rollback.error";
+import { SqlDatabaseDirtyTracker } from "../../sql-database-dirty-tracker";
 import type { ModelDefaults } from "../../types";
+import { DatabaseDriver } from "../../utils/connect-to-database";
+import { isValidDateValue } from "../../utils/is-valid-date-value";
 import { PostgresBlueprint } from "./postgres-blueprint";
 import { PostgresDialect } from "./postgres-dialect";
 import { PostgresMigrationDriver } from "./postgres-migration-driver";
@@ -101,7 +106,7 @@ export class PostgresDriver implements DriverContract {
   /**
    * Driver name identifier.
    */
-  public readonly name = "postgres" as const;
+  public readonly name = "postgres" as DatabaseDriver;
 
   /**
    * SQL dialect for PostgreSQL-specific syntax.
@@ -124,7 +129,7 @@ export class PostgresDriver implements DriverContract {
     deletedAtColumn: "deleted_at",
     timestamps: true,
     autoGenerateId: false, // PostgreSQL uses SERIAL/BIGSERIAL
-    strictMode: "strip",
+    strictMode: "fail",
     deleteStrategy: "permanent",
   };
 
@@ -283,6 +288,7 @@ export class PostgresDriver implements DriverContract {
     if (!this._eventListeners.has(event)) {
       this._eventListeners.set(event, new Set());
     }
+
     this._eventListeners.get(event)!.add(listener);
   }
 
@@ -310,12 +316,28 @@ export class PostgresDriver implements DriverContract {
       } else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
         // Nested objects will be stored as JSONB
         serialized[key] = value;
+      } else if (
+        Array.isArray(value) &&
+        value.length > 0 &&
+        value.every((v) => typeof v === "number")
+      ) {
+        // pgvector columns expect the literal '[n1,n2,...]' format.
+        // If we pass a raw JS number[] the pg driver serializes it as a
+        // PostgreSQL array '{n1,n2,...}' which the vector type rejects.
+        serialized[key] = `[${value.join(",")}]`;
       } else {
         serialized[key] = value;
       }
     }
 
     return serialized;
+  }
+
+  /**
+   * Get the dirty tracker for this driver.
+   */
+  public getDirtyTracker(data: Record<string, unknown>): SqlDatabaseDirtyTracker {
+    return new SqlDatabaseDirtyTracker(data);
   }
 
   /**
@@ -329,6 +351,38 @@ export class PostgresDriver implements DriverContract {
   public deserialize(data: Record<string, unknown>): Record<string, unknown> {
     // PostgreSQL pg driver handles most type conversions automatically
     // Special handling can be added here if needed
+    for (const [key, value] of Object.entries(data)) {
+      // Only re-inflate strings — pg already returns Date objects from DB reads
+      if (typeof value !== "string") continue;
+
+      if (isValidDateValue(value)) {
+        data[key] = new Date(value);
+        continue;
+      }
+
+      // pgvector columns are returned as '[n1,n2,...]' strings.
+      // charCodeAt is faster than startsWith/endsWith — no string allocation.
+      // '[' = 91, ']' = 93
+      if (value.charCodeAt(0) === 91 && value.charCodeAt(value.length - 1) === 93) {
+        const parts = value.slice(1, -1).split(",");
+        const nums = new Array<number>(parts.length);
+        let isNumericVector = parts.length > 0;
+
+        for (let i = 0; i < parts.length; i++) {
+          const n = +parts[i]; // unary + is the fastest string-to-number coercion
+          if (!Number.isFinite(n)) {
+            isNumericVector = false;
+            break; // early-exit — not a numeric vector, leave value untouched
+          }
+          nums[i] = n;
+        }
+
+        if (isNumericVector) {
+          data[key] = nums;
+        }
+      }
+    }
+
     return data;
   }
 
@@ -454,12 +508,17 @@ export class PostgresDriver implements DriverContract {
     _options?: Record<string, unknown>,
   ): Promise<UpdateResult> {
     const { sql, params } = this.buildUpdateQuery(table, filter, update, 1);
+    try {
+      const result = await this.query(sql, params);
 
-    const result = await this.query(sql, params);
+      return {
+        modifiedCount: result.rowCount ?? 0,
+      };
+    } catch (error) {
+      console.log("PG Query Error in:", sql, params);
 
-    return {
-      modifiedCount: result.rowCount ?? 0,
-    };
+      throw error;
+    }
   }
 
   /**
@@ -688,11 +747,13 @@ export class PostgresDriver implements DriverContract {
    *
    * @param table - Target table name
    * @param options - Optional options
+   * @param options.cascade - If true, automatically truncate all tables with foreign key references (use with caution)
    * @returns Number of deleted rows (always 0 for TRUNCATE)
    */
-  public async truncateTable(table: string, _options?: Record<string, unknown>): Promise<number> {
+  public async truncateTable(table: string, options?: { cascade?: boolean }): Promise<number> {
     const quotedTable = this.dialect.quoteIdentifier(table);
-    await this.query(`TRUNCATE TABLE ${quotedTable} RESTART IDENTITY`);
+    const cascadeClause = options?.cascade ? " CASCADE" : "";
+    await this.query(`TRUNCATE TABLE ${quotedTable} RESTART IDENTITY${cascadeClause}`);
     return 0; // TRUNCATE doesn't return row count
   }
 
@@ -745,6 +806,64 @@ export class PostgresDriver implements DriverContract {
         client.release();
       },
     };
+  }
+
+  /**
+   * Execute a function within a transaction scope (recommended pattern).
+   *
+   * Automatically commits on success, rolls back on any error, and guarantees
+   * resource cleanup. This is the recommended way to use transactions.
+   *
+   * @param fn - Async function to execute within transaction
+   * @param options - Transaction options (isolation level, read-only, etc.)
+   * @returns The return value of the callback function
+   * @throws {Error} If transaction fails or is explicitly rolled back
+   */
+  public async transaction<T>(
+    fn: (ctx: TransactionContext) => Promise<T>,
+    options?: Record<string, unknown>,
+  ): Promise<T> {
+    // Prevent nested transaction() calls
+    if (databaseTransactionContext.hasActiveTransaction()) {
+      // throw new Error(
+      //   "Nested transaction() calls are not supported. " +
+      //     "Use beginTransaction() with savepoints for advanced transaction patterns.",
+      // );
+    }
+
+    const tx = await this.beginTransaction(options);
+
+    // Set transaction context for queries within callback
+    databaseTransactionContext.enter({ session: tx.context });
+
+    try {
+      // Create transaction context with rollback method
+      const ctx: TransactionContext = {
+        rollback(reason?: string): never {
+          throw new TransactionRollbackError(reason);
+        },
+      };
+
+      // Execute callback
+      const result = await fn(ctx);
+
+      // Auto-commit on success
+      await tx.commit();
+
+      return result;
+    } catch (error) {
+      // Auto-rollback on any error (including explicit rollback)
+      await tx.rollback();
+      logger.error(
+        `database.postgress`,
+        "transaction",
+        "Transaction operation failed, rolled back everything",
+      );
+      throw error;
+    } finally {
+      // Guaranteed cleanup
+      databaseTransactionContext.exit();
+    }
   }
 
   /**
@@ -814,6 +933,9 @@ export class PostgresDriver implements DriverContract {
   ): Promise<PostgresQueryResult<T>> {
     // Check for active transaction client
     const txClient = databaseTransactionContext.getSession() as PgPoolClient | undefined;
+
+    // console.log("SQL", sql);
+    // console.log("SQL Params", params);
 
     if (txClient) {
       const result = await txClient.query(sql, params);

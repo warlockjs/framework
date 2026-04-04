@@ -205,6 +205,6 @@ export interface SqlDialectContract {
    */
   getSqlType(
     type: string,
-    options?: { length?: number; precision?: number; scale?: number },
+    options?: { length?: number; precision?: number; scale?: number; dimensions?: number },
   ): string;
 }

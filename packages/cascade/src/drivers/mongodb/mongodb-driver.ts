@@ -28,11 +28,15 @@ import type {
   MigrationDriverContract,
   QueryBuilderContract,
   SyncAdapterContract,
+  TransactionContext,
   UpdateOperations,
   UpdateResult,
 } from "../../contracts";
 import { dataSourceRegistry } from "../../data-source/data-source-registry";
+import { DatabaseDirtyTracker } from "../../database-dirty-tracker";
+import { TransactionRollbackError } from "../../errors/transaction-rollback.error";
 import type { ModelDefaults } from "../../types";
+import { isValidDateValue } from "../../utils/is-valid-date-value";
 import { MongoDBBlueprint } from "./mongodb-blueprint";
 import { MongoIdGenerator } from "./mongodb-id-generator";
 import { MongoMigrationDriver } from "./mongodb-migration-driver";
@@ -91,6 +95,10 @@ async function loadMongoDB() {
 }
 
 loadMongoDB();
+
+export function isMongoDBDriverLoaded() {
+  return isModuleExists;
+}
 
 async function assertModuleIsLoaded() {
   if (isModuleExists === false) {
@@ -564,11 +572,35 @@ export class MongoDbDriver implements DriverContract {
    * Serialize the given data
    */
   public serialize(data: Record<string, unknown>): Record<string, unknown> {
-    if (data._id && data._id instanceof ObjectId) {
-      data._id = data._id.toString();
+    const serialized: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(data)) {
+      if (value === undefined) {
+        continue; // Skip undefined values
+      }
+
+      if (value instanceof ObjectId) {
+        serialized[key] = value.toString();
+      } else if (value instanceof Date) {
+        serialized[key] = value.toISOString();
+      } else if (typeof value === "bigint") {
+        serialized[key] = value.toString();
+      } else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+        // Nested objects will be stored as JSONB
+        serialized[key] = value;
+      } else {
+        serialized[key] = value;
+      }
     }
 
     return data;
+  }
+
+  /**
+   * Get the dirty tracker for this driver.
+   */
+  public getDirtyTracker(data: Record<string, unknown>): DatabaseDirtyTracker {
+    return new DatabaseDirtyTracker(data);
   }
 
   /**
@@ -577,6 +609,13 @@ export class MongoDbDriver implements DriverContract {
   public deserialize(data: Record<string, unknown>): Record<string, unknown> {
     if (data._id && typeof data._id === "string") {
       data._id = new ObjectId(data._id);
+    }
+
+    for (const [key, value] of Object.entries(data)) {
+      // Only re-inflate strings — Mongo driver already returns Date objects from DB reads
+      if (typeof value === "string" && isValidDateValue(value)) {
+        data[key] = new Date(value);
+      }
     }
 
     return data;
@@ -630,6 +669,77 @@ export class MongoDbDriver implements DriverContract {
         });
       },
     };
+  }
+
+  /**
+   * Execute a function within a transaction scope (recommended pattern).
+   *
+   * Automatically commits on success, rolls back on any error, and guarantees
+   * resource cleanup. This is the recommended way to use transactions.
+   *
+   * **MongoDB Requirements:**
+   * - Requires MongoDB 4.0+ with replica set or sharded cluster
+   * - Standalone MongoDB instances do not support transactions
+   *
+   * @param fn - Async function to execute within transaction
+   * @param options - Transaction options (read preference, write concern, etc.)
+   * @returns The return value of the callback function
+   * @throws {Error} If transaction fails, is explicitly rolled back, or replica set not configured
+   */
+  public async transaction<T>(
+    fn: (ctx: TransactionContext) => Promise<T>,
+    options?: Record<string, unknown>,
+  ): Promise<T> {
+    // Prevent nested transaction() calls
+    if (databaseTransactionContext.hasActiveTransaction()) {
+      throw new Error(
+        "Nested transaction() calls are not supported. " +
+          "Use beginTransaction() with savepoints for advanced transaction patterns.",
+      );
+    }
+
+    // Check if MongoDB is running as a replica set (required for transactions)
+    await this.ensureReplicaSetAvailable();
+
+    const client = this.getClientInstance();
+    const session = client.startSession();
+
+    try {
+      await session.startTransaction({
+        ...this.transactionOptions,
+        ...(options as TransactionOptions),
+      });
+
+      // Set transaction context for queries within callback
+      databaseTransactionContext.enter({ session });
+
+      try {
+        // Create transaction context with rollback method
+        const ctx: TransactionContext = {
+          rollback(reason?: string): never {
+            throw new TransactionRollbackError(reason);
+          },
+        };
+
+        // Execute callback
+        const result = await fn(ctx);
+
+        // Auto-commit on success
+        await session.commitTransaction();
+
+        return result;
+      } catch (error) {
+        // Auto-rollback on any error (including explicit rollback)
+        await session.abortTransaction().catch(() => undefined);
+        throw error;
+      } finally {
+        // Guaranteed context cleanup
+        databaseTransactionContext.exit();
+      }
+    } finally {
+      // Guaranteed session cleanup
+      await session.endSession().catch(() => undefined);
+    }
   }
 
   /**
@@ -750,6 +860,34 @@ export class MongoDbDriver implements DriverContract {
    */
   private emit(event: DriverEvent, ...args: unknown[]): void {
     this.events.emit(event, ...args);
+  }
+
+  /**
+   * Ensure MongoDB is running as a replica set (required for transactions).
+   *
+   * @throws {Error} If MongoDB is running as a standalone instance
+   */
+  private async ensureReplicaSetAvailable(): Promise<void> {
+    try {
+      const admin = this.database!.admin();
+      const status = await admin.serverStatus();
+
+      if (!status.repl) {
+        throw new Error(
+          "MongoDB transactions require a replica set or sharded cluster. " +
+            "Standalone MongoDB instances do not support transactions.\n\n" +
+            "For local development:\n" +
+            "  - Run MongoDB with --replSet flag: mongod --replSet rs0\n" +
+            "  - Or use Docker with replica set configuration\n" +
+            "  - Or use MongoDB Atlas (cloud) which provides replica sets by default",
+        );
+      }
+    } catch (error: any) {
+      if (error.message?.includes("replica set")) {
+        throw error;
+      }
+      throw new Error(`Failed to check MongoDB replica set status: ${error.message}`);
+    }
   }
 
   /**

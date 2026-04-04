@@ -280,7 +280,7 @@ export class RelationLoader<TModel extends Model = Model> {
     constraint?: RelationConstraintCallback,
   ): Promise<void> {
     const RelatedModel = this.resolveModelClass(definition.model);
-    const foreignKey = definition.foreignKey ?? `${name}Id`;
+    const foreignKey = definition.foreignKey ?? `${name}_id`;
     const ownerKey = definition.localKey ?? "id";
 
     // Collect all foreign key values from the models

@@ -1,9 +1,9 @@
-import { DriverContract } from "../contracts";
+import { DriverContract, TransactionContext } from "../contracts";
 import { DataSource } from "../data-source/data-source";
 import { dataSourceRegistry } from "../data-source/data-source-registry";
 import { MongoDbDriver } from "../drivers/mongodb/mongodb-driver";
 import { PostgresDriver } from "../drivers/postgres";
-import type { DeleteStrategy, ModelDefaults, StrictMode } from "../types";
+import type { DeleteStrategy, MigrationDefaults, ModelDefaults } from "../types";
 
 /**
  * Supported database driver types.
@@ -187,11 +187,11 @@ export type ConnectionOptions<TDriverOptions = any, TClientOptions = any> = {
    *     namingConvention: "camelCase",
    *     createdAtColumn: "createdAt",
    *     updatedAtColumn: "updatedAt",
-   *     
+   *
    *     // ID generation settings (for MongoDB)
    *     randomIncrement: true,
    *     initialId: 1000,
-   *     
+   *
    *     // Deletion settings
    *     deleteStrategy: "soft",
    *     trashTable: "archive", // All models use same trash table
@@ -211,6 +211,23 @@ export type ConnectionOptions<TDriverOptions = any, TClientOptions = any> = {
    * ```
    */
   modelOptions?: ModelDefaultConfig;
+
+  /**
+   * Migration-level defaults (UUID strategy, etc.).
+   *
+   * These defaults override driver migration defaults but can be
+   * overridden by individual migration calls.
+   *
+   * @default undefined (uses driver defaults)
+   *
+   * @example
+   * ```typescript
+   * migrationDefaults: {
+   *   uuidStrategy: "v7", // Use UUID v7 for all migrations
+   * }
+   * ```
+   */
+  migrationOptions?: MigrationDefaults;
 
   // ============================================================================
   // DATA SOURCE DEFAULTS
@@ -239,6 +256,35 @@ export type ConnectionOptions<TDriverOptions = any, TClientOptions = any> = {
    * @default undefined (uses {table}Trash pattern)
    */
   defaultTrashTable?: string;
+
+  // ============================================================================
+  // MIGRATION OPTIONS
+  // ============================================================================
+
+  /**
+   * Migration configuration options.
+   */
+  migrations?: {
+    /**
+     * Whether to wrap migrations in database transactions.
+     *
+     * Overrides driver defaults:
+     * - PostgreSQL default: `true` (DDL is transactional)
+     * - MongoDB default: `false` (DDL cannot be transactional)
+     *
+     * Individual migrations can override this with their own `transactional` property.
+     *
+     * @default undefined (uses driver default)
+     */
+    transactional?: boolean;
+
+    /**
+     * Name of the migrations tracking table/collection.
+     *
+     * @default "_migrations"
+     */
+    table?: string;
+  };
 };
 
 /**
@@ -345,6 +391,8 @@ export async function connectToDatabase<TDriverOptions = any, TClientOptions = a
     defaultDeleteStrategy: options.defaultDeleteStrategy,
     defaultTrashTable: options.defaultTrashTable,
     modelDefaults: options.modelOptions,
+    migrationDefaults: options.migrationOptions,
+    migrations: options.migrations,
   });
 
   // Register data source
@@ -362,4 +410,20 @@ export async function connectToDatabase<TDriverOptions = any, TClientOptions = a
   }
 
   return dataSource;
+}
+
+/**
+ * Get current driver instance
+ */
+export const currentDatabaseDriver = () => dataSourceRegistry.get().driver;
+
+/**
+ * Perform database transaction(s)
+ * Shorthand to `dataSourceRegister.get().driver.transaction
+ */
+export async function transaction<T = any>(
+  fn: (ctx: TransactionContext) => Promise<T>,
+  options?: Record<string, unknown>,
+): Promise<T> {
+  return currentDatabaseDriver().transaction(fn, options);
 }

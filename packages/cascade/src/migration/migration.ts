@@ -10,6 +10,8 @@ import type {
 } from "../contracts/migration-driver.contract";
 import type { DataSource } from "../data-source/data-source";
 import type { ChildModel, Model } from "../model/model";
+import type { MigrationDefaults } from "../types";
+import { DatabaseDriver } from "../utils/connect-to-database";
 import { ColumnBuilder } from "./column-builder";
 import { ForeignKeyBuilder } from "./foreign-key-builder";
 
@@ -74,11 +76,6 @@ export interface MigrationContract {
   readonly dataSource?: string | DataSource;
 
   /**
-   * Optional timestamp override.
-   */
-  readonly createdAt?: string;
-
-  /**
    * Whether to wrap migration in a transaction.
    */
   readonly transactional?: boolean;
@@ -100,6 +97,14 @@ export interface MigrationContract {
    * @internal
    */
   setDriver(driver: MigrationDriverContract): void;
+
+  /**
+   * Set migration defaults from the resolved DataSource.
+   *
+   * @param defaults - Migration defaults (UUID strategy, etc.)
+   * @internal
+   */
+  setMigrationDefaults(defaults?: MigrationDefaults): void;
 
   /**
    * Get the migration driver.
@@ -353,6 +358,35 @@ export interface MigrationContract {
    */
   set(column: string, values: string[]): ColumnBuilder;
 
+  // ── PostgreSQL array types ──────────────────────────────────────────────────
+
+  /** INTEGER[] — array of integers. */
+  arrayInt(column: string): ColumnBuilder;
+
+  /** BIGINT[] — array of big integers. */
+  arrayBigInt(column: string): ColumnBuilder;
+
+  /** REAL[] — array of floats. */
+  arrayFloat(column: string): ColumnBuilder;
+
+  /** DECIMAL[] — array of decimals (optional precision/scale). */
+  arrayDecimal(column: string, precision?: number, scale?: number): ColumnBuilder;
+
+  /** BOOLEAN[] — array of booleans. */
+  arrayBoolean(column: string): ColumnBuilder;
+
+  /** TEXT[] — array of text values. */
+  arrayText(column: string): ColumnBuilder;
+
+  /** DATE[] — array of dates. */
+  arrayDate(column: string): ColumnBuilder;
+
+  /** TIMESTAMPTZ[] — array of timestamps with time zone. */
+  arrayTimestamp(column: string): ColumnBuilder;
+
+  /** UUID[] — array of UUIDs. */
+  arrayUuid(column: string): ColumnBuilder;
+
   /**
    * Add an auto-increment primary key column.
    */
@@ -367,6 +401,23 @@ export interface MigrationContract {
    * Add a UUID primary key column.
    */
   uuidId(name?: string): ColumnBuilder;
+
+  /**
+   * Add a UUID primary key column with automatic generation.
+   *
+   * PostgreSQL: Uses gen_random_uuid() (built-in since PG 13)
+   * MongoDB: Application-level UUID generation
+   *
+   * @param name - Column name (default: "id")
+   * @returns Column builder for chaining modifiers
+   *
+   * @example
+   * ```typescript
+   * this.primaryUuid(); // id UUID PRIMARY KEY DEFAULT gen_random_uuid()
+   * this.primaryUuid("organization_id"); // Custom column name
+   * ```
+   */
+  primaryUuid(name?: string): ColumnBuilder;
 
   /**
    * Add createdAt and updatedAt timestamp columns.
@@ -498,9 +549,15 @@ export interface MigrationContract {
   foreign(column: string): ForeignKeyBuilder;
 
   /**
-   * Drop a foreign key constraint by name.
+   * Drop a foreign key constraint.
+   *
+   * When `referencesTable` is provided, the constraint name is auto-computed
+   * using the same convention as `addForeignKey`:
+   * `fk_{table}_{column}_{referencesTable}`
+   *
+   * When omitted, `columnOrConstraint` is used as the raw constraint name.
    */
-  dropForeign(name: string): MigrationContract;
+  dropForeign(columnOrConstraint: string, referencesTable?: string): MigrationContract;
 
   /**
    * Set JSON schema validation rules on the collection.
@@ -511,11 +568,6 @@ export interface MigrationContract {
    * Remove schema validation rules from the collection.
    */
   dropSchemaValidation(): MigrationContract;
-
-  /**
-   * Execute raw operations with direct driver access.
-   */
-  raw<T>(callback: (connection: unknown) => Promise<T>): Promise<T>;
 
   /**
    * Check if a table exists.
@@ -546,6 +598,28 @@ export interface MigrationContract {
    * Check if a named index exists on the current table.
    */
   hasIndex(indexName: string): Promise<boolean>;
+
+  /**
+   * Queue a raw SQL string for execution within the migration.
+   *
+   * @param sql - SQL statement to execute
+   */
+  raw(sql: string): this;
+
+  /**
+   * Execute raw operations with direct driver/connection access.
+   *
+   * @param callback - Callback receiving the native connection
+   */
+  withConnection<T>(callback: (connection: unknown) => Promise<T>): Promise<T>;
+
+  /**
+   * Add a vector column for storing AI embeddings.
+   *
+   * @param column - Column name
+   * @param dimensions - Embedding size (e.g. 1536 for text-embedding-3-small)
+   */
+  vector(column: string, dimensions: number): ColumnBuilder;
 }
 
 /**
@@ -649,7 +723,7 @@ export abstract class Migration implements MigrationContract {
    *
    * Format: ISO 8601 or any parseable date string.
    */
-  public readonly createdAt?: string;
+  public static readonly createdAt?: string;
 
   /**
    * Whether to wrap migration in a transaction.
@@ -665,6 +739,12 @@ export abstract class Migration implements MigrationContract {
    * Migration driver instance (injected by the runner).
    */
   protected driver!: MigrationDriverContract;
+
+  /**
+   * Migration defaults from the resolved DataSource.
+   * @internal
+   */
+  private _migrationDefaults?: MigrationDefaults;
 
   /**
    * Queued operations to execute.
@@ -743,12 +823,29 @@ export abstract class Migration implements MigrationContract {
   }
 
   /**
+   * Set migration defaults from the resolved DataSource.
+   *
+   * @param defaults - Migration defaults (UUID strategy, etc.)
+   * @internal
+   */
+  public setMigrationDefaults(defaults?: MigrationDefaults): void {
+    this._migrationDefaults = defaults;
+  }
+
+  /**
    * Get the migration driver.
    *
    * @returns The migration driver instance
    */
   public getDriver(): MigrationDriverContract {
     return this.driver;
+  }
+
+  /**
+   * Get database engine (MongoDB, Postgress...etc)
+   */
+  public get databaseEngine(): DatabaseDriver {
+    return this.driver.driver.name;
   }
 
   // ============================================================================
@@ -1759,6 +1856,140 @@ export abstract class Migration implements MigrationContract {
   }
 
   // ============================================================================
+  // COLUMN TYPES - POSTGRESQL ARRAYS
+  // ============================================================================
+
+  /**
+   * Add an INTEGER[] column (array of integers).
+   *
+   * @example
+   * ```typescript
+   * this.arrayInt("scores"); // INTEGER[]
+   * ```
+   */
+  public arrayInt(column: string): ColumnBuilder {
+    const builder = new ColumnBuilder(this, column, "arrayInt");
+    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+    return builder;
+  }
+
+  /**
+   * Add a BIGINT[] column (array of big integers).
+   *
+   * @example
+   * ```typescript
+   * this.arrayBigInt("ids"); // BIGINT[]
+   * ```
+   */
+  public arrayBigInt(column: string): ColumnBuilder {
+    const builder = new ColumnBuilder(this, column, "arrayBigInt");
+    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+    return builder;
+  }
+
+  /**
+   * Add a REAL[] column (array of floats).
+   *
+   * @example
+   * ```typescript
+   * this.arrayFloat("weights"); // REAL[]
+   * ```
+   */
+  public arrayFloat(column: string): ColumnBuilder {
+    const builder = new ColumnBuilder(this, column, "arrayFloat");
+    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+    return builder;
+  }
+
+  /**
+   * Add a DECIMAL[] column (array of decimals).
+   *
+   * @param precision - Total digits
+   * @param scale - Digits after decimal point
+   *
+   * @example
+   * ```typescript
+   * this.arrayDecimal("prices", 10, 2); // DECIMAL(10,2)[]
+   * this.arrayDecimal("amounts");        // DECIMAL[]
+   * ```
+   */
+  public arrayDecimal(column: string, precision?: number, scale?: number): ColumnBuilder {
+    const builder = new ColumnBuilder(this, column, "arrayDecimal", { precision, scale });
+    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+    return builder;
+  }
+
+  /**
+   * Add a BOOLEAN[] column (array of booleans).
+   *
+   * @example
+   * ```typescript
+   * this.arrayBoolean("flags"); // BOOLEAN[]
+   * ```
+   */
+  public arrayBoolean(column: string): ColumnBuilder {
+    const builder = new ColumnBuilder(this, column, "arrayBoolean");
+    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+    return builder;
+  }
+
+  /**
+   * Add a TEXT[] column (array of text values).
+   *
+   * @example
+   * ```typescript
+   * this.arrayText("tags"); // TEXT[]
+   * ```
+   */
+  public arrayText(column: string): ColumnBuilder {
+    const builder = new ColumnBuilder(this, column, "arrayText");
+    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+    return builder;
+  }
+
+  /**
+   * Add a DATE[] column (array of dates).
+   *
+   * @example
+   * ```typescript
+   * this.arrayDate("holidays"); // DATE[]
+   * ```
+   */
+  public arrayDate(column: string): ColumnBuilder {
+    const builder = new ColumnBuilder(this, column, "arrayDate");
+    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+    return builder;
+  }
+
+  /**
+   * Add a TIMESTAMPTZ[] column (array of timestamps with time zone).
+   *
+   * @example
+   * ```typescript
+   * this.arrayTimestamp("events"); // TIMESTAMPTZ[]
+   * ```
+   */
+  public arrayTimestamp(column: string): ColumnBuilder {
+    const builder = new ColumnBuilder(this, column, "arrayTimestamp");
+    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+    return builder;
+  }
+
+  /**
+   * Add a UUID[] column (array of UUIDs).
+   *
+   * @example
+   * ```typescript
+   * this.arrayUuid("relatedIds"); // UUID[]
+   * ```
+   */
+  public arrayUuid(column: string): ColumnBuilder {
+    const builder = new ColumnBuilder(this, column, "arrayUuid");
+    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+    return builder;
+  }
+
+  // ============================================================================
   // SHORTCUTS
   // ============================================================================
 
@@ -1803,8 +2034,13 @@ export abstract class Migration implements MigrationContract {
   /**
    * Add a UUID primary key column with automatic generation.
    *
-   * PostgreSQL: Uses gen_random_uuid() (built-in since PG 13)
-   * MongoDB: Application-level UUID generation
+   * Delegates UUID expression to the migration driver, which resolves
+   * the default based on `migrationDefaults` from the DataSource config.
+   *
+   * Resolution order:
+   * 1. `migrationDefaults.uuidExpression` (raw escape hatch)
+   * 2. `migrationDefaults.uuidStrategy` (mapped per driver)
+   * 3. Driver default (PostgreSQL: `gen_random_uuid()`, MongoDB: undefined)
    *
    * @param name - Column name (default: "id")
    * @returns Column builder for chaining modifiers
@@ -1816,7 +2052,14 @@ export abstract class Migration implements MigrationContract {
    * ```
    */
   public primaryUuid(name = "id"): ColumnBuilder {
-    return this.uuid(name).primary().default("gen_random_uuid()");
+    const uuidDefault = this.driver.getUuidDefault(this._migrationDefaults);
+    const builder = this.uuid(name).primary();
+
+    if (uuidDefault) {
+      builder.default(uuidDefault);
+    }
+
+    return builder;
   }
 
   /**
@@ -2280,13 +2523,30 @@ export abstract class Migration implements MigrationContract {
   }
 
   /**
-   * Drop a foreign key constraint by name.
+   * Drop a foreign key constraint.
    *
-   * @param name - Constraint name
+   * Two calling forms:
+   *
+   * 1. Auto-compute the name (matches what `addForeignKey` generates):
+   *    ```typescript
+   *    this.dropForeign("unit_id", Unit.table);
+   *    // → drops: fk_{table}_unit_id_units
+   *    ```
+   *
+   * 2. Raw constraint name (use when the name was set explicitly):
+   *    ```typescript
+   *    this.dropForeign("my_custom_fk_name");
+   *    ```
+   *
+   * @param columnOrConstraint - Column name (auto mode) or raw constraint name (raw mode)
+   * @param referencesTable - Referenced table name; triggers auto-name computation when provided
    * @returns This migration for chaining
    */
-  public dropForeign(name: string): this {
-    this.pendingOperations.push({ type: "dropForeignKey", payload: name });
+  public dropForeign(columnOrConstraint: string, referencesTable?: string): this {
+    const constraintName = referencesTable
+      ? `fk_${this.table}_${columnOrConstraint}_${referencesTable}`
+      : columnOrConstraint;
+    this.pendingOperations.push({ type: "dropForeignKey", payload: constraintName });
     return this;
   }
 
@@ -2340,30 +2600,32 @@ export abstract class Migration implements MigrationContract {
   // ============================================================================
 
   /**
-   * Execute raw operations with direct driver access.
+   * Execute raw operations with direct driver/connection access.
    *
-   * Use this for database-specific operations not covered by the API.
+   * Use this when you need to bypass the migration API entirely and
+   * interact with the native database driver directly.
    *
    * @param callback - Callback receiving the native connection
    * @returns Result from callback
    *
    * @example
    * ```typescript
-   * await this.raw(async (db) => {
+   * await this.withConnection(async (db) => {
    *   await db.collection("users").updateMany({}, { $set: { active: true } });
    * });
    * ```
    */
-  public async raw<T>(callback: (connection: unknown) => Promise<T>): Promise<T> {
+  public async withConnection<T>(callback: (connection: unknown) => Promise<T>): Promise<T> {
     return this.driver.raw(callback);
   }
 
   /**
-   * Queue a raw SQL statement for execution.
+   * Queue a raw SQL string for execution within the migration.
    *
-   * Convenient shorthand for executing SQL statements. The statement is queued
-   * and executed in order with other migration operations, within the transaction
-   * context if the migration is transactional.
+   * The statement is queued and executed in order with other migration
+   * operations, within the transaction context if the migration is transactional.
+   *
+   * Use `withConnection()` instead if you need direct driver access.
    *
    * Works with PostgreSQL, MySQL, etc. For MongoDB, uses $eval command.
    *
@@ -2373,21 +2635,13 @@ export abstract class Migration implements MigrationContract {
    * @example
    * ```typescript
    * // Enable PostgreSQL extension
-   * this.statement('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
+   * this.raw('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
    *
    * // Create custom type
-   * this.statement('CREATE TYPE mood AS ENUM (\'happy\', \'sad\', \'neutral\')');
-   *
-   * // Execute complex DDL
-   * this.statement(`
-   *   CREATE TABLE custom_table (
-   *     id SERIAL PRIMARY KEY,
-   *     data JSONB NOT NULL
-   *   )
-   * `);
+   * this.raw('CREATE TYPE mood AS ENUM (\'happy\', \'sad\', \'neutral\')');
    * ```
    */
-  public statement(sql: string): this {
+  public raw(sql: string): this {
     this.pendingOperations.push({
       type: "rawStatement",
       payload: sql,

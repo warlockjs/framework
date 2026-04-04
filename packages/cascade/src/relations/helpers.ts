@@ -67,6 +67,7 @@ export function hasMany(model: string, options?: HasManyOptions): RelationDefini
     model,
     foreignKey: options?.foreignKey,
     localKey: options?.localKey ?? "id",
+    select: options?.select,
   };
 }
 
@@ -111,6 +112,7 @@ export function hasOne(model: string, options?: HasOneOptions): RelationDefiniti
     model,
     foreignKey: options?.foreignKey,
     localKey: options?.localKey ?? "id",
+    select: options?.select,
   };
 }
 
@@ -152,6 +154,7 @@ export function belongsTo(model: string, options?: BelongsToOptions): RelationDe
     model,
     foreignKey: options?.foreignKey,
     localKey: options?.ownerKey ?? "id",
+    select: options?.select,
   };
 }
 
@@ -209,5 +212,6 @@ export function belongsToMany(model: string, options: BelongsToManyOptions): Rel
     foreignKey: options.foreignKey,
     pivotLocalKey: options.pivotLocalKey ?? "id",
     pivotForeignKey: options.pivotForeignKey ?? "id",
+    select: options.select,
   };
 }

@@ -321,3 +321,69 @@ export type ModelDefaults = {
    */
   namingConvention?: NamingConvention;
 };
+
+// ============================================================================
+// Migration Defaults
+// ============================================================================
+
+/**
+ * UUID generation strategy for primary keys.
+ *
+ * Each driver maps this to its native expression:
+ * - `"v4"`: PG → `gen_random_uuid()` (PG 13+), MySQL → `UUID()`
+ * - `"v7"`: PG → `uuid_generate_v7()` (PG 18+)
+ *
+ * @example
+ * ```typescript
+ * // In database config
+ * migrationDefaults: {
+ *   uuidStrategy: "v7", // Use UUID v7 (PG 18+)
+ * }
+ * ```
+ */
+export type UuidStrategy = "v4" | "v7";
+
+/**
+ * Migration-level defaults configurable per data source.
+ *
+ * These settings affect DDL operations (schema changes) and are
+ * separate from runtime model behavior (`ModelDefaults`).
+ *
+ * The configuration follows a 3-tier hierarchy (highest to lowest):
+ * 1. Inline migration call (explicit `.default("...")`)
+ * 2. DataSource `migrationDefaults` (this type)
+ * 3. Driver migration defaults (e.g., PG defaults to v4)
+ *
+ * @example
+ * ```typescript
+ * // Use UUID v7 for all migrations on this data source
+ * migrationDefaults: {
+ *   uuidStrategy: "v7",
+ * }
+ *
+ * // Use a custom UUID extension
+ * migrationDefaults: {
+ *   uuidExpression: "uuid_generate_v1mc()",
+ * }
+ * ```
+ */
+export type MigrationDefaults = {
+  /**
+   * UUID generation strategy for `primaryUuid()` migration shortcut.
+   * Each driver maps this to its native SQL/expression.
+   *
+   * @default "v4"
+   */
+  uuidStrategy?: UuidStrategy;
+
+  /**
+   * Raw SQL/expression override for UUID generation.
+   * Takes precedence over `uuidStrategy` when set.
+   *
+   * Use for custom extensions (e.g., `uuid-ossp`, `pgcrypto`)
+   * or non-standard UUID generation functions.
+   *
+   * @example "uuid_generate_v1mc()"
+   */
+  uuidExpression?: string;
+};

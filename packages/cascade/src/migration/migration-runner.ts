@@ -26,6 +26,93 @@ type ExecuteOptions = {
 };
 
 /**
+ * Parse createdAt timestamp from custom format to Date.
+ * Supports both: MM-DD-YYYY_HH-MM-SS and DD-MM-YYYY_HH-MM-SS
+ * Intelligently detects format by checking if first value > 12 (must be day)
+ * Falls back to standard Date parsing for ISO strings.
+ */
+function parseCreatedAt(createdAt: string): Date | undefined {
+  const match = createdAt.match(/^(\d{2})-(\d{2})-(\d{4})_(\d{2})-(\d{2})-(\d{2})$/);
+  if (match) {
+    const [, first, second, year, hour, minute, second_time] = match;
+    const firstNum = parseInt(first);
+    const secondNum = parseInt(second);
+
+    let month: number, day: number;
+
+    // Intelligently detect format:
+    // If first > 12, it must be DD-MM-YYYY (day can't be month)
+    // If second > 12, it must be MM-DD-YYYY (day can't be month)
+    // Otherwise, assume MM-DD-YYYY (US format as default)
+    if (firstNum > 12) {
+      // DD-MM-YYYY format
+      day = firstNum;
+      month = secondNum;
+    } else if (secondNum > 12) {
+      // MM-DD-YYYY format
+      month = firstNum;
+      day = secondNum;
+    } else {
+      // Ambiguous - default to MM-DD-YYYY
+      month = firstNum;
+      day = secondNum;
+    }
+
+    const date = new Date(
+      parseInt(year),
+      month - 1, // JavaScript months are 0-indexed
+      day,
+      parseInt(hour),
+      parseInt(minute),
+      parseInt(second_time),
+    );
+
+    // Validate the date is actually valid
+    if (isNaN(date.getTime())) {
+      return undefined;
+    }
+
+    return date;
+  }
+  // Fallback to standard Date parsing for ISO strings
+  try {
+    const date = new Date(createdAt);
+    return isNaN(date.getTime()) ? undefined : date;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Comparator for sorting migration classes.
+ *
+ * Priority:
+ *   1. Explicit `order` (lower = earlier)
+ *   2. `createdAt` timestamp (older = earlier)
+ *   3. Alphabetical by migration name (last resort)
+ */
+function sortMigrations(
+  a: { order?: number; createdAt?: string; migrationName: string },
+  b: { order?: number; createdAt?: string; migrationName: string },
+): number {
+  // Both have explicit order → numeric sort
+  if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+  if (a.order !== undefined) return -1;
+  if (b.order !== undefined) return 1;
+
+  // Sort by createdAt timestamp
+  const aDate = a.createdAt ? parseCreatedAt(a.createdAt) : undefined;
+  const bDate = b.createdAt ? parseCreatedAt(b.createdAt) : undefined;
+
+  if (aDate && bDate) return aDate.getTime() - bDate.getTime();
+  if (aDate) return -1;
+  if (bDate) return 1;
+
+  // Last resort: alphabetical
+  return a.migrationName.localeCompare(b.migrationName);
+}
+
+/**
  * Migration runner that executes migrations.
  *
  * This is a pure executor - it doesn't discover migrations.
@@ -445,33 +532,84 @@ export class MigrationRunner {
       if (!dryRun) {
         const driver = this.getMigrationDriver();
         migration.setDriver(driver);
+        migration.setMigrationDefaults(this.getDataSource().migrationDefaults);
 
-        if (direction === "up") {
-          await migration.up();
+        // ============================================================================
+        // TRANSACTION RESOLUTION (3-tier hierarchy)
+        // ============================================================================
+        // 1. Migration-level explicit override
+        // 2. Config-level global override
+        // 3. Driver default (PostgreSQL: true, MongoDB: false)
+        const shouldUseTransaction =
+          migration.transactional ??
+          this.getDataSource().migrations?.transactional ??
+          driver.getDefaultTransactional();
+
+        // ============================================================================
+        // EXECUTE WITH OR WITHOUT TRANSACTION
+        // ============================================================================
+        if (shouldUseTransaction && driver.supportsTransactions()) {
+          // Transactional execution (PostgreSQL default)
+          await driver.beginTransaction();
+          try {
+            // Execute migration DDL operations
+            if (direction === "up") {
+              await migration.up();
+            } else {
+              await migration.down();
+            }
+            await migration.execute();
+
+            // Record migration tracking
+            if (record) {
+              if (direction === "up") {
+                const batch = options.batch ?? (await this.getNextBatchNumber());
+                await this.recordMigration(
+                  name,
+                  batch,
+                  MigrationClass.createdAt ? parseCreatedAt(MigrationClass.createdAt) : new Date(),
+                );
+              } else {
+                await this.removeMigrationRecord(name);
+              }
+            }
+
+            // Commit transaction on success
+            await driver.commit();
+          } catch (txError) {
+            // Rollback transaction on failure
+            await driver.rollback();
+            throw txError;
+          }
         } else {
-          await migration.down();
-        }
-
-        await migration.execute();
-
-        if (record) {
+          // Non-transactional execution (MongoDB default, or explicit override)
           if (direction === "up") {
-            const batch = options.batch ?? (await this.getNextBatchNumber());
-            await this.recordMigration(
-              name,
-              batch,
-              MigrationClass.createdAt ? new Date(MigrationClass.createdAt) : undefined,
-            );
+            await migration.up();
           } else {
-            await this.removeMigrationRecord(name);
+            await migration.down();
+          }
+
+          await migration.execute();
+
+          if (record) {
+            if (direction === "up") {
+              const batch = options.batch ?? (await this.getNextBatchNumber());
+              await this.recordMigration(
+                name,
+                batch,
+                MigrationClass.createdAt ? parseCreatedAt(MigrationClass.createdAt) : new Date(),
+              );
+            } else {
+              await this.removeMigrationRecord(name);
+            }
           }
         }
       }
     } catch (err) {
       success = false;
       error = err instanceof Error ? err.message : String(err);
-      console.log(err);
       log.error("database", "migration", `${colors.magenta(name)}: ✗ Failed: ${error}`);
+      throw err;
     }
 
     const durationMs = Date.now() - startTime;
@@ -480,7 +618,7 @@ export class MigrationRunner {
       log.success(
         "database",
         "migration",
-        `${direction == "up" ? "Migrated" : "Rolled back"} ${colors.magenta(name)}: successfully (${durationMs}ms)`,
+        `${direction == "up" ? "Migrated" : "Rolled back"}: ${colors.magenta(name)} successfully (${durationMs}ms)`,
       );
     }
 
@@ -503,13 +641,7 @@ export class MigrationRunner {
     const executedNames = new Set(executed.map((r) => r.name));
     const migrations = this.migrations.filter((m) => !executedNames.has(m.migrationName));
 
-    return migrations.sort((a, b) => {
-      if (a.order && b.order) {
-        return a.order - b.order;
-      }
-
-      return a.migrationName.localeCompare(b.migrationName);
-    });
+    return migrations.sort(sortMigrations);
   }
 
   /**
@@ -529,13 +661,7 @@ export class MigrationRunner {
       .map((r) => this.migrations.find((m) => m.migrationName === r.name))
       .filter((m): m is MigrationClass => !!m);
 
-    return migrations.sort((a, b) => {
-      if (a.order && b.order) {
-        return a.order - b.order;
-      }
-
-      return a.migrationName.localeCompare(b.migrationName);
-    });
+    return migrations.sort(sortMigrations);
   }
 
   /**

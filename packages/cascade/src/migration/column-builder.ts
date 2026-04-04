@@ -514,21 +514,41 @@ export class ColumnBuilder {
    * ```
    */
   public change(): unknown {
-    // Remove the existing addColumn operation that was pushed in the constructor
     const operations = (this.migration as any).pendingOperations;
-    const lastOp = operations[operations.length - 1];
 
+    // Remove the addColumn pushed by the column type method (e.g. uuid(), string())
+    const lastOp = operations[operations.length - 1];
     if (lastOp?.type === "addColumn" && lastOp.payload === this.definition) {
       operations.pop();
     }
 
-    // Push modifyColumn instead
-    (this.migration as any).pendingOperations.push({
-      type: "modifyColumn",
-      payload: this.definition,
-    });
+    // If .references() was called before .change(), the addForeignKey op is now
+    // last in the queue. We must pop it, push modifyColumn first, then re-push
+    // the FK — because SQL requires: ALTER COLUMN (type change) → ADD CONSTRAINT (FK).
+    let pendingFkOp: (typeof operations)[number] | undefined;
+    if (this.fkDefinition) {
+      const tail = operations[operations.length - 1];
+      if (tail?.type === "addForeignKey" && tail.payload === this.fkDefinition) {
+        pendingFkOp = operations.pop();
+      }
+    }
+
+    // Push modifyColumn — it must precede the FK constraint
+    operations.push({ type: "modifyColumn", payload: this.definition });
+
+    // Re-queue the FK after the column modification
+    if (pendingFkOp) {
+      operations.push(pendingFkOp);
+    }
 
     return this.migration;
+  }
+
+  /**
+   * @alias change
+   */
+  public modify(): unknown {
+    return this.change();
   }
 
   // ============================================================================

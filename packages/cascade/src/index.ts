@@ -18,6 +18,7 @@ export * from "./data-source/data-source-registry";
 
 // Errors
 export * from "./errors/missing-data-source.error";
+export * from "./errors/transaction-rollback.error";
 
 // Core Services
 export * from "./database-dirty-tracker";

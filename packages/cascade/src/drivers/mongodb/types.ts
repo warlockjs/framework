@@ -13,7 +13,9 @@ export type PipelineStage =
   | "$skip"
   | "$unwind"
   | "$addFields"
-  | "$setWindowFields";
+  | "$setWindowFields"
+  | "$vectorSearch";
+
 
 /**
  * Represents a single operation in the query builder chain.
