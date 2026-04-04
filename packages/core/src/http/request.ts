@@ -104,6 +104,16 @@ export class Request<RequestValidation = any> {
   public id = Random.string(32);
 
   /**
+   * Start Time
+   */
+  public startTime = Date.now();
+
+  /**
+   * End Time
+   */
+  public endTime?: undefined | number;
+
+  /**
    * Set request handler
    */
   public setRequest(request: FastifyRequest) {
@@ -507,9 +517,11 @@ export class Request<RequestValidation = any> {
    * Get inputs that has been validated only
    * You can also pass an array of inputs to get only the validated inputs
    */
-  public validated<Output = RequestValidation>(inputs?: string[]): Output {
+  public validated<Output = RequestValidation>(inputs?: (keyof Output | (string & {}))[]): Output {
     if (this.validatedData) {
-      return inputs ? only(this.validatedData as Output, inputs) : (this.validatedData as Output);
+      return inputs
+        ? only(this.validatedData as Output, inputs as string[])
+        : (this.validatedData as Output);
     }
 
     return {} as Output;

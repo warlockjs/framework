@@ -137,6 +137,14 @@ export class CascadeQueryBuilder<T extends Model> implements QueryBuilderContrac
     return this;
   }
 
+  /**
+   * {@inheritDoc QueryBuilderContract.nearestTo}
+   */
+  public nearestTo(column: string, embedding: number[], alias?: string): this {
+    this.query.nearestTo(column, embedding, alias);
+    return this;
+  }
+
   // ============================================================================
   // SELECT / PROJECTION
   // ============================================================================
@@ -283,51 +291,36 @@ export class CascadeQueryBuilder<T extends Model> implements QueryBuilderContrac
 
   /**
    * {@inheritDoc QueryBuilderContract.cursorPaginate}
+   *
+   * NOTE: This method is a pure executor.
+   * The caller (e.g. RepositoryManager._listImpl) is responsible for applying
+   * the cursor WHERE condition and ORDER BY BEFORE calling this method,
+   * so that the cursor column is always the primary sort key.
    */
   public async cursorPaginate(
     options: CursorPaginationOptions,
   ): Promise<CursorPaginationResult<T>> {
-    // Cascade-Next doesn't have built-in cursor pagination yet
-    // Implement it manually
-    const { limit, cursor, direction = "forward", cursorColumn = "id" } = options;
+    const { limit, cursor, cursorColumn = "id" } = options;
 
-    // Apply cursor condition
-    if (cursor) {
-      if (direction === "forward") {
-        this.where(cursorColumn, ">", cursor);
-      } else {
-        this.where(cursorColumn, "<", cursor);
-      }
-    }
-
-    // Fetch limit + 1 to check if there are more results
+    // Fetch limit + 1 to detect whether more pages exist
     this.limit(limit + 1);
-
-    // Apply ordering
-    if (direction === "forward") {
-      this.orderBy(cursorColumn, "asc");
-    } else {
-      this.orderBy(cursorColumn, "desc");
-    }
 
     const results = await this.get();
     const hasMore = results.length > limit;
 
-    // Remove the extra record
+    // Drop the extra record used for the hasMore check
     const documents = hasMore ? results.slice(0, limit) : results;
 
-    // Determine cursors
     const nextCursor = hasMore ? (documents[documents.length - 1] as any)[cursorColumn] : undefined;
-    const prevCursor = cursor;
 
     return {
-      documents,
+      data: documents,
       pagination: {
         limit,
         result: documents.length,
         hasMore,
         nextCursor,
-        prevCursor,
+        prevCursor: cursor,
       },
     };
   }
@@ -342,6 +335,31 @@ export class CascadeQueryBuilder<T extends Model> implements QueryBuilderContrac
   // ============================================================================
   // UTILITIES
   // ============================================================================
+
+  /**
+   * {@inheritDoc QueryBuilderContract.with}
+   */
+  public with(relation: string): this {
+    this.query.with(relation);
+    return this;
+  }
+
+  /**
+   * {@inheritDoc QueryBuilderContract.joinWith}
+   */
+  public joinWith(...relations: string[]): this {
+    if (this.query.joinWith) {
+      this.query.joinWith(...relations);
+    } else {
+      console.warn(
+        "[Repository] joinWith is not supported by the underlying query builder. Falling back to with.",
+      );
+      for (const relation of relations) {
+        this.query.with(relation);
+      }
+    }
+    return this;
+  }
 
   /**
    * {@inheritDoc QueryBuilderContract.clone}

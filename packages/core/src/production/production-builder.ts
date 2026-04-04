@@ -98,7 +98,7 @@ export class ProductionBuilder {
 
 // Set production environment
 Application.setRuntimeStrategy("production");
-Application.setEnviornment("production");
+Application.setEnvironment("production");
 
 // Bootstrap the application
 bootstrap();

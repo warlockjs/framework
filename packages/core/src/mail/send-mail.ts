@@ -208,7 +208,7 @@ async function triggerEvents(
     // Trigger mail-specific event (e.g., mail.$id.success)
     const specificResults = await mailEvents.triggerForMail(mailId, event, ...args);
 
-    return [...globalResults, ...specificResults];
+    return [...(globalResults || []), ...(specificResults || [])];
   } catch (error) {
     log.error("mail", "event", `Event handler error: ${error}`);
     return [];

@@ -1,4 +1,7 @@
+import { CacheDriver } from "@warlock.js/cache";
+import { RepositoryManager } from "../repository.manager";
 import { QueryBuilderContract } from "./query-builder.contract";
+import { RepositoryAdapterContract } from "./repository-adapter.contract";
 
 /**
  * Pagination result structure returned by repository list methods
@@ -48,7 +51,7 @@ export type CursorPaginationResult<T> = {
   /**
    * Array of documents/records in the current page
    */
-  documents: T[];
+  data: T[];
 
   /**
    * Cursor pagination metadata
@@ -174,6 +177,9 @@ export type FilterOperator =
   | "dateTimeBetween"
   | "location"
   | "scope"
+  | "with"
+  | "joinWith"
+  | "nearestTo"
   | WhereOperator;
 
 /**
@@ -327,11 +333,6 @@ export type RepositoryOptions = {
    * Custom query modifications
    */
   perform?: (query: QueryBuilderContract<any>, options: RepositoryOptions) => void;
-
-  /**
-   * Additional filter values
-   */
-  [key: string]: any;
 };
 
 /**
@@ -374,6 +375,38 @@ export type CachedRepositoryOptions = RepositoryOptions & {
 export type AllRepositoryOptions = Omit<RepositoryOptions, "paginate" | "page">;
 
 /**
+ * Typed repository options — merges base options with a repo-specific filter
+ * shape `F` so callers get full autocomplete on filter keys.
+ *
+ * @template F - The filter shape defined by the repository (e.g. `{ id?: number; status?: string }`)
+ *
+ * @example
+ * // In a service:
+ * repo.list({ organization_id: 1, status: "active" }); // ← autocompleted & type-checked
+ */
+export type TypedRepositoryOptions<F = Record<string, any>> = RepositoryOptions & Partial<F>;
+
+/**
+ * Typed version of AllRepositoryOptions (no paginate/page) with filter shape.
+ * @template F - The filter shape defined by the repository
+ */
+export type TypedAllRepositoryOptions<F = Record<string, any>> = AllRepositoryOptions & Partial<F>;
+
+/**
+ * Typed version of RepositoryOptionsWithPages with filter shape.
+ * @template F - The filter shape defined by the repository
+ */
+export type TypedRepositoryOptionsWithPages<F = Record<string, any>> = RepositoryOptionsWithPages &
+  Partial<F>;
+
+/**
+ * Typed version of RepositoryOptionsWithCursor with filter shape.
+ * @template F - The filter shape defined by the repository
+ */
+export type TypedRepositoryOptionsWithCursor<F = Record<string, any>> =
+  RepositoryOptionsWithCursor & Partial<F>;
+
+/**
  * Repository event names
  */
 export type RepositoryEvent =
@@ -394,3 +427,33 @@ export type RepositoryEvent =
  * Save mode for repository operations
  */
 export type SaveMode = "create" | "update" | "patch";
+
+/**
+ * Repositroy configurations
+ */
+export type RepositoryConfigurations = {
+  /**
+   * Default cache driver
+   */
+  cacheDriver?: CacheDriver<any, any>;
+
+  /**
+   * Default adapter resolver
+   */
+  adapterResolver?: (repository: RepositoryManager<any>) => RepositoryAdapterContract<any>;
+
+  /**
+   * Default repository options
+   */
+  defaultOptions?: Partial<RepositoryOptions>;
+
+  /**
+   * Default active column name
+   */
+  isActiveColumn?: string;
+
+  /**
+   * Default active column value
+   */
+  isActiveValue?: any;
+};

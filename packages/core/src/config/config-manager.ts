@@ -1,4 +1,4 @@
-import { FileManager } from "../dev2-server/file-manager";
+import { FileManager } from "../dev-server/file-manager";
 import { ConfigLoader } from "./config-loader";
 
 export class ConfigManager {

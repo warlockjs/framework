@@ -78,14 +78,14 @@ export class CascadeAdapter<T extends Model<any>> implements RepositoryAdapterCo
    * {@inheritDoc RepositoryAdapterContract.serializeModel}
    */
   public serializeModel(model: T): any {
-    return model.serialize?.() || model.toJSON();
+    return model.toSnapshot();
   }
 
   /**
    * {@inheritDoc RepositoryAdapterContract.deserializeModel}
    */
   public deserializeModel(data: any): T {
-    return this.model.deserialize(data);
+    return this.model.fromSnapshot(data);
   }
 
   /**

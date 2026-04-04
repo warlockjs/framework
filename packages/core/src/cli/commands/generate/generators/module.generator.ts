@@ -57,6 +57,7 @@ export async function generateModule(data: CommandActionData): Promise<void> {
     "services",
     "models",
     "repositories",
+    "schema",
     "validation",
     "requests",
     "resources",
@@ -149,15 +150,15 @@ groupedTranslations("${name.camel}", {
     );
     console.log(colors.green(`✓ Created delete-${entity.kebab}.controller.ts`));
 
-    // Create validation schemas
+    // Create schema files
     await putFileAsync(
-      path.join(modulePath, "validation", `create-${entity.kebab}.schema.ts`),
+      path.join(modulePath, "schema", `create-${entity.kebab}.schema.ts`),
       crudCreateValidationStub(name),
     );
     console.log(colors.green(`✓ Created create-${entity.kebab}.schema.ts`));
 
     await putFileAsync(
-      path.join(modulePath, "validation", `update-${entity.kebab}.schema.ts`),
+      path.join(modulePath, "schema", `update-${entity.kebab}.schema.ts`),
       crudUpdateValidationStub(name),
     );
     console.log(colors.green(`✓ Created update-${entity.kebab}.schema.ts`));
@@ -254,7 +255,7 @@ groupedTranslations("${name.camel}", {
     console.log(colors.gray(`\n📦 CRUD scaffold created with:`));
     console.log(colors.gray(`  - List, Get, Create & Update controllers`));
     console.log(colors.gray(`  - Repository`));
-    console.log(colors.gray(`  - Validation schemas`));
+    console.log(colors.gray(`  - Validation schemas in schema/`));
     console.log(colors.gray(`  - Request types`));
     console.log(colors.gray(`  - Model with resource`));
     console.log(colors.gray(`  - Routes configured`));
@@ -262,7 +263,7 @@ groupedTranslations("${name.camel}", {
     console.log(
       colors.gray(`  1. Update model schema in models/${name.kebab}/${name.kebab}.model.ts`),
     );
-    console.log(colors.gray(`  2. Update validation rules in validation/*.schema.ts`));
+    console.log(colors.gray(`  2. Update schema rules in schema/*.schema.ts`));
     console.log(
       colors.gray(`  3. Create migration: warlock generate.model ${name.kebab}/${name.kebab}`),
     );

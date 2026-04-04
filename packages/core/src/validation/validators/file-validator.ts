@@ -29,7 +29,7 @@ export const uploadedFileMetadataSchema = v.object({
 export class FileValidator extends BaseValidator {
   public constructor(errorMessage?: string) {
     super();
-    this.addRule(fileRule, errorMessage);
+    this.addMutableRule(fileRule, errorMessage);
   }
 
   /**
@@ -41,22 +41,21 @@ export class FileValidator extends BaseValidator {
 
   /** Value must be an image */
   public image(errorMessage?: string) {
-    this.addRule(imageRule, errorMessage);
-    return this;
+    return this.addRule(imageRule, errorMessage);
   }
 
   /** Accept specific file extensions */
   public accept(extensions: string | string[], errorMessage?: string) {
-    const rule = this.addRule(fileExtensionRule, errorMessage);
-    rule.context.options.extensions = extensions;
-    return this;
+    return this.addRule(fileExtensionRule, errorMessage, {
+      extensions,
+    });
   }
 
   /** Allow specific MIME types */
   public mimeType(mimeTypes: string | string[], errorMessage?: string) {
-    const rule = this.addRule(fileTypeRule, errorMessage);
-    rule.context.options.mimeTypes = mimeTypes;
-    return this;
+    return this.addRule(fileTypeRule, errorMessage, {
+      mimeTypes,
+    });
   }
 
   /** Allow only pdf files */
@@ -88,9 +87,9 @@ export class FileValidator extends BaseValidator {
 
   /** Minimum file size */
   public minSize(size: number | FileSizeOption, errorMessage?: string) {
-    const rule = this.addRule(minFileSizeRule, errorMessage);
-    rule.context.options.minSize = resolveFileSize(size);
-    return this;
+    return this.addRule(minFileSizeRule, errorMessage, {
+      minSize: resolveFileSize(size),
+    });
   }
 
   /** @alias minSize */
@@ -100,9 +99,9 @@ export class FileValidator extends BaseValidator {
 
   /** Maximum file size */
   public maxSize(size: number | FileSizeOption, errorMessage?: string) {
-    const rule = this.addRule(maxFileSizeRule, errorMessage);
-    rule.context.options.maxSize = resolveFileSize(size);
-    return this;
+    return this.addRule(maxFileSizeRule, errorMessage, {
+      maxSize: resolveFileSize(size),
+    });
   }
 
   /** @alias maxSize */
@@ -112,30 +111,30 @@ export class FileValidator extends BaseValidator {
 
   /** Minimum image width */
   public minWidth(width: number, errorMessage?: string) {
-    const rule = this.addRule(minWidthRule, errorMessage);
-    rule.context.options.minWidth = width;
-    return this;
+    return this.addRule(minWidthRule, errorMessage, {
+      minWidth: width,
+    });
   }
 
   /** Maximum image width */
   public maxWidth(width: number, errorMessage?: string) {
-    const rule = this.addRule(maxWidthRule, errorMessage);
-    rule.context.options.maxWidth = width;
-    return this;
+    return this.addRule(maxWidthRule, errorMessage, {
+      maxWidth: width,
+    });
   }
 
   /** Minimum image height */
   public minHeight(height: number, errorMessage?: string) {
-    const rule = this.addRule(minHeightRule, errorMessage);
-    rule.context.options.minHeight = height;
-    return this;
+    return this.addRule(minHeightRule, errorMessage, {
+      minHeight: height,
+    });
   }
 
   /** Maximum image height */
   public maxHeight(height: number, errorMessage?: string) {
-    const rule = this.addRule(maxHeightRule, errorMessage);
-    rule.context.options.maxHeight = height;
-    return this;
+    return this.addRule(maxHeightRule, errorMessage, {
+      maxHeight: height,
+    });
   }
 
   /**

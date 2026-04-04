@@ -1,6 +1,6 @@
 import type { MigrationConstructor } from "@warlock.js/cascade";
 import type { CLICommand } from "../cli/cli-command";
-import type { FileHealthCheckerContract } from "../dev2-server/health-checker/file-health-checker.contract";
+import type { FileHealthCheckerContract } from "../dev-server/health-checker/file-health-checker.contract";
 
 /**
  * Resolved Warlock Configuration
@@ -78,7 +78,12 @@ export type WarlockConfig = {
     /**
      * Custom health checkers
      */
-    healthCheckers?: FileHealthCheckerContract[];
+    healthCheckers?: FileHealthCheckerContract[] | false;
+    /**
+     * Whether to generate typings on dev server start
+     * @default true
+     */
+    generateTypings?: boolean;
   };
 
   /**

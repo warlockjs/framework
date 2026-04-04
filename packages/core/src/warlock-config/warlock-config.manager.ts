@@ -1,9 +1,9 @@
 import { fileExistsAsync, getFileAsync, putFileAsync } from "@mongez/fs";
 import { get } from "@mongez/reinforcements";
 import { pathToFileURL } from "url";
-import { devLogWarn } from "../dev2-server/dev-logger";
+import { devLogWarn } from "../dev-server/dev-logger";
 import { rootPath, warlockPath } from "../utils";
-import { transpile } from "./../dev2-server/transpile-file";
+import { transpile } from "./../dev-server/transpile-file";
 import { WarlockConfig } from "./types";
 
 /**

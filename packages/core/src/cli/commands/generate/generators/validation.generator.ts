@@ -39,22 +39,22 @@ export async function generateValidation(data: CommandActionData): Promise<void>
   const force = data.options.force || data.options.f;
   const withRequest = data.options.withRequest || data.options.r;
 
-  // Check if validation already exists
-  if ((await componentExists(module, "validation", `${name.kebab}.schema`)) && !force) {
-    console.log(colors.red(`Error: Validation "${name.kebab}.schema.ts" already exists`));
+  // Check if schema already exists
+  if ((await componentExists(module, "schema", `${name.kebab}.schema`)) && !force) {
+    console.log(colors.red(`Error: Schema "${name.kebab}.schema.ts" already exists`));
     console.log(colors.yellow("Use --force to overwrite"));
     process.exit(1);
   }
 
-  // Ensure directories exist
-  await ensureComponentDirectory(module, "validation");
+  // Ensure schema directory exists
+  await ensureComponentDirectory(module, "schema");
 
-  // Generate validation
-  const validationPath = resolveComponentPath(module, "validation", `${name.kebab}.schema`);
-  const validationContent = validationStub(name);
+  // Generate schema
+  const schemaPath = resolveComponentPath(module, "schema", `${name.kebab}.schema`);
+  const schemaContent = validationStub(name);
 
-  await putFileAsync(validationPath, validationContent);
-  console.log(colors.green(`✓ Created validation: ${validationPath}`));
+  await putFileAsync(schemaPath, schemaContent);
+  console.log(colors.green(`✓ Created schema: ${schemaPath}`));
 
   // Generate request if requested
   if (withRequest) {
@@ -67,5 +67,5 @@ export async function generateValidation(data: CommandActionData): Promise<void>
     console.log(colors.green(`✓ Created request: ${requestPath}`));
   }
 
-  console.log(colors.cyan(`\n✨ Validation "${name.camel}Schema" generated successfully!`));
+  console.log(colors.cyan(`\n✨ Schema "${name.camel}Schema" generated successfully!`));
 }

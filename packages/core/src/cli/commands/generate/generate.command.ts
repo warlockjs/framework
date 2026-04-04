@@ -78,6 +78,7 @@ export const generateModuleCommand = command({
     {
       text: "--crud, -c",
       description: "Generate full CRUD scaffold (controllers, model, validation, routes)",
+      defaultValue: true,
     },
     {
       text: "--force, -f",

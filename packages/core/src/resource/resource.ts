@@ -10,6 +10,12 @@ import {
 } from "./types";
 
 /**
+ * Maximum recursion depth for self-referencing fields.
+ * Prevents runaway serialization on deep trees or circular data.
+ */
+const MAX_SELF_DEPTH = 10;
+
+/**
  * Resource contract
  */
 export interface ResourceContract {
@@ -22,6 +28,11 @@ export interface ResourceContract {
    * Resource final output
    */
   data: GenericObject;
+
+  /**
+   * Original data
+   */
+  originalData: GenericObject;
 
   /**
    * Convert resource to JSON
@@ -113,6 +124,12 @@ export class Resource implements ResourceContract {
   public data: GenericObject = {};
 
   /**
+   * Tracks visited object identities during self-reference recursion.
+   * Prevents infinite loops on circular data (e.g. A.parent → B, B.parent → A).
+   */
+  protected _selfSeen?: Set<unknown>;
+
+  /**
    * Raw resource schema — field declarations as written by the developer.
    * Used by doc generators for introspection.
    */
@@ -133,7 +150,10 @@ export class Resource implements ResourceContract {
     const parsed: Record<string, ResourceFieldConfig> = {};
 
     for (const [key, value] of Object.entries(schema)) {
-      if (typeof value === "string") {
+      if (value === "self" || value === "self[]") {
+        // Keep self-references as-is — resolved lazily in transformValue
+        parsed[key] = value;
+      } else if (typeof value === "string") {
         parsed[key] = ResourceFieldBuilder.fromCastType(value);
       } else if (Array.isArray(value) && value.length === 2 && typeof value[0] === "string") {
         const builder = ResourceFieldBuilder.fromCastType(value[1] as string);
@@ -150,7 +170,7 @@ export class Resource implements ResourceContract {
   /**
    * Constructor
    */
-  public constructor(protected originalData: GenericObject | Resource | Model) {
+  public constructor(public originalData: GenericObject | Resource | Model) {
     if (this.originalData instanceof Model) {
       this.resource = this.originalData.data;
     } else if (this.originalData instanceof Resource) {
@@ -212,7 +232,13 @@ export class Resource implements ResourceContract {
   protected transformValue(value: any, outputSettings: ResourceFieldConfig, locale?: string) {
     let outputValue: any;
 
-    if (typeof outputSettings === "function" && outputSettings.prototype instanceof Resource) {
+    if (outputSettings === "self" || outputSettings === "self[]") {
+      // Self-reference — resolve using the same resource class with cycle detection
+      outputValue = this.transformSelfReference(value, outputSettings === "self[]");
+    } else if (
+      typeof outputSettings === "function" &&
+      outputSettings.prototype instanceof Resource
+    ) {
       // Nested resource — handle both single and array values
       if (Array.isArray(value)) {
         outputValue = value
@@ -252,6 +278,47 @@ export class Resource implements ResourceContract {
    */
   protected extend() {
     //
+  }
+
+  /**
+   * Transform a self-referencing field value.
+   *
+   * @example
+   * // Single: parent: "self"
+   * // Array:  children: "self[]"
+   */
+  protected transformSelfReference(value: any, isArray: boolean): any {
+    if (isArray) {
+      return Array.isArray(value)
+        ? value.map((item) => this.resolveSelf(item)).filter((v) => v !== undefined)
+        : undefined;
+    }
+
+    return this.resolveSelf(value);
+  }
+
+  /**
+   * Resolve a single self-reference value.
+   * Uses identity-based cycle detection (id/_id) and a max depth guard.
+   */
+  protected resolveSelf(value: any): any {
+    if (!value) return undefined;
+
+    const identity = value.id ?? value._id ?? value;
+    const seen = this._selfSeen ?? new Set();
+
+    // Circular reference or depth limit reached — stop recursion
+    if (seen.has(identity) || seen.size >= MAX_SELF_DEPTH) {
+      return undefined;
+    }
+
+    seen.add(identity);
+
+    const SelfConstructor = this.constructor as typeof Resource;
+    const child = new SelfConstructor(value);
+    child._selfSeen = seen;
+
+    return child.toJSON();
   }
 
   /**

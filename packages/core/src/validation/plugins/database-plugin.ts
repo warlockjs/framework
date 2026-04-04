@@ -47,12 +47,10 @@ export const databasePlugin: SealPlugin = {
         },
       ) {
         const { errorMessage, ...options } = optionsList || {};
-        const rule = this.addRule(uniqueRule, errorMessage);
-        rule.context.options = {
-          ...options,
+        return this.addRule(uniqueRule, errorMessage, {
           Model: model,
-        };
-        return this;
+          ...options,
+        });
       },
 
       /** Value must be unique in database except current user */
@@ -64,12 +62,10 @@ export const databasePlugin: SealPlugin = {
         },
       ) {
         const { errorMessage, ...options } = optionsList || {};
-        const rule = this.addRule(uniqueExceptCurrentUserRule, errorMessage);
-        rule.context.options = {
-          ...options,
+        return this.addRule(uniqueExceptCurrentUserRule, errorMessage, {
           Model: model,
-        };
-        return this;
+          ...options,
+        });
       },
 
       /** Value must be unique in database except current id */
@@ -81,12 +77,10 @@ export const databasePlugin: SealPlugin = {
         },
       ) {
         const { errorMessage, ...options } = optionsList || {};
-        const rule = this.addRule(uniqueExceptCurrentIdRule, errorMessage);
-        rule.context.options = {
-          ...options,
+        return this.addRule(uniqueExceptCurrentIdRule, errorMessage, {
           Model: model,
-        };
-        return this;
+          ...options,
+        });
       },
 
       /** Value must exist in database */
@@ -98,12 +92,10 @@ export const databasePlugin: SealPlugin = {
         },
       ) {
         const { errorMessage, ...options } = optionsList || {};
-        const rule = this.addRule(existsRule, errorMessage);
-        rule.context.options = {
-          ...options,
+        return this.addRule(existsRule, errorMessage, {
           Model: model,
-        };
-        return this;
+          ...options,
+        });
       },
 
       /** Value must exist in database except current user */
@@ -115,12 +107,10 @@ export const databasePlugin: SealPlugin = {
         },
       ) {
         const { errorMessage, ...options } = optionsList || {};
-        const rule = this.addRule(existsExceptCurrentUserRule, errorMessage);
-        rule.context.options = {
-          ...options,
+        return this.addRule(existsExceptCurrentUserRule, errorMessage, {
           Model: model,
-        };
-        return this;
+          ...options,
+        });
       },
 
       /** Value must exists in database except current id */
@@ -132,12 +122,10 @@ export const databasePlugin: SealPlugin = {
         },
       ) {
         const { errorMessage, ...options } = optionsList || {};
-        const rule = this.addRule(existsExceptCurrentIdRule, errorMessage);
-        rule.context.options = {
-          ...options,
+        return this.addRule(existsExceptCurrentIdRule, errorMessage, {
           Model: model,
-        };
-        return this;
+          ...options,
+        });
       },
     });
 

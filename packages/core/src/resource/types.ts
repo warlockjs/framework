@@ -20,6 +20,13 @@ export type ResourceOutputValueCastType =
   | "storageUrl";
 
 /**
+ * Self-referencing type — resolves the field using the same resource class.
+ * - `"self"` for a single nested self-reference
+ * - `"self[]"` for an array of self-references
+ */
+export type ResourceSelfReference = "self" | "self[]";
+
+/**
  * Cast type with modifier suffixes for use in resource schemas.
  * - `[]` suffix declares the field as an array (e.g. "string[]")
  * - `?` suffix declares the field as nullable — always present in output, value or null (e.g. "number?")
@@ -39,6 +46,7 @@ export type ResourceArraySchema = {
 export type ResourceFieldConfig =
   | ResourceCastType
   | ResourceConstructor
+  | ResourceSelfReference
   | [string, ResourceCastType]
   | ResourceFieldBuilder
   | ResourceArraySchema
@@ -72,11 +80,16 @@ export type ResourceFieldBuilderDateOutputOptions =
        * Return date in current locale
        */
       locale?: boolean;
+      /**
+       * Return date in iso format
+       */
+      iso?: boolean;
     }
   | "format"
   | "timestamp"
   | "humanTime"
-  | "locale";
+  | "locale"
+  | "iso";
 
 /**
  * Allowed value types in a response schema body.

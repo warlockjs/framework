@@ -264,6 +264,67 @@ export type ListOptions = {
 };
 
 /**
+ * Options for putDirectory operations
+ */
+export type PutDirectoryOptions = {
+  /**
+   * Max concurrent uploads
+   * @default 5
+   */
+  concurrency?: number;
+
+  /**
+   * Filter function — return true to include the file, false to skip
+   *
+   * @param absolutePath - Absolute local filesystem path of the file
+   * @param relativePath - Relative path from the source directory root
+   *
+   * @example
+   * // Skip hidden files and node_modules
+   * filter: (_, rel) => !rel.includes("node_modules") && !rel.startsWith(".")
+   */
+  filter?: (absolutePath: string, relativePath: string) => boolean;
+
+  /**
+   * Progress callback — called after each successful upload
+   *
+   * @param uploaded - Number of files uploaded so far
+   * @param total - Total number of files to upload
+   * @param file - The StorageFile that was just uploaded
+   */
+  onProgress?: (
+    uploaded: number,
+    total: number,
+    file: import("./storage-file").StorageFile,
+  ) => void;
+
+  /**
+   * Options forwarded to each individual put() call
+   */
+  putOptions?: PutOptions;
+};
+
+/**
+ * Result of a putDirectory operation
+ */
+export type PutDirectoryResult = {
+  /**
+   * Successfully uploaded files
+   */
+  uploaded: import("./storage-file").StorageFile[];
+
+  /**
+   * Files that failed to upload
+   */
+  failed: Array<{ localPath: string; error: Error }>;
+
+  /**
+   * Total files attempted
+   */
+  total: number;
+};
+
+/**
  * Options for presigned URLs
  */
 export type PresignedOptions = {

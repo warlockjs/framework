@@ -55,6 +55,7 @@ export class ResourceFieldBuilder {
     locale: false,
     offset: false,
     humanTime: true,
+    iso: true,
   };
 
   /**
@@ -203,10 +204,12 @@ export class ResourceFieldBuilder {
         const float = parseFloat(value);
         return isNaN(float) ? (this.isNullable ? null : undefined) : float;
       }
+
       case "int": {
         const int = parseInt(value);
         return isNaN(int) ? (this.isNullable ? null : undefined) : int;
       }
+
       case "date":
         return this.transformDate(value as string | Date, locale);
       case "localized":
@@ -218,9 +221,13 @@ export class ResourceFieldBuilder {
       case "storageUrl":
         return storage.url(value as string);
       case "object":
-        return isObject(value) && !Array.isArray(value) ? value : (this.isNullable ? null : undefined);
+        return isObject(value) && !Array.isArray(value) && Object.keys(value).length > 0
+          ? value
+          : this.isNullable
+            ? null
+            : undefined;
       case "array":
-        return Array.isArray(value) ? value : (this.isNullable ? null : undefined);
+        return Array.isArray(value) ? value : this.isNullable ? null : undefined;
     }
   }
 
@@ -231,6 +238,10 @@ export class ResourceFieldBuilder {
     if (typeof this.dateOptionsInput === "string") {
       if (this.dateOptionsInput === "format") {
         return dayjs(value).format(this.dateFormat);
+      }
+
+      if (this.dateOptionsInput === "iso") {
+        return dayjs(value).toISOString();
       }
 
       if (this.dateOptionsInput === "timestamp") {
@@ -256,12 +267,17 @@ export class ResourceFieldBuilder {
       timestamp?: number;
       humanTime?: string;
       locale?: string;
+      iso?: string;
     } = {};
 
-    let dayjsObject = dayjs(value);
+    let dayjsObject = dayjs((value as any)?.iso || value);
 
     if (locale) {
       dayjsObject = dayjsObject.locale(locale);
+    }
+
+    if (this.dateOptionsInput.iso) {
+      output.iso = dayjsObject.toISOString();
     }
 
     if (this.dateOptionsInput.format) {
@@ -278,6 +294,10 @@ export class ResourceFieldBuilder {
 
     if (this.dateOptionsInput.locale) {
       output.locale = dayjsObject.format(this.dateFormat);
+    }
+
+    if (this.dateOptionsInput.iso) {
+      output.iso = dayjsObject.toISOString();
     }
 
     return output;

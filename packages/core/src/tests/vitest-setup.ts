@@ -10,8 +10,8 @@ import { Application } from "../application/application";
 import { bootstrap } from "../bootstrap";
 import { config } from "../config";
 import { loadConfigFiles } from "../config/load-config-files";
-import { ConnectorName, connectorsManager } from "../dev2-server/connectors";
-import { filesOrchestrator } from "../dev2-server/files-orchestrator";
+import { ConnectorName, connectorsManager } from "../connectors";
+import { filesOrchestrator } from "../dev-server/files-orchestrator";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 
 // Global flag to prevent duplicate setup within the same worker

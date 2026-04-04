@@ -1,6 +1,6 @@
-import { filesOrchestrator } from "../dev2-server/files-orchestrator";
-import { Path } from "../dev2-server/path";
-import { getFilesFromDirectory } from "../dev2-server/utils";
+import { filesOrchestrator } from "../dev-server/files-orchestrator";
+import { Path } from "../dev-server/path";
+import { getFilesFromDirectory } from "../dev-server/utils";
 import { srcPath } from "../utils";
 import { CLICommand } from "./cli-command";
 import { isMatchingCommandName } from "./cli-commands.utils";

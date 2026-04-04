@@ -65,6 +65,7 @@ export function createRequestStore(
 
       return output as ReturnedResponse;
     } catch (error: any) {
+      request.log(`${error.constructor.name}: Request failed: ${error.message}`, "error");
       return handleRequestError(error, response);
     }
   });
@@ -143,7 +144,10 @@ function handleRequestError(error: any, response: Response): ReturnedResponse {
  * Translate a keyword (uses request context for locale)
  */
 export function t(keyword: string, placeholders?: any) {
-  return requestContextInstance.getRequest()?.trans(keyword, placeholders) || trans(keyword);
+  return (
+    requestContextInstance.getRequest()?.trans(keyword, placeholders) ||
+    trans(keyword, placeholders)
+  );
 }
 
 /**

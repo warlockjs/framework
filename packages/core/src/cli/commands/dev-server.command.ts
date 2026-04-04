@@ -1,4 +1,4 @@
-import { startDevelopmentServer } from "../../dev2-server/start-development-server";
+import { startDevelopmentServer } from "../../dev-server/start-development-server";
 import { command } from "../cli-command";
 import { displayStartupBanner } from "../cli-commands.utils";
 

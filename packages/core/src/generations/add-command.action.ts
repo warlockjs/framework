@@ -6,41 +6,77 @@ import { rootPath, srcPath } from "../utils";
 import { communicatorsConfigStub } from "./stubs";
 
 async function completeTestInstallation(options: CommandActionData) {
-  // first check if `src/test-setup.ts` exists
-  const testSetupFilPath = srcPath("test-setup.ts");
-  const testSetupExists = await fileExistsAsync(testSetupFilPath);
-  // if not exists, then create it
-  if (!testSetupExists) {
-    await putFileAsync(
-      testSetupFilPath,
-      `import { setupTestVest } from "@warlock.js/core";
+  // Create test-global-setup.ts (runs once before all tests)
+  const testGlobalSetupPath = srcPath("test-global-setup.ts");
+  const testGlobalSetupExists = await fileExistsAsync(testGlobalSetupPath);
 
-await setupTestVest();
+  if (!testGlobalSetupExists) {
+    await putFileAsync(
+      testGlobalSetupPath,
+      `/**
+ * Global Test Setup
+ *
+ * Runs ONCE before all test workers.
+ * Starts the HTTP server for integration tests.
+ */
+import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core";
+
+export async function setup() {
+  await startHttpTestServer();
+}
+
+export async function teardown() {
+  await stopHttpTestServer();
+}
 `,
     );
+    console.log(`${colors.green("✓")} Created src/test-global-setup.ts`);
+  }
 
-    // now check if vite.config.ts exists
-    const viteConfigFilePath = rootPath("vite.config.ts");
-    const viteConfigExists = await fileExistsAsync(viteConfigFilePath);
-    // if not exists, then create it
-    if (!viteConfigExists) {
-      await putFileAsync(
-        viteConfigFilePath,
-        `import mongezVite from "@mongez/vite";
+  // Create test-setup.ts (runs per worker thread)
+  const testSetupPath = srcPath("test-setup.ts");
+  const testSetupExists = await fileExistsAsync(testSetupPath);
+
+  if (!testSetupExists) {
+    await putFileAsync(
+      testSetupPath,
+      `/**
+ * Per-Worker Test Setup
+ *
+ * Runs in EACH Vitest worker thread before tests execute.
+ * Sets up per-worker database and cache connections.
+ */
+import { setupTest } from "@warlock.js/core";
+
+await setupTest({ connectors: true });
+`,
+    );
+    console.log(`${colors.green("✓")} Created src/test-setup.ts`);
+  }
+
+  // Create vite.config.ts
+  const viteConfigPath = rootPath("vite.config.ts");
+  const viteConfigExists = await fileExistsAsync(viteConfigPath);
+
+  if (!viteConfigExists) {
+    await putFileAsync(
+      viteConfigPath,
+      `import mongezVite from "@mongez/vite";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [mongezVite()],
   test: {
-    setupFiles: ["./src/test-setup.ts"],
+    globalSetup: "./src/test-global-setup.ts", // HTTP server - runs once
+    setupFiles: ["./src/test-setup.ts"],       // DB/cache - runs per worker
     environment: "node",
     globals: false,
-    include: ["src/app/*/**/*.test.ts", "src/app/*/**/*.test.ts"],
+    include: ["src/app/**/*.test.ts"],
   },
 });
 `,
-      );
-    }
+    );
+    console.log(`${colors.green("✓")} Created vite.config.ts`);
   }
 }
 

@@ -149,6 +149,15 @@ export class FilterApplicator {
 
       // Scope filter - applies local scope when value is truthy
       scope: this.handleScope,
+
+      // With filter - eager-loads a relation when value is truthy
+      with: this.handleWith,
+
+      // JoinWith filter - eager-loads a relation via SQL JOIN when value is truthy
+      joinWith: this.handleJoinWith,
+
+      // Vector similarity search — calls nearestTo(column, embedding[])
+      nearestTo: this.handleNearestTo,
     };
 
     return handlers[type];
@@ -415,6 +424,124 @@ export class FilterApplicator {
     if (column) {
       query.scope(column, value);
     }
+  }
+
+  // ============================================================================
+  // WITH (EAGER LOAD) FILTER
+  // ============================================================================
+
+  /**
+   * Handle with filter - eager-loads a relation when the filter value is truthy.
+   *
+   * Usage in filterBy:
+   * ```typescript
+   * filterBy: {
+   *   with_ai_model: ["with", "ai_model"],         // load single relation
+   *   with_all:      ["with", ["ai_model", "unit"]] // load multiple relations
+   * }
+   * ```
+   *
+   * When list({ with_ai_model: true }) is called, it will call query.with("ai_model")
+   */
+  private handleWith(
+    query: QueryBuilderContract,
+    column?: string,
+    columns?: string[],
+    value?: any,
+  ) {
+    if (!value) return;
+
+    // Load a single named relation
+    if (column) {
+      if (query.with) {
+        query.with(column);
+      }
+      return;
+    }
+
+    // Load multiple relations from the columns array
+    if (columns) {
+      for (const relation of columns) {
+        if (query.with) {
+          query.with(relation);
+        }
+      }
+    }
+  }
+
+  /**
+   * Handle joinWith filter - eager-loads a relation via SQL JOIN when the filter value is truthy.
+   *
+   * Usage in filterBy:
+   * ```typescript
+   * filterBy: {
+   *   with_ai_model: ["joinWith", "ai_model"],         // load single relation via join
+   *   with_all:      ["joinWith", ["ai_model", "unit"]] // load multiple relations via join
+   * }
+   * ```
+   *
+   * When list({ with_ai_model: true }) is called, it will call query.joinWith("ai_model")
+   */
+  private handleJoinWith(
+    query: QueryBuilderContract,
+    column?: string,
+    columns?: string[],
+    value?: any,
+  ) {
+    if (!value) return;
+
+    if (!query.joinWith) {
+      console.warn(
+        "[Repository] joinWith is not supported by the query builder. using with instead.",
+      );
+      return this.handleWith(query, column, columns, value);
+    }
+
+    // Load a single named relation
+    if (column) {
+      query.joinWith(column);
+      return;
+    }
+
+    // Load multiple relations from the columns array
+    if (columns) {
+      query.joinWith(...columns);
+    }
+  }
+
+  // ============================================================================
+  // VECTOR FILTER
+  // ============================================================================
+
+  /**
+   * Handle nearestTo filter — performs nearest-neighbour vector similarity search.
+   *
+   * The filter value must be a `number[]` (pre-computed embedding).
+   * Delegates to `query.nearestTo(column, embedding)` which is handled
+   * driver-specifically (pgvector or MongoDB Atlas $vectorSearch).
+   *
+   * Usage in filterBy:
+   * ```typescript
+   * filterBy: {
+   *   organization_id: "=",
+   *   embedding: "nearestTo",
+   * }
+   * ```
+   *
+   * Then in the service:
+   * ```typescript
+   * await vectorsRepository.list({ embedding: queryEmbedding, organization_id: orgId });
+   * ```
+   */
+  private handleNearestTo(
+    query: QueryBuilderContract,
+    column?: string,
+    _columns?: string[],
+    value?: any,
+  ) {
+    if (!column || !Array.isArray(value)) return;
+
+    query.nearestTo(column, value);
   }
 
   // ============================================================================

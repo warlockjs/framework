@@ -6,15 +6,22 @@ export const seedCommand = command({
   name: "seed",
   description: "Run database seeds",
   preload: {
-    config: ["database", "log"],
+    config: true,
     env: true,
-    connectors: ["database"],
+    bootstrap: true,
+    connectors: ["database", "cache"],
   },
   options: [
     {
       text: "--fresh, -f",
       description: "Drop all tables records and run seeds",
       type: "boolean",
+    },
+    {
+      text: "--transaction, -t",
+      description: "Run seeds in a transaction",
+      type: "boolean",
+      defaultValue: true,
     },
   ],
 });

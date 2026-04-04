@@ -1,4 +1,4 @@
-import { cache, type CacheDriver } from "@warlock.js/cache";
+import { cache, CacheKey, type CacheDriver } from "@warlock.js/cache";
 import { config } from "../config";
 import { CascadeAdapter } from "./adapters/cascade";
 import type {
@@ -10,9 +10,11 @@ import type {
   QueryBuilderContract,
   RepositoryAdapterContract,
   RepositoryOptions,
-  RepositoryOptionsWithCursor,
-  RepositoryOptionsWithPages,
   SaveMode,
+  TypedAllRepositoryOptions,
+  TypedRepositoryOptions,
+  TypedRepositoryOptionsWithCursor,
+  TypedRepositoryOptionsWithPages,
 } from "./contracts";
 
 /**
@@ -33,7 +35,7 @@ import type {
  * // Direct instantiation with adapter
  * const userRepo = new RepositoryManager<User>(new PrismaAdapter(prisma.user));
  */
-export class RepositoryManager<T = unknown> {
+export class RepositoryManager<T = unknown, F = Record<string, any>> {
   /**
    * Adapter instance (lazy-loaded)
    * @private
@@ -46,6 +48,17 @@ export class RepositoryManager<T = unknown> {
    * @protected
    */
   protected source?: any;
+
+  // ============================================================================
+  // CONFIGURATION PROPERTIES
+  // ============================================================================
+
+  /**
+   * Filter definitions
+   * Maps filter keys to filter rules
+   * @protected
+   */
+  protected filterBy: FilterRules = {};
 
   /**
    * Get adapter instance (lazy-loaded)
@@ -74,17 +87,6 @@ export class RepositoryManager<T = unknown> {
     // Adapter is guaranteed to be set at this point
     return this._adapter!;
   }
-
-  // ============================================================================
-  // CONFIGURATION PROPERTIES
-  // ============================================================================
-
-  /**
-   * Filter definitions
-   * Maps filter keys to filter rules
-   * @protected
-   */
-  protected filterBy: FilterRules = {};
 
   /**
    * Default repository options
@@ -160,7 +162,12 @@ export class RepositoryManager<T = unknown> {
    * Register events
    */
   public registerEvents() {
-    this.eventsCallbacks.push(...this.adapter.registerEvents(this.clearCache.bind(this)));
+    this.eventsCallbacks.push(
+      ...this.adapter.registerEvents((source: any) => {
+        // this.clearCache({ id: source.id });
+        this.clearCache();
+      }),
+    );
   }
 
   /**
@@ -327,7 +334,7 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to first record or null
    * @public
    */
-  public async first(options?: RepositoryOptions): Promise<T | null> {
+  public async first(options?: TypedRepositoryOptions<F>): Promise<T | null> {
     const query = this.newQuery();
     const opts = this.prepareOptions(options);
 
@@ -337,13 +344,85 @@ export class RepositoryManager<T = unknown> {
   }
 
   /**
+   * Get id by the given filter
+   */
+  public async firstId(options?: TypedRepositoryOptions<F>): Promise<string | number | undefined> {
+    const record = await this.first(options);
+    return (record as any)?.id;
+  }
+
+  /**
+   * Get first active id
+   */
+  public async firstActiveId(
+    options?: TypedRepositoryOptions<F>,
+  ): Promise<string | number | undefined> {
+    const record = await this.firstActive(options);
+    return (record as any)?.id;
+  }
+
+  /**
+   * Get first cached id
+   */
+  public async firstCachedId(
+    options?: TypedRepositoryOptions<F>,
+  ): Promise<string | number | undefined> {
+    const record = await this.firstCached(options);
+    return (record as any)?.id;
+  }
+
+  /**
+   * Get first active cached id
+   */
+  public async firstActiveCachedId(
+    options?: TypedRepositoryOptions<F>,
+  ): Promise<string | number | undefined> {
+    const record = await this.firstActiveCached(options);
+    return (record as any)?.id;
+  }
+
+  /**
+   * Get first uuid
+   */
+  public async firstUuid(options?: TypedRepositoryOptions<F>): Promise<string | undefined> {
+    const record = await this.first(options);
+    return (record as any)?.uuid;
+  }
+
+  /**
+   * Get first active uuid
+   */
+  public async firstActiveUuid(options?: TypedRepositoryOptions<F>): Promise<string | undefined> {
+    const record = await this.firstActive(options);
+    return (record as any)?.uuid;
+  }
+
+  /**
+   * Get first cached uuid
+   */
+  public async firstCachedUuid(options?: TypedRepositoryOptions<F>): Promise<string | undefined> {
+    const record = await this.firstCached(options);
+    return (record as any)?.uuid;
+  }
+
+  /**
+   * Get first active cached uuid
+   */
+  public async firstActiveCachedUuid(
+    options?: TypedRepositoryOptions<F>,
+  ): Promise<string | undefined> {
+    const record = await this.firstActiveCached(options);
+    return (record as any)?.uuid;
+  }
+
+  /**
    * Get first cached record
    */
-  public async firstCached(options?: RepositoryOptions): Promise<T | null> {
+  public async firstCached(options?: TypedRepositoryOptions<F>): Promise<T | null> {
     const results = await this.allCached({
       ...options,
       limit: 1,
-    });
+    } as TypedAllRepositoryOptions<F>);
 
     return results[0] || null;
   }
@@ -354,11 +433,11 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to first active record or null
    * @public
    */
-  public async firstActive(options?: RepositoryOptions): Promise<T | null> {
+  public async firstActive(options?: TypedRepositoryOptions<F>): Promise<T | null> {
     return this.first({
       ...this.getIsActiveFilter(),
       ...options,
-    });
+    } as TypedRepositoryOptions<F>);
   }
 
   /**
@@ -367,11 +446,11 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to first active cached record or null
    * @public
    */
-  public async firstActiveCached(options?: RepositoryOptions): Promise<T | null> {
+  public async firstActiveCached(options?: TypedRepositoryOptions<F>): Promise<T | null> {
     return this.firstCached({
       ...this.getIsActiveFilter(),
       ...options,
-    });
+    } as TypedRepositoryOptions<F>);
   }
 
   /**
@@ -380,26 +459,26 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to last record or null
    * @public
    */
-  public async last(options?: RepositoryOptions): Promise<T | null> {
+  public async last(options?: TypedRepositoryOptions<F>): Promise<T | null> {
     return this.first({
       orderBy: {
         id: "desc",
       },
       ...options,
-    });
+    } as TypedRepositoryOptions<F>);
   }
 
   /**
    * Get last cached record
    */
-  public async lastCached(options?: RepositoryOptions): Promise<T | null> {
-    const results = await this.allCached({
-      ...options,
-      limit: 1,
-      orderBy: {
-        id: "desc",
-      },
-    });
+  public async lastCached(options?: TypedRepositoryOptions<F>): Promise<T | null> {
+    const results = await this.allCached(
+      this.asTypedAll({
+        ...options,
+        limit: 1,
+        orderBy: { id: "desc" },
+      }),
+    );
 
     return results[0] || null;
   }
@@ -410,11 +489,11 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to last active record or null
    * @public
    */
-  public async lastActive(options?: RepositoryOptions): Promise<T | null> {
+  public async lastActive(options?: TypedRepositoryOptions<F>): Promise<T | null> {
     return this.last({
       ...this.getIsActiveFilter(),
       ...options,
-    });
+    } as TypedRepositoryOptions<F>);
   }
 
   /**
@@ -423,11 +502,11 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to last active cached record or null
    * @public
    */
-  public async lastActiveCached(options?: RepositoryOptions): Promise<T | null> {
+  public async lastActiveCached(options?: TypedRepositoryOptions<F>): Promise<T | null> {
     return this.lastCached({
       ...this.getIsActiveFilter(),
       ...options,
-    });
+    } as TypedRepositoryOptions<F>);
   }
 
   // ============================================================================
@@ -456,10 +535,12 @@ export class RepositoryManager<T = unknown> {
    *
    * @public
    */
-  public async list(options?: RepositoryOptionsWithPages): Promise<PaginationResult<T>>;
-  public async list(options: RepositoryOptionsWithCursor): Promise<CursorPaginationResult<T>>;
+  public async list(options?: TypedRepositoryOptionsWithPages<F>): Promise<PaginationResult<T>>;
   public async list(
-    options?: RepositoryOptions,
+    options: TypedRepositoryOptionsWithCursor<F>,
+  ): Promise<CursorPaginationResult<T>>;
+  public async list(
+    options?: TypedRepositoryOptions<F>,
   ): Promise<PaginationResult<T> | CursorPaginationResult<T>> {
     return this._listImpl(options);
   }
@@ -474,16 +555,15 @@ export class RepositoryManager<T = unknown> {
     options?: RepositoryOptions,
   ): Promise<PaginationResult<T> | CursorPaginationResult<T>> {
     const query = this.newQuery();
-
-    const opts = this.prepareOptions(options);
-
-    // Apply options (filters, select, orderBy, etc.)
-    this.applyOptionsToQuery(query, opts);
-
+    const opts = this.prepareOptions(options as TypedRepositoryOptions<F>);
     const paginationMode = opts.paginationMode || "pages";
 
+    // applyOptionsToQuery handles cursor phase 1 (WHERE + ORDER BY) internally
+    // when paginationMode === "cursor", ensuring the cursor column is always
+    // the primary sort key before any other options are applied.
+    this.applyOptionsToQuery(query, opts);
+
     if (paginationMode === "cursor") {
-      // Cursor pagination
       return query.cursorPaginate({
         limit: opts.limit || opts.defaultLimit || 15,
         cursor: opts.cursor,
@@ -505,7 +585,7 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to array of records
    * @public
    */
-  public async all(options?: AllRepositoryOptions): Promise<T[]> {
+  public async all(options?: TypedAllRepositoryOptions<F>): Promise<T[]> {
     const query = this.newQuery();
 
     // Apply options
@@ -523,10 +603,14 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to pagination result
    * @public
    */
-  public async listActive(options?: RepositoryOptionsWithPages): Promise<PaginationResult<T>>;
-  public async listActive(options: RepositoryOptionsWithCursor): Promise<CursorPaginationResult<T>>;
   public async listActive(
-    options?: RepositoryOptions,
+    options?: TypedRepositoryOptionsWithPages<F>,
+  ): Promise<PaginationResult<T>>;
+  public async listActive(
+    options: TypedRepositoryOptionsWithCursor<F>,
+  ): Promise<CursorPaginationResult<T>>;
+  public async listActive(
+    options?: TypedRepositoryOptions<F>,
   ): Promise<PaginationResult<T> | CursorPaginationResult<T>> {
     return this._listImpl({
       ...this.getIsActiveFilter(),
@@ -540,11 +624,8 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to array of active records
    * @public
    */
-  public async allActive(options?: AllRepositoryOptions): Promise<T[]> {
-    return this.all({
-      ...this.getIsActiveFilter(),
-      ...options,
-    });
+  public async allActive(options?: TypedAllRepositoryOptions<F>): Promise<T[]> {
+    return this.all(this.asTypedAll({ ...this.getIsActiveFilter(), ...options }));
   }
 
   // ============================================================================
@@ -557,7 +638,7 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to true if exists
    * @public
    */
-  public async exists(filter?: RepositoryOptions): Promise<boolean> {
+  public async exists(filter?: TypedRepositoryOptions<F>): Promise<boolean> {
     return !!(await this.first(filter));
   }
 
@@ -567,7 +648,7 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to true if active record exists
    * @public
    */
-  public async existsActive(filter?: RepositoryOptions): Promise<boolean> {
+  public async existsActive(filter?: TypedRepositoryOptions<F>): Promise<boolean> {
     return !!(await this.firstActive(filter));
   }
 
@@ -592,10 +673,25 @@ export class RepositoryManager<T = unknown> {
   }
 
   /**
-   * Prepare options
+   * Prepare options — merges defaultOptions with caller options.
+   * Returning as TypedRepositoryOptions<F> ensures internal composition
+   * (spread + forward) satisfies the typed public API without per-call casts.
    */
-  protected prepareOptions(options?: RepositoryOptions): RepositoryOptions {
-    return { ...(this.defaultOptions || {}), ...(options || {}) };
+  protected prepareOptions(options?: TypedRepositoryOptions<F>): TypedRepositoryOptions<F> {
+    return { ...(this.defaultOptions || {}), ...(options || {}) } as TypedRepositoryOptions<F>;
+  }
+
+  /**
+   * Cast a plain `RepositoryOptions` spread to the typed variant.
+   * Used internally when composing options across method calls where the
+   * spread breaks the F-generic inference chain.
+   */
+  protected asTyped(opts: RepositoryOptions): TypedRepositoryOptions<F> {
+    return opts as TypedRepositoryOptions<F>;
+  }
+
+  protected asTypedAll(opts: AllRepositoryOptions): TypedAllRepositoryOptions<F> {
+    return opts as TypedAllRepositoryOptions<F>;
   }
 
   // ============================================================================
@@ -612,6 +708,38 @@ export class RepositoryManager<T = unknown> {
     query: QueryBuilderContract<T>,
     options: RepositoryOptions,
   ): RepositoryOptions {
+    // ── Cursor phase 1: WHERE + ORDER BY ──────────────────────────────────────
+    // Must run first so the cursor column is always the PRIMARY sort key.
+    // Any orderBy appended below becomes a harmless secondary sort key.
+    if (options.paginationMode === "cursor") {
+      const cursorColumn = options.cursorColumn ?? "id";
+      const direction = options.direction ?? "next";
+
+      if (options.cursor) {
+        query.where(cursorColumn, direction === "next" ? ">" : "<", options.cursor);
+      }
+
+      query.orderBy(cursorColumn, direction === "next" ? "asc" : "desc");
+
+      // Warn and strip orderBy that targets the same column as the cursor —
+      // it would produce a duplicate / conflicting sort clause.
+      if (options.orderBy) {
+        const conflictingKeys = Array.isArray(options.orderBy)
+          ? [options.orderBy[0]]
+          : typeof options.orderBy === "object"
+            ? Object.keys(options.orderBy)
+            : [];
+
+        if (conflictingKeys.includes(cursorColumn)) {
+          console.warn(
+            `[Repository] orderBy on "${cursorColumn}" conflicts with cursorColumn and will be ignored. ` +
+              `Cursor pagination owns the sort order for its cursor column.`,
+          );
+          options = { ...options, orderBy: undefined };
+        }
+      }
+    }
+
     // Apply filters
     if (this.filterBy && Object.keys(this.filterBy).length > 0) {
       query.applyFilters(this.filterBy, options, {
@@ -733,7 +861,7 @@ export class RepositoryManager<T = unknown> {
   public async chunk(
     size: number,
     callback: ChunkCallback<T>,
-    options?: RepositoryOptions,
+    options?: TypedRepositoryOptions<F>,
   ): Promise<void> {
     const query = this.newQuery();
     const opts = this.prepareOptions(options);
@@ -754,12 +882,9 @@ export class RepositoryManager<T = unknown> {
   public async chunkActive(
     size: number,
     callback: ChunkCallback<T>,
-    options?: RepositoryOptions,
+    options?: TypedRepositoryOptions<F>,
   ): Promise<void> {
-    return this.chunk(size, callback, {
-      ...this.getIsActiveFilter(),
-      ...options,
-    });
+    return this.chunk(size, callback, this.asTyped({ ...this.getIsActiveFilter(), ...options }));
   }
 
   // ============================================================================
@@ -774,10 +899,12 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to pagination result
    * @public
    */
-  public async latest(options?: RepositoryOptionsWithPages): Promise<PaginationResult<T>>;
-  public async latest(options: RepositoryOptionsWithCursor): Promise<CursorPaginationResult<T>>;
+  public async latest(options?: TypedRepositoryOptionsWithPages<F>): Promise<PaginationResult<T>>;
   public async latest(
-    options?: RepositoryOptions,
+    options: TypedRepositoryOptionsWithCursor<F>,
+  ): Promise<CursorPaginationResult<T>>;
+  public async latest(
+    options?: TypedRepositoryOptions<F>,
   ): Promise<PaginationResult<T> | CursorPaginationResult<T>> {
     return this._listImpl({
       orderBy: ["id", "desc"],
@@ -793,10 +920,12 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to pagination result
    * @public
    */
-  public async oldest(options?: RepositoryOptionsWithPages): Promise<PaginationResult<T>>;
-  public async oldest(options: RepositoryOptionsWithCursor): Promise<CursorPaginationResult<T>>;
+  public async oldest(options?: TypedRepositoryOptionsWithPages<F>): Promise<PaginationResult<T>>;
   public async oldest(
-    options?: RepositoryOptions,
+    options: TypedRepositoryOptionsWithCursor<F>,
+  ): Promise<CursorPaginationResult<T>>;
+  public async oldest(
+    options?: TypedRepositoryOptions<F>,
   ): Promise<PaginationResult<T> | CursorPaginationResult<T>> {
     return this._listImpl({
       orderBy: ["id", "asc"],
@@ -812,12 +941,14 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to pagination result
    * @public
    */
-  public async latestActive(options?: RepositoryOptionsWithPages): Promise<PaginationResult<T>>;
   public async latestActive(
-    options: RepositoryOptionsWithCursor,
+    options?: TypedRepositoryOptionsWithPages<F>,
+  ): Promise<PaginationResult<T>>;
+  public async latestActive(
+    options: TypedRepositoryOptionsWithCursor<F>,
   ): Promise<CursorPaginationResult<T>>;
   public async latestActive(
-    options?: RepositoryOptions,
+    options?: TypedRepositoryOptions<F>,
   ): Promise<PaginationResult<T> | CursorPaginationResult<T>> {
     return this._listImpl({
       orderBy: ["id", "desc"],
@@ -834,12 +965,14 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to pagination result
    * @public
    */
-  public async oldestActive(options?: RepositoryOptionsWithPages): Promise<PaginationResult<T>>;
   public async oldestActive(
-    options: RepositoryOptionsWithCursor,
+    options?: TypedRepositoryOptionsWithPages<F>,
+  ): Promise<PaginationResult<T>>;
+  public async oldestActive(
+    options: TypedRepositoryOptionsWithCursor<F>,
   ): Promise<CursorPaginationResult<T>>;
   public async oldestActive(
-    options?: RepositoryOptions,
+    options?: TypedRepositoryOptions<F>,
   ): Promise<PaginationResult<T> | CursorPaginationResult<T>> {
     return this._listImpl({
       orderBy: ["id", "asc"],
@@ -959,7 +1092,7 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to count
    * @public
    */
-  public async count(options?: RepositoryOptions): Promise<number> {
+  public async count(options?: TypedRepositoryOptions<F>): Promise<number> {
     const query = this.newQuery();
     const opts = this.prepareOptions(options);
 
@@ -974,11 +1107,8 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to count of active records
    * @public
    */
-  public async countActive(options?: RepositoryOptions): Promise<number> {
-    return await this.count({
-      ...this.getIsActiveFilter(),
-      ...options,
-    });
+  public async countActive(options?: TypedRepositoryOptions<F>): Promise<number> {
+    return await this.count(this.asTyped({ ...this.getIsActiveFilter(), ...options }));
   }
 
   /**
@@ -987,7 +1117,7 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to cached count
    * @public
    */
-  public async countCached(options?: RepositoryOptions): Promise<number> {
+  public async countCached(options?: TypedRepositoryOptions<F>): Promise<number> {
     if (!this.isCacheable || !this.cacheDriver) {
       return await this.count(options);
     }
@@ -1010,11 +1140,8 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to cached count of active records
    * @public
    */
-  public async countActiveCached(options?: RepositoryOptions): Promise<number> {
-    return await this.countCached({
-      ...this.getIsActiveFilter(),
-      ...options,
-    });
+  public async countActiveCached(options?: TypedRepositoryOptions<F>): Promise<number> {
+    return await this.countCached(this.asTyped({ ...this.getIsActiveFilter(), ...options }));
   }
 
   // ============================================================================
@@ -1080,7 +1207,14 @@ export class RepositoryManager<T = unknown> {
    * @public
    */
   public async getCached(id: string | number): Promise<T | null> {
-    return await this.getCachedBy("id", Number(id));
+    return await this.getCachedBy("id", id);
+  }
+
+  /**
+   * @alias getCached
+   */
+  public async findCached(id: string | number): Promise<T | null> {
+    return await this.getCachedBy("id", id);
   }
 
   /**
@@ -1100,17 +1234,18 @@ export class RepositoryManager<T = unknown> {
       return await this.findBy(column, value);
     }
 
-    const cacheKey = this.cacheKey(`data.${column}.${value}`, cacheKeyOptions);
+    const cacheKey = this.cacheKey(`${column}.${value}`, cacheKeyOptions);
     const cachedData = await this.cacheDriver.get(cacheKey);
 
     if (cachedData) {
-      return this.newModel(cachedData);
+      return this.adapter.deserializeModel(cachedData);
     }
 
     const model = await this.findBy(column, value);
+
     if (!model) return null;
 
-    await this.cache(cacheKey, this.adapter.serializeModel(model));
+    this.cache(cacheKey, this.adapter.serializeModel(model));
     return model;
   }
 
@@ -1120,7 +1255,7 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to array of cached records
    * @public
    */
-  public async allCached(options?: AllRepositoryOptions): Promise<T[]> {
+  public async allCached(options?: TypedAllRepositoryOptions<F>): Promise<T[]> {
     if (!this.isCacheable || !this.cacheDriver) {
       return await this.all(options);
     }
@@ -1128,7 +1263,7 @@ export class RepositoryManager<T = unknown> {
     const opts = this.prepareOptions(options);
 
     const cacheKey = this.cacheKey("all", opts);
-    const cachedData: T[] = await this.cacheDriver.get(cacheKey);
+    const cachedData = await this.cacheDriver.get<T[]>(cacheKey);
 
     if (cachedData) {
       return cachedData.map((record) => this.adapter.deserializeModel(record));
@@ -1148,11 +1283,8 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to array of cached active records
    * @public
    */
-  public async allActiveCached(options?: AllRepositoryOptions): Promise<T[]> {
-    return await this.allCached({
-      ...this.getIsActiveFilter(),
-      ...options,
-    });
+  public async allActiveCached(options?: TypedAllRepositoryOptions<F>): Promise<T[]> {
+    return await this.allCached(this.asTypedAll({ ...this.getIsActiveFilter(), ...options }));
   }
 
   /**
@@ -1161,7 +1293,7 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to cached pagination result
    * @public
    */
-  public async listCached(options?: RepositoryOptions): Promise<PaginationResult<T>> {
+  public async listCached(options?: TypedRepositoryOptions<F>): Promise<PaginationResult<T>> {
     if (!this.isCacheable || !this.cacheDriver) {
       return (await this._listImpl(options)) as PaginationResult<T>;
     }
@@ -1179,6 +1311,7 @@ export class RepositoryManager<T = unknown> {
     }
 
     const result = (await this._listImpl(options)) as PaginationResult<T>;
+
     await this.cache(cacheKey, {
       data: result.data.map((record) => this.adapter.serializeModel(record)),
       pagination: result.pagination,
@@ -1192,11 +1325,8 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to cached pagination result of active records
    * @public
    */
-  public async listActiveCached(options?: RepositoryOptions): Promise<PaginationResult<T>> {
-    return await this.listCached({
-      ...this.getIsActiveFilter(),
-      ...options,
-    });
+  public async listActiveCached(options?: TypedRepositoryOptions<F>): Promise<PaginationResult<T>> {
+    return await this.listCached(this.asTyped({ ...this.getIsActiveFilter(), ...options }));
   }
 
   /**
@@ -1208,6 +1338,12 @@ export class RepositoryManager<T = unknown> {
   public async getActiveCached(id: string | number): Promise<T | undefined> {
     const model = await this.getCached(id);
     if (!model) return undefined;
+
+    if (typeof (model as any).get === "function") {
+      return (model as any).get(this.getIsActiveColumn()) === this.getIsActiveValue()
+        ? model
+        : undefined;
+    }
 
     // Check if model is active
     const isActive = (model as any)[this.getIsActiveColumn()] === this.getIsActiveValue();
@@ -1257,10 +1393,10 @@ export class RepositoryManager<T = unknown> {
    * Clear all cache for this repository
    * @public
    */
-  public async clearCache(): Promise<void> {
+  public async clearCache(key?: CacheKey): Promise<void> {
     if (!this.isCacheable || !this.cacheDriver) return;
 
-    await this.cacheDriver.removeNamespace(this.cacheKey(""));
+    await this.cacheDriver.removeNamespace(this.cacheKey(key || ""));
   }
 
   /**
@@ -1275,7 +1411,7 @@ export class RepositoryManager<T = unknown> {
     if (!id) return;
 
     const cacheKey = this.cacheKey(`id.${id}`);
-    await this.cacheDriver.remove(cacheKey);
+    await this.cacheDriver.removeNamespace(cacheKey);
   }
 
   /**
@@ -1299,7 +1435,10 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to found or created record
    * @public
    */
-  public async findOrCreate(where: Record<string, any>, data: Record<string, any>): Promise<T> {
+  public async findOrCreate(
+    where: TypedRepositoryOptions<F>,
+    data: Record<string, any>,
+  ): Promise<T> {
     const model = await this.first(where);
     return model || (await this.create(data));
   }
@@ -1311,7 +1450,10 @@ export class RepositoryManager<T = unknown> {
    * @returns Promise resolving to updated or created record
    * @public
    */
-  public async updateOrCreate(where: Record<string, any>, data: Record<string, any>): Promise<T> {
+  public async updateOrCreate(
+    where: TypedRepositoryOptions<F>,
+    data: Record<string, any>,
+  ): Promise<T> {
     const model = await this.first(where);
     if (model) {
       return await this.update(model, data);

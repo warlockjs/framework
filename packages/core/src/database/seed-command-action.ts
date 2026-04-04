@@ -1,8 +1,8 @@
 import { DataSource, dataSourceRegistry } from "@warlock.js/cascade";
 import { CommandActionData } from "../cli/types";
-import { filesOrchestrator } from "../dev2-server/files-orchestrator";
-import { Path } from "../dev2-server/path";
-import { getFilesFromDirectory } from "../dev2-server/utils";
+import { filesOrchestrator } from "../dev-server/files-orchestrator";
+import { Path } from "../dev-server/path";
+import { getFilesFromDirectory } from "../dev-server/utils";
 import { srcPath } from "../utils";
 import { Seeder } from "./seeds/seeder";
 import { SeedersManager } from "./seeds/seeders.manager";
@@ -11,12 +11,12 @@ async function clearAllTables(datasource: DataSource) {
   const tables = await datasource.driver.blueprint.listTables();
 
   for (const table of tables) {
-    await datasource.driver.blueprint.truncateTable(table);
+    await datasource.driver.truncateTable(table, { cascade: true });
   }
 }
 
 export async function seedCommandAction(options: CommandActionData) {
-  const { path, fresh } = options.options;
+  const { path, fresh, transaction } = options.options;
 
   const datasource = dataSourceRegistry.get();
 
@@ -32,7 +32,7 @@ export async function seedCommandAction(options: CommandActionData) {
 
   seedersManager.register(...seeds);
 
-  await seedersManager.run();
+  await seedersManager.run(transaction as boolean);
 }
 
 async function listSeedsFiles() {

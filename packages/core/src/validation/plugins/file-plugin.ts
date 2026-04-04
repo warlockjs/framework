@@ -15,7 +15,6 @@ export const filePlugin: SealPlugin = {
   name: "file",
   version: "1.0.0",
   description: "Adds file upload validation (v.file())",
-
   install() {
     // Inject file() method into v factory
     v.file = (errorMessage?: string) => new FileValidator(errorMessage);

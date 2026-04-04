@@ -338,9 +338,54 @@ export interface QueryBuilderContract<T> {
   // ============================================================================
 
   /**
+   * Eager-load a relation by name
+   *
+   * @param relation - Name of the relation defined on the model
+   * @returns Query builder for chaining
+   *
+   * @example
+   * query.with("ai_model")
+   */
+  with?(relation: string): this;
+
+  /**
+   * Load relations using database JOINs in a single query
+   *
+   * @param relations - Relation names to load via JOIN
+   * @returns Query builder for chaining
+   *
+   * @example
+   * query.joinWith("ai_model", "unit")
+   */
+  joinWith?(...relations: string[]): this;
+
+  /**
    * Clone the query builder
    *
    * @returns New query builder instance with same state
    */
   clone(): this;
+
+  /**
+   * Nearest-neighbour vector similarity search.
+   *
+   * Adds a score SELECT and vector ORDER BY (SQL) or $vectorSearch stage (MongoDB Atlas)
+   * in one call. Driver implementations handle the specifics.
+   *
+   * @param column    - Vector column name (e.g. `"embedding"`)
+   * @param embedding - Query embedding as a number array
+   * @param alias     - Result score field alias (default: `"score"`)
+   *
+   * @example
+   * ```typescript
+   * const results = await vectorsRepository
+   *   .newQuery()
+   *   .where({ organization_id: "org-123" })
+   *   .nearestTo("embedding", queryEmbedding)
+   *   .limit(5)
+   *   .get<VectorRow & { score: number }>();
+   * ```
+   */
+  nearestTo(column: string, embedding: number[], alias?: string): this;
 }
+

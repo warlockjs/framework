@@ -203,17 +203,25 @@ export type ResponseStreamController = {
 
 export type ResponseSSEController = {
   /**
-   * Send data to the client
+   * Send an SSE event to the client
+   * @param event - Event name
+   * @param data - Event data (will be JSON stringified)
+   * @param id - Optional event ID for client-side Last-Event-ID tracking
    */
-  send: (event: string, data: any) => void;
+  send: (event: string, data: any, id?: string) => ResponseSSEController;
   /**
-   * Send comment to the client
+   * Send a comment to keep the connection alive (invisible to client)
    */
-  comment: (comment: string) => void;
+  comment: (comment: string) => ResponseSSEController;
   /**
-   * End the stream
+   * End the SSE stream
    */
-  end: () => void;
+  end: () => ResponseSSEController;
+  /**
+   * Register a handler to be called when the client disconnects
+   * Use this to clean up resources (e.g., EventEmitter listeners, background jobs)
+   */
+  onDisconnect: (handler: () => void) => ResponseSSEController;
   /**
    * Detect whether stream is ended
    */

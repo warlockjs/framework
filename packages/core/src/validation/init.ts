@@ -15,6 +15,7 @@ configureSeal({
   firstErrorOnly: config.key("validation.firstErrorOnly", true),
   translateRule({ rule, attributes }) {
     const translateRule = config.key("validation.translateRule");
+
     if (translateRule) {
       return translateRule({ rule, attributes });
     }

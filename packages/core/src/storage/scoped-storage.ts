@@ -1,11 +1,15 @@
 import { fileExistsAsync } from "@mongez/fs";
+import { createReadStream } from "fs";
 import fs from "fs/promises";
+import path from "path";
 import type { Readable } from "stream";
 import type { UploadedFile } from "../http";
 import { StorageFile } from "./storage-file";
 import type {
   DeleteManyResult,
   ListOptions,
+  PutDirectoryOptions,
+  PutDirectoryResult,
   PutOptions,
   StorageDriverContract,
   StorageDriverType,
@@ -469,6 +473,108 @@ export class ScopedStorage {
     await this.deleteDirectory(from);
 
     return count;
+  }
+
+  /**
+   * Upload a local filesystem directory into storage
+   *
+   * Recursively walks the local directory, applies an optional filter, then
+   * streams each file into storage. Uploads run in concurrent batches for
+   * efficiency. Failures are collected — a single failed file never aborts
+   * the entire operation (mirrors the contract of `deleteMany`).
+   *
+   * @param localDirPath  - Absolute path of the local directory to upload
+   * @param destination   - Target prefix in storage (e.g. "uploads/assets")
+   * @param options       - Concurrency, filter, progress callback, put options
+   * @returns             - { uploaded, failed, total }
+   *
+   * @example
+   * ```typescript
+   * const result = await storage.putDirectory("./public/assets", "cdn/assets", {
+   *   concurrency: 10,
+   *   filter: (_, rel) => !rel.startsWith("."),
+   *   onProgress: (done, total) => console.log(`${done}/${total}`),
+   * });
+   *
+   * console.log(`Uploaded: ${result.uploaded.length}, Failed: ${result.failed.length}`);
+   * ```
+   */
+  public async putDirectory(
+    localDirPath: string,
+    destination: string,
+    options?: PutDirectoryOptions,
+  ): Promise<PutDirectoryResult> {
+    const concurrency = options?.concurrency ?? 5;
+
+    // Collect all local file paths recursively
+    const localFiles = await this.walkLocalDirectory(localDirPath);
+
+    // Apply the user-supplied filter if any
+    const filteredFiles = options?.filter
+      ? localFiles.filter(({ absolute, relative }) => options.filter!(absolute, relative))
+      : localFiles;
+
+    const total = filteredFiles.length;
+    const uploaded: StorageFile[] = [];
+    const failed: Array<{ localPath: string; error: Error }> = [];
+    let doneCount = 0;
+
+    // Upload in concurrent batches
+    for (let i = 0; i < filteredFiles.length; i += concurrency) {
+      const batch = filteredFiles.slice(i, i + concurrency);
+
+      await Promise.all(
+        batch.map(async ({ absolute, relative }) => {
+          const storagePath = `${destination.replace(/\/$/, "")}/${relative}`;
+
+          try {
+            const stream = createReadStream(absolute);
+            const file = await this.putStream(stream, storagePath, options?.putOptions);
+            uploaded.push(file);
+            doneCount++;
+            options?.onProgress?.(doneCount, total, file);
+          } catch (err) {
+            failed.push({
+              localPath: absolute,
+              error: err instanceof Error ? err : new Error(String(err)),
+            });
+          }
+        }),
+      );
+    }
+
+    return { uploaded, failed, total };
+  }
+
+  /**
+   * Walk a local directory recursively and return all file paths
+   *
+   * @param dirPath - Absolute local directory path
+   * @returns Array of { absolute, relative } file path pairs
+   * @internal
+   */
+  private async walkLocalDirectory(
+    dirPath: string,
+    baseDir?: string,
+  ): Promise<Array<{ absolute: string; relative: string }>> {
+    const root = baseDir ?? dirPath;
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    const results: Array<{ absolute: string; relative: string }> = [];
+
+    for (const entry of entries) {
+      const absolute = path.join(dirPath, entry.name);
+      const relative = path.relative(root, absolute).replace(/\\/g, "/");
+
+      if (entry.isDirectory()) {
+        const nested = await this.walkLocalDirectory(absolute, root);
+        results.push(...nested);
+      } else if (entry.isFile()) {
+        results.push({ absolute, relative });
+      }
+      // Symlinks are intentionally skipped
+    }
+
+    return results;
   }
 
   /**

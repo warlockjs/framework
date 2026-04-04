@@ -1,7 +1,7 @@
-import { filesOrchestrator } from "../../dev2-server/files-orchestrator";
-import { Path } from "../../dev2-server/path";
-import { typeGenerator } from "../../dev2-server/type-generator";
-import { getFilesFromDirectory } from "../../dev2-server/utils";
+import { filesOrchestrator } from "../../dev-server/files-orchestrator";
+import { Path } from "../../dev-server/path";
+import { typeGenerator } from "../../dev-server/type-generator";
+import { getFilesFromDirectory } from "../../dev-server/utils";
 import { srcPath } from "../../utils";
 import { command } from "../cli-command";
 

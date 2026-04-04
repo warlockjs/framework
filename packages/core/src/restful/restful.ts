@@ -73,7 +73,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
       responseDocument[this.recordsListName] = documents;
 
       if (pagination) {
-        responseDocument.paginationInfo = pagination;
+        responseDocument.pagination = pagination;
       }
 
       return response.success(responseDocument);

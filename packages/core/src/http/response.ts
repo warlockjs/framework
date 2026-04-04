@@ -138,6 +138,12 @@ export class Response {
   public setResponse(response: FastifyReply) {
     this.baseResponse = response;
 
+    // Listen to the 'finish' event to track when response is fully sent
+    // This works for all response types: JSON, streams, buffers, files, etc.
+    this.baseResponse.raw.once("finish", () => {
+      this.request.endTime = Date.now();
+    });
+
     return this;
   }
 
@@ -603,21 +609,34 @@ export class Response {
     // Track stream state
     let isEnded = false;
     const events: any[] = [];
+    const disconnectHandlers: Array<() => void> = [];
 
     // Write headers to start the stream
     this.baseResponse.raw.writeHead(this.statusCode, this.getHeaders() as any);
 
-    return {
+    // Detect client disconnect — set isEnded silently and invoke cleanup handlers.
+    // Without this, background jobs keep writing to a dead socket after the client drops.
+    this.baseResponse.raw.on("close", () => {
+      if (!isEnded) {
+        isEnded = true;
+        this.log("SSE client disconnected");
+        for (const handler of disconnectHandlers) {
+          handler();
+        }
+      }
+    });
+
+    const controller: ResponseSSEController = {
       /**
        * Send an SSE event
-       * @param event - Event name (e.g., "message", "notification")
+       * @param event - Event name (e.g., "message", "chunk", "done")
        * @param data - Event data (will be JSON stringified)
-       * @param id - Optional event ID for client-side tracking
+       * @param id - Optional event ID for client-side Last-Event-ID tracking (reconnect support)
        */
-      send: (event: string, data: any, id?: string) => {
-        if (isEnded) {
-          throw new Error("Cannot send event: SSE stream has already ended");
-        }
+      send: (event: string, data: any, id?: string): ResponseSSEController => {
+        // Silent no-op after disconnect — background jobs should not crash when
+        // the client drops mid-stream. The onDisconnect handler handles cleanup.
+        if (isEnded) return controller;
 
         let message = "";
         if (id) message += `id: ${id}\n`;
@@ -627,7 +646,7 @@ export class Response {
         events.push({ event, data, id });
         this.baseResponse.raw.write(message);
 
-        return this;
+        return controller;
       },
 
       /**
@@ -635,23 +654,20 @@ export class Response {
        * Useful for preventing timeout on long-lived connections
        * @param text - Comment text
        */
-      comment: (text: string) => {
-        if (isEnded) {
-          throw new Error("Cannot send comment: SSE stream has already ended");
-        }
+      comment: (text: string): ResponseSSEController => {
+        // Silent no-op after disconnect
+        if (isEnded) return controller;
 
         this.baseResponse.raw.write(`: ${text}\n\n`);
 
-        return this;
+        return controller;
       },
 
       /**
        * End the SSE stream and trigger completion events
        */
-      end: () => {
-        if (isEnded) {
-          return;
-        }
+      end: (): ResponseSSEController => {
+        if (isEnded) return controller;
 
         isEnded = true;
 
@@ -674,15 +690,36 @@ export class Response {
         if (this.isOk) {
           Response.trigger("success", this);
         }
+
+        return controller;
       },
 
       /**
-       * Check if the stream has ended
+       * Register a handler to be called when the client disconnects.
+       * Use this to clean up EventEmitter listeners, cancel background jobs, etc.
+       *
+       * @example
+       * ```ts
+       * const sse = response.sse();
+       * const listener = (chunk) => sse.send("chunk", { chunk });
+       * eventBus.on(aiMessageId, listener);
+       * sse.onDisconnect(() => eventBus.off(aiMessageId, listener));
+       * ```
+       */
+      onDisconnect: (handler: () => void): ResponseSSEController => {
+        disconnectHandlers.push(handler);
+        return controller;
+      },
+
+      /**
+       * Check if the stream has ended (either via end() or client disconnect)
        */
       get ended() {
         return isEnded;
       },
     };
+
+    return controller;
   }
 
   /**
@@ -977,7 +1014,7 @@ export class Response {
         }
       });
 
-      // Send the stream
+      // Send the stream (endTime will be set by finish event listener)
       return this.baseResponse.send(stream);
     } catch (error: any) {
       this.log(`Error sending file: ${error.message}`, "error");
@@ -1002,6 +1039,7 @@ export class Response {
     const sent304 = this.applyResponseOptions(opts);
     if (sent304) return this.baseResponse;
 
+    // Note: endTime is set in the main send() method for non-streaming responses
     return this.baseResponse.send(buffer);
   }
 
@@ -1041,6 +1079,7 @@ export class Response {
     const sent304 = this.applyResponseOptions({ ...opts, contentType });
     if (sent304) return this.baseResponse;
 
+    // Note: endTime is set in the main send() method for non-streaming responses
     return this.baseResponse.send(buffer);
   }
 
@@ -1094,6 +1133,7 @@ export class Response {
         }
       });
 
+      // Send the stream (endTime will be set by finish event listener)
       return this.baseResponse.send(stream);
     } catch (error: any) {
       this.log(`Error downloading file: ${error.message}`, "error");

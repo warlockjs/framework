@@ -6,6 +6,10 @@ export type Seeder = {
    */
   name: string;
   /**
+   * Whether to enable it
+   */
+  enabled?: boolean;
+  /**
    * Seed description
    */
   description?: string;

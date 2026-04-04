@@ -14,13 +14,13 @@ export type MiddlewareResponse = ReturnedResponse | undefined | void;
  * Receives the request and response objects
  * And returns a response object or undefined if the request should continue
  */
-export type Middleware = {
-  (request: Request, response: Response): MiddlewareResponse;
+export type Middleware<MiddlewareRequest extends Request = Request> = {
+  (request: MiddlewareRequest, response: Response): MiddlewareResponse;
 };
 
 export type RouterGroupCallback = () => void;
 
-export type RequestHandlerType = RequestHandler | [GenericObject, string];
+export type RequestHandlerType = RequestHandler<any> | [GenericObject, string];
 
 /**
  * Resource standard methods
@@ -29,11 +29,11 @@ export type ResourceMethod = "list" | "get" | "create" | "update" | "delete" | "
 
 export type RestfulMiddleware = Record<string, [Middleware]>;
 
-export type RequestHandlerValidation = {
+export type RequestHandlerValidation<TRequest extends Request = Request> = {
   /**
    * Validation custom message
    */
-  validate?: Middleware;
+  validate?: Middleware<TRequest>;
   /**
    * Define what should be validated
    * If not passed, it will be validating only body and query
@@ -77,7 +77,7 @@ export type RequestHandler<TRequest extends Request = Request> = {
   /**
    * Validation static object property which can be optional
    */
-  validation?: RequestHandlerValidation;
+  validation?: RequestHandlerValidation<TRequest>;
 
   /**
    * Request Handler Description
@@ -253,19 +253,19 @@ export type RouteResource = {
     /**
      * Apply validation on create|update|patch combined
      */
-    all?: RequestHandlerValidation;
+    all?: RequestHandlerValidation<any>;
     /**
      * Create validation object
      */
-    create?: RequestHandlerValidation;
+    create?: RequestHandlerValidation<any>;
     /**
      * Update validation object
      */
-    update?: RequestHandlerValidation;
+    update?: RequestHandlerValidation<any>;
     /**
      * Patch validation object
      */
-    patch?: RequestHandlerValidation;
+    patch?: RequestHandlerValidation<any>;
   };
 };
 

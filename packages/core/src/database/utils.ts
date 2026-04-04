@@ -4,20 +4,16 @@ import { authService } from "@warlock.js/auth";
 import { Model, useModelTransformer } from "@warlock.js/cascade";
 import { ComputedCallback, SchemaContext } from "@warlock.js/seal";
 
-type PasswordTransformOptiosn = {
-  // TODO: Nothing yet
-};
-
 /**
  * Hash password on saving if password changes
  */
-export const useHashedPassword = (options?: PasswordTransformOptiosn) =>
+export const useHashedPassword = () =>
   useModelTransformer(({ value, isChanged, isNew }) => {
     if (!value) return value;
 
     if (!isNew && !isChanged) return value;
 
-    return authService.hashPassword(value);
+    return authService.hashPassword(String(value));
   });
 
 type ComputedCallbackModel = (

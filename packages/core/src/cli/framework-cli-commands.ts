@@ -1,6 +1,8 @@
 import { addCommand } from "./commands/add.command";
 import { buildCommand } from "./commands/build.command";
+import { createDatabaseCommand } from "./commands/create-database.command";
 import { devServerCommand } from "./commands/dev-server.command";
+import { dropTablesCommand } from "./commands/drop-tables.command";
 import {
   generateCommand,
   generateControllerCommand,
@@ -14,21 +16,24 @@ import {
 } from "./commands/generate/generate.command";
 import { migrateCommand } from "./commands/migrate.command";
 import { seedCommand } from "./commands/seed.command";
-
-import { createDatabaseCommand } from "./commands/create-database.command";
 import { startProductionCommand } from "./commands/start-production.command";
+import { storagePutCommand } from "./commands/storage-put.command";
 import { typingsGeneratorCommand } from "./commands/typings-generator.command";
 
 export const frameworkCommands = [
+  // development commands
   devServerCommand,
+  typingsGeneratorCommand,
+
+  // production commands
   buildCommand,
   startProductionCommand,
-  typingsGeneratorCommand,
 
   // database commands
   migrateCommand,
   seedCommand,
   createDatabaseCommand,
+  dropTablesCommand,
 
   // generation/installation commands
   addCommand,
@@ -43,4 +48,7 @@ export const frameworkCommands = [
   generateResourceCommand,
   generateValidationCommand,
   generateMigrationCommand,
+
+  // storage commands
+  storagePutCommand,
 ];

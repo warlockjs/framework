@@ -1,8 +1,8 @@
 import config from "@mongez/config";
 import { colors } from "@mongez/copper";
 import { pathToFileURL } from "node:url";
-import type { FileManager } from "../dev2-server/file-manager";
-import { warlockCachePath } from "../dev2-server/utils";
+import type { FileManager } from "../dev-server/file-manager";
+import { warlockCachePath } from "../dev-server/utils";
 import { configSpecialHandlers } from "./config-special-handlers";
 
 /**

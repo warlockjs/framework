@@ -3,9 +3,9 @@ import { Migration, migrationRunner } from "@warlock.js/cascade";
 import dayjs from "dayjs";
 import path from "path";
 import { CommandActionData } from "../cli/types";
-import { filesOrchestrator } from "../dev2-server/files-orchestrator";
-import { Path } from "../dev2-server/path";
-import { getFilesFromDirectory } from "../dev2-server/utils";
+import { filesOrchestrator } from "../dev-server/files-orchestrator";
+import { Path } from "../dev-server/path";
+import { getFilesFromDirectory } from "../dev-server/utils";
 import { srcPath } from "../utils";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 
@@ -106,6 +106,16 @@ async function loadMigrationFile(absPath: string) {
       .replace("_migration", "");
   }
 
+  // Extract createdAt timestamp from filename if not already set
+  // Expected format: MM-DD-YYYY_HH-MM-SS-name.migration.ts
+  if (!MigrationClass.createdAt) {
+    const filename = path.basename(absPath);
+    const timestampMatch = filename.match(/^(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})/);
+    if (timestampMatch) {
+      MigrationClass.createdAt = timestampMatch[1];
+    }
+  }
+
   migrationRunner.register(MigrationClass);
 }
 
@@ -130,20 +140,16 @@ async function loadAllMigrations() {
   const configMigrations = warlockConfigManager.get("database")?.migrations || [];
 
   for (const MigrationClass of configMigrations) {
-    const migration = MigrationClass;
-
     // Use class name as migration name if not set
-    if (!migration.migrationName) {
-      migration.migrationName = MigrationClass.name;
+    if (!MigrationClass.migrationName) {
+      MigrationClass.migrationName = MigrationClass.name;
     }
+    migrationRunner.register(MigrationClass);
+  }
 
-    migrationRunner.register(migration);
-
-    // Load file-based migrations from src/app
-    const migrations = await migrationFiles();
-
-    for (const migrationFile of migrations) {
-      await loadMigrationFile(migrationFile);
-    }
+  // Always load file-based migrations from src/app, regardless of config
+  const migrations = await migrationFiles();
+  for (const migrationFile of migrations) {
+    await loadMigrationFile(migrationFile);
   }
 }

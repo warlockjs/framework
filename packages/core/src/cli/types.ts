@@ -4,7 +4,7 @@
  * These types define the structure for commands, options, preloading, and actions.
  */
 
-import { ConnectorName } from "../dev2-server/connectors";
+import { ConnectorName } from "../connectors";
 
 /**
  * Indicates the origin/source of a CLI command.

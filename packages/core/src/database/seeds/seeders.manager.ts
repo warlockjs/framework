@@ -2,8 +2,10 @@ import { colors } from "@mongez/copper";
 import {
   type DataSource,
   type DriverContract,
+  DatabaseWriterValidationError,
   dataSourceRegistry,
   migrationRunner,
+  transaction,
 } from "@warlock.js/cascade";
 import { Seeder } from "./seeder";
 import { SeedsTableMigration } from "./seeds-table-migration";
@@ -43,7 +45,7 @@ export class SeedersManager {
   /**
    * Run seeders
    */
-  public async run() {
+  public async run(withTransaction = true) {
     await this.init();
     this.prepareSeeders();
 
@@ -65,7 +67,9 @@ export class SeedersManager {
         console.log(`🔄 Running ${colors.green(seeder.name)}...`);
         const startTime = Date.now();
 
-        const result = await seeder.run();
+        const result = withTransaction
+          ? await transaction(async () => seeder.run())
+          : await seeder.run();
 
         const duration = Date.now() - startTime;
         if (result) {
@@ -76,11 +80,15 @@ export class SeedersManager {
           `✅ ${colors.green(seeder.name)} completed (${duration}ms, ${result?.recordsCreated ?? 0} records)\n`,
         );
         successCount++;
-      } catch (error) {
+      } catch (error: any) {
         const err = error as Error;
         console.error(`❌ ${colors.red(seeder.name)} failed:`, err.message);
-        console.error(err.stack);
+        console.log(err);
         failedCount++;
+
+        if (error instanceof DatabaseWriterValidationError) {
+          console.log(error.errors);
+        }
 
         // Re-throw to stop execution (or continue to next seed based on your preference)
         throw error;
@@ -104,11 +112,13 @@ export class SeedersManager {
    * they are ordered correctly
    */
   public prepareSeeders() {
-    this.seeders.sort((a, b) => {
-      const orderA = a.order ?? Number.MAX_SAFE_INTEGER;
-      const orderB = b.order ?? Number.MAX_SAFE_INTEGER;
-      return orderA - orderB;
-    });
+    this.seeders = this.seeders
+      .filter((seeder) => seeder.enabled !== false)
+      .sort((a, b) => {
+        const orderA = a.order ?? Number.MAX_SAFE_INTEGER;
+        const orderB = b.order ?? Number.MAX_SAFE_INTEGER;
+        return orderA - orderB;
+      });
 
     // TODO: Handle dependsOn resolution
     // This is more complex - needs topological sort

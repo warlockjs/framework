@@ -1,6 +1,6 @@
-import { filesOrchestrator } from "../dev2-server/files-orchestrator";
-import { Path } from "../dev2-server/path";
-import { getCertainFilesFromDirectory, getFilesFromDirectory } from "../dev2-server/utils";
+import { filesOrchestrator } from "../dev-server/files-orchestrator";
+import { Path } from "../dev-server/path";
+import { getCertainFilesFromDirectory, getFilesFromDirectory } from "../dev-server/utils";
 import { srcPath } from "../utils";
 import { configManager } from "./config-manager";
 
@@ -15,7 +15,9 @@ export async function loadConfigFiles(config: string[] | true) {
     relativePaths = configFilesAbsulatePaths.map((path) => Path.toRelative(path));
   } else {
     // define only the given config files
+
     const configFilesAbsulatePaths = await getCertainFilesFromDirectory(srcPath("config"), config);
+
     relativePaths = configFilesAbsulatePaths.map((path) => Path.toRelative(path));
   }
 

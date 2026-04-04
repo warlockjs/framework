@@ -8,7 +8,7 @@ interface ConfigAccessor {
   /**
    * Get a config value by dot-notation key path.
    */
-  key<T = any>(key: ConfigKey | string, defaultValue?: T): T;
+  key<T = any>(key: ConfigKey | (string & {}), defaultValue?: T): T;
 
   /**
    * Get an entire config group by name with type inference.
@@ -36,7 +36,7 @@ interface ConfigAccessor {
  * ```
  */
 export const config: ConfigAccessor = {
-  key(key: ConfigKey | string, defaultValue?: any): any {
+  key(key: ConfigKey | (string & {}), defaultValue?: any): any {
     return baseConfig.get(key, defaultValue);
   },
 

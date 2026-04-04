@@ -55,21 +55,21 @@ export async function generateController(data: CommandActionData): Promise<void>
   await putFileAsync(controllerPath, controllerContent);
   console.log(colors.green(`✓ Created controller: ${controllerPath}`));
 
-  // Generate validation and request if requested
+  // Generate schema and request if requested
   if (withValidation) {
-    await ensureComponentDirectory(module, "validation");
+    await ensureComponentDirectory(module, "schema");
     await ensureComponentDirectory(module, "requests");
 
-    const validationPath = resolveComponentPath(module, "validation", `${name.kebab}.schema`);
+    const schemaPath = resolveComponentPath(module, "schema", `${name.kebab}.schema`);
     const requestPath = resolveComponentPath(module, "requests", `${name.kebab}.request`);
 
-    const validationContent = validationStub(name);
+    const schemaContent = validationStub(name);
     const requestContent = requestStub(name);
 
-    await putFileAsync(validationPath, validationContent);
+    await putFileAsync(schemaPath, schemaContent);
     await putFileAsync(requestPath, requestContent);
 
-    console.log(colors.green(`✓ Created validation: ${validationPath}`));
+    console.log(colors.green(`✓ Created schema: ${schemaPath}`));
     console.log(colors.green(`✓ Created request: ${requestPath}`));
   }
 
