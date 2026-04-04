@@ -606,8 +606,6 @@ export class BaseValidator {
 
     const isEmpty = isEmptyValue(valueForRules);
 
-    console.log("isEmpty", isEmpty, valueForRules);
-
     // Prepend the required-condition rule if set, so it always runs first.
     // requiredRule has requiresValue = false so it runs even on empty values.
     const rulesToRun = this.requiredRule ? [this.requiredRule, ...this.rules] : this.rules;

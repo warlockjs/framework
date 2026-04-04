@@ -321,7 +321,10 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
   }
 
   /** Validate the data */
-  public async validate(data: any, context: SchemaContext): Promise<ValidationResult> {
+  public async validate(
+    data: any,
+    context: SchemaContext = { path: "" } as SchemaContext,
+  ): Promise<ValidationResult> {
     context.schema = this.schema;
     const mutatedData = await this.mutate(data, context);
 
