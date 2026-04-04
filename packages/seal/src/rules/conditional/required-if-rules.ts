@@ -23,6 +23,7 @@ export const requiredIfRule: SchemaRule<{
 
     // Field is required if the other field equals the expected value
     if (isEmptyValue(value) && fieldValue === expectedValue) {
+      this.context.translatableParams.field = this.context.options.field;
       return invalidRule(this, context);
     }
 
@@ -39,7 +40,7 @@ export const requiredIfEmptyRule: SchemaRule<{
   scope?: "global" | "sibling";
 }> = {
   name: "requiredIfEmpty",
-  description: "The field is required if another field is empty",
+  description: "The field is required if :field is empty",
   sortOrder: -2,
   requiresValue: false,
   defaultErrorMessage: "The :input is required",
@@ -48,6 +49,7 @@ export const requiredIfEmptyRule: SchemaRule<{
 
     // Field is required if the other field is empty
     if (isEmptyValue(value) && isEmptyValue(fieldValue)) {
+      this.context.translatableParams.field = this.context.options.field;
       return invalidRule(this, context);
     }
 
@@ -64,7 +66,7 @@ export const requiredIfNotEmptyRule: SchemaRule<{
   scope?: "global" | "sibling";
 }> = {
   name: "requiredIfNotEmpty",
-  description: "The field is required if another field is not empty",
+  description: "The field is required if :field is not empty",
   sortOrder: -2,
   requiresValue: false,
   defaultErrorMessage: "The :input is required",
@@ -73,6 +75,7 @@ export const requiredIfNotEmptyRule: SchemaRule<{
 
     // Field is required if the other field is not empty
     if (isEmptyValue(value) && !isEmptyValue(fieldValue)) {
+      this.context.translatableParams.field = this.context.options.field;
       return invalidRule(this, context);
     }
 
@@ -90,7 +93,7 @@ export const requiredIfInRule: SchemaRule<{
   scope?: "global" | "sibling";
 }> = {
   name: "requiredIfIn",
-  description: "The field is required if another field's value is in the given array",
+  description: "The field is required if :field value is in the given array",
   sortOrder: -2,
   requiresValue: false,
   defaultErrorMessage: "The :input is required",
@@ -100,6 +103,8 @@ export const requiredIfInRule: SchemaRule<{
 
     // Field is required if the other field's value is in the array
     if (isEmptyValue(value) && values.includes(fieldValue)) {
+      this.context.translatableParams.field = this.context.options.field;
+      this.context.translationParams.values = this.context.options.values.join(", ");
       return invalidRule(this, context);
     }
 
@@ -127,6 +132,8 @@ export const requiredIfNotInRule: SchemaRule<{
 
     // Field is required if the other field's value is NOT in the array
     if (isEmptyValue(value) && !values.includes(fieldValue)) {
+      this.context.translatableParams.field = this.context.options.field;
+      this.context.translationParams.values = this.context.options.values.join(", ");
       return invalidRule(this, context);
     }
 
@@ -165,7 +172,9 @@ export const requiredIfAllEmptyRule: SchemaRule<{
     // Field is required if ALL other fields are empty
     const allEmpty = fieldValues.every((v) => isEmptyValue(v));
     if (isEmptyValue(value) && allEmpty) {
-      this.context.attributesList.fields = this.context.options.fields.join(",");
+      this.context.options.fields.forEach((field) => {
+        this.context.translatableParams.field = field;
+      });
       return invalidRule(this, context);
     }
 
@@ -192,7 +201,9 @@ export const requiredIfAnyEmptyRule: SchemaRule<{
     // Field is required if ANY other field is empty
     const anyEmpty = fieldValues.some((v) => isEmptyValue(v));
     if (isEmptyValue(value) && anyEmpty) {
-      this.context.attributesList.fields = this.context.options.fields.join(",");
+      this.context.options.fields.forEach((field) => {
+        this.context.translatableParams.field = field;
+      });
       return invalidRule(this, context);
     }
 
@@ -219,7 +230,9 @@ export const requiredIfAllNotEmptyRule: SchemaRule<{
     // Field is required if ALL other fields are NOT empty
     const allNotEmpty = fieldValues.every((v) => !isEmptyValue(v));
     if (isEmptyValue(value) && allNotEmpty) {
-      this.context.attributesList.fields = this.context.options.fields.join(",");
+      this.context.options.fields.forEach((field) => {
+        this.context.translatableParams.field = field;
+      });
       return invalidRule(this, context);
     }
 
@@ -246,7 +259,9 @@ export const requiredIfAnyNotEmptyRule: SchemaRule<{
     // Field is required if ANY other field is NOT empty
     const anyNotEmpty = fieldValues.some((v) => !isEmptyValue(v));
     if (isEmptyValue(value) && anyNotEmpty) {
-      this.context.attributesList.fields = this.context.options.fields.join(",");
+      this.context.options.fields.forEach((field) => {
+        this.context.translatableParams.field = field;
+      });
       return invalidRule(this, context);
     }
 

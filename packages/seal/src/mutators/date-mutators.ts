@@ -8,7 +8,7 @@ import type { Mutator } from "../types";
 export const dateMutator: Mutator = async (value) => {
   // Handle null/undefined
   if (!value) {
-    return new Date("Invalid Date");
+    return;
   }
 
   // Already a Date object

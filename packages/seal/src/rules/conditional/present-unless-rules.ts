@@ -11,8 +11,7 @@ export const presentUnlessRule: SchemaRule<{
   scope?: "global" | "sibling";
 }> = {
   name: "presentUnless",
-  description:
-    "The field must be present unless another field equals a specific value",
+  description: "The field must be present unless another field equals a specific value",
   sortOrder: -2,
   requiresValue: false,
   defaultErrorMessage: "The :input field must be present",
@@ -22,6 +21,8 @@ export const presentUnlessRule: SchemaRule<{
 
     // Field must be present unless the other field equals the expected value
     if (value === undefined && fieldValue !== expectedValue) {
+      this.context.translationParams.value = expectedValue;
+      this.context.translatableParams.field = this.context.options.field;
       return invalidRule(this, context);
     }
 

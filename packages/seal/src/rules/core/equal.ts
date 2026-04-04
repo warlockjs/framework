@@ -9,6 +9,7 @@ export const equalRule: SchemaRule<{ value: any }> = {
   defaultErrorMessage: "The :input must be equal to :value",
   async validate(value: any, context) {
     if (value !== this.context.options.value) {
+      this.context.translatableParams.value = this.context.options.value;
       return invalidRule(this, context);
     }
     return VALID_RULE;

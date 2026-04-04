@@ -7,6 +7,6 @@ import { NumberValidator } from "./number-validator";
 export class IntValidator extends NumberValidator {
   public constructor(errorMessage?: string) {
     super();
-    this.addRule(intRule, errorMessage);
+    this.addMutableRule(intRule, errorMessage);
   }
 }

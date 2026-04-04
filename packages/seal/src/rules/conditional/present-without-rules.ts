@@ -20,6 +20,7 @@ export const presentWithoutRule: SchemaRule<{
 
     // Field must be present if the other field is missing
     if (value === undefined && fieldValue === undefined) {
+      this.context.translatableParams.field = this.context.options.field;
       return invalidRule(this, context);
     }
 
@@ -45,10 +46,14 @@ export const presentWithoutAllRule: SchemaRule<{
     const source = scope === "sibling" ? context.parent : context.allValues;
 
     // Check if all fields are missing
-    const allMissing = fields.every(field => get(source, field) === undefined);
+    const allMissing = fields.every((field) => get(source, field) === undefined);
 
     // Field must be present if all other fields are missing
     if (value === undefined && allMissing) {
+      fields.forEach((field) => {
+        this.context.translatableParams.field = field;
+      });
+
       return invalidRule(this, context);
     }
 
@@ -65,8 +70,7 @@ export const presentWithoutAnyRule: SchemaRule<{
   scope?: "global" | "sibling";
 }> = {
   name: "presentWithoutAny",
-  description:
-    "The field must be present if any of the specified fields is missing",
+  description: "The field must be present if any of the specified fields is missing",
   sortOrder: -2,
   requiresValue: false,
   defaultErrorMessage: "The :input field must be present",
@@ -75,10 +79,14 @@ export const presentWithoutAnyRule: SchemaRule<{
     const source = scope === "sibling" ? context.parent : context.allValues;
 
     // Check if any field is missing
-    const anyMissing = fields.some(field => get(source, field) === undefined);
+    const anyMissing = fields.some((field) => get(source, field) === undefined);
 
     // Field must be present if any other field is missing
     if (value === undefined && anyMissing) {
+      fields.forEach((field) => {
+        this.context.translatableParams.field = field;
+      });
+
       return invalidRule(this, context);
     }
 

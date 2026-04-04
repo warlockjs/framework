@@ -40,8 +40,6 @@ export class UnionValidator extends BaseValidator {
    * ```
    */
   public union(validators: BaseValidator[], errorMessage?: string) {
-    const rule = this.addRule(unionRule, errorMessage);
-    rule.context.options.validators = validators;
-    return this;
+    return this.addRule(unionRule, errorMessage, { validators });
   }
 }

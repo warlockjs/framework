@@ -15,6 +15,8 @@ export const matchesRule: SchemaRule<{ field: string }> = {
       return VALID_RULE;
     }
 
+    this.context.translatableParams.field = this.context.options.field;
+
     return invalidRule(this, context);
   },
 };

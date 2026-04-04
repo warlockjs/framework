@@ -10,6 +10,17 @@
 export * from "./any-validator";
 export * from "./array-validator";
 export * from "./base-validator";
+
+// BaseValidator prototype augmentations — must come after base-validator export
+// to ensure the class is fully initialized before augmentation
+import "./methods/equality-conditional-methods";
+import "./methods/forbidden-methods";
+import "./methods/present-methods";
+import "./methods/required-methods";
+
+// Abstract intermediate bases — export after augmentations so prototype is ready
+export * from "./primitive-validator";
+
 export * from "./boolean-validator";
 export * from "./computed-validator";
 export * from "./date-validator";

@@ -3,8 +3,11 @@ import {
   betweenNumbersRule,
   evenRule,
   greaterThanRule,
+  lengthRule,
   lessThanRule,
+  maxLengthRule,
   maxRule,
+  minLengthRule,
   minRule,
   moduloRule,
   negativeRule,
@@ -12,17 +15,15 @@ import {
   oddRule,
   positiveRule,
 } from "../rules";
-import { BaseValidator } from "./base-validator";
-import { ScalarValidator } from "./scalar-validator";
-import { StringValidator } from "./string-validator";
+import { PrimitiveValidator } from "./primitive-validator";
 
 /**
  * Number validator class - base for Int and Float validators
  */
-export class NumberValidator extends BaseValidator {
+export class NumberValidator extends PrimitiveValidator {
   public constructor(errorMessage?: string) {
     super();
-    this.addRule(numberRule, errorMessage);
+    this.addMutableRule(numberRule, errorMessage);
   }
 
   /**
@@ -39,10 +40,7 @@ export class NumberValidator extends BaseValidator {
    * @category Validation Rule
    */
   public min(min: number | string, errorMessage?: string) {
-    const rule = this.addRule(minRule, errorMessage);
-    rule.context.options.min = min;
-    rule.context.options.scope = "global";
-    return this;
+    return this.addRule(minRule, errorMessage, { min, scope: "global" });
   }
 
   /**
@@ -52,10 +50,7 @@ export class NumberValidator extends BaseValidator {
    * @category Validation Rule
    */
   public max(max: number | string, errorMessage?: string) {
-    const rule = this.addRule(maxRule, errorMessage);
-    rule.context.options.max = max;
-    rule.context.options.scope = "global";
-    return this;
+    return this.addRule(maxRule, errorMessage, { max, scope: "global" });
   }
 
   /**
@@ -63,10 +58,7 @@ export class NumberValidator extends BaseValidator {
    * @category Validation Rule
    */
   public minSibling(field: string, errorMessage?: string) {
-    const rule = this.addRule(minRule, errorMessage);
-    rule.context.options.min = field;
-    rule.context.options.scope = "sibling";
-    return this;
+    return this.addRule(minRule, errorMessage, { min: field, scope: "sibling" });
   }
 
   /**
@@ -74,10 +66,7 @@ export class NumberValidator extends BaseValidator {
    * @category Validation Rule
    */
   public maxSibling(field: string, errorMessage?: string) {
-    const rule = this.addRule(maxRule, errorMessage);
-    rule.context.options.max = field;
-    rule.context.options.scope = "sibling";
-    return this;
+    return this.addRule(maxRule, errorMessage, { max: field, scope: "sibling" });
   }
 
   /**
@@ -87,10 +76,10 @@ export class NumberValidator extends BaseValidator {
    * @category Validation Rule
    */
   public greaterThan(value: number | string, errorMessage?: string) {
-    const rule = this.addRule(greaterThanRule, errorMessage);
-    rule.context.options.value = value;
-    rule.context.options.scope = "global";
-    return this;
+    return this.addRule(greaterThanRule, errorMessage, {
+      value,
+      scope: "global",
+    });
   }
 
   /**
@@ -100,10 +89,10 @@ export class NumberValidator extends BaseValidator {
    * @category Validation Rule
    */
   public lessThan(value: number | string, errorMessage?: string) {
-    const rule = this.addRule(lessThanRule, errorMessage);
-    rule.context.options.value = value;
-    rule.context.options.scope = "global";
-    return this;
+    return this.addRule(lessThanRule, errorMessage, {
+      value,
+      scope: "global",
+    });
   }
 
   /**
@@ -127,10 +116,10 @@ export class NumberValidator extends BaseValidator {
    * @category Validation Rule
    */
   public greaterThanSibling(field: string, errorMessage?: string) {
-    const rule = this.addRule(greaterThanRule, errorMessage);
-    rule.context.options.value = field;
-    rule.context.options.scope = "sibling";
-    return this;
+    return this.addRule(greaterThanRule, errorMessage, {
+      value: field,
+      scope: "sibling",
+    });
   }
 
   /**
@@ -146,10 +135,10 @@ export class NumberValidator extends BaseValidator {
    * @category Validation Rule
    */
   public lessThanSibling(field: string, errorMessage?: string) {
-    const rule = this.addRule(lessThanRule, errorMessage);
-    rule.context.options.value = field;
-    rule.context.options.scope = "sibling";
-    return this;
+    return this.addRule(lessThanRule, errorMessage, {
+      value: field,
+      scope: "sibling",
+    });
   }
 
   /**
@@ -162,9 +151,7 @@ export class NumberValidator extends BaseValidator {
 
   /** Value must be a modulo of the given number */
   public modulo(value: number, errorMessage?: string) {
-    const rule = this.addRule(moduloRule, errorMessage);
-    rule.context.options.value = value;
-    return this;
+    return this.addRule(moduloRule, errorMessage, { value });
   }
 
   /**
@@ -190,26 +177,22 @@ export class NumberValidator extends BaseValidator {
 
   /** Accept only numbers higher than 0 */
   public positive(errorMessage?: string) {
-    this.addRule(positiveRule, errorMessage);
-    return this;
+    return this.addRule(positiveRule, errorMessage);
   }
 
   /** Accept only negative numbers */
   public negative(errorMessage?: string) {
-    this.addRule(negativeRule, errorMessage);
-    return this;
+    return this.addRule(negativeRule, errorMessage);
   }
 
   /** Accept only odd numbers */
   public odd(errorMessage?: string) {
-    this.addRule(oddRule, errorMessage);
-    return this;
+    return this.addRule(oddRule, errorMessage);
   }
 
   /** Accept only even numbers */
   public even(errorMessage?: string) {
-    this.addRule(evenRule, errorMessage);
-    return this;
+    return this.addRule(evenRule, errorMessage);
   }
 
   /**
@@ -219,11 +202,11 @@ export class NumberValidator extends BaseValidator {
    * @category Validation Rule
    */
   public between(min: number | string, max: number | string, errorMessage?: string) {
-    const rule = this.addRule(betweenNumbersRule, errorMessage);
-    rule.context.options.min = min;
-    rule.context.options.max = max;
-    rule.context.options.scope = "global";
-    return this;
+    return this.addRule(betweenNumbersRule, errorMessage, {
+      min,
+      max,
+      scope: "global",
+    });
   }
 
   /**
@@ -231,25 +214,32 @@ export class NumberValidator extends BaseValidator {
    * @category Validation Rule
    */
   public betweenSibling(minField: string, maxField: string, errorMessage?: string) {
-    const rule = this.addRule(betweenNumbersRule, errorMessage);
-    rule.context.options.min = minField;
-    rule.context.options.max = maxField;
-    rule.context.options.scope = "sibling";
-    return this;
+    return this.addRule(betweenNumbersRule, errorMessage, {
+      min: minField,
+      max: maxField,
+      scope: "sibling",
+    });
   }
 
-  // Enum and value checking methods from ScalarValidator
-  public enum = ScalarValidator.prototype.enum;
-  public in = ScalarValidator.prototype.in;
-  public oneOf = ScalarValidator.prototype.in;
-  public allowsOnly = ScalarValidator.prototype.allowsOnly;
-  public forbids = ScalarValidator.prototype.forbids;
-  public notIn = ScalarValidator.prototype.forbids;
+  // Enum and value membership methods are inherited from PrimitiveValidator.
 
-  // Length methods from StringValidator
-  public length = StringValidator.prototype.length;
-  public minLength = StringValidator.prototype.minLength;
-  public maxLength = StringValidator.prototype.maxLength;
+  /**
+   * Value (as a string) must be exactly this many characters.
+   * Useful for fixed-format numeric codes (e.g. 4-digit PIN).
+   */
+  public length(length: number, errorMessage?: string) {
+    return this.addRule(lengthRule, errorMessage, { length });
+  }
+
+  /** Value (as string representation) length must be ≥ min */
+  public minLength(length: number, errorMessage?: string) {
+    return this.addRule(minLengthRule, errorMessage, { minLength: length });
+  }
+
+  /** Value (as string representation) length must be ≤ max */
+  public maxLength(length: number, errorMessage?: string) {
+    return this.addRule(maxLengthRule, errorMessage, { maxLength: length });
+  }
 
   // Mutators
 
@@ -257,39 +247,34 @@ export class NumberValidator extends BaseValidator {
    * Convert value to its absolute value
    */
   public abs() {
-    this.addMutator(absMutator);
-    return this;
+    return this.addMutator(absMutator);
   }
 
   /**
    * Round value up to the nearest integer
    */
   public ceil() {
-    this.addMutator(ceilMutator);
-    return this;
+    return this.addMutator(ceilMutator);
   }
 
   /**
    * Round value down to the nearest integer
    */
   public floor() {
-    this.addMutator(floorMutator);
-    return this;
+    return this.addMutator(floorMutator);
   }
 
   /**
    * Round value to the nearest integer or specified decimals
    */
   public round(decimals = 0) {
-    this.addMutator(roundMutator, { decimals });
-    return this;
+    return this.addMutator(roundMutator, { decimals });
   }
 
   /**
    * Format number using fixed-point notation
    */
   public toFixed(decimals = 2) {
-    this.addMutator(toFixedMutator, { decimals });
-    return this;
+    return this.addMutator(toFixedMutator, { decimals });
   }
 }

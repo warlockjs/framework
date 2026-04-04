@@ -47,6 +47,7 @@ import {
   minDayRule,
   minMonthRule,
   minYearRule,
+  Month,
   monthRule,
   pastRule,
   quarterRule,
@@ -70,8 +71,8 @@ import { BaseValidator } from "./base-validator";
 export class DateValidator extends BaseValidator {
   public constructor(errorMessage?: string) {
     super();
-    this.addMutator(dateMutator); // Normalize to Date object first
-    this.addRule(dateRule, errorMessage);
+    this.addMutableMutator(dateMutator); // Normalize to Date object first
+    this.addMutableRule(dateRule, errorMessage);
   }
 
   /**
@@ -89,16 +90,12 @@ export class DateValidator extends BaseValidator {
    * @category transformer
    */
   public toISOString() {
-    this.addTransformer(data =>
-      data instanceof Date ? data.toISOString() : data,
-    );
-    return this;
+    return this.addTransformer((data) => (data instanceof Date ? data.toISOString() : data));
   }
 
   /** Convert date to Unix timestamp (milliseconds) */
   public toTimestamp() {
-    this.addTransformer(data => (data instanceof Date ? data.getTime() : data));
-    return this;
+    return this.addTransformer((data) => (data instanceof Date ? data.getTime() : data));
   }
 
   // ==================== String Format Transformers ====================
@@ -106,28 +103,24 @@ export class DateValidator extends BaseValidator {
 
   /** Convert date to specific format using dayjs */
   public toFormat(format: string) {
-    this.addTransformer(
-      (data, { options }) =>
-        data instanceof Date ? dayjs(data).format(options.format) : data,
+    return this.addTransformer(
+      (data, { options }) => (data instanceof Date ? dayjs(data).format(options.format) : data),
       { format },
     );
-    return this;
   }
 
   /** Convert to date only (remove time, returns YYYY-MM-DD) */
   public toDateOnly() {
-    this.addTransformer(data =>
+    return this.addTransformer((data) =>
       data instanceof Date ? dayjs(data).format("YYYY-MM-DD") : data,
     );
-    return this;
   }
 
   /** Convert to time only (returns HH:MM:SS) */
   public toTimeOnly() {
-    this.addTransformer(data =>
+    return this.addTransformer((data) =>
       data instanceof Date ? dayjs(data).format("HH:mm:ss") : data,
     );
-    return this;
   }
 
   // ==================== Date Mutators ====================
@@ -138,70 +131,59 @@ export class DateValidator extends BaseValidator {
    * @category mutator
    */
   public toStartOfDay() {
-    this.addMutator(toStartOfDayMutator);
-    return this;
+    return this.addMutator(toStartOfDayMutator);
   }
 
   /** Convert date to end of day (23:59:59.999) */
   public toEndOfDay() {
-    this.addMutator(toEndOfDayMutator);
-    return this;
+    return this.addMutator(toEndOfDayMutator);
   }
 
   /** Add or subtract days from date */
   public addDays(days: number) {
-    this.addMutator(addDaysMutator, { days });
-    return this;
+    return this.addMutator(addDaysMutator, { days });
   }
 
   /** Add or subtract months from date */
   public addMonths(months: number) {
-    this.addMutator(addMonthsMutator, { months });
-    return this;
+    return this.addMutator(addMonthsMutator, { months });
   }
 
   /** Add or subtract years from date */
   public addYears(years: number) {
-    this.addMutator(addYearsMutator, { years });
-    return this;
+    return this.addMutator(addYearsMutator, { years });
   }
 
   /** Add or subtract hours from date */
   public addHours(hours: number) {
-    this.addMutator(addHoursMutator, { hours });
-    return this;
+    return this.addMutator(addHoursMutator, { hours });
   }
 
   /** Convert date to UTC */
   public toUTC() {
-    this.addMutator(toUTCMutator);
-    return this;
+    return this.addMutator(toUTCMutator);
   }
 
   // ==================== Date Range Mutators ====================
 
   /** Set to start of month */
   public toStartOfMonth() {
-    this.addMutator(toStartOfMonthMutator);
-    return this;
+    return this.addMutator(toStartOfMonthMutator);
   }
 
   /** Set to end of month */
   public toEndOfMonth() {
-    this.addMutator(toEndOfMonthMutator);
-    return this;
+    return this.addMutator(toEndOfMonthMutator);
   }
 
   /** Set to start of year */
   public toStartOfYear() {
-    this.addMutator(toStartOfYearMutator);
-    return this;
+    return this.addMutator(toStartOfYearMutator);
   }
 
   /** Set to end of year */
   public toEndOfYear() {
-    this.addMutator(toEndOfYearMutator);
-    return this;
+    return this.addMutator(toEndOfYearMutator);
   }
 
   // ==================== Date Comparison ====================
@@ -229,10 +211,10 @@ export class DateValidator extends BaseValidator {
    * @category Validation Rule
    */
   public min(dateOrField: Date | string | number, errorMessage?: string): this {
-    const rule = this.addRule(minDateRule, errorMessage);
-    rule.context.options.dateOrField = dateOrField;
-    rule.context.options.scope = "global";
-    return this;
+    return this.addRule(minDateRule, errorMessage, {
+      dateOrField,
+      scope: "global",
+    });
   }
 
   /**
@@ -245,10 +227,10 @@ export class DateValidator extends BaseValidator {
    * @category Validation Rule
    */
   public max(dateOrField: Date | string | number, errorMessage?: string): this {
-    const rule = this.addRule(maxDateRule, errorMessage);
-    rule.context.options.dateOrField = dateOrField;
-    rule.context.options.scope = "global";
-    return this;
+    return this.addRule(maxDateRule, errorMessage, {
+      dateOrField,
+      scope: "global",
+    });
   }
 
   /**
@@ -260,14 +242,11 @@ export class DateValidator extends BaseValidator {
    *
    * @category Validation Rule
    */
-  public before(
-    dateOrField: Date | string | number,
-    errorMessage?: string,
-  ): this {
-    const rule = this.addRule(beforeFieldRule, errorMessage);
-    rule.context.options.dateOrField = dateOrField;
-    rule.context.options.scope = "global";
-    return this;
+  public before(dateOrField: Date | string | number, errorMessage?: string): this {
+    return this.addRule(beforeFieldRule, errorMessage, {
+      dateOrField,
+      scope: "global",
+    });
   }
 
   /**
@@ -279,58 +258,46 @@ export class DateValidator extends BaseValidator {
    *
    * @category Validation Rule
    */
-  public after(
-    dateOrField: Date | string | number,
-    errorMessage?: string,
-  ): this {
-    const rule = this.addRule(afterFieldRule, errorMessage);
-    rule.context.options.dateOrField = dateOrField;
-    rule.context.options.scope = "global";
-    return this;
+  public after(dateOrField: Date | string | number, errorMessage?: string): this {
+    return this.addRule(afterFieldRule, errorMessage, {
+      dateOrField,
+      scope: "global",
+    });
   }
 
   /** Date must be between start and end dates */
   public between(startDate: Date, endDate: Date, errorMessage?: string) {
-    const rule = this.addRule(betweenDatesRule, errorMessage);
-    rule.context.options.startDate = startDate;
-    rule.context.options.endDate = endDate;
-    return this;
+    return this.addRule(betweenDatesRule, errorMessage, { startDate, endDate });
   }
 
   /** Date must be exactly today */
   public today(errorMessage?: string) {
-    this.addRule(todayRule, errorMessage);
-    return this;
+    return this.addRule(todayRule, errorMessage);
   }
 
   /** Date must be today or in the future */
   public fromToday(errorMessage?: string) {
-    this.addRule(fromTodayRule, errorMessage);
-    return this;
+    return this.addRule(fromTodayRule, errorMessage);
   }
 
   /** Date must be before today */
   public beforeToday(errorMessage?: string) {
-    this.addRule(beforeTodayRule, errorMessage);
-    return this;
+    return this.addRule(beforeTodayRule, errorMessage);
   }
 
   /** Date must be after today (not including today) */
   public afterToday(errorMessage?: string) {
-    this.addRule(afterTodayRule, errorMessage);
-    return this;
+    return this.addRule(afterTodayRule, errorMessage);
   }
 
   /** Date must be in the past */
   public past(errorMessage?: string) {
-    this.addRule(pastRule, errorMessage);
-    return this;
+    return this.addRule(pastRule, errorMessage);
   }
 
   /** Date must be in the future */
   public future(errorMessage?: string) {
-    this.addRule(futureRule, errorMessage);
-    return this;
+    return this.addRule(futureRule, errorMessage);
   }
 
   // ==================== Sibling Field Comparison ====================
@@ -341,10 +308,10 @@ export class DateValidator extends BaseValidator {
    * @category Validation Rule
    */
   public minSibling(field: string, errorMessage?: string): this {
-    const rule = this.addRule(minDateRule, errorMessage);
-    rule.context.options.dateOrField = field;
-    rule.context.options.scope = "sibling";
-    return this;
+    return this.addRule(minDateRule, errorMessage, {
+      dateOrField: field,
+      scope: "sibling",
+    });
   }
 
   /**
@@ -352,10 +319,10 @@ export class DateValidator extends BaseValidator {
    * @category Validation Rule
    */
   public maxSibling(field: string, errorMessage?: string): this {
-    const rule = this.addRule(maxDateRule, errorMessage);
-    rule.context.options.dateOrField = field;
-    rule.context.options.scope = "sibling";
-    return this;
+    return this.addRule(maxDateRule, errorMessage, {
+      dateOrField: field,
+      scope: "sibling",
+    });
   }
 
   /**
@@ -363,10 +330,10 @@ export class DateValidator extends BaseValidator {
    * @category Validation Rule
    */
   public beforeSibling(field: string, errorMessage?: string): this {
-    const rule = this.addRule(beforeFieldRule, errorMessage);
-    rule.context.options.dateOrField = field;
-    rule.context.options.scope = "sibling";
-    return this;
+    return this.addRule(beforeFieldRule, errorMessage, {
+      dateOrField: field,
+      scope: "sibling",
+    });
   }
 
   /**
@@ -374,197 +341,144 @@ export class DateValidator extends BaseValidator {
    * @category Validation Rule
    */
   public afterSibling(field: string, errorMessage?: string): this {
-    const rule = this.addRule(afterFieldRule, errorMessage);
-    rule.context.options.dateOrField = field;
-    rule.context.options.scope = "sibling";
-    return this;
+    return this.addRule(afterFieldRule, errorMessage, {
+      dateOrField: field,
+      scope: "sibling",
+    });
   }
 
   /** Date must be the same as another field's date */
   public sameAsField(field: string, errorMessage?: string) {
-    const rule = this.addRule(sameAsFieldDateRule, errorMessage);
-    rule.context.options.field = field;
-    rule.context.options.scope = "global";
-    return this;
+    return this.addRule(sameAsFieldDateRule, errorMessage, {
+      field,
+      scope: "global",
+    });
   }
 
   /** Date must be the same as another sibling field's date */
   public sameAsFieldSibling(field: string, errorMessage?: string) {
-    const rule = this.addRule(sameAsFieldDateRule, errorMessage);
-    rule.context.options.field = field;
-    rule.context.options.scope = "sibling";
-    return this;
+    return this.addRule(sameAsFieldDateRule, errorMessage, {
+      field,
+      scope: "sibling",
+    });
   }
 
   // ==================== Time Validation ====================
 
   /** Time must be from specific hour onwards (0-23) */
   public fromHour(hour: number, errorMessage?: string) {
-    const rule = this.addRule(fromHourRule, errorMessage);
-    rule.context.options.hour = hour;
-    return this;
+    return this.addRule(fromHourRule, errorMessage, { hour });
   }
 
   /** Time must be before specific hour (0-23) */
   public beforeHour(hour: number, errorMessage?: string) {
-    const rule = this.addRule(beforeHourRule, errorMessage);
-    rule.context.options.hour = hour;
-    return this;
+    return this.addRule(beforeHourRule, errorMessage, { hour });
   }
 
   /** Time must be between start and end hours (0-23) */
-  public betweenHours(
-    startHour: number,
-    endHour: number,
-    errorMessage?: string,
-  ) {
-    const rule = this.addRule(betweenHoursRule, errorMessage);
-    rule.context.options.startHour = startHour;
-    rule.context.options.endHour = endHour;
-    return this;
+  public betweenHours(startHour: number, endHour: number, errorMessage?: string) {
+    return this.addRule(betweenHoursRule, errorMessage, { startHour, endHour });
   }
 
   /** Time must be from specific minute onwards (0-59) */
   public fromMinute(minute: number, errorMessage?: string) {
-    const rule = this.addRule(fromMinuteRule, errorMessage);
-    rule.context.options.minute = minute;
-    return this;
+    return this.addRule(fromMinuteRule, errorMessage, { minute });
   }
 
   /** Time must be before specific minute (0-59) */
   public beforeMinute(minute: number, errorMessage?: string) {
-    const rule = this.addRule(beforeMinuteRule, errorMessage);
-    rule.context.options.minute = minute;
-    return this;
+    return this.addRule(beforeMinuteRule, errorMessage, { minute });
   }
 
   /** Time must be between start and end minutes (0-59) */
-  public betweenMinutes(
-    startMinute: number,
-    endMinute: number,
-    errorMessage?: string,
-  ) {
-    const rule = this.addRule(betweenMinutesRule, errorMessage);
-    rule.context.options.startMinute = startMinute;
-    rule.context.options.endMinute = endMinute;
-    return this;
+  public betweenMinutes(startMinute: number, endMinute: number, errorMessage?: string) {
+    return this.addRule(betweenMinutesRule, errorMessage, {
+      startMinute,
+      endMinute,
+    });
   }
 
   /** Time must be between start and end times (HH:MM format) */
-  public betweenTimes(
-    startTime: string,
-    endTime: string,
-    errorMessage?: string,
-  ) {
-    const rule = this.addRule(betweenTimesRule, errorMessage);
-    rule.context.options.startTime = startTime;
-    rule.context.options.endTime = endTime;
-    return this;
+  public betweenTimes(startTime: string, endTime: string, errorMessage?: string) {
+    return this.addRule(betweenTimesRule, errorMessage, { startTime, endTime });
   }
 
   // ==================== Age Validation ====================
 
   /** Age must be exactly the given years */
   public age(years: number, errorMessage?: string) {
-    const rule = this.addRule(ageRule, errorMessage);
-    rule.context.options.years = years;
-    return this;
+    return this.addRule(ageRule, errorMessage, { years });
   }
 
   /** Minimum age requirement */
   public minAge(years: number, errorMessage?: string) {
-    const rule = this.addRule(minAgeRule, errorMessage);
-    rule.context.options.years = years;
-    return this;
+    return this.addRule(minAgeRule, errorMessage, { years });
   }
 
   /** Maximum age requirement */
   public maxAge(years: number, errorMessage?: string) {
-    const rule = this.addRule(maxAgeRule, errorMessage);
-    rule.context.options.years = years;
-    return this;
+    return this.addRule(maxAgeRule, errorMessage, { years });
   }
 
   /** Age must be between min and max years */
   public betweenAge(minAge: number, maxAge: number, errorMessage?: string) {
-    const rule = this.addRule(betweenAgeRule, errorMessage);
-    rule.context.options.minAge = minAge;
-    rule.context.options.maxAge = maxAge;
-    return this;
+    return this.addRule(betweenAgeRule, errorMessage, { minAge, maxAge });
   }
 
   // ==================== Day Validation ====================
 
   /** Date must be specific weekday */
   public weekDay(day: WeekDay, errorMessage?: string) {
-    const rule = this.addRule(weekDayRule, errorMessage);
-    rule.context.options.day = day;
-    return this;
+    return this.addRule(weekDayRule, errorMessage, { day });
   }
 
   /** Date must be one of specified weekdays */
   public weekdays(days: WeekDay[], errorMessage?: string) {
-    const rule = this.addRule(weekdaysRule, errorMessage);
-    rule.context.options.days = days;
-    return this;
+    return this.addRule(weekdaysRule, errorMessage, { days });
   }
 
   /** Date must be a weekend (Saturday or Sunday) */
   public weekend(errorMessage?: string) {
-    this.addRule(weekendRule, errorMessage);
-    return this;
+    return this.addRule(weekendRule, errorMessage);
   }
 
   /** Date must be a business day (Monday-Friday) */
   public businessDay(errorMessage?: string) {
-    this.addRule(businessDayRule, errorMessage);
-    return this;
+    return this.addRule(businessDayRule, errorMessage);
   }
 
   /** Date must match specific format */
   public format(format: string, errorMessage?: string) {
-    const rule = this.addRule(dateRule, errorMessage);
-    rule.context.options.format = format;
-    return this;
+    return this.addRule(dateRule, errorMessage, { format });
   }
 
   // ==================== Relative Date Validation ====================
 
   /** Date must be within X days from now (past or future) */
   public withinDays(days: number, errorMessage?: string) {
-    const rule = this.addRule(withinDaysRule, errorMessage);
-    rule.context.options.days = days;
-    return this;
+    return this.addRule(withinDaysRule, errorMessage, { days });
   }
 
   /** Date must be within X days in the past */
   public withinPastDays(days: number, errorMessage?: string) {
-    const rule = this.addRule(withinPastDaysRule, errorMessage);
-    rule.context.options.days = days;
-    return this;
+    return this.addRule(withinPastDaysRule, errorMessage, { days });
   }
 
   /** Date must be within X days in the future */
   public withinFutureDays(days: number, errorMessage?: string) {
-    const rule = this.addRule(withinFutureDaysRule, errorMessage);
-    rule.context.options.days = days;
-    return this;
+    return this.addRule(withinFutureDaysRule, errorMessage, { days });
   }
 
   // ==================== Period Validation ====================
 
   /** Date must be in specific month (1-12) */
-  public month(month: number, errorMessage?: string) {
-    const rule = this.addRule(monthRule, errorMessage);
-    rule.context.options.month = month;
-    return this;
+  public month(month: Month, errorMessage?: string) {
+    return this.addRule(monthRule, errorMessage, { month });
   }
 
   /** Date must be in specific year */
   public year(year: number, errorMessage?: string) {
-    const rule = this.addRule(yearRule, errorMessage);
-    rule.context.options.year = year;
-    return this;
+    return this.addRule(yearRule, errorMessage, { year });
   }
 
   /**
@@ -573,16 +487,12 @@ export class DateValidator extends BaseValidator {
    *
    * @category Validation Rule
    */
-  public betweenYears(
-    startYear: number | string,
-    endYear: number | string,
-    errorMessage?: string,
-  ) {
-    const rule = this.addRule(betweenYearsRule, errorMessage);
-    rule.context.options.startYear = startYear;
-    rule.context.options.endYear = endYear;
-    rule.context.options.scope = "global";
-    return this;
+  public betweenYears(startYear: number | string, endYear: number | string, errorMessage?: string) {
+    return this.addRule(betweenYearsRule, errorMessage, {
+      startYear,
+      endYear,
+      scope: "global",
+    });
   }
 
   /**
@@ -592,15 +502,15 @@ export class DateValidator extends BaseValidator {
    * @category Validation Rule
    */
   public betweenMonths(
-    startMonth: number | string,
-    endMonth: number | string,
+    startMonth: Month | string,
+    endMonth: Month | string,
     errorMessage?: string,
   ) {
-    const rule = this.addRule(betweenMonthsRule, errorMessage);
-    rule.context.options.startMonth = startMonth;
-    rule.context.options.endMonth = endMonth;
-    rule.context.options.scope = "global";
-    return this;
+    return this.addRule(betweenMonthsRule, errorMessage, {
+      startMonth,
+      endMonth,
+      scope: "global",
+    });
   }
 
   /**
@@ -609,32 +519,24 @@ export class DateValidator extends BaseValidator {
    *
    * @category Validation Rule
    */
-  public betweenDays(
-    startDay: number | string,
-    endDay: number | string,
-    errorMessage?: string,
-  ) {
-    const rule = this.addRule(betweenDaysRule, errorMessage);
-    rule.context.options.startDay = startDay;
-    rule.context.options.endDay = endDay;
-    rule.context.options.scope = "global";
-    return this;
+  public betweenDays(startDay: number | string, endDay: number | string, errorMessage?: string) {
+    return this.addRule(betweenDaysRule, errorMessage, {
+      startDay,
+      endDay,
+      scope: "global",
+    });
   }
 
   /**
    * Date must be between sibling field years
    * @category Validation Rule
    */
-  public betweenYearsSibling(
-    startYearField: string,
-    endYearField: string,
-    errorMessage?: string,
-  ) {
-    const rule = this.addRule(betweenYearsRule, errorMessage);
-    rule.context.options.startYear = startYearField;
-    rule.context.options.endYear = endYearField;
-    rule.context.options.scope = "sibling";
-    return this;
+  public betweenYearsSibling(startYearField: string, endYearField: string, errorMessage?: string) {
+    return this.addRule(betweenYearsRule, errorMessage, {
+      startYear: startYearField,
+      endYear: endYearField,
+      scope: "sibling",
+    });
   }
 
   /**
@@ -646,27 +548,23 @@ export class DateValidator extends BaseValidator {
     endMonthField: string,
     errorMessage?: string,
   ) {
-    const rule = this.addRule(betweenMonthsRule, errorMessage);
-    rule.context.options.startMonth = startMonthField;
-    rule.context.options.endMonth = endMonthField;
-    rule.context.options.scope = "sibling";
-    return this;
+    return this.addRule(betweenMonthsRule, errorMessage, {
+      startMonth: startMonthField,
+      endMonth: endMonthField,
+      scope: "sibling",
+    });
   }
 
   /**
    * Date must be between sibling field days
    * @category Validation Rule
    */
-  public betweenDaysSibling(
-    startDayField: string,
-    endDayField: string,
-    errorMessage?: string,
-  ) {
-    const rule = this.addRule(betweenDaysRule, errorMessage);
-    rule.context.options.startDay = startDayField;
-    rule.context.options.endDay = endDayField;
-    rule.context.options.scope = "sibling";
-    return this;
+  public betweenDaysSibling(startDayField: string, endDayField: string, errorMessage?: string) {
+    return this.addRule(betweenDaysRule, errorMessage, {
+      startDay: startDayField,
+      endDay: endDayField,
+      scope: "sibling",
+    });
   }
 
   /**
@@ -685,10 +583,10 @@ export class DateValidator extends BaseValidator {
    * @category Validation Rule
    */
   public minYear(yearOrField: number | string, errorMessage?: string): this {
-    const rule = this.addRule(minYearRule, errorMessage);
-    rule.context.options.yearOrField = yearOrField;
-    rule.context.options.scope = "global";
-    return this;
+    return this.addRule(minYearRule, errorMessage, {
+      yearOrField,
+      scope: "global",
+    });
   }
 
   /**
@@ -698,10 +596,10 @@ export class DateValidator extends BaseValidator {
    * @category Validation Rule
    */
   public maxYear(yearOrField: number | string, errorMessage?: string): this {
-    const rule = this.addRule(maxYearRule, errorMessage);
-    rule.context.options.yearOrField = yearOrField;
-    rule.context.options.scope = "global";
-    return this;
+    return this.addRule(maxYearRule, errorMessage, {
+      yearOrField,
+      scope: "global",
+    });
   }
 
   /**
@@ -711,10 +609,10 @@ export class DateValidator extends BaseValidator {
    * @category Validation Rule
    */
   public minMonth(monthOrField: number | string, errorMessage?: string): this {
-    const rule = this.addRule(minMonthRule, errorMessage);
-    rule.context.options.monthOrField = monthOrField;
-    rule.context.options.scope = "global";
-    return this;
+    return this.addRule(minMonthRule, errorMessage, {
+      monthOrField,
+      scope: "global",
+    });
   }
 
   /**
@@ -723,11 +621,11 @@ export class DateValidator extends BaseValidator {
    *
    * @category Validation Rule
    */
-  public maxMonth(monthOrField: number | string, errorMessage?: string): this {
-    const rule = this.addRule(maxMonthRule, errorMessage);
-    rule.context.options.monthOrField = monthOrField;
-    rule.context.options.scope = "global";
-    return this;
+  public maxMonth(monthOrField: Month | string, errorMessage?: string): this {
+    return this.addRule(maxMonthRule, errorMessage, {
+      monthOrField,
+      scope: "global",
+    });
   }
 
   /**
@@ -737,10 +635,10 @@ export class DateValidator extends BaseValidator {
    * @category Validation Rule
    */
   public minDay(dayOrField: number | string, errorMessage?: string): this {
-    const rule = this.addRule(minDayRule, errorMessage);
-    rule.context.options.dayOrField = dayOrField;
-    rule.context.options.scope = "global";
-    return this;
+    return this.addRule(minDayRule, errorMessage, {
+      dayOrField,
+      scope: "global",
+    });
   }
 
   /**
@@ -750,10 +648,10 @@ export class DateValidator extends BaseValidator {
    * @category Validation Rule
    */
   public maxDay(dayOrField: number | string, errorMessage?: string): this {
-    const rule = this.addRule(maxDayRule, errorMessage);
-    rule.context.options.dayOrField = dayOrField;
-    rule.context.options.scope = "global";
-    return this;
+    return this.addRule(maxDayRule, errorMessage, {
+      dayOrField,
+      scope: "global",
+    });
   }
 
   /**
@@ -761,10 +659,10 @@ export class DateValidator extends BaseValidator {
    * @category Validation Rule
    */
   public minYearSibling(field: string, errorMessage?: string): this {
-    const rule = this.addRule(minYearRule, errorMessage);
-    rule.context.options.yearOrField = field;
-    rule.context.options.scope = "sibling";
-    return this;
+    return this.addRule(minYearRule, errorMessage, {
+      yearOrField: field,
+      scope: "sibling",
+    });
   }
 
   /**
@@ -772,10 +670,10 @@ export class DateValidator extends BaseValidator {
    * @category Validation Rule
    */
   public maxYearSibling(field: string, errorMessage?: string): this {
-    const rule = this.addRule(maxYearRule, errorMessage);
-    rule.context.options.yearOrField = field;
-    rule.context.options.scope = "sibling";
-    return this;
+    return this.addRule(maxYearRule, errorMessage, {
+      yearOrField: field,
+      scope: "sibling",
+    });
   }
 
   /**
@@ -783,10 +681,10 @@ export class DateValidator extends BaseValidator {
    * @category Validation Rule
    */
   public minMonthSibling(field: string, errorMessage?: string): this {
-    const rule = this.addRule(minMonthRule, errorMessage);
-    rule.context.options.monthOrField = field;
-    rule.context.options.scope = "sibling";
-    return this;
+    return this.addRule(minMonthRule, errorMessage, {
+      monthOrField: field,
+      scope: "sibling",
+    });
   }
 
   /**
@@ -794,10 +692,10 @@ export class DateValidator extends BaseValidator {
    * @category Validation Rule
    */
   public maxMonthSibling(field: string, errorMessage?: string): this {
-    const rule = this.addRule(maxMonthRule, errorMessage);
-    rule.context.options.monthOrField = field;
-    rule.context.options.scope = "sibling";
-    return this;
+    return this.addRule(maxMonthRule, errorMessage, {
+      monthOrField: field,
+      scope: "sibling",
+    });
   }
 
   /**
@@ -805,10 +703,10 @@ export class DateValidator extends BaseValidator {
    * @category Validation Rule
    */
   public minDaySibling(field: string, errorMessage?: string): this {
-    const rule = this.addRule(minDayRule, errorMessage);
-    rule.context.options.dayOrField = field;
-    rule.context.options.scope = "sibling";
-    return this;
+    return this.addRule(minDayRule, errorMessage, {
+      dayOrField: field,
+      scope: "sibling",
+    });
   }
 
   /**
@@ -816,36 +714,33 @@ export class DateValidator extends BaseValidator {
    * @category Validation Rule
    */
   public maxDaySibling(field: string, errorMessage?: string): this {
-    const rule = this.addRule(maxDayRule, errorMessage);
-    rule.context.options.dayOrField = field;
-    rule.context.options.scope = "sibling";
-    return this;
+    return this.addRule(maxDayRule, errorMessage, {
+      dayOrField: field,
+      scope: "sibling",
+    });
   }
 
   /** Date must be in specific quarter (1-4) */
   public quarter(quarter: 1 | 2 | 3 | 4, errorMessage?: string) {
-    const rule = this.addRule(quarterRule, errorMessage);
-    rule.context.options.quarter = quarter;
-    return this;
+    return this.addRule(quarterRule, errorMessage, { quarter });
   }
 
   // ==================== Special Validation ====================
 
   /** Valid birthday (not in future, reasonable age) */
   public birthday(minAge?: number, maxAge?: number, errorMessage?: string) {
-    const rule = this.addRule(birthdayRule, errorMessage);
-    if (minAge !== undefined) {
-      rule.context.options.minAge = minAge;
-    }
-    if (maxAge !== undefined) {
-      rule.context.options.maxAge = maxAge;
-    }
-    return this;
+    return this.addRule(birthdayRule, errorMessage, { minAge, maxAge });
   }
 
   /** Date must be in a leap year */
   public leapYear(errorMessage?: string) {
-    this.addRule(leapYearRule, errorMessage);
-    return this;
+    return this.addRule(leapYearRule, errorMessage);
+  }
+
+  /**
+   * Set default value as current time of exeuction
+   */
+  public defaultNow() {
+    return this.default(() => new Date());
   }
 }

@@ -22,6 +22,8 @@ export const presentIfRule: SchemaRule<{
 
     // Field must be present if the other field equals the expected value
     if (value === undefined && fieldValue === expectedValue) {
+      this.context.translationParams.value = expectedValue;
+      this.context.translatableParams.field = this.context.options.field;
       return invalidRule(this, context);
     }
 

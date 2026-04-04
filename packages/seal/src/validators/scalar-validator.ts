@@ -1,6 +1,5 @@
 import { invalidRule, VALID_RULE } from "../helpers";
 import { numberMutator, stringMutator } from "../mutators";
-import { allowedValuesRule, enumRule, inRule, notAllowedValuesRule } from "../rules";
 import {
   acceptedIfPresentRule,
   acceptedIfRequiredRule,
@@ -15,20 +14,21 @@ import {
   declinedUnlessRule,
   declinedWithoutRule,
 } from "../rules/scalar";
-
-import { BaseValidator } from "./base-validator";
+import { PrimitiveValidator } from "./primitive-validator";
 
 /**
  * Scalar validator class
  *
- * Core validator for scalar values (string, number, boolean)
+ * Core validator for scalar values (string, number, boolean).
+ * Extends PrimitiveValidator (inherits enum/in/oneOf/allowsOnly/forbids/notIn)
+ * and additionally provides type-coercion mutators and accepted/declined rules.
  *
  * Database methods (unique, exists, etc.) are injected by the framework
  */
-export class ScalarValidator extends BaseValidator {
+export class ScalarValidator extends PrimitiveValidator {
   public constructor(errorMessage?: string) {
     super();
-    this.addRule(
+    this.addMutableRule(
       {
         name: "scalar",
         defaultErrorMessage: "The :input must be a scalar value",
@@ -54,18 +54,14 @@ export class ScalarValidator extends BaseValidator {
    * Mutate the scalar value to be number
    */
   public asNumber() {
-    this.addMutator(numberMutator);
-
-    return this;
+    return this.addMutator(numberMutator);
   }
 
   /**
    * Mutate the scalar value to be string
    */
   public asString() {
-    this.addMutator(stringMutator);
-
-    return this;
+    return this.addMutator(stringMutator);
   }
 
   /**
@@ -73,55 +69,42 @@ export class ScalarValidator extends BaseValidator {
    * The value will be valid if it equals 1 | "1" | true | "true" | "yes" | "y" | "on"
    */
   public accepted(errorMessage?: string) {
-    this.addRule(acceptedRule, errorMessage);
-    return this;
+    return this.addRule(acceptedRule, errorMessage);
   }
 
   /**
    * Accepted value if another field's value equals to a specific value
    */
   public acceptedIf(field: string, value: any, errorMessage?: string) {
-    const rule = this.addRule(acceptedIfRule, errorMessage);
-    rule.context.options.field = field;
-    rule.context.options.value = value;
-    return this;
+    return this.addRule(acceptedIfRule, errorMessage, { field, value });
   }
 
   /**
    * Accepted value if another field's value is not equal to the given value
    */
   public acceptedUnless(field: string, value: any, errorMessage?: string) {
-    const rule = this.addRule(acceptedUnlessRule, errorMessage);
-    rule.context.options.field = field;
-    rule.context.options.value = value;
-    return this;
+    return this.addRule(acceptedUnlessRule, errorMessage, { field, value });
   }
 
   /**
    * Accepted value if another field is required
    */
   public acceptedIfRequired(field: string, errorMessage?: string) {
-    const rule = this.addRule(acceptedIfRequiredRule, errorMessage);
-    rule.context.options.field = field;
-    return this;
+    return this.addRule(acceptedIfRequiredRule, errorMessage, { field });
   }
 
   /**
    * Accepted value if another field is present
    */
   public acceptedIfPresent(field: string, errorMessage?: string) {
-    const rule = this.addRule(acceptedIfPresentRule, errorMessage);
-    rule.context.options.field = field;
-    return this;
+    return this.addRule(acceptedIfPresentRule, errorMessage, { field });
   }
 
   /**
    * Accepted value if another field is missing
    */
   public acceptedWithout(field: string, errorMessage?: string) {
-    const rule = this.addRule(acceptedWithoutRule, errorMessage);
-    rule.context.options.field = field;
-    return this;
+    return this.addRule(acceptedWithoutRule, errorMessage, { field });
   }
 
   /**
@@ -129,92 +112,42 @@ export class ScalarValidator extends BaseValidator {
    * The value will be valid if it equals 0 | "0" | false | "false" | "no" | "n" | "off"
    */
   public declined(errorMessage?: string) {
-    this.addRule(declinedRule, errorMessage);
-    return this;
+    return this.addRule(declinedRule, errorMessage);
   }
 
   /**
    * Declined value if another field's value equals to a specific value
    */
   public declinedIf(field: string, value: any, errorMessage?: string) {
-    const rule = this.addRule(declinedIfRule, errorMessage);
-    rule.context.options.field = field;
-    rule.context.options.value = value;
-    return this;
+    return this.addRule(declinedIfRule, errorMessage, { field, value });
   }
 
   /**
    * Declined value if another field's value is not equal to the given value
    */
   public declinedUnless(field: string, value: any, errorMessage?: string) {
-    const rule = this.addRule(declinedUnlessRule, errorMessage);
-    rule.context.options.field = field;
-    rule.context.options.value = value;
-    return this;
+    return this.addRule(declinedUnlessRule, errorMessage, { field, value });
   }
 
   /**
    * Declined value if another field is required
    */
   public declinedIfRequired(field: string, errorMessage?: string) {
-    const rule = this.addRule(declinedIfRequiredRule, errorMessage);
-    rule.context.options.field = field;
-    return this;
+    return this.addRule(declinedIfRequiredRule, errorMessage, { field });
   }
 
   /**
    * Declined value if another field is present
    */
   public declinedIfPresent(field: string, errorMessage?: string) {
-    const rule = this.addRule(declinedIfPresentRule, errorMessage);
-    rule.context.options.field = field;
-    return this;
+    return this.addRule(declinedIfPresentRule, errorMessage, { field });
   }
 
   /**
    * Declined value if another field is missing
    */
   public declinedWithout(field: string, errorMessage?: string) {
-    const rule = this.addRule(declinedWithoutRule, errorMessage);
-    rule.context.options.field = field;
-    return this;
+    return this.addRule(declinedWithoutRule, errorMessage, { field });
   }
 
-  /** Value must be one of the given values */
-  public enum(values: any, errorMessage?: string) {
-    const rule = this.addRule(enumRule, errorMessage);
-    rule.context.options.enum = Object.values(values);
-    return this;
-  }
-
-  /** Value must be one of the given values */
-  public in(values: any[], errorMessage?: string) {
-    const rule = this.addRule(inRule, errorMessage);
-    rule.context.options.values = values;
-    return this;
-  }
-
-  /** @alias in */
-  public oneOf(values: any[], errorMessage?: string) {
-    return this.in(values, errorMessage);
-  }
-
-  /** Add rule to check if the value is one of the allowed values */
-  public allowsOnly(values: any[], errorMessage?: string) {
-    const rule = this.addRule(allowedValuesRule, errorMessage);
-    rule.context.options.allowedValues = values;
-    return this;
-  }
-
-  /** Forbid the value from being one of the given values */
-  public forbids(values: any[], errorMessage?: string) {
-    const rule = this.addRule(notAllowedValuesRule, errorMessage);
-    rule.context.options.notAllowedValues = values;
-    return this;
-  }
-
-  /** @alias forbids */
-  public notIn(values: any[], errorMessage?: string) {
-    return this.forbids(values, errorMessage);
-  }
 }

@@ -1,14 +1,31 @@
+import {
+  acceptedIfPresentRule,
+  acceptedIfRequiredRule,
+  acceptedIfRule,
+  acceptedRule,
+  acceptedUnlessRule,
+  acceptedWithoutRule,
+  declinedIfPresentRule,
+  declinedIfRequiredRule,
+  declinedIfRule,
+  declinedRule,
+  declinedUnlessRule,
+  declinedWithoutRule,
+} from "../rules/scalar";
 import { booleanRule } from "../rules";
-import { BaseValidator } from "./base-validator";
-import { ScalarValidator } from "./scalar-validator";
+import { PrimitiveValidator } from "./primitive-validator";
 
 /**
  * Boolean validator class
+ *
+ * Extends PrimitiveValidator — inherits enum/in/oneOf/allowsOnly/forbids/notIn.
+ * Defines accepted/declined directly as real methods (not ScalarValidator field copies)
+ * so they survive cloning correctly.
  */
-export class BooleanValidator extends BaseValidator {
+export class BooleanValidator extends PrimitiveValidator {
   public constructor(errorMessage?: string) {
     super();
-    this.addRule(booleanRule, errorMessage);
+    this.addMutableRule(booleanRule, errorMessage);
   }
 
   /**
@@ -18,32 +35,71 @@ export class BooleanValidator extends BaseValidator {
     return typeof value === "boolean";
   }
 
-  // Accepted/Declined methods from ScalarValidator
+  // ==================== Accepted ====================
+
   /** Value must be accepted (true, "yes", 1, "on", etc.) */
-  public accepted = ScalarValidator.prototype.accepted;
+  public accepted(errorMessage?: string) {
+    return this.addRule(acceptedRule, errorMessage);
+  }
+
   /** Value must be accepted if another field equals a value */
-  public acceptedIf = ScalarValidator.prototype.acceptedIf;
+  public acceptedIf(field: string, value: any, errorMessage?: string) {
+    return this.addRule(acceptedIfRule, errorMessage, { field, value });
+  }
+
   /** Value must be accepted unless another field equals a value */
-  public acceptedUnless = ScalarValidator.prototype.acceptedUnless;
+  public acceptedUnless(field: string, value: any, errorMessage?: string) {
+    return this.addRule(acceptedUnlessRule, errorMessage, { field, value });
+  }
+
   /** Value must be accepted if another field is required */
-  public acceptedIfRequired = ScalarValidator.prototype.acceptedIfRequired;
+  public acceptedIfRequired(field: string, errorMessage?: string) {
+    return this.addRule(acceptedIfRequiredRule, errorMessage, { field });
+  }
+
   /** Value must be accepted if another field is present */
-  public acceptedIfPresent = ScalarValidator.prototype.acceptedIfPresent;
+  public acceptedIfPresent(field: string, errorMessage?: string) {
+    return this.addRule(acceptedIfPresentRule, errorMessage, { field });
+  }
+
   /** Value must be accepted if another field is missing */
-  public acceptedWithout = ScalarValidator.prototype.acceptedWithout;
+  public acceptedWithout(field: string, errorMessage?: string) {
+    return this.addRule(acceptedWithoutRule, errorMessage, { field });
+  }
+
+  // ==================== Declined ====================
 
   /** Value must be declined (false, "no", 0, "off", etc.) */
-  public declined = ScalarValidator.prototype.declined;
+  public declined(errorMessage?: string) {
+    return this.addRule(declinedRule, errorMessage);
+  }
+
   /** Value must be declined if another field equals a value */
-  public declinedIf = ScalarValidator.prototype.declinedIf;
+  public declinedIf(field: string, value: any, errorMessage?: string) {
+    return this.addRule(declinedIfRule, errorMessage, { field, value });
+  }
+
   /** Value must be declined unless another field equals a value */
-  public declinedUnless = ScalarValidator.prototype.declinedUnless;
+  public declinedUnless(field: string, value: any, errorMessage?: string) {
+    return this.addRule(declinedUnlessRule, errorMessage, { field, value });
+  }
+
   /** Value must be declined if another field is required */
-  public declinedIfRequired = ScalarValidator.prototype.declinedIfRequired;
+  public declinedIfRequired(field: string, errorMessage?: string) {
+    return this.addRule(declinedIfRequiredRule, errorMessage, { field });
+  }
+
   /** Value must be declined if another field is present */
-  public declinedIfPresent = ScalarValidator.prototype.declinedIfPresent;
+  public declinedIfPresent(field: string, errorMessage?: string) {
+    return this.addRule(declinedIfPresentRule, errorMessage, { field });
+  }
+
   /** Value must be declined if another field is missing */
-  public declinedWithout = ScalarValidator.prototype.declinedWithout;
+  public declinedWithout(field: string, errorMessage?: string) {
+    return this.addRule(declinedWithoutRule, errorMessage, { field });
+  }
+
+  // ==================== Strict boolean checks ====================
 
   /**
    * Value must be strictly true (not "yes", "on", 1, etc.)

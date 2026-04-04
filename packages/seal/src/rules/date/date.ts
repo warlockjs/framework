@@ -148,6 +148,8 @@ export const fromHourRule: SchemaRule<{ hour: number }> = {
     if (hour >= this.context.options.hour) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.hour = this.context.options.hour;
     return invalidRule(this, context);
   },
 };
@@ -165,6 +167,8 @@ export const beforeHourRule: SchemaRule<{ hour: number }> = {
     if (hour < this.context.options.hour) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.hour = this.context.options.hour;
     return invalidRule(this, context);
   },
 };
@@ -177,8 +181,7 @@ export const betweenHoursRule: SchemaRule<{
   endHour: number;
 }> = {
   name: "betweenHours",
-  defaultErrorMessage:
-    "The :input must be between :startHour:00 and :endHour:00",
+  defaultErrorMessage: "The :input must be between :startHour:00 and :endHour:00",
   async validate(value: Date, context) {
     const inputDate = new Date(value);
     const hour = inputDate.getHours();
@@ -187,6 +190,9 @@ export const betweenHoursRule: SchemaRule<{
     if (hour >= startHour && hour <= endHour) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.startHour = startHour;
+    this.context.translationParams.endHour = endHour;
     return invalidRule(this, context);
   },
 };
@@ -204,6 +210,9 @@ export const fromMinuteRule: SchemaRule<{ minute: number }> = {
     if (minute >= this.context.options.minute) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.minute = this.context.options.minute;
+
     return invalidRule(this, context);
   },
 };
@@ -221,6 +230,9 @@ export const beforeMinuteRule: SchemaRule<{ minute: number }> = {
     if (minute < this.context.options.minute) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.minute = this.context.options.minute;
+
     return invalidRule(this, context);
   },
 };
@@ -233,8 +245,7 @@ export const betweenMinutesRule: SchemaRule<{
   endMinute: number;
 }> = {
   name: "betweenMinutes",
-  defaultErrorMessage:
-    "The :input must be between minute :startMinute and :endMinute",
+  defaultErrorMessage: "The :input must be between minute :startMinute and :endMinute",
   async validate(value: Date, context) {
     const inputDate = new Date(value);
     const minute = inputDate.getMinutes();
@@ -243,6 +254,10 @@ export const betweenMinutesRule: SchemaRule<{
     if (minute >= startMinute && minute <= endMinute) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.startMinute = startMinute;
+    this.context.translationParams.endMinute = endMinute;
+
     return invalidRule(this, context);
   },
 };
@@ -259,16 +274,16 @@ export const ageRule: SchemaRule<{ years: number }> = {
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
 
-    if (
-      monthDiff < 0 ||
-      (monthDiff === 0 && today.getDate() < birthDate.getDate())
-    ) {
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
 
     if (age === this.context.options.years) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.years = this.context.options.years;
+
     return invalidRule(this, context);
   },
 };
@@ -285,16 +300,16 @@ export const minAgeRule: SchemaRule<{ years: number }> = {
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
 
-    if (
-      monthDiff < 0 ||
-      (monthDiff === 0 && today.getDate() < birthDate.getDate())
-    ) {
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
 
     if (age >= this.context.options.years) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.years = this.context.options.years;
+
     return invalidRule(this, context);
   },
 };
@@ -311,16 +326,16 @@ export const maxAgeRule: SchemaRule<{ years: number }> = {
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
 
-    if (
-      monthDiff < 0 ||
-      (monthDiff === 0 && today.getDate() < birthDate.getDate())
-    ) {
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
 
     if (age <= this.context.options.years) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.years = this.context.options.years;
+
     return invalidRule(this, context);
   },
 };
@@ -339,6 +354,9 @@ export const weekDayRule: SchemaRule<{ day: WeekDay }> = {
     if (dayOfWeek === expectedDay) {
       return VALID_RULE;
     }
+
+    this.context.translatableParams.day = this.context.options.day;
+
     return invalidRule(this, context);
   },
 };

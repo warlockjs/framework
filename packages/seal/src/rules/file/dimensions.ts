@@ -14,6 +14,8 @@ export const minWidthRule: SchemaRule<{ minWidth: number }> = {
       return VALID_RULE;
     }
 
+    this.context.translationParams.minWidth = this.context.options.minWidth;
+
     return invalidRule(this, context);
   },
 };
@@ -30,6 +32,8 @@ export const maxWidthRule: SchemaRule<{ maxWidth: number }> = {
     if (dimensions.width <= this.context.options.maxWidth) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.maxWidth = this.context.options.maxWidth;
 
     return invalidRule(this, context);
   },
@@ -48,6 +52,8 @@ export const minHeightRule: SchemaRule<{ minHeight: number }> = {
       return VALID_RULE;
     }
 
+    this.context.translationParams.minHeight = this.context.options.minHeight;
+
     return invalidRule(this, context);
   },
 };
@@ -64,6 +70,8 @@ export const maxHeightRule: SchemaRule<{ maxHeight: number }> = {
     if (dimensions.height <= this.context.options.maxHeight) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.maxHeight = this.context.options.maxHeight;
 
     return invalidRule(this, context);
   },

@@ -1,4 +1,4 @@
-import { invalidRule, VALID_RULE } from "../../helpers";
+import { invalidRule, resolveTranslation, VALID_RULE } from "../../helpers";
 import type { SchemaRule } from "../../types";
 
 /**
@@ -8,14 +8,19 @@ export const enumRule: SchemaRule<{ enum: any }> = {
   name: "enum",
   defaultErrorMessage: "The :input must be one of the following values: :enum",
   async validate(value: any, context) {
-    const enumObject = this.context.options.enum;
-    const enumValues = Object.values(enumObject);
+    const enumValues = this.context.options.enum;
 
     if (enumValues.includes(value)) {
       return VALID_RULE;
     }
 
-    this.context.options.enum = enumValues.join(", ");
+    // Translate each enum value individually, then join into a display string
+    this.context.translationParams.enum = enumValues
+      .map((v: any) =>
+        resolveTranslation({ key: String(v), rawValue: String(v), rule: this, context }),
+      )
+      .join(", ");
+
     return invalidRule(this, context);
   },
 };
@@ -25,12 +30,19 @@ export const enumRule: SchemaRule<{ enum: any }> = {
  */
 export const inRule: SchemaRule<{ values: any[] }> = {
   name: "in",
-  defaultErrorMessage:
-    "The :input must be one of the following values: :values",
+  defaultErrorMessage: "The :input must be one of the following values: :values",
   async validate(value: any, context) {
     if (this.context.options.values.includes(value)) {
       return VALID_RULE;
     }
+
+    // Translate each value individually, then join
+    this.context.translationParams.values = this.context.options.values
+      .map((v: any) =>
+        resolveTranslation({ key: String(v), rawValue: String(v), rule: this, context }),
+      )
+      .join(", ");
+
     return invalidRule(this, context);
   },
 };
@@ -45,6 +57,14 @@ export const allowedValuesRule: SchemaRule<{ allowedValues: any[] }> = {
     if (this.context.options.allowedValues.includes(value)) {
       return VALID_RULE;
     }
+
+    // Translate each value individually, then join
+    this.context.translationParams.allowedValues = this.context.options.allowedValues
+      .map((v: any) =>
+        resolveTranslation({ key: String(v), rawValue: String(v), rule: this, context }),
+      )
+      .join(", ");
+
     return invalidRule(this, context);
   },
 };
@@ -59,6 +79,14 @@ export const notAllowedValuesRule: SchemaRule<{ notAllowedValues: any[] }> = {
     if (!this.context.options.notAllowedValues.includes(value)) {
       return VALID_RULE;
     }
+
+    // Translate each value individually, then join
+    this.context.translationParams.notAllowedValues = this.context.options.notAllowedValues
+      .map((v: any) =>
+        resolveTranslation({ key: String(v), rawValue: String(v), rule: this, context }),
+      )
+      .join(", ");
+
     return invalidRule(this, context);
   },
 };

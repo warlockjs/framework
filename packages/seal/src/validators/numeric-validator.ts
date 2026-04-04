@@ -11,7 +11,7 @@ export class NumericValidator extends NumberValidator {
    */
   public constructor(errorMessage?: string) {
     super(errorMessage);
-    this.addMutator(numericMutator);
+    this.addMutableMutator(numericMutator);
   }
 
   /**

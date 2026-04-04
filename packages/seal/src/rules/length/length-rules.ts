@@ -9,16 +9,13 @@ export const minLengthRule: SchemaRule<{ minLength: number }> = {
   name: "minLength",
   defaultErrorMessage: "The :input must be at least :minLength characters long",
   async validate(value: any, context) {
-    const length =
-      typeof value?.length === "number"
-        ? value.length
-        : String(value || "").length;
+    const length = typeof value?.length === "number" ? value.length : String(value || "").length;
 
     if (length >= this.context.options.minLength) {
       return VALID_RULE;
     }
 
-    this.context.attributesList.minLength = this.context.options.minLength;
+    this.context.translationParams.minLength = this.context.options.minLength;
 
     return invalidRule(this, context);
   },
@@ -32,16 +29,13 @@ export const maxLengthRule: SchemaRule<{ maxLength: number }> = {
   name: "maxLength",
   defaultErrorMessage: "The :input must not exceed :maxLength characters",
   async validate(value: any, context) {
-    const length =
-      typeof value?.length === "number"
-        ? value.length
-        : String(value || "").length;
+    const length = typeof value?.length === "number" ? value.length : String(value || "").length;
 
     if (length <= this.context.options.maxLength) {
       return VALID_RULE;
     }
 
-    this.context.attributesList.maxLength = this.context.options.maxLength;
+    this.context.translationParams.maxLength = this.context.options.maxLength;
 
     return invalidRule(this, context);
   },
@@ -56,23 +50,16 @@ export const betweenLengthRule: SchemaRule<{
   maxLength: number;
 }> = {
   name: "betweenLength",
-  defaultErrorMessage:
-    "The :input must be between :minLength and :maxLength characters long",
+  defaultErrorMessage: "The :input must be between :minLength and :maxLength characters long",
   async validate(value: any, context) {
-    const length =
-      typeof value?.length === "number"
-        ? value.length
-        : String(value || "").length;
+    const length = typeof value?.length === "number" ? value.length : String(value || "").length;
 
-    if (
-      length >= this.context.options.minLength &&
-      length <= this.context.options.maxLength
-    ) {
+    if (length >= this.context.options.minLength && length <= this.context.options.maxLength) {
       return VALID_RULE;
     }
 
-    this.context.attributesList.minLength = this.context.options.minLength;
-    this.context.attributesList.maxLength = this.context.options.maxLength;
+    this.context.translationParams.minLength = this.context.options.minLength;
+    this.context.translationParams.maxLength = this.context.options.maxLength;
 
     return invalidRule(this, context);
   },
@@ -86,16 +73,13 @@ export const lengthRule: SchemaRule<{ length: number }> = {
   name: "length",
   defaultErrorMessage: "The :input must be exactly :length characters long",
   async validate(value: any, context) {
-    const length =
-      typeof value?.length === "number"
-        ? value.length
-        : String(value || "").length;
+    const length = typeof value?.length === "number" ? value.length : String(value || "").length;
 
     if (length === this.context.options.length) {
       return VALID_RULE;
     }
 
-    this.context.attributesList.length = this.context.options.length;
+    this.context.translationParams.length = this.context.options.length;
 
     return invalidRule(this, context);
   },
@@ -108,13 +92,11 @@ export const minWordsRule: SchemaRule<{ minWords: number }> = {
   name: "minWords",
   defaultErrorMessage: "The :input must be at least :minWords words",
   async validate(value: any, context) {
-    if (
-      String(value || "").split(" ").length >= this.context.options.minWords
-    ) {
+    if (String(value || "").split(" ").length >= this.context.options.minWords) {
       return VALID_RULE;
     }
 
-    this.context.attributesList.minWords = this.context.options.minWords;
+    this.context.translationParams.minWords = this.context.options.minWords;
 
     return invalidRule(this, context);
   },
@@ -127,13 +109,11 @@ export const maxWordsRule: SchemaRule<{ maxWords: number }> = {
   name: "maxWords",
   defaultErrorMessage: "The :input must be at most :maxWords words",
   async validate(value: any, context) {
-    if (
-      String(value || "").split(" ").length <= this.context.options.maxWords
-    ) {
+    if (String(value || "").split(" ").length <= this.context.options.maxWords) {
       return VALID_RULE;
     }
 
-    this.context.attributesList.maxWords = this.context.options.maxWords;
+    this.context.translationParams.maxWords = this.context.options.maxWords;
 
     return invalidRule(this, context);
   },
@@ -150,7 +130,7 @@ export const wordsRule: SchemaRule<{ words: number }> = {
       return VALID_RULE;
     }
 
-    this.context.attributesList.words = this.context.options.words;
+    this.context.translationParams.words = this.context.options.words;
 
     return invalidRule(this, context);
   },

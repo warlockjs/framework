@@ -41,8 +41,8 @@ export const v: ValidatorV = {
     },
 
   /** Create a record validator - object with dynamic keys and consistent value types */
-  record: <T extends BaseValidator>(validator: T, errorMessage?: string) =>
-    new RecordValidator(validator, errorMessage) as RecordValidator & {
+  record: <T extends BaseValidator>(validator?: T, errorMessage?: string) =>
+    new RecordValidator(validator || v.any(), errorMessage) as RecordValidator & {
       valueValidator: T;
     },
 
@@ -117,7 +117,7 @@ export interface ValidatorV {
     validator: T;
   };
   record: <T extends BaseValidator>(
-    validator: T,
+    validator?: T,
     errorMessage?: string,
   ) => RecordValidator & {
     valueValidator: T;

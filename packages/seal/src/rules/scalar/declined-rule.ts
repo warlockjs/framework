@@ -29,11 +29,15 @@ export const declinedRule: SchemaRule = {
  */
 export const declinedIfRule: SchemaRule<{ field: string; value: any }> = {
   name: "declinedIf",
-  description: "The field must be declined if another field's value equals to a specific value",
+  description: "The field must be declined if :field's value equals to :value",
   defaultErrorMessage: "The :input must be declined",
   async validate(value: any, context) {
     const fieldValue = getFieldValue(this, context);
     const { value: expectedValue } = this.context.options;
+
+    this.context.translatableParams.field = this.context.options.field;
+    this.context.translatableParams.value = this.context.options.value;
+
     if (fieldValue !== expectedValue) {
       return invalidRule(this, context);
     }
@@ -51,12 +55,14 @@ export const declinedIfRule: SchemaRule<{ field: string; value: any }> = {
  */
 export const declinedUnlessRule: SchemaRule<{ field: string; value: any }> = {
   name: "declinedUnless",
-  description:
-    "The field must be declined if another field's value is not equal to a specific value",
+  description: "The field must be declined if :field's value is not equal to :value",
   defaultErrorMessage: "The :input must be declined",
   async validate(value: any, context) {
     const fieldValue = getFieldValue(this, context);
     const { value: expectedValue } = this.context.options;
+
+    this.context.translatableParams.field = this.context.options.field;
+    this.context.translatableParams.value = this.context.options.value;
     if (fieldValue === expectedValue) {
       return invalidRule(this, context);
     }
@@ -74,10 +80,12 @@ export const declinedUnlessRule: SchemaRule<{ field: string; value: any }> = {
  */
 export const declinedIfRequiredRule: SchemaRule<{ field: string }> = {
   name: "declinedIfRequired",
-  description: "The field must be declined if another field is required",
+  description: "The field must be declined if :field is required",
   defaultErrorMessage: "The :input must be declined",
   async validate(value: any, context) {
     const fieldValue = getFieldValue(this, context);
+    this.context.translatableParams.field = this.context.options.field;
+
     if (isEmptyValue(fieldValue)) {
       return invalidRule(this, context);
     }
@@ -95,10 +103,12 @@ export const declinedIfRequiredRule: SchemaRule<{ field: string }> = {
  */
 export const declinedIfPresentRule: SchemaRule<{ field: string }> = {
   name: "declinedIfPresent",
-  description: "The field must be declined if another field is present",
+  description: "The field must be declined if :field is present",
   defaultErrorMessage: "The :input must be declined",
   async validate(value: any, context) {
     const fieldValue = getFieldValue(this, context);
+    this.context.translatableParams.field = this.context.options.field;
+
     if (fieldValue === undefined) {
       return invalidRule(this, context);
     }
@@ -116,10 +126,12 @@ export const declinedIfPresentRule: SchemaRule<{ field: string }> = {
  */
 export const declinedWithoutRule: SchemaRule<{ field: string }> = {
   name: "declinedWithout",
-  description: "The field must be declined if another field is missing",
+  description: "The field must be declined if :field is missing",
   defaultErrorMessage: "The :input must be declined",
   async validate(value: any, context) {
     const fieldValue = getFieldValue(this, context);
+    this.context.translatableParams.field = this.context.options.field;
+
     if (fieldValue !== undefined) {
       return invalidRule(this, context);
     }

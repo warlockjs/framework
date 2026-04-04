@@ -19,6 +19,7 @@ export const equalsFieldRule: SchemaRule<{
 
     // Value must equal the other field's value
     if (value !== fieldValue) {
+      this.context.translatableParams.field = this.context.options.field;
       return invalidRule(this, context);
     }
 

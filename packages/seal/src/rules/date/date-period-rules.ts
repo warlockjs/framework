@@ -2,10 +2,27 @@ import { get } from "@mongez/reinforcements";
 import { invalidRule, VALID_RULE } from "../../helpers";
 import type { SchemaRule } from "../../types";
 
+const MONTHS = {
+  1: "january",
+  2: "february",
+  3: "march",
+  4: "april",
+  5: "may",
+  6: "june",
+  7: "july",
+  8: "august",
+  9: "september",
+  10: "october",
+  11: "november",
+  12: "december",
+};
+
+export type Month = keyof typeof MONTHS;
+
 /**
  * Month rule - date must be in specific month (1-12)
  */
-export const monthRule: SchemaRule<{ month: number }> = {
+export const monthRule: SchemaRule<{ month: Month }> = {
   name: "month",
   defaultErrorMessage: "The :input must be in month :month",
   async validate(value: Date, context) {
@@ -15,6 +32,9 @@ export const monthRule: SchemaRule<{ month: number }> = {
     if (month === this.context.options.month) {
       return VALID_RULE;
     }
+
+    this.context.translatableParams.month =
+      MONTHS[this.context.options.month as keyof typeof MONTHS];
     return invalidRule(this, context);
   },
 };
@@ -32,6 +52,8 @@ export const yearRule: SchemaRule<{ year: number }> = {
     if (year === this.context.options.year) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.year = this.context.options.year;
     return invalidRule(this, context);
   },
 };
@@ -107,6 +129,9 @@ export const betweenYearsRule: SchemaRule<{
     if (inputYear >= compareStartYear && inputYear <= compareEndYear) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.startYear = compareStartYear;
+    this.context.translationParams.endYear = compareEndYear;
     return invalidRule(this, context);
   },
 };
@@ -116,13 +141,12 @@ export const betweenYearsRule: SchemaRule<{
  * Supports field names with sibling scope
  */
 export const betweenMonthsRule: SchemaRule<{
-  startMonth: number | string;
-  endMonth: number | string;
+  startMonth: Month | string;
+  endMonth: Month | string;
   scope?: "global" | "sibling";
 }> = {
   name: "betweenMonths",
-  defaultErrorMessage:
-    "The :input must be between month :startMonth and :endMonth",
+  defaultErrorMessage: "The :input must be between month :startMonth and :endMonth",
   async validate(value: Date, context) {
     const { startMonth, endMonth, scope = "global" } = this.context.options;
     const inputDate = new Date(value);
@@ -132,6 +156,7 @@ export const betweenMonthsRule: SchemaRule<{
     let compareStartMonth: number;
     if (typeof startMonth === "number") {
       compareStartMonth = startMonth;
+      this.context.translatableParams.startMonth = MONTHS[compareStartMonth as keyof typeof MONTHS];
     } else {
       const source = scope === "sibling" ? context.parent : context.allValues;
       const fieldValue = get(source, startMonth);
@@ -139,6 +164,8 @@ export const betweenMonthsRule: SchemaRule<{
       if (fieldValue === undefined) {
         return VALID_RULE;
       }
+
+      this.context.translatableParams.startMonth = startMonth;
 
       if (fieldValue instanceof Date) {
         compareStartMonth = fieldValue.getMonth() + 1;
@@ -158,6 +185,7 @@ export const betweenMonthsRule: SchemaRule<{
     let compareEndMonth: number;
     if (typeof endMonth === "number") {
       compareEndMonth = endMonth;
+      this.context.translatableParams.endMonth = MONTHS[compareEndMonth as keyof typeof MONTHS];
     } else {
       const source = scope === "sibling" ? context.parent : context.allValues;
       const fieldValue = get(source, endMonth);
@@ -165,6 +193,8 @@ export const betweenMonthsRule: SchemaRule<{
       if (fieldValue === undefined) {
         return VALID_RULE;
       }
+
+      this.context.translatableParams.endMonth = endMonth;
 
       if (fieldValue instanceof Date) {
         compareEndMonth = fieldValue.getMonth() + 1;
@@ -183,6 +213,7 @@ export const betweenMonthsRule: SchemaRule<{
     if (inputMonth >= compareStartMonth && inputMonth <= compareEndMonth) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };
@@ -258,6 +289,9 @@ export const betweenDaysRule: SchemaRule<{
     if (inputDay >= compareStartDay && inputDay <= compareEndDay) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.startDay = compareStartDay;
+    this.context.translationParams.endDay = compareEndDay;
     return invalidRule(this, context);
   },
 };
@@ -276,6 +310,8 @@ export const quarterRule: SchemaRule<{ quarter: 1 | 2 | 3 | 4 }> = {
     if (quarter === this.context.options.quarter) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.quarter = this.context.options.quarter;
     return invalidRule(this, context);
   },
 };
@@ -305,12 +341,12 @@ export const betweenTimesRule: SchemaRule<{
     const [endHour, endMinute] = endTime.split(":").map(Number);
     const endTimeInMinutes = endHour * 60 + endMinute;
 
-    if (
-      inputTimeInMinutes >= startTimeInMinutes &&
-      inputTimeInMinutes <= endTimeInMinutes
-    ) {
+    if (inputTimeInMinutes >= startTimeInMinutes && inputTimeInMinutes <= endTimeInMinutes) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.startTime = startTime;
+    this.context.translationParams.endTime = endTime;
     return invalidRule(this, context);
   },
 };
@@ -326,13 +362,14 @@ export const minYearRule: SchemaRule<{
 }> = {
   name: "minYear",
   description: "The date year must be at least the given year or field",
-  defaultErrorMessage: "The :input year must be at least :yearOrField",
+  defaultErrorMessage: "The :input year must be higher than :yearOrField",
   async validate(value: Date, context) {
     const { yearOrField, scope = "global" } = this.context.options;
     let compareYear: number;
 
     if (typeof yearOrField === "number") {
       compareYear = yearOrField;
+      this.context.translationParams.yearOrField = yearOrField;
     } else {
       const source = scope === "sibling" ? context.parent : context.allValues;
       const fieldValue = get(source, yearOrField);
@@ -340,6 +377,8 @@ export const minYearRule: SchemaRule<{
       if (fieldValue === undefined) {
         return VALID_RULE;
       }
+
+      this.context.translatableParams.yearOrField = yearOrField;
 
       // If field contains a date, extract the year
       if (fieldValue instanceof Date) {
@@ -363,6 +402,7 @@ export const minYearRule: SchemaRule<{
     if (inputYear >= compareYear) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };
@@ -385,6 +425,7 @@ export const maxYearRule: SchemaRule<{
 
     if (typeof yearOrField === "number") {
       compareYear = yearOrField;
+      this.context.translationParams.yearOrField = compareYear;
     } else {
       const source = scope === "sibling" ? context.parent : context.allValues;
       const fieldValue = get(source, yearOrField);
@@ -392,6 +433,8 @@ export const maxYearRule: SchemaRule<{
       if (fieldValue === undefined) {
         return VALID_RULE;
       }
+
+      this.context.translatableParams.yearOrField = yearOrField;
 
       // If field contains a date, extract the year
       if (fieldValue instanceof Date) {
@@ -415,6 +458,7 @@ export const maxYearRule: SchemaRule<{
     if (inputYear <= compareYear) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };
@@ -437,6 +481,7 @@ export const minMonthRule: SchemaRule<{
 
     if (typeof monthOrField === "number") {
       compareMonth = monthOrField;
+      this.context.translationParams.monthOrField = compareMonth;
     } else {
       const source = scope === "sibling" ? context.parent : context.allValues;
       const fieldValue = get(source, monthOrField);
@@ -444,6 +489,8 @@ export const minMonthRule: SchemaRule<{
       if (fieldValue === undefined) {
         return VALID_RULE;
       }
+
+      this.context.translatableParams.monthOrField = monthOrField;
 
       // If field contains a date, extract the month
       if (fieldValue instanceof Date) {
@@ -477,7 +524,7 @@ export const minMonthRule: SchemaRule<{
  * Supports both global and sibling scope
  */
 export const maxMonthRule: SchemaRule<{
-  monthOrField: number | string;
+  monthOrField: Month | string;
   scope?: "global" | "sibling";
 }> = {
   name: "maxMonth",
@@ -489,6 +536,7 @@ export const maxMonthRule: SchemaRule<{
 
     if (typeof monthOrField === "number") {
       compareMonth = monthOrField;
+      this.context.translatableParams.monthOrField = MONTHS[monthOrField];
     } else {
       const source = scope === "sibling" ? context.parent : context.allValues;
       const fieldValue = get(source, monthOrField);
@@ -496,6 +544,8 @@ export const maxMonthRule: SchemaRule<{
       if (fieldValue === undefined) {
         return VALID_RULE;
       }
+
+      this.context.translatableParams.monthOrField = monthOrField;
 
       // If field contains a date, extract the month
       if (fieldValue instanceof Date) {
@@ -519,6 +569,7 @@ export const maxMonthRule: SchemaRule<{
     if (inputMonth <= compareMonth) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };
@@ -534,13 +585,14 @@ export const minDayRule: SchemaRule<{
 }> = {
   name: "minDay",
   description: "The date day must be at least the given day or field",
-  defaultErrorMessage: "The :input day must be at least :dayOrField",
+  defaultErrorMessage: "The :input day must be higher than :dayOrField",
   async validate(value: Date, context) {
     const { dayOrField, scope = "global" } = this.context.options;
     let compareDay: number;
 
     if (typeof dayOrField === "number") {
       compareDay = dayOrField;
+      this.context.translationParams.dayOrField = dayOrField;
     } else {
       const source = scope === "sibling" ? context.parent : context.allValues;
       const fieldValue = get(source, dayOrField);
@@ -548,6 +600,8 @@ export const minDayRule: SchemaRule<{
       if (fieldValue === undefined) {
         return VALID_RULE;
       }
+
+      this.context.translatableParams.dayOrField = dayOrField;
 
       // If field contains a date, extract the day
       if (fieldValue instanceof Date) {
@@ -593,6 +647,7 @@ export const maxDayRule: SchemaRule<{
 
     if (typeof dayOrField === "number") {
       compareDay = dayOrField;
+      this.context.translationParams.dayOrField = dayOrField;
     } else {
       const source = scope === "sibling" ? context.parent : context.allValues;
       const fieldValue = get(source, dayOrField);
@@ -600,6 +655,8 @@ export const maxDayRule: SchemaRule<{
       if (fieldValue === undefined) {
         return VALID_RULE;
       }
+
+      this.context.translatableParams.dayOrField = dayOrField;
 
       // If field contains a date, extract the day
       if (fieldValue instanceof Date) {

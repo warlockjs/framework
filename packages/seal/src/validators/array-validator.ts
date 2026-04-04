@@ -1,9 +1,5 @@
 import { setKeyPath } from "../helpers";
-import {
-  flipArrayMutator,
-  sortArrayMutator,
-  uniqueArrayMutator,
-} from "../mutators";
+import { flipArrayMutator, sortArrayMutator, uniqueArrayMutator } from "../mutators";
 import {
   arrayRule,
   betweenLengthRule,
@@ -25,7 +21,7 @@ export class ArrayValidator extends BaseValidator {
     errorMessage?: string,
   ) {
     super();
-    this.addRule(arrayRule, errorMessage);
+    this.addMutableRule(arrayRule, errorMessage);
   }
 
   /**
@@ -63,29 +59,22 @@ export class ArrayValidator extends BaseValidator {
 
   /** Sort array */
   public sort(direction: "asc" | "desc" = "asc", key?: string) {
-    this.addMutator(sortArrayMutator, { direction, key });
-    return this;
+    return this.addMutator(sortArrayMutator, { direction, key });
   }
 
   /** Array length must be greater than the given length */
   public minLength(length: number, errorMessage?: string) {
-    const rule = this.addRule(minLengthRule, errorMessage);
-    rule.context.options.minLength = length;
-    return this;
+    return this.addRule(minLengthRule, errorMessage, { minLength: length });
   }
 
   /** Array length must be less than the given length */
   public maxLength(length: number, errorMessage?: string) {
-    const rule = this.addRule(maxLengthRule, errorMessage);
-    rule.context.options.maxLength = length;
-    return this;
+    return this.addRule(maxLengthRule, errorMessage, { maxLength: length });
   }
 
   /** Array length must be of the given length */
   public length(length: number, errorMessage?: string) {
-    const rule = this.addRule(lengthRule, errorMessage);
-    rule.context.options.length = length;
-    return this;
+    return this.addRule(lengthRule, errorMessage, { length });
   }
 
   /**
@@ -103,10 +92,10 @@ export class ArrayValidator extends BaseValidator {
    * @category Validation Rule
    */
   public between(min: number, max: number, errorMessage?: string) {
-    const rule = this.addRule(betweenLengthRule, errorMessage);
-    rule.context.options.minLength = min;
-    rule.context.options.maxLength = max;
-    return this;
+    return this.addRule(betweenLengthRule, errorMessage, {
+      minLength: min,
+      maxLength: max,
+    });
   }
 
   /**
@@ -117,16 +106,13 @@ export class ArrayValidator extends BaseValidator {
   }
 
   /** Array must have unique values */
-  public unique() {
-    this.addRule(uniqueArrayRule);
-    return this;
+  public unique(errorMessage?: string) {
+    return this.addRule(uniqueArrayRule, errorMessage);
   }
 
   /** Array must be sorted */
-  public sorted(direction: "asc" | "desc" = "asc") {
-    const rule = this.addRule(sortedArrayRule);
-    rule.context.options.direction = direction;
-    return this;
+  public sorted(direction: "asc" | "desc" = "asc", errorMessage?: string) {
+    return this.addRule(sortedArrayRule, errorMessage, { direction });
   }
 
   /** Mutate the data */
@@ -136,10 +122,7 @@ export class ArrayValidator extends BaseValidator {
   }
 
   /** Validate array */
-  public async validate(
-    data: any,
-    context: SchemaContext,
-  ): Promise<ValidationResult> {
+  public async validate(data: any, context: SchemaContext): Promise<ValidationResult> {
     const mutatedData = (await this.mutate(data, context)) || [];
     const result = await super.validate(data, context);
 
@@ -148,27 +131,25 @@ export class ArrayValidator extends BaseValidator {
     const errors: ValidationResult["errors"] = [];
 
     // Validate all items in parallel (consistent with ObjectValidator)
-    const validationPromises = mutatedData.map(
-      async (value: any, index: number) => {
-        const childContext: SchemaContext = {
-          ...context,
-          parent: mutatedData,
-          value,
-          key: index.toString(),
-          path: setKeyPath(context.path, index.toString()),
-        };
+    const validationPromises = mutatedData.map(async (value: any, index: number) => {
+      const childContext: SchemaContext = {
+        ...context,
+        parent: mutatedData,
+        value,
+        key: index.toString(),
+        path: setKeyPath(context.path, index.toString()),
+      };
 
-        const childResult = await this.validator.validate(value, childContext);
+      const childResult = await this.validator.validate(value, childContext);
 
-        // Update mutated data with validated result
-        mutatedData[index] = childResult.data;
+      // Update mutated data with validated result
+      mutatedData[index] = childResult.data;
 
-        // Collect errors from this element
-        if (childResult.isValid === false) {
-          errors.push(...childResult.errors);
-        }
-      },
-    );
+      // Collect errors from this element
+      if (childResult.isValid === false) {
+        errors.push(...childResult.errors);
+      }
+    });
 
     await Promise.all(validationPromises);
 

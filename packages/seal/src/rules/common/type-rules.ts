@@ -1,4 +1,4 @@
-import { isPlainObject } from "@mongez/supportive-is";
+import { isObject, isPlainObject } from "@mongez/supportive-is";
 import { invalidRule, VALID_RULE } from "../../helpers";
 import type { SchemaRule } from "../../types";
 
@@ -93,6 +93,21 @@ export const objectRule: SchemaRule = {
   name: "object",
   defaultErrorMessage: "The :input must be an object",
   async validate(value: any, context) {
+    if (!!isObject(value) && value !== null) {
+      return VALID_RULE;
+    }
+
+    return invalidRule(this, context);
+  },
+};
+
+/**
+ * Object rule - validates object type
+ */
+export const plainObjectRule: SchemaRule = {
+  name: "plainObject",
+  defaultErrorMessage: "The :input must be an object",
+  async validate(value: any, context) {
     if (!!isPlainObject(value) && value !== null) {
       return VALID_RULE;
     }
@@ -111,6 +126,7 @@ export const arrayRule: SchemaRule = {
     if (Array.isArray(value)) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };

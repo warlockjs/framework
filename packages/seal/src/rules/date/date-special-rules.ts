@@ -7,8 +7,7 @@ import type { SchemaRule } from "../../types";
 export const birthdayRule: SchemaRule<{ minAge?: number; maxAge?: number }> = {
   name: "birthday",
   defaultErrorMessage: "The :input must be a valid birthday",
-  async validate(value: Date, context) {
-    const birthDate = new Date(value);
+  async validate(birthDate: Date, context) {
     const today = new Date();
 
     // Must not be in the future
@@ -20,10 +19,7 @@ export const birthdayRule: SchemaRule<{ minAge?: number; maxAge?: number }> = {
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
 
-    if (
-      monthDiff < 0 ||
-      (monthDiff === 0 && today.getDate() < birthDate.getDate())
-    ) {
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
 
@@ -55,10 +51,7 @@ export const betweenAgeRule: SchemaRule<{ minAge: number; maxAge: number }> = {
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
 
-    if (
-      monthDiff < 0 ||
-      (monthDiff === 0 && today.getDate() < birthDate.getDate())
-    ) {
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
 
@@ -67,6 +60,10 @@ export const betweenAgeRule: SchemaRule<{ minAge: number; maxAge: number }> = {
     if (age >= minAge && age <= maxAge) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.minAge = minAge;
+    this.context.translationParams.maxAge = maxAge;
+
     return invalidRule(this, context);
   },
 };
@@ -87,6 +84,7 @@ export const leapYearRule: SchemaRule = {
     if (isLeapYear) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };

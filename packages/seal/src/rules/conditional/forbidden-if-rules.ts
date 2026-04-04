@@ -21,6 +21,8 @@ export const forbiddenIfRule: SchemaRule<{
 
     // Field is forbidden if it has a value and the other field equals the expected value
     if (!isEmptyValue(value) && fieldValue === expectedValue) {
+      this.context.translatableParams.field = this.context.options.field;
+      this.context.translationParams.value = expectedValue;
       return invalidRule(this, context);
     }
 
@@ -121,6 +123,8 @@ export const forbiddenIfInRule: SchemaRule<{
 
     // Field is forbidden if it has a value and the other field's value is in the array
     if (!isEmptyValue(value) && values.includes(fieldValue)) {
+      this.context.translationParams.values = values.join(", ");
+      this.context.translatableParams.field = this.context.options.field;
       return invalidRule(this, context);
     }
 
@@ -147,6 +151,8 @@ export const forbiddenIfNotInRule: SchemaRule<{
 
     // Field is forbidden if it has a value and the other field's value is NOT in the array
     if (!isEmptyValue(value) && !values.includes(fieldValue)) {
+      this.context.translationParams.values = values.join(", ");
+      this.context.translatableParams.field = this.context.options.field;
       return invalidRule(this, context);
     }
 

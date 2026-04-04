@@ -35,6 +35,7 @@ export const weekdayRule: SchemaRule = {
     if (dayOfWeek >= 1 && dayOfWeek <= 5) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };
@@ -50,11 +51,16 @@ export const weekdaysRule: SchemaRule<{ days: WeekDay[] }> = {
     const dayOfWeek = inputDate.getDay();
     const { days } = this.context.options;
 
-    const allowedDays = days.map(day => WEEK_DAYS[day]);
+    const allowedDays = days.map((day) => WEEK_DAYS[day]);
 
     if (allowedDays.includes(dayOfWeek)) {
       return VALID_RULE;
     }
+
+    days.forEach((day) => {
+      this.context.translatableParams[day] = day;
+    });
+
     return invalidRule(this, context);
   },
 };
@@ -73,6 +79,7 @@ export const businessDayRule: SchemaRule = {
     if (dayOfWeek >= 1 && dayOfWeek <= 5) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };

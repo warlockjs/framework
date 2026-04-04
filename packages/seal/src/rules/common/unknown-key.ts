@@ -17,8 +17,8 @@ export const unknownKeyRule: SchemaRule<{
     const unknownKeys = Object.keys(value).filter((key) => !allowedKeys.includes(key));
 
     if (unknownKeys.length > 0) {
-      (this.context.options as any).unknownKeys = unknownKeys.join(", ");
-      console.log("Options", this.context.options);
+      this.context.translationParams.unknownKeys = unknownKeys.join(", ");
+      this.context.translationParams.input = context.key || "schema";
 
       return invalidRule(this, context);
     }

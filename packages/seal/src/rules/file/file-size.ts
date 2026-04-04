@@ -14,21 +14,9 @@ export const maxFileSizeRule: SchemaRule<{ maxSize: number }> = {
       return VALID_RULE;
     }
 
-    const ruleContext = {
-      ...this.context,
-      options: {
-        ...this.context.options,
-        maxSize: humanizeSize(this.context.options.maxSize) as unknown as number,
-      },
-    };
+    this.context.translationParams.maxSize = humanizeSize(this.context.options.maxSize);
 
-    return invalidRule(
-      {
-        ...this,
-        context: ruleContext,
-      },
-      context,
-    );
+    return invalidRule(this, context);
   },
 };
 
@@ -45,20 +33,8 @@ export const minFileSizeRule: SchemaRule<{ minSize: number }> = {
       return VALID_RULE;
     }
 
-    const ruleContext = {
-      ...this.context,
-      options: {
-        ...this.context.options,
-        minSize: humanizeSize(this.context.options.minSize) as unknown as number,
-      },
-    };
+    this.context.translationParams.minSize = humanizeSize(this.context.options.minSize);
 
-    return invalidRule(
-      {
-        ...this,
-        context: ruleContext,
-      },
-      context,
-    );
+    return invalidRule(this, context);
   },
 };

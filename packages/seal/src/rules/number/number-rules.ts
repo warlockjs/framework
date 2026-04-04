@@ -18,6 +18,7 @@ export const minRule: SchemaRule<{
 
     if (typeof min === "number") {
       compareMin = min;
+      this.context.translationParams.min = min;
     } else {
       const source = scope === "sibling" ? context.parent : context.allValues;
       const fieldValue = get(source, min);
@@ -26,7 +27,10 @@ export const minRule: SchemaRule<{
         return VALID_RULE;
       }
 
+      this.context.translatableParams.min = min;
+
       compareMin = Number(fieldValue);
+
       if (isNaN(compareMin)) {
         return VALID_RULE;
       }
@@ -35,6 +39,7 @@ export const minRule: SchemaRule<{
     if (value >= compareMin) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };
@@ -55,6 +60,7 @@ export const maxRule: SchemaRule<{
 
     if (typeof max === "number") {
       compareMax = max;
+      this.context.translationParams.max = max;
     } else {
       const source = scope === "sibling" ? context.parent : context.allValues;
       const fieldValue = get(source, max);
@@ -63,7 +69,10 @@ export const maxRule: SchemaRule<{
         return VALID_RULE;
       }
 
+      this.context.translatableParams.max = max;
+
       compareMax = Number(fieldValue);
+
       if (isNaN(compareMax)) {
         return VALID_RULE;
       }
@@ -72,6 +81,7 @@ export const maxRule: SchemaRule<{
     if (value <= compareMax) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };
@@ -92,6 +102,7 @@ export const greaterThanRule: SchemaRule<{
 
     if (typeof compareValue === "number") {
       compareNumber = compareValue;
+      this.context.translationParams.value = compareValue;
     } else {
       const source = scope === "sibling" ? context.parent : context.allValues;
       const fieldValue = get(source, compareValue);
@@ -100,7 +111,10 @@ export const greaterThanRule: SchemaRule<{
         return VALID_RULE;
       }
 
+      this.context.translatableParams.value = compareValue;
+
       compareNumber = Number(fieldValue);
+
       if (isNaN(compareNumber)) {
         return VALID_RULE;
       }
@@ -109,6 +123,7 @@ export const greaterThanRule: SchemaRule<{
     if (value > compareNumber) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };
@@ -129,6 +144,7 @@ export const lessThanRule: SchemaRule<{
 
     if (typeof compareValue === "number") {
       compareNumber = compareValue;
+      this.context.translationParams.value = compareValue;
     } else {
       const source = scope === "sibling" ? context.parent : context.allValues;
       const fieldValue = get(source, compareValue);
@@ -137,7 +153,10 @@ export const lessThanRule: SchemaRule<{
         return VALID_RULE;
       }
 
+      this.context.translatableParams.value = compareValue;
+
       compareNumber = Number(fieldValue);
+
       if (isNaN(compareNumber)) {
         return VALID_RULE;
       }
@@ -146,6 +165,7 @@ export const lessThanRule: SchemaRule<{
     if (value < compareNumber) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };
@@ -160,6 +180,7 @@ export const positiveRule: SchemaRule = {
     if (value > 0) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };
@@ -174,6 +195,7 @@ export const negativeRule: SchemaRule = {
     if (value < 0) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };
@@ -188,6 +210,7 @@ export const oddRule: SchemaRule = {
     if (value % 2 !== 0) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };
@@ -202,6 +225,7 @@ export const evenRule: SchemaRule = {
     if (value % 2 === 0) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };
@@ -216,6 +240,9 @@ export const moduloRule: SchemaRule<{ value: number }> = {
     if (value % this.context.options.value === 0) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.value = this.context.options.value;
+
     return invalidRule(this, context);
   },
 };
@@ -238,6 +265,7 @@ export const betweenNumbersRule: SchemaRule<{
     let compareMin: number;
     if (typeof min === "number") {
       compareMin = min;
+      this.context.translationParams.min = min;
     } else {
       const source = scope === "sibling" ? context.parent : context.allValues;
       const fieldValue = get(source, min);
@@ -245,6 +273,8 @@ export const betweenNumbersRule: SchemaRule<{
       if (fieldValue === undefined) {
         return VALID_RULE;
       }
+
+      this.context.translatableParams.min = min;
 
       compareMin = Number(fieldValue);
       if (isNaN(compareMin)) {
@@ -256,6 +286,7 @@ export const betweenNumbersRule: SchemaRule<{
     let compareMax: number;
     if (typeof max === "number") {
       compareMax = max;
+      this.context.translationParams.max = max;
     } else {
       const source = scope === "sibling" ? context.parent : context.allValues;
       const fieldValue = get(source, max);
@@ -264,6 +295,8 @@ export const betweenNumbersRule: SchemaRule<{
         return VALID_RULE;
       }
 
+      this.context.translatableParams.max = max;
+
       compareMax = Number(fieldValue);
       if (isNaN(compareMax)) {
         return VALID_RULE;
@@ -271,10 +304,9 @@ export const betweenNumbersRule: SchemaRule<{
     }
 
     if (value >= compareMin && value <= compareMax) {
-      (this.context.options as any).betweenNumbers =
-        `${compareMin} and ${compareMax}`;
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };

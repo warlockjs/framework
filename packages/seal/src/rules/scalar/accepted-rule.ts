@@ -29,12 +29,14 @@ export const acceptedRule: SchemaRule = {
  */
 export const acceptedIfRule: SchemaRule<{ field: string; value: any }> = {
   name: "acceptedIf",
-  description: "The field must be accepted if another field's value equals to a specific value",
+  description: "The field must be accepted if :field's value equals to :value",
   defaultErrorMessage: "The :input must be accepted",
   async validate(value: any, context) {
     const fieldValue = getFieldValue(this, context);
     const { value: expectedValue } = this.context.options;
 
+    this.context.translatableParams.field = this.context.options.field;
+    this.context.translatableParams.value = this.context.options.value;
     if (fieldValue !== expectedValue) {
       return invalidRule(this, context);
     }
@@ -52,12 +54,14 @@ export const acceptedIfRule: SchemaRule<{ field: string; value: any }> = {
  */
 export const acceptedUnlessRule: SchemaRule<{ field: string; value: any }> = {
   name: "acceptedUnless",
-  description:
-    "The field must be accepted if another field's value is not equal to a specific value",
+  description: "The field must be accepted if :field's value is not equal to :value",
   defaultErrorMessage: "The :input must be accepted",
   async validate(value: any, context) {
     const fieldValue = getFieldValue(this, context);
     const { value: expectedValue } = this.context.options;
+
+    this.context.translatableParams.field = this.context.options.field;
+    this.context.translatableParams.value = this.context.options.value;
 
     if (fieldValue === expectedValue) {
       return invalidRule(this, context);
@@ -76,10 +80,12 @@ export const acceptedUnlessRule: SchemaRule<{ field: string; value: any }> = {
  */
 export const acceptedIfRequiredRule: SchemaRule<{ field: string }> = {
   name: "acceptedIfRequired",
-  description: "The field must be accepted if another field is required",
+  description: "The field must be accepted if :field is required",
   defaultErrorMessage: "The :input must be accepted",
   async validate(value: any, context) {
     const fieldValue = getFieldValue(this, context);
+    this.context.translatableParams.field = this.context.options.field;
+
     if (isEmptyValue(fieldValue)) {
       return invalidRule(this, context);
     }
@@ -97,10 +103,12 @@ export const acceptedIfRequiredRule: SchemaRule<{ field: string }> = {
  */
 export const acceptedIfPresentRule: SchemaRule<{ field: string }> = {
   name: "acceptedIfPresent",
-  description: "The field must be accepted if another field is present",
+  description: "The field must be accepted if :field is present",
   defaultErrorMessage: "The :input must be accepted",
   async validate(value: any, context) {
     const fieldValue = getFieldValue(this, context);
+    this.context.translatableParams.field = this.context.options.field;
+
     if (fieldValue === undefined) {
       return invalidRule(this, context);
     }
@@ -118,10 +126,12 @@ export const acceptedIfPresentRule: SchemaRule<{ field: string }> = {
  */
 export const acceptedWithoutRule: SchemaRule<{ field: string }> = {
   name: "acceptedWithout",
-  description: "The field must be accepted if another field is missing",
+  description: "The field must be accepted if :field is missing",
   defaultErrorMessage: "The :input must be accepted",
   async validate(value: any, context) {
     const fieldValue = getFieldValue(this, context);
+    this.context.translatableParams.field = this.context.options.field;
+
     if (fieldValue !== undefined) {
       return invalidRule(this, context);
     }

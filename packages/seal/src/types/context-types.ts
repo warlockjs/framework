@@ -8,7 +8,6 @@ export type RuleTranslation = {
     input: string;
     path: string;
     key: string;
-    field: string;
     value: any;
     [key: string]: any;
   };

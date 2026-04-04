@@ -11,6 +11,8 @@ export const patternRule: SchemaRule<{ pattern: RegExp }> = {
     if (this.context.options.pattern.test(value)) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.pattern = this.context.options.pattern.toString();
     return invalidRule(this, context);
   },
 };

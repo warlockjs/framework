@@ -68,16 +68,15 @@ import {
   withoutWhitespaceRule,
   wordsRule,
 } from "../rules";
-import { BaseValidator } from "./base-validator";
-import { ScalarValidator } from "./scalar-validator";
+import { PrimitiveValidator } from "./primitive-validator";
 
 /**
  * String validator class
  */
-export class StringValidator extends BaseValidator {
+export class StringValidator extends PrimitiveValidator {
   public constructor(errorMessage?: string) {
     super();
-    this.addRule(stringRule, errorMessage);
+    this.addMutableRule(stringRule, errorMessage);
   }
 
   /**
@@ -93,56 +92,47 @@ export class StringValidator extends BaseValidator {
    * Stringify the value if not a string
    */
   public toString() {
-    this.addMutator(stringifyMutator);
-    return this;
+    return this.addMutator(stringifyMutator);
   }
 
   /** Convert string to uppercase */
   public uppercase() {
-    this.addMutator(uppercaseMutator);
-    return this;
+    return this.addMutator(uppercaseMutator);
   }
 
   /** Convert string to lowercase */
   public lowercase() {
-    this.addMutator(lowercaseMutator);
-    return this;
+    return this.addMutator(lowercaseMutator);
   }
 
   /** Capitalize only the first letter of the string */
   public capitalize() {
-    this.addMutator(capitalizeMutator);
-    return this;
+    return this.addMutator(capitalizeMutator);
   }
 
   /** Capitalize the first letter of each word (Title Case) */
   public titleCase() {
-    this.addMutator(titleCaseMutator);
-    return this;
+    return this.addMutator(titleCaseMutator);
   }
 
   /** Convert to camelCase */
   public camelCase() {
-    this.addMutator(camelCaseMutator);
-    return this;
+    return this.addMutator(camelCaseMutator);
   }
 
   /** Convert to PascalCase */
   public pascalCase() {
-    this.addMutator(pascalCaseMutator);
-    return this;
+    return this.addMutator(pascalCaseMutator);
   }
 
   /** Convert to snake_case */
   public snakeCase() {
-    this.addMutator(snakeCaseMutator);
-    return this;
+    return this.addMutator(snakeCaseMutator);
   }
 
   /** Convert to kebab-case */
   public kebabCase() {
-    this.addMutator(kebabCaseMutator);
-    return this;
+    return this.addMutator(kebabCaseMutator);
   }
 
   /**
@@ -150,44 +140,37 @@ export class StringValidator extends BaseValidator {
    * If no needle is provided, the default is a single space
    */
   public trim(needle?: string) {
-    this.addMutator(trimMutator, { needle });
-    return this;
+    return this.addMutator(trimMutator, { needle });
   }
 
   /** Trim from the left/start */
   public ltrim(needle?: string) {
-    this.addMutator(ltrimMutator, { needle });
-    return this;
+    return this.addMutator(ltrimMutator, { needle });
   }
 
   /** Trim from the right/end */
   public rtrim(needle?: string) {
-    this.addMutator(rtrimMutator, { needle });
-    return this;
+    return this.addMutator(rtrimMutator, { needle });
   }
 
   /** Trim multiple whitespace into single space */
   public trimMultipleWhitespace() {
-    this.addMutator(trimMultipleWhitespaceMutator);
-    return this;
+    return this.addMutator(trimMultipleWhitespaceMutator);
   }
 
   /** Pad string from the start to reach target length */
   public padStart(length: number, char = " ") {
-    this.addMutator(padStartMutator, { length, char });
-    return this;
+    return this.addMutator(padStartMutator, { length, char });
   }
 
   /** Pad string from the end to reach target length */
   public padEnd(length: number, char = " ") {
-    this.addMutator(padEndMutator, { length, char });
-    return this;
+    return this.addMutator(padEndMutator, { length, char });
   }
 
   /** Remove HTML tags (safe HTML) */
   public safeHtml() {
-    this.addMutator(safeHtmlMutator);
-    return this;
+    return this.addMutator(safeHtmlMutator);
   }
 
   /** HTML escape special characters */
@@ -197,8 +180,7 @@ export class StringValidator extends BaseValidator {
 
   /** Unescape HTML entities */
   public unescapeHtml() {
-    this.addMutator(unescapeHtmlMutator);
-    return this;
+    return this.addMutator(unescapeHtmlMutator);
   }
 
   /**
@@ -206,131 +188,109 @@ export class StringValidator extends BaseValidator {
    * This will remove all characters that are not alphanumeric or whitespace
    */
   public removeSpecialCharacters() {
-    this.addMutator(removeSpecialCharactersMutator);
-    return this;
+    return this.addMutator(removeSpecialCharactersMutator);
   }
 
   /** Convert to only alphabetic characters */
   public toAlpha() {
-    this.addMutator(alphaOnlyMutator);
-    return this;
+    return this.addMutator(alphaOnlyMutator);
   }
 
   /** Convert to only alphanumeric characters */
   public toAlphanumeric() {
-    this.addMutator(alphanumericOnlyMutator);
-    return this;
+    return this.addMutator(alphanumericOnlyMutator);
   }
 
   /** Remove all numeric characters */
   public removeNumbers() {
-    this.addMutator(removeNumbersMutator);
-    return this;
+    return this.addMutator(removeNumbersMutator);
   }
 
   /** URL decode */
   public urlDecode() {
-    this.addMutator(urlDecodeMutator);
-    return this;
+    return this.addMutator(urlDecodeMutator);
   }
 
   /** URL encode */
   public urlEncode() {
-    this.addMutator(urlEncodeMutator);
-    return this;
+    return this.addMutator(urlEncodeMutator);
   }
 
   /** Convert to URL-friendly slug */
   public slug() {
-    this.addMutator(slugMutator);
-    return this;
+    return this.addMutator(slugMutator);
   }
 
   /** Base64 encode */
   public base64Encode() {
-    this.addMutator(base64EncodeMutator);
-    return this;
+    return this.addMutator(base64EncodeMutator);
   }
 
   /** Base64 decode */
   public base64Decode() {
-    this.addMutator(base64DecodeMutator);
-    return this;
+    return this.addMutator(base64DecodeMutator);
   }
 
   /** Replace substring or pattern */
   public replace(search: string | RegExp, replace: string) {
-    this.addMutator(replaceMutator, { search, replace });
-    return this;
+    return this.addMutator(replaceMutator, { search, replace });
   }
 
   /** Replace all occurrences of substring or pattern */
   public replaceAll(search: string | RegExp, replace: string) {
-    this.addMutator(replaceAllMutator, { search, replace });
-    return this;
+    return this.addMutator(replaceAllMutator, { search, replace });
   }
 
   /** Append/suffix text to the end */
   public append(suffix: string) {
-    this.addMutator(appendMutator, { suffix });
-    return this;
+    return this.addMutator(appendMutator, { suffix });
   }
 
   /** Prepend/prefix text to the beginning */
   public prepend(prefix: string) {
-    this.addMutator(prependMutator, { prefix });
-    return this;
+    return this.addMutator(prependMutator, { prefix });
   }
 
   /** Reverse the string */
   public reverse() {
-    this.addMutator(reverseMutator);
-    return this;
+    return this.addMutator(reverseMutator);
   }
 
   /** Truncate to a maximum length */
   public truncate(maxLength: number, suffix = "...") {
-    this.addMutator(truncateMutator, { maxLength, suffix });
-    return this;
+    return this.addMutator(truncateMutator, { maxLength, suffix });
   }
 
   /** Repeat string N times */
   public repeat(count: number) {
-    this.addMutator(repeatMutator, { count });
-    return this;
+    return this.addMutator(repeatMutator, { count });
   }
 
   /** Mask part of string */
   public mask(start: number, end?: number, char = "*") {
-    this.addMutator(maskMutator, { start, end, char });
-    return this;
+    return this.addMutator(maskMutator, { start, end, char });
   }
 
   // ==================== Validation Rules ====================
 
   /** Value must be a valid email */
   public email(errorMessage?: string) {
-    this.addRule(emailRule, errorMessage);
-    return this;
+    return this.addRule(emailRule, errorMessage);
   }
 
   /** Value must be a valid URL */
   public url(errorMessage?: string) {
-    this.addRule(urlRule, errorMessage);
-    return this;
+    return this.addRule(urlRule, errorMessage);
   }
 
   /** Value can not have whitespace */
   public withoutWhitespace(errorMessage?: string) {
-    this.addRule(withoutWhitespaceRule, errorMessage);
-    return this;
+    return this.addRule(withoutWhitespaceRule, errorMessage);
   }
 
   /** Value must match the given pattern */
   public pattern(pattern: RegExp, errorMessage?: string) {
-    const rule = this.addRule(patternRule, errorMessage);
-    rule.context.options.pattern = pattern;
-    return this;
+    return this.addRule(patternRule, errorMessage, { pattern });
   }
 
   /**
@@ -343,37 +303,27 @@ export class StringValidator extends BaseValidator {
    * - At least 1 special character
    */
   public strongPassword(minLength?: number, errorMessage?: string) {
-    const rule = this.addRule(strongPasswordRule, errorMessage);
-    rule.context.options.minLength = minLength;
-    return this;
+    return this.addRule(strongPasswordRule, errorMessage, { minLength });
   }
 
   /** Value must be exactly the given number of words */
   public words(words: number, errorMessage?: string) {
-    const rule = this.addRule(wordsRule, errorMessage);
-    rule.context.options.words = words;
-    return this;
+    return this.addRule(wordsRule, errorMessage, { words });
   }
 
   /** Value must be at least the given number of words */
   public minWords(words: number, errorMessage?: string) {
-    const rule = this.addRule(minWordsRule, errorMessage);
-    rule.context.options.minWords = words;
-    return this;
+    return this.addRule(minWordsRule, errorMessage, { minWords: words });
   }
 
   /** Value must be at most the given number of words */
   public maxWords(words: number, errorMessage?: string) {
-    const rule = this.addRule(maxWordsRule, errorMessage);
-    rule.context.options.maxWords = words;
-    return this;
+    return this.addRule(maxWordsRule, errorMessage, { maxWords: words });
   }
 
   /** Value length must be greater than the given length */
   public minLength(length: number, errorMessage?: string) {
-    const rule = this.addRule(minLengthRule, errorMessage);
-    rule.context.options.minLength = length;
-    return this;
+    return this.addRule(minLengthRule, errorMessage, { minLength: length });
   }
 
   /** @alias minLength */
@@ -383,9 +333,7 @@ export class StringValidator extends BaseValidator {
 
   /** Value length must be less than the given length */
   public maxLength(length: number, errorMessage?: string) {
-    const rule = this.addRule(maxLengthRule, errorMessage);
-    rule.context.options.maxLength = length;
-    return this;
+    return this.addRule(maxLengthRule, errorMessage, { maxLength: length });
   }
 
   /** @alias maxLength */
@@ -395,9 +343,7 @@ export class StringValidator extends BaseValidator {
 
   /** Value must be of the given length */
   public length(length: number, errorMessage?: string) {
-    const rule = this.addRule(lengthRule, errorMessage);
-    rule.context.options.length = length;
-    return this;
+    return this.addRule(lengthRule, errorMessage, { length });
   }
 
   /**
@@ -414,142 +360,100 @@ export class StringValidator extends BaseValidator {
    *
    * @category Validation Rule
    */
-  public between(min: number, max: number, errorMessage?: string) {
-    const rule = this.addRule(betweenLengthRule, errorMessage);
-    rule.context.options.minLength = min;
-    rule.context.options.maxLength = max;
-    return this;
-  }
-
-  /**
-   * Alias for between() - string length between min and max
-   */
   public lengthBetween(min: number, max: number, errorMessage?: string) {
-    return this.between(min, max, errorMessage);
+    return this.addRule(betweenLengthRule, errorMessage, {
+      minLength: min,
+      maxLength: max,
+    });
   }
 
   /** Allow only alphabetic characters */
   public alpha(errorMessage?: string) {
-    this.addRule(alphaRule, errorMessage);
-    return this;
+    return this.addRule(alphaRule, errorMessage);
   }
 
   /** Allow only alphanumeric characters */
   public alphanumeric(errorMessage?: string) {
-    this.addRule(alphaNumericRule, errorMessage);
-    return this;
+    return this.addRule(alphaNumericRule, errorMessage);
   }
 
   /** Allow only numeric characters */
   public numeric(errorMessage?: string) {
-    this.addRule(isNumericRule, errorMessage);
-    return this;
+    return this.addRule(isNumericRule, errorMessage);
   }
 
   /** Value must starts with the given string */
   public startsWith(value: string, errorMessage?: string) {
-    const rule = this.addRule(startsWithRule, errorMessage);
-    rule.context.options.value = value;
-    return this;
+    return this.addRule(startsWithRule, errorMessage, { value });
   }
 
   /** Value must ends with the given string */
   public endsWith(value: string, errorMessage?: string) {
-    const rule = this.addRule(endsWithRule, errorMessage);
-    rule.context.options.value = value;
-    return this;
+    return this.addRule(endsWithRule, errorMessage, { value });
   }
 
   /** Value must contain the given string */
   public contains(value: string, errorMessage?: string) {
-    const rule = this.addRule(containsRule, errorMessage);
-    rule.context.options.value = value;
-    return this;
+    return this.addRule(containsRule, errorMessage, { value });
   }
 
   /** Value must not contain the given string */
   public notContains(value: string, errorMessage?: string) {
-    const rule = this.addRule(notContainsRule, errorMessage);
-    rule.context.options.value = value;
-    return this;
+    return this.addRule(notContainsRule, errorMessage, { value });
   }
 
   /** Value must be a valid IP address */
   public ip(errorMessage?: string) {
-    this.addRule(ipRule, errorMessage);
-    return this;
+    return this.addRule(ipRule, errorMessage);
   }
 
   /** Value must be a valid IPv4 address */
   public ip4(errorMessage?: string) {
-    this.addRule(ip4Rule, errorMessage);
-    return this;
+    return this.addRule(ip4Rule, errorMessage);
   }
 
   /** Value must be a valid IPv6 address */
   public ip6(errorMessage?: string) {
-    this.addRule(ip6Rule, errorMessage);
-    return this;
+    return this.addRule(ip6Rule, errorMessage);
   }
 
   /** Check if the string matches a credit card number */
   public creditCard(errorMessage?: string) {
-    this.addRule(isCreditCardRule, errorMessage);
-    return this;
+    return this.addRule(isCreditCardRule, errorMessage);
   }
 
   /** Determine if the value is a valid color */
   public color(errorMessage?: string) {
-    this.addRule(colorRule, errorMessage);
-    return this;
+    return this.addRule(colorRule, errorMessage);
   }
 
   /** Determine if the value is a valid hex color */
   public hexColor(errorMessage?: string) {
-    this.addRule(hexColorRule, errorMessage);
-    return this;
+    return this.addRule(hexColorRule, errorMessage);
   }
 
   /** Determine if the value is a valid HSL color */
   public hslColor(errorMessage?: string) {
-    this.addRule(hslColorRule, errorMessage);
-    return this;
+    return this.addRule(hslColorRule, errorMessage);
   }
 
   /** Determine if the value is a valid RGB color */
   public rgbColor(errorMessage?: string) {
-    this.addRule(rgbColorRule, errorMessage);
-    return this;
+    return this.addRule(rgbColorRule, errorMessage);
   }
 
   /** Determine if the value is a valid RGBA color */
   public rgbaColor(errorMessage?: string) {
-    this.addRule(rgbaColorRule, errorMessage);
-    return this;
+    return this.addRule(rgbaColorRule, errorMessage);
   }
 
   /** Determine if the value is a valid light color */
   public lightColor(errorMessage?: string) {
-    this.addRule(lightColorRule, errorMessage);
-    return this;
+    return this.addRule(lightColorRule, errorMessage);
   }
 
   /** Determine if the value is a valid dark color */
   public darkColor(errorMessage?: string) {
-    this.addRule(darkColorRule, errorMessage);
-    return this;
+    return this.addRule(darkColorRule, errorMessage);
   }
-
-  // Enum and value checking methods from ScalarValidator
-  public enum = ScalarValidator.prototype.enum;
-  /** Value must be in one of the given values */
-  public in = ScalarValidator.prototype.in;
-  /** @alias in */
-  public oneOf = ScalarValidator.prototype.in;
-  /** @alias oneOf */
-  public allowsOnly = ScalarValidator.prototype.allowsOnly;
-  /** Forbid the value from being one of the given values */
-  public forbids = ScalarValidator.prototype.forbids;
-  /** @alias forbids */
-  public notIn = ScalarValidator.prototype.forbids;
 }

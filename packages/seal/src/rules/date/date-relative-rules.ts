@@ -16,6 +16,9 @@ export const withinDaysRule: SchemaRule<{ days: number }> = {
     if (diffDays <= this.context.options.days) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.days = this.context.options.days;
+
     return invalidRule(this, context);
   },
 };
@@ -40,6 +43,9 @@ export const withinPastDaysRule: SchemaRule<{ days: number }> = {
     if (diffDays <= this.context.options.days) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.days = this.context.options.days;
+
     return invalidRule(this, context);
   },
 };
@@ -64,6 +70,9 @@ export const withinFutureDaysRule: SchemaRule<{ days: number }> = {
     if (diffDays <= this.context.options.days) {
       return VALID_RULE;
     }
+
+    this.context.translationParams.days = this.context.options.days;
+
     return invalidRule(this, context);
   },
 };

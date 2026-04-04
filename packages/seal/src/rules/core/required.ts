@@ -20,7 +20,7 @@ export const requiredRule: SchemaRule = {
 
 /**
  * Present rule - key must exist in the data, but value can be anything
- * (empty string, null, undefined are all valid as long as the key exists)
+ * (empty string, null are all valid as long as the key exists)
  */
 export const presentRule: SchemaRule = {
   name: "present",

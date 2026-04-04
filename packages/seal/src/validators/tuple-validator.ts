@@ -24,7 +24,7 @@ export class TupleValidator extends BaseValidator {
     errorMessage?: string,
   ) {
     super();
-    this.addRule(arrayRule, errorMessage);
+    this.addMutableRule(arrayRule, errorMessage);
   }
 
   /**
@@ -39,17 +39,14 @@ export class TupleValidator extends BaseValidator {
    */
   public override clone(): this {
     const cloned = super.clone();
-    cloned.validators = this.validators.map(v => v.clone());
+    cloned.validators = this.validators.map((v) => v.clone());
     return cloned;
   }
 
   /**
    * Validate tuple - check length then validate each position
    */
-  public async validate(
-    data: any,
-    context: SchemaContext,
-  ): Promise<ValidationResult> {
+  public async validate(data: any, context: SchemaContext): Promise<ValidationResult> {
     const mutatedData = (await this.mutate(data, context)) || [];
     const result = await super.validate(data, context);
 
@@ -77,10 +74,7 @@ export class TupleValidator extends BaseValidator {
         path: setKeyPath(context.path, index.toString()),
       };
 
-      const childResult = await validator.validate(
-        mutatedData[index],
-        childContext,
-      );
+      const childResult = await validator.validate(mutatedData[index], childContext);
 
       // Update mutated data with validated result
       mutatedData[index] = childResult.data;

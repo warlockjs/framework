@@ -13,13 +13,14 @@ import { ComputedValidator } from "./computed-validator";
 export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValidator {
   protected shouldAllowUnknown = false;
   protected allowedKeys: string[] = [];
+  protected hasUnknownKeyRule = false;
 
   public constructor(
     public schema: TSchema,
     errorMessage?: string,
   ) {
     super();
-    this.addRule(objectRule, errorMessage);
+    this.addMutableRule(objectRule, errorMessage);
   }
 
   /**
@@ -31,34 +32,34 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
 
   /** Strip unknown keys from the data */
   public stripUnknown() {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const validator = this;
-    this.addMutator(stripUnknownMutator, {
+    const validator = this.instance;
+    return validator.addMutator(stripUnknownMutator, {
       get allowedKeys() {
         return validator.allowedKeys;
       },
     });
-    return this;
   }
 
   /** Add list of allowed keys that could be in the data but not necessarily validated */
   public allow(...keys: string[]) {
-    this.allowedKeys.push(...keys);
-    return this;
+    const validator = this.instance;
+    validator.allowedKeys.push(...keys);
+    return validator;
   }
 
   /** Trim values of the object properties */
   public trim(recursive = true) {
-    this.addMutator(objectTrimMutator, { recursive });
-    return this;
+    const validator = this.instance;
+    return validator.addMutator(objectTrimMutator, { recursive });
   }
 
   /** Whether to allow unknown properties
    * Please note it will allow only unknown direct children keys, not nested children keys
    */
   public allowUnknown(allow = true) {
-    this.shouldAllowUnknown = allow;
-    return this;
+    const validator = this.instance;
+    validator.shouldAllowUnknown = allow;
+    return validator;
   }
 
   /**
@@ -90,6 +91,9 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
     // Add ObjectValidator-specific properties
     cloned.shouldAllowUnknown = this.shouldAllowUnknown;
     cloned.allowedKeys = [...this.allowedKeys];
+    // NOTE: hasUnknownKeyRule is intentionally NOT copied.
+    // Each clone must add its own unknownKeyRule on first validate()
+    // so it holds references to its own schema/allowedKeys, not the original's.
 
     return cloned;
   }
@@ -322,10 +326,12 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
     const mutatedData = await this.mutate(data, context);
 
     // Check for unknown properties
-    if (this.shouldAllowUnknown === false) {
-      const rule = this.addRule(unknownKeyRule);
-      rule.context.options.allowedKeys = this.allowedKeys;
-      rule.context.options.schema = this.schema;
+    if (this.shouldAllowUnknown === false && !this.hasUnknownKeyRule) {
+      this.hasUnknownKeyRule = true;
+      const rule = this.addMutableRule(unknownKeyRule, undefined, {
+        allowedKeys: this.allowedKeys,
+        schema: this.schema,
+      });
 
       this.setRuleAttributesList(rule);
     }

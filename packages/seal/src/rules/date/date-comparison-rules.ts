@@ -15,8 +15,11 @@ export const betweenDatesRule: SchemaRule<{
     const inputDate = new Date(value);
 
     if (inputDate >= startDate && inputDate <= endDate) {
+      this.context.translationParams.startDate = startDate.toISOString();
+      this.context.translationParams.endDate = endDate.toISOString();
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };

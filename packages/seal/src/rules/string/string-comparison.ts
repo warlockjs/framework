@@ -11,6 +11,9 @@ export const startsWithRule: SchemaRule<{ value: string }> = {
     if (String(value).startsWith(this.context.options.value)) {
       return VALID_RULE;
     }
+
+    this.context.translatableParams.value = this.context.options.value;
+
     return invalidRule(this, context);
   },
 };
@@ -25,6 +28,9 @@ export const endsWithRule: SchemaRule<{ value: string }> = {
     if (String(value).endsWith(this.context.options.value)) {
       return VALID_RULE;
     }
+
+    this.context.translatableParams.value = this.context.options.value;
+
     return invalidRule(this, context);
   },
 };
@@ -39,6 +45,9 @@ export const containsRule: SchemaRule<{ value: string }> = {
     if (String(value).includes(this.context.options.value)) {
       return VALID_RULE;
     }
+
+    this.context.translatableParams.value = this.context.options.value;
+
     return invalidRule(this, context);
   },
 };
@@ -53,6 +62,9 @@ export const notContainsRule: SchemaRule<{ value: string }> = {
     if (!String(value).includes(this.context.options.value)) {
       return VALID_RULE;
     }
+
+    this.context.translatableParams.value = this.context.options.value;
+
     return invalidRule(this, context);
   },
 };

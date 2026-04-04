@@ -1,6 +1,6 @@
 import { isPlainObject } from "@mongez/supportive-is";
 import { setKeyPath } from "../helpers";
-import { objectRule } from "../rules";
+import { objectRule, plainObjectRule } from "../rules";
 import type { SchemaContext, ValidationResult } from "../types";
 import { BaseValidator } from "./base-validator";
 
@@ -24,7 +24,14 @@ export class RecordValidator extends BaseValidator {
     errorMessage?: string,
   ) {
     super();
-    this.addRule(objectRule, errorMessage);
+    this.addMutableRule(objectRule, errorMessage);
+  }
+
+  /**
+   * Validate it as plain object
+   */
+  public plainObject(errorMessage?: string) {
+    return this.addRule(plainObjectRule, errorMessage);
   }
 
   /**
@@ -46,10 +53,7 @@ export class RecordValidator extends BaseValidator {
   /**
    * Validate record - iterate all keys and validate each value
    */
-  public async validate(
-    data: any,
-    context: SchemaContext,
-  ): Promise<ValidationResult> {
+  public async validate(data: any, context: SchemaContext): Promise<ValidationResult> {
     const mutatedData = (await this.mutate(data, context)) || {};
     const result = await super.validate(data, context);
 
@@ -59,7 +63,7 @@ export class RecordValidator extends BaseValidator {
     const keys = Object.keys(mutatedData);
 
     // Validate all values in parallel
-    const validationPromises = keys.map(async key => {
+    const validationPromises = keys.map(async (key) => {
       const childContext: SchemaContext = {
         ...context,
         parent: mutatedData,
@@ -68,10 +72,7 @@ export class RecordValidator extends BaseValidator {
         path: setKeyPath(context.path, key),
       };
 
-      const childResult = await this.valueValidator.validate(
-        mutatedData[key],
-        childContext,
-      );
+      const childResult = await this.valueValidator.validate(mutatedData[key], childContext);
 
       // Update mutated data with validated result
       mutatedData[key] = childResult.data;

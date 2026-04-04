@@ -34,6 +34,7 @@ export const sortedArrayRule: SchemaRule<{
     }
 
     const direction = this.context.options.direction ?? "asc";
+    this.context.translatableParams.direction = direction;
 
     for (let i = 0; i < value.length - 1; i++) {
       const current = value[i];

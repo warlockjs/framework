@@ -62,6 +62,7 @@ export const afterFieldRule: SchemaRule<{
     if (isDateValue(dateOrField)) {
       // Value comparison
       compareDate = new Date(dateOrField);
+      this.context.translationParams.dateOrField = compareDate.toISOString();
     } else {
       // Field comparison
       const source = scope === "sibling" ? context.parent : context.allValues;
@@ -72,6 +73,7 @@ export const afterFieldRule: SchemaRule<{
       }
 
       compareDate = new Date(fieldValue);
+      this.context.translatableParams.dateOrField = fieldValue;
     }
 
     const inputDate = new Date(value);
@@ -79,6 +81,7 @@ export const afterFieldRule: SchemaRule<{
     if (inputDate > compareDate) {
       return VALID_RULE;
     }
+
     return invalidRule(this, context);
   },
 };
@@ -101,6 +104,7 @@ export const sameAsFieldDateRule: SchemaRule<{
 
     // Both fields must exist to be considered "the same"
     if (fieldValue === undefined || value === undefined) {
+      this.context.translatableParams.field = fieldValue;
       return invalidRule(this, context);
     }
 
@@ -112,6 +116,8 @@ export const sameAsFieldDateRule: SchemaRule<{
     if (inputDate.getTime() === compareDate.getTime()) {
       return VALID_RULE;
     }
+
+    this.context.translatableParams.field = fieldValue;
     return invalidRule(this, context);
   },
 };

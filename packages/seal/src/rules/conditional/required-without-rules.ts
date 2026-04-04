@@ -21,6 +21,7 @@ export const requiredWithoutRule: SchemaRule<{
 
     // Field is required if the other field is missing
     if (isEmptyValue(value) && fieldValue === undefined) {
+      this.context.translatableParams.field = this.context.options.field;
       return invalidRule(this, context);
     }
 
