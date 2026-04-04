@@ -19,42 +19,39 @@ export class EmbedModelValidator extends BaseValidator {
   /**
    * Mutate the value to be a model, also fail if the mutated value is not a valid model
    */
-  public model(model: ChildModel<any> | string) {
+  public model(model: ChildModel<any> | string, errorMessage?: string) {
     this.addMutator(databaseModelMutator, {
       model,
     });
 
-    const rule = this.addRule(databaseModelRule);
-
-    rule.context.options.model = model;
-
-    return this;
+    return this.addRule(databaseModelRule, errorMessage, {
+      model,
+    });
   }
 
   /**
    * Validate the value is a list of models
    */
-  public models(model: ChildModel<any> | string) {
-    this.addMutator(databaseModelsMutator, {
+  public models(model: ChildModel<any> | string, errorMessage?: string) {
+    const instance = this.instance;
+    instance.addMutator(databaseModelsMutator, {
       model,
     });
 
-    this.addRule(arrayRule);
-    const rule = this.addRule(databaseModelsRule);
+    instance.addMutableRule(arrayRule);
+    instance.addMutableRule(databaseModelsRule, errorMessage, {
+      model,
+    });
 
-    rule.context.options.model = model;
-
-    return this;
+    return instance;
   }
 
   /**
    * Determine how the data will be stored as an embedded document
    */
   public embed(embed?: string | string[]) {
-    this.addTransformer(databaseModelTransformer, {
+    return this.addTransformer(databaseModelTransformer, {
       embed,
     });
-
-    return this;
   }
 }
