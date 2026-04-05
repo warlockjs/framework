@@ -92,7 +92,8 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * Default repository options
    * @protected
    */
-  protected defaultOptions: Partial<RepositoryOptions> = {};
+  protected defaultOptions: Partial<RepositoryOptions> =
+    config.get("repository.defaultOptions") || {};
 
   /**
    * Simple select columns (used with simple filter)
@@ -125,13 +126,13 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * @default true
    * @protected
    */
-  protected isCacheable = true;
+  protected isCacheable = config.get("repository.isCacheable") ?? true;
 
   /**
    * Cache driver instance
    * @protected
    */
-  protected cacheDriver!: CacheDriver<any, any>;
+  protected cacheDriver: CacheDriver<any, any> = config.get("repository.cacheDriver") || cache;
 
   /**
    * List of all events callbacks
@@ -145,10 +146,6 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
   public constructor(adapter?: RepositoryAdapterContract<T>) {
     if (adapter) {
       this._adapter = adapter;
-    }
-
-    if (!this.cacheDriver) {
-      this.cacheDriver = config.key("repository.cacheDriver") || cache;
     }
 
     // Wait for constructor to finish and all properties are properly registered

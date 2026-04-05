@@ -23,7 +23,7 @@ export const uniqueExceptCurrentIdRule: SchemaRule<UniqueExceptCurrentIdRuleOpti
     const dbQuery = ResolvedModelClass.query();
 
     dbQuery.where(column, value);
-    dbQuery.where(exceptCurrentIdColumn, "!=", request.int("id"));
+    dbQuery.where(exceptCurrentIdColumn, "!=", request.input("id"));
 
     if (query) {
       await query({

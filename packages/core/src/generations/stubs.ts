@@ -33,7 +33,7 @@ const communicatorConfigurations: CommunicatorConfigurations<RabbitMQClientOptio
   reconnect: true,
 
   /** Delay between reconnection attempts in milliseconds */
-  reconnectDelay: 5000,
+  reconnectDelay: 5_000,
 
   // ============================================================================
   // Consumer Options

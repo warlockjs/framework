@@ -1,4 +1,4 @@
-import type { FileSizeOption } from "@warlock.js/seal";
+import type { FileSizeOption, JsonSchemaResult, JsonSchemaTarget } from "@warlock.js/seal";
 import {
   BaseValidator,
   maxFileSizeRule,
@@ -40,31 +40,31 @@ export class FileValidator extends BaseValidator {
   }
 
   /** Value must be an image */
-  public image(errorMessage?: string) {
+  public image(errorMessage?: string): FileValidator {
     return this.addRule(imageRule, errorMessage);
   }
 
   /** Accept specific file extensions */
-  public accept(extensions: string | string[], errorMessage?: string) {
+  public accept(extensions: string | string[], errorMessage?: string): FileValidator {
     return this.addRule(fileExtensionRule, errorMessage, {
       extensions,
     });
   }
 
   /** Allow specific MIME types */
-  public mimeType(mimeTypes: string | string[], errorMessage?: string) {
+  public mimeType(mimeTypes: string | string[], errorMessage?: string): FileValidator {
     return this.addRule(fileTypeRule, errorMessage, {
       mimeTypes,
     });
   }
 
   /** Allow only pdf files */
-  public pdf(errorMessage?: string) {
+  public pdf(errorMessage?: string): FileValidator {
     return this.mimeType("application/pdf", errorMessage);
   }
 
   /** Allow only excel files */
-  public excel(errorMessage?: string) {
+  public excel(errorMessage?: string): FileValidator {
     return this.mimeType(
       [
         "application/vnd.ms-excel",
@@ -75,7 +75,7 @@ export class FileValidator extends BaseValidator {
   }
 
   /** Allow only word files */
-  public word(errorMessage?: string) {
+  public word(errorMessage?: string): FileValidator {
     return this.mimeType(
       [
         "application/msword",
@@ -86,52 +86,52 @@ export class FileValidator extends BaseValidator {
   }
 
   /** Minimum file size */
-  public minSize(size: number | FileSizeOption, errorMessage?: string) {
+  public minSize(size: number | FileSizeOption, errorMessage?: string): FileValidator {
     return this.addRule(minFileSizeRule, errorMessage, {
       minSize: resolveFileSize(size),
     });
   }
 
   /** @alias minSize */
-  public min(size: number | FileSizeOption, errorMessage?: string) {
+  public min(size: number | FileSizeOption, errorMessage?: string): FileValidator {
     return this.minSize(size, errorMessage);
   }
 
   /** Maximum file size */
-  public maxSize(size: number | FileSizeOption, errorMessage?: string) {
+  public maxSize(size: number | FileSizeOption, errorMessage?: string): FileValidator {
     return this.addRule(maxFileSizeRule, errorMessage, {
       maxSize: resolveFileSize(size),
     });
   }
 
   /** @alias maxSize */
-  public max(size: number, errorMessage?: string) {
+  public max(size: number, errorMessage?: string): FileValidator {
     return this.maxSize(size, errorMessage);
   }
 
   /** Minimum image width */
-  public minWidth(width: number, errorMessage?: string) {
+  public minWidth(width: number, errorMessage?: string): FileValidator {
     return this.addRule(minWidthRule, errorMessage, {
       minWidth: width,
     });
   }
 
   /** Maximum image width */
-  public maxWidth(width: number, errorMessage?: string) {
+  public maxWidth(width: number, errorMessage?: string): FileValidator {
     return this.addRule(maxWidthRule, errorMessage, {
       maxWidth: width,
     });
   }
 
   /** Minimum image height */
-  public minHeight(height: number, errorMessage?: string) {
+  public minHeight(height: number, errorMessage?: string): FileValidator {
     return this.addRule(minHeightRule, errorMessage, {
       minHeight: height,
     });
   }
 
   /** Maximum image height */
-  public maxHeight(height: number, errorMessage?: string) {
+  public maxHeight(height: number, errorMessage?: string): FileValidator {
     return this.addRule(maxHeightRule, errorMessage, {
       maxHeight: height,
     });
@@ -140,11 +140,39 @@ export class FileValidator extends BaseValidator {
   /**
    * Save the file and return it as a string
    */
-  public saveTo(relativeDirectory: string) {
+  public saveTo(relativeDirectory: string): FileValidator {
     return this.addTransformer(async (file: UploadedFile) => {
       const output = await file.save(relativeDirectory);
 
       return output.path;
     });
+  }
+
+  /**
+   * @inheritdoc
+   *
+   * File uploads are not natively representable in JSON Schema.
+   * The output varies by target:
+   * - `openapi-3.0`   → `{ type: "string", format: "binary" }` (standard for multipart/form-data uploads)
+   * - `draft-2020-12` → `{ type: "string", contentEncoding: "binary" }`
+   * - `draft-07`      → `{}` (no standard binary representation — permissive fallback)
+   *
+   * @example
+   * ```ts
+   * v.file().toJsonSchema("openapi-3.0")
+   * // → { type: "string", format: "binary" }
+   * ```
+   */
+  public override toJsonSchema(target: JsonSchemaTarget = "draft-2020-12"): JsonSchemaResult {
+    if (target === "openapi-3.0") {
+      return { type: "string", format: "binary" };
+    }
+
+    if (target === "draft-2020-12") {
+      return { type: "string", contentEncoding: "binary" };
+    }
+
+    // draft-07: no standard binary representation
+    return {};
   }
 }
