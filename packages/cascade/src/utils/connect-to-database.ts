@@ -413,9 +413,21 @@ export async function connectToDatabase<TDriverOptions = any, TClientOptions = a
 }
 
 /**
- * Get current driver instance
+ * Get current driver instance.
+ *
+ * @example
+ * ```typescript
+ * const driver = getDatabaseDriver();
+ *
+ * // Pass type to return Postgres driver type
+ * const pgDriver = getDatabaseDriver<PostgresDriver>();
+ * ```
  */
-export const currentDatabaseDriver = () => dataSourceRegistry.get().driver;
+export function getDatabaseDriver<T extends DriverContract = any>(): T {
+  const driver = dataSourceRegistry.get().driver;
+
+  return driver as unknown as T;
+}
 
 /**
  * Perform database transaction(s)
@@ -425,5 +437,5 @@ export async function transaction<T = any>(
   fn: (ctx: TransactionContext) => Promise<T>,
   options?: Record<string, unknown>,
 ): Promise<T> {
-  return currentDatabaseDriver().transaction(fn, options);
+  return getDatabaseDriver().transaction(fn, options);
 }
