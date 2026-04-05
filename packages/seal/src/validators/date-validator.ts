@@ -64,6 +64,8 @@ import {
 import type { WeekDay } from "../types/date-types";
 import { isDateValue } from "./../helpers/date-helpers";
 import { BaseValidator } from "./base-validator";
+import { applyNullable, getRuleOptions } from "../standard-schema/json-schema";
+import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 
 /**
  * Date validator class
@@ -742,5 +744,46 @@ export class DateValidator extends BaseValidator {
    */
   public defaultNow() {
     return this.default(() => new Date());
+  }
+
+  /**
+   * @inheritdoc
+   *
+   * Maps DateValidator to JSON Schema format keywords.
+   * Default is `date-time`. If `.toDateOnly()` or `.toTimeOnly()` are used,
+   * falls back to `date` or `time` formats respectively.
+   *
+   * @example
+   * ```ts
+   * v.date().toJsonSchema("draft-2020-12")
+   * // → { type: "string", format: "date-time" }
+   *
+   * v.date().toDateOnly().toJsonSchema("draft-2020-12")
+   * // → { type: "string", format: "date" }
+   * ```
+   */
+  public override toJsonSchema(target: JsonSchemaTarget = "draft-2020-12"): JsonSchemaResult {
+    const schema: JsonSchemaResult = { type: "string", format: "date-time" };
+
+    // Check if an explicit format rule was applied via v.date().format()
+    const dateOpts = getRuleOptions(this.rules, "date");
+    if (dateOpts?.format === "YYYY-MM-DD") {
+      schema.format = "date";
+    } else if (dateOpts?.format === "HH:mm:ss") {
+      schema.format = "time";
+    }
+
+    // As a fallback, check if transformers (like toDateOnly) stringify to known patterns
+    if (schema.format === "date-time") {
+      const hasToDateOnly = this.dataTransformers.some((t: any) => t.toString().includes("YYYY-MM-DD"));
+      if (hasToDateOnly) schema.format = "date";
+      
+      const hasToTimeOnly = this.dataTransformers.some((t: any) => t.toString().includes("HH:mm:ss"));
+      if (hasToTimeOnly) schema.format = "time";
+    }
+
+    if (this.isNullable) applyNullable(schema, target);
+
+    return schema;
   }
 }

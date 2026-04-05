@@ -1,7 +1,11 @@
 import { clone } from "@mongez/reinforcements";
+import { validate } from "../factory";
 import { VALID_RULE, invalidRule } from "../helpers";
 import { isEmptyValue } from "../helpers/is-empty-value";
 import { requiredRule as defaultRequiredRule } from "../rules/core/required";
+import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
+import { mapToStandardResult } from "../standard-schema/map-result";
+import type { StandardJSONSchemaV1, StandardSchemaV1 } from "../standard-schema/types";
 import type {
   ContextualSchemaRule,
   ContextualizedMutator,
@@ -19,7 +23,7 @@ import type {
 /**
  * Base validator class - foundation for all validators
  */
-export class BaseValidator {
+export class BaseValidator<TInput = unknown, TOutput = TInput> {
   public rules: ContextualSchemaRule[] = [];
   public mutators: ContextualizedMutator[] = [];
   protected defaultValue: any | (() => any);
@@ -649,5 +653,94 @@ export class BaseValidator {
       typeof this.attributesText[rule.name] === "object"
         ? (this.attributesText[rule.name] as ValidationAttributesList)
         : this.attributesText;
+  }
+
+  /**
+   * Standard Schema V1 compliance.
+   *
+   * Allows this validator to be used with any Standard Schema-aware library
+   * (OpenAI structured outputs, LangGraph, TanStack Form, Conform, Valibot adapters, etc.)
+   * without extra adapters.
+   *
+   * Delegates to the `validate()` factory so all `configureSeal()` options
+   * (translations, firstErrorOnly) are picked up automatically at call time.
+   *
+   * Includes Standard JSON Schema support via `jsonSchema.input()` / `jsonSchema.output()`.
+   *
+   * ## How Standard Schema libraries consume this
+   *
+   * You pass the **schema object itself** to the library — they internally read
+   * `schema["~standard"]`. Do NOT pass `schema["~standard"]` directly.
+   *
+   * @example
+   * ```ts
+   * const schema = v.object({ name: v.string().required() });
+   *
+   * // TanStack Form — pass schema, library reads ["~standard"] internally
+   * const form = useForm({ validators: { onChange: schema } });
+   *
+   * // Conform (Remix) — same pattern
+   * const [form] = useForm({ onValidate({ formData }) {
+   *   return parseWithStandardSchema(formData, { schema });
+   * }});
+   *
+   * // Direct validation (lower level — most apps don't need this)
+   * const result = await schema["~standard"].validate({ name: "Hasan" });
+   * // → { value: { name: "Hasan" } }  on success
+   * // → { issues: [{ message: "...", path: [{ key: "name" }] }] }  on failure
+   *
+   * // JSON Schema for OpenAI / LangChain tool calling
+   * const parameters = schema["~standard"].jsonSchema.input({ target: "openai-strict" });
+   * // → { type: "object", properties: {...}, required: [...], additionalProperties: false }
+   * ```
+   *
+   * @note Cross-field rules (sameAs, requiredIf, requiredWith) rely on sibling values
+   * available in the full validation context. When called on a standalone scalar validator,
+   * sibling data is absent and those rules will not evaluate correctly.
+   * Always call on the parent ObjectValidator for full-payload validation.
+   */
+  get ["~standard"](): StandardJSONSchemaV1.Props<TInput, TOutput> {
+    return {
+      version: 1,
+      vendor: "seal",
+      types: undefined as unknown as StandardSchemaV1.Types<TInput, TOutput>,
+      validate: async (value: unknown) => {
+        const result = await validate(this, value);
+        return mapToStandardResult(result) as StandardSchemaV1.Result<TOutput>;
+      },
+      jsonSchema: {
+        input: (options) => this.toJsonSchema(options.target),
+        output: (options) => this.toJsonSchema(options.target),
+      },
+    };
+  }
+
+  /**
+   * Generate a JSON Schema representation of this validator.
+   *
+   * Supports targets: `"draft-2020-12"` (default), `"draft-07"`, `"openapi-3.0"`.
+   *
+   * Subclasses override this to describe their specific constraints.
+   * The base implementation returns `{}` (permissive — accepts anything),
+   * which is correct for validators with no representable JSON Schema constraints.
+   *
+   * @note Rules that cannot be expressed in JSON Schema are silently omitted:
+   * - Cross-field rules: sameAs, requiredIf, requiredWith, requiredWithout
+   * - Custom callbacks: refine()
+   * - Framework-specific runtime rules (core/cascade plugins)
+   * These rules still run normally at validation time — only absent from JSON Schema.
+   *
+   * @example
+   * ```ts
+   * v.string().min(3).max(50).toJsonSchema("draft-2020-12")
+   * // → { type: "string", minLength: 3, maxLength: 50 }
+   *
+   * v.object({ name: v.string().required(), age: v.int().optional() })
+   *   .toJsonSchema("draft-07")
+   * // → { type: "object", properties: { name: { type: "string" }, age: { type: "integer" } }, required: ["name"] }
+   * ```
+   */
+  public toJsonSchema(_target: JsonSchemaTarget = "draft-2020-12"): JsonSchemaResult {
+    return {};
   }
 }

@@ -16,6 +16,8 @@ import {
   positiveRule,
 } from "../rules";
 import { PrimitiveValidator } from "./primitive-validator";
+import { applyNullable, getRuleOptions } from "../standard-schema/json-schema";
+import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 
 /**
  * Number validator class - base for Int and Float validators
@@ -276,5 +278,93 @@ export class NumberValidator extends PrimitiveValidator {
    */
   public toFixed(decimals = 2) {
     return this.addMutator(toFixedMutator, { decimals });
+  }
+
+  /**
+   * @inheritdoc
+   *
+   * Returns `{ type: "number" }` with numeric constraint keywords.
+   * IntValidator overrides `type` to `"integer"`.
+   *
+   * @note Sibling-scoped rules (minSibling, maxSibling, etc.) are not representable
+   * in JSON Schema and are silently omitted.
+   *
+   * @example
+   * ```ts
+   * v.number().min(0).max(100).toJsonSchema("draft-2020-12")
+   * // → { type: "number", minimum: 0, maximum: 100 }
+   * ```
+   */
+  public override toJsonSchema(target: JsonSchemaTarget = "draft-2020-12"): JsonSchemaResult {
+    return this.buildNumberJsonSchema("number", target);
+  }
+
+  /**
+   * Shared logic for number/integer JSON Schema generation.
+   * Called by NumberValidator.toJsonSchema() (→ type: "number")
+   * and IntValidator.toJsonSchema() (→ type: "integer").
+   */
+  protected buildNumberJsonSchema(
+    type: "number" | "integer",
+    target: JsonSchemaTarget,
+  ): JsonSchemaResult {
+    const schema: JsonSchemaResult = { type };
+
+    // minimum (inclusive)
+    const minOpts = getRuleOptions(this.rules, "min");
+    if (minOpts?.min !== undefined && typeof minOpts.min === "number") {
+      schema.minimum = minOpts.min;
+    }
+
+    // maximum (inclusive)
+    const maxOpts = getRuleOptions(this.rules, "max");
+    if (maxOpts?.max !== undefined && typeof maxOpts.max === "number") {
+      schema.maximum = maxOpts.max;
+    }
+
+    // between (inclusive range)
+    const betweenOpts = getRuleOptions(this.rules, "betweenNumbers");
+    if (betweenOpts) {
+      if (typeof betweenOpts.min === "number") schema.minimum = betweenOpts.min;
+      if (typeof betweenOpts.max === "number") schema.maximum = betweenOpts.max;
+    }
+
+    // greaterThan (>) → exclusiveMinimum
+    const gtOpts = getRuleOptions(this.rules, "greaterThan");
+    if (gtOpts?.value !== undefined && typeof gtOpts.value === "number") {
+      if (target === "draft-07") {
+        schema.minimum = gtOpts.value;
+        schema.exclusiveMinimum = true;
+      } else {
+        schema.exclusiveMinimum = gtOpts.value;
+      }
+    }
+
+    // lessThan (<) → exclusiveMaximum
+    const ltOpts = getRuleOptions(this.rules, "lessThan");
+    if (ltOpts?.value !== undefined && typeof ltOpts.value === "number") {
+      if (target === "draft-07") {
+        schema.maximum = ltOpts.value;
+        schema.exclusiveMaximum = true;
+      } else {
+        schema.exclusiveMaximum = ltOpts.value;
+      }
+    }
+
+    // multipleOf / modulo
+    const moduloOpts = getRuleOptions(this.rules, "modulo");
+    if (moduloOpts?.value !== undefined && typeof moduloOpts.value === "number") {
+      schema.multipleOf = moduloOpts.value;
+    }
+
+    // enum (from PrimitiveValidator.in / .enum)
+    const inOpts = getRuleOptions(this.rules, "in");
+    if (inOpts?.values && Array.isArray(inOpts.values)) {
+      schema.enum = inOpts.values;
+    }
+
+    if (this.isNullable) applyNullable(schema, target);
+
+    return schema;
   }
 }

@@ -42,3 +42,6 @@ export * from "./plugins";
 
 // Export configuration
 export * from "./config";
+
+// Export Standard Schema types and utilities
+export * from "./standard-schema";

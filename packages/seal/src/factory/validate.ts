@@ -1,7 +1,7 @@
 import { getSealConfig } from "../config";
 import type { SchemaContext, ValidationResult } from "../types";
 import type { BaseValidator } from "../validators";
-import { ValidateOptions } from "./validators";
+import { type ValidateOptions } from "./validators";
 
 /**
  * Validate data against a schema

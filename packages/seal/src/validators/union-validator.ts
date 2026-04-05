@@ -1,5 +1,7 @@
 import { unionRule } from "../rules";
 import { BaseValidator } from "./base-validator";
+import { getRuleOptions } from "../standard-schema/json-schema";
+import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 
 /**
  * Union validator class - validates value against multiple validator types
@@ -41,5 +43,25 @@ export class UnionValidator extends BaseValidator {
    */
   public union(validators: BaseValidator[], errorMessage?: string) {
     return this.addRule(unionRule, errorMessage, { validators });
+  }
+
+  /**
+   * @inheritdoc
+   *
+   * Generates `{ oneOf: [...] }` by mapping each sub-validator to its JSON Schema.
+   *
+   * @example
+   * ```ts
+   * v.union([v.string(), v.number()]).toJsonSchema("draft-2020-12")
+   * // → { oneOf: [{ type: "string" }, { type: "number" }] }
+   * ```
+   */
+  public override toJsonSchema(target: JsonSchemaTarget = "draft-2020-12"): JsonSchemaResult {
+    const opts = getRuleOptions(this.rules, "union");
+    const validators = (opts?.validators ?? []) as BaseValidator[];
+
+    return {
+      oneOf: validators.map(v => v.toJsonSchema(target)),
+    };
   }
 }

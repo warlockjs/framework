@@ -69,6 +69,8 @@ import {
   wordsRule,
 } from "../rules";
 import { PrimitiveValidator } from "./primitive-validator";
+import { applyNullable, getRuleOptions } from "../standard-schema/json-schema";
+import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 
 /**
  * String validator class
@@ -455,5 +457,75 @@ export class StringValidator extends PrimitiveValidator {
   /** Determine if the value is a valid dark color */
   public darkColor(errorMessage?: string) {
     return this.addRule(darkColorRule, errorMessage);
+  }
+
+  /**
+   * @inheritdoc
+   *
+   * Maps String-specific rule options to JSON Schema keywords.
+   * Non-representable rules (cross-field, refine, color rules, etc.) are silently omitted.
+   *
+   * @example
+   * ```ts
+   * v.string().min(2).max(100).email().toJsonSchema("draft-2020-12")
+   * // → { type: "string", minLength: 2, maxLength: 100, format: "email" }
+   * ```
+   */
+  public override toJsonSchema(target: JsonSchemaTarget = "draft-2020-12"): JsonSchemaResult {
+    const schema: JsonSchemaResult = { type: "string" };
+
+    // minLength / min
+    const minOpts = getRuleOptions(this.rules, "minLength");
+    if (minOpts?.minLength !== undefined) schema.minLength = minOpts.minLength;
+
+    // maxLength / max
+    const maxOpts = getRuleOptions(this.rules, "maxLength");
+    if (maxOpts?.maxLength !== undefined) schema.maxLength = maxOpts.maxLength;
+
+    // betweenLength covers both min and max in one rule
+    const betweenOpts = getRuleOptions(this.rules, "betweenLength");
+    if (betweenOpts) {
+      if (betweenOpts.minLength !== undefined) schema.minLength = betweenOpts.minLength;
+      if (betweenOpts.maxLength !== undefined) schema.maxLength = betweenOpts.maxLength;
+    }
+
+    // exact length
+    const lengthOpts = getRuleOptions(this.rules, "length");
+    if (lengthOpts?.length !== undefined) {
+      schema.minLength = lengthOpts.length;
+      schema.maxLength = lengthOpts.length;
+    }
+
+    // pattern (regex)
+    const patternOpts = getRuleOptions(this.rules, "pattern");
+    if (patternOpts?.pattern instanceof RegExp) {
+      schema.pattern = patternOpts.pattern.source;
+    }
+
+    // format hints
+    if (getRuleOptions(this.rules, "email") !== undefined ||
+        this.rules.some(r => r.name === "email")) {
+      schema.format = "email";
+    } else if (this.rules.some(r => r.name === "url")) {
+      schema.format = "uri";
+    } else if (this.rules.some(r => r.name === "ip")) {
+      schema.format = "ipv4";
+    } else if (this.rules.some(r => r.name === "ip4")) {
+      schema.format = "ipv4";
+    } else if (this.rules.some(r => r.name === "ip6")) {
+      schema.format = "ipv6";
+    } else if (this.rules.some(r => r.name === "hexColor")) {
+      schema.format = "color";
+    }
+
+    // enum (from PrimitiveValidator.in / .enum)
+    const inOpts = getRuleOptions(this.rules, "in");
+    if (inOpts?.values && Array.isArray(inOpts.values)) {
+      schema.enum = inOpts.values;
+    }
+
+    if (this.isNullable) applyNullable(schema, target);
+
+    return schema;
   }
 }

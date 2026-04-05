@@ -1,5 +1,6 @@
 import type { SchemaContext, ValidationResult } from "../types";
 import { BaseValidator } from "./base-validator";
+import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 
 /**
  * Callback function for computed fields
@@ -124,5 +125,23 @@ export class ComputedValidator<TResult = any> extends BaseValidator {
    */
   public matchesType(value: any): boolean {
     return true; // Computed fields accept any input (they generate their own value)
+  }
+
+  /**
+   * @inheritdoc
+   *
+   * Computed fields are server-side runtime values — they have no input schema
+   * and cannot be represented in JSON Schema. Calling this method is always a
+   * programming error.
+   *
+   * @throws Error Always throws — computed/managed fields have no JSON Schema representation.
+   */
+  public override toJsonSchema(_target: JsonSchemaTarget = "draft-2020-12"): JsonSchemaResult {
+    throw new Error(
+      `[Seal] toJsonSchema() is not supported on ComputedValidator / ManagedValidator. ` +
+      `Computed fields are runtime-only and have no input JSON Schema representation. ` +
+      `ObjectValidator.toJsonSchema() automatically skips computed fields — ` +
+      `do not call toJsonSchema() on a computed validator directly.`,
+    );
   }
 }

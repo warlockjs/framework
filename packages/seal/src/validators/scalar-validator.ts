@@ -15,6 +15,8 @@ import {
   declinedWithoutRule,
 } from "../rules/scalar";
 import { PrimitiveValidator } from "./primitive-validator";
+import { getRuleOptions } from "../standard-schema/json-schema";
+import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 
 /**
  * Scalar validator class
@@ -150,4 +152,39 @@ export class ScalarValidator extends PrimitiveValidator {
     return this.addRule(declinedWithoutRule, errorMessage, { field });
   }
 
+  /**
+   * @inheritdoc
+   *
+   * A scalar accepts string | number | boolean. If `.in()` / `.enum()` is used,
+   * output collapses to a simple `enum` list instead.
+   *
+   * @example
+   * ```ts
+   * v.scalar().toJsonSchema("draft-2020-12")
+   * // → { oneOf: [{ type: "string" }, { type: "number" }, { type: "boolean" }] }
+   *
+   * v.scalar().in(["active", "inactive"]).toJsonSchema("draft-2020-12")
+   * // → { enum: ["active", "inactive"] }
+   * ```
+   */
+  public override toJsonSchema(_target: JsonSchemaTarget = "draft-2020-12"): JsonSchemaResult {
+    // If a value set is constrained, collapse to enum
+    const inOpts = getRuleOptions(this.rules, "in");
+    if (inOpts?.values && Array.isArray(inOpts.values)) {
+      return { enum: inOpts.values };
+    }
+
+    const enumOpts = getRuleOptions(this.rules, "enum");
+    if (enumOpts?.enum && Array.isArray(enumOpts.enum)) {
+      return { enum: enumOpts.enum };
+    }
+
+    return {
+      oneOf: [
+        { type: "string" },
+        { type: "number" },
+        { type: "boolean" },
+      ],
+    };
+  }
 }

@@ -2,6 +2,8 @@ import { setKeyPath } from "../helpers";
 import { arrayRule } from "../rules";
 import type { SchemaContext, ValidationResult } from "../types";
 import { BaseValidator } from "./base-validator";
+import { applyNullable } from "../standard-schema/json-schema";
+import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 
 /**
  * Tuple validator class - validates fixed-length arrays with position-specific types
@@ -92,5 +94,50 @@ export class TupleValidator extends BaseValidator {
       errors,
       data: await this.startTransformationPipeline(mutatedData, context),
     };
+  }
+
+  /**
+   * @inheritdoc
+   *
+   * Tuple keyword diverges between targets:
+   * - `draft-2020-12` → `prefixItems` + `items: false` (exact length enforced)
+   * - `draft-07`      → `items` as array + `additionalItems: false`
+   * - `openapi-3.0`   → same as draft-07 (OpenAPI 3.0 is based on draft-07)
+   *
+   * @example
+   * ```ts
+   * v.tuple([v.string(), v.int(), v.boolean()]).toJsonSchema("draft-2020-12")
+   * // → {
+   * //   type: "array",
+   * //   prefixItems: [{ type: "string" }, { type: "integer" }, { type: "boolean" }],
+   * //   items: false,
+   * //   minItems: 3,
+   * //   maxItems: 3
+   * // }
+   * ```
+   */
+  public override toJsonSchema(target: JsonSchemaTarget = "draft-2020-12"): JsonSchemaResult {
+    const itemSchemas = this.validators.map(v => v.toJsonSchema(target));
+    const length = this.validators.length;
+
+    const schema: JsonSchemaResult = {
+      type: "array",
+      minItems: length,
+      maxItems: length,
+    };
+
+    if (target === "draft-2020-12") {
+      // prefixItems is the draft-2020-12 keyword for positional tuple items
+      schema.prefixItems = itemSchemas;
+      schema.items = false; // no additional items beyond the tuple
+    } else {
+      // draft-07 and openapi-3.0: items as array + additionalItems: false
+      schema.items = itemSchemas;
+      schema.additionalItems = false;
+    }
+
+    if (this.isNullable) applyNullable(schema, target);
+
+    return schema;
   }
 }

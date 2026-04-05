@@ -3,6 +3,8 @@ import { setKeyPath } from "../helpers";
 import { objectRule, plainObjectRule } from "../rules";
 import type { SchemaContext, ValidationResult } from "../types";
 import { BaseValidator } from "./base-validator";
+import { applyNullable } from "../standard-schema/json-schema";
+import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 
 /**
  * Record validator class - validates objects with dynamic keys and consistent value types
@@ -90,5 +92,31 @@ export class RecordValidator extends BaseValidator {
       errors,
       data: await this.startTransformationPipeline(mutatedData, context),
     };
+  }
+
+  /**
+   * @inheritdoc
+   *
+   * Generates `{ type: "object", additionalProperties: <valueSchema> }` —
+   * the standard JSON Schema for a dictionary/map with homogeneous values.
+   *
+   * @example
+   * ```ts
+   * v.record(v.string()).toJsonSchema("draft-2020-12")
+   * // → { type: "object", additionalProperties: { type: "string" } }
+   *
+   * v.record(v.union([v.string(), v.number()])).toJsonSchema("draft-2020-12")
+   * // → { type: "object", additionalProperties: { oneOf: [{ type: "string" }, { type: "number" }] } }
+   * ```
+   */
+  public override toJsonSchema(target: JsonSchemaTarget = "draft-2020-12"): JsonSchemaResult {
+    const schema: JsonSchemaResult = {
+      type: "object",
+      additionalProperties: this.valueValidator.toJsonSchema(target),
+    };
+
+    if (this.isNullable) applyNullable(schema, target);
+
+    return schema;
   }
 }

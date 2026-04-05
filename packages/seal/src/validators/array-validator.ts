@@ -11,6 +11,8 @@ import {
 } from "../rules";
 import type { SchemaContext, ValidationResult } from "../types";
 import { BaseValidator } from "./base-validator";
+import { applyNullable, getRuleOptions } from "../standard-schema/json-schema";
+import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 
 /**
  * Array validator class
@@ -158,5 +160,45 @@ export class ArrayValidator extends BaseValidator {
       errors,
       data: await this.startTransformationPipeline(mutatedData, context),
     };
+  }
+
+  /**
+   * @inheritdoc
+   *
+   * Recursively generates JSON Schema for the array items.
+   *
+   * @example
+   * ```ts
+   * v.array(v.string().min(1)).minLength(1).toJsonSchema("draft-2020-12")
+   * // → { type: "array", items: { type: "string", minLength: 1 }, minItems: 1 }
+   * ```
+   */
+  public override toJsonSchema(target: JsonSchemaTarget = "draft-2020-12"): JsonSchemaResult {
+    const schema: JsonSchemaResult = {
+      type: "array",
+      items: this.validator.toJsonSchema(target),
+    };
+
+    const minOpts = getRuleOptions(this.rules, "minLength");
+    if (minOpts?.minLength !== undefined) schema.minItems = minOpts.minLength;
+
+    const maxOpts = getRuleOptions(this.rules, "maxLength");
+    if (maxOpts?.maxLength !== undefined) schema.maxItems = maxOpts.maxLength;
+
+    const betweenOpts = getRuleOptions(this.rules, "betweenLength");
+    if (betweenOpts) {
+      if (betweenOpts.minLength !== undefined) schema.minItems = betweenOpts.minLength;
+      if (betweenOpts.maxLength !== undefined) schema.maxItems = betweenOpts.maxLength;
+    }
+
+    const lengthOpts = getRuleOptions(this.rules, "length");
+    if (lengthOpts?.length !== undefined) {
+      schema.minItems = lengthOpts.length;
+      schema.maxItems = lengthOpts.length;
+    }
+
+    if (this.isNullable) applyNullable(schema, target);
+
+    return schema;
   }
 }

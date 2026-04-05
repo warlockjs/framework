@@ -6,6 +6,8 @@ import { objectRule, unknownKeyRule } from "../rules";
 import type { Schema, SchemaContext, ValidationResult } from "../types";
 import { BaseValidator } from "./base-validator";
 import { ComputedValidator } from "./computed-validator";
+import { applyNullable, wrapNullableStrict } from "../standard-schema/json-schema";
+import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 
 /**
  * Object validator class with generic schema type for proper type inference
@@ -469,6 +471,78 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
     }
 
     return computed;
+  }
+
+  /**
+   * @inheritdoc
+   *
+   * Recursively generates JSON Schema for all input fields in the schema.
+   * Computed/managed fields are skipped — they have no input representation.
+   *
+   * **Standard targets** (`draft-2020-12`, `draft-07`, `openapi-3.0`):
+   * - Fields marked `.optional()` are excluded from `required`.
+   *
+   * **`openai-strict` target** (OpenAI Structured Outputs):
+   * - ALL fields appear in `required` — OpenAI rejects schemas with optional fields.
+   * - Optional fields are instead expressed as nullable types:
+   *   `{ type: ["string", "null"] }` so the model can output `null` for them.
+   * - Recursively applies `openai-strict` to all nested objects.
+   *
+   * @example
+   * ```ts
+   * v.object({
+   *   name: v.string().required(),
+   *   age: v.int().optional(),
+   * }).toJsonSchema("draft-2020-12")
+   * // → { type: "object",
+   * //     properties: { name: { type: "string" }, age: { type: "integer" } },
+   * //     required: ["name"], additionalProperties: false }
+   *
+   * v.object({
+   *   name: v.string().required(),
+   *   age: v.int().optional(),
+   * }).toJsonSchema("openai-strict")
+   * // → { type: "object",
+   * //     properties: { name: { type: "string" }, age: { type: ["integer", "null"] } },
+   * //     required: ["name", "age"],   ← all fields
+   * //     additionalProperties: false }
+   * ```
+   */
+  public override toJsonSchema(target: JsonSchemaTarget = "draft-2020-12"): JsonSchemaResult {
+    const properties: Record<string, JsonSchemaResult> = {};
+    const required: string[] = [];
+    const isOpenAIStrict = target === "openai-strict";
+
+    for (const [key, validator] of Object.entries(this.schema)) {
+      // Skip computed/managed — runtime-only, no input schema
+      if (validator instanceof ComputedValidator) continue;
+
+      let fieldSchema = validator.toJsonSchema(target);
+
+      if (isOpenAIStrict) {
+        // OpenAI strict: every field must be in required.
+        // Optional fields are expressed as nullable rather than absent.
+        if (validator.isOptional) {
+          fieldSchema = wrapNullableStrict(fieldSchema);
+        }
+        required.push(key);
+      } else {
+        // Standard JSON Schema: only non-optional fields go in required
+        if (!validator.isOptional) {
+          required.push(key);
+        }
+      }
+
+      properties[key] = fieldSchema;
+    }
+
+    const schema: JsonSchemaResult = { type: "object", properties };
+
+    if (required.length > 0) schema.required = required;
+    if (!this.shouldAllowUnknown) schema.additionalProperties = false;
+    if (this.isNullable) applyNullable(schema, target);
+
+    return schema;
   }
 }
 

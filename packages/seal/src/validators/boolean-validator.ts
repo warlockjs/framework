@@ -14,6 +14,8 @@ import {
 } from "../rules/scalar";
 import { booleanRule } from "../rules";
 import { PrimitiveValidator } from "./primitive-validator";
+import { applyNullable } from "../standard-schema/json-schema";
+import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 
 /**
  * Boolean validator class
@@ -115,5 +117,26 @@ export class BooleanValidator extends PrimitiveValidator {
    */
   public mustBeFalse(errorMessage?: string) {
     return this.equal(false, errorMessage);
+  }
+
+  /**
+   * @inheritdoc
+   *
+   * @note accepted/declined rules and all cross-field boolean rules
+   * are not representable in JSON Schema and are silently omitted.
+   *
+   * @example
+   * ```ts
+   * v.boolean().toJsonSchema("draft-2020-12")
+   * // → { type: "boolean" }
+   *
+   * v.boolean().nullable().toJsonSchema("openapi-3.0")
+   * // → { type: "boolean", nullable: true }
+   * ```
+   */
+  public override toJsonSchema(target: JsonSchemaTarget = "draft-2020-12"): JsonSchemaResult {
+    const schema: JsonSchemaResult = { type: "boolean" };
+    if (this.isNullable) applyNullable(schema, target);
+    return schema;
   }
 }
