@@ -11,6 +11,7 @@ import type {
 type MigrationLike = {
   addPendingIndex(index: { columns: string[]; unique?: boolean }): void;
   addForeignKeyOperation(fk: ForeignKeyDefinition): void;
+  addPendingVectorIndex?(column: string, options: Omit<import("../contracts/migration-driver.contract").VectorIndexOptions, "column">): void;
 };
 
 /**
@@ -234,6 +235,29 @@ export class ColumnBuilder {
     this.migration.addPendingIndex({
       columns: [this.definition.name],
     });
+    return this;
+  }
+
+  /**
+   * Add a vector search index on this column.
+   *
+   * Registers a pending vector index with the parent migration.
+   *
+   * @param options - Vector index options
+   * @returns This builder for chaining
+   *
+   * @example
+   * ```typescript
+   * this.vector(1536).vectorIndex({ similarity: "cosine" });
+   * ```
+   */
+  public vectorIndex(options: Omit<import("../contracts/migration-driver.contract").VectorIndexOptions, "dimensions"> = {}): this {
+    if (this.migration.addPendingVectorIndex) {
+      this.migration.addPendingVectorIndex(this.definition.name, {
+        ...options,
+        dimensions: this.definition.dimensions || 0,
+      });
+    }
     return this;
   }
 

@@ -857,18 +857,25 @@ export class MigrationRunner {
    */
   private formatSQLForExport(statements: TaggedSQL[]): string {
     const lines: string[] = [];
-    let lastGroupKey: string | null = null;
+    
+    // Group statements by their phase and migration name
+    const grouped = new Map<string, string[]>();
 
     for (const stmt of statements) {
       const groupKey = `Phase ${stmt.phase} [${stmt.migrationName}]`;
-
-      if (groupKey !== lastGroupKey) {
-        if (lines.length > 0) lines.push(""); // blank line between groups
-        lines.push(`/* ${groupKey} */`);
-        lastGroupKey = groupKey;
+      if (!grouped.has(groupKey)) {
+        grouped.set(groupKey, []);
       }
+      grouped.get(groupKey)!.push(stmt.sql);
+    }
 
-      lines.push(`${stmt.sql};`);
+    // Format each group
+    for (const [groupKey, sqls] of grouped.entries()) {
+      if (lines.length > 0) lines.push(""); // blank line between groups
+      lines.push(`/* ${groupKey} */`);
+      for (const sql of sqls) {
+        lines.push(`${sql};`);
+      }
     }
 
     return lines.join("\n");

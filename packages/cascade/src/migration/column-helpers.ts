@@ -18,12 +18,25 @@ class DetachedMigrationSink {
   /** Pending FK definitions registered via .references() on a helper column. */
   public readonly pendingForeignKeys: object[] = [];
 
+  /** Pending Vector index definitions registered via .vectorIndex() on a helper column. */
+  public readonly pendingVectorIndexes: {
+    column: string;
+    options: import("../contracts/migration-driver.contract").VectorIndexOptions;
+  }[] = [];
+
   public addPendingIndex(index: { columns: string[]; unique?: boolean }): void {
     this.pendingIndexes.push(index);
   }
 
   public addForeignKeyOperation(fk: object): void {
     this.pendingForeignKeys.push(fk);
+  }
+
+  public addPendingVectorIndex(
+    column: string,
+    options: Omit<import("../contracts/migration-driver.contract").VectorIndexOptions, "column">,
+  ): void {
+    this.pendingVectorIndexes.push({ column, options: options as any });
   }
 }
 

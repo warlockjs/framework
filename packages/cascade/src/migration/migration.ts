@@ -3091,6 +3091,14 @@ function wireColumns(migration: Migration, columns: ColumnMap): void {
       fk.column = columnName;
       migration.addForeignKeyOperation(fk);
     }
+
+    // Transfer any Vector indexes registered via .vectorIndex()
+    if (detached.sink.pendingVectorIndexes) {
+      for (const vIdx of detached.sink.pendingVectorIndexes) {
+        vIdx.column = columnName;
+        migration.vectorIndex(vIdx.column, vIdx.options);
+      }
+    }
   }
 }
 

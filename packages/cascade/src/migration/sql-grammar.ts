@@ -75,8 +75,11 @@ export class SQLGrammar {
       }
 
       // 2. Sort by CreatedAt (within same phase)
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      let dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      let dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (isNaN(dateA)) dateA = 0;
+      if (isNaN(dateB)) dateB = 0;
+
       if (dateA !== dateB) {
         return dateA - dateB;
       }
