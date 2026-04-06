@@ -135,6 +135,10 @@ export const generateModelCommand = command({
       text: "--force, -f",
       description: "Overwrite existing files",
     },
+    {
+      text: "--timestamps [bool]",
+      description: "Include timestamps in migration (default: true)",
+    },
   ],
 });
 
@@ -190,6 +194,22 @@ export const generateMigrationCommand = command({
     {
       text: "--force, -f",
       description: "Overwrite existing files",
+    },
+    {
+      text: "--add <columns>",
+      description: "Columns to add (DSL: name:type:modifier,...)",
+    },
+    {
+      text: "--drop <columns>",
+      description: "Columns to drop (comma-separated names)",
+    },
+    {
+      text: "--rename <columns>",
+      description: "Columns to rename (DSL: old:new,...)",
+    },
+    {
+      text: "--timestamps [bool]",
+      description: "Include timestamps (default: true)",
     },
   ],
 });

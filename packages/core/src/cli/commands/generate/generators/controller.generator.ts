@@ -35,7 +35,7 @@ export async function generateController(data: CommandActionData): Promise<void>
     process.exit(1);
   }
 
-  const name = parseName(componentName, module);
+  const name = parseName(componentName);
   const withValidation = data.options.withValidation || data.options.v;
   const force = data.options.force || data.options.f;
 

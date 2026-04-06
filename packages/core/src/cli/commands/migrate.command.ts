@@ -36,5 +36,10 @@ export const migrateCommand = command({
       description: "List all migrations files in the app",
       type: "boolean",
     },
+    {
+      text: "--sql, -s",
+      description: "Export pending migrations as phase-ordered SQL files instead of executing them",
+      type: "boolean",
+    },
   ],
 });

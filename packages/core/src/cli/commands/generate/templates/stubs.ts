@@ -1,5 +1,5 @@
 import type { ParsedName } from "../types";
-import { parseName } from "../utils/name-parser";
+import { Name } from "../utils/name-parser";
 
 /**
  * Controller template stub
@@ -40,31 +40,25 @@ ${name.camel}Controller.validation = {
  * CRUD Create Controller template
  * Note: moduleName is the module (plural), we need singular entity name
  */
-export function crudCreateControllerStub(moduleName: ParsedName): string {
-  // Get singular entity name (e.g., "products" -> "product")
-  const entityKebab = moduleName.kebab.endsWith("s")
-    ? moduleName.kebab.slice(0, -1)
-    : moduleName.kebab;
-  const entity = parseName(entityKebab);
-
+export function crudCreateControllerStub(moduleName: Name): string {
   return `import { type RequestHandler } from "@warlock.js/core";
-import { type Create${entity.pascal}Request } from "../requests/create-${entity.kebab}.request";
-import { create${entity.pascal}Schema } from "../schema/create-${entity.kebab}.schema";
-import { create${entity.pascal}Service } from "../services/create-${entity.kebab}.service";
+import { type Create${moduleName.pascal}Request } from "../requests/create-${moduleName.kebab}.request";
+import { create${moduleName.pascal}Schema } from "../schema/create-${moduleName.kebab}.schema";
+import { create${moduleName.pascal}Service } from "../services/create-${moduleName.kebab}.service";
 
-export const create${entity.pascal}Controller: RequestHandler = async (
-  request: Create${entity.pascal}Request,
+export const create${moduleName.pascal}Controller: RequestHandler = async (
+  request: Create${moduleName.pascal}Request,
   response,
 ) => {
-  const ${entity.camel} = await create${entity.pascal}Service(request.validated());
+  const ${moduleName.camel} = await create${moduleName.pascal}Service(request.validated());
 
   return response.success({
-    ${entity.camel},
+    ${moduleName.camel},
   });
 };
 
-create${entity.pascal}Controller.validation = {
-  schema: create${entity.pascal}Schema,
+create${moduleName.pascal}Controller.validation = {
+  schema: create${moduleName.pascal}Schema,
 };
 `;
 }
@@ -72,35 +66,25 @@ create${entity.pascal}Controller.validation = {
 /**
  * CRUD Update Controller template
  */
-export function crudUpdateControllerStub(moduleName: ParsedName): string {
-  // Get singular entity name
-  const entityKebab = moduleName.kebab.endsWith("s")
-    ? moduleName.kebab.slice(0, -1)
-    : moduleName.kebab;
-  const entity = parseName(entityKebab);
-
+export function crudUpdateControllerStub(moduleName: Name): string {
   return `import { type RequestHandler } from "@warlock.js/core";
-import { type Update${entity.pascal}Request } from "../requests/update-${entity.kebab}.request";
-import { update${entity.pascal}Schema } from "../schema/update-${entity.kebab}.schema";
-import { update${entity.pascal}Service } from "../services/update-${entity.kebab}.service";
+import { type Update${moduleName.pascal}Request } from "../requests/update-${moduleName.kebab}.request";
+import { update${moduleName.pascal}Schema } from "../schema/update-${moduleName.kebab}.schema";
+import { update${moduleName.pascal}Service } from "../services/update-${moduleName.kebab}.service";
 
-export const update${entity.pascal}Controller: RequestHandler = async (
-  request: Update${entity.pascal}Request,
+export const update${moduleName.pascal}Controller: RequestHandler = async (
+  request: Update${moduleName.pascal}Request,
   response,
 ) => {
-  const ${entity.camel} = await update${entity.pascal}Service(request.int("id"), request.validated());
-
-  if (!${entity.camel}) {
-    return response.notFound();
-  }
+  const ${moduleName.camel} = await update${moduleName.pascal}Service(request.input("id"), request.validated());
 
   return response.success({
-    ${entity.camel},
+    ${moduleName.camel},
   });
 };
 
-update${entity.pascal}Controller.validation = {
-  schema: update${entity.pascal}Schema,
+update${moduleName.pascal}Controller.validation = {
+  schema: update${moduleName.pascal}Schema,
 };
 `;
 }
@@ -108,20 +92,16 @@ update${entity.pascal}Controller.validation = {
 /**
  * CRUD List Controller template
  */
-export function crudListControllerStub(moduleName: ParsedName): string {
-  const entityKebab = moduleName.kebab.endsWith("s")
-    ? moduleName.kebab.slice(0, -1)
-    : moduleName.kebab;
-  const entity = parseName(entityKebab);
-
+export function crudListControllerStub(moduleName: Name): string {
+  const plural = moduleName.plural;
   return `import { type RequestHandler } from "@warlock.js/core";
-import { list${entity.pascal}sService } from "../services/list-${moduleName.kebab}.service";
+import { list${plural.pascal}Service } from "../services/list-${plural.kebab}.service";
 
-export const list${entity.pascal}sController: RequestHandler = async (
+export const list${plural.pascal}Controller: RequestHandler = async (
   request,
   response,
 ) => {
-  const { data, pagination } = await list${entity.pascal}sService(request.all());
+  const { data, pagination } = await list${plural.pascal}Service(request.all());
 
   return response.success({
     data,
@@ -134,27 +114,22 @@ export const list${entity.pascal}sController: RequestHandler = async (
 /**
  * CRUD Show/Get Controller template
  */
-export function crudShowControllerStub(moduleName: ParsedName): string {
-  const entityKebab = moduleName.kebab.endsWith("s")
-    ? moduleName.kebab.slice(0, -1)
-    : moduleName.kebab;
-  const entity = parseName(entityKebab);
-
+export function crudShowControllerStub(moduleName: Name): string {
   return `import { type RequestHandler } from "@warlock.js/core";
-import { get${entity.pascal}Service } from "../services/get-${entity.kebab}.service";
+import { get${moduleName.pascal}Service } from "../services/get-${moduleName.kebab}.service";
 
-export const get${entity.pascal}Controller: RequestHandler = async (
+export const get${moduleName.pascal}Controller: RequestHandler = async (
   request,
   response,
 ) => {
-  const ${entity.camel} = await get${entity.pascal}Service(request.int("id"));
+  const ${moduleName.camel} = await get${moduleName.pascal}Service(request.input("id"));
 
-  if (!${entity.camel}) {
+  if (!${moduleName.camel}) {
     return response.notFound();
   }
 
   return response.success({
-    ${entity.camel},
+    ${moduleName.camel},
   });
 };
 `;
@@ -163,23 +138,18 @@ export const get${entity.pascal}Controller: RequestHandler = async (
 /**
  * CRUD Delete Controller template
  */
-export function crudDeleteControllerStub(moduleName: ParsedName): string {
-  const entityKebab = moduleName.kebab.endsWith("s")
-    ? moduleName.kebab.slice(0, -1)
-    : moduleName.kebab;
-  const entity = parseName(entityKebab);
-
+export function crudDeleteControllerStub(moduleName: Name): string {
   return `import { type RequestHandler } from "@warlock.js/core";
-import { delete${entity.pascal}Service } from "../services/delete-${entity.kebab}.service";
+import { delete${moduleName.pascal}Service } from "../services/delete-${moduleName.kebab}.service";
 
-export const delete${entity.pascal}Controller: RequestHandler = async (
+export const delete${moduleName.pascal}Controller: RequestHandler = async (
   request,
   response,
 ) => {
-  await delete${entity.pascal}Service(request.int("id"));
+  await delete${moduleName.pascal}Service(request.input("id"));
 
   return response.success({
-    message: "${entity.pascal} deleted successfully",
+    message: "${moduleName.pascal} deleted successfully",
   });
 };
 `;
@@ -188,28 +158,26 @@ export const delete${entity.pascal}Controller: RequestHandler = async (
 /**
  * CRUD Routes template
  */
-export function crudRoutesStub(moduleName: ParsedName): string {
-  const entityKebab = moduleName.kebab.endsWith("s")
-    ? moduleName.kebab.slice(0, -1)
-    : moduleName.kebab;
-  const entity = parseName(entityKebab);
+export function crudRoutesStub(moduleName: Name): string {
+  const singular = moduleName.singular;
+  const plural = moduleName.plural;
 
   return `import { router } from "@warlock.js/core";
 import { guarded } from "app/shared/utils/router";
-import { create${entity.pascal}Controller } from "./controllers/create-${entity.kebab}.controller";
-import { delete${entity.pascal}Controller } from "./controllers/delete-${entity.kebab}.controller";
-import { get${entity.pascal}Controller } from "./controllers/get-${entity.kebab}.controller";
-import { list${entity.pascal}sController } from "./controllers/list-${moduleName.kebab}.controller";
-import { update${entity.pascal}Controller } from "./controllers/update-${entity.kebab}.controller";
+import { create${singular.pascal}Controller } from "./controllers/create-${singular.kebab}.controller";
+import { delete${singular.pascal}Controller } from "./controllers/delete-${singular.kebab}.controller";
+import { get${singular.pascal}Controller } from "./controllers/get-${singular.kebab}.controller";
+import { list${plural.pascal}Controller } from "./controllers/list-${plural.kebab}.controller";
+import { update${singular.pascal}Controller } from "./controllers/update-${singular.kebab}.controller";
 
 guarded(() => {
   router
-    .route("/${moduleName.kebab}")
-    .list(list${entity.pascal}sController)
-    .show(get${entity.pascal}Controller)
-    .create(create${entity.pascal}Controller)
-    .update(update${entity.pascal}Controller)
-    .destroy(delete${entity.pascal}Controller);
+    .route("/${plural.kebab}")
+    .list(list${plural.pascal}Controller)
+    .show(get${singular.pascal}Controller)
+    .create(create${singular.pascal}Controller)
+    .update(update${singular.pascal}Controller)
+    .destroy(delete${singular.pascal}Controller);
 });
 `;
 }
@@ -217,33 +185,29 @@ guarded(() => {
 /**
  * CRUD Model template
  */
-export function crudModelStub(moduleName: ParsedName): string {
-  // Get singular entity name
-  const entityKebab = moduleName.kebab.endsWith("s")
-    ? moduleName.kebab.slice(0, -1)
-    : moduleName.kebab;
-  const entity = parseName(entityKebab);
+export function crudModelStub(moduleName: Name): string {
+  const singular = moduleName.singular;
+  const plural = moduleName.plural;
 
   return `import { Model, RegisterModel } from "@warlock.js/cascade";
 import { type Infer, v } from "@warlock.js/core";
-import { ${entity.pascal}Resource } from "app/${moduleName.kebab}/resources/${entity.kebab}.resource";
+import { ${singular.pascal}Resource } from "app/${plural.kebab}/resources/${singular.kebab}.resource";
 
-export const ${entity.camel}Schema = v.object({
-  name: v.string().required(),
+export const ${singular.camel}Schema = v.object({
   // TODO: Add more fields
 });
 
-type ${entity.pascal}Schema = Infer<typeof ${entity.camel}Schema>;
+type ${singular.pascal}Schema = Infer<typeof ${singular.camel}Schema>;
 
 @RegisterModel()
-export class ${entity.pascal} extends Model<${entity.pascal}Schema> {
-  public static table = "${moduleName.snake}";
+export class ${singular.pascal} extends Model<${singular.pascal}Schema> {
+  public static table = "${plural.snake}";
 
-  public static schema = ${entity.camel}Schema;
+  public static schema = ${singular.camel}Schema;
 
   public static relations = {};
 
-  public static resource = ${entity.pascal}Resource;
+  public static resource = ${singular.pascal}Resource;
 }
 `;
 }
@@ -251,23 +215,16 @@ export class ${entity.pascal} extends Model<${entity.pascal}Schema> {
 /**
  * CRUD Resource template
  */
-export function crudResourceStub(moduleName: ParsedName): string {
+export function crudResourceStub(moduleName: Name): string {
   // Get singular entity name
-  const entityKebab = moduleName.kebab.endsWith("s")
-    ? moduleName.kebab.slice(0, -1)
-    : moduleName.kebab;
-  const entity = parseName(entityKebab);
+  const entity = moduleName.singular;
 
   return `import { defineResource } from "@warlock.js/core";
 
 export const ${entity.pascal}Resource = defineResource({
   schema: {
     id: "number",
-    name: "string",
-    // TODO: Add more fields
-    createdBy: "object",
-    updatedBy: "object",
-    isActive: "boolean",
+    // TODO: Add more resource fields
   },
 });
 `;
@@ -276,22 +233,26 @@ export const ${entity.pascal}Resource = defineResource({
 /**
  * CRUD Repository template
  */
-export function crudRepositoryStub(moduleName: ParsedName): string {
-  const entityKebab = moduleName.kebab.endsWith("s")
-    ? moduleName.kebab.slice(0, -1)
-    : moduleName.kebab;
-  const entity = parseName(entityKebab);
+export function crudRepositoryStub(entity: Name): string {
+  const moduleSingularName = entity.singular;
+  const modulePluralName = entity.plural;
   return `import type { FilterRules, RepositoryOptions } from "@warlock.js/core";
 import { RepositoryManager } from "@warlock.js/core";
-import { ${entity.pascal} } from "../models/${entity.kebab}";
+import { ${moduleSingularName.pascal} } from "../models/${moduleSingularName.kebab}";
 
-class ${entity.pascal}Repository extends RepositoryManager<${entity.pascal}> {
-  public source = ${entity.pascal};
+type ${moduleSingularName.pascal}ListFilter = {
+  // Repository list filters
+};
+
+export type ${moduleSingularName.pascal}ListOptions = RepositoryOptions & ${moduleSingularName.pascal}ListFilter;
+
+class ${modulePluralName.pascal}Repository extends RepositoryManager<${moduleSingularName.pascal}, ${moduleSingularName.pascal}ListOptions> {
+  public source = ${moduleSingularName.pascal};
 
   public simpleSelectColumns: string[] = ["id"];
 
   public filterBy: FilterRules = {
-    id: "int",
+    id: "=",
   };
 
   public defaultOptions: RepositoryOptions = {
@@ -301,24 +262,21 @@ class ${entity.pascal}Repository extends RepositoryManager<${entity.pascal}> {
   };
 }
 
-export const ${moduleName.camel}Repository = new ${entity.pascal}Repository();
+export const ${modulePluralName.camel}Repository = new ${modulePluralName.pascal}Repository();
 `;
 }
 
 /**
  * CRUD Create Service template
  */
-export function crudCreateServiceStub(moduleName: ParsedName): string {
-  const entityKebab = moduleName.kebab.endsWith("s")
-    ? moduleName.kebab.slice(0, -1)
-    : moduleName.kebab;
-  const entity = parseName(entityKebab);
-  return `import { ${entity.pascal} } from "../models/${entity.kebab}";
-import type { Create${entity.pascal}Schema } from "../schema/create-${entity.kebab}.schema";
+export function crudCreateServiceStub(entity: Name): string {
+  const moduleSingularName = entity.singular;
+  return `import { ${moduleSingularName.pascal} } from "../models/${moduleSingularName.kebab}";
+import type { Create${moduleSingularName.pascal}Schema } from "../schema/create-${moduleSingularName.kebab}.schema";
 
-export async function create${entity.pascal}Service(data: Create${entity.pascal}Schema) {
-  const ${entity.camel} = await ${entity.pascal}.create(data);
-  return ${entity.camel};
+export async function create${moduleSingularName.pascal}Service(data: Create${moduleSingularName.pascal}Schema) {
+  const ${moduleSingularName.camel} = await ${moduleSingularName.pascal}.create(data);
+  return ${moduleSingularName.camel};
 }
 `;
 }
@@ -326,22 +284,17 @@ export async function create${entity.pascal}Service(data: Create${entity.pascal}
 /**
  * CRUD Update Service template
  */
-export function crudUpdateServiceStub(moduleName: ParsedName): string {
-  const entityKebab = moduleName.kebab.endsWith("s")
-    ? moduleName.kebab.slice(0, -1)
-    : moduleName.kebab;
-  const entity = parseName(entityKebab);
+export function crudUpdateServiceStub(entity: Name): string {
+  const moduleSingularName = entity.singular;
   return `import { ResourceNotFoundError } from "@warlock.js/core";
-import { ${entity.pascal} } from "../models/${entity.kebab}";
-import type { Update${entity.pascal}Schema } from "../schema/update-${entity.kebab}.schema";
+import { get${moduleSingularName.pascal}Service } from "./get-${moduleSingularName.kebab}.service";
+import type { Update${moduleSingularName.pascal}Schema } from "../schema/update-${moduleSingularName.kebab}.schema";
 
-export async function update${entity.pascal}Service(id: number, data: Update${entity.pascal}Schema) {
-  const ${entity.camel} = await ${entity.pascal}.find(id);
-  if (!${entity.camel}) {
-    throw new ResourceNotFoundError("${entity.pascal} not found");
-  }
-  await ${entity.camel}.save({ merge: data });
-  return ${entity.camel};
+export async function update${moduleSingularName.pascal}Service(id: number | string, data: Update${moduleSingularName.pascal}Schema) {
+  const ${moduleSingularName.camel} = await get${moduleSingularName.pascal}Service(id);
+
+  await ${moduleSingularName.camel}.save({ merge: data });
+  return ${moduleSingularName.camel};
 }
 `;
 }
@@ -349,15 +302,12 @@ export async function update${entity.pascal}Service(id: number, data: Update${en
 /**
  * CRUD List Service template
  */
-export function crudListServiceStub(moduleName: ParsedName): string {
-  const entityKebab = moduleName.kebab.endsWith("s")
-    ? moduleName.kebab.slice(0, -1)
-    : moduleName.kebab;
-  const entity = parseName(entityKebab);
-  return `import { ${moduleName.camel}Repository } from "../repositories/${moduleName.kebab}.repository";
+export function crudListServiceStub(entity: Name): string {
+  const modulePluralName = entity.plural;
+  return `import { ${modulePluralName.camel}Repository } from "../repositories/${modulePluralName.kebab}.repository";
 
-export async function list${entity.pascal}sService(filters: any) {
-  return ${moduleName.camel}Repository.listCached(filters);
+export async function list${modulePluralName.pascal}Service(filters: any) {
+  return ${modulePluralName.camel}Repository.listCached(filters);
 }
 `;
 }
@@ -365,15 +315,18 @@ export async function list${entity.pascal}sService(filters: any) {
 /**
  * CRUD Get Service template
  */
-export function crudGetServiceStub(moduleName: ParsedName): string {
-  const entityKebab = moduleName.kebab.endsWith("s")
-    ? moduleName.kebab.slice(0, -1)
-    : moduleName.kebab;
-  const entity = parseName(entityKebab);
-  return `import { ${moduleName.camel}Repository } from "../repositories/${moduleName.kebab}.repository";
+export function crudGetServiceStub(entity: Name): string {
+  return `import { ${entity.plural.camel}Repository } from "../repositories/${entity.plural.kebab}.repository";
+import { ResourceNotFoundError } from "@warlock.js/core";
 
-export async function get${entity.pascal}Service(id: number) {
-  return ${moduleName.camel}Repository.getCached(id);
+export async function get${entity.singular.pascal}Service(id: number | string) {
+  const ${entity.singular.camel} = await ${entity.plural.camel}Repository.getCached(id);
+
+  if (!${entity.singular.camel}) {
+    throw new ResourceNotFoundError("${entity.singular.pascal} resource not found!");
+  }
+
+  return ${entity.singular.camel};
 }
 `;
 }
@@ -381,20 +334,17 @@ export async function get${entity.pascal}Service(id: number) {
 /**
  * CRUD Delete Service template
  */
-export function crudDeleteServiceStub(moduleName: ParsedName): string {
-  const entityKebab = moduleName.kebab.endsWith("s")
-    ? moduleName.kebab.slice(0, -1)
-    : moduleName.kebab;
-  const entity = parseName(entityKebab);
+export function crudDeleteServiceStub(entity: Name): string {
+  const singular = entity.singular;
   return `import { ResourceNotFoundError } from "@warlock.js/core";
-import { ${entity.pascal} } from "../models/${entity.kebab}";
+import { get${singular.pascal}Service } from "./get-${singular.kebab}.service";
 
-export async function delete${entity.pascal}Service(id: number) {
-  const ${entity.camel} = await ${entity.pascal}.find(id);
-  if (!${entity.camel}) {
-    throw new ResourceNotFoundError("${entity.pascal} not found");
+export async function delete${singular.pascal}Service(id: number | string) {
+  const ${singular.camel} = await get${singular.pascal}Service(id);
+  if (!${singular.camel}) {
+    throw new ResourceNotFoundError("${singular.pascal} not found");
   }
-  await ${entity.camel}.destroy();
+  await ${singular.camel}.destroy();
 }
 `;
 }
@@ -402,26 +352,20 @@ export async function delete${entity.pascal}Service(id: number) {
 /**
  * CRUD Seed template
  */
-export function crudSeedStub(moduleName: ParsedName): string {
-  const entityKebab = moduleName.kebab.endsWith("s")
-    ? moduleName.kebab.slice(0, -1)
-    : moduleName.kebab;
-  const entity = parseName(entityKebab);
-  return `import { Random } from "@mongez/reinforcements";
-import { seeder } from "@warlock.js/core";
-import { ${entity.pascal} } from "../models/${entity.kebab}";
+export function crudSeedStub(entity: Name): string {
+  return `import { seeder } from "@warlock.js/core";
+import { ${entity.singular.pascal} } from "../models/${entity.singular.kebab}";
 
 export default seeder({
-  name: "Seed ${entity.pascal}s",
+  name: "Seed ${entity.plural.pascal}",
   once: true,
   enabled: true,
   run: async () => {
     const total = 10;
     for (let i = 0; i < total; i++) {
-      // await ${entity.pascal}.create({
-      //   name: \`${entity.pascal} \${Random.int()}\`,
-      //   // TODO: Add more fields
-      // });
+      await ${entity.singular.pascal}.create({
+        // TODO: Add more fields
+      });
     }
 
     return {
@@ -435,42 +379,72 @@ export default seeder({
 /**
  * Migration template
  */
-export function migrationStub(entityName: ParsedName): string {
-  return `import { Migration } from "@warlock.js/cascade";
+/**
+ * Migration Create template
+ */
+export function migrationStub(
+  entityName: ParsedName,
+  options: {
+    columns?: string;
+    imports?: string[];
+    timestamps?: boolean;
+    tableName?: string;
+  } = {},
+): string {
+  const { columns = "", imports = [], timestamps = true } = options;
+
+  const allImports = ["Migration", ...imports].join(", ");
+
+  let optionsString = "";
+  if (timestamps === false) {
+    optionsString = `, { timestamps: false }`;
+  }
+
+  return `import { ${allImports} } from "@warlock.js/cascade";
 import { ${entityName.pascal} } from "../${entityName.kebab}.model";
 
-export default class ${entityName.pascal}Migration extends Migration.for(${entityName.pascal}) {
-  /**
-    * Migration metadata
-  */
-  public static createdAt = "${new Date().toISOString()}";
-
-  /**
-   * Set migration execution order (If it holds other migrations references)
-   */
-  public static order = 0;
-
-  public up() {
-    // Create table
-    this.createTableIfNotExists();
-
-    // Primary key
-    this.id();
-
-    // Add your schema fields here
-    this.text("name").notNullable();
-
-    // Status
-    this.boolean("isActive").default(true);
-
-    // Timestamps
-    this.timestamps();
-  }
-
-  public down() {
-    this.dropTableIfExists();
-  }
+export default Migration.create(${entityName.pascal}, {
+${columns ? columns : "  // add your columns here, id is auto added to the list"}
+}${optionsString});
+`;
 }
+
+/**
+ * Migration Alter template
+ */
+export function migrationAlterStub(
+  entityName: ParsedName,
+  options: {
+    add?: string;
+    drop?: string; // stringified array like `"[\"col1\", \"col2\"]"`
+    rename?: string; // stringified object like `{ old: "new" }`
+    imports?: string[];
+  } = {},
+): string {
+  const { add = "", drop, rename, imports = [] } = options;
+  const allImports = ["Migration", ...imports].join(", ");
+
+  // Build the schema object dynamically
+  const schemaParts: string[] = [];
+
+  if (add) {
+    schemaParts.push(`  add: {\n${add}\n  },`);
+  }
+
+  if (drop) {
+    schemaParts.push(`  drop: ${drop},`);
+  }
+
+  if (rename) {
+    schemaParts.push(`  rename: ${rename},`);
+  }
+
+  return `import { ${allImports} } from "@warlock.js/cascade";
+import { ${entityName.pascal} } from "../${entityName.kebab}.model";
+
+export default Migration.alter(${entityName.pascal}, {
+${schemaParts.join("\n")}
+});
 `;
 }
 
@@ -478,21 +452,14 @@ export default class ${entityName.pascal}Migration extends Migration.for(${entit
  * CRUD Create Schema template
  * Outputs to: schema/create-{entity}.schema.ts
  */
-export function crudCreateValidationStub(moduleName: ParsedName): string {
-  // Get singular entity name
-  const entityKebab = moduleName.kebab.endsWith("s")
-    ? moduleName.kebab.slice(0, -1)
-    : moduleName.kebab;
-  const entity = parseName(entityKebab);
-
+export function crudCreateValidationStub(moduleName: Name): string {
   return `import { v, type Infer } from "@warlock.js/core";
 
-export const create${entity.pascal}Schema = v.object({
-  name: v.string().required(),
+export const create${moduleName.pascal}Schema = v.object({
   // TODO: Add validation rules
 });
 
-export type Create${entity.pascal}Schema = Infer<typeof create${entity.pascal}Schema>;
+export type Create${moduleName.pascal}Schema = Infer<typeof create${moduleName.pascal}Schema>;
 `;
 }
 
@@ -500,28 +467,22 @@ export type Create${entity.pascal}Schema = Infer<typeof create${entity.pascal}Sc
  * CRUD Update Schema template
  * Outputs to: schema/update-{entity}.schema.ts
  */
-export function crudUpdateValidationStub(moduleName: ParsedName): string {
-  // Get singular entity name
-  const entityKebab = moduleName.kebab.endsWith("s")
-    ? moduleName.kebab.slice(0, -1)
-    : moduleName.kebab;
-  const entity = parseName(entityKebab);
+export function crudUpdateValidationStub(moduleName: Name): string {
+  return `import { v, type Infer } from "@warlock.js/seal";
 
-  return `import { v, type Infer } from "@warlock.js/core";
-
-export const update${entity.pascal}Schema = v.object({
+export const update${moduleName.pascal}Schema = v.object({
   name: v.string(),
   // TODO: Add validation rules
 });
 
-export type Update${entity.pascal}Schema = Infer<typeof update${entity.pascal}Schema>;
+export type Update${moduleName.pascal}Schema = Infer<typeof update${moduleName.pascal}Schema>;
 `;
 }
 
 /**
  * Service template stub
  */
-export function serviceStub(name: ParsedName): string {
+export function serviceStub(name: Name): string {
   return `export async function ${name.camel}Service(data: any): Promise<any> {
   // TODO: Implement service logic
   throw new Error("${name.camel}Service not implemented");
@@ -533,8 +494,8 @@ export function serviceStub(name: ParsedName): string {
  * Schema template stub
  * Outputs to: schema/{name}.schema.ts
  */
-export function validationStub(name: ParsedName): string {
-  return `import { v, type Infer } from "@warlock.js/core";
+export function validationStub(name: Name): string {
+  return `import { v, type Infer } from "@warlock.js/seal";
 
 export const ${name.camel}Schema = v.object({
   // TODO: Define validation schema
@@ -547,7 +508,7 @@ export type ${name.pascal}Schema = Infer<typeof ${name.camel}Schema>;
 /**
  * Request type template stub
  */
-export function requestStub(name: ParsedName): string {
+export function requestStub(name: Name): string {
   return `import type { Request } from "@warlock.js/core";
 import { type ${name.pascal}Schema } from "../schema/${name.kebab}.schema";
 
@@ -559,31 +520,32 @@ export type ${name.pascal}Request = Request<${name.pascal}Schema>;
  * Model template stub
  */
 export function modelStub(
-  name: ParsedName,
+  name: Name,
   options: { tableName?: string; withResource?: boolean } = {},
 ): string {
-  const { tableName = `${name.snake}s`, withResource } = options;
+  const { tableName = `${name.plural.snake}`, withResource } = options;
 
   return `import { Model } from "@warlock.js/core";
 import type { StrictMode } from "@warlock.js/cascade";
 import { v, type Infer } from "@warlock.js/core";
-${withResource ? `import { ${name.pascal}Resource } from "../../resources/${name.kebab}.resource";` : ""}
+${withResource ? `import { ${name.singular.pascal}Resource } from "../../resources/${name.singular.kebab}.resource";` : ""}
 
-const ${name.camel}Schema = v.object({
+const ${name.singular.camel}Schema = v.object({
   // TODO: Define model schema
-  name: v.string().required(),
 });
 
-type ${name.pascal}Type = Infer<typeof ${name.camel}Schema>;
+type ${name.singular.pascal}Type = Infer<typeof ${name.singular.camel}Schema>;
 
-export class ${name.pascal} extends Model<${name.pascal}Type> {
+export class ${name.singular.pascal} extends Model<${name.singular.pascal}Type> {
   public static table = "${tableName}";
   public static strictMode: StrictMode = "fail";
-${withResource ? `  public static resource = ${name.pascal}Resource;` : ""}
+${withResource ? `  public static resource = ${name.singular.pascal}Resource;` : ""}
 
-  public static schema = ${name.camel}Schema;
+  public static schema = ${name.singular.camel}Schema;
 
-  public embed = ["id", "name"];
+  public static relations = {
+    // TODO: Define relations
+  };
 }
 `;
 }
@@ -591,13 +553,19 @@ ${withResource ? `  public static resource = ${name.pascal}Resource;` : ""}
 /**
  * Repository template stub
  */
-export function repositoryStub(name: ParsedName): string {
+export function repositoryStub(name: Name): string {
   return `import type { FilterByOptions, RepositoryOptions } from "@warlock.js/core";
 import { RepositoryManager } from "@warlock.js/core";
-import { ${name.pascal} } from "../models/${name.kebab}";
+import { ${name.singular.pascal} } from "../models/${name.singular.kebab}";
 
-export class ${name.pascal}Repository extends RepositoryManager<${name.pascal}> {
-  public source = ${name.pascal};
+type ${name.singular.pascal}ListFilter = {
+  // Repository list filters
+};
+
+export type ${name.singular.pascal}ListOptions = RepositoryOptions & ${name.singular.pascal}ListFilter;
+
+export class ${name.plural.pascal}Repository extends RepositoryManager<${name.singular.pascal}, ${name.singular.pascal}ListFilter> {
+  public source = ${name.singular.pascal};
 
   protected defaultOptions: RepositoryOptions = this.withDefaultOptions({});
 
@@ -606,17 +574,17 @@ export class ${name.pascal}Repository extends RepositoryManager<${name.pascal}> 
   });
 }
 
-export const ${name.camel}Repository = new ${name.pascal}Repository();
+export const ${name.plural.camel}Repository = new ${name.plural.pascal}Repository();
 `;
 }
 
 /**
  * Resource template stub
  */
-export function resourceStub(name: ParsedName): string {
+export function resourceStub(name: Name): string {
   return `import { Resource } from "@warlock.js/core";
 
-export class ${name.pascal}Resource extends Resource {
+export class ${name.singular.pascal}Resource extends Resource {
   public schema = {
     id: "int",
     name: "string",
@@ -625,7 +593,3 @@ export class ${name.pascal}Resource extends Resource {
 }
 `;
 }
-
-/**
- * Migration template stub
- */

@@ -23,7 +23,7 @@ import {
   crudUpdateValidationStub,
   requestStub,
 } from "../templates/stubs";
-import { parseName } from "../utils/name-parser";
+import { pluralName, singularName } from "../utils/name-parser";
 import { moduleExists } from "../utils/path-resolver";
 import { createMigrationFile } from "./migration.generator";
 
@@ -38,7 +38,7 @@ export async function generateModule(data: CommandActionData): Promise<void> {
     process.exit(1);
   }
 
-  const name = parseName(moduleName);
+  const name = pluralName(moduleName);
   const force = data.options.force || data.options.f;
   const withCrud = data.options.crud || data.options.c;
 
@@ -58,7 +58,6 @@ export async function generateModule(data: CommandActionData): Promise<void> {
     "models",
     "repositories",
     "schema",
-    "validation",
     "requests",
     "resources",
     "events",
@@ -73,14 +72,9 @@ export async function generateModule(data: CommandActionData): Promise<void> {
   console.log(colors.green(`✓ Created module structure`));
 
   // Create main.ts
-  const mainContent = `import { onceConnected } from "@warlock.js/cascade";
-
-// This function will be called once the app is connected to the database
-onceConnected(async () => {
-  // Module initialization code
-  // Register event listeners
-  // Setup module-specific configurations
-});
+  const mainContent = `// You may use this file as a custom entry point to be executed when the app starts.
+// it runs only once, and you don't need to import the routes.ts file, it will be imported automatically.
+// Use it to regsiter or boot up any custom logic for this module.
 `;
   await putFileAsync(path.join(modulePath, "main.ts"), mainContent);
   console.log(colors.green(`✓ Created main.ts`));
@@ -115,20 +109,18 @@ groupedTranslations("${name.camel}", {
 
   // If --crud flag is set, generate full CRUD scaffold
   if (withCrud) {
-    // Derive singular entity name from plural module name
-    const entityKebab = name.kebab.endsWith("s") ? name.kebab.slice(0, -1) : name.kebab;
-    const entity = parseName(entityKebab);
+    const entity = singularName(moduleName);
 
     // Create controllers
     await putFileAsync(
       path.join(modulePath, "controllers", `create-${entity.kebab}.controller.ts`),
-      crudCreateControllerStub(name),
+      crudCreateControllerStub(entity),
     );
     console.log(colors.green(`✓ Created create-${entity.kebab}.controller.ts`));
 
     await putFileAsync(
       path.join(modulePath, "controllers", `update-${entity.kebab}.controller.ts`),
-      crudUpdateControllerStub(name),
+      crudUpdateControllerStub(entity),
     );
     console.log(colors.green(`✓ Created update-${entity.kebab}.controller.ts`));
 
@@ -140,38 +132,38 @@ groupedTranslations("${name.camel}", {
 
     await putFileAsync(
       path.join(modulePath, "controllers", `get-${entity.kebab}.controller.ts`),
-      crudShowControllerStub(name),
+      crudShowControllerStub(entity),
     );
     console.log(colors.green(`✓ Created get-${entity.kebab}.controller.ts`));
 
     await putFileAsync(
       path.join(modulePath, "controllers", `delete-${entity.kebab}.controller.ts`),
-      crudDeleteControllerStub(name),
+      crudDeleteControllerStub(entity),
     );
     console.log(colors.green(`✓ Created delete-${entity.kebab}.controller.ts`));
 
     // Create schema files
     await putFileAsync(
       path.join(modulePath, "schema", `create-${entity.kebab}.schema.ts`),
-      crudCreateValidationStub(name),
+      crudCreateValidationStub(entity),
     );
     console.log(colors.green(`✓ Created create-${entity.kebab}.schema.ts`));
 
     await putFileAsync(
       path.join(modulePath, "schema", `update-${entity.kebab}.schema.ts`),
-      crudUpdateValidationStub(name),
+      crudUpdateValidationStub(entity),
     );
     console.log(colors.green(`✓ Created update-${entity.kebab}.schema.ts`));
 
     // Create request types
-    const createRequestName = parseName(`create-${entity.kebab}`);
+    const createRequestName = singularName(`create-${entity.kebab}`);
     await putFileAsync(
       path.join(modulePath, "requests", `create-${entity.kebab}.request.ts`),
       requestStub(createRequestName),
     );
     console.log(colors.green(`✓ Created create-${entity.kebab}.request.ts`));
 
-    const updateRequestName = parseName(`update-${entity.kebab}`);
+    const updateRequestName = singularName(`update-${entity.kebab}`);
     await putFileAsync(
       path.join(modulePath, "requests", `update-${entity.kebab}.request.ts`),
       requestStub(updateRequestName),
@@ -182,7 +174,7 @@ groupedTranslations("${name.camel}", {
     await ensureDirectoryAsync(path.join(modulePath, "models", entity.kebab));
     await putFileAsync(
       path.join(modulePath, "models", entity.kebab, `${entity.kebab}.model.ts`),
-      crudModelStub(name),
+      crudModelStub(entity),
     );
     console.log(colors.green(`✓ Created ${entity.kebab}.model.ts`));
 
@@ -212,13 +204,13 @@ groupedTranslations("${name.camel}", {
     // Create services
     await putFileAsync(
       path.join(modulePath, "services", `create-${entity.kebab}.service.ts`),
-      crudCreateServiceStub(name),
+      crudCreateServiceStub(entity),
     );
     console.log(colors.green(`✓ Created create-${entity.kebab}.service.ts`));
 
     await putFileAsync(
       path.join(modulePath, "services", `update-${entity.kebab}.service.ts`),
-      crudUpdateServiceStub(name),
+      crudUpdateServiceStub(entity),
     );
     console.log(colors.green(`✓ Created update-${entity.kebab}.service.ts`));
 
@@ -230,13 +222,13 @@ groupedTranslations("${name.camel}", {
 
     await putFileAsync(
       path.join(modulePath, "services", `get-${entity.kebab}.service.ts`),
-      crudGetServiceStub(name),
+      crudGetServiceStub(entity),
     );
     console.log(colors.green(`✓ Created get-${entity.kebab}.service.ts`));
 
     await putFileAsync(
       path.join(modulePath, "services", `delete-${entity.kebab}.service.ts`),
-      crudDeleteServiceStub(name),
+      crudDeleteServiceStub(entity),
     );
     console.log(colors.green(`✓ Created delete-${entity.kebab}.service.ts`));
 

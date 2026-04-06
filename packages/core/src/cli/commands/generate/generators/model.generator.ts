@@ -3,7 +3,7 @@ import { ensureDirectoryAsync, putFileAsync } from "@mongez/fs";
 import path from "node:path";
 import type { CommandActionData } from "../../../types";
 import { migrationStub, modelStub } from "../templates/stubs";
-import { parseModulePath, parseName } from "../utils/name-parser";
+import { parseModulePath, singularName } from "../utils/name-parser";
 import { componentExists, moduleExists, resolveModulePath } from "../utils/path-resolver";
 
 export async function generateModel(data: CommandActionData): Promise<void> {
@@ -31,7 +31,7 @@ export async function generateModel(data: CommandActionData): Promise<void> {
     process.exit(1);
   }
 
-  const name = parseName(componentName, module);
+  const name = singularName(componentName);
   const force = data.options.force || data.options.f;
   const withResource = data.options.withResource || data.options.rs;
   const tableName = (data.options.table as string) || `${name.snake}s`;
@@ -68,7 +68,10 @@ export async function generateModel(data: CommandActionData): Promise<void> {
     "migrations",
     `${timestamp}_${name.kebab}.migration.ts`,
   );
-  const migrationContent = migrationStub(name, tableName);
+
+  const migrationContent = migrationStub(name, {
+    timestamps: data.options.timestamps !== "false" && data.options.timestamps !== false,
+  });
 
   await putFileAsync(migrationPath, migrationContent);
   console.log(colors.green(`✓ Created migration: ${migrationPath}`));

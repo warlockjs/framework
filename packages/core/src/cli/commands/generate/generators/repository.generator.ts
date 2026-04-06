@@ -35,7 +35,7 @@ export async function generateRepository(data: CommandActionData): Promise<void>
     process.exit(1);
   }
 
-  const name = parseName(componentName, module);
+  const name = parseName(componentName);
   const force = data.options.force || data.options.f;
 
   // Check if repository already exists

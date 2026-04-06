@@ -1,3 +1,5 @@
+import { toCamelCase, toKebabCase, toSnakeCase, toStudlyCase } from "@mongez/reinforcements";
+import pluralize from "pluralize-esm";
 import type { ParsedName } from "../types";
 
 /**
@@ -20,67 +22,64 @@ export function parseModulePath(input: string): { module?: string; name: string 
 }
 
 /**
- * Convert string to PascalCase
- * Examples:
- * - "create-user" → "CreateUser"
- * - "create_user" → "CreateUser"
- * - "createUser" → "CreateUser"
- */
-export function toPascalCase(str: string): string {
-  return str
-    .replace(/[-_\s]+(.)?/g, (_, char) => (char ? char.toUpperCase() : ""))
-    .replace(/^(.)/, (char) => char.toUpperCase());
-}
-
-/**
- * Convert string to camelCase
- * Examples:
- * - "create-user" → "createUser"
- * - "CreateUser" → "createUser"
- */
-export function toCamelCase(str: string): string {
-  const pascal = toPascalCase(str);
-  return pascal.charAt(0).toLowerCase() + pascal.slice(1);
-}
-
-/**
- * Convert string to kebab-case
- * Examples:
- * - "CreateUser" → "create-user"
- * - "createUser" → "create-user"
- */
-export function toKebabCase(str: string): string {
-  return str
-    .replace(/([a-z])([A-Z])/g, "$1-$2")
-    .replace(/[\s_]+/g, "-")
-    .toLowerCase();
-}
-
-/**
- * Convert string to snake_case
- * Examples:
- * - "CreateUser" → "create_user"
- * - "create-user" → "create_user"
- */
-export function toSnakeCase(str: string): string {
-  return str
-    .replace(/([a-z])([A-Z])/g, "$1_$2")
-    .replace(/[\s-]+/g, "_")
-    .toLowerCase();
-}
-
-/**
  * Parse name into all case variants
  */
-export function parseName(input: string, module?: string): ParsedName {
-  const kebab = toKebabCase(input);
+export function parseName(input: string): ParsedName {
+  return new Name(input);
+}
 
-  return {
-    raw: input,
-    pascal: toPascalCase(input),
-    camel: toCamelCase(input),
-    kebab,
-    snake: toSnakeCase(input),
-    module,
+/**
+ * Get plural name
+ */
+export function pluralName(name: string) {
+  return new Name(pluralize(name));
+}
+
+/**
+ * Get singular name
+ */
+export function singularName(name: string) {
+  return new Name(pluralize.singular(name));
+}
+
+export class Name {
+  protected parsedData: {
+    kebab: string;
+    camel: string;
+    snake: string;
+    studly: string;
   };
+
+  public constructor(public readonly raw: string) {
+    this.parsedData = {
+      kebab: toKebabCase(raw),
+      camel: toCamelCase(raw),
+      snake: toSnakeCase(raw),
+      studly: toStudlyCase(raw),
+    };
+  }
+
+  public get plural() {
+    return new Name(pluralize(this.raw));
+  }
+
+  public get singular() {
+    return new Name(pluralize.singular(this.raw));
+  }
+
+  public get pascal(): string {
+    return this.parsedData.studly;
+  }
+
+  public get camel(): string {
+    return this.parsedData.camel;
+  }
+
+  public get kebab(): string {
+    return this.parsedData.kebab;
+  }
+
+  public get snake(): string {
+    return this.parsedData.snake;
+  }
 }

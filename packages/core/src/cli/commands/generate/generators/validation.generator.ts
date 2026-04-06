@@ -35,7 +35,7 @@ export async function generateValidation(data: CommandActionData): Promise<void>
     process.exit(1);
   }
 
-  const name = parseName(componentName, module);
+  const name = parseName(componentName);
   const force = data.options.force || data.options.f;
   const withRequest = data.options.withRequest || data.options.r;
 
