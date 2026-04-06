@@ -18,7 +18,7 @@ import { ForeignKeyBuilder } from "./foreign-key-builder";
 /**
  * Pending operation types supported by migrations.
  */
-type OperationType =
+export type OperationType =
   | "addColumn"
   | "dropColumn"
   | "dropColumns"
@@ -56,7 +56,7 @@ type OperationType =
 /**
  * Pending operation to be executed when migration runs.
  */
-type PendingOperation = {
+export type PendingOperation = {
   readonly type: OperationType;
   readonly payload: unknown;
 };
@@ -856,9 +856,8 @@ export abstract class Migration implements MigrationContract {
   /**
    * Execute all pending operations.
    *
-   * Called by the migration runner after up() or down() completes.
-   * Executes operations in the order they were defined.
-   *
+   * @deprecated Use toSQL() instead — migrations now generate SQL rather than
+   * executing DDL directly through the driver.
    * @internal
    */
   public async execute(): Promise<void> {
@@ -867,6 +866,34 @@ export abstract class Migration implements MigrationContract {
     }
 
     this.pendingOperations.length = 0;
+  }
+
+  /**
+   * Serialize all queued pending operations into a flat list of SQL strings.
+   *
+   * Call this AFTER invoking `up()` or `down()` to extract the SQL for the
+   * operations that were queued during that call. The pending queue is cleared
+   * after serializing so the instance is safe to reuse.
+   *
+   * @example
+   * ```typescript
+   * const migration = new CreateUsersTable();
+   * migration.setDriver(driver);
+   *
+   * // Up SQL
+   * await migration.up();
+   * const upSQL = migration.toSQL();
+   *
+   * // Down SQL — reuse the same instance
+   * await migration.down();
+   * const downSQL = migration.toSQL();
+   * ```
+   */
+  public toSQL(): string[] {
+    const serializer = this.driver.driver.getSQLSerializer();
+    const statements = serializer.serializeAll(this.pendingOperations, this.table);
+    this.pendingOperations.length = 0;
+    return statements;
   }
 
   /**
@@ -3320,8 +3347,7 @@ Migration.alter = function alterMigration(
       // ── Foreign Keys ──────────────────────────────────────────────────────
       if (schema.addForeign) {
         for (const fk of schema.addForeign) {
-          const tableName =
-            typeof fk.references === "string" ? fk.references : fk.references.table;
+          const tableName = typeof fk.references === "string" ? fk.references : fk.references.table;
 
           this.foreign(fk.column)
             .references(tableName, fk.on ?? "id")
@@ -3370,9 +3396,7 @@ Migration.alter = function alterMigration(
   } as unknown as MigrationConstructor;
 };
 
-
 // The no-op re-assignments below silence the TS "used before assigned" check;
 // the real implementations are set by the Migration.create = ... and
 // Migration.alter = ... blocks immediately above.
 (Migration as any).__declarativeFactoriesAttached = true;
-

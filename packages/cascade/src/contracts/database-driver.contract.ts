@@ -401,6 +401,22 @@ export interface DriverContract {
   /** Access the migration driver for schema operations. */
   migrationDriver(): MigrationDriverContract;
 
+  /**
+   * Return a SQL serializer for this driver's dialect.
+   * Used by Migration.toSQL() to convert pending operations to SQL strings.
+   */
+  getSQLSerializer(): import("../migration/sql-serializer").SQLSerializer;
+
+  /**
+   * Execute a raw SQL query.
+   * Used by the runner to execute phase-ordered SQL.
+   *
+   * @param sql - SQL query string
+   * @param params - Optional query parameters
+   * @returns Query result
+   */
+  query<T = unknown>(sql: string, params?: unknown[]): Promise<any>;
+
   // ============================================================
   // Database Lifecycle Operations
   // ============================================================

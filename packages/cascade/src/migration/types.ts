@@ -143,3 +143,17 @@ export interface RollbackOptions {
    */
   readonly dryRun?: boolean;
 }
+
+/**
+ * A tagged SQL statement with phase and ordering information.
+ */
+export type TaggedSQL = {
+  /** The generated SQL statement */
+  sql: string;
+  /** Phase 1-6 for ordering */
+  phase: 1 | 2 | 3 | 4 | 5 | 6;
+  /** Date string for within-phase ordering */
+  createdAt?: string;
+  /** Migration name for within-phase tiebreaking */
+  migrationName?: string;
+};

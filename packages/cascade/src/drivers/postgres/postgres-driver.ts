@@ -29,6 +29,7 @@ import type { MigrationDriverContract } from "../../contracts/migration-driver.c
 import type { QueryBuilderContract } from "../../contracts/query-builder.contract";
 import type { SyncAdapterContract } from "../../contracts/sync-adapter.contract";
 import { TransactionRollbackError } from "../../errors/transaction-rollback.error";
+import { SQLSerializer } from "../../migration/sql-serializer";
 import { SqlDatabaseDirtyTracker } from "../../sql-database-dirty-tracker";
 import type { ModelDefaults } from "../../types";
 import { DatabaseDriver } from "../../utils/connect-to-database";
@@ -37,6 +38,7 @@ import { PostgresBlueprint } from "./postgres-blueprint";
 import { PostgresDialect } from "./postgres-dialect";
 import { PostgresMigrationDriver } from "./postgres-migration-driver";
 import { PostgresQueryBuilder } from "./postgres-query-builder";
+import { PostgresSQLSerializer } from "./postgres-sql-serializer";
 import { PostgresSyncAdapter } from "./postgres-sync-adapter";
 import type { PostgresPoolConfig, PostgresQueryResult, PostgresTransactionOptions } from "./types";
 
@@ -916,6 +918,14 @@ export class PostgresDriver implements DriverContract {
       this._migrationDriver = new PostgresMigrationDriver(this);
     }
     return this._migrationDriver;
+  }
+
+  /**
+   * Return a SQL serializer for this driver's dialect.
+   * Used by Migration.toSQL() to convert pending operations to SQL strings.
+   */
+  public getSQLSerializer(): SQLSerializer {
+    return new PostgresSQLSerializer(this.dialect);
   }
 
   /**

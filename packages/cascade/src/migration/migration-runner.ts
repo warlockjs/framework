@@ -1,18 +1,30 @@
 import { colors } from "@mongez/copper";
 import { log } from "@warlock.js/logger";
+import fs from "fs";
+import path from "path";
 import type { MigrationDriverContract } from "../contracts/migration-driver.contract";
 import type { DataSource } from "../data-source/data-source";
 import { dataSourceRegistry } from "../data-source/data-source-registry";
 import { type Migration } from "./migration";
-import type { MigrationRecord, MigrationResult } from "./types";
+import { SQLGrammar } from "./sql-grammar";
+import type { MigrationRecord, MigrationResult, TaggedSQL } from "./types";
 
 /**
  * Migration class type with static name property.
  */
 type MigrationClass = (new () => Migration) & {
   migrationName: string;
-  order?: number;
   createdAt?: string;
+};
+
+/**
+ * Resolved instance data for a single pending migration.
+ * @internal
+ */
+type MigrationData = {
+  MigrationClass: MigrationClass;
+  migration: Migration;
+  name: string;
 };
 
 /**
@@ -87,19 +99,13 @@ function parseCreatedAt(createdAt: string): Date | undefined {
  * Comparator for sorting migration classes.
  *
  * Priority:
- *   1. Explicit `order` (lower = earlier)
- *   2. `createdAt` timestamp (older = earlier)
- *   3. Alphabetical by migration name (last resort)
+ *   1. `createdAt` timestamp (older = earlier)
+ *   2. Alphabetical by migration name (last resort)
  */
 function sortMigrations(
-  a: { order?: number; createdAt?: string; migrationName: string },
-  b: { order?: number; createdAt?: string; migrationName: string },
+  a: { createdAt?: string; migrationName: string },
+  b: { createdAt?: string; migrationName: string },
 ): number {
-  // Both have explicit order → numeric sort
-  if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
-  if (a.order !== undefined) return -1;
-  if (b.order !== undefined) return 1;
-
   // Sort by createdAt timestamp
   const aDate = a.createdAt ? parseCreatedAt(a.createdAt) : undefined;
   const bDate = b.createdAt ? parseCreatedAt(b.createdAt) : undefined;
@@ -356,30 +362,217 @@ export class MigrationRunner {
       return results;
     }
 
-    log.info("database", "migration", `Found ${pending.length} pending migration(s).`);
+    log.info(
+      "database",
+      "migration",
+      `Found ${pending.length} pending migration(s). Generating SQL pool...`,
+    );
     const nextBatch = await this.getNextBatchNumber();
 
-    for (const MigrationClass of pending) {
-      const result = await this.runMigration(MigrationClass, "up", {
-        dryRun,
-        record,
-        batch: nextBatch,
-      });
-      results.push(result);
+    const taggedStatements: TaggedSQL[] = [];
+    const migrationsData: MigrationData[] = [];
 
-      if (!result.success) {
-        break; // Stop on first error
+    // 1. Collect SQL from each pending migration
+    for (const MigrationClass of pending) {
+      const migration = this.createMigrationInstance(MigrationClass);
+      const name = MigrationClass.migrationName;
+
+      await migration.up();
+      const upStatements = migration.toSQL();
+
+      migrationsData.push({ MigrationClass, migration, name });
+
+      for (const sql of upStatements) {
+        taggedStatements.push({
+          sql,
+          phase: SQLGrammar.classify(sql),
+          createdAt: MigrationClass.createdAt,
+          migrationName: name,
+        });
       }
+    }
+
+    // 2. Sort all SQL statements globally across all pending migrations
+    const sortedStatements = SQLGrammar.sort(taggedStatements);
+
+    // 3. Execute in a single batch
+    if (dryRun) {
+      log.info("database", "migration", "Dry run enabled. Would execute the following statements:");
+      for (const statement of sortedStatements) {
+        console.log(`-- Phase ${statement.phase} [${statement.migrationName}]`);
+        console.log(statement.sql + ";\n");
+      }
+      return [];
+    }
+
+    const driver = this.getDataSource().driver;
+
+    let transactionFailed = false;
+    let errorMessage = "";
+
+    const startTime = Date.now();
+
+    // Use transaction if supported
+    if (driver.transaction) {
+      try {
+        await driver.transaction(async () => {
+          for (const statement of sortedStatements) {
+            await driver.query(statement.sql);
+          }
+
+          if (record) {
+            for (const data of migrationsData) {
+              await this.recordMigration(
+                data.name,
+                nextBatch,
+                data.MigrationClass.createdAt
+                  ? parseCreatedAt(data.MigrationClass.createdAt)
+                  : new Date(),
+              );
+            }
+          }
+        });
+      } catch (err) {
+        transactionFailed = true;
+        errorMessage = err instanceof Error ? err.message : String(err);
+      }
+    } else {
+      // Non-transactional execution
+      try {
+        for (const statement of sortedStatements) {
+          await driver.query(statement.sql);
+        }
+
+        if (record) {
+          for (const data of migrationsData) {
+            await this.recordMigration(
+              data.name,
+              nextBatch,
+              data.MigrationClass.createdAt
+                ? parseCreatedAt(data.MigrationClass.createdAt)
+                : new Date(),
+            );
+          }
+        }
+      } catch (err) {
+        transactionFailed = true;
+        errorMessage = err instanceof Error ? err.message : String(err);
+      }
+    }
+
+    const durationMs = Date.now() - startTime;
+
+    // Report results per-migration for compatibility
+    for (const data of migrationsData) {
+      results.push({
+        name: data.name,
+        table: data.migration.table,
+        direction: "up",
+        success: !transactionFailed,
+        error: transactionFailed ? errorMessage : undefined,
+        durationMs: Math.round(durationMs / migrationsData.length), // rough average
+        executedAt: new Date(),
+      });
+
+      if (transactionFailed) {
+        log.error(
+          "database",
+          "migration",
+          `${colors.magenta(data.name)}: ✗ Failed during batch execution: ${errorMessage}`,
+        );
+      } else {
+        log.success("database", "migration", `Migrated: ${colors.magenta(data.name)} successfully`);
+      }
+    }
+
+    if (transactionFailed) {
+      log.error(
+        "database",
+        "migration",
+        `Batch execution failed. Rollback performed if transactional.`,
+      );
+      throw new Error("Migration batch failed: " + errorMessage);
     }
 
     const successCount = results.filter((r) => r.success).length;
     log.success(
       "database",
       "migration",
-      `Migration complete: ${successCount}/${pending.length} successful.`,
+      `Migration bulk phase execution complete: ${successCount}/${pending.length} migrations processed successfully.`,
     );
 
     return results;
+  }
+
+  /**
+   * Export pending migrations as phase-ordered SQL files in database/sql/ directory.
+   */
+  public async exportSQL(): Promise<void> {
+    const pending = await this.getPendingMigrations();
+
+    if (pending.length === 0) {
+      log.warn("database", "migration", "No pending migrations to export.");
+      return;
+    }
+
+    log.info(
+      "database",
+      "migration",
+      `Exporting ${pending.length} pending migration(s) to SQL files...`,
+    );
+
+    const upStatements: TaggedSQL[] = [];
+    const downStatements: TaggedSQL[] = [];
+
+    for (const MigrationClass of pending) {
+      const migration = this.createMigrationInstance(MigrationClass);
+      const name = MigrationClass.migrationName;
+
+      // Collect up SQL
+      await migration.up();
+      for (const sql of migration.toSQL()) {
+        upStatements.push({
+          sql,
+          phase: SQLGrammar.classify(sql),
+          createdAt: MigrationClass.createdAt,
+          migrationName: name,
+        });
+      }
+
+      // Collect down SQL (reuse same instance — toSQL() cleared pendingOps)
+      await migration.down();
+      for (const sql of migration.toSQL()) {
+        downStatements.push({
+          sql,
+          phase: SQLGrammar.classify(sql),
+          createdAt: MigrationClass.createdAt,
+          migrationName: name,
+        });
+      }
+    }
+
+    const sortedUp = SQLGrammar.sort(upStatements);
+    // Down SQL: reverse order (undo in reverse dependency order)
+    const sortedDown = downStatements.reverse();
+
+    const upSQLString = this.formatSQLForExport(sortedUp);
+    const downSQLString = this.formatSQLForExport(sortedDown);
+
+    const rootPath = process.cwd();
+    const sqlDir = path.join(rootPath, "database", "sql");
+
+    if (!fs.existsSync(sqlDir)) {
+      fs.mkdirSync(sqlDir, { recursive: true });
+    }
+
+    const timestamp = new Date().toISOString().replace(/T/, "_").replace(/:/g, "-").split(".")[0];
+    const upPath = path.join(sqlDir, `migration_${timestamp}.up.sql`);
+    const downPath = path.join(sqlDir, `migration_${timestamp}.down.sql`);
+
+    fs.writeFileSync(upPath, upSQLString);
+    fs.writeFileSync(downPath, downSQLString);
+
+    log.success("database", "migration", `Exported to:\n- ${upPath}\n- ${downPath}`);
   }
 
   /**
@@ -548,17 +741,24 @@ export class MigrationRunner {
         // ============================================================================
         // EXECUTE WITH OR WITHOUT TRANSACTION
         // ============================================================================
-        if (shouldUseTransaction && driver.supportsTransactions()) {
-          // Transactional execution (PostgreSQL default)
-          await driver.beginTransaction();
-          try {
-            // Execute migration DDL operations
-            if (direction === "up") {
-              await migration.up();
-            } else {
-              await migration.down();
+
+        // Collect SQL for the requested direction
+        if (direction === "up") {
+          await migration.up();
+        } else {
+          await migration.down();
+        }
+        const sqlStatements = migration.toSQL();
+
+        const databaseDriver = this.getDataSource().driver;
+
+        if (shouldUseTransaction && databaseDriver.transaction) {
+          // Transactional execution
+          await databaseDriver.transaction(async () => {
+            // Execute generated SQL statements sequentially (no phase-sorting here since it's single execution)
+            for (const sql of sqlStatements) {
+              await databaseDriver.query(sql);
             }
-            await migration.execute();
 
             // Record migration tracking
             if (record) {
@@ -573,23 +773,12 @@ export class MigrationRunner {
                 await this.removeMigrationRecord(name);
               }
             }
-
-            // Commit transaction on success
-            await driver.commit();
-          } catch (txError) {
-            // Rollback transaction on failure
-            await driver.rollback();
-            throw txError;
-          }
+          });
         } else {
-          // Non-transactional execution (MongoDB default, or explicit override)
-          if (direction === "up") {
-            await migration.up();
-          } else {
-            await migration.down();
+          // Non-transactional execution
+          for (const sql of sqlStatements) {
+            await databaseDriver.query(sql);
           }
-
-          await migration.execute();
 
           if (record) {
             if (direction === "up") {
@@ -631,6 +820,58 @@ export class MigrationRunner {
       durationMs,
       executedAt: new Date(),
     };
+  }
+
+  /**
+   * Create, configure, and return a ready-to-use migration instance.
+   *
+   * Centralises the repeated "new + setDriver + setMigrationDefaults" boilerplate
+   * that all batch/single execution paths need.
+   *
+   * @internal
+   */
+  private createMigrationInstance(MigrationClass: MigrationClass): Migration {
+    const migration = new MigrationClass();
+    migration.setDriver(this.getMigrationDriver());
+    migration.setMigrationDefaults(this.getDataSource().migrationDefaults);
+    return migration;
+  }
+
+  /**
+   * Format an ordered array of TaggedSQL into a human-readable SQL file string.
+   *
+   * Consecutive statements that belong to the same (phase, migration) group share
+   * a single block comment at the top, avoiding the noisy per-statement repetition.
+   *
+   * Example output:
+   * ```sql
+   * /* Phase 3 [create-users] *\/
+   * ALTER TABLE "users" ADD COLUMN "name" TEXT NOT NULL;
+   * ALTER TABLE "users" ADD COLUMN "email" TEXT NOT NULL;
+   *
+   * /* Phase 4 [create-users] *\/
+   * CREATE UNIQUE INDEX ...;
+   * ```
+   *
+   * @internal
+   */
+  private formatSQLForExport(statements: TaggedSQL[]): string {
+    const lines: string[] = [];
+    let lastGroupKey: string | null = null;
+
+    for (const stmt of statements) {
+      const groupKey = `Phase ${stmt.phase} [${stmt.migrationName}]`;
+
+      if (groupKey !== lastGroupKey) {
+        if (lines.length > 0) lines.push(""); // blank line between groups
+        lines.push(`/* ${groupKey} */`);
+        lastGroupKey = groupKey;
+      }
+
+      lines.push(`${stmt.sql};`);
+    }
+
+    return lines.join("\n");
   }
 
   /**
