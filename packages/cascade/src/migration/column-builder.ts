@@ -382,25 +382,36 @@ export class ColumnBuilder {
   /**
    * Declare a foreign key constraint on this column.
    *
+   * Accepts either a raw table-name string or a Model class (anything with a
+   * static `table` property). Using a Model class is preferred — it is
+   * type-safe and automatically tracks table renames.
+   *
    * Pushes an `addForeignKey` operation immediately using a mutable reference —
    * subsequent `.on()`, `.onDelete()`, `.onUpdate()` calls mutate the same
    * definition that is already queued, so no `.add()` terminator is needed.
    *
    * Referenced column defaults to `"id"` — use `.on()` to override.
    *
-   * @param table - Referenced table name
+   * @param tableOrModel - Referenced table name OR a Model class with a static `table` property
    * @returns This builder for chaining
    *
    * @example
    * ```typescript
-   * this.integer("user_id").references("users");
-   * this.integer("user_id").references("users").on("custom_id").onDelete("cascade");
+   * // Preferred — model class reference (type-safe, rename-proof)
+   * this.uuid("organization_id").references(Organization).onDelete("cascade");
+   *
+   * // Also supported — raw table string
+   * this.uuid("organization_id").references("organizations").onDelete("cascade");
+   * this.uuid("organization_id").references(Organization.table).onDelete("cascade");
    * ```
    */
-  public references(table: string): this {
+  public references(tableOrModel: string | { table: string }): this {
+    const tableName =
+      typeof tableOrModel === "string" ? tableOrModel : tableOrModel.table;
+
     this.fkDefinition = {
       column: this.definition.name,
-      referencesTable: table,
+      referencesTable: tableName,
       referencesColumn: "id",
       onDelete: "restrict",
       onUpdate: "restrict",

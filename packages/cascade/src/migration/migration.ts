@@ -744,7 +744,8 @@ export abstract class Migration implements MigrationContract {
    * Migration defaults from the resolved DataSource.
    * @internal
    */
-  private _migrationDefaults?: MigrationDefaults;
+  /** @internal — readable by factory-generated subclasses */
+  protected _migrationDefaults?: MigrationDefaults;
 
   /**
    * Queued operations to execute.
@@ -2648,6 +2649,32 @@ export abstract class Migration implements MigrationContract {
     });
     return this;
   }
+
+  // ============================================================================
+  // DECLARATIVE FACTORY STUBS
+  // These are assigned after the class body — declared here so TS knows the
+  // shape of the static members without triggering abstract-class restrictions.
+  // ============================================================================
+
+  /**
+   * Create a declarative initial-table migration.
+   * Implemented and assigned below the class body.
+   */
+  public static create: (
+    model: ChildModel<Model<any>>,
+    columns: ColumnMap,
+    options?: MigrationCreateOptions,
+  ) => MigrationConstructor;
+
+  /**
+   * Create a declarative alteration migration.
+   * Implemented and assigned below the class body.
+   */
+  public static alter: (
+    model: ChildModel<Model<any>>,
+    schema: AlterSchema,
+    options?: MigrationAlterOptions,
+  ) => MigrationConstructor;
 }
 
 export function migrate(
@@ -2675,3 +2702,677 @@ export function migrate(
     }
   };
 }
+
+// ============================================================================
+// DECLARATIVE FACTORIES
+// ============================================================================
+
+/**
+ * Options accepted by `Migration.create()`.
+ */
+export type MigrationCreateOptions = {
+  /**
+   * Sort order override.
+   * @default 0
+   */
+  order?: number;
+
+  /**
+   * ISO timestamp override for migration ordering.
+   * Normally extracted from the filename by the runner.
+   */
+  createdAt?: string;
+
+  /**
+   * Override the primary key type for this migration only.
+   *
+   * - `"uuid"` — UUID primary key (uses `primaryUuid()`)
+   * - `"int"` — Auto-increment integer (uses `id()`)
+   * - `"bigInt"` — Big auto-increment integer (uses `bigId()`)
+   * - `false` — Skip primary key generation entirely
+   *
+   * When omitted, falls back to `migrationDefaults.primaryKey` from the
+   * DataSource config, then to `"int"` as the framework default.
+   */
+  primaryKey?: "uuid" | "int" | "bigInt" | false;
+
+  /**
+   * Whether to add `timestamps()` (created_at / updated_at).
+   * @default true
+   */
+  timestamps?: boolean;
+
+  /**
+   * Whether to wrap this migration in a transaction.
+   * Falls back to DataSource / driver defaults when omitted.
+   */
+  transactional?: boolean;
+
+  /**
+   * Custom logic to execute after the declarative definitions.
+   * Useful for data seeding or raw SQL following table creation.
+   */
+  up?: (this: Migration) => void | Promise<void>;
+
+  /**
+   * Raw SQL queries to run before the custom `up` logic.
+   * Useful for triggering statements or custom constraints.
+   */
+  raw?: string | string[];
+
+  /**
+   * Custom rollback logic to execute before the default `dropTableIfExists`.
+   */
+  down?: (this: Migration) => void | Promise<void>;
+};
+
+/**
+ * Column map accepted by `Migration.create()` and `Migration.alter()`.
+ *
+ * Keys become the column names; values are `DetachedColumnBuilder` instances
+ * produced by the standalone column helpers (`uuid()`, `text()`, etc.).
+ */
+export type ColumnMap = Record<string, import("./column-helpers").DetachedColumnBuilder>;
+
+/**
+ * Options accepted by `Migration.alter()`.
+ */
+export type MigrationAlterOptions = {
+  /** Sort order override. */
+  order?: number;
+  /** ISO timestamp override. */
+  createdAt?: string;
+  /** Whether to wrap in a transaction. */
+  transactional?: boolean;
+
+  /**
+   * Custom logic to execute after the declarative definitions.
+   */
+  up?: (this: Migration) => void | Promise<void>;
+
+  /**
+   * Custom rollback logic to execute on rollback.
+   * Unlike `create()`, `alter()` does not auto-infer rollbacks.
+   */
+  down?: (this: Migration) => void | Promise<void>;
+};
+
+/**
+ * Schema map passed to `Migration.alter()`.
+ *
+ * Groups all table-level DDL operations by intent.
+ * Any key can be omitted when not needed.
+ *
+ * @example
+ * ```typescript
+ * export default Migration.alter(User, {
+ *   // Column operations
+ *   add:    { phone: text().nullable() },
+ *   drop:   ["legacy_column"],
+ *   rename: { old_name: "new_name" },
+ *   modify: { email: string(320).notNullable() },
+ *
+ *   // Index / constraint operations
+ *   addIndex:   [{ columns: ["first_name", "last_name"] }],
+ *   addUnique:  [{ columns: ["email"] }],
+ *   addForeign: [{ column: "team_id", references: Team }],
+ *   dropIndexes: ["old_idx_name"],
+ *   dropUnique:  [["email"]],
+ * });
+ * ```
+ */
+export type AlterSchema = {
+  // ============================================================================
+  // Column Operations
+  // ============================================================================
+
+  /** Columns to add. Keys become column names. */
+  add?: ColumnMap;
+
+  /** Column names to drop. */
+  drop?: string[];
+
+  /** Rename map: `{ oldName: newName }`. */
+  rename?: Record<string, string>;
+
+  /** Columns to modify. Keys become column names. */
+  modify?: ColumnMap;
+
+  // ============================================================================
+  // Index Operations
+  // ============================================================================
+
+  /**
+   * Regular indexes to add.
+   *
+   * @example
+   * ```typescript
+   * addIndex: [
+   *   { columns: "email" },
+   *   { columns: ["first_name", "last_name"], name: "idx_full_name" },
+   *   { columns: "email", options: { concurrently: true } },
+   * ]
+   * ```
+   */
+  addIndex?: Array<{
+    columns: string | string[];
+    name?: string;
+    options?: { include?: string[]; concurrently?: boolean };
+  }>;
+
+  /**
+   * Indexes to drop (by name or columns array).
+   *
+   * @example
+   * ```typescript
+   * dropIndex: ["idx_old_name", ["first_name", "last_name"]]
+   * ```
+   */
+  dropIndex?: Array<string | string[]>;
+
+  /**
+   * Unique constraints / indexes to add.
+   *
+   * @example
+   * ```typescript
+   * addUnique: [{ columns: "email" }]
+   * ```
+   */
+  addUnique?: Array<{
+    columns: string | string[];
+    name?: string;
+    options?: { include?: string[]; concurrently?: boolean };
+  }>;
+
+  /**
+   * Unique constraints to drop (by columns array).
+   *
+   * @example
+   * ```typescript
+   * dropUnique: [["email"], ["phone"]]
+   * ```
+   */
+  dropUnique?: Array<string | string[]>;
+
+  /**
+   * Expression-based indexes to add (PostgreSQL-specific).
+   *
+   * @example
+   * ```typescript
+   * addExpressionIndex: [
+   *   { expressions: "lower(email)", name: "idx_email_lower" },
+   * ]
+   * ```
+   */
+  addExpressionIndex?: Array<{
+    expressions: string | string[];
+    name?: string;
+    options?: { concurrently?: boolean };
+  }>;
+
+  // ============================================================================
+  // Specialized Indexes
+  // ============================================================================
+
+  /**
+   * Full-text search indexes to add.
+   *
+   * @example
+   * ```typescript
+   * addFullText: [{ columns: ["title", "body"] }]
+   * ```
+   */
+  addFullText?: Array<{
+    columns: string | string[];
+    options?: FullTextIndexOptions;
+  }>;
+
+  /** Full-text indexes to drop (by name). */
+  dropFullText?: string[];
+
+  /**
+   * Geo-spatial indexes to add.
+   *
+   * @example
+   * ```typescript
+   * addGeoIndex: [{ column: "location" }]
+   * ```
+   */
+  addGeoIndex?: Array<{
+    column: string;
+    options?: GeoIndexOptions;
+  }>;
+
+  /** Geo indexes to drop (by column name). */
+  dropGeoIndex?: string[];
+
+  /**
+   * Vector search indexes to add.
+   *
+   * @example
+   * ```typescript
+   * addVectorIndex: [{ column: "embedding", options: { dimensions: 1536, similarity: "cosine" } }]
+   * ```
+   */
+  addVectorIndex?: Array<{
+    column: string;
+    options: VectorIndexOptions;
+  }>;
+
+  /** Vector indexes to drop (by column name). */
+  dropVectorIndex?: string[];
+
+  /**
+   * TTL indexes to add (MongoDB-primary).
+   *
+   * @example
+   * ```typescript
+   * addTTLIndex: [{ column: "created_at", expireAfterSeconds: 86400 }]
+   * ```
+   */
+  addTTLIndex?: Array<{ column: string; expireAfterSeconds: number }>;
+
+  /** TTL indexes to drop (by column name). */
+  dropTTLIndex?: string[];
+
+  // ============================================================================
+  // Constraints (SQL)
+  // ============================================================================
+
+  /**
+   * Foreign keys to add to existing columns.
+   *
+   * Accepts a Model class or a raw table-name string for `references`.
+   *
+   * @example
+   * ```typescript
+   * addForeign: [
+   *   { column: "team_id",  references: Team,       onDelete: "cascade" },
+   *   { column: "owner_id", references: "users",    on: "id", onDelete: "setNull" },
+   * ]
+   * ```
+   */
+  addForeign?: Array<{
+    column: string;
+    references: string | { table: string };
+    on?: string;
+    onDelete?: "cascade" | "restrict" | "setNull" | "noAction";
+    onUpdate?: "cascade" | "restrict" | "setNull" | "noAction";
+  }>;
+
+  /**
+   * Foreign keys to drop.
+   *
+   * Two forms:
+   * - `{ columnOrConstraint: "team_id", referencesTable: "teams" }` → auto-name resolution
+   * - `{ columnOrConstraint: "fk_my_custom_name" }` → raw constraint name
+   */
+  dropForeign?: Array<{ columnOrConstraint: string; referencesTable?: string }>;
+
+  /**
+   * CHECK constraints to add.
+   *
+   * @example
+   * ```typescript
+   * addCheck: [{ name: "age_positive", expression: "age >= 0" }]
+   * ```
+   */
+  addCheck?: Array<{ name: string; expression: string }>;
+
+  /** CHECK constraints to drop (by name). */
+  dropCheck?: string[];
+
+  // ============================================================================
+  // Raw SQL
+  // ============================================================================
+
+  /**
+   * Raw SQL queries to execute as part of this alter operation.
+   */
+  raw?: string | string[];
+};
+
+/**
+ * Wire a `ColumnMap` onto an active migration instance.
+ *
+ * Fixes up the placeholder column name in each `DetachedColumnBuilder`,
+ * pushes the `addColumn` operation, and transfers any pending FK / index
+ * side effects from the detached sink to the real migration.
+ *
+ * @internal
+ */
+function wireColumns(migration: Migration, columns: ColumnMap): void {
+  for (const [columnName, detached] of Object.entries(columns)) {
+    // Overwrite the placeholder name with the real key
+    const definition = detached.getDefinition();
+    (definition as any).name = columnName;
+
+    // Push the addColumn operation
+    (migration as any).pendingOperations.push({
+      type: "addColumn",
+      payload: definition,
+    });
+
+    // Transfer any index operations registered via .unique() / .index()
+    for (const idx of detached.sink.pendingIndexes) {
+      migration.addPendingIndex(idx);
+    }
+
+    // Transfer any FK operations registered via .references()
+    for (const fk of detached.sink.pendingForeignKeys as any[]) {
+      // Fix the column name on the FK definition too
+      fk.column = columnName;
+      migration.addForeignKeyOperation(fk);
+    }
+  }
+}
+
+/**
+ * Create a declarative initial-table migration.
+ *
+ * Automatically handles:
+ * - `createTableIfNotExists()`
+ * - Primary key (type resolved from `migrationDefaults.primaryKey` → options → `"int"`)
+ * - `timestamps()`
+ * - `down()` → `dropTableIfExists()`
+ *
+ * The class-based API remains available for complex migrations (raw SQL,
+ * data backfills, conditional logic).
+ *
+ * @param model - Model class to bind (provides table name + data source)
+ * @param columns - Column definitions keyed by column name
+ * @param options - Optional overrides
+ *
+ * @example
+ * ```typescript
+ * import { Migration, uuid, text, timestamp } from "@warlock.js/cascade";
+ * import { Organization } from "app/organizations/models/organization";
+ * import { Chat } from "../chat.model";
+ *
+ * export default Migration.create(Chat, {
+ *   organization_id: uuid().references(Organization).onDelete("cascade"),
+ *   title:           text(),
+ *   status:          text(),
+ *   started_at:      timestamp().default("NOW()"),
+ *   closed_at:       timestamp().nullable(),
+ * }, { order: 5 });
+ * ```
+ */
+Migration.create = function createMigration(
+  model: ChildModel<Model<any>>,
+  columns: ColumnMap,
+  options: MigrationCreateOptions = {},
+): MigrationConstructor {
+  const {
+    order = 0,
+    createdAt,
+    primaryKey: primaryKeyOverride,
+    timestamps: withTimestamps = true,
+    transactional,
+  } = options;
+
+  return class DeclarativeMigration extends Migration {
+    public static readonly order = order;
+    public static readonly createdAt = createdAt;
+    public static readonly transactional = transactional;
+    public readonly table = model.table;
+    public readonly dataSource = model.dataSource;
+
+    public async up(): Promise<void> {
+      this.createTableIfNotExists();
+
+      // Resolve primary key type: option → migrationDefaults → "int"
+      const pkType =
+        primaryKeyOverride !== undefined
+          ? primaryKeyOverride
+          : (this._migrationDefaults?.primaryKey ?? "int");
+
+      if (pkType === "uuid") {
+        this.primaryUuid();
+      } else if (pkType === "bigInt") {
+        this.bigId();
+      } else if (pkType === "int") {
+        this.id();
+      }
+      // pkType === false → skip primary key
+
+      wireColumns(this, columns);
+
+      if (withTimestamps) {
+        this.timestamps();
+      }
+
+      if (options.raw) {
+        const rawQueries = Array.isArray(options.raw) ? options.raw : [options.raw];
+        for (const query of rawQueries) {
+          this.raw(query);
+        }
+      }
+
+      if (options.up) {
+        await options.up.call(this as unknown as Migration);
+      }
+    }
+
+    public async down(): Promise<void> {
+      if (options.down) {
+        await options.down.call(this as unknown as Migration);
+      }
+      this.dropTableIfExists();
+    }
+  } as unknown as MigrationConstructor;
+};
+
+/**
+ * Create a declarative alteration migration.
+ *
+ * @param model - Model class to bind
+ * @param schema - What to add / drop / rename / modify
+ * @param options - Optional overrides
+ *
+ * @example
+ * ```typescript
+ * import { Migration, text } from "@warlock.js/cascade";
+ * import { User } from "../user.model";
+ *
+ * export default Migration.alter(User, {
+ *   add: {
+ *     phone:  text().nullable(),
+ *     avatar: text().nullable(),
+ *   },
+ *   drop: ["legacy_field"],
+ *   rename: { old_name: "new_name" },
+ * });
+ * ```
+ */
+Migration.alter = function alterMigration(
+  model: ChildModel<Model<any>>,
+  schema: AlterSchema,
+  options: MigrationAlterOptions = {},
+): MigrationConstructor {
+  const { order = 0, createdAt, transactional } = options;
+
+  return class AlterMigration extends Migration {
+    public static readonly order = order;
+    public static readonly createdAt = createdAt;
+    public static readonly transactional = transactional;
+    public readonly table = model.table;
+    public readonly dataSource = model.dataSource;
+
+    public async up(): Promise<void> {
+      // ── Column Operations ─────────────────────────────────────────────────
+      if (schema.add) {
+        wireColumns(this, schema.add);
+      }
+
+      if (schema.drop) {
+        for (const col of schema.drop) {
+          this.dropColumn(col);
+        }
+      }
+
+      if (schema.rename) {
+        for (const [from, to] of Object.entries(schema.rename)) {
+          this.renameColumn(from, to);
+        }
+      }
+
+      if (schema.modify) {
+        for (const [columnName, detached] of Object.entries(schema.modify)) {
+          const definition = detached.getDefinition();
+          (definition as any).name = columnName;
+
+          (this as any).pendingOperations.push({
+            type: "modifyColumn",
+            payload: definition,
+          });
+
+          // Transfer FK side effects
+          for (const fk of detached.sink.pendingForeignKeys as any[]) {
+            fk.column = columnName;
+            this.addForeignKeyOperation(fk);
+          }
+        }
+      }
+
+      // ── Regular Indexes ───────────────────────────────────────────────────
+      if (schema.addIndex) {
+        for (const { columns, name, options: opts } of schema.addIndex) {
+          this.index(columns, name, opts);
+        }
+      }
+
+      if (schema.dropIndex) {
+        for (const target of schema.dropIndex) {
+          this.dropIndex(target);
+        }
+      }
+
+      // ── Unique Indexes ────────────────────────────────────────────────────
+      if (schema.addUnique) {
+        for (const { columns, name, options: opts } of schema.addUnique) {
+          this.unique(columns, name, opts);
+        }
+      }
+
+      if (schema.dropUnique) {
+        for (const cols of schema.dropUnique) {
+          this.dropUnique(cols);
+        }
+      }
+
+      // ── Expression Indexes ───────────────────────────────────────────────
+      if (schema.addExpressionIndex) {
+        for (const { expressions, name, options: opts } of schema.addExpressionIndex) {
+          this.expressionIndex(expressions, name, opts);
+        }
+      }
+
+      // ── Specialized Indexes ───────────────────────────────────────────────
+      if (schema.addFullText) {
+        for (const { columns, options: opts } of schema.addFullText) {
+          this.fullText(columns, opts);
+        }
+      }
+
+      if (schema.dropFullText) {
+        for (const name of schema.dropFullText) {
+          this.dropFullText(name);
+        }
+      }
+
+      if (schema.addGeoIndex) {
+        for (const { column, options: opts } of schema.addGeoIndex) {
+          this.geoIndex(column, opts);
+        }
+      }
+
+      if (schema.dropGeoIndex) {
+        for (const column of schema.dropGeoIndex) {
+          this.dropGeoIndex(column);
+        }
+      }
+
+      if (schema.addVectorIndex) {
+        for (const { column, options: opts } of schema.addVectorIndex) {
+          this.vectorIndex(column, opts);
+        }
+      }
+
+      if (schema.dropVectorIndex) {
+        for (const column of schema.dropVectorIndex) {
+          this.dropVectorIndex(column);
+        }
+      }
+
+      if (schema.addTTLIndex) {
+        for (const { column, expireAfterSeconds } of schema.addTTLIndex) {
+          this.ttlIndex(column, expireAfterSeconds);
+        }
+      }
+
+      if (schema.dropTTLIndex) {
+        for (const column of schema.dropTTLIndex) {
+          this.dropTTLIndex(column);
+        }
+      }
+
+      // ── Foreign Keys ──────────────────────────────────────────────────────
+      if (schema.addForeign) {
+        for (const fk of schema.addForeign) {
+          const tableName =
+            typeof fk.references === "string" ? fk.references : fk.references.table;
+
+          this.foreign(fk.column)
+            .references(tableName, fk.on ?? "id")
+            .onDelete(fk.onDelete ?? "restrict")
+            .onUpdate(fk.onUpdate ?? "restrict");
+        }
+      }
+
+      if (schema.dropForeign) {
+        for (const { columnOrConstraint, referencesTable } of schema.dropForeign) {
+          this.dropForeign(columnOrConstraint, referencesTable);
+        }
+      }
+
+      // ── Check Constraints ─────────────────────────────────────────────────
+      if (schema.addCheck) {
+        for (const { name, expression } of schema.addCheck) {
+          this.check(name, expression);
+        }
+      }
+
+      if (schema.dropCheck) {
+        for (const name of schema.dropCheck) {
+          this.dropCheck(name);
+        }
+      }
+
+      // ── Raw SQL ───────────────────────────────────────────────────────────
+      if (schema.raw) {
+        const rawQueries = Array.isArray(schema.raw) ? schema.raw : [schema.raw];
+        for (const query of rawQueries) {
+          this.raw(query);
+        }
+      }
+
+      if (options.up) {
+        await options.up.call(this as unknown as Migration);
+      }
+    }
+
+    public async down(): Promise<void> {
+      if (options.down) {
+        await options.down.call(this as unknown as Migration);
+      }
+    }
+  } as unknown as MigrationConstructor;
+};
+
+
+// The no-op re-assignments below silence the TS "used before assigned" check;
+// the real implementations are set by the Migration.create = ... and
+// Migration.alter = ... blocks immediately above.
+(Migration as any).__declarativeFactoriesAttached = true;
+

@@ -193,10 +193,10 @@ export class DatabaseWriter implements WriterContract {
     const validationSchema = isInsert
       ? this.schema.clone()
       : this.schema.clone(Object.keys(this.model.data)).extend({
-          id: v.scalar(),
-          _id: v.any(),
-          [this.ctor.createdAtColumn as string]: v.date(),
-          [this.ctor.updatedAtColumn as string]: v.date(),
+          id: v.scalar().optional(),
+          _id: v.any().optional(),
+          [this.ctor.createdAtColumn as string]: v.date().optional(),
+          [this.ctor.updatedAtColumn as string]: v.date().optional(),
         });
 
     // Apply strict mode

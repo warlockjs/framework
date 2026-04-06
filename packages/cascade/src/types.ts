@@ -386,4 +386,28 @@ export type MigrationDefaults = {
    * @example "uuid_generate_v1mc()"
    */
   uuidExpression?: string;
+
+  /**
+   * Default primary key type for `Migration.create()`.
+   *
+   * Controls which primary key column is automatically added when using
+   * the declarative `Migration.create()` factory. Individual migrations
+   * can still override this by passing `{ primaryKey: false }` in options.
+   *
+   * - `"uuid"` — UUID primary key via `primaryUuid()` (default for PostgreSQL)
+   * - `"int"` — Auto-increment integer via `id()`
+   * - `"bigInt"` — Big auto-increment integer via `bigId()`
+   *
+   * @default "int"
+   *
+   * @example
+   * ```typescript
+   * // src/config/database.ts
+   * migrationOptions: {
+   *   uuidStrategy: "v7",
+   *   primaryKey: "uuid",
+   * }
+   * ```
+   */
+  primaryKey?: "uuid" | "int" | "bigInt";
 };
