@@ -409,76 +409,80 @@ export class MigrationRunner {
 
     let transactionFailed = false;
     let errorMessage = "";
+    /** The migration name that owns the SQL statement that threw. */
+    let failingMigrationName: string | undefined;
 
     const startTime = Date.now();
 
-    // Use transaction if supported
-    if (driver.transaction) {
-      try {
-        await driver.transaction(async () => {
-          for (const statement of sortedStatements) {
-            await driver.query(statement.sql);
-          }
-
-          if (record) {
-            for (const data of migrationsData) {
-              await this.recordMigration(
-                data.name,
-                nextBatch,
-                data.MigrationClass.createdAt
-                  ? parseCreatedAt(data.MigrationClass.createdAt)
-                  : new Date(),
-              );
-            }
-          }
-        });
-      } catch (err) {
-        transactionFailed = true;
-        errorMessage = err instanceof Error ? err.message : String(err);
-      }
-    } else {
-      // Non-transactional execution
-      try {
-        for (const statement of sortedStatements) {
+    /**
+     * Execute all sorted statements, capturing which migration owns the
+     * statement that throws — so we report a precise culprit instead of
+     * blaming every migration in the batch.
+     */
+    const executeStatements = async (): Promise<void> => {
+      for (const statement of sortedStatements) {
+        try {
           await driver.query(statement.sql);
+        } catch (err) {
+          failingMigrationName = statement.migrationName;
+          throw err;
         }
-
-        if (record) {
-          for (const data of migrationsData) {
-            await this.recordMigration(
-              data.name,
-              nextBatch,
-              data.MigrationClass.createdAt
-                ? parseCreatedAt(data.MigrationClass.createdAt)
-                : new Date(),
-            );
-          }
-        }
-      } catch (err) {
-        transactionFailed = true;
-        errorMessage = err instanceof Error ? err.message : String(err);
       }
+
+      if (record) {
+        for (const data of migrationsData) {
+          await this.recordMigration(
+            data.name,
+            nextBatch,
+            data.MigrationClass.createdAt
+              ? parseCreatedAt(data.MigrationClass.createdAt)
+              : new Date(),
+          );
+        }
+      }
+    };
+
+    try {
+      if (driver.transaction) {
+        await driver.transaction(executeStatements);
+      } else {
+        await executeStatements();
+      }
+    } catch (err) {
+      transactionFailed = true;
+      errorMessage = err instanceof Error ? err.message : String(err);
     }
 
     const durationMs = Date.now() - startTime;
 
-    // Report results per-migration for compatibility
+    // Report results per-migration.
+    // Only the migration that owns the failing statement is marked as failed;
+    // all others are reported as rolled back / not reached.
     for (const data of migrationsData) {
+      const isCulprit = transactionFailed && data.name === failingMigrationName;
+      const wasSkipped = transactionFailed && !isCulprit;
+
       results.push({
         name: data.name,
         table: data.migration.table,
         direction: "up",
         success: !transactionFailed,
-        error: transactionFailed ? errorMessage : undefined,
-        durationMs: Math.round(durationMs / migrationsData.length), // rough average
+        error: isCulprit ? errorMessage : undefined,
+        durationMs: Math.round(durationMs / migrationsData.length),
         executedAt: new Date(),
       });
 
-      if (transactionFailed) {
+      if (isCulprit) {
         log.error(
           "database",
           "migration",
-          `${colors.magenta(data.name)}: ✗ Failed during batch execution: ${errorMessage}`,
+          `${colors.magenta(data.name)}: ✗ Failed: ${errorMessage}`,
+        );
+      } else if (wasSkipped) {
+        log.warn(
+          "database",
+          "migration",
+          `${colors.magenta(data.name)}: rolled back (batch transaction failed)`,
         );
       } else {
         log.success("database", "migration", `Migrated: ${colors.magenta(data.name)} successfully`);

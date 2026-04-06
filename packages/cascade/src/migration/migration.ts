@@ -2735,6 +2735,60 @@ export function migrate(
 // ============================================================================
 
 /**
+ * A single composite index entry for `Migration.create()` options.
+ *
+ * @example
+ * ```typescript
+ * // Simple — columns only, name and type auto-resolved
+ * { columns: ["organization_id", "content_type"] }
+ *
+ * // Named
+ * { columns: ["organization_id", "content_type"], name: "idx_org_content" }
+ *
+ * // Typed (PostgreSQL)
+ * { columns: ["embedding"], using: "ivfflat" }
+ * ```
+ */
+export type IndexEntry = {
+  /** Column(s) to include in the index. */
+  columns: string | string[];
+  /** Optional explicit index name. Auto-generated when omitted. */
+  name?: string;
+  /**
+   * Index access method (PostgreSQL).
+   * Defaults to `"btree"` when omitted.
+   */
+  using?: "btree" | "hash" | "gin" | "gist" | "brin" | "ivfflat" | "hnsw" | (string & {});
+  /** Extra columns to include in a covering index (PostgreSQL `INCLUDE`). */
+  include?: string[];
+  /** Build the index without locking the table (PostgreSQL). */
+  concurrently?: boolean;
+};
+
+/**
+ * A single composite unique constraint entry for `Migration.create()` options.
+ *
+ * @example
+ * ```typescript
+ * // Simple
+ * { columns: ["organization_id", "email"] }
+ *
+ * // Named — useful when you need to reference it in a future ALTER
+ * { columns: ["org_id", "content_id", "lang"], name: "uq_summary_idempotency" }
+ * ```
+ */
+export type UniqueEntry = {
+  /** Column(s) that must be unique together. */
+  columns: string | string[];
+  /** Optional explicit constraint name. Auto-generated when omitted. */
+  name?: string;
+  /** Extra columns to include (PostgreSQL covering unique index). */
+  include?: string[];
+  /** Build the constraint without locking the table (PostgreSQL). */
+  concurrently?: boolean;
+};
+
+/**
  * Options accepted by `Migration.create()`.
  */
 export type MigrationCreateOptions = {
@@ -2774,6 +2828,40 @@ export type MigrationCreateOptions = {
    * Falls back to DataSource / driver defaults when omitted.
    */
   transactional?: boolean;
+
+  /**
+   * Composite indexes to create on the table.
+   *
+   * Use this for multi-column indexes. Single-column indexes should be
+   * defined at the column level via `.index()`.
+   *
+   * @example
+   * ```typescript
+   * index: [
+   *   { columns: ["organization_id", "content_type", "content_id"] },
+   *   { columns: ["organization_id", "status"], name: "idx_org_status" },
+   * ]
+   * ```
+   */
+  index?: IndexEntry[];
+
+  /**
+   * Composite unique constraints to create on the table.
+   *
+   * Use this for multi-column uniqueness. Single-column unique constraints
+   * should be defined at the column level via `.unique()`.
+   *
+   * @example
+   * ```typescript
+   * unique: [
+   *   {
+   *     columns: ["organization_id", "content_id", "content_language"],
+   *     name: "uq_summary_idempotency",
+   *   },
+   * ]
+   * ```
+   */
+  unique?: UniqueEntry[];
 
   /**
    * Custom logic to execute after the declarative definitions.
@@ -3081,7 +3169,9 @@ function wireColumns(migration: Migration, columns: ColumnMap): void {
     });
 
     // Transfer any index operations registered via .unique() / .index()
+    // Replace the placeholder column name with the real column name before transfer.
     for (const idx of detached.sink.pendingIndexes) {
+      idx.columns = idx.columns.map(col => (col === "__placeholder__" ? columnName : col));
       migration.addPendingIndex(idx);
     }
 
@@ -3175,6 +3265,26 @@ Migration.create = function createMigration(
 
       if (withTimestamps) {
         this.timestamps();
+      }
+
+      // ── Composite indexes ───────────────────────────────────────────────
+      if (options.index) {
+        for (const entry of options.index) {
+          this.index(entry.columns, entry.name, {
+            include: entry.include,
+            concurrently: entry.concurrently,
+          });
+        }
+      }
+
+      // ── Composite unique constraints ────────────────────────────────────
+      if (options.unique) {
+        for (const entry of options.unique) {
+          this.unique(entry.columns, entry.name, {
+            include: entry.include,
+            concurrently: entry.concurrently,
+          });
+        }
       }
 
       if (options.raw) {
