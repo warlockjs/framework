@@ -138,9 +138,9 @@ export class CascadeQueryBuilder<T extends Model> implements QueryBuilderContrac
   }
 
   /**
-   * {@inheritDoc QueryBuilderContract.nearestTo}
+   * {@inheritDoc QueryBuilderContract.similarTo}
    */
-  public nearestTo(column: string, embedding: number[], alias?: string): this {
+  public similarTo(column: string, embedding: number[], alias?: string): this {
     this.query.nearestTo(column, embedding, alias);
     return this;
   }

@@ -367,7 +367,7 @@ export interface QueryBuilderContract<T> {
   clone(): this;
 
   /**
-   * Nearest-neighbour vector similarity search.
+   * Vector similarity search.
    *
    * Adds a score SELECT and vector ORDER BY (SQL) or $vectorSearch stage (MongoDB Atlas)
    * in one call. Driver implementations handle the specifics.
@@ -381,11 +381,11 @@ export interface QueryBuilderContract<T> {
    * const results = await vectorsRepository
    *   .newQuery()
    *   .where({ organization_id: "org-123" })
-   *   .nearestTo("embedding", queryEmbedding)
+   *   .similarTo("embedding", queryEmbedding)
    *   .limit(5)
    *   .get<VectorRow & { score: number }>();
    * ```
    */
-  nearestTo(column: string, embedding: number[], alias?: string): this;
+  similarTo(column: string, embedding: number[], alias?: string): this;
 }
 

@@ -179,7 +179,7 @@ export type FilterOperator =
   | "scope"
   | "with"
   | "joinWith"
-  | "nearestTo"
+  | "similarTo"
   | WhereOperator;
 
 /**

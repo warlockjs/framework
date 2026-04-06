@@ -156,8 +156,8 @@ export class FilterApplicator {
       // JoinWith filter - eager-loads a relation via SQL JOIN when value is truthy
       joinWith: this.handleJoinWith,
 
-      // Vector similarity search — calls nearestTo(column, embedding[])
-      nearestTo: this.handleNearestTo,
+      // Vector similarity search — calls similarTo(column, embedding[])
+      similarTo: this.handleSimilarTo,
     };
 
     return handlers[type];
@@ -514,17 +514,17 @@ export class FilterApplicator {
   // ============================================================================
 
   /**
-   * Handle nearestTo filter — performs nearest-neighbour vector similarity search.
+   * Handle similarTo filter — performs vector similarity search.
    *
    * The filter value must be a `number[]` (pre-computed embedding).
-   * Delegates to `query.nearestTo(column, embedding)` which is handled
+   * Delegates to `query.similarTo(column, embedding)` which is handled
    * driver-specifically (pgvector or MongoDB Atlas $vectorSearch).
    *
    * Usage in filterBy:
    * ```typescript
    * filterBy: {
    *   organization_id: "=",
-   *   embedding: "nearestTo",
+   *   embedding: "similarTo",
    * }
    * ```
    *
@@ -533,7 +533,7 @@ export class FilterApplicator {
    * await vectorsRepository.list({ embedding: queryEmbedding, organization_id: orgId });
    * ```
    */
-  private handleNearestTo(
+  private handleSimilarTo(
     query: QueryBuilderContract,
     column?: string,
     _columns?: string[],
@@ -541,7 +541,9 @@ export class FilterApplicator {
   ) {
     if (!column || !Array.isArray(value)) return;
 
-    query.nearestTo(column, value);
+    // Cast to any: Cascade's internal QueryBuilderContract still uses nearestTo;
+    // our wrapper (CascadeQueryBuilder.similarTo) delegates to it correctly.
+    (query as any).similarTo(column, value);
   }
 
   // ============================================================================
