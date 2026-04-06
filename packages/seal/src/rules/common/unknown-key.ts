@@ -18,7 +18,6 @@ export const unknownKeyRule: SchemaRule<{
 
     if (unknownKeys.length > 0) {
       this.context.translationParams.unknownKeys = unknownKeys.join(", ");
-      this.context.translationParams.input = context.key || "schema";
 
       return invalidRule(this, context);
     }

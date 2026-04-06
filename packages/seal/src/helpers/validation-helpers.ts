@@ -54,7 +54,8 @@ export const invalidRule = (rule: ContextualSchemaRule, context: SchemaContext):
   // `input` is always translatable — rules may add more (e.g., field references in sameAs)
   // Rule-defined translatableParams override the default input if the key matches
   const translatableWithInput: Record<string, string> = {
-    input: context.key,
+    // Fall back to "schema" when validating at the root level (no key)
+    input: context.key || "schema",
     ...rule.context.translatableParams,
   };
 
@@ -78,16 +79,22 @@ export const invalidRule = (rule: ContextualSchemaRule, context: SchemaContext):
     input: resolvedParams.input,
   };
 
-  const error =
+  const rawError =
     rule.context.errorMessage ||
     rule.errorMessage ||
     context.translateRule?.({ rule, context, attributes }) ||
     rule.defaultErrorMessage!;
 
+  // Fallback interpolation: replace :placeholder patterns from attributes
+  // This kicks in when translateRule is absent or returns "" (not configured)
+  const error = rawError.replace(/:([a-zA-Z_]+)/g, (match, key) =>
+    key in attributes ? String(attributes[key as keyof typeof attributes]) : match,
+  );
+
   return {
     isValid: false,
     error,
-    input: context.key,
+    input: attributes.input, // use resolved input, not raw context.key (may be "")
     path: context.path,
   };
 };
