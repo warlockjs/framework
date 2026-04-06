@@ -1,5 +1,5 @@
 import { clone } from "@mongez/reinforcements";
-import { validate } from "../factory";
+import { validate } from "../factory/validate";
 import { VALID_RULE, invalidRule } from "../helpers";
 import { isEmptyValue } from "../helpers/is-empty-value";
 import { requiredRule as defaultRequiredRule } from "../rules/core/required";

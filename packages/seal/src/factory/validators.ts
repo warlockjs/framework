@@ -1,24 +1,22 @@
 import { SealConfig } from "../config";
 import type { Schema, SchemaContext, ValidationResult } from "../types";
-import type { BaseValidator } from "../validators";
-import {
-  AnyValidator,
-  ArrayValidator,
-  BooleanValidator,
-  ComputedValidator,
-  DateValidator,
-  FloatValidator,
-  IntValidator,
-  ManagedValidator,
-  NumberValidator,
-  NumericValidator,
-  ObjectValidator,
-  RecordValidator,
-  ScalarValidator,
-  StringValidator,
-  TupleValidator,
-  UnionValidator,
-} from "../validators";
+import { AnyValidator } from "../validators/any-validator";
+import { ArrayValidator } from "../validators/array-validator";
+import type { BaseValidator } from "../validators/base-validator";
+import { BooleanValidator } from "../validators/boolean-validator";
+import { ComputedValidator } from "../validators/computed-validator";
+import { DateValidator } from "../validators/date-validator";
+import { FloatValidator } from "../validators/float-validator";
+import { IntValidator } from "../validators/int-validator";
+import { ManagedValidator } from "../validators/managed-validator";
+import { NumberValidator } from "../validators/number-validator";
+import { NumericValidator } from "../validators/numeric-validator";
+import { ObjectValidator } from "../validators/object-validator";
+import { RecordValidator } from "../validators/record-validator";
+import { ScalarValidator } from "../validators/scalar-validator";
+import { StringValidator } from "../validators/string-validator";
+import { TupleValidator } from "../validators/tuple-validator";
+import { UnionValidator } from "../validators/union-validator";
 import { validate as validateFunction } from "./validate";
 
 /**
