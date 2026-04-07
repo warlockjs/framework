@@ -2,6 +2,22 @@ import type SMTPTransport from "nodemailer/lib/smtp-transport";
 import type React from "react";
 
 /**
+ * AWS SES mail configuration
+ */
+export type SesConfigurations = {
+  driver: "ses";
+  accessKeyId: string;
+  secretAccessKey: string;
+  region: string;
+  from?: MailAddress;
+};
+
+/**
+ * Any mail configuration (SMTP or SES)
+ */
+export type MailConfigurations = SmtpConfigurations | SesConfigurations;
+
+/**
  * Mail mode determines how emails are handled
  */
 export type MailMode = "production" | "development" | "test";
@@ -106,7 +122,11 @@ export type MailAttachment = {
  * });
  * ```
  */
-export type MailConfigurations = SMTPTransport.Options & {
+export type SmtpConfigurations = SMTPTransport.Options & {
+  /**
+   * Transport driver type
+   */
+  driver?: "smtp";
   /**
    * Enable STARTTLS upgrade (alias for requireTLS)
    * Set to `true` for port 587
@@ -263,6 +283,7 @@ export type NormalizedMail = {
   headers: Record<string, string>;
   tags: string[];
   correlationId?: string;
+  config: MailConfigurations;
 };
 
 /**

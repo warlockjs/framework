@@ -121,6 +121,12 @@ const featuresMap: Record<
       "@types/nodemailer": "^7.0.4",
     },
   },
+  ses: {
+    description: "Installs AWS SES SDK for sending emails via Amazon SES",
+    dependencies: {
+      "@aws-sdk/client-sesv2": "^3.1025.0",
+    },
+  },
   mongodb: {
     description: "Installs mongodb driver for database driver (Cascade Package)",
     dependencies: {
@@ -177,11 +183,14 @@ const featuresMap: Record<
     script: {
       test: "vitest",
       "test:coverage": "vitest --coverage",
+      "test:ui": "vitest --ui",
+      "test:watch": "vitest --watch",
     },
     devDependencies: {
       "@mongez/vite": "^2.0.4",
       vite: "^7.3.1",
       vitest: "^4.0.16",
+      "@vitest/coverage-v8": "^4.0.16",
     },
   },
   herald: {

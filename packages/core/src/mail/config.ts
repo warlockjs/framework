@@ -1,11 +1,12 @@
-import type { MailConfigurations, MailersConfig, MailMode } from "./types";
+import type { MailConfigurations, MailersConfig, MailMode, SmtpConfigurations } from "./types";
 
 /**
  * Default mail configurations
  */
-const defaultConfigurations: Partial<MailConfigurations> = {
+const defaultConfigurations: Partial<SmtpConfigurations> = {
   secure: true,
   tls: true,
+  driver: "smtp",
 };
 
 /**
@@ -105,14 +106,15 @@ export function setMailConfigurations(config: MailConfigurations | MailersConfig
   }
 }
 
-/**
- * Get the default mail configuration
- */
 export function getDefaultMailConfig(): MailConfigurations {
+  const config = mailersConfig.default;
+  if (!config) return {} as MailConfigurations;
+  if ("driver" in config && config.driver === "ses") return config;
+
   return {
     ...defaultConfigurations,
-    ...mailersConfig.default,
-  };
+    ...config,
+  } as SmtpConfigurations;
 }
 
 /**
@@ -128,10 +130,12 @@ export function getMailerConfig(name: string): MailConfigurations | undefined {
     return undefined;
   }
 
+  if ("driver" in config && config.driver === "ses") return config;
+
   return {
     ...defaultConfigurations,
     ...config,
-  };
+  } as SmtpConfigurations;
 }
 
 /**
@@ -142,15 +146,18 @@ export function resolveMailConfig(options: {
   config?: MailConfigurations;
   mailer?: string;
 }): MailConfigurations {
-  // Direct config takes highest priority
   if (options.config) {
+    // SES config passes through as-is, no defaultConfigurations merge
+    if ("driver" in options.config && options.config.driver === "ses") {
+      return options.config;
+    }
+
     return {
       ...defaultConfigurations,
       ...options.config,
-    };
+    } as SmtpConfigurations;
   }
 
-  // Named mailer
   if (options.mailer) {
     const config = getMailerConfig(options.mailer);
     if (!config) {
@@ -159,7 +166,6 @@ export function resolveMailConfig(options: {
     return config;
   }
 
-  // Default
   return getDefaultMailConfig();
 }
 

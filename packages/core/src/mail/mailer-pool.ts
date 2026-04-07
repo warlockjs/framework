@@ -1,7 +1,7 @@
 import { log } from "@warlock.js/logger";
 import type nodemailer from "nodemailer";
 import type { Transporter } from "nodemailer";
-import type { MailConfigurations } from "./types";
+import type { MailConfigurations, SesConfigurations, SmtpConfigurations } from "./types";
 
 // ============================================================
 // Eager-loaded Nodemailer Module
@@ -33,6 +33,8 @@ let moduleExists: boolean | null = null;
  */
 let nodemailerModule: typeof nodemailer;
 
+let nodemailerLoadPromise: Promise<void> | null = null;
+
 /**
  * Eagerly load nodemailer module at import time
  */
@@ -47,7 +49,77 @@ async function loadNodemailerModule() {
 }
 
 // Kick off eager loading immediately
-loadNodemailerModule();
+nodemailerLoadPromise = loadNodemailerModule();
+
+const SES_INSTALL_INSTRUCTIONS = `
+AWS SES functionality requires the @aws-sdk/client-sesv2 package.
+Install it with:
+
+  warlock add ses
+
+Or manually:
+
+  npm install @aws-sdk/client-sesv2
+  pnpm add @aws-sdk/client-sesv2
+  yarn add @aws-sdk/client-sesv2
+`.trim();
+
+let sesModuleExists: boolean | null = null;
+
+let sesModule: typeof import("@aws-sdk/client-sesv2");
+
+let sesLoadPromise: Promise<void> | null = null;
+
+async function loadSesModule() {
+  try {
+    const module = await import("@aws-sdk/client-sesv2");
+    sesModule = module.default;
+    sesModuleExists = true;
+  } catch {
+    sesModuleExists = false;
+  }
+}
+
+sesLoadPromise = loadSesModule();
+
+function isSesConfig(config: MailConfigurations): config is SesConfigurations {
+  return "driver" in config && config.driver === "ses";
+}
+
+async function getSesMailer(config: SesConfigurations): Promise<Transporter> {
+  if (sesModuleExists === null && sesLoadPromise) {
+    await sesLoadPromise;
+  }
+  
+  if (sesModuleExists === false) {
+    throw new Error(`@aws-sdk/client-sesv2 is not installed.\n\n${SES_INSTALL_INSTRUCTIONS}`);
+  }
+
+  const hash = `ses_${config.region}_${config.accessKeyId}`;
+
+  const existingTransporter = mailerPool.get(hash);
+  if (existingTransporter) {
+    return existingTransporter;
+  }
+
+  log.info("mail", "pool", `Creating new SES mailer transport (pool size: ${mailerPool.size + 1})`);
+
+  const ses = new sesModule!.SESv2Client({
+    region: config.region,
+    credentials: {
+      accessKeyId: config.accessKeyId,
+      secretAccessKey: config.secretAccessKey,
+    },
+  });
+
+  const transporter = nodemailerModule.createTransport({
+    SES: { sesClient: ses, SendEmailCommand: sesModule.SendEmailCommand },
+  });
+
+  mailerPool.set(hash, transporter);
+
+  return transporter;
+}
 
 // ============================================================
 // Mailer Pool
@@ -62,8 +134,9 @@ const mailerPool = new Map<string, Transporter>();
 /**
  * Create a hash from mail configuration for pooling
  */
-function createConfigHash(config: MailConfigurations): string {
+function createConfigHash(config: SmtpConfigurations): string {
   const key = JSON.stringify({
+    // SMTP specific fields
     host: config.host,
     port: config.port,
     secure: config.secure,
@@ -84,15 +157,33 @@ function createConfigHash(config: MailConfigurations): string {
 }
 
 /**
+ * Get hash for any mailer config
+ */
+function getMailerHash(config: MailConfigurations): string {
+  if (isSesConfig(config)) {
+    return `ses_${config.region}_${config.accessKeyId}`;
+  }
+  return createConfigHash(config);
+}
+
+/**
  * Get or create a mailer transporter from the pool
  * Nodemailer is eagerly loaded at import time
  */
-export function getMailer(config: MailConfigurations): Transporter {
+export async function getMailer(config: MailConfigurations): Promise<Transporter> {
+  if (moduleExists === null && nodemailerLoadPromise) {
+    await nodemailerLoadPromise;
+  }
+
   if (moduleExists === false) {
     throw new Error(`nodemailer is not installed.\n\n${NODEMAILER_INSTALL_INSTRUCTIONS}`);
   }
 
-  const hash = createConfigHash(config);
+  if (isSesConfig(config)) {
+    return getSesMailer(config);
+  }
+
+  const hash = getMailerHash(config);
 
   // Return existing transporter if available
   const existingTransporter = mailerPool.get(hash);
@@ -125,7 +216,7 @@ export function getMailer(config: MailConfigurations): Transporter {
  * Verify a mailer connection
  */
 export async function verifyMailer(config: MailConfigurations): Promise<boolean> {
-  const transporter = getMailer(config);
+  const transporter = await getMailer(config);
 
   try {
     await transporter.verify();
@@ -139,7 +230,7 @@ export async function verifyMailer(config: MailConfigurations): Promise<boolean>
  * Close a specific mailer connection
  */
 export function closeMailer(config: MailConfigurations): void {
-  const hash = createConfigHash(config);
+  const hash = getMailerHash(config);
   const transporter = mailerPool.get(hash);
 
   if (transporter) {
