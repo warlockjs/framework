@@ -35,6 +35,7 @@ import type {
 import { dataSourceRegistry } from "../../data-source/data-source-registry";
 import { DatabaseDirtyTracker } from "../../database-dirty-tracker";
 import { TransactionRollbackError } from "../../errors/transaction-rollback.error";
+import { type SQLSerializer } from "../../migration/sql-serializer";
 import type { ModelDefaults } from "../../types";
 import { isValidDateValue } from "../../utils/is-valid-date-value";
 import { MongoDBBlueprint } from "./mongodb-blueprint";
@@ -907,6 +908,26 @@ export class MongoDbDriver implements DriverContract {
     baseOptions.session = session;
 
     return baseOptions;
+  }
+
+  // ============================================================
+  // SQL Compatibility Operations (Not supported in MongoDB)
+  // ============================================================
+
+  /**
+   * Return a SQL serializer for this driver's dialect.
+   * Not supported for MongoDB.
+   */
+  public getSQLSerializer(): SQLSerializer {
+    throw new Error("MongoDB driver does not support SQL serialization.");
+  }
+
+  /**
+   * Execute a raw SQL query.
+   * Not supported for MongoDB.
+   */
+  public async query<T = unknown>(_sql: string, _params?: unknown[]): Promise<any> {
+    throw new Error("MongoDB driver does not support raw SQL queries.");
   }
 
   // ============================================================

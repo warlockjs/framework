@@ -372,7 +372,11 @@ export class MigrationRunner {
     const taggedStatements: TaggedSQL[] = [];
     const migrationsData: MigrationData[] = [];
 
-    // 1. Collect SQL from each pending migration
+    // 1. Collect SQL from each pending migration.
+    //    Fire extension checks concurrently as we encounter CREATE EXTENSION
+    //    statements — they resolve before execution begins.
+    const extensionChecks: Promise<void>[] = [];
+
     for (const MigrationClass of pending) {
       const migration = this.createMigrationInstance(MigrationClass);
       const name = MigrationClass.migrationName;
@@ -383,23 +387,39 @@ export class MigrationRunner {
       migrationsData.push({ MigrationClass, migration, name });
 
       for (const sql of upStatements) {
+        const statementType = SQLGrammar.classify(sql);
+
+        if (statementType === "CREATE_EXTENSION") {
+          const ext = SQLGrammar.extractExtensionName(sql);
+          if (ext) extensionChecks.push(this.informIfExtensionMissing(ext));
+        }
+
         taggedStatements.push({
           sql,
-          phase: SQLGrammar.classify(sql),
+          phase: SQLGrammar.phase(sql),
+          statementType,
           createdAt: MigrationClass.createdAt,
           migrationName: name,
         });
       }
     }
 
-    // 2. Sort all SQL statements globally across all pending migrations
+    // 2. Resolve all extension checks before any SQL is executed.
+    //    Each check displays a rich message if the extension is missing
+    //    but does not throw — execution continues and Postgres will
+    //    surface its own error with full context already shown.
+    await Promise.all(extensionChecks);
+
+    // 3. Sort all SQL statements globally across all pending migrations
     const sortedStatements = SQLGrammar.sort(taggedStatements);
 
-    // 3. Execute in a single batch
+    // 4. Execute in a single batch
     if (dryRun) {
       log.info("database", "migration", "Dry run enabled. Would execute the following statements:");
       for (const statement of sortedStatements) {
-        console.log(`-- Phase ${statement.phase} [${statement.migrationName}]`);
+        console.log(
+          `-- [${statement.statementType}] Phase ${statement.phase} [${statement.migrationName}]`,
+        );
         console.log(statement.sql + ";\n");
       }
       return [];
@@ -537,7 +557,8 @@ export class MigrationRunner {
       for (const sql of migration.toSQL()) {
         upStatements.push({
           sql,
-          phase: SQLGrammar.classify(sql),
+          phase: SQLGrammar.phase(sql),
+          statementType: SQLGrammar.classify(sql),
           createdAt: MigrationClass.createdAt,
           migrationName: name,
         });
@@ -548,7 +569,8 @@ export class MigrationRunner {
       for (const sql of migration.toSQL()) {
         downStatements.push({
           sql,
-          phase: SQLGrammar.classify(sql),
+          phase: SQLGrammar.phase(sql),
+          statementType: SQLGrammar.classify(sql),
           createdAt: MigrationClass.createdAt,
           migrationName: name,
         });
@@ -693,6 +715,54 @@ export class MigrationRunner {
         batch: record?.batch ?? null,
       };
     });
+  }
+
+  // ============================================================================
+  // EXTENSION PRE-FLIGHT
+  // ============================================================================
+
+  /**
+   * Check whether a database extension is available and inform the developer
+   * if it is not installed.
+   *
+   * Does NOT throw — execution proceeds normally. If the extension is truly
+   * missing, the database will surface its own error with full context already
+   * displayed to the developer.
+   *
+   * @example
+   * await this.informIfExtensionMissing("vector");
+   */
+  private async informIfExtensionMissing(extension: string): Promise<void> {
+    try {
+      const migrationDriver = this.getMigrationDriver();
+      const isAvailable = await migrationDriver.isExtensionAvailable(extension);
+
+      if (!isAvailable) {
+        const hr = "─".repeat(60);
+        console.log(`\n${colors.yellow(hr)}`);
+        console.log(colors.yellow(`  ⚠  Missing Database Extension: ${colors.bold(extension)}`));
+        console.log(colors.yellow(hr));
+        console.log();
+        console.log(`  A pending migration requires the ${colors.cyan(extension)} extension,`);
+        console.log(`  which is not installed on your database server.`);
+        console.log();
+        console.log(
+          `  ${colors.bold("This means the physical database server is missing the extension package.")}`,
+        );
+        console.log(`  You cannot simply run CREATE EXTENSION until the package is installed`);
+        console.log(`  on the host machine or Docker container.`);
+        console.log();
+
+        const docsUrl = migrationDriver.getExtensionDocsUrl(extension);
+        if (docsUrl) {
+          console.log(`  ${colors.bold("Or follow the installation guide:")}`);
+          console.log(`    ${colors.cyan(docsUrl)}`);
+        }
+        console.log(`\n${colors.yellow(hr)}\n`);
+      }
+    } catch {
+      // If the check itself fails, silently skip — don't break the migration.
+    }
   }
 
   // ============================================================================
@@ -861,7 +931,7 @@ export class MigrationRunner {
    */
   private formatSQLForExport(statements: TaggedSQL[]): string {
     const lines: string[] = [];
-    
+
     // Group statements by their phase and migration name
     const grouped = new Map<string, string[]>();
 

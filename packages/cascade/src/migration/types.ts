@@ -145,6 +145,35 @@ export interface RollbackOptions {
 }
 
 /**
+ * Semantic classification of a SQL statement, independent of execution phase.
+ *
+ * Used by SQLGrammar.classify() to identify what kind of DDL/DML a statement
+ * represents — useful for pre-flight checks, dry-run display, and selective
+ * filtering outside the migration pipeline.
+ */
+export type SQLStatementType =
+  | "CREATE_EXTENSION"
+  | "CREATE_SCHEMA"
+  | "CREATE_TYPE"
+  | "CREATE_DOMAIN"
+  | "CREATE_TABLE"
+  | "DROP_TABLE"
+  | "TRUNCATE_TABLE"
+  | "RENAME_TABLE"
+  | "ADD_COLUMN"
+  | "DROP_COLUMN"
+  | "MODIFY_COLUMN"
+  | "RENAME_COLUMN"
+  | "ADD_FOREIGN_KEY"
+  | "DROP_FOREIGN_KEY"
+  | "ADD_PRIMARY_KEY"
+  | "DROP_PRIMARY_KEY"
+  | "CREATE_INDEX"
+  | "CREATE_UNIQUE_INDEX"
+  | "DROP_INDEX"
+  | "RAW";
+
+/**
  * A tagged SQL statement with phase and ordering information.
  */
 export type TaggedSQL = {
@@ -152,6 +181,8 @@ export type TaggedSQL = {
   sql: string;
   /** Phase 1-6 for ordering */
   phase: 1 | 2 | 3 | 4 | 5 | 6;
+  /** Semantic statement type — what the statement does */
+  statementType: SQLStatementType;
   /** Date string for within-phase ordering */
   createdAt?: string;
   /** Migration name for within-phase tiebreaking */

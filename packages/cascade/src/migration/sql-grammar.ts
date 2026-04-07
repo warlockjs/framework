@@ -1,16 +1,30 @@
-import type { TaggedSQL } from "./types";
+import type { SQLStatementType, TaggedSQL } from "./types";
 
 /**
- * Parses and sorts SQL statements globally based on their execution phase.
+ * Parses and sorts SQL statements globally based on their execution phase,
+ * and classifies statements by their semantic type.
  */
 export class SQLGrammar {
   /**
-   * Classify a raw SQL statement into one of the 6 execution phases.
+   * Determine the execution phase of a SQL statement (1–6).
    *
-   * @param sql The SQL statement
-   * @returns Phase 1-6
+   * Phase ordering ensures DDL operations run in dependency-safe order
+   * regardless of which migration file they originate from.
+   *
+   * | Phase | Statements                                    |
+   * |-------|-----------------------------------------------|
+   * | 1     | CREATE EXTENSION, TYPE, DOMAIN, SCHEMA        |
+   * | 2     | CREATE TABLE                                  |
+   * | 3     | ADD COLUMN, ADD PRIMARY KEY                   |
+   * | 4     | CREATE INDEX, ADD FOREIGN KEY                 |
+   * | 5     | DROP COLUMN, ALTER COLUMN, DROP TABLE         |
+   * | 6     | Raw / unclassified                            |
+   *
+   * @example
+   * SQLGrammar.phase("CREATE EXTENSION IF NOT EXISTS vector"); // => 1
+   * SQLGrammar.phase("ALTER TABLE users ADD COLUMN email TEXT"); // => 3
    */
-  public static classify(sql: string): 1 | 2 | 3 | 4 | 5 | 6 {
+  public static phase(sql: string): 1 | 2 | 3 | 4 | 5 | 6 {
     const s = sql.trim().toUpperCase();
 
     // Phase 1: Preparation (Extensions, Enums, Domains, Types)
@@ -23,49 +37,102 @@ export class SQLGrammar {
       return 1;
     }
 
-    // Phase 2: Table Creation (CREATE TABLE ...)
+    // Phase 2: Table Creation
     if (s.startsWith("CREATE TABLE")) {
       return 2;
     }
 
-    // Phase 3: Column Creation (ALTER TABLE ... ADD COLUMN ... without references)
-    // Actually, our PostgresSQLSerializer generates ADD COLUMN, DROP COLUMN, etc.
-    // Let's distinguish destructive and non-destructive ALTERs.
+    // Phase 3 / 4 / 5: ALTER TABLE — broken down by clause
     if (s.startsWith("ALTER TABLE")) {
-      if (s.includes("ADD CONSTRAINT") && s.includes("FOREIGN KEY")) {
-        // Phase 4: Indexes & Constraints
-        return 4;
-      }
-      if (s.includes("DROP COLUMN") || s.includes("DROP CONSTRAINT") || s.includes("ALTER COLUMN")) {
-        // Phase 5: Destructive Column Modification
-        return 5;
-      }
-      if (s.includes("ADD COLUMN")) {
-        // Phase 3: Column Addition
-        return 3;
-      }
-      if (s.includes("ADD CONSTRAINT") && s.includes("PRIMARY KEY")) {
-        // Primary keys can be phase 3 or 4, usually 3 is fine before FKs
-        return 3;
-      }
+      if (s.includes("ADD CONSTRAINT") && s.includes("FOREIGN KEY")) return 4;
+      if (s.includes("DROP COLUMN") || s.includes("DROP CONSTRAINT") || s.includes("ALTER COLUMN")) return 5;
+      if (s.includes("ADD COLUMN")) return 3;
+      if (s.includes("ADD CONSTRAINT") && s.includes("PRIMARY KEY")) return 3;
     }
 
-    // Phase 4: Indexes & Constraints
+    // Phase 4: Index Creation
     if (s.startsWith("CREATE INDEX") || s.startsWith("CREATE UNIQUE INDEX")) {
       return 4;
     }
 
-    // Phase 5: Table and Database Drops/Destructive Operations
+    // Phase 5: Destructive table/index operations
     if (s.startsWith("DROP TABLE") || s.startsWith("TRUNCATE TABLE") || s.startsWith("DROP INDEX")) {
       return 5;
     }
 
-    // Phase 6: Raw/Unclassified statements (Data manipulation, triggers, procedures, views)
+    // Phase 6: Raw / unclassified (DML, triggers, procedures, views)
     return 6;
   }
 
   /**
-   * Sort an array of tagged SQL statements sequentially by phase, then by creation date, then by migration name.
+   * Classify a SQL statement into its semantic statement type.
+   *
+   * This is independent of execution phase — it identifies *what* a statement
+   * does, not *when* it should run. Use this for pre-flight checks, dry-run
+   * display, selective filtering, and extension detection.
+   *
+   * @example
+   * SQLGrammar.classify("CREATE EXTENSION IF NOT EXISTS vector");
+   * // => "CREATE_EXTENSION"
+   *
+   * SQLGrammar.classify("ALTER TABLE users ADD COLUMN email TEXT");
+   * // => "ADD_COLUMN"
+   */
+  public static classify(sql: string): SQLStatementType {
+    const s = sql.trim().toUpperCase();
+
+    if (s.startsWith("CREATE EXTENSION")) return "CREATE_EXTENSION";
+    if (s.startsWith("CREATE SCHEMA")) return "CREATE_SCHEMA";
+    if (s.startsWith("CREATE TYPE")) return "CREATE_TYPE";
+    if (s.startsWith("CREATE DOMAIN")) return "CREATE_DOMAIN";
+    if (s.startsWith("CREATE TABLE")) return "CREATE_TABLE";
+    if (s.startsWith("DROP TABLE")) return "DROP_TABLE";
+    if (s.startsWith("TRUNCATE TABLE")) return "TRUNCATE_TABLE";
+    if (s.startsWith("DROP INDEX")) return "DROP_INDEX";
+
+    // Must check UNIQUE before plain INDEX to avoid misclassification
+    if (s.startsWith("CREATE UNIQUE INDEX")) return "CREATE_UNIQUE_INDEX";
+    if (s.startsWith("CREATE INDEX")) return "CREATE_INDEX";
+
+    if (s.startsWith("ALTER TABLE")) {
+      if (s.includes("ADD CONSTRAINT") && s.includes("FOREIGN KEY")) return "ADD_FOREIGN_KEY";
+      if (s.includes("DROP CONSTRAINT") && s.includes("FOREIGN KEY")) return "DROP_FOREIGN_KEY";
+      if (s.includes("ADD CONSTRAINT") && s.includes("PRIMARY KEY")) return "ADD_PRIMARY_KEY";
+      if (s.includes("DROP CONSTRAINT")) return "DROP_PRIMARY_KEY";
+      if (s.includes("ADD COLUMN")) return "ADD_COLUMN";
+      if (s.includes("DROP COLUMN")) return "DROP_COLUMN";
+      if (s.includes("RENAME COLUMN")) return "RENAME_COLUMN";
+      if (s.includes("RENAME TO")) return "RENAME_TABLE";
+      if (s.includes("ALTER COLUMN")) return "MODIFY_COLUMN";
+    }
+
+    return "RAW";
+  }
+
+  /**
+   * Extract the extension name from a CREATE EXTENSION statement.
+   *
+   * Returns undefined if the statement is not a CREATE EXTENSION statement
+   * or the name cannot be parsed.
+   *
+   * @example
+   * SQLGrammar.extractExtensionName("CREATE EXTENSION IF NOT EXISTS vector");
+   * // => "vector"
+   *
+   * SQLGrammar.extractExtensionName("CREATE EXTENSION postgis");
+   * // => "postgis"
+   */
+  public static extractExtensionName(sql: string): string | undefined {
+    // Matches: CREATE EXTENSION [IF NOT EXISTS] <name>
+    const match = sql
+      .trim()
+      .match(/^CREATE\s+EXTENSION\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/i);
+
+    return match?.[1]?.toLowerCase();
+  }
+
+  /**
+   * Sort an array of tagged SQL statements by phase, then creation date, then migration name.
    */
   public static sort(statements: TaggedSQL[]): TaggedSQL[] {
     return statements.slice().sort((a, b) => {

@@ -726,6 +726,28 @@ export class MongoMigrationDriver implements MigrationDriverContract {
   }
 
   // ============================================================================
+  // EXTENSIONS
+  // ============================================================================
+
+  /**
+   * Check if a database extension is available (no-op for MongoDB).
+   *
+   * @param _extension - Extension name
+   */
+  public async isExtensionAvailable(_extension: string): Promise<boolean> {
+    return true; // MongoDB doesn't use SQL extensions
+  }
+
+  /**
+   * Get the official documentation or installation URL for a database extension.
+   *
+   * @param _extension - Extension name
+   */
+  public getExtensionDocsUrl(_extension: string): string | undefined {
+    return undefined; // MongoDB doesn't use SQL extensions
+  }
+
+  // ============================================================================
   // RAW ACCESS
   // ============================================================================
 

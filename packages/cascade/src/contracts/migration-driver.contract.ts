@@ -623,6 +623,26 @@ export interface MigrationDriverContract {
   getUuidDefault(migrationDefaults?: MigrationDefaults): string | undefined;
 
   // ============================================================================
+  // EXTENSIONS
+  // ============================================================================
+
+  /**
+   * Check if a database extension/plugin is available on the database server.
+   *
+   * @param extension - Name of the extension
+   * @returns true if available, or if the database doesn't require explicit extension installation
+   */
+  isExtensionAvailable(extension: string): Promise<boolean>;
+
+  /**
+   * Get the official documentation or installation URL for a database extension.
+   *
+   * @param extension - Extension name
+   * @returns URL string, or undefined to fall back to a generic search approach
+   */
+  getExtensionDocsUrl(extension: string): string | undefined;
+
+  // ============================================================================
   // RAW ACCESS
   // ============================================================================
 

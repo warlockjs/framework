@@ -723,6 +723,46 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
   }
 
   // ============================================================================
+  // EXTENSIONS
+  // ============================================================================
+
+  /**
+   * Check if a PostgreSQL extension is available on the database server.
+   *
+   * @param extension - Extension name (e.g., "vector")
+   */
+  public async isExtensionAvailable(extension: string): Promise<boolean> {
+    try {
+      const result = await this.driver.query<{ name: string }>(
+        `SELECT name FROM pg_available_extensions WHERE name = $1`,
+        [extension],
+      );
+
+      return result?.rows?.length > 0;
+    } catch {
+      // If we can't check (e.g., permissions issue or pg_available_extensions not accessible),
+      // we return true to avoid false positives. Execution will just proceed and fail naturally if it's missing.
+      return true;
+    }
+  }
+
+  /**
+   * Get the official documentation or installation URL for a PostgreSQL extension.
+   *
+   * @param extension - Extension name
+   */
+  public getExtensionDocsUrl(extension: string): string | undefined {
+    const guideUrls: Record<string, string> = {
+      vector: "https://github.com/pgvector/pgvector#installation",
+      postgis: "https://postgis.net/documentation/getting_started/",
+      pg_trgm: "https://www.postgresql.org/docs/current/pgtrgm.html",
+      uuid_ossp: "https://www.postgresql.org/docs/current/uuid-ossp.html",
+    };
+
+    return guideUrls[extension] ?? `https://www.postgresql.org/docs/current/${extension}.html`;
+  }
+
+  // ============================================================================
   // CONSTRAINTS
   // ============================================================================
 
