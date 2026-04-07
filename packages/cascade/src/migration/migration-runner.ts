@@ -529,26 +529,29 @@ export class MigrationRunner {
   }
 
   /**
-   * Export pending migrations as phase-ordered SQL files in database/sql/ directory.
+   * Export migrations as phase-ordered SQL files in database/sql/ directory.
+   * By default, it exports all registered migrations. Use `pendingOnly: true` to export only pending ones.
    */
-  public async exportSQL(): Promise<void> {
-    const pending = await this.getPendingMigrations();
+  public async exportSQL(options: { pendingOnly?: boolean; compact?: boolean } = {}): Promise<void> {
+    const migrationsToExport = options.pendingOnly
+      ? await this.getPendingMigrations()
+      : this.migrations;
 
-    if (pending.length === 0) {
-      log.warn("database", "migration", "No pending migrations to export.");
+    if (migrationsToExport.length === 0) {
+      log.warn("database", "migration", "No migrations to export.");
       return;
     }
 
     log.info(
       "database",
       "migration",
-      `Exporting ${pending.length} pending migration(s) to SQL files...`,
+      `Exporting ${migrationsToExport.length} ${options.pendingOnly ? "pending " : ""}migration(s) to SQL files...`,
     );
 
     const upStatements: TaggedSQL[] = [];
     const downStatements: TaggedSQL[] = [];
 
-    for (const MigrationClass of pending) {
+    for (const MigrationClass of migrationsToExport) {
       const migration = this.createMigrationInstance(MigrationClass);
       const name = MigrationClass.migrationName;
 
@@ -581,8 +584,8 @@ export class MigrationRunner {
     // Down SQL: reverse order (undo in reverse dependency order)
     const sortedDown = downStatements.reverse();
 
-    const upSQLString = this.formatSQLForExport(sortedUp);
-    const downSQLString = this.formatSQLForExport(sortedDown);
+    const upSQLString = this.formatSQLForExport(sortedUp, options.compact);
+    const downSQLString = this.formatSQLForExport(sortedDown, options.compact);
 
     const rootPath = process.cwd();
     const sqlDir = path.join(rootPath, "database", "sql");
@@ -929,8 +932,16 @@ export class MigrationRunner {
    *
    * @internal
    */
-  private formatSQLForExport(statements: TaggedSQL[]): string {
+  private formatSQLForExport(statements: TaggedSQL[], compact: boolean = false): string {
     const lines: string[] = [];
+
+    if (compact) {
+      // Just output raw statements, no grouping, no blank lines
+      for (const stmt of statements) {
+        lines.push(`${stmt.sql};`);
+      }
+      return lines.join("\n");
+    }
 
     // Group statements by their phase and migration name
     const grouped = new Map<string, string[]>();
