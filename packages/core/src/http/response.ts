@@ -1,3 +1,4 @@
+import type { CookieSerializeOptions } from "@fastify/cookie";
 import config from "@mongez/config";
 import type { EventSubscription } from "@mongez/events";
 import events from "@mongez/events";
@@ -16,6 +17,8 @@ import type { Route } from "../router";
 import { renderReact } from "./../react";
 import type { Request } from "./request";
 import type { ResponseEvent, ResponseSSEController, ResponseStreamController } from "./types";
+
+type CookieValue = string | number | boolean | Record<string, any> | Array<any>;
 
 export enum ResponseStatus {
   OK = 200,
@@ -793,6 +796,32 @@ export class Response {
    */
   public header(key: string, value: any) {
     this.baseResponse.header(key, value);
+
+    return this;
+  }
+
+  /**
+   * Set a cookie on the response
+   *
+   * @example
+   * response.cookie('theme', 'dark', { maxAge: 3600, httpOnly: true })
+   */
+  public cookie(name: string, value: CookieValue, options?: CookieSerializeOptions) {
+    const defaultOptions = config.get("http.cookies.options", {});
+    this.baseResponse.setCookie(name, JSON.stringify(value), { ...defaultOptions, ...options });
+
+    return this;
+  }
+
+  /**
+   * Clear a cookie from the response
+   *
+   * @example
+   * response.clearCookie('token', { path: '/' });
+   */
+  public clearCookie(name: string, options?: CookieSerializeOptions) {
+    const defaultOptions = config.get("http.cookies.options", {});
+    this.baseResponse.clearCookie(name, { ...defaultOptions, ...options });
 
     return this;
   }

@@ -208,6 +208,33 @@ export class Request<RequestValidation = any> {
   }
 
   /**
+   * Get all cookies from the current request
+   */
+  public get cookies(): Record<string, string | undefined> {
+    return this.baseRequest.cookies || {};
+  }
+
+  /**
+   * Get a particular cookie value or fallback to default
+   */
+  public cookie(name: string, defaultValue?: any): string | any {
+    const value = this.cookies[name] ?? defaultValue;
+
+    try {
+      return JSON.parse(value);
+    } catch (error) {
+      return value;
+    }
+  }
+
+  /**
+   * Determine if the request has the specified cookie
+   */
+  public hasCookie(name: string): boolean {
+    return this.cookies[name] !== undefined;
+  }
+
+  /**
    * Get the current request domain
    */
   public get domain() {

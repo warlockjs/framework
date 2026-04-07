@@ -45,20 +45,47 @@ Or with your preferred package manager:
 `.trim();
 
 /**
+ * Atomic initialization promise to handle concurrent calls to loadS3
  */
-async function loadS3() {
-  try {
-    // load @aws-sdk/client-s3
-    S3Client = await import("@aws-sdk/client-s3");
-    // load @aws-sdk/lib-storage
-    S3Storage = await import("@aws-sdk/lib-storage");
-    // load @aws-sdk/s3-request-presigner
-    S3Presigner = await import("@aws-sdk/s3-request-presigner");
+let initializationPromise: Promise<void> | null = null;
 
-    isModuleExists = true;
-  } catch {
-    isModuleExists = false;
-  }
+/**
+ * Load S3 modules lazily
+ *
+ * @example
+ * await loadS3();
+ * if (isModuleExists) {
+ *   // Safe to use S3Client, S3Storage, S3Presigner
+ * }
+ */
+export async function loadS3(): Promise<void> {
+  // If already successfully loaded, no need to do anything
+  if (isModuleExists === true) return;
+
+  // If currently loading, return the existing promise so the caller waits
+  if (initializationPromise) return initializationPromise;
+
+  initializationPromise = (async () => {
+    try {
+      // Use Promise.all to load modules in parallel for efficiency
+      const [client, storage, presigner] = await Promise.all([
+        import("@aws-sdk/client-s3"),
+        import("@aws-sdk/lib-storage"),
+        import("@aws-sdk/s3-request-presigner"),
+      ]);
+
+      S3Client = client;
+      S3Storage = storage;
+      S3Presigner = presigner;
+
+      isModuleExists = true;
+    } catch {
+      // Mark as failed if any import fails (usually means packages aren't installed)
+      isModuleExists = false;
+    }
+  })();
+
+  return initializationPromise;
 }
 
 loadS3();

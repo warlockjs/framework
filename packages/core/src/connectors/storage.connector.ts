@@ -1,4 +1,5 @@
 import { storage } from "../storage";
+import { loadS3 } from "../storage/drivers/cloud-driver";
 import { BaseConnector } from "./base-connector";
 import { ConnectorPriority } from "./types";
 
@@ -19,7 +20,12 @@ export class StorageConnector extends BaseConnector {
    * Initialize cache connection
    */
   public async start(): Promise<void> {
+    console.log("Starting storage connector");
+
+    await loadS3();
     await storage.init();
+
+    console.log("Storage connector started");
 
     this.active = true;
   }

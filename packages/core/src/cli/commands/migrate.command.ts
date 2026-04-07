@@ -38,7 +38,18 @@ export const migrateCommand = command({
     },
     {
       text: "--sql, -s",
-      description: "Export pending migrations as phase-ordered SQL files instead of executing them",
+      description: "Export all migrations as phase-ordered SQL files instead of executing them",
+      type: "boolean",
+    },
+    {
+      text: "--pending-only",
+      description: "When used with --sql, exports only pending migrations instead of all",
+      type: "boolean",
+    },
+    {
+      text: "--compact, -c",
+      description:
+        "When used with --sql, strips out generated comments and blank lines to reduce file size",
       type: "boolean",
     },
   ],

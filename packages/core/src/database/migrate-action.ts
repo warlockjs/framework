@@ -57,7 +57,7 @@ async function allMigrationsFilesAction() {
  * If rollback is provided, then run the migration runner against all files in reverse order
  */
 export async function migrateAction(options: CommandActionData) {
-  const { fresh, path, rollback, all, list, sql } = options.options;
+  const { fresh, path, rollback, all, list, sql, pendingOnly, compact } = options.options;
 
   if (list) {
     return await listMigrationsAction();
@@ -85,7 +85,7 @@ export async function migrateAction(options: CommandActionData) {
   if (rollback) return;
 
   if (sql) {
-    await migrationRunner.exportSQL();
+    await migrationRunner.exportSQL({ pendingOnly: pendingOnly as boolean, compact: compact as boolean });
   } else {
     await migrationRunner.runAll();
   }

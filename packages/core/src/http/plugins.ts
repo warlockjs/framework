@@ -39,4 +39,10 @@ export async function registerHttpPlugins(server: FastifyInstance) {
     root: config.get("storage.publicRoot", rootPath("public")),
     prefix: config.get("storage.publicPrefix", "/public/"),
   });
+
+  // 👇🏻 register cookie plugin
+  server.register(import("@fastify/cookie"), {
+    secret: config.get("http.cookies.secret"), // Optional: allow signed cookies
+    parseOptions: config.get("http.cookies.options", {}),
+  });
 }

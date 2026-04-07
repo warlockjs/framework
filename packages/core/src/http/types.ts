@@ -1,3 +1,4 @@
+import type { CookieSerializeOptions } from "@fastify/cookie";
 import type { FastifyCorsOptions } from "@fastify/cors";
 import React from "react";
 import type { Middleware } from "../router";
@@ -142,6 +143,16 @@ export interface HttpConfigurations {
    * @default 10MB
    */
   fileUploadLimit?: number;
+  cookies?: {
+    /**
+     * Secret key for signed cookies
+     */
+    secret?: string;
+    /**
+     * Default cookie options
+     */
+    options?: CookieSerializeOptions;
+  };
   /**
    * Rate limit
    */
