@@ -4,7 +4,7 @@ import type React from "react";
 /**
  * AWS SES mail configuration
  */
-export type SesConfigurations = {
+export type SESConfigurations = {
   driver: "ses";
   accessKeyId: string;
   secretAccessKey: string;
@@ -15,7 +15,7 @@ export type SesConfigurations = {
 /**
  * Any mail configuration (SMTP or SES)
  */
-export type MailConfigurations = SmtpConfigurations | SesConfigurations;
+export type MailConfigurations = SMTPConfigurations | SESConfigurations;
 
 /**
  * Mail mode determines how emails are handled
@@ -122,7 +122,7 @@ export type MailAttachment = {
  * });
  * ```
  */
-export type SmtpConfigurations = SMTPTransport.Options & {
+export type SMTPConfigurations = SMTPTransport.Options & {
   /**
    * Transport driver type
    */

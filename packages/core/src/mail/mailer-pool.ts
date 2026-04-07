@@ -1,7 +1,7 @@
 import { log } from "@warlock.js/logger";
 import type nodemailer from "nodemailer";
 import type { Transporter } from "nodemailer";
-import type { MailConfigurations, SesConfigurations, SmtpConfigurations } from "./types";
+import type { MailConfigurations, SESConfigurations, SMTPConfigurations } from "./types";
 
 // ============================================================
 // Eager-loaded Nodemailer Module
@@ -82,15 +82,15 @@ async function loadSesModule() {
 
 sesLoadPromise = loadSesModule();
 
-function isSesConfig(config: MailConfigurations): config is SesConfigurations {
+function isSesConfig(config: MailConfigurations): config is SESConfigurations {
   return "driver" in config && config.driver === "ses";
 }
 
-async function getSesMailer(config: SesConfigurations): Promise<Transporter> {
+async function getSesMailer(config: SESConfigurations): Promise<Transporter> {
   if (sesModuleExists === null && sesLoadPromise) {
     await sesLoadPromise;
   }
-  
+
   if (sesModuleExists === false) {
     throw new Error(`@aws-sdk/client-sesv2 is not installed.\n\n${SES_INSTALL_INSTRUCTIONS}`);
   }
@@ -134,7 +134,7 @@ const mailerPool = new Map<string, Transporter>();
 /**
  * Create a hash from mail configuration for pooling
  */
-function createConfigHash(config: SmtpConfigurations): string {
+function createConfigHash(config: SMTPConfigurations): string {
   const key = JSON.stringify({
     // SMTP specific fields
     host: config.host,

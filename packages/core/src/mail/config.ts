@@ -1,9 +1,9 @@
-import type { MailConfigurations, MailersConfig, MailMode, SmtpConfigurations } from "./types";
+import type { MailConfigurations, MailersConfig, MailMode, SMTPConfigurations } from "./types";
 
 /**
  * Default mail configurations
  */
-const defaultConfigurations: Partial<SmtpConfigurations> = {
+const defaultConfigurations: Partial<SMTPConfigurations> = {
   secure: true,
   tls: true,
   driver: "smtp",
@@ -114,7 +114,7 @@ export function getDefaultMailConfig(): MailConfigurations {
   return {
     ...defaultConfigurations,
     ...config,
-  } as SmtpConfigurations;
+  } as SMTPConfigurations;
 }
 
 /**
@@ -135,7 +135,7 @@ export function getMailerConfig(name: string): MailConfigurations | undefined {
   return {
     ...defaultConfigurations,
     ...config,
-  } as SmtpConfigurations;
+  } as SMTPConfigurations;
 }
 
 /**
@@ -155,7 +155,7 @@ export function resolveMailConfig(options: {
     return {
       ...defaultConfigurations,
       ...options.config,
-    } as SmtpConfigurations;
+    } as SMTPConfigurations;
   }
 
   if (options.mailer) {

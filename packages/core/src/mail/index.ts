@@ -56,6 +56,8 @@ export type {
   MailResult,
   MailersConfig,
   NormalizedMail,
+  SESConfigurations,
+  SMTPConfigurations,
 } from "./types";
 
 export { MailError } from "./types";
