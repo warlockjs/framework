@@ -1,11 +1,21 @@
-import { BaseValidator } from "./base-validator";
-import { applyNullable } from "../standard-schema/json-schema";
 import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
+import { applyNullable } from "../standard-schema/json-schema";
+import { BaseValidator } from "./base-validator";
 
 /**
  * Any validator - accepts any value
  */
 export class AnyValidator extends BaseValidator {
+  /**
+   * Any validator means any value, so we disable the default required requirement.
+   */
+  public override requiredRule = null;
+
+  /**
+   * Set is optional to be true
+   */
+  public override isOptional = true;
+
   /**
    * @inheritdoc
    *
