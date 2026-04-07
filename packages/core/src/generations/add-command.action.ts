@@ -1,5 +1,11 @@
 import { colors } from "@mongez/copper";
-import { fileExistsAsync, jsonFileAsync, putFileAsync, putJsonFileAsync } from "@mongez/fs";
+import {
+  ensureDirectoryAsync,
+  fileExistsAsync,
+  jsonFileAsync,
+  putFileAsync,
+  putJsonFileAsync,
+} from "@mongez/fs";
 import { execSync } from "node:child_process";
 import { CommandActionData } from "../cli/types";
 import { rootPath, srcPath } from "../utils";
@@ -80,12 +86,72 @@ export default defineConfig({
   }
 }
 
+async function completeReactEmailInstallation(_options: CommandActionData) {
+  // 1. Create emails/ folder with a sample component
+  const emailsFolderPath = rootPath("emails");
+  const sampleEmailPath = rootPath("emails/welcome-email.tsx");
+
+  if (!(await fileExistsAsync(sampleEmailPath))) {
+    await ensureDirectoryAsync(emailsFolderPath);
+    await putFileAsync(
+      sampleEmailPath,
+      `import { Body, Container, Head, Html, Text } from "@react-email/components";
+import { Tailwind } from "@react-email/tailwind";
+
+interface WelcomeEmailProps {
+  name: string;
+}
+
+/**
+ * Sample welcome email component.
+ * Preview with: yarn email:preview
+ */
+export default function WelcomeEmail({ name }: WelcomeEmailProps) {
+  return (
+    <Html>
+      <Head />
+      <Tailwind>
+        <Body className="bg-gray-100 font-sans">
+          <Container className="mx-auto max-w-xl py-8 px-4">
+            <Text className="text-2xl font-bold text-gray-900">
+              Welcome, {name}!
+            </Text>
+            <Text className="text-gray-600 mt-2">
+              You're all set. We're glad to have you on board.
+            </Text>
+          </Container>
+        </Body>
+      </Tailwind>
+    </Html>
+  );
+}
+`,
+    );
+    console.log(`${colors.green("✓")} Created emails/welcome-email.tsx`);
+  }
+
+  // 2. Patch tsconfig.json — add "emails" to include if missing
+  const tsconfigPath = rootPath("tsconfig.json");
+  const tsconfig = await jsonFileAsync(tsconfigPath);
+
+  if (!tsconfig.include) {
+    tsconfig.include = [];
+  }
+
+  if (!tsconfig.include.includes("emails")) {
+    tsconfig.include.push("emails");
+    await putJsonFileAsync(tsconfigPath, tsconfig);
+    console.log(`${colors.green("✓")} Added "emails" to tsconfig.json include`);
+  }
+}
+
 const featuresMap: Record<
   string,
   {
     dependencies?: Record<string, string>;
     devDependencies?: Record<string, string>;
     description: string;
+    requires?: string[];
     script?: Record<string, string>;
     onExecuting?: (options: CommandActionData) => Promise<any>;
     ejectConfig?: {
@@ -94,6 +160,23 @@ const featuresMap: Record<
     };
   }
 > = {
+  "react-email": {
+    description: "Installs react-email for building email templates with React and Tailwind",
+    requires: ["mail", "react"],
+    dependencies: {
+      "react-email": "^5.2.10",
+      "@react-email/components": "^1.0.11",
+      "@react-email/render": "^2.0.5",
+      "@react-email/tailwind": "^2.0.7",
+    },
+    devDependencies: {
+      "@react-email/preview-server": "5.2.10",
+    },
+    script: {
+      "email:preview": "npx react-email dev",
+    },
+    onExecuting: completeReactEmailInstallation,
+  },
   react: {
     description:
       "Installs React and React dom for rendering React components (non-interactive), useful for sending mails and generating HTML",
@@ -115,10 +198,10 @@ const featuresMap: Record<
   mail: {
     description: "Installs nodemailer for sending emails",
     dependencies: {
-      nodemailer: "^6.9.14",
+      nodemailer: "^8.0.5",
     },
     devDependencies: {
-      "@types/nodemailer": "^7.0.4",
+      "@types/nodemailer": "^8.0.0",
     },
   },
   ses: {
@@ -213,6 +296,25 @@ const allowedFeatures = Object.keys(featuresMap);
 
 type PackageManager = "yarn" | "pnpm" | "npm";
 
+function resolveFeatures(features: string[], visited = new Set<string>()): string[] {
+  const resolved: string[] = [];
+
+  for (const feature of features) {
+    if (visited.has(feature)) continue;
+    visited.add(feature);
+
+    const def = featuresMap[feature];
+
+    if (def.requires?.length) {
+      resolved.push(...resolveFeatures(def.requires, visited));
+    }
+
+    resolved.push(feature);
+  }
+
+  return resolved;
+}
+
 export async function addCommandAction(options: CommandActionData) {
   const features = options.args;
   const { packageManager, list } = options.options;
@@ -231,12 +333,14 @@ export async function addCommandAction(options: CommandActionData) {
 
   validateFeatures(features);
 
+  const resolvedFeatures = resolveFeatures(features);
+
   const dependencies: Record<string, string> = {};
   const devDependencies: Record<string, string> = {};
   const ejectConfigs: Record<string, { content: string; name: string }> = {};
   const scripts: Record<string, string> = {};
 
-  for (const feature of features) {
+  for (const feature of resolvedFeatures) {
     const featurePackages = featuresMap[feature as keyof typeof featuresMap];
     Object.assign(dependencies, featurePackages.dependencies);
     if (featurePackages.devDependencies) {
@@ -318,7 +422,7 @@ export async function addCommandAction(options: CommandActionData) {
   }
 
   // now loop again over features to execute onExecuting
-  for (const feature of features) {
+  for (const feature of resolvedFeatures) {
     const featurePackages = featuresMap[feature as keyof typeof featuresMap];
     if (featurePackages.onExecuting) {
       await featurePackages.onExecuting(options);

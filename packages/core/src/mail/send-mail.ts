@@ -253,7 +253,7 @@ export async function sendMail(options: MailOptions): Promise<MailResult> {
   // Render React component if provided
   if (options.component) {
     try {
-      options.html = renderReactMail(options.component);
+      options.html = await renderReactMail(options.component);
     } catch (error) {
       const mailError = new MailError(
         `Failed to render React component: ${error instanceof Error ? error.message : "Unknown error"}`,

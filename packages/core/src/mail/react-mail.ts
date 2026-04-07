@@ -25,11 +25,24 @@ function createHtmlPage(html: string): string {
 /**
  * Render a React element to HTML for email
  *
+ * - Uses @react-email/render when installed (full react-email pipeline)
+ * - Falls back to react-dom/server renderToStaticMarkup otherwise
+ *
  * **Note:** This function requires React packages to be installed.
  * Install them with: `warlock add react` or `npm install react react-dom`
  */
-export function renderReactMail(element: React.ReactElement | React.ComponentType): string {
-  const content = renderReact(element);
+export async function renderReactMail(
+  element: React.ReactElement | React.ComponentType,
+): Promise<string> {
+  const React = await import("react");
+  const reactElement = typeof element === "function" ? React.createElement(element) : element;
 
-  return createHtmlPage(content);
+  try {
+    const { render } = await import("@react-email/render");
+    return await render(reactElement as React.ReactElement);
+  } catch {
+    // @react-email/render not installed — graceful fallback
+    const content = renderReact(reactElement);
+    return createHtmlPage(content);
+  }
 }
