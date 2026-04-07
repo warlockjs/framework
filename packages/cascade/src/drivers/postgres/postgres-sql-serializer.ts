@@ -155,7 +155,7 @@ export class PostgresSQLSerializer extends SQLSerializer {
   // COLUMN OPERATIONS
   // ============================================================================
 
-  private addColumn(table: string, column: ColumnDefinition): string {
+  private addColumn(table: string, column: ColumnDefinition): string | string[] {
     const quotedTable = this.dialect.quoteIdentifier(table);
     const quotedColumn = this.dialect.quoteIdentifier(column.name);
 
@@ -213,6 +213,13 @@ export class PostgresSQLSerializer extends SQLSerializer {
       if (column.unique) {
         sql += " UNIQUE";
       }
+    }
+
+    // pgvector: ensure the extension is active before the vector column is created.
+    // SQLGrammar classifies CREATE EXTENSION as Phase 1, so this will always
+    // run before any CREATE TABLE / ADD COLUMN statement regardless of batch order.
+    if (column.type === "vector") {
+      return ["CREATE EXTENSION IF NOT EXISTS vector", sql];
     }
 
     return sql;
