@@ -268,6 +268,19 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
   }
 
   /**
+   * Mark all schema fields as optional
+   */
+  public partial() {
+    const validationSchema = this.clone();
+
+    for (const key in validationSchema.schema) {
+      validationSchema.schema[key] = validationSchema.schema[key].optional();
+    }
+
+    return validationSchema;
+  }
+
+  /**
    * Create a new schema excluding the specified fields
    * Clones the current validator and removes the specified fields
    * **Preserves all configuration** (allowUnknown, stripUnknown, etc.)
