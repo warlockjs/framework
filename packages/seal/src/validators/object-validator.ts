@@ -3,11 +3,11 @@ import { isPlainObject } from "@mongez/supportive-is";
 import { setKeyPath } from "../helpers";
 import { objectTrimMutator, stripUnknownMutator } from "../mutators";
 import { objectRule, unknownKeyRule } from "../rules";
+import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
+import { applyNullable, wrapNullableStrict } from "../standard-schema/json-schema";
 import type { Schema, SchemaContext, ValidationResult } from "../types";
 import { BaseValidator } from "./base-validator";
 import { ComputedValidator } from "./computed-validator";
-import { applyNullable, wrapNullableStrict } from "../standard-schema/json-schema";
-import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 
 /**
  * Object validator class with generic schema type for proper type inference
@@ -268,13 +268,34 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
   }
 
   /**
-   * Mark all schema fields as optional
+   * Mark all or the given schema fields as optional
    */
-  public partial() {
+  public partial<K extends keyof TSchema>(...keys: K[]) {
     const validationSchema = this.clone();
 
-    for (const key in validationSchema.schema) {
+    if (keys.length === 0) {
+      keys = Object.keys(validationSchema.schema) as K[];
+    }
+
+    for (const key of keys) {
       validationSchema.schema[key] = validationSchema.schema[key].optional();
+    }
+
+    return validationSchema;
+  }
+
+  /**
+   * Make the all or the given fields as required
+   */
+  public requiredFields<K extends keyof TSchema>(...keys: K[]) {
+    const validationSchema = this.clone();
+
+    if (keys.length === 0) {
+      keys = Object.keys(validationSchema.schema) as K[];
+    }
+
+    for (const key of keys) {
+      validationSchema.schema[key] = validationSchema.schema[key].required();
     }
 
     return validationSchema;
