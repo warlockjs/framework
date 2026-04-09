@@ -197,7 +197,7 @@ export const ${singular.camel}Schema = v.object({
   // TODO: Add more fields
 });
 
-type ${singular.pascal}Schema = Infer<typeof ${singular.camel}Schema>;
+export type ${singular.pascal}Schema = Infer<typeof ${singular.camel}Schema>;
 
 @RegisterModel()
 export class ${singular.pascal} extends Model<${singular.pascal}Schema> {
@@ -534,7 +534,7 @@ const ${name.singular.camel}Schema = v.object({
   // TODO: Define model schema
 });
 
-type ${name.singular.pascal}Type = Infer<typeof ${name.singular.camel}Schema>;
+export type ${name.singular.pascal}Type = Infer<typeof ${name.singular.camel}Schema>;
 
 export class ${name.singular.pascal} extends Model<${name.singular.pascal}Type> {
   public static table = "${tableName}";

@@ -979,7 +979,16 @@ export class Request<RequestValidation = any> {
   /**
    * Get request headers
    */
-  public get headers() {
+  public get headers(): typeof this.baseRequest.headers {
     return this.baseRequest.headers;
+  }
+
+  /**
+   * Set the given header
+   */
+  public setHeader(key: HeaderKeys, value: string) {
+    this.baseRequest.headers[key.toLowerCase()] = value;
+
+    return this;
   }
 }

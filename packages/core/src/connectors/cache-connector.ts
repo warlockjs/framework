@@ -14,7 +14,7 @@ export class CacheConnector extends BaseConnector {
   /**
    * Files that trigger cache restart
    */
-  protected readonly watchedFiles = [".env", "src/config/cache.ts", "src/config/cache.tsx"];
+  protected readonly watchedFiles = ["src/config/cache.ts", "src/config/cache.tsx"];
 
   /**
    * Initialize cache connection

@@ -239,8 +239,10 @@ export class Resource implements ResourceContract {
       typeof outputSettings === "function" &&
       outputSettings.prototype instanceof Resource
     ) {
+      if (!value) return;
       // Nested resource — handle both single and array values
       if (Array.isArray(value)) {
+        if (value.length === 0) return;
         outputValue = value
           .map((item) => new (outputSettings as typeof Resource)(item).toJSON())
           .filter((v) => v !== undefined);

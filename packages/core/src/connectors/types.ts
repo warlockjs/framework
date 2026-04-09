@@ -46,6 +46,8 @@ export interface Connector {
 }
 
 export type ConnectorName =
+  | "logger"
+  | "mailer"
   | "http"
   | "database"
   | "cache"
@@ -57,9 +59,11 @@ export type ConnectorName =
  * Connector priority constants
  */
 export enum ConnectorPriority {
-  DATABASE = 1,
-  COMMUNICATOR = 2,
-  CACHE = 3,
-  HTTP = 4,
-  STORAGE = 5,
+  LOGGER = 0,
+  MAILER = 1,
+  DATABASE = 2,
+  COMMUNICATOR = 3,
+  CACHE = 4,
+  HTTP = 5,
+  STORAGE = 6,
 }

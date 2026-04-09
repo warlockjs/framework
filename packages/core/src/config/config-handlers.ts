@@ -1,5 +1,3 @@
-import { LogConfigurations, setLogConfigurations } from "../logger";
-import { MailConfigurations, setMailConfigurations } from "../mail";
 import { AppConfigurations } from "../utils/types";
 import { configSpecialHandlers } from "./config-special-handlers";
 
@@ -23,33 +21,3 @@ export const registerAppConfig = async (config: AppConfigurations) => {
 };
 
 configSpecialHandlers.register("app", registerAppConfig);
-
-/**
- * Log Config Handler
- * Sets log configurations in @warlock.js/core
- */
-export const registerLogConfig = async (logConfig: LogConfigurations) => {
-  try {
-    setLogConfigurations(logConfig);
-  } catch (error) {
-    // @warlock.js/core might not be available in all projects
-    console.warn("   ⚠️  Could not set log configurations");
-  }
-};
-
-configSpecialHandlers.register("log", registerLogConfig);
-
-/**
- * Mail Config Handler
- * Sets mail configurations in @warlock.js/core
- */
-export const registerMailConfig = async (mailConfig: MailConfigurations) => {
-  try {
-    setMailConfigurations(mailConfig);
-  } catch (error) {
-    // @warlock.js/core might not be available in all projects
-    console.warn("   ⚠️  Could not set mail configurations");
-  }
-};
-
-configSpecialHandlers.register("mail", registerMailConfig);

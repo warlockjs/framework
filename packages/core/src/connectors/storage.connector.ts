@@ -14,18 +14,14 @@ export class StorageConnector extends BaseConnector {
   /**
    * Files that trigger cache restart
    */
-  protected readonly watchedFiles = [".env", "src/config/storage.ts", "src/config/storage.tsx"];
+  protected readonly watchedFiles = ["src/config/storage.ts", "src/config/storage.tsx"];
 
   /**
    * Initialize cache connection
    */
   public async start(): Promise<void> {
-    console.log("Starting storage connector");
-
     await loadS3();
     await storage.init();
-
-    console.log("Storage connector started");
 
     this.active = true;
   }

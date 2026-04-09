@@ -4,6 +4,8 @@ import { CacheConnector } from "./cache-connector";
 import { CommunicatorConnector } from "./communicator-connector";
 import { DatabaseConnector } from "./database-connector";
 import { HttpConnector } from "./http-connector";
+import { LoggerConnector } from "./logger-connector";
+import { MailerConnector } from "./mail-connector";
 import { StorageConnector } from "./storage.connector";
 import type { Connector, ConnectorName } from "./types";
 
@@ -17,6 +19,8 @@ export class ConnectorsManager {
    * Constructor
    */
   public constructor() {
+    this.register(new LoggerConnector());
+    this.register(new MailerConnector());
     this.register(new HttpConnector());
     this.register(new DatabaseConnector());
     this.register(new CommunicatorConnector());
