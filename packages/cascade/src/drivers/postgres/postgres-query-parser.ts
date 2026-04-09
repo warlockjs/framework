@@ -757,6 +757,11 @@ export class PostgresQueryParser {
     const quotedAlias = this.dialect.quoteIdentifier(alias);
     const quotedTable = this.dialect.quoteIdentifier(this.table);
 
+    const hasExplicitSelect = this.selectColumns.length > 0;
+    if (!hasExplicitSelect && !this.selectRaw.includes(`${quotedTable}.*`)) {
+      this.selectRaw.unshift(`${quotedTable}.*`);
+    }
+
     if (relationType === "hasMany") {
       // Correlated subquery — no JOIN, no row explosion, returns a JSON array.
       const relatedTable = data.table as string;
@@ -819,11 +824,6 @@ export class PostgresQueryParser {
       this.selectRaw.push(aggregated);
     } else {
       // hasOne / belongsTo — single object via LEFT JOIN + row_to_json.
-      const hasExplicitSelect = this.selectColumns.length > 0;
-      if (!hasExplicitSelect && !this.selectRaw.includes(`${quotedTable}.*`)) {
-        this.selectRaw.unshift(`${quotedTable}.*`);
-      }
-
       // If constraint provides an explicit select list, prefer it over data.select
       let effectiveSelect = select;
       if (constraintOps && constraintOps.length > 0) {

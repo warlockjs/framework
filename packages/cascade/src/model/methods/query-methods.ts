@@ -1,14 +1,13 @@
-import { RelationLoader } from "../../relations/relation-loader";
-import { dataSourceRegistry } from "../../data-source/data-source-registry";
-import type { DataSource } from "../../data-source/data-source";
 import type {
-  DriverContract,
   PaginationOptions,
   PaginationResult,
-  UpdateOperations,
   QueryBuilderContract,
+  UpdateOperations,
 } from "../../contracts";
-import type { ChildModel, Model, GlobalScopeDefinition } from "../model";
+import type { DataSource } from "../../data-source/data-source";
+import { dataSourceRegistry } from "../../data-source/data-source-registry";
+import { RelationLoader } from "../../relations/relation-loader";
+import type { ChildModel, GlobalScopeDefinition, Model } from "../model";
 
 export function buildQuery<TModel extends Model>(
   ModelClass: ChildModel<TModel>,
@@ -29,7 +28,10 @@ export function buildQuery<TModel extends Model>(
   queryBuilder.relationDefinitions = ModelClass.relations;
   queryBuilder.modelClass = ModelClass;
 
-  ModelClass.events().emitFetching(queryBuilder, { table: ModelClass.table, modelClass: ModelClass });
+  ModelClass.events().emitFetching(queryBuilder, {
+    table: ModelClass.table,
+    modelClass: ModelClass,
+  });
 
   queryBuilder.hydrate((data: any) => {
     return ModelClass.hydrate(data);
@@ -87,6 +89,7 @@ export async function findLast<TModel extends Model>(
   if (filter) {
     query.where(filter);
   }
+
   return query.last();
 }
 

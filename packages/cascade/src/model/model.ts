@@ -1263,9 +1263,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     return buildQuery(this, Model);
   }
 
-  /**
-   * Short hand for the query builder method with
-   */
+  // Short hand for the query builder method with
   /**
    * Eagerly load one or more relations with the query results.
    *
