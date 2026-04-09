@@ -8,7 +8,7 @@ export const migrateCommand = command({
   preload: {
     config: ["database", "log"],
     env: true,
-    connectors: ["database"],
+    connectors: ["database", "logger"],
   },
   options: [
     {
