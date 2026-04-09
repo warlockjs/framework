@@ -944,15 +944,60 @@ export class PostgresDriver implements DriverContract {
     // Check for active transaction client
     const txClient = databaseTransactionContext.getSession() as PgPoolClient | undefined;
 
-    // console.log("SQL", sql);
-    // console.log("SQL Params", params);
-
-    if (txClient) {
-      const result = await txClient.query(sql, params);
-      return result as PostgresQueryResult<T>;
+    const startTime = this.config.logging ? performance.now() : 0;
+    
+    let paramsString = "";
+    if (this.config.logging && params.length > 0) {
+      paramsString = JSON.stringify(params);
+      if (paramsString.length > 300) {
+        paramsString = paramsString.substring(0, 300) + '...';
+      }
+      paramsString = ` | Params: ${paramsString}`;
     }
 
-    return this.pool.query(sql, params) as unknown as Promise<PostgresQueryResult<T>>;
+    try {
+      let result;
+      if (this.config.logging) {
+        log.info({
+          module: "database.postgres",
+          action: "query.executing",
+          message: `${sql}${paramsString}`,
+          context: { params, sql },
+        });
+      }
+      if (txClient) {
+        result = await txClient.query(sql, params);
+      } else {
+        result = await this.pool.query(sql, params);
+      }
+
+      if (this.config.logging) {
+        const duration = (performance.now() - startTime).toFixed(2);
+        log.success({
+          module: "database.postgres",
+          action: "query.executed",
+          message: `[${duration}ms] ${sql}${paramsString}`,
+          context: { params, sql, duration },
+        });
+      }
+
+      return result as PostgresQueryResult<T>;
+    } catch (error) {
+      if (this.config.logging) {
+        const duration = (performance.now() - startTime).toFixed(2);
+        log.error({
+          module: "database.postgres",
+          action: "query.error",
+          message: `[${duration}ms] ${sql}${paramsString}`,
+          context: {
+            sql,
+            params,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
+      }
+      throw error;
+    }
   }
 
   /**

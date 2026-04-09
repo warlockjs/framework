@@ -96,6 +96,14 @@ export type ConnectionOptions<TDriverOptions = any, TClientOptions = any> = {
    */
   database: string;
 
+  /**
+   * Enable database operation logging (queries, execution time, parameters).
+   * Highly recommended to keep this disabled in production to prevent sensitive data leakage.
+   *
+   * @default false
+   */
+  logging?: boolean;
+
   // ============================================================================
   // CONNECTION DETAILS (Shared across drivers)
   // ============================================================================
@@ -353,6 +361,7 @@ export async function connectToDatabase<TDriverOptions = any, TClientOptions = a
           username: options.username,
           password: options.password,
           authSource: options.authSource,
+          logging: options.logging,
           clientOptions: options.clientOptions as any,
         },
         options.driverOptions as any,
@@ -368,6 +377,7 @@ export async function connectToDatabase<TDriverOptions = any, TClientOptions = a
         port: options.port ?? 5432,
         user: options.username,
         password: options.password,
+        logging: options.logging,
         // Spread any additional client options (pool settings, SSL, etc.)
         ...(options.clientOptions as object),
       });

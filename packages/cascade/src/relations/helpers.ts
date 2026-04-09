@@ -148,13 +148,15 @@ export function hasOne(model: string, options?: HasOneOptions): RelationDefiniti
  * console.log(post.author); // User | null
  * ```
  */
-export function belongsTo(model: string, options?: BelongsToOptions): RelationDefinition {
+export function belongsTo(model: string, options?: BelongsToOptions | string): RelationDefinition {
+  const resolvedOptions =
+    typeof options === "string" ? { foreignKey: options, ownerKey: "id" } : options;
   return {
     type: "belongsTo",
     model,
-    foreignKey: options?.foreignKey,
-    localKey: options?.ownerKey ?? "id",
-    select: options?.select,
+    foreignKey: resolvedOptions?.foreignKey,
+    localKey: resolvedOptions?.ownerKey,
+    select: resolvedOptions?.select,
   };
 }
 

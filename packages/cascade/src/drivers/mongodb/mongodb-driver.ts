@@ -184,6 +184,7 @@ export class MongoDbDriver implements DriverContract {
       username?: string;
       password?: string;
       authSource?: string;
+      logging?: boolean;
       clientOptions?: MongoClientOptions;
     },
     private readonly driverOptions?: MongoDriverOptions,
@@ -312,6 +313,47 @@ export class MongoDbDriver implements DriverContract {
           log.warn("database.mongodb", "connection", "Disconnected from database");
         }
       });
+
+      if (this.config.logging) {
+        const ignoredCommands = ["isMaster", "hello", "ping", "saslStart", "saslContinue"];
+
+        client.on("commandStarted", (event: any) => {
+          if (ignoredCommands.includes(event.commandName)) return;
+
+          let cmdStr = JSON.stringify(event.command);
+          if (cmdStr.length > 300) {
+            cmdStr = cmdStr.substring(0, 300) + "...";
+          }
+
+          log.info({
+            module: "database.mongodb",
+            action: "query.executing",
+            message: `[${event.commandName}] ${cmdStr}`,
+            context: { command: event.command },
+          });
+        });
+
+        client.on("commandSucceeded", (event: any) => {
+          if (ignoredCommands.includes(event.commandName)) return;
+
+          log.success({
+            module: "database.mongodb",
+            action: "query.executed",
+            message: `[${event.duration.toFixed(2)}ms] [${event.commandName}]`,
+          });
+        });
+
+        client.on("commandFailed", (event: any) => {
+          if (ignoredCommands.includes(event.commandName)) return;
+
+          log.error({
+            module: "database.mongodb",
+            action: "query.error",
+            message: `[${event.duration.toFixed(2)}ms] [${event.commandName}]`,
+            context: { failure: event.failure },
+          });
+        });
+      }
 
       this.emit("connected");
     } catch (error: any) {
@@ -841,6 +883,10 @@ export class MongoDbDriver implements DriverContract {
     const baseOptions: MongoClientOptions = {
       ...(this.config.clientOptions ?? {}),
     };
+
+    if (this.config.logging) {
+      baseOptions.monitorCommands = true;
+    }
 
     if (this.config.username && !baseOptions.auth) {
       baseOptions.auth = {

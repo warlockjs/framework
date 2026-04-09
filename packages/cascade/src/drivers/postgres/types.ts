@@ -31,6 +31,8 @@ export type PostgresConnectionConfig = {
         readonly cert?: string;
         readonly key?: string;
       };
+  /** Enable database operation logging (queries, execution time, parameters) */
+  readonly logging?: boolean;
 };
 
 /**

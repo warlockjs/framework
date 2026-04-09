@@ -560,8 +560,14 @@ export class PostgresQueryParser {
         return this.addWhereClause(`EXISTS (${value})`, boolean);
     }
 
-    // Simple single-value operator — fall through to generic path
     const quotedField = this.parseColumnIdentifier(field, this.table, this.alias);
+
+    if (value === null) {
+      const nullOperator = operator === "!=" ? "IS NOT NULL" : "IS NULL";
+      return this.addWhereClause(`${quotedField} ${nullOperator}`, boolean);
+    }
+
+    // Simple single-value operator — fall through to generic path
     const placeholder = this.addParam(value);
     this.addWhereClause(`${quotedField} ${this.mapOperator(operator)} ${placeholder}`, boolean);
   }
