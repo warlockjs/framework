@@ -200,7 +200,7 @@ export type CloudStorageFileData = StorageFileData & {
 };
 
 /**
- * Storage file info for list and getInfo operations
+ * Storage file info for list and metadata operations
  */
 export type StorageFileInfo = {
   /**
@@ -791,7 +791,7 @@ export interface StorageDriverContract {
    * @returns File information object
    * @throws Error if file not found
    */
-  getInfo(location: string): Promise<StorageFileInfo>;
+  metadata(location: string): Promise<StorageFileInfo>;
 
   /**
    * Get file size in bytes
@@ -1017,7 +1017,7 @@ export interface ScopedStorageContract {
   /**
    * Get file metadata
    */
-  getInfo(location: string): Promise<StorageFileInfo>;
+  metadata(location: string): Promise<StorageFileInfo>;
 
   /**
    * Get file size

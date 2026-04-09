@@ -339,6 +339,8 @@ export abstract class CloudDriver<
 
       const result = await this.client.send(command);
 
+      console.log("Up Res", result);
+
       return {
         path: location,
         url: this.url(location),
@@ -388,7 +390,7 @@ export abstract class CloudDriver<
       const result = await upload.done();
 
       // Get file info for size and hash
-      const info = await this.getInfo(location);
+      const info = await this.metadata(location);
 
       return {
         path: location,
@@ -660,7 +662,7 @@ export abstract class CloudDriver<
   /**
    * Get file info/metadata without downloading
    */
-  public async getInfo(location: string): Promise<StorageFileInfo> {
+  public async metadata(location: string): Promise<StorageFileInfo> {
     return this.withRetry(async () => {
       const { HeadObjectCommand } = S3Client;
 
@@ -685,14 +687,14 @@ export abstract class CloudDriver<
         etag: result.ETag,
         storageClass: result.StorageClass,
       };
-    }, "getInfo");
+    }, "metadata");
   }
 
   /**
-   * Get file size in bytes (shortcut for getInfo().size)
+   * Get file size in bytes (shortcut for metadata().size)
    */
   public async size(location: string): Promise<number> {
-    const info = await this.getInfo(location);
+    const info = await this.metadata(location);
     return info.size;
   }
 

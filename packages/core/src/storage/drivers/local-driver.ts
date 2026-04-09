@@ -388,7 +388,7 @@ export class LocalDriver implements StorageDriverContract {
   /**
    * Get file info/metadata without downloading
    */
-  public async getInfo(location: string): Promise<StorageFileInfo> {
+  public async metadata(location: string): Promise<StorageFileInfo> {
     const absolutePath = this.getAbsolutePath(location);
 
     if (!(await fileExistsAsync(absolutePath))) {
@@ -409,7 +409,7 @@ export class LocalDriver implements StorageDriverContract {
   }
 
   /**
-   * Get file size in bytes (shortcut for getInfo().size)
+   * Get file size in bytes (shortcut for metadata().size)
    */
   public async size(location: string): Promise<number> {
     const absolutePath = this.getAbsolutePath(location);

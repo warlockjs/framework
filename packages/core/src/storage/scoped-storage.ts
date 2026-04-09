@@ -697,20 +697,20 @@ export class ScopedStorage {
    *
    * @example
    * ```typescript
-   * const info = await storage.getInfo("documents/report.pdf");
+   * const info = await storage.metadata("documents/report.pdf");
    * console.log(`Size: ${info.size} bytes`);
    * console.log(`Type: ${info.mimeType}`);
    * console.log(`Modified: ${info.lastModified}`);
    * ```
    */
-  public async getInfo(location: string): Promise<StorageFileInfo> {
-    return this.activeDriver.getInfo(location);
+  public async metadata(location: string): Promise<StorageFileInfo> {
+    return this.activeDriver.metadata(location);
   }
 
   /**
    * Get file size in bytes
    *
-   * Shortcut for `getInfo(location).size`.
+   * Shortcut for `metadata(location).size`.
    *
    * @param location - File path
    * @returns File size in bytes

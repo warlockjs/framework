@@ -1,3 +1,4 @@
+import { ltrim } from "@mongez/reinforcements";
 import type { CloudStorageDriverOptions } from "../types";
 import { CloudDriver } from "./cloud-driver";
 
@@ -47,7 +48,7 @@ export class DOSpacesDriver extends CloudDriver<CloudStorageDriverOptions> {
     // 1. Use urlPrefix if configured
     if (this.options.urlPrefix) {
       const prefix = this.options.urlPrefix.replace(/\/+$/, "");
-      return `${prefix}/${location}`;
+      location = `${prefix}/${ltrim(location, "/")}`;
     }
 
     // 2. Default Spaces CDN URL

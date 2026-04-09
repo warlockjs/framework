@@ -310,7 +310,7 @@ const uploadUrl = await storage.getPresignedUploadUrl("uploads/new-file.pdf", {
 
 ```typescript
 // Get file info without downloading
-const info = await storage.getInfo("uploads/image.jpg");
+const info = await storage.metadata("uploads/image.jpg");
 // { path, name, size, isDirectory, lastModified, mimeType, etag, storageClass }
 
 // Get just the size

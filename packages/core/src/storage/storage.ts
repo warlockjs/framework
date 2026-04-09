@@ -725,8 +725,8 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @param location - File path
    * @returns File information object
    */
-  public override async getInfo(location: string): Promise<StorageFileInfo> {
-    return this.activeDriver.getInfo(location);
+  public override async metadata(location: string): Promise<StorageFileInfo> {
+    return this.activeDriver.metadata(location);
   }
 
   /**

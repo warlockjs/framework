@@ -152,12 +152,12 @@ export class StorageFile {
     this.ensureNotDeleted();
     if (!this._data) {
       // Fetch info and construct data
-      const info = await this._driver.getInfo(this._path);
+      const info = await this._driver.metadata(this._path);
       this._data = {
         path: info.path,
         url: this._driver.url(this._path),
         size: info.size,
-        hash: "", // Not available from getInfo
+        hash: "", // Not available from metadata
         mimeType: info.mimeType || "application/octet-stream",
         driver: this._driver.name,
       };
@@ -186,7 +186,7 @@ export class StorageFile {
    */
   public async lastModified(): Promise<Date | undefined> {
     this.ensureNotDeleted();
-    const info = await this._driver.getInfo(this._path);
+    const info = await this._driver.metadata(this._path);
     return info.lastModified;
   }
 
@@ -195,7 +195,7 @@ export class StorageFile {
    */
   public async etag(): Promise<string | undefined> {
     this.ensureNotDeleted();
-    const info = await this._driver.getInfo(this._path);
+    const info = await this._driver.metadata(this._path);
     return info.etag;
   }
 
@@ -401,17 +401,8 @@ export class StorageFile {
    * Get file metadata
    */
   public async metadata(): Promise<StorageFileInfo> {
-    return {
-      isDirectory: false,
-      lastModified: await this.lastModified(),
-      mimeType: await this.mimeType(),
-      path: this._path,
-      name: this.name,
-      size: this._data?.size ?? (await this.size()),
-      etag: await this.etag(),
-      storageClass: (this._data as CloudStorageFileData)?.storageClass,
-      isCloud: !!(this._data as CloudStorageFileData)?.bucket,
-    };
+    this.ensureNotDeleted();
+    return this._driver.metadata(this._path);
   }
 
   /**

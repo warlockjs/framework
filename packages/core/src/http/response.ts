@@ -104,6 +104,13 @@ export class Response {
   public parsedBody: any;
 
   /**
+   * Get raw response
+   */
+  public get raw() {
+    return this.baseResponse.raw;
+  }
+
+  /**
    * Get Current response body
    */
   public get body() {
