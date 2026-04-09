@@ -22,7 +22,7 @@ export type BasicLogConfigurations = {
   /**
    * Advanced filter to determine if the message should be logged or not
    */
-  filter: (data: LoggingData) => boolean;
+  filter?: (data: LoggingData) => boolean;
   /**
    * Add additional context to the log
    */
@@ -36,6 +36,8 @@ export type LogMessage = {
   module: string;
   action: string;
   stack?: string;
+  context?: Record<string, any>;
+  timestamp?: string;
 };
 
 export interface LogContract {
@@ -58,6 +60,11 @@ export interface LogContract {
    * Log the given message
    */
   log(data: LoggingData): void | Promise<void>;
+
+  /**
+   * Synchronously flush logs
+   */
+  flushSync?(): void;
 }
 
 export type LoggingData = {
@@ -101,4 +108,8 @@ export interface Log {
    * Get channel by name
    */
   channel(name: string): LogChannel | undefined;
+  /**
+   * Synchronously flush all logs
+   */
+  flushSync(): void;
 }

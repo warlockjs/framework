@@ -151,6 +151,17 @@ export class Logger {
   public channel(name: string) {
     return this.channels.find(channel => channel.name === name);
   }
+
+  /**
+   * Synchronously flush logs
+   */
+  public flushSync() {
+    for (const channel of this.channels) {
+      if (channel.flushSync) {
+        channel.flushSync();
+      }
+    }
+  }
 }
 
 export const logger = new Logger();
@@ -166,3 +177,4 @@ log.error = logger.error.bind(logger) as Log["error"];
 log.success = logger.success.bind(logger) as Log["success"];
 
 log.channel = logger.channel.bind(logger);
+log.flushSync = logger.flushSync.bind(logger);

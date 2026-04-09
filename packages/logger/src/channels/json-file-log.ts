@@ -5,6 +5,7 @@ import {
   putJsonFileAsync,
 } from "@mongez/fs";
 import dayjs from "dayjs";
+import fs from "fs";
 import path from "path";
 import type { LogContract, LogMessage, LoggingData } from "../types";
 import { FileLog } from "./file-log";
@@ -32,6 +33,49 @@ export class JSONFileLog extends FileLog implements LogContract {
   }
 
   /**
+   * Synchronously flush messages
+   */
+  public flushSync(): void {
+    if (this.messages.length === 0 && Object.keys(this.groupedMessages).length === 0) return;
+
+    if (this.messagedShouldBeGrouped) {
+      this.prepareGroupedMessages();
+      for (const key in this.groupedMessages) {
+        const directoryPath = path.join(this.storagePath, key);
+        fs.mkdirSync(directoryPath, { recursive: true });
+        const filePath = path.join(directoryPath, `${this.fileName}.${this.extension}`);
+        
+        let fileContents = { messages: [] as any[] };
+        if (fs.existsSync(filePath)) {
+          try {
+            fileContents = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+            if (!Array.isArray(fileContents.messages)) fileContents.messages = [];
+          } catch (e) {
+            fileContents = { messages: [] };
+          }
+        }
+        fileContents.messages.push(...this.groupedMessages[key]);
+        fs.writeFileSync(filePath, JSON.stringify(fileContents, null, 2));
+      }
+    } else {
+      fs.mkdirSync(this.storagePath, { recursive: true });
+      let fileContents = { messages: [] as any[] };
+      if (fs.existsSync(this.filePath)) {
+        try {
+          fileContents = JSON.parse(fs.readFileSync(this.filePath, "utf-8"));
+          if (!Array.isArray(fileContents.messages)) fileContents.messages = [];
+        } catch (e) {
+          fileContents = { messages: [] };
+        }
+      }
+      fileContents.messages.push(...this.messages);
+      fs.writeFileSync(this.filePath, JSON.stringify(fileContents, null, 2));
+    }
+
+    this.onSave();
+  }
+
+  /**
    * {@inheritdoc}
    */
   public async log(data: LoggingData) {
@@ -42,7 +86,7 @@ export class JSONFileLog extends FileLog implements LogContract {
       data.message = data.message.message;
     }
 
-    const { module, action, message, type: level } = data;
+    const { module, action, message, type: level, context } = data;
 
     if (!this.shouldBeLogged(data)) return;
 
@@ -57,6 +101,8 @@ export class JSONFileLog extends FileLog implements LogContract {
       module,
       action,
       stack,
+      context,
+      timestamp: new Date().toISOString(),
     } as LogMessage);
 
     await this.checkIfMessagesShouldBeWritten(); // Immediate check on buffer size
@@ -114,17 +160,27 @@ export class JSONFileLog extends FileLog implements LogContract {
 
       await ensureDirectoryAsync(directoryPath);
 
-      const filePath = path.join(
-        directoryPath,
-        `${this.fileName}.${this.extension}`,
-      );
+      const filePath = path.join(directoryPath, `${this.fileName}.${this.extension}`);
 
       await this.checkAndRotateFile(filePath); // Ensure we check file size before writing
 
-      const content = this.groupedMessages[key];
+      let fileContents;
+      if (await fileExistsAsync(filePath)) {
+        try {
+          fileContents = await getJsonFileAsync(filePath);
+          if (!Array.isArray(fileContents.messages)) fileContents.messages = [];
+        } catch (error) {
+          console.error("Error reading log file, reinitializing:", error);
+          fileContents = { messages: [] };
+        }
+      } else {
+        fileContents = { messages: [] };
+      }
+
+      fileContents.messages.push(...this.groupedMessages[key]);
 
       try {
-        await putJsonFileAsync(filePath, content, { spaces: 2 });
+        await putJsonFileAsync(filePath, fileContents, { spaces: 2 });
       } catch (error) {
         console.error("Failed to write log:", error);
         this.isWriting = false;

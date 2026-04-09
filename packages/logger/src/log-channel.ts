@@ -102,6 +102,11 @@ export abstract class LogChannel<
   public abstract log(data: LoggingData): void | Promise<void>;
 
   /**
+   * Synchronously flush messages
+   */
+  public flushSync?(): void;
+
+  /**
    * Get date and time formats
    */
   protected getDateAndTimeFormat() {
