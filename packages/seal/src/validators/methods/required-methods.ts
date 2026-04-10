@@ -240,7 +240,7 @@ declare module "../base-validator" {
  * This value must be present and has a value
  */
 BaseValidator.prototype.required = function (errorMessage?: string) {
-  return this.addRule(requiredRule, errorMessage);
+  return this.setRequiredRule(requiredRule, errorMessage);
 };
 
 /**
