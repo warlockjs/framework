@@ -1,2 +1,2 @@
-export * from "./communicator";
-export * from "./communicator-registry";
+export * from "./broker";
+export * from "./broker-registry";

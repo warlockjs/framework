@@ -319,10 +319,14 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
   }
 
   /**
-   * Stop consuming subscriptions
+   * Stop consuming messages on this channel.
+   * Cancels all active subscriptions gracefully.
    */
-  public async stopConsuming() {
-    this.amqpChannel.pauseAllSubscriptions();
+  public async stopConsuming(): Promise<void> {
+    const cancellations = Array.from(this.subscriptions.values()).map(sub =>
+      sub.unsubscribe(),
+    );
+    await Promise.all(cancellations);
   }
 
   /**

@@ -1,27 +1,27 @@
-import { Communicator, communicatorRegistry } from "../communicators";
-import type { ChannelContract, CommunicatorDriverContract } from "../contracts";
+import { Broker, brokerRegistry } from "../communicators";
+import type { BrokerDriverContract, ChannelContract } from "../contracts";
 import { EventConsumerClass, EventMessage } from "../message-managers";
 import type { ChannelOptions, ConnectionOptions, RabbitMQConnectionOptions } from "../types";
 
 /**
- * Connect to a message broker and register the communicator.
+ * Connect to a message broker and register it.
  *
  * This is a high-level utility function that simplifies connection setup
  * for most projects. It handles driver instantiation, connection,
- * communicator creation, and automatic registration.
+ * broker creation, and automatic registration.
  *
  * **Supported Drivers:**
  * - `rabbitmq` (default) - RabbitMQ/AMQP driver
  * - `kafka` - Apache Kafka driver (coming soon)
  *
  * @param options - Connection configuration options
- * @returns A connected and registered Communicator instance
+ * @returns A connected and registered Broker instance
  * @throws {Error} If connection fails or driver is not implemented
  *
  * @example
  * ```typescript
  * // RabbitMQ connection
- * const communicator = await connectToCommunicator({
+ * const broker = await connectToBroker({
  *   driver: "rabbitmq",
  *   host: "localhost",
  *   port: 5672,
@@ -29,41 +29,41 @@ import type { ChannelOptions, ConnectionOptions, RabbitMQConnectionOptions } fro
  *   password: "guest",
  * });
  *
- * // Use the communicator
- * await communicator.channel("user.created").publish({ userId: 1 });
+ * // Use the broker
+ * await broker.channel("user.created").publish({ userId: 1 });
  * ```
  *
  * @example
  * ```typescript
- * // Multiple communicators
- * await connectToCommunicator({
+ * // Multiple brokers
+ * await connectToBroker({
  *   driver: "rabbitmq",
  *   name: "notifications",
  *   isDefault: true,
  *   host: process.env.RABBITMQ_HOST,
  * });
  *
- * await connectToCommunicator({
+ * await connectToBroker({
  *   driver: "rabbitmq",
  *   name: "analytics",
  *   host: process.env.ANALYTICS_RABBITMQ_HOST,
  * });
  *
- * // Use default communicator
- * communicators().channel("notifications").publish({ ... });
+ * // Use default broker
+ * herald().channel("notifications").publish({ ... });
  *
- * // Use specific communicator
- * communicators("analytics").channel("events").publish({ ... });
+ * // Use specific broker
+ * herald("analytics").channel("events").publish({ ... });
  * ```
  */
-export async function connectToCommunicator(options: ConnectionOptions): Promise<Communicator> {
+export async function connectToBroker(options: ConnectionOptions): Promise<Broker> {
   // Default values
   const driverType = options.driver ?? "rabbitmq";
-  const communicatorName = options.name ?? "default";
+  const brokerName = options.name ?? "default";
   const isDefault = options.isDefault ?? true;
 
   // Create driver based on type
-  let driver: CommunicatorDriverContract;
+  let driver: BrokerDriverContract;
 
   switch (driverType) {
     case "rabbitmq": {
@@ -86,9 +86,9 @@ export async function connectToCommunicator(options: ConnectionOptions): Promise
       throw new Error(`Unknown driver: "${driverType}". Supported drivers: rabbitmq, kafka`);
   }
 
-  // Create communicator
-  const communicator = communicatorRegistry.register({
-    name: communicatorName,
+  // Create broker
+  const broker = brokerRegistry.register({
+    name: brokerName,
     driver,
     isDefault,
   });
@@ -102,30 +102,30 @@ export async function connectToCommunicator(options: ConnectionOptions): Promise
     );
   }
 
-  return communicator;
+  return broker;
 }
 
 /**
- * Get a communicator by name or the default one.
+ * Get a broker by name or the default one.
  *
- * This is the main entry point for using communicators in your application.
+ * This is the main entry point for using brokers in your application.
+ * Named after the package — `herald()` carries your messages!
  *
- * @param name - Optional communicator name (uses default if not provided)
- * @returns Communicator instance
- * @throws MissingCommunicatorError if communicator not found
+ * @param name - Optional broker name (uses default if not provided)
+ * @returns Broker instance
+ * @throws MissingBrokerError if broker not found
  *
  * @example
- * ```typescript
- * // Get default communicator
- * const channel = communicators().channel("user.created");
+ * // Get default broker
+ * const channel = herald().channel("user.created");
  * await channel.publish({ userId: 1 });
  *
- * // Get specific communicator
- * const analyticsChannel = communicators("analytics").channel("events");
+ * // Get specific broker
+ * const analyticsChannel = herald("analytics").channel("events");
  * await analyticsChannel.publish({ event: "page_view" });
  *
  * // Subscribe to messages
- * communicators()
+ * herald()
  *   .channel<UserPayload>("user.created")
  *   .subscribe(async (message, ctx) => {
  *     console.log("User created:", message.payload);
@@ -133,34 +133,39 @@ export async function connectToCommunicator(options: ConnectionOptions): Promise
  *   });
  * ```
  */
-export function communicators(name?: string): Communicator {
-  return communicatorRegistry.get(name);
+export function herald(name?: string): Broker {
+  return brokerRegistry.get(name);
 }
 
 /**
- * Get channel instance for the given name from default communicator
+ * Get channel instance for the given name from default broker.
+ *
+ * Shorthand for `herald().channel(name, options)`.
+ *
  * @param name - Channel name
+ * @param options - Optional channel options
  * @returns Channel instance
- * @throws MissingCommunicatorError if communicator not found
+ * @throws MissingBrokerError if broker not found
  *
  * @example
  * ```typescript
- * const channel = communicatorChannel("user.created");
+ * const channel = heraldChannel("user.created");
  * await channel.publish({ userId: 1 });
  * ```
  */
-export function communicatorChannel<TPayload = unknown>(
+export function heraldChannel<TPayload = unknown>(
   name: string,
   options?: ChannelOptions<TPayload>,
 ): ChannelContract<TPayload> {
-  return communicators().channel<TPayload>(name, options);
+  return herald().channel<TPayload>(name, options);
 }
 
 /**
- * Publish the given
+ * Publish an EventMessage to the default broker.
+ *
  * @param event - Event message to publish
  * @returns Promise that resolves when the event is published
- * @throws Error if the event is not published
+ * @throws Error if the broker is not connected
  *
  * @example
  * ```typescript
@@ -168,26 +173,23 @@ export function communicatorChannel<TPayload = unknown>(
  * ```
  */
 export async function publishEvent<TPayload = Record<string, any>>(event: EventMessage<TPayload>) {
-  return communicators().publish(event);
+  return herald().publish(event);
 }
 
 /**
- * Subscribe the given consumer to the default communicator
+ * Subscribe an EventConsumer class to the default broker.
+ *
  * @param Consumer - Event consumer class
- * @returns Function to unsubscribe the consumer
- * @throws Error if the consumer is not subscribed
+ * @returns Unsubscribe function
+ * @throws MissingBrokerError if broker not found
  *
  * @example
  * ```typescript
  * await subscribeConsumer(UserUpdatedConsumer);
- * });
- *
- * // Unsubscribe
- * await unsubscribeConsumer(UserUpdatedConsumer);
  * ```
  */
 export async function subscribeConsumer<TPayload = Record<string, any>>(
   Consumer: EventConsumerClass<TPayload>,
 ) {
-  return communicators().subscribe(Consumer);
+  return herald().subscribe(Consumer);
 }

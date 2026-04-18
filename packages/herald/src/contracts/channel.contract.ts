@@ -19,7 +19,7 @@ import type {
  * @example
  * ```typescript
  * // Get a typed channel
- * const userChannel = communicators().channel<UserPayload>("user.created");
+ * const userChannel = herald().channel<UserPayload>("user.created");
  *
  * // Publish
  * await userChannel.publish({ userId: 1, email: "test@example.com" });
@@ -206,4 +206,10 @@ export interface ChannelContract<TPayload = unknown> {
    * Creates the channel if it doesn't exist, or verifies options match.
    */
   assert(): Promise<void>;
+
+  /**
+   * Stop consuming messages on this channel.
+   * Cancels all active subscriptions gracefully.
+   */
+  stopConsuming(): Promise<void>;
 }

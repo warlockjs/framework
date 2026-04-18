@@ -15,7 +15,14 @@ export abstract class EventConsumer<Payload = Record<string, any>> {
    */
   public static eventName: string;
 
-  public static consumerId = randomUUID();
+  private static _consumerId?: string;
+
+  public static get consumerId(): string {
+    if (!this._consumerId) {
+      this._consumerId = randomUUID();
+    }
+    return this._consumerId;
+  }
 
   public get eventName() {
     return (this.constructor as typeof EventConsumer).eventName;

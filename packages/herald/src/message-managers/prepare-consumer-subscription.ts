@@ -1,7 +1,10 @@
 import type { MessageHandler } from "./../types";
 import { EventConsumerClass } from "./types";
 
-export function prepareConsumerSubscription(Consumer: EventConsumerClass) {
+export function prepareConsumerSubscription(
+  Consumer: EventConsumerClass,
+  onError?: (error: unknown, consumerName: string) => void,
+) {
   const callback: MessageHandler<any> = async (message, ctx) => {
     const envelope = message.payload;
     let eventPayload = envelope.payload;
@@ -37,8 +40,9 @@ export function prepareConsumerSubscription(Consumer: EventConsumerClass) {
       ctx.ack(); // Auto-ack on success?
     } catch (error) {
       ctx.nack(true); // Requeue on failure
-      // Or emit error event for logging
-      console.error(error);
+      if (onError) {
+        onError(error, Consumer.eventName);
+      }
     }
   };
 

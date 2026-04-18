@@ -48,13 +48,12 @@ export abstract class EventMessage<TPayload = Record<string, any>> {
   public constructor(protected data?: TPayload) {}
 
   /**
-   * Serialize the event to be ready for publishing
+   * Serialize the event to be ready for publishing.
+   * Delegates payload resolution to toJSON() — override toJSON() to customize.
+   *
+   * @throws Error if toJSON() throws (e.g. no data provided)
    */
   public serialize() {
-    if (!this.data && !this.toJSON) {
-      throw new Error("No data or toJSON method provided");
-    }
-
     const payload = this.toJSON();
 
     return {
@@ -94,10 +93,10 @@ type EventMessageClass<TIncoming = Record<string, any>, TOutgoing = TIncoming> =
  * A shorthand to define an event without declaring an entire class.
  *
  * This factory function creates an EventMessage subclass that transforms
- * input data (IncomingData) into a different output format (OutcomingData).
+ * input data (IncomingData) into a different output format (OutgoingData).
  *
  * @template IncomingData - The type of data passed to the constructor
- * @template OutcomingData - The type of data returned by toJSON()
+ * @template OutgoingData - The type of data returned by toJSON()
  *
  * @example
  * ```typescript
@@ -109,13 +108,13 @@ type EventMessageClass<TIncoming = Record<string, any>, TOutgoing = TIncoming> =
  * publishEvent(new UserCreatedEvent(user));
  * ```
  */
-export function defineEvent<IncomingData = unknown, OutcomingData = unknown>(
+export function defineEvent<IncomingData = unknown, OutgoingData = unknown>(
   eventName: string,
   options: EventOptions<IncomingData> = {},
-): EventMessageClass<IncomingData, OutcomingData> {
-  // We need to use `any` here to bridge the IncomingData -> OutcomingData transformation
-  // The class accepts IncomingData in constructor but outputs OutcomingData via toJSON()
-  return class AnnouncedEvent extends EventMessage<OutcomingData> {
+): EventMessageClass<IncomingData, OutgoingData> {
+  // We need to use `any` here to bridge the IncomingData -> OutgoingData transformation
+  // The class accepts IncomingData in constructor but outputs OutgoingData via toJSON()
+  return class AnnouncedEvent extends EventMessage<OutgoingData> {
     public eventName = eventName;
     public schema = options.schema;
 
@@ -123,10 +122,10 @@ export function defineEvent<IncomingData = unknown, OutcomingData = unknown>(
       super(data as any);
     }
 
-    public toJSON(): OutcomingData {
-      if (!options.toJSON) return this.data as OutcomingData;
+    public toJSON(): OutgoingData {
+      if (!options.toJSON) return this.data as OutgoingData;
 
-      return options.toJSON(this.data as IncomingData) as OutcomingData;
+      return options.toJSON(this.data as IncomingData) as OutgoingData;
     }
   };
 }

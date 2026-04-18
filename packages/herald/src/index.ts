@@ -1,5 +1,5 @@
 /**
- * Warlock Herald - Message Bus / Communicators
+ * Warlock Herald - Message Bus
  *
  * A powerful, type-safe message bus library for RabbitMQ, Kafka, and more.
  *
@@ -9,27 +9,27 @@
  *
  * Structure:
  * - contracts/ - Core interfaces
- * - communicators/ - Communicator and registry
+ * - brokers/ - Broker and registry
  * - drivers/ - RabbitMQ, Kafka implementations
  * - types/ - TypeScript type definitions
  * - utils/ - Connection helpers
  *
  * @example
  * ```typescript
- * import { connectToCommunicator, communicators } from "@warlock.js/herald";
+ * import { connectToBroker, herald } from "@warlock.js/herald";
  *
  * // Connect to RabbitMQ
- * await connectToCommunicator({
+ * await connectToBroker({
  *   driver: "rabbitmq",
  *   host: "localhost",
  *   port: 5672,
  * });
  *
  * // Publish a message
- * await communicators().channel("user.created").publish({ userId: 1 });
+ * await herald().channel("user.created").publish({ userId: 1 });
  *
  * // Subscribe to messages
- * communicators()
+ * herald()
  *   .channel<UserPayload>("user.created")
  *   .subscribe(async (message, ctx) => {
  *     console.log(message.payload);
@@ -39,18 +39,18 @@
  */
 
 // Export types
-export * from "./types";
+export * from "./types/index";
 
 // Export contracts
 export * from "./contracts";
 
-// Export communicators
+// Export brokers
 export * from "./communicators";
 
 // Export drivers
 export * from "./drivers";
 
-// Export utilities (connectToCommunicator, communicators function)
+// Export utilities (connectToBroker, herald function)
 export * from "./utils";
 
 // Export message managers

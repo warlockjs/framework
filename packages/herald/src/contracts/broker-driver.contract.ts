@@ -1,16 +1,16 @@
 import { type EventMessage } from "../message-managers/event-message";
 import { EventConsumerClass } from "../message-managers/types";
 import type {
+  BrokerDriverType,
+  BrokerEvent,
+  BrokerEventListener,
   ChannelOptions,
-  CommunicatorDriverType,
-  CommunicatorEvent,
-  CommunicatorEventListener,
   HealthCheckResult,
 } from "../types";
 import type { ChannelContract } from "./channel.contract";
 
 /**
- * Communicator Driver Contract
+ * Broker Driver Contract
  *
  * Base contract for all message bus drivers (RabbitMQ, Kafka, etc.)
  * Similar to DriverContract in @warlock.js/cascade
@@ -18,19 +18,19 @@ import type { ChannelContract } from "./channel.contract";
  * @example
  * ```typescript
  * // Driver implementation
- * class RabbitMQDriver implements CommunicatorDriverContract {
+ * class RabbitMQDriver implements BrokerDriverContract {
  *   readonly name = "rabbitmq";
  *   // ...
  * }
  * ```
  */
-export interface CommunicatorDriverContract {
+export interface BrokerDriverContract {
   /**
    * Driver name identifier
    *
    * @example "rabbitmq", "kafka", "redis-streams"
    */
-  readonly name: CommunicatorDriverType;
+  readonly name: BrokerDriverType;
 
   /**
    * Whether currently connected to the message broker
@@ -87,7 +87,7 @@ export interface CommunicatorDriverContract {
    * });
    * ```
    */
-  on(event: CommunicatorEvent, listener: CommunicatorEventListener): void;
+  on(event: BrokerEvent, listener: BrokerEventListener): void;
 
   /**
    * Remove an event listener
@@ -95,7 +95,7 @@ export interface CommunicatorDriverContract {
    * @param event - Event name
    * @param listener - Callback to remove
    */
-  off(event: CommunicatorEvent, listener: CommunicatorEventListener): void;
+  off(event: BrokerEvent, listener: BrokerEventListener): void;
 
   /**
    * Subscribe the given consumer class to the driver

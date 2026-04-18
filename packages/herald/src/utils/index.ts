@@ -1,1 +1,1 @@
-export * from "./connect-to-communicator";
+export * from "./connect-to-broker";

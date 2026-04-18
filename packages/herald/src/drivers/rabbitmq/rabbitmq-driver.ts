@@ -1,11 +1,12 @@
 import { EventEmitter } from "node:events";
-import type { ChannelContract, CommunicatorDriverContract } from "../../contracts";
+import type { BrokerDriverContract, ChannelContract } from "../../contracts";
 import { EventMessage } from "../../message-managers/event-message";
 import { EventConsumerClass } from "../../message-managers/types";
 import type {
+  BrokerDriverType,
+  BrokerEvent,
+  BrokerEventListener,
   ChannelOptions,
-  CommunicatorEvent,
-  CommunicatorEventListener,
   HealthCheckResult,
   RabbitMQConnectionOptions,
 } from "../../types";
@@ -64,7 +65,7 @@ loadAmqplibModule();
 /**
  * RabbitMQ Driver
  *
- * Implementation of CommunicatorDriverContract for RabbitMQ/AMQP.
+ * Implementation of BrokerDriverContract for RabbitMQ/AMQP.
  *
  * **Important:** This driver requires the `amqplib` package to be installed.
  * Install it with: `npx warlock add herald --driver=rabbitmq` or `npm install amqplib`
@@ -83,7 +84,7 @@ loadAmqplibModule();
  * const channel = driver.channel("user.created");
  * ```
  */
-export class RabbitMQDriver implements CommunicatorDriverContract {
+export class RabbitMQDriver implements BrokerDriverContract {
   public readonly name = "rabbitmq" as const;
 
   public readonly consumers: EventConsumerClass[] = [];
@@ -124,9 +125,14 @@ export class RabbitMQDriver implements CommunicatorDriverContract {
    */
   public subscribe(Consumer: EventConsumerClass) {
     if (this.isConnected) {
-      this.channel(Consumer.eventName).subscribe(prepareConsumerSubscription(Consumer), {
-        consumerId: Consumer.consumerId,
-      });
+      this.channel(Consumer.eventName).subscribe(
+        prepareConsumerSubscription(Consumer, (error, eventName) => {
+          this.events.emit("error", error, eventName);
+        }),
+        {
+          consumerId: Consumer.consumerId,
+        },
+      );
     } else {
       this.consumers.push(Consumer);
     }
@@ -150,10 +156,11 @@ export class RabbitMQDriver implements CommunicatorDriverContract {
   }
 
   /**
-   * Publish the given event message
+   * Publish the given event message.
+   * Auto-creates the channel if it hasn't been accessed before.
    */
   public publish<TPayload = Record<string, any>>(event: EventMessage<TPayload>): void {
-    this.channels.get(event.eventName)?.publish(event.serialize());
+    this.channel(event.eventName).publish(event.serialize());
   }
 
   /**
@@ -297,14 +304,14 @@ export class RabbitMQDriver implements CommunicatorDriverContract {
   /**
    * Register event listener
    */
-  public on(event: CommunicatorEvent, listener: CommunicatorEventListener): void {
+  public on(event: BrokerEvent, listener: BrokerEventListener): void {
     this.events.on(event, listener as any);
   }
 
   /**
    * Remove event listener
    */
-  public off(event: CommunicatorEvent, listener: CommunicatorEventListener): void {
+  public off(event: BrokerEvent, listener: BrokerEventListener): void {
     this.events.off(event, listener as any);
   }
 
@@ -337,14 +344,14 @@ export class RabbitMQDriver implements CommunicatorDriverContract {
   }
 
   /**
-   * Stop consuming messages
+   * Stop consuming messages from all subscribed channels.
+   * Gracefully cancels all active consumers.
    */
   public async stopConsuming(): Promise<void> {
-    // Cancel all consumers
-    for (const channel of this.channels.values()) {
-      // Channel implementations should handle this    // Need to add pauseAllSubscriptions() to RabbitMQChannel
-      // await channel.stopConsuming();
-    }
+    const stops = Array.from(this.channels.values()).map(channel =>
+      (channel as RabbitMQChannel<any>).stopConsuming(),
+    );
+    await Promise.all(stops);
   }
 
   /**

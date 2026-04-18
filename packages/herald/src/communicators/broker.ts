@@ -1,54 +1,54 @@
-import type { CommunicatorDriverContract } from "../contracts";
+import type { BrokerDriverContract } from "../contracts";
 import type { ChannelContract } from "../contracts/channel.contract";
 import { EventMessage } from "../message-managers/event-message";
 import { EventConsumerClass } from "../message-managers/types";
 import type { ChannelOptions } from "../types";
 
 /**
- * Options for creating a Communicator
+ * Options for creating a Broker
  */
-export interface CommunicatorOptions {
-  /** Unique name for this communicator */
+export interface BrokerOptions {
+  /** Unique name for this broker */
   name: string;
   /** The underlying driver */
-  driver: CommunicatorDriverContract;
-  /** Whether this is the default communicator */
+  driver: BrokerDriverContract;
+  /** Whether this is the default broker */
   isDefault?: boolean;
 }
 
 /**
- * Communicator - wrapper around a driver with metadata
+ * Broker - wrapper around a driver with metadata
  *
  * Similar to DataSource in @warlock.js/cascade
  *
  * @example
  * ```typescript
- * const communicator = new Communicator({
+ * const broker = new Broker({
  *   name: "default",
  *   driver: rabbitMQDriver,
  *   isDefault: true,
  * });
  *
  * // Get a channel
- * const channel = communicator.channel("user.created");
+ * const channel = broker.channel("user.created");
  * ```
  */
-export class Communicator {
-  /** Unique name identifying this communicator */
+export class Broker {
+  /** Unique name identifying this broker */
   public readonly name: string;
 
   /** The underlying driver */
-  public readonly driver: CommunicatorDriverContract;
+  public readonly driver: BrokerDriverContract;
 
-  /** Whether this is the default communicator */
+  /** Whether this is the default broker */
   public readonly isDefault: boolean;
 
   /**
-   * Create a new Communicator
+   * Create a new Broker
    *
-   * @param options - Communicator configuration
+   * @param options - Broker configuration
    */
-  public constructor(options: CommunicatorOptions) {
+  public constructor(options: BrokerOptions) {
     this.name = options.name;
     this.driver = options.driver;
     this.isDefault = Boolean(options.isDefault);
@@ -78,10 +78,10 @@ export class Communicator {
    * @example
    * ```typescript
    * // Simple channel
-   * const channel = communicator.channel("notifications");
+   * const channel = broker.channel("notifications");
    *
    * // Typed channel with schema
-   * const orderChannel = communicator.channel<OrderPayload>("orders", {
+   * const orderChannel = broker.channel<OrderPayload>("orders", {
    *   schema: OrderSchema,
    *   durable: true,
    * });
@@ -95,7 +95,7 @@ export class Communicator {
   }
 
   /**
-   * Check if the communicator is connected
+   * Check if the broker is connected
    */
   public get isConnected(): boolean {
     return this.driver.isConnected;
