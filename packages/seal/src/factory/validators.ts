@@ -61,7 +61,10 @@ export const v: ValidatorV = {
     new StringValidator(errorMessage).email(emailErrorMessage),
 
   /** Create an enum validator */
-  enum: (values: any, errorMessage?: string) => new ScalarValidator().enum(values, errorMessage),
+  enum: (values: any, errorMessage?: string) =>
+    Array.isArray(values)
+      ? new StringValidator().oneOf(values, errorMessage)
+      : new ScalarValidator().enum(values, errorMessage),
 
   /** Create a number validator */
   number: (errorMessage?: string) => new NumberValidator(errorMessage),
