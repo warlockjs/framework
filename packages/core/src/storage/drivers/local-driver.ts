@@ -64,13 +64,15 @@ export class LocalDriver implements StorageDriverContract {
    */
   protected signatureKey?: string;
 
-  public constructor(public options: LocalStorageDriverOptions = {}) {
-    this.root = options.root || storagePath();
-    if (options.urlPrefix) {
-      this.urlPrefix = options.urlPrefix;
-    }
+  /**
+   * Cached Storage File Metadata
+   */
+  protected _metadata = new Map<string, StorageFileInfo>();
 
-    this.temporaryUrlPrefix = options.temporaryUrlPrefix || "/temp-files";
+  public constructor(public options: LocalStorageDriverOptions = {}) {
+    this.root = options.root ?? storagePath();
+    this.urlPrefix = options.urlPrefix ?? "";
+    this.temporaryUrlPrefix = options.temporaryUrlPrefix ?? "/temp-files";
     this.signatureKey = options.signatureKey;
   }
 
@@ -389,37 +391,37 @@ export class LocalDriver implements StorageDriverContract {
    * Get file info/metadata without downloading
    */
   public async metadata(location: string): Promise<StorageFileInfo> {
+    if (this._metadata.has(location)) {
+      return this._metadata.get(location)!;
+    }
+
     const absolutePath = this.getAbsolutePath(location);
 
     if (!(await fileExistsAsync(absolutePath))) {
-      throw new Error(`File not found: ${location}`);
+      throw new Error(`File not found: ${absolutePath}`);
     }
 
     const stats = await stat(absolutePath);
     const name = location.split("/").pop() || "";
 
-    return {
+    this._metadata.set(location, {
       path: location,
       name,
       size: stats.size,
       isDirectory: stats.isDirectory(),
       lastModified: stats.mtime,
       mimeType: this.guessMimeType(location),
-    };
+    });
+
+    return this._metadata.get(location)!;
   }
 
   /**
    * Get file size in bytes (shortcut for metadata().size)
    */
   public async size(location: string): Promise<number> {
-    const absolutePath = this.getAbsolutePath(location);
-
-    if (!(await fileExistsAsync(absolutePath))) {
-      throw new Error(`File not found: ${location}`);
-    }
-
-    const stats = await stat(absolutePath);
-    return stats.size;
+    const metadata = await this.metadata(location);
+    return metadata.size;
   }
 
   // ============================================================

@@ -339,8 +339,6 @@ export abstract class CloudDriver<
 
       const result = await this.client.send(command);
 
-      console.log("Up Res", result);
-
       return {
         path: location,
         url: this.url(location),

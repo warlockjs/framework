@@ -47,6 +47,7 @@ export class SeedersManager {
    */
   public async run(withTransaction = true) {
     await this.init();
+
     this.prepareSeeders();
 
     console.log(`🌱 Running ${this.seeders.length} seeder(s)...\n`);
@@ -107,18 +108,27 @@ export class SeedersManager {
   }
 
   /**
+   * Sort seeds
+   */
+  public sort() {
+    this.seeders = this.seeders.sort((a, b) => {
+      const orderA = a.order ?? Number.MAX_SAFE_INTEGER;
+      const orderB = b.order ?? Number.MAX_SAFE_INTEGER;
+      return orderA - orderB;
+    });
+
+    return this;
+  }
+
+  /**
    * Prepare seeders to order by the seeder order
    * Also keep an eye on the dependsOn for each seeder to make sure
    * they are ordered correctly
    */
   public prepareSeeders() {
-    this.seeders = this.seeders
-      .filter((seeder) => seeder.enabled !== false)
-      .sort((a, b) => {
-        const orderA = a.order ?? Number.MAX_SAFE_INTEGER;
-        const orderB = b.order ?? Number.MAX_SAFE_INTEGER;
-        return orderA - orderB;
-      });
+    this.seeders = this.seeders.filter((seeder) => seeder.enabled !== false);
+
+    this.sort();
 
     // TODO: Handle dependsOn resolution
     // This is more complex - needs topological sort

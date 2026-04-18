@@ -53,6 +53,7 @@ export type ConnectorName =
   | "cache"
   | "storage"
   | "communicator"
+  | "socket"
   | (string & {});
 
 /**
@@ -66,4 +67,5 @@ export enum ConnectorPriority {
   CACHE = 4,
   HTTP = 5,
   STORAGE = 6,
+  SOCKET = 7,
 }

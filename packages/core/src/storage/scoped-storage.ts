@@ -11,6 +11,7 @@ import type {
   PutDirectoryOptions,
   PutDirectoryResult,
   PutOptions,
+  ScopedStorageContract,
   StorageDriverContract,
   StorageDriverType,
   StorageFileInfo,
@@ -37,7 +38,7 @@ import type {
  * await file.copy("backup/photo.jpg");
  * ```
  */
-export class ScopedStorage {
+export class ScopedStorage implements ScopedStorageContract {
   /**
    * The underlying storage driver instance
    * @internal
@@ -742,7 +743,7 @@ export class ScopedStorage {
    * await file.delete();
    * ```
    */
-  public async file(location: string): Promise<StorageFile> {
+  public file(location: string): StorageFile {
     return new StorageFile(location, this.activeDriver);
   }
 

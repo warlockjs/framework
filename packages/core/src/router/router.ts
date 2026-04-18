@@ -5,6 +5,7 @@ import { ltrim, merge, toCamelCase, trim } from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
 import { log } from "@warlock.js/logger";
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { container } from "../container";
 import { Request } from "../http/request";
 import { Response } from "../http/response";
 import { type FastifyInstance } from "../http/server";
@@ -799,3 +800,5 @@ export class Router {
 }
 
 export const router = Router.getInstance();
+
+container.set("router", router);

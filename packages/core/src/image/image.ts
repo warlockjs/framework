@@ -464,6 +464,14 @@ export class Image {
    * Resize image
    */
   public resize(options: sharp.ResizeOptions): this {
+    if (typeof options.width !== "undefined" && !options.width) {
+      delete options.width;
+    }
+
+    if (typeof options.height !== "undefined" && !options.height) {
+      delete options.height;
+    }
+
     return this.addOperation({ type: "resize", options });
   }
 

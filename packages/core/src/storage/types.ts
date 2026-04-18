@@ -1042,7 +1042,7 @@ export interface ScopedStorageContract {
   /**
    * Get a StorageFile instance
    */
-  file(location: string): Promise<StorageFile>;
+  file(location: string): StorageFile;
 }
 
 /**

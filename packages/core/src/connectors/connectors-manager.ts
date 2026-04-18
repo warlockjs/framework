@@ -1,11 +1,12 @@
 import { colors } from "@mongez/copper";
 import { devServeLog } from "../dev-server/dev-logger";
 import { CacheConnector } from "./cache-connector";
-import { CommunicatorConnector } from "./communicator-connector";
+import { HeraldConnector } from "./herald-connector";
 import { DatabaseConnector } from "./database-connector";
 import { HttpConnector } from "./http-connector";
 import { LoggerConnector } from "./logger-connector";
 import { MailerConnector } from "./mail-connector";
+import { SocketConnector } from "./socket-connector";
 import { StorageConnector } from "./storage.connector";
 import type { Connector, ConnectorName } from "./types";
 
@@ -23,9 +24,10 @@ export class ConnectorsManager {
     this.register(new MailerConnector());
     this.register(new HttpConnector());
     this.register(new DatabaseConnector());
-    this.register(new CommunicatorConnector());
+    this.register(new HeraldConnector());
     this.register(new CacheConnector());
     this.register(new StorageConnector());
+    this.register(new SocketConnector());
   }
 
   /**

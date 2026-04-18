@@ -14,6 +14,7 @@ import path from "path";
 import type React from "react";
 import { type ReactNode } from "react";
 import type { Route } from "../router";
+import { StorageFile } from "../storage";
 import { renderReact } from "./../react";
 import type { Request } from "./request";
 import type { ResponseEvent, ResponseSSEController, ResponseStreamController } from "./types";
@@ -983,7 +984,11 @@ export class Response {
   /**
    * Send a file as a response
    */
-  public async sendFile(filePath: string, options?: number | SendFileOptions) {
+  public async sendFile(filePath: string | StorageFile, options?: number | SendFileOptions) {
+    if (filePath instanceof StorageFile) {
+      filePath = filePath.absolutePath!;
+    }
+
     this.log(`Sending file: ${filePath}`);
 
     // Check if file exists first
@@ -1124,7 +1129,7 @@ export class Response {
    * Cache time in seconds
    * Cache time will be one year
    */
-  public sendCachedFile(path: string, cacheTime = 31536000) {
+  public sendCachedFile(path: string | StorageFile, cacheTime = 31536000) {
     return this.sendFile(path, cacheTime);
   }
 

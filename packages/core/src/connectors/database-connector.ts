@@ -1,5 +1,6 @@
 import config from "@mongez/config";
 import { connectToDatabase, dataSourceRegistry } from "@warlock.js/cascade";
+import { container } from "../container";
 import { BaseConnector } from "./base-connector";
 import { ConnectorPriority } from "./types";
 
@@ -27,7 +28,8 @@ export class DatabaseConnector extends BaseConnector {
     }
 
     try {
-      await connectToDatabase(databaseConfig);
+      const source = await connectToDatabase(databaseConfig);
+      container.set("database.source", source);
       this.active = true;
     } catch (error) {
       console.error("Failed to connect to database:", error);

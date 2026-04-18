@@ -22,6 +22,7 @@ import type {
   PresignedUploadOptions,
   PutOptions,
   R2StorageDriverOptions,
+  ScopedStorageContract,
   StorageCopyEventPayload,
   StorageDriverConfig,
   StorageDriverContract,
@@ -198,7 +199,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * console.log(localFile.url);
    * ```
    */
-  public use(name: StorageDriverName): ScopedStorage {
+  public use(name: StorageDriverName): ScopedStorageContract {
     return new ScopedStorage(this.getDriver(name));
   }
 
@@ -737,16 +738,6 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    */
   public override async size(location: string): Promise<number> {
     return this.activeDriver.size(location);
-  }
-
-  /**
-   * Get a StorageFile instance for OOP-style operations
-   *
-   * @param location - File path
-   * @returns StorageFile instance
-   */
-  public override async file(location: string): Promise<StorageFile> {
-    return new StorageFile(location, this.activeDriver);
   }
 
   // ============================================================

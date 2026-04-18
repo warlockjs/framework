@@ -131,6 +131,7 @@ export class StorageFile {
     if ("path" in this._driver && typeof this._driver.path === "function") {
       return this._driver.path(this._path);
     }
+
     return undefined;
   }
 
@@ -152,7 +153,7 @@ export class StorageFile {
     this.ensureNotDeleted();
     if (!this._data) {
       // Fetch info and construct data
-      const info = await this._driver.metadata(this._path);
+      const info = await this.metadata();
       this._data = {
         path: info.path,
         url: this._driver.url(this._path),
@@ -186,7 +187,7 @@ export class StorageFile {
    */
   public async lastModified(): Promise<Date | undefined> {
     this.ensureNotDeleted();
-    const info = await this._driver.metadata(this._path);
+    const info = await this.metadata();
     return info.lastModified;
   }
 
@@ -195,7 +196,7 @@ export class StorageFile {
    */
   public async etag(): Promise<string | undefined> {
     this.ensureNotDeleted();
-    const info = await this._driver.metadata(this._path);
+    const info = await this.metadata();
     return info.etag;
   }
 
@@ -403,6 +404,71 @@ export class StorageFile {
   public async metadata(): Promise<StorageFileInfo> {
     this.ensureNotDeleted();
     return this._driver.metadata(this._path);
+  }
+
+  /**
+   * Determine if this file is an image type
+   */
+  public async isImage() {
+    const metadata = await this.metadata();
+    return metadata.mimeType!.startsWith("image/");
+  }
+
+  /**
+   * Determine if this file is a document type
+   */
+  public async isDocument() {
+    const metadata = await this.metadata();
+    return metadata.mimeType!.startsWith("application/");
+  }
+
+  /**
+   * Determine if this file is a pdf type
+   */
+  public async isPdf() {
+    const metadata = await this.metadata();
+    return metadata.mimeType!.startsWith("application/pdf");
+  }
+
+  /**
+   * Determine if this file is an excel file (any support excel file)
+   */
+  public async isExcel() {
+    const metadata = await this.metadata();
+    return (
+      metadata.mimeType!.startsWith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      ) || metadata.mimeType!.startsWith("application/vnd.ms-excel")
+    );
+  }
+
+  /**
+   * Determine if this file is a doc file
+   */
+  public async isDoc() {
+    const metadata = await this.metadata();
+    return (
+      metadata.mimeType!.startsWith("application/msword") ||
+      metadata.mimeType!.startsWith(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      )
+    );
+  }
+
+  /**
+   * Determine if this file is an audio type
+   */
+  public async isAudio() {
+    const metadata = await this.metadata();
+    return metadata.mimeType!.startsWith("audio/");
+  }
+
+  /**
+   * Determine if this file is a video type
+   */
+  public async isVideo() {
+    const metadata = await this.metadata();
+    return metadata.mimeType!.startsWith("video/");
   }
 
   /**

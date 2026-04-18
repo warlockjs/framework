@@ -884,8 +884,10 @@ export class Request<RequestValidation = any> {
   /**
    * Get integer input value
    */
-  public int(key: string, defaultValue: number = 0): number {
+  public int(key: string, defaultValue: number = 0): number | undefined {
     const value = this.input(key, defaultValue);
+
+    if (!value && value !== 0) return undefined;
 
     return parseInt(value);
   }

@@ -248,7 +248,7 @@ export class UploadedFile {
    * ```
    */
   public use(driver: StorageDriverName): this {
-    this._storage = storage.use(driver);
+    this._storage = storage.use(driver) as ScopedStorage;
     return this;
   }
 
@@ -674,7 +674,7 @@ export class UploadedFile {
    */
   protected resolveStorage(driver?: StorageDriverName): ScopedStorage | typeof storage {
     if (driver) {
-      return storage.use(driver);
+      return storage.use(driver) as ScopedStorage;
     }
 
     return this._storage || storage;

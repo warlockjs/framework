@@ -18,6 +18,11 @@ export const seedCommand = command({
       type: "boolean",
     },
     {
+      text: "--order, -o",
+      description: "Display the seeds list in order without execution",
+      type: "boolean",
+    },
+    {
       text: "--transaction, -t",
       description: "Run seeds in a transaction",
       type: "boolean",

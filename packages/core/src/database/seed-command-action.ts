@@ -1,3 +1,4 @@
+import { colors } from "@mongez/copper";
 import { DataSource, dataSourceRegistry } from "@warlock.js/cascade";
 import { CommandActionData } from "../cli/types";
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
@@ -15,13 +16,54 @@ async function clearAllTables(datasource: DataSource) {
   }
 }
 
+/**
+ * Run database seeds.
+ *
+ * @example
+ * ```ts
+ * import { seedCommandAction } from "@warlock.js/core";
+ *
+ * await seedCommandAction({
+ *   command: "seed",
+ *   options: { fresh: true, order: false }
+ * });
+ * ```
+ */
 export async function seedCommandAction(options: CommandActionData) {
-  const { path, fresh, transaction } = options.options;
+  const { path, fresh, transaction, order } = options.options;
 
   const datasource = dataSourceRegistry.get();
 
   if (fresh) {
     await clearAllTables(datasource);
+  }
+
+  if (order) {
+    const seedFiles = await listSeedsFiles();
+
+    if (seedFiles.length === 0) {
+      console.log("No seeds found.");
+      return;
+    }
+
+    const seedersManager = new SeedersManager();
+
+    seedersManager.register(...seedFiles);
+
+    const seeds = seedersManager.sort().seeders.map((seed) => {
+      return {
+        name: seed.name,
+        order: seed.order,
+        enabled: seed.enabled,
+      };
+    });
+
+    console.table(seeds);
+
+    console.log(
+      `Total Seeds: ${colors.blueBright(seeds.length)}, enabled: ${colors.greenBright(seeds.filter((seed) => seed.enabled !== false).length)}, disabled: ${colors.redBright(seeds.filter((seed) => seed.enabled === false).length)}`,
+    );
+    return;
   }
 
   const seeds = path

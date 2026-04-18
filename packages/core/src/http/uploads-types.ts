@@ -76,7 +76,7 @@ export type PrefixConfig = boolean | string | PrefixOptions;
  * - `"original"`: Use the original uploaded filename (sanitized)
  * - `string`: Custom filename (extension auto-appended from original file)
  */
-export type FileNamingStrategy = "random" | "original" | string;
+export type FileNamingStrategy = "random" | "original" | (string & {});
 
 /**
  * Options for saving uploaded files

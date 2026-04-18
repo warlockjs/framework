@@ -90,7 +90,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
     try {
       if (await this.callMiddleware("get", request, response)) return;
 
-      const record = await this.find(request.int("id"));
+      const record = await this.find(request.input("id"));
 
       if (!record) {
         return response.notFound();
@@ -158,7 +158,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
   public async update(request: Request, response: Response) {
     try {
       // Find record
-      const record = await this.find(request.int("id"));
+      const record = await this.find(request.input("id"));
 
       if (!record) {
         return response.notFound({
@@ -201,7 +201,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
    */
   public async patch(request: Request, response: Response) {
     try {
-      const record = await this.find(request.int("id"));
+      const record = await this.find(request.input("id"));
 
       if (!record) {
         return response.notFound({
@@ -236,7 +236,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
    */
   public async delete(request: Request, response: Response) {
     try {
-      const record = await this.find(request.int("id"));
+      const record = await this.find(request.input("id"));
 
       if (!record) {
         return response.notFound();

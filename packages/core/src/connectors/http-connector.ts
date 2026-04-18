@@ -4,10 +4,11 @@ import { logger } from "@warlock.js/logger";
 import { Application } from "../application";
 import { devLogError } from "../dev-server/dev-logger";
 import { registerHttpPlugins } from "../http/plugins";
-import { getServer, startServer } from "../http/server";
+import { getHttpServer, startHttpServer } from "../http/server";
 import { router } from "../router/router";
 import { Environment } from "../utils";
 import { setBaseUrl } from "../utils/urls";
+import { container } from "./../container";
 import { BaseConnector } from "./base-connector";
 import { ConnectorPriority } from "./types";
 
@@ -54,7 +55,9 @@ export class HttpConnector extends BaseConnector {
       `Starting http server on port ${port} in ${environmentColor(Application.environment)} mode`,
     );
 
-    const server = startServer();
+    const server = startHttpServer(httpConfig.serverOptions);
+
+    container.set("http.server", server);
 
     await registerHttpPlugins(server);
 
@@ -72,6 +75,8 @@ export class HttpConnector extends BaseConnector {
       });
 
       const baseUrl = config.get("app.baseUrl");
+
+      container.set("http.baseUrl", baseUrl);
 
       // update base url
       setBaseUrl(baseUrl);
@@ -94,7 +99,7 @@ export class HttpConnector extends BaseConnector {
       return;
     }
 
-    const server = getServer();
+    const server = getHttpServer();
 
     server?.close();
 

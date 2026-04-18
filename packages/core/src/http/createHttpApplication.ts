@@ -4,10 +4,10 @@ import { router } from "../router";
 import { setBaseUrl } from "../utils/urls";
 import { httpConfig } from "./config";
 import { registerHttpPlugins } from "./plugins";
-import { getServer, startServer } from "./server";
+import { getHttpServer, startHttpServer } from "./server";
 
 export async function createHttpApplication() {
-  const server = startServer();
+  const server = startHttpServer();
 
   await registerHttpPlugins(server);
 
@@ -38,7 +38,7 @@ export async function createHttpApplication() {
 
 export async function stopHttpApplication() {
   log.info("http", "server", "Stopping the server");
-  const server = getServer();
+  const server = getHttpServer();
 
   await server?.close();
 
