@@ -46,6 +46,7 @@ export class Logger {
     action?: string,
     message: any = "",
     level?: LogLevel,
+    context?: Record<string, any>,
   ): LoggingData {
     if (typeof dataOrModule === "object") {
       // If level is provided, override type
@@ -54,7 +55,7 @@ export class Logger {
         module: dataOrModule.module,
         action: dataOrModule.action,
         message: dataOrModule.message,
-        ...(dataOrModule.context ? { context: dataOrModule.context } : {}),
+        ...(context ? { context } : dataOrModule.context ? { context: dataOrModule.context } : {}),
       };
     }
     return {
@@ -62,6 +63,7 @@ export class Logger {
       module: dataOrModule,
       action: action as string,
       message,
+      ...(context ? { context } : {}),
     };
   }
 
@@ -86,8 +88,9 @@ export class Logger {
     dataOrModule: LoggingData | string,
     action?: string,
     message: any = "",
+    context?: Record<string, any>,
   ) {
-    const data = this.normalizeLogData(dataOrModule, action, message, "debug");
+    const data = this.normalizeLogData(dataOrModule, action, message, "debug", context);
     return this.log(data);
   }
 
@@ -98,8 +101,9 @@ export class Logger {
     dataOrModule: OmittedLoggingData | string,
     action?: string,
     message: any = "",
+    context?: Record<string, any>,
   ) {
-    const data = this.normalizeLogData(dataOrModule, action, message, "info");
+    const data = this.normalizeLogData(dataOrModule, action, message, "info", context);
     return this.log(data);
   }
 
@@ -110,8 +114,9 @@ export class Logger {
     dataOrModule: LoggingData | string,
     action?: string,
     message: any = "",
+    context?: Record<string, any>,
   ) {
-    const data = this.normalizeLogData(dataOrModule, action, message, "warn");
+    const data = this.normalizeLogData(dataOrModule, action, message, "warn", context);
     return this.log(data);
   }
 
@@ -122,8 +127,9 @@ export class Logger {
     dataOrModule: LoggingData | string,
     action?: string,
     message: any = "",
+    context?: Record<string, any>,
   ) {
-    const data = this.normalizeLogData(dataOrModule, action, message, "error");
+    const data = this.normalizeLogData(dataOrModule, action, message, "error", context);
     return this.log(data);
   }
 
@@ -134,13 +140,9 @@ export class Logger {
     dataOrModule: LoggingData | string,
     action?: string,
     message: any = "",
+    context?: Record<string, any>,
   ) {
-    const data = this.normalizeLogData(
-      dataOrModule,
-      action,
-      message,
-      "success",
-    );
+    const data = this.normalizeLogData(dataOrModule, action, message, "success", context);
 
     return this.log(data);
   }
@@ -149,7 +151,7 @@ export class Logger {
    * Get channel by name
    */
   public channel(name: string) {
-    return this.channels.find(channel => channel.name === name);
+    return this.channels.find((channel) => channel.name === name);
   }
 
   /**
