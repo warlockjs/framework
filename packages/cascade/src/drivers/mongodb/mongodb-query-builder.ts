@@ -1357,7 +1357,7 @@ export class MongoQueryBuilder<T = unknown>
    * Orders results by a date field in descending order (newest first).
    * @param column - The date column to sort by
    */
-  public latest(column: string = "createdAt") {
+  public latest(column: string = "createdAt"): Promise<T[]> {
     return this.orderBy(column, "desc").get();
   }
 
@@ -2569,12 +2569,12 @@ export class MongoQueryBuilder<T = unknown>
    * ```typescript
    * const results = await Vector.query()
    *   .where({ organization_id: "org-123" })
-   *   .nearestTo("embedding", queryEmbedding)
+   *   .similarTo("embedding", queryEmbedding)
    *   .limit(5)
    *   .get<VectorRow & { score: number }>();
    * ```
    */
-  public nearestTo(column: string, embedding: number[], alias = "score"): this {
+  public similarTo(column: string, embedding: number[], alias = "score"): this {
     // Grab the limit op recorded so far (default to 10 if not set yet)
     const limitOp = this.operations.find((op) => op.type === "limit");
     const limit = (limitOp?.data?.value as number) ?? 10;
@@ -2604,4 +2604,3 @@ export class MongoQueryBuilder<T = unknown>
     return this;
   }
 }
-

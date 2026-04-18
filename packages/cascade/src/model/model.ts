@@ -1579,7 +1579,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   }
 
   /**
-   * Perform a direct update $set for the given id
+   * Perform an atomic update for the given id
    */
   public static async update<TModel extends Model = Model>(
     this: ChildModel<TModel>,

@@ -2,6 +2,7 @@ import type {
   ColumnDefinition,
   ColumnType,
   ForeignKeyDefinition,
+  VectorIndexOptions,
 } from "../contracts/migration-driver.contract";
 
 /**
@@ -11,7 +12,10 @@ import type {
 type MigrationLike = {
   addPendingIndex(index: { columns: string[]; unique?: boolean }): void;
   addForeignKeyOperation(fk: ForeignKeyDefinition): void;
-  addPendingVectorIndex?(column: string, options: Omit<import("../contracts/migration-driver.contract").VectorIndexOptions, "column">): void;
+  addPendingVectorIndex?(
+    column: string,
+    options: Omit<import("../contracts/migration-driver.contract").VectorIndexOptions, "column">,
+  ): void;
 };
 
 /**
@@ -251,7 +255,7 @@ export class ColumnBuilder {
    * this.vector(1536).vectorIndex({ similarity: "cosine" });
    * ```
    */
-  public vectorIndex(options: Omit<import("../contracts/migration-driver.contract").VectorIndexOptions, "dimensions"> = {}): this {
+  public vectorIndex(options: Omit<VectorIndexOptions, "dimensions"> = {}): this {
     if (this.migration.addPendingVectorIndex) {
       this.migration.addPendingVectorIndex(this.definition.name, {
         ...options,
@@ -430,8 +434,7 @@ export class ColumnBuilder {
    * ```
    */
   public references(tableOrModel: string | { table: string }): this {
-    const tableName =
-      typeof tableOrModel === "string" ? tableOrModel : tableOrModel.table;
+    const tableName = typeof tableOrModel === "string" ? tableOrModel : tableOrModel.table;
 
     this.fkDefinition = {
       column: this.definition.name,

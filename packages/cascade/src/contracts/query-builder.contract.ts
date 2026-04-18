@@ -1878,10 +1878,10 @@ export interface QueryBuilderContract<T = unknown> {
    * ```typescript
    * const results = await Vector.query()
    *   .where({ organization_id: "org-123", content_type: "summary" })
-   *   .nearestTo("embedding", queryEmbedding)
+   *   .similarTo("embedding", queryEmbedding)
    *   .limit(5)
    *   .get<VectorRow & { score: number }>();
    * ```
    */
-  nearestTo(column: string, embedding: number[], alias?: string): this;
+  similarTo(column: string, embedding: number[], alias?: string): this;
 }

@@ -203,12 +203,12 @@ export class PostgresQueryBuilder<T = unknown>
    * ```typescript
    * const results = await Vector.query()
    *   .where({ organization_id: "org-123", content_type: "summary" })
-   *   .nearestTo("embedding", queryEmbedding)
+   *   .similarTo("embedding", queryEmbedding)
    *   .limit(5)
    *   .get<VectorRow & { score: number }>();
    * ```
    */
-  public nearestTo(column: string, embedding: number[], alias = "score"): this {
+  public similarTo(column: string, embedding: number[], alias = "score"): this {
     // pgvector expects the literal format: [n,n,n,...]
     const literal = `[${embedding.join(",")}]`;
     const quotedCol = this.driver.dialect.quoteIdentifier(column);
@@ -236,8 +236,6 @@ export class PostgresQueryBuilder<T = unknown>
 
     return this;
   }
-
-
 
   /** Set a hydration callback that transforms each result row. */
   public hydrate(callback: (data: unknown, index: number) => unknown): this {
