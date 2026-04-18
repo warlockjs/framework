@@ -4,32 +4,39 @@ import { type Server } from "socket.io";
 import { type Router } from "../router";
 import { container } from "./../container";
 
-export const app = {
+type RuntimeApplication = {
+  socket: Server;
+  http: FastifyInstance;
+  router: Router;
+  database: DataSource;
+};
+
+export const app: RuntimeApplication = {
   /**
    * Socket Io Instance
    * Available only if socket.io config file exists
    */
-  get socket(): Server {
+  get socket() {
     return container.get("socket");
   },
   /**
    * HTTP Server Instance
    * Available only if http config file exists
    */
-  get http(): FastifyInstance {
+  get http() {
     return container.get("http.server");
   },
   /**
    * Router Instance
    */
-  get router(): Router {
+  get router() {
     return container.get("router");
   },
   /**
    * Database Instance
    * Available only if database config file exists
    */
-  get database(): DataSource {
+  get database() {
     return container.get("database.source");
   },
 };
