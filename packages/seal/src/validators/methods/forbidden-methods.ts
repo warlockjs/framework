@@ -9,6 +9,12 @@ import {
 import { forbiddenRule } from "../../rules/core/forbidden";
 import { BaseValidator } from "../base-validator";
 
+/**
+ * Marker re-exported by the validators barrel so the dts bundler keeps this
+ * module (and its `declare module` augmentation) in the bundled `.d.ts`.
+ */
+export const forbiddenMethodsApplied = true;
+
 declare module "../base-validator" {
   interface BaseValidator {
     /**

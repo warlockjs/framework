@@ -12,11 +12,18 @@ export * from "./array-validator";
 export * from "./base-validator";
 
 // BaseValidator prototype augmentations — must come after base-validator export
-// to ensure the class is fully initialized before augmentation
-import "./methods/equality-conditional-methods";
-import "./methods/forbidden-methods";
-import "./methods/present-methods";
-import "./methods/required-methods";
+// to ensure the class is fully initialized before augmentation.
+//
+// These are re-exported (not bare `import "..."`) on purpose: each module is a
+// side-effect-only `declare module` augmentation. A bare side-effect import gets
+// tree-shaken out of the bundled `.d.ts`, which silently drops every chainable
+// rule method (`.required()`, `.optional()`, `.requiredIfEmpty()`, …) from the
+// published types. Re-exporting a real marker keeps the module — and its
+// augmentation — in both the runtime bundle and the type bundle.
+export { equalityConditionalMethodsApplied } from "./methods/equality-conditional-methods";
+export { forbiddenMethodsApplied } from "./methods/forbidden-methods";
+export { presentMethodsApplied } from "./methods/present-methods";
+export { requiredMethodsApplied } from "./methods/required-methods";
 
 // Abstract intermediate bases — export after augmentations so prototype is ready
 export * from "./primitive-validator";

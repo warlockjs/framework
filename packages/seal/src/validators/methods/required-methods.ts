@@ -25,6 +25,14 @@ import { presentRule, requiredRule } from "../../rules/core/required";
 import type { SchemaContext } from "../../types";
 import { BaseValidator } from "../base-validator";
 
+/**
+ * Marker re-exported by the validators barrel so the dts bundler keeps this
+ * module (and its `declare module` augmentation) in the bundled `.d.ts`.
+ * Without a real export, side-effect-only augmentation modules get tree-shaken
+ * out of the published types, dropping every chainable rule method.
+ */
+export const requiredMethodsApplied = true;
+
 declare module "../base-validator" {
   interface BaseValidator {
     /**

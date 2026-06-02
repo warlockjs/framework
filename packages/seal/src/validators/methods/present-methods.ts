@@ -18,6 +18,12 @@ import {
 } from "../../rules/conditional/present-without-rules";
 import { BaseValidator } from "../base-validator";
 
+/**
+ * Marker re-exported by the validators barrel so the dts bundler keeps this
+ * module (and its `declare module` augmentation) in the bundled `.d.ts`.
+ */
+export const presentMethodsApplied = true;
+
 declare module "../base-validator" {
   interface BaseValidator {
     /**

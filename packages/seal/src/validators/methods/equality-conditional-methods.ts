@@ -4,6 +4,12 @@ import { whenRule } from "../../rules/core/when";
 import type { WhenRuleOptions } from "../../types";
 import { BaseValidator } from "../base-validator";
 
+/**
+ * Marker re-exported by the validators barrel so the dts bundler keeps this
+ * module (and its `declare module` augmentation) in the bundled `.d.ts`.
+ */
+export const equalityConditionalMethodsApplied = true;
+
 declare module "../base-validator" {
   interface BaseValidator {
     /**
