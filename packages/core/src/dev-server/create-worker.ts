@@ -40,9 +40,9 @@ export function createWorker(
 ): Worker {
   const isDevServerCore = env("DEV_SERVER_CORE");
 
-  // In dev: .ts file with tsx loader
-  // In prod: .js file (compiled)
-  const extension = isDevServerCore ? ".ts" : ".js";
+  // In dev (running core from source): .ts file with tsx loader.
+  // When published, core ships ESM modules with the .mjs extension (preserveModules).
+  const extension = isDevServerCore ? ".ts" : ".mjs";
   const workerUrl = new URL(`${workerPath}${extension}`, baseUrl);
   const workerFilePath = fileURLToPath(workerUrl);
 

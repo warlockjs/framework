@@ -1,3 +1,4 @@
+import { env } from "@mongez/dotenv";
 import { putFileAsync } from "@warlock.js/fs";
 import { build } from "esbuild";
 import { register } from "node:module";
@@ -43,7 +44,12 @@ export async function registerLoader(
 ): Promise<MessagePort> {
   const { port1, port2 } = new MessageChannel();
 
-  const hookThreadPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "hook-thread.ts");
+  // Running core from source → hook-thread.ts; published core ships .mjs.
+  const hookThreadExtension = env("DEV_SERVER_CORE") ? ".ts" : ".mjs";
+  const hookThreadPath = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    `hook-thread${hookThreadExtension}`,
+  );
 
   const bundleResult = await build({
     entryPoints: [hookThreadPath],
