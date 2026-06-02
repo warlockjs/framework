@@ -1,2 +1,0 @@
-import "./file.mjs";
-export {};

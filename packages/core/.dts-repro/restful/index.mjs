@@ -1,2 +1,0 @@
-import "./restful.mjs";
-export {};

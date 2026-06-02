@@ -9,6 +9,7 @@ import {
 import { execSync } from "node:child_process";
 import { CommandActionData } from "../cli/types";
 import { rootPath, srcPath } from "../utils";
+import { getWarlockVersion } from "../utils/framework-vesion";
 import { communicatorsConfigStub, socketConfigStub } from "./stubs";
 
 async function completeTestInstallation(options: CommandActionData) {
@@ -404,6 +405,16 @@ export async function addCommandAction(options: CommandActionData) {
 
     if (featurePackages.script) {
       Object.assign(scripts, featurePackages.script);
+    }
+  }
+
+  // Pin every @warlock.js/* feature package to the INSTALLED framework version so
+  // a scaffolded project's features match its core version instead of drifting to
+  // the feature map's static range.
+  const frameworkVersion = await getWarlockVersion();
+  for (const dependency of Object.keys(dependencies)) {
+    if (dependency.startsWith("@warlock.js/")) {
+      dependencies[dependency] = frameworkVersion;
     }
   }
 

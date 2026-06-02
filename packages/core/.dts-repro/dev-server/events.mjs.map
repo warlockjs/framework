@@ -1,1 +1,0 @@
-{"version":3,"file":"events.mjs","names":[],"sources":["../../src/dev-server/events.ts"],"sourcesContent":["export const DEV_SERVER_EVENTS = {\n  MANIFEST_NOT_FOUND: \"dev-server.manifest.not-found\",\n  FILE_READY: \"dev-server.file.ready\",\n};\n"],"mappings":";AAAA,MAAa,oBAAoB;CAC/B,oBAAoB;CACpB,YAAY;AACd"}

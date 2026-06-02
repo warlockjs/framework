@@ -1,1 +1,0 @@
-{"version":3,"file":"start.mjs","names":[],"sources":["../../src/cli/start.ts"],"sourcesContent":["import { CLICommandsManager } from \"./cli-commands.manager\";\n\nconst commandsManager = new CLICommandsManager();\nawait commandsManager.start();\n"],"mappings":";;AAGA,MAAM,IADsB,mBACR,EAAE,MAAM"}

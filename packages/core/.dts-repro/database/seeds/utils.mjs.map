@@ -1,1 +1,0 @@
-{"version":3,"file":"utils.mjs","names":[],"sources":["../../../src/database/seeds/utils.ts"],"sourcesContent":["export const seedsTableName = \"_seeds\";\n"],"mappings":";AAAA,MAAa,iBAAiB"}
