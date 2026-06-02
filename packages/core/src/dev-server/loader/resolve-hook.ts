@@ -1,4 +1,4 @@
-import { createPathsMatcher, getTsconfig } from "get-tsconfig";
+import { getTsconfig, resolvePathAlias } from "get-tsconfig";
 import { existsSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { ownResolve, type PathsMatcher } from "./own-resolver.js";
@@ -29,7 +29,9 @@ function getPathsMatcher(): PathsMatcher | null {
   if (pathsMatcherBuilt) return pathsMatcher;
   pathsMatcherBuilt = true;
   const tsconfig = getTsconfig(process.cwd());
-  pathsMatcher = tsconfig ? createPathsMatcher(tsconfig) : null;
+  // get-tsconfig v5 renamed the curried `createPathsMatcher(t)(spec)` to a direct
+  // `resolvePathAlias(t, spec)`. Wrap it to keep the PathsMatcher closure shape.
+  pathsMatcher = tsconfig ? (specifier: string) => resolvePathAlias(tsconfig, specifier) : null;
   return pathsMatcher;
 }
 
