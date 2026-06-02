@@ -24,10 +24,11 @@ const BCRYPTJS_INSTALL_INSTRUCTIONS = `
 Password encryption requires the bcryptjs package.
 Install it with:
 
-  npm install bcryptjs
+  yarn add bcryptjs
 
 Or with your preferred package manager:
 
+  npm install bcryptjs
   pnpm add bcryptjs
   yarn add bcryptjs
 `.trim();

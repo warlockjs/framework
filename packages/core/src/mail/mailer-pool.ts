@@ -14,7 +14,7 @@ const NODEMAILER_INSTALL_INSTRUCTIONS = `
 Email functionality requires the nodemailer package.
 Install it with:
 
-  warlock add mailer
+  warlock add mail
 
 Or manually:
 

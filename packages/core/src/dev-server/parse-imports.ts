@@ -1,4 +1,4 @@
-import { fileExistsAsync, isDirectoryAsync } from "@mongez/fs";
+import { fileExistsAsync, directoryExistsAsync } from "@warlock.js/fs";
 import { ImportSpecifier, parse } from "es-module-lexer";
 import path from "node:path";
 import { Path } from "./path";
@@ -113,62 +113,96 @@ export function isTypeOnlyFile(source: string): boolean {
 }
 
 /**
- * Extract import paths using regex (more reliable for TypeScript)
- * This is a fallback when es-module-lexer fails
+ * Check if an import statement is a pure `import type` (the keyword sits
+ * immediately after `import`, covering `import type { X }`, `import type Foo`,
+ * and `import type * as Ns`).
+ */
+function isTypeOnlyImport(line: string): boolean {
+  const trimmed = line.trim();
+
+  return trimmed.startsWith("import type ") || !!trimmed.match(/^import\s+type\s+[\{\*]/);
+}
+
+/**
+ * Decide whether an `import ... from "m"` statement contributes any runtime
+ * binding. Returns false for pure `import type` and for destructured imports
+ * where every specifier is prefixed with the `type` keyword.
+ */
+function hasRuntimeImports(line: string): boolean {
+  const trimmed = line.trim();
+
+  if (isTypeOnlyImport(trimmed)) {
+    return false;
+  }
+
+  const specifiersMatch = trimmed.match(/import\s+(?:type\s+)?\{([^}]+)\}/);
+
+  if (!specifiersMatch) {
+    return true;
+  }
+
+  const items = specifiersMatch[1].split(",").map((s) => s.trim()).filter(Boolean);
+
+  return !items.every((item) => /^type\s+\w+/.test(item));
+}
+
+/**
+ * Decide whether an `export ... from "m"` statement re-exports only types.
+ * Covers `export type { X } from`, `export type * from`, and
+ * `export { type X, type Y } from`.
+ */
+function isExportTypeOnlyStatement(line: string): boolean {
+  const trimmed = line.trim();
+
+  if (/^export\s+type\s+/.test(trimmed)) {
+    return true;
+  }
+
+  const specifiersMatch = trimmed.match(/export\s+\{([^}]+)\}/);
+
+  if (!specifiersMatch) {
+    return false;
+  }
+
+  const items = specifiersMatch[1].split(",").map((s) => s.trim()).filter(Boolean);
+
+  return items.every((item) => /^type\s+\w+/.test(item));
+}
+
+/**
+ * Extract import paths using regex (more reliable for TypeScript).
+ * Each entry carries an `isTypeOnly` flag: true when every occurrence of the
+ * path in the source is a type-only statement (no runtime binding).
+ * A single runtime occurrence makes the path runtime.
  */
 function extractImportPathsWithRegex(
   source: string,
-): Array<{ path: string; originalLine: string }> {
-  const imports: Array<{ path: string; originalLine: string }> = [];
-  const seenPaths = new Set<string>();
+): Array<{ path: string; originalLine: string; isTypeOnly: boolean }> {
+  const imports: Array<{ path: string; originalLine: string; isTypeOnly: boolean }> = [];
+  const seenPaths = new Map<string, number>();
 
   /**
-   * Check if an import line is type-only
-   * Handles:
-   * - import type { Foo } from "module"
-   * - import type Foo from "module"
-   * - import type * as Foo from "module"
+   * Record an import path with its type-only flag.
+   * If the same path appears in multiple statements, the edge is type-only
+   * iff every occurrence is type-only â€” a single runtime statement makes it runtime.
    */
-  const isTypeOnlyImport = (line: string): boolean => {
-    const trimmed = line.trim();
-    return trimmed.startsWith("import type ") || !!trimmed.match(/^import\s+type\s+[\{\*]/);
-  };
-
-  /**
-   * Check if an import has any runtime (non-type) imports
-   * Handles mixed imports: import { type Foo, runtimeBar } from "module"
-   * Returns true if there are runtime imports (should be tracked)
-   */
-  const hasRuntimeImports = (line: string): boolean => {
-    const trimmed = line.trim();
-
-    // If it's a pure type-only import, no runtime imports
-    if (isTypeOnlyImport(trimmed)) {
-      return false;
+  const record = (importPath: string, originalLine: string, isTypeOnly: boolean): void => {
+    if (!importPath) {
+      return;
     }
 
-    // Extract the import specifiers part: import { ... } from "module"
-    const specifiersMatch = trimmed.match(/import\s+\{([^}]+)\}/);
-    if (!specifiersMatch) {
-      // Not a destructured import, or it's a default/namespace import
-      // These are runtime imports unless marked with "import type"
-      return true;
+    const existingIndex = seenPaths.get(importPath);
+
+    if (existingIndex === undefined) {
+      seenPaths.set(importPath, imports.length);
+      imports.push({ path: importPath, originalLine, isTypeOnly });
+
+      return;
     }
 
-    const specifiers = specifiersMatch[1];
-
-    // Split by comma and check each specifier
-    const items = specifiers.split(",").map((s) => s.trim());
-
-    // Check if ALL items are type-only (prefixed with "type ")
-    const allTypeOnly = items.every((item) => {
-      // Match: "type Foo" or "type Foo as Bar"
-      return /^type\s+\w+/.test(item);
-    });
-
-    // If all are type-only, this import has no runtime imports
-    // Otherwise, it has at least one runtime import
-    return !allTypeOnly;
+    if (!isTypeOnly) {
+      imports[existingIndex].isTypeOnly = false;
+    }
   };
 
   // Pattern 1: Standard ES module imports (handles multiline)
@@ -177,98 +211,81 @@ function extractImportPathsWithRegex(
     /import\s+(?:type\s+)?(\{[\s\S]*?\}|\*\s+as\s+\w+|\w+(?:\s*,\s*\{[\s\S]*?\})?)\s+from\s+['"]([^'"]+)['"]/g;
 
   let match;
+
   while ((match = importRegex.exec(source)) !== null) {
     const fullMatch = match[0];
-    const importSpecifier = match[1];
     const importPath = match[2];
+    const isTypeOnly = !hasRuntimeImports(fullMatch);
 
-    // Skip type-only imports
-    if (fullMatch.match(/^import\s+type\s+/)) {
-      continue;
-    }
-
-    // Skip if it's a mixed import with only types
-    if (!hasRuntimeImports(fullMatch)) {
-      continue;
-    }
-
-    if (importPath && !seenPaths.has(importPath)) {
-      seenPaths.add(importPath);
-      imports.push({
-        path: importPath,
-        originalLine: fullMatch,
-      });
-    }
+    record(importPath, fullMatch, isTypeOnly);
   }
 
-  // Pattern 1b: Side-effect imports - import "path"
+  // Pattern 1b: Side-effect imports - import "path" â€” always runtime
   const sideEffectRegex = /import\s+['"]([^'"]+)['"]/g;
+
   while ((match = sideEffectRegex.exec(source)) !== null) {
-    const importPath = match[1];
-    if (importPath && !seenPaths.has(importPath)) {
-      seenPaths.add(importPath);
-      imports.push({
-        path: importPath,
-        originalLine: match[0],
-      });
-    }
+    record(match[1], match[0], false);
   }
 
-  // Pattern 2: Dynamic imports - import("path")
+  // Pattern 2: Dynamic imports - import("path") â€” always runtime
   const dynamicImportPattern = /import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+
   while ((match = dynamicImportPattern.exec(source)) !== null) {
-    const importPath = match[1];
-    if (importPath && !seenPaths.has(importPath)) {
-      seenPaths.add(importPath);
-      imports.push({
-        path: importPath,
-        originalLine: match[0],
-      });
-    }
+    record(match[1], match[0], false);
   }
 
   // Pattern 3: Export from - export ... from "path"
-  // Skip export type statements (e.g., export type { Foo } from "module")
   const exportFromPattern = /export\s+(?:\{[^}]*\}|\*|\w+)\s+from\s+['"]([^'"]+)['"]/g;
+
   while ((match = exportFromPattern.exec(source)) !== null) {
     const fullMatch = match[0];
 
-    // Skip type-only exports: export type ... from "module"
-    if (/^export\s+type\s+/.test(fullMatch)) {
-      continue;
-    }
-
-    const importPath = match[1];
-    if (importPath && !seenPaths.has(importPath)) {
-      seenPaths.add(importPath);
-      imports.push({
-        path: importPath,
-        originalLine: fullMatch,
-      });
-    }
+    record(match[1], fullMatch, isExportTypeOnlyStatement(fullMatch));
   }
 
   return imports;
 }
 
 /**
- * This function will transpile the given ts/tsx code to js code
- * // also it will return the dependencies of the file
- *
- * @returns Map of originalImportPath -> resolvedAbsolutePath
+ * Metadata for a single resolved import edge.
+ * `isTypeOnly` is true iff every import/export statement that references this
+ * path is type-only (pure `import type`, `export type`, or destructured lists
+ * where every specifier carries the `type` keyword). A single runtime
+ * occurrence flips the flag to false â€” that's what matters for cycle detection.
  */
-export async function parseImports(source: string, filePath: string) {
+export type ResolvedImport = {
+  absolutePath: string;
+  isTypeOnly: boolean;
+};
+
+/**
+ * Parse import/export statements in a TS/JS source file and return the
+ * resolved dependency edges keyed by the original import path. Includes
+ * type-only edges (flagged) so downstream consumers can distinguish runtime
+ * cycles from type-only ones.
+ *
+ * @example
+ * const importMap = await parseImports(source, "/abs/path/to/file.ts");
+ * for (const [importPath, { absolutePath, isTypeOnly }] of importMap) {
+ *   // ...
+ * }
+ */
+export async function parseImports(
+  source: string,
+  filePath: string,
+): Promise<Map<string, ResolvedImport>> {
   try {
     // Skip .d.ts files - they're type declarations, not runtime code
     if (filePath.endsWith(".d.ts")) {
-      return new Map<string, string>();
+      return new Map();
     }
 
     // Try es-module-lexer first (faster and more accurate for simple cases)
     try {
       const [imports] = await parse(source);
+
       if (imports && imports.length > 0) {
-        return await resolveImports(imports as ImportSpecifier[], filePath);
+        return await resolveImports(imports as ImportSpecifier[], source, filePath);
       }
     } catch (lexerError) {
       // es-module-lexer failed, fall back to regex-based extraction
@@ -277,78 +294,141 @@ export async function parseImports(source: string, filePath: string) {
 
     // Fallback: Use regex-based extraction (more forgiving with TypeScript)
     const regexImports = extractImportPathsWithRegex(source);
-    const resolvedImports = new Map<string, string>();
+    const resolvedImports = new Map<string, ResolvedImport>();
 
-    for (const { path: importPath } of regexImports) {
-      // Skip node built-ins and external packages
+    for (const { path: importPath, isTypeOnly } of regexImports) {
       if (isNodeBuiltin(importPath)) {
         continue;
       }
 
-      // Skip external node_modules packages (not starting with . or alias)
       if (!importPath.startsWith(".") && !tsconfigManager.isAlias(importPath)) {
         continue;
       }
 
       let resolvedPath: string | null = null;
 
-      // Handle alias imports
       if (tsconfigManager.isAlias(importPath)) {
         resolvedPath = await resolveAliasImport(importPath);
       } else if (importPath.startsWith(".")) {
-        // Handle relative imports
         resolvedPath = await resolveRelativeImport(importPath, filePath);
       }
 
       if (resolvedPath) {
-        resolvedImports.set(importPath, resolvedPath);
+        mergeResolvedImport(resolvedImports, importPath, resolvedPath, isTypeOnly);
       }
     }
 
     return resolvedImports;
   } catch (error) {
     console.error(`Error parsing imports for ${filePath}:`, error);
-    return new Map<string, string>();
+
+    return new Map();
   }
 }
 
-async function resolveImports(imports: ImportSpecifier[], filePath: string) {
-  const resolvedImports = new Map<string, string>();
+/**
+ * Merge a resolved import into the output map, preserving the type-only rule:
+ * a path is type-only iff every statement that references it is type-only.
+ */
+function mergeResolvedImport(
+  target: Map<string, ResolvedImport>,
+  importPath: string,
+  absolutePath: string,
+  isTypeOnly: boolean,
+): void {
+  const existing = target.get(importPath);
+
+  if (!existing) {
+    target.set(importPath, { absolutePath, isTypeOnly });
+
+    return;
+  }
+
+  if (!isTypeOnly) {
+    existing.isTypeOnly = false;
+  }
+}
+
+/**
+ * Resolve imports from `es-module-lexer` output. For each specifier, slice the
+ * raw statement (`ss..se`) and re-run the type-only heuristic so we can flag
+ * the edge correctly â€” the lexer itself does not distinguish `import type`.
+ */
+async function resolveImports(
+  imports: ImportSpecifier[],
+  source: string,
+  filePath: string,
+): Promise<Map<string, ResolvedImport>> {
+  const resolvedImports = new Map<string, ResolvedImport>();
 
   for (const imp of imports) {
     const importPath = imp.n;
 
-    if (!importPath) continue;
+    if (!importPath) {
+      continue;
+    }
 
-    // Skip node built-ins and external packages
     if (isNodeBuiltin(importPath)) {
       continue;
     }
 
-    // console.log(importPath, tsconfigManager.isAlias(importPath));
-
-    // Skip external node_modules packages (not starting with . or alias)
     if (!importPath.startsWith(".") && !tsconfigManager.isAlias(importPath)) {
       continue;
     }
 
     let resolvedPath: string | null = null;
 
-    // Handle alias imports (e.g., app/users/services/get-users.service)
     if (tsconfigManager.isAlias(importPath)) {
       resolvedPath = await resolveAliasImport(importPath);
     } else if (importPath.startsWith(".")) {
-      // Handle relative imports (e.g., ./../services/get-user.service)
       resolvedPath = await resolveRelativeImport(importPath, filePath);
     }
 
-    if (resolvedPath) {
-      // Store mapping: original import path -> resolved absolute path
-      resolvedImports.set(importPath, resolvedPath);
+    if (!resolvedPath) {
+      continue;
     }
+
+    const isTypeOnly = isLexerStatementTypeOnly(imp, source);
+
+    mergeResolvedImport(resolvedImports, importPath, resolvedPath, isTypeOnly);
   }
 
   return resolvedImports;
+}
+
+/**
+ * Classify a single lexer-reported statement as type-only or runtime.
+ * Dynamic imports (`import(...)`) are always runtime. For static
+ * imports/export-from we slice the raw source and apply the same heuristic
+ * the regex fallback uses.
+ */
+function isLexerStatementTypeOnly(imp: ImportSpecifier, source: string): boolean {
+  // Dynamic imports always execute â€” they cannot be type-only.
+  // es-module-lexer reports dynamic with a.n === undefined typically, but
+  // we guard by checking the statement prefix too.
+  const statementStart = imp.ss;
+  const statementEnd = imp.se;
+
+  if (
+    typeof statementStart !== "number" ||
+    typeof statementEnd !== "number" ||
+    statementEnd <= statementStart
+  ) {
+    return false;
+  }
+
+  const statement = source.slice(statementStart, statementEnd);
+  const trimmed = statement.trim();
+
+  if (trimmed.startsWith("import(") || /^\bimport\s*\(/.test(trimmed)) {
+    return false;
+  }
+
+  if (trimmed.startsWith("export")) {
+    return isExportTypeOnlyStatement(statement);
+  }
+
+  return !hasRuntimeImports(statement);
 }
 
 /**
@@ -444,7 +524,7 @@ async function tryResolveWithExtensions(basePath: string): Promise<string | null
   }
 
   // Try index files in directory
-  if (await isDirectoryAsync(normalizedBase)) {
+  if (await directoryExistsAsync(normalizedBase)) {
     const indexPaths = extensions.map((extension) =>
       Path.join(normalizedBase, `index${extension}`),
     );

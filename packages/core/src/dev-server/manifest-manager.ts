@@ -1,4 +1,4 @@
-import { fileExistsAsync, getJsonFileAsync, putFileAsync } from "@mongez/fs";
+import { fileExistsAsync, getJsonFileAsync, putFileAsync } from "@warlock.js/fs";
 import { FileManager } from "./file-manager";
 import type { FileManifest } from "./types";
 import { MANIFEST_PATH } from "./flags";

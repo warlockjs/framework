@@ -1,0 +1,1 @@
+{"version":3,"file":"noop.channel.mjs","names":[],"sources":["../../../src/benchmark/channels/noop.channel.ts"],"sourcesContent":["import type { BenchmarkChannel } from \"../types\";\n\nexport class NoopChannel implements BenchmarkChannel {\n  public onFlush(): void {}\n}\n"],"mappings":";AAEA,IAAa,cAAb,MAAqD;CACnD,UAAuB,CAAC;AAC1B"}

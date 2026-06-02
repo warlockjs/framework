@@ -30,7 +30,19 @@ type HeaderKeys = keyof StandardHeaders;
 
 export class Request<RequestValidation = any> {
   /**
-   * Fastify Request object
+   * Underlying Fastify request — a public escape hatch to capabilities the
+   * framework's high-level helpers don't yet cover.
+   *
+   * **Prefer framework methods first**: `request.input()`, `request.header()`,
+   * `request.body`, `request.query`, `request.params`, `request.file()`,
+   * `request.user`, `request.detectIp()`, etc. They handle locale, parsing,
+   * trust-proxy, and validation pipeline integration correctly.
+   *
+   * **Reach for `baseRequest` only** when the framework genuinely lacks a
+   * helper for what you need — and when you do, file an issue so we can add
+   * it. The escape hatch is the release valve that lets consumers move
+   * faster than the framework, but every long-term reach here is a missing
+   * helper waiting to be added.
    */
   public baseRequest!: FastifyRequest;
 
@@ -119,6 +131,8 @@ export class Request<RequestValidation = any> {
   public setRequest(request: FastifyRequest) {
     this.baseRequest = request;
 
+    this.resolveRequestId();
+
     this.parsePayload();
 
     const localeCode = this.getLocaleCode();
@@ -126,6 +140,48 @@ export class Request<RequestValidation = any> {
     this.trans = this.t = transFrom.bind(null, localeCode);
 
     return this;
+  }
+
+  /**
+   * Inherit `X-Request-Id` from the incoming request, fall back to a custom
+   * generator, then to the field-init default (`Random.string(32)`).
+   *
+   * Inherited values are validated (length cap + printable-ASCII) to prevent
+   * log-injection from a malicious client. Disable the whole behavior by
+   * setting `http.requestId.enabled = false` — in which case the field-init
+   * default is used regardless of any incoming header.
+   */
+  protected resolveRequestId() {
+    const requestIdConfig = config.key("http.requestId") || {};
+
+    if (requestIdConfig.enabled === false) return;
+
+    const headerName = (requestIdConfig.header || "x-request-id").toLowerCase();
+    const incoming = this.baseRequest.headers[headerName];
+
+    if (Request.isValidRequestId(incoming)) {
+      this.id = incoming;
+
+      return;
+    }
+
+    if (typeof requestIdConfig.generator === "function") {
+      this.id = requestIdConfig.generator();
+    }
+  }
+
+  /**
+   * Validate a candidate request-id value. Accepts non-empty printable ASCII
+   * up to 128 characters — tight enough to reject newline / control-character
+   * log-injection, loose enough to accept UUIDs, ULIDs, snowflakes, etc.
+   */
+  protected static isValidRequestId(value: unknown): value is string {
+    return (
+      typeof value === "string" &&
+      value.length > 0 &&
+      value.length <= 128 &&
+      /^[\x21-\x7e]+$/.test(value)
+    );
   }
 
   /**
@@ -476,7 +532,7 @@ export class Request<RequestValidation = any> {
   public log(message: any, level: LogLevel = "info") {
     if (!config.key("http.log")) return;
 
-    log({
+    log.log({
       module: "request",
       action: this.route.method + " " + this.route.path.replace("/*", "") + `:${this.id}`,
       message,
@@ -509,7 +565,12 @@ export class Request<RequestValidation = any> {
   }
 
   /**
-   * Run middleware
+   * Drive the middleware chain for the current route, then defer to the
+   * controller. Returns the first response value any middleware short-circuits
+   * with, or `undefined` to continue into validation + handler.
+   *
+   * @internal Framework orchestration — do not call from app code. Will move
+   * to a dedicated controller dispatcher in a future refactor.
    */
   public async runMiddleware() {
     // measure request time
@@ -534,7 +595,9 @@ export class Request<RequestValidation = any> {
   }
 
   /**
-   * Get route handler
+   * Return the request handler attached to the current route.
+   *
+   * @internal Framework orchestration — do not call from app code.
    */
   public getHandler() {
     return this.route.handler;
@@ -569,7 +632,11 @@ export class Request<RequestValidation = any> {
   }
 
   /**
-   * Execute the request
+   * Top-level entry into the request lifecycle — opens the context store,
+   * runs middleware, drives the handler, handles errors.
+   *
+   * @internal Framework orchestration — do not call from app code. Wired
+   * from the Fastify route handler in `router.scan()`.
    */
   public async execute() {
     try {
@@ -586,7 +653,10 @@ export class Request<RequestValidation = any> {
   }
 
   /**
-   * Execute middleware list of current route
+   * Iterate the collected middlewares in order; return the first short-circuit
+   * value or `undefined` when every middleware passes through.
+   *
+   * @internal Framework orchestration — do not call from app code.
    */
   protected async executeMiddleware() {
     // collect all middlewares for current route
@@ -626,7 +696,10 @@ export class Request<RequestValidation = any> {
   }
 
   /**
-   * Collect middlewares for current route
+   * Gather the middleware list for the current route — today just the
+   * route-level array; future extraction may merge group + app-wide layers.
+   *
+   * @internal Framework orchestration — do not call from app code.
    */
   protected collectMiddlewares(): Middleware[] {
     const middlewaresList: Middleware[] = [];
@@ -927,14 +1000,27 @@ export class Request<RequestValidation = any> {
   }
 
   /**
-   * Get request ip
+   * Immediate-peer IP as Fastify reports it — the address that connected to
+   * the server socket, with `trustProxy` resolution applied. Use this when
+   * you specifically need the peer address (rate-limit-by-direct-connection,
+   * health-check origin verification).
+   *
+   * **For most use cases prefer `request.detectIp()`** — behind any proxy
+   * (load balancer, CDN, sidecar) `ip` reports the proxy, not the real client.
    */
   public get ip() {
     return this.baseRequest.ip;
   }
 
   /**
-   * Detect proper ip
+   * Best-effort real client IP — checks `X-Real-IP` and `X-Forwarded-For`
+   * headers first, falls back to `baseRequest.ip` when neither is present.
+   *
+   * **Prefer this over `request.ip` for any caller behind a proxy** (load
+   * balancer, CDN, reverse proxy, k8s ingress). Only trust the result as
+   * far as you trust the upstream proxy chain — `X-Forwarded-For` is
+   * client-settable; verify the request came through your trusted edge
+   * before treating the value as authoritative.
    */
   public detectIp() {
     // as the server maybe used behind a proxy

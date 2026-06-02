@@ -8,6 +8,7 @@ import { trans } from "@mongez/localization";
 import { GenericObject } from "@mongez/reinforcements";
 import { DatabaseWriterValidationError } from "@warlock.js/cascade";
 import { contextManager } from "@warlock.js/context";
+import config from "@mongez/config";
 import { environment } from "../../utils";
 import {
   requestContext as requestContextInstance,
@@ -28,6 +29,23 @@ import { type ReturnedResponse } from "./../types";
 // Contexts are now registered in core/context/init-contexts.ts via initializeContexts()
 
 /**
+ * Echo `request.id` back as a response header so the FE / proxies / log
+ * aggregators can correlate by the same value the server logs against.
+ *
+ * Reads the header name from `http.requestId.header` (default `X-Request-Id`).
+ * Skip when `http.requestId.enabled` is explicitly false.
+ */
+function stampRequestIdHeader(request: Request, response: Response) {
+  const requestIdConfig = config.get("http.requestId", {} as Record<string, any>);
+
+  if (requestIdConfig.enabled === false) return;
+
+  const headerName = requestIdConfig.header || "X-Request-Id";
+
+  response.header(headerName, request.id);
+}
+
+/**
  * Create request store and execute middleware + handler
  *
  * Runs all registered contexts together using ContextManager.
@@ -36,6 +54,8 @@ export function createRequestStore(
   request: Request<any>,
   response: Response,
 ): Promise<ReturnedResponse> {
+  stampRequestIdHeader(request, response);
+
   // Build all context stores using the immutable API
   // Each context defines its own store initialization via buildStore()
   const httpContextStore = contextManager.buildStores({ request, response });

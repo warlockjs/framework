@@ -1,4 +1,4 @@
-import { fileExistsAsync } from "@mongez/fs";
+import { fileExistsAsync } from "@warlock.js/fs";
 import { createReadStream } from "fs";
 import fs from "fs/promises";
 import path from "path";
@@ -481,7 +481,7 @@ export class ScopedStorage implements ScopedStorageContract {
    *
    * Recursively walks the local directory, applies an optional filter, then
    * streams each file into storage. Uploads run in concurrent batches for
-   * efficiency. Failures are collected — a single failed file never aborts
+   * efficiency. Failures are collected â€” a single failed file never aborts
    * the entire operation (mirrors the contract of `deleteMany`).
    *
    * @param localDirPath  - Absolute path of the local directory to upload

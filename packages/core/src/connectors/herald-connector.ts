@@ -1,7 +1,7 @@
 import config from "@mongez/config";
 import { log } from "@warlock.js/logger";
 import { BaseConnector } from "./base-connector";
-import { ConnectorPriority } from "./types";
+import { ConnectorLifecyclePhase, ConnectorPriority } from "./types";
 
 /**
  * Herald Connector
@@ -10,6 +10,7 @@ import { ConnectorPriority } from "./types";
 export class HeraldConnector extends BaseConnector {
   public readonly name = "herald";
   public readonly priority = ConnectorPriority.COMMUNICATOR;
+  public readonly lifecyclePhase = ConnectorLifecyclePhase.Early;
 
   /**
    * Files that trigger herald restart

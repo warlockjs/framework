@@ -1,10 +1,10 @@
 import { colors } from "@mongez/copper";
-import { ensureDirectoryAsync, putFileAsync } from "@mongez/fs";
 import path from "node:path";
 import type { CommandActionData } from "../../../types";
 import { migrationStub, modelStub } from "../templates/stubs";
 import { parseModulePath, singularName } from "../utils/name-parser";
 import { componentExists, moduleExists, resolveModulePath } from "../utils/path-resolver";
+import { ensureDirectoryAsync, putFileAsync, setDryRun } from "../utils/writer";
 
 export async function generateModel(data: CommandActionData): Promise<void> {
   const input = data.args[0];
@@ -33,8 +33,9 @@ export async function generateModel(data: CommandActionData): Promise<void> {
 
   const name = singularName(componentName);
   const force = data.options.force || data.options.f;
+  setDryRun(Boolean(data.options.dryRun));
   const withResource = data.options.withResource || data.options.rs;
-  const tableName = (data.options.table as string) || `${name.snake}s`;
+  const tableName = (data.options.table as string) || name.plural.snake;
 
   // Check if model already exists
   const modelDir = path.join(resolveModulePath(module), "models", name.kebab);
@@ -53,13 +54,11 @@ export async function generateModel(data: CommandActionData): Promise<void> {
   // Generate model
   const modelContent = modelStub(name, { tableName, withResource: !!withResource });
   await putFileAsync(modelPath, modelContent);
-  console.log(colors.green(`✓ Created model: ${modelPath}`));
 
   // Generate index.ts
   const indexContent = `export * from "./${name.kebab}.model";
 `;
   await putFileAsync(path.join(modelDir, "index.ts"), indexContent);
-  console.log(colors.green(`✓ Created index.ts`));
 
   // Generate migration
   const timestamp = new Date().toISOString().replace(/[-:T]/g, "_").split(".")[0];
@@ -74,9 +73,8 @@ export async function generateModel(data: CommandActionData): Promise<void> {
   });
 
   await putFileAsync(migrationPath, migrationContent);
-  console.log(colors.green(`✓ Created migration: ${migrationPath}`));
 
-  console.log(colors.cyan(`\n✨ Model "${name.pascal}" generated successfully!`));
+  console.log(colors.cyan(`\nâœ¨ Model "${name.pascal}" generated successfully!`));
   console.log(colors.gray(`\nNext steps:`));
   console.log(colors.gray(`  1. Update model schema in ${name.kebab}.model.ts`));
   console.log(

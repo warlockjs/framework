@@ -1,7 +1,7 @@
 import { storage } from "../storage";
 import { loadS3 } from "../storage/drivers/cloud-driver";
 import { BaseConnector } from "./base-connector";
-import { ConnectorPriority } from "./types";
+import { ConnectorLifecyclePhase, ConnectorPriority } from "./types";
 
 /**
  * Cache Connector
@@ -10,6 +10,7 @@ import { ConnectorPriority } from "./types";
 export class StorageConnector extends BaseConnector {
   public readonly name = "storage";
   public readonly priority = ConnectorPriority.STORAGE;
+  public readonly lifecyclePhase = ConnectorLifecyclePhase.Early;
 
   /**
    * Files that trigger cache restart

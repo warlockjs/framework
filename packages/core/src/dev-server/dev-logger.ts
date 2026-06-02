@@ -3,67 +3,107 @@ import dayjs from "dayjs";
 import { Path } from "./path";
 
 /**
- * Dev server logger with Vite-like formatting
+ * Dev server logger — Vite-style formatting helpers.
  */
 
-// Timestamp formatter
 function timestamp(): string {
   return colors.dim(`${dayjs().format("HH:mm:ss A")}`);
 }
 
-// Main log function
 export function devLog(message: string) {
   console.log(`${timestamp()} ${message}`);
 }
 
-// Success log (green checkmark)
 export function devLogSuccess(message: string) {
   console.log(`${timestamp()} ${colors.green("✓")} ${colors.green(message)}`);
 }
 
-// Error log (red X)
-export function devLogError(message: string, error?: any) {
-  console.log(`${timestamp()} ${colors.red("✗")} ${colors.red(message)}`);
-  if (error && error.stack) {
-    // Clean up error stack to show relative paths
-    const cleanStack = cleanErrorStack(error.stack);
-    console.log(colors.dim(cleanStack));
-  }
+/**
+ * Colourise a stack trace so the eye lands on *your* code.
+ *
+ * - Error header (`ReferenceError: x is not defined`) → bold red.
+ * - Frames in project `src/` → highlighted: a green `›` pointer, yellow
+ *   function name, cyan relative path, dim `:line:col`. These are almost
+ *   always where the bug is.
+ * - Framework (`@warlock.js`), `node_modules`, and `node:` internal frames
+ *   → dimmed and relativised. Still there for context, just out of the way.
+ *
+ * Source maps are enabled in dev, so the paths/lines here are already the
+ * original `.ts` locations — this only changes how they're painted.
+ */
+export function formatErrorStack(stack: string): string {
+  const frame = /^(\s*)at (.+?) \((.+):(\d+):(\d+)\)$/;
+  const bareFrame = /^(\s*)at (.+):(\d+):(\d+)$/;
+  let headerDone = false;
+
+  return stack
+    .split("\n")
+    .map(line => {
+      const withFn = line.match(frame);
+      const bare = line.match(bareFrame);
+
+      if (!withFn && !bare) {
+        // Header line(s) before the first frame.
+        const painted = headerDone ? colors.dim(line) : colors.bold(colors.red(line));
+        return painted;
+      }
+
+      headerDone = true;
+
+      const fn = withFn ? withFn[2] : "";
+      const file = withFn ? withFn[3] : bare![2];
+      const lineNo = withFn ? withFn[4] : bare![3];
+      const col = withFn ? withFn[5] : bare![4];
+
+      const isNodeInternal = file.startsWith("node:");
+      const isDep = file.includes("node_modules");
+      const isFramework = /[\\/]@warlock\.js[\\/]/.test(file);
+      const isUserCode = !isNodeInternal && !isDep && !isFramework;
+
+      const rel = isNodeInternal ? file : Path.toRelative(file);
+      const loc = `:${lineNo}:${col}`;
+
+      if (isUserCode) {
+        return (
+          `  ${colors.green("›")} ${colors.dim("at")} ` +
+          `${colors.yellow(fn || "<anonymous>")} ` +
+          `${colors.cyan(rel)}${colors.dim(loc)}`
+        );
+      }
+
+      const label = fn ? `at ${fn} ${rel}${loc}` : `at ${rel}${loc}`;
+      return `    ${colors.dim(label)}`;
+    })
+    .join("\n");
 }
 
-// Warning log (yellow)
+export function devLogError(message: string, error?: any) {
+  console.log(`${timestamp()} ${colors.red("✗")} ${colors.red(message)}`);
+  if (error?.stack) console.log(formatErrorStack(error.stack));
+}
+
 export function devLogWarn(message: string) {
   console.log(`${timestamp()} ${colors.yellow("⚠")} ${colors.yellow(message)}`);
 }
 
-// Info log (cyan)
 export function devLogInfo(message: string) {
   console.log(`${timestamp()} ${colors.cyan(message)}`);
 }
 
-// Dim log (for less important info)
 export function devLogDim(message: string) {
   console.log(`${timestamp()} ${colors.dim(message)}`);
 }
 
-// HMR update log (like Vite)
 export function devLogHMR(file: string, dependents?: number) {
   const relativePath = Path.toRelative(file);
   const depInfo = dependents
     ? colors.dim(` +${dependents} module${dependents > 1 ? "s" : ""}`)
     : "";
-  // console.log(`${timestamp()} ✨ ${colors.green("hmr update")}✨ ${colors.dim(relativePath)}${depInfo}`);
   console.log(
     `${timestamp()} 🔥 ${colors.green("hmr update")} ${colors.dim(relativePath)}${depInfo}`,
   );
 }
 
-// FSR log
-export function devLogFSR(reason: string) {
-  console.log(`${timestamp()} ${colors.yellow("full restart")} ${colors.dim(reason)}`);
-}
-
-// Config reload log
 export function devLogConfig(file: string, connectors?: string[]) {
   const relativePath = Path.toRelative(file);
   const connectorInfo =
@@ -73,113 +113,43 @@ export function devLogConfig(file: string, connectors?: string[]) {
   );
 }
 
-// Ready log (like Vite's ready message)
 export function devLogReady(message: string) {
   console.log(`\n${timestamp()}  ${colors.green("➜")}  ${colors.bold(message)}`);
 }
 
-// Section header
 export function devLogSection(title: string) {
   console.log(`\n${timestamp()} ${colors.bold(colors.cyan(title))}`);
 }
 
-// Clean error stack to show relative paths instead of absolute cache paths
-function cleanErrorStack(stack: string): string {
-  const lines = stack.split("\n");
-  const cleaned = lines.map((line) => {
-    // Replace absolute cache paths with relative source paths
-    // Pattern: D:\...\dev-server\.warlock\cache\src-app-users-main.js
-    // Replace with: src/app/users/main.ts
-
-    let cleanedLine = line;
-
-    // Remove cache directory references
-    cleanedLine = cleanedLine.replace(/\.warlock[\\\/]cache[\\\/]/g, "");
-
-    // Convert cache file names back to source paths
-    // src-app-users-main.js → src/app/users/main.ts
-    cleanedLine = cleanedLine.replace(/([a-zA-Z0-9_-]+(?:-[a-zA-Z0-9_-]+)+)\.js/g, (match, p1) => {
-      const sourcePath = p1.replace(/-/g, "/") + ".ts";
-      return sourcePath;
-    });
-
-    // Make paths relative
-    try {
-      const absolutePathMatch = cleanedLine.match(/([A-Z]:\\[^:]+|\/[^:]+)(?=:|\))/);
-      if (absolutePathMatch) {
-        const absolutePath = absolutePathMatch[1];
-        const relativePath = Path.toRelative(absolutePath);
-        cleanedLine = cleanedLine.replace(absolutePath, relativePath);
-      }
-    } catch {
-      // If path conversion fails, keep original
-    }
-
-    return cleanedLine;
-  });
-
-  return cleaned.join("\n");
-}
-
-// Format module not found errors with enhanced context
+/**
+ * Format ERR_MODULE_NOT_FOUND so the displayed paths are relative to the
+ * project root. The loader hook keeps source paths in the URL so we only
+ * need to strip the absolute prefix — no cache-path translation any more.
+ */
 export function formatModuleNotFoundError(error: Error, suggestions?: string[]): string {
-  const message = error.message;
+  const match = error.message.match(/Cannot find module '([^']+)' imported from '([^']+)'/);
+  if (!match) return error.message;
 
-  // Extract paths from error message
-  // Pattern: Cannot find module 'D:\...\cache\src-app-users-utils.js' imported from 'D:\...\main.js'
-  const match = message.match(/Cannot find module '([^']+)' imported from '([^']+)'/);
+  const [, modulePath, importerPath] = match;
+  const lines: string[] = [
+    "",
+    `${colors.red("❌ MODULE NOT FOUND")}`,
+    "",
+    `${colors.dim("Cannot find:")} ${colors.cyan(Path.toRelative(modulePath))}`,
+    "",
+    `${colors.dim("Imported by:")}`,
+    `  ${colors.yellow("→")} ${colors.white(Path.toRelative(importerPath))}`,
+  ];
 
-  if (match) {
-    const [, modulePath, importerPath] = match;
-
-    // Convert cache paths to source paths
-    const cleanModulePath = modulePath
-      .replace(/\.warlock[\\\/]cache[\\\/]/, "")
-      .replace(
-        /([a-zA-Z0-9_-]+(?:-[a-zA-Z0-9_-]+)+)\.js/,
-        (m, p1) => p1.replace(/-/g, "/") + ".ts",
-      );
-
-    const cleanImporterPath = importerPath
-      .replace(/\.warlock[\\\/]cache[\\\/]/, "")
-      .replace(
-        /([a-zA-Z0-9_-]+(?:-[a-zA-Z0-9_-]+)+)\.js/,
-        (m, p1) => p1.replace(/-/g, "/") + ".ts",
-      );
-
-    // Make paths relative
-    const relativeModule = Path.toRelative(cleanModulePath);
-    const relativeImporter = Path.toRelative(cleanImporterPath);
-
-    // Build formatted message
-    const lines: string[] = [
-      "",
-      `${colors.red("❌ MODULE NOT FOUND")}`,
-      "",
-      `${colors.dim("Cannot find:")} ${colors.cyan(relativeModule)}`,
-      "",
-      `${colors.dim("Imported by:")}`,
-      `  ${colors.yellow("→")} ${colors.white(relativeImporter)}`,
-    ];
-
-    // Add suggestions if provided
-    if (suggestions && suggestions.length > 0) {
-      lines.push("");
-      lines.push(`${colors.dim("Did you mean?")}`);
-      suggestions.forEach((s) => {
-        lines.push(`  ${colors.cyan("→")} ${colors.green(s)}`);
-      });
-    }
-
+  if (suggestions && suggestions.length > 0) {
     lines.push("");
-
-    return lines.join("\n");
+    lines.push(`${colors.dim("Did you mean?")}`);
+    suggestions.forEach(s => lines.push(`  ${colors.cyan("→")} ${colors.green(s)}`));
   }
 
-  return message;
+  lines.push("");
+  return lines.join("\n");
 }
 
-// Legacy function for backward compatibility
-export function devServeLog(message: string) {
-  devLog(message);
-}
+/** @deprecated alias retained for older callers. Use `devLog` directly. */
+export const devServeLog = devLog;

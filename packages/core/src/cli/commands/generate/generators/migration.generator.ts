@@ -1,11 +1,11 @@
 import { colors } from "@mongez/copper";
-import { ensureDirectoryAsync, putFileAsync } from "@mongez/fs";
 import path from "node:path";
 import { appPath } from "../../../../utils";
 import type { CommandActionData } from "../../../types";
 import { migrationAlterStub, migrationStub } from "../templates/stubs";
 import { parseColumnDsl } from "./column-dsl-parser";
 import { parseName } from "../utils/name-parser";
+import { ensureDirectoryAsync, putFileAsync, setDryRun } from "../utils/writer";
 
 /**
  * Generate a migration file for a model
@@ -75,7 +75,6 @@ export async function createMigrationFile(moduleName: string, entityName: string
   const migrationFilePath = path.join(migrationsPath, migrationFileName);
   await putFileAsync(migrationFilePath, migrationContent);
 
-  console.log(colors.green(`✓ Created ${migrationFileName}`));
   return migrationFilePath;
 }
 
@@ -101,9 +100,11 @@ export async function generateMigration(data: CommandActionData) {
     return;
   }
 
+  setDryRun(Boolean(data.options.dryRun));
+
   const migrationFilePath = await createMigrationFile(moduleName, entityName, data.options);
 
   console.log(
-    colors.cyan(`\n✨ Migration file created at: ${path.relative(appPath(), migrationFilePath)}`),
+    colors.cyan(`\nâœ¨ Migration file created at: ${path.relative(appPath(), migrationFilePath)}`),
   );
 }

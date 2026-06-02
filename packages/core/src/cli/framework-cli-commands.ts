@@ -12,7 +12,6 @@ import {
   generateRepositoryCommand,
   generateResourceCommand,
   generateServiceCommand,
-  generateValidationCommand,
 } from "./commands/generate/generate.command";
 import { migrateCommand } from "./commands/migrate.command";
 import { seedCommand } from "./commands/seed.command";
@@ -46,7 +45,6 @@ export const frameworkCommands = [
   generateModelCommand,
   generateRepositoryCommand,
   generateResourceCommand,
-  generateValidationCommand,
   generateMigrationCommand,
 
   // storage commands

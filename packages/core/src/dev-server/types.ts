@@ -1,4 +1,3 @@
-export type LayerType = "FSR" | "HMR";
 export type FileType =
   | "main"
   | "config"
@@ -15,33 +14,24 @@ export type FileManifest = {
   lastModified: number;
   hash: string;
   dependencies: string[];
+  /**
+   * Subset of `dependencies` reached only through type-only imports
+   * (`import type`, `export type`, or specifier lists where every entry is
+   * prefixed with `type`). Used by the dependency graph to filter cycles
+   * that have no runtime effect. Optional for backwards compatibility —
+   * older manifests default to an empty set (every edge treated as runtime).
+   */
+  typeOnlyDependencies?: string[];
   dependents: string[];
-  version: number;
   type: FileType;
-  layer: LayerType;
-  cachePath: string;
 };
 
 /**
- * File processing state in the unified pipeline
+ * File processing state.
  *
- * Lifecycle: idle → loading → parsed → transpiled → ready
- *
- * - `idle`: Initial state, no processing started
- * - `loading`: Reading source from disk
- * - `parsed`: Source loaded and imports discovered
- * - `transpiled`: TypeScript compiled to JavaScript
- * - `ready`: Fully processed and available for use
- * - `updating`: Being reprocessed after a change
- * - `deleted`: File has been removed from disk
- * - `error`: Processing failed
+ * - `idle`: not yet processed
+ * - `loading`: reading source
+ * - `ready`: parsed and available
+ * - `deleted`: removed from disk
  */
-export type FileState =
-  | "idle"
-  | "loading"
-  | "parsed"
-  | "transpiled"
-  | "ready"
-  | "error"
-  | "updating"
-  | "deleted";
+export type FileState = "idle" | "loading" | "ready" | "deleted";

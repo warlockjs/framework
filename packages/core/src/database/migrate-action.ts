@@ -1,5 +1,13 @@
 import { colors } from "@mongez/copper";
-import { Migration, migrationRunner } from "@warlock.js/cascade";
+import {
+  exportMigrationsSQL,
+  freshMigrate,
+  listExecutedMigrations,
+  Migration,
+  migrationRunner,
+  rollbackMigrations,
+  runMigrations,
+} from "@warlock.js/cascade";
 import dayjs from "dayjs";
 import path from "path";
 import { CommandActionData } from "../cli/types";
@@ -10,7 +18,7 @@ import { srcPath } from "../utils";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 
 async function listMigrationsAction() {
-  const createdMigrations = await migrationRunner.getExecutedMigrations();
+  const createdMigrations = await listExecutedMigrations();
 
   console.log(`\nTotal Executed Migrations: ${colors.green(createdMigrations.length)}\n`);
 
@@ -78,17 +86,25 @@ export async function migrateAction(options: CommandActionData) {
     process.exit(1);
   }
 
-  if (rollback || fresh) {
-    await migrationRunner.rollbackAll();
+  if (rollback) {
+    await rollbackMigrations({ all: true });
+    return;
   }
-
-  if (rollback) return;
 
   if (sql) {
-    await migrationRunner.exportSQL({ pendingOnly: pendingOnly as boolean, compact: compact as boolean });
-  } else {
-    await migrationRunner.runAll();
+    await exportMigrationsSQL({
+      pendingOnly: pendingOnly as boolean,
+      compact: compact as boolean,
+    });
+    return;
   }
+
+  if (fresh) {
+    await freshMigrate();
+    return;
+  }
+
+  await runMigrations();
 }
 
 async function loadMigrationFile(absPath: string) {

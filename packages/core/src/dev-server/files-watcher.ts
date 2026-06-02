@@ -71,10 +71,11 @@ export class FilesWatcher {
 
     // Build paths to watch:
     // 1. All .env variants that exist
-    // 2. src directory
-    // 3. Any additional paths from user config
+    // 2. warlock.config.ts (project-level settings; restart-required on change)
+    // 3. src directory
+    // 4. Any additional paths from user config
     const envPaths = ENV_FILES.map((file) => rootPath(file));
-    const basePaths = [...envPaths, srcPath()];
+    const basePaths = [...envPaths, rootPath("warlock.config.ts"), srcPath()];
     const additionalPaths = userWatchConfig?.include || config?.include || [];
 
     const paths = [...basePaths, ...additionalPaths].map((path) => Path.normalize(path));

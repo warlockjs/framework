@@ -1,6 +1,7 @@
-import { ensureDirectoryAsync, fileExistsAsync } from "@mongez/fs";
+import { directoryExistsAsync, fileExistsAsync } from "@warlock.js/fs";
 import path from "node:path";
 import { appPath } from "../../../../utils";
+import { ensureDirectoryAsync } from "./writer";
 
 /**
  * Resolve module path
@@ -28,9 +29,13 @@ export function resolveComponentPath(
 
 /**
  * Check if module exists
+ *
+ * A module is a DIRECTORY under the app path, so this uses
+ * `directoryExistsAsync` — `fileExistsAsync` would resolve `false` for a folder
+ * and wrongly gate every module-scoped generator behind "module does not exist".
  */
 export async function moduleExists(module: string): Promise<boolean> {
-  return (await fileExistsAsync(resolveModulePath(module))) as boolean;
+  return await directoryExistsAsync(resolveModulePath(module));
 }
 
 /**

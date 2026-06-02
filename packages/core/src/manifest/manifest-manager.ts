@@ -1,4 +1,4 @@
-import { getJsonFileAsync, putJsonFileAsync, unlinkAsync } from "@mongez/fs";
+import { getJsonFileAsync, putJsonFileAsync, unlinkAsync } from "@warlock.js/fs";
 import { warlockPath } from "../utils";
 
 /**

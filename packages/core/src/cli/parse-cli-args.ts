@@ -11,11 +11,11 @@ export type ParsedCliArgs = {
  *
  * @example
  * parseCliArgs(["node", "warlock", "migrate", "--rollback", "file.ts"])
- * // Returns: { command: "migrate", args: ["file.ts"], options: { rollback: true } }
+ * // Returns: { name: "migrate", args: [], options: { rollback: "file.ts" } }
  *
  * @example
  * parseCliArgs(["node", "warlock", "dev", "--port=3000", "--fresh"])
- * // Returns: { command: "dev", args: [], options: { port: "3000", fresh: true } }
+ * // Returns: { name: "dev", args: [], options: { port: "3000", fresh: true } }
  */
 export function parseCliArgs(argv: string[]): ParsedCliArgs {
   // Command is at index 2 (after "node" and script path)

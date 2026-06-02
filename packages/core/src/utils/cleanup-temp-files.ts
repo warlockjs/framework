@@ -1,4 +1,4 @@
-import { listFiles, unlinkAsync } from "@mongez/fs";
+import { listFiles, unlinkAsync } from "@warlock.js/fs";
 import { warlockPath } from "./paths";
 
 /**

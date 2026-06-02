@@ -1,13 +1,14 @@
 import { colors } from "@mongez/copper";
 import { loadEnv } from "@mongez/dotenv";
-import { ensureDirectoryAsync, fileExistsAsync } from "@mongez/fs";
+import { fileExistsAsync } from "@warlock.js/fs";
 import { Application } from "../application";
 import { bootstrap } from "../bootstrap";
 import { loadConfigFiles } from "../config/load-config-files";
 import { connectorsManager } from "../connectors/connectors-manager";
+import { ConnectorLifecyclePhase } from "../connectors/types";
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
 import { manifestManager } from "../manifest/manifest-manager";
-import { appPath, warlockPath } from "../utils";
+import { appPath } from "../utils";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 import { CLICommand } from "./cli-command";
 import {
@@ -153,8 +154,6 @@ export class CLICommandsManager {
       }),
     );
 
-    await ensureDirectoryAsync(warlockPath("cache"));
-
     const isHelpCommand = options.help || options.h;
 
     // Handle global help (no command)
@@ -255,7 +254,7 @@ export class CLICommandsManager {
    */
   protected async warmCache() {
     console.log();
-    console.log(`  ${colors.cyan("›")} Scanning project commands...`);
+    console.log(`  ${colors.cyan("â€º")} Scanning project commands...`);
 
     const projectCommands = await cliCommandsLoader.scanAll();
 
@@ -264,7 +263,7 @@ export class CLICommandsManager {
     await manifestManager.saveCommands();
 
     console.log(
-      `  ${colors.green("✔")} Cached ${colors.bold(String(projectCommands.length))} project commands`,
+      `  ${colors.green("âœ”")} Cached ${colors.bold(String(projectCommands.length))} project commands`,
     );
     console.log();
   }
@@ -439,6 +438,11 @@ export class CLICommandsManager {
       }
     } catch (error) {
       displayCommandError(command.name, error as Error);
+      // Persistent commands (dev/start) own their startup-failure exits;
+      // by the time an error reaches here they've already entered their
+      // run loop, so it's a runtime error we log but don't crash on â€”
+      // HMR or process supervisors can recover. Non-persistent
+      // one-shot commands always exit on failure.
       if (!command.isPersistent) {
         process.exit(1);
       }
@@ -486,11 +490,17 @@ export class CLICommandsManager {
       }
     }
 
-    // Initialize connectors
+    // Initialize connectors.
+    // `connectors: true` only starts the early phase here â€” late-phase
+    // connectors (http, socket) start after the command's action loads
+    // app code. Explicit lists bypass phase splitting (caller knows
+    // exactly which connectors they want).
     if (preloaders.connectors) {
-      await connectorsManager.start(
-        preloaders.connectors === true ? undefined : preloaders.connectors,
-      );
+      if (preloaders.connectors === true) {
+        await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);
+      } else {
+        await connectorsManager.start(preloaders.connectors);
+      }
     }
   }
 }

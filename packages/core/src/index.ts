@@ -25,7 +25,6 @@ export * from "./react";
 export * from "./repositories";
 export * from "./resource";
 export * from "./restful";
-export * from "./retry";
 export * from "./router";
 export * from "./socket";
 export * from "./storage";

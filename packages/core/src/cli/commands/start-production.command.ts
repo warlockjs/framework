@@ -1,6 +1,5 @@
 import { spawn } from "child_process";
-import path from "path";
-import { warlockConfigManager } from "../../warlock-config/warlock-config.manager";
+import { resolveBuildConfig } from "../../production/resolve-build-config";
 import { command } from "../cli-command";
 import { displayStartupBanner } from "../cli-commands.utils";
 
@@ -15,17 +14,13 @@ export const startProductionCommand = command({
     displayStartupBanner({ environment: "production" });
   },
   action: async () => {
-    const buildConfig = warlockConfigManager.get("build");
-
-    const outDir = buildConfig?.outDirectory || "dist";
-    const outFile = buildConfig?.outFile || "app.js";
-    const entryPath = path.resolve(outDir, outFile);
+    const { entryPath, sourcemap } = resolveBuildConfig();
 
     // Build node args
     const nodeArgs: string[] = [];
 
     // Enable source maps if configured
-    if (buildConfig?.sourcemap !== false) {
+    if (sourcemap !== false) {
       nodeArgs.push("--enable-source-maps");
     }
 

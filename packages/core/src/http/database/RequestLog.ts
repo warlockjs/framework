@@ -18,7 +18,7 @@ const schema = v.object({
   requestQuery: v.record(v.any()),
 });
 
-type RequestLogSchema = Infer<typeof schema>;
+type RequestLogSchema = Infer.Output<typeof schema>;
 
 export class RequestLog extends Model<RequestLogSchema> {
   /**

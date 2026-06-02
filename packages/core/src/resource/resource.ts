@@ -1,4 +1,4 @@
-import { get, set, type GenericObject } from "@mongez/reinforcements";
+import { get, isLazy, set, type GenericObject } from "@mongez/reinforcements";
 import { Model } from "@warlock.js/cascade";
 import { useRequestStore } from "../http/context/request-context";
 import { ResourceFieldBuilder } from "./resource-field-builder";
@@ -153,6 +153,11 @@ export class Resource implements ResourceContract {
       if (value === "self" || value === "self[]") {
         // Keep self-references as-is — resolved lazily in transformValue
         parsed[key] = value;
+      } else if (isLazy<ResourceConstructor>(value)) {
+        // Keep Lazy<ResourceConstructor> as-is — resolved at transform
+        // time so cyclic resource refs (A embeds B embeds A) compose
+        // without import-graph cycles.
+        parsed[key] = value;
       } else if (typeof value === "string") {
         parsed[key] = ResourceFieldBuilder.fromCastType(value);
       } else if (Array.isArray(value) && value.length === 2 && typeof value[0] === "string") {
@@ -229,8 +234,15 @@ export class Resource implements ResourceContract {
    * Transform the given value for the given output setting.
    * After normalization, string cast types no longer reach here — they are pre-converted to builders.
    */
-  protected transformValue(value: any, outputSettings: ResourceFieldConfig, locale?: string) {
+  protected transformValue(value: any, outputSettings: ResourceFieldConfig, locale?: string): any {
     let outputValue: any;
+
+    if (isLazy<ResourceConstructor>(outputSettings)) {
+      // Resolve the lazy ref now (cyclic resource imports are fully loaded
+      // by serialization time) and recurse — the resolved constructor is
+      // handled by the ResourceConstructor branch below.
+      return this.transformValue(value, outputSettings.resolve(), locale);
+    }
 
     if (outputSettings === "self" || outputSettings === "self[]") {
       // Self-reference — resolve using the same resource class with cycle detection

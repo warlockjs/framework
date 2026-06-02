@@ -2,6 +2,7 @@
 export * from "./config";
 export * from "./createHttpApplication";
 export * from "./database/RequestLog";
+export * from "./error-codes";
 export * from "./events";
 export * from "./request-controller";
 export * from "./uploaded-file";

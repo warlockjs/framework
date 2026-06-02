@@ -14,5 +14,10 @@ export const addCommand = command({
       text: "--list, -l",
       description: "List available features",
     },
+    {
+      text: "--no-install",
+      description:
+        "Record dependencies in package.json without installing them — still ejects configs, adds scripts, and runs setup hooks. Pass it last, after the feature list. Used by scaffolders that run a single install afterwards.",
+    },
   ],
 });

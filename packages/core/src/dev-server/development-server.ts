@@ -1,271 +1,186 @@
 import { colors } from "@mongez/copper";
 import events from "@mongez/events";
-import { getFileAsync } from "@mongez/fs";
+import { fileExistsAsync, getFileAsync, unlinkAsync } from "@warlock.js/fs";
 import { connectorsManager } from "../connectors/connectors-manager";
+import { ConnectorLifecyclePhase } from "../connectors/types";
 import { warlockConfigManager } from "../warlock-config";
-import { devLogReady, devLogSection, devServeLog } from "./dev-logger";
+import { devLogReady, devLogSection, devLogWarn, devServeLog } from "./dev-logger";
 import { filesOrchestrator } from "./files-orchestrator";
+import { MANIFEST_PATH } from "./flags";
 import { LayerExecutor } from "./layer-executor";
-import { ModuleLoader } from "./module-loader";
+import type { StartDevServerOptions } from "./start-development-server";
 import { typeGenerator } from "./type-generator";
 
+type Batch = { added: string[]; changed: string[]; deleted: string[] };
+
 /**
- * Development Server
- * Main coordinator for the dev server
- * Manages file system, connectors, and hot reloading
+ * Top-level coordinator for `warlock dev`. Wires the file orchestrator, the
+ * connectors, and the layer executor together, and listens for the watcher's
+ * batched events to drive HMR.
  */
 export class DevelopmentServer {
-  /**
-   * Module loader - dynamically loads application modules
-   */
-  private moduleLoader?: ModuleLoader;
-
-  /**
-   * Layer executor - handles HMR and FSR execution
-   */
   private layerExecutor?: LayerExecutor;
+  private running = false;
+  private readonly options: StartDevServerOptions;
 
-  /**
-   * Whether the server is currently running
-   */
-  private running: boolean = false;
-
-  public constructor() {
+  public constructor(options: StartDevServerOptions = {}) {
+    this.options = options;
     devLogSection("Starting Development Server...");
   }
 
-  /**
-   * Initialize and start the development server
-   */
   public async start(): Promise<void> {
     try {
-      const now = performance.now();
+      const startedAt = performance.now();
 
-      // STEP 1: Initialize file system (discover and process files)
+      // --fresh deletes the manifest so reconciliation re-parses every file
+      // from disk. Transpile caching is owned by the loader hook (in-memory).
+      if (this.options.fresh && (await fileExistsAsync(MANIFEST_PATH))) {
+        await unlinkAsync(MANIFEST_PATH);
+        devServeLog(colors.cyanBright("Cleared manifest (--fresh)"));
+      }
+
       await filesOrchestrator.init();
-      await filesOrchestrator.initiaizeAll();
-
-      // Start file watcher
+      await filesOrchestrator.initializeAll();
       await filesOrchestrator.watchFiles();
 
-      // devLogInfo("Initializing special files...");
-      // STEP 3: Collect special files
       filesOrchestrator.specialFilesCollector.collect(filesOrchestrator.getFiles());
 
-      // devLogInfo("Setting up event listeners...");
-      // STEP 6: Setup event listeners
       this.setupEventListeners();
 
-      // STEP 7: Auto-discover files (models, etc.) before loading entry points
-      // This ensures all models are in the registry before main/route files execute
+      // Decorator-driven registries (models, etc.) must be populated before
+      // routes/services can resolve symbols by name.
       await this.autoDiscoverFiles();
 
-      // STEP 8: Load application modules (main, routes, events, locales)
       await filesOrchestrator.moduleLoader.loadAll();
 
-      // STEP 9: Initialize layer executor
+      // Late-phase connectors (http, socket) bind after app code has
+      // registered routes/listeners.
+      await connectorsManager.startPhase(ConnectorLifecyclePhase.Late);
+
       this.layerExecutor = new LayerExecutor(
         filesOrchestrator.getDependencyGraph(),
         filesOrchestrator.specialFilesCollector,
         filesOrchestrator.moduleLoader,
+        (absolutePath) => filesOrchestrator.bumpVersion(absolutePath),
+        () => filesOrchestrator.flushVersionBumps(),
       );
 
-      // Mark as running
       this.running = true;
 
-      const duration = performance.now() - now;
-
+      const duration = performance.now() - startedAt;
       devLogReady(`Development Server is ready in ${colors.greenBright(parseDuration(duration))}`);
 
-      // Generate type definitions in background (non-blocking)
-      // Runs after server ready for fast startup
-      // typeGenerator.generateAll();
+      // Precedence: explicit CLI option > devServer.* config > default.
       const devServerConfig = await warlockConfigManager.get("devServer");
-      const generateTypings = devServerConfig?.generateTypings ?? true;
-      const healthCheckers = devServerConfig?.healthCheckers ?? true;
+      const generateTypings =
+        this.options.generateTypings ?? devServerConfig?.generateTypings ?? true;
+      const healthCheckers = this.options.healthCheckers ?? devServerConfig?.healthCheckers ?? true;
 
-      if (generateTypings) {
-        typeGenerator.executeGenerateAllCommand();
-      }
+      if (generateTypings) typeGenerator.executeGenerateAllCommand();
 
-      // Start health checks (non-blocking)
       if (healthCheckers) {
         filesOrchestrator.startCheckingHealth(healthCheckers === true ? undefined : healthCheckers);
       }
     } catch (error) {
-      devServeLog(colors.redBright(`❌ Failed to start Development Server: ${error}`));
+      devServeLog(colors.redBright(`Failed to start Development Server: ${error}`));
       await this.shutdown();
       throw error;
     }
   }
 
   /**
-   * Auto-discover and import files that rely on registry-based resolution.
-   *
-   * Iterates over all tracked files whose type matches `discoveryTypes`
-   * and eagerly imports them so their decorators execute and register
-   * themselves in the appropriate global registries.
+   * Eagerly import files whose decorators populate global registries so any
+   * symbol-by-name resolution later in boot finds them.
    */
   private async autoDiscoverFiles(): Promise<void> {
-    /**
-     * File types that should be auto-discovered (imported) at boot time.
-     *
-     * Models must be discovered early so that `@RegisterModel()` decorators
-     * populate the global model registry before any application code
-     * (main files, routes, services) attempts to resolve relations by name.
-     *
-     * Extend this list if other decorator-based registries are added in the future.
-     */
-    const discoveryTypes = ["model"];
-    for (const [, file] of filesOrchestrator.files.entries()) {
-      if (file.type && discoveryTypes.includes(file.type)) {
+    const discoveryTypes = ["model"] as const;
+    for (const file of filesOrchestrator.files.values()) {
+      if (file.type && (discoveryTypes as readonly string[]).includes(file.type)) {
         await filesOrchestrator.moduleLoader.loadModule(file, file.type);
       }
     }
   }
 
-  /**
-   * Setup event listeners for file changes
-   */
   private setupEventListeners(): void {
-    // Listen to batch completion events from FileEventHandler
-    events.on(
-      "dev-server:batch-complete",
-      (batch: { added: string[]; changed: string[]; deleted: string[] }) => {
-        this.handleBatchComplete(batch);
-      },
-    );
+    events.on("dev-server:batch-complete", (batch: Batch) => this.handleBatchComplete(batch));
   }
 
-  /**
-   * Handle batch completion event
-   * Triggered when a batch of files has been processed
-   */
-  private async handleBatchComplete(batch: {
-    added: string[];
-    changed: string[];
-    deleted: string[];
-  }): Promise<void> {
-    // Only execute reload if server is running (skip during initial startup)
-    if (!this.running || !this.layerExecutor) {
-      return;
+  private async handleBatchComplete(batch: Batch): Promise<void> {
+    if (!this.running || !this.layerExecutor) return;
+
+    // warlock.config.ts holds settings read at boot (CLI commands, build
+    // options, watch patterns, scheduled jobs). Hot-reloading it would
+    // leave running services configured with stale values, so tell the
+    // dev they need a restart and don't pretend to apply the change.
+    if (batch.changed.includes("warlock.config.ts")) {
+      devLogWarn("warlock.config.ts changed — restart the dev server to apply.");
     }
 
+    // Some editors fsync on save without writing â€” drop no-op changes.
     if (batch.changed.length > 0) {
-      // Helper to check if a path is an env file
-      const isEnvFile = (path: string) => {
-        const basename = path.split("/").pop() || path;
-        return basename === ".env" || basename.startsWith(".env.");
-      };
-
-      // if they are the same, then ignore the trigger
-      // Note: env files are NOT in filesOrchestrator.files but still need to trigger HMR
-      batch.changed = (
-        await Promise.all(
-          batch.changed.map(async (relativePath) => {
-            // Env files always pass through (they trigger config reload)
-            if (isEnvFile(relativePath)) {
-              return relativePath;
-            }
-
-            const file = filesOrchestrator.files.get(relativePath);
-
-            if (!file) return null;
-
-            const content = await getFileAsync(file.absolutePath);
-            if (content.trim() === file.source) {
-              return null;
-            }
-
-            file.source = content;
-
-            return relativePath;
-          }),
-        )
-      ).filter((file) => file !== null);
+      batch.changed = await dropNoOpChanges(batch.changed);
     }
 
-    // Get all changed files (added + changed + deleted)
-    const allChangedPaths = [...batch.added, ...batch.changed, ...batch.deleted];
+    const total = batch.added.length + batch.changed.length + batch.deleted.length;
+    if (total === 0) return;
 
-    if (allChangedPaths.length === 0) {
-      return;
-    }
+    const codeFiles = [...batch.added, ...batch.changed].filter((p) => !isEnvPath(p));
 
-    // Filter out .env files for code processing (they don't need transpilation)
-    // But they're still in batch.changed which triggers config reload in layer-executor
-    const codeFiles = [...batch.added, ...batch.changed].filter((path) => {
-      const basename = path.split("/").pop() || path;
-      return !(basename === ".env" || basename.startsWith(".env."));
-    });
-
-    // Delegate to layer executor for batch reload
     try {
-      // Pass code files to layer executor, but include all changed paths (including .env)
-      // in the invalidation chain context
       await this.layerExecutor.executeBatchReload(
         codeFiles,
         filesOrchestrator.getFiles(),
         batch.deleted,
-        batch.changed, // Pass all changed paths including .env for config reload
+        batch.changed,
       );
 
-      // Regenerate types if config files changed
       typeGenerator.executeTypingsGenerator([...batch.added, ...batch.changed]);
 
-      filesOrchestrator.checkHealth({
-        added: batch.added,
-        changed: batch.changed,
-        deleted: batch.deleted,
-      });
+      filesOrchestrator.checkHealth(batch);
     } catch (error) {
-      devServeLog(colors.redBright(`❌ Failed to execute batch reload: ${error}`));
+      devServeLog(colors.redBright(`Failed to execute batch reload: ${error}`));
     }
   }
 
-  /**
-   * Gracefully shutdown the development server
-   */
   public async shutdown(): Promise<void> {
-    console.log("Shutting down...");
-
-    if (!this.running) {
-      return;
-    }
-
-    devServeLog(colors.redBright("🛑 Shutting down Development Server..."));
-
+    if (!this.running) return;
+    devServeLog(colors.redBright("Shutting down Development Server..."));
     this.running = false;
-
-    // Shutdown connectors in reverse priority order
     await connectorsManager.shutdown();
-
-    devServeLog(colors.greenBright("✅ Development Server stopped"));
+    devServeLog(colors.greenBright("Development Server stopped"));
   }
 
-  /**
-   * Check if server is running
-   */
   public isRunning(): boolean {
     return this.running;
   }
-
-  /**
-   * Get module loader
-   */
-  public getModuleLoader(): ModuleLoader | undefined {
-    return this.moduleLoader;
-  }
 }
 
-function parseDuration(diffInMilliseconds: number): string {
-  if (diffInMilliseconds < 1000) {
-    return `${diffInMilliseconds.toFixed(2)}ms`;
-  }
+async function dropNoOpChanges(changedPaths: string[]): Promise<string[]> {
+  const kept = await Promise.all(
+    changedPaths.map(async (relativePath) => {
+      if (isEnvPath(relativePath)) return relativePath;
 
-  if (diffInMilliseconds > 60_000) {
-    return `${(diffInMilliseconds / 60_000).toFixed(2)}m`;
-  }
+      const file = filesOrchestrator.files.get(relativePath);
+      if (!file) return null;
 
-  return `${(diffInMilliseconds / 1000).toFixed(2)}s`;
+      const content = await getFileAsync(file.absolutePath);
+      if (content.trim() === file.source) return null;
+
+      file.source = content;
+      return relativePath;
+    }),
+  );
+
+  return kept.filter((p): p is string => p !== null);
+}
+
+function isEnvPath(path: string): boolean {
+  const basename = path.split("/").pop() ?? path;
+  return basename === ".env" || basename.startsWith(".env.");
+}
+
+function parseDuration(ms: number): string {
+  if (ms < 1000) return `${ms.toFixed(2)}ms`;
+  if (ms > 60_000) return `${(ms / 60_000).toFixed(2)}m`;
+  return `${(ms / 1000).toFixed(2)}s`;
 }

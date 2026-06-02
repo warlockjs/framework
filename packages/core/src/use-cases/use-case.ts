@@ -1,14 +1,19 @@
-import { except, Random } from "@mongez/reinforcements";
+import { except, Random, retry as runWithRetry } from "@mongez/reinforcements";
+import { log } from "@warlock.js/logger";
+import type { Infer, ObjectValidator } from "@warlock.js/seal";
 import { measure } from "../benchmark";
 import { config } from "../config";
-import { retry } from "../retry";
 import type {
   UseCase,
   UseCaseConfigurations,
+  UseCaseContext,
   UseCaseErrorResult,
+  UseCaseHandler,
   UseCaseResult,
   UseCaseRuntimeOptions,
+  UseCaseWithSchema,
 } from "./types";
+import { broadcastUseCaseResult } from "./use-case-broadcast";
 import { fireLifecycleEvent, globalEventsCallbacksMap } from "./use-case-events";
 import { runPipeline } from "./use-case-pipeline";
 import {
@@ -20,17 +25,7 @@ import {
 } from "./use-cases-registry";
 
 const defaultUseCaseOptions: UseCaseConfigurations = {
-  benchmarkOptions: {
-    enabled: true,
-    latencyRange: {
-      excellent: 100,
-      poor: 200,
-    },
-  },
-  retryOptions: {
-    count: 0,
-    delay: 0,
-  },
+  benchmark: true,
 };
 
 /**
@@ -39,29 +34,47 @@ const defaultUseCaseOptions: UseCaseConfigurations = {
  * A use case is a named, observable, optionally benchmarked unit of business logic.
  * The returned handler is a typed async function you call with the input data.
  *
- * Execution order: onExecuting → guards → validation → before → handler → after → onCompleted
+ * Execution order: onExecuting → guards → validation → before → handler → after →
+ * onCompleted → broadcast. Retry and benchmark wrap the **handler** only.
+ *
+ * When a `schema` is provided, the handler's input is inferred from it — no manual
+ * `Input` generic needed.
  *
  * @example
- * export const createOrderUseCase = useCase<OrderOutput, OrderInput>({
+ * export const createOrderUseCase = useCase({
  *   name: "create_order",
- *   schema: createOrderSchema,
+ *   schema: createOrderSchema,           // handler `data` is inferred from this
  *   guards: [authGuard],
  *   handler: async (data, ctx) => orderService.create(data),
  *   after: [sendConfirmationEmail],
- *   retries: { count: 2, delay: 500 },
+ *   retry: { attempts: 3, delay: 500, backoff: "exponential" },
+ *   broadcast: true,
  * });
  *
  * // In a controller:
  * const output = await createOrderUseCase({ ...validated, user_id: req.user.id });
  */
-export function useCase<Output, Input = any>(options: UseCase<Output, Input>) {
+export function useCase<
+  Output,
+  Schema extends ObjectValidator,
+  Ctx extends UseCaseContext = UseCaseContext,
+>(options: UseCaseWithSchema<Output, Schema, Ctx>): UseCaseHandler<Output, Infer<Schema>>;
+export function useCase<Output = any, Input = any, Ctx extends UseCaseContext = UseCaseContext>(
+  options: UseCase<Output, Input, Ctx>,
+): UseCaseHandler<Output, Input>;
+export function useCase<Output = any, Input = any>(
+  options: UseCase<Output, Input>,
+): UseCaseHandler<Output, Input> {
   const { name, handler, schema, guards, before, after, onExecuting, onCompleted, onError } =
     options;
 
   // Merge per-use-case options with global config defaults
   const useCaseConfig = config.get<UseCaseConfigurations>("use-cases", defaultUseCaseOptions);
-  const benchmarkOptions = options.benchmarkOptions ?? useCaseConfig?.benchmarkOptions;
-  const retryOptions = options.retryOptions ?? useCaseConfig?.retryOptions;
+  const benchmark = options.benchmark ?? useCaseConfig?.benchmark ?? true;
+  const retryConfig = options.retry ?? useCaseConfig?.retry;
+  const broadcast = options.broadcast;
+  const broadcastConfig = useCaseConfig?.broadcast;
+  const logEnabled = useCaseConfig?.log === true;
 
   $registerUseCase(name, {
     ...options,
@@ -85,10 +98,14 @@ export function useCase<Output, Input = any>(options: UseCase<Output, Input>) {
     let output: Output | undefined;
     let error: Error | undefined;
     let benchmarkResult: { latency: number; state: "excellent" | "good" | "poor" } | undefined;
+    let currentRetry = 0;
 
-    // The core pipeline — wrapped by retry and/or benchmark below
-    const execute = () =>
-      runPipeline<Input, Output>({
+    if (logEnabled) {
+      log.debug("use-cases", name, "executing", { id });
+    }
+
+    try {
+      const transformed = await runPipeline<Input>({
         name,
         id,
         data,
@@ -97,35 +114,43 @@ export function useCase<Output, Input = any>(options: UseCase<Output, Input>) {
         schema,
         guards,
         before,
-        handler,
         onExecuting: invocationOnExecuting,
         ucOnExecuting: onExecuting,
       });
 
-    // Apply retry if configured, otherwise execute once
-    const run = () =>
-      retryOptions?.count && retryOptions.count > 0 ? retry(execute, retryOptions) : execute();
+      // Benchmark wraps ONLY the handler (per attempt) so latency reflects business
+      // logic — not the guard/validation prelude, and not the retry backoff delays.
+      const runHandler = async (): Promise<Output> => {
+        if (!benchmark) {
+          return handler(transformed, ctx);
+        }
 
-    try {
-      if (benchmarkOptions) {
-        // measure() catches errors internally and returns a result object.
-        // Re-throw on failure so the outer catch handles it uniformly.
-        const result = await measure(
+        const measured = await measure(
           name,
-          run,
-          typeof benchmarkOptions === "boolean" ? undefined : benchmarkOptions,
+          () => handler(transformed, ctx),
+          benchmark === true ? undefined : benchmark,
         );
 
-        if (result.success) {
-          output = result.value;
-          benchmarkResult = except(result, ["value", "success"]);
-        } else {
-          benchmarkResult = except(result, ["error", "success"]);
-          throw result.error;
+        benchmarkResult = { latency: measured.latency, state: measured.state };
+
+        // measure() never throws — it returns an error result. Re-throw so retry
+        // and the outer catch handle failures uniformly.
+        if (!measured.success) {
+          throw measured.error;
         }
-      } else {
-        output = await run();
-      }
+
+        return measured.value;
+      };
+
+      output = retryConfig
+        ? await runWithRetry(runHandler, {
+            ...retryConfig,
+            onError: (retryError, attempt) => {
+              currentRetry = attempt;
+              retryConfig.onError?.(retryError, attempt);
+            },
+          })
+        : await runHandler();
     } catch (err) {
       error = err as Error;
     }
@@ -137,8 +162,8 @@ export function useCase<Output, Input = any>(options: UseCase<Output, Input>) {
       for (const middleware of after) {
         try {
           await middleware(output, ctx);
-        } catch (err) {
-          console.error(`[use-case] After middleware error in "${name}":`, err);
+        } catch (afterError) {
+          log.error("use-cases", name, "after middleware failed", { error: afterError });
         }
       }
     }
@@ -150,16 +175,24 @@ export function useCase<Output, Input = any>(options: UseCase<Output, Input>) {
       endedAt,
       id,
       name,
-      retries: retryOptions?.count
-        ? { count: retryOptions.count, delay: retryOptions.delay }
+      retries: retryConfig
+        ? { attempts: retryConfig.attempts ?? 3, delay: retryConfig.delay, currentRetry }
         : undefined,
       benchmarkResult,
-      calls: increaseUseCaseSuccessCalls(name),
+      // Set per-branch below so the counter reflects the actual outcome —
+      // a failure must never increment the success tally.
+      calls: 0,
     };
 
     if (error) {
+      snapshot.calls = increaseUseCaseFailedCalls(name);
+
+      if (logEnabled) {
+        log.error("use-cases", name, "failed", { id, error });
+      }
+
       await fireLifecycleEvent<UseCaseErrorResult>(
-        { ...except(snapshot, ["output"]), error, calls: increaseUseCaseFailedCalls(name) },
+        { ...except(snapshot, ["output"]), error },
         {
           invocation: invocationOnError ? [invocationOnError] : undefined,
           useCase: onError ? [onError] : undefined,
@@ -168,7 +201,14 @@ export function useCase<Output, Input = any>(options: UseCase<Output, Input>) {
             : undefined,
         },
       );
+
       throw error;
+    }
+
+    snapshot.calls = increaseUseCaseSuccessCalls(name);
+
+    if (logEnabled) {
+      log.debug("use-cases", name, "completed", { id, latency: benchmarkResult?.latency });
     }
 
     await addUseCaseHistory(name, snapshot);
@@ -179,6 +219,15 @@ export function useCase<Output, Input = any>(options: UseCase<Output, Input>) {
       global: globalEventsCallbacksMap.onCompleted.length
         ? globalEventsCallbacksMap.onCompleted
         : undefined,
+    });
+
+    await broadcastUseCaseResult({
+      name,
+      id,
+      output: output!,
+      result: snapshot,
+      broadcast,
+      config: broadcastConfig,
     });
 
     return output!;

@@ -1,5 +1,5 @@
 import { colors } from "@mongez/copper";
-import { dataSourceRegistry } from "@warlock.js/cascade";
+import { createDatabase } from "@warlock.js/cascade";
 import { log } from "@warlock.js/logger";
 import { CommandActionData } from "../cli/types";
 import { config } from "../config";
@@ -8,9 +8,8 @@ export async function createDatabaseAction(command: CommandActionData) {
   const name = command.args[0];
   const { connection = "default" } = command.options;
 
-  const dataSource = dataSourceRegistry.get(
-    connection === "default" || connection === true ? undefined : String(connection),
-  );
+  const connectionName =
+    connection === "default" || connection === true ? undefined : String(connection);
 
   let databaseName = name;
 
@@ -32,7 +31,7 @@ export async function createDatabaseAction(command: CommandActionData) {
   log.info("database", "create", `Creating database ${colors.cyan(databaseName)}...`);
 
   try {
-    const created = await dataSource.driver.createDatabase(databaseName);
+    const { created } = await createDatabase(databaseName, { connection: connectionName });
 
     if (created) {
       log.success(

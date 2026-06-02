@@ -1,16 +1,16 @@
 import config from "@mongez/config";
 import { colors } from "@mongez/copper";
-import { logger } from "@warlock.js/logger";
+import { log } from "@warlock.js/logger";
 import { Application } from "../application";
 import { devLogError } from "../dev-server/dev-logger";
 import { registerHttpPlugins } from "../http/plugins";
-import { getHttpServer, startHttpServer } from "../http/server";
+import { FastifyInstance, getHttpServer, startHttpServer } from "../http/server";
 import { router } from "../router/router";
 import { Environment } from "../utils";
 import { setBaseUrl } from "../utils/urls";
 import { container } from "./../container";
 import { BaseConnector } from "./base-connector";
-import { ConnectorPriority } from "./types";
+import { ConnectorLifecyclePhase, ConnectorPriority } from "./types";
 
 function environmentColor(environment: Environment) {
   switch (environment) {
@@ -32,6 +32,7 @@ function environmentColor(environment: Environment) {
 export class HttpConnector extends BaseConnector {
   public readonly name = "http";
   public readonly priority = ConnectorPriority.HTTP;
+  public readonly lifecyclePhase = ConnectorLifecyclePhase.Late;
 
   /**
    * Files that trigger HTTP server restart
@@ -41,47 +42,65 @@ export class HttpConnector extends BaseConnector {
   protected readonly watchedFiles = ["src/config/http.ts", "src/config/http.tsx"];
 
   /**
-   * Initialize HTTP server
+   * Fastify Server instance
    */
-  public async start(): Promise<void> {
+  protected http?: FastifyInstance;
+
+  /**
+   * Boot the connector — construction only (create Fastify, register
+   * plugins, populate container). Route scanning is deferred to
+   * `start()` so it reads the router after app code has registered.
+   */
+  public async boot() {
     const httpConfig = config.get("http");
 
     if (!httpConfig) return;
 
     const port = httpConfig.port;
-    logger.info(
+    log.info(
       `http`,
       "connection",
       `Starting http server on port ${port} in ${environmentColor(Application.environment)} mode`,
     );
 
-    const server = startHttpServer(httpConfig.serverOptions);
+    this.http = startHttpServer(httpConfig.serverOptions);
 
-    container.set("http.server", server);
+    container.set("http.server", this.http);
 
-    await registerHttpPlugins(server);
+    await registerHttpPlugins(this.http);
+
+    const baseUrl = config.get("app.baseUrl");
+
+    // update base url
+    setBaseUrl(baseUrl);
+  }
+
+  /**
+   * Initialize HTTP server — bind app-registered routes to Fastify
+   * then listen. Scanning here (not in `boot`) lets HTTP boot before
+   * app code without losing routes.
+   */
+  public async start(): Promise<void> {
+    const httpConfig = config.get("http");
+
+    if (!httpConfig || !this.http) return;
 
     if (Application.runtimeStrategy === "development") {
-      router.scanDevServer(server);
+      router.scanDevServer(this.http);
     } else {
-      router.scan(server);
+      router.scan(this.http);
     }
 
     try {
       // We can use the url of the server
-      await server.listen({
-        port,
+      await this.http.listen({
+        port: httpConfig.port,
         host: httpConfig.host || "localhost",
       });
 
       const baseUrl = config.get("app.baseUrl");
 
-      container.set("http.baseUrl", baseUrl);
-
-      // update base url
-      setBaseUrl(baseUrl);
-
-      logger.success(`http`, "connection", `Server ready at ${baseUrl}`);
+      log.success(`http`, "connection", `Server ready at ${baseUrl}`);
     } catch (error) {
       devLogError("Error while starting http server", error);
 
@@ -89,6 +108,17 @@ export class HttpConnector extends BaseConnector {
     }
 
     this.active = true;
+  }
+
+  /**
+   * Restart — needs a fresh Fastify instance since `start()` now
+   * re-runs `router.scan()`, and re-scanning the same Fastify would
+   * register duplicate route handlers.
+   */
+  public async restart(): Promise<void> {
+    await this.shutdown();
+    await this.boot();
+    await this.start();
   }
 
   /**

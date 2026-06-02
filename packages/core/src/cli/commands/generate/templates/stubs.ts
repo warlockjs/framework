@@ -3,6 +3,11 @@ import { Name } from "../utils/name-parser";
 
 /**
  * Controller template stub
+ *
+ * Controllers default to the guarded handler type since application
+ * routes run behind `guarded()`. When `withValidation` is set, the
+ * schema's exported type + value are imported directly from the
+ * `schema/` folder and bound to the handler — no `requests/` alias.
  */
 export function controllerStub(
   name: ParsedName,
@@ -10,29 +15,30 @@ export function controllerStub(
 ): string {
   const { withValidation } = options;
 
-  return `import type { RequestHandler, Response } from "@warlock.js/core";
-${
-  withValidation
-    ? `import { type ${name.pascal}Request } from "../requests/${name.kebab}.request";
-import { ${name.camel}Schema } from "../schema/${name.kebab}.schema";`
-    : ""
-}
+  if (!withValidation) {
+    return `import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 
-export const ${name.camel}Controller: RequestHandler = async (
-  request${withValidation ? `: ${name.pascal}Request` : ""},
-  response: Response,
+export const ${name.camel}Controller: GuardedRequestHandler = async (request, response) => {
+  // TODO: Implement controller logic
+  return response.success({});
+};
+`;
+  }
+
+  return `import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
+import { type ${name.pascal}Schema, ${name.camel}Schema } from "../schema/${name.kebab}.schema";
+
+export const ${name.camel}Controller: GuardedRequestHandler<${name.pascal}Schema> = async (
+  request,
+  response,
 ) => {
   // TODO: Implement controller logic
   return response.success({});
 };
-${
-  withValidation
-    ? `
+
 ${name.camel}Controller.validation = {
   schema: ${name.camel}Schema,
-};`
-    : ""
-}
+};
 `;
 }
 
@@ -41,18 +47,17 @@ ${name.camel}Controller.validation = {
  * Note: moduleName is the module (plural), we need singular entity name
  */
 export function crudCreateControllerStub(moduleName: Name): string {
-  return `import { type RequestHandler } from "@warlock.js/core";
-import { type Create${moduleName.pascal}Request } from "../requests/create-${moduleName.kebab}.request";
-import { create${moduleName.pascal}Schema } from "../schema/create-${moduleName.kebab}.schema";
+  return `import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
+import { type Create${moduleName.pascal}Schema, create${moduleName.pascal}Schema } from "../schema/create-${moduleName.kebab}.schema";
 import { create${moduleName.pascal}Service } from "../services/create-${moduleName.kebab}.service";
 
-export const create${moduleName.pascal}Controller: RequestHandler = async (
-  request: Create${moduleName.pascal}Request,
+export const create${moduleName.pascal}Controller: GuardedRequestHandler<Create${moduleName.pascal}Schema> = async (
+  request,
   response,
 ) => {
   const ${moduleName.camel} = await create${moduleName.pascal}Service(request.validated());
 
-  return response.success({
+  return response.successCreate({
     ${moduleName.camel},
   });
 };
@@ -67,13 +72,12 @@ create${moduleName.pascal}Controller.validation = {
  * CRUD Update Controller template
  */
 export function crudUpdateControllerStub(moduleName: Name): string {
-  return `import { type RequestHandler } from "@warlock.js/core";
-import { type Update${moduleName.pascal}Request } from "../requests/update-${moduleName.kebab}.request";
-import { update${moduleName.pascal}Schema } from "../schema/update-${moduleName.kebab}.schema";
+  return `import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
+import { type Update${moduleName.pascal}Schema, update${moduleName.pascal}Schema } from "../schema/update-${moduleName.kebab}.schema";
 import { update${moduleName.pascal}Service } from "../services/update-${moduleName.kebab}.service";
 
-export const update${moduleName.pascal}Controller: RequestHandler = async (
-  request: Update${moduleName.pascal}Request,
+export const update${moduleName.pascal}Controller: GuardedRequestHandler<Update${moduleName.pascal}Schema> = async (
+  request,
   response,
 ) => {
   const ${moduleName.camel} = await update${moduleName.pascal}Service(request.input("id"), request.validated());
@@ -94,10 +98,10 @@ update${moduleName.pascal}Controller.validation = {
  */
 export function crudListControllerStub(moduleName: Name): string {
   const plural = moduleName.plural;
-  return `import { type RequestHandler } from "@warlock.js/core";
+  return `import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { list${plural.pascal}Service } from "../services/list-${plural.kebab}.service";
 
-export const list${plural.pascal}Controller: RequestHandler = async (
+export const list${plural.pascal}Controller: GuardedRequestHandler = async (
   request,
   response,
 ) => {
@@ -115,10 +119,10 @@ export const list${plural.pascal}Controller: RequestHandler = async (
  * CRUD Show/Get Controller template
  */
 export function crudShowControllerStub(moduleName: Name): string {
-  return `import { type RequestHandler } from "@warlock.js/core";
+  return `import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { get${moduleName.pascal}Service } from "../services/get-${moduleName.kebab}.service";
 
-export const get${moduleName.pascal}Controller: RequestHandler = async (
+export const get${moduleName.pascal}Controller: GuardedRequestHandler = async (
   request,
   response,
 ) => {
@@ -139,18 +143,16 @@ export const get${moduleName.pascal}Controller: RequestHandler = async (
  * CRUD Delete Controller template
  */
 export function crudDeleteControllerStub(moduleName: Name): string {
-  return `import { type RequestHandler } from "@warlock.js/core";
+  return `import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { delete${moduleName.pascal}Service } from "../services/delete-${moduleName.kebab}.service";
 
-export const delete${moduleName.pascal}Controller: RequestHandler = async (
+export const delete${moduleName.pascal}Controller: GuardedRequestHandler = async (
   request,
   response,
 ) => {
   await delete${moduleName.pascal}Service(request.input("id"));
 
-  return response.success({
-    message: "${moduleName.pascal} deleted successfully",
-  });
+  return response.noContent();
 };
 `;
 }
@@ -197,7 +199,7 @@ export const ${singular.camel}Schema = v.object({
   // TODO: Add more fields
 });
 
-export type ${singular.pascal}Schema = Infer<typeof ${singular.camel}Schema>;
+export type ${singular.pascal}Schema = Infer.Output<typeof ${singular.camel}Schema>;
 
 @RegisterModel()
 export class ${singular.pascal} extends Model<${singular.pascal}Schema> {
@@ -236,7 +238,7 @@ export const ${entity.pascal}Resource = defineResource({
 export function crudRepositoryStub(entity: Name): string {
   const moduleSingularName = entity.singular;
   const modulePluralName = entity.plural;
-  return `import type { FilterRules, RepositoryOptions } from "@warlock.js/core";
+  return `import type { FilterRules, TypedRepositoryOptions } from "@warlock.js/core";
 import { RepositoryManager } from "@warlock.js/core";
 import { ${moduleSingularName.pascal} } from "../models/${moduleSingularName.kebab}";
 
@@ -244,7 +246,7 @@ type ${moduleSingularName.pascal}ListFilter = {
   // Repository list filters
 };
 
-export type ${moduleSingularName.pascal}ListOptions = RepositoryOptions & ${moduleSingularName.pascal}ListFilter;
+export type ${moduleSingularName.pascal}ListOptions = TypedRepositoryOptions<${moduleSingularName.pascal}ListFilter>;
 
 class ${modulePluralName.pascal}Repository extends RepositoryManager<${moduleSingularName.pascal}, ${moduleSingularName.pascal}ListOptions> {
   public source = ${moduleSingularName.pascal};
@@ -452,8 +454,8 @@ ${schemaParts.join("\n")}
  * CRUD Create Schema template
  * Outputs to: schema/create-{entity}.schema.ts
  */
-export function crudCreateValidationStub(moduleName: Name): string {
-  return `import { v, type Infer } from "@warlock.js/core";
+export function crudCreateSchemaStub(moduleName: Name): string {
+  return `import { type Infer, v } from "@warlock.js/seal";
 
 export const create${moduleName.pascal}Schema = v.object({
   // TODO: Add validation rules
@@ -467,11 +469,10 @@ export type Create${moduleName.pascal}Schema = Infer<typeof create${moduleName.p
  * CRUD Update Schema template
  * Outputs to: schema/update-{entity}.schema.ts
  */
-export function crudUpdateValidationStub(moduleName: Name): string {
-  return `import { v, type Infer } from "@warlock.js/seal";
+export function crudUpdateSchemaStub(moduleName: Name): string {
+  return `import { type Infer, v } from "@warlock.js/seal";
 
 export const update${moduleName.pascal}Schema = v.object({
-  name: v.string(),
   // TODO: Add validation rules
 });
 
@@ -494,25 +495,14 @@ export function serviceStub(name: Name): string {
  * Schema template stub
  * Outputs to: schema/{name}.schema.ts
  */
-export function validationStub(name: Name): string {
-  return `import { v, type Infer } from "@warlock.js/seal";
+export function schemaStub(name: Name): string {
+  return `import { type Infer, v } from "@warlock.js/seal";
 
 export const ${name.camel}Schema = v.object({
   // TODO: Define validation schema
 });
 
 export type ${name.pascal}Schema = Infer<typeof ${name.camel}Schema>;
-`;
-}
-
-/**
- * Request type template stub
- */
-export function requestStub(name: Name): string {
-  return `import type { Request } from "@warlock.js/core";
-import { type ${name.pascal}Schema } from "../schema/${name.kebab}.schema";
-
-export type ${name.pascal}Request = Request<${name.pascal}Schema>;
 `;
 }
 
@@ -534,7 +524,7 @@ const ${name.singular.camel}Schema = v.object({
   // TODO: Define model schema
 });
 
-export type ${name.singular.pascal}Type = Infer<typeof ${name.singular.camel}Schema>;
+export type ${name.singular.pascal}Type = Infer.Output<typeof ${name.singular.camel}Schema>;
 
 export class ${name.singular.pascal} extends Model<${name.singular.pascal}Type> {
   public static table = "${tableName}";

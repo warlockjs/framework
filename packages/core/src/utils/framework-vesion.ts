@@ -1,4 +1,4 @@
-import { getJsonFileAsync } from "@mongez/fs";
+import { getJsonFileAsync } from "@warlock.js/fs";
 import path from "node:path";
 
 /**
@@ -12,9 +12,9 @@ let cachedVersion: string | null = null;
 export async function getWarlockVersion(): Promise<string> {
   if (cachedVersion) return cachedVersion;
 
-  const frameworkPackageJson = await getJsonFileAsync(
+  const frameworkPackageJson = (await getJsonFileAsync(
     path.join(import.meta.dirname, "./../../package.json"),
-  );
+  )) as { version: string };
 
   const version = frameworkPackageJson.version.replace(/\^|\~/g, "");
   cachedVersion = version;

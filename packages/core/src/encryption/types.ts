@@ -11,7 +11,7 @@
  *   algorithm: "aes-256-gcm",
  *   hmacKey: env("APP_HMAC_KEY"),
  *   password: {
- *     saltRounds: 12,
+ *     salt: 12,
  *   },
  * };
  *

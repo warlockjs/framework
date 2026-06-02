@@ -1,6 +1,12 @@
 import { isObject } from "@mongez/supportive-is";
 import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime.js";
 import { storage } from "../storage";
+
+// `humanTime` date options call dayjs(...).fromNow(), which lives in the
+// relativeTime plugin. dayjs.extend is idempotent (a plugin registers itself
+// once), so extending here at module load is safe to repeat.
+dayjs.extend(relativeTime);
 import { uploadsUrl, url } from "../utils/urls";
 import { type LocalizedObject } from "./../utils/get-localized";
 import { ResourceFieldBuilderDateOutputOptions, type ResourceOutputValueCastType } from "./types";

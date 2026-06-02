@@ -3,31 +3,34 @@ import { configManager } from "../config/config-manager";
 import { connectorsManager } from "../connectors/connectors-manager";
 import type { DependencyGraph } from "./dependency-graph";
 import { devLogHMR } from "./dev-logger";
-import { exportAnalyzer } from "./export-analyzer";
 import { FileManager } from "./file-manager";
 import type { ModuleLoader } from "./module-loader";
 import type { SpecialFilesCollector } from "./special-files-collector";
+
 /**
- * LayerExecutor handles the execution of file reloads based on their layer type
+ * Decides what to reload when a batch of files changes.
  *
- * Strategy:
- * 1. Determine reload type (FSR or HMR) based on invalidation chain
- * 2. For FSR: Restart connectors if needed, reload special files
- * 3. For HMR: Clear module cache, reload affected modules
+ * Strategy: bump the hook's version counter for every file in the
+ * invalidation chain, wait for the hook worker to flush, then re-import
+ * any special files (config / main / routes / events / locales) the chain
+ * touched and restart any connector whose watched-files overlap the change.
  */
 export class LayerExecutor {
   public constructor(
     private readonly dependencyGraph: DependencyGraph,
     private readonly specialFilesCollector: SpecialFilesCollector,
     private readonly moduleLoader: ModuleLoader,
+    private readonly bumpVersion: (absolutePath: string) => void,
+    private readonly flushVersionBumps: () => Promise<void>,
   ) {}
 
   /**
-   * Execute batch reload for multiple changed files
-   * @param changedPaths Array of relative paths that changed (code files only)
-   * @param filesMap Map of all FileManager instances
-   * @param deletedFiles Array of deleted file paths
-   * @param allChangedPaths Optional array of all changed paths including env files (for config reload)
+   * Entry point for the file watcher batch.
+   *
+   * @param changedPaths - code files added or changed in this batch
+   * @param filesMap - all tracked files (relativePath → FileManager)
+   * @param deletedFiles - paths that were removed from disk
+   * @param allChangedPaths - includes .env so we can detect config reloads
    */
   public async executeBatchReload(
     changedPaths: string[],
@@ -35,392 +38,156 @@ export class LayerExecutor {
     deletedFiles: string[],
     allChangedPaths?: string[],
   ): Promise<void> {
-    // If env files are in allChangedPaths, they will trigger config reload
-    // via the isEnvFileAffected check in reloadAffectedModules
-    const envFilesChanged =
-      allChangedPaths?.some((path) => {
-        const basename = path.split("/").pop() || path;
-        return basename === ".env" || basename.startsWith(".env.");
-      }) || false;
+    const envFilesChanged = (allChangedPaths ?? []).some(isEnvPath);
 
-    if (changedPaths.length === 0) {
-      if (deletedFiles.length > 0) {
-        deletedFiles.forEach((file) => {
-          const fileSystem = filesMap.get(file);
-          if (fileSystem) {
-            this.moduleLoader.cleanupDeletedModule(fileSystem);
-          }
-        });
-      }
-
-      // Even if no code files changed, if env files changed, we need to reload configs
-      if (envFilesChanged) {
-        await this.reloadAffectedModules([".env"], filesMap);
-        await this.restartAffectedConnectors([]);
-      }
+    if (changedPaths.length === 0 && deletedFiles.length === 0 && !envFilesChanged) {
       return;
     }
 
-    // Build combined invalidation chain for all changed files
-    const allInvalidatedFiles = new Set<string>();
-    const fsrFiles: string[] = [];
-    const hmrFiles: string[] = [];
+    // Deletes: clean up routes/cleanup hooks for files that no longer exist.
+    for (const path of deletedFiles) {
+      const file = filesMap.get(path);
+      if (file) this.moduleLoader.cleanupDeletedModule(file);
+    }
 
-    for (const relativePath of changedPaths) {
-      const fileManager = filesMap.get(relativePath);
-      if (!fileManager) continue;
+    // Env-only change: reload all configs, restart connectors that watch them.
+    if (changedPaths.length === 0 && envFilesChanged) {
+      const configPaths = await this.reloadAffectedModules([".env"], filesMap);
+      await this.restartAffectedConnectors(configPaths);
+      return;
+    }
 
-      // Get invalidation chain for this file
-      const invalidationChain = this.dependencyGraph.getInvalidationChain(relativePath);
+    if (changedPaths.length === 0) return;
 
-      // Add to combined set
-      invalidationChain.forEach((file) => allInvalidatedFiles.add(file));
-
-      // Determine strategy for this file
-      const strategy = this.determineReloadStrategy(invalidationChain, filesMap);
-
-      if (strategy === "FSR") {
-        fsrFiles.push(relativePath);
-      } else {
-        hmrFiles.push(relativePath);
+    const invalidationChain = new Set<string>();
+    for (const path of changedPaths) {
+      for (const file of this.dependencyGraph.getInvalidationChain(path)) {
+        invalidationChain.add(file);
       }
+      devLogHMR(path, invalidationChain.size - 1);
     }
 
-    try {
-      hmrFiles.forEach((file) => {
-        const dependentFiles = this.dependencyGraph.getInvalidationChain(file);
-        for (const dependentFile of dependentFiles) {
-          // skip the file itself as it will be cleared by reloadModule method
-          // in the module loader
-          if (dependentFile === file) continue;
+    const chain = Array.from(invalidationChain);
 
-          const fileSystem = filesMap.get(dependentFile);
-          if (fileSystem) {
-            this.moduleLoader.clearModuleCache(fileSystem.absolutePath);
-            this.moduleLoader.cleanupFileModule(fileSystem);
-            __clearModuleVersion(fileSystem.cachePath);
-            exportAnalyzer.clearCache(fileSystem.relativePath);
-          }
-        }
-
-        devLogHMR(file, dependentFiles.length - 1);
-      });
-    } catch (error) {
-      console.log("Error in devLogHMR: ", error);
-    }
-
-    try {
-      // Execute reload once for all files
-      const invalidationChain = Array.from(allInvalidatedFiles);
-
-      const firstHmrFile = filesMap.get(hmrFiles[0])!;
-      await this.executeHotModuleReplacement(firstHmrFile, invalidationChain, filesMap, hmrFiles);
-    } catch (error) {
-      console.log("Error in execute HotModuleReplacement: ", error);
-    }
-
-    try {
-      deletedFiles.forEach((file) => {
-        const fileSystem = filesMap.get(file);
-        if (fileSystem) {
-          this.moduleLoader.cleanupDeletedModule(fileSystem);
-        }
-      });
-    } catch (error) {
-      console.log("ERRor in deleteFiles: ", error);
-    }
-  }
-
-  /**
-   * Determine if we need FSR or HMR
-   * FSR is needed if ANY file in the invalidation chain is FSR layer
-   */
-  private determineReloadStrategy(
-    invalidationChain: string[],
-    filesMap: Map<string, FileManager>,
-  ): "FSR" | "HMR" {
-    for (const relativePath of invalidationChain) {
+    // Step 1: bump version counters so the next import() is fresh.
+    for (const relativePath of chain) {
       const file = filesMap.get(relativePath);
-      if (file && file.layer === "FSR") {
-        return "FSR";
-      }
-    }
-    return "HMR";
-  }
-
-  /**
-   * Execute Full Server Restart
-   * This happens when config, routes, or other FSR layer files change
-   */
-  private async executeFullServerRestart(
-    changedFile: FileManager,
-    invalidationChain: string[],
-    filesMap: Map<string, FileManager>,
-  ): Promise<void> {
-    // Step 1: Handle config files specially
-    const configFiles = invalidationChain
-      .map((path) => filesMap.get(path))
-      .filter((file): file is FileManager => file !== undefined && file.type === "config");
-
-    if (configFiles.length > 0) {
-      // Reload config files first
-      for (const configFile of configFiles) {
-        await configManager.reload(configFile);
-      }
-
-      // Restart only affected connectors
-      await this.restartAffectedConnectors(invalidationChain);
-
-      // Clear module cache for invalidation chain
-      await this.clearModuleCacheForChain(invalidationChain, filesMap);
-
-      // Reload special files if affected
-      await this.reloadAffectedSpecialFiles(invalidationChain);
-      return;
+      if (!file) continue;
+      this.moduleLoader.runCleanup(file);
+      this.bumpVersion(file.absolutePath);
+      await file.process({ force: true });
     }
 
-    // Step 2: For non-config FSR (routes, etc.), restart all connectors
-    await this.restartAffectedConnectors(invalidationChain);
+    // Step 2: wait for the hook worker to ack every bump.
+    // Without this, resolve() may still return the old ?v=N URL.
+    await this.flushVersionBumps();
 
-    // Step 3: Clear module cache for invalidation chain
-    await this.clearModuleCacheForChain(invalidationChain, filesMap);
+    // Step 3: re-import affected special files.
+    const affectedConfigPaths = await this.reloadAffectedModules(chain, filesMap);
 
-    // Step 4: Reload special files if affected
-    await this.reloadAffectedSpecialFiles(invalidationChain);
+    // Step 4: restart any connector whose watched-files overlap the chain.
+    await this.restartAffectedConnectors([...changedPaths, ...affectedConfigPaths]);
   }
 
-  /**
-   * Execute Hot Module Replacement
-   * This happens when only HMR layer files (controllers, services, etc.) change
-   */
-  private async executeHotModuleReplacement(
-    changedFile: FileManager,
-    invalidationChain: string[],
-    filesMap: Map<string, FileManager>,
-    hmrFiles: string[],
-  ): Promise<void> {
-    // Step 1: Clear module cache for invalidation chain
-    await this.clearModuleCacheForChain(invalidationChain, filesMap);
-
-    // Step 2: Reload affected modules and get affected config paths
-    const affectedConfigPaths = await this.reloadAffectedModules(invalidationChain, filesMap);
-
-    // Step 3: Restart connectors - pass config paths so they know their config changed
-    // This way connectors don't need to watch .env directly
-    await this.restartAffectedConnectors([...hmrFiles, ...affectedConfigPaths]);
-  }
-
-  /**
-   * Restart connectors that are affected by the changed files
-   */
   private async restartAffectedConnectors(affectedFiles: string[]): Promise<void> {
-    const connectorsToRestart = connectorsManager
+    const toRestart = connectorsManager
       .list()
-      .filter((connector) => connector.shouldRestart(affectedFiles));
+      .filter(connector => connector.shouldRestart(affectedFiles));
 
-    if (connectorsToRestart.length === 0) {
-      return;
-    }
-
-    // Restart in priority order
-    for (const connector of connectorsToRestart) {
-      connector.restart();
+    for (const connector of toRestart) {
+      await connector.restart();
     }
   }
 
   /**
-   * Clear Node.js module cache for the invalidation chain
-   * and re-process files to pick up export changes
-   */
-  private async clearModuleCacheForChain(
-    invalidationChain: string[],
-    filesMap: Map<string, FileManager>,
-  ): Promise<void> {
-    for (const relativePath of invalidationChain) {
-      const file = filesMap.get(relativePath);
-      if (file) {
-        this.moduleLoader.clearModuleCache(file.absolutePath);
-        this.moduleLoader.cleanupFileModule(file);
-
-        // Update module version for HMR cache busting
-        __clearModuleVersion(`./${file.cachePath}`);
-
-        // Clear export analyzer cache for proper re-export transformation
-        exportAnalyzer.clearCache(file.relativePath);
-
-        // Re-process the file to pick up export changes
-        // This is crucial for files that re-export from changed dependencies
-        // Skip saving to cache since we'll reload the module anyway
-        await file.process({ force: true, saveToCache: true });
-      }
-    }
-  }
-
-  /**
-   * Reload special files that are affected by the change
-   * This includes main, routes, events, locales
-   * Special files are reloaded if they are in the invalidation chain OR if they depend on files in the chain
-   */
-  private async reloadAffectedSpecialFiles(invalidationChain: string[]): Promise<void> {
-    // Helper to check if a file is affected (either in chain or depends on chain)
-    const isAffected = (file: FileManager): boolean => {
-      // Direct match: file itself is in the chain
-      if (invalidationChain.includes(file.relativePath)) {
-        return true;
-      }
-      // Indirect match: file depends on something in the chain
-      for (const dep of file.dependencies) {
-        if (invalidationChain.includes(dep)) {
-          return true;
-        }
-      }
-      return false;
-    };
-
-    // Check which special files are affected
-    const affectedMainFiles = this.specialFilesCollector.getMainFiles().filter(isAffected);
-
-    const affectedRouteFiles = this.specialFilesCollector.getRouteFiles().filter(isAffected);
-
-    const affectedEventFiles = this.specialFilesCollector.getEventFiles().filter(isAffected);
-
-    const affectedLocaleFiles = this.specialFilesCollector.getLocaleFiles().filter(isAffected);
-
-    // Reload affected special files
-    if (affectedMainFiles.length > 0) {
-      for (const file of affectedMainFiles) {
-        await this.moduleLoader.reloadModule(file);
-      }
-    }
-
-    if (affectedLocaleFiles.length > 0) {
-      for (const file of affectedLocaleFiles) {
-        await this.moduleLoader.reloadModule(file);
-      }
-    }
-
-    if (affectedEventFiles.length > 0) {
-      for (const file of affectedEventFiles) {
-        await this.moduleLoader.reloadModule(file);
-      }
-    }
-
-    if (affectedRouteFiles.length > 0) {
-      for (const file of affectedRouteFiles) {
-        await this.moduleLoader.reloadModule(file);
-      }
-    }
-  }
-
-  /**
-   * Reload affected modules (for HMR)
-   * Special files (main, routes, events, locales) need to be actively reloaded
-   * Other files will be loaded on next import
-   * @returns Array of affected config file paths (for connector restart logic)
+   * Re-import every special file whose path or dependency-set intersects the
+   * invalidation chain. Returns the relative paths of any config files that
+   * reloaded so the caller can pass them to the connector-restart pass.
    */
   private async reloadAffectedModules(
-    invalidationChain: string[],
+    chain: string[],
     filesMap: Map<string, FileManager>,
   ): Promise<string[]> {
-    // Helper to check if a file is affected (either in chain or depends on chain)
-    const isAffected = (file: FileManager): boolean => {
-      // Direct match: file itself is in the chain
-      if (invalidationChain.includes(file.relativePath)) {
-        return true;
-      }
-      // Indirect match: file depends on something in the chain
-      for (const dep of file.dependencies) {
-        if (invalidationChain.includes(dep)) {
-          return true;
-        }
-      }
-      return false;
-    };
+    const isEnvAffected = chain.some(isEnvPath);
+    if (isEnvAffected) await loadEnv();
 
-    // Check if any .env file variant is affected (.env, .env.local, .env.development, etc.)
-    const isEnvFileAffected = invalidationChain.some((path) => {
-      const basename = path.split("/").pop() || path;
-      return basename === ".env" || basename.startsWith(".env.");
-    });
+    const isAffected = (file: FileManager) => isFileAffected(file, chain);
 
-    if (isEnvFileAffected) {
-      await loadEnv();
+    // Models self-register via the @RegisterModel decorator and rely on the
+    // module-loader's registerCleanup() to attach Model.$cleanup (which
+    // unregisters them on the next reload). That only happens inside
+    // loadModule(), which models hit exactly once — at boot, via
+    // autoDiscoverFiles. During HMR they're otherwise re-imported
+    // *transitively* through routes, which never re-runs registerCleanup, so
+    // after the first reload the cleanup list is empty and the registration
+    // leaks ("Model X is already registered" on every subsequent edit).
+    //
+    // Re-importing changed model files through loadModule here re-attaches
+    // $cleanup every cycle. It runs before the route pass so the decorator
+    // registers once; the transitive route import then hits the cached ?v=N
+    // and does not double-register.
+    const affectedModels = chain
+      .map(path => filesMap.get(path))
+      .filter((file): file is FileManager => !!file && file.type === "model");
+
+    for (const file of affectedModels) {
+      await this.moduleLoader.loadModule(file, "model");
     }
 
-    // Check which special files are affected
-    const affectedMainFiles = this.specialFilesCollector.getMainFiles().filter(isAffected);
-
-    const affectedConfigFiles = this.specialFilesCollector
-      .getConfigFiles()
-      .filter((file) => (isEnvFileAffected ? true : isAffected(file)));
-
-    const affectedRouteFiles = this.specialFilesCollector.getRouteFiles().filter(isAffected);
-
-    const affectedEventFiles = this.specialFilesCollector.getEventFiles().filter(isAffected);
-
-    const affectedLocaleFiles = this.specialFilesCollector.getLocaleFiles().filter(isAffected);
+    const collector = this.specialFilesCollector;
+    const affectedConfigs = collector
+      .getFilesByType("config")
+      .filter(file => (isEnvAffected ? true : isAffected(file)));
+    const affectedMains = collector.getFilesByType("main").filter(isAffected);
+    const affectedRoutes = collector.getFilesByType("route").filter(isAffected);
+    const affectedEvents = collector.getFilesByType("event").filter(isAffected);
+    const affectedLocales = collector.getFilesByType("locale").filter(isAffected);
 
     const hasSpecialFiles =
-      affectedMainFiles.length > 0 ||
-      affectedRouteFiles.length > 0 ||
-      affectedEventFiles.length > 0 ||
-      affectedLocaleFiles.length > 0 ||
-      affectedConfigFiles.length > 0;
+      affectedConfigs.length > 0 ||
+      affectedMains.length > 0 ||
+      affectedRoutes.length > 0 ||
+      affectedEvents.length > 0 ||
+      affectedLocales.length > 0;
 
-    // For future me:
-    // why we are only allowing special files?
-    // because they act as entry points
-    // so for example of a service file is changed
-    // but not called within a controller that's called
-    // within a router, then it's useless to reload it
-    // since it will not be executed.
+    // No entry points touched: reloading internal files alone is wasted work
+    // because the hook will re-import them on next access anyway. But the
+    // dep chain's last hop is usually the user-facing edge — give it a kick.
     if (!hasSpecialFiles) {
-      // however, we could just reload the last file in the chain
-      // since it's the main dependent file instead of reloading all of them.
-      const lastFileInChain = invalidationChain[invalidationChain.length - 1];
-      const file = filesMap.get(lastFileInChain);
-      if (!file) {
-        return [];
-      }
-      await this.moduleLoader.reloadModule(file);
+      const tail = filesMap.get(chain[chain.length - 1]);
+      if (tail) await this.moduleLoader.reloadModule(tail);
       return [];
     }
 
-    // Track affected config paths to return for connector restart logic
-    const affectedConfigPaths: string[] = [];
-
-    if (affectedConfigFiles.length > 0) {
-      for (const file of affectedConfigFiles) {
-        await configManager.reload(file);
-        affectedConfigPaths.push(file.relativePath);
-      }
+    const configPaths: string[] = [];
+    for (const file of affectedConfigs) {
+      await configManager.reload(file);
+      configPaths.push(file.relativePath);
     }
 
-    // Reload special files
-    if (affectedMainFiles.length > 0) {
-      for (const file of affectedMainFiles) {
-        await this.moduleLoader.reloadModule(file);
-      }
-    }
+    // Order matters: locales first (translations used by main), main before
+    // routes (registers state routes consume), events between (listeners).
+    for (const file of affectedLocales) await this.moduleLoader.reloadModule(file);
+    for (const file of affectedMains) await this.moduleLoader.reloadModule(file);
+    for (const file of affectedEvents) await this.moduleLoader.reloadModule(file);
+    for (const file of affectedRoutes) await this.moduleLoader.reloadModule(file);
 
-    if (affectedLocaleFiles.length > 0) {
-      for (const file of affectedLocaleFiles) {
-        await this.moduleLoader.reloadModule(file);
-      }
-    }
-
-    if (affectedEventFiles.length > 0) {
-      for (const file of affectedEventFiles) {
-        await this.moduleLoader.reloadModule(file);
-      }
-    }
-
-    if (affectedRouteFiles.length > 0) {
-      for (const file of affectedRouteFiles) {
-        await this.moduleLoader.reloadModule(file);
-      }
-    }
-
-    return affectedConfigPaths;
+    return configPaths;
   }
+}
+
+function isEnvPath(path: string): boolean {
+  const basename = path.split("/").pop() ?? path;
+  return basename === ".env" || basename.startsWith(".env.");
+}
+
+/**
+ * A file is "affected" if it itself is in the chain or imports something in it.
+ */
+function isFileAffected(file: FileManager, chain: string[]): boolean {
+  if (chain.includes(file.relativePath)) return true;
+  for (const dep of file.dependencies) {
+    if (chain.includes(dep)) return true;
+  }
+  return false;
 }

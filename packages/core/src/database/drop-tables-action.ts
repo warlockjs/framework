@@ -1,5 +1,5 @@
 import { colors } from "@mongez/copper";
-import { dataSourceRegistry } from "@warlock.js/cascade";
+import { dataSourceRegistry, dropAllTables } from "@warlock.js/cascade";
 import { log } from "@warlock.js/logger";
 import { confirm } from "../cli/commands/generate/utils/prompt";
 import { CommandActionData } from "../cli/types";
@@ -7,22 +7,20 @@ import { CommandActionData } from "../cli/types";
 export async function dropTablesAction(command: CommandActionData) {
   const { force } = command.options;
 
-  // For now we will support only the default connection
-  const dataSource = dataSourceRegistry.get();
-
-  const driver = dataSource.driver;
-
   if (force) {
-    const tables = await driver.blueprint.listTables();
-    await driver.dropAllTables();
+    const { dropped } = await dropAllTables();
     log.success(
       "database",
       "drop",
-      `Dropped ${colors.yellowBright(tables.length)} tables successfully.`,
+      `Dropped ${colors.yellowBright(dropped)} tables successfully.`,
     );
     return;
   }
 
+  // Preview phase — we keep direct driver access so we can show per-table
+  // row counts before asking for confirmation. The actual drop still goes
+  // through the Cascade Operations API.
+  const driver = dataSourceRegistry.get().driver;
   const tables = await driver.blueprint.listTables();
 
   if (tables.length === 0) {
@@ -46,11 +44,11 @@ export async function dropTablesAction(command: CommandActionData) {
     return;
   }
 
-  await driver.dropAllTables();
+  const { dropped } = await dropAllTables();
 
   log.success(
     "database",
     "drop",
-    `Dropped ${colors.yellowBright(tables.length)} tables successfully.`,
+    `Dropped ${colors.yellowBright(dropped)} tables successfully.`,
   );
 }

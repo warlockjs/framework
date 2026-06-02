@@ -1,7 +1,10 @@
 /**
  * Framework Validator Type Augmentations
  *
- * Augments core validators with framework-specific methods
+ * Augments core validators with framework-specific methods. The base
+ * `unique()` / `exists()` augmentations now live in `@warlock.js/cascade`
+ * (where their implementations were moved). This file only declares the
+ * request-aware variants that depend on core's HTTP helpers.
  */
 
 import type { ChildModel, Model } from "@warlock.js/cascade";
@@ -14,10 +17,8 @@ import type {
 import type {
   ExistsExceptCurrentIdRuleOptions,
   ExistsExceptCurrentUserRuleOptions,
-  ExistsRuleOptions,
   UniqueExceptCurrentIdRuleOptions,
   UniqueExceptCurrentUserRuleOptions,
-  UniqueRuleOptions,
 } from "./database";
 import type { FileValidator } from "./validators";
 
@@ -35,14 +36,6 @@ declare module "@warlock.js/seal" {
   }
 
   interface ScalarValidator {
-    /** Value must be unique in database */
-    unique(
-      model: ChildModel<Model> | string,
-      optionsList?: Partial<UniqueRuleOptions> & {
-        errorMessage?: string;
-      },
-    ): this;
-
     /** Value must be unique in database except current user */
     uniqueExceptCurrentUser(
       model: ChildModel<Model> | string,
@@ -55,14 +48,6 @@ declare module "@warlock.js/seal" {
     uniqueExceptCurrentId(
       model: ChildModel<Model> | string,
       optionsList?: Partial<UniqueExceptCurrentIdRuleOptions> & {
-        errorMessage?: string;
-      },
-    ): this;
-
-    /** Value must exist in database */
-    exists(
-      model: ChildModel<Model> | string,
-      optionsList?: Partial<ExistsRuleOptions> & {
         errorMessage?: string;
       },
     ): this;
@@ -86,18 +71,10 @@ declare module "@warlock.js/seal" {
 
   // StringValidator gets same database methods
   interface StringValidator {
-    unique: ScalarValidator["unique"];
     uniqueExceptCurrentUser: ScalarValidator["uniqueExceptCurrentUser"];
     uniqueExceptCurrentId: ScalarValidator["uniqueExceptCurrentId"];
-    exists: ScalarValidator["exists"];
     existsExceptCurrentUser: ScalarValidator["existsExceptCurrentUser"];
     existsExceptCurrentId: ScalarValidator["existsExceptCurrentId"];
-  }
-
-  // NumberValidator gets unique and exists only
-  interface NumberValidator {
-    unique: ScalarValidator["unique"];
-    exists: ScalarValidator["exists"];
   }
 }
 
@@ -105,10 +82,8 @@ declare module "@warlock.js/seal" {
 export type {
   ExistsExceptCurrentIdRuleOptions,
   ExistsExceptCurrentUserRuleOptions,
-  ExistsRuleOptions,
   UniqueExceptCurrentIdRuleOptions,
   UniqueExceptCurrentUserRuleOptions,
-  UniqueRuleOptions,
 } from "./database";
 
 export type ValidationConfiguration = {

@@ -2,7 +2,7 @@ import config from "@mongez/config";
 import { connectToDatabase, dataSourceRegistry } from "@warlock.js/cascade";
 import { container } from "../container";
 import { BaseConnector } from "./base-connector";
-import { ConnectorPriority } from "./types";
+import { ConnectorLifecyclePhase, ConnectorPriority } from "./types";
 
 /**
  * Database Connector
@@ -11,6 +11,7 @@ import { ConnectorPriority } from "./types";
 export class DatabaseConnector extends BaseConnector {
   public readonly name = "database";
   public readonly priority = ConnectorPriority.DATABASE;
+  public readonly lifecyclePhase = ConnectorLifecyclePhase.Early;
 
   /**
    * Files that trigger database restart

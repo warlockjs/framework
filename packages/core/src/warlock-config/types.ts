@@ -84,6 +84,16 @@ export type WarlockConfig = {
      * @default true
      */
     generateTypings?: boolean;
+    /**
+     * Debug aid for the (always-on) persisted transpile cache. Names cache
+     * files `<slug>.<hash>.js` (last 3 source path segments) and appends a
+     * trailing `// @source <path>` marker, so you can eyeball which entry
+     * in `.warlock/transpile/` is which. Purely cosmetic — does not affect
+     * cache keys, lookup, or correctness. Turn on only while diagnosing a
+     * cache issue; leave off for opaque hash-only names.
+     * @default false
+     */
+    transpileCacheDebug?: boolean;
   };
 
   /**

@@ -66,17 +66,17 @@ export function appPath(relativePath = "") {
 }
 
 /**
- * Console path
+ * Get logs directory path
  */
-export function consolePath(relativePath = "") {
-  return rootPath("src/console", relativePath);
+export function logsPath(relativePath = "") {
+  return rootPath("storage/logs", relativePath);
 }
 
 /**
  * Get a temp path
  */
 export function tempPath(relativePath = "") {
-  return rootPath("storage/temp", relativePath);
+  return rootPath("storage/tmp", relativePath);
 }
 
 /**
@@ -102,3 +102,18 @@ export function warlockPath(...path: string[]) {
 export function configPath(...path: string[]) {
   return rootPath("src/config", ...path);
 }
+
+export const paths = {
+  root: rootPath,
+  src: srcPath,
+  storage: storagePath,
+  logs: logsPath,
+  uploads: uploadsPath,
+  public: publicPath,
+  cache: cachePath,
+  app: appPath,
+  temp: tempPath,
+  warlock: warlockPath,
+  config: configPath,
+  sanitize: sanitizePath,
+};

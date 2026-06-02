@@ -1,7 +1,7 @@
 import { colors } from "@mongez/copper";
-import { putFileAsync } from "@mongez/fs";
 import type { CommandActionData } from "../../../types";
 import { resourceStub } from "../templates/stubs";
+import { putFileAsync, setDryRun } from "../utils/writer";
 import { parseModulePath, parseName } from "../utils/name-parser";
 import {
   componentExists,
@@ -37,6 +37,7 @@ export async function generateResource(data: CommandActionData): Promise<void> {
 
   const name = parseName(componentName);
   const force = data.options.force || data.options.f;
+  setDryRun(Boolean(data.options.dryRun));
 
   // Check if resource already exists
   if ((await componentExists(module, "resources", `${name.kebab}.resource`)) && !force) {
@@ -53,7 +54,6 @@ export async function generateResource(data: CommandActionData): Promise<void> {
   const resourceContent = resourceStub(name);
 
   await putFileAsync(resourcePath, resourceContent);
-  console.log(colors.green(`✓ Created resource: ${resourcePath}`));
 
-  console.log(colors.cyan(`\n✨ Resource "${name.pascal}Resource" generated successfully!`));
+  console.log(colors.cyan(`\nâœ¨ Resource "${name.pascal}Resource" generated successfully!`));
 }

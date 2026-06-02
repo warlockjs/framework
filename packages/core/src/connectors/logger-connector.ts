@@ -2,7 +2,7 @@ import config from "@mongez/config";
 import { log } from "@warlock.js/logger";
 import { setLogConfigurations } from "../logger";
 import { BaseConnector } from "./base-connector";
-import { ConnectorPriority } from "./types";
+import { ConnectorLifecyclePhase, ConnectorPriority } from "./types";
 
 /**
  * Logger Connector
@@ -11,6 +11,7 @@ import { ConnectorPriority } from "./types";
 export class LoggerConnector extends BaseConnector {
   public readonly name = "logger";
   public readonly priority = ConnectorPriority.LOGGER;
+  public readonly lifecyclePhase = ConnectorLifecyclePhase.Early;
 
   /**
    * Files that trigger logger restart

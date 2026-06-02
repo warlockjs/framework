@@ -1,9 +1,8 @@
-import { fileExistsAsync, getFileAsync, putFileAsync } from "@mongez/fs";
+import { fileExistsAsync } from "@warlock.js/fs";
 import { get } from "@mongez/reinforcements";
 import { pathToFileURL } from "url";
 import { devLogWarn } from "../dev-server/dev-logger";
-import { rootPath, warlockPath } from "../utils";
-import { transpile } from "./../dev-server/transpile-file";
+import { rootPath } from "../utils";
 import { WarlockConfig } from "./types";
 
 /**
@@ -49,47 +48,26 @@ export class WarlockConfigManager {
 
   /**
    * Internal load implementation
+   *
+   * The ESM loader hook transpiles `warlock.config.ts` on import â€” no
+   * separate compile-to-disk step is needed.
    */
   private async doLoad(): Promise<WarlockConfig | undefined> {
-    const configPath = warlockPath("cache/warlock-config.js");
+    const configPath = rootPath("warlock.config.ts");
 
-    // if (!(await fileExistsAsync(configPath))) {
-    const result = await this.compile();
-
-    if (!result) {
+    if (!(await fileExistsAsync(configPath))) {
       devLogWarn(
         "warlock.config.ts is missing, it's highly recommended to create it, run warlock init to create it",
       );
       return;
     }
-    // }
 
-    const fileUrl = pathToFileURL(configPath).href;
     try {
-      const configModule = await import(fileUrl);
-
+      const configModule = await import(pathToFileURL(configPath).href);
       return configModule.default;
     } catch (error) {
-      throw new Error(
-        `Failed to load warlock.config.js from ${fileUrl}. ` +
-          `Make sure the config has been compiled. Error: ${error}`,
-      );
+      throw new Error(`Failed to load warlock.config.ts: ${error}`);
     }
-  }
-
-  /**
-   * Compile warlock.config.ts file
-   */
-  protected async compile() {
-    const configPath = rootPath("warlock.config.ts");
-    if (!(await fileExistsAsync(configPath))) {
-      return false;
-    }
-
-    const content = await getFileAsync(configPath);
-    const compiledContent = await transpile(content, configPath);
-    await putFileAsync(warlockPath("cache/warlock-config.js"), compiledContent);
-    return true;
   }
 
   /**

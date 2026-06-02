@@ -1,9 +1,10 @@
 import {
+  directoryExistsAsync,
   ensureDirectoryAsync,
   fileExistsAsync,
   removeDirectoryAsync,
   unlinkAsync,
-} from "@mongez/fs";
+} from "@warlock.js/fs";
 import { ltrim } from "@mongez/reinforcements";
 import crypto from "crypto";
 import { createReadStream, createWriteStream } from "fs";
@@ -491,7 +492,10 @@ export class LocalDriver implements StorageDriverContract {
     const absolutePath = this.getAbsolutePath(directory);
     const files: StorageFileInfo[] = [];
 
-    if (!(await fileExistsAsync(absolutePath))) {
+    // A listing target is a DIRECTORY, so guard with `directoryExistsAsync`.
+    // `fileExistsAsync` resolves `false` for a folder, which would make `list`
+    // always return [] for a real, populated directory.
+    if (!(await directoryExistsAsync(absolutePath))) {
       return files;
     }
 

@@ -1,4 +1,4 @@
-import axios from "axios";
+import { http } from "@mongez/http";
 import type sharp from "sharp";
 import type { FormatEnum } from "sharp";
 
@@ -270,22 +270,17 @@ export class Image {
    * Create image instance from url
    */
   public static async fromUrl(url: string): Promise<Image> {
-    try {
-      const response = await axios.get(url, {
-        responseType: "arraybuffer",
-      });
+    const { data, error } = await http.get<ArrayBuffer>(url, {
+      responseType: "arrayBuffer",
+    });
 
-      if (!response.data) {
-        throw new Error("Empty response received");
-      }
-
-      const buffer = Buffer.from(response.data, "binary");
-
-      return new Image(buffer);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      throw new Error(`Failed to load image from URL "${url}": ${message}`);
+    if (error || !data) {
+      throw new Error(
+        `Failed to load image from URL "${url}": ${error?.message ?? "Empty response received"}`,
+      );
     }
+
+    return new Image(Buffer.from(data));
   }
 
   /**

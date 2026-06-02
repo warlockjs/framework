@@ -1,7 +1,7 @@
 import { colors } from "@mongez/copper";
-import { putFileAsync } from "@mongez/fs";
 import type { CommandActionData } from "../../../types";
 import { repositoryStub } from "../templates/stubs";
+import { putFileAsync, setDryRun } from "../utils/writer";
 import { parseModulePath, parseName } from "../utils/name-parser";
 import {
   componentExists,
@@ -37,6 +37,7 @@ export async function generateRepository(data: CommandActionData): Promise<void>
 
   const name = parseName(componentName);
   const force = data.options.force || data.options.f;
+  setDryRun(Boolean(data.options.dryRun));
 
   // Check if repository already exists
   if ((await componentExists(module, "repositories", `${name.kebab}.repository`)) && !force) {
@@ -53,7 +54,6 @@ export async function generateRepository(data: CommandActionData): Promise<void>
   const repositoryContent = repositoryStub(name);
 
   await putFileAsync(repositoryPath, repositoryContent);
-  console.log(colors.green(`✓ Created repository: ${repositoryPath}`));
 
-  console.log(colors.cyan(`\n✨ Repository "${name.pascal}Repository" generated successfully!`));
+  console.log(colors.cyan(`\nâœ¨ Repository "${name.pascal}Repository" generated successfully!`));
 }

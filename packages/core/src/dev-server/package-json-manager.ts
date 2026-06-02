@@ -1,4 +1,4 @@
-import { getJsonFileAsync } from "@mongez/fs";
+import { getJsonFileAsync } from "@warlock.js/fs";
 import { Path } from "./path";
 
 export class PackageJsonManager {

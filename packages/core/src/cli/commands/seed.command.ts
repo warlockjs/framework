@@ -18,7 +18,7 @@ export const seedCommand = command({
       type: "boolean",
     },
     {
-      text: "--order, -o",
+      text: "--list, -l",
       description: "Display the seeds list in order without execution",
       type: "boolean",
     },

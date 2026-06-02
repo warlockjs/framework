@@ -4,14 +4,15 @@ import {
   fileExistsAsync,
   putFileAsync,
   removeDirectoryAsync,
-} from "@mongez/fs";
+} from "@warlock.js/fs";
 import esbuild from "esbuild";
 import glob from "fast-glob";
 import path from "path";
+import { tsconfigManager } from "../dev-server/tsconfig-manager";
 import { appPath, warlockPath } from "../utils";
-import { WarlockConfig } from "../warlock-config/types";
-import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 import { nativeNodeModulesPlugin } from "./esbuild-plugins";
+import { resolveBuildConfig, type ResolvedBuildConfig } from "./resolve-build-config";
+import { toCamelCase, toKebabCase } from "@mongez/reinforcements";
 
 /**
  * Production Builder
@@ -19,14 +20,14 @@ import { nativeNodeModulesPlugin } from "./esbuild-plugins";
  * Build options are loaded from warlock.config.ts
  */
 export class ProductionBuilder {
-  private options!: Required<WarlockConfig["build"]>;
+  private options!: ResolvedBuildConfig;
   private readonly productionDir = warlockPath("production");
 
   /**
    * Main build entry point
    */
   public async build(): Promise<void> {
-    console.log(colors.cyan("🚀 Building for production...\n"));
+    console.log(colors.cyan("Building for production...\n"));
 
     // Step 1: Initialize options from config
     await this.initializeOptions();
@@ -40,10 +41,10 @@ export class ProductionBuilder {
     // Step 4: Bundle with esbuild
     await this.bundle();
 
-    // Step 5: Remove production folder
+    // // Step 5: Remove production folder
     await removeDirectoryAsync(this.productionDir);
 
-    console.log(colors.green("\n✅ Build complete!"));
+    console.log(colors.green("Build complete!"));
     console.log(`Start production server by running ${colors.cyan("warlock start")}`);
   }
 
@@ -51,7 +52,7 @@ export class ProductionBuilder {
    * Initialize options from warlock.config.ts
    */
   private async initializeOptions(): Promise<void> {
-    this.options = warlockConfigManager.get("build") as Required<WarlockConfig["build"]>;
+    this.options = resolveBuildConfig();
 
     // Ensure production directory exists
     await ensureDirectoryAsync(this.productionDir);
@@ -166,10 +167,11 @@ bootstrap();
     const executors: string[] = [];
 
     for (const configName of configNames) {
-      const varName = `${configName}Config`;
+      const properConfigName = toCamelCase(configName);
+      const varName = `${properConfigName}Config`;
       configImports.push(`import ${varName} from "../../src/config/${configName}";`);
-      configSetCalls.push(`config.set("${configName}", ${varName});`);
-      executors.push(`await configSpecialHandlers.execute("${configName}", ${varName});`);
+      configSetCalls.push(`config.set("${properConfigName}", ${varName});`);
+      executors.push(`await configSpecialHandlers.execute("${properConfigName}", ${varName});`);
     }
 
     let content = [
@@ -259,31 +261,40 @@ bootstrap();
       "",
       "// 2. Load configs",
       'import "./config-loader";',
+      "",
+      "// 3. Start early-phase connectors (database, cache, logger, ...)",
+      "//    so data sources, cache, etc. are ready before app code runs",
+      'import { connectorsManager, ConnectorLifecyclePhase } from "@warlock.js/core";',
+      "await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);",
     ];
 
-    // Add special files in correct order (only if they have content)
-    imports.push("", "// 3. Load special files in order");
+    // App code uses dynamic `await import(...)` so each module's side
+    // effects fire at THIS point in execution. Static imports would be
+    // hoisted to module-instantiation time (before the early-phase await
+    // resolves), which is exactly the bug this split is meant to fix.
+    // Requires `splitting: true` in esbuild (set below in bundle()).
+    imports.push("", "// 4. Load app code (events, locales, main, routes)");
 
     if (this.generatedFiles.events) {
-      imports.push('import "./events";');
+      imports.push('await import("./events");');
     }
     if (this.generatedFiles.locales) {
-      imports.push('import "./locales";');
+      imports.push('await import("./locales");');
     }
     if (this.generatedFiles.main) {
-      imports.push('import "./main";');
+      imports.push('await import("./main");');
     }
     if (this.generatedFiles.routes) {
-      imports.push('import "./routes";');
+      imports.push('await import("./routes");');
     }
 
-    // Start connectors at the end
+    // Start late-phase connectors after app code registers routes/listeners
     imports.push(
       "",
-      "// 4. Start connectors (database, cache, http)",
-      'import { connectorsManager } from "@warlock.js/core";',
-      "await connectorsManager.start();",
-      `connectorsManager.shutdownOnProcessKill();`,
+      "// 5. Start late-phase connectors (http, socket) â€” routes and",
+      "//    listeners registered by app code are now ready to bind",
+      "await connectorsManager.startPhase(ConnectorLifecyclePhase.Late);",
+      "connectorsManager.shutdownOnProcessKill();",
     );
 
     const content = imports.join("\n") + "\n";
@@ -297,21 +308,63 @@ bootstrap();
     console.log(colors.magenta("   Bundling with esbuild..."));
 
     const entryPoint = path.join(this.productionDir, "app.ts");
-    const outfile = path.resolve(this.options!.outDirectory!, this.options!.outFile!);
+    const outDir = this.options!.outDirectory!;
+    const outFileName = this.options!.outFile!;
+    // Strip extension so entryNames produces "<base>.js" via esbuild
+    const entryName = path.basename(outFileName, path.extname(outFileName));
 
-    await ensureDirectoryAsync(this.options!.outDirectory!);
+    await ensureDirectoryAsync(outDir);
+
+    const alias = this.buildAliasMapFromTsconfig();
 
     await esbuild.build({
       platform: "node",
       entryPoints: [entryPoint],
       bundle: true,
+      // Required so dynamic `await import("./main")` in the generated
+      // app.ts produces separate chunks loaded at the runtime call site,
+      // instead of inlining the modules at instantiation time (which
+      // would defeat the early/late phase split).
+      splitting: true,
       packages: "external",
       minify: this.options!.minify,
       sourcemap: this.options!.sourcemap === true ? "linked" : this.options!.sourcemap,
       format: "esm",
-      target: ["esnext"],
-      outfile,
+      // Targeting a concrete Node version (not "esnext") so esbuild
+      // transpiles TC39 stage 3 decorators into helpers â€” Node does not
+      // implement them natively yet.
+      target: ["node22"],
+      outdir: outDir,
+      entryNames: entryName,
+      alias,
       plugins: [nativeNodeModulesPlugin],
     });
+  }
+
+  /**
+   * Build an alias map from tsconfig `paths` so esbuild resolves local
+   * source aliases (e.g. `@warlock.js/cascade`) to their on-disk source
+   * folders during bundling. Without this, `packages: "external"` would
+   * leave those bare specifiers as raw imports and Node would fail to
+   * resolve them at runtime (they aren't installed in node_modules).
+   *
+   * Only exact (non-wildcard) aliases are included â€” esbuild's `alias`
+   * option doesn't support glob-style mappings.
+   */
+  private buildAliasMapFromTsconfig(): Record<string, string> {
+    tsconfigManager.init();
+
+    const alias: Record<string, string> = {};
+    const baseUrl = path.resolve(process.cwd(), tsconfigManager.baseUrl);
+
+    for (const [from, to] of Object.entries(tsconfigManager.aliases)) {
+      if (from.endsWith("/*") || !Array.isArray(to) || to.length === 0) {
+        continue;
+      }
+
+      alias[from] = path.resolve(baseUrl, to[0]);
+    }
+
+    return alias;
   }
 }

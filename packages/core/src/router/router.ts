@@ -776,8 +776,6 @@ export class Router {
 
       request.setRequest(fastifyRequest).setRoute(route);
 
-      Request.current = request;
-
       log.info({
         module: "route",
         action: route.method + " " + route.path.replace("/*", ""),

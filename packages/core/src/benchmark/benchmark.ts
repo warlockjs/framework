@@ -38,7 +38,7 @@ function latencyState(
  *   onFinish:   (r) => logger.info(`${r.name} took ${r.latency}ms`),
  * });
  *
- * if (isSuccessResult(result)) {
+ * if (result.success) {
  *   console.log(result.value);
  * } else {
  *   console.error(result.error);

@@ -1,3 +1,21 @@
+export const socketConfigStub = `import type { SocketOptions } from "@warlock.js/core";
+
+/**
+ * Socket.IO configuration — read by the framework's socket connector
+ * on boot. When the HTTP server is running the socket server attaches
+ * to it; otherwise it listens on its own configured port.
+ *
+ * Remove this file to disable the socket server entirely.
+ */
+export default {
+  options: {
+    cors: {
+      origin: "*",
+    },
+  },
+} as SocketOptions;
+`;
+
 export const communicatorsConfigStub = `import { env } from "@mongez/dotenv";
 import type { CommunicatorConfigurations, RabbitMQClientOptions } from "@warlock.js/herald";
 

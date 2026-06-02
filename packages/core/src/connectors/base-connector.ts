@@ -1,4 +1,5 @@
 import { Path } from "../dev-server/path";
+import { ConnectorLifecyclePhase } from "./types";
 import type { Connector, ConnectorName } from "./types";
 
 /**
@@ -17,6 +18,13 @@ export abstract class BaseConnector implements Connector {
   public abstract readonly priority: number;
 
   /**
+   * Lifecycle phase. Defaults to `Early`; override to `Late` if the
+   * connector consumes state user code registers at import time
+   * (routes, socket listeners).
+   */
+  public readonly lifecyclePhase: ConnectorLifecyclePhase = ConnectorLifecyclePhase.Early;
+
+  /**
    * Files that trigger restart when changed
    * Use relative paths
    */
@@ -32,6 +40,13 @@ export abstract class BaseConnector implements Connector {
    */
   public isActive(): boolean {
     return this.active;
+  }
+
+  /**
+   * Boot the connector
+   */
+  public async boot(): Promise<void> {
+    return;
   }
 
   /**

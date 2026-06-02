@@ -15,9 +15,21 @@ export interface Connector {
   readonly priority: number;
 
   /**
+   * Phase the connector boots in, relative to user code.
+   * See `ConnectorLifecyclePhase` for semantics.
+   */
+  readonly lifecyclePhase: ConnectorLifecyclePhase;
+
+  /**
    * Whether the connector is currently active/connected
    */
   isActive(): boolean;
+
+  /**
+   * Boot the connector
+   * Called during server startup before starting the connector
+   */
+  boot(): void | Promise<void>;
 
   /**
    * Initialize the connector
@@ -55,6 +67,20 @@ export type ConnectorName =
   | "communicator"
   | "socket"
   | (string & {});
+
+/**
+ * When a connector boots relative to user code (main, routes, events).
+ *
+ * - `Early`: before user code is imported. For services user code
+ *   needs at import time (database, cache, logger, storage, mailer).
+ * - `Late`: after user code is imported. For services that bind to
+ *   things user code registered (http scans the router; socket
+ *   depends on http's instance).
+ */
+export enum ConnectorLifecyclePhase {
+  Early = "early",
+  Late = "late",
+}
 
 /**
  * Connector priority constants

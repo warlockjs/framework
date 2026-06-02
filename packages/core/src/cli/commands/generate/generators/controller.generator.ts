@@ -1,7 +1,6 @@
 import { colors } from "@mongez/copper";
-import { putFileAsync } from "@mongez/fs";
 import type { CommandActionData } from "../../../types";
-import { controllerStub, requestStub, validationStub } from "../templates/stubs";
+import { controllerStub, schemaStub } from "../templates/stubs";
 import { parseModulePath, parseName } from "../utils/name-parser";
 import {
   componentExists,
@@ -9,6 +8,7 @@ import {
   moduleExists,
   resolveComponentPath,
 } from "../utils/path-resolver";
+import { putFileAsync, setDryRun } from "../utils/writer";
 
 export async function generateController(data: CommandActionData): Promise<void> {
   const input = data.args[0];
@@ -38,6 +38,7 @@ export async function generateController(data: CommandActionData): Promise<void>
   const name = parseName(componentName);
   const withValidation = data.options.withValidation || data.options.v;
   const force = data.options.force || data.options.f;
+  setDryRun(Boolean(data.options.dryRun));
 
   // Check if controller already exists
   const controllerPath = resolveComponentPath(module, "controllers", `${name.kebab}.controller`);
@@ -53,25 +54,18 @@ export async function generateController(data: CommandActionData): Promise<void>
   // Generate controller
   const controllerContent = controllerStub(name, { withValidation: !!withValidation });
   await putFileAsync(controllerPath, controllerContent);
-  console.log(colors.green(`✓ Created controller: ${controllerPath}`));
 
-  // Generate schema and request if requested
+  // Generate the validation schema alongside the controller if requested.
+  // The controller imports the schema's exported type + value directly —
+  // there is no separate `requests/` alias file.
   if (withValidation) {
     await ensureComponentDirectory(module, "schema");
-    await ensureComponentDirectory(module, "requests");
 
     const schemaPath = resolveComponentPath(module, "schema", `${name.kebab}.schema`);
-    const requestPath = resolveComponentPath(module, "requests", `${name.kebab}.request`);
-
-    const schemaContent = validationStub(name);
-    const requestContent = requestStub(name);
+    const schemaContent = schemaStub(name);
 
     await putFileAsync(schemaPath, schemaContent);
-    await putFileAsync(requestPath, requestContent);
-
-    console.log(colors.green(`✓ Created schema: ${schemaPath}`));
-    console.log(colors.green(`✓ Created request: ${requestPath}`));
   }
 
-  console.log(colors.cyan(`\n✨ Controller "${name.camel}" generated successfully!`));
+  console.log(colors.cyan(`\nâœ¨ Controller "${name.camel}" generated successfully!`));
 }

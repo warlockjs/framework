@@ -1,23 +1,31 @@
 # TODO
 
+## Mail
+
+- [ ] Support Amazon SES
+
 ## Storage
 
-- Add GCP driver
-- Add Azure driver
-- Add Cloudinary driver
-- Add Wasabi driver
+- [ ] Add GCP driver
+- [ ] Add Azure driver
+- [ ] Add Cloudinary driver
+- [ ] Add Wasabi driver
 
 ## Cascade
 
-- Add Postgress Driver
-- Add Mysql Driver
+- [x] Add Postgres Driver
+- [ ] Add Mysql Driver
+
+## Typings
+
+- [ ] Generate typings from .env to support env() auto complete
 
 ## Auth
 
-- Google Login
-- Github Login
-- Facebook Login
-- Apple Login
+- [ ] Google Login
+- [ ] Github Login
+- [ ] Facebook Login
+- [ ] Apple Login
 
 ## Notifications
 

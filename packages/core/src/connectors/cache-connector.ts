@@ -1,7 +1,7 @@
 import config from "@mongez/config";
 import { cache } from "@warlock.js/cache";
 import { BaseConnector } from "./base-connector";
-import { ConnectorPriority } from "./types";
+import { ConnectorLifecyclePhase, ConnectorPriority } from "./types";
 
 /**
  * Cache Connector
@@ -10,6 +10,7 @@ import { ConnectorPriority } from "./types";
 export class CacheConnector extends BaseConnector {
   public readonly name = "cache";
   public readonly priority = ConnectorPriority.CACHE;
+  public readonly lifecyclePhase = ConnectorLifecyclePhase.Early;
 
   /**
    * Files that trigger cache restart

@@ -1,3 +1,4 @@
+import { log } from "@warlock.js/logger";
 import type {
   UseCaseErrorResult,
   UseCaseEventsCallbacksMap,
@@ -53,7 +54,10 @@ export const globalUseCasesEvents = {
 
 /**
  * Dispatches a lifecycle event to invocation → use-case → global observers, in that order.
- * All observers are awaited sequentially.
+ *
+ * Each observer is awaited sequentially and isolated in its own try/catch — a slow
+ * observer can't stall the others, and a throwing one can't break the pipeline (e.g.
+ * a successful use case must not fail because a metrics/broadcast observer threw).
  */
 export async function fireLifecycleEvent<EventCtx>(
   ctx: EventCtx,
@@ -63,15 +67,19 @@ export async function fireLifecycleEvent<EventCtx>(
     global?: ((ctx: EventCtx) => void | Promise<void>)[];
   },
 ) {
-  if (observers.invocation) {
-    for (const obs of observers.invocation) await obs(ctx);
-  }
+  const tiers = [observers.invocation, observers.useCase, observers.global];
 
-  if (observers.useCase) {
-    for (const obs of observers.useCase) await obs(ctx);
-  }
+  for (const tier of tiers) {
+    if (!tier) {
+      continue;
+    }
 
-  if (observers.global) {
-    for (const obs of observers.global) await obs(ctx);
+    for (const observer of tier) {
+      try {
+        await observer(ctx);
+      } catch (observerError) {
+        log.error("use-cases", "lifecycle", "observer failed", { error: observerError });
+      }
+    }
   }
 }

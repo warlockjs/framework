@@ -1,6 +1,6 @@
 import type { CookieSerializeOptions } from "@fastify/cookie";
 import type { FastifyCorsOptions } from "@fastify/cors";
-import React from "react";
+import type React from "react";
 import type { Middleware } from "../router";
 import type { Response } from "./response";
 
@@ -88,6 +88,10 @@ export type ResponseEvent =
    */
   | "notFound"
   /**
+   * Triggered after sending the response if the response status code is 413
+   */
+  | "contentTooLarge"
+  /**
    * Triggered after sending the response if the response status code is 429
    */
   | "throttled"
@@ -143,6 +147,16 @@ export interface HttpConfigurations {
    * @default 10MB
    */
   fileUploadLimit?: number;
+  /**
+   * Global Fastify body size limit in bytes.
+   *
+   * Applies to every request body (JSON, form-urlencoded, raw). For per-route
+   * limits use the `maxBodySize()` middleware. For multipart uploads use
+   * `fileUploadLimit` (capped by `@fastify/multipart`).
+   *
+   * @default 200 * 1024 * 1024 * 1024  // 200GB — historical default; consider lowering for production.
+   */
+  bodyLimit?: number;
   cookies?: {
     /**
      * Secret key for signed cookies
@@ -169,6 +183,84 @@ export interface HttpConfigurations {
      * @default 60 * 1000
      */
     duration?: number;
+  };
+  /**
+   * Request id (correlation) settings.
+   *
+   * The framework generates a `request.id` for every incoming request and
+   * echoes it back as a response header so clients, logs, and traces can
+   * correlate by a single value. Set `enabled: false` to disable echo + inherit.
+   */
+  requestId?: {
+    /**
+     * Inbound + outbound header name.
+     *
+     * @default "X-Request-Id"
+     */
+    header?: string;
+    /**
+     * Generator override. Defaults to a 32-char random string.
+     */
+    generator?: () => string;
+    /**
+     * Set to false to disable echo + inherit. The framework still generates
+     * `request.id` for internal logging.
+     *
+     * @default true
+     */
+    enabled?: boolean;
+  };
+  /**
+   * Idempotency middleware defaults. Per-call options on `idempotency()` win.
+   */
+  idempotency?: {
+    /**
+     * Cache TTL in seconds.
+     *
+     * @default 86400 — 24h, matches Stripe's window.
+     */
+    ttl?: number;
+    /**
+     * Header name carrying the client's idempotency key.
+     *
+     * @default "Idempotency-Key"
+     */
+    headerName?: string;
+    /**
+     * HTTP methods eligible for idempotency. Safe methods (GET/HEAD) are
+     * always skipped regardless of this setting.
+     *
+     * @default ["POST", "PUT", "PATCH", "DELETE"]
+     */
+    methods?: string[];
+    /**
+     * Cache driver name. Defaults to the manager's default driver.
+     */
+    driver?: string;
+  };
+  /**
+   * Maintenance mode configuration. The `maintenance()` middleware reads these.
+   */
+  maintenance?: {
+    /**
+     * Toggle maintenance mode. When true, every request returns 503 unless
+     * its path matches the `allowlist`.
+     *
+     * @default false
+     */
+    enabled?: boolean;
+    /**
+     * Path prefixes (ending in `*`) or exact paths to bypass.
+     *
+     * @default ["/health"]
+     */
+    allowlist?: string[];
+    /**
+     * Seconds advertised in the `Retry-After` response header.
+     *
+     * @default 60
+     */
+    retryAfter?: number;
   };
   /**
    * Host

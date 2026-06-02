@@ -9,7 +9,7 @@ const schema = v.object({
   level: v.string(),
 });
 
-type LogSchema = Infer<typeof schema>;
+type LogSchema = Infer.Output<typeof schema>;
 
 export class DatabaseLogModel extends Model<LogSchema> {
   /**

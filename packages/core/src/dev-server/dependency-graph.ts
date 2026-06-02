@@ -5,14 +5,18 @@ import type { FileManager } from "./file-manager";
  * Tracks bidirectional relationships between files:
  * - dependencies: files that this file imports
  * - dependents: files that import this file
+ *
+ * Each forward edge also carries an `isTypeOnly` flag so cycle detection
+ * can distinguish runtime cycles from ones formed purely by `import type`
+ * edges — the latter are erased by TypeScript and have no runtime effect.
  */
 export class DependencyGraph {
   /**
-   * Map of file -> files it depends on (imports)
-   * Key: relative file path
-   * Value: Set of relative file paths this file imports
+   * Map of file -> files it depends on (imports).
+   * Key: relative file path.
+   * Value: relative dependency path → `{ isTypeOnly }` for that edge.
    */
-  private dependencies = new Map<string, Set<string>>();
+  private dependencies = new Map<string, Map<string, { isTypeOnly: boolean }>>();
 
   /**
    * Map of file -> files that depend on it (importers)
@@ -23,7 +27,7 @@ export class DependencyGraph {
 
   /**
    * Reference to the files map for accessing FileManager instances
-   * Used to check isTypeOnlyFile flag during cycle detection
+   * Used to read per-file typeOnlyDependencies during graph build.
    */
   private files: Map<string, FileManager> | null = null;
 
@@ -31,54 +35,61 @@ export class DependencyGraph {
    * Build dependency graph from FileManager map
    */
   public build(files: Map<string, FileManager>) {
-    // Store reference to files map for type-only detection
     this.files = files;
 
-    // Clear existing graph
     this.dependencies.clear();
     this.dependents.clear();
 
-    // Build graph from all files
     for (const [relativePath, fileManager] of files) {
-      // Initialize empty sets ONLY if not already present
-      // (addDependency may have already created entries for this file)
       if (!this.dependencies.has(relativePath)) {
-        this.dependencies.set(relativePath, new Set());
+        this.dependencies.set(relativePath, new Map());
       }
 
       if (!this.dependents.has(relativePath)) {
         this.dependents.set(relativePath, new Set());
       }
 
-      // Add dependencies
       for (const dependency of fileManager.dependencies) {
-        this.addDependency(relativePath, dependency);
+        const isTypeOnly = fileManager.typeOnlyDependencies.has(dependency);
+
+        this.addDependency(relativePath, dependency, isTypeOnly);
       }
     }
 
-    // Detect circular dependencies
     const cycles = this.detectCircularDependencies();
+
     if (cycles.length > 0) {
       this.displayCircularDependencyWarnings(cycles);
     }
   }
 
   /**
-   * Add a dependency relationship
+   * Add a dependency relationship.
+   * If the edge already exists, the type-only flag is ANDed: any runtime
+   * statement between the two files makes the edge runtime permanently.
+   *
    * @param file The file that has the dependency
    * @param dependency The file being depended upon
+   * @param isTypeOnly Whether every reference from `file` to `dependency` is type-only
    */
-  public addDependency(file: string, dependency: string) {
-    // Ensure both files exist in the graph
+  public addDependency(file: string, dependency: string, isTypeOnly: boolean = false) {
     if (!this.dependencies.has(file)) {
-      this.dependencies.set(file, new Set());
+      this.dependencies.set(file, new Map());
     }
+
     if (!this.dependents.has(dependency)) {
       this.dependents.set(dependency, new Set());
     }
 
-    // Add bidirectional relationship
-    this.dependencies.get(file)!.add(dependency);
+    const edges = this.dependencies.get(file)!;
+    const existing = edges.get(dependency);
+
+    if (existing) {
+      existing.isTypeOnly = existing.isTypeOnly && isTypeOnly;
+    } else {
+      edges.set(dependency, { isTypeOnly });
+    }
+
     this.dependents.get(dependency)!.add(file);
   }
 
@@ -97,47 +108,62 @@ export class DependencyGraph {
    * @param file The file to remove
    */
   public removeFile(file: string) {
-    // Remove as dependent from all its dependencies
     const deps = this.dependencies.get(file);
+
     if (deps) {
-      for (const dependency of deps) {
+      for (const dependency of deps.keys()) {
         this.dependents.get(dependency)?.delete(file);
       }
     }
 
-    // Remove as dependency from all its dependents
     const dependents = this.dependents.get(file);
+
     if (dependents) {
       for (const dependent of dependents) {
         this.dependencies.get(dependent)?.delete(file);
       }
     }
 
-    // Remove from maps
     this.dependencies.delete(file);
     this.dependents.delete(file);
   }
 
   /**
-   * Update dependencies for a file
+   * Update dependencies for a file.
+   *
+   * Accepts the updated `Set<string>` of dependency paths; when the caller
+   * has per-edge type-only info, pass `typeOnlyDependencies` so the new
+   * edges get the correct flag. Missing flag defaults to runtime.
+   *
    * @param file The file to update
-   * @param newDependencies New set of dependencies
+   * @param newDependencies New set of dependency paths
+   * @param typeOnlyDependencies Subset of `newDependencies` whose edges are type-only
    */
-  public updateFile(file: string, newDependencies: Set<string>) {
-    // Get old dependencies
-    const oldDependencies = this.dependencies.get(file) || new Set();
+  public updateFile(
+    file: string,
+    newDependencies: Set<string>,
+    typeOnlyDependencies: Set<string> = new Set(),
+  ) {
+    const oldEdges = this.dependencies.get(file) ?? new Map<string, { isTypeOnly: boolean }>();
 
-    // Find removed dependencies
-    for (const oldDep of oldDependencies) {
+    for (const oldDep of oldEdges.keys()) {
       if (!newDependencies.has(oldDep)) {
         this.removeDependency(file, oldDep);
       }
     }
 
-    // Find added dependencies
     for (const newDep of newDependencies) {
-      if (!oldDependencies.has(newDep)) {
-        this.addDependency(file, newDep);
+      const isTypeOnly = typeOnlyDependencies.has(newDep);
+      const existing = oldEdges.get(newDep);
+
+      if (!existing) {
+        this.addDependency(file, newDep, isTypeOnly);
+
+        continue;
+      }
+
+      if (existing.isTypeOnly !== isTypeOnly) {
+        existing.isTypeOnly = isTypeOnly;
       }
     }
   }
@@ -148,7 +174,21 @@ export class DependencyGraph {
    * @returns Set of files this file imports
    */
   public getDependencies(file: string): Set<string> {
-    return this.dependencies.get(file) || new Set();
+    const edges = this.dependencies.get(file);
+
+    if (!edges) {
+      return new Set();
+    }
+
+    return new Set(edges.keys());
+  }
+
+  /**
+   * Check whether the edge `file → dependency` is type-only.
+   * Returns false if the edge does not exist.
+   */
+  public isEdgeTypeOnly(file: string, dependency: string): boolean {
+    return this.dependencies.get(file)?.get(dependency)?.isTypeOnly === true;
   }
 
   /**
@@ -187,12 +227,14 @@ export class DependencyGraph {
   }
 
   /**
-   * Detect circular dependencies in the dependency graph
-   * Uses depth-first search to find cycles
+   * Detect circular dependencies in the dependency graph.
+   * Uses depth-first search to find cycles.
    *
-   * Filtering:
-   * - Type-only imports are excluded at the parsing level (parse-imports.ts)
-   * - Cycles where ALL files are type-only are filtered out (no runtime impact)
+   * Filtering rule (per-edge): a cycle is suppressed when **any** edge in
+   * the chain is type-only. TypeScript erases type-only imports entirely,
+   * so a single type-only edge breaks the cycle at runtime. Only warn when
+   * every edge is a runtime binding — that's the cycle that actually loops
+   * at load time.
    *
    * @returns Array of circular dependency chains (each chain is an array of file paths)
    */
@@ -206,15 +248,18 @@ export class DependencyGraph {
       recursionStack.add(file);
       path.push(file);
 
-      const deps = this.getDependencies(file);
-      for (const dep of deps) {
-        if (!visited.has(dep)) {
-          dfs(dep, [...path]);
-        } else if (recursionStack.has(dep)) {
-          // Found a cycle
-          const cycleStart = path.indexOf(dep);
-          const cycle = [...path.slice(cycleStart), dep];
-          cycles.push(cycle);
+      const edges = this.dependencies.get(file);
+
+      if (edges) {
+        for (const dep of edges.keys()) {
+          if (!visited.has(dep)) {
+            dfs(dep, [...path]);
+          } else if (recursionStack.has(dep)) {
+            const cycleStart = path.indexOf(dep);
+            const cycle = [...path.slice(cycleStart), dep];
+
+            cycles.push(cycle);
+          }
         }
       }
 
@@ -227,21 +272,26 @@ export class DependencyGraph {
       }
     }
 
-    // Filter out cycles where ALL files are type-only
-    // Type-only circular dependencies have no runtime impact
-    return cycles.filter((cycle) => {
-      // Exclude the last element (it's a duplicate of the first to show the cycle completes)
-      const uniqueFiles = cycle.slice(0, -1);
+    return cycles.filter((cycle) => this.isRuntimeCycle(cycle));
+  }
 
-      // A cycle is safe to ignore if ALL participating files are type-only
-      const allTypeOnly = uniqueFiles.every((filePath) => {
-        const file = this.files?.get(filePath);
-        return file?.isTypeOnlyFile === true;
-      });
+  /**
+   * True iff every edge in the cycle is a runtime binding. The cycle array
+   * ends with a duplicate of its start (`[A, B, C, A]`) so we walk the
+   * consecutive pairs once — any type-only edge means TS erases the loop
+   * and there is no runtime cycle to report.
+   */
+  private isRuntimeCycle(cycle: string[]): boolean {
+    for (let index = 0; index < cycle.length - 1; index++) {
+      const from = cycle[index];
+      const to = cycle[index + 1];
 
-      // Return true to KEEP the cycle (show warning), false to filter it out
-      return !allTypeOnly;
-    });
+      if (this.isEdgeTypeOnly(from, to)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   /**
@@ -296,28 +346,43 @@ export class DependencyGraph {
     console.log(colors.yellow("💡 How to Fix:"));
     console.log("");
 
-    // Get first cycle for examples
     const exampleCycle = cycles[0];
     const fileA = exampleCycle[0]?.split("/").pop() || "fileA.ts";
     const fileB = exampleCycle[1]?.split("/").pop() || "fileB.ts";
+    const stripExt = (file: string) => file.replace(/\.tsx?$/, "");
 
-    console.log(colors.green("  Option 1: Use lazy/dynamic import"));
-    console.log(colors.dim(`   In ${fileB}, change:`));
-    console.log(colors.dim(`     import { SomeClass } from "./${fileA.replace(".ts", "")}";`));
-    console.log(colors.dim(`   To:`));
-    console.log(
-      colors.dim(`     const { SomeClass } = await import("./${fileA.replace(".ts", "")}");`),
-    );
-    console.log("");
+    const kind = classifyCycle(exampleCycle);
 
-    console.log(colors.green("  Option 2: Extract shared code"));
-    console.log(colors.dim("   Move the shared logic into a third file that both can import."));
-    console.log(colors.dim(`   Example: Create a shared.ts file and import from there.`));
-    console.log("");
+    if (kind === "resource" || kind === "model") {
+      // Cascade's `lazy()` is purpose-built for circular relations between
+      // resources and models — recommend it first, not as a footnote.
+      console.log(colors.green(`  ✨ Use lazy() for the back-reference`));
+      console.log(
+        colors.dim(
+          `   ${kind === "resource" ? "Resources" : "Models"} that reference each other should declare`,
+        ),
+      );
+      console.log(colors.dim(`   one side with lazy() so the import resolves at access time:`));
+      console.log("");
+      console.log(colors.dim(`     import { lazy } from "@warlock.js/cascade";`));
+      console.log(colors.dim(`     // inside ${fileB}:`));
+      console.log(colors.dim(`     other: lazy(() => ${kind === "resource" ? "OtherResource" : "OtherModel"})`));
+      console.log("");
+    } else {
+      // Generic cycle — dynamic import is the most common reliable fix.
+      console.log(colors.green(`  ✨ Convert one edge to a dynamic import`));
+      console.log(colors.dim(`   In ${fileB}, change:`));
+      console.log(colors.dim(`     import { SomeClass } from "./${stripExt(fileA)}";`));
+      console.log(colors.dim(`   To:`));
+      console.log(
+        colors.dim(`     const { SomeClass } = await import("./${stripExt(fileA)}");`),
+      );
+      console.log("");
+    }
 
-    console.log(colors.green("  Option 3: Dependency injection"));
-    console.log(colors.dim("   Pass dependencies as constructor/function parameters instead"));
-    console.log(colors.dim("   of importing them directly."));
+    console.log(colors.dim("  Other options:"));
+    console.log(colors.dim("    • Extract the shared symbols into a third file both can import."));
+    console.log(colors.dim("    • Pass the dependency as a constructor/function parameter instead."));
     console.log("");
 
     console.log(colors.dim("━".repeat(60)));
@@ -361,4 +426,20 @@ export class DependencyGraph {
       mostDependedFile,
     };
   }
+}
+
+/**
+ * Pick the most useful "fix-it" hint for a cycle by inspecting the file
+ * extensions involved. Cascade resources/models have a first-class fix
+ * (`lazy()`); generic cycles just want a dynamic import.
+ */
+function classifyCycle(cycle: string[]): "resource" | "model" | "generic" {
+  const files = cycle.slice(0, -1); // last entry repeats the first
+  if (files.every(file => file.endsWith(".resource.ts") || file.endsWith(".resource.tsx"))) {
+    return "resource";
+  }
+  if (files.every(file => file.endsWith(".model.ts") || file.endsWith(".model.tsx"))) {
+    return "model";
+  }
+  return "generic";
 }

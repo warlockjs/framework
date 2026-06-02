@@ -1,7 +1,7 @@
 import { colors } from "@mongez/copper";
-import { putFileAsync } from "@mongez/fs";
 import type { CommandActionData } from "../../../types";
 import { serviceStub } from "../templates/stubs";
+import { putFileAsync, setDryRun } from "../utils/writer";
 import { parseModulePath, parseName } from "../utils/name-parser";
 import {
   componentExists,
@@ -37,6 +37,7 @@ export async function generateService(data: CommandActionData): Promise<void> {
 
   const name = parseName(componentName);
   const force = data.options.force || data.options.f;
+  setDryRun(Boolean(data.options.dryRun));
 
   // Check if service already exists
   if ((await componentExists(module, "services", `${name.kebab}.service`)) && !force) {
@@ -53,7 +54,6 @@ export async function generateService(data: CommandActionData): Promise<void> {
   const serviceContent = serviceStub(name);
 
   await putFileAsync(servicePath, serviceContent);
-  console.log(colors.green(`✓ Created service: ${servicePath}`));
 
-  console.log(colors.cyan(`\n✨ Service "${name.camel}" generated successfully!`));
+  console.log(colors.cyan(`\nâœ¨ Service "${name.camel}" generated successfully!`));
 }

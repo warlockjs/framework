@@ -185,7 +185,11 @@ export type FilterOperator =
 /**
  * Filter function that receives value, query builder, and context
  */
-export type FilterFunction<Q = any> = (value: any, query: Q, context: Record<string, any>) => void;
+export type FilterFunction<M, Q = QueryBuilderContract<M>> = (
+  value: any,
+  query: Q,
+  context: Record<string, any>,
+) => void;
 
 /**
  * Filter rule definition
@@ -194,7 +198,7 @@ export type FilterFunction<Q = any> = (value: any, query: Q, context: Record<str
  * - A custom filter function
  * - An array with operator and optional column name(s)
  */
-export type FilterRule<Q = any> =
+export type FilterRule<Q = QueryBuilderContract<any>> =
   | FilterOperator
   | FilterFunction<Q>
   | [FilterOperator]

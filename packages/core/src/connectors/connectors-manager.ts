@@ -1,13 +1,14 @@
 import { colors } from "@mongez/copper";
 import { devServeLog } from "../dev-server/dev-logger";
 import { CacheConnector } from "./cache-connector";
-import { HeraldConnector } from "./herald-connector";
 import { DatabaseConnector } from "./database-connector";
+import { HeraldConnector } from "./herald-connector";
 import { HttpConnector } from "./http-connector";
 import { LoggerConnector } from "./logger-connector";
 import { MailerConnector } from "./mail-connector";
 import { SocketConnector } from "./socket-connector";
 import { StorageConnector } from "./storage.connector";
+import { ConnectorLifecyclePhase } from "./types";
 import type { Connector, ConnectorName } from "./types";
 
 export class ConnectorsManager {
@@ -50,9 +51,38 @@ export class ConnectorsManager {
    * start all connectors
    */
   public async start(connectorsNames?: ConnectorName[]): Promise<void> {
-    for (const connector of this.connectors) {
-      if (connectorsNames && !connectorsNames.includes(connector.name)) continue;
+    const connectorsList = connectorsNames
+      ? this.connectors.filter((connector) => connectorsNames.includes(connector.name))
+      : this.connectors;
 
+    for (const connector of connectorsList) {
+      await connector.boot();
+    }
+
+    for (const connector of connectorsList) {
+      await connector.start();
+    }
+  }
+
+  /**
+   * Start all connectors in the given lifecycle phase.
+   *
+   * The production builder and dev preload split startup around app
+   * code: early phase before app imports, late phase after. Within a
+   * phase, all connectors `boot()` first, then all `start()`, so
+   * cross-connector wiring inside the phase still works (e.g. socket
+   * reads http's instance during its own boot).
+   */
+  public async startPhase(phase: ConnectorLifecyclePhase): Promise<void> {
+    const phaseConnectors = this.connectors.filter(
+      (connector) => connector.lifecyclePhase === phase,
+    );
+
+    for (const connector of phaseConnectors) {
+      await connector.boot();
+    }
+
+    for (const connector of phaseConnectors) {
       await connector.start();
     }
   }

@@ -2,14 +2,14 @@ import { colors } from "@mongez/copper";
 import {
   ensureDirectoryAsync,
   fileExistsAsync,
-  jsonFileAsync,
+  getJsonFileAsync,
   putFileAsync,
   putJsonFileAsync,
-} from "@mongez/fs";
+} from "@warlock.js/fs";
 import { execSync } from "node:child_process";
 import { CommandActionData } from "../cli/types";
 import { rootPath, srcPath } from "../utils";
-import { communicatorsConfigStub } from "./stubs";
+import { communicatorsConfigStub, socketConfigStub } from "./stubs";
 
 async function completeTestInstallation(options: CommandActionData) {
   // Create test-global-setup.ts (runs once before all tests)
@@ -36,7 +36,7 @@ export async function teardown() {
 }
 `,
     );
-    console.log(`${colors.green("✓")} Created src/test-global-setup.ts`);
+    console.log(`${colors.green("âœ“")} Created src/test-global-setup.ts`);
   }
 
   // Create test-setup.ts (runs per worker thread)
@@ -57,7 +57,7 @@ import { setupTest } from "@warlock.js/core";
 await setupTest({ connectors: true });
 `,
     );
-    console.log(`${colors.green("✓")} Created src/test-setup.ts`);
+    console.log(`${colors.green("âœ“")} Created src/test-setup.ts`);
   }
 
   // Create vite.config.ts
@@ -82,7 +82,7 @@ export default defineConfig({
 });
 `,
     );
-    console.log(`${colors.green("✓")} Created vite.config.ts`);
+    console.log(`${colors.green("âœ“")} Created vite.config.ts`);
   }
 }
 
@@ -127,12 +127,12 @@ export default function WelcomeEmail({ name }: WelcomeEmailProps) {
 }
 `,
     );
-    console.log(`${colors.green("✓")} Created emails/welcome-email.tsx`);
+    console.log(`${colors.green("âœ“")} Created emails/welcome-email.tsx`);
   }
 
-  // 2. Patch tsconfig.json — add "emails" to include if missing
+  // 2. Patch tsconfig.json â€” add "emails" to include if missing
   const tsconfigPath = rootPath("tsconfig.json");
-  const tsconfig = await jsonFileAsync(tsconfigPath);
+  const tsconfig = await getJsonFileAsync(tsconfigPath);
 
   if (!tsconfig.include) {
     tsconfig.include = [];
@@ -141,7 +141,7 @@ export default function WelcomeEmail({ name }: WelcomeEmailProps) {
   if (!tsconfig.include.includes("emails")) {
     tsconfig.include.push("emails");
     await putJsonFileAsync(tsconfigPath, tsconfig);
-    console.log(`${colors.green("✓")} Added "emails" to tsconfig.json include`);
+    console.log(`${colors.green("âœ“")} Added "emails" to tsconfig.json include`);
   }
 }
 
@@ -271,9 +271,9 @@ const featuresMap: Record<
     },
     devDependencies: {
       "@mongez/vite": "^2.0.4",
-      vite: "^7.3.1",
-      vitest: "^4.0.16",
-      "@vitest/coverage-v8": "^4.0.16",
+      vite: "^8.0.16",
+      vitest: "^4.1.8",
+      "@vitest/coverage-v8": "^4.1.8",
     },
   },
   herald: {
@@ -288,6 +288,57 @@ const featuresMap: Record<
     ejectConfig: {
       content: communicatorsConfigStub,
       name: "communicator",
+    },
+  },
+  socket: {
+    description: "Installs socket.io for the realtime socket server (Socket Connector)",
+    dependencies: {
+      "socket.io": "^4.8.3",
+    },
+    ejectConfig: {
+      content: socketConfigStub,
+      name: "socket",
+    },
+  },
+  ai: {
+    description: "Installs @warlock.js/ai — the core AI toolkit (agents, tools, workflows)",
+    dependencies: {
+      "@warlock.js/ai": "~4.0.0",
+    },
+  },
+  openai: {
+    description: "Installs the OpenAI provider for @warlock.js/ai (pulls the core ai package)",
+    requires: ["ai"],
+    dependencies: {
+      "@warlock.js/ai-openai": "~4.0.0",
+    },
+  },
+  google: {
+    description: "Installs the Google (Gemini) provider for @warlock.js/ai (pulls the core ai package)",
+    requires: ["ai"],
+    dependencies: {
+      "@warlock.js/ai-google": "~4.0.0",
+    },
+  },
+  anthropic: {
+    description: "Installs the Anthropic (Claude) provider for @warlock.js/ai (pulls the core ai package)",
+    requires: ["ai"],
+    dependencies: {
+      "@warlock.js/ai-anthropic": "~4.0.0",
+    },
+  },
+  bedrock: {
+    description: "Installs the AWS Bedrock provider for @warlock.js/ai (pulls the core ai package)",
+    requires: ["ai"],
+    dependencies: {
+      "@warlock.js/ai-bedrock": "~4.0.0",
+    },
+  },
+  ollama: {
+    description: "Installs the Ollama provider for @warlock.js/ai (pulls the core ai package)",
+    requires: ["ai"],
+    dependencies: {
+      "@warlock.js/ai-ollama": "~4.0.0",
     },
   },
 };
@@ -317,7 +368,7 @@ function resolveFeatures(features: string[], visited = new Set<string>()): strin
 
 export async function addCommandAction(options: CommandActionData) {
   const features = options.args;
-  const { packageManager, list } = options.options;
+  const { packageManager, list, noInstall } = options.options;
 
   if (list) {
     console.log("Available Features:");
@@ -356,56 +407,31 @@ export async function addCommandAction(options: CommandActionData) {
     }
   }
 
-  const currentPackageJson = await jsonFileAsync(rootPath("package.json"));
+  const currentPackageJson = await getJsonFileAsync(rootPath("package.json"));
 
-  // TODO: to reduce time of execution, check packages that are already installed
+  // Fresh templates may omit one of the maps — guard before reading.
+  currentPackageJson.dependencies = currentPackageJson.dependencies ?? {};
+  currentPackageJson.devDependencies = currentPackageJson.devDependencies ?? {};
 
-  const packageManagerCommand = await getPackageManagerCommand(packageManager as PackageManager);
-
-  // check if dependencies are already installed
+  // Skip anything already present so we never downgrade an existing pin.
   for (const dependency of Object.keys(dependencies)) {
     if (currentPackageJson.dependencies[dependency]) {
       console.log(`${colors.yellowBright(dependency)} is already installed, skipping...`);
       delete dependencies[dependency];
-      continue;
     }
   }
 
-  // check if dev dependencies are already installed
   for (const devDependency of Object.keys(devDependencies)) {
     if (currentPackageJson.devDependencies[devDependency]) {
       console.log(`${colors.yellowBright(devDependency)} is already installed, skipping...`);
       delete devDependencies[devDependency];
-      continue;
     }
   }
 
-  // install dependencies
-  if (Object.keys(dependencies).length > 0) {
-    console.log(`Installing dependencies ${colors.magenta(Object.keys(dependencies).join(", "))}`);
-    execSync(`${packageManagerCommand} ${Object.keys(dependencies).join(" ")}`, {
-      cwd: process.cwd(),
-      stdio: "inherit",
-    });
-
-    console.log(
-      `Dependencies installed successfully ${colors.green(Object.keys(dependencies).join(", "))}`,
-    );
-  }
-
-  // install dev dependencies
-  if (Object.keys(devDependencies).length > 0) {
-    console.log(
-      `Installing dev dependencies ${colors.magenta(Object.keys(devDependencies).join(", "))}`,
-    );
-    execSync(`${packageManagerCommand} ${Object.keys(devDependencies).join(" ")} -D`, {
-      cwd: process.cwd(),
-      stdio: "inherit",
-    });
-
-    console.log(
-      `Dev dependencies installed successfully ${colors.green(Object.keys(devDependencies).join(", "))}`,
-    );
+  if (noInstall) {
+    await recordDependencies(dependencies, devDependencies);
+  } else {
+    await installDependencies(packageManager as PackageManager, dependencies, devDependencies);
   }
 
   for (const [name, config] of Object.entries(ejectConfigs)) {
@@ -432,12 +458,83 @@ export async function addCommandAction(options: CommandActionData) {
   if (Object.keys(scripts).length > 0) {
     console.log(`Adding scripts ${colors.magenta(Object.keys(scripts).join(", "))}`);
     const packageJsonPath = rootPath("package.json");
-    const packageJson = await jsonFileAsync(packageJsonPath);
-    Object.assign(packageJson.scripts, scripts);
+    const packageJson = await getJsonFileAsync(packageJsonPath);
+    packageJson.scripts = { ...(packageJson.scripts ?? {}), ...scripts };
     await putJsonFileAsync(packageJsonPath, packageJson);
 
     console.log(`Scripts added successfully ${colors.green(Object.keys(scripts).join(", "))}`);
   }
+}
+
+/**
+ * Install the resolved dependency sets through the project's package manager.
+ * Runs two passes (prod then dev) so each lands in the correct section.
+ */
+async function installDependencies(
+  packageManager: PackageManager,
+  dependencies: Record<string, string>,
+  devDependencies: Record<string, string>,
+) {
+  const packageManagerCommand = await getPackageManagerCommand(packageManager);
+
+  if (Object.keys(dependencies).length > 0) {
+    console.log(`Installing dependencies ${colors.magenta(Object.keys(dependencies).join(", "))}`);
+
+    execSync(`${packageManagerCommand} ${Object.keys(dependencies).join(" ")}`, {
+      cwd: process.cwd(),
+      stdio: "inherit",
+    });
+
+    console.log(
+      `Dependencies installed successfully ${colors.green(Object.keys(dependencies).join(", "))}`,
+    );
+  }
+
+  if (Object.keys(devDependencies).length > 0) {
+    console.log(
+      `Installing dev dependencies ${colors.magenta(Object.keys(devDependencies).join(", "))}`,
+    );
+
+    execSync(`${packageManagerCommand} ${Object.keys(devDependencies).join(" ")} -D`, {
+      cwd: process.cwd(),
+      stdio: "inherit",
+    });
+
+    console.log(
+      `Dev dependencies installed successfully ${colors.green(Object.keys(devDependencies).join(", "))}`,
+    );
+  }
+}
+
+/**
+ * Write the resolved dependency sets into package.json without installing.
+ * Used by `--no-install` so a scaffolder can batch every feature into one
+ * install pass after the command returns. Versions come from the feature map.
+ */
+async function recordDependencies(
+  dependencies: Record<string, string>,
+  devDependencies: Record<string, string>,
+) {
+  if (Object.keys(dependencies).length === 0 && Object.keys(devDependencies).length === 0) {
+    return;
+  }
+
+  const packageJsonPath = rootPath("package.json");
+  const packageJson = await getJsonFileAsync(packageJsonPath);
+
+  packageJson.dependencies = packageJson.dependencies ?? {};
+  packageJson.devDependencies = packageJson.devDependencies ?? {};
+
+  Object.assign(packageJson.dependencies, dependencies);
+  Object.assign(packageJson.devDependencies, devDependencies);
+
+  await putJsonFileAsync(packageJsonPath, packageJson);
+
+  const recorded = [...Object.keys(dependencies), ...Object.keys(devDependencies)];
+
+  console.log(
+    `Recorded ${colors.green(recorded.join(", "))} in package.json (install skipped via --no-install)`,
+  );
 }
 
 function validateFeatures(features: string[]) {

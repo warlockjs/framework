@@ -20,5 +20,3 @@ export * from "./database";
 
 // File upload validation rules
 export * from "./file";
-
-export { v, type Infer } from "@warlock.js/seal";

@@ -8,7 +8,6 @@ import { generateModule } from "./generators/module.generator";
 import { generateRepository } from "./generators/repository.generator";
 import { generateResource } from "./generators/resource.generator";
 import { generateService } from "./generators/service.generator";
-import { generateValidation } from "./generators/validation.generator";
 
 const generators: Record<string, (data: CommandActionData) => Promise<void>> = {
   module: generateModule,
@@ -18,7 +17,6 @@ const generators: Record<string, (data: CommandActionData) => Promise<void>> = {
   migration: generateMigration,
   repository: generateRepository,
   resource: generateResource,
-  validation: generateValidation,
 };
 
 async function generateCommandAction(data: CommandActionData) {
@@ -65,6 +63,10 @@ export const generateCommand = command({
       text: "--force, -f",
       description: "Overwrite existing files",
     },
+    {
+      text: "--dry-run",
+      description: "Preview the files that would be generated without writing anything",
+    },
   ],
 });
 
@@ -76,13 +78,17 @@ export const generateModuleCommand = command({
   action: generateModule,
   options: [
     {
-      text: "--crud, -c",
-      description: "Generate full CRUD scaffold (controllers, model, validation, routes)",
-      defaultValue: true,
+      text: "--minimal, -m",
+      description:
+        "Generate a minimal skeleton (routes, main, locales, empty subfolders) instead of the full CRUD scaffold",
     },
     {
       text: "--force, -f",
       description: "Overwrite existing files",
+    },
+    {
+      text: "--dry-run",
+      description: "Preview the files that would be generated without writing anything",
     },
   ],
 });
@@ -95,11 +101,15 @@ export const generateControllerCommand = command({
   options: [
     {
       text: "--with-validation, -v",
-      description: "Generate validation schema and request type",
+      description: "Generate a validation schema and bind it to the controller",
     },
     {
       text: "--force, -f",
       description: "Overwrite existing files",
+    },
+    {
+      text: "--dry-run",
+      description: "Preview the files that would be generated without writing anything",
     },
   ],
 });
@@ -113,6 +123,10 @@ export const generateServiceCommand = command({
     {
       text: "--force, -f",
       description: "Overwrite existing files",
+    },
+    {
+      text: "--dry-run",
+      description: "Preview the files that would be generated without writing anything",
     },
   ],
 });
@@ -136,6 +150,10 @@ export const generateModelCommand = command({
       description: "Overwrite existing files",
     },
     {
+      text: "--dry-run",
+      description: "Preview the files that would be generated without writing anything",
+    },
+    {
       text: "--timestamps [bool]",
       description: "Include timestamps in migration (default: true)",
     },
@@ -152,6 +170,10 @@ export const generateRepositoryCommand = command({
       text: "--force, -f",
       description: "Overwrite existing files",
     },
+    {
+      text: "--dry-run",
+      description: "Preview the files that would be generated without writing anything",
+    },
   ],
 });
 
@@ -165,22 +187,9 @@ export const generateResourceCommand = command({
       text: "--force, -f",
       description: "Overwrite existing files",
     },
-  ],
-});
-
-export const generateValidationCommand = command({
-  name: "generate.validation <module>/<name>",
-  alias: "gen.v",
-  description: "Generate a new validation schema",
-  action: generateValidation,
-  options: [
     {
-      text: "--with-request, -r",
-      description: "Generate request type",
-    },
-    {
-      text: "--force, -f",
-      description: "Overwrite existing files",
+      text: "--dry-run",
+      description: "Preview the files that would be generated without writing anything",
     },
   ],
 });
@@ -194,6 +203,10 @@ export const generateMigrationCommand = command({
     {
       text: "--force, -f",
       description: "Overwrite existing files",
+    },
+    {
+      text: "--dry-run",
+      description: "Preview the files that would be generated without writing anything",
     },
     {
       text: "--add <columns>",

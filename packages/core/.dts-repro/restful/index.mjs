@@ -1,0 +1,2 @@
+import "./restful.mjs";
+export {};

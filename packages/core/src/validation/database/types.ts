@@ -1,37 +1,4 @@
-import type { ChildModel, Model, QueryBuilderContract } from "@warlock.js/cascade";
-
-/**
- * Base options for database query rules
- */
-export type BaseQueryRuleOptions = {
-  /** The Model to query against */
-  Model: ChildModel<Model> | string;
-  /** Callback to customize the query */
-  query?: (options: {
-    query: QueryBuilderContract;
-    value: any;
-    allValues: any;
-  }) => void | Promise<void>;
-  /** The column to filter by (defaults to the key) */
-  column?: string;
-};
-
-/**
- * Base options for unique validation rules
- */
-export type BaseUniqueRuleOptions = BaseQueryRuleOptions;
-
-/**
- * Options for unique rule
- */
-export type UniqueRuleOptions = BaseUniqueRuleOptions & {
-  /** Field to except from uniqueness check */
-  except?: string;
-  /** Column name for the except field */
-  exceptColumnName?: string;
-  /** Value for the except field */
-  exceptValue?: any;
-};
+import type { BaseQueryRuleOptions, BaseUniqueRuleOptions } from "@warlock.js/cascade";
 
 /**
  * Options for unique except current user rule
@@ -50,11 +17,6 @@ export type UniqueExceptCurrentIdRuleOptions = BaseUniqueRuleOptions & {
   /** Column for current id filter (default: id) */
   exceptCurrentIdColumn?: string;
 };
-
-/**
- * Options for exists rule
- */
-export type ExistsRuleOptions = BaseQueryRuleOptions;
 
 /**
  * Options for exists except current user rule

@@ -1,39 +1,24 @@
-import axios, { type AxiosResponse } from "axios";
+import { http } from "@mongez/http";
 import crypto from "crypto";
-import { createWriteStream } from "fs";
+import { writeFile } from "fs/promises";
+import path from "path";
 
 export async function downloadFileFromUrl(
   fileUrl: string,
   outputLocationPath: string,
   fileName?: string,
-): Promise<AxiosResponse> {
+): Promise<void> {
   const fileExtension = (fileName || fileUrl).split(".").pop();
   fileName ??= crypto.randomBytes(16).toString("hex");
-  const writer = createWriteStream(outputLocationPath + "/" + fileName + "." + fileExtension);
+  const filePath = path.join(outputLocationPath, `${fileName}.${fileExtension}`);
 
-  return axios
-    .get(fileUrl, {
-      responseType: "stream",
-    })
-    .then((response) => {
-      //ensure that the user can call `then()` only when the file has
-      //been downloaded entirely.
+  const { data, error } = await http.get<ArrayBuffer>(fileUrl, {
+    responseType: "arrayBuffer",
+  });
 
-      return new Promise((resolve, reject) => {
-        response.data.pipe(writer);
-        let error: any = null;
-        writer.on("error", (err) => {
-          error = err;
-          writer.close();
-          reject(err);
-        });
-        writer.on("close", () => {
-          if (!error) {
-            resolve(response);
-          }
-          //no need to call the reject here, as it will be called in the
-          //'error' stream;
-        });
-      });
-    });
+  if (error || !data) {
+    throw new Error(`Failed to download file from "${fileUrl}": ${error?.message ?? "Unknown error"}`);
+  }
+
+  await writeFile(filePath, Buffer.from(data));
 }

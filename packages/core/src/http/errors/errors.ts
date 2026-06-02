@@ -8,6 +8,7 @@ export class HttpError extends Error {
     this.name = "HttpError";
   }
 }
+
 export class ResourceNotFoundError extends HttpError {
   public constructor(
     message: string,

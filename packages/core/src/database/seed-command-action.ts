@@ -25,12 +25,12 @@ async function clearAllTables(datasource: DataSource) {
  *
  * await seedCommandAction({
  *   command: "seed",
- *   options: { fresh: true, order: false }
+ *   options: { fresh: true, list: false }
  * });
  * ```
  */
 export async function seedCommandAction(options: CommandActionData) {
-  const { path, fresh, transaction, order } = options.options;
+  const { path, fresh, transaction, list } = options.options;
 
   const datasource = dataSourceRegistry.get();
 
@@ -38,7 +38,7 @@ export async function seedCommandAction(options: CommandActionData) {
     await clearAllTables(datasource);
   }
 
-  if (order) {
+  if (list) {
     const seedFiles = await listSeedsFiles();
 
     if (seedFiles.length === 0) {

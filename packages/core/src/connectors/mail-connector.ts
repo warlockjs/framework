@@ -1,7 +1,7 @@
 import config from "@mongez/config";
 import { closeAllMailers, setMailConfigurations } from "../mail";
 import { BaseConnector } from "./base-connector";
-import { ConnectorPriority } from "./types";
+import { ConnectorLifecyclePhase, ConnectorPriority } from "./types";
 
 /**
  * Mailer Connector
@@ -10,6 +10,7 @@ import { ConnectorPriority } from "./types";
 export class MailerConnector extends BaseConnector {
   public readonly name = "mailer";
   public readonly priority = ConnectorPriority.MAILER;
+  public readonly lifecyclePhase = ConnectorLifecyclePhase.Early;
 
   /**
    * Files that trigger mailer restart

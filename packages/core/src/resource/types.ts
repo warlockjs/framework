@@ -1,3 +1,4 @@
+import { type Lazy } from "@mongez/reinforcements";
 import { ResponseStatus } from "../http";
 import { type ResourceConstructor, type ResourceContract } from "./resource";
 import { type ResourceFieldBuilder } from "./resource-field-builder";
@@ -47,6 +48,7 @@ export type ResourceFieldConfig =
   | ResourceCastType
   | ResourceConstructor
   | ResourceSelfReference
+  | Lazy<ResourceConstructor>
   | [string, ResourceCastType]
   | ResourceFieldBuilder
   | ResourceArraySchema

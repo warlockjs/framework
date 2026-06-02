@@ -41,7 +41,7 @@ export async function startHttpTestServer(): Promise<void> {
 
     // Initialize file orchestrator (but don't watch)
     await filesOrchestrator.init();
-    await filesOrchestrator.initiaizeAll();
+    await filesOrchestrator.initializeAll();
 
     // Load config files
     await loadConfigFiles(true);

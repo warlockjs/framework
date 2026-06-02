@@ -2,7 +2,7 @@ import type { CookieSerializeOptions } from "@fastify/cookie";
 import config from "@mongez/config";
 import type { EventSubscription } from "@mongez/events";
 import events from "@mongez/events";
-import { fileExistsAsync } from "@mongez/fs";
+import { fileExistsAsync } from "@warlock.js/fs";
 import { isIterable, isPlainObject, isScalar } from "@mongez/supportive-is";
 import type { LogLevel } from "@warlock.js/logger";
 import { log } from "@warlock.js/logger";
@@ -20,6 +20,27 @@ import type { Request } from "./request";
 import type { ResponseEvent, ResponseSSEController, ResponseStreamController } from "./types";
 
 type CookieValue = string | number | boolean | Record<string, any> | Array<any>;
+
+/**
+ * Cookie options accepted by `response.cookie()`.
+ *
+ * Extends Fastify's `CookieSerializeOptions` with `raw` — set to `true` to
+ * skip the default `JSON.stringify` of the value and write it as-is. Use for
+ * plain-string cookies (session tokens, opaque IDs) that shouldn't be JSON-quoted.
+ *
+ * When `raw: true`, non-string values are coerced via `String(value)`. The
+ * read side (`request.cookie(name)`) tries `JSON.parse` first and falls back
+ * to the raw string on parse failure, so round-tripping a raw string cookie
+ * Just Works.
+ */
+export type CookieOptions = CookieSerializeOptions & {
+  /**
+   * Skip JSON.stringify and write the value as-is.
+   *
+   * @default false
+   */
+  raw?: boolean;
+};
 
 export enum ResponseStatus {
   OK = 200,
@@ -68,7 +89,20 @@ export class Response {
   protected route!: Route;
 
   /**
-   * Fastify response object
+   * Underlying Fastify reply — a public escape hatch to capabilities the
+   * framework's high-level helpers don't yet cover.
+   *
+   * **Prefer framework methods first**: `response.send()`, `response.header()`,
+   * `response.cookie()`, `response.sendFile()`, `response.stream()`, etc.
+   * They wire status codes, content-type detection, the event lifecycle, and
+   * the cache-pattern replay path correctly.
+   *
+   * **Reach for `baseResponse` only** when the framework genuinely lacks a
+   * helper for what you need — and when you do, file an issue so we can add
+   * it. Streaming and SSE are the precedent here: they bypass `send()`
+   * deliberately because the framework didn't ship chunked-write support
+   * natively at the time. Reaching here for non-streaming work means a
+   * missing helper, not an answer.
    */
   public baseResponse!: FastifyReply;
 
@@ -81,11 +115,6 @@ export class Response {
    * Current response body
    */
   protected currentBody: any;
-
-  /**
-   * A flag to determine if response is being sent
-   */
-  protected isSending = false;
 
   /**
    * Request object
@@ -288,7 +317,7 @@ export class Response {
   public log(message: string, level: LogLevel = "info") {
     if (!config.get("http.log")) return;
 
-    log({
+    log.log({
       module: "response",
       action: this.route.method + " " + this.route.path.replace("/*", "") + `:${this.request.id}`,
       message,
@@ -314,6 +343,22 @@ export class Response {
    * @param triggerEvents - Whether to trigger response events (default: true)
    */
   public async send(data?: any, statusCode?: number, triggerEvents = true): Promise<Response> {
+    // Defensive guard against double-send. The underlying Fastify reply silently
+    // ignores subsequent sends once `sent === true`, which has historically hidden
+    // middleware bugs (cache-pattern replay paths that returned `baseResponse.send`
+    // ended up re-entering `Response.send` with the FastifyReply as the body).
+    // Surfacing the misuse via `error`-level log makes the bug loud without
+    // crashing production traffic.
+    if (this.baseResponse.sent) {
+      log.error(
+        "response",
+        "send",
+        `send() called on already-sent response (request:${this.request?.id ?? "unknown"}) — likely a middleware bug`,
+      );
+
+      return this;
+    }
+
     if (statusCode) {
       this.currentStatusCode = statusCode;
     }
@@ -329,9 +374,14 @@ export class Response {
     }
 
     this.log("Sending response");
-    // trigger the sending event
+    // Auto-pick `application/json` only when no content-type was set by the caller.
+    // This preserves explicit overrides (e.g. `application/vnd.api+json` from a
+    // cache replay, `application/problem+json` from an RFC 7807 error response)
+    // while keeping the convenience default for the common object-body path.
     if (Array.isArray(this.currentBody) || isPlainObject(this.currentBody)) {
-      this.setContentType("application/json");
+      if (!this.baseResponse.getHeader("Content-Type")) {
+        this.setContentType("application/json");
+      }
     }
 
     if (triggerEvents) {
@@ -409,6 +459,11 @@ export class Response {
         Response.trigger("notFound", this);
       }
 
+      // trigger the content too large event if the status code is 413
+      if (this.currentStatusCode === 413) {
+        Response.trigger("contentTooLarge", this);
+      }
+
       // trigger the throttled event if the status code is 429
       if (this.currentStatusCode === 429) {
         Response.trigger("throttled", this);
@@ -426,6 +481,46 @@ export class Response {
     }
 
     return this;
+  }
+
+  /**
+   * Replay a previously-captured response shape — used by cache-pattern
+   * middlewares (idempotency, response cache) to send a cached response
+   * without re-running the controller.
+   *
+   * Preserves the cached status code, content-type, and any extra headers,
+   * then sends the body through the standard `send()` pipeline so the full
+   * event lifecycle still fires (`sent`, `success`, status-specific events).
+   * That keeps cross-cutting observers (logger, metrics, audit) consistent
+   * between fresh and replayed responses.
+   *
+   * @example
+   * // Inside a cache-pattern middleware on HIT:
+   * return response.header("X-Cache", "HIT").replay({
+   *   status: cached.status,
+   *   body: cached.body,
+   *   contentType: cached.contentType,
+   * });
+   */
+  public replay(cached: {
+    status: number;
+    body: unknown;
+    contentType?: string;
+    headers?: Record<string, string>;
+  }): Promise<Response> {
+    this.setStatusCode(cached.status);
+
+    if (cached.contentType) {
+      this.setContentType(cached.contentType);
+    }
+
+    if (cached.headers) {
+      for (const [name, value] of Object.entries(cached.headers)) {
+        this.header(name, value);
+      }
+    }
+
+    return this.send(cached.body);
   }
 
   /**
@@ -625,7 +720,7 @@ export class Response {
     // Write headers to start the stream
     this.baseResponse.raw.writeHead(this.statusCode, this.getHeaders() as any);
 
-    // Detect client disconnect — set isEnded silently and invoke cleanup handlers.
+    // Detect client disconnect â€” set isEnded silently and invoke cleanup handlers.
     // Without this, background jobs keep writing to a dead socket after the client drops.
     this.baseResponse.raw.on("close", () => {
       if (!isEnded) {
@@ -645,7 +740,7 @@ export class Response {
        * @param id - Optional event ID for client-side Last-Event-ID tracking (reconnect support)
        */
       send: (event: string, data: any, id?: string): ResponseSSEController => {
-        // Silent no-op after disconnect — background jobs should not crash when
+        // Silent no-op after disconnect â€” background jobs should not crash when
         // the client drops mid-stream. The onDisconnect handler handles cleanup.
         if (isEnded) return controller;
 
@@ -809,14 +904,29 @@ export class Response {
   }
 
   /**
-   * Set a cookie on the response
+   * Set a cookie on the response.
+   *
+   * Values are JSON-stringified by default so structured cookies round-trip
+   * cleanly with `request.cookie(name)`. Pass `{ raw: true }` to skip the
+   * JSON wrapping for plain-string cookies (session tokens, opaque IDs).
    *
    * @example
-   * response.cookie('theme', 'dark', { maxAge: 3600, httpOnly: true })
+   * // JSON-wrapped (default) — round-trips with request.cookie()
+   * response.cookie("prefs", { theme: "dark" }, { maxAge: 3600, httpOnly: true });
+   *
+   * @example
+   * // Raw string — no JSON quoting; useful for tokens / opaque IDs
+   * response.cookie("session", "abc.def.ghi", { raw: true, httpOnly: true });
    */
-  public cookie(name: string, value: CookieValue, options?: CookieSerializeOptions) {
+  public cookie(name: string, value: CookieValue, options: CookieOptions = {}) {
+    const { raw, ...cookieOptions } = options;
     const defaultOptions = config.get("http.cookies.options", {});
-    this.baseResponse.setCookie(name, JSON.stringify(value), { ...defaultOptions, ...options });
+    const serializedValue = raw ? String(value) : JSON.stringify(value);
+
+    this.baseResponse.setCookie(name, serializedValue, {
+      ...defaultOptions,
+      ...cookieOptions,
+    });
 
     return this;
   }
@@ -896,6 +1006,13 @@ export class Response {
   }
 
   /**
+   * Send a content too large response with status code 413
+   */
+  public contentTooLarge(data: any) {
+    return this.send(data, 413);
+  }
+
+  /**
    * Send a success response with status code 201
    */
   public successCreate(data: any) {
@@ -929,6 +1046,13 @@ export class Response {
    */
   public conflict(data: any = { error: "Resource conflict" }) {
     return this.send(data, 409);
+  }
+
+  /**
+   * Send a too many requests response with status code 429
+   */
+  public tooManyRequests(data: any) {
+    return this.send(data, 429);
   }
 
   /**
