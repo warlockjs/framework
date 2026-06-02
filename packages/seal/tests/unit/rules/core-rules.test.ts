@@ -30,8 +30,8 @@ describe("Core Rules", () => {
 
   describe("Forbidden", () => {
     it("should fail if value is present", async () => {
-      const validator = v.string();
-      validator.addRule(forbiddenRule);
+      const validator = v.any().mutable;
+      validator.addMutableRule(forbiddenRule);
 
       expect((await validate(validator, undefined)).isValid).toBe(true);
       expect((await validate(validator, "value")).isValid).toBe(false);
@@ -72,8 +72,8 @@ describe("Core Rules", () => {
 
   describe("When Rule", () => {
     it("should apply conditional validation", async () => {
-      const valueValidator = v.any();
-      const rule = valueValidator.addRule(whenRule);
+      const valueValidator = v.any().mutable;
+      const rule = valueValidator.addMutableRule(whenRule);
 
       rule.context.options = {
         field: "type",

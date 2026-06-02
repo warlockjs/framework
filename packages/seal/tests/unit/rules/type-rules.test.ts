@@ -8,14 +8,15 @@ import {
   intRule,
   numberRule,
   objectRule,
+  plainObjectRule,
   scalarRule,
   stringRule,
 } from "../../../src/rules/common/type-rules";
 
 describe("Type Rules", () => {
   it("stringRule", async () => {
-    const validator = v.any();
-    validator.addRule(stringRule);
+    const validator = v.any().mutable;
+    validator.addMutableRule(stringRule);
 
     expect((await validate(validator, "test")).isValid).toBe(true);
     expect((await validate(validator, 123)).isValid).toBe(false);
@@ -24,8 +25,8 @@ describe("Type Rules", () => {
   });
 
   it("numberRule", async () => {
-    const validator = v.any();
-    validator.addRule(numberRule);
+    const validator = v.any().mutable;
+    validator.addMutableRule(numberRule);
 
     expect((await validate(validator, 123)).isValid).toBe(true);
     expect((await validate(validator, 12.34)).isValid).toBe(true);
@@ -34,8 +35,8 @@ describe("Type Rules", () => {
   });
 
   it("booleanRule", async () => {
-    const validator = v.any();
-    validator.addRule(booleanRule);
+    const validator = v.any().mutable;
+    validator.addMutableRule(booleanRule);
 
     expect((await validate(validator, true)).isValid).toBe(true);
     expect((await validate(validator, false)).isValid).toBe(true);
@@ -44,8 +45,8 @@ describe("Type Rules", () => {
   });
 
   it("intRule", async () => {
-    const validator = v.any();
-    validator.addRule(intRule);
+    const validator = v.any().mutable;
+    validator.addMutableRule(intRule);
 
     expect((await validate(validator, 123)).isValid).toBe(true);
     expect((await validate(validator, 0)).isValid).toBe(true);
@@ -54,8 +55,8 @@ describe("Type Rules", () => {
   });
 
   it("floatRule", async () => {
-    const validator = v.any();
-    validator.addRule(floatRule);
+    const validator = v.any().mutable;
+    validator.addMutableRule(floatRule);
 
     expect((await validate(validator, 12.34)).isValid).toBe(true);
     expect((await validate(validator, 123)).isValid).toBe(false);
@@ -64,8 +65,8 @@ describe("Type Rules", () => {
   });
 
   it("scalarRule", async () => {
-    const validator = v.any();
-    validator.addRule(scalarRule);
+    const validator = v.any().mutable;
+    validator.addMutableRule(scalarRule);
 
     expect((await validate(validator, "test")).isValid).toBe(true);
     expect((await validate(validator, 123)).isValid).toBe(true);
@@ -75,27 +76,39 @@ describe("Type Rules", () => {
     expect((await validate(validator, [1])).isValid).toBe(false);
 
     const reqValidator = v.any().required();
-    reqValidator.addRule(scalarRule);
+    reqValidator.addMutableRule(scalarRule);
     expect((await validate(reqValidator, null)).isValid).toBe(false);
   });
 
   it("objectRule", async () => {
-    const validator = v.any();
-    validator.addRule(objectRule);
+    const validator = v.any().mutable;
+    validator.addMutableRule(objectRule);
 
     expect((await validate(validator, {})).isValid).toBe(true);
     expect((await validate(validator, { a: 1 })).isValid).toBe(true);
-    expect((await validate(validator, [1])).isValid).toBe(false);
+    // objectRule is the loose `typeof === object` check — arrays are objects too.
+    // Use plainObjectRule when arrays must be rejected (see below).
+    expect((await validate(validator, [1])).isValid).toBe(true);
 
     const reqValidator = v.any().required();
-    reqValidator.addRule(objectRule);
+    reqValidator.addMutableRule(objectRule);
     expect((await validate(reqValidator, null)).isValid).toBe(false);
     expect((await validate(validator, "test")).isValid).toBe(false);
   });
 
+  it("plainObjectRule rejects arrays", async () => {
+    const validator = v.any().mutable;
+    validator.addMutableRule(plainObjectRule);
+
+    expect((await validate(validator, {})).isValid).toBe(true);
+    expect((await validate(validator, { a: 1 })).isValid).toBe(true);
+    expect((await validate(validator, [1])).isValid).toBe(false);
+    expect((await validate(validator, "test")).isValid).toBe(false);
+  });
+
   it("arrayRule", async () => {
-    const validator = v.any();
-    validator.addRule(arrayRule);
+    const validator = v.any().mutable;
+    validator.addMutableRule(arrayRule);
 
     expect((await validate(validator, [])).isValid).toBe(true);
     expect((await validate(validator, [1, 2])).isValid).toBe(true);

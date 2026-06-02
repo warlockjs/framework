@@ -107,7 +107,7 @@ describe("Conditional Rules", () => {
     it("forbiddenIf", async () => {
       const validator = v.object({
         authType: v.string(),
-        password: v.string().forbiddenIf("authType", "oauth"),
+        password: v.string().forbiddenIf("authType", "oauth").optional(),
       });
 
       expect((await validate(validator, { authType: "local", password: "123" })).isValid).toBe(
@@ -122,7 +122,7 @@ describe("Conditional Rules", () => {
     it("forbiddenIfNot", async () => {
       const validator = v.object({
         type: v.string(),
-        details: v.string().forbiddenIfNot("type", "complex"),
+        details: v.string().forbiddenIfNot("type", "complex").optional(),
       });
 
       expect((await validate(validator, { type: "complex", details: "abc" })).isValid).toBe(true);
@@ -133,7 +133,7 @@ describe("Conditional Rules", () => {
     it("forbiddenIfEmpty", async () => {
       const validator = v.object({
         parent: v.string().optional(),
-        child: v.string().forbiddenIfEmpty("parent"),
+        child: v.string().forbiddenIfEmpty("parent").optional(),
       });
 
       expect((await validate(validator, { parent: "P", child: "C" })).isValid).toBe(true);
@@ -145,8 +145,8 @@ describe("Conditional Rules", () => {
   describe("Present Variants", () => {
     it("presentIf", async () => {
       // 'metadata' field must be present (even if null) if 'advanced' is true
-      const metadataValidator = v.any();
-      const rule = metadataValidator.addRule(presentIfRule);
+      const metadataValidator = v.any().mutable;
+      const rule = metadataValidator.addMutableRule(presentIfRule);
       rule.context.options.field = "advanced";
       rule.context.options.value = true;
 
@@ -165,7 +165,7 @@ describe("Conditional Rules", () => {
     it("presentUnless", async () => {
       const validator = v.object({
         isDraft: v.boolean(),
-        publishDate: v.string().presentUnless("isDraft", true),
+        publishDate: v.string().presentUnless("isDraft", true).optional(),
       });
 
       expect((await validate(validator, { isDraft: true })).isValid).toBe(true);
@@ -178,7 +178,7 @@ describe("Conditional Rules", () => {
     it("presentWith", async () => {
       const validator = v.object({
         img: v.string().optional(),
-        caption: v.string().presentWith("img"),
+        caption: v.string().presentWith("img").optional(),
       });
 
       expect((await validate(validator, {})).isValid).toBe(true);
@@ -190,7 +190,7 @@ describe("Conditional Rules", () => {
       const validator = v.object({
         a: v.string().optional(),
         b: v.string().optional(),
-        c: v.string().presentWithAll(["a", "b"]),
+        c: v.string().presentWithAll(["a", "b"]).optional(),
       });
 
       expect((await validate(validator, { a: "A" })).isValid).toBe(true);
@@ -202,7 +202,7 @@ describe("Conditional Rules", () => {
       const validator = v.object({
         a: v.string().optional(),
         b: v.string().optional(),
-        c: v.string().presentWithAny(["a", "b"]),
+        c: v.string().presentWithAny(["a", "b"]).optional(),
       });
 
       expect((await validate(validator, {})).isValid).toBe(true);
@@ -213,7 +213,7 @@ describe("Conditional Rules", () => {
     it("presentWithout", async () => {
       const validator = v.object({
         a: v.string().optional(),
-        b: v.string().presentWithout("a"),
+        b: v.string().presentWithout("a").optional(),
       });
 
       expect((await validate(validator, { a: "yes" })).isValid).toBe(true);
@@ -225,7 +225,7 @@ describe("Conditional Rules", () => {
       const validator = v.object({
         a: v.string().optional(),
         b: v.string().optional(),
-        c: v.string().presentWithoutAll(["a", "b"]),
+        c: v.string().presentWithoutAll(["a", "b"]).optional(),
       });
 
       expect((await validate(validator, { a: "A" })).isValid).toBe(true);
@@ -237,7 +237,7 @@ describe("Conditional Rules", () => {
       const validator = v.object({
         a: v.string().optional(),
         b: v.string().optional(),
-        c: v.string().presentWithoutAny(["a", "b"]),
+        c: v.string().presentWithoutAny(["a", "b"]).optional(),
       });
 
       expect((await validate(validator, { a: "A", b: "B" })).isValid).toBe(true);

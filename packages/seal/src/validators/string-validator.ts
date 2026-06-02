@@ -41,6 +41,7 @@ import {
   betweenLengthRule,
   colorRule,
   containsRule,
+  cuidRule,
   darkColorRule,
   emailRule,
   endsWithRule,
@@ -57,6 +58,7 @@ import {
   maxWordsRule,
   minLengthRule,
   minWordsRule,
+  nanoidRule,
   notContainsRule,
   patternRule,
   rgbColorRule,
@@ -64,9 +66,12 @@ import {
   startsWithRule,
   stringRule,
   strongPasswordRule,
+  ulidRule,
   urlRule,
+  uuidRule,
   withoutWhitespaceRule,
   wordsRule,
+  type UUIDVersion,
 } from "../rules";
 import { PrimitiveValidator } from "./primitive-validator";
 import { applyNullable, getRuleOptions } from "../standard-schema/json-schema";
@@ -459,6 +464,48 @@ export class StringValidator extends PrimitiveValidator {
     return this.addRule(darkColorRule, errorMessage);
   }
 
+  // ==================== ID Format Rules ====================
+
+  /**
+   * Value must be a valid UUID. Optionally restrict to a specific version.
+   *
+   * @example
+   * v.string().uuid()    // any RFC 4122 UUID
+   * v.string().uuid(4)   // only v4 (random)
+   * v.string().uuid(7)   // only v7 (timestamp-ordered)
+   */
+  public uuid(version?: UUIDVersion, errorMessage?: string) {
+    return this.addRule(uuidRule, errorMessage, { version });
+  }
+
+  /**
+   * Value must be a valid CUID. Defaults to CUID2; pass `{ version: 1 }` for legacy.
+   *
+   * @example
+   * v.string().cuid()                   // CUID2
+   * v.string().cuid({ version: 1 })     // legacy CUID1
+   */
+  public cuid(options?: { version?: 1 | 2; errorMessage?: string }) {
+    const { errorMessage, version } = options ?? {};
+    return this.addRule(cuidRule, errorMessage, { version });
+  }
+
+  /** Value must be a valid ULID (26 chars, Crockford base32). */
+  public ulid(errorMessage?: string) {
+    return this.addRule(ulidRule, errorMessage);
+  }
+
+  /**
+   * Value must be a valid nanoid string. Default length is 21.
+   *
+   * @example
+   * v.string().nanoid()       // 21 chars (default)
+   * v.string().nanoid(10)     // 10 chars
+   */
+  public nanoid(length?: number, errorMessage?: string) {
+    return this.addRule(nanoidRule, errorMessage, { length });
+  }
+
   /**
    * @inheritdoc
    *
@@ -514,8 +561,27 @@ export class StringValidator extends PrimitiveValidator {
       schema.format = "ipv4";
     } else if (this.rules.some(r => r.name === "ip6")) {
       schema.format = "ipv6";
+    } else if (this.rules.some(r => r.name === "uuid")) {
+      schema.format = "uuid";
     } else if (this.rules.some(r => r.name === "hexColor")) {
       schema.format = "color";
+    }
+
+    // CUID / ULID / nanoid don't have widely-supported format keywords —
+    // fall back to pattern so JSON Schema validators still enforce shape.
+    if (!schema.format) {
+      const cuidOpts = getRuleOptions(this.rules, "cuid");
+      if (cuidOpts) {
+        schema.pattern = cuidOpts.version === 1 ? "^c[a-z0-9]{24,}$" : "^[a-z][a-z0-9]{23}$";
+      }
+      if (this.rules.some(r => r.name === "ulid")) {
+        schema.pattern = "^[0-9A-HJKMNP-TV-Z]{26}$";
+      }
+      const nanoidOpts = getRuleOptions(this.rules, "nanoid");
+      if (nanoidOpts) {
+        const len = (nanoidOpts.length as number | undefined) ?? 21;
+        schema.pattern = `^[A-Za-z0-9_-]{${len}}$`;
+      }
     }
 
     // enum (from PrimitiveValidator.in / .enum)

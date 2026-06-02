@@ -6,13 +6,33 @@ import { objectRule, unknownKeyRule } from "../rules";
 import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 import { applyNullable, wrapNullableStrict } from "../standard-schema/json-schema";
 import type { Schema, SchemaContext, ValidationResult } from "../types";
+import type {
+  InferInputObjectShape,
+  InferOutputObjectShape,
+} from "../types/inference-types";
 import { BaseValidator } from "./base-validator";
 import { ComputedValidator } from "./computed-validator";
 
 /**
- * Object validator class with generic schema type for proper type inference
+ * Object validator class with generic schema type for proper type inference.
+ *
+ * Threads two distinct inferred shapes into `BaseValidator`'s `TInput`/`TOutput`:
+ *
+ * - `TInput`  = `InferInputObjectShape<TSchema>`  — what `~standard.validate()`
+ *               accepts (caller's pre-validation payload; defaults/catches make
+ *               keys optional)
+ * - `TOutput` = `InferOutputObjectShape<TSchema>` — what `~standard.validate()`
+ *               returns on success (post-default, post-catch shape; guaranteed
+ *               keys are required)
+ *
+ * Both helpers are used directly (not the full `Infer.*` walker) to avoid a
+ * recursive class-base evaluation that would otherwise occur when the
+ * brand-aware widening tries to inspect the class type.
  */
-export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValidator {
+export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValidator<
+  InferInputObjectShape<TSchema>,
+  InferOutputObjectShape<TSchema>
+> {
   protected shouldAllowUnknown = false;
   protected allowedKeys: string[] = [];
   protected hasUnknownKeyRule = false;

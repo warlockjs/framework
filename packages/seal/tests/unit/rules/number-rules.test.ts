@@ -39,8 +39,8 @@ describe("Number Rules", () => {
 
   describe("Comparison", () => {
     it("greaterThan", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(greaterThanRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(greaterThanRule);
       rule.context.options.value = 10;
 
       expect((await validate(validator, 11)).isValid).toBe(true);
@@ -50,8 +50,8 @@ describe("Number Rules", () => {
     });
 
     it("lessThan", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(lessThanRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(lessThanRule);
       rule.context.options.value = 10;
 
       expect((await validate(validator, 9)).isValid).toBe(true);
@@ -61,8 +61,8 @@ describe("Number Rules", () => {
     });
 
     it("between", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(betweenNumbersRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(betweenNumbersRule);
       rule.context.options.min = 10;
       rule.context.options.max = 20;
 
@@ -76,8 +76,8 @@ describe("Number Rules", () => {
 
   describe("Sign", () => {
     it("positive", async () => {
-      const validator = v.any();
-      validator.addRule(positiveRule);
+      const validator = v.any().mutable;
+      validator.addMutableRule(positiveRule);
 
       expect((await validate(validator, 1)).isValid).toBe(true);
       expect((await validate(validator, 100)).isValid).toBe(true);
@@ -87,8 +87,8 @@ describe("Number Rules", () => {
     });
 
     it("negative", async () => {
-      const validator = v.any();
-      validator.addRule(negativeRule);
+      const validator = v.any().mutable;
+      validator.addMutableRule(negativeRule);
 
       expect((await validate(validator, -1)).isValid).toBe(true);
       expect((await validate(validator, -100)).isValid).toBe(true);
@@ -100,8 +100,8 @@ describe("Number Rules", () => {
 
   describe("Parity & Divisibility", () => {
     it("even", async () => {
-      const validator = v.any();
-      validator.addRule(evenRule);
+      const validator = v.any().mutable;
+      validator.addMutableRule(evenRule);
 
       expect((await validate(validator, 0)).isValid).toBe(true);
       expect((await validate(validator, 2)).isValid).toBe(true);
@@ -112,8 +112,8 @@ describe("Number Rules", () => {
     });
 
     it("odd", async () => {
-      const validator = v.any();
-      validator.addRule(oddRule);
+      const validator = v.any().mutable;
+      validator.addMutableRule(oddRule);
 
       expect((await validate(validator, 1)).isValid).toBe(true);
       expect((await validate(validator, 3)).isValid).toBe(true);
@@ -124,8 +124,8 @@ describe("Number Rules", () => {
     });
 
     it("divisibleBy", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(moduloRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(moduloRule);
       rule.context.options.value = 5;
 
       expect((await validate(validator, 0)).isValid).toBe(true);
@@ -137,8 +137,8 @@ describe("Number Rules", () => {
     });
 
     it("multipleOf", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(moduloRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(moduloRule);
       rule.context.options.value = 3;
 
       expect((await validate(validator, 0)).isValid).toBe(true);
@@ -154,10 +154,10 @@ describe("Number Rules", () => {
     it("min with field reference", async () => {
       const validator = v.object({
         minValue: v.number(),
-        value: v.any(),
+        value: v.any().mutable,
       });
 
-      const rule = validator.schema.value.addRule(minRule);
+      const rule = validator.schema.value.addMutableRule(minRule);
       rule.context.options.min = "minValue";
       rule.context.options.scope = "sibling";
 
@@ -169,10 +169,10 @@ describe("Number Rules", () => {
     it("max with field reference", async () => {
       const validator = v.object({
         maxValue: v.number(),
-        value: v.any(),
+        value: v.any().mutable,
       });
 
-      const rule = validator.schema.value.addRule(maxRule);
+      const rule = validator.schema.value.addMutableRule(maxRule);
       rule.context.options.max = "maxValue";
       rule.context.options.scope = "sibling";
 

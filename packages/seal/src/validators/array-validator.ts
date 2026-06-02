@@ -123,12 +123,29 @@ export class ArrayValidator extends BaseValidator {
     return super.mutate([...data], context);
   }
 
-  /** Validate array */
+  /** Validate array
+   *
+   * Absent input (and absent without `.default()`) propagates as `data: undefined`
+   * so the parent ObjectValidator can omit the key. Without this, optional array
+   * fields would silently materialise as `[]` in the validated output.
+   */
   public async validate(data: any, context: SchemaContext): Promise<ValidationResult> {
-    const mutatedData = (await this.mutate(data, context)) || [];
+    // Apply default when absent, then mutate. Mirrors BaseValidator's
+    // `valueForRules = data ?? this.getDefaultValue()` so `.default([...])`
+    // works on arrays too.
+    const valueForRules = data ?? this.getDefaultValue();
+    const mutatedData = await this.mutate(valueForRules, context);
+
     const result = await super.validate(data, context);
 
     if (result.isValid === false) return result;
+
+    // Nothing to iterate for absent (no default) or null (nullable) inputs —
+    // propagate so the parent ObjectValidator can omit the key.
+    if (mutatedData === undefined || mutatedData === null) return result;
+
+    // Defensive: type rule (arrayRule) should have failed for non-arrays.
+    if (!Array.isArray(mutatedData)) return result;
 
     const errors: ValidationResult["errors"] = [];
 

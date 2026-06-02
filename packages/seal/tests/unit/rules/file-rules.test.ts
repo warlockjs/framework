@@ -5,8 +5,8 @@ import { maxFileSizeRule, minFileSizeRule } from "../../../src/rules/file/file-s
 
 describe("File Rules", () => {
   it("should validate max file size", async () => {
-    const validator = v.any();
-    const rule = validator.addRule(maxFileSizeRule);
+    const validator = v.any().mutable;
+    const rule = validator.addMutableRule(maxFileSizeRule);
     rule.context.options.maxSize = 1000;
 
     // Valid file (size provided as property)
@@ -17,8 +17,8 @@ describe("File Rules", () => {
   });
 
   it("should validate min file size", async () => {
-    const validator = v.any();
-    const rule = validator.addRule(minFileSizeRule);
+    const validator = v.any().mutable;
+    const rule = validator.addMutableRule(minFileSizeRule);
     rule.context.options.minSize = 1000;
 
     expect((await validate(validator, { size: 1500 })).isValid).toBe(true);

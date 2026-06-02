@@ -61,11 +61,11 @@ import {
   withinPastDaysRule,
   yearRule,
 } from "../rules";
+import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
+import { applyNullable, getRuleOptions } from "../standard-schema/json-schema";
 import type { WeekDay } from "../types/date-types";
 import { isDateValue } from "./../helpers/date-helpers";
 import { BaseValidator } from "./base-validator";
-import { applyNullable, getRuleOptions } from "../standard-schema/json-schema";
-import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 
 /**
  * Date validator class
@@ -113,15 +113,17 @@ export class DateValidator extends BaseValidator {
 
   /** Convert to date only (remove time, returns YYYY-MM-DD) */
   public toDateOnly() {
-    return this.addTransformer((data) =>
-      data instanceof Date ? dayjs(data).format("YYYY-MM-DD") : data,
+    return this.addTransformer(
+      (data) => (data instanceof Date ? dayjs(data).format("YYYY-MM-DD") : data),
+      { __jsonSchemaFormat: "date" },
     );
   }
 
   /** Convert to time only (returns HH:MM:SS) */
   public toTimeOnly() {
-    return this.addTransformer((data) =>
-      data instanceof Date ? dayjs(data).format("HH:mm:ss") : data,
+    return this.addTransformer(
+      (data) => (data instanceof Date ? dayjs(data).format("HH:mm:ss") : data),
+      { __jsonSchemaFormat: "time" },
     );
   }
 
@@ -773,13 +775,29 @@ export class DateValidator extends BaseValidator {
       schema.format = "time";
     }
 
-    // As a fallback, check if transformers (like toDateOnly) stringify to known patterns
+    // Transformer-based detection (marker-driven; minifier-safe).
+    // toDateOnly/toTimeOnly tag their options bag with __jsonSchemaFormat.
+    // toFormat() exposes the user-supplied format string in options.format.
     if (schema.format === "date-time") {
-      const hasToDateOnly = this.dataTransformers.some((t: any) => t.toString().includes("YYYY-MM-DD"));
-      if (hasToDateOnly) schema.format = "date";
-      
-      const hasToTimeOnly = this.dataTransformers.some((t: any) => t.toString().includes("HH:mm:ss"));
-      if (hasToTimeOnly) schema.format = "time";
+      for (const t of this.dataTransformers) {
+        const hint = t.options?.__jsonSchemaFormat;
+        if (hint === "date" || hint === "time") {
+          schema.format = hint;
+          break;
+        }
+
+        const userFormat = t.options?.format;
+
+        if (userFormat === "YYYY-MM-DD") {
+          schema.format = "date";
+          break;
+        }
+
+        if (userFormat === "HH:mm:ss") {
+          schema.format = "time";
+          break;
+        }
+      }
     }
 
     if (this.isNullable) applyNullable(schema, target);

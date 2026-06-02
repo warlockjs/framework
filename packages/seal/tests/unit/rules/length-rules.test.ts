@@ -14,8 +14,8 @@ import {
 describe("Length Rules", () => {
   describe("Character Length", () => {
     it("minLength", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(minLengthRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(minLengthRule);
       rule.context.options.minLength = 5;
 
       expect((await validate(validator, "hello")).isValid).toBe(true);
@@ -28,8 +28,8 @@ describe("Length Rules", () => {
     });
 
     it("maxLength", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(maxLengthRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(maxLengthRule);
       rule.context.options.maxLength = 10;
 
       expect((await validate(validator, "hello")).isValid).toBe(true);
@@ -42,8 +42,8 @@ describe("Length Rules", () => {
     });
 
     it("betweenLength", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(betweenLengthRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(betweenLengthRule);
       rule.context.options.minLength = 5;
       rule.context.options.maxLength = 10;
 
@@ -56,8 +56,8 @@ describe("Length Rules", () => {
     });
 
     it("length (exact)", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(lengthRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(lengthRule);
       rule.context.options.length = 5;
 
       expect((await validate(validator, "hello")).isValid).toBe(true);
@@ -72,8 +72,8 @@ describe("Length Rules", () => {
 
   describe("Word Count", () => {
     it("minWords", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(minWordsRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(minWordsRule);
       rule.context.options.minWords = 3;
 
       expect((await validate(validator, "one two three")).isValid).toBe(true);
@@ -84,8 +84,8 @@ describe("Length Rules", () => {
     });
 
     it("maxWords", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(maxWordsRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(maxWordsRule);
       rule.context.options.maxWords = 3;
 
       expect((await validate(validator, "one two three")).isValid).toBe(true);
@@ -96,8 +96,8 @@ describe("Length Rules", () => {
     });
 
     it("words (exact)", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(wordsRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(wordsRule);
       rule.context.options.words = 3;
 
       expect((await validate(validator, "one two three")).isValid).toBe(true);

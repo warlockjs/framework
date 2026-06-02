@@ -8,6 +8,7 @@
 export * from "./alpha";
 export * from "./credit-card";
 export * from "./email";
+export * from "./id-formats";
 export * from "./ip";
 export * from "./matches";
 export * from "./pattern";

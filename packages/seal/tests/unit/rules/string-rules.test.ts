@@ -25,8 +25,8 @@ describe("String Rules", () => {
     });
 
     it("url", async () => {
-      const validator = v.any();
-      validator.addRule(urlRule);
+      const validator = v.any().mutable;
+      validator.addMutableRule(urlRule);
 
       expect((await validate(validator, "https://example.com")).isValid).toBe(true);
       expect((await validate(validator, "http://test.org/path?query=1")).isValid).toBe(true);
@@ -38,8 +38,8 @@ describe("String Rules", () => {
 
   describe("Character Type Rules", () => {
     it("alpha", async () => {
-      const validator = v.any();
-      validator.addRule(alphaRule);
+      const validator = v.any().mutable;
+      validator.addMutableRule(alphaRule);
 
       expect((await validate(validator, "abc")).isValid).toBe(true);
       expect((await validate(validator, "ABC")).isValid).toBe(true);
@@ -50,8 +50,8 @@ describe("String Rules", () => {
     });
 
     it("alphaNumeric", async () => {
-      const validator = v.any();
-      validator.addRule(alphaNumericRule);
+      const validator = v.any().mutable;
+      validator.addMutableRule(alphaNumericRule);
 
       expect((await validate(validator, "abc123")).isValid).toBe(true);
       expect((await validate(validator, "ABC123")).isValid).toBe(true);
@@ -62,8 +62,8 @@ describe("String Rules", () => {
     });
 
     it("numeric", async () => {
-      const validator = v.any();
-      validator.addRule(isNumericRule);
+      const validator = v.any().mutable;
+      validator.addMutableRule(isNumericRule);
 
       expect((await validate(validator, "123")).isValid).toBe(true);
       expect((await validate(validator, "0")).isValid).toBe(true);
@@ -76,8 +76,8 @@ describe("String Rules", () => {
 
   describe("Pattern & Whitespace", () => {
     it("pattern", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(patternRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(patternRule);
       rule.context.options.pattern = /^[A-Z]{3}-\d{3}$/;
 
       expect((await validate(validator, "ABC-123")).isValid).toBe(true);
@@ -88,8 +88,8 @@ describe("String Rules", () => {
     });
 
     it("withoutWhitespace", async () => {
-      const validator = v.any();
-      validator.addRule(withoutWhitespaceRule);
+      const validator = v.any().mutable;
+      validator.addMutableRule(withoutWhitespaceRule);
 
       expect((await validate(validator, "nowhitespace")).isValid).toBe(true);
       expect((await validate(validator, "test123")).isValid).toBe(true);
@@ -101,8 +101,8 @@ describe("String Rules", () => {
 
   describe("String Comparison", () => {
     it("startsWith", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(startsWithRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(startsWithRule);
       rule.context.options.value = "test";
 
       expect((await validate(validator, "test123")).isValid).toBe(true);
@@ -113,8 +113,8 @@ describe("String Rules", () => {
     });
 
     it("endsWith", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(endsWithRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(endsWithRule);
       rule.context.options.value = "end";
 
       expect((await validate(validator, "theend")).isValid).toBe(true);
@@ -125,8 +125,8 @@ describe("String Rules", () => {
     });
 
     it("contains", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(containsRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(containsRule);
       rule.context.options.value = "test";
 
       expect((await validate(validator, "testing")).isValid).toBe(true);
@@ -137,8 +137,8 @@ describe("String Rules", () => {
     });
 
     it("notContains", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(notContainsRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(notContainsRule);
       rule.context.options.value = "bad";
 
       expect((await validate(validator, "good")).isValid).toBe(true);

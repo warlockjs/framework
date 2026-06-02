@@ -44,8 +44,8 @@ describe("Date Rules", () => {
     it("betweenDates", async () => {
       const start = new Date("2023-01-01");
       const end = new Date("2023-01-31");
-      const validator = v.any();
-      const rule = validator.addRule(betweenDatesRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(betweenDatesRule);
       rule.context.options.startDate = start;
       rule.context.options.endDate = end;
 
@@ -57,8 +57,8 @@ describe("Date Rules", () => {
     });
 
     it("today", async () => {
-      const validator = v.any();
-      validator.addRule(todayRule);
+      const validator = v.any().mutable;
+      validator.addMutableRule(todayRule);
 
       const today = new Date();
       expect((await validate(validator, today)).isValid).toBe(true);
@@ -73,8 +73,8 @@ describe("Date Rules", () => {
     });
 
     it("past", async () => {
-      const validator = v.any();
-      validator.addRule(pastRule);
+      const validator = v.any().mutable;
+      validator.addMutableRule(pastRule);
 
       const past = new Date();
       past.setDate(past.getDate() - 1);
@@ -86,8 +86,8 @@ describe("Date Rules", () => {
     });
 
     it("future", async () => {
-      const validator = v.any();
-      validator.addRule(futureRule);
+      const validator = v.any().mutable;
+      validator.addMutableRule(futureRule);
 
       const future = new Date();
       future.setMinutes(future.getMinutes() + 10);
@@ -99,8 +99,8 @@ describe("Date Rules", () => {
     });
 
     it("afterToday", async () => {
-      const validator = v.any();
-      validator.addRule(afterTodayRule);
+      const validator = v.any().mutable;
+      validator.addMutableRule(afterTodayRule);
 
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
@@ -117,8 +117,8 @@ describe("Date Rules", () => {
 
   describe("Relative Rules", () => {
     it("withinDays", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(withinDaysRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(withinDaysRule);
       rule.context.options.days = 5;
 
       const now = new Date();
@@ -136,8 +136,8 @@ describe("Date Rules", () => {
     });
 
     it("withinPastDays", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(withinPastDaysRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(withinPastDaysRule);
       rule.context.options.days = 5;
 
       const now = new Date();
@@ -155,8 +155,8 @@ describe("Date Rules", () => {
     });
 
     it("withinFutureDays", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(withinFutureDaysRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(withinFutureDaysRule);
       rule.context.options.days = 5;
 
       const now = new Date();
@@ -176,8 +176,8 @@ describe("Date Rules", () => {
 
   describe("Day Rules", () => {
     it("weekend", async () => {
-      const validator = v.any();
-      validator.addRule(weekendRule);
+      const validator = v.any().mutable;
+      validator.addMutableRule(weekendRule);
 
       // Sat Jan 07 2023
       expect((await validate(validator, "2023-01-07")).isValid).toBe(true);
@@ -188,10 +188,10 @@ describe("Date Rules", () => {
     });
 
     it("weekday / businessDay", async () => {
-      const validator = v.any();
-      validator.addRule(weekdayRule);
-      const bizValidator = v.any();
-      bizValidator.addRule(businessDayRule);
+      const validator = v.any().mutable;
+      validator.addMutableRule(weekdayRule);
+      const bizValidator = v.any().mutable;
+      bizValidator.addMutableRule(businessDayRule);
 
       // Sat Jan 07 2023
       expect((await validate(validator, "2023-01-07")).isValid).toBe(false);
@@ -202,8 +202,8 @@ describe("Date Rules", () => {
     });
 
     it("weekdays", async () => {
-      const validator = v.any();
-      const rule = validator.addRule(weekdaysRule);
+      const validator = v.any().mutable;
+      const rule = validator.addMutableRule(weekdaysRule);
       rule.context.options.days = ["sunday", "monday"]; // Sunday, Monday
 
       // Sun Jan 08 2023
@@ -222,7 +222,7 @@ describe("Date Rules", () => {
         end: v.any(),
       });
 
-      const rule = validator.schema.start.addRule(beforeFieldRule);
+      const rule = validator.schema.start.mutable.addMutableRule(beforeFieldRule);
       rule.context.options.dateOrField = "end";
       rule.context.options.scope = "sibling";
 
@@ -240,7 +240,7 @@ describe("Date Rules", () => {
         end: v.any(),
       });
 
-      const rule = validator.schema.end.addRule(afterFieldRule);
+      const rule = validator.schema.end.mutable.addMutableRule(afterFieldRule);
       rule.context.options.dateOrField = "start";
       rule.context.options.scope = "sibling";
 
@@ -257,7 +257,7 @@ describe("Date Rules", () => {
         d1: v.any(),
         d2: v.any(),
       });
-      const rule = validator.schema.d2.addRule(sameAsFieldDateRule);
+      const rule = validator.schema.d2.mutable.addMutableRule(sameAsFieldDateRule);
       rule.context.options.field = "d1";
       rule.context.options.scope = "sibling";
 
@@ -277,7 +277,7 @@ describe("Date Rules", () => {
         metadata: v.string().optional(),
       });
 
-      const rule = validator.schema.metadata.addRule(presentIfRule);
+      const rule = validator.schema.metadata.mutable.addMutableRule(presentIfRule);
       rule.context.options.field = "type";
       rule.context.options.value = "advanced";
       rule.context.options.scope = "sibling";
@@ -295,7 +295,7 @@ describe("Date Rules", () => {
         fallback: v.string().optional(),
       });
 
-      const rule = validator.schema.fallback.addRule(presentIfEmptyRule);
+      const rule = validator.schema.fallback.mutable.addMutableRule(presentIfEmptyRule);
       rule.context.options.field = "primary";
       rule.context.options.scope = "sibling";
 
@@ -310,7 +310,7 @@ describe("Date Rules", () => {
         emailConfirm: v.string().optional(),
       });
 
-      const rule = validator.schema.emailConfirm.addRule(presentIfNotEmptyRule);
+      const rule = validator.schema.emailConfirm.mutable.addMutableRule(presentIfNotEmptyRule);
       rule.context.options.field = "email";
       rule.context.options.scope = "sibling";
 
@@ -328,7 +328,7 @@ describe("Date Rules", () => {
         address: v.string().optional(),
       });
 
-      const rule = validator.schema.address.addRule(requiredIfRule);
+      const rule = validator.schema.address.mutable.addMutableRule(requiredIfRule);
       rule.context.options.field = "shipping";
       rule.context.options.value = "delivery";
       rule.context.options.scope = "sibling";
@@ -348,7 +348,7 @@ describe("Date Rules", () => {
         email: v.string().optional(),
       });
 
-      const rule = validator.schema.email.addRule(requiredIfEmptyRule);
+      const rule = validator.schema.email.mutable.addMutableRule(requiredIfEmptyRule);
       rule.context.options.field = "username";
       rule.context.options.scope = "sibling";
 
@@ -363,7 +363,7 @@ describe("Date Rules", () => {
         phoneCountry: v.string().optional(),
       });
 
-      const rule = validator.schema.phoneCountry.addRule(requiredIfNotEmptyRule);
+      const rule = validator.schema.phoneCountry.mutable.addMutableRule(requiredIfNotEmptyRule);
       rule.context.options.field = "phone";
       rule.context.options.scope = "sibling";
 
@@ -380,7 +380,7 @@ describe("Date Rules", () => {
         secondary: v.string().optional(),
       });
 
-      const rule = validator.schema.secondary.addRule(forbiddenIfEmptyRule);
+      const rule = validator.schema.secondary.mutable.addMutableRule(forbiddenIfEmptyRule);
       rule.context.options.field = "primary";
       rule.context.options.scope = "sibling";
 
@@ -397,7 +397,7 @@ describe("Date Rules", () => {
         manualValue: v.string().optional(),
       });
 
-      const rule = validator.schema.manualValue.addRule(forbiddenIfNotEmptyRule);
+      const rule = validator.schema.manualValue.mutable.addMutableRule(forbiddenIfNotEmptyRule);
       rule.context.options.field = "autoGenerate";
       rule.context.options.scope = "sibling";
 

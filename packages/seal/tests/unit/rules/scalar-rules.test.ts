@@ -13,8 +13,8 @@ import {
 describe("Scalar Rules - Declined", () => {
   describe("Basic Declined", () => {
     it("declined", async () => {
-      const validator = v.any();
-      validator.addRule(declinedRule);
+      const validator = v.any().mutable;
+      validator.addMutableRule(declinedRule);
 
       // Valid declined values
       expect((await validate(validator, false)).isValid).toBe(true);
@@ -43,7 +43,7 @@ describe("Scalar Rules - Declined", () => {
         consent: v.any(),
       });
 
-      const rule = validator.schema.consent.addRule(declinedIfRule);
+      const rule = validator.schema.consent.mutable.addMutableRule(declinedIfRule);
       rule.context.options.field = "type";
       rule.context.options.value = "reject";
       rule.context.options.scope = "sibling";
@@ -59,7 +59,7 @@ describe("Scalar Rules - Declined", () => {
         tracking: v.any(),
       });
 
-      const rule = validator.schema.tracking.addRule(declinedUnlessRule);
+      const rule = validator.schema.tracking.mutable.addMutableRule(declinedUnlessRule);
       rule.context.options.field = "mode";
       rule.context.options.value = "enabled";
       rule.context.options.scope = "sibling";
@@ -75,7 +75,7 @@ describe("Scalar Rules - Declined", () => {
         newsletter: v.any(),
       });
 
-      const rule = validator.schema.newsletter.addRule(declinedIfRequiredRule);
+      const rule = validator.schema.newsletter.mutable.addMutableRule(declinedIfRequiredRule);
       rule.context.options.field = "email";
       rule.context.options.scope = "sibling";
 
@@ -94,7 +94,7 @@ describe("Scalar Rules - Declined", () => {
         consent: v.any(),
       });
 
-      const rule = validator.schema.consent.addRule(declinedIfPresentRule);
+      const rule = validator.schema.consent.mutable.addMutableRule(declinedIfPresentRule);
       rule.context.options.field = "optOut";
       rule.context.options.scope = "sibling";
 
@@ -109,7 +109,7 @@ describe("Scalar Rules - Declined", () => {
         ads: v.any(),
       });
 
-      const rule = validator.schema.ads.addRule(declinedWithoutRule);
+      const rule = validator.schema.ads.mutable.addMutableRule(declinedWithoutRule);
       rule.context.options.field = "premium";
       rule.context.options.scope = "sibling";
 

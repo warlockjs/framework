@@ -1,0 +1,2175 @@
+# Warlock Seal — full skills
+
+> Package: `@warlock.js/seal`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/seal/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## bridge-standard-schema  `@warlock.js/seal/bridge-standard-schema/SKILL.md`
+
+---
+name: bridge-standard-schema
+description: 'Diagnose `StandardSchemaV1` interop — phantom-intersection at the `v` factory return, why typed slots reject a schema, cascade `Model<TSchema>` variance. Triggers: `StandardSchemaV1`, `~standard`, `Infer`, `ObjectValidator`, `StringValidator`, `LiteralValidator`, `BaseValidator`, `Model<TSchema>`, `StandardJSONSchemaV1`, `Result<unknown>`; "StandardSchemaV1 slot rejecting my schema", "Result<unknown> error", "drop as unknown as cast", "cascade Model schema variance"; typical import `import { v, type Infer } from "@warlock.js/seal"`. Skip: foundations — `@warlock.js/seal/seal-basics/SKILL.md`; JSON Schema gen — `@warlock.js/seal/generate-json-schema/SKILL.md`; competing spec `@standard-schema/spec`.'
+---
+
+# The Standard Schema bridge
+
+Seal validators implement [Standard Schema V1](https://standardschema.dev) — every validator exposes a `~standard` member with `validate()`, JSON Schema metadata, and inferred types. Any consumer that accepts `StandardSchemaV1<T>` (`@warlock.js/ai` supervisor `output`, ai tool `input`, LangGraph state, OpenAI structured outputs, TanStack Form, Conform) accepts a seal schema directly.
+
+This skill is about the **typing** of that interop — the phantom intersection that makes `v.object({...})` satisfy `StandardSchemaV1<T>` without `as unknown as` casts.
+
+## The shape of the bridge
+
+The `v` factory returns aren't bare validator classes. Each factory widens its return with a phantom intersection:
+
+```ts
+// Inside seal's factory:
+object: <T extends Schema>(schema: T) =>
+  new ObjectValidator<T>(schema) as ObjectValidator<T>
+    & StandardSchemaV1<Infer<ObjectValidator<T>>>;
+
+string: () =>
+  new StringValidator() as StringValidator & StandardSchemaV1<string>;
+
+literal: <T extends readonly [...] >(...values: T) =>
+  new LiteralValidator<T>(values) as LiteralValidator<T> & StandardSchemaV1<T[number]>;
+
+// ...one intersection per factory.
+```
+
+The intersection is **only on the factory return type** — the `BaseValidator` and `ObjectValidator` *class* shapes are unchanged. That distinction is load-bearing: putting `Infer<this>` directly on `BaseValidator['~standard']` breaks `@warlock.js/cascade`'s `Model<TSchema>` because `ObjectValidator` becomes invariant when its members vary with `TSchema`. The factory-side intersection avoids that — bare classes in `Model.schema: ObjectValidator<TSchema>` slots are still structurally compatible with the typed factory return.
+
+## What this means for app code
+
+You write the schema once, you use it anywhere a `StandardSchemaV1<T>` is expected, you never cast:
+
+```ts
+import { v, validate, type Infer } from "@warlock.js/seal";
+import { ai } from "@warlock.js/ai";
+
+const userSchema = v.object({
+  email: v.string().email(),
+  age: v.int().optional(),
+});
+
+type User = Infer<typeof userSchema>;
+
+// ✅ ai-side slot — no cast
+ai.tool({
+  name: "create_user",
+  description: "Create a new user",
+  input: userSchema,
+  execute: async input => createUser(input),
+});
+
+// ✅ supervisor output — no cast
+ai.supervisor({
+  name: "user-flow",
+  output: userSchema,
+  // ...
+});
+
+// ✅ direct validation — call ~standard
+const result = await userSchema["~standard"].validate(rawData);
+```
+
+## `Infer<typeof schema>` vs hand-rolled types
+
+Use `Infer<>`. Always:
+
+```ts
+const schema = v.object({
+  email: v.string(),
+  blocks: v.array(v.literal("text", "image")).optional(),
+});
+
+type Output = Infer<typeof schema>;
+// { email: string; blocks?: ("text" | "image")[] }
+```
+
+Hand-rolled parallel types drift the moment a field changes — and seal's tightened typing now catches that drift at compile time. The old loose typing hid the mismatch; the bridge surfaces it.
+
+## When the bridge "fails"
+
+Three failure modes you'll see in real projects:
+
+### 1. You annotated the schema with the bare class type
+
+```ts
+// ❌ Discards the phantom intersection
+const schema: ObjectValidator<{ email: StringValidator }> = v.object({...});
+
+// ✅ Let inference run
+const schema = v.object({...});
+```
+
+The annotation strips `& StandardSchemaV1<...>` from the type. The schema stops fitting `StandardSchemaV1<T>` slots. Fix: remove the annotation. If you need the value type, use `Infer<typeof schema>`.
+
+### 2. The schema's inferred shape doesn't match the target type
+
+```ts
+ai.supervisor<MyOutput, ...>({
+  output: schema,  // ❌ schema infers differently from MyOutput
+});
+```
+
+The supervisor's explicit `<MyOutput>` generic is a constraint the schema must satisfy. If they diverge, TS rightly rejects. Two fixes:
+
+- **Drop the explicit generic** — let the supervisor infer output type from the schema. The hand-rolled type was probably documentation-only anyway.
+- **Align them** — if the hand-rolled type is the source of truth (e.g. a domain type from elsewhere), make the schema match.
+
+### 3. The error says `Result<unknown>` even though `Infer<>` resolves correctly
+
+This is a TypeScript reporting quirk, not a bridge bug. When a `StandardSchemaV1<T>` slot rejects a schema, TS picks the simplest mismatch chain to report — often it falls through `BaseValidator['~standard'].validate`'s wider `Result<unknown>` declaration before reaching the factory-side narrower one. The intersection *is* there structurally, but the error message mentions `unknown`.
+
+If you see this, ignore the `unknown` and ask: does `Infer<typeof schema>` match the slot's expected `T`? Probe with:
+
+```ts
+type _Probe = Infer<typeof schema>;
+const _force: { __nope: 1 } = null as unknown as _Probe;
+// Hover the error to see the resolved shape, then compare to the slot's T.
+```
+
+That's the real mismatch.
+
+## Why not `Omit<class, "~standard"> & StandardSchemaV1<T>`?
+
+Tempting — it would force the factory's `~standard` to fully replace the class's wider one, fixing the misleading `Result<unknown>` error message. **Don't do it.** `Omit` on a class instance type triggers the same variance trap as putting `Infer<this>` on the class itself: cascade explodes with hundreds of `ObjectValidator<{specific}>` vs `ObjectValidator<TSchema>` errors. The phantom intersection is the only shape that satisfies both ends — narrower for typed slots, structurally identical to the class for cascade's invariant generic positions.
+
+## Why not import `@standard-schema/spec` instead of forking the types?
+
+Seal forks the types locally. Reasons:
+
+- Seal extends the spec with `StandardJSONSchemaV1` (JSON Schema converter on `~standard.jsonSchema`). The package doesn't have this — half-importing is the worst of both worlds.
+- V1 spec is locked. The fork is ~70 lines and updates rarely.
+- Avoids version-coupling pain across `@warlock.js/*` packages.
+
+If V2 lands, re-fork. Until then the local copy is the right call.
+
+
+## compose-seal-modifiers  `@warlock.js/seal/compose-seal-modifiers/SKILL.md`
+
+---
+name: compose-seal-modifiers
+description: 'Apply cross-cutting modifiers — `.optional` / `.nullable` / `.default` / `.catch` / `.omit` / membership rules — plus the mutator-vs-transformer pipeline and `Infer.Input` vs `Infer.Output`. Triggers: `.optional`, `.required`, `.nullable`, `.default`, `.catch`, `.present`, `.requiredIf`, `.requiredWith`, `.in`, `.oneOf`, `.notIn`, `.omit`, `.attribute`, `.mutable`, `.addMutator`, `Infer.Input`, `Infer.Output`; "mark field optional in seal", "default value in schema", "mutator vs transformer", "when does .catch fire"; typical import `import { v, type Infer } from "@warlock.js/seal"`. Skip: primitives — `@warlock.js/seal/pick-seal-primitive/SKILL.md`; containers — `@warlock.js/seal/define-structural-shape/SKILL.md`; errors — `@warlock.js/seal/handle-seal-errors/SKILL.md`; competing `zod` `.optional`/`.default`.'
+---
+
+# Cross-cutting modifiers + the pipeline
+
+This skill covers methods that work on **every** validator. Type-specific methods (`.email()`, `.min()` on strings, `.between()` on numbers, `.weekDay()` on dates, etc.) live in the per-type method references — see [`@warlock.js/seal/pick-seal-primitive/SKILL.md`](@warlock.js/seal/pick-seal-primitive/SKILL.md) and [`@warlock.js/seal/define-structural-shape/SKILL.md`](@warlock.js/seal/define-structural-shape/SKILL.md).
+
+## The pipeline
+
+When `validate()` runs against a value, the order is:
+
+```
+1. default       — fills if input is undefined
+2. mutators      — reshape value (string → Date, .trim(), .toUTC())
+3. optional/required check — decide whether to run rules
+4. requiredRule  — required-condition rule (.requiredIf, .requiredWith, etc.)
+5. rules         — every other rule, in declaration order
+6. transformers  — reshape value into data (.toISOString, .toLowerCase)
+```
+
+If a rule fails, transformers don't run for that field.
+
+**Mutator vs transformer mental model:**
+- **Mutator** = pre-validation reshape. `v.date()` ships one that parses strings. Use when you want rules to see the reshaped value.
+- **Transformer** = post-validation reshape. Lands in `data`. Use when you only care about the output form.
+
+```ts
+// trim BEFORE length check — use a mutator
+v.string().addMutator(s => s.trim()).min(3)
+// "  Hi  " → mutator trims → "Hi" → fails min(3)
+
+// trim only the OUTPUT — use a transformer (.trim() on string is a transformer)
+v.string().min(3).trim()
+// "  Hi  " → rules see "  Hi  " (length 6, passes min(3)) → trim → data = "Hi"
+```
+
+## `.required()` / `.optional()` / `.present()`
+
+```ts
+v.string()             // already required inside v.object — no need to call .required()
+v.string().optional()  // type: string | undefined — { isOptional: true } brand
+v.string().present()   // must exist, may be "" / null
+v.string().required()  // explicit form — same behavior, redundant
+```
+
+**Required is the default inside `v.object`.** Most schemas read cleaner without `.required()` — `Infer<>` already shows what's required (no `?`) vs optional (`?`). Calling `.required()` explicitly is harmless and accepted, but the canonical seal style is to skip it. Keep `.optional()` explicit (it changes behavior); skip `.required()` (it doesn't).
+
+The `{ isOptional: true }` brand survives chaining (`.optional().min(3)` is still optional) and `Infer<>` reads it to make the key optional.
+
+**When `.required()` is still useful:**
+- Visual contrast next to `.optional()` siblings when you want the asymmetry to be loud — style call.
+- It's not needed for conditional rules — `.requiredIf(field, value)` and friends *replace* the default required-condition slot, so they work standalone.
+
+Conditional variants (run inside `v.object` only):
+- `.requiredIf(field, value)` / `.requiredIfSibling(field, value)`
+- `.requiredWith(field)` / `.requiredWithSibling(field)`
+- `.requiredWithout(field)` / `.requiredWithoutSibling(field)`
+- `.requiredUnless(field, value)`
+- `.requiredWhen(callback)` — predicate
+- `.present()` / `.presentIf(field, value)` / `.presentUnless(field, value)`
+- `.forbidden()` / `.forbiddenIf(field, value)` — opposite of present
+
+## `.nullable()` / `.notNullable()` / `.nullish()`
+
+```ts
+v.string().nullable()  // type: string | null
+v.string().nullish()   // sugar for .optional().nullable()
+```
+
+Independent of optional — a field can be required *and* nullable. Defaults to non-nullable. The `{ isNullable: true }` brand widens both `Infer.Input` and `Infer.Output` with `| null`.
+
+## `.default(value | callback)`
+
+```ts
+v.string().default("guest")
+v.int().default(0)
+v.date().default(() => new Date())   // lazy — fresh each validation
+v.array(v.string()).default([])
+```
+
+If input is `undefined` (or missing), the default is used and rules run against it. Pass a callback for fresh-per-run values. The default fires *before* rules — so `v.string().min(3).default("a")` fails because `"a"` is shorter than 3.
+
+Date sugar: `v.date().defaultNow()` ≡ `.default(() => new Date())`.
+
+The `{ hasDefault: true }` brand makes the key optional in `Infer.Input` (caller doesn't have to send it) and required in `Infer.Output` (data always has it).
+
+## `.catch(fallback)`
+
+Rescues *failed* validation by substituting a fallback. Complement to `.default()`:
+
+- `.default(x)` fires when input is **absent**
+- `.catch(y)` fires when input is **present but invalid**
+
+```ts
+const config = v.object({
+  retries: v.int().min(0).catch(3),
+  region: v.string().in(["us", "eu"]).catch("us"),
+  features: v.array(v.string()).catch([]),
+});
+
+await validate(config, { retries: "five", region: null, features: "x" });
+// { isValid: true, data: { retries: 3, region: "us", features: [] } }
+```
+
+The fallback can be a value or a callback `(errors, originalInput) => fallback` — the callback variant is the only side-channel for the swallowed errors. Use it to log/alert before substituting.
+
+**Scope (v1).** Catch is honoured for **leaf validators** (string, number, boolean, date, …) and for fields inside containers. It is a **no-op on container validators themselves** (`v.object`, `v.array`, `v.record`, `v.tuple`, `v.discriminatedUnion`) — those use their own iteration logic that bypasses the catch hook. To rescue a whole-container failure, wrap the call site in your own try/catch instead.
+
+**Best used for:** LLM output parsing, third-party API responses, config files, any data where the cost of failure is higher than the cost of a wrong value. Overuse masks real bugs — reach for it deliberately.
+
+The `{ hasCatch: true }` brand has the same effect on `Infer.Input`/`Infer.Output` as `{ hasDefault: true }`.
+
+## `Infer.Input` vs `Infer.Output`
+
+The two inference helpers describe the two halves of the pipeline:
+
+```ts
+const schema = v.object({
+  bio: v.string().optional(),
+  status: v.enum(Status).optional().default(Status.ACTIVE),
+  retries: v.int().catch(3),
+});
+
+type In  = Infer.Input<typeof schema>;
+// {
+//   bio?:     string;
+//   status?:  Status;      ← default makes caller optional
+//   retries?: number;      ← catch makes caller optional
+// }
+
+type Out = Infer.Output<typeof schema>;
+// {
+//   bio?:    string;
+//   status:  Status;       ← default guarantees a value
+//   retries: number;       ← catch guarantees a value
+// }
+
+type Default = Infer<typeof schema>;   // alias for Infer.Input
+```
+
+**When to reach for which:**
+- `Infer.Input<T>` (or bare `Infer<T>`) — for HTTP request bodies, form payloads, DTOs, anything pre-validation. **The common case in HTTP-shaped code.**
+- `Infer.Output<T>` — for Cascade `Model<>` params, validated state, anywhere downstream of `validate()`.
+
+Both widen with `| null` when `.nullable()` is set.
+
+## Absent vs empty vs invalid — what `data` actually contains
+
+Three failure modes, three different rescue mechanisms:
+
+| Input state | Rescued by | What appears in `data` |
+| --- | --- | --- |
+| Field absent | `.default(x)` | `x` |
+| Field absent (no default) | `.optional()` | Key omitted entirely |
+| Field present and invalid | `.catch(y)` | `y` |
+| Field is `null` | `.nullable()` | `null` |
+| Field present, empty (`""`, `[]`, `{}`) | (none needed — empty is a valid value) | Preserved as-is |
+
+Full truth table for an `.optional()` field inside `v.object(…)`:
+
+| Input | What appears in `data` |
+| --- | --- |
+| Field absent | Key **omitted entirely** (not `undefined`-valued) |
+| Field is explicit `undefined` | Key omitted (treated identically to absent) |
+| Field is `null` (no `.nullable()`) | Key omitted — for an **optional** field, `null` coalesces to empty and the (cleared) required rule doesn't fire. On a **required** field the same `null` triggers a validation error. |
+| Field is `null` with `.nullable()` | Key is `null` |
+| Field present and empty (`""`, `[]`, `{}`) | Preserved as-is — empty ≠ absent |
+| Field is `.default(x)` and absent | Key is `x` (default fires, then rules run on `x`) |
+| Field is `.default(x)` and present | Caller value wins; default is unused |
+| Field is `.catch(y)` and validation fails | Key is `y` (catch rescues) |
+
+```ts
+const schema = v.object({
+  metadata: v.record(v.string()).optional(),
+  embedding: v.array(v.number()).optional(),
+});
+
+(await validate(schema, {})).data
+// → {} — neither key appears
+// (NOT { metadata: {}, embedding: [] })
+
+(await validate(schema, { metadata: {}, embedding: [] })).data
+// → { metadata: {}, embedding: [] } — present-empty is preserved
+```
+
+**Why the distinction matters.** Persistence layers see `key in data` as "user touched this column". Synthesizing `{}` / `[]` for absent input would write empty values to the DB, defeat `$exists` filters, and confuse "I cleared this" vs "I never set this" downstream. Cascade models, Standard-Schema consumers, and JSON serializers all depend on this contract.
+
+Collection validators (`v.record`, `v.array`, `v.tuple`) explicitly honor this — they used to coerce absent input to empty containers (a long-standing bug), but now propagate `undefined` so the parent `v.object` correctly omits the key.
+
+## Membership rules (inherited by every primitive)
+
+Available on `v.string()`, `v.number()`, `v.int()`, `v.float()`, `v.boolean()`, `v.scalar()`:
+
+```ts
+v.string().in(["admin", "user", "guest"])   // value must match one
+v.string().oneOf(["a", "b"])                // alias for .in
+v.string().notIn(["banned", "blocked"])     // value must NOT match
+v.string().forbids(["banned"])              // alias for .notIn
+v.number().allowsOnly([1, 2, 3])            // stricter — explicit allowlist
+v.string().enum(MyTSEnum)                   // accepts a TS enum object via Object.values
+```
+
+For literal-typed narrowing (`"admin" | "user" | "guest"` instead of `string`), use `v.literal(...)` instead — `oneOf` keeps the broader primitive type.
+
+## `.omit()` / `.exclude()`
+
+```ts
+v.object({
+  email: v.string(),
+  password: v.string(),
+  passwordConfirm: v.string().sameAs("password").omit(),
+})
+```
+
+`.omit()` keeps the field in *validation* but drops it from `data` and from `Infer<>`. Use for confirmation/checksum fields that exist only for cross-field rules. `.exclude()` is the same idea, used internally for managed/computed plumbing.
+
+## `.label("Display Name")` — field display name
+
+To control the `:input` placeholder in a field's own messages, call `.label()` on the field validator:
+
+```ts
+v.object({
+  email_address: v.string().label("Email Address"),
+})
+// Error message: "The Email Address is required" (instead of "The email_address is required")
+```
+
+`.label(x)` sets the field's `:input` attribute, so every rule message for that field renders the friendly name.
+
+### `.attributes({ ... })` is a different tool
+
+`.attributes()` does NOT relabel a field's own `:input`. It supplies named substitution values consumed by the translation layer and by rules that reference *other* fields (e.g. `matches`):
+
+```ts
+v.string().sameAs("confirmPassword").attributes({
+  matches: { confirmPassword: "Confirm Password" },
+})
+```
+
+For per-field display names use `.label()`; for translated messages wire the `translateRule` / `translateAttribute` hooks via `configureSeal()`.
+
+## Mutability — `.mutable` / `.immutable`
+
+Validators are **immutable by default**. Every chain method returns a clone:
+
+```ts
+const baseString = v.string();
+const required = baseString.required();
+// baseString is unchanged
+```
+
+This matters because schemas are often shared (`Model.schema = v.object({...})`). If chaining mutated, every reuse would carry forward the previous chain's state.
+
+Toggle in-place with the `.mutable` getter (rare):
+
+```ts
+const schema = v.string().mutable.required().min(3);
+// Same instance throughout — useful when building dynamically
+```
+
+Switch back with `.immutable`. Default is fine 99% of the time. Reach for `.mutable` only when you've thought about who else holds a reference.
+
+## Things NOT to do
+
+- Don't put a transformer where a mutator belongs — `.trim()` is a transformer; if you need trimming *before* `.min()`, use `.addMutator(s => s.trim())`.
+- Don't combine `.required()` and `.optional()` on the same chain — last wins, but the intent is unclear; pick one.
+- Don't chain `.default("a")` with `.min(3)` and expect `"a"` to pass — the default goes through rules.
+- Don't expect `.requiredIf()` to work on a standalone validator outside `v.object` — sibling resolution silently passes.
+- Don't mutate a schema you handed to a Model. Default immutability protects you; opting into `.mutable` on shared schemas is asking for confusion.
+
+
+## define-structural-shape  `@warlock.js/seal/define-structural-shape/SKILL.md`
+
+---
+name: define-structural-shape
+description: 'Compose `v.object` / `v.array` / `v.record` / `v.tuple` / `v.union` / `v.discriminatedUnion` / `v.lazy`. Triggers: `v.object`, `v.array`, `v.record`, `v.tuple`, `v.union`, `v.discriminatedUnion`, `v.lazy`, `ObjectValidator`; "how do I build an object schema", "dynamic-keyed record", "tagged union with discriminator", "recursive schema", "self-referencing schema"; typical import `import { v, type Infer } from "@warlock.js/seal"`. Skip: leaf primitives — `@warlock.js/seal/pick-seal-primitive/SKILL.md`; modifiers — `@warlock.js/seal/compose-seal-modifiers/SKILL.md`; standard-schema bridge — `@warlock.js/seal/bridge-standard-schema/SKILL.md`; competing libs `zod`, `valibot`.'
+---
+
+# Structural validators — picking guide
+
+The five structural factories. Each composes — pass leaf primitives or other structural validators inside, infer with `Infer<typeof schema>`. **Method surface for `v.object` and `v.array` lives in `object-methods.md` and `array-methods.md`** — this file is just orientation.
+
+## `v.object` — fixed-key records
+
+```ts
+v.object({
+  email: v.string().email(),
+  age: v.int().min(13).optional(),
+  role: v.literal("admin", "user", "guest"),
+})
+```
+
+- **Required by default.** `.optional()` to opt out — the `{ isOptional: true }` brand makes the key optional in `Infer<>`.
+- **Unknown keys policy.** By default extra keys are silently dropped from `data`. Toggle with `.allowUnknown()` (forward as-is), `.stripUnknown()` (explicit drop), or `.allow(...keys)` (whitelist specific extras). See [`object-methods.md`](./object-methods.md).
+- **Schema composition.** `.extend(schema)`, `.merge(other)`, `.pick(...keys)`, `.without(...keys)`, `.partial(...keys)`, `.requiredFields(...keys)` — all in [`object-methods.md`](./object-methods.md).
+- **Cross-field rules** (`sameAs`, `requiredIf`, `requiredWith`) attach to fields *inside* a `v.object`. Without a parent, sibling resolution silently passes.
+
+## `v.array` — homogeneous lists
+
+```ts
+v.array(v.string())          // type: string[]
+v.array(userSchema)          // type: User[]
+v.array(v.array(v.int()))    // type: number[][] — recursive inference
+```
+
+The inner validator runs against each element; failure on any element fails the array. Method surface (`.min`, `.max`, `.unique`, `.sorted`, `.flip`, …) in [`array-methods.md`](./array-methods.md).
+
+## `v.record` — homogeneous values, dynamic keys
+
+```ts
+v.record(v.int())                          // type: Record<string, number>
+v.record(v.object({ count: v.int() }))     // type: Record<string, { count: number }>
+v.record()                                 // type: Record<string, any>
+```
+
+Reach for `v.record` when keys are dynamic (user-provided, dictionary-style) but values share a schema. If keys are also constrained (e.g. only `"draft" | "published"`), use `v.object` with literal keys instead — the constraint lives in the type.
+
+## `v.tuple` — positional types
+
+```ts
+v.tuple([v.string(), v.int(), v.boolean()])  // type: [string, number, boolean]
+v.tuple([v.literal("ok"), v.string()])       // type: ["ok", string]
+```
+
+Each position has its own validator; the array length must match the tuple length. Pair with `v.literal` at position 0 for result-tuple patterns (`["ok", data]` vs `["error", message]`).
+
+## `v.union` — one of N validators (untagged)
+
+```ts
+v.union([v.string(), v.int()])  // type: string | number
+```
+
+The first type-matching validator wins, picked via each branch's `matchesType()`. Use for unions of **scalar** types (string vs number, etc.) where `matchesType` is enough to disambiguate. For object-vs-object unions, reach for `v.discriminatedUnion` instead — `matchesType` can't distinguish two object branches and you'll get errors from the wrong branch.
+
+## `v.discriminatedUnion` — tagged unions (recommended for objects)
+
+```ts
+const email = v.object({ type: v.literal("email"), email: v.string().email() });
+const sms   = v.object({ type: v.literal("sms"),   phone: v.string() });
+const push  = v.object({ type: v.literal("push"),  deviceId: v.string() });
+
+const notif = v.discriminatedUnion("type", [email, sms, push]);
+
+type Notif = Infer<typeof notif>;
+// { type: "email"; email: string }
+// | { type: "sms"; phone: string }
+// | { type: "push"; deviceId: string }
+```
+
+Routes payloads by reading the discriminator field (here `type`), looking it up in a key→branch map built at construction time, and delegating to the matching branch only. Benefits over plain `v.union`:
+
+- **Precise errors.** Failures come from the matched branch, not from every branch.
+- **O(1) routing** instead of trial-and-error.
+- **Exact TS inference** — discriminated union with narrowing inside `if (x.type === "email")` blocks.
+- **Cleaner JSON Schema** — `oneOf` with literal discriminators; OpenAI-strict accepts it.
+
+Construction-time validation throws on:
+
+- Missing discriminator field in any branch
+- Non-literal discriminator (must be `v.literal(...)`)
+- Duplicate discriminator values across branches
+
+So misconfigurations surface at schema-build time, not runtime.
+
+## `v.lazy` — recursive and forward-referenced schemas
+
+```ts
+type Category = { name: string; children: Category[] };
+
+const categorySchema: ObjectValidator<...> = v.object({
+  name: v.string(),
+  children: v.array(v.lazy(() => categorySchema)),
+});
+
+type T = Infer<typeof categorySchema>;
+// { name: string; children: T[] }   ← recursive type
+```
+
+Defers resolution of the inner validator until validate-time. JavaScript evaluates the object literal before the `const` binding completes, so the inner reference would normally fail with `ReferenceError`. The thunk is invoked only when `validate()` runs, by which time the binding exists.
+
+**Memoised.** The thunk fires once on first use; subsequent calls reuse the cached validator.
+
+**JSON Schema caveat.** Simple-resolve in v1 — recursive shapes will infinite-loop in `toJsonSchema()`. If you need JSON Schema for a recursive shape, generate it manually with `$defs` + `$ref` until v2 lands.
+
+**TS inference requires a recursive type alias.** TS can't infer `Category = { name: string; children: Category[] }` from the schema alone — declare the type explicitly and annotate the schema variable with `ObjectValidator<...>` or similar (same pattern as Zod's `z.ZodType<Category>`).
+
+Use for: trees (categories, file systems), threaded data (comment chains), mutually recursive schemas (`A` references `B` references `A`), and forward references (a schema needs to use one defined later in the file).
+
+## Quick map
+
+| Want | Reach for |
+| --- | --- |
+| Fixed-shape record | `v.object({...})` |
+| Dynamic keys, same value shape | `v.record(valueSchema)` |
+| List of items | `v.array(itemSchema)` |
+| Position-typed array | `v.tuple([a, b, c])` |
+| One of N scalar types | `v.union([...])` |
+| One of N object shapes with a tag field | `v.discriminatedUnion(key, [...])` |
+| Self-referencing or forward reference | `v.lazy(() => schema)` |
+| One of N constants | `v.literal(...values)` (not structural — see [`@warlock.js/seal/pick-seal-primitive/SKILL.md`](@warlock.js/seal/pick-seal-primitive/SKILL.md)) |
+
+## A note on cascade Models
+
+`@warlock.js/cascade` Models declare `static schema: ObjectValidator<TSchema>`. Passing a `v.object({...})` works directly — the factory return widens to fit the Model's invariant generic without breaking type checking. If TS complains *"`ObjectValidator<{specific}>` is not assignable to `ObjectValidator<TSchema>`"*, that's the variance trap and the answer isn't to widen the schema — it's almost always that `Model<TSchema>` was parameterized with a hand-rolled type that drifted from the schema's inferred shape. Fix the type, not the schema. See [`@warlock.js/seal/bridge-standard-schema/SKILL.md`](@warlock.js/seal/bridge-standard-schema/SKILL.md).
+
+## Method-surface reference
+
+- [`object-methods.md`](./object-methods.md) — `.extend` / `.merge` / `.pick` / `.without` / `.partial` / `.requiredFields` / `.allowUnknown` / `.stripUnknown` / `.allow` / `.trim`.
+- [`array-methods.md`](./array-methods.md) — `.minLength` / `.maxLength` / `.length` / `.between` / `.unique` / `.sorted` / `.flip` / `.sort` / `.onlyUnique`.
+
+`v.record` and `v.tuple` share the array-style length surface. `v.union` and `v.discriminatedUnion` have no chainable methods beyond what's shown above. `v.lazy` is a single-call factory.
+
+
+### define-structural-shape/array-methods.md  `@warlock.js/seal/define-structural-shape/array-methods.md`
+
+# `v.array(itemValidator)` — method reference
+
+The inner validator runs against each element. Failure on any element fails the array. Picking guide (array vs tuple vs record) is in [`@warlock.js/seal/define-structural-shape/SKILL.md`](@warlock.js/seal/define-structural-shape/SKILL.md).
+
+## Length
+
+| Method | Args | JSON Schema | Example |
+|---|---|---|---|
+| `.min(n, msg?)` | n/a — see note below | — | use `.minLength(n)` |
+| `.minLength(n, msg?)` | inclusive lower bound | `minItems: n` | `v.array(v.string()).minLength(1)` |
+| `.maxLength(n, msg?)` | inclusive upper bound | `maxItems: n` | `v.array(v.string()).maxLength(10)` |
+| `.length(n, msg?)` | exact length | `minItems=maxItems=n` | `v.array(v.string()).length(3)` |
+| `.between(a, b, msg?)` | inclusive range | `minItems: a, maxItems: b` | `v.array(v.string()).between(1, 10)` |
+| `.lengthBetween(a, b, msg?)` | alias for `.between()` | `minItems: a, maxItems: b` | — |
+
+**Note on `.min`/`.max`:** the array validator does not expose `.min`/`.max` directly — use `.minLength`/`.maxLength` (or `.between`/`.length`). This is intentional: `.min`/`.max` would conflict with primitive value-comparison semantics if they ever bled into here.
+
+## Uniqueness & sort
+
+| Method | Args | Effect |
+|---|---|---|
+| `.unique(msg?)` | — | every element is distinct |
+| `.sorted(direction?, msg?)` | `"asc"` (default) or `"desc"` | array is monotonically sorted |
+
+## Mutators (pre-validation reshape)
+
+| Method | Args | Effect |
+|---|---|---|
+| `.flip()` | — | reverse the array |
+| `.reverse()` | — | alias for `.flip()` |
+| `.onlyUnique()` | — | dedupe before validation |
+| `.sort(direction?, key?)` | `"asc"` (default) or `"desc"`; optional sort key for object items | sort before validation |
+
+`onlyUnique()` and `unique()` differ: the mutator silently dedupes; the rule fails when duplicates are present. Pick by intent — coerce vs reject.
+
+## Inner validator notes
+
+```ts
+v.array(v.string().email())              // every element must be a valid email
+v.array(userSchema)                      // every element must satisfy userSchema
+v.array(v.array(v.int()))                // matrix-ish — Infer is recursive
+```
+
+Element validators run with element-level context. `path` becomes `${parent}.${index}` for error messages. Cross-field rules inside element schemas resolve to that element's fields, not the array.
+
+## JSON Schema mapping
+
+- `v.array(item)` → `{ type: "array", items: <item.toJsonSchema()> }`
+- `.minLength(n)` → `minItems: n`
+- `.maxLength(n)` → `maxItems: n`
+- `.length(n)` → `minItems: n, maxItems: n`
+- `.between(a, b)` → `minItems: a, maxItems: b`
+- `.unique()` and `.sorted()` are NOT representable — silently omitted
+
+## Common chains
+
+```ts
+// Tags
+v.array(v.string().min(1)).unique().between(1, 10)
+
+// User list
+v.array(userSchema).minLength(1)
+
+// Pre-sorted, deduped
+v.array(v.string()).onlyUnique().sort("asc")
+
+// Reverse-emit
+v.array(v.string()).flip()
+
+// Matrix
+v.array(v.array(v.number())).minLength(1)
+
+// Sorted ids
+v.array(v.string().uuid()).sorted("asc").unique()
+
+// Optional list with default
+v.array(v.string()).default([]).optional()
+```
+
+
+### define-structural-shape/object-methods.md  `@warlock.js/seal/define-structural-shape/object-methods.md`
+
+# `v.object({...})` — method reference
+
+Picking guide for structural validators is in [`@warlock.js/seal/define-structural-shape/SKILL.md`](@warlock.js/seal/define-structural-shape/SKILL.md). For field-level chaining (`.required` / `.optional` / `.attribute`), see [`@warlock.js/seal/compose-seal-modifiers/SKILL.md`](@warlock.js/seal/compose-seal-modifiers/SKILL.md).
+
+## Schema composition
+
+These return a new `ObjectValidator` with a transformed schema. The TypeScript inference follows correctly — `Infer<>` reflects the post-composition shape.
+
+### `.extend(schemaOrValidator)` — add fields, keep config
+
+```ts
+const baseUser = v.object({
+  name: v.string(),
+  email: v.string().email(),
+}).allowUnknown();
+
+const adminUser = baseUser.extend({
+  role: v.string().oneOf(["admin", "superadmin"]),
+});
+// adminUser type: { name; email; role } — keeps allowUnknown()
+```
+
+Accepts a plain schema object **or** another `ObjectValidator` (only its schema is used — config is ignored). Use for reusable field collections (e.g. timestamp fields).
+
+### `.merge(otherValidator)` — combine, override config
+
+```ts
+const base = v.object({ name: v.string() }).allowUnknown();
+const audit = v.object({
+  createdAt: v.date(),
+  updatedAt: v.date(),
+}).stripUnknown();
+
+const merged = base.merge(audit);
+// type: { name; createdAt; updatedAt }
+// config: stripUnknown() from audit (overrides base's allowUnknown)
+```
+
+`.merge` combines schemas **and** configurations — the other validator wins. Rules, mutators, transformers, and attribute display names from both validators are appended.
+
+### `.pick(...keys)` — keep only specified fields
+
+```ts
+const fullUser = v.object({
+  id: v.int(),
+  name: v.string(),
+  email: v.string().email(),
+  password: v.string(),
+});
+
+const loginSchema = fullUser.pick("email", "password");
+// type: { email; password }
+```
+
+Returns `ObjectValidator<Pick<TSchema, K>>`. Keeps original config (`allowUnknown`, etc.).
+
+### `.without(...keys)` — drop specified fields
+
+```ts
+const updateSchema = fullUser.without("id");
+// type: { name; email; password }
+```
+
+Returns `ObjectValidator<Omit<TSchema, K>>`. Inverse of `.pick`. Keeps original config.
+
+### `.partial(...keys?)` — mark fields optional
+
+```ts
+fullUser.partial()                // every field becomes optional
+fullUser.partial("password")      // only `password` becomes optional
+```
+
+Walks the schema and applies `.optional()` to each named field (or all if no keys given). `Infer<>` makes those keys optional.
+
+### `.requiredFields(...keys?)` — mark fields required
+
+```ts
+const partialUser = fullUser.partial();    // all optional
+const updateUser = partialUser.requiredFields("id", "email");
+// id and email are required again, others stay optional
+```
+
+Inverse of `.partial`.
+
+## Unknown-keys policy
+
+By default, extra keys in input are silently dropped from `data` (no error, no forward).
+
+| Method | Effect |
+|---|---|
+| `.allowUnknown(allow = true)` | extra **direct-child** keys forward as-is |
+| `.stripUnknown()` | explicit drop (mutator-based — affects `data` shape) |
+| `.allow(...keys)` | whitelist specific extras to forward without validation |
+
+`.allowUnknown()` only affects direct children — nested objects keep their own policies. For a fully permissive object including nested children, set `.allowUnknown()` on each level.
+
+## Object-level mutators
+
+| Method | Args | Effect |
+|---|---|---|
+| `.trim(recursive?)` | default `true` | recursively trim string values across the object |
+
+For per-field mutators, attach on the field validator instead.
+
+## Cross-field rules — context
+
+The cross-field methods (`.sameAs`, `.requiredIf`, `.requiredWith`, etc.) are **field-level**, not object-level — you call them on the field validator inside `v.object`. The object validator's job is to hand them the parent context so sibling resolution works:
+
+```ts
+v.object({
+  password: v.string(),
+  passwordConfirm: v.string().sameAs("password"),
+})
+```
+
+If you call cross-field rules outside a `v.object`, sibling resolution silently passes — there's nobody to compare against.
+
+## `Infer<>` semantics
+
+```ts
+Infer<typeof userSchema>
+// { reqField: T; optField?: T }
+```
+
+- Required fields → required keys
+- `.optional()` fields → optional keys (`?:`)
+- `.omit()` / `.exclude()` fields → dropped from the inferred type
+- `v.computed<T>()` / `v.managed<T>()` → present as `T` in inferred output (they produce values)
+
+## Common chains
+
+```ts
+// User CRUD trio from one base
+const baseUser = v.object({
+  id: v.int(),
+  name: v.string(),
+  email: v.string().email(),
+  password: v.string(),
+});
+
+const createUser = baseUser.without("id");
+const updateUser = baseUser.partial().requiredFields("id");
+const loginUser = baseUser.pick("email", "password");
+
+// Reusable timestamps
+const timestamps = v.object({
+  createdAt: v.date(),
+  updatedAt: v.date(),
+});
+
+const userWithAudit = baseUser.extend(timestamps);
+
+// Permissive container that forwards extras
+const eventEnvelope = v.object({
+  type: v.literal("user.created", "user.updated"),
+  payload: v.object({}).allowUnknown(),
+}).allowUnknown();
+
+// Confirmation pattern with omit
+const signupSchema = v.object({
+  password: v.string().strongPassword(),
+  passwordConfirm: v.string().sameAs("password").omit(),
+  email: v.string().email(),
+});
+// Infer<> = { password; email } — passwordConfirm omitted from output
+```
+
+
+## extend-seal-with-plugins  `@warlock.js/seal/extend-seal-with-plugins/SKILL.md`
+
+---
+name: extend-seal-with-plugins
+description: 'Author a custom seal plugin to add validator methods (`.slug`, `.postalCode`, etc) — `SealPlugin` shape, `registerPlugin` lifecycle, TS prototype augmentation. Triggers: `SealPlugin`, `registerPlugin`, `unregisterPlugin`, `hasPlugin`, `getInstalledPlugins`, `StringValidator`, `NumberValidator`, `DateValidator`, `BaseValidator`, `install`, `uninstall`; "how do I add a custom validator method", "write a seal plugin", "extend v.string with .slug", "module augmentation for seal"; typical import `import { StringValidator, registerPlugin, type SealPlugin } from "@warlock.js/seal"`. Skip: built-in primitives — `@warlock.js/seal/pick-seal-primitive/SKILL.md`; bridge typing — `@warlock.js/seal/bridge-standard-schema/SKILL.md`; competing `zod` `.refine`/`.transform`.'
+---
+
+# Extend seal with plugins
+
+Seal exposes a plugin system so you can add validator methods without forking the package. A plugin is an object with `name`, optional `version`/`description`, and an `install` function that runs once when the plugin is registered. The standard pattern is to `Object.assign(StringValidator.prototype, { ... })` to graft new methods onto a validator class.
+
+## When to reach for a plugin
+
+- The validator method you want **does not exist** in built-in seal — check [`@warlock.js/seal/pick-seal-primitive/SKILL.md`](@warlock.js/seal/pick-seal-primitive/SKILL.md) and its method references first.
+- The validation is **stable and reusable** across modules — domain-specific formats (IBAN, postal codes, tax IDs, license plates, internal ID schemes).
+- You want the **chainable syntax** — `v.string().slug()` reads better than `v.string().pattern(/.../).addMutator(s => slugify(s))` at every call site.
+
+**Don't** reach for a plugin when a one-off `.pattern()` would do. The boilerplate (declare module, register on boot) is justified only when you'll call the new method many times.
+
+## The plugin shape
+
+```ts
+import type { SealPlugin } from "@warlock.js/seal";
+
+type SealPlugin = {
+  name: string;          // unique identifier — duplicates warn and skip install
+  version?: string;
+  description?: string;
+  install: (context: { name: string; version?: string }) => void | Promise<void>;
+  uninstall?: () => void | Promise<void>;
+};
+```
+
+The `install` function is where you add methods. Typically you patch a validator class prototype:
+
+```ts
+import { StringValidator, type SealPlugin } from "@warlock.js/seal";
+
+export const slugPlugin: SealPlugin = {
+  name: "slug",
+  version: "1.0.0",
+  description: "Adds .slug() — pattern-only slug validation",
+
+  install() {
+    Object.assign(StringValidator.prototype, {
+      slug(this: StringValidator, errorMessage?: string) {
+        return this.pattern(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, errorMessage);
+      },
+    });
+  },
+};
+```
+
+`uninstall` is optional. Provide it when your plugin needs to clean up — e.g. removing prototype methods for hot-reload scenarios. Most production plugins skip it; methods grafted at boot stay for the process lifetime.
+
+## Registering plugins
+
+```ts
+import { registerPlugin, unregisterPlugin, hasPlugin, getInstalledPlugins } from "@warlock.js/seal";
+
+await registerPlugin(slugPlugin);
+// console.warn if "slug" is already installed; otherwise install() runs and the plugin is tracked.
+
+hasPlugin("slug");           // → true
+getInstalledPlugins();       // → [slugPlugin]
+
+await unregisterPlugin("slug");
+// runs slugPlugin.uninstall?.(); removes from registry.
+```
+
+`registerPlugin` is async (the `install` function may be async). Await it during boot so the methods are available before the first request.
+
+**Where to register:** the conventional place in a Warlock app is a side-effect file loaded by `warlock.config.ts` — e.g. `src/setup/seal-plugins.ts`:
+
+```ts title="src/setup/seal-plugins.ts"
+import { registerPlugin } from "@warlock.js/seal";
+import { slugPlugin } from "./plugins/slug-plugin";
+import { postalCodePlugin } from "./plugins/postal-code-plugin";
+
+export async function setupSealPlugins() {
+  await registerPlugin(slugPlugin);
+  await registerPlugin(postalCodePlugin);
+}
+```
+
+Then call `setupSealPlugins()` in a bootstrap connector. Registering at top-level module scope works too (it's idempotent — duplicates warn and skip), but explicit setup is clearer.
+
+## TypeScript — declare the new methods
+
+`Object.assign` on a prototype is invisible to TypeScript. Declare the new methods with module augmentation so call sites compile:
+
+```ts title="src/setup/seal-plugins.types.ts"
+import "@warlock.js/seal";
+
+declare module "@warlock.js/seal" {
+  interface StringValidator {
+    /** Pattern-only slug — `"hello-world"`, not `"Hello World"`. */
+    slug(errorMessage?: string): StringValidator;
+  }
+}
+```
+
+After this file is included in the project's `tsconfig.json` (via `include` or a side-effect import), `v.string().slug()` autocompletes and type-checks everywhere.
+
+**Important.** The augmentation has to declare on the **class** (`StringValidator`), not the factory return type. The factory return widens with `& StandardSchemaV1<...>` (see [`@warlock.js/seal/bridge-standard-schema/SKILL.md`](@warlock.js/seal/bridge-standard-schema/SKILL.md)) — augmentations on the intersection don't propagate. Patch the class, augment the class; the factory return picks up the new methods through structural inference.
+
+## Larger example — postal codes per country
+
+```ts
+import { StringValidator, type SealPlugin } from "@warlock.js/seal";
+
+const PATTERNS: Record<string, RegExp> = {
+  US: /^\d{5}(?:-\d{4})?$/,
+  DE: /^\d{5}$/,
+  UK: /^[A-Z]{1,2}\d[A-Z\d]? \d[A-Z]{2}$/i,
+  EG: /^\d{5}$/,
+};
+
+export const postalCodePlugin: SealPlugin = {
+  name: "postal-code",
+
+  install() {
+    Object.assign(StringValidator.prototype, {
+      postalCode(this: StringValidator, country: keyof typeof PATTERNS, errorMessage?: string) {
+        const pattern = PATTERNS[country];
+
+        if (!pattern) {
+          throw new Error(`postalCode: unknown country "${country}"`);
+        }
+
+        return this.pattern(pattern, errorMessage ?? `Invalid ${country} postal code`);
+      },
+    });
+  },
+};
+```
+
+```ts
+// Module augmentation
+declare module "@warlock.js/seal" {
+  interface StringValidator {
+    postalCode(country: "US" | "DE" | "UK" | "EG", errorMessage?: string): StringValidator;
+  }
+}
+
+// Use site
+const addressSchema = v.object({
+  country: v.literal("US", "DE", "UK", "EG"),
+  postal: v.string().postalCode("DE"),
+});
+```
+
+## Patterns beyond `StringValidator`
+
+The same approach works on any validator class. Pick the right prototype:
+
+- `StringValidator` — string methods (`.slug`, `.postalCode`, `.licensePlate`).
+- `NumberValidator` / `IntValidator` / `FloatValidator` — number methods.
+- `DateValidator` — date methods (`.businessDayInCountry("US")`).
+- `ArrayValidator` / `ObjectValidator` — structural methods (rarer).
+- `BaseValidator` — universal methods (rare — usually a sign you want a separate `v.something()` factory instead).
+
+For a method that creates a **new validator** (not chained from an existing one), expose it as a regular function alongside `v` rather than patching the factory. E.g. export `iban()` from your plugin module that returns a configured `v.string()`.
+
+## Introspection — checking what's loaded
+
+```ts
+hasPlugin("slug");                 // boolean
+getInstalledPlugins();             // SealPlugin[]
+```
+
+Use these in startup diagnostics or in tests that need to assert a plugin is registered before exercising a method that depends on it.
+
+## Things NOT to do
+
+- Don't `Object.assign(BaseValidator.prototype, ...)` for type-specific methods. The method would exist on every validator (`v.boolean().slug()` typechecks but breaks at runtime). Patch the narrowest class that owns the method.
+- Don't forget the module augmentation. Without it, the new methods exist at runtime but TS rejects every call site.
+- Don't make the plugin's `install` function depend on shared state mutable from elsewhere. Plugins should be idempotent — installing twice (or registering across hot-reloads) should not break anything.
+- Don't ship a plugin that overrides a built-in method without a clear reason. If you must, `uninstall` should restore the original — but the better path is a different method name.
+- Don't author one plugin per method. Group related methods (e.g. "country-specific validators") into one plugin so the install/uninstall lifecycle is coherent.
+
+
+## generate-json-schema  `@warlock.js/seal/generate-json-schema/SKILL.md`
+
+---
+name: generate-json-schema
+description: 'Generate JSON Schema via `schema.toJsonSchema(target)` — `draft-2020-12` / `draft-07` / `openapi-3.0` / `openai-strict`. Triggers: `toJsonSchema`, `JsonSchemaTarget`, `draft-2020-12`, `draft-07`, `openapi-3.0`, `openai-strict`, `response_format`, `additionalProperties`, `nullable`; "how do I generate JSON Schema from seal", "OpenAI structured outputs from schema", "OpenAPI 3.0 nullable", "json_schema strict mode"; typical import `import { v } from "@warlock.js/seal"`. Skip: foundations — `@warlock.js/seal/seal-basics/SKILL.md`; bridge typing — `@warlock.js/seal/bridge-standard-schema/SKILL.md`; competing libs `zod-to-json-schema`, `ajv`, `@anatine/zod-openapi`.'
+---
+
+# JSON Schema generation
+
+Every seal validator exposes `toJsonSchema(target)`. The result is a plain object — pass it straight to OpenAI's `response_format`, an OpenAPI spec, a UI form builder, or anywhere else JSON Schema is the contract.
+
+```ts
+const userSchema = v.object({
+  email: v.string().email(),
+  age: v.int().min(13).optional(),
+});
+
+userSchema.toJsonSchema("draft-2020-12");
+// {
+//   type: "object",
+//   properties: {
+//     email: { type: "string", format: "email" },
+//     age: { type: "integer", minimum: 13 },
+//   },
+//   required: ["email"],
+//   additionalProperties: false,
+// }
+```
+
+## The four targets
+
+```ts
+type JsonSchemaTarget =
+  | "draft-2020-12"  // default — modern JSON Schema
+  | "draft-07"       // older tooling, Swagger 2.0
+  | "openapi-3.0"    // uses { nullable: true } instead of type unions
+  | "openai-strict"  // OpenAI Structured Outputs strict mode
+```
+
+Pick by consumer:
+
+| Consumer | Target |
+| --- | --- |
+| Modern tooling, no specific reason otherwise | `"draft-2020-12"` |
+| Swagger 2.0 / older OpenAPI / older form builders | `"draft-07"` |
+| OpenAPI 3.0 spec (uses `nullable: true`) | `"openapi-3.0"` |
+| OpenAI `response_format: { type: "json_schema", strict: true }` | `"openai-strict"` |
+
+## OpenAI structured outputs (`openai-strict`)
+
+This target encodes the quirks of OpenAI's strict mode:
+
+- **Every field listed in `required`** — strict mode forbids leaving fields out.
+- **Optional fields encoded as `type: ["T", "null"]`** instead of being omitted from `required`.
+- **`additionalProperties: false` on every object.**
+
+```ts
+const schema = v.object({
+  reply: v.string(),
+  citations: v.array(v.string()).optional(),
+});
+
+schema.toJsonSchema("openai-strict");
+// {
+//   type: "object",
+//   properties: {
+//     reply: { type: "string" },
+//     citations: { type: ["array", "null"], items: { type: "string" } },
+//   },
+//   required: ["reply", "citations"],   // every field listed
+//   additionalProperties: false,
+// }
+```
+
+Hand to OpenAI:
+
+```ts
+import OpenAI from "openai";
+
+const completion = await openai.chat.completions.create({
+  model: "gpt-4o",
+  messages: [...],
+  response_format: {
+    type: "json_schema",
+    json_schema: {
+      name: "user_reply",
+      strict: true,
+      schema: schema.toJsonSchema("openai-strict"),
+    },
+  },
+});
+```
+
+In `@warlock.js/ai`, this happens automatically when you set `output: schema` on a supervisor / agent — the runtime picks `openai-strict` for OpenAI providers. You only call `toJsonSchema()` directly when integrating with a non-warlock OpenAI usage.
+
+## OpenAPI 3.0 nullable
+
+```ts
+v.string().nullable().toJsonSchema("openapi-3.0");
+// { type: "string", nullable: true }
+
+v.string().nullable().toJsonSchema("draft-2020-12");
+// { type: ["string", "null"] }
+```
+
+OpenAPI 3.0 uses the boolean `nullable` keyword instead of a type union. Use this target when generating a `paths.openapi.yaml` consumed by Swagger UI or codegen tools.
+
+## What's representable
+
+Cleanly mapped:
+
+- `v.string()` — `{ type: "string" }` (with `format: email/url/uuid`, `pattern`, `minLength`, `maxLength`, `enum`)
+- `v.int()` / `v.float()` — `{ type: "integer" | "number" }` (with `minimum`, `maximum`, `multipleOf`)
+- `v.boolean()` — `{ type: "boolean" }`
+- `v.date()` — `{ type: "string", format: "date-time" | "date" | "time" }` (format derived from transformer if applicable)
+- `v.literal(values)` — `{ const: value }` (single) or `{ enum: [...] }` (multiple)
+- `v.array(item)` — `{ type: "array", items: ... }` (with `minItems`, `maxItems` from length rules; `.unique()`/`.sorted()` are runtime-only and not emitted)
+- `v.object({...})` — `{ type: "object", properties, required, additionalProperties }`
+- `v.union([...])` — `{ oneOf: [...] }`
+- `v.tuple([...])` — `{ type: "array", prefixItems: [...] }` (draft-2020-12) or `{ type: "array", items: [...] }` (draft-07)
+- `v.nullable()` — type union or `nullable: true` per target
+
+## What's silently dropped
+
+Some seal constructs have no JSON Schema representation:
+
+- **Cross-field rules** (`sameAs`, `requiredIf`, `requiredWith`, etc.) — runtime-only. The generated schema describes the *shape*, not the inter-field invariants.
+- **Transformers and mutators** — output reshaping doesn't appear in the schema; the schema reflects *post-mutator, pre-transformer* shape (since that's what rules see and what the LLM is asked to produce for `openai-strict`).
+- **`v.computed` / `v.managed`** — **skipped** entirely by the parent `v.object`; they never appear in `properties`. They aren't part of the data contract. (Calling `.toJsonSchema()` directly on one throws — the parent object is responsible for skipping them.)
+- **`v.instanceof(Ctor)`** — produces `{}`. Class identity isn't expressible. For `File`, attach `{ type: "string", format: "binary" }` manually after generation if needed for OpenAPI.
+- **`v.any()`** — produces `{}` deliberately (any value is valid).
+
+Boolean rules `accepted` / `declined` and similar coercion-style rules are also dropped — JSON Schema doesn't have a notion of "yes/no/on/off" beyond `enum`.
+
+## When the generated schema rejects valid data
+
+If the schema validator itself accepts data but the *generated* JSON Schema rejects the same data downstream, the cause is usually one of:
+
+- **Cross-field rule.** The generated schema doesn't enforce it, but a separate consumer might. (Or the runtime check fired at a different stage.)
+- **Transformer running on the wrong side.** The schema describes the input shape (or strict-mode normalized form). If your transformer reshapes `Date` to ISO string for `data`, the *input* still needs to be a Date-parseable thing.
+- **`openai-strict` quirk.** Optional fields show as `["T", "null"]` rather than omitted — if the model omits them entirely (without sending `null`), strict mode fails. The fix is on the prompt side: tell the model to send `null` for unused fields.
+
+## Cost note
+
+Generating JSON Schema is cheap (pure-function tree walk), so don't worry about caching the result for schemas that change at startup. For dynamic schemas built per-request, generate per-request — there's no shared mutable state.
+
+
+## handle-seal-errors  `@warlock.js/seal/handle-seal-errors/SKILL.md`
+
+---
+name: handle-seal-errors
+description: 'Read `ValidationResult` — `isValid`, `errors[]`, `data`. Branch on `error.type`, customize messages, hook translation. Triggers: `ValidationResult`, `ValidationError`, `validate`, `isValid`, `errors`, `data`, `error.type`, `error.input`, `error.error`, `translationParams`, `.attribute`, `SealConfig`; "how to read seal errors", "branch on a specific rule failure", "customize validation error message", "translate seal error", "surface validation errors as 422"; typical import `import { validate, v } from "@warlock.js/seal"`. Skip: modifiers — `@warlock.js/seal/compose-seal-modifiers/SKILL.md`; structural shapes — `@warlock.js/seal/define-structural-shape/SKILL.md`; competing libs `zod` `.safeParse`, `yup` `ValidationError`, `joi`.'
+---
+
+# `ValidationResult` — reading errors
+
+`validate(schema, data)` never throws. It returns a `ValidationResult`:
+
+```ts
+type ValidationResult = {
+  isValid: boolean;
+  data: any;             // shape after mutators + transformers (the validated value)
+  errors: ValidationError[];
+};
+
+type ValidationError = {
+  type: string;          // rule type that failed — "required", "email", "min", "string", ...
+  error: string;         // resolved message (translated, with attribute substitution)
+  input: string;         // input field name — "email" or "address.city"
+};
+```
+
+Branch on `isValid` first; reach for `errors[]` only when you need to act on a specific failure.
+
+## Basic flow
+
+```ts
+import { validate, v } from "@warlock.js/seal";
+
+const schema = v.object({
+  email: v.string().email(),
+  age: v.int().min(13).optional(),
+});
+
+const result = await validate(schema, input);
+
+if (result.isValid) {
+  return result.data;  // typed as the inferred shape (post-transformer)
+}
+
+return {
+  status: 422,
+  body: { errors: result.errors },
+};
+```
+
+## Branching on a specific rule
+
+```ts
+const result = await validate(schema, input);
+
+if (!result.isValid) {
+  const emailMissing = result.errors.find(
+    e => e.input === "email" && e.type === "required",
+  );
+  if (emailMissing) {
+    return { redirect: "/signup", reason: "no email" };
+  }
+
+  const ageInvalid = result.errors.find(
+    e => e.input === "age" && (e.type === "int" || e.type === "min"),
+  );
+  if (ageInvalid) {
+    return { error: "Age must be 13 or older" };
+  }
+}
+```
+
+The `type` field is the **stable** identifier — the message is human-facing and may be localized. Branch on `type`, never on the message string.
+
+## Common rule type names
+
+These are the strings you'll see in `error.type`:
+
+The `type` is the rule's own `name` field — not the method you called. Several methods map to one shared rule name (e.g. `.min()` / `.minLength()` on a string both surface as `minLength`; `.sameAs()` surfaces as `equalsField`). The table below lists the actual `type` strings:
+
+| Type | Produced by |
+| --- | --- |
+| `required`, `present` | `.required()`, `.present()` (note: `.optional()` has no error type — it clears the required rule) |
+| `requiredIf`, `requiredWith`, `requiredWithout`, `requiredUnless` | conditional required methods |
+| `string`, `number`, `int`, `float`, `boolean`, `scalar`, `object`, `array`, `date` | type guards from `matchesType` |
+| `minLength`, `maxLength`, `betweenLength`, `length` | string / array length rules (`.min`/`.max` on a string alias to `minLength`/`maxLength`) |
+| `min`, `max`, `betweenNumbers` | number range rules (`.min`/`.max`/`.between` on a number) |
+| `email`, `url`, `uuid`, `pattern`, `matches` | string format rules (`.pattern()` → `pattern`) |
+| `literal`, `enum`, `in`, `allowedValues`, `notAllowedValues` | value-membership rules (`.oneOf` aliases `in`; `.notIn`/`.forbids` → `notAllowedValues`; `.allowsOnly` → `allowedValues`) |
+| `instanceof` | `v.instanceof(Ctor)` |
+| `equalsField`, `notEqualsField` | cross-field equality (`.sameAs` → `equalsField`; `.differentFrom` → `notEqualsField`) |
+| `minDate`, `maxDate`, `beforeField`, `afterField`, `today`, `past`, `future`, `weekDay`, `weekend`, `businessDay`, `birthday` | date rules (`.min`/`.max` → `minDate`/`maxDate`; `.before`/`.after` → `beforeField`/`afterField`) |
+
+If you write custom rules, the `type` name you set on the rule object is what shows up here. Pick stable, kebab-or-camel-case names — they become a public API.
+
+## Customizing error messages
+
+Two layers:
+
+```ts
+v.string().email("Please enter a valid email address").required("Email is required");
+//                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                ^^^^^^^^^^^^^^^^
+//                per-rule override                                  per-rule override
+```
+
+Each chain method takes an optional `errorMessage` as its last argument. That overrides the rule's `defaultErrorMessage`. Use it when a single rule needs a tailored message in a specific schema.
+
+For project-wide message overrides, hook into the translation layer (the framework calls `resolveTranslation` with the rule context — wire up your own `t()` function via `SealConfig`).
+
+## Translation params
+
+Rules can stash dynamic substitution params on the context. The default messages reference them:
+
+```
+"The :input must be at least :min characters"
+```
+
+`:input` is the field name (or its translated display name); `:min` and others come from rule-specific metadata. If you need to render the message yourself in a custom UI, the params are available on the rule's context.
+
+For attribute display names ("email" → "Email Address"), use `.attributes({ email: "Email Address" })` on the parent `v.object` or pass via the `validate()` options. The `:input` placeholder picks up the configured display name.
+
+## When to throw
+
+Don't wrap `validate()` in try/catch for *validation* failures — those land in `result.errors`. The only thing that *throws* is a programming bug:
+
+- A rule's callback threw (e.g. you wrote `async validate() { throw new Error(...) }`).
+- A transformer threw on output.
+- A mutator threw on input.
+
+Those are bugs — fix them. Don't try/catch them in app code as a way to handle bad input.
+
+## At the framework boundary
+
+If you're surfacing seal errors through HTTP / RPC, the typical shape is:
+
+```ts
+if (!result.isValid) {
+  return reply.code(422).send({
+    error: "validation_failed",
+    fields: result.errors.map(e => ({
+      field: e.input,
+      type: e.type,
+      message: e.error,
+    })),
+  });
+}
+```
+
+Avoid leaking `result.data` back to the client when rejecting — it might contain transformed sensitive fields.
+
+For server-side logs, log `errors[]` with the field paths and rule types; redact values unless you're certain the field isn't sensitive. The `@warlock.js/logger` redaction layer is the right place to enforce that.
+
+
+## overview  `@warlock.js/seal/overview/SKILL.md`
+
+---
+name: overview
+description: 'Front-door orientation for `@warlock.js/seal` — framework-agnostic, type-safe validation. The `v` factory builds schemas, `validate(schema, data)` runs them, `Infer<typeof schema>` extracts the type. Primitives, structural shapes (object/array/record/tuple/union/discriminatedUnion/lazy), modifiers, mutators, a plugin system, JSON-Schema export, and a Standard Schema bridge. TRIGGER when: code imports `v`, `validate`, or `Infer` from `@warlock.js/seal`; user asks "what does @warlock.js/seal do", "validation library for Warlock", "compare seal with zod / yup / valibot", "infer a type from a schema", "JSON schema from a validator", "Standard Schema interop"; package.json adds `@warlock.js/seal`. Skip: specific task already known — load the matching task skill directly (`seal-basics`, `pick-seal-primitive`, `define-structural-shape`, `compose-seal-modifiers`, `handle-seal-errors`, `generate-json-schema`, `bridge-standard-schema`, `extend-seal-with-plugins`); framework-specific validators (FileValidator, database rules) live in `@warlock.js/core/v`, not here.'
+---
+
+# `@warlock.js/seal` — overview
+
+A type-safe, framework-agnostic validation library. You build a schema with the `v` factory, run it with `validate(schema, data)`, and pull the static type out with `Infer<typeof schema>`. One schema is the runtime check *and* the TypeScript type *and* (optionally) a JSON Schema.
+
+Standalone — no framework required. Ships built-in with `@warlock.js/core`, which adds framework-specific validators (file uploads, database existence/uniqueness rules) on top.
+
+## When to reach for it
+
+- You want a single source of truth for a shape — runtime validation, the TS type, and JSON Schema all from one declaration.
+- You'd reach for **zod** / **yup** / **valibot** but want the library the rest of Warlock already speaks (request validation, AI tool inputs, Cascade model schemas).
+- You need **JSON Schema output** for OpenAI structured outputs or an OpenAPI spec.
+
+Skip if you only need framework-bound validators (file uploads, DB rules) — those live in `@warlock.js/core/v`, which extends this package.
+
+## The mental model in one paragraph
+
+`v` is a builder: `v.string()`, `v.int()`, `v.object({...})`, `v.array(...)`, and so on, chained with modifiers (`.optional()`, `.nullable()`, `.default(...)`, `.min(...)`). `validate(schema, data)` returns a `ValidationResult` with `isValid`, `data` (the validated value), and `errors[]`. `Infer<typeof schema>` gives you the static type (with `Infer.Input` / `Infer.Output` distinguishing pre- and post-transform shapes). Because every schema implements Standard Schema, it slots into any `StandardSchemaV1<T>` consumer — and `schema.toJsonSchema(target)` emits JSON Schema for external tools.
+
+## Skills index
+
+Eight task skills. Most schemas only need `seal-basics` + `pick-seal-primitive` + `define-structural-shape`.
+
+### Foundations
+
+#### [`seal-basics/`](../seal-basics/SKILL.md)
+Start here. The `v` factory, `validate(schema, data)`, and `Infer<typeof schema>`.
+
+### Building schemas
+
+#### [`pick-seal-primitive/`](../pick-seal-primitive/SKILL.md)
+Choose the right primitive — `string` / `int` / `literal` / `date` / `enum` / `computed` / `managed` / `instanceof` / `any`. Covers the close calls (`string` vs `scalar`, `int` vs `number`, `literal` vs `enum`).
+
+#### [`define-structural-shape/`](../define-structural-shape/SKILL.md)
+Compose `v.object` / `v.array` / `v.record` / `v.tuple` / `v.union` / `v.discriminatedUnion` / `v.lazy` — object schemas, dynamic-keyed records, tagged unions, recursive shapes.
+
+#### [`compose-seal-modifiers/`](../compose-seal-modifiers/SKILL.md)
+Cross-cutting modifiers — `.optional` / `.nullable` / `.default` / `.catch` / `.omit` / membership rules — plus the mutator-vs-transformer pipeline and `Infer.Input` vs `Infer.Output`.
+
+### Output + interop
+
+#### [`handle-seal-errors/`](../handle-seal-errors/SKILL.md)
+Read a `ValidationResult` — `isValid`, `errors[]`, `data`. Branch on `error.type`, customize messages, hook translation.
+
+#### [`generate-json-schema/`](../generate-json-schema/SKILL.md)
+`schema.toJsonSchema(target)` — draft-2020-12 / draft-07 / openapi-3.0 / openai-strict. For OpenAI structured outputs, OpenAPI specs, any JSON-Schema consumer.
+
+#### [`bridge-standard-schema/`](../bridge-standard-schema/SKILL.md)
+Standard Schema interop — why a `StandardSchemaV1<T>` slot might reject a schema, the phantom-intersection at the `v` factory return, Cascade `Model<TSchema>` variance. For migrating off `as unknown as` casts.
+
+#### [`extend-seal-with-plugins/`](../extend-seal-with-plugins/SKILL.md)
+Author a plugin to add validator methods (`.slug`, `.postalCode`, …) — the `SealPlugin` shape, `registerPlugin` lifecycle, TS prototype augmentation.
+
+## Configuration
+
+`configureSeal({ ... })` sets global behavior (translation hooks, first-error-only mode); `getSealConfig()` reads it; `resetSealConfig()` clears it. Most apps call `configureSeal` once at boot to wire i18n.
+
+## What this package deliberately doesn't do
+
+- **Framework-bound validation.** File-upload and database (exists/unique) rules live in `@warlock.js/core/v`, which builds on this package.
+- **Coercion by default.** Seal validates the shape you declare; reshaping is explicit via mutators/transformers, not silent coercion.
+- **Async-everywhere.** `validate()` is async to support rules that need it, but the core primitives are synchronous checks.
+
+## See also
+
+- [`@warlock.js/cascade`](../../cascade/skills/overview/SKILL.md) — uses seal schemas as `Model.schema`.
+- [`@warlock.js/core`](../../core/skills/overview/SKILL.md) — re-exports `v` (aliased) and adds framework validators in `core/v`.
+- [`mongez-agent-kit-authoring-skills`](../../../../domains/shared/skills/) (load via agent-kit sync) — how this becomes `.claude/skills/warlock-js-seal-overview/`.
+
+
+## pick-seal-primitive  `@warlock.js/seal/pick-seal-primitive/SKILL.md`
+
+---
+name: pick-seal-primitive
+description: 'Pick the right `v` factory primitive — string / int / literal / date / enum / computed / managed / instanceof / any. Triggers: `v.string`, `v.email`, `v.number`, `v.int`, `v.float`, `v.numeric`, `v.boolean`, `v.scalar`, `v.date`, `v.literal`, `v.enum`, `v.instanceof`, `v.computed`, `v.managed`, `v.any`; "v.string vs v.scalar", "v.literal vs v.enum", "v.date vs v.instanceof(Date)", "what is v.computed"; typical import `import { v } from "@warlock.js/seal"`. Skip: structural shapes — `@warlock.js/seal/define-structural-shape/SKILL.md`; modifiers — `@warlock.js/seal/compose-seal-modifiers/SKILL.md`; competing libs `zod`, `valibot`, `yup`.'
+---
+
+# Picking the right primitive
+
+This is the orientation skill — *which* primitive for *which* job. For the chainable methods on each (`.email()`, `.min()`, `.between()`, etc.), load the matching `*-methods.md` reference file in this skill folder.
+
+## Strings
+
+```ts
+v.string()              // type: string — full surface in string-methods.md
+v.email()               // shorthand for v.string().email()
+v.enum(["a", "b"])      // type: "a" | "b" — runs as v.string().oneOf, but the factory overload preserves the literal union
+```
+
+Reach for `v.string()` for any text input. `v.email()` is just sugar — switch back to `v.string().email().min(...)` when you need extra rules.
+
+## Numbers — pick by what you accept
+
+| Validator | Accepts | When |
+|---|---|---|
+| `v.number()` | any finite number | accepts both integers and floats |
+| `v.int()` | integers only | rejects `1.5` |
+| `v.float()` | finite, non-integer | rejects `1` |
+| `v.numeric()` | numeric strings + numbers | form/query inputs that arrive as `"42"` — coerces to number |
+
+All four share the same chain surface (see [`number-methods.md`](./number-methods.md)). Picking is about input acceptance, not chain power.
+
+## Booleans & scalars
+
+```ts
+v.boolean()  // type: boolean — adds .accepted() / .declined() for form-style inputs
+v.scalar()   // type: string | number | boolean — usually a smell pointing at a missing discriminator
+```
+
+Use `v.scalar()` only when the field truly accepts any of the three primitives. If it's "one of N specific values across types", `v.literal(...)` is cleaner.
+
+## Dates
+
+```ts
+v.date()                  // type: Date — normalizes strings/timestamps to Date, rich rule surface
+v.instanceof(Date)        // type: Date — raw instanceof, no normalization, no rules
+```
+
+`v.date()` is the right tool 99% of the time — it ships `.min/.max/.before/.after/.weekDay/.minAge/...` and a built-in mutator that parses strings. `v.instanceof(Date)` is the escape hatch when you specifically need strict instance identity with zero coercion.
+
+## Literals & instances
+
+```ts
+v.literal("items")                          // type: "items"
+v.literal("draft", "published", "archived") // type: "draft" | "published" | "archived"
+v.literal(1, 2, 3)                          // type: 1 | 2 | 3
+v.literal(true)                             // type: true
+
+v.instanceof(File)                          // type: File
+v.instanceof(Buffer)                        // type: Buffer
+v.instanceof(MyClass)                       // type: MyClass
+```
+
+**`v.literal` vs `v.string().oneOf([...])` vs `v.enum([...])`:**
+
+- `v.literal("a", "b")` infers as `"a" | "b"` (literal narrowing). **Use this for discriminator fields.**
+- `v.string().oneOf(["a", "b"])` infers as `string` (loses literal types). Use when broad type is fine.
+- `v.enum(["a", "b"])` runs the same `oneOf` rule at runtime (it builds a `StringValidator().oneOf(...)`), but the `v.enum` factory overload **preserves the literal union** — it infers `"a" | "b"`, not `string`. Pass a TS enum object (`v.enum(Direction)`) and it uses `Object.values`, inferring `Direction[keyof Direction]`.
+
+`v.instanceof(Ctor)` for File/Buffer/Uint8Array/custom classes. Returns `{}` from `toJsonSchema()` (not representable). For OpenAPI `File`, attach `{ type: "string", format: "binary" }` manually after generation.
+
+## `v.any` — escape hatch
+
+```ts
+v.any()  // type: any — skips validation entirely
+```
+
+Reach for it when you genuinely don't care about the shape. Usually a smell — search PRs for it and ask whether a real schema would catch a class of bugs.
+
+## Derived: `v.computed` and `v.managed`
+
+These two **don't validate input** — they produce a value as part of validation.
+
+```ts
+v.object({
+  firstName: v.string(),
+  lastName: v.string(),
+  fullName: v.computed<string>((data) => `${data.firstName} ${data.lastName}`),
+  createdAt: v.managed<Date>(() => new Date()),
+  createdBy: v.managed<string>((context) => context.context?.userId),
+});
+```
+
+- **`v.computed`** runs after sibling validation; callback signature is `(data, context)` — `data` is the validated sibling object. Use for derived values (full name, hash of fields, computed totals). An optional second arg validates the result: `v.computed<string>(cb, v.string().min(3))`.
+- **`v.managed`** runs from `SchemaContext` only — callback signature is `(context)`. Caller-supplied extras passed to `validate(schema, data, { context })` land on `context.context`. Use for framework-injected values — timestamps, current user, request id. The callback is optional (`v.managed()`) for values the framework injects without a generator.
+
+Both are **skipped** when their parent `v.object` generates JSON Schema — they never appear in `properties`, since they're runtime-only and not part of the JSON contract an LLM or external API consumer reads. Calling `.toJsonSchema()` *directly* on a `v.computed` / `v.managed` validator **throws** (it's a programming error — let the parent object skip them).
+
+## Quick map — "I need to validate…"
+
+| Need | Reach for |
+|---|---|
+| Email | `v.string().email()` or `v.email()` |
+| URL | `v.string().url()` |
+| UUID | `v.string().uuid()` (see [`string-methods.md`](./string-methods.md)) |
+| Number 0–100 | `v.number().between(0, 100)` |
+| Positive integer | `v.int().positive()` |
+| One of N constants | `v.literal(...values)` |
+| One of TS enum values | `v.enum(MyEnum)` |
+| Date in the past | `v.date().past()` |
+| File upload | `v.instanceof(File)` |
+| Class instance (not Date) | `v.instanceof(Ctor)` |
+| Discriminated union | see [`@warlock.js/seal/define-structural-shape/SKILL.md`](@warlock.js/seal/define-structural-shape/SKILL.md) |
+| Derived value (computed from siblings) | `v.computed<T>(callback)` |
+| Framework-injected value | `v.managed<T>(callback)` |
+| Free-form / pass-through | `v.any()` (only when you've thought about it) |
+
+## Method-surface reference
+
+Each primitive's full method list lives in a sibling file:
+
+- [`string-methods.md`](./string-methods.md) — `.email` / `.url` / `.uuid` / `.pattern` / `.startsWith` / `.alpha` / `.trim` / `.slug` / `.mask` / `.base64Encode` / …
+- [`number-methods.md`](./number-methods.md) — `.min` / `.max` / `.between` / `.greaterThan` / `.positive` / `.even` / `.multipleOf` / `.minSibling` / `.round` / …
+- [`date-methods.md`](./date-methods.md) — `.min` / `.before` / `.after` / `.today` / `.past` / `.future` / `.weekDay` / `.minAge` / `.year` / `.quarter` / `.toISOString` / …
+- [`boolean-methods.md`](./boolean-methods.md) — `.accepted` / `.declined` / `.mustBeTrue` / `.mustBeFalse` / `.acceptedIf` / `.declinedWithout` / …
+
+For cross-cutting modifiers (`.optional`/`.nullable`/`.default`/`.catch`/`.in`/`.oneOf`), see [`@warlock.js/seal/compose-seal-modifiers/SKILL.md`](@warlock.js/seal/compose-seal-modifiers/SKILL.md). For containers (object/array/record/tuple/union), see [`@warlock.js/seal/define-structural-shape/SKILL.md`](@warlock.js/seal/define-structural-shape/SKILL.md).
+
+## Things NOT to do
+
+- Don't `new ObjectValidator()` (or any class) directly — factory returns carry the StandardSchema bridge that bare instantiation loses.
+- Don't pick `v.scalar` because "it's flexible". Flexibility at this layer usually means a missing discriminator — try `v.literal` or `v.union` first.
+- Don't reach for `v.instanceof(Date)` when `v.date()` works. The latter is purpose-built.
+- Don't use `v.string().oneOf(["a", "b"])` for discriminator fields where you need the literal type — use `v.literal("a", "b")`.
+- Don't expect `v.computed` / `v.managed` to validate input — they ignore input shape entirely. Reach for them only when *producing* a value.
+
+
+### pick-seal-primitive/boolean-methods.md  `@warlock.js/seal/pick-seal-primitive/boolean-methods.md`
+
+# `v.boolean()` — method reference
+
+Picking guide is in [`@warlock.js/seal/pick-seal-primitive/SKILL.md`](@warlock.js/seal/pick-seal-primitive/SKILL.md). Membership rules (`.in`/`.oneOf`) inherited from PrimitiveValidator — see [`@warlock.js/seal/compose-seal-modifiers/SKILL.md`](@warlock.js/seal/compose-seal-modifiers/SKILL.md).
+
+## Strict equality
+
+| Method | Effect |
+|---|---|
+| `.mustBeTrue(msg?)` | strictly `=== true` (rejects `"yes"`, `1`, `"on"`) |
+| `.mustBeFalse(msg?)` | strictly `=== false` |
+
+Use these when the field is a real boolean checkbox value — e.g. "agree to terms" must be exactly `true`, not a truthy string.
+
+## Form-style coercion — `accepted` / `declined`
+
+The "accepted" rules treat `true`, `"yes"`, `"on"`, `1`, `"1"`, `"true"` as accepted. "Declined" treats their counterparts (`false`, `"no"`, `"off"`, `0`, etc.) as declined. Designed for form inputs where a checkbox/radio arrives as a string.
+
+| Method | Effect |
+|---|---|
+| `.accepted(msg?)` | value must be accepted |
+| `.declined(msg?)` | value must be declined |
+
+## Conditional variants — accepted
+
+| Method | Args | Effect |
+|---|---|---|
+| `.acceptedIf(field, value, msg?)` | sibling field equals value | must be accepted in that case |
+| `.acceptedUnless(field, value, msg?)` | sibling field equals value | must be accepted unless that's true |
+| `.acceptedIfRequired(field, msg?)` | sibling field is required | — |
+| `.acceptedIfPresent(field, msg?)` | sibling field is present | — |
+| `.acceptedWithout(field, msg?)` | sibling field is absent | — |
+
+## Conditional variants — declined
+
+| Method | Args | Effect |
+|---|---|---|
+| `.declinedIf(field, value, msg?)` | sibling field equals value | must be declined in that case |
+| `.declinedUnless(field, value, msg?)` | sibling field equals value | must be declined unless that's true |
+| `.declinedIfRequired(field, msg?)` | — | — |
+| `.declinedIfPresent(field, msg?)` | — | — |
+| `.declinedWithout(field, msg?)` | — | — |
+
+All conditional variants only run inside `v.object` — sibling resolution silently passes otherwise.
+
+## JSON Schema mapping
+
+- `v.boolean()` → `{ type: "boolean" }`
+- `.mustBeTrue()` / `.mustBeFalse()` — not currently emitted (could add `const: true/false` in the future)
+- `.accepted()` / `.declined()` and their conditional variants — runtime coercion concerns, not representable
+
+## Common chains
+
+```ts
+// Strict consent checkbox
+v.boolean().mustBeTrue("You must accept the terms")
+
+// Form-style "remember me" — accepts "on" / true / 1
+v.boolean().accepted().optional()
+
+// Cross-field — newsletter must be accepted if subscriptionType = "premium"
+v.object({
+  subscriptionType: v.string().oneOf(["free", "premium"]),
+  newsletter: v.boolean().acceptedIf("subscriptionType", "premium"),
+})
+
+// Marketing opt-in — declined unless region is GDPR-exempt
+v.object({
+  region: v.string(),
+  marketingOptIn: v.boolean().declinedUnless("region", "US"),
+})
+```
+
+
+### pick-seal-primitive/date-methods.md  `@warlock.js/seal/pick-seal-primitive/date-methods.md`
+
+# `v.date()` — method reference
+
+`v.date()` ships a built-in mutator that normalizes strings, timestamps, and `Date` objects to a `Date` before rules run. Picking guide (`v.date()` vs `v.instanceof(Date)`) is in [`@warlock.js/seal/pick-seal-primitive/SKILL.md`](@warlock.js/seal/pick-seal-primitive/SKILL.md).
+
+## Range — global value comparison
+
+| Method | Args | Example |
+|---|---|---|
+| `.min(dateOrField, msg?)` | inclusive `>=` | `v.date().min("2024-01-01")` or `v.date().min(new Date())` |
+| `.max(dateOrField, msg?)` | inclusive `<=` | `v.date().max(new Date())` |
+| `.before(dateOrField, msg?)` | strict `<` | `v.date().before(new Date())` |
+| `.after(dateOrField, msg?)` | strict `>` | `v.date().after(new Date())` |
+| `.between(start, end, msg?)` | inclusive range | `v.date().between(start, end)` |
+
+Smart detection: a string with `-` or `/` is a date string; a plain string is a sibling field name.
+
+## Range — explicit sibling scope
+
+| Method | Effect |
+|---|---|
+| `.minSibling(field, msg?)` | `>=` sibling field |
+| `.maxSibling(field, msg?)` | `<=` sibling field |
+| `.beforeSibling(field, msg?)` | `<` sibling field |
+| `.afterSibling(field, msg?)` | `>` sibling field |
+| `.sameAsField(field, msg?)` | `===` sibling field |
+| `.sameAsFieldSibling(field, msg?)` | `===` sibling field (explicit scope) |
+
+Only run inside `v.object`. Not representable in JSON Schema.
+
+## Today / past / future
+
+| Method | Effect |
+|---|---|
+| `.today(msg?)` | exactly today |
+| `.fromToday(msg?)` | today or future |
+| `.beforeToday(msg?)` | strictly before today |
+| `.afterToday(msg?)` | strictly after today |
+| `.past(msg?)` | any past date |
+| `.future(msg?)` | any future date |
+
+## Relative window
+
+| Method | Args | Effect |
+|---|---|---|
+| `.withinDays(n, msg?)` | within N days past or future | — |
+| `.withinPastDays(n, msg?)` | within N days in the past | — |
+| `.withinFutureDays(n, msg?)` | within N days in the future | — |
+
+## Age
+
+| Method | Args | Effect |
+|---|---|---|
+| `.age(years, msg?)` | exactly N years old |
+| `.minAge(years, msg?)` | at least N years old |
+| `.maxAge(years, msg?)` | at most N years old |
+| `.betweenAge(min, max, msg?)` | between min/max years |
+| `.birthday(minAge?, maxAge?, msg?)` | not in future, optional age range |
+
+## Weekday / weekend / business day
+
+| Method | Args | Effect |
+|---|---|---|
+| `.weekDay(day, msg?)` | day = `"monday"` … `"sunday"` |
+| `.weekdays(days, msg?)` | array of weekdays |
+| `.weekend(msg?)` | Saturday or Sunday |
+| `.businessDay(msg?)` | Monday – Friday |
+
+## Period — month / year / quarter
+
+| Method | Args | Effect |
+|---|---|---|
+| `.month(m, msg?)` | `m` = 1–12 (or `Month` enum) |
+| `.year(y, msg?)` | exact year |
+| `.quarter(q, msg?)` | `q` = 1–4 |
+| `.leapYear(msg?)` | year is a leap year |
+| `.minYear(yearOrField, msg?)` | year `>=` |
+| `.maxYear(yearOrField, msg?)` | year `<=` |
+| `.minMonth(mOrField, msg?)` | month `>=` |
+| `.maxMonth(mOrField, msg?)` | month `<=` |
+| `.minDay(dOrField, msg?)` | day-of-month `>=` |
+| `.maxDay(dOrField, msg?)` | day-of-month `<=` |
+| `.betweenYears(start, end, msg?)` | inclusive year range |
+| `.betweenMonths(start, end, msg?)` | inclusive month range |
+| `.betweenDays(start, end, msg?)` | inclusive day-of-month range |
+
+Each `min*` / `max*` / `between*` accepts a sibling field name. Sibling-explicit variants exist: `.minYearSibling`, `.maxYearSibling`, `.minMonthSibling`, `.maxMonthSibling`, `.minDaySibling`, `.maxDaySibling`, `.betweenYearsSibling`, `.betweenMonthsSibling`, `.betweenDaysSibling`.
+
+## Time — hour / minute
+
+| Method | Args | Effect |
+|---|---|---|
+| `.fromHour(h, msg?)` | h = 0–23, time `>= h:00` |
+| `.beforeHour(h, msg?)` | time `< h:00` |
+| `.betweenHours(start, end, msg?)` | inclusive hour range |
+| `.fromMinute(m, msg?)` | m = 0–59 |
+| `.beforeMinute(m, msg?)` | — |
+| `.betweenMinutes(start, end, msg?)` | inclusive minute range |
+| `.betweenTimes(start, end, msg?)` | "HH:MM" strings |
+
+## Format
+
+| Method | Args | Effect |
+|---|---|---|
+| `.format(fmt, msg?)` | dayjs format string | input must match the format |
+
+## Mutators (pre-validation reshape)
+
+| Method | Effect |
+|---|---|
+| `.toStartOfDay()` | 00:00:00.000 |
+| `.toEndOfDay()` | 23:59:59.999 |
+| `.toStartOfMonth()` | first day of month |
+| `.toEndOfMonth()` | last day of month |
+| `.toStartOfYear()` | January 1st |
+| `.toEndOfYear()` | December 31st |
+| `.addDays(n)` | shift by N days (negative = back) |
+| `.addMonths(n)` | shift by N months |
+| `.addYears(n)` | shift by N years |
+| `.addHours(n)` | shift by N hours |
+| `.toUTC()` | normalize to UTC |
+
+Mutators run *before* rules. `v.date().addDays(7).future()` checks whether the shifted date is in the future.
+
+## Transformers (post-validation, reshape `data`)
+
+| Method | Args | Effect |
+|---|---|---|
+| `.toISOString()` | — | `Date` → `"2026-01-15T00:00:00.000Z"` |
+| `.toTimestamp()` | — | `Date` → number (ms since epoch) |
+| `.toFormat(fmt)` | dayjs format string | `Date` → formatted string |
+| `.toDateOnly()` | — | `"YYYY-MM-DD"` |
+| `.toTimeOnly()` | — | `"HH:mm:ss"` |
+
+Transformers shape the *output*. `Infer<>` still resolves to `Date` even if a transformer changes the runtime shape — `Infer` reads the validator type, not the transformer pipeline.
+
+## Defaults
+
+| Method | Effect |
+|---|---|
+| `.defaultNow()` | shorthand for `.default(() => new Date())` |
+
+## JSON Schema mapping
+
+- `v.date()` → `{ type: "string", format: "date-time" }` by default
+- After `.toDateOnly()` or `.format("YYYY-MM-DD")` → `{ type: "string", format: "date" }`
+- After `.toTimeOnly()` or `.format("HH:mm:ss")` → `{ type: "string", format: "time" }`
+- Sibling-scoped rules and most relative checks are not representable — silently omitted
+
+## Common chains
+
+```ts
+// Birthday — must be 13+ and in the past
+v.date().past().minAge(13)
+
+// Reservation — future, business day, between hours
+v.date().future().businessDay().betweenHours(9, 17)
+
+// Effective date range (cross-field)
+v.object({
+  startsAt: v.date(),
+  endsAt: v.date().afterSibling("startsAt"),
+})
+
+// API response — emit ISO string
+v.date().toISOString()
+
+// Event window — within 30 future days, normalized to UTC
+v.date().toUTC().withinFutureDays(30)
+
+// Quarterly report
+v.date().quarter(1).year(2026)
+
+// Date-only, end-of-day for inclusive comparisons
+v.date().toEndOfDay().toDateOnly()
+```
+
+
+### pick-seal-primitive/number-methods.md  `@warlock.js/seal/pick-seal-primitive/number-methods.md`
+
+# `v.number()` / `v.int()` / `v.float()` / `v.numeric()` — method reference
+
+All four share this surface. The picking guide (which factory to call) is in [`@warlock.js/seal/pick-seal-primitive/SKILL.md`](@warlock.js/seal/pick-seal-primitive/SKILL.md). For `.optional()` / `.in()` / `.oneOf()`, see [`@warlock.js/seal/compose-seal-modifiers/SKILL.md`](@warlock.js/seal/compose-seal-modifiers/SKILL.md).
+
+## Range — global value comparison
+
+| Method | Args | JSON Schema | Example |
+|---|---|---|---|
+| `.min(n, msg?)` | inclusive lower bound | `minimum: n` | `v.int().min(0)` |
+| `.max(n, msg?)` | inclusive upper bound | `maximum: n` | `v.int().max(100)` |
+| `.between(a, b, msg?)` | inclusive range | `minimum: a, maximum: b` | `v.number().between(0, 1)` |
+| `.greaterThan(n, msg?)` | strict `>` | `exclusiveMinimum: n` | `v.int().greaterThan(0)` |
+| `.gt(n, msg?)` | alias for `.greaterThan` | `exclusiveMinimum: n` | — |
+| `.lessThan(n, msg?)` | strict `<` | `exclusiveMaximum: n` | `v.int().lessThan(100)` |
+| `.lt(n, msg?)` | alias for `.lessThan` | `exclusiveMaximum: n` | — |
+
+`.min` / `.max` / `.between` / `.greaterThan` / `.lessThan` accept a **string** as the value — interpreted as a sibling field name (smart detection):
+
+```ts
+v.object({
+  minPrice: v.int(),
+  maxPrice: v.int().min("minPrice"),  // maxPrice >= minPrice
+})
+```
+
+Sibling references are **not representable in JSON Schema** — silently omitted from generated output.
+
+## Range — explicit sibling scope
+
+For when smart detection is ambiguous (e.g. a numeric string that happens to match a field name):
+
+| Method | Effect |
+|---|---|
+| `.minSibling(field, msg?)` | value `>=` sibling field |
+| `.maxSibling(field, msg?)` | value `<=` sibling field |
+| `.greaterThanSibling(field, msg?)` | value `>` sibling field |
+| `.gtSibling(field, msg?)` | alias |
+| `.lessThanSibling(field, msg?)` | value `<` sibling field |
+| `.ltSibling(field, msg?)` | alias |
+| `.betweenSibling(minField, maxField, msg?)` | between two sibling fields |
+
+These **only run inside `v.object`** — sibling resolution silently passes otherwise.
+
+## Sign & parity
+
+| Method | Effect | Example |
+|---|---|---|
+| `.positive(msg?)` | value `> 0` | `v.int().positive()` |
+| `.negative(msg?)` | value `< 0` | `v.int().negative()` |
+| `.odd(msg?)` | value is odd | `v.int().odd()` |
+| `.even(msg?)` | value is even | `v.int().even()` |
+
+## Divisibility / modulo
+
+| Method | Effect | JSON Schema |
+|---|---|---|
+| `.modulo(n, msg?)` | value `% n === 0` | `multipleOf: n` |
+| `.divisibleBy(n, msg?)` | alias | `multipleOf: n` |
+| `.multipleOf(n, msg?)` | alias | `multipleOf: n` |
+| `.modulusOf(n, msg?)` | alias | `multipleOf: n` |
+
+## String-form length (rare)
+
+When the numeric value is a fixed-format code (PINs, IDs):
+
+| Method | Effect |
+|---|---|
+| `.length(n, msg?)` | string-rep length must be exactly `n` |
+| `.minLength(n, msg?)` | string-rep length `>= n` |
+| `.maxLength(n, msg?)` | string-rep length `<= n` |
+
+For most numeric-shaped IDs you'd use `v.string().length(n).numeric()` instead — let the value be a string.
+
+## Mutators (pre-validation reshape)
+
+| Method | Args | Effect |
+|---|---|---|
+| `.abs()` | — | `Math.abs(value)` |
+| `.ceil()` | — | round up to integer |
+| `.floor()` | — | round down to integer |
+| `.round(decimals?)` | default 0 | round to N decimals |
+| `.toFixed(decimals?)` | default 2 | format as fixed-point |
+
+These run *before* validation rules. If you mutate `1.6` with `.ceil()`, `v.int()` sees `2` and passes. Use mutators when the input arrives in a slightly wrong form and you want to coerce, not reject.
+
+## JSON Schema notes
+
+- `v.number()` → `{ type: "number" }`
+- `v.int()` → `{ type: "integer" }`
+- `v.float()` → `{ type: "number" }` (no JSON Schema distinction from `number`)
+- `v.numeric()` → `{ type: "number" }` (input coercion is a runtime concern)
+- `exclusiveMinimum` / `exclusiveMaximum` are encoded as numbers in `draft-2020-12` and `openapi-3.0`, but as boolean flags + `minimum`/`maximum` in `draft-07`.
+
+## Common chains
+
+```ts
+// Age
+v.int().min(0).max(150)
+
+// Price (cents)
+v.int().min(0)
+
+// Probability
+v.number().between(0, 1)
+
+// Even page index
+v.int().min(0).even()
+
+// Quantity divisible by box size
+v.int().min(1).multipleOf(12)
+
+// Coerced from form input
+v.numeric().min(0).max(100)
+
+// Cross-field range
+v.object({
+  startYear: v.int(),
+  endYear: v.int().minSibling("startYear"),
+})
+
+// Optional with default
+v.int().min(0).default(0).optional()
+```
+
+
+### pick-seal-primitive/string-methods.md  `@warlock.js/seal/pick-seal-primitive/string-methods.md`
+
+# `v.string()` — method reference
+
+Reference for `v.string()` / `v.email()`. Covers length, format, content, color, mutators (case, trim, mask, slug, base64, …) and what each maps to in JSON Schema.
+
+For the picking guide (`v.string` vs `v.scalar` vs `v.literal`), see [`@warlock.js/seal/pick-seal-primitive/SKILL.md`](@warlock.js/seal/pick-seal-primitive/SKILL.md). For `.optional()` / `.nullable()` / `.default()` / `.in()` / `.oneOf()`, see [`@warlock.js/seal/compose-seal-modifiers/SKILL.md`](@warlock.js/seal/compose-seal-modifiers/SKILL.md).
+
+## Length
+
+| Method | Args | JSON Schema | Example |
+|---|---|---|---|
+| `.min(n, msg?)` | min length, inclusive | `minLength: n` | `v.string().min(3)` |
+| `.minLength(n, msg?)` | alias for `.min()` | `minLength: n` | `v.string().minLength(3)` |
+| `.max(n, msg?)` | max length, inclusive | `maxLength: n` | `v.string().max(120)` |
+| `.maxLength(n, msg?)` | alias for `.max()` | `maxLength: n` | `v.string().maxLength(120)` |
+| `.length(n, msg?)` | exact length | `minLength=maxLength=n` | `v.string().length(10)` |
+| `.lengthBetween(a, b, msg?)` | min and max length | `minLength: a, maxLength: b` | `v.string().lengthBetween(5, 30)` |
+
+## Format
+
+| Method | Pattern | JSON Schema | Example |
+|---|---|---|---|
+| `.email(msg?)` | RFC-flavored regex | `format: "email"` | `v.string().email()` |
+| `.url(msg?)` | http/https URL | `format: "uri"` | `v.string().url()` |
+| `.pattern(re, msg?)` | custom regex | `pattern: re.source` | `v.string().pattern(/^[A-Z]/)` |
+| `.alpha(msg?)` | letters only | — | `v.string().alpha()` |
+| `.alphanumeric(msg?)` | letters + digits | — | `v.string().alphanumeric()` |
+| `.numeric(msg?)` | digits only (string) | — | `v.string().numeric()` |
+| `.withoutWhitespace(msg?)` | no spaces/tabs/newlines | — | `v.string().withoutWhitespace()` |
+| `.creditCard(msg?)` | credit-card-shaped | — | `v.string().creditCard()` |
+| `.ip(msg?)` | IPv4 or IPv6 | `format: "ipv4"` | `v.string().ip()` |
+| `.ip4(msg?)` | IPv4 only | `format: "ipv4"` | `v.string().ip4()` |
+| `.ip6(msg?)` | IPv6 only | `format: "ipv6"` | `v.string().ip6()` |
+| `.strongPassword(minLen?, msg?)` | 8+ chars, upper+lower+digit+symbol | — | `v.string().strongPassword(12)` |
+
+## ID formats
+
+| Method | Args | JSON Schema | Example |
+|---|---|---|---|
+| `.uuid(version?, msg?)` | UUID, any version or restrict to 1/3/4/5/6/7 | `format: "uuid"` | `v.string().uuid(4)` |
+| `.cuid({ version?: 1\|2 }?)` | CUID2 default (24 chars, lowercase); v1 legacy | `pattern: …` | `v.string().cuid()` |
+| `.ulid(msg?)` | 26 chars, Crockford base32 (no I/L/O/U) | `pattern: …` | `v.string().ulid()` |
+| `.nanoid(length?, msg?)` | URL-safe alphabet, default length 21 | `pattern: …` | `v.string().nanoid(21)` |
+
+UUID validation is RFC 4122 strict — the variant nibble (8/9/a/b at position 17) is checked, so "looks-like-UUID-but-not-valid" inputs are rejected. CUID defaults to **CUID2** since CUID1 is deprecated by its original author; pass `{ version: 1 }` only for legacy data. nanoid's alphabet is fixed (`A-Za-z0-9_-`) — for custom alphabets use `.pattern()` directly.
+
+## Word count
+
+| Method | Args | Example |
+|---|---|---|
+| `.words(n, msg?)` | exact word count | `v.string().words(5)` |
+| `.minWords(n, msg?)` | min words | `v.string().minWords(3)` |
+| `.maxWords(n, msg?)` | max words | `v.string().maxWords(50)` |
+
+## Content
+
+| Method | Args | Example |
+|---|---|---|
+| `.startsWith(s, msg?)` | prefix check | `v.string().startsWith("https://")` |
+| `.endsWith(s, msg?)` | suffix check | `v.string().endsWith(".pdf")` |
+| `.contains(s, msg?)` | substring check | `v.string().contains("@")` |
+| `.notContains(s, msg?)` | inverse substring | `v.string().notContains("javascript:")` |
+
+## Color
+
+| Method | Accepts | Example |
+|---|---|---|
+| `.color(msg?)` | any valid CSS color | `v.string().color()` |
+| `.hexColor(msg?)` | `#rgb`, `#rrggbb` | `v.string().hexColor()` |
+| `.rgbColor(msg?)` | `rgb(r,g,b)` | — |
+| `.rgbaColor(msg?)` | `rgba(r,g,b,a)` | — |
+| `.hslColor(msg?)` | `hsl(h,s,l)` | — |
+| `.lightColor(msg?)` | luminance-based | — |
+| `.darkColor(msg?)` | luminance-based | — |
+
+JSON Schema: `format: "color"` for `.hexColor()`; the others map to `format: "color"` only via `.hexColor()` — for OpenAPI consumers expecting strict format, prefer `.hexColor()`.
+
+## Case mutators (pre-validation)
+
+| Method | Effect | Example |
+|---|---|---|
+| `.uppercase()` | "Hello" → "HELLO" | `v.string().uppercase()` |
+| `.lowercase()` | "Hello" → "hello" | — |
+| `.capitalize()` | "hello world" → "Hello world" | — |
+| `.titleCase()` | "hello world" → "Hello World" | — |
+| `.camelCase()` | "hello world" → "helloWorld" | — |
+| `.pascalCase()` | "hello world" → "HelloWorld" | — |
+| `.snakeCase()` | "hello world" → "hello_world" | — |
+| `.kebabCase()` | "hello world" → "hello-world" | — |
+
+## Trim & whitespace mutators
+
+| Method | Args | Effect |
+|---|---|---|
+| `.trim(needle?)` | default = space | trim both ends |
+| `.ltrim(needle?)` | — | trim left only |
+| `.rtrim(needle?)` | — | trim right only |
+| `.trimMultipleWhitespace()` | — | "a   b" → "a b" |
+| `.padStart(len, char?)` | char default = " " | left-pad to length |
+| `.padEnd(len, char?)` | char default = " " | right-pad to length |
+
+## Replace, append, modify mutators
+
+| Method | Args | Example |
+|---|---|---|
+| `.replace(search, replace)` | string or RegExp + string | — |
+| `.replaceAll(search, replace)` | string or RegExp + string | — |
+| `.append(suffix)` | string | "foo" → "foobar" via `.append("bar")` |
+| `.prepend(prefix)` | string | "foo" → "barfoo" via `.prepend("bar")` |
+| `.reverse()` | — | "abc" → "cba" |
+| `.repeat(count)` | number | "ab" → "ababab" via `.repeat(3)` |
+| `.truncate(maxLen, suffix?)` | suffix default = "…" | "long text" → "long…" |
+| `.mask(start, end?, char?)` | char default = "*" | "1234567890" → "12******90" |
+
+## Filter mutators
+
+| Method | Effect |
+|---|---|
+| `.toAlpha()` | strip non-letters |
+| `.toAlphanumeric()` | strip non-alphanumerics |
+| `.removeSpecialCharacters()` | keep alphanumerics + whitespace |
+| `.removeNumbers()` | strip digits |
+| `.safeHtml()` | strip HTML tags |
+| `.htmlEscape()` | `<` → `&lt;` etc |
+| `.unescapeHtml()` | reverse `htmlEscape()` |
+
+## Encoding mutators
+
+| Method | Effect |
+|---|---|
+| `.base64Encode()` | utf8 → base64 |
+| `.base64Decode()` | base64 → utf8 |
+| `.urlEncode()` | percent-encode |
+| `.urlDecode()` | percent-decode |
+| `.slug()` | "Hello World!" → "hello-world" |
+| `.toString()` | coerce non-string input to string |
+
+## Mutator vs transformer
+
+The methods above are **all mutators** — they reshape the value *before* validation rules run. If you want post-validation reshaping, attach via `.addTransformer(fn)` (see [`@warlock.js/seal/compose-seal-modifiers/SKILL.md`](@warlock.js/seal/compose-seal-modifiers/SKILL.md)).
+
+Practical implication: `v.string().min(3).trim()` runs `min(3)` against the *un-trimmed* input. To check trimmed length, mutate first: `v.string().trim().min(3)`.
+
+## Common chains
+
+```ts
+// Email field
+v.string().email()
+
+// Username
+v.string().min(3).max(30).alphanumeric().lowercase()
+
+// Slug from title
+v.string().slug()
+
+// Strong password
+v.string().strongPassword(12)
+
+// URL with strict format
+v.string().url().startsWith("https://")
+
+// Sanitized HTML body
+v.string().safeHtml().min(1)
+
+// Masked phone for response
+v.string().pattern(/^\+\d{8,}$/).mask(3, -2)
+
+// Optional with default
+v.string().email().default("guest@example.com").optional()
+```
+
+
+## seal-basics  `@warlock.js/seal/seal-basics/SKILL.md`
+
+---
+name: seal-basics
+description: 'Start with @warlock.js/seal — the `v` factory, `validate(schema, data)`, and `Infer<typeof schema>`. Triggers: `v`, `validate`, `Infer`, `Infer.Input`, `Infer.Output`, `v.object`, `v.lazy`, `v.discriminatedUnion`, `v.computed`, `v.managed`, `ValidationResult`; "how do I start with seal", "what is the v factory", "validate a schema in warlock", "Infer.Input vs Infer.Output"; typical import `import { v, validate, type Infer } from "@warlock.js/seal"`. Skip: primitive picking — `@warlock.js/seal/pick-seal-primitive/SKILL.md`; modifiers — `@warlock.js/seal/compose-seal-modifiers/SKILL.md`; competing libs `zod`, `valibot`, `yup`, `joi`, `ajv`.'
+---
+
+# Validate with seal
+
+Schema-first validation. Single entry point: the `v` factory. Every validator chains, composes, and infers. Schemas double as runtime validators *and* type-level shapes via `Infer<typeof schema>`, and ship `~standard` so any Standard-Schema-aware consumer accepts them directly.
+
+> This skill is the seal **map** — read it first, then load the specific skill for the task.
+
+## Install
+
+```bash
+yarn add @warlock.js/seal
+```
+
+Most warlock projects already have `@warlock.js/seal` transitively via `@warlock.js/core` (which re-exports the `v` factory and `Infer` types). Import direct from the package you control: `@warlock.js/seal` if you build a leaf package, `@warlock.js/core` if you write app code.
+
+## Minimal example
+
+```ts
+import { v, validate, type Infer } from "@warlock.js/seal";
+
+const userSchema = v.object({
+  email: v.string().email(),
+  age: v.int().min(13).optional(),
+  role: v.literal("admin", "user", "guest"),
+});
+
+type User = Infer<typeof userSchema>;
+// { email: string; age?: number; role: "admin" | "user" | "guest" }
+
+const result = await validate(userSchema, input);
+if (result.isValid) {
+  result.data;      // typed, post-transformer
+} else {
+  result.errors;    // [{ type, error, input }, ...]
+}
+```
+
+## Foundations
+
+The 12 things that are true in every seal use:
+
+1. **Public API is the `v` factory.** Never `new ObjectValidator(...)` from app code — bare classes lose the StandardSchema bridge typing. See [`@warlock.js/seal/bridge-standard-schema/SKILL.md`](@warlock.js/seal/bridge-standard-schema/SKILL.md).
+2. **Every factory return is a `StandardSchemaV1<Infer.Output<T>>`.** Pass seal schemas straight into `StandardSchemaV1<T>`-typed slots — no casts.
+3. **Two inference helpers — `Infer.Input<T>` and `Infer.Output<T>`.** Bare `Infer<T>` is an alias for `Infer.Input<T>` (the dominant usage: HTTP bodies, DTOs, form payloads). Use `Infer.Output<T>` for validated state (Cascade `Model<>` params, post-`validate()` data). See [the rules below](#inferinput-vs-inferoutput).
+4. **Fields are required by default.** Mark optional explicitly: `.optional()`. Skip `.required()` — canonical seal style omits the redundant call; inferred types already show what's required.
+5. **`validate(schema, data)` never throws.** Returns `Promise<ValidationResult>` with `{ isValid, data, errors }` — the validated value is `result.data`. See [`@warlock.js/seal/handle-seal-errors/SKILL.md`](@warlock.js/seal/handle-seal-errors/SKILL.md).
+6. **Validators are immutable by default.** Every chain method (`.min(3)`, `.email()`, `.optional()`, …) returns a clone. Toggle with the `.mutable` getter.
+7. **Two pipelines: mutators (pre-validation), transformers (post-validation).** Order: `default → mutators → required check → required-condition rule → other rules → transformers → data`. `.catch(fallback)` rescues any failure on leaf validators.
+8. **Cross-field rules need a `v.object` parent.** Standalone scalar validators have no siblings to resolve against.
+9. **JSON Schema generation is built-in.** `schema.toJsonSchema(target)` for `"draft-2020-12"` (default), `"draft-07"`, `"openapi-3.0"`, `"openai-strict"`. See [`@warlock.js/seal/generate-json-schema/SKILL.md`](@warlock.js/seal/generate-json-schema/SKILL.md).
+10. **`v.computed` / `v.managed` derive — they don't validate inputs.** They produce values from siblings or context, and are **skipped** when the parent `v.object` emits JSON Schema (runtime-only constructs — calling `.toJsonSchema()` on one directly throws).
+11. **`v.lazy(() => schema)` for recursive shapes.** Defers resolution until validate-time so self-referencing types work.
+12. **`v.discriminatedUnion(field, branches)` for tagged unions.** Routes by a literal discriminator field instead of `matchesType()` trial — precise errors, exact inference.
+
+## `Infer.Input` vs `Infer.Output`
+
+The two inference shapes describe the two halves of the pipeline:
+
+- **`Infer.Input<T>`** — what the caller sends. `.optional()`, `.default()`, `.catch()` all make a key optional (any of them means "you don't have to supply this").
+- **`Infer.Output<T>`** — what `data` contains after validation. `.default()` and `.catch()` guarantee a value, so keys with those brands are required even when chained with `.optional()`.
+
+```ts
+const schema = v.object({
+  email: v.string().email().optional(),
+  status: v.enum(Status).optional().default(Status.ACTIVE),
+});
+
+type In  = Infer.Input<typeof schema>;
+// { email?: string; status?: Status }     ← caller may omit both
+
+type Out = Infer.Output<typeof schema>;
+// { email?: string; status: Status }      ← default fired for status
+
+type Default = Infer<typeof schema>;       // alias for Infer.Input
+```
+
+Both flavours widen with `| null` when `.nullable()` is set.
+
+**When to reach for which:**
+
+- `Infer.Input<T>` (or bare `Infer<T>`) — for HTTP request bodies, form payloads, DTOs, anything pre-validation. **The common case in HTTP-shaped code.**
+- `Infer.Output<T>` — for Cascade `Model<>` params, validated state, anywhere downstream of `validate()`.
+
+## Pick a skill
+
+| If the task is about… | Load |
+| --- | --- |
+| Picking the right primitive (`v.string` vs `v.scalar`, `v.literal` vs `v.enum`, `v.date` vs `v.instanceof(Date)`) | [`@warlock.js/seal/pick-seal-primitive/SKILL.md`](@warlock.js/seal/pick-seal-primitive/SKILL.md) |
+| Building object / array / record / tuple / union schemas, discriminated unions, recursive schemas | [`@warlock.js/seal/define-structural-shape/SKILL.md`](@warlock.js/seal/define-structural-shape/SKILL.md) |
+| Modifiers — `.required` / `.optional` / `.nullable` / `.default` / `.catch` / `.omit`, transformer vs mutator pipelines, membership rules | [`@warlock.js/seal/compose-seal-modifiers/SKILL.md`](@warlock.js/seal/compose-seal-modifiers/SKILL.md) |
+| Reading `ValidationResult`, branching on `error.type`, error message customization, translation | [`@warlock.js/seal/handle-seal-errors/SKILL.md`](@warlock.js/seal/handle-seal-errors/SKILL.md) |
+| Generating JSON Schema for OpenAI strict / OpenAPI / draft-07 | [`@warlock.js/seal/generate-json-schema/SKILL.md`](@warlock.js/seal/generate-json-schema/SKILL.md) |
+| Why a `StandardSchemaV1<T>` slot accepts/rejects a schema, the phantom-intersection design, `Result<unknown>` errors | [`@warlock.js/seal/bridge-standard-schema/SKILL.md`](@warlock.js/seal/bridge-standard-schema/SKILL.md) |
+| Authoring custom seal plugins to add validator methods | [`@warlock.js/seal/extend-seal-with-plugins/SKILL.md`](@warlock.js/seal/extend-seal-with-plugins/SKILL.md) |
+
+## Things NOT to do
+
+- Don't `new ObjectValidator(...)` from app code — use `v.object(...)` so the StandardSchema bridge attaches.
+- Don't annotate a schema with the bare class type — strips the bridge intersection. Let inference run.
+- Don't expect `validate()` to throw on bad input — bad input lands in `result.errors`. The only things that throw are bugs (a rule's callback threw, a transformer threw).
+- Don't expect `.requiredIf()` / `.sameAs()` to work on a standalone validator outside `v.object` — sibling resolution silently passes.
+- Don't put `.trim()` before `.min(3)` and expect it to trim first — `.trim()` is a transformer (post-validation). For pre-validation trim, attach with `.addMutator(s => s.trim())`.
+
+

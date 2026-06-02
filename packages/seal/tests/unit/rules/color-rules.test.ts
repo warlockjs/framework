@@ -20,30 +20,30 @@ describe("Color Rules", () => {
   });
 
   it("should validate hex color", async () => {
-    const validator = v.string();
-    validator.addRule(hexColorRule);
+    const validator = v.string().mutable;
+    validator.addMutableRule(hexColorRule);
 
     expect((await validate(validator, "#fff")).isValid).toBe(true);
     expect((await validate(validator, "fff")).isValid).toBe(false);
   });
 
   it("should validate rgb color", async () => {
-    const validator = v.string();
-    validator.addRule(rgbColorRule);
+    const validator = v.string().mutable;
+    validator.addMutableRule(rgbColorRule);
 
     expect((await validate(validator, "rgb(255, 0, 0)")).isValid).toBe(true);
     expect((await validate(validator, "rgba(255, 0, 0, 1)")).isValid).toBe(false);
   });
 
   it("should validate light and dark colors", async () => {
-    const lightValidator = v.string();
-    lightValidator.addRule(lightColorRule);
+    const lightValidator = v.string().mutable;
+    lightValidator.addMutableRule(lightColorRule);
 
     expect((await validate(lightValidator, "#ffffff")).isValid).toBe(true);
     expect((await validate(lightValidator, "#000000")).isValid).toBe(false);
 
-    const darkValidator = v.string();
-    darkValidator.addRule(darkColorRule);
+    const darkValidator = v.string().mutable;
+    darkValidator.addMutableRule(darkColorRule);
 
     expect((await validate(darkValidator, "#000000")).isValid).toBe(true);
     expect((await validate(darkValidator, "#ffffff")).isValid).toBe(false);

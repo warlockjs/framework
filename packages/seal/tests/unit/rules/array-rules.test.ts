@@ -5,8 +5,8 @@ import { sortedArrayRule, uniqueArrayRule } from "../../../src/rules/array/array
 
 describe("Array Rules", () => {
   it("uniqueArray", async () => {
-    const validator = v.any();
-    validator.addRule(uniqueArrayRule);
+    const validator = v.any().mutable;
+    validator.addMutableRule(uniqueArrayRule);
 
     expect((await validate(validator, [1, 2, 3])).isValid).toBe(true);
     expect((await validate(validator, ["a", "b", "c"])).isValid).toBe(true);
@@ -19,8 +19,8 @@ describe("Array Rules", () => {
   });
 
   it("sortedArray - ascending", async () => {
-    const validator = v.any();
-    const rule = validator.addRule(sortedArrayRule);
+    const validator = v.any().mutable;
+    const rule = validator.addMutableRule(sortedArrayRule);
     rule.context.options.direction = "asc";
 
     expect((await validate(validator, [1, 2, 3])).isValid).toBe(true);
@@ -34,8 +34,8 @@ describe("Array Rules", () => {
   });
 
   it("sortedArray - descending", async () => {
-    const validator = v.any();
-    const rule = validator.addRule(sortedArrayRule);
+    const validator = v.any().mutable;
+    const rule = validator.addMutableRule(sortedArrayRule);
     rule.context.options.direction = "desc";
 
     expect((await validate(validator, [3, 2, 1])).isValid).toBe(true);

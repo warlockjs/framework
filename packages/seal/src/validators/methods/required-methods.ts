@@ -44,6 +44,21 @@ declare module "../base-validator" {
     optional(): this & { isOptional: true };
 
     /**
+     * Sugar for `.optional().nullable()` — the field may be absent OR null.
+     *
+     * Brands the return type with both `{ isOptional: true }` and `{ isNullable: true }`
+     * so `Infer<>` produces `{ field?: T | null }`.
+     *
+     * @example
+     * v.string().nullish()
+     * // type: string | null | undefined
+     * //   absent  → key omitted
+     * //   null    → null
+     * //   "x"     → "x"
+     */
+    nullish(): this & { isOptional: true; isNullable: true };
+
+    /**
      * Value is required if another field exists
      */
     requiredWith(field: string, errorMessage?: string): this;
@@ -262,6 +277,17 @@ BaseValidator.prototype.optional = function (): BaseValidator & { isOptional: tr
   instance.isOptional = true;
   instance.requiredRule = null;
   return instance as BaseValidator & { isOptional: true };
+};
+
+/**
+ * Sugar — equivalent to `.optional().nullable()`.
+ */
+BaseValidator.prototype.nullish = function (): BaseValidator & {
+  isOptional: true;
+  isNullable: true;
+} {
+  const instance = this.optional().nullable();
+  return instance as BaseValidator & { isOptional: true; isNullable: true };
 };
 
 // ==================== REQUIRED: BASED ON FIELD PRESENCE ====================

@@ -17,34 +17,34 @@ function createMockContext(value: any): SchemaContext {
 
 describe("BaseValidator", () => {
   it("should initialize default properties", () => {
-    const validator = new BaseValidator();
+    const validator = new BaseValidator().mutable;
     expect(validator.rules).toEqual([]);
     expect(validator.mutators).toEqual([]);
     expect(validator["isNullable"]).toBe(false);
   });
 
   it("should set nullable", () => {
-    const validator = new BaseValidator();
+    const validator = new BaseValidator().mutable;
     validator.nullable();
     expect(validator["isNullable"]).toBe(true);
   });
 
   it("should set description", () => {
-    const validator = new BaseValidator();
+    const validator = new BaseValidator().mutable;
     validator.describe("test description");
     expect(validator["description"]).toBe("test description");
   });
 
   describe("Transformers", () => {
     it("should add transformer", () => {
-      const validator = new BaseValidator();
+      const validator = new BaseValidator().mutable;
       const transform = (v: any) => v;
       validator.addTransformer(transform);
       expect(validator["dataTransformers"]).toHaveLength(1);
     });
 
     it("should run transformation pipeline", async () => {
-      const validator = new BaseValidator();
+      const validator = new BaseValidator().mutable;
       validator.addTransformer((val) => val.toUpperCase());
       validator.addTransformer((val) => val + "!");
 
@@ -53,7 +53,7 @@ describe("BaseValidator", () => {
     });
 
     it("outputAs should add a simple transformer", async () => {
-      const validator = new BaseValidator();
+      const validator = new BaseValidator().mutable;
       validator.outputAs((val) => Number(val));
 
       const result = await validator.startTransformationPipeline("123", createMockContext("123"));
@@ -61,7 +61,7 @@ describe("BaseValidator", () => {
     });
 
     it("toJSON should add a JSON transformer", async () => {
-      const validator = new BaseValidator();
+      const validator = new BaseValidator().mutable;
       validator.toJSON();
 
       const data = { a: 1 };

@@ -33,6 +33,18 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
   protected isMutable = false;
 
   /**
+   * Catch state — when `hasCatch` is true and validation fails, `catchValue`
+   * (or its callback result) substitutes for the failed value, and the public
+   * result reports `isValid: true` with no errors.
+   *
+   * See `.catch()` for semantics and the v1 scope (leaf-only).
+   */
+  protected catchValue:
+    | any
+    | ((errors: ValidationResult["errors"], originalInput: any) => any | Promise<any>);
+  protected hasCatch = false;
+
+  /**
    * Whether the field is optional.
    * - false (default): field is required unless a requiredRule governs the condition.
    * - true: field can be absent or empty — set by calling .optional().
@@ -101,21 +113,27 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
   }
 
   /**
-   * Determine if value accepts null value
+   * Allow null as a valid value.
+   *
+   * Brands the return type with `{ isNullable: true }` so `Infer<>` widens
+   * the inferred output to include `| null`.
    */
-  public nullable(): this {
+  public nullable(): this & { isNullable: true } {
     const instance = this.instance;
     instance.isNullable = true;
-    return instance;
+    return instance as this & { isNullable: true };
   }
 
   /**
-   * Explicitly disallow null values after calling nullable
+   * Explicitly disallow null values after calling nullable.
+   *
+   * Brands the return type with `{ isNullable: false }` to cancel any prior
+   * `.nullable()` at the type level.
    */
-  public notNullable(): this {
+  public notNullable(): this & { isNullable: false } {
     const instance = this.instance;
     instance.isNullable = false;
-    return instance;
+    return instance as this & { isNullable: false };
   }
 
   /**
@@ -347,6 +365,8 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
     cloned.isNullable = this.isNullable;
     cloned.isOptional = this.isOptional;
     cloned.requiredRule = this.requiredRule; // same reference is fine — rule is treated as immutable
+    cloned.catchValue = this.catchValue;
+    cloned.hasCatch = this.hasCatch;
 
     return cloned;
   }
@@ -562,12 +582,59 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
   }
 
   /**
-   * Set default value for the field
+   * Set default value for the field. The default is used when the input is
+   * absent (`undefined`); it then flows through the rule pipeline.
+   *
+   * Brands the return type with `{ hasDefault: true }` so `Infer<>` treats
+   * the field as guaranteed-present even when chained with `.optional()`.
    */
-  public default(value: any) {
+  public default(value: any): this & { hasDefault: true } {
     const instance = this.instance;
     instance.defaultValue = value;
-    return instance;
+    return instance as this & { hasDefault: true };
+  }
+
+  /**
+   * Fallback to a value when validation fails.
+   *
+   * Complementary to `.default()`: `.default(x)` fires when input is **absent**,
+   * `.catch(y)` fires when input is **present but invalid**. Combine them when
+   * you want both behaviours: `.optional().default(x).catch(y)`.
+   *
+   * The fallback can be a value or a callback `(errors, originalInput) => fallback`.
+   * The callback variant is the only side-channel for the swallowed errors —
+   * use it to log/alert before the fallback substitutes.
+   *
+   * Brands the return type with `{ hasCatch: true }` so `Infer<>` treats the
+   * field as guaranteed-present (the catch ensures a value will always exist).
+   *
+   * **Scope (v1).** Catch is honoured for **leaf validators** (string, number,
+   * boolean, date, …) and for fields inside containers. It is a **no-op on
+   * container validators themselves** (`v.object`, `v.array`, `v.record`,
+   * `v.tuple`, `v.discriminatedUnion`) — those use their own iteration logic
+   * that bypasses the catch hook in `BaseValidator.validate()`.
+   *
+   * @example
+   * ```ts
+   * v.int().min(0).catch(3)                   // bad number → 3
+   * v.string().in(["us", "eu"]).catch("us")   // unknown enum → "us"
+   * v.string().catch((errors, input) => {
+   *   console.warn(`bad user value: ${JSON.stringify(input)}`, errors);
+   *   return "anonymous";
+   * })
+   * ```
+   */
+  public catch(
+    fallback:
+      | any
+      | ((errors: ValidationResult["errors"], originalInput: any) => any | Promise<any>),
+  ): this & { hasCatch: true } {
+    const instance = this.instance;
+
+    instance.catchValue = fallback;
+    instance.hasCatch = true;
+
+    return instance as this & { hasCatch: true };
   }
 
   /**
@@ -635,7 +702,7 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
       }
     }
 
-    return {
+    const result: ValidationResult = {
       isValid,
       errors,
       data:
@@ -643,6 +710,20 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
           ? await this.startTransformationPipeline(mutatedData, context)
           : undefined,
     };
+
+    // Catch fallback — only on the leaf path. Container validators override
+    // validate() and don't run this hook on their own outcome, so catching
+    // a whole object/array/record is a no-op in v1.
+    if (result.isValid === false && this.hasCatch) {
+      const fallback =
+        typeof this.catchValue === "function"
+          ? await this.catchValue(result.errors, data)
+          : this.catchValue;
+
+      return { isValid: true, errors: [], data: fallback };
+    }
+
+    return result;
   }
 
   /**

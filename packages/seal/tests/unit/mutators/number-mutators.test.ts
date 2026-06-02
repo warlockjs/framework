@@ -21,7 +21,7 @@ describe("Number Mutators", () => {
 
   it("roundNumberMutator should round to default decimals", async () => {
     const result = await roundNumberMutator(10.126, createMockMutatorContext());
-    expect(result).toBe(10.12);
+    expect(result).toBe(10.13);
   });
 
   it("roundNumberMutator should round to specified decimals", async () => {
