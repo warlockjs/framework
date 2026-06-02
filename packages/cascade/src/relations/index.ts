@@ -44,9 +44,6 @@ export type {
   RelationType,
 } from "./types";
 
-// Helper functions
-export { belongsTo, belongsToMany, hasMany, hasOne } from "./helpers";
-
 // Relation loader
 export { RelationLoader } from "./relation-loader";
 

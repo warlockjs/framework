@@ -17,7 +17,7 @@
  */
 
 import type { ChildModel, Model } from "../model/model";
-import { getModelFromRegistry } from "../model/register-model";
+import { resolveModelClass } from "../model/register-model";
 import type { RelationDefinition } from "./types";
 
 // ============================================================================
@@ -90,7 +90,7 @@ export class RelationHydrator {
       // since the snapshot could be from an older schema version.
       if (!def) continue;
 
-      const RelModel = getModelFromRegistry(def.model) as ChildModel<Model> | undefined;
+      const RelModel = resolveModelClass(def.model) as ChildModel<Model> | undefined;
       if (!RelModel) continue;
 
       let hydrated: Model | Model[] | null;

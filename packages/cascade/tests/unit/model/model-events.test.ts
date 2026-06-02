@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { dataSourceRegistry } from "../../../src/data-source/data-source-registry";
 import { ModelEvents, globalModelEvents } from "../../../src/events/model-events";
 import { Model } from "../../../src/model/model";
 import { RegisterModel } from "../../../src/model/register-model";
+import { createMockDriver } from "../../utils/test-helpers";
 
 // Mock QueryBuilder since events use it
 const mockQueryBuilder = {
@@ -14,6 +16,20 @@ class TestUser extends Model {
 }
 
 describe("Model Events System", () => {
+  // Instantiating a model asks its driver for a dirty tracker, so a default
+  // data source must be registered before any `new TestUser()` call.
+  beforeAll(() => {
+    dataSourceRegistry.register({
+      name: "test",
+      driver: createMockDriver(),
+      isDefault: true,
+    });
+  });
+
+  afterAll(() => {
+    dataSourceRegistry.clear();
+  });
+
   beforeEach(() => {
     // Clear global events before each test
     globalModelEvents.clear();

@@ -7,14 +7,74 @@
  * @module @warlock.js/cascade/relations/relation-loader
  */
 
+import { isLazy, type Lazy } from "@mongez/reinforcements";
 import type { ChildModel, Model } from "../model/model";
-import { getModelFromRegistry } from "../model/register-model";
+import { getModelFromRegistry, resolveModelName } from "../model/register-model";
+import {
+  inferBelongsToForeignKey,
+  inferHasForeignKey,
+  inferPivotKey,
+  inferPivotTable,
+} from "./key-conventions";
 import type {
   LoadedRelationResult,
   RelationConstraintCallback,
   RelationConstraints,
   RelationDefinition,
 } from "./types";
+
+// ============================================================================
+// SHARED HELPER — SINGLE SOURCE OF TRUTH FOR LOADED RELATIONS
+// ============================================================================
+
+/**
+ * Attach a loaded relation onto a model instance, keeping the
+ * `loadedRelations` Map and the direct property access in sync.
+ *
+ * The property is installed as a `defineProperty` getter/setter façade over
+ * the Map — `model.posts` reads from `loadedRelations.get("posts")`, and
+ * assigning `model.posts = newPosts` writes back to the Map. Eliminates the
+ * historical drift between the two storage slots: any mutation visible via
+ * one path is visible via the other.
+ *
+ * Used by both `RelationLoader` (the `with()` path) and the Postgres
+ * driver's `attachJoinedRelations` (the `joinWith()` path).
+ *
+ * @example
+ *   attachLoadedRelation(user, "posts", postsArray);
+ *   user.posts === user.loadedRelations.get("posts"); // always true
+ */
+export function attachLoadedRelation(
+  model: object,
+  name: string,
+  value: LoadedRelationResult,
+): void {
+  const modelWithRelations = model as {
+    loadedRelations?: Map<string, LoadedRelationResult>;
+  };
+
+  if (!modelWithRelations.loadedRelations) {
+    modelWithRelations.loadedRelations = new Map();
+  }
+
+  const relations = modelWithRelations.loadedRelations;
+  relations.set(name, value);
+
+  // Install a getter/setter on the instance so direct property access reads
+  // from (and writes to) the Map. `configurable: true` lets a later reload
+  // re-define the property; `enumerable: true` so JSON.stringify and
+  // Object.keys see the relation.
+  Object.defineProperty(model, name, {
+    configurable: true,
+    enumerable: true,
+    get(): LoadedRelationResult | undefined {
+      return relations.get(name);
+    },
+    set(next: LoadedRelationResult): void {
+      relations.set(name, next);
+    },
+  });
+}
 
 // ============================================================================
 // RELATION LOADER CLASS
@@ -79,6 +139,19 @@ export class RelationLoader<TModel extends Model = Model> {
   public constructor(models: TModel[], modelClass: ChildModel<TModel>) {
     this.models = models;
     this.modelClass = modelClass;
+  }
+
+  /**
+   * Read the configured relation conventions from this model's data
+   * source. Returns `undefined` when no overrides are set — the inference
+   * helpers fall back to framework defaults in that case.
+   */
+  private get relationDefaults() {
+    try {
+      return this.modelClass.getDataSource()?.relationDefaults;
+    } catch {
+      return undefined;
+    }
   }
 
   // ==========================================================================
@@ -188,8 +261,8 @@ export class RelationLoader<TModel extends Model = Model> {
     constraint?: RelationConstraintCallback,
   ): Promise<void> {
     const RelatedModel = this.resolveModelClass(definition.model);
-    const localKey = definition.localKey ?? "id";
-    const foreignKey = definition.foreignKey ?? this.inferForeignKey(this.modelClass.name);
+    const localKey = definition.localKey ?? this.modelClass.primaryKey ?? "id";
+    const foreignKey = definition.foreignKey ?? inferHasForeignKey(this.modelClass.name, this.relationDefaults);
 
     // Collect all local key values
     const localKeyValues = this.collectKeyValues(localKey);
@@ -231,8 +304,8 @@ export class RelationLoader<TModel extends Model = Model> {
     constraint?: RelationConstraintCallback,
   ): Promise<void> {
     const RelatedModel = this.resolveModelClass(definition.model);
-    const localKey = definition.localKey ?? "id";
-    const foreignKey = definition.foreignKey ?? this.inferForeignKey(this.modelClass.name);
+    const localKey = definition.localKey ?? this.modelClass.primaryKey ?? "id";
+    const foreignKey = definition.foreignKey ?? inferHasForeignKey(this.modelClass.name, this.relationDefaults);
 
     // Collect all local key values
     const localKeyValues = this.collectKeyValues(localKey);
@@ -280,8 +353,8 @@ export class RelationLoader<TModel extends Model = Model> {
     constraint?: RelationConstraintCallback,
   ): Promise<void> {
     const RelatedModel = this.resolveModelClass(definition.model);
-    const foreignKey = definition.foreignKey ?? `${name}_id`;
-    const ownerKey = definition.localKey ?? "id";
+    const foreignKey = definition.foreignKey ?? inferBelongsToForeignKey(name, this.relationDefaults);
+    const ownerKey = definition.localKey ?? RelatedModel.primaryKey ?? "id";
 
     // Collect all foreign key values from the models
     const foreignKeyValues = this.collectKeyValues(foreignKey);
@@ -325,19 +398,17 @@ export class RelationLoader<TModel extends Model = Model> {
     definition: RelationDefinition,
     constraint?: RelationConstraintCallback,
   ): Promise<void> {
-    if (!definition.pivot) {
-      throw new Error(
-        `belongsToMany relation "${name}" requires a pivot table. ` +
-          `Make sure to specify the 'pivot' option.`,
-      );
-    }
-
     const RelatedModel = this.resolveModelClass(definition.model);
-    const pivotTable = definition.pivot;
-    const localKey = definition.pivotLocalKey ?? "id";
-    const pivotLocalKey = definition.localKey ?? this.inferForeignKey(this.modelClass.name);
-    const pivotForeignKey = definition.foreignKey ?? this.inferForeignKey(definition.model);
-    const relatedKey = definition.pivotForeignKey ?? "id";
+    const relatedModelName = resolveModelName(definition.model);
+    const pivotTable =
+      definition.pivot ??
+      inferPivotTable(this.modelClass.name, relatedModelName, this.relationDefaults);
+    const localKey = definition.pivotLocalKey ?? this.modelClass.primaryKey ?? "id";
+    const pivotLocalKey =
+      definition.localKey ?? inferPivotKey(this.modelClass.name, this.relationDefaults);
+    const pivotForeignKey =
+      definition.foreignKey ?? inferPivotKey(relatedModelName, this.relationDefaults);
+    const relatedKey = definition.pivotForeignKey ?? RelatedModel.primaryKey ?? "id";
 
     // Collect all local key values
     const localKeyValues = this.collectKeyValues(localKey);
@@ -468,13 +539,28 @@ export class RelationLoader<TModel extends Model = Model> {
    * @returns The model class constructor
    * @throws Error if the model is not found in the registry
    */
-  private resolveModelClass(name: string): ChildModel<Model> {
-    const ModelClass = getModelFromRegistry(name);
+  private resolveModelClass(
+    model: string | ChildModel<Model> | Lazy<unknown>,
+  ): ChildModel<Model> {
+    if (typeof model === "function") return model;
+    if (isLazy(model)) return model.resolve() as ChildModel<Model>;
+
+    const ModelClass = getModelFromRegistry(model);
 
     if (!ModelClass) {
+      const callerName = this.modelClass.name || "unknown";
       throw new Error(
-        `Model "${name}" not found in registry. ` +
-          `Make sure it is decorated with @RegisterModel() and imported.`,
+        `Cannot resolve relation target — model "${model}" is not registered.\n` +
+          `  Caller: ${callerName} (relation target reference)\n` +
+          `  Common causes:\n` +
+          `    - The target model is missing the @RegisterModel() decorator\n` +
+          `    - The target model's module is not imported anywhere at startup\n` +
+          `    - Circular import between the caller and target — one of them sees\n` +
+          `      the other as undefined during module load\n` +
+          `  Fix: add an explicit \`import "<path-to-${model}-model>";\` to your app's\n` +
+          `  entry point so the decorator runs before any query consults this relation.\n` +
+          `  Alternative: declare the relation with \`lazy(() => ${model})\` instead of a string\n` +
+          `  to bind directly to the class (no registry lookup needed).`,
       );
     }
 
@@ -537,16 +623,6 @@ export class RelationLoader<TModel extends Model = Model> {
   }
 
   /**
-   * Infers a foreign key name from a model name.
-   *
-   * @param modelName - The model class name
-   * @returns The inferred foreign key (e.g., "User" -> "userId")
-   */
-  private inferForeignKey(modelName: string): string {
-    return `${modelName.charAt(0).toLowerCase()}${modelName.slice(1)}Id`;
-  }
-
-  /**
    * Sets a relation value on all models using a getter function.
    *
    * @param name - The relation name
@@ -581,18 +657,6 @@ export class RelationLoader<TModel extends Model = Model> {
    * @param value - The relation value
    */
   private setLoadedRelation(model: TModel, name: string, value: LoadedRelationResult): void {
-    // Ensure the model has a loadedRelations map
-    const modelWithRelations = model as unknown as {
-      loadedRelations?: Map<string, LoadedRelationResult>;
-    };
-
-    if (!modelWithRelations.loadedRelations) {
-      modelWithRelations.loadedRelations = new Map();
-    }
-
-    modelWithRelations.loadedRelations.set(name, value);
-
-    // Also set as a property for convenient access
-    (model as unknown as Record<string, LoadedRelationResult>)[name] = value;
+    attachLoadedRelation(model as object, name, value);
   }
 }

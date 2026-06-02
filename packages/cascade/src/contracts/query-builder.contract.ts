@@ -243,9 +243,25 @@ export interface QueryBuilderContract<T = unknown> {
   eagerLoadRelations?: Map<string, boolean | ((query: QueryBuilderContract) => void)>;
 
   /**
-   * Array of relation names to count.
+   * Map of count expressions to emit alongside each result row.
+   *
+   * Keyed by **output column alias** (default `${relationName}Count`,
+   * customisable via the `as <alias>` shorthand or the object value form).
+   * Aliasing by output column lets the same relation appear multiple times
+   * under different filters.
+   *
+   * Populated by `withCount()`. Consumed by the driver subclass at execute
+   * time to emit per-row count expressions.
    */
-  countRelations?: string[];
+  countRelations?: Map<
+    string,
+    {
+      /** Relation name as declared on the model — used to resolve the relation definition. */
+      relation: string;
+      /** Operations recorded inside a constraint callback (where* filters only). */
+      constraintOps?: unknown[];
+    }
+  >;
 
   /**
    * Map of relations to load via JOIN (single query).
@@ -1256,35 +1272,81 @@ export interface QueryBuilderContract<T = unknown> {
   with(relations: Record<string, boolean | ((query: QueryBuilderContract) => void)>): this;
 
   /**
-   * Add a count of related models as a virtual field.
+   * Add a count of a related model as a virtual field on each result row.
    *
-   * The count is added as `{relationName}Count` on each result.
+   * Default output alias is `${relationName}Count`. Use the
+   * `"name as alias"` shorthand to pick a custom alias.
    *
-   * @param relation - Single relation name to count
+   * @param relation - Single relation name (optionally with `as <alias>`)
    * @returns Query builder for chaining
    *
    * @example
    * ```typescript
    * const users = await User.query().withCount("posts").get();
    * console.log(users[0].postsCount); // number
+   *
+   * // Custom alias
+   * await User.query().withCount("posts as totalPosts").get();
    * ```
    */
   withCount(relation: string): this;
 
   /**
-   * Add counts of multiple related models as virtual fields.
+   * Add counts for multiple relations at once.
    *
-   * @param relations - Relation names to count
+   * @param relations - Relation names (each may include `as <alias>`)
    * @returns Query builder for chaining
    *
    * @example
    * ```typescript
-   * const users = await User.query()
+   * await User.query()
    *   .withCount("posts", "comments", "followers")
    *   .get();
    * ```
    */
   withCount(...relations: string[]): this;
+
+  /**
+   * Add counts for multiple relations passed as an array.
+   *
+   * @param relations - Array of relation names (each may include `as <alias>`)
+   *
+   * @example
+   * ```typescript
+   * await User.query().withCount(["posts", "comments"]).get();
+   * ```
+   */
+  withCount(relations: string[]): this;
+
+  /**
+   * Add counts with optional per-relation constraints or alias overrides.
+   *
+   * Keys are relation names, optionally with `as <alias>` shorthand to
+   * override the default `${relationName}Count` output column name. Values
+   * may be:
+   * - `true` — count the relation with no extra constraints
+   * - A string — overrides the alias (equivalent to using `as` in the key)
+   * - A callback — applies where-clauses inside the count subquery. Other
+   *   operations (`orderBy`, `limit`, etc.) have no meaning in COUNT and
+   *   are silently dropped.
+   *
+   * To count the same relation more than once under different aliases, use
+   * the `as <alias>` form in the key so each entry is unique.
+   *
+   * @example
+   * ```typescript
+   * await Post.query()
+   *   .withCount({
+   *     comments: true,                                          // -> commentsCount
+   *     "comments as approvedCount": (q) => q.where("approved", true),
+   *     tags: "tagCount",                                        // -> tagCount
+   *   })
+   *   .get();
+   * ```
+   */
+  withCount(
+    relations: Record<string, true | string | ((query: QueryBuilderContract) => void)>,
+  ): this;
 
   /**
    * Filter results to only those that have related models.
@@ -1344,6 +1406,22 @@ export interface QueryBuilderContract<T = unknown> {
    * ```
    */
   whereHas(relation: string, callback: (query: QueryBuilderContract) => void): this;
+
+  /**
+   * OR-joined variant of `whereHas`.
+   *
+   * @param relation - Relation name to check
+   * @param callback - Callback to define conditions on the related query
+   *
+   * @example
+   * ```typescript
+   * await User.query()
+   *   .where("role", "admin")
+   *   .orWhereHas("posts", (query) => query.where("isFeatured", true))
+   *   .get();
+   * ```
+   */
+  orWhereHas(relation: string, callback: (query: QueryBuilderContract) => void): this;
 
   /**
    * Filter results that don't have any related models.

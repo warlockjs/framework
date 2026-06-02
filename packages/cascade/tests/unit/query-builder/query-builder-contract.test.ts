@@ -62,8 +62,8 @@ describe("QueryBuilderContract - Shared Behavior Tests", () => {
           expect(queryBuilder.eagerLoadRelations).toBeInstanceOf(Map);
         });
 
-        it("should initialize countRelations as an array", () => {
-          expect(Array.isArray(queryBuilder.countRelations)).toBe(true);
+        it("should initialize countRelations as a Map", () => {
+          expect(queryBuilder.countRelations).toBeInstanceOf(Map);
         });
 
         it("should initialize disabledGlobalScopes as a Set", () => {
@@ -282,15 +282,16 @@ describe("QueryBuilderContract - Shared Behavior Tests", () => {
         it("should add single relation to count", () => {
           queryBuilder.withCount("posts");
 
-          expect(queryBuilder.countRelations).toContain("posts");
+          // countRelations is keyed by output alias (default `${relation}Count`).
+          expect(queryBuilder.countRelations.get("postsCount")?.relation).toBe("posts");
         });
 
         it("should add multiple relations to count", () => {
           queryBuilder.withCount("posts", "comments", "likes");
 
-          expect(queryBuilder.countRelations).toContain("posts");
-          expect(queryBuilder.countRelations).toContain("comments");
-          expect(queryBuilder.countRelations).toContain("likes");
+          expect(queryBuilder.countRelations.get("postsCount")?.relation).toBe("posts");
+          expect(queryBuilder.countRelations.get("commentsCount")?.relation).toBe("comments");
+          expect(queryBuilder.countRelations.get("likesCount")?.relation).toBe("likes");
         });
       });
 
@@ -412,7 +413,7 @@ describe("QueryBuilderContract - Shared Behavior Tests", () => {
 
           expect(queryBuilder.eagerLoadRelations?.has("posts")).toBe(true);
           expect(queryBuilder.eagerLoadRelations?.has("comments")).toBe(true);
-          expect(queryBuilder.countRelations).toContain("likes");
+          expect(queryBuilder.countRelations.get("likesCount")?.relation).toBe("likes");
         });
       });
 

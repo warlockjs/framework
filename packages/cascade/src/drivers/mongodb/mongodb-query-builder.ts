@@ -2411,11 +2411,6 @@ export class MongoQueryBuilder<T = unknown>
     new Map();
 
   /**
-   * Relations to count.
-   */
-  public countRelations: string[] = [];
-
-  /**
    * Relations to load via $lookup (single query).
    */
   public joinRelations: Map<string, { alias: string; type: "belongsTo" | "hasOne" | "hasMany" }> =
@@ -2490,15 +2485,6 @@ export class MongoQueryBuilder<T = unknown>
       }
       // Functions not preceded by a string are ignored (invalid usage)
     }
-    return this;
-  }
-
-  /**
-   * Add a count of related models as a virtual field.
-   * @param relations - Relation name(s) to count
-   */
-  public withCount(...relations: string[]): this {
-    this.countRelations.push(...relations);
     return this;
   }
 

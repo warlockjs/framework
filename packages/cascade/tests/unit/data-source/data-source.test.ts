@@ -161,4 +161,42 @@ describe("DataSource", () => {
       expect(dataSource.modelDefaults).toBeUndefined();
     });
   });
+  describe("migrationDefaults", () => {
+    it("should store migration defaults when provided", () => {
+      const mockDriver = createMockDriver();
+      const migrationDefaults = {
+        uuidStrategy: "v7" as const,
+      };
+
+      const dataSource = new DataSource({
+        name: "test",
+        driver: mockDriver,
+        migrationDefaults,
+      });
+
+      expect(dataSource.migrationDefaults).toBe(migrationDefaults);
+    });
+
+    it("should store uuidExpression when provided", () => {
+      const mockDriver = createMockDriver();
+      const migrationDefaults = {
+        uuidExpression: "uuid_generate_v1mc()",
+      };
+
+      const dataSource = new DataSource({
+        name: "test",
+        driver: mockDriver,
+        migrationDefaults,
+      });
+
+      expect(dataSource.migrationDefaults?.uuidExpression).toBe("uuid_generate_v1mc()");
+    });
+
+    it("should be undefined when not provided", () => {
+      const mockDriver = createMockDriver();
+      const dataSource = new DataSource({ name: "test", driver: mockDriver });
+
+      expect(dataSource.migrationDefaults).toBeUndefined();
+    });
+  });
 });

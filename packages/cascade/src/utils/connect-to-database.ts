@@ -3,7 +3,7 @@ import { DataSource } from "../data-source/data-source";
 import { dataSourceRegistry } from "../data-source/data-source-registry";
 import { MongoDbDriver } from "../drivers/mongodb/mongodb-driver";
 import { PostgresDriver } from "../drivers/postgres";
-import type { DeleteStrategy, MigrationDefaults, ModelDefaults } from "../types";
+import type { DeleteStrategy, MigrationDefaults, ModelDefaults, RelationDefaults } from "../types";
 
 /**
  * Supported database driver types.
@@ -237,6 +237,24 @@ export type ConnectionOptions<TDriverOptions = any, TClientOptions = any> = {
    */
   migrationOptions?: MigrationDefaults;
 
+  /**
+   * Defaults for relation conventions — foreign-key suffix and pivot-table
+   * naming order. Controls how `@BelongsTo` / `@HasOne` / `@HasMany` /
+   * `@BelongsToMany` infer column / table names when none are explicitly
+   * configured on the decorator.
+   *
+   * @default undefined (uses framework defaults: `"_id"` suffix + alphabetical pivot)
+   *
+   * @example
+   * ```typescript
+   * relationOptions: {
+   *   foreignKeySuffix: "_id",
+   *   pivotTableNamingOrder: "alphabetical",
+   * }
+   * ```
+   */
+  relationOptions?: RelationDefaults;
+
   // ============================================================================
   // DATA SOURCE DEFAULTS
   // ============================================================================
@@ -402,6 +420,7 @@ export async function connectToDatabase<TDriverOptions = any, TClientOptions = a
     defaultTrashTable: options.defaultTrashTable,
     modelDefaults: options.modelOptions,
     migrationDefaults: options.migrationOptions,
+    relationDefaults: options.relationOptions,
     migrations: options.migrations,
   });
 

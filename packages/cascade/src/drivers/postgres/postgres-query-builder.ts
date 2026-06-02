@@ -13,15 +13,25 @@ import type {
   CursorPaginationOptions,
   CursorPaginationResult,
   DriverQuery,
+  GroupByInput,
   PaginationOptions,
   PaginationResult,
   QueryBuilderContract,
+  RawExpression,
 } from "../../contracts/query-builder.contract";
 import type { DataSource } from "../../data-source/data-source";
 import { dataSourceRegistry } from "../../data-source/data-source-registry";
+import { isAggregateExpression } from "../../expressions";
 import type { GlobalScopeDefinition } from "../../model/model";
-import { getModelFromRegistry, resolveModelClass } from "../../model/register-model";
+import { resolveModelClass, tryResolveModelClass, type ModelRef } from "../../model/register-model";
 import { QueryBuilder, type Op } from "../../query-builder/query-builder";
+import {
+  inferBelongsToForeignKey,
+  inferHasForeignKey,
+  inferPivotKey,
+  inferPivotTable,
+} from "../../relations/key-conventions";
+import { attachLoadedRelation, RelationLoader } from "../../relations/relation-loader";
 import type { PostgresDriver } from "./postgres-driver";
 import { PostgresQueryParser, type PostgresParserOperation } from "./postgres-query-parser";
 
@@ -44,13 +54,13 @@ function toParserOps(ops: Op[]): PostgresParserOperation[] {
 type JoinRelationConfig = {
   alias: string;
   type: "belongsTo" | "hasOne" | "hasMany";
-  model?: unknown;
+  model?: ModelRef;
   localKey?: string;
   foreignKey?: string;
   ownerKey?: string;
   parentPath?: string | null;
   relationName?: string;
-  parentModel?: unknown;
+  parentModel?: ModelRef;
   select?: string[];
   /** Operations recorded by a joinWith constraint callback. */
   constraintOps?: Op[];
@@ -105,6 +115,36 @@ export class PostgresQueryBuilder<T = unknown>
    */
   public joinRelations = new Map<string, JoinRelationConfig>();
 
+  /**
+   * Idempotency guard for `applyJoinRelations()` so calling `parse()` then
+   * `get()` (or `parse()` twice) doesn't double-emit `selectRelatedColumns`
+   * operations.
+   */
+  private joinRelationsApplied = false;
+
+  /**
+   * Idempotency guard for `applyCountRelations()` — see `joinRelationsApplied`.
+   */
+  private countRelationsApplied = false;
+
+  /**
+   * Idempotency guard for `applyHasRelations()` — see `joinRelationsApplied`.
+   */
+  private hasRelationsApplied = false;
+
+  /**
+   * Alias → SQL expression for two-arg `groupBy` aggregates. Recorded by the
+   * `groupBy` override; consumed by `applyGroupByAggregates` to rewrite a
+   * `having()` on the alias into the underlying expression (Postgres forbids
+   * SELECT aliases in HAVING).
+   */
+  private aggregateAliases = new Map<string, string>();
+
+  /**
+   * Idempotency guard for `applyGroupByAggregates()` — see `joinRelationsApplied`.
+   */
+  private groupByAggregatesApplied = false;
+
   // ──────────────────────────────────────────────────────────────
   // CONSTRUCTOR
   // ──────────────────────────────────────────────────────────────
@@ -143,13 +183,18 @@ export class PostgresQueryBuilder<T = unknown>
     cloned.disabledGlobalScopes = new Set(this.disabledGlobalScopes);
     cloned.scopesApplied = this.scopesApplied;
     cloned.eagerLoadRelations = new Map(this.eagerLoadRelations);
-    cloned.countRelations = [...this.countRelations];
+    cloned.countRelations = new Map(this.countRelations);
     cloned.relationDefinitions = this.relationDefinitions;
     cloned.modelClass = this.modelClass;
 
     // Copy PG-specific state
     cloned.hydrateCallback = this.hydrateCallback;
     cloned.joinRelations = new Map(this.joinRelations);
+    cloned.joinRelationsApplied = this.joinRelationsApplied;
+    cloned.countRelationsApplied = this.countRelationsApplied;
+    cloned.hasRelationsApplied = this.hasRelationsApplied;
+    cloned.aggregateAliases = new Map(this.aggregateAliases);
+    cloned.groupByAggregatesApplied = this.groupByAggregatesApplied;
 
     return cloned;
   }
@@ -187,6 +232,63 @@ export class PostgresQueryBuilder<T = unknown>
       this.addOperation("select", { fields: fieldArr });
     }
     return this;
+  }
+
+  /**
+   * GROUP BY with computed aggregates.
+   *
+   * Single-arg form defers to the base builder. With `aggregates`, each entry
+   * is translated to SQL — via the dialect for `$agg.*` helpers, verbatim for
+   * a raw SQL string — and pushed through the proven `selectRaw` projection
+   * (the same plumbing `similarTo` / `applyCountRelations` rely on). The
+   * grouped columns are projected explicitly because `SELECT *` is invalid
+   * alongside `GROUP BY`. The alias → expression map is recorded so
+   * `applyGroupByAggregates` can later rewrite `having()` on the alias.
+   *
+   * `$agg.distinct/floor/first/last` throw (MongoDB-only on Postgres v1);
+   * MongoDB operator objects throw (not portable to SQL).
+   *
+   * @example
+   * Order.query().groupBy("category", {
+   *   orders: $agg.count(),
+   *   revenue: $agg.sum("amount"),
+   * }).having("revenue", ">", 1000);
+   */
+  public groupBy(fields: GroupByInput): this;
+  public groupBy(fields: GroupByInput, aggregates: Record<string, RawExpression>): this;
+  public groupBy(fields: GroupByInput, aggregates?: Record<string, RawExpression>): this {
+    if (!aggregates) {
+      return super.groupBy(fields);
+    }
+
+    const fieldList = Array.isArray(fields) ? fields : [fields];
+
+    this.addOperation("select", { fields: fieldList });
+
+    for (const [alias, expression] of Object.entries(aggregates)) {
+      let sql: string;
+
+      if (isAggregateExpression(expression)) {
+        sql = this.driver.dialect.aggregateToSql(expression);
+      } else if (typeof expression === "string") {
+        sql = expression;
+      } else {
+        throw new Error(
+          `groupBy aggregate "${alias}" must be a $agg.* helper or a raw SQL ` +
+            `string on Postgres; got ${typeof expression}. MongoDB operator ` +
+            `objects are not portable to SQL — use selectRaw with explicit SQL.`,
+        );
+      }
+
+      this.aggregateAliases.set(alias, sql);
+
+      this.addOperation("selectRaw", {
+        expression: `${sql} AS ${this.driver.dialect.quoteIdentifier(alias)}`,
+        bindings: [],
+      });
+    }
+
+    return super.groupBy(fields);
   }
 
   /**
@@ -401,13 +503,11 @@ export class PostgresQueryBuilder<T = unknown>
       if (typeof arg === "string") {
         entries.push({ path: arg });
       } else if (Array.isArray(arg)) {
-        for (const rel of arg as string[]) {
+        for (const rel of arg) {
           entries.push({ path: rel });
         }
       } else if (typeof arg === "object" && arg !== null) {
-        for (const [rel, val] of Object.entries(
-          arg as Record<string, string | ((q: QueryBuilder) => void)>,
-        )) {
+        for (const [rel, val] of Object.entries(arg)) {
           entries.push({ path: rel, constraint: val });
         }
       }
@@ -444,10 +544,7 @@ export class PostgresQueryBuilder<T = unknown>
             existing.constraintOps = this._resolveConstraintOps(constraint);
           }
 
-          currentModel =
-            typeof existing.model === "string"
-              ? getModelFromRegistry(existing.model as string)
-              : existing.model;
+          currentModel = tryResolveModelClass(existing.model);
           continue;
         }
 
@@ -483,19 +580,18 @@ export class PostgresQueryBuilder<T = unknown>
         this.joinRelations.set(currentPath, {
           alias,
           type: def.type as JoinRelationConfig["type"],
-          model: def.model,
+          model: def.model as ModelRef | undefined,
           localKey: def.localKey as string | undefined,
           foreignKey: def.foreignKey as string | undefined,
           ownerKey: def.ownerKey as string | undefined,
           parentPath: i > 0 ? currentPath.substring(0, currentPath.lastIndexOf(".")) : null,
           relationName: segName,
-          parentModel: currentModel,
+          parentModel: currentModel as ModelRef | undefined,
           select: selectColumns,
           constraintOps,
         });
 
-        currentModel =
-          typeof def.model === "string" ? getModelFromRegistry(def.model as string) : def.model;
+        currentModel = tryResolveModelClass(def.model as ModelRef | undefined);
 
         if (!currentModel) {
           throw new Error(`Relation model not found for "${segName}" in "${currentPath}"`);
@@ -525,6 +621,9 @@ export class PostgresQueryBuilder<T = unknown>
     this.applyPendingScopes();
     this._processJoinWithOps();
     this.applyJoinRelations();
+    this.applyHasRelations();
+    this.applyCountRelations();
+    this.applyGroupByAggregates();
 
     if (this.fetchingCallback) {
       await this.fetchingCallback(this);
@@ -552,6 +651,8 @@ export class PostgresQueryBuilder<T = unknown>
       }
 
       this.attachJoinedRelations(records, joinedData);
+
+      await this.applyEagerLoading(records as unknown[]);
 
       if (this.fetchedCallback) {
         await this.fetchedCallback(records as unknown[], {});
@@ -886,9 +987,22 @@ export class PostgresQueryBuilder<T = unknown>
 
   // ─── Inspection / Debugging ───────────────────────────────────
 
-  /** Return the SQL + bindings without executing. */
+  /**
+   * Return the SQL + bindings without executing.
+   *
+   * Runs the same prelude as `get()` (scopes, joinWith expansion, joinRelations,
+   * countRelations) so the preview matches what would actually be sent to the
+   * database. The apply* methods are idempotent — calling `parse()` then `get()`
+   * does not double-emit operations.
+   */
   public parse(): DriverQuery {
     this.applyPendingScopes();
+    this._processJoinWithOps();
+    this.applyJoinRelations();
+    this.applyHasRelations();
+    this.applyCountRelations();
+    this.applyGroupByAggregates();
+
     const parser = new PostgresQueryParser({
       table: this.table,
       operations: toParserOps(this.operations),
@@ -958,15 +1072,21 @@ export class PostgresQueryBuilder<T = unknown>
 
   /**
    * Translate each entry in `joinRelations` into actual JOIN + selectRelatedColumns operations.
+   *
+   * Idempotent — guarded by `joinRelationsApplied` so repeat calls (e.g.
+   * `parse()` followed by `get()`) don't double-emit operations.
    */
   private applyJoinRelations(): void {
-    if (this.joinRelations.size === 0) return;
+    if (this.joinRelationsApplied || this.joinRelations.size === 0) {
+      return;
+    }
+
+    this.joinRelationsApplied = true;
 
     for (const [path, config] of this.joinRelations) {
-      const RelatedModel =
-        typeof config.model === "string"
-          ? getModelFromRegistry(config.model as string)
-          : (config.model as { table: string } | undefined);
+      const RelatedModel = tryResolveModelClass(config.model) as
+        | { table: string; name?: string; primaryKey?: string }
+        | undefined;
 
       if (!RelatedModel) {
         throw new Error(`Relation model not found for ${path}`);
@@ -978,18 +1098,22 @@ export class PostgresQueryBuilder<T = unknown>
         ? this.joinRelations.get(config.parentPath)!.alias
         : this.table;
 
-      const parentDefTable =
-        (config.parentModel as { table?: string } | undefined)?.table ?? this.table;
+      const parentModel = config.parentModel as { name?: string; primaryKey?: string } | undefined;
+      const relatedModelMeta = RelatedModel as { name?: string; primaryKey?: string };
 
       let localField: string;
       let foreignField: string;
 
+      const conventions = this.dataSource?.relationDefaults;
+
       if (config.type === "belongsTo") {
-        localField = config.foreignKey ?? `${config.relationName}Id`;
-        foreignField = config.ownerKey ?? "id";
+        localField =
+          config.foreignKey ?? inferBelongsToForeignKey(config.relationName ?? "", conventions);
+        foreignField = config.ownerKey ?? relatedModelMeta.primaryKey ?? "id";
       } else {
-        localField = config.localKey ?? "id";
-        foreignField = config.foreignKey ?? `${parentDefTable.slice(0, -1)}Id`;
+        localField = config.localKey ?? parentModel?.primaryKey ?? "id";
+        foreignField =
+          config.foreignKey ?? inferHasForeignKey(parentModel?.name ?? "Model", conventions);
       }
 
       // hasMany uses a correlated subquery in SELECT (no JOIN) to avoid row explosion
@@ -999,6 +1123,12 @@ export class PostgresQueryBuilder<T = unknown>
           alias,
           localField: `${parentTable}.${localField}`,
           foreignField,
+          // For hasOne/belongsTo joinWith with a constraint callback, the parser
+          // appends the constraint's where-clauses to the JOIN's ON condition
+          // (not the outer WHERE, which would convert LEFT JOIN semantics into
+          // INNER JOIN — main rows without a matching constraint-passing related
+          // row would disappear).
+          constraintOps: config.constraintOps,
         });
       }
 
@@ -1015,6 +1145,537 @@ export class PostgresQueryBuilder<T = unknown>
         constraintOps: config.constraintOps, // passed through to parser
       });
     }
+  }
+
+  // ============================================================================
+  // HAS RELATIONS — INTERNAL PIPELINE
+  // ============================================================================
+
+  /**
+   * Translate every `has` / `whereHas` / `orWhereHas` / `doesntHave` /
+   * `whereDoesntHave` operation into an equivalent `whereRaw` (or
+   * `orWhereRaw`) carrying an EXISTS / NOT EXISTS / COUNT-comparison
+   * subquery. Keeps the parser pure (no schema awareness) — same pattern as
+   * `applyJoinRelations` and `applyCountRelations`.
+   *
+   * In-place rewrite preserves position so the boolean (AND/OR) stays
+   * correctly slotted relative to other where conditions.
+   *
+   * Idempotent — guarded by `hasRelationsApplied` so repeat calls (e.g.
+   * `parse()` followed by `get()`) don't double-translate.
+   */
+  private applyHasRelations(): void {
+    if (this.hasRelationsApplied) {
+      return;
+    }
+
+    const HAS_OP_TYPES = new Set([
+      "has",
+      "whereHas",
+      "orWhereHas",
+      "doesntHave",
+      "whereDoesntHave",
+    ]);
+
+    const hasAnyHasOp = this.operations.some((op) => HAS_OP_TYPES.has(op.type));
+
+    if (!hasAnyHasOp) {
+      this.hasRelationsApplied = true;
+      return;
+    }
+
+    this.hasRelationsApplied = true;
+
+    this.operations = this.operations.map((op) => {
+      if (!HAS_OP_TYPES.has(op.type)) {
+        return op;
+      }
+
+      return this.translateHasOp(op);
+    });
+
+    this.rebuildIndex();
+  }
+
+  /**
+   * Translate one has-family operation into its `whereRaw`/`orWhereRaw`
+   * equivalent. Resolves the relation definition, builds the EXISTS or
+   * COUNT-comparison subquery, and returns the replacement op.
+   */
+  private translateHasOp(op: Op): Op {
+    const data = op.data as {
+      relation: string;
+      subquery?: Op[];
+      operator?: string;
+      count?: number;
+    };
+
+    const definition = this.relationDefinitions?.[data.relation] as
+      | Record<string, unknown>
+      | undefined;
+
+    if (!definition) {
+      const modelName = (this.modelClass as { name?: string } | undefined)?.name ?? "unknown";
+      throw new Error(`${op.type}: Relation "${data.relation}" not found on model ${modelName}`);
+    }
+
+    const RelatedModel = tryResolveModelClass(definition.model as ModelRef | undefined) as
+      | { table?: string; name?: string; primaryKey?: string }
+      | undefined;
+
+    if (!RelatedModel || !(RelatedModel as { table?: string }).table) {
+      throw new Error(`${op.type}: Related model not resolvable for "${data.relation}"`);
+    }
+
+    const subquery = this.buildHasSubquery(
+      op.type,
+      data.relation,
+      definition,
+      RelatedModel as { table: string; name: string; primaryKey?: string },
+      data.subquery,
+      data.operator,
+      data.count,
+    );
+
+    const targetType = op.type === "orWhereHas" ? "orWhereRaw" : "whereRaw";
+
+    return {
+      type: targetType,
+      data: {
+        expression: subquery.expression,
+        bindings: subquery.bindings,
+      },
+    };
+  }
+
+  /**
+   * Build the SQL fragment that goes inside a `whereRaw` op for a has-family
+   * translation. Branches on relation type AND on the operation type:
+   *
+   * - `has` with default operator/count → `EXISTS (SELECT 1 FROM ...)`
+   * - `has` with custom operator/count → `(SELECT COUNT(*) FROM ...) <op> <count>`
+   * - `whereHas` / `orWhereHas` → `EXISTS (SELECT 1 ... AND <constraint>)`
+   * - `doesntHave` → `NOT EXISTS (SELECT 1 FROM ...)`
+   * - `whereDoesntHave` → `NOT EXISTS (SELECT 1 ... AND <constraint>)`
+   */
+  private buildHasSubquery(
+    opType: string,
+    relationName: string,
+    definition: Record<string, unknown>,
+    RelatedModel: { table: string; name: string; primaryKey?: string },
+    constraintOps: Op[] | undefined,
+    operator: string | undefined,
+    count: number | undefined,
+  ): { expression: string; bindings: unknown[] } {
+    const dialect = this.driver.dialect;
+    const quotedSelfTable = dialect.quoteIdentifier(this.table);
+    const quotedRelatedTable = dialect.quoteIdentifier(RelatedModel.table);
+    const relationType = definition.type as string;
+    const selfModel = this.modelClass as { name?: string; primaryKey?: string } | undefined;
+    const conventions = this.dataSource?.relationDefaults;
+
+    const where = this.extractCountWhereFragment(RelatedModel.table, constraintOps);
+
+    let fromClause: string;
+    let joinCondition: string;
+
+    if (relationType === "hasMany" || relationType === "hasOne") {
+      const localKey = (definition.localKey as string | undefined) ?? selfModel?.primaryKey ?? "id";
+      const foreignKey =
+        (definition.foreignKey as string | undefined) ??
+        inferHasForeignKey(selfModel?.name ?? "Model", conventions);
+
+      fromClause = quotedRelatedTable;
+      joinCondition =
+        `${quotedRelatedTable}.${dialect.quoteIdentifier(foreignKey)} = ` +
+        `${quotedSelfTable}.${dialect.quoteIdentifier(localKey)}`;
+    } else if (relationType === "belongsTo") {
+      const ownerKey =
+        (definition.localKey as string | undefined) ?? RelatedModel.primaryKey ?? "id";
+      const foreignKey =
+        (definition.foreignKey as string | undefined) ??
+        inferBelongsToForeignKey(relationName, conventions);
+
+      fromClause = quotedRelatedTable;
+      joinCondition =
+        `${quotedRelatedTable}.${dialect.quoteIdentifier(ownerKey)} = ` +
+        `${quotedSelfTable}.${dialect.quoteIdentifier(foreignKey)}`;
+    } else if (relationType === "belongsToMany") {
+      const pivotTableName =
+        (definition.pivot as string | undefined) ??
+        inferPivotTable(selfModel?.name ?? "Model", RelatedModel.name, conventions);
+
+      const quotedPivot = dialect.quoteIdentifier(pivotTableName);
+      const pivotLocalCol =
+        (definition.localKey as string | undefined) ??
+        inferPivotKey(selfModel?.name ?? "Model", conventions);
+      const pivotForeignCol =
+        (definition.foreignKey as string | undefined) ??
+        inferPivotKey(RelatedModel.name, conventions);
+      const selfPk =
+        (definition.pivotLocalKey as string | undefined) ?? selfModel?.primaryKey ?? "id";
+      const relatedPk =
+        (definition.pivotForeignKey as string | undefined) ?? RelatedModel.primaryKey ?? "id";
+
+      // Constraint-free: pivot-only count. With constraint: INNER JOIN related so
+      // the constraint can target related columns.
+      if (!constraintOps || constraintOps.length === 0) {
+        fromClause = quotedPivot;
+        joinCondition =
+          `${quotedPivot}.${dialect.quoteIdentifier(pivotLocalCol)} = ` +
+          `${quotedSelfTable}.${dialect.quoteIdentifier(selfPk)}`;
+      } else {
+        fromClause =
+          `${quotedPivot} INNER JOIN ${quotedRelatedTable} ON ` +
+          `${quotedRelatedTable}.${dialect.quoteIdentifier(relatedPk)} = ` +
+          `${quotedPivot}.${dialect.quoteIdentifier(pivotForeignCol)}`;
+        joinCondition =
+          `${quotedPivot}.${dialect.quoteIdentifier(pivotLocalCol)} = ` +
+          `${quotedSelfTable}.${dialect.quoteIdentifier(selfPk)}`;
+      }
+    } else {
+      throw new Error(
+        `${opType}: Unsupported relation type "${relationType}" for "${relationName}"`,
+      );
+    }
+
+    const fullWhere = where.fragment ? `${joinCondition} AND ${where.fragment}` : joinCondition;
+
+    // `has` with custom operator/count compiles to a COUNT comparison; everything
+    // else uses EXISTS / NOT EXISTS for short-circuit behaviour.
+    const isCountComparison =
+      opType === "has" && ((operator !== undefined && operator !== ">=") || (count ?? 1) !== 1);
+
+    if (isCountComparison) {
+      const op = operator ?? ">=";
+      const compareCount = count ?? 1;
+
+      return {
+        expression: `(SELECT COUNT(*) FROM ${fromClause} WHERE ${fullWhere}) ${op} ${compareCount}`,
+        bindings: where.bindings,
+      };
+    }
+
+    const negate = opType === "doesntHave" || opType === "whereDoesntHave";
+    const keyword = negate ? "NOT EXISTS" : "EXISTS";
+
+    return {
+      expression: `${keyword} (SELECT 1 FROM ${fromClause} WHERE ${fullWhere})`,
+      bindings: where.bindings,
+    };
+  }
+
+  // ============================================================================
+  // COUNT RELATIONS — INTERNAL PIPELINE
+  // ============================================================================
+
+  /**
+   * Translate each entry in `countRelations` into a correlated COUNT subquery
+   * emitted as a `selectRaw` operation. Runs after `applyJoinRelations` so the
+   * "preserve main table columns" guard sees any joins already in place.
+   *
+   * Idempotent — guarded by `countRelationsApplied` so repeat calls (e.g.
+   * `parse()` followed by `get()`) don't double-emit operations.
+   */
+  private applyCountRelations(): void {
+    if (this.countRelationsApplied || this.countRelations.size === 0) {
+      return;
+    }
+
+    this.countRelationsApplied = true;
+
+    this.ensureMainColumnsForCount();
+
+    for (const [alias, entry] of this.countRelations) {
+      const definition = this.relationDefinitions?.[entry.relation] as
+        | Record<string, unknown>
+        | undefined;
+
+      if (!definition) {
+        const modelName = (this.modelClass as { name?: string } | undefined)?.name ?? "unknown";
+        throw new Error(`withCount: Relation "${entry.relation}" not found on model ${modelName}`);
+      }
+
+      const RelatedModel = tryResolveModelClass(definition.model as ModelRef | undefined) as
+        | { table?: string; name?: string }
+        | undefined;
+
+      if (!RelatedModel || !(RelatedModel as { table?: string }).table) {
+        throw new Error(
+          `withCount: Related model not resolvable for "${entry.relation}" (alias "${alias}")`,
+        );
+      }
+
+      const subquery = this.buildCountSubquery(
+        alias,
+        entry.relation,
+        definition,
+        RelatedModel as { table: string; name: string },
+        entry.constraintOps,
+      );
+
+      this.addOperation("selectRaw", {
+        expression: subquery.expression,
+        bindings: subquery.bindings,
+      });
+    }
+  }
+
+  /**
+   * Without an explicit `select(...)` or any `selectRaw`/`selectRelatedColumns`
+   * already pushed, the parser's "no selects → SELECT *" fallback would be
+   * suppressed once we add count expressions. Push `<table>.*` first so the
+   * caller's columns survive.
+   */
+  private ensureMainColumnsForCount(): void {
+    const hasExistingSelect = this.operations.some(
+      (op) => op.type === "select" || op.type === "selectRaw" || op.type === "selectRelatedColumns",
+    );
+
+    if (hasExistingSelect) {
+      return;
+    }
+
+    const quotedTable = this.driver.dialect.quoteIdentifier(this.table);
+
+    this.addOperation("selectRaw", {
+      expression: `${quotedTable}.*`,
+      bindings: [],
+    });
+  }
+
+  /**
+   * Build a single correlated-subquery expression for a count entry. Branches
+   * on relation type (hasMany/hasOne/belongsTo/belongsToMany). The optional
+   * constraint callback's where-ops are translated via a sub-parser and
+   * spliced into the subquery's WHERE clause.
+   */
+  private buildCountSubquery(
+    alias: string,
+    relationName: string,
+    definition: Record<string, unknown>,
+    RelatedModel: { table: string; name: string },
+    constraintOps: Op[] | undefined,
+  ): { expression: string; bindings: unknown[] } {
+    const dialect = this.driver.dialect;
+    const quotedAlias = dialect.quoteIdentifier(alias);
+    const quotedSelfTable = dialect.quoteIdentifier(this.table);
+    const quotedRelatedTable = dialect.quoteIdentifier(RelatedModel.table);
+    const relationType = definition.type as string;
+
+    const selfModel = this.modelClass as { name?: string; primaryKey?: string } | undefined;
+    const relatedMeta = RelatedModel as { name: string; primaryKey?: string; table: string };
+    const conventions = this.dataSource?.relationDefaults;
+
+    if (relationType === "hasMany" || relationType === "hasOne") {
+      const localKey = (definition.localKey as string | undefined) ?? selfModel?.primaryKey ?? "id";
+      const foreignKey =
+        (definition.foreignKey as string | undefined) ??
+        inferHasForeignKey(selfModel?.name ?? "Model", conventions);
+      const where = this.extractCountWhereFragment(RelatedModel.table, constraintOps);
+
+      const fkCondition =
+        `${quotedRelatedTable}.${dialect.quoteIdentifier(foreignKey)} = ` +
+        `${quotedSelfTable}.${dialect.quoteIdentifier(localKey)}`;
+      const fullWhere = where.fragment ? `${fkCondition} AND ${where.fragment}` : fkCondition;
+
+      return {
+        expression: `(SELECT COUNT(*) FROM ${quotedRelatedTable} WHERE ${fullWhere})::int AS ${quotedAlias}`,
+        bindings: where.bindings,
+      };
+    }
+
+    if (relationType === "belongsTo") {
+      const ownerKey =
+        (definition.localKey as string | undefined) ?? relatedMeta.primaryKey ?? "id";
+      const foreignKey =
+        (definition.foreignKey as string | undefined) ??
+        inferBelongsToForeignKey(relationName, conventions);
+      const where = this.extractCountWhereFragment(RelatedModel.table, constraintOps);
+
+      const condition =
+        `${quotedRelatedTable}.${dialect.quoteIdentifier(ownerKey)} = ` +
+        `${quotedSelfTable}.${dialect.quoteIdentifier(foreignKey)}`;
+      const fullWhere = where.fragment ? `${condition} AND ${where.fragment}` : condition;
+
+      return {
+        expression: `(SELECT COUNT(*) FROM ${quotedRelatedTable} WHERE ${fullWhere})::int AS ${quotedAlias}`,
+        bindings: where.bindings,
+      };
+    }
+
+    if (relationType === "belongsToMany") {
+      const pivotTableName =
+        (definition.pivot as string | undefined) ??
+        inferPivotTable(selfModel?.name ?? "Model", relatedMeta.name, conventions);
+
+      const quotedPivot = dialect.quoteIdentifier(pivotTableName);
+      const pivotLocalCol =
+        (definition.localKey as string | undefined) ??
+        inferPivotKey(selfModel?.name ?? "Model", conventions);
+      const pivotForeignCol =
+        (definition.foreignKey as string | undefined) ??
+        inferPivotKey(relatedMeta.name, conventions);
+      const selfPk =
+        (definition.pivotLocalKey as string | undefined) ?? selfModel?.primaryKey ?? "id";
+      const relatedPk =
+        (definition.pivotForeignKey as string | undefined) ?? relatedMeta.primaryKey ?? "id";
+
+      const pivotCondition =
+        `${quotedPivot}.${dialect.quoteIdentifier(pivotLocalCol)} = ` +
+        `${quotedSelfTable}.${dialect.quoteIdentifier(selfPk)}`;
+
+      if (!constraintOps || constraintOps.length === 0) {
+        return {
+          expression: `(SELECT COUNT(*) FROM ${quotedPivot} WHERE ${pivotCondition})::int AS ${quotedAlias}`,
+          bindings: [],
+        };
+      }
+
+      const where = this.extractCountWhereFragment(RelatedModel.table, constraintOps);
+      const join =
+        `INNER JOIN ${quotedRelatedTable} ON ${quotedRelatedTable}.${dialect.quoteIdentifier(relatedPk)} = ` +
+        `${quotedPivot}.${dialect.quoteIdentifier(pivotForeignCol)}`;
+      const fullWhere = where.fragment ? `${pivotCondition} AND ${where.fragment}` : pivotCondition;
+
+      return {
+        expression: `(SELECT COUNT(*) FROM ${quotedPivot} ${join} WHERE ${fullWhere})::int AS ${quotedAlias}`,
+        bindings: where.bindings,
+      };
+    }
+
+    throw new Error(`withCount: Unsupported relation type "${relationType}" for "${relationName}"`);
+  }
+
+  /**
+   * Run a constraint's where-ops through a fresh sub-parser to obtain a SQL
+   * WHERE-fragment plus bindings. Strips the leading `WHERE ` and rewrites
+   * `$N` placeholders back to `?` so the outer parser renumbers them
+   * consistently when it processes the enclosing `selectRaw` operation.
+   *
+   * Non-where ops (orderBy / limit / etc.) are silently dropped — they have
+   * no meaning inside a COUNT subquery.
+   */
+  private extractCountWhereFragment(
+    relatedTable: string,
+    constraintOps: Op[] | undefined,
+  ): { fragment: string; bindings: unknown[] } {
+    if (!constraintOps || constraintOps.length === 0) {
+      return { fragment: "", bindings: [] };
+    }
+
+    const whereOps = constraintOps.filter(
+      (op) => op.type.startsWith("where") || op.type.startsWith("orWhere"),
+    );
+
+    if (whereOps.length === 0) {
+      return { fragment: "", bindings: [] };
+    }
+
+    const subParser = new PostgresQueryParser({
+      table: relatedTable,
+      operations: toParserOps(whereOps),
+    });
+
+    const { query = "", bindings = [] } = subParser.parse();
+    const match = query.match(/WHERE\s+(.+)$/);
+
+    if (!match) {
+      return { fragment: "", bindings: [] };
+    }
+
+    const fragment = match[1].replace(/\$\d+/g, "?");
+
+    return { fragment, bindings: bindings ?? [] };
+  }
+
+  // ============================================================================
+  // GROUP-BY AGGREGATES — INTERNAL PIPELINE
+  // ============================================================================
+
+  /**
+   * Rewrite every `having` op whose field matches a recorded aggregate alias
+   * into a `havingRaw` carrying the underlying SQL expression. PostgreSQL
+   * forbids SELECT aliases in HAVING, so `having("revenue", ">", 1000)` on a
+   * `groupBy` aggregate would otherwise throw at runtime. A `having` on a
+   * grouped column (no alias match) is left untouched. Runs at parse time
+   * (not in the `groupBy` override) so it is independent of fluent call order.
+   *
+   * Idempotent — guarded by `groupByAggregatesApplied` so repeat calls (e.g.
+   * `parse()` followed by `get()`) don't double-process.
+   */
+  private applyGroupByAggregates(): void {
+    if (this.groupByAggregatesApplied) {
+      return;
+    }
+
+    this.groupByAggregatesApplied = true;
+
+    if (this.aggregateAliases.size === 0) {
+      return;
+    }
+
+    this.operations = this.operations.map((operation) => {
+      if (operation.type !== "having") {
+        return operation;
+      }
+
+      const field = operation.data.field as string;
+      const sql = this.aggregateAliases.get(field);
+
+      if (!sql) {
+        return operation;
+      }
+
+      const operator = (operation.data.operator as string) ?? "=";
+
+      return {
+        type: "havingRaw",
+        data: {
+          expression: `${sql} ${operator} ?`,
+          bindings: [operation.data.value],
+        },
+      };
+    });
+
+    this.rebuildIndex();
+  }
+
+  // ============================================================================
+  // EAGER LOADING — INTERNAL PIPELINE
+  // ============================================================================
+
+  /**
+   * Run the RelationLoader against the fetched rows for every relation
+   * registered via `with()`. Mutates each model instance in place — attaches
+   * loaded relations onto `model.loadedRelations` and as direct properties.
+   *
+   * Lives here (not in `buildQuery`'s `onFetched` callback as it did
+   * historically) so any code path that calls `get()` — including
+   * `Model.newQueryBuilder()` direct instantiation, custom builder subclasses
+   * via `static builder`, or any `eagerLoadRelations`-bearing builder — gets
+   * eager-loading. Previously the loader was only installed when the builder
+   * was constructed via `Model.query()` / `buildQuery`, so bypassing that
+   * factory made `with()` a silent no-op.
+   *
+   * Skipped silently when `modelClass` is absent (raw driver-level
+   * `queryBuilder()` usage has no relations map to consult).
+   */
+  private async applyEagerLoading(records: unknown[]): Promise<void> {
+    if (!this.modelClass || this.eagerLoadRelations.size === 0 || records.length === 0) {
+      return;
+    }
+
+    const constraints: Record<string, (query: QueryBuilderContract) => void> = {};
+
+    for (const [name, constraint] of this.eagerLoadRelations) {
+      if (typeof constraint === "function") {
+        constraints[name] = constraint as (query: QueryBuilderContract) => void;
+      }
+    }
+
+    const loader = new RelationLoader(records as never, this.modelClass as never);
+    await loader.load([...this.eagerLoadRelations.keys()], constraints);
   }
 
   /**
@@ -1084,13 +1745,8 @@ export class PostgresQueryBuilder<T = unknown>
         const config = this.joinRelations.get(path);
         if (!config) continue;
 
-        const m = model as Record<string, unknown> & {
-          loadedRelations?: Map<string, unknown>;
-        };
-
         if (data === null) {
-          m[key] = null;
-          m.loadedRelations?.set(key, null);
+          attachLoadedRelation(model as object, key, null);
           continue;
         }
 
@@ -1109,8 +1765,7 @@ export class PostgresQueryBuilder<T = unknown>
             return (RelatedModel as { hydrate: (d: unknown) => unknown }).hydrate(rowData);
           });
 
-          m[key] = instances;
-          m.loadedRelations?.set(key, instances);
+          attachLoadedRelation(model as object, key, instances as never);
         } else {
           const modelData = { ...(data as object) } as Record<string, unknown>;
           for (const childKey of childKeys) delete modelData[childKey];
@@ -1120,8 +1775,7 @@ export class PostgresQueryBuilder<T = unknown>
           );
           attachNested(relatedInstance, data, path);
 
-          m[key] = relatedInstance;
-          m.loadedRelations?.set(key, relatedInstance);
+          attachLoadedRelation(model as object, key, relatedInstance as never);
         }
       }
     };

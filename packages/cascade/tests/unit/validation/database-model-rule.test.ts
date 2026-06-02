@@ -1,12 +1,28 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { dataSourceRegistry } from "../../../src/data-source/data-source-registry";
 import { Model } from "../../../src/model/model";
 import { RegisterModel, cleanupModelsRegistery } from "../../../src/model/register-model";
 import {
   databaseModelRule,
   databaseModelsRule,
 } from "../../../src/validation/rules/database-model-rule";
+import { createMockDriver } from "../../utils/test-helpers";
 
 describe("Database Validation Rules", () => {
+  // Constructing a Model asks its driver for a dirty tracker, so a default
+  // data source must be registered before any `new SomeModel()` call.
+  beforeAll(() => {
+    dataSourceRegistry.register({
+      name: "test",
+      driver: createMockDriver(),
+      isDefault: true,
+    });
+  });
+
+  afterAll(() => {
+    dataSourceRegistry.clear();
+  });
+
   beforeEach(() => {
     cleanupModelsRegistery();
   });
@@ -27,7 +43,7 @@ describe("Database Validation Rules", () => {
         options: { model: User },
       } as any;
 
-      const result = await databaseModelRule.validate?.call({ context }, user, context);
+      const result = await databaseModelRule.validate?.call({ ...databaseModelRule, context }, user, context);
 
       expect(result).toEqual({ isValid: true });
     });
@@ -43,7 +59,7 @@ describe("Database Validation Rules", () => {
         options: { model: { name: "User" } },
       } as any;
 
-      const result = await databaseModelRule.validate?.call({ context }, notAModel, context);
+      const result = await databaseModelRule.validate?.call({ ...databaseModelRule, context }, notAModel, context);
 
       expect(result).toHaveProperty("isValid", false);
     });
@@ -59,7 +75,7 @@ describe("Database Validation Rules", () => {
         options: { model: { name: "User" } },
       } as any;
 
-      await databaseModelRule.validate?.call({ context }, notAModel, context);
+      await databaseModelRule.validate?.call({ ...databaseModelRule, context }, notAModel, context);
 
       expect(context.attributesList.model).toBe("User");
     });
@@ -74,7 +90,7 @@ describe("Database Validation Rules", () => {
         options: {},
       } as any;
 
-      const result = await databaseModelRule.validate?.call({ context }, null, context);
+      const result = await databaseModelRule.validate?.call({ ...databaseModelRule, context }, null, context);
 
       expect(result).toHaveProperty("isValid", false);
     });
@@ -97,7 +113,7 @@ describe("Database Validation Rules", () => {
         options: { model: Post },
       } as any;
 
-      const result = await databaseModelsRule.validate?.call({ context }, posts, context);
+      const result = await databaseModelsRule.validate?.call({ ...databaseModelsRule, context }, posts, context);
 
       expect(result).toEqual({ isValid: true });
     });
@@ -118,7 +134,7 @@ describe("Database Validation Rules", () => {
         options: { model: Comment },
       } as any;
 
-      const result = await databaseModelsRule.validate?.call({ context }, mixed, context);
+      const result = await databaseModelsRule.validate?.call({ ...databaseModelsRule, context }, mixed, context);
 
       expect(result).toHaveProperty("isValid", false);
     });
@@ -134,7 +150,7 @@ describe("Database Validation Rules", () => {
         options: { model: { name: "Item" } },
       } as any;
 
-      const result = await databaseModelsRule.validate?.call({ context }, notArray, context);
+      const result = await databaseModelsRule.validate?.call({ ...databaseModelsRule, context }, notArray, context);
 
       expect(result).toHaveProperty("isValid", false);
     });
@@ -156,7 +172,7 @@ describe("Database Validation Rules", () => {
         options: { model: "Product" }, // String reference
       } as any;
 
-      const result = await databaseModelsRule.validate?.call({ context }, products, context);
+      const result = await databaseModelsRule.validate?.call({ ...databaseModelsRule, context }, products, context);
 
       expect(result).toEqual({ isValid: true });
     });
@@ -175,7 +191,7 @@ describe("Database Validation Rules", () => {
         options: { model: Category },
       } as any;
 
-      await databaseModelsRule.validate?.call({ context }, [], context);
+      await databaseModelsRule.validate?.call({ ...databaseModelsRule, context }, [], context);
 
       expect(context.attributesList.model).toBe("Category");
     });
@@ -194,7 +210,7 @@ describe("Database Validation Rules", () => {
         options: { model: Tag },
       } as any;
 
-      const result = await databaseModelsRule.validate?.call({ context }, [], context);
+      const result = await databaseModelsRule.validate?.call({ ...databaseModelsRule, context }, [], context);
 
       expect(result).toEqual({ isValid: true });
     });
@@ -212,7 +228,7 @@ describe("Database Validation Rules", () => {
     });
 
     it("should have correct rule names", () => {
-      expect(databaseModelRule.name).toBe("databaseModule");
+      expect(databaseModelRule.name).toBe("databaseModel");
       expect(databaseModelsRule.name).toBe("databaseModels");
     });
   });

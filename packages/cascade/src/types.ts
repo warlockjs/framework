@@ -411,3 +411,54 @@ export type MigrationDefaults = {
    */
   primaryKey?: "uuid" | "int" | "bigInt";
 };
+
+/**
+ * Defaults for relation conventions — controls how `@BelongsTo` /
+ * `@HasOne` / `@HasMany` / `@BelongsToMany` infer foreign-key columns
+ * and pivot-table names when none are explicitly configured.
+ *
+ * **Note on column casing.** Foreign-key column casing follows
+ * `modelOptions.namingConvention` (snake_case vs camelCase) and is NOT
+ * a separate knob — exposing one here would let users desync FK casing
+ * from the actual column casing produced by migrations, which always
+ * silently breaks queries.
+ *
+ * @example
+ * ```typescript
+ * // src/config/database.ts
+ * relationOptions: {
+ *   foreignKeySuffix: "_id",                  // default
+ *   pivotTableNamingOrder: "alphabetical",    // default — `post_tag`
+ * }
+ * ```
+ */
+export type RelationDefaults = {
+  /**
+   * Suffix appended to the inferred relation name to form the foreign-key
+   * column name.
+   *
+   * Examples (suffix = `"_id"`):
+   * - `@BelongsTo("Organization") organization` → `organization_id`
+   * - `@HasMany("Post") posts` on `User` → `user_id` on the `posts` table
+   *
+   * @default "_id"
+   */
+  foreignKeySuffix?: string;
+
+  /**
+   * Ordering rule used to derive the default pivot-table name for
+   * `@BelongsToMany` relations when no explicit `pivot` is given.
+   *
+   * - `"alphabetical"` — snake names sorted alphabetically (Laravel/Rails
+   *   default). `Post` + `Tag` → `post_tag`. Same result regardless of
+   *   which side declares the relation.
+   * - `"owner_first"` — owner's snake name first, related's snake name
+   *   second. `Post` declares `@BelongsToMany("Tag")` → `post_tag`;
+   *   `Tag` declares `@BelongsToMany("Post")` → `tag_post`. Less safe
+   *   when both sides declare the relation (the names disagree); only
+   *   pick this if you've standardised on one-side-declares.
+   *
+   * @default "alphabetical"
+   */
+  pivotTableNamingOrder?: "alphabetical" | "owner_first";
+};

@@ -382,6 +382,9 @@ export interface MigrationContract {
   /** UUID[] — array of UUIDs. */
   arrayUuid(column: string): ColumnBuilder;
 
+  /** JSONB[] — array of JSON objects. */
+  arrayJson(column: string): ColumnBuilder;
+
   /**
    * Add an auto-increment primary key column.
    */
@@ -800,6 +803,93 @@ export abstract class Migration implements MigrationContract {
     }
 
     return BoundMigration as unknown as MigrationConstructor;
+  }
+
+  /**
+   * Create a migration that executes raw SQL statements.
+   *
+   * Intended for external packages that ship engine-specific DDL — typically a
+   * one-shot `CREATE TABLE` bundle whose `up` is the only direction that matters.
+   * The `down` direction is optional; when omitted, rollback is a recorded no-op.
+   *
+   * Raw SQL is engine-locked by definition. This factory is rejected on MongoDB
+   * data sources at execute time — use the fluent builder for cross-engine work.
+   *
+   * @param options - Migration name, SQL statements, and optional overrides
+   * @returns Migration constructor ready to register with the runner
+   *
+   * @example
+   * ```typescript
+   * export const createAuthTables = Migration.rawSql({
+   *   name: "create_auth_tables",
+   *   up: [
+   *     `CREATE TABLE users (id UUID PRIMARY KEY, email TEXT UNIQUE NOT NULL)`,
+   *     `CREATE TABLE sessions (id UUID PRIMARY KEY, user_id UUID REFERENCES users(id))`,
+   *   ],
+   * });
+   * ```
+   */
+  public static rawSql(options: {
+    /**
+     * Migration name. Used as the tracking key in the migrations table — must
+     * be unique across the application.
+     */
+    name: string;
+    /**
+     * SQL statement(s) to execute on the up direction.
+     */
+    up: string | string[];
+    /**
+     * Optional SQL statement(s) for rollback. If omitted, `down()` is a no-op
+     * and rollback simply removes the tracking record.
+     */
+    down?: string | string[];
+    /**
+     * Optional data source override (string name or DataSource instance).
+     */
+    dataSource?: string | DataSource;
+    /**
+     * Whether to wrap execution in a transaction. Defaults to the runner's
+     * resolved default.
+     */
+    transactional?: boolean;
+  }): MigrationConstructor {
+    const { name, up, down, dataSource, transactional } = options;
+
+    const toStatements = (input: string | string[]): string[] =>
+      Array.isArray(input) ? input : [input];
+
+    class RawSqlMigration extends Migration {
+      public readonly table = "";
+      public readonly dataSource = dataSource;
+      public readonly transactional = transactional;
+
+      public up(): void {
+        this.guardEngine();
+        for (const sql of toStatements(up)) {
+          this.raw(sql);
+        }
+      }
+
+      public down(): void {
+        if (down === undefined) return;
+        this.guardEngine();
+        for (const sql of toStatements(down)) {
+          this.raw(sql);
+        }
+      }
+
+      private guardEngine(): void {
+        if (this.databaseEngine === "mongodb") {
+          throw new Error(
+            `Migration.rawSql ("${name}") is not supported on mongodb data sources — use the fluent builder instead.`,
+          );
+        }
+      }
+    }
+
+    RawSqlMigration.migrationName = name;
+    return RawSqlMigration as unknown as MigrationConstructor;
   }
 
   // ============================================================================
@@ -2012,6 +2102,20 @@ export abstract class Migration implements MigrationContract {
     return builder;
   }
 
+  /**
+   * Add a JSONB[] column — array of JSON objects.
+   *
+   * @example
+   * ```typescript
+   * this.arrayJson("metadata"); // JSONB[]
+   * ```
+   */
+  public arrayJson(column: string): ColumnBuilder {
+    const builder = new ColumnBuilder(this, column, "arrayJson");
+    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+    return builder;
+  }
+
   // ============================================================================
   // SHORTCUTS
   // ============================================================================
@@ -3166,7 +3270,7 @@ function wireColumns(migration: Migration, columns: ColumnMap): void {
     // Transfer any index operations registered via .unique() / .index()
     // Replace the placeholder column name with the real column name before transfer.
     for (const idx of detached.sink.pendingIndexes) {
-      idx.columns = idx.columns.map(col => (col === "__placeholder__" ? columnName : col));
+      idx.columns = idx.columns.map((col) => (col === "__placeholder__" ? columnName : col));
       migration.addPendingIndex(idx);
     }
 

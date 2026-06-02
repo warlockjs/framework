@@ -26,36 +26,45 @@ export type DefineModelOptions<TSchema extends ModelSchema> = {
   schema: ObjectValidator;
 
   /**
-   * Optional: Delete strategy for the model.
-   * - "trash": Move records to trash/soft-delete (default)
-   * - "hard": Permanently delete records
-   * - "soft": Mark records as deleted but keep them in the database
-   * - "disable": Mark records as disabled
+   * Delete strategy for this model. Controls how `destroy()` handles records.
+   *
+   * - `"trash"` — Moves the record to a trash table/collection, then deletes from the source.
+   * - `"permanent"` — Hard delete. The record is removed from the database.
+   * - `"soft"` — Sets a `deletedAt` timestamp; the row stays in place.
+   *
+   * When omitted, the runtime resolves the strategy in this priority order:
+   * `destroy()` call options → this model's static → data source `defaultDeleteStrategy` → `"permanent"`.
    */
   deleteStrategy?: DeleteStrategy;
 
   /**
-   * Optional: Strict mode for unknown fields.
-   * - "strip": Remove unknown fields (default)
-   * - "fail": Throw error on unknown fields
+   * Behavior when the model is asked to write a field that is not declared in `schema`.
+   *
+   * - `"strip"` — Drop unknown fields silently (default).
+   * - `"fail"` — Throw a validation error on unknown fields.
+   * - `"allow"` — Pass unknown fields through to the database as-is.
    */
   strictMode?: StrictMode;
 
   /**
-   * Optional: Whether to automatically generate IDs.
-   * Default: false (use MongoDB's _id)
+   * Auto-generate a sequential `id` field on insert (NoSQL only).
+   *
+   * SQL drivers use native AUTO_INCREMENT and ignore this. When omitted, the
+   * MongoDB driver defaults to `true`; the PostgreSQL driver defaults to `false`.
    */
   autoGenerateId?: boolean;
 
   /**
-   * Optional: Whether to use random increments for IDs.
-   * Default: false
+   * Use a random increment (1–10) instead of a fixed step when auto-generating IDs.
+   *
+   * When omitted, falls through to the driver/data-source default.
    */
   randomIncrement?: boolean;
 
   /**
-   * Optional: Initial ID value when auto-generating.
-   * Default: 1
+   * Initial ID value for the first record when auto-generating IDs.
+   *
+   * When omitted, falls through to the driver/data-source default (typically `1`).
    */
   initialId?: number;
 
@@ -166,11 +175,11 @@ export function defineModel<
 >(
   options: DefineModelOptions<TSchema> & {
     schema: TSchemaValidator;
-    properties?: ThisType<Model<Infer<TSchemaValidator>>> & TProperties;
-    statics?: ThisType<typeof Model<Infer<TSchemaValidator>>> & TStatics;
+    properties?: ThisType<Model<Infer.Output<TSchemaValidator>>> & TProperties;
+    statics?: ThisType<typeof Model<Infer.Output<TSchemaValidator>>> & TStatics;
   },
 ) {
-  type InferredSchema = Infer<TSchemaValidator>;
+  type InferredSchema = Infer.Output<TSchemaValidator>;
 
   class DefinedModel extends Model<InferredSchema> {
     /**
@@ -184,29 +193,34 @@ export function defineModel<
     public static schema = options.schema;
 
     /**
-     * Delete strategy
+     * Delete strategy. When undefined, the runtime resolves via call options →
+     * data source `defaultDeleteStrategy` → `"permanent"`.
      */
-    public static deleteStrategy: DeleteStrategy = options.deleteStrategy || "trash";
+    public static deleteStrategy: DeleteStrategy | undefined = options.deleteStrategy;
 
     /**
-     * Strict mode
+     * Strict mode for unknown fields. Defaults to `"strip"` to match the base
+     * `Model` static default.
      */
-    public static strictMode = options.strictMode || "strip";
+    public static strictMode: StrictMode = options.strictMode || "strip";
 
     /**
-     * Auto-generate ID
+     * Auto-generate sequential IDs (NoSQL only). Defaults to `true` to match
+     * the base `Model` static default.
      */
-    public static autoGenerateId = options.autoGenerateId || false;
+    public static autoGenerateId: boolean = options.autoGenerateId ?? true;
 
     /**
-     * Random increment
+     * Random increment for auto-generated IDs. When undefined, falls through
+     * to the data-source default.
      */
-    public static randomIncrement = options.randomIncrement || false;
+    public static randomIncrement: boolean | undefined = options.randomIncrement;
 
     /**
-     * Initial ID
+     * Initial ID value for the first record when auto-generating IDs. When
+     * undefined, falls through to the data-source default.
      */
-    public static initialId = options.initialId || 1;
+    public static initialId: number | undefined = options.initialId;
   }
 
   // Apply custom instance properties (getters/setters/methods)
@@ -226,13 +240,23 @@ export function defineModel<
     Object.defineProperties(DefinedModel, Object.getOwnPropertyDescriptors(options.statics));
   }
 
-  // Return with proper type inference
-  type ReturnType = {
-    new (initialData?: Partial<InferredSchema>): DefinedModel & TProperties;
-  } & Omit<typeof DefinedModel, "new"> &
+  // Return with proper type inference.
+  //
+  // The constructed type references the EXPORTED `Model` (instance + statics)
+  // rather than the local `DefinedModel` class. `DefinedModel` is declared
+  // inside this function, so emitting it into the public `.d.ts` would force the
+  // declaration emitter to inline it as an anonymous class type — which fails
+  // with TS4094 ("anonymous class type may not be private or protected", from
+  // Model's `protected isActiveColumn`) and crashes the dts bundler on Model's
+  // getters. `DefinedModel` adds no instance members over `Model<InferredSchema>`
+  // and no statics beyond those already declared on `Model`, so this is a
+  // faithful, emittable equivalent of the previously-inferred return type.
+  type DefinedModelClass = {
+    new (initialData?: Partial<InferredSchema>): Model<InferredSchema> & TProperties;
+  } & Omit<typeof Model, "new"> &
     TStatics;
 
-  return DefinedModel as unknown as ReturnType;
+  return DefinedModel as unknown as DefinedModelClass;
 }
 
 /**

@@ -520,6 +520,38 @@ export class PostgresQueryParser {
   }
 
   /**
+   * Absorb a sub-parser's params into this parser, returning a rewriter
+   * function that translates the sub-parser's `$N` placeholders into freshly
+   * numbered placeholders in this parser's namespace.
+   *
+   * Required whenever sub-parser SQL fragments (e.g. WHERE clauses produced
+   * for a `joinWith` constraint) are spliced into the outer query — without
+   * the rewrite the embedded `$N` references point at parameters this
+   * parser has no knowledge of, leaving them dangling in the final SQL.
+   *
+   * The sub-parser's `params[i]` corresponds to its `$(i+1)` placeholder
+   * (its `paramIndex` always starts at 1), so we map sequentially.
+   *
+   * @example
+   *   const renumber = this.absorbSubParserParams(subParser);
+   *   const fragment = renumber(subParser.whereClauses.join(" "));
+   */
+  private absorbSubParserParams(subParser: PostgresQueryParser): (sql: string) => string {
+    if (subParser.params.length === 0) {
+      return (sql) => sql;
+    }
+
+    const oldToNew = new Map<string, string>();
+
+    for (let index = 0; index < subParser.params.length; index++) {
+      const newPlaceholder = this.addParam(subParser.params[index]);
+      oldToNew.set(`$${index + 1}`, newPlaceholder);
+    }
+
+    return (sql) => sql.replace(/\$\d+/g, (match) => oldToNew.get(match) ?? match);
+  }
+
+  /**
    * Process a basic WHERE operation.
    *
    * Delegates to specialised processors for operators that require more than a
@@ -533,15 +565,9 @@ export class PostgresQueryParser {
     // Delegate to specialised processors for operators that need it
     switch (operator) {
       case "between":
-        return this.processWhereBetween(
-          { field, range: value as [unknown, unknown] },
-          false,
-        );
+        return this.processWhereBetween({ field, range: value as [unknown, unknown] }, false);
       case "notBetween":
-        return this.processWhereBetween(
-          { field, range: value as [unknown, unknown] },
-          true,
-        );
+        return this.processWhereBetween({ field, range: value as [unknown, unknown] }, true);
       case "in":
         return this.processWhereIn({ field, values: value as unknown[] }, false);
       case "notIn":
@@ -786,7 +812,10 @@ export class PostgresQueryParser {
       // Build the base FK condition
       const fkCondition = `a.${quotedForeignKey} = ${quotedMainTable}.${quotedLocalKey}`;
 
-      // Merge constraint ops (where / order / limit) from a sub-parser
+      // Merge constraint ops (where / order / limit) from a sub-parser.
+      // The sub-parser numbers its own placeholders starting at $1; we must
+      // absorb its params into this parser and renumber the embedded SQL,
+      // otherwise $N references in the merged clauses dangle.
       let extraWhere = "";
       let orderBy = "";
       let limitClause = "";
@@ -799,11 +828,13 @@ export class PostgresQueryParser {
         });
         subParser.parse();
 
+        const renumber = this.absorbSubParserParams(subParser);
+
         if (subParser.whereClauses.length > 0) {
-          extraWhere = ` AND ${subParser.whereClauses.join(" ")}`;
+          extraWhere = ` AND ${renumber(subParser.whereClauses.join(" "))}`;
         }
         if (subParser.orderClauses.length > 0) {
-          orderBy = ` ORDER BY ${subParser.orderClauses.join(", ")}`;
+          orderBy = ` ORDER BY ${renumber(subParser.orderClauses.join(", "))}`;
         }
         if (subParser.limitValue !== undefined) {
           limitClause = ` LIMIT ${subParser.limitValue}`;
@@ -869,6 +900,7 @@ export class PostgresQueryParser {
     const localField = "localField" in options ? options.localField : "";
     const foreignField = "foreignField" in options ? options.foreignField : "";
     const alias = "alias" in options ? options.alias : undefined;
+    const constraintOps = (data.constraintOps as PostgresParserOperation[] | undefined) ?? [];
 
     const quotedTable = this.dialect.quoteIdentifier(joinTable);
     const tableRef = alias
@@ -888,13 +920,51 @@ export class PostgresQueryParser {
     // Parse foreign field (belongs to join table)
     const quotedForeign = this.parseColumnIdentifier(foreignField!, joinTable, tableAlias);
 
-    this.joinClauses.push(`${type} JOIN ${tableRef} ON ${quotedLocal} = ${quotedForeign}`);
+    // Build the basic ON condition. For hasOne/belongsTo joinWith with a
+    // constraint callback, append the constraint's where-clauses to the ON
+    // clause (preserves LEFT JOIN semantics — main rows stay even when no
+    // related row passes the constraint). orderBy/limit on the constraint
+    // are silently dropped — they have no meaning on a single-row LEFT JOIN.
+    let onClause = `${quotedLocal} = ${quotedForeign}`;
+
+    if (constraintOps.length > 0) {
+      const whereOps = constraintOps.filter(
+        (op) => op.type.startsWith("where") || op.type.startsWith("orWhere"),
+      );
+
+      if (whereOps.length > 0) {
+        const subParser = new PostgresQueryParser({
+          table: joinTable,
+          alias: tableAlias,
+          operations: whereOps,
+        });
+        subParser.parse();
+
+        if (subParser.whereClauses.length > 0) {
+          const renumber = this.absorbSubParserParams(subParser);
+          onClause = `${onClause} AND ${renumber(subParser.whereClauses.join(" "))}`;
+        }
+      }
+    }
+
+    this.joinClauses.push(`${type} JOIN ${tableRef} ON ${onClause}`);
   }
 
   /**
    * Parse a column identifier with smart detection for table prefixes and JSONB paths.
    *
-   * @param field - The field string (e.g., "id", "users.id", "createdBy.id")
+   * Supports an optional explicit cast suffix using PostgreSQL's `::type` syntax,
+   * which is the only way to coerce a JSONB-extracted value (always returned as
+   * `text`) into another type. The parser does NOT infer casts from key names —
+   * coercion is always opt-in by the caller.
+   *
+   * @param field - The field string. Examples:
+   *   - "id"                       → `"table"."id"`
+   *   - "users.id"                 → `"users"."id"`
+   *   - "createdBy.id"             → `"table"."createdBy"->>'id'`
+   *   - "createdBy.id::int"        → `("table"."createdBy"->>'id')::int`
+   *   - "meta.score::numeric"      → `("table"."meta"->>'score')::numeric`
+   *   - "posts.createdBy.id::uuid" → `("posts"."createdBy"->>'id')::uuid`
    * @param defaultTable - Default table to use if no prefix
    * @param tableAlias - Table alias to use if provided
    * @returns Properly quoted SQL expression
@@ -902,38 +972,47 @@ export class PostgresQueryParser {
   private parseColumnIdentifier(field: string, defaultTable: string, tableAlias?: string): string {
     if (!field) return "";
 
+    // Extract optional explicit cast suffix: "createdBy.id::int" → path "createdBy.id", cast "int"
+    let cast: string | undefined;
+    const castIndex = field.indexOf("::");
+    if (castIndex !== -1) {
+      cast = field.slice(castIndex + 2).trim();
+      field = field.slice(0, castIndex);
+    }
+
     const effectiveTable = tableAlias ?? defaultTable;
     const parts = field.split(".");
 
-    // Single part: just a column name, prefix with default table
-    if (parts.length === 1) {
-      return `${this.dialect.quoteIdentifier(effectiveTable)}.${this.dialect.quoteIdentifier(field)}`;
-    }
+    let expression: string;
 
-    // Two parts: could be "table.column" or "jsonbColumn.key"
-    if (parts.length === 2) {
+    if (parts.length === 1) {
+      // Single part: just a column name, prefix with default table
+      expression = `${this.dialect.quoteIdentifier(effectiveTable)}.${this.dialect.quoteIdentifier(field)}`;
+    } else if (parts.length === 2) {
+      // Two parts: could be "table.column" or "jsonbColumn.key"
       const [first, second] = parts;
 
-      // Check if first part is a known table (main table, join table, or alias)
       if (this.isTableReference(first)) {
         // It's table.column - regular column reference
-        return `${this.dialect.quoteIdentifier(first)}.${this.dialect.quoteIdentifier(second)}`;
+        expression = `${this.dialect.quoteIdentifier(first)}.${this.dialect.quoteIdentifier(second)}`;
+      } else {
+        // It's jsonbColumn.key - JSONB path
+        expression = this.buildJsonbPath(effectiveTable, first, [second]);
       }
+    } else {
+      // Three or more parts: "table.jsonbColumn.key..." or "jsonbColumn.key1.key2..."
+      const [first, second, ...rest] = parts;
 
-      // It's jsonbColumn.key - JSONB path
-      return this.buildJsonbPath(effectiveTable, first, [second]);
+      if (this.isTableReference(first)) {
+        // First part is table: "posts.createdBy.id" → table is "posts", JSONB is "createdBy.id"
+        expression = this.buildJsonbPath(first, second, rest);
+      } else {
+        // No table prefix: "createdBy.address.city" → use default table
+        expression = this.buildJsonbPath(effectiveTable, first, [second, ...rest]);
+      }
     }
 
-    // Three or more parts: "table.jsonbColumn.key..." or "jsonbColumn.key1.key2..."
-    const [first, second, ...rest] = parts;
-
-    if (this.isTableReference(first)) {
-      // First part is table: "posts.createdBy.id" → table is "posts", JSONB is "createdBy.id"
-      return this.buildJsonbPath(first, second, rest);
-    }
-
-    // No table prefix: "createdBy.address.city" → use default table
-    return this.buildJsonbPath(effectiveTable, first, [second, ...rest]);
+    return cast ? `(${expression})::${cast}` : expression;
   }
 
   /**
@@ -959,9 +1038,13 @@ export class PostgresQueryParser {
    * @param path - Array of nested keys
    * @returns PostgreSQL JSONB path expression
    *
+   * Returns the raw JSONB path expression — extracted values are always `text`
+   * (`->>` returns text). Callers that need a different type must request an
+   * explicit cast via the `::type` suffix in `parseColumnIdentifier`.
+   *
    * @example
    * buildJsonbPath("posts", "createdBy", ["id"])
-   * // Returns: ("posts"."createdBy"->>'id')::integer
+   * // Returns: "posts"."createdBy"->>'id'
    *
    * buildJsonbPath("posts", "createdBy", ["address", "city"])
    * // Returns: "posts"."createdBy"->'address'->>'city'
@@ -981,12 +1064,6 @@ export class PostgresQueryParser {
       const isLast = i === path.length - 1;
       const operator = isLast ? "->>" : "->";
       expression += `${operator}'${path[i]}'`;
-    }
-
-    // Cast to integer if the path ends with 'id' (common pattern for foreign keys)
-    const lastKey = path[path.length - 1].toLowerCase();
-    if (lastKey === "id" || lastKey.endsWith("id")) {
-      expression = `(${expression})::integer`;
     }
 
     return expression;
@@ -1066,10 +1143,18 @@ export class PostgresQueryParser {
   }
 
   /**
-   * Process raw HAVING expression.
+   * Process a raw HAVING expression, threading `?` placeholders into
+   * positional params the same way `processWhereRaw` / `processSelectRaw` do.
+   * Without this, bindings on a `havingRaw` op are silently dropped.
    */
   private processHavingRaw(data: Record<string, unknown>): void {
-    const expression = data.expression as string;
+    let expression = data.expression as string;
+    const bindings = (data.bindings as unknown[]) ?? [];
+
+    for (const binding of bindings) {
+      expression = expression.replace("?", this.addParam(binding));
+    }
+
     this.havingClauses.push(expression);
   }
 

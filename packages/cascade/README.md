@@ -1,10 +1,10 @@
 # cascade
 
-A powerful and easy to use MongoDB driver for `Nodejs`
+A powerful, model-first TypeScript ORM for **MongoDB and PostgreSQL** on `Node.js`.
 
 ## Features
 
-cascade is a MongoDB driver for Nodejs, it's built on top of the official MongoDB driver, and it provides a simple and easy to use API for working with MongoDB, it is fast, efficient, reliable and will make your life easier with real world apps.
+Cascade is a unified ORM for MongoDB and PostgreSQL — one model-first API runs against both engines. Define a model once (its `@warlock.js/seal` schema doubles as the TypeScript type, the runtime validator, and the DB shape) and query straight off the class. It's fast, type-safe, and built for real-world apps.
 
 Some but not all of the features:
 
@@ -52,14 +52,15 @@ pnpm add @warlock.js/cascade
 Here is a simple example of defining a User model:
 
 ```ts title="src/models/user.ts"
-import { Model } from "@warlock.js/cascade";
+import { Model, RegisterModel } from "@warlock.js/cascade";
 
+@RegisterModel()
 export class User extends Model {
   /**
-   * The collection name
+   * The table / collection name.
    * Must be defined explicitly.
    */
-  public static collection = "users";
+  public static table = "users";
 }
 ```
 

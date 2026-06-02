@@ -1,13 +1,14 @@
 /**
  * Database-agnostic aggregation expressions.
  *
- * These helpers provide a unified API for building aggregate queries that work
- * across different database types (MongoDB, PostgreSQL, MySQL, etc.).
+ * `count` / `sum` / `avg` / `min` / `max` are **cross-driver** — the same
+ * call compiles to the native shape on every supported database (MongoDB
+ * `{ $sum: "$field" }`, SQL `SUM(field)`, ...).
  *
- * Each driver implementation translates these abstract expressions to their
- * native format:
- * - MongoDB: { $sum: 1 }, { $sum: "$field" }, etc.
- * - SQL: COUNT(*), SUM(field), etc.
+ * `distinct` / `floor` / `first` / `last` are **MongoDB-only**. They have no
+ * single-scalar `GROUP BY` equivalent in SQL, so on Postgres they throw a
+ * fail-fast error at the `.groupBy()` call (naming the `selectRaw` /
+ * `havingRaw` escape hatch) rather than emit a silently-different query.
  *
  * @example
  * ```typescript
@@ -187,9 +188,11 @@ export const $agg = {
    * });
    * ```
    *
-   * Translates to:
-   * - MongoDB: `{ $distinct: "$color" }`
-   * - SQL: `DISTINCT(color)`
+   * **MongoDB-only.** MongoDB: `{ $distinct: "$color" }` (returns the array
+   * of distinct values). On Postgres this throws — SQL `DISTINCT` is a set
+   * quantifier, not a scalar aggregate, so there is no equivalent single
+   * value to put in a `GROUP BY` projection. Use `selectRaw` if you need a
+   * Postgres-specific shape (e.g. `array_agg(DISTINCT color)`).
    */
   distinct(field: string): AggregateExpression {
     return { __agg: "distinct", __field: field };
@@ -208,9 +211,10 @@ export const $agg = {
    * });
    * ```
    *
-   * Translates to:
-   * - MongoDB: `{ $floor: "$price" }`
-   * - SQL: `FLOOR(price)`
+   * **MongoDB-only.** MongoDB: `{ $floor: "$price" }`. On Postgres this
+   * throws — `FLOOR` is a scalar function, not an aggregate, so it is
+   * meaningless inside a bare `$group` / `GROUP BY`. Use `selectRaw` with
+   * `FLOOR(...)` over the aggregated value if you need it on Postgres.
    */
   floor(field: string): AggregateExpression {
     return { __agg: "floor", __field: field };
@@ -229,9 +233,11 @@ export const $agg = {
    * });
    * ```
    *
-   * Translates to:
-   * - MongoDB: `{ $first: "$name" }`
-   * - SQL: `FIRST_VALUE(name) OVER (...)`
+   * **MongoDB-only.** MongoDB: `{ $first: "$name" }` (group-order
+   * dependent). On Postgres this throws — the SQL equivalent is
+   * `FIRST_VALUE(name) OVER (ORDER BY ...)`, a window function needing an
+   * ordering context the `$agg` API doesn't carry. Use `selectRaw` with an
+   * explicit window function if you need it on Postgres.
    */
   first(field: string): AggregateExpression {
     return { __agg: "first", __field: field };
@@ -250,9 +256,11 @@ export const $agg = {
    * });
    * ```
    *
-   * Translates to:
-   * - MongoDB: `{ $last: "$name" }`
-   * - SQL: `LAST_VALUE(name) OVER (...)`
+   * **MongoDB-only.** MongoDB: `{ $last: "$name" }` (group-order
+   * dependent). On Postgres this throws — the SQL equivalent is
+   * `LAST_VALUE(name) OVER (ORDER BY ...)`, a window function needing an
+   * ordering context the `$agg` API doesn't carry. Use `selectRaw` with an
+   * explicit window function if you need it on Postgres.
    */
   last(field: string): AggregateExpression {
     return { __agg: "last", __field: field };

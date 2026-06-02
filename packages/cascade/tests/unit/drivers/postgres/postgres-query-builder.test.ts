@@ -3,6 +3,7 @@ import { DataSource } from "../../../../src/data-source/data-source";
 import { dataSourceRegistry } from "../../../../src/data-source/data-source-registry";
 import { PostgresDialect } from "../../../../src/drivers/postgres/postgres-dialect";
 import { PostgresQueryBuilder } from "../../../../src/drivers/postgres/postgres-query-builder";
+import { $agg } from "../../../../src/expressions";
 import { createMockDriver } from "../../../helpers/mock-driver";
 
 /**
@@ -974,6 +975,105 @@ describe("PostgresQueryBuilder", () => {
         expect(queryBuilder.operations).toHaveLength(1);
         expect(queryBuilder.operations[0].type).toBe("havingRaw");
       });
+
+      it("threads ? placeholders into positional params", () => {
+        queryBuilder.select(["category"]).havingRaw("SUM(amount) > ?", [1000]);
+
+        const { query = "", bindings = [] } = queryBuilder.parse();
+
+        expect(query).toContain("SUM(amount) > $1");
+        expect(bindings).toContain(1000);
+      });
+    });
+
+    describe("groupBy() with aggregates", () => {
+      it("projects each clean aggregate and emits GROUP BY", () => {
+        queryBuilder.groupBy("category", {
+          count: $agg.count(),
+          total: $agg.sum("amount"),
+          average: $agg.avg("amount"),
+          lowest: $agg.min("amount"),
+          highest: $agg.max("amount"),
+        });
+
+        const { query = "" } = queryBuilder.parse();
+
+        expect(query).toContain('COUNT(*) AS "count"');
+        expect(query).toContain('SUM("amount") AS "total"');
+        expect(query).toContain('AVG("amount") AS "average"');
+        expect(query).toContain('MIN("amount") AS "lowest"');
+        expect(query).toContain('MAX("amount") AS "highest"');
+        expect(query).toContain('GROUP BY "category"');
+      });
+
+      it("includes every group field in SELECT and GROUP BY", () => {
+        queryBuilder.groupBy(["category", "status"], { total: $agg.sum("amount") });
+
+        const { query = "" } = queryBuilder.parse();
+
+        expect(query).toContain('"category"');
+        expect(query).toContain('"status"');
+        expect(query).toContain('GROUP BY "category", "status"');
+      });
+
+      it("rewrites having() on an aggregate alias to the substituted expression", () => {
+        queryBuilder.groupBy("category", { total: $agg.sum("amount") }).having("total", ">", 1000);
+
+        const { query = "", bindings = [] } = queryBuilder.parse();
+
+        expect(query).toContain('HAVING SUM("amount") >');
+        expect(query).not.toContain('HAVING "total"');
+        expect(bindings).toContain(1000);
+      });
+
+      it("leaves having() on a grouped non-aggregate column untouched", () => {
+        queryBuilder
+          .groupBy("category", { total: $agg.sum("amount") })
+          .having("category", "=", "books");
+
+        const { query = "" } = queryBuilder.parse();
+
+        expect(query).toContain('HAVING "category" =');
+      });
+
+      it("passes a raw SQL string aggregate through verbatim", () => {
+        queryBuilder.groupBy("category", { total: "SUM(amount)" }).having("total", ">", 1000);
+
+        const { query = "" } = queryBuilder.parse();
+
+        expect(query).toContain('SUM(amount) AS "total"');
+        expect(query).toContain("HAVING SUM(amount) >");
+      });
+
+      it("throws on a non-portable MongoDB operator object", () => {
+        expect(() => queryBuilder.groupBy("category", { total: { $sum: "$amount" } })).toThrow(
+          /not portable/,
+        );
+      });
+
+      it("throws on MongoDB-only aggregates (distinct/floor/first/last)", () => {
+        const cases = [
+          $agg.distinct("color"),
+          $agg.floor("amount"),
+          $agg.first("name"),
+          $agg.last("name"),
+        ];
+
+        for (const aggregate of cases) {
+          const builder = new PostgresQueryBuilder("users", mockDataSource);
+
+          expect(() => builder.groupBy("category", { value: aggregate })).toThrow(/MongoDB-only/);
+        }
+      });
+
+      it("leaves single-arg groupBy() unchanged", () => {
+        queryBuilder.groupBy("category");
+
+        const { query = "" } = queryBuilder.parse();
+
+        expect(query).toContain('GROUP BY "category"');
+        expect(query).not.toContain(' AS "');
+      });
     });
   });
 
@@ -1249,10 +1349,11 @@ describe("PostgresQueryBuilder", () => {
     });
 
     describe("withCount()", () => {
-      it("should add relation to count array", () => {
+      it("should add relation to count map", () => {
         queryBuilder.withCount("posts");
 
-        expect(queryBuilder.countRelations).toContain("posts");
+        // countRelations is keyed by output alias (default `${relation}Count`).
+        expect(queryBuilder.countRelations.get("postsCount")?.relation).toBe("posts");
       });
     });
 
@@ -1319,15 +1420,15 @@ describe("PostgresQueryBuilder", () => {
   });
 
   describe("SQL parsing - parse()", () => {
-    it("should return SQL object with sql and params", () => {
+    it("should return DriverQuery object with query and bindings", () => {
       queryBuilder.select(["name", "email"]).where("status", "active");
 
       const result = queryBuilder.parse();
 
-      expect(result).toHaveProperty("sql");
-      expect(result).toHaveProperty("params");
-      expect(typeof result.sql).toBe("string");
-      expect(Array.isArray(result.params)).toBe(true);
+      expect(result).toHaveProperty("query");
+      expect(result).toHaveProperty("bindings");
+      expect(typeof result.query).toBe("string");
+      expect(Array.isArray(result.bindings)).toBe(true);
     });
   });
 
@@ -1338,7 +1439,7 @@ describe("PostgresQueryBuilder", () => {
       const result = queryBuilder.pretty();
 
       expect(typeof result).toBe("string");
-      expect(result).toContain("Parameters:");
+      expect(result).toContain("Bindings:");
     });
   });
 });

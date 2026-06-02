@@ -128,8 +128,8 @@ export class QueryBuilder<T = unknown> {
 
   /** Relations to eager-load via separate queries. */
   public eagerLoadRelations: Map<string, boolean | ((query: any) => void)> = new Map();
-  /** Relation names to count alongside results. */
-  public countRelations: string[] = [];
+  /** Count expressions to emit per result row, keyed by output column alias. */
+  public countRelations: Map<string, { relation: string; constraintOps?: Op[] }> = new Map();
   /** Relation definition map injected from the owning Model. */
   public relationDefinitions?: Record<string, any>;
   /** The Model class reference, required for relation resolution. */
@@ -225,7 +225,7 @@ export class QueryBuilder<T = unknown> {
     cloned.disabledGlobalScopes = new Set(this.disabledGlobalScopes);
     cloned.scopesApplied = this.scopesApplied;
     cloned.eagerLoadRelations = new Map(this.eagerLoadRelations);
-    cloned.countRelations = [...this.countRelations];
+    cloned.countRelations = new Map(this.countRelations);
     cloned.relationDefinitions = this.relationDefinitions;
     cloned.modelClass = this.modelClass;
     return cloned;
@@ -934,10 +934,99 @@ export class QueryBuilder<T = unknown> {
     return this;
   }
 
-  /** Count related models alongside results. */
-  public withCount(...relations: string[]): this {
-    this.countRelations.push(...relations);
+  /**
+   * Register one or more relation counts to emit alongside each result row.
+   *
+   * Accepts:
+   * - Bare relation names (variadic strings or array): `withCount("posts", "comments")`
+   * - Alias shorthand: `withCount("posts as totalPosts")`
+   * - Object form for per-relation constraints / aliases:
+   *   `withCount({ posts: true, "posts as approved": (q) => q.where("approved", true) })`
+   *
+   * Each entry is stored in `countRelations` keyed by its output column alias
+   * (default `${relationName}Count`). The driver subclass consumes the map at
+   * execute time to emit count expressions.
+   *
+   * @example
+   * ```typescript
+   * await User.query().withCount("posts").get();              // postsCount
+   * await User.query().withCount("posts as totalPosts").get(); // totalPosts
+   * await User.query()
+   *   .withCount({
+   *     posts: true,
+   *     "posts as published": (q) => q.where("isPublished", true),
+   *     comments: "commentTotal",
+   *   })
+   *   .get();
+   * ```
+   */
+  public withCount(...args: unknown[]): this {
+    for (const arg of args) {
+      if (typeof arg === "string") {
+        this.recordCountEntry(arg);
+        continue;
+      }
+
+      if (Array.isArray(arg)) {
+        for (const spec of arg as string[]) {
+          this.recordCountEntry(spec);
+        }
+        continue;
+      }
+
+      if (typeof arg === "object" && arg !== null) {
+        const entries = Object.entries(
+          arg as Record<string, true | string | ((query: any) => void)>,
+        );
+
+        for (const [key, value] of entries) {
+          if (value === true) {
+            this.recordCountEntry(key);
+          } else if (typeof value === "string") {
+            this.recordCountEntry(`${key} as ${value}`);
+          } else if (typeof value === "function") {
+            this.recordCountEntry(key, value);
+          }
+        }
+      }
+    }
+
     return this;
+  }
+
+  /**
+   * Parse a count spec ("relation" or "relation as alias") into its relation
+   * name and output alias, optionally capturing a constraint callback's
+   * operations via a sub-builder. Stored in `countRelations` keyed by alias.
+   */
+  protected recordCountEntry(spec: string, constraint?: (query: any) => void): void {
+    const { relation, alias } = this.parseCountSpec(spec);
+
+    let constraintOps: Op[] | undefined;
+
+    if (constraint) {
+      const sub = this.subQuery();
+      constraint(sub);
+      constraintOps = sub.operations;
+    }
+
+    this.countRelations.set(alias, { relation, constraintOps });
+  }
+
+  /**
+   * Split a `"<relation>"` or `"<relation> as <alias>"` spec. Returns the
+   * resolved relation name and the output column alias (defaulting to
+   * `${relation}Count` when no `as` is present).
+   */
+  protected parseCountSpec(spec: string): { relation: string; alias: string } {
+    const trimmed = spec.trim();
+    const match = /^(.+?)\s+as\s+(.+)$/i.exec(trimmed);
+
+    if (!match) {
+      return { relation: trimmed, alias: `${trimmed}Count` };
+    }
+
+    return { relation: match[1].trim(), alias: match[2].trim() };
   }
 
   /**

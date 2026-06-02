@@ -8,6 +8,8 @@
  */
 
 import type { ChildModel, Model } from "../model/model";
+import { resolveModelClass, resolveModelName } from "../model/register-model";
+import { inferPivotKey, inferPivotTable } from "./key-conventions";
 import type { PivotData, PivotIds, RelationDefinition } from "./types";
 
 // ============================================================================
@@ -90,14 +92,22 @@ export class PivotOperations {
       );
     }
 
-    if (!definition.pivot) {
-      throw new Error(`Relation "${relationName}" is missing the pivot table configuration.`);
-    }
-
     this.model = model;
     this.relationName = relationName;
     this.definition = definition;
     this.modelClass = modelClass;
+  }
+
+  /**
+   * Read the configured relation conventions from this pivot's owning
+   * data source. Returns `undefined` when no overrides are set.
+   */
+  private get relationDefaults() {
+    try {
+      return this.modelClass.getDataSource()?.relationDefaults;
+    } catch {
+      return undefined;
+    }
   }
 
   // ==========================================================================
@@ -272,12 +282,18 @@ export class PivotOperations {
     pivotForeignKey: string;
     relatedKey: string;
   } {
-    const pivotTable = this.definition.pivot!;
-    const localKey = this.definition.pivotLocalKey ?? "id";
-    const pivotLocalKey = this.definition.localKey ?? this.inferForeignKey(this.modelClass.name);
+    const conventions = this.relationDefaults;
+    const relatedModelName = resolveModelName(this.definition.model);
+    const pivotTable =
+      this.definition.pivot ??
+      inferPivotTable(this.modelClass.name, relatedModelName, conventions);
+    const RelatedModel = resolveModelClass(this.definition.model);
+    const localKey = this.definition.pivotLocalKey ?? this.modelClass.primaryKey ?? "id";
+    const pivotLocalKey =
+      this.definition.localKey ?? inferPivotKey(this.modelClass.name, conventions);
     const pivotForeignKey =
-      this.definition.foreignKey ?? this.inferForeignKey(this.definition.model);
-    const relatedKey = this.definition.pivotForeignKey ?? "id";
+      this.definition.foreignKey ?? inferPivotKey(relatedModelName, conventions);
+    const relatedKey = this.definition.pivotForeignKey ?? RelatedModel?.primaryKey ?? "id";
     const localKeyValue = this.model.get(localKey);
 
     return {
@@ -315,15 +331,6 @@ export class PivotOperations {
     return ids;
   }
 
-  /**
-   * Infers a foreign key name from a model name.
-   *
-   * @param modelName - The model class name
-   * @returns The inferred foreign key (e.g., "User" -> "userId")
-   */
-  private inferForeignKey(modelName: string): string {
-    return `${modelName.charAt(0).toLowerCase()}${modelName.slice(1)}Id`;
-  }
 }
 
 // ============================================================================

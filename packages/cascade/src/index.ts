@@ -25,6 +25,7 @@ export * from "./database-dirty-tracker";
 export * from "./events/model-events";
 export * from "./model/model";
 export * from "./model/register-model";
+export * from "./model/relation-decorators";
 export * from "./remover/database-remover";
 export * from "./restorer/database-restorer";
 export * from "./types";
@@ -73,6 +74,9 @@ export * from "./utils/once-connected";
 
 // Migration System
 export * from "./migration";
+
+// Operations API
+export * from "./operations";
 
 // MongoDB Migration Driver
 export { MongoMigrationDriver } from "./drivers/mongodb/mongodb-migration-driver";

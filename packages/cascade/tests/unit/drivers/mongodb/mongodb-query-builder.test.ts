@@ -1352,16 +1352,18 @@ describe("MongoQueryBuilder", () => {
     });
 
     describe("withCount()", () => {
-      it("should add relation to count array", () => {
+      it("should add relation to count map", () => {
         queryBuilder.withCount("posts");
 
-        expect(queryBuilder.countRelations).toContain("posts");
+        // countRelations is keyed by output alias (default `${relation}Count`).
+        expect(queryBuilder.countRelations.get("postsCount")?.relation).toBe("posts");
       });
 
       it("should add multiple relations", () => {
         queryBuilder.withCount("posts", "comments");
 
-        expect(queryBuilder.countRelations).toEqual(["posts", "comments"]);
+        expect(queryBuilder.countRelations.get("postsCount")?.relation).toBe("posts");
+        expect(queryBuilder.countRelations.get("commentsCount")?.relation).toBe("comments");
       });
     });
 

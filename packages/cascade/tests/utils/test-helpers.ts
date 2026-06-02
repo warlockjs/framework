@@ -10,6 +10,7 @@ import type {
   InsertResult,
   UpdateResult,
 } from "../../src/contracts/database-driver.contract";
+import { DatabaseDirtyTracker } from "../../src/database-dirty-tracker";
 import type { DataSource } from "../../src/data-source/data-source";
 import { Model } from "../../src/model/model";
 
@@ -92,6 +93,10 @@ export function createMockDriver(options: MockDriverOptions = {}): DriverContrac
     // Serialization
     serialize: (data: unknown) => data,
     deserialize: (data: unknown) => data,
+
+    // Dirty tracking — the model constructor asks the driver for a tracker,
+    // so the mock must hand back a real one for instances to construct.
+    getDirtyTracker: (data: Record<string, unknown>) => new DatabaseDirtyTracker(data),
 
     // Adapters
     syncAdapter: vi.fn().mockReturnValue(undefined),

@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { dataSourceRegistry } from "../../../src/data-source/data-source-registry";
 import { Model } from "../../../src/model/model";
 import { RegisterModel } from "../../../src/model/register-model";
+import { createMockDriver } from "../../utils/test-helpers";
 
 // Test model for basic operations
 @RegisterModel()
@@ -27,6 +29,20 @@ class SoftDeleteModel extends Model {
 }
 
 describe("Model Core", () => {
+  // The Model constructor asks its driver for a dirty tracker, so a default
+  // data source must be registered before any model is instantiated.
+  beforeAll(() => {
+    dataSourceRegistry.register({
+      name: "test",
+      driver: createMockDriver(),
+      isDefault: true,
+    });
+  });
+
+  afterAll(() => {
+    dataSourceRegistry.clear();
+  });
+
   describe("constructor", () => {
     it("should create instance with empty data", () => {
       const user = new TestUser();

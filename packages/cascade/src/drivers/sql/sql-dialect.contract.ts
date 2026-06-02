@@ -8,6 +8,8 @@
  * @module cascade/drivers/sql
  */
 
+import type { AggregateExpression } from "../../expressions";
+
 /**
  * Contract that SQL dialects must implement to handle database-specific
  * SQL syntax variations.
@@ -207,4 +209,26 @@ export interface SqlDialectContract {
     type: string,
     options?: { length?: number; precision?: number; scale?: number; dimensions?: number },
   ): string;
+
+  /**
+   * Translate a database-agnostic aggregate expression to its SQL form.
+   *
+   * Supported aggregates return their SQL function call. Aggregates a given
+   * dialect cannot express as a scalar `GROUP BY` aggregate (e.g. `distinct`,
+   * `floor`, `first`, `last` on PostgreSQL) MUST throw with an actionable
+   * message naming the SQL escape hatch — never emit a silently-different
+   * semantic. Making this part of the contract forces every SQL dialect to
+   * decide its own aggregate capability matrix explicitly.
+   *
+   * @param expression - The abstract aggregate (`$agg.*`) to translate
+   * @returns The SQL fragment (e.g. `SUM("amount")`, `COUNT(*)`)
+   *
+   * @example
+   * ```typescript
+   * dialect.aggregateToSql($agg.sum("amount")); // 'SUM("amount")'
+   * dialect.aggregateToSql($agg.count());       // "COUNT(*)"
+   * dialect.aggregateToSql($agg.distinct("c")); // throws — use selectRaw escape hatch
+   * ```
+   */
+  aggregateToSql(expression: AggregateExpression): string;
 }

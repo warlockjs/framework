@@ -1,52 +1,71 @@
 {
-    "name": "@warlock.js/cascade",
-    "version": "4.0.174",
-    "description": "ORM for managing databases",
-    "main": "./cjs/index.js",
-    "dependencies": {
-        "@mongez/copper": "^1.0.1",
-        "@mongez/events": "^2.1.0",
-        "@mongez/reinforcements": "^2.3.17",
-        "@mongez/supportive-is": "^2.0.0",
-        "@warlock.js/context": "4.0.174",
-        "@warlock.js/logger": "4.0.174",
-        "@warlock.js/seal": "4.0.174"
-    },
-    "scripts": {
-        "update": "npx ncu -u",
-        "fix:test": "eslint --fix -c ./.eslintrc.json ./tests",
-        "format:test": "prettier --write ./tests/**/*.{js,jsx,ts,tsx,css,md,json} --config ./.prettierrc.json",
-        "fix": "eslint --fix -c ./.eslintrc.json ./src",
-        "format": "prettier --write ./src/**/*.{js,jsx,ts,tsx,css,md,json} --config ./.prettierrc.json",
-        "test": "jest tests"
-    },
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/warlockjs/cascade"
-    },
-    "devDependencies": {
-        "mongodb": "^7.0.0",
-        "typescript": "^5.1.6"
-    },
-    "peerDependencies": {
-        "mongodb": "^5.7.0 || ^6.0.0 || ^7.0.0",
-        "pg": "^8.16.3"
-    },
-    "keywords": [
-        "mongodb",
-        "node",
-        "database",
-        "orm",
-        "mongodb-orm",
-        "mongodb-odm",
-        "mongodb-orm-node",
-        "entity",
-        "model",
-        "aggregate",
-        "aggregate-framework"
-    ],
-    "author": "hassanzohdy",
-    "license": "MIT",
-    "module": "./esm/index.js",
-    "typings": "./cjs/index.d.ts"
+  "name": "@warlock.js/cascade",
+  "version": "4.1.1",
+  "type": "module",
+  "description": "ORM for managing databases",
+  "main": "./cjs/index.js",
+  "bin": {
+    "cascade": "./bin/cascade.js"
+  },
+  "dependencies": {
+    "@mongez/copper": "^2.1.2",
+    "@mongez/dotenv": "^1.2.4",
+    "@mongez/events": "^2.2.6",
+    "@mongez/reinforcements": "^3.2.0",
+    "@mongez/supportive-is": "^2.1.3",
+    "@warlock.js/context": "*",
+    "@warlock.js/logger": "*",
+    "@warlock.js/seal": "*",
+    "citty": "^0.2.2",
+    "fast-glob": "^3.3.3"
+  },
+  "scripts": {
+    "update": "npx ncu -u",
+    "fix:test": "eslint --fix -c ./.eslintrc.json ./tests",
+    "format:test": "prettier --write ./tests/**/*.{js,jsx,ts,tsx,css,md,json} --config ./.prettierrc.json",
+    "fix": "eslint --fix -c ./.eslintrc.json ./src",
+    "format": "prettier --write ./src/**/*.{js,jsx,ts,tsx,css,md,json} --config ./.prettierrc.json",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "test:unit": "vitest tests/unit",
+    "test:integration": "vitest tests/integration",
+    "test:watch": "vitest --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warlockjs/cascade"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "eslint": "^8.46.0",
+    "eslint-config-prettier": "^8.9.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "eslint-plugin-unused-imports": "^3.0.0",
+    "npm-check-updates": "^16.10.17",
+    "prettier": "^3.0.0",
+    "prettier-plugin-organize-imports": "^3.2.3",
+    "typescript": "^5.1.6"
+  },
+  "peerDependencies": {
+    "mongodb": "^5.7.0 || ^6.0.0 || ^7.0.0",
+    "pg": "^8.16.3"
+  },
+  "keywords": [
+    "mongodb",
+    "postgres",
+    "node",
+    "database",
+    "orm",
+    "mongodb-orm",
+    "mongodb-odm",
+    "mongodb-orm-node",
+    "entity",
+    "model",
+    "aggregate",
+    "aggregate-framework"
+  ],
+  "author": "hassanzohdy",
+  "license": "MIT",
+  "module": "./esm/index.js",
+  "typings": "./cjs/index.d.ts"
 }

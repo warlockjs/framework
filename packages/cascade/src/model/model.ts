@@ -13,8 +13,15 @@ import type { DataSource } from "../data-source/data-source";
 import { DatabaseDirtyTracker } from "../database-dirty-tracker";
 import type { ModelEventListener, ModelEventName } from "../events/model-events";
 import { ModelEvents } from "../events/model-events";
+import type { PivotOperations } from "../relations/pivot-operations";
 import type { ModelSnapshot } from "../relations/relation-hydrator";
-import { RelationLoader } from "../relations/relation-loader";
+import { attachLoadedRelation, RelationLoader } from "../relations/relation-loader";
+import type {
+  LoadedRelationResult,
+  PivotData,
+  PivotIds,
+  RelationDefinition,
+} from "../relations/types";
 import { modelSync } from "../sync/model-sync";
 import type { ModelSyncOperationContract } from "../sync/types";
 import type { DeleteStrategy, StrictMode } from "../types";
@@ -61,6 +68,7 @@ import {
   performAtomicIncrement,
   performAtomicUpdate,
 } from "./methods/meta-methods";
+import { attachPivotRelation, detachPivotRelation, pivotRelation } from "./methods/pivot-methods";
 import {
   buildNewQueryBuilder,
   buildQuery,
@@ -490,7 +498,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * console.log(users[0].posts); // Post[]
    * ```
    */
-  public static relations: Record<string, any> = {};
+  public static relations: Readonly<Record<string, RelationDefinition>> = {};
 
   /**
    * Flag indicating whether this model instance represents a new (unsaved) record.
@@ -618,6 +626,16 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   }
 
   /**
+   * Set relation manually
+   *
+   * @param relationName
+   * @param relationData
+   */
+  public setRelation(relationName: string, relationData: LoadedRelationResult): void {
+    attachLoadedRelation(this, relationName, relationData);
+  }
+
+  /**
    * Get a loaded relation by name.
    *
    * Returns undefined if the relation has not been loaded.
@@ -736,7 +754,23 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   }
 
   /**
-   * Get uuid
+   * String-typed accessor for the model's primary id.
+   *
+   * The underlying `id` field is `string | number` (MongoDB's ObjectId-as-string
+   * vs SQL's auto-increment integer), which forces consumers to write
+   * `string | number` everywhere they pass an id around. This getter narrows
+   * the contract to `string` so callers can write functions that accept a
+   * single id type without leaking the engine difference.
+   *
+   * The name `uuid` is historical — it does NOT validate or coerce the value
+   * to a UUID. It simply returns the id, typed as a string.
+   *
+   * @example
+   * ```typescript
+   * function shareLink(modelId: string) { ... }
+   * shareLink(user.uuid); // works regardless of whether the underlying id is
+   *                      // a Mongo ObjectId string or a SQL integer
+   * ```
    */
   public get uuid(): string {
     return this.get("id");
@@ -1360,6 +1394,76 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   }
 
   /**
+   * Add a count of related records as a virtual field on each result row.
+   *
+   * Each relation produces a `${relationName}Count` column by default. Use
+   * the `"name as alias"` shorthand or the object form to customise the
+   * output alias or apply per-relation where-clause constraints.
+   *
+   * @param relation - Relation name (optionally with `as <alias>`)
+   * @returns Query builder for chaining
+   *
+   * @example
+   * ```typescript
+   * const users = await User.withCount("posts").get();
+   * console.log(users[0].postsCount); // number
+   * ```
+   */
+  public static withCount<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    relation: string,
+  ): QueryBuilderContract<TModel>;
+
+  /**
+   * Add counts for multiple relations at once.
+   *
+   * @example
+   * ```typescript
+   * await User.withCount("posts", "comments", "followers").get();
+   * ```
+   */
+  public static withCount<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    ...relations: string[]
+  ): QueryBuilderContract<TModel>;
+
+  /**
+   * Add counts for multiple relations supplied as an array.
+   */
+  public static withCount<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    relations: string[],
+  ): QueryBuilderContract<TModel>;
+
+  /**
+   * Add counts with optional per-relation constraints and alias overrides.
+   *
+   * Values may be `true`, an alias string, or a callback that applies
+   * where-clauses inside the count subquery. Use the `as <alias>` shorthand
+   * in the key to count the same relation more than once.
+   *
+   * @example
+   * ```typescript
+   * await Post.withCount({
+   *   comments: true,
+   *   "comments as approvedCount": (q) => q.where("approved", true),
+   *   tags: "tagCount",
+   * }).get();
+   * ```
+   */
+  public static withCount<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    relations: Record<string, true | string | ((query: QueryBuilderContract) => void)>,
+  ): QueryBuilderContract<TModel>;
+
+  public static withCount<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    ...args: any[]
+  ): QueryBuilderContract<TModel> {
+    return this.query().withCount(...args);
+  }
+
+  /**
    * Load relations using database JOINs in a single query.
    *
    * Unlike `with()` which uses separate queries, `joinWith()` uses
@@ -1651,6 +1755,59 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
     skipEvents?: boolean;
   }): Promise<RemoverResult> {
     return destroyModel(this, options);
+  }
+
+  /**
+   * Attach one or more related records to a `belongsToMany` pivot table.
+   *
+   * Thin wrapper over `createPivotOperations(this, relation).attach(ids, pivotData)`.
+   * Throws if the named relation is not a `belongsToMany` relation.
+   *
+   * @example
+   * ```typescript
+   * await post.attach("tags", [1, 2, 3]);
+   * await post.attach("tags", [4], { addedBy: currentUserId });
+   * ```
+   */
+  public async attach(relation: string, ids: PivotIds, pivotData?: PivotData): Promise<void> {
+    return attachPivotRelation(this, relation, ids, pivotData);
+  }
+
+  /**
+   * Detach related records from a `belongsToMany` pivot table. Omit `ids`
+   * to detach every row for this side of the relation.
+   *
+   * Thin wrapper over `createPivotOperations(this, relation).detach(ids)`.
+   * Throws if the named relation is not a `belongsToMany` relation.
+   *
+   * @example
+   * ```typescript
+   * await post.detach("tags", [2]);
+   * await post.detach("tags"); // detach all
+   * ```
+   */
+  public async detach(relation: string, ids?: PivotIds): Promise<void> {
+    return detachPivotRelation(this, relation, ids);
+  }
+
+  /**
+   * Get the pivot-operations handle for a `belongsToMany` relation.
+   *
+   * Returns a `PivotOperations` object exposing `attach` / `detach` /
+   * `sync` / `toggle` for the named relation's pivot table. Routing every
+   * pivot mutation through `model.pivot(relation)` keeps the join-table
+   * `sync` distinct from `Model.sync(Target, field)` (the denormalization
+   * feature). Throws if the named relation is not a `belongsToMany` relation.
+   *
+   * @example
+   * ```typescript
+   * await post.pivot("tags").attach([1, 2, 3]);
+   * await post.pivot("tags").sync([1, 3, 5]);   // replace the whole set
+   * await post.pivot("tags").toggle([1, 7]);    // flip each
+   * ```
+   */
+  public pivot(relation: string): PivotOperations {
+    return pivotRelation(this, relation);
   }
 
   /**
@@ -2029,7 +2186,18 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   }
 
   /**
-   * Cleanup model events
+   * Tear down framework-level registrations attached to this Model class.
+   *
+   * Called by Warlock's HMR machinery when a model file (or any file in its
+   * dependency graph) is reloaded. Removes the event listeners and registry
+   * entries the Model installed at module-load time so the reloaded class
+   * does not double-register.
+   *
+   * The `$` prefix marks this as framework-internal — application code should
+   * not call this. It is part of the public surface only because the HMR
+   * system needs to invoke it from outside the Model class.
+   *
+   * @internal
    */
   public static $cleanup() {
     cleanupModelEvents(this);

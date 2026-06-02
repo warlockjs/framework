@@ -11,7 +11,7 @@
  */
 
 import { colors } from "@mongez/copper";
-import { log, logger } from "@warlock.js/logger";
+import { log } from "@warlock.js/logger";
 import { databaseTransactionContext } from "../../context/database-transaction-context";
 import type {
   CreateDatabaseOptions,
@@ -856,7 +856,7 @@ export class PostgresDriver implements DriverContract {
     } catch (error) {
       // Auto-rollback on any error (including explicit rollback)
       await tx.rollback();
-      logger.error(
+      log.error(
         `database.postgress`,
         "transaction",
         "Transaction operation failed, rolled back everything",
@@ -915,6 +915,7 @@ export class PostgresDriver implements DriverContract {
     if (!this._migrationDriver) {
       this._migrationDriver = new PostgresMigrationDriver(this);
     }
+
     return this._migrationDriver;
   }
 
@@ -943,12 +944,12 @@ export class PostgresDriver implements DriverContract {
     const txClient = databaseTransactionContext.getSession() as PgPoolClient | undefined;
 
     const startTime = this.config.logging ? performance.now() : 0;
-    
+
     let paramsString = "";
     if (this.config.logging && params.length > 0) {
       paramsString = JSON.stringify(params);
       if (paramsString.length > 300) {
-        paramsString = paramsString.substring(0, 300) + '...';
+        paramsString = paramsString.substring(0, 300) + "...";
       }
       paramsString = ` | Params: ${paramsString}`;
     }

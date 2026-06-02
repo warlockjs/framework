@@ -1054,6 +1054,8 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
       "timestamp with time zone[]": "arrayTimestamp",
       "timestamptz[]": "arrayTimestamp",
       "uuid[]": "arrayUuid",
+      "jsonb[]": "arrayJson",
+      "json[]": "arrayJson",
     };
 
     return typeMap[pgType.toLowerCase()] ?? "string";

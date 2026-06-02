@@ -1,0 +1,31 @@
+//#region ../../@warlock.js/cascade/src/errors/missing-data-source.error.ts
+/**
+* Error thrown when a requested data source is not found in the registry.
+*
+* This can occur when:
+* - Attempting to retrieve a non-existent named data source
+* - Trying to get the default data source before any have been registered
+* - Context override references an unregistered data source name
+*/
+var MissingDataSourceError = class MissingDataSourceError extends Error {
+	/**
+	* The name of the data source that was not found (if applicable).
+	*/
+	dataSourceName;
+	/**
+	* Creates a new MissingDataSourceError.
+	*
+	* @param message - Descriptive error message
+	* @param dataSourceName - Optional data source name that was not found
+	*/
+	constructor(message, dataSourceName) {
+		super(message);
+		this.name = "MissingDataSourceError";
+		this.dataSourceName = dataSourceName;
+		if (Error.captureStackTrace) Error.captureStackTrace(this, MissingDataSourceError);
+	}
+};
+//#endregion
+export { MissingDataSourceError };
+
+//# sourceMappingURL=missing-data-source.error.mjs.map

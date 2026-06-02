@@ -6,7 +6,6 @@ import type {
 } from "../../contracts";
 import type { DataSource } from "../../data-source/data-source";
 import { dataSourceRegistry } from "../../data-source/data-source-registry";
-import { RelationLoader } from "../../relations/relation-loader";
 import type { ChildModel, GlobalScopeDefinition, Model } from "../model";
 
 export function buildQuery<TModel extends Model>(
@@ -37,19 +36,11 @@ export function buildQuery<TModel extends Model>(
     return ModelClass.hydrate(data);
   });
 
+  // Eager-loading runs inside the driver's `get()` so it works for any
+  // builder construction path (Model.query, Model.newQueryBuilder, custom
+  // subclassed builders). This hook only handles the model-level `fetched`
+  // event emission.
   queryBuilder.onFetched(async (models: any[]) => {
-    const eagerRelations = qb.eagerLoadRelations;
-    if (eagerRelations && eagerRelations.size > 0 && models.length > 0) {
-      const constraints: Record<string, (query: QueryBuilderContract) => void> = {};
-      for (const [name, constraint] of eagerRelations) {
-        if (typeof constraint === "function") {
-          constraints[name] = constraint;
-        }
-      }
-
-      const loader = new RelationLoader(models, ModelClass as any);
-      await loader.load([...eagerRelations.keys()], constraints);
-    }
     await ModelClass.events().emit("fetched", models as any, {});
   });
 

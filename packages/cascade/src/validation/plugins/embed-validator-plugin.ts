@@ -1,7 +1,7 @@
 /**
- * File Validator Plugin
+ * Embed Validator Plugin
  *
- * Adds file validation to Seal v factory
+ * Adds embed validation to Seal v factory
  */
 
 import type { SealPlugin } from "@warlock.js/seal";
@@ -27,10 +27,10 @@ declare module "@warlock.js/seal" {
 export const embedValidator: SealPlugin = {
   name: "embed",
   version: "1.0.0",
-  description: "Adds file upload validation (v.file())",
+  description: "Adds embed validation (v.embed())",
 
   install() {
-    // Inject file() method into v factory
+    // Inject embed() method into v factory
     v.embed = (model: ChildModel<any> | string, options?: EmbedOptions) =>
       new EmbedModelValidator().model(model).embed(options?.embed);
     v.embedMany = (model: ChildModel<any> | string, options?: EmbedOptions) =>

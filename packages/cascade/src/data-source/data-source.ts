@@ -1,5 +1,5 @@
 import type { DriverContract, IdGeneratorContract } from "../contracts";
-import type { DeleteStrategy, MigrationDefaults, ModelDefaults } from "../types";
+import type { DeleteStrategy, MigrationDefaults, ModelDefaults, RelationDefaults } from "../types";
 
 /**
  * Configuration options used when registering a data source.
@@ -54,6 +54,17 @@ export type DataSourceOptions = {
    * @default undefined (uses driver defaults)
    */
   migrationDefaults?: MigrationDefaults;
+
+  /**
+   * Default relation conventions (FK suffix, pivot-table naming order).
+   *
+   * Consumed by the runtime convention helpers in
+   * `relations/key-conventions.ts` whenever a relation definition omits
+   * an explicit `foreignKey` / `pivot` / pivot-column override.
+   *
+   * @default undefined (uses framework defaults)
+   */
+  relationDefaults?: RelationDefaults;
 
   /**
    * Migration configuration options.
@@ -129,6 +140,9 @@ export class DataSource {
   /** Migration-level defaults (UUID strategy, etc.). */
   public readonly migrationDefaults?: MigrationDefaults;
 
+  /** Default relation conventions (FK suffix, pivot ordering). */
+  public readonly relationDefaults?: RelationDefaults;
+
   /** Migration configuration options. */
   public readonly migrations?: {
     transactional?: boolean;
@@ -148,6 +162,7 @@ export class DataSource {
     this.defaultTrashTable = options.defaultTrashTable;
     this.modelDefaults = options.modelDefaults;
     this.migrationDefaults = options.migrationDefaults;
+    this.relationDefaults = options.relationDefaults;
     this.migrations = options.migrations;
   }
 

@@ -41,12 +41,18 @@ describe("Model Registry", () => {
     });
 
     it("should throw error if model name cannot be determined", () => {
-      // This is a edge case - creating an anonymous class
+      // Edge case: a nameless class with a decorator context that carries no
+      // name. `@RegisterModel` uses the TC39 Stage 3 signature `(value,
+      // context)`, so the context must be supplied explicitly when invoking
+      // the decorator by hand. A bare class expression passed as an argument
+      // has an empty `.name`, and `context.name` is undefined here — both of
+      // the fallbacks the decorator consults — so it must throw.
       expect(() => {
-        const AnonymousModel = RegisterModel()(
+        RegisterModel()(
           class extends Model {
             static table = "test";
           },
+          { kind: "class", name: undefined, metadata: {} } as unknown as ClassDecoratorContext,
         );
       }).toThrow(/Unable to determine model name/);
     });

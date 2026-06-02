@@ -8,6 +8,7 @@
  * @module cascade/drivers/postgres
  */
 
+import type { AggregateExpression } from "../../expressions";
 import type { SqlDialectContract } from "../sql/sql-dialect.contract";
 
 /**
@@ -290,8 +291,44 @@ export class PostgresDialect implements SqlDialectContract {
         return "TIMESTAMPTZ[]";
       case "arrayUuid":
         return "UUID[]";
+      case "arrayJson":
+        return "JSONB[]";
       default:
         return type.toUpperCase();
+    }
+  }
+
+  /**
+   * Translate a database-agnostic aggregate expression to PostgreSQL SQL.
+   *
+   * The five scalar aggregates map to their ANSI SQL function. `distinct`,
+   * `floor`, `first` and `last` are MongoDB-only for v1 — none has a
+   * single-scalar `GROUP BY` equivalent on PostgreSQL, so they throw instead
+   * of emitting a silently-different semantic (the footgun this guards).
+   *
+   * @param expression - The abstract aggregate (`$agg.*`) to translate
+   * @returns The SQL fragment (e.g. `SUM("amount")`, `COUNT(*)`)
+   */
+  public aggregateToSql(expression: AggregateExpression): string {
+    const column = expression.__field === null ? "*" : this.quoteIdentifier(expression.__field);
+
+    switch (expression.__agg) {
+      case "count":
+        return "COUNT(*)";
+      case "sum":
+        return `SUM(${column})`;
+      case "avg":
+        return `AVG(${column})`;
+      case "min":
+        return `MIN(${column})`;
+      case "max":
+        return `MAX(${column})`;
+      default:
+        throw new Error(
+          `$agg.${expression.__agg} is MongoDB-only and not supported on a ` +
+            `PostgreSQL groupBy. Use selectRaw / havingRaw with the equivalent ` +
+            `SQL (window function / DISTINCT / FLOOR) if you need it here.`,
+        );
     }
   }
 }

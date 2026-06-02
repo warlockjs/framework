@@ -12,10 +12,7 @@ import type {
 type MigrationLike = {
   addPendingIndex(index: { columns: string[]; unique?: boolean }): void;
   addForeignKeyOperation(fk: ForeignKeyDefinition): void;
-  addPendingVectorIndex?(
-    column: string,
-    options: Omit<import("../contracts/migration-driver.contract").VectorIndexOptions, "column">,
-  ): void;
+  addPendingVectorIndex?(column: string, options: Omit<VectorIndexOptions, "column">): void;
 };
 
 /**

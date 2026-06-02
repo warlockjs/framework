@@ -466,3 +466,8 @@ export function arrayTimestamp(): DetachedColumnBuilder {
 export function arrayUuid(): DetachedColumnBuilder {
   return new DetachedColumnBuilder("arrayUuid", "__placeholder__");
 }
+
+/** Standalone helper: JSONB[] */
+export function arrayJson(): DetachedColumnBuilder {
+  return new DetachedColumnBuilder("arrayJson", "__placeholder__");
+}

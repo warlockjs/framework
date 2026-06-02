@@ -7,8 +7,9 @@
  * @module @warlock.js/cascade/relations/types
  */
 
+import type { Lazy } from "@mongez/reinforcements";
 import type { QueryBuilderContract } from "../contracts";
-import type { Model } from "../model/model";
+import type { ChildModel, Model } from "../model/model";
 
 // ============================================================================
 // RELATION TYPES
@@ -59,10 +60,21 @@ export type RelationDefinition = {
   readonly type: RelationType;
 
   /**
-   * The name of the related model in the registry.
-   * Models must be decorated with `@RegisterModel()` to be resolvable.
+   * The related model — accepts three forms:
+   *  - **String** registered via `@RegisterModel()` — indirect lookup,
+   *    cycle-safe because resolution is dynamic. Required for cross-package
+   *    refs that can't import the class.
+   *  - **Direct class reference** — idiomatic and type-safe. Cleanest
+   *    choice when no import cycle exists between the two model files.
+   *  - **`lazy(() => SomeModel)`** — type-safe AND cycle-safe. The
+   *    closure defers reading the binding until query time, sidestepping
+   *    the ESM partial-load gotcha that breaks direct refs in cycles.
+   *
+   * The framework resolves all three via `resolveModelClass()` from
+   * `model/register-model.ts`. Direct class and lazy refs carry the class
+   * directly, so their target does NOT need to be registered.
    */
-  readonly model: string;
+  readonly model: string | ChildModel<Model> | Lazy<unknown>;
 
   /**
    * The foreign key field on the related model (for hasOne/hasMany)
@@ -226,9 +238,11 @@ export type BelongsToOptions = {
 export type BelongsToManyOptions = {
   /**
    * The pivot table name that connects the two models.
-   * This is required for many-to-many relationships.
+   *
+   * If omitted, defaults to the alphabetical snake-case join of the two
+   * model names (e.g. `post_tag` for `Post` ↔ `Tag`).
    */
-  readonly pivot: string;
+  readonly pivot?: string;
 
   /**
    * The column in the pivot table that references this model's primary key.

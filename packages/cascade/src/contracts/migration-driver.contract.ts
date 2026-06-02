@@ -48,7 +48,8 @@ export type ColumnType =
   | "arrayText"
   | "arrayDate"
   | "arrayTimestamp"
-  | "arrayUuid";
+  | "arrayUuid"
+  | "arrayJson";
 
 /**
  * Column definition used when adding or modifying columns.
