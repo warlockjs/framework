@@ -1,0 +1,100 @@
+---
+title: "Per-User / Multi-Tenant Cache"
+slug: v/latest/cache/multi-tenant-cache
+---
+
+A common need: cache a bunch of values *per user* (or per tenant), keep them
+tidily grouped, and wipe everything for one user the moment their data
+changes. This is where [namespaces](/v/latest/cache/namespaces/) and
+[tags](/v/latest/cache/tags/) combine beautifully — the namespace groups the
+keys, the tags give you a single-call invalidation switch.
+
+## The pattern
+
+Create one scope per user, seeded with a tag that marks every write as
+belonging to that user:
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+function userCache(userId: number) {
+  return cache.namespace(`user.${userId}`, {
+    ttl: "1h",
+    tags: [`user.${userId}`],
+  });
+}
+```
+
+Every write through that scope is automatically **prefixed** (`user.42.…`)
+and **tagged** (`user.42`):
+
+```ts
+const me = userCache(42);
+
+await me.set("profile", profile);                 // → key "user.42.profile", tag "user.42"
+await me.remember("orders", "10m", () =>          // → key "user.42.orders"
+  db.orders.forUser(42),
+);
+await me.set("draft", draft, { ttl: "5m" });      // per-call ttl wins over scope default
+```
+
+## Wiping one user
+
+Because every entry carries the `user.42` tag, a single call invalidates the
+user's entire cached footprint — no matter which scope or key it lives under.
+Tags are global, so this reaches everything tagged `user.42`:
+
+```ts
+// User updated their profile → blow away everything cached for them
+await cache.tags(["user.42"]).invalidate();
+```
+
+If you'd rather wipe only what's under the namespace prefix (and leave other
+`user.42`-tagged entries elsewhere intact), clear the scope instead:
+
+```ts
+await me.clear();   // removes every key under "user.42.*"
+```
+
+:::tip Scope vs. tag — which to invalidate?
+**Clear the scope** when "everything under this prefix" is exactly what you
+mean. **Invalidate the tag** when entries for this user are scattered across
+multiple scopes (a profile scope, a feed scope, a settings scope) and you want
+them all gone at once.
+:::
+
+## Nesting scopes
+
+Scopes nest, inheriting the parent's defaults — handy for sub-grouping a
+user's data while keeping the invalidation tag flowing through:
+
+```ts
+const me = userCache(42);
+const settings = me.namespace("settings");   // prefix "user.42.settings", still tagged user.42
+
+await settings.set("theme", "dark");          // → "user.42.settings.theme"
+await cache.tags(["user.42"]).invalidate();   // still wipes it
+```
+
+## Multi-tenant variant
+
+The same shape works for tenants — swap the axis and add a coarser tag so you
+can invalidate a single tenant *or* drill down to one user within it:
+
+```ts
+function tenantUserCache(tenantId: number, userId: number) {
+  return cache.namespace(`tenant.${tenantId}.user.${userId}`, {
+    ttl: "1h",
+    tags: [`tenant.${tenantId}`, `tenant.${tenantId}.user.${userId}`],
+  });
+}
+
+await cache.tags(["tenant.7"]).invalidate();             // whole tenant
+await cache.tags(["tenant.7.user.42"]).invalidate();     // one user in it
+```
+
+## Related Documentation
+
+- [Namespaces](/v/latest/cache/namespaces/) — scoped views, prefixing, nesting
+- [Cache Tags](/v/latest/cache/tags/) — tag-based invalidation
+- [Set Options](/v/latest/cache/set-options/) — inline `tags` and `ttl`

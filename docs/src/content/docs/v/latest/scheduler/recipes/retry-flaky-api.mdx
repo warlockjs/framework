@@ -1,0 +1,123 @@
+---
+title: "Retry a Failed Job with Backoff"
+sidebar:
+  order: 2
+---
+
+You have a job that calls a third-party API — a payment reconciler, an
+inventory sync, a webhook replay. Third-party APIs have bad seconds:
+they rate-limit you, they blip, they 503 under load. A single failure
+should not mean the job is lost until tomorrow. `retry()` handles this
+for you.
+
+## The job
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+scheduler.addJob(
+  job("sync-inventory", async () => {
+    // Throws on a 429 / 503 / network error.
+    await supplierApi.pullInventory();
+  })
+    .everyHour()
+    .retry(5, 1000, 2), // up to 5 retries, exponential backoff
+);
+
+scheduler.start();
+```
+
+Read `retry(5, 1000, 2)` as: *try up to five more times after the first
+attempt; wait 1 second before the first retry; double the wait each
+time after that.*
+
+## What the timeline looks like
+
+The third argument turns on **exponential backoff** — each wait is
+`delay × multiplier^(attempt - 1)`:
+
+| Attempt | Wait before it |
+| ------- | -------------- |
+| 1 (initial) | — |
+| 2 | 1 000 ms |
+| 3 | 2 000 ms |
+| 4 | 4 000 ms |
+| 5 | 8 000 ms |
+| 6 | 16 000 ms |
+
+If any attempt succeeds, the rest are skipped. Backoff matters when the
+failure is *load-related* (a rate limit, an overwhelmed downstream):
+hammering it again immediately just earns another rejection, so you back
+off and give it room to recover.
+
+Drop the multiplier for a flat delay instead — `retry(3, 500)` waits
+500 ms before every retry, good for transient blips like a database
+deadlock where there is nothing to "cool down".
+
+## Knowing whether it limped or sailed
+
+A job that needed three retries before succeeding is a warning sign even
+though it "passed". The retry count rides along in the `JobResult`:
+
+```ts
+scheduler.on("job:complete", (name, result) => {
+  if (result.retries && result.retries > 0) {
+    console.warn(`${name} succeeded, but only after ${result.retries} retries`);
+  }
+});
+```
+
+And `job:error` fires exactly once, **after every retry is spent** —
+this is your "it is genuinely broken, page someone" signal, not a noisy
+per-attempt event:
+
+```ts
+scheduler.on("job:error", (name, error) => {
+  alerts.critical(`${name} failed after all retries`, error);
+});
+```
+
+## It will not get stuck retrying forever
+
+A natural worry: if the API is down for an hour, does this job spin
+forever? No. Retries happen **within a single fire**. Once the five
+retries are exhausted, the run ends, `job:error` fires, and `nextRun`
+advances by the normal interval — the next attempt is the next hourly
+slot, not an instant re-fire.
+
+```ts
+// 10:00 fire fails all retries → next attempt is 11:00, NOT 10:00:00.3
+job("sync-inventory", pullInventory).everyHour().retry(5, 1000, 2);
+```
+
+## Giving up after repeated failures
+
+If a job has failed every hour for a day, you may want to stop trying
+and escalate. There is no built-in "circuit breaker" — wire it in user
+code by counting consecutive `job:error` events:
+
+```ts
+let consecutiveFailures = 0;
+
+scheduler.on("job:error", (name) => {
+  if (name !== "sync-inventory") {
+    return;
+  }
+
+  consecutiveFailures++;
+
+  if (consecutiveFailures >= 5) {
+    scheduler.removeJob("sync-inventory");
+    alerts.critical("sync-inventory disabled after 5 consecutive failures");
+  }
+});
+
+scheduler.on("job:complete", (name) => {
+  if (name === "sync-inventory") {
+    consecutiveFailures = 0;
+  }
+});
+```
+
+For the full signature and the validation rules, see the
+[Retry & Backoff guide](../guides/retry-backoff/).

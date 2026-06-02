@@ -1,0 +1,57 @@
+---
+title: "Seal"
+description: Schema-first validation for TypeScript — the v factory, fluent chains, type inference, JSON Schema, and Standard Schema interop.
+sidebar:
+  order: 0
+  label: "Overview"
+---
+
+> Standalone — usable in any Node project, no `@warlock.js/core` required.
+
+Seal is a schema-first validation library for TypeScript. You declare a shape once with the `v` factory, and that one declaration gives you:
+
+- A runtime validator (`validate(schema, data)`) that returns a typed result instead of throwing.
+- A static type via `Infer<typeof schema>` — no hand-rolled parallel `type User = { ... }`.
+- A JSON Schema export (`schema.toJsonSchema(target)`) for OpenAI structured outputs, OpenAPI specs, AJV, or any other consumer.
+- A Standard Schema bridge (`schema["~standard"]`) so it slots into TanStack Form, Conform, LangGraph, and anything else built against the Standard Schema spec.
+
+```ts
+import { v, validate, type Infer } from "@warlock.js/seal";
+
+const userSchema = v.object({
+  email: v.string().email(),
+  age: v.int().min(13).optional(),
+  role: v.literal("admin", "user", "guest"),
+});
+
+type User = Infer<typeof userSchema>;
+// { email: string; age?: number; role: "admin" | "user" | "guest" }
+
+const result = await validate(userSchema, request.body);
+
+if (result.isValid) {
+  result.data;  // typed as User
+} else {
+  result.errors;  // [{ type, error, input }, ...]
+}
+```
+
+That single import block is the entire surface area you need for 90% of real apps.
+
+## Where to go next
+
+- **New here?** Start with [Introduction](./getting-started/01-introduction.md) and walk the three-page getting-started.
+- **Coming from Zod / Valibot / Yup?** [Introduction](./getting-started/01-introduction.md) opens with the comparison frame.
+- **Already shipping?** [Essentials](./essentials/01-primitives.md) is the daily reference; [Guides](./guides/pick-the-right-primitive.md) covers task-shaped how-tos.
+- **Need a specific recipe?** [Recipes](./recipes/validate-request-body.md) — validate a request body, reuse/compose schemas, coerce query params, custom error messages, optional fields, polymorphic data, recursion, ID validation.
+- **API surface?** [Reference / API](./reference/api.md) — every export with signature and one example.
+
+## What's covered here
+
+| Section | When to reach for it |
+| --- | --- |
+| [Getting started](./getting-started/01-introduction.md) | Install + first schema in 5 minutes. |
+| [Essentials](./essentials/01-primitives.md) | Concepts every user needs — primitives, modifiers, structural shapes, inference, errors. |
+| [Guides](./guides/pick-the-right-primitive.md) | Task-oriented how-tos — picking primitives, JSON Schema export, plugins, Standard Schema interop. |
+| [Recipes](./recipes/validate-request-body.md) | Copy-paste patterns — request-body validation, schema reuse, query-param coercion, custom messages, optional/default/catch, polymorphic data, recursion, ID formats. |
+| [Reference](./reference/api.md) | API surface — one page, every exported identifier. |

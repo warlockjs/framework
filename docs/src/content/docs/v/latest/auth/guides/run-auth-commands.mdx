@@ -1,0 +1,171 @@
+---
+title: "Run auth commands"
+description: Register and run warlock jwt.generate and warlock auth.cleanup — bootstrap secrets and sweep expired refresh tokens.
+sidebar:
+  order: 6
+  label: "Run auth commands"
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+The package ships two CLI commands. Register them once in `warlock.config.ts`; the framework picks them up.
+
+## Register them
+
+```ts title="warlock.config.ts"
+import {
+  registerAuthCleanupCommand,
+  registerJWTSecretGeneratorCommand,
+} from "@warlock.js/auth";
+import { defineConfig } from "@warlock.js/core";
+
+export default defineConfig({
+  cli: {
+    commands: [
+      registerJWTSecretGeneratorCommand(),
+      registerAuthCleanupCommand(),
+    ],
+  },
+});
+```
+
+Both functions return a `CLICommand` — they don't have side effects until the framework boots the CLI layer.
+
+## `warlock jwt.generate` — bootstrap secrets
+
+<Tabs syncKey="pm">
+  <TabItem label="npm">
+    ```bash
+    npx warlock jwt.generate
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn warlock jwt.generate
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm warlock jwt.generate
+    ```
+  </TabItem>
+</Tabs>
+
+Generates 32-character random strings for `JWT_SECRET` and `JWT_REFRESH_SECRET` and appends them to `.env`. Idempotent — if a key already exists, it's skipped with a warning.
+
+What happens under the hood:
+
+1. Look for `.env` at the project root.
+2. If missing, fall back to `.env.development` (in dev) or `.env.production` (in prod).
+3. If still missing, log an error and exit.
+4. For each secret name not already present, generate `Random.string(32)` and append.
+
+Run it once per environment when bootstrapping a new project. Each developer typically runs it locally; production secrets come from your secret manager and bypass this command.
+
+:::caution
+Don't commit `.env`. The default Warlock `.gitignore` already excludes it.
+:::
+
+## `warlock auth.cleanup` — expired-token sweep
+
+<Tabs syncKey="pm">
+  <TabItem label="npm">
+    ```bash
+    npx warlock auth.cleanup
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn warlock auth.cleanup
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm warlock auth.cleanup
+    ```
+  </TabItem>
+</Tabs>
+
+Runs `authService.cleanupExpiredTokens()` — deletes every refresh token whose `expires_at` is in the past. Fires `token.expired` per token and `cleanup.completed` once with the total count.
+
+The command preloads `auth` + `database` config and the `database` connector, so it's safe to run as a one-off without warming the rest of the app.
+
+## Scheduling — pick one
+
+### In-process (warlock scheduler)
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+import { authService } from "@warlock.js/auth";
+
+scheduler.addJob(
+  job("auth-cleanup", () => authService.cleanupExpiredTokens())
+    .daily()
+    .at("03:00")
+    .preventOverlap(),
+);
+
+scheduler.start();
+```
+
+Best when you already run the scheduler. No shell call, no env duplication. See [the scheduler docs](../../../scheduler/getting-started/introduction/).
+
+### Out-of-process (system cron)
+
+```bash
+0 3 * * *  cd /path/to/app && /usr/local/bin/yarn warlock auth.cleanup
+```
+
+Best when this service doesn't run the scheduler subsystem (smaller process surface, isolated cleanup).
+
+### How often?
+
+Daily is plenty for almost every app. The query is a single indexed `DELETE WHERE expires_at < now()` — cheap.
+
+If you run very-short-lived refresh tokens (1h) at million-user scale, bump to hourly. Otherwise daily.
+
+## Custom commands
+
+`auth.cleanup` covers the simple case. If you need more — say, revoke all tokens for users inactive for 30+ days alongside the expiry sweep — write your own command and combine the service helpers:
+
+```ts title="src/cli/commands/deep-auth-cleanup.ts"
+import { authService } from "@warlock.js/auth";
+import { command } from "@warlock.js/core";
+import { User } from "@/app/users/models/user.model";
+
+export function registerDeepCleanupCommand() {
+  return command({
+    name: "auth.deep-cleanup",
+    description: "Expire stale tokens AND revoke tokens for inactive users",
+    preload: {
+      env: true,
+      config: ["auth", "database"],
+      connectors: ["database"],
+    },
+    action: async () => {
+      await authService.cleanupExpiredTokens();
+
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const stale = await User.query().where("last_seen_at", "<", thirtyDaysAgo).get();
+
+      for (const user of stale) {
+        await authService.revokeAllTokens(user);
+      }
+    },
+  });
+}
+```
+
+Register it the same way as the bundled commands.
+
+## Things to avoid
+
+- **Re-running `jwt.generate` in production.** It changes the secrets, which invalidates every token in flight. Generate once per environment.
+- **Falling back to a hardcoded dev secret.** `env("JWT_SECRET", "dev-secret")` is a footgun — a missing secret should fail the boot, not silently degrade.
+- **Sub-minute cleanup intervals.** The delete itself is cheap, but the per-token `token.expired` event fan-out adds up. Hourly is the lowest you should go.
+
+## Related
+
+- [Manage tokens](./manage-tokens.md) — `cleanupExpiredTokens` internals.
+- [Configuration](../getting-started/03-configuration.mdx) — where the secrets get read from.
+- [Scheduler — getting started](../../../scheduler/getting-started/introduction/) — in-process scheduling.

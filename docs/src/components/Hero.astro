@@ -1,0 +1,325 @@
+---
+/**
+ * Warlock.js landing hero — v2.
+ *
+ * Logo prominently shown (with subtle electric glow), big confident
+ * headline, tagline, three CTAs. Animated radial gradient + grid
+ * backdrop. Respects prefers-reduced-motion.
+ */
+import logo from "../assets/logo.png";
+---
+
+<section class="warlock-hero">
+  <div class="warlock-hero-glow" aria-hidden="true"></div>
+  <div class="warlock-hero-grid" aria-hidden="true"></div>
+
+  <div class="warlock-hero-inner">
+    <div class="warlock-hero-logo-wrap">
+      <div class="warlock-hero-logo-halo" aria-hidden="true"></div>
+      <img
+        class="warlock-hero-logo"
+        src={logo.src}
+        width="120"
+        height="120"
+        alt="Warlock.js"
+        loading="eager"
+        fetchpriority="high"
+      />
+    </div>
+
+    <p class="warlock-hero-eyebrow">
+      <span class="warlock-hero-dot"></span>
+      <span>AI-native TypeScript framework</span>
+      <span class="warlock-hero-eyebrow-sep">·</span>
+      <span class="warlock-hero-eyebrow-version">v4</span>
+    </p>
+
+    <h1 class="warlock-hero-headline">
+      Build backends and AI agents
+      <span class="warlock-hero-accent">on the same primitives.</span>
+    </h1>
+
+    <p class="warlock-hero-tagline">
+      Fourteen standalone packages — HTTP, ORM, cache, queues, auth,
+      observability, and a first-class AI layer with typed agents, tools,
+      and workflows. Pick what you need; ship faster.
+    </p>
+
+    <div class="warlock-hero-cta">
+      <a class="warlock-cta warlock-cta-primary" href="/v/latest/core/getting-started/01-introduction/">
+        Get started
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5 12h14M13 5l7 7-7 7" />
+        </svg>
+      </a>
+      <a class="warlock-cta warlock-cta-secondary" href="/packages/">
+        Browse packages
+      </a>
+      <a class="warlock-cta warlock-cta-ghost" href="https://github.com/warlockjs/core" target="_blank" rel="noopener">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2.16c-3.2.7-3.88-1.36-3.88-1.36-.52-1.34-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18A11.02 11.02 0 0 1 12 6.8c.98 0 1.97.13 2.89.39 2.21-1.49 3.18-1.18 3.18-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.82 1.19 3.08 0 4.42-2.69 5.39-5.26 5.68.41.35.78 1.05.78 2.12v3.14c0 .31.21.67.79.56C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5Z" />
+        </svg>
+        GitHub
+      </a>
+    </div>
+
+    <div class="warlock-hero-trust" aria-label="At a glance">
+      <span><strong>14</strong> packages</span>
+      <span class="warlock-hero-trust-sep"></span>
+      <span><strong>120+</strong> skills</span>
+      <span class="warlock-hero-trust-sep"></span>
+      <span><strong>MIT</strong> licensed</span>
+    </div>
+  </div>
+</section>
+
+<style>
+  .warlock-hero {
+    position: relative;
+    overflow: hidden;
+    padding: clamp(2.5rem, 2.5rem + 2vw, 4.5rem) clamp(1.25rem, 4vw, 3rem)
+      clamp(3rem, 3.5rem + 2vw, 5rem);
+    margin: 0 auto;
+    border-bottom: 1px solid var(--sl-color-hairline);
+    isolation: isolate;
+  }
+
+  .warlock-hero-glow {
+    position: absolute;
+    inset: -40% -10% auto -10%;
+    height: 110%;
+    background:
+      radial-gradient(60% 50% at 30% 30%, var(--warlock-yellow-glow) 0%, transparent 60%),
+      radial-gradient(50% 40% at 75% 20%, rgba(250, 204, 21, 0.1) 0%, transparent 70%);
+    filter: blur(2px);
+    animation: warlock-hero-drift 18s ease-in-out infinite alternate;
+    z-index: -2;
+    pointer-events: none;
+  }
+
+  @keyframes warlock-hero-drift {
+    0% { transform: translate3d(0, 0, 0) scale(1); }
+    50% { transform: translate3d(-2%, 1%, 0) scale(1.05); }
+    100% { transform: translate3d(2%, -1%, 0) scale(1.02); }
+  }
+
+  .warlock-hero-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(to right, var(--sl-color-hairline) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--sl-color-hairline) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 60% 55% at 50% 35%, black 0%, transparent 80%);
+    -webkit-mask-image: radial-gradient(ellipse 60% 55% at 50% 35%, black 0%, transparent 80%);
+    opacity: 0.45;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .warlock-hero-inner {
+    max-width: 60rem;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  /* Logo with electric halo */
+  .warlock-hero-logo-wrap {
+    position: relative;
+    display: inline-block;
+    margin-block-end: 1.75rem;
+  }
+
+  .warlock-hero-logo-halo {
+    position: absolute;
+    inset: -25%;
+    background: radial-gradient(circle, var(--warlock-yellow-glow) 0%, transparent 65%);
+    filter: blur(20px);
+    animation: warlock-hero-halo-pulse 3.5s ease-in-out infinite;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  @keyframes warlock-hero-halo-pulse {
+    0%, 100% { opacity: 0.6; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.08); }
+  }
+
+  .warlock-hero-logo {
+    display: block;
+    width: clamp(72px, 8vw + 40px, 120px);
+    height: auto;
+    filter: drop-shadow(0 0 24px var(--warlock-yellow-glow));
+    animation: warlock-hero-logo-float 6s ease-in-out infinite;
+  }
+
+  @keyframes warlock-hero-logo-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+
+  /* Eyebrow */
+  .warlock-hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--sl-color-gray-3);
+    margin-block-end: 1.5rem;
+    padding: 0.4rem 0.85rem;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 999px;
+    background-color: color-mix(in srgb, var(--sl-color-bg) 60%, transparent);
+    backdrop-filter: blur(8px);
+  }
+
+  .warlock-hero-eyebrow-sep {
+    opacity: 0.4;
+  }
+
+  .warlock-hero-eyebrow-version {
+    color: var(--sl-color-text-accent);
+    font-weight: 700;
+  }
+
+  .warlock-hero-dot {
+    width: 6px;
+    height: 6px;
+    background-color: var(--sl-color-text-accent);
+    border-radius: 50%;
+    box-shadow: 0 0 12px var(--sl-color-text-accent);
+    animation: warlock-pulse 2.4s ease-in-out infinite;
+  }
+
+  @keyframes warlock-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+
+  /* Headline */
+  .warlock-hero-headline {
+    font-family: var(--sl-font);
+    font-size: clamp(2.25rem, 1.5rem + 4vw, 4.25rem);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+    color: var(--sl-color-white);
+    margin: 0 auto;
+    max-width: 24ch;
+  }
+
+  .warlock-hero-accent {
+    display: block;
+    color: var(--sl-color-text-accent);
+    text-shadow: 0 0 40px var(--warlock-yellow-glow);
+  }
+
+  .warlock-hero-tagline {
+    font-size: clamp(1rem, 0.9rem + 0.4vw, 1.18rem);
+    line-height: 1.6;
+    color: var(--sl-color-gray-2);
+    max-width: 38rem;
+    margin: 1.75rem auto 0;
+  }
+
+  /* CTAs */
+  .warlock-hero-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-block-start: 2.5rem;
+  }
+
+  .warlock-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.7rem 1.2rem;
+    border-radius: var(--warlock-radius);
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: -0.01em;
+    text-decoration: none !important;
+    border: 1px solid transparent;
+    transition: transform 0.06s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    cursor: pointer;
+  }
+
+  .warlock-cta:active {
+    transform: translateY(1px);
+  }
+
+  .warlock-cta-primary {
+    background-color: var(--sl-color-text-accent);
+    color: var(--warlock-midnight) !important;
+    box-shadow: 0 4px 30px var(--warlock-yellow-glow);
+  }
+
+  .warlock-cta-primary:hover {
+    background-color: var(--warlock-yellow-bright);
+    box-shadow: 0 6px 40px var(--warlock-yellow-glow);
+  }
+
+  .warlock-cta-secondary {
+    background-color: var(--warlock-surface-dark);
+    border-color: var(--sl-color-gray-5);
+    color: var(--sl-color-white) !important;
+  }
+
+  :root[data-theme="light"] .warlock-cta-secondary {
+    background-color: #ffffff;
+    border-color: var(--sl-color-gray-5);
+    color: var(--sl-color-text) !important;
+  }
+
+  .warlock-cta-secondary:hover {
+    border-color: var(--sl-color-text-accent);
+  }
+
+  .warlock-cta-ghost {
+    color: var(--sl-color-gray-2) !important;
+    background-color: transparent;
+  }
+
+  .warlock-cta-ghost:hover {
+    color: var(--sl-color-text-accent) !important;
+  }
+
+  /* At-a-glance trust strip */
+  .warlock-hero-trust {
+    display: inline-flex;
+    align-items: center;
+    gap: 1.1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-block-start: 2.5rem;
+    padding: 0.85rem 1.5rem;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--warlock-radius);
+    background-color: color-mix(in srgb, var(--warlock-surface-dark) 70%, transparent);
+    backdrop-filter: blur(10px);
+    font-size: 0.875rem;
+    color: var(--sl-color-gray-2);
+  }
+
+  :root[data-theme="light"] .warlock-hero-trust {
+    background-color: rgba(255, 255, 255, 0.7);
+  }
+
+  .warlock-hero-trust strong {
+    color: var(--sl-color-white);
+    font-weight: 700;
+    font-feature-settings: "tnum" 1;
+  }
+
+  .warlock-hero-trust-sep {
+    width: 1px;
+    height: 14px;
+    background-color: var(--sl-color-hairline);
+  }
+</style>

@@ -1,0 +1,166 @@
+---
+title: "Testing with `@warlock.js/cache`"
+slug: v/latest/cache/testing
+---
+
+Tests that touch cache benefit from a driver shaped like the production one — same contract, same events, same TTL handling — but with introspection helpers that make behavioral assertions easy. That's `MockCacheDriver`.
+
+This page covers three strategies, ranked by how often you'll reach for each.
+
+## `MockCacheDriver` — behavioral assertions
+
+`MockCacheDriver` is a full driver implementation backed by an in-memory `Map`, plus four helpers that no production driver exposes:
+
+| Helper | What it does |
+|---|---|
+| `wasCalled(operation, key?)` | Did this op run? Optional key matched post-`parseKey`. |
+| `getStored(key)` | Raw stored value, bypassing TTL handling and clone protection. |
+| `reset()` | Wipe storage, tag index, and call log in one call. |
+| `callLog: CacheCall[]` | Ordered record of every op — `{ operation, key, args, timestamp }`. |
+
+Setup mirrors any other driver:
+
+```ts title="tests/user-service.spec.ts"
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { cache, MockCacheDriver } from "@warlock.js/cache";
+import { UserService } from "../src/services/user.service";
+
+describe("UserService", () => {
+  let driver: MockCacheDriver;
+
+  beforeEach(async () => {
+    cache.setCacheConfigurations({
+      default: "mock",
+      logging: false,
+      drivers: { mock: MockCacheDriver },
+      options: { mock: {} },
+    });
+    await cache.init();
+
+    driver = cache.currentDriver as MockCacheDriver;
+  });
+
+  afterEach(async () => {
+    driver.reset();
+    await cache.disconnect();
+  });
+
+  it("invalidates the user cache after update", async () => {
+    await new UserService().update(42, { name: "Jane" });
+
+    expect(driver.wasCalled("remove", "users.42")).toBe(true);
+  });
+
+  it("caches the profile with a 1h TTL", async () => {
+    await new UserService().getProfile(1);
+
+    const setCall = driver.callLog.find((call) => call.operation === "set");
+    expect(setCall?.args[1]).toBe("1h");
+  });
+});
+```
+
+### Match keys however you wrote them
+
+`wasCalled` normalizes object keys via `parseKey`, so both forms match the same call:
+
+```ts
+await cache.set({ id: 1 }, user);
+
+driver.wasCalled("set", { id: 1 });   // true
+driver.wasCalled("set", "id.1");      // also true
+```
+
+### Inspect the raw store
+
+`getStored` returns the persisted value untouched — useful when you want to assert on shape without going through `get` (which deep-clones, honors TTL, and emits events):
+
+```ts
+await cache.set("config", { theme: "dark" });
+
+expect(driver.getStored("config")).toEqual({ theme: "dark" });
+```
+
+### What it does NOT do
+
+`MockCacheDriver` does not implement `similar()` — vector writes are recorded into the call log so you can assert "was a vector passed?" but nearest-neighbor scoring isn't available. Use `MemoryCacheDriver` for tests that exercise real similarity retrieval.
+
+## `MemoryCacheDriver` — full-stack integration tests
+
+When you want the real read/write semantics — eviction, TTL expiry, similarity scoring, no asserts on which methods got called — use `MemoryCacheDriver`. Same setup, swap one name:
+
+```ts
+cache.setCacheConfigurations({
+  default: "memory",
+  logging: false,
+  drivers: { memory: MemoryCacheDriver },
+  options: { memory: {} },
+});
+```
+
+Pick this when the test is about *outcome* ("the user got the cached profile") rather than *interaction* ("the cache was hit twice").
+
+## `NullCacheDriver` — cache disabled
+
+When you want to verify your code still works with caching turned off — graceful degradation tests, error-path coverage:
+
+```ts
+cache.setCacheConfigurations({
+  default: "null",
+  drivers: { null: NullCacheDriver },
+  options: { null: {} },
+});
+```
+
+Every read returns `null`, every write silently discards. The code path under test should still produce correct results from upstream.
+
+## Spying on events
+
+Every driver emits the same lifecycle events. Listeners survive `cache.use()` switches:
+
+```ts
+import { vi } from "vitest";
+
+const onHit = vi.fn();
+cache.on("hit", onHit);
+
+await service.getProfile(1);
+await service.getProfile(1);
+
+expect(onHit).toHaveBeenCalledTimes(1); // second call was a cache hit
+```
+
+This works against any driver — `MockCacheDriver` emits the same events as the real ones.
+
+## Silencing logs
+
+The in-package vitest config runs `silent: true`, but if your test suite is outside the cache package, disable logging at config time:
+
+```ts
+cache.setCacheConfigurations({
+  default: "mock",
+  logging: false,             // here
+  drivers: { mock: MockCacheDriver },
+  options: { mock: {} },
+});
+```
+
+Or per-driver: `driver.setLoggingState(false)`.
+
+## Choosing between mock, memory, and null
+
+| Test goal | Use |
+|---|---|
+| "Did my service call `set` / `remove` with the right args?" | `MockCacheDriver` |
+| "Does my service produce the right output when caching works?" | `MemoryCacheDriver` |
+| "Does my code still work with cache turned off?" | `NullCacheDriver` |
+| "Does my similarity-based recommender return the right hits?" | `MemoryCacheDriver` |
+| "Did my code attach the right tags?" | `MockCacheDriver` (inspect `callLog`) |
+
+Default to `MockCacheDriver`. Reach for the others when the test is about real behavior, not about how your code talks to the cache.
+
+## Related
+
+- [Memory Cache Driver](/v/latest/cache/memory/) — runtime semantics for the in-memory backend.
+- [Null Cache Driver](/v/latest/cache/null/) — no-op driver reference.
+- [Event System](/v/latest/cache/events/) — full event payload reference.

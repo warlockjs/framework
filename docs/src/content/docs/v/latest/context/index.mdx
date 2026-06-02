@@ -1,0 +1,69 @@
+---
+title: Context
+description: Request-scoped state propagation without prop-drilling — typed contexts you define + orchestrate.
+---
+
+> Standalone — usable in any Node project, no `@warlock.js/core` required.
+
+`@warlock.js/context` carries request-scoped state — current user,
+trace ID, tenant, locale, anything you'd otherwise prop-drill — through
+the call stack without explicit handoff. Built on
+`AsyncLocalStorage` so the context survives async boundaries.
+
+Define a typed context, run your handler inside it, then read the value anywhere downstream — no parameter threading, even five async frames deep:
+
+```ts
+import { Context } from "@warlock.js/context";
+
+type UserStore = { userId: string; role: "admin" | "user" };
+
+class UserContext extends Context<UserStore> {
+  public buildStore(payload?: Record<string, any>): UserStore {
+    return { userId: payload?.userId ?? "", role: payload?.role ?? "user" };
+  }
+}
+
+export const userContext = new UserContext();
+
+// At the boundary — an HTTP handler, a queue consumer, a scheduled job:
+await userContext.run({ userId: "u-123", role: "admin" }, async () => {
+  await loadUserPreferences();
+});
+
+// ...and five frames deep, with no userId parameter in sight:
+function fetchAuditTrail() {
+  return userContext.get("userId"); // "u-123"
+}
+```
+
+Two concurrent requests never see each other's store, and when `run()` returns the store is released — no cleanup code.
+
+## What it gives you
+
+- **Define a context** — typed slots for the values you want to thread
+  through (`user`, `traceId`, `tenant`, …).
+- **Orchestrate multiple contexts** — compose them so a single
+  request-scope carries all the slots your app needs.
+- **Read from anywhere** — `ctx.get("user")` deep in your service
+  layer; no parameter threading.
+- **Reset on boundaries** — fresh context per request, worker job,
+  scheduled run.
+
+## Read by intent
+
+- **New here?** [Meet @warlock.js/context](./getting-started/01-introduction)
+  — what it is and why, then [your first context](./getting-started/03-your-first-context)
+  in five minutes.
+- **Want the mental model?** [The context model](./essentials/01-the-context-model)
+  — how `AsyncLocalStorage` flows through awaits and why each request gets
+  its own store.
+- **Building one?** [Define a context](./guides/define-a-context) — store
+  shape, `buildStore`, convenience getters.
+- **Several at once?** [Orchestrate contexts](./guides/orchestrate-contexts)
+  — register them and run them together with `contextManager`.
+- **Outside a request?** [Use in workers and jobs](./guides/use-in-workers-and-jobs)
+  — set a fresh context at every process boundary.
+- **Looking up a method?** [API reference](./reference/api) — every export,
+  every signature.
+
+Source: `@warlock.js/context/`.

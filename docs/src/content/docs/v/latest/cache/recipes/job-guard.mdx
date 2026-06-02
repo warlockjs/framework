@@ -1,0 +1,82 @@
+---
+title: "Distributed Job Guard"
+slug: v/latest/cache/job-guard
+---
+
+You run three instances of your app. A cron fires the nightly import on all
+three at once. You want it to run **exactly once**.
+[`cache.lock()`](/v/latest/cache/lock/) is the guard: the first caller acquires
+the lock and runs the work; everyone else gets told "someone's already on it"
+and bows out.
+
+## The pattern
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+async function runNightlyImport() {
+  const outcome = await cache.lock(
+    "lock.nightly-import",
+    { ttl: "10m", driver: "redis" },   // ttl is the crash safety-net
+    async () => {
+      await importEverything();
+      return "done";
+    },
+  );
+
+  if (!outcome.acquired) {
+    // Another instance holds the lock — nothing to do here.
+    return;
+  }
+
+  console.log("import finished:", outcome.value);   // "done"
+}
+```
+
+`lock()` returns a [`LockOutcome`](/v/latest/cache/lock/) discriminated union:
+
+- `{ acquired: true, value }` — we got the lock, ran `fn`, and here's its result.
+- `{ acquired: false }` — someone else holds it; `fn` never ran.
+
+The `acquired` flag is what you branch on — it stays unambiguous even when the
+wrapped function legitimately returns `undefined`.
+
+## Why the TTL matters
+
+The lock auto-releases when `fn` finishes (success **or** throw — release is in
+a `finally`). The `ttl` is the safety net for the case where the process
+*crashes* mid-job and never reaches the release: the lock self-expires after
+`ttl` so the job isn't wedged forever. Set it comfortably longer than the
+job's worst-case runtime.
+
+:::caution Pick a TTL longer than the job
+If `ttl` is shorter than the job's runtime, the lock expires mid-run and a
+second instance can pick up the work concurrently. Size it generously.
+:::
+
+## Real distributed locking needs Redis
+
+On the [`redis`](/v/latest/cache/redis/) driver the lock is built on native
+`SET … NX EX`, so it's a genuine cross-instance lock — that's why the example
+pins `driver: "redis"`. On the in-memory drivers the lock is emulated and only
+coordinates **within a single process**, which is fine for local dev but won't
+stop two separate servers from both running the job.
+
+## Labeling the holder
+
+Pass an `owner` to stamp who holds the lock — handy when debugging a stuck job
+(it defaults to `pid.<process.pid>`):
+
+```ts
+await cache.lock(
+  "lock.nightly-import",
+  { ttl: "10m", driver: "redis", owner: "worker.jobs-2" },
+  async () => importEverything(),
+);
+```
+
+## Related Documentation
+
+- [Distributed Locks — cache.lock()](/v/latest/cache/lock/) — the full lock API
+- [Set Options](/v/latest/cache/set-options/#conditional-writes--onconflict) — the `onConflict: "create"` primitive locks are built on
+- [Redis Cache Driver](/v/latest/cache/redis/) — native `SET NX` locking

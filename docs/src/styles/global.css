@@ -1,0 +1,995 @@
+/*
+ * Warlock.js docs — global theme.
+ *
+ * Direction C per the blueprint: premium dev-tool foundation, electric
+ * Warlock accents. Overrides Starlight's CSS custom properties.
+ */
+
+/* Fonts — Geist Sans + Geist Mono, Vercel's open-source set. */
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap");
+
+/* ---------- Design tokens ---------- */
+
+:root {
+  /* Brand */
+  --warlock-yellow: #facc15;
+  --warlock-yellow-bright: #fde047;
+  --warlock-yellow-glow: rgba(250, 204, 21, 0.18);
+  --warlock-midnight: #0a0e1a;
+  --warlock-surface-dark: #10141f;
+  --warlock-surface-darker: #070a13;
+  --warlock-hairline-dark: rgba(255, 255, 255, 0.08);
+  --warlock-hairline-light: rgba(15, 23, 42, 0.08);
+
+  /* Geometry */
+  --warlock-radius-sm: 4px;
+  --warlock-radius: 6px;
+  --warlock-radius-lg: 10px;
+}
+
+/* ---------- Starlight overrides — dark mode (default) ---------- */
+
+:root,
+:root[data-theme="dark"] {
+  /* Accent — Warlock yellow */
+  --sl-color-accent-low: #3a2f00;
+  --sl-color-accent: var(--warlock-yellow);
+  --sl-color-accent-high: var(--warlock-yellow-bright);
+  --sl-color-text-accent: var(--warlock-yellow);
+
+  /* Backgrounds */
+  --sl-color-bg: var(--warlock-midnight);
+  --sl-color-bg-nav: var(--warlock-surface-darker);
+  --sl-color-bg-sidebar: var(--warlock-surface-darker);
+  --sl-color-bg-inline-code: rgba(250, 204, 21, 0.08);
+
+  /* Hairlines + text */
+  --sl-color-hairline: var(--warlock-hairline-dark);
+  --sl-color-hairline-light: var(--warlock-hairline-dark);
+  --sl-color-hairline-shade: rgba(255, 255, 255, 0.04);
+
+  --sl-color-text: #e6e8ee;
+  --sl-color-text-invert: var(--warlock-midnight);
+
+  /* Grayscale tuned to brand */
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #f8fafc;
+  --sl-color-gray-2: #cbd5e1;
+  --sl-color-gray-3: #94a3b8;
+  --sl-color-gray-4: #475569;
+  --sl-color-gray-5: #2d3548;
+  --sl-color-gray-6: #1a2030;
+  --sl-color-gray-7: #10141f;
+  --sl-color-black: var(--warlock-midnight);
+
+  /* Typography */
+  --sl-font: "Geist", "Inter", system-ui, -apple-system, sans-serif;
+  --sl-font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  --sl-text-base: 1rem;
+  --sl-line-height: 1.65;
+  --sl-line-height-headings: 1.2;
+
+  /* Layout — Starlight's 45rem default is too narrow; 50rem fits sidebar
+   * + content + TOC at 1280px viewport without overflow. */
+  --sl-content-width: 50rem;
+  --sl-sidebar-width: 19.5rem;
+}
+
+/* ---------- Light mode ---------- */
+
+:root[data-theme="light"] {
+  --sl-color-accent-low: #fef9c3;
+  --sl-color-accent: #ca8a04;
+  --sl-color-accent-high: #854d0e;
+  --sl-color-text-accent: #a16207;
+
+  --sl-color-bg: #ffffff;
+  --sl-color-bg-nav: #ffffff;
+  --sl-color-bg-sidebar: #f9fafb;
+  --sl-color-bg-inline-code: rgba(202, 138, 4, 0.1);
+
+  --sl-color-hairline: var(--warlock-hairline-light);
+  --sl-color-hairline-light: var(--warlock-hairline-light);
+  --sl-color-hairline-shade: rgba(15, 23, 42, 0.04);
+
+  --sl-color-text: #0f172a;
+  --sl-color-text-invert: #ffffff;
+
+  --sl-color-white: #0f172a;
+  --sl-color-gray-1: #111827;
+  --sl-color-gray-2: #1f2937;
+  --sl-color-gray-3: #475569;
+  --sl-color-gray-4: #64748b;
+  --sl-color-gray-5: #cbd5e1;
+  --sl-color-gray-6: #e2e8f0;
+  --sl-color-gray-7: #f1f5f9;
+  --sl-color-black: #ffffff;
+}
+
+/* ---------- Body baseline ---------- */
+
+html,
+body {
+  font-family: var(--sl-font);
+  font-feature-settings: "ss01", "cv01", "cv02", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---------- Headings — tighter + bolder ---------- */
+
+.sl-markdown-content h1,
+.sl-markdown-content h2,
+.sl-markdown-content h3,
+.sl-markdown-content h4 {
+  font-weight: 700;
+  letter-spacing: -0.018em;
+  line-height: 1.2;
+}
+
+.sl-markdown-content h1 {
+  font-size: clamp(2rem, 1.5rem + 2vw, 2.75rem);
+  letter-spacing: -0.025em;
+}
+
+.sl-markdown-content h2 {
+  font-size: clamp(1.5rem, 1.25rem + 1vw, 1.875rem);
+  letter-spacing: -0.022em;
+  margin-block-start: 2.5rem;
+  padding-block-start: 0.5rem;
+}
+
+.sl-markdown-content h3 {
+  font-size: 1.25rem;
+  margin-block-start: 1.75rem;
+}
+
+/* ---------- Header / nav ---------- */
+
+/* Starlight wraps the custom Header.astro inside <header class="header">,
+ * which is the fixed top bar. Style the wrapper itself (don't double up
+ * inside the inner component). */
+header.header {
+  background-color: color-mix(in srgb, var(--sl-color-bg-nav) 88%, transparent);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid var(--sl-color-hairline);
+  box-shadow: 0 1px 0 var(--warlock-yellow-glow);
+  /* Inner component handles its own grid + padding — keep horizontal pad
+   * here to match Starlight's nav-pad expectation and avoid edge cling. */
+  padding-block: 0 !important;
+}
+
+.site-title {
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+/* ---------- Links — accent on hover, never on rest ---------- */
+
+.sl-markdown-content a:not(.not-content *) {
+  color: var(--sl-color-text);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--sl-color-text-accent) 40%, transparent);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+  transition: text-decoration-color 0.15s ease, color 0.15s ease;
+}
+
+.sl-markdown-content a:not(.not-content *):hover {
+  color: var(--sl-color-text-accent);
+  text-decoration-color: var(--sl-color-text-accent);
+}
+
+/* ---------- Inline code ---------- */
+
+.sl-markdown-content :not(pre) > code {
+  background-color: var(--sl-color-bg-inline-code);
+  color: var(--sl-color-text-accent);
+  padding: 0.15em 0.4em;
+  border-radius: var(--warlock-radius-sm);
+  font-size: 0.875em;
+  font-weight: 500;
+  border: 1px solid color-mix(in srgb, var(--sl-color-text-accent) 12%, transparent);
+}
+
+:root[data-theme="light"] .sl-markdown-content :not(pre) > code {
+  background-color: rgba(15, 23, 42, 0.04);
+  color: #0f172a;
+  border-color: rgba(15, 23, 42, 0.1);
+}
+
+/* ---------- Code blocks (Expressive Code) ---------- */
+
+/* Disable font ligatures in all code — the mono font merges `===`, `!==`,
+ * `=>`, etc. into single glyphs that read ambiguously in docs. Show the
+ * literal characters instead. */
+.expressive-code code,
+.expressive-code pre,
+.sl-markdown-content code,
+code,
+pre {
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+}
+
+.expressive-code .frame,
+.expressive-code pre {
+  border-radius: var(--warlock-radius) !important;
+  border: 1px solid var(--sl-color-hairline) !important;
+}
+
+.expressive-code .frame.has-title:not(.is-terminal) .header {
+  background-color: var(--warlock-surface-darker);
+  border-bottom: 1px solid var(--sl-color-hairline);
+  font-family: var(--sl-font-mono);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+}
+
+/* ---------- Cards (LinkCard / Card) ---------- */
+
+.sl-link-card,
+.sl-card {
+  border-radius: var(--warlock-radius) !important;
+  border: 1px solid var(--sl-color-hairline) !important;
+  background-color: var(--warlock-surface-dark);
+  transition: border-color 0.15s ease, transform 0.05s ease, box-shadow 0.15s ease;
+}
+
+:root[data-theme="light"] .sl-link-card,
+:root[data-theme="light"] .sl-card {
+  background-color: #ffffff;
+}
+
+.sl-link-card:hover,
+.sl-card:hover {
+  border-color: var(--sl-color-text-accent) !important;
+  box-shadow: 0 0 0 1px var(--sl-color-text-accent) inset;
+}
+
+.sl-link-card .title,
+.sl-card .title {
+  font-weight: 600;
+  letter-spacing: -0.012em;
+}
+
+/* ---------- Sidebar — redesigned chrome ---------- */
+
+.sidebar-pane {
+  border-right: 1px solid var(--sl-color-hairline);
+  background-color: var(--sl-color-bg-sidebar);
+}
+
+/* Add breathing room around the whole sidebar inside the pane. */
+.sidebar-pane .sidebar-content {
+  padding: 0.6rem 0.75rem 2rem !important;
+}
+
+/* ---------- Custom package switcher ---------- */
+
+.warlock-pkg {
+  position: relative;
+  margin: 0.25rem 0 1.1rem;
+  padding-block-end: 1rem;
+  border-bottom: 1px dashed color-mix(in srgb, var(--sl-color-hairline) 80%, transparent);
+}
+
+.warlock-pkg-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sl-color-gray-3);
+  margin-block-end: 0.5rem;
+  padding-inline-start: 0.15rem;
+}
+
+.warlock-pkg-eyebrow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--sl-color-text-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sl-color-text-accent) 18%, transparent);
+}
+
+/* Trigger button — pill-card with mark + name/subname + chevron. */
+.warlock-pkg-trigger {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.55rem 0.6rem 0.55rem 0.55rem;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sl-color-text-accent) 4%, var(--warlock-surface-dark)) 0%,
+      var(--warlock-surface-dark) 100%
+    );
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: var(--warlock-radius);
+  color: var(--sl-color-white);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+:root[data-theme="light"] .warlock-pkg-trigger {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sl-color-text-accent) 5%, #ffffff) 0%,
+      #ffffff 100%
+    );
+  color: var(--sl-color-text);
+}
+
+.warlock-pkg-trigger:hover {
+  border-color: color-mix(in srgb, var(--sl-color-text-accent) 55%, var(--sl-color-hairline));
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px -10px color-mix(in srgb, var(--sl-color-text-accent) 45%, transparent);
+}
+
+.warlock-pkg.is-open .warlock-pkg-trigger {
+  border-color: var(--sl-color-text-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sl-color-text-accent) 18%, transparent);
+}
+
+.warlock-pkg-trigger-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--sl-color-text-accent) 14%, transparent);
+  color: var(--sl-color-text-accent);
+  flex: none;
+}
+
+.warlock-pkg-trigger-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+}
+
+.warlock-pkg-trigger-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.warlock-pkg-trigger-sub {
+  font-family: var(--sl-font-mono);
+  font-size: 0.7rem;
+  color: var(--sl-color-gray-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.warlock-pkg-trigger-chevron {
+  color: var(--sl-color-gray-3);
+  transition: transform 0.18s ease, color 0.15s ease;
+}
+
+.warlock-pkg.is-open .warlock-pkg-trigger-chevron {
+  transform: rotate(-180deg);
+  color: var(--sl-color-text-accent);
+}
+
+/* Popover — floats below trigger. */
+.warlock-pkg-popover {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(100% - 0.6rem);
+  z-index: 40;
+  margin-block-start: 0.35rem;
+  padding: 0.55rem;
+  background-color: var(--warlock-surface-dark);
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: var(--warlock-radius);
+  box-shadow:
+    0 18px 40px -16px rgba(0, 0, 0, 0.55),
+    0 0 0 1px color-mix(in srgb, var(--sl-color-text-accent) 6%, transparent);
+  max-height: 60vh;
+  overflow-y: auto;
+  animation: warlockPkgIn 0.16s ease-out both;
+}
+
+:root[data-theme="light"] .warlock-pkg-popover {
+  background-color: #ffffff;
+  box-shadow:
+    0 18px 40px -16px rgba(15, 23, 42, 0.18),
+    0 0 0 1px color-mix(in srgb, var(--sl-color-text-accent) 5%, transparent);
+}
+
+@keyframes warlockPkgIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.warlock-pkg-group + .warlock-pkg-group {
+  margin-block-start: 0.4rem;
+  padding-block-start: 0.4rem;
+  border-top: 1px solid color-mix(in srgb, var(--sl-color-hairline) 60%, transparent);
+}
+
+.warlock-pkg-group-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sl-color-gray-3);
+  padding: 0.35rem 0.55rem 0.25rem;
+}
+
+.warlock-pkg-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* `.sidebar-content a { display: block }` (the docs tree styling) cascades
+ * into the switcher anchors and beats `.warlock-pkg-option` on specificity.
+ * Scope ours under `.warlock-pkg-popover` so (0,2,0) > (0,1,1). */
+.warlock-pkg-popover .warlock-pkg-option {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--warlock-radius-sm);
+  color: var(--sl-color-gray-2);
+  text-decoration: none !important;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+/* Name takes all the remaining space so the check pins to the right edge */
+.warlock-pkg-option-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.warlock-pkg-option:hover,
+.warlock-pkg-option:focus-visible {
+  background-color: color-mix(in srgb, var(--sl-color-text-accent) 10%, transparent);
+  color: var(--sl-color-white);
+  outline: none;
+}
+
+.warlock-pkg-option:hover .warlock-pkg-option-mark {
+  color: var(--sl-color-text-accent);
+  border-color: color-mix(in srgb, var(--sl-color-text-accent) 35%, var(--sl-color-hairline));
+}
+
+:root[data-theme="light"] .warlock-pkg-option:hover,
+:root[data-theme="light"] .warlock-pkg-option:focus-visible {
+  color: var(--sl-color-text);
+}
+
+.warlock-pkg-option.is-active {
+  background-color: color-mix(in srgb, var(--sl-color-text-accent) 14%, transparent);
+  color: var(--sl-color-text-accent);
+  font-weight: 600;
+}
+
+/* Icon mark — neutral by default; only the ACTIVE package gets the
+ * accent. Keeps shape recognition without painting the sidebar yellow. */
+.warlock-pkg-option-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: transparent;
+  border: 1px solid var(--sl-color-hairline);
+  color: var(--sl-color-gray-3);
+  flex: none;
+  transition:
+    color 0.12s ease,
+    border-color 0.12s ease,
+    background-color 0.12s ease;
+}
+
+/* Icon-inside-the-mark sizing — bigger glyph so it visually fills the
+ * badge instead of floating in negative space. */
+.warlock-pkg-option-mark svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+.warlock-pkg-option.is-active .warlock-pkg-option-mark {
+  background: color-mix(in srgb, var(--sl-color-text-accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--sl-color-text-accent) 50%, var(--sl-color-hairline));
+  color: var(--sl-color-text-accent);
+}
+
+/* Check SVG — flex-aligned center alongside the text. `display: block`
+ * eliminates SVG's default inline baseline offset (which pushes it ~1-2px
+ * below the text line). */
+.warlock-pkg-option-check {
+  display: block;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--sl-color-text-accent);
+}
+
+/* ---------- Sidebar accordion — fully redesigned ---------- */
+
+/* Top-level group: render as a card-like section with breathing room. */
+.sidebar-content ul.top-level {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.sidebar-content ul.top-level > li {
+  border-radius: var(--warlock-radius);
+}
+
+/* Section group label — uppercase, tracked, muted */
+.sidebar-content ul.top-level > li > details > summary,
+.sidebar-content ul.top-level > li > summary,
+.sidebar-content ul.top-level > li > .group-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.5rem !important;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--sl-color-gray-3);
+  border-radius: var(--warlock-radius-sm);
+  white-space: nowrap;
+  transition: color 0.12s ease, background-color 0.12s ease;
+}
+
+.sidebar-content ul.top-level > li > details > summary:hover,
+.sidebar-content ul.top-level > li > summary:hover {
+  color: var(--sl-color-white);
+  background-color: color-mix(in srgb, var(--sl-color-text-accent) 5%, transparent);
+}
+
+:root[data-theme="light"] .sidebar-content ul.top-level > li > details > summary:hover,
+:root[data-theme="light"] .sidebar-content ul.top-level > li > summary:hover {
+  color: var(--sl-color-text);
+}
+
+/* Tiny square bullet before each group label */
+.sidebar-content ul.top-level > li > details > summary::before,
+.sidebar-content ul.top-level > li > summary::before,
+.sidebar-content ul.top-level > li > .group-label::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 1.5px;
+  background: var(--sl-color-text-accent);
+  opacity: 0.7;
+  flex: none;
+}
+
+/* Sidebar leaf items — clean rows with subtle hover slide */
+.sidebar-content a {
+  position: relative;
+  display: block;
+  padding: 0.4rem 0.65rem 0.4rem 0.85rem !important;
+  border-radius: var(--warlock-radius-sm);
+  font-size: 0.875rem;
+  color: var(--sl-color-gray-2);
+  text-decoration: none !important;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease,
+    padding-left 0.12s ease;
+}
+
+.sidebar-content a:hover {
+  background-color: color-mix(in srgb, var(--sl-color-text-accent) 7%, transparent);
+  color: var(--sl-color-white);
+  padding-inline-start: 1rem !important;
+}
+
+:root[data-theme="light"] .sidebar-content a:hover {
+  color: var(--sl-color-text);
+}
+
+/* Active page — accent bar on the left + soft glow background */
+.sidebar-content a[aria-current="page"] {
+  background-color: color-mix(in srgb, var(--sl-color-text-accent) 14%, transparent);
+  color: var(--sl-color-text-accent);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--sl-color-text-accent);
+}
+
+.sidebar-content a[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  right: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--sl-color-text-accent);
+  box-shadow: 0 0 8px var(--sl-color-text-accent);
+}
+
+/* Group summary (expandable) — custom chevron, no native marker */
+.sidebar-content details > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.sidebar-content details > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Starlight ships its own caret SVG inside <summary>. We render our
+ * own ::after chevron, so hide the built-in one. */
+.sidebar-content details > summary svg,
+.sidebar-content details > summary .caret {
+  display: none !important;
+}
+
+.sidebar-content details > summary::after {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  margin-inline-start: auto;
+  opacity: 0.55;
+  transition:
+    transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.15s ease,
+    color 0.15s ease;
+}
+
+.sidebar-content details[open] > summary::after {
+  transform: rotate(45deg);
+  color: var(--sl-color-text-accent);
+  opacity: 1;
+}
+
+/* Nested children fade-in when group opens */
+.sidebar-content details[open] > ul {
+  animation: warlockSidebarReveal 0.22s ease-out both;
+}
+
+@keyframes warlockSidebarReveal {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Indentation guide for nested levels */
+.sidebar-content ul ul {
+  border-left: 1px solid color-mix(in srgb, var(--sl-color-hairline) 75%, transparent);
+  margin-inline-start: 0.6rem;
+  padding-inline-start: 0.55rem !important;
+  margin-block: 0.25rem 0.35rem;
+}
+
+/* Highlight the indent guide for the active branch */
+.sidebar-content details[open]:has(a[aria-current="page"]) > ul {
+  border-left-color: color-mix(in srgb, var(--sl-color-text-accent) 45%, var(--sl-color-hairline));
+}
+
+/* ---------- Table of contents ---------- */
+
+/* Push TOC down so it doesn't visually crash into the fixed header.
+ * Starlight's default 1rem isn't enough for our header's box-shadow glow. */
+.right-sidebar-panel {
+  padding-block-start: 2.5rem !important;
+}
+
+.right-sidebar-panel h2 {
+  margin-block-end: 0.85rem !important;
+  letter-spacing: -0.012em;
+}
+
+starlight-toc nav a {
+  border-left: 1.5px solid transparent;
+  padding-inline-start: 0.85rem;
+  padding-block: 0.3rem;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+starlight-toc nav a:hover {
+  background-color: color-mix(in srgb, var(--sl-color-text-accent) 6%, transparent);
+  color: var(--sl-color-white);
+}
+
+starlight-toc nav a[aria-current="true"] {
+  border-left-color: var(--sl-color-text-accent);
+  color: var(--sl-color-text-accent);
+  font-weight: 600;
+}
+
+/* ---------- Focus rings ---------- */
+
+a:focus-visible,
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--sl-color-text-accent);
+  outline-offset: 2px;
+  border-radius: var(--warlock-radius-sm);
+}
+
+/* ---------- Scrollbar (subtle) ---------- */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sl-color-gray-5) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--sl-color-gray-5);
+  border-radius: 5px;
+  border: 2px solid var(--sl-color-bg);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--sl-color-text-accent);
+}
+
+/* ---------- Mermaid diagrams — branded card chrome ---------- */
+
+/* The astro-mermaid plugin emits <pre class="mermaid">…source…</pre>;
+ * mermaid.js replaces the content with an inline <svg> once rendered.
+ * Style the wrapper as a card and let the SVG breathe inside it. */
+pre.mermaid {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(245, 184, 0, 0.025), transparent 60%),
+    var(--warlock-surface-dark, #161b29);
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: var(--warlock-radius);
+  padding: 1.5rem 1.25rem;
+  margin-block: 1.75rem;
+  overflow-x: auto;
+  box-shadow:
+    0 1px 0 rgba(245, 184, 0, 0.06),
+    0 10px 30px -20px rgba(0, 0, 0, 0.5);
+  /* While mermaid is parsing, the raw source flashes — hide it. */
+  color: transparent;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+pre.mermaid:hover {
+  border-color: color-mix(in srgb, var(--sl-color-text-accent) 40%, var(--sl-color-hairline));
+  box-shadow:
+    0 1px 0 rgba(245, 184, 0, 0.12),
+    0 16px 40px -22px rgba(245, 184, 0, 0.18);
+}
+
+:root[data-theme="light"] pre.mermaid {
+  background:
+    linear-gradient(180deg, rgba(161, 98, 7, 0.04), transparent 60%),
+    #ffffff;
+}
+
+/* Tiny "diagram" tag in the top-right — reinforces this is a chart, not code. */
+pre.mermaid::before {
+  content: "diagram";
+  position: absolute;
+  top: 0.6rem;
+  right: 0.85rem;
+  font-family: var(--sl-font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sl-color-text-accent);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* Once mermaid finishes, the wrapper has data-processed="true" and an
+ * <svg> inside — center + responsive. */
+pre.mermaid[data-processed="true"] {
+  display: flex;
+  justify-content: center;
+}
+
+pre.mermaid svg {
+  max-width: 100%;
+  height: auto;
+  /* Soften node/edge stroke so the yellow accent reads cleanly */
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.25));
+}
+
+/* Hide the raw text content while rendering (text is also `color: transparent`
+ * above, but this kills any leftover layout flash) */
+pre.mermaid:not([data-processed="true"]) {
+  min-height: 6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+pre.mermaid:not([data-processed="true"])::after {
+  content: "Loading diagram…";
+  color: var(--sl-color-gray-3);
+  font-family: var(--sl-font);
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+}
+
+/* Node fill subtle gradient — pure CSS overlay on the rendered SVG */
+pre.mermaid svg .node rect,
+pre.mermaid svg .node polygon,
+pre.mermaid svg .node circle,
+pre.mermaid svg .node ellipse,
+pre.mermaid svg .node path {
+  filter: drop-shadow(0 0 6px rgba(245, 184, 0, 0.12));
+  transition: filter 0.2s ease;
+}
+
+pre.mermaid svg .node:hover rect,
+pre.mermaid svg .node:hover polygon,
+pre.mermaid svg .node:hover circle,
+pre.mermaid svg .node:hover ellipse,
+pre.mermaid svg .node:hover path {
+  filter: drop-shadow(0 0 10px rgba(245, 184, 0, 0.35));
+}
+
+/* Edge labels: keep readable on the dark wrapper background */
+pre.mermaid svg .edgeLabel,
+pre.mermaid svg .edgeLabel p {
+  color: var(--sl-color-white) !important;
+  background-color: var(--warlock-surface-dark, #161b29) !important;
+  padding: 0.1rem 0.35rem !important;
+  border-radius: var(--warlock-radius-sm) !important;
+}
+
+:root[data-theme="light"] pre.mermaid svg .edgeLabel,
+:root[data-theme="light"] pre.mermaid svg .edgeLabel p {
+  color: var(--sl-color-text) !important;
+  background-color: #ffffff !important;
+}
+
+/* Cluster (subgraph) styling — slightly lifted */
+pre.mermaid svg .cluster rect {
+  rx: 8;
+  ry: 8;
+}
+
+/* ---------- Asides (callouts) — sharper borders, brand accent ---------- */
+
+.starlight-aside {
+  border-radius: var(--warlock-radius) !important;
+  border-inline-start-width: 3px !important;
+}
+
+.starlight-aside--tip {
+  border-color: var(--sl-color-text-accent) !important;
+}
+
+/* ---------- Tabs ---------- */
+
+starlight-tabs [role="tablist"] {
+  border-bottom: 1px solid var(--sl-color-hairline);
+}
+
+starlight-tabs [role="tab"][aria-selected="true"] {
+  color: var(--sl-color-text-accent);
+  font-weight: 600;
+}
+
+/* ---------- Landing — full-bleed + suppress Starlight chrome ---------- */
+
+/* Splash template renders TWO `.content-panel` divs: the first holds
+ * only the auto page-title h1, the second holds the actual content.
+ * When our Hero is anywhere on the page, hide every content-panel that
+ * doesn't contain it (i.e. the title-only panel). */
+body:has(.warlock-hero) .content-panel:not(:has(.warlock-hero)) {
+  display: none !important;
+}
+
+/* Hide Starlight default `.hero` div (splash placeholder) and the
+ * "Edit page" footer on landing. */
+.content-panel > .hero,
+body:has(.warlock-hero) footer.sl-flex:not(.warlock-footer) {
+  display: none !important;
+}
+
+/* Release every wrapper Starlight stacks so sections can go full-bleed.
+ * Use `body:has(.warlock-hero)` instead of `:has(.warlock-hero)` on
+ * the wrapper itself — the latter fails when warlock-hero is too deep. */
+body:has(.warlock-hero) .content-panel,
+body:has(.warlock-hero) .content-panel > .sl-container,
+body:has(.warlock-hero) .content-panel .sl-markdown-content,
+body:has(.warlock-hero) .main-frame {
+  padding: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
+  width: 100% !important;
+}
+
+/* ---------- Landing — shared section heading ---------- */
+
+.warlock-section-head {
+  text-align: center;
+  max-width: 44rem;
+  margin: 0 auto;
+}
+
+.warlock-section-kicker {
+  font-family: var(--sl-font-mono);
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--sl-color-text-accent);
+  letter-spacing: 0.03em;
+  margin: 0 0 0.85rem;
+  text-transform: lowercase;
+  opacity: 0.85;
+}
+
+.warlock-section-title {
+  font-size: clamp(1.75rem, 1.25rem + 1.5vw, 2.5rem);
+  font-weight: 700;
+  letter-spacing: -0.028em;
+  line-height: 1.15;
+  margin: 0;
+  color: var(--sl-color-white);
+}
+
+.warlock-section-sub {
+  margin: 1.1rem auto 0;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--sl-color-gray-2);
+  max-width: 38rem;
+}
+
+/* ---------- Respect motion preferences ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001s !important;
+    scroll-behavior: auto !important;
+  }
+}

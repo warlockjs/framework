@@ -1,0 +1,56 @@
+---
+title: Herald
+description: Message broker primitives — publish, consume, request-and-respond — over RabbitMQ.
+---
+
+> Standalone — usable in any Node project, no `@warlock.js/core` required.
+
+`@warlock.js/herald` is the messaging layer. Publish events from one
+service, consume them in workers anywhere on your network, do
+request-and-respond over a queue for cross-service RPC without HTTP
+overhead. Backed by RabbitMQ (`amqplib`).
+
+Connect once, grab a typed channel, and you have a publish→consume loop — manual-ack by default, so a crash redelivers the message instead of dropping it:
+
+```ts
+import { connectToBroker, herald } from "@warlock.js/herald";
+
+type UserCreated = { userId: number; email: string };
+
+await connectToBroker({ driver: "rabbitmq", host: "localhost", port: 5672 });
+
+const channel = herald().channel<UserCreated>("user.created");
+
+// Consumer — runs in a worker anywhere on your network
+await channel.subscribe(async (message, ctx) => {
+  await sendWelcomeEmail(message.payload.email);
+  await ctx.ack();
+});
+
+// Producer
+await channel.publish({ userId: 1, email: "ada@example.com" });
+```
+
+The queue is asserted lazily on first access — you never pre-create one. Need a reply instead of fire-and-forget? Herald does typed request-and-respond (RPC over the queue, with a timeout) too.
+
+## What it gives you
+
+- **Publish** — fire-and-forget events with a typed payload.
+- **Consume** — long-running worker subscribers with backpressure
+  and acknowledgement semantics.
+- **Request + respond** — RPC over the queue: send a message, await a
+  typed reply, with timeout. Great for service-to-service calls when
+  HTTP isn't the right tool.
+- **Routing** — exchanges, routing keys, dead-letter queues.
+- **Reconnection + retry** — survives broker restarts gracefully.
+
+## Read by intent
+
+- **New here?** Start with [getting-started / introduction](./getting-started/01-introduction.md), then [your first message](./getting-started/03-your-first-message.md) for a publish→consume loop end to end.
+- **Mental model** — what brokers, channels, and the message envelope map to in RabbitMQ: [essentials / the messaging model](./essentials/01-the-messaging-model.md).
+- **Production setup** — connection options, multi-broker, reconnects, graceful shutdown: [essentials / connection and config](./essentials/02-connection-and-config.md).
+- **Task guides** — [publish](./guides/publish-message.md), [consume](./guides/consume-message.md), [request and respond](./guides/request-and-respond.md), [errors and retries](./guides/handle-errors-and-retries.md).
+- **Recipes** — [dead-letter queue](./recipes/dead-letter-queue.md), end to end.
+- **Reference** — every public export in the [API reference](./reference/api.md).
+
+Source: `@warlock.js/herald/`.

@@ -1,0 +1,277 @@
+---
+title: "Cache Configurations"
+slug: v/latest/cache/configurations
+---
+
+Cache configurations define which drivers are available, the default driver, and options for each driver.
+
+:::info
+Examples use `process.env` directly. Swap in any env parser you prefer (dotenv, @mongez/dotenv, etc.).
+:::
+
+## Configuration Structure
+
+A cache configuration object has three main properties:
+
+- `drivers` - Object mapping driver names to driver classes
+- `default` - The name of the default driver to use
+- `options` - Object mapping driver names to their configuration options
+
+## Environment-Based Configuration
+
+Conditionally configure drivers based on your environment:
+
+```ts title="src/config/cache.ts"
+import { join } from "path";
+import {
+  CacheConfigurations,
+  RedisCacheDriver,
+  FileCacheDriver,
+  MemoryCacheDriver,
+} from "@warlock.js/cache";
+
+const isProduction = process.env.NODE_ENV === "production";
+
+const cacheConfigurations: CacheConfigurations = {
+  drivers: {
+    redis: RedisCacheDriver,
+    file: FileCacheDriver,
+    memory: MemoryCacheDriver,
+  },
+  default: isProduction ? "redis" : "memory",
+  options: {
+    redis: {
+      host: process.env.REDIS_HOST || "localhost",
+      port: parseInt(process.env.REDIS_PORT || "6379"),
+      password: process.env.REDIS_PASSWORD,
+      globalPrefix: process.env.APP_NAME || "warlock",
+      ttl: "1h",             // string form — parsed via ms
+    },
+    file: {
+      directory: process.env.CACHE_DIRECTORY || join(process.cwd(), "storage", "cache"),
+      globalPrefix: process.env.APP_NAME || "warlock",
+    },
+    memory: {
+      globalPrefix: process.env.APP_NAME || "warlock",
+      ttl: 3600,             // numeric seconds — also valid
+    },
+  },
+};
+
+export default cacheConfigurations;
+```
+
+:::tip TTL in driver options
+At the driver-config level, the `ttl` key accepts **either** a number of seconds **or** a human-readable duration string (`"1h"`, `"30m"`, `"7d"`). The rich [`CacheSetOptions`](/v/latest/cache/set-options/) object is only meaningful at the call site, not in global config.
+:::
+
+After defining your configuration, you'll need to set it and initialize the cache manager. See [Cache Manager](/v/latest/cache/cache-manager/) for details on using `setCacheConfigurations()` and `init()`.
+
+## Basic Example
+
+```ts title="src/config/cache.ts"
+import { CacheConfigurations, RedisCacheDriver } from "@warlock.js/cache";
+
+const cacheConfigurations: CacheConfigurations = {
+  drivers: {
+    redis: RedisCacheDriver,
+  },
+  default: "redis",
+  options: {
+    redis: {
+      host: process.env.REDIS_HOST,
+      port: parseInt(process.env.REDIS_PORT || "6379"),
+      password: process.env.REDIS_PASSWORD,
+    },
+  },
+};
+
+export default cacheConfigurations;
+```
+
+## Multiple Drivers
+
+You can define multiple drivers and switch between them at runtime:
+
+```ts title="src/config/cache.ts"
+import { join } from "path";
+import {
+  FileCacheDriver,
+  RedisCacheDriver,
+  MemoryCacheDriver,
+  LRUMemoryCacheDriver,
+  MemoryExtendedCacheDriver,
+  PgCacheDriver,
+} from "@warlock.js/cache";
+
+const cacheConfigurations = {
+  drivers: {
+    redis: RedisCacheDriver,
+    file: FileCacheDriver,
+    memory: MemoryCacheDriver,
+    lru: LRUMemoryCacheDriver,
+    memoryExtended: MemoryExtendedCacheDriver,
+    pg: PgCacheDriver,
+  },
+  default: "redis",
+  options: {
+    redis: {
+      host: "localhost",
+      globalPrefix: "myapp",
+      ttl: "1h",
+    },
+    file: {
+      directory: join(process.cwd(), "storage", "cache"),
+      globalPrefix: "myapp",
+    },
+    memory: {
+      ttl: "1h",
+      globalPrefix: "myapp",
+    },
+    lru: {
+      capacity: 1000,
+      globalPrefix: "myapp",
+    },
+    memoryExtended: {
+      ttl: "30m",
+      globalPrefix: "myapp",
+    },
+  },
+};
+
+export default cacheConfigurations;
+```
+
+Once configured, you can switch between drivers at runtime using the cache manager. See [Switching Drivers](/v/latest/cache/cache-manager/#set-default-driver) for details.
+
+## Custom Drivers
+
+Include your custom drivers in the configuration:
+
+```ts title="src/config/cache.ts"
+import { CacheConfigurations } from "@warlock.js/cache";
+import { MyCustomCacheDriver } from "./my-custom-driver";
+
+const cacheConfigurations: CacheConfigurations<"custom"> = {
+  drivers: {
+    custom: MyCustomCacheDriver,
+  },
+  default: "custom",
+  options: {
+    custom: { 
+      globalPrefix: "myapp",
+      ttl: 3600,
+      // ... other custom options
+    },
+  },
+};
+
+export default cacheConfigurations;
+```
+
+:::info TypeScript Type Safety
+When using custom drivers, you must specify the driver name(s) as a generic parameter to `CacheConfigurations`. See [Make Your Own Cache Driver](/v/latest/cache/make-your-own-cache-driver/#registering-your-driver) for more details.
+:::
+
+Learn how to [create custom drivers](/v/latest/cache/make-your-own-cache-driver/).
+
+## Driver Options
+
+Each driver has its own configuration options. See the individual driver documentation for detailed options:
+
+- [Redis Cache Driver](/v/latest/cache/redis/#options) - Redis-specific options
+- [File Cache Driver](/v/latest/cache/file/#options) - File-specific options
+- [Memory Cache Driver](/v/latest/cache/memory/#options) - Memory-specific options
+- [Memory Extended Cache Driver](/v/latest/cache/memory-extended/#options) - Memory Extended-specific options
+- [LRU Memory Cache Driver](/v/latest/cache/lru-memory/#options) - LRU-specific options
+- [Null Cache Driver](/v/latest/cache/null/#options) - Null-specific options
+
+### Static vs runtime options
+
+Options split between two places:
+
+- **Static** — `setCacheConfigurations({ options: { ... } })`. Declarative, serializable knobs: table names, TTLs, URL strings, global prefixes.
+- **Runtime** — `cache.use(name, options)` / `cache.load(name, options)` / `cache.driver(name, options)`. Constructor-only bits that can't sit in static config: `pg`'s `client: pg.Pool`, pre-wired clients, anything built at app startup.
+
+Runtime options merge **over** static ones per-key (runtime wins). See [Cache Manager → Runtime driver options](/v/latest/cache/cache-manager/#runtime-driver-options) for the full pattern.
+
+## Inside a Warlock app
+
+When you're running inside a Warlock backend, you'll typically pull env values
+through `env()` from `@warlock.js/core` and add the framework's
+`DatabaseCacheDriver` alongside the standalone drivers. A realistic shape:
+
+```ts title="src/config/cache.ts"
+import {
+  FileCacheDriver,
+  MemoryCacheDriver,
+  MemoryExtendedCacheDriver,
+  RedisCacheDriver,
+  type CacheConfigurations,
+} from "@warlock.js/cache";
+import { DatabaseCacheDriver, env, useRequestStore } from "@warlock.js/core";
+
+// Build a per-request cache prefix from the incoming domain so multi-tenant
+// data never collides in a shared Redis instance.
+const globalPrefix = () => {
+  const { request } = useRequestStore();
+
+  let cachePrefix = "my-app";
+
+  if (!request) return cachePrefix;
+
+  const domain = request.originDomain || request.header("domain") || request.input("domain");
+
+  if (!domain) return cachePrefix;
+
+  return `${cachePrefix}.${domain}`;
+};
+
+const cacheConfigurations: CacheConfigurations<"database"> = {
+  default: "memoryExtended",
+  logging: false,
+  drivers: {
+    file: FileCacheDriver,
+    memory: MemoryCacheDriver,
+    redis: RedisCacheDriver,
+    memoryExtended: MemoryExtendedCacheDriver,
+    database: DatabaseCacheDriver,
+  },
+  options: {
+    redis: {
+      host: env("REDIS_HOST"),
+      port: env("REDIS_PORT"),
+      url: env("REDIS_URL"),
+      globalPrefix,
+    },
+    memory: {
+      globalPrefix,
+      ttl: 3 * 60 * 60, // 3 hours
+    },
+    memoryExtended: {
+      globalPrefix,
+      ttl: 30 * 60, // 30 minutes
+    },
+  },
+};
+
+export default cacheConfigurations;
+```
+
+Two things worth highlighting:
+
+- **`globalPrefix` can be a function.** Every driver resolves it per call, so a
+  request-scoped prefix (multi-tenant, per-locale, per-feature-flag) is just a
+  closure over your request context.
+- **`DatabaseCacheDriver` ships with `@warlock.js/core`**, not with this
+  package — that's why you list it explicitly under a custom name and pass the
+  slug as the `CacheConfigurations` generic (`<"database">`).
+
+The same shape works without Warlock — swap `env(...)` for whatever env parser
+you use and drop the `DatabaseCacheDriver` line.
+
+## Troubleshooting
+
+- **Driver not found?** Make sure it's listed in the `drivers` object with the correct name.
+- **Wrong driver used?** Check the `default` property matches a driver name in `drivers`.
+- **Options not applied?** Ensure the key in `options` matches the driver name in `drivers`.

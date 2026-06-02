@@ -1,0 +1,147 @@
+---
+title: "LRU Memory Cache Driver"
+slug: v/latest/cache/lru-memory
+---
+
+In-memory cache with automatic eviction of the least recently used items when the capacity limit is reached.
+
+## When to Use
+- You want fast, in-memory caching with automatic eviction
+- You have limited memory and want to avoid unbounded growth
+
+## Best For
+- Caching computed values, API responses, or temporary data
+- Scenarios where memory usage must be controlled
+
+## Limitations
+- Data is lost on restart
+- Not shared between processes or servers
+- No persistence
+
+## Configuration
+
+```ts title="src/config/cache.ts"
+import { LRUMemoryCacheDriver } from "@warlock.js/cache";
+
+const cacheConfigurations = {
+  drivers: {
+    lru: LRUMemoryCacheDriver,
+  },
+  default: "lru",
+  options: {
+    lru: {
+      capacity: 500,
+      ttl: "1h",                 // optional default TTL for new entries
+      globalPrefix: "myapp",     // optional
+    },
+  },
+};
+```
+
+## Options
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `capacity` | number | `1000` | Maximum number of items in the cache |
+| `ttl` | number \| string | `Infinity` | Default TTL for new entries — seconds or a duration string like `"1h"` |
+| `globalPrefix` | string \| Function | `undefined` | Global prefix for all cache keys |
+
+### Capacity Configuration
+
+The `capacity` option sets the maximum number of items the cache will hold. Once exceeded, the least recently used item is removed.
+
+```ts
+{
+  capacity: 1000,              // store up to 1000 items (default)
+  // OR
+  capacity: 500,               // store up to 500 items
+  // OR
+  capacity: 10000,             // store up to 10,000 items
+}
+```
+
+### TTL Configuration
+
+Unlike plain memory, LRU now supports a default TTL on entries. Individual `set()` calls can still override it:
+
+```ts
+{
+  capacity: 1000,
+  ttl: "1h",        // every new entry expires after 1h by default
+}
+
+// Override at the call site
+await cache.set("temp", "v", "30s");   // this one expires in 30s
+await cache.set("perm", "v", Infinity); // this one never expires
+```
+
+### Global Prefix
+
+Same semantics as other drivers — useful for multi-tenant scoping. When set, `flush()` also scopes itself to the prefix instead of wiping sibling tenants.
+
+```ts
+{
+  globalPrefix: "myapp",
+  // OR
+  globalPrefix: () => `tenant.${currentContext.tenantId}`,
+}
+```
+
+## Example Usage
+
+## Storing and Retrieving Data
+```ts
+import { cache } from "@warlock.js/cache";
+
+await cache.set("products.456", { sku: "ABC123", stock: 45 });
+const product = await cache.get("products.456");
+```
+
+## How LRU Works
+
+The LRU (Least Recently Used) algorithm works as follows:
+
+1. **Capacity Limit**: When the cache reaches its capacity limit, the least recently used item is automatically removed
+2. **Access Updates**: Every time an item is accessed (get or set), it becomes the most recently used
+3. **Automatic Eviction**: When adding a new item would exceed capacity, the oldest item is evicted
+
+### Example Eviction Scenario
+
+```ts
+// Cache with capacity: 3
+await cache.set("a", 1);  // Cache: {a: 1}
+await cache.set("b", 2);  // Cache: {a: 1, b: 2}
+await cache.set("c", 3);  // Cache: {a: 1, b: 2, c: 3}
+await cache.set("d", 4);  // Cache: {b: 2, c: 3, d: 4} - 'a' was evicted
+await cache.get("b");     // Cache: {c: 3, d: 4, b: 2} - 'b' moved to end
+await cache.set("e", 5);  // Cache: {d: 4, b: 2, e: 5} - 'c' was evicted
+```
+
+## Performance Characteristics
+
+- **Time Complexity**: O(1) average for get/set operations
+- **Space Complexity**: O(n) where n is the capacity
+- **Memory Usage**: Predictable and bounded by capacity
+- **Eviction**: Automatic and efficient
+
+## Namespaces
+
+`removeNamespace(prefix)` clears every entry whose key starts with the given prefix (followed by a dot) or matches it exactly. Useful for multi-tenant eviction:
+
+```ts
+await cache.set("user.1.profile", profile);
+await cache.set("user.1.prefs", prefs);
+await cache.set("user.2.profile", otherProfile);
+
+await cache.removeNamespace("user.1");
+// user.1.profile and user.1.prefs are gone;
+// user.2.profile is still there.
+```
+
+Prefix matching is dot-boundary-aware — `removeNamespace("user")` does **not** affect `"users.1"`.
+
+## Troubleshooting
+- **Data disappears after restart**: Expected. Use [File](/v/latest/cache/file/) or [Redis](/v/latest/cache/redis/) for persistence.
+- **Cache not shared between processes**: Use [Redis](/v/latest/cache/redis/) for distributed cache.
+- **Items being evicted too quickly**: Increase the `capacity` option.
+- **Default TTL not applying**: Check that `options.lru.ttl` is set — positional TTLs on `set()` override the default. 
+✅ **Supported (brute force).** `set({ vector })` indexes the entry; `similar()` does an O(N) cosine scan over live nodes. LRU eviction also drops the vector. Dev-only at scale — see [Similarity Retrieval](/v/latest/cache/similarity/).

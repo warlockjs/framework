@@ -1,0 +1,285 @@
+---
+title: "Atomic Operations"
+slug: v/latest/cache/atomic-operations
+---
+
+Atomic operations prevent race conditions in concurrent environments. `@warlock.js/cache` provides atomic **increment/decrement**, atomic **update/merge** for arbitrary-shaped values, and **conditional writes** via `onConflict` — especially powerful when using the Redis driver.
+
+## The problem: race conditions
+
+Without atomic operations, concurrent requests silently lose data:
+
+```ts
+// ❌ RACE CONDITION
+const views = await cache.get("page.views") || 0;
+await cache.set("page.views", views + 1);
+
+// Two requests firing at once:
+//   Request 1: reads 100, writes 101
+//   Request 2: reads 100, writes 101
+// Result: 101 (should be 102!)
+```
+
+## The solution: atomic primitives
+
+Four tools, pick by shape of the data:
+
+| Operation | Use for | Redis primitive |
+|-----------|---------|-----------------|
+| `increment` / `decrement` | Numeric counters | `INCRBY` / `DECRBY` |
+| `update` / `merge` | Object/structured values | Chain lock (WATCH/MULTI in v2.1) |
+| `set({ onConflict: "create" })` | Distributed locks, idempotency keys | `SET … NX` |
+| `set({ onConflict: "update" })` | Update-only writes | `SET … XX` |
+
+## Increment and decrement
+
+### Rate limiting
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+async function checkRateLimit(
+  ip: string,
+  limit: number = 100,
+  windowSeconds: number = 60,
+) {
+  const key = `rate-limit.api.${ip}`;
+
+  // Atomically increment request count
+  const requests = await cache.increment(key, 1);
+
+  // Initialize TTL on first request
+  if (requests === 1) {
+    await cache.set(key, 1, windowSeconds);
+  }
+
+  if (requests > limit) {
+    throw new Error(`Rate limit exceeded: ${requests}/${limit}`);
+  }
+
+  return { allowed: true, remaining: limit - requests, resetIn: windowSeconds };
+}
+```
+
+On Redis, `increment` uses the native `INCRBY` command — truly atomic even with thousands of concurrent requests.
+
+### Product view counter
+
+```ts
+async function trackProductView(productId: number) {
+  return cache.increment(`products.${productId}.views`);
+}
+```
+
+### Shopping cart item count
+
+```ts
+async function addToCart(userId: number, quantity: number = 1) {
+  return cache.increment(`cart.${userId}.items`, quantity);
+}
+
+async function removeFromCart(userId: number, quantity: number = 1) {
+  const remaining = await cache.decrement(`cart.${userId}.items`, quantity);
+  return Math.max(0, remaining);
+}
+```
+
+## Conditional writes — `onConflict`
+
+`onConflict` on `set()` controls what happens when the key already exists (or doesn't). It replaces the legacy Redis-only `setNX` with a cross-driver API:
+
+```ts
+// `workerId` is just any value you want to store as the lock's owner.
+// Using the OS process ID makes debugging easier — any unique string works.
+const workerId = `worker.${process.pid}`;
+
+// "create" — set only if the key is missing. Returns CacheSetResult.
+const result = await cache.set("lock.operation", workerId, {
+  onConflict: "create",
+  ttl: "30s",
+});
+
+if (result.wasSet) {
+  // Lock acquired — `workerId` is now stored under "lock.operation"
+} else {
+  // Someone else owns the lock — result.existing has their workerId value
+}
+
+// "update" — set only if the key exists. Don't resurrect expired entries.
+await cache.set(`session.${sessionId}`, session, { onConflict: "update" });
+```
+
+Return shape for conditional writes:
+
+```ts
+type CacheSetResult<T = any> = {
+  wasSet: boolean;
+  existing: T | null;
+};
+```
+
+See [Set Options — Conditional writes](/v/latest/cache/set-options/#conditional-writes--onconflict) for the full reference.
+
+### Distributed lock recipe
+
+A distributed lock ensures only one process runs a block of code at a time, even across servers. Wrap your critical section in `withLock()`:
+
+```ts
+async function withLock<T>(key: string, ttl: string, work: () => Promise<T>) {
+  // `process.pid` identifies the current Node.js process — handy for debugging
+  // stuck locks ("which worker is holding this lock?").
+  const acquired = await cache.set(key, process.pid, {
+    onConflict: "create",
+    ttl,   // safety net: auto-release if we crash without remove()
+  });
+
+  if (!acquired.wasSet) {
+    throw new Error("Operation already in progress");
+  }
+
+  try {
+    return await work();
+  } finally {
+    await cache.remove(key);
+  }
+}
+
+// Usage — a nightly import job that should only run on one server
+await withLock("lock.nightly-import", "10m", async () => {
+  const rows = await fetchLatestFromApi();
+  await db.products.bulkInsert(rows);
+});
+```
+
+### Idempotency keys
+
+**Idempotency** means "running this operation twice is the same as running it once." An idempotency key prevents double-processing — useful for payments, webhooks, or any operation you don't want to run twice:
+
+```ts
+async function processPayment(paymentId: string, amount: number) {
+  // Claim the payment ID. If another request already processed this ID,
+  // `wasSet` is false and we bail out.
+  const claimed = await cache.set(`payment.processed.${paymentId}`, 1, {
+    onConflict: "create",
+    ttl: "1d",   // keep the idempotency record for a day
+  });
+
+  if (!claimed.wasSet) {
+    throw new Error(`Payment ${paymentId} already processed`);
+  }
+
+  // Safe to run — no other request will get past the check above
+  await stripe.charges.create({ amount, source: paymentId });
+}
+```
+
+### Unique job processing
+
+Same shape as the idempotency-key example, but for a long-running job. Prevents two workers from picking up the same job:
+
+```ts
+async function processJob(jobId: string) {
+  const claimed = await cache.set(`job.processing.${jobId}`, process.pid, {
+    onConflict: "create",
+    ttl: "1h",     // if we crash, lock releases after an hour
+  });
+
+  if (!claimed.wasSet) {
+    console.log(`Job ${jobId} already being processed by another worker`);
+    return;
+  }
+
+  try {
+    // Replace this with your real job work — emailing users, resizing images,
+    // regenerating reports, whatever.
+    await doTheWork(jobId);
+    await cache.set(`job.completed.${jobId}`, 1, "1d");
+  } finally {
+    await cache.remove(`job.processing.${jobId}`);
+  }
+}
+```
+
+## Update and merge — atomic object mutations
+
+For structured values (not just counters), `update()` does read-transform-write atomically under a per-key chain lock:
+
+```ts
+// Update one field on a cached user
+await cache.merge<User>(`user.${userId}`, { lastSeenAt: Date.now() });
+
+// More complex — derive next state from current
+await cache.update<UserState>(`user.${userId}.state`, (current) => ({
+  ...(current ?? defaultState),
+  visitCount: (current?.visitCount ?? 0) + 1,
+}));
+
+// Conditional — return null to remove the entry
+await cache.update<Session>(`session.${id}`, (session) => {
+  if (!session || session.expired) return null;
+  return { ...session, extendedAt: Date.now() };
+});
+```
+
+The chain lock serializes concurrent callers end-to-end within a single process — no lost updates. See [Update & Merge](/v/latest/cache/update-merge/) for details and cross-process-safety caveats.
+
+## Distributed rate limiter — full example
+
+Combines `onConflict: "create"` for initialization and `increment` for counting:
+
+```ts
+async function rateLimitDistributed(ip: string, limit: number = 100) {
+  const key = `rate-limit.api.${ip}`;
+  const windowSeconds = 60;
+
+  // Try to initialize counter (succeeds only if missing)
+  await cache.set(key, 0, { onConflict: "create", ttl: windowSeconds });
+
+  // Increment atomically
+  const count = await cache.increment(key, 1);
+
+  if (count > limit) {
+    throw new Error("Rate limit exceeded");
+  }
+
+  return { allowed: true, remaining: limit - count };
+}
+```
+
+## Performance characteristics
+
+### Redis
+
+- `INCRBY` / `DECRBY` — O(1), fully atomic at the Redis level.
+- `SET … NX` / `SET … XX` (via `onConflict`) — O(1), atomic.
+- Network overhead: one round-trip per op.
+- Distributed-safe across multiple Redis instances when properly configured.
+
+### Memory / file drivers
+
+- `increment` / `decrement` — emulated via read-modify-write; atomic **within** a single process, not across processes.
+- `onConflict: "create"` / `"update"` — emulated via `has()` + `set()`; atomic **within** a single process.
+- `update` / `merge` — chain-serialized via an in-process lock map on the driver instance.
+
+## Best practices
+
+1. **Use Redis for distributed systems.** Only Redis gives you cross-process atomicity today.
+2. **Always set TTLs on counter keys** — prevents unbounded growth.
+3. **Handle negative values** when decrementing — the driver doesn't clamp.
+4. **Always `try`/`finally` around lock-and-release patterns** — forgotten `cache.remove(lockKey)` is the #1 cause of stuck distributed locks.
+5. **Check `wasSet`** on every conditional write — ignoring it defeats the purpose.
+6. **Prefer `onConflict: "create"` over manual `has()` + `set()`** — the manual pattern has a race between the two ops.
+
+## Troubleshooting
+
+- **Rate limiter lets too many requests through?** Check you're using the Redis driver; memory drivers are not cross-process atomic.
+- **Distributed lock never releases?** Missing `try`/`finally`, or the process crashed before `remove()`. The `ttl` on `onConflict: "create"` is your safety net — set it.
+- **Counter growing unbounded?** Set a TTL on the key.
+- **Decrement returns negative?** Expected behavior — clamp at the call site if that matters for your domain.
+
+## Related documentation
+
+- [Set Options](/v/latest/cache/set-options/) — full `onConflict` reference and distributed-lock recipe
+- [Update & Merge](/v/latest/cache/update-merge/) — atomic object mutations
+- [Stampede Prevention](/v/latest/cache/stampede-prevention/) — `remember()` for cache-aside lookups
+- [Best Practices](/v/latest/cache/best-practices/) — production patterns

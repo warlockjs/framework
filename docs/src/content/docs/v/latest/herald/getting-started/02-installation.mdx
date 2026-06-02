@@ -1,0 +1,138 @@
+---
+title: "Installation"
+description: Install @warlock.js/herald and its amqplib peer — Standalone vs Warlock.js paths, with package-manager tabs.
+sidebar:
+  order: 2
+  label: "Installation"
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+Two packages: `@warlock.js/herald` (the library) and `amqplib` (the RabbitMQ client). `amqplib` is a peer dependency — herald declares it but doesn't bundle it, so you control the version.
+
+## Prerequisites
+
+- **Node.js 20+**.
+- **A running RabbitMQ broker** — local Docker, managed cloud, anywhere reachable over AMQP.
+
+If you don't have a broker handy, the fastest way is Docker:
+
+```bash
+docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+```
+
+Management UI lives at `http://localhost:15672` (guest / guest). Useful for poking at queues while you build.
+
+## Install
+
+<Tabs syncKey="context">
+  <TabItem label="Standalone">
+
+Install both packages with your package manager:
+
+<Tabs syncKey="pm">
+  <TabItem label="yarn">
+
+```bash
+yarn add @warlock.js/herald amqplib
+```
+
+  </TabItem>
+  <TabItem label="npm">
+
+```bash
+npm install @warlock.js/herald amqplib
+```
+
+  </TabItem>
+  <TabItem label="pnpm">
+
+```bash
+pnpm add @warlock.js/herald amqplib
+```
+
+  </TabItem>
+</Tabs>
+
+Connect once at startup — before any publish or subscribe runs:
+
+```ts
+import { connectToBroker } from "@warlock.js/herald";
+
+await connectToBroker({
+  driver: "rabbitmq",
+  host: "localhost",
+  port: 5672,
+  username: "guest",
+  password: "guest",
+});
+```
+
+No Warlock framework, no config files, no lifecycle hooks — that's the whole bootstrap. From here, [your first message](./03-your-first-message.md) shows the publish/consume loop end to end.
+
+  </TabItem>
+  <TabItem label="Warlock.js">
+
+Use the framework CLI to install + auto-wire the driver:
+
+```bash
+npx warlock add herald --driver=rabbitmq
+```
+
+This pulls in `@warlock.js/herald` + `amqplib`, registers the herald connector in `src/config/connectors.ts`, and scaffolds `src/config/herald.ts` with sane defaults. The connector calls `connectToBroker` on app boot — your code just imports `herald()` and starts publishing.
+
+```ts
+// src/config/herald.ts (scaffolded for you)
+export default {
+  driver: "rabbitmq",
+  host: process.env.RABBITMQ_HOST ?? "localhost",
+  port: Number(process.env.RABBITMQ_PORT ?? 5672),
+  username: process.env.RABBITMQ_USER ?? "guest",
+  password: process.env.RABBITMQ_PASSWORD ?? "guest",
+};
+```
+
+New to the framework? See [core / getting-started](/v/latest/core/getting-started/01-introduction/).
+
+  </TabItem>
+</Tabs>
+
+## Why amqplib is a peer dependency
+
+Herald's RabbitMQ driver lazy-imports `amqplib` so projects that switch to Kafka (or any other future driver) don't ship code they'll never run. The downside: if you forget to install it, the connect call throws a clear error:
+
+```
+amqplib is not installed.
+
+RabbitMQ driver requires the amqplib package.
+Install it with:
+
+  npx warlock add herald --driver=rabbitmq
+
+Or manually:
+
+  yarn add amqplib
+```
+
+Install it once, never think about it again.
+
+## Verify the connection
+
+A 10-line smoke test confirms herald can reach the broker and round-trip a message:
+
+```ts
+import { connectToBroker, herald } from "@warlock.js/herald";
+
+await connectToBroker({ driver: "rabbitmq", host: "localhost" });
+
+const channel = herald().channel<{ ping: number }>("smoke.test");
+
+await channel.subscribe(async (message, ctx) => {
+  console.log("got:", message.payload.ping);
+  await ctx.ack();
+});
+
+await channel.publish({ ping: Date.now() });
+```
+
+If you see `got: <timestamp>` in stdout within a second, herald is wired correctly. Move on to [your first message](./03-your-first-message.md) for the real shape.

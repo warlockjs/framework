@@ -1,0 +1,177 @@
+---
+title: Anthropic provider
+description: Anthropic provider adapter for @warlock.js/ai — Claude Opus / Sonnet / Haiku as a vendor-neutral model.
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+> Standalone — usable in any Node project, no `@warlock.js/core` required.
+
+`@warlock.js/ai-anthropic` is the Anthropic provider adapter for
+[`@warlock.js/ai`](/v/latest/ai/). It wraps the official
+`@anthropic-ai/sdk` Messages API and hands you a vendor-neutral
+`ModelContract` — the same shape every agent, workflow, and supervisor
+already speaks. Swap Claude in for any other provider without touching
+your orchestration code.
+
+## Install
+
+<Tabs syncKey="pm">
+  <TabItem label="npm">
+    ```bash
+    npm install @warlock.js/ai @warlock.js/ai-anthropic
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn add @warlock.js/ai @warlock.js/ai-anthropic
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm add @warlock.js/ai @warlock.js/ai-anthropic
+    ```
+  </TabItem>
+</Tabs>
+
+## Construct
+
+One `AnthropicSDK` holds one live `Anthropic` client. Build it once at
+boot and reuse it everywhere — every model it produces shares the same
+connection pool, auth, and rate-limit state.
+
+```ts
+import { AnthropicSDK } from "@warlock.js/ai-anthropic";
+
+const anthropic = new AnthropicSDK({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+});
+```
+
+The config extends the upstream `ClientOptions`, so anything the SDK
+accepts works here too — most usefully `baseURL` to point at a gateway
+or proxy, and `provider` to relabel the upstream (it defaults to
+`"anthropic"` and flows through to `AgentReport.model`, logs, and any
+provider-aware middleware).
+
+```ts
+const anthropic = new AnthropicSDK({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+  baseURL: "https://my-gateway.internal/anthropic",
+  provider: "anthropic-gateway",
+});
+```
+
+## First call
+
+Build a model, hand it to an agent, run it. `execute()` never throws —
+failures land in `error` as a typed `AIError`.
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { AnthropicSDK } from "@warlock.js/ai-anthropic";
+
+const anthropic = new AnthropicSDK({ apiKey: process.env.ANTHROPIC_API_KEY! });
+
+const assistant = ai.agent({
+  model: anthropic.model({ name: "claude-sonnet-4-6" }),
+  systemPrompt: "You are a concise senior TypeScript engineer.",
+});
+
+const { text, usage, error } = await assistant.execute("Why use generics?");
+
+if (error) {
+  console.warn(error.code, error.category);
+} else {
+  console.log(text, usage.total);
+}
+```
+
+## Use as a model
+
+```ts
+const model = anthropic.model({ name: "claude-sonnet-4-6", temperature: 0.7 });
+// Pass to any @warlock.js/ai agent / workflow / supervisor.
+```
+
+Anthropic requires a token cap on every request. When you don't set
+`maxTokens` (per-model or per-call), the adapter falls back to a
+generous default of **4096** so a caller who never thought about caps
+still gets a complete answer instead of a 400.
+
+## Capabilities
+
+- **Tool calling** — vendor-neutral `ToolConfig`s map to Claude
+  `tool_use` blocks; tool results round-trip back as `user` turns.
+- **Streaming** — `stream()` yields text `delta`s, a `tool-call` once a
+  `tool_use` block's arguments have fully accumulated, and a terminal
+  `done` carrying the final finish reason and usage.
+- **Structured output** — on by default. A root-object JSON Schema is
+  forwarded to Claude's native `output_config.format` (JSON-schema
+  structured outputs). Non-object schemas or a `structuredOutput: false`
+  override fall back to the agent's soft system-prompt hint plus
+  client-side validation.
+- **Vision** — auto-detected from the model name. Every Claude 3,
+  3.5/3.7, and 4 family model is treated as multimodal (prefixes
+  `claude-3`, `claude-4`, `claude-opus-4`, `claude-sonnet-4`,
+  `claude-haiku-4`); pre-3 families (`claude-2`, `claude-instant`) are
+  text-only. Override either way with the `vision` flag.
+- **No embedder.** Anthropic ships no first-party embeddings API, so
+  this adapter has no `embedder()`. Pair Claude with an embedding
+  provider — [OpenAI](/v/latest/ai/providers/openai/),
+  [Google](/v/latest/ai/providers/google/),
+  [Bedrock](/v/latest/ai/providers/bedrock/), or
+  [Ollama](/v/latest/ai/providers/ollama/) — when you need vectors.
+
+Image attachments accept both a remote `url` and inlined `base64`
+bytes (`image/jpeg`, `image/png`, `image/gif`, `image/webp`).
+
+## Vision
+
+Pass image parts on a user message — the agent resolves attachments
+before they reach the adapter, which forwards them as Claude `image`
+blocks.
+
+```ts
+const model = anthropic.model({ name: "claude-sonnet-4-6" });
+
+const response = await model.complete([
+  {
+    role: "user",
+    content: [
+      { type: "text", text: "What's in this photo?" },
+      { type: "image", source: { url: "https://example.com/cat.jpg" } },
+    ],
+  },
+]);
+```
+
+## Pricing and usage
+
+Every response reports token `usage` (`input`, `output`, `total`).
+Claude bills input and output separately with no pre-summed total, so
+the adapter computes `total` itself; prompt-cache reads surface as
+`cachedTokens` when present.
+
+To turn tokens into money, attach a `pricing` registry — keyed by model
+name, in USD per million tokens. It can live on the SDK (one source of
+truth) or per-model (wins when both are set). With pricing set, the
+framework rolls cost up through every node of the `AgentReport`.
+
+```ts
+const anthropic = new AnthropicSDK({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+  pricing: {
+    "claude-haiku-4-5": { input: 1, output: 5, cachedInput: 0.1 },
+    "claude-sonnet-4-6": { input: 3, output: 15, cachedInput: 0.3 },
+  },
+});
+```
+
+Need an offline token estimate before a call? `anthropic.count(text)`
+returns a fast character-heuristic approximation — good for budgeting
+and quota guards, not for billing.
+
+For the agent/workflow surface these models plug into, see
+[`@warlock.js/ai`](/v/latest/ai/). For provider-specific notes and the
+latest model ids, see the `setup-anthropic` skill.

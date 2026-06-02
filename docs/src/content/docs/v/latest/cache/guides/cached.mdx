@@ -1,0 +1,231 @@
+---
+title: "cached()"
+slug: v/latest/cache/cached
+---
+
+`cached()` is a **higher-order function** that wraps any async function with a cache. Declare the caching strategy once; every subsequent call uses the cache automatically.
+
+```ts
+import { cached } from "@warlock.js/cache";
+
+const getUser = cached(
+  (id: number) => db.users.find(id),
+  "user",
+  "1h",
+);
+
+await getUser(42);     // cache miss → runs DB query, caches, returns
+await getUser(42);     // cache hit → no DB call
+await getUser.invalidate(42);   // drop "user.42" from the cache
+await getUser(42);     // miss again
+```
+
+Uses [`remember()`](/v/latest/cache/stampede-prevention/) under the hood — inherits stampede protection for free.
+
+## When to use `cached` vs `remember`
+
+| Task | Use |
+|------|-----|
+| One-shot "get this value or compute it" | [`cache.remember()`](/v/latest/cache/stampede-prevention/) |
+| Turn an existing function into a cached version you'll call many times | `cached()` |
+
+## Three shapes
+
+All three put `fn` first and return the same wrapped function type.
+
+### 1. Shorthand — prefix only
+
+Driver's default TTL. The wrapped function's arguments are auto-appended to the prefix to derive the cache key.
+
+```ts
+const getFeatured = cached(
+  () => db.products.findFeatured(),
+  "featured-products",
+);
+// cache key: "featured-products"
+
+const getUser = cached(
+  (id: number) => db.users.find(id),
+  "user",
+);
+// getUser(42) → cache key "user.42"
+```
+
+### 2. Shorthand — prefix + TTL
+
+Same as #1, with an explicit TTL. Accepts number of seconds or a duration string.
+
+```ts
+const getUser = cached(
+  (id: number) => db.users.find(id),
+  "user",
+  "1h",
+);
+
+const getOrder = cached(
+  (userId: number, orderId: string) => db.orders.find(userId, orderId),
+  "orders",
+  "10m",
+);
+// getOrder(42, "abc") → cache key "orders.42.abc"
+```
+
+### 3. Options form — full control
+
+Custom key function, tags, per-call driver override.
+
+```ts
+type Filters = { category: string; sort: string; page: number };
+
+const searchProducts = cached(
+  (filters: Filters) => db.products.search(filters),
+  {
+    key: (filters) => `products.search.${filters.category}.${filters.sort}`,
+    ttl: "15m",
+    tags: ["products"],
+    driver: "redis",
+  },
+);
+```
+
+Use the options form when:
+- The cache key shouldn't include every argument (drop `page` from the key above so paginated calls share a cache entry).
+- You want to attach tags for bulk invalidation.
+- You need to route this wrapper's calls to a non-default driver.
+
+## Auto-key rules (shorthand only)
+
+When you use the positional `cached(fn, prefix)` / `cached(fn, prefix, ttl)` form, keys are derived automatically:
+
+| Args shape | Key |
+|------------|-----|
+| No args | `prefix` |
+| All primitives (`string`, `number`, `boolean`, `bigint`, `null`, `undefined`) | `${prefix}.${args.join(".")}` |
+| Any object / array arg | `${prefix}.${JSON.stringify(args)}` |
+| Serialization throws (circular refs, `BigInt` nested in an object) | `CacheConfigurationError` |
+
+**Examples:**
+
+```ts
+getUser(42)                           // "user.42"
+getUser("john")                       // "user.john"
+getOrder(42, "abc")                   // "orders.42.abc"
+getBy("john", null)                   // "user.john.null"
+searchBy({ q: "hello" })              // 'search.[{"q":"hello"}]'
+```
+
+## Caveats
+
+- **Order matters.** `getOrder(42, "abc")` and `getOrder("abc", 42)` produce different keys.
+- **`Date` → ISO string** via `JSON.stringify`. Two `Date` objects at the same millisecond share a key — correct.
+- **`Map` / `Set` serialize to `{}`** via `JSON.stringify` — that's a footgun. Reach for the options form with a custom `key` fn.
+- **Very large args** produce very large keys. Fine on Redis, terrible on file driver (absurd directory paths).
+
+When the auto-key isn't right, use the options form. `key` can project whatever subset of the args actually identifies the cached value.
+
+## Helpers on the wrapped function
+
+### `.invalidate(...args)`
+
+Drop the cache entry for a specific argument combination — uses the same key function the wrapper uses internally, so callers don't re-derive keys by hand.
+
+```ts
+const getUser = cached((id: number) => db.users.find(id), "user", "1h");
+
+await getUser(42);              // populates "user.42"
+await getUser.invalidate(42);   // drops "user.42"
+```
+
+:::info Planned for v2.1
+`.refresh()` (force-recompute) and `.peek()` (read without populating) are not shipping yet. If you need them, file it under `domains/cache/backlog.md`.
+:::
+
+## Real-world examples
+
+### Memoize a DB lookup
+
+```ts
+const getUser = cached(
+  (id: number) => db.users.findById(id),
+  "user",
+  "1h",
+);
+
+// Call wherever you need a user
+const user = await getUser(42);
+
+// Invalidate after a write
+await db.users.update(42, patch);
+await getUser.invalidate(42);
+```
+
+### Bulk invalidation via tags
+
+```ts
+const getUser = cached(
+  (id: number) => db.users.findById(id),
+  { key: (id) => `user.${id}`, ttl: "1h", tags: ["users"] },
+);
+
+const getPosts = cached(
+  (userId: number) => db.posts.findByUser(userId),
+  { key: (userId) => `posts.by-user.${userId}`, ttl: "30m", tags: ["users", "posts"] },
+);
+
+// After any user-table change, drop every wrapper's cache in one go
+await cache.tags(["users"]).invalidate();
+```
+
+### Project a subset of args into the key
+
+```ts
+type Filters = { category: string; sort: string; page: number; pageSize: number };
+
+// Key ignores `page` so paginated calls for the same filters share an entry.
+// (Only do this if your source function returns ALL pages — otherwise pages
+// would collide. Use this pattern thoughtfully.)
+const getCategoryMeta = cached(
+  (filters: Filters) => db.categories.meta(filters.category),
+  {
+    key: (f) => `category.meta.${f.category}`,
+    ttl: "1h",
+  },
+);
+```
+
+### Cache a remote API call with tags
+
+```ts
+const getWeather = cached(
+  (city: string) => fetch(`https://api.weather.com/${city}`).then((r) => r.json()),
+  { key: (city) => `weather.${city.toLowerCase()}`, ttl: "10m", tags: ["weather"] },
+);
+
+// Refresh everyone after a scheduled sync
+cron.every("10m", () => cache.tags(["weather"]).invalidate());
+```
+
+## Stampede behavior
+
+Inherited from `remember()`. When 100 concurrent calls hit the same wrapper with the same args on a cold cache, the underlying function runs **once** and the other 99 share its promise. Works within a single Node process; cross-process stampede safety still needs a distributed lock.
+
+```ts
+const getter = cached(expensiveQuery, "report", "1h");
+
+// Underlying expensiveQuery runs exactly once
+await Promise.all(Array.from({ length: 100 }, () => getter(42)));
+```
+
+## Troubleshooting
+
+- **`CacheConfigurationError: could not derive an auto-key from args`** — your args include something JSON.stringify can't handle (circular ref, `BigInt` nested in an object). Switch to the options form with a custom `key` fn that picks JSON-safe fields.
+- **Two calls with the same args hit the source function** — driver default TTL is `Infinity` only if you haven't set one. Check `options.<driver>.ttl`, or pass a TTL via the shorthand.
+- **`.invalidate()` doesn't seem to work** — verify you're calling it with the same args shape the wrapper was called with. The key function needs matching inputs to produce the same key.
+- **Huge cache keys on the file driver** — the auto-key `JSON.stringify` path grows unbounded. Use a custom `key` fn to project only what identifies the value.
+
+## Related Documentation
+
+- [Stampede Prevention](/v/latest/cache/stampede-prevention/) — `remember()`, the primitive under the hood
+- [Set Options](/v/latest/cache/set-options/) — the shape of the options object `cached` forwards to `set()`
+- [Cache Tags](/v/latest/cache/tags/) — tag-based invalidation
+- [Errors](/v/latest/cache/errors/) — `CacheConfigurationError` and when it fires

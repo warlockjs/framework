@@ -1,0 +1,123 @@
+---
+title: "Installation"
+description: Install @warlock.js/fs standalone in any Node project, or pick it up through @warlock.js/core. Zero runtime dependencies.
+sidebar:
+  order: 2
+  label: "Installation"
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+`@warlock.js/fs` is standalone. It has no runtime dependencies beyond
+Node's built-in `node:fs` and `node:crypto`. Requires Node 18 or newer
+(uses `cp` with `recursive` option from `node:fs/promises`).
+
+<Tabs syncKey="context">
+  <TabItem label="Standalone">
+
+    Install with your package manager:
+
+    <Tabs syncKey="pm">
+      <TabItem label="yarn">
+      ```bash
+      yarn add @warlock.js/fs
+      ```
+      </TabItem>
+      <TabItem label="npm">
+      ```bash
+      npm install @warlock.js/fs
+      ```
+      </TabItem>
+      <TabItem label="pnpm">
+      ```bash
+      pnpm add @warlock.js/fs
+      ```
+      </TabItem>
+    </Tabs>
+
+    Then import what you need — no setup, no factory, no config:
+
+    ```ts
+    import { putJsonFileAsync, getJsonFileAsync, atomicWriteAsync } from "@warlock.js/fs";
+
+    await putJsonFileAsync("./out/manifest.json", { version: "1.0.0" });
+    const manifest = await getJsonFileAsync<{ version: string }>("./out/manifest.json");
+    ```
+
+    Every export is tree-shakeable. Pull in `hashString` alone and you're
+    not bundling the directory helpers.
+
+  </TabItem>
+  <TabItem label="Warlock.js">
+
+    `@warlock.js/fs` is a dependency of `@warlock.js/core`, so any
+    Warlock project already has it on the dependency graph. If your
+    `package.json` doesn't list it directly, add it so you get a stable
+    version pin:
+
+    <Tabs syncKey="pm">
+      <TabItem label="yarn">
+      ```bash
+      yarn add @warlock.js/fs
+      ```
+      </TabItem>
+      <TabItem label="npm">
+      ```bash
+      npm install @warlock.js/fs
+      ```
+      </TabItem>
+      <TabItem label="pnpm">
+      ```bash
+      pnpm add @warlock.js/fs
+      ```
+      </TabItem>
+    </Tabs>
+
+    Use it the same way as the standalone setup — no framework wiring,
+    no config file, no connector. It's plain functions:
+
+    ```ts
+    import { atomicWriteJsonAsync } from "@warlock.js/fs";
+    import { storagePath } from "@warlock.js/core";
+
+    await atomicWriteJsonAsync(storagePath("manifest.json"), manifest);
+    ```
+
+    Pair it with `@warlock.js/core`'s path helpers (`storagePath`,
+    `publicPath`, etc.) when you want the framework's path conventions.
+
+  </TabItem>
+</Tabs>
+
+## TypeScript
+
+Types ship with the package — no separate `@types/...` install. Every
+helper is fully typed; the JSON helpers are generic:
+
+```ts
+type Manifest = { version: string; files: string[] };
+
+const manifest = await getJsonFileAsync<Manifest>("./manifest.json");
+//    ^? Manifest
+```
+
+If you skip the generic, you get `unknown` — narrow it with a guard
+before reading fields.
+
+## Verifying the install
+
+A one-liner to prove it's wired up:
+
+```ts
+import { putFileAsync, getFileAsync } from "@warlock.js/fs";
+
+await putFileAsync("./.fs-check", "ok");
+console.log(await getFileAsync("./.fs-check"));   // → "ok"
+```
+
+If that prints `ok`, you're done.
+
+## Next
+
+- [Your first write](./03-your-first-write) — chained `ensureDirectory`
+  + `putFile` + `getFile` walkthrough.

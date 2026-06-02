@@ -1,0 +1,263 @@
+---
+/**
+ * Custom Warlock.js header — full replacement of Starlight's default
+ * Header component.
+ *
+ * Layout: brand mark + wordmark + version pill on the left, top-nav in
+ * the middle (desktop only), search + theme + GitHub + mobile-trigger
+ * on the right. Sticky with backdrop blur.
+ *
+ * We render Starlight's own Search and ThemeSelect inside our own
+ * layout so search and theme toggle keep working without re-implementing
+ * them.
+ */
+import Search from "@astrojs/starlight/components/Search.astro";
+import ThemeSelect from "@astrojs/starlight/components/ThemeSelect.astro";
+import logo from "../assets/logo.png";
+
+const navLinks = [
+  { label: "Documentation", href: "/v/latest/core/getting-started/01-introduction/" },
+  { label: "Packages", href: "/packages/" },
+  { label: "Skills", href: "/skills/" },
+];
+
+const currentPath = Astro.url.pathname;
+function isActive(href) {
+  if (href === "/packages/") return currentPath === "/packages/";
+  if (href === "/skills/") return currentPath === "/skills/";
+  if (href.startsWith("/v/latest/")) return currentPath.startsWith("/v/");
+  return false;
+}
+---
+
+<div class="warlock-header">
+  <div class="warlock-header-inner">
+    <a class="warlock-brand" href="/" aria-label="Warlock.js home">
+      <span class="warlock-brand-mark-wrap" aria-hidden="true">
+        <img src={logo.src} alt="" width="28" height="28" class="warlock-brand-mark" />
+      </span>
+      <span class="warlock-brand-name">Warlock<span class="warlock-brand-tld">.js</span></span>
+      <span class="warlock-brand-version">v4</span>
+    </a>
+
+    <nav class="warlock-topnav" aria-label="Top">
+      {navLinks.map((link) => (
+        <a
+          href={link.href}
+          class:list={["warlock-topnav-link", isActive(link.href) && "is-active"]}
+        >
+          {link.label}
+        </a>
+      ))}
+    </nav>
+
+    <div class="warlock-header-actions">
+      <div class="warlock-search-slot">
+        <Search />
+      </div>
+
+      <a
+        class="warlock-icon-link"
+        href="https://github.com/warlockjs/core"
+        target="_blank"
+        rel="noopener"
+        aria-label="GitHub"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2.16c-3.2.7-3.88-1.36-3.88-1.36-.52-1.34-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18A11.02 11.02 0 0 1 12 6.8c.98 0 1.97.13 2.89.39 2.21-1.49 3.18-1.18 3.18-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.82 1.19 3.08 0 4.42-2.69 5.39-5.26 5.68.41.35.78 1.05.78 2.12v3.14c0 .31.21.67.79.56C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5Z" />
+        </svg>
+      </a>
+
+      <div class="warlock-theme-slot">
+        <ThemeSelect />
+      </div>
+
+      <starlight-menu-button class="warlock-menu-button" />
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Outer <header class="header"> (Starlight) already provides fixed
+   * positioning, height, background. We just paint layout here. */
+  .warlock-header {
+    width: 100%;
+    height: 100%;
+  }
+
+  .warlock-header-inner {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 1.25rem;
+    height: 100%;
+    /* Outer wrapper already pads via --sl-nav-pad-* — match it horizontally */
+    max-width: none;
+    margin: 0;
+  }
+
+  /* Brand block */
+  .warlock-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    text-decoration: none !important;
+    color: var(--sl-color-white) !important;
+    line-height: 1;
+    transition: opacity 0.15s ease;
+  }
+
+  .warlock-brand:hover {
+    opacity: 0.85;
+  }
+
+  .warlock-brand-mark-wrap {
+    position: relative;
+    display: inline-flex;
+    width: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--warlock-radius-sm);
+  }
+
+  .warlock-brand-mark-wrap::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    background: radial-gradient(circle, var(--warlock-yellow-glow) 0%, transparent 70%);
+    filter: blur(6px);
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  .warlock-brand-mark {
+    position: relative;
+    display: block;
+    width: 28px;
+    height: auto;
+    filter: drop-shadow(0 0 4px var(--warlock-yellow-glow));
+  }
+
+  .warlock-brand-name {
+    font-family: var(--sl-font);
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: -0.02em;
+  }
+
+  .warlock-brand-tld {
+    color: var(--sl-color-text-accent);
+    font-weight: 700;
+  }
+
+  .warlock-brand-version {
+    margin-inline-start: 0.4rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: var(--warlock-radius-sm);
+    background-color: var(--warlock-yellow-glow);
+    color: var(--sl-color-text-accent);
+    font-family: var(--sl-font-mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  /* Top nav (centered) */
+  .warlock-topnav {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+  }
+
+  @media (min-width: 60rem) {
+    .warlock-topnav {
+      display: flex;
+    }
+  }
+
+  .warlock-topnav-link {
+    position: relative;
+    padding: 0.5rem 0.85rem;
+    border-radius: var(--warlock-radius-sm);
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--sl-color-gray-2);
+    text-decoration: none !important;
+    transition: color 0.15s ease, background-color 0.15s ease;
+  }
+
+  .warlock-topnav-link:hover {
+    color: var(--sl-color-white);
+    background-color: color-mix(in srgb, var(--sl-color-text-accent) 8%, transparent);
+  }
+
+  .warlock-topnav-link.is-active {
+    color: var(--sl-color-text-accent);
+    background-color: color-mix(in srgb, var(--sl-color-text-accent) 12%, transparent);
+  }
+
+  /* Right-side actions */
+  .warlock-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    justify-self: end;
+  }
+
+  /* Tame Starlight's Search internal markup to fit our row */
+  .warlock-search-slot :global(button[aria-keyshortcuts]),
+  .warlock-search-slot :global(button[data-open-modal]) {
+    height: 34px;
+    border-radius: var(--warlock-radius) !important;
+    border: 1px solid var(--sl-color-hairline) !important;
+    background-color: var(--warlock-surface-dark);
+    color: var(--sl-color-gray-2) !important;
+    padding: 0 0.7rem !important;
+    font-family: var(--sl-font);
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+  }
+
+  :root[data-theme="light"] .warlock-search-slot :global(button[data-open-modal]) {
+    background-color: #ffffff;
+  }
+
+  .warlock-search-slot :global(button[data-open-modal]:hover) {
+    border-color: var(--sl-color-text-accent) !important;
+    color: var(--sl-color-white) !important;
+  }
+
+  .warlock-icon-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--warlock-radius);
+    color: var(--sl-color-gray-2);
+    transition: color 0.15s ease, background-color 0.15s ease;
+  }
+
+  .warlock-icon-link:hover {
+    color: var(--sl-color-text-accent);
+    background-color: color-mix(in srgb, var(--sl-color-text-accent) 8%, transparent);
+  }
+
+  /* Tame Starlight's ThemeSelect button */
+  .warlock-theme-slot :global(starlight-theme-select select),
+  .warlock-theme-slot :global(label) {
+    border-radius: var(--warlock-radius) !important;
+  }
+
+  /* Mobile menu button hidden on desktop (Starlight handles the hookup) */
+  .warlock-menu-button {
+    display: inline-flex;
+  }
+
+  @media (min-width: 50rem) {
+    .warlock-menu-button {
+      display: none;
+    }
+  }
+</style>

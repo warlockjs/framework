@@ -1,0 +1,210 @@
+---
+title: "Set Options"
+slug: v/latest/cache/set-options
+---
+
+The third argument to `cache.set()` accepts three shapes — a positional TTL (number or string) for the common case, and a rich options object when you need more than just expiration.
+
+## The three shapes
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+// 1. Number of seconds (back-compat)
+await cache.set("name", "John Doe", 600);
+
+// 2. Human-readable duration string (parsed via ms)
+await cache.set("name", "John Doe", "10m");
+await cache.set("session", token, "1h");
+await cache.set("report", report, "7d");
+
+// 3. Rich options object
+await cache.set("user.1", user, {
+  ttl: "1h",
+  tags: ["users", "active"],
+  onConflict: "create",
+});
+```
+
+See [Duration Strings](/v/latest/cache/quick-start/#duration-strings) for the full grammar of accepted string forms.
+
+## Options reference
+
+| Key | Type | Purpose |
+|-----|------|---------|
+| `ttl` | `number \| string` | Relative expiry. Mutually exclusive with `expiresAt`. |
+| `expiresAt` | `number \| Date` | Absolute deadline. Must be in the future. Mutually exclusive with `ttl`. |
+| `tags` | `string[]` | Inline tag list — equivalent to `cache.tags([...]).set(...)`. |
+| `onConflict` | `"create" \| "update" \| "upsert"` | Conditional-write policy. Defaults to `"upsert"`. |
+| `driver` | `string` | Per-call driver override by registered name. |
+| `vector` | `number[]` | Embedding indexed alongside the entry for [similarity retrieval](/v/latest/cache/similarity/). Drivers without similarity support throw `CacheUnsupportedError`. |
+
+:::info Validation rules
+- Passing both `ttl` and `expiresAt` throws `CacheConfigurationError`.
+- An `expiresAt` in the past throws `CacheConfigurationError`.
+- Invalid duration strings (`"2 weeksandahalf"`) throw `CacheConfigurationError`.
+:::
+
+## TTL and expiresAt
+
+Use `ttl` for relative expiry ("cache for 1 hour from now"). Use `expiresAt` when the deadline is pinned to a specific wall-clock moment — JWT expiry, session close, scheduled campaign end.
+
+```ts
+// Relative — "1 hour from now"
+await cache.set("session", session, { ttl: "1h" });
+
+// Absolute — aligned to JWT expiry
+await cache.set("session", session, { expiresAt: jwt.exp * 1000 });
+
+// Absolute — aligned to a Date
+await cache.set("campaign", data, {
+  expiresAt: new Date("2026-12-31T23:59:59Z"),
+});
+```
+
+Passing both is rejected at the call site — two ways to say the same thing silently drift over time.
+
+## Conditional writes — `onConflict`
+
+Controls what happens when the key already exists (or doesn't).
+
+```ts
+// "create" — set only if the key is missing
+const workerId = `worker.${process.pid}`;    // any identifying value
+const result = await cache.set("lock.orders", workerId, {
+  onConflict: "create",
+  ttl: "5m",
+});
+// { wasSet: true, existing: null } on acquire
+// { wasSet: false, existing: <prior workerId> } if someone else holds it
+
+if (!result.wasSet) {
+  throw new Error(`Another worker owns this lock: ${result.existing}`);
+}
+
+// "update" — set only if the key exists (don't resurrect expired entries)
+await cache.set("user.1", patch, { onConflict: "update" });
+
+// "upsert" — the default. Overwrites regardless.
+await cache.set("user.1", user);
+```
+
+Conditional writes return a `CacheSetResult`:
+
+```ts
+type CacheSetResult<T = any> = {
+  wasSet: boolean;
+  existing: T | null;  // only populated on "create" rejections
+};
+```
+
+Unconditional `"upsert"` writes return the driver instance or the stored value, matching the legacy shape.
+
+:::tip Redis equivalence
+`"create"` maps to Redis `SET … NX` natively; `"update"` maps to `SET … XX`. Other drivers emulate the behavior in-process. You get the same semantics regardless of driver.
+:::
+
+## Inline tags
+
+Equivalent to the fluent form, terser at the call site:
+
+```ts
+// Inline
+await cache.set("user.1", user, { tags: ["users", "tenant-42"] });
+
+// Fluent (useful when you already have a tagged instance)
+const users = cache.tags(["users"]);
+await users.set("user.1", user);
+```
+
+Both invalidate via the same path:
+
+```ts
+await cache.tags(["users"]).invalidate();
+```
+
+See [Cache Tags](/v/latest/cache/tags/) for the full invalidation workflow.
+
+## Per-call driver override
+
+When most writes go to your default driver but one call needs a different one, pass `driver` in the options object. The manager loads (and connects) the override driver lazily on first use, then routes that single operation without mutating `currentDriver`.
+
+```ts
+// Audit events always land in Redis, regardless of default driver
+await cache.set("audit.event", event, {
+  driver: "redis",
+  ttl: "30d",
+});
+
+// Normal usage still uses the default driver
+await cache.set("user.1", user, "1h");
+```
+
+The override driver must be registered in your configuration:
+
+```ts
+cache.setCacheConfigurations({
+  default: "memory",
+  drivers: {
+    memory: MemoryCacheDriver,
+    redis: RedisCacheDriver,
+  },
+  options: { /* ... */ },
+});
+```
+
+## Distributed locking recipe
+
+A **distributed lock** makes sure only one process runs a block of code at a time, even across multiple servers. The `onConflict: "create"` pattern is the portable way to build one — Redis-native on Redis, single-process elsewhere.
+
+```ts
+async function withLock<T>(
+  key: string,
+  ttl: string,
+  work: () => Promise<T>,
+): Promise<T | null> {
+  // process.pid is just an identifying value so you can see which worker
+  // holds the lock when debugging. Any unique string works.
+  const acquired = await cache.set(key, process.pid, {
+    onConflict: "create",
+    ttl,   // safety net: auto-release if we crash before remove()
+  });
+
+  if (!acquired.wasSet) {
+    return null; // someone else holds the lock — skip this work
+  }
+
+  try {
+    return await work();
+  } finally {
+    await cache.remove(key);
+  }
+}
+
+// Usage — build a heavy report, but only run the job on one server even if
+// three servers received the request at the same time.
+const result = await withLock("lock.build-report.42", "2m", async () => {
+  const report = await db.reports.generate(42);   // expensive
+  await cache.set("report.42", report, "1h");
+  return report;
+});
+```
+
+See [Stampede Prevention](/v/latest/cache/stampede-prevention/) for the single-node variant using `remember()`.
+
+## Back-compat
+
+Every call site using the old positional-TTL shape still works:
+
+```ts
+await cache.set("k", v);              // no TTL — driver default
+await cache.set("k", v, 3600);        // seconds
+await cache.set("k", v, undefined);   // same as no TTL
+```
+
+## Related Documentation
+
+- [Atomic Operations](/v/latest/cache/atomic-operations/) — counters, `update()`, `merge()`
+- [Cache Tags](/v/latest/cache/tags/) — tag-based invalidation
+- [Cache Manager](/v/latest/cache/cache-manager/) — full API surface
+- [Errors](/v/latest/cache/errors/) — `CacheConfigurationError` and friends

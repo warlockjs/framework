@@ -1,0 +1,210 @@
+---
+title: "Postgres Cache Driver"
+slug: v/latest/cache/pg
+---
+
+The `pg` driver puts the cache in your existing Postgres database. It does two jobs:
+
+1. **KV-only mode** — same `CacheDriver` contract you get everywhere else, just persistent across processes and survives restarts. Useful if you already run Postgres and don't want to add Redis to the dependency tree.
+2. **pgvector mode** — opt in by setting `options.pg.vector.dimensions`, and the same driver becomes a production-grade similarity store backed by pgvector's HNSW or IVFFlat index.
+
+Same driver, same API. Flip a config flag.
+
+## When to Use
+
+- You already deploy Postgres and want one less moving part than Redis.
+- You need persistence across process restarts (Memory/LRU don't, File doesn't scale).
+- You're building [semantic caching](/v/latest/cache/similarity/), RAG retrieval, or "find similar items" features and want a real ANN index — not the brute-force memory scan.
+
+## Limitations
+
+- Each `get` / `set` is a full network round-trip. Hot reads will be slower than Redis or in-process memory.
+- pgvector adds an extension dependency and a migration step (one-time). The driver does not auto-migrate — by design.
+
+## Installation
+
+`pg` is an **optional peer dependency** — install it yourself only if you use this driver.
+
+```bash
+npm install pg
+# pgvector mode also needs the Postgres extension installed once on the server:
+# psql> CREATE EXTENSION vector;
+```
+
+## Configuration
+
+The driver accepts your existing `pg.Pool` (or `pg.Client`). It does **not** own the connection lifecycle — `cache.disconnect()` will not close your pool, so you can keep using it everywhere else in the app.
+
+### KV-only
+
+```ts title="src/config/cache.ts"
+import { Pool } from "pg";
+import { CacheConfigurations, PgCacheDriver } from "@warlock.js/cache";
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+export const cacheConfigurations: CacheConfigurations = {
+  default: "pg",
+  drivers: { pg: PgCacheDriver },
+  options: {
+    pg: {
+      client: pool,
+      table: "warlock_cache",  // optional, this is the default
+      ttl: "1h",               // optional default for new entries
+      globalPrefix: "prod-app",
+    },
+  },
+};
+```
+
+#### Alternative — pass the pool at `cache.use()` time
+
+When the pool isn't available at config-load time (lazy bootstrap, multi-tenant pool selection, test fixtures swapping clients), keep the static knobs in config and inject the client at runtime:
+
+```ts title="src/config/cache.ts"
+options: {
+  pg: {
+    table: "warlock_cache",
+    ttl: "1h",
+    globalPrefix: "prod-app",
+  },
+},
+```
+
+```ts title="src/main.ts"
+const pool = await buildTenantPool(tenantId);
+cache.setCacheConfigurations(cacheConfigurations);
+await cache.use("pg", { client: pool });   // runtime options merge over static config
+```
+
+Both patterns produce the same loaded driver. See [Cache Manager → Runtime driver options](/v/latest/cache/cache-manager/#runtime-driver-options) for merge precedence and reload semantics.
+
+### pgvector (similarity)
+
+Add the `vector` block. Everything else stays the same:
+
+```ts
+options: {
+  pg: {
+    client: pool,
+    vector: {
+      dimensions: 1536,        // must match your embedder's output dim
+      index: "hnsw",           // or "ivfflat"; default "hnsw"
+    },
+  },
+},
+```
+
+The choice between **HNSW** and **IVFFlat**:
+
+- **HNSW** (default) — faster queries, slower index build, larger on disk. The right default for most apps.
+- **IVFFlat** — faster build, slightly slower queries. Useful when you bulk-load a lot of data at once.
+
+You can change it later, but you'll need to rebuild the index.
+
+### Options reference
+
+| Option | Type | Required | Description |
+|---|---|---|---|
+| `client` | `pg.Pool \| pg.Client` | yes | Your already-built Postgres connection. The driver never closes it. |
+| `table` | `string` | no | Table name. Default: `"warlock_cache"`. Restricted to `[A-Za-z_][A-Za-z0-9_]*` (no SQL injection via DDL). |
+| `ttl` | `number \| string` | no | Default TTL for new entries. Seconds or a duration string (`"1h"`, `"7d"`). Default: `Infinity`. |
+| `globalPrefix` | `string \| () => string` | no | Prefix all keys for tenant separation. |
+| `vector.dimensions` | `number` | only with vector | Vector size. Must match your embedder. |
+| `vector.index` | `"hnsw" \| "ivfflat"` | no | pgvector index strategy. Default: `"hnsw"`. |
+
+## One-time schema setup
+
+The driver does **not** run migrations. It hands you the SQL via `driver.schema()` so you can run it through whatever migration tool you already use (Knex, Prisma, plain SQL files, anything).
+
+```ts
+const driver = new PgCacheDriver();
+driver.setOptions({ client: pool, vector: { dimensions: 1536 } });
+
+console.log(driver.schema());
+// CREATE TABLE IF NOT EXISTS warlock_cache (
+//   key TEXT PRIMARY KEY,
+//   value JSONB NOT NULL,
+//   expires_at TIMESTAMPTZ,
+//   stale_at TIMESTAMPTZ,
+//   tags TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
+//   embedding VECTOR(1536)
+// );
+// CREATE INDEX IF NOT EXISTS idx_warlock_cache_expires_at ON warlock_cache (expires_at);
+// CREATE INDEX IF NOT EXISTS idx_warlock_cache_tags ON warlock_cache USING GIN (tags);
+// CREATE INDEX IF NOT EXISTS idx_warlock_cache_embedding ON warlock_cache USING hnsw (embedding vector_cosine_ops);
+```
+
+The `stale_at` column powers [stale-while-revalidate](/v/latest/cache/swr/) — entries written via `cache.swr(...)` populate it so the driver can branch on freshness on every read. Plain `set()` calls leave the column null (treated as always-fresh by SWR).
+
+For a one-off bootstrap script:
+
+```ts
+import { Pool } from "pg";
+import { PgCacheDriver } from "@warlock.js/cache";
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const driver = new PgCacheDriver();
+driver.setOptions({ client: pool, vector: { dimensions: 1536 } });
+
+await pool.query(driver.schema());
+await pool.end();
+```
+
+If you change `vector.dimensions` later, you'll need to drop and recreate the column. **Vectors are not portable across embedders** — different models produce different dimensions and different geometries.
+
+## Usage
+
+Once configured + migrated, the driver behaves like every other one:
+
+```ts
+await cache.set("user.42", { name: "Hasan" }, "1h");
+const user = await cache.get("user.42");
+
+await cache.tags(["users"]).set("user.43.profile", profile);
+await cache.tags(["users"]).invalidate();
+
+await cache.update<User>("user.42", (u) => ({ ...u, lastSeen: Date.now() }));
+```
+
+### With vectors
+
+```ts
+await cache.set("doc.policy", policy, {
+  vector: await embedder.embed(policy.text),
+  tags: ["policies"],
+});
+
+const hits = await cache.similar<typeof policy>(
+  await embedder.embed(userQuestion),
+  { topK: 5, threshold: 0.75 },
+);
+```
+
+See [Similarity Retrieval](/v/latest/cache/similarity/) for the full `similar()` API.
+
+## How it works under the hood
+
+A peek for the curious — most users never need to think about this.
+
+- **Storage**: a single table (`warlock_cache` by default). One row per cache entry.
+- **TTL**: `expires_at TIMESTAMPTZ`. Reads filter via `WHERE expires_at IS NULL OR expires_at > now()` (lazy expiry).
+- **Tags**: `tags TEXT[]` with a GIN index. `similar()` uses the native `tags && $1` overlap operator — much faster than walking meta-keys.
+- **`onConflict: "create"`**: race-safe via `INSERT ... ON CONFLICT (key) DO UPDATE ... WHERE expires_at < now() RETURNING value`. Reclaims expired rows automatically; blocks live ones.
+- **`onConflict: "update"`**: `UPDATE ... WHERE expires_at IS NULL OR expires_at > now() RETURNING value`.
+- **Similarity**: `1 - (embedding <=> $1::vector) AS score ORDER BY embedding <=> $1::vector LIMIT $N`. The `<=>` operator is pgvector's cosine distance; converting via `1 - distance` gives the similarity score we return as `score`.
+
+## Errors you might hit
+
+- **`CacheConfigurationError: Pg cache driver requires a 'client' option ...`** — you didn't pass a Pool/Client.
+- **`CacheConfigurationError: invalid table name '...'`** — table name failed the `[A-Za-z_][A-Za-z0-9_]*` check. We refuse to interpolate arbitrary strings into DDL.
+- **`CacheConfigurationError: pgvector extension not installed`** — run `CREATE EXTENSION vector;` once on your database, or remove the `vector` config block.
+- **`CacheConfigurationError: vector dimension mismatch`** — the input vector length doesn't equal `vector.dimensions`. Usually a sign your embedder changed.
+- **`CacheUnsupportedError: similarity retrieval requires the 'vector' config block`** — you called `similar()` on a driver running in KV-only mode. Add the `vector` block.
+
+## See also
+
+- [Similarity Retrieval](/v/latest/cache/similarity/) — the `similar()` API in depth
+- [Configurations](/v/latest/cache/configurations/) — driver setup at the package level
+- [Set Options](/v/latest/cache/set-options/) — TTL, tags, conflict policy
+- [Tags](/v/latest/cache/tags/) — group invalidation

@@ -1,0 +1,268 @@
+---
+/**
+ * "Pick your path" — three distinct cards instead of generic reading
+ * paths. Each card has an icon, a role label, three concrete actions,
+ * and a directed CTA.
+ */
+const paths = [
+  {
+    label: "Backend developer",
+    title: "Ship an HTTP API in 5 minutes.",
+    description:
+      "Scaffold with `warlock create`, register a route, drop in a Cascade model. Auth, validation, mail, files are already wired.",
+    icon: "code",
+    steps: [
+      { name: "Install", href: "/v/latest/core/getting-started/02-installation/" },
+      { name: "Routing", href: "/v/latest/core/the-basics/02-routing/" },
+      { name: "Cascade models", href: "/v/latest/cascade/getting-started/05-your-first-model/" },
+    ],
+    cta: { label: "Start with Core", href: "/v/latest/core/getting-started/01-introduction/" },
+  },
+  {
+    label: "AI engineer",
+    title: "Run a typed agent in 5 minutes.",
+    description:
+      "Pick a provider, define a tool with Seal, call `runAgent`. Same envelope as the rest of the framework, no exceptions to plumb.",
+    icon: "rocket",
+    steps: [
+      { name: "Install AI", href: "/v/latest/ai/getting-started/01-introduction/" },
+      { name: "Your first agent", href: "/v/latest/ai/getting-started/04-your-first-agent/" },
+      { name: "Define tools", href: "/v/latest/ai/the-basics/define-tools/" },
+    ],
+    cta: { label: "Start with AI", href: "/v/latest/ai/" },
+  },
+  {
+    label: "Framework explorer",
+    title: "Understand the mental model.",
+    description:
+      "How the connector lifecycle boots subsystems, how modules thread through the request, how skills bring AI agents up to speed.",
+    icon: "open-book",
+    steps: [
+      { name: "Architecture", href: "/v/latest/core/architecture-concepts/application/" },
+      { name: "Connectors", href: "/v/latest/core/architecture-concepts/bootstrap-and-connectors/" },
+      { name: "Skills system", href: "/skills/" },
+    ],
+    cta: { label: "Read the spine", href: "/v/latest/core/architecture-concepts/how-it-works/" },
+  },
+];
+
+const icons = {
+  code: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4M6 8l-4 4 4 4m8.5-12-5 16"/></svg>',
+  rocket:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>',
+  "open-book":
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',
+};
+---
+
+<section class="warlock-pathpicker">
+  <div class="warlock-section-head">
+    <p class="warlock-section-kicker">[ Pick your path ]</p>
+    <h2 class="warlock-section-title">Three ways to start</h2>
+    <p class="warlock-section-sub">
+      Different goals lead to different first pages. The framework doesn't
+      care which one you take.
+    </p>
+  </div>
+
+  <div class="warlock-paths">
+    {paths.map((p, i) => (
+      <article class="warlock-path">
+        <div class="warlock-path-head">
+          <span class="warlock-path-icon" aria-hidden="true" set:html={icons[p.icon]} />
+          <span class="warlock-path-num">0{i + 1}</span>
+        </div>
+        <p class="warlock-path-label">{p.label}</p>
+        <h3 class="warlock-path-title">{p.title}</h3>
+        <p class="warlock-path-desc">{p.description}</p>
+        <ul class="warlock-path-steps">
+          {p.steps.map((step) => (
+            <li>
+              <a href={step.href}>
+                <span class="warlock-path-arrow" aria-hidden="true">→</span>
+                {step.name}
+              </a>
+            </li>
+          ))}
+        </ul>
+        <a class="warlock-path-cta" href={p.cta.href}>
+          {p.cta.label}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 12h14M13 5l7 7-7 7"/>
+          </svg>
+        </a>
+      </article>
+    ))}
+  </div>
+</section>
+
+<style>
+  .warlock-pathpicker {
+    max-width: 78rem;
+    margin: 0 auto;
+    padding: clamp(3rem, 4rem + 2vw, 5rem) clamp(1.25rem, 4vw, 2.5rem);
+  }
+
+  .warlock-paths {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-block-start: 2.5rem;
+  }
+
+  @media (min-width: 60rem) {
+    .warlock-paths {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+    }
+  }
+
+  .warlock-path {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem 1.5rem 1.25rem;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--warlock-radius);
+    background: linear-gradient(180deg, var(--warlock-surface-dark), color-mix(in srgb, var(--warlock-surface-dark) 60%, transparent));
+    transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+    overflow: hidden;
+  }
+
+  :root[data-theme="light"] .warlock-path {
+    background: linear-gradient(180deg, #ffffff, #fafafa);
+  }
+
+  .warlock-path::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--sl-color-text-accent), transparent);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .warlock-path:hover {
+    border-color: color-mix(in srgb, var(--sl-color-text-accent) 50%, var(--sl-color-hairline));
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px color-mix(in srgb, var(--sl-color-text-accent) 10%, transparent);
+  }
+
+  .warlock-path:hover::before {
+    opacity: 1;
+  }
+
+  .warlock-path-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-block-end: 1.25rem;
+  }
+
+  .warlock-path-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--warlock-radius);
+    color: var(--sl-color-text-accent);
+  }
+
+  .warlock-path-icon :global(svg) {
+    width: 18px;
+    height: 18px;
+  }
+
+  .warlock-path-num {
+    font-family: var(--sl-font-mono);
+    font-size: 0.85rem;
+    color: var(--sl-color-gray-3);
+    letter-spacing: 0.05em;
+  }
+
+  .warlock-path-label {
+    margin: 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--sl-color-text-accent);
+  }
+
+  .warlock-path-title {
+    margin: 0.5rem 0 0.75rem;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--sl-color-white);
+    line-height: 1.3;
+  }
+
+  .warlock-path-desc {
+    margin: 0 0 1.25rem;
+    font-size: 0.92rem;
+    line-height: 1.55;
+    color: var(--sl-color-gray-2);
+  }
+
+  .warlock-path-steps {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .warlock-path-steps a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0;
+    color: var(--sl-color-gray-2);
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition: color 0.15s ease;
+  }
+
+  .warlock-path-steps a:hover {
+    color: var(--sl-color-text-accent);
+  }
+
+  .warlock-path-arrow {
+    color: var(--sl-color-text-accent);
+    font-weight: 600;
+    transition: transform 0.15s ease;
+  }
+
+  .warlock-path-steps a:hover .warlock-path-arrow {
+    transform: translateX(2px);
+  }
+
+  .warlock-path-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: auto;
+    padding: 0.55rem 0.9rem;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--warlock-radius);
+    align-self: flex-start;
+    color: var(--sl-color-white) !important;
+    text-decoration: none !important;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+  }
+
+  .warlock-path-cta:hover {
+    border-color: var(--sl-color-text-accent);
+    color: var(--sl-color-text-accent) !important;
+    background-color: color-mix(in srgb, var(--sl-color-text-accent) 8%, transparent);
+  }
+</style>

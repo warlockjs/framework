@@ -1,0 +1,385 @@
+---
+title: "Cache Manager"
+slug: v/latest/cache/cache-manager
+---
+
+The cache manager is the main interface for working with cache in your application. It manages drivers, handles configuration, and provides a unified API for all cache operations.
+
+```ts
+import { cache } from "@warlock.js/cache";
+```
+
+## Setup
+
+Before using the cache, configure and initialize it:
+
+```ts title="src/main.ts"
+import { cache } from "@warlock.js/cache";
+import cacheConfigurations from "./config/cache";
+
+// Set configurations
+cache.setCacheConfigurations(cacheConfigurations);
+
+// Initialize (connects to the default driver)
+await cache.init();
+```
+
+:::info Important
+`@warlock.js/cache` requires manual setup. Unlike the Warlock framework where initialization is automatic, you must call `setCacheConfigurations()` and `init()` before using any cache operations.
+:::
+
+:::danger
+Always initialize at application startup. Using cache methods before `init()` throws [`CacheDriverNotInitializedError`](/v/latest/cache/errors/#cachedrivernotinitializederror).
+:::
+
+## Basic Operations
+
+The cache manager provides core cache operations that work with all drivers.
+
+### Set
+
+Store a value in cache. The third argument accepts three shapes:
+
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+// 1. Number of seconds
+await cache.set(`products.${productId}`, product, CACHE_FOR.ONE_HOUR);
+await cache.set(`products.${productId}`, product, 3600);
+
+// 2. Human-readable duration string (parsed via ms)
+await cache.set(`products.${productId}`, product, "1h");
+await cache.set(`session.${sessionId}`, session, "30m");
+await cache.set(`report.${reportId}`, report, "7d");
+
+// 3. Rich options object
+await cache.set(`products.${productId}`, product, {
+  ttl: "1h",
+  tags: ["products"],
+  onConflict: "create",
+});
+```
+
+If the third argument is omitted, the driver's default TTL is used, or the value is stored forever (`Infinity`).
+
+See [Set Options](/v/latest/cache/set-options/) for the full options-object reference — `ttl`, `expiresAt`, `tags`, `onConflict`, and per-call `driver` overrides.
+
+### Get
+
+Retrieve a value:
+
+```ts
+const product = await cache.get(`products.${productId}`); // null if not found
+```
+
+### Remove
+
+Delete a specific key:
+
+```ts
+await cache.remove(`products.${productId}`);
+```
+
+### Flush
+
+Clear the entire cache:
+
+```ts
+await cache.flush();
+```
+
+### Has
+
+Check if a key exists without fetching:
+
+```ts
+const exists = await cache.has(`products.${productId}`);
+```
+
+:::tip
+Use `has()` instead of `get() !== null` when you only need existence.
+:::
+
+### Pull
+
+Get and remove in one operation:
+
+```ts
+const verifyToken = await cache.pull(`users.${userId}.verify-token`);
+```
+
+### Forever
+
+Store without expiration:
+
+```ts
+await cache.forever("app.config", { version: "1.0.0" });
+// Remove manually when no longer needed
+await cache.remove("app.config");
+```
+
+### Remember (get or compute)
+
+`remember()` gets a value from cache, or if it doesn't exist, executes a callback to generate it, caches the result, and returns it. **It also prevents cache stampedes** within a single process — concurrent callers for the same key share the in-flight promise.
+
+```ts
+const products = await cache.remember(
+  `products.category.${categoryId}`,
+  "30m",
+  async () => db.products.findByCategory(categoryId),
+);
+```
+
+#### `set()` vs `remember()`
+
+| Method | When to use | Behavior |
+|--------|-------------|----------|
+| `set()` | You already have the value | Stores it directly |
+| `remember()` | Value needs to be computed on cache miss | Gets from cache OR runs the callback and caches the result |
+
+```ts
+// set() — value in hand
+const profile = await db.users.getProfile(userId);
+await cache.set(`users.${userId}.profile`, profile, "1d");
+
+// remember() — let the cache handle it
+const profile = await cache.remember(`users.${userId}.profile`, "1d", () =>
+  db.users.getProfile(userId),
+);
+```
+
+:::tip
+Always prefer `remember()` for expensive operations (database queries, API calls, computations). See [Cache Stampede Prevention](/v/latest/cache/stampede-prevention/).
+:::
+
+### Update
+
+Atomically read, transform, and write a cached value:
+
+```ts
+await cache.update<User>(`user.${userId}`, (current) => ({
+  ...(current ?? defaultUser),
+  lastSeenAt: Date.now(),
+}));
+```
+
+See [Update & Merge](/v/latest/cache/update-merge/) for the callback contract, TTL preservation rules, and driver support matrix.
+
+### Merge
+
+Shallow-merge a partial object into an existing cached value:
+
+```ts
+await cache.merge<User>(`user.${userId}`, { theme: "dark" });
+```
+
+### Lists
+
+Obtain a typed list accessor for queue / stack / recent-N workflows:
+
+```ts
+const recent = cache.list<Event>("recent.events");
+await recent.push(event);
+const last10 = await recent.slice(0, 10);
+```
+
+See [Cache Lists](/v/latest/cache/lists/) for the full accessor API.
+
+### Similar (vector-based retrieval)
+
+Look up entries by cosine similarity instead of exact key match. Pair with `set({ vector })`:
+
+```ts
+await cache.set("doc.refunds", policy, { vector: await embed(policy.text) });
+
+const hits = await cache.similar(await embed(userQuestion), {
+  topK: 5,
+  threshold: 0.7,
+});
+```
+
+See [Similarity Retrieval](/v/latest/cache/similarity/) for the full API and capability matrix — only memory drivers and `pg` (with `vector` config) support it; others throw `CacheUnsupportedError`.
+
+## Driver Management
+
+### Get Current Driver
+
+```ts
+const currentDriver = cache.currentDriver;
+```
+
+`currentDriver` is `undefined` until `init()` or `use()` completes. Every data op guards with an init check, so calling `get` / `set` before init throws [`CacheDriverNotInitializedError`](/v/latest/cache/errors/#cachedrivernotinitializederror).
+
+### Switch Default Driver
+
+Change the active driver:
+
+```ts
+await cache.use("redis");
+```
+
+`use()` is async because it loads the driver if not already loaded.
+
+### Runtime driver options
+
+Most options live in `setCacheConfigurations({ options })` — table names, TTLs, URL strings, anything declarative and serializable. Some options can only be built at runtime — `pg`'s `client: pg.Pool`, a pre-wired Redis client from your app's connection module, anything you don't want sitting inside a static config object.
+
+Pass those via the second argument to `use` / `load` / `driver`:
+
+```ts
+import { Pool } from "pg";
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+cache.setCacheConfigurations({
+  default: "pg",
+  drivers: { pg: PgCacheDriver },
+  options: { pg: { table: "cache" } },           // static defaults
+});
+
+await cache.use("pg", { client: pool });          // runtime injection
+```
+
+Runtime options merge **over** the config defaults per-key — runtime wins on collision:
+
+```ts
+// config: { ttl: 60, table: "cache" }
+// runtime: { ttl: 120, client: pool }
+// final:   { ttl: 120, table: "cache", client: pool }
+```
+
+Once a driver is loaded, options are frozen on the instance. Calling `load` / `driver` / `use` a second time with **new** options throws [`CacheConfigurationError`](/v/latest/cache/errors/#cacheconfigurationerror) — no silent overwrites:
+
+```ts
+await cache.load("pg", { client: poolA });
+await cache.load("pg", { client: poolB }); // throws
+```
+
+If you need a different configuration, register a second driver name (`pg-tenant-b`) — driver identity stays one-to-one with config.
+
+Calling without options on an already-loaded driver still returns the cached instance silently. The throw only fires when options would otherwise be silently dropped.
+
+### Per-call Driver Override
+
+When most writes go to your default driver but one call needs a different one, use the `driver` option instead of switching:
+
+```ts
+// Routes this single write to "redis" without mutating currentDriver
+await cache.set("audit.event", event, { driver: "redis", ttl: "30d" });
+```
+
+### Get Specific Driver
+
+Obtain a driver instance without changing the default:
+
+```ts
+const redisDriver = await cache.driver("redis");
+const memoryDriver = await cache.driver("memory");
+
+await redisDriver.set("key", "value");
+await memoryDriver.set("temp", 123);
+```
+
+### Register Custom Driver
+
+Add drivers at runtime:
+
+```ts
+import { CustomCacheDriver } from "./CustomCacheDriver";
+
+cache.registerDriver("custom", CustomCacheDriver);
+await cache.use("custom");
+```
+
+## Driver Options
+
+### Get Current Options
+
+```ts
+const options = cache.options;
+```
+
+### Update Options
+
+```ts
+cache.setOptions({
+  globalPrefix: "newprefix",
+  ttl: "2h",
+});
+```
+
+### Global Prefix
+
+All built-in drivers support a `globalPrefix` option to avoid key conflicts, especially on shared storage like Redis. Think of it like a database name — it separates your keys from other applications. The prefix can be a string or a function (the function form runs per call, which is great for per-tenant scoping).
+
+Set it in your [configuration](/v/latest/cache/configurations/) or update at runtime with `setOptions()`.
+
+## Namespaces
+
+Namespaces help organize cache keys hierarchically using dot notation. See [Namespaces](/v/latest/cache/namespaces/) for a complete guide, including `cache.namespace(prefix, options?)` for scoped handles.
+
+```ts
+await cache.set(`orders.${userId}.recent`, orders);
+await cache.set(`orders.${userId}.total`, total);
+
+// Remove all keys in a namespace
+await cache.removeNamespace(`orders.${userId}`);
+
+// Or grab a scoped handle when you'll touch the prefix more than once
+const orders = cache.namespace(`orders.${userId}`, { ttl: "1h" });
+await orders.set("recent", recent);
+await orders.set("total", total);
+await orders.clear();
+```
+
+## Advanced Features
+
+Each has dedicated documentation:
+
+- [Set Options](/v/latest/cache/set-options/) — rich `CacheSetOptions` object: `ttl`, `expiresAt`, `tags`, `onConflict`, `driver`
+- [Update & Merge](/v/latest/cache/update-merge/) — atomic read-modify-write
+- [Cache Lists](/v/latest/cache/lists/) — queue / stack / recent-N buffer accessor
+- [Cache Tags](/v/latest/cache/tags/) — group and invalidate related entries
+- [Atomic Operations](/v/latest/cache/atomic-operations/) — `increment`, `decrement`, conditional writes
+- [Bulk Operations](/v/latest/cache/bulk-operations/) — `many()` and `setMany()` batching
+- [Stampede Prevention](/v/latest/cache/stampede-prevention/) — `remember()` and distributed-lock recipes
+- [Event System](/v/latest/cache/events/) — observe every cache operation
+
+## Cache Keys
+
+**Always use dot notation strings:**
+
+- ✅ `"user.1"`
+- ✅ `"posts.123.comments"`
+- ✅ `"app.config.settings"`
+
+- ❌ `{ id: 1 }` (objects work but reduce readability)
+- ❌ `"user:1"` (colons are rewritten to dots — be explicit)
+
+:::tip Recommended
+Dot notation makes keys predictable, readable, and easier to debug. If you need to generate keys from complex data, see [`parseCacheKey`](/v/latest/cache/utils/#parse-cache-key).
+:::
+
+## Disconnect
+
+Disconnect from the current driver:
+
+```ts
+await cache.disconnect();
+```
+
+## Troubleshooting
+
+:::info
+- **Always call `init()` before using cache operations** — operations throw [`CacheDriverNotInitializedError`](/v/latest/cache/errors/#cachedrivernotinitializederror) otherwise.
+- **Use `await cache.driver('name')` to access a specific driver without changing the default** — useful when you need to read from one driver and write to another in the same flow (e.g. rate-limit in memory, results in Redis).
+- **Use `{ driver: "name" }` in `set` options** when the override is per-call — cleaner than switching and switching back.
+:::
+
+## Related Documentation
+
+- [Cache Configurations](/v/latest/cache/configurations/) — configure drivers and options
+- [Set Options](/v/latest/cache/set-options/) — the headline v2 feature
+- [Cache Driver Interface](/v/latest/cache/cache-driver-interface/) — complete method reference
+- [Errors](/v/latest/cache/errors/) — error classes and how to react
+- [Best Practices](/v/latest/cache/best-practices/) — production-ready caching strategies

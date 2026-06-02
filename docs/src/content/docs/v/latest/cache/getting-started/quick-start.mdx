@@ -1,0 +1,204 @@
+---
+title: "Quick Start"
+slug: v/latest/cache/quick-start
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+
+## Installation
+
+<Tabs>
+  <TabItem label="npm" default>
+
+```bash
+npm install @warlock.js/cache
+```
+
+  </TabItem>
+  <TabItem label="yarn">
+
+```bash
+yarn add @warlock.js/cache
+```
+
+  </TabItem>
+  <TabItem label="pnpm">
+
+```bash
+pnpm add @warlock.js/cache
+```
+
+  </TabItem>
+</Tabs>
+
+## Setup
+
+```ts
+import { cache, MemoryCacheDriver } from "@warlock.js/cache";
+
+cache.setCacheConfigurations({
+  default: "memory",
+  drivers: { memory: MemoryCacheDriver },
+  options: { memory: { ttl: "1h" } },   // or a number of seconds
+});
+await cache.init();
+```
+
+:::danger Call `init()` once at startup
+Any cache operation before `init()` throws. Do this once in your main entry file, not on every request.
+:::
+
+## Verify it works
+
+A 4-line sanity check you can run immediately after setup:
+
+```ts
+await cache.set("hello", "world", "1m");
+console.log(await cache.get("hello"));   // "world"
+await cache.remove("hello");
+console.log(await cache.get("hello"));   // null
+```
+
+If you see `"world"` then `null`, your cache is working.
+
+## The whole arc in 15 lines
+
+Cache a value, read it back, then graduate to the two patterns you'll actually
+reach for in production — `cached()` to memoize a function, and `swr()` to serve
+hot data instantly while it refreshes in the background. Paste this after `init()`:
+
+```ts
+// 1. Cache a value, read it back.
+await cache.set("greeting", "hello", "5m");
+await cache.get("greeting");                       // "hello"
+
+// 2. Memoize a function — declare the strategy once, call it anywhere.
+const getUser = cached((id: number) => db.users.find(id), "user", "1h");
+await getUser(42);                                 // miss → runs the query
+await getUser(42);                                 // hit → no query
+await getUser.invalidate(42);                      // drop "user.42"
+
+// 3. Serve stale-but-instant while a refresh runs in the background.
+const product = await cache.swr(
+  "product.42",
+  { freshTtl: "1m", staleTtl: "1h" },              // fresh 1m, stale up to 1h
+  () => db.products.find(42),
+);
+```
+
+Three escalating tools: `set`/`get` for direct control, [`cached()`](/v/latest/cache/cached/)
+when freshness can lag a little and you call the same function from many places,
+and [`swr()`](/v/latest/cache/swr/) when a slow upstream must never make a fast
+endpoint slow. The rest of this page zooms in on each.
+
+## Your first cached function — the 101 pattern
+
+The most common use for a cache is **memoizing an expensive function** — a database query, an API call, a heavy computation. Here's the pattern you'll reach for 90% of the time:
+
+```ts
+// Before: every call hits the database (~50ms each)
+async function getUser(id: number) {
+  return db.users.findById(id);
+}
+
+// After: the first call hits the database, the next thousand don't (~1ms each)
+async function getUser(id: number) {
+  return cache.remember(
+    `user.${id}`,       // cache key — one per user
+    "1h",               // how long to cache (see "Duration strings" below)
+    () => db.users.findById(id),   // only runs on cache miss
+  );
+}
+```
+
+That's it. `remember()` checks the cache first; if it finds the value it returns it, otherwise it runs your callback, caches the result, and returns it.
+
+**Bonus:** when 1000 concurrent requests call `getUser(42)` at the same instant on a cold cache, `remember()` only runs the callback **once** — the other 999 wait for that one result. This is called **stampede prevention**, and it's the main reason to prefer `remember()` over a manual `get` + `set` pair.
+
+## Core Patterns
+
+### set / get
+
+Store and retrieve data directly:
+
+```ts
+// Duration string (preferred — more readable)
+await cache.set(`products.${id}`, product, "1h");
+
+// Or numeric seconds — both work
+await cache.set(`products.${id}`, product, 3600);
+
+// Returns null if missing or expired
+const product = await cache.get(`products.${id}`);
+```
+
+### remember (get or compute)
+
+Covered above — this is the function you'll use most.
+
+### Invalidate — `remove` / `removeNamespace`
+
+Drop one key, or every key under a prefix:
+
+```ts
+// Drop a single key
+await cache.remove("user.1");
+
+// Drop everything under "orders.{userId}." after checkout
+await cache.removeNamespace(`orders.${userId}`);
+```
+
+### Advanced: conditional writes
+
+Once you're comfortable with the basics, `set()` accepts a rich options object. The headline feature is `onConflict`, which lets you implement a **distributed lock** — a way to make sure only one process runs a job at a time, even across servers:
+
+```ts
+// "create" = succeed only if the key is missing
+const lock = await cache.set("lock.import", 1, {
+  onConflict: "create",
+  ttl: "5m",          // auto-release after 5 min if we crash
+});
+
+if (lock.wasSet) {
+  try {
+    await runImport();
+  } finally {
+    await cache.remove("lock.import");   // release the lock
+  }
+}
+```
+
+Full reference in [Set Options](/v/latest/cache/set-options/). Skip this section on your first read if you just want to cache some data.
+
+## Duration strings
+
+TTL values accept a number of seconds or a human-readable duration string:
+
+| Form | Meaning |
+|------|---------|
+| `600` | 600 seconds (10 minutes) |
+| `"1s"`, `"30s"` | Seconds |
+| `"30m"` | Minutes |
+| `"1h"`, `"12h"` | Hours |
+| `"7d"`, `"30d"` | Days |
+| `"1w"`, `"2 weeks"` | Weeks |
+| `"1y"`, `"1 year"` | Years |
+| `Infinity` | Never expires |
+
+Compound forms like `"1h30m"` are not supported — use `"90m"` or the numeric equivalent. Duration strings work everywhere a TTL is accepted: `set()`, `remember()`, driver options, and inside [`CacheSetOptions`](/v/latest/cache/set-options/).
+
+## Key Concepts
+
+- **TTL**: Time-to-live (seconds or duration string — see above).
+- **Dot-notation keys**: Use hierarchical keys like `"products.123"` or `"category.electronics.featured"` to organize related cache entries.
+- **Namespaces**: Groups of related keys that can be invalidated together with `removeNamespace()`.
+
+## Next Steps
+
+- [Configuration](/v/latest/cache/configurations/) — set up Redis or other drivers
+- [Cache Manager](/v/latest/cache/cache-manager/) — complete method reference
+- [Set Options](/v/latest/cache/set-options/) — `ttl`, `expiresAt`, `tags`, `onConflict`, per-call `driver` override
+- [Stampede Prevention](/v/latest/cache/stampede-prevention/) — why `remember()` is special
+- [Cache Tags](/v/latest/cache/tags/), [Events](/v/latest/cache/events/), and more advanced features
+

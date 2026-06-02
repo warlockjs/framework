@@ -1,0 +1,141 @@
+---
+title: "Introduction"
+slug: v/latest/cache/introduction
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+`@warlock.js/cache` is a standalone Node.js caching library. It turns slow, repeated work — database queries, API calls, heavy computations — into cheap memory reads.
+
+```ts
+// Before: every request hits the database (~50ms each)
+app.get("/product/:id", async (req, res) => {
+  const product = await db.products.findById(req.params.id);
+  res.json(product);
+});
+
+// After: the first request hits the database, the next 999 don't (~1ms each)
+app.get("/product/:id", async (req, res) => {
+  const product = await cache.remember(
+    `products.${req.params.id}`,
+    "1h",
+    () => db.products.findById(req.params.id),
+  );
+  res.json(product);
+});
+```
+
+What's in the box:
+
+- **8 interchangeable drivers** — Redis, Memory, Memory Extended, LRU, File, Null, Postgres (with optional pgvector), and Mock for [tests](/v/latest/cache/testing/).
+- **Rich `set` options** — `ttl` / `expiresAt` / `tags` / `onConflict` / per-call `driver` / `vector` for similarity.
+- **Atomic operations** — `increment`, `decrement`, `update`, `merge`, conditional writes.
+- **Cache tags** — group related entries and invalidate them together.
+- **List sub-API** — queues, stacks, recent-N buffers.
+- **Similarity retrieval** — store embeddings alongside entries, query by meaning ([what's similarity?](/v/latest/cache/similarity/)).
+- **Stampede prevention** — when 1000 concurrent requests all miss the same key, only one hits the source of truth ([what's a stampede?](/v/latest/cache/stampede-prevention/)).
+- **Stale-while-revalidate** — return cached data instantly while a background refresh runs, so slow upstreams never make fast endpoints slow ([SWR guide](/v/latest/cache/swr/)).
+- **Event system** — observe every cache operation.
+- **Built-in metrics** — `cache.metrics()` returns hit rate, latency percentiles, per-driver breakdowns ([metrics guide](/v/latest/cache/metrics/)).
+
+:::info Standalone Package
+Works independently of the Warlock framework in any Node.js environment — Express, Fastify, NestJS, Next.js, Remix, or any other runtime that runs on Node.js.
+:::
+
+:::tip TypeScript or JavaScript
+Examples use TypeScript. If you're on plain JS, just drop the `<Type>` generics — everything works identically at runtime.
+:::
+
+## Installation
+
+<Tabs>
+  <TabItem label="npm" default>
+
+```bash
+npm install @warlock.js/cache
+```
+
+  </TabItem>
+  <TabItem label="yarn">
+
+```bash
+yarn add @warlock.js/cache
+```
+
+  </TabItem>
+  <TabItem label="pnpm">
+
+```bash
+pnpm add @warlock.js/cache
+```
+
+  </TabItem>
+</Tabs>
+
+## Core Operations
+
+| Method | Description |
+|--------|-------------|
+| `set(key, value, ttlOrOptions?)` | Store a value with optional TTL or [rich options](/v/latest/cache/set-options/) |
+| `get(key)` | Retrieve a cached value |
+| `remove(key)` | Delete a cache entry |
+| `has(key)` | Check if a key exists |
+| `pull(key)` | Get a value and delete it |
+| `forever(key, value)` | Store a value without expiration |
+| `remember(key, ttl, callback)` | Get cached value or compute and cache it (with stampede prevention) |
+| `flush()` | Clear all cache entries |
+| `increment(key, amount)` | Atomically increment a numeric value |
+| `decrement(key, amount)` | Atomically decrement a numeric value |
+| `update(key, fn)` | Atomic read-modify-write for objects |
+| `merge(key, partial)` | Shallow-merge a partial into a cached object |
+| `list<T>(key)` | Typed list accessor (push/shift/slice/trim) |
+| `many(keys)` | Retrieve multiple values at once |
+| `setMany(entries, ttl?)` | Store multiple values at once |
+| `removeNamespace(namespace)` | Delete all keys matching a namespace pattern |
+
+Conditional writes — "set only if missing" or "set only if present" — are expressed via `set(k, v, { onConflict: "create" \| "update" })` and work across every driver (Redis-native, others emulated).
+
+## Drivers
+
+| Use Case | Recommended Driver |
+|----------|-------------------|
+| Production, multi-server, distributed | Redis |
+| Local development, simple persistence | File |
+| Fastest, ephemeral, single-process | Memory |
+| Need sliding expiration | Memory Extended |
+| Limited memory, want LRU eviction | LRU Memory |
+| Testing, disable cache | Null |
+
+## Advanced Features
+
+- [Set Options](/v/latest/cache/set-options/) — rich third-arg object: `ttl`, `expiresAt`, `tags`, `onConflict`, per-call `driver`
+- [Update & Merge](/v/latest/cache/update-merge/) — atomic read-modify-write for structured values
+- [Cache Lists](/v/latest/cache/lists/) — queue / stack / recent-N buffer sub-API
+- [Cache Tags](/v/latest/cache/tags/) — group related entries and invalidate them together
+- [Atomic Operations](/v/latest/cache/atomic-operations/) — increment, decrement, and conditional writes without race conditions
+- [Stampede Prevention](/v/latest/cache/stampede-prevention/) — `remember()` shares one concurrent regeneration per key
+- [Events](/v/latest/cache/events/) — observe every cache operation with 9 event types
+- [Errors](/v/latest/cache/errors/) — error classes and how to react
+
+## Quick Example
+
+```ts
+import { cache, RedisCacheDriver } from "@warlock.js/cache";
+
+cache.setCacheConfigurations({
+  default: "redis",
+  drivers: { redis: RedisCacheDriver },
+  options: { redis: { url: process.env.REDIS_URL, globalPrefix: "shop" } },
+});
+await cache.init();
+
+// Cache a product for 1 hour (human-readable duration string)
+const product = await cache.remember(
+  `products.${productId}`,
+  "1h",
+  () => db.products.findById(productId),
+);
+
+// Invalidate all cached orders for a user after checkout
+await cache.removeNamespace(`orders.${userId}`);
+```

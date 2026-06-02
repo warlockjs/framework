@@ -1,0 +1,203 @@
+---
+title: "Distributed Locks — cache.lock()"
+slug: v/latest/cache/lock
+---
+
+`cache.lock(key, ttl, fn)` acquires a distributed lock, runs your function, and auto-releases — even if the function throws. Built on top of `set({ onConflict: "create" })`, so it's Redis-native on Redis and emulated in-process elsewhere.
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+const outcome = await cache.lock("lock.nightly-import", "10m", async () => {
+  await importLatestDataset();
+  return "done";
+});
+
+if (outcome.acquired) {
+  console.log("import ran:", outcome.value);
+} else {
+  console.log("skipped — another server is already running the import");
+}
+```
+
+Replaces the manual `try` / `finally` + `onConflict: "create"` pattern. Same semantics, zero boilerplate.
+
+## When to use
+
+Reach for `cache.lock()` when:
+- A task should run on only one server at a time (cron jobs, imports, migrations).
+- Two requests shouldn't process the same thing twice (payment processing, webhook dedup).
+- You're about to write the `try { … } finally { cache.remove(lockKey); }` boilerplate for the nth time.
+
+Don't use `lock` for:
+- **Memoizing a function's result** — use [`cached()`](/v/latest/cache/cached/) or [`remember()`](/v/latest/cache/stampede-prevention/) instead.
+- **Cross-process `update()` coordination** — the upcoming Redis `WATCH`/`MULTI` path will be the better fit; today, wrapping `update` in a lock works but is heavier than needed.
+
+## The return shape
+
+`cache.lock()` returns a **discriminated union** — the `acquired` flag tells you whether `fn` ran. This disambiguates "fn returned undefined" from "we didn't run at all":
+
+```ts
+type LockOutcome<T> =
+  | { acquired: true; value: T }
+  | { acquired: false };
+```
+
+Pattern-match on it with TypeScript narrowing:
+
+```ts
+const outcome = await cache.lock("lock.x", "1m", async () => computeValue());
+
+if (outcome.acquired) {
+  // outcome is { acquired: true; value: T } — outcome.value is typed
+  console.log(outcome.value);
+} else {
+  // outcome is { acquired: false } — no .value available
+  console.log("someone else is running this");
+}
+```
+
+## The three shapes
+
+All three put `fn` last and auto-release on completion or throw.
+
+### 1. Positional TTL — the common case
+
+```ts
+await cache.lock("lock.nightly-import", "10m", async () => {
+  await runImport();
+});
+```
+
+Accepts either a number of seconds or a human-readable duration string (`"30s"`, `"5m"`, `"1h"`).
+
+### 2. Options form — add an `owner` label
+
+```ts
+await cache.lock(
+  "lock.payments.batch",
+  { ttl: "5m", owner: "worker.payments-2" },
+  async () => processBatch(),
+);
+```
+
+`owner` is stored as the lock's value. Default is `pid.<process.pid>`. Use a custom owner when debugging stuck locks — you can `cache.get(lockKey)` and see exactly which worker is holding it.
+
+### 3. Options form — per-call driver override
+
+```ts
+await cache.lock(
+  "lock.audit",
+  { ttl: "1m", driver: "redis" },
+  async () => writeAuditLog(),
+);
+```
+
+Routes the whole op (acquire + release) through the named driver without mutating `currentDriver`. Same semantics as `set`'s `driver` option.
+
+## TTL is required
+
+Unlike `set()` or `remember()`, `lock()` requires a TTL. This is deliberate — forgotten locks are one of the classic bugs in distributed systems ("the job crashed and now nothing can ever run again"). The TTL is your safety net: even if the process crashes before `fn` completes, the lock auto-releases after TTL.
+
+Pick a TTL longer than the work you expect. If the TTL elapses before `fn` finishes, another process can acquire the lock and run concurrently — that defeats the whole purpose.
+
+```ts
+// ❌ TTL too short — if runImport takes >30s, a second worker can start
+await cache.lock("lock.import", "30s", async () => runImport());
+
+// ✅ TTL with generous safety margin
+await cache.lock("lock.import", "30m", async () => runImport());
+```
+
+## Real-world recipes
+
+### Cron job that should only run on one server
+
+```ts
+cron.daily("3am", async () => {
+  await cache.lock("lock.cleanup", "30m", async () => {
+    await db.cleanup();
+  });
+});
+```
+
+Every server fires the cron at 3am; only one acquires the lock and runs. The rest get `{ acquired: false }` and no-op.
+
+### Idempotent webhook processing
+
+```ts
+app.post("/webhooks/stripe", async (req, res) => {
+  const eventId = req.body.id;
+
+  const outcome = await cache.lock(
+    `webhook.stripe.${eventId}`,
+    "24h",
+    async () => processStripeEvent(req.body),
+  );
+
+  if (!outcome.acquired) {
+    // Already processed — ack immediately
+    return res.status(200).json({ status: "already-processed" });
+  }
+
+  res.status(200).json({ status: "processed", result: outcome.value });
+});
+```
+
+Stripe retries webhooks on non-2xx. The lock ensures each event is processed exactly once, even under retry storms.
+
+### Batch job with unique-run guarantee
+
+```ts
+async function runDailyReport(date: string) {
+  const outcome = await cache.lock(
+    `lock.daily-report.${date}`,
+    { ttl: "1h", owner: `worker.${process.env.HOSTNAME}` },
+    async () => {
+      const report = await generateReport(date);
+      await sendToOps(report);
+      return report.id;
+    },
+  );
+
+  if (outcome.acquired) {
+    logger.info(`Generated report ${outcome.value} for ${date}`);
+  } else {
+    logger.info(`Report for ${date} is already being generated elsewhere`);
+  }
+}
+```
+
+## Driver support
+
+| Driver | Support | Semantics |
+|--------|:-:|-----------|
+| `redis` | ✅ Native | Redis `SET … NX EX` — cross-process atomic |
+| `memory` | ✅ Emulated | In-process only |
+| `memoryExtended` | ✅ Emulated | In-process only |
+| `lru` | ✅ Emulated | In-process only |
+| `file` | ✅ Emulated | Single-host only; not safe across multiple servers |
+| `null` | ✅ Always acquires | No-op driver — `fn` always runs, no coordination |
+
+On non-Redis drivers, "distributed" means "across callers in the same process." For true cross-server locking, use Redis.
+
+## Things NOT to do
+
+- **Don't call `lock()` recursively on the same key** — v1 is non-re-entrant. The inner call sees the outer call's lock and returns `{ acquired: false }`.
+- **Don't release the lock inside `fn`** — `lock()` auto-releases. A manual `cache.remove(lockKey)` inside `fn` would release early and let another process jump in while your work is still running.
+- **Don't forget the TTL** — TypeScript won't compile without it, but if you're tempted to use `"1y"` as "infinite," think again about what happens when the process crashes mid-work.
+- **Don't use `lock()` for memoization** — use [`cached()`](/v/latest/cache/cached/) or [`remember()`](/v/latest/cache/stampede-prevention/).
+
+## Troubleshooting
+
+- **Lock never releases** — check that `fn` doesn't hang forever. The TTL is your safety net but expect the lock to be held for the full TTL if `fn` hangs.
+- **Second process acquires while first is still running** — TTL elapsed before `fn` completed. Increase the TTL, or rearchitect the work into shorter chunks each with their own lock.
+- **`outcome.acquired` is always `false`** — check you're reading/writing the same key. Check the `globalPrefix` configuration — if different processes use different prefixes, they can't see each other's locks.
+- **Debugging stuck locks** — `await cache.get(lockKey)` returns the current owner. Set a descriptive `owner` option to make this useful.
+
+## Related Documentation
+
+- [Set Options — Conditional writes](/v/latest/cache/set-options/#conditional-writes--onconflict) — the `onConflict: "create"` primitive `lock()` is built on
+- [Stampede Prevention](/v/latest/cache/stampede-prevention/) — `remember()` for cache-aside patterns (different use case)
+- [`cached()`](/v/latest/cache/cached/) — HOF memoization (different use case)
+- [Atomic Operations](/v/latest/cache/atomic-operations/) — the full atomic toolkit

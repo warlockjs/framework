@@ -1,0 +1,103 @@
+---
+title: "Overlap Prevention"
+sidebar:
+  order: 3
+---
+
+The scheduler always waits for a tick's jobs to finish before scheduling the next tick — so the scheduler's own loop never starts a second copy of a job while the first is still running. Overlap only becomes possible when the job's callback is invoked from somewhere **outside** that loop: a manual `job.run()` for a forced re-run, a boot-time recovery sweep, a separate scheduler instance pointed at the same job, etc.
+
+`preventOverlap()` is how you tell the scheduler "this job has external invocation paths — if a tick fires while one of those is still running, skip the tick rather than try to run again." The scheduler then emits a `job:skip` event so you can observe the gap in your logs or metrics.
+
+## Basic Usage
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+scheduler.addJob(
+  job("process-queue", async () => {
+    // This might take several minutes
+    await queue.processAllPendingItems();
+  })
+    .everyMinutes(5)
+    .preventOverlap()   // skip the 5-min tick if a previous run is still going
+);
+
+scheduler.start();
+```
+
+When a tick finds the job already running, the scheduler emits a `job:skip` event with the reason `"Job is already running"`, then moves on.
+
+## When Overlap Actually Occurs
+
+A common shape — startup recovery + normal scheduling on the same callback:
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+const queueJob = job("process-queue", processQueueOnce)
+  .everyMinutes(5)
+  .preventOverlap();
+
+scheduler.addJob(queueJob);
+
+// Boot-time sweep — kick the job off immediately, don't wait for the first tick.
+queueJob.run().catch(error => log.error({ error }, "boot sweep failed"));
+
+scheduler.start();
+```
+
+If the boot sweep takes longer than 5 minutes, the first scheduled tick will land mid-sweep. With `preventOverlap()` set, the tick emits `job:skip` and the sweep finishes uninterrupted.
+
+## Checking Skip Events
+
+```ts
+import { scheduler } from "@warlock.js/scheduler";
+
+scheduler.on("job:skip", (name, reason) => {
+  // name    = "process-queue"
+  // reason  = "Job is already running"
+  console.log(`[scheduler] ${name} skipped — ${reason}`);
+});
+```
+
+## Disabling Overlap Prevention
+
+Pass `false` to explicitly re-enable concurrent execution if you've previously set it:
+
+```ts
+job("task", fn).everyMinute().preventOverlap(false);
+```
+
+## Signature
+
+```ts
+job.preventOverlap(skip?: boolean): this
+// skip defaults to true
+```
+
+## Checking Run State Programmatically
+
+```ts
+import { scheduler } from "@warlock.js/scheduler";
+
+const j = scheduler.getJob("process-queue");
+
+if (j?.isRunning) {
+  console.log("Job is currently executing — will be skipped on next tick");
+}
+```
+
+## Graceful Shutdown and Overlap
+
+During `scheduler.shutdown()`, in-flight jobs are always allowed to finish (up to the configured timeout), regardless of whether overlap prevention is enabled. This is separate from the tick-time skip behavior.
+
+```ts
+// Give jobs up to 60 s to finish during shutdown
+await scheduler.shutdown(60_000);
+```
+
+See [Configuration](../essentials/configuration.mdx) for more on graceful shutdown.
+
+:::tip
+Enable `preventOverlap()` for any job whose callback you also invoke outside the scheduler — boot-time recovery, admin tools, retried failures from another path. For jobs that only run via the scheduler's own loop, it's a no-op (and that's fine — it's free, defensive documentation).
+:::

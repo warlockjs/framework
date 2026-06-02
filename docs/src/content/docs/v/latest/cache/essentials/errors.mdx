@@ -1,0 +1,177 @@
+---
+title: "Errors"
+slug: v/latest/cache/errors
+---
+
+All cache errors extend `CacheError`, which extends the native `Error`. Use `instanceof` to react selectively.
+
+```ts
+import {
+  CacheError,
+  CacheConfigurationError,
+  CacheConnectionError,
+  CacheDriverNotInitializedError,
+  CacheUnsupportedError,
+  CacheConcurrencyError,
+} from "@warlock.js/cache";
+```
+
+## Error hierarchy
+
+```
+Error
+ └─ CacheError                          (base — match all cache errors)
+     ├─ CacheConfigurationError         (bad config or call-site options)
+     ├─ CacheConnectionError            (reserved — not thrown today)
+     ├─ CacheDriverNotInitializedError  (ops called before init())
+     ├─ CacheUnsupportedError           (driver doesn't implement op)
+     └─ CacheConcurrencyError           (reserved — v2.1 WATCH/MULTI)
+```
+
+## When each fires
+
+### `CacheConfigurationError`
+
+Programmer error — bad configuration or invalid call-site options. Should be fixed at the source, not caught at runtime.
+
+Fires on:
+
+- Invalid duration string: `cache.set("user.1", user, "2 weeksandahalf")`
+- Both `ttl` and `expiresAt` in the same call: `cache.set("user.1", user, { ttl: "1h", expiresAt: ... })`
+- `expiresAt` in the past: `cache.set("user.1", user, { expiresAt: Date.now() - 1000 })`
+- Negative TTL number: `cache.set("user.1", user, -5)`
+- Redis driver without `url` or `host`: `driver.setOptions({})`
+- File driver without `directory`: `driver.setOptions({})`
+- Using an unregistered driver name: `cache.use("undeclared-driver")`
+
+```ts
+import { cache, CacheConfigurationError } from "@warlock.js/cache";
+
+try {
+  await cache.set("user.1", user, { ttl: "1h", expiresAt: new Date() });
+} catch (error) {
+  if (error instanceof CacheConfigurationError) {
+    // "Cache set options cannot specify both `ttl` and `expiresAt` — choose one."
+    console.error(error.message);
+  }
+}
+```
+
+### `CacheDriverNotInitializedError`
+
+Any data operation called before `cache.init()` or `cache.use()`.
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+// No setCacheConfigurations + init yet
+await cache.get("user.1");
+// → CacheDriverNotInitializedError: "No cache driver initialized. Call cache.init() or cache.use() first."
+```
+
+**Fix:** call `cache.setCacheConfigurations(config)` then `await cache.init()` at application startup — and in every test's `beforeEach`.
+
+### `CacheUnsupportedError`
+
+The driver doesn't implement the requested operation.
+
+Today this fires on:
+- `cache.update()` / `cache.merge()` on the file driver (no file-lock primitive yet)
+- `cache.set(k, v, { vector })` and `cache.similar(...)` on drivers that don't index vectors (file, redis until RediSearch lands, pg without the `vector` config block) — see [Similarity Retrieval](/v/latest/cache/similarity/)
+
+```ts
+import { cache, CacheUnsupportedError } from "@warlock.js/cache";
+
+try {
+  await cache.update("user.1", (current) => ({ ...current, lastSeen: Date.now() }));
+} catch (error) {
+  if (error instanceof CacheUnsupportedError) {
+    // Fall back to non-atomic update (last-write-wins, but safe if you
+    // know no other process will update this key concurrently)
+    const current = await cache.get("user.1");
+    await cache.set("user.1", { ...current, lastSeen: Date.now() });
+  }
+}
+```
+
+### `CacheConnectionError`
+
+Reserved for driver connection failures. Not thrown by any built-in driver today — the Redis driver currently logs the error and emits an `"error"` event on the manager bus instead. See [Events](/v/latest/cache/events/) for how to subscribe.
+
+### `CacheConcurrencyError`
+
+Reserved for the v2.1 Redis `update()` implementation using `WATCH`/`MULTI`. Will fire when optimistic-concurrency retries exhaust the retry budget.
+
+## Reaction patterns
+
+### Catch-all at the application boundary
+
+Let the cache layer degrade gracefully without bringing down the request:
+
+```ts
+import { CacheError } from "@warlock.js/cache";
+
+try {
+  const user = await cache.remember(`user.${id}`, "1h", () => db.users.find(id));
+  return user;
+} catch (error) {
+  if (error instanceof CacheError) {
+    logger.warn("cache unavailable, falling back to DB", error);
+    return db.users.find(id);
+  }
+  throw error;
+}
+```
+
+### Selective — user-input validation
+
+Treat `CacheConfigurationError` as a 4xx in HTTP handlers; everything else as 5xx. This is useful when your API lets users specify TTLs or options directly:
+
+```ts
+import { cache, CacheConfigurationError } from "@warlock.js/cache";
+
+app.post("/cache/:key", async (req, res) => {
+  try {
+    await cache.set(req.params.key, req.body.value, {
+      ttl: req.body.ttl,     // may be a user-supplied "1h" / "30m" / etc
+    });
+    res.json({ ok: true });
+  } catch (error) {
+    if (error instanceof CacheConfigurationError) {
+      return res.status(400).json({ error: error.message });
+    }
+    throw error;
+  }
+});
+```
+
+### Driver-missing fallback
+
+When you know a driver might not support an operation (file driver + `update`), degrade explicitly:
+
+```ts
+try {
+  await cache.update(`user.${id}`, (current) => ({ ...current, ...patch }));
+} catch (error) {
+  if (error instanceof CacheUnsupportedError) {
+    const current = await cache.get(`user.${id}`);
+    await cache.set(`user.${id}`, { ...current, ...patch });
+    return;
+  }
+  throw error;
+}
+```
+
+## Things the driver does NOT throw
+
+- **Missing keys.** `get()` returns `null`, never throws. Tests should assert `resolves.toBeNull()`, not `rejects.toThrow`.
+- **Expired entries.** `get()` returns `null` and emits `"miss"` + `"expired"` events. No throw.
+- **Flush on empty cache.** `flush()` succeeds silently when there's nothing to flush.
+- **Concurrent last-write-wins.** Two `set()` calls on the same key race — the later one wins, no error. Use `update()` or `onConflict: "create"` if you need protection.
+
+## Related Documentation
+
+- [Cache Manager](/v/latest/cache/cache-manager/) — `init()` and setup
+- [Set Options](/v/latest/cache/set-options/) — validation rules for options object
+- [Update & Merge](/v/latest/cache/update-merge/) — `CacheUnsupportedError` on the file driver
+- [Events](/v/latest/cache/events/) — connection errors surface here

@@ -1,0 +1,252 @@
+---
+title: "Redis Cache Driver"
+slug: v/latest/cache/redis
+---
+
+[Redis](https://redis.io/) is a high-performance, in-memory data store. It is ideal for distributed, production-grade caching.
+
+## When to Use
+- Production environments
+- Multi-server or distributed systems
+- Need for persistence, high availability, or large cache sizes
+
+## Best For
+- Caching API/database responses
+- Session storage
+- Shared cache between multiple app instances
+
+## Limitations
+- Requires Redis server setup
+- Slightly more operational overhead than memory/file
+
+## Alternatives
+- [File Cache Driver](/v/latest/cache/file/): Simpler, persistent, but not distributed
+- [Memory Cache Driver](/v/latest/cache/memory/): Fastest, but not shared or persistent
+
+## Configuration
+
+Configure the Redis driver in your [cache configurations](/v/latest/cache/configurations/):
+
+### Using Connection URL (Recommended)
+
+```ts title="src/config/cache.ts"
+import { env } from "@mongez/dotenv";
+import { CacheConfigurations, RedisCacheDriver } from "@warlock.js/cache";
+
+const cacheConfigurations: CacheConfigurations = {
+  drivers: {
+    redis: RedisCacheDriver,
+  },
+  default: env("CACHE_DRIVER", "redis"),
+  options: {
+    redis: {
+      url: env("REDIS_URL", "redis://localhost:6379"),
+      globalPrefix: "prod-app",
+      ttl: "1d",
+    },
+  },
+};
+
+export default cacheConfigurations;
+```
+
+### Using Host and Port
+
+```ts title="src/config/cache.ts"
+import { env } from "@mongez/dotenv";
+import { CacheConfigurations, RedisCacheDriver } from "@warlock.js/cache";
+
+const cacheConfigurations: CacheConfigurations = {
+  drivers: {
+    redis: RedisCacheDriver,
+  },
+  default: env("CACHE_DRIVER", "redis"),
+  options: {
+    redis: {
+      host: env("REDIS_HOST", "localhost"),
+      port: env("REDIS_PORT", 6379),
+      username: env("REDIS_USERNAME"),
+      password: env("REDIS_PASSWORD"),
+      globalPrefix: "prod-app",
+      ttl: "1d",
+    },
+  },
+};
+
+export default cacheConfigurations;
+```
+
+:::tip
+Ensure Redis is installed and running on your machine or server.
+:::
+
+## Options
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `host` | string | `"localhost"` | Redis server host |
+| `port` | number | `6379` | Redis server port |
+| `username` | string | `undefined` | Redis username for authentication |
+| `password` | string | `undefined` | Redis password for authentication |
+| `url` | string | `undefined` | Redis connection URL (overrides host/port) |
+| `globalPrefix` | string \| Function | `undefined` | Global prefix for all cache keys |
+| `ttl` | number \| string | `Infinity` | Default TTL — seconds or a duration string like `"1h"` |
+| `clientOptions` | object | `{}` | Additional Redis client options |
+
+### Connection Options
+
+```ts
+{
+  host: "localhost",           // Redis host
+  port: 6379,                  // Redis port
+  username: "default",         // Redis username
+  password: "your-password",   // Redis password
+  url: "redis://user:pass@host:port", // Alternative: use URL
+}
+```
+
+### Global Prefix
+
+```ts
+{
+  globalPrefix: "myapp",       // Static prefix
+  // OR
+  globalPrefix: () => `app-${Date.now()}`, // Dynamic prefix
+}
+```
+
+### TTL Configuration
+
+```ts
+{
+  ttl: 3600,        // 1 hour, numeric seconds
+  // OR
+  ttl: "1h",        // human-readable duration string
+  // OR
+  ttl: "7d",        // 7 days
+  // OR
+  ttl: Infinity,    // never expire (default)
+}
+```
+
+### Advanced Client Options
+
+```ts
+{
+  clientOptions: {
+    retry_strategy: (options) => {
+      if (options.total_retry_time > 1000 * 60 * 60) {
+        return new Error('Retry time exhausted');
+      }
+      if (options.attempt > 10) {
+        return undefined;
+      }
+      return Math.min(options.attempt * 100, 3000);
+    },
+    max_attempts: 3,
+    connect_timeout: 10000,
+  }
+}
+```
+
+## Example Usage
+
+## Storing and Retrieving Data
+```ts
+import { cache } from "@warlock.js/cache";
+
+await cache.set("products.789", { name: "Keyboard", price: 129 }, "1h");
+const product = await cache.get("products.789");
+```
+
+## Atomic Operations
+
+The Redis driver provides native atomic operations using Redis commands. These are **race-condition free** even in distributed systems.
+
+### Atomic Increment and Decrement
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+// Atomic increment using Redis INCRBY command
+const views = await cache.increment("page.views", 1);
+
+// Atomic decrement using Redis DECRBY command
+const remaining = await cache.decrement("api.quota", 10);
+```
+
+**Under the hood:**
+- `increment()` uses Redis `INCRBY` command
+- `decrement()` uses Redis `DECRBY` command
+- Both are atomic at Redis level - guaranteed race-free
+
+### Conditional Writes (Distributed Locking)
+
+Use `set(key, value, { onConflict })` for atomic "set if missing" / "set if present" semantics. On Redis this maps to native `SET … NX` / `SET … XX` commands — other drivers emulate the same semantics in-process.
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+// Try to acquire a lock — uses Redis SET … NX under the hood
+const lock = await cache.set("lock.critical-operation", process.pid, {
+  onConflict: "create",
+  ttl: "30s",
+});
+
+if (lock.wasSet) {
+  try {
+    await performCriticalOperation();
+  } finally {
+    await cache.remove("lock.critical-operation");
+  }
+} else {
+  throw new Error("Operation already in progress");
+}
+```
+
+**Use cases:**
+- Distributed locking across multiple servers
+- Idempotency keys (ensure an operation runs only once)
+- Leader election
+- Preventing duplicate processing
+
+See [Set Options — Conditional writes](/v/latest/cache/set-options/#conditional-writes--onconflict) for the full reference and the return shape.
+
+### Why Atomic Operations Matter
+
+In distributed systems, multiple servers might try to modify the same cache key simultaneously:
+
+```ts
+// ❌ WITHOUT ATOMIC OPERATIONS (Race condition)
+const views = await cache.get("page.views") || 0;
+await cache.set("page.views", views + 1);
+// Two servers both read 100, both write 101 → Wrong!
+
+// ✅ WITH ATOMIC OPERATIONS (Race-free)
+await cache.increment("page.views", 1);
+// Redis INCRBY is atomic → Always correct!
+```
+
+See [Atomic Operations](/v/latest/cache/atomic-operations/) for comprehensive documentation and examples.
+
+## Accessing the Redis Client
+
+For advanced Redis operations, you can access the underlying Redis client:
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+const redisClient = cache.client;
+
+// Use native Redis commands if needed
+await redisClient.zAdd("leaderboard", {
+  score: 100,
+  value: "player1"
+});
+```
+
+## Troubleshooting
+- **Connection errors?** Check your Redis server is running and credentials are correct.
+- **Data not shared between servers?** Make sure all instances use the same Redis server.
+- **Race conditions?** Use atomic operations (`increment()`, `decrement()`, `set(k, v, { onConflict: "create" })`) instead of manual get/set for counters and locks.
+
+❌ **Not supported today.** `cache.set(k, v, { vector })` and `cache.similar(...)` throw `CacheUnsupportedError`. RediSearch-backed similarity is on the [backlog](/v/latest/cache/similarity/#capability-matrix). Use the [`pg` driver](/v/latest/cache/pg/) with `vector` config for production similarity, or a memory driver for development.

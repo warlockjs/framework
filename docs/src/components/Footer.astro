@@ -1,0 +1,114 @@
+---
+import Default from "@astrojs/starlight/components/Footer.astro";
+
+const year = new Date().getFullYear();
+---
+
+<Default><slot /></Default>
+
+<footer class="warlock-footer">
+  <div class="warlock-footer-inner">
+    <div class="warlock-footer-brand">
+      <span class="warlock-footer-mark">⚡</span>
+      <span class="warlock-footer-name">Warlock.js</span>
+      <span class="warlock-footer-tag">AI-native TypeScript framework</span>
+    </div>
+
+    <nav class="warlock-footer-nav" aria-label="Footer">
+      <a href="/v/latest/core/">Docs</a>
+      <a href="/packages/">Packages</a>
+      <a href="/skills/">Skills</a>
+      <a href="https://github.com/warlockjs/core" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+
+    <p class="warlock-footer-credit">
+      © {year} ·
+      <a href="https://mentoor.io" target="_blank" rel="noopener">mentoor.io</a>
+      · MIT licensed
+    </p>
+  </div>
+</footer>
+
+<style>
+  .warlock-footer {
+    margin-top: 4rem;
+    padding: 2.5rem 0 3rem;
+    border-top: 1px solid var(--sl-color-hairline);
+    background:
+      linear-gradient(to bottom, transparent, var(--warlock-yellow-glow) 1px, transparent 2px),
+      var(--sl-color-bg);
+  }
+
+  .warlock-footer-inner {
+    max-width: var(--sl-content-width);
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    align-items: center;
+    text-align: center;
+  }
+
+  .warlock-footer-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .warlock-footer-mark {
+    color: var(--sl-color-text-accent);
+    font-size: 1.1rem;
+    line-height: 1;
+  }
+
+  .warlock-footer-name {
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: var(--sl-color-white);
+  }
+
+  .warlock-footer-tag {
+    color: var(--sl-color-gray-3);
+    font-size: 0.85rem;
+  }
+
+  .warlock-footer-nav {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .warlock-footer-nav a {
+    font-size: 0.875rem;
+    color: var(--sl-color-gray-2);
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .warlock-footer-nav a:hover {
+    color: var(--sl-color-text-accent);
+  }
+
+  .warlock-footer-credit {
+    font-size: 0.8rem;
+    color: var(--sl-color-gray-3);
+    margin: 0;
+  }
+
+  .warlock-footer-credit a {
+    color: var(--sl-color-gray-2);
+    text-decoration: underline;
+    text-decoration-color: var(--sl-color-hairline);
+    text-underline-offset: 3px;
+    transition: color 0.15s ease, text-decoration-color 0.15s ease;
+  }
+
+  .warlock-footer-credit a:hover {
+    color: var(--sl-color-text-accent);
+    text-decoration-color: var(--sl-color-text-accent);
+  }
+</style>

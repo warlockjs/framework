@@ -1,0 +1,176 @@
+---
+title: Ollama provider
+description: Ollama provider adapter for @warlock.js/ai — run local LLMs through the same primitives as cloud providers.
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+> Standalone — usable in any Node project, no `@warlock.js/core` required.
+
+`@warlock.js/ai-ollama` is the Ollama provider adapter for
+[`@warlock.js/ai`](/v/latest/ai/). It runs local (or self-hosted) LLMs —
+Llama, Mistral, Phi, Qwen, anything on the Ollama registry — through the
+same vendor-neutral `ModelContract` as the cloud providers. Swapping a
+local model for a cloud one is zero code change, just a different SDK
+instance.
+
+## Set up the daemon
+
+The adapter talks to a running Ollama server. Install Ollama from
+[ollama.com](https://ollama.com), then pull the model you want to run:
+
+```bash
+ollama pull llama3.1
+ollama pull nomic-embed-text   # if you'll use embeddings
+```
+
+Ollama serves on `http://127.0.0.1:11434` by default. Confirm it's up
+with `ollama list`.
+
+## Install
+
+<Tabs syncKey="pm">
+  <TabItem label="npm">
+    ```bash
+    npm install @warlock.js/ai @warlock.js/ai-ollama
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn add @warlock.js/ai @warlock.js/ai-ollama
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm add @warlock.js/ai @warlock.js/ai-ollama
+    ```
+  </TabItem>
+</Tabs>
+
+## Construct
+
+One `OllamaSDK` holds one live `Ollama` client. The config is optional —
+with no arguments it points at the local default host.
+
+```ts
+import { OllamaSDK } from "@warlock.js/ai-ollama";
+
+const ollama = new OllamaSDK(); // local default: http://127.0.0.1:11434
+```
+
+The config wraps the official `ollama` client `Config`. Point `host` at
+a remote/self-hosted box, and use `headers` when an auth gateway sits in
+front of Ollama:
+
+```ts
+const ollama = new OllamaSDK({
+  host: "https://ollama.internal",
+  headers: { Authorization: `Bearer ${process.env.OLLAMA_TOKEN}` },
+});
+```
+
+`provider` relabels the upstream (defaults to `"ollama"`).
+
+## First call
+
+Build a model, hand it to an agent, run it. `execute()` never throws —
+failures land in `error` as a typed `AIError`. (Make sure the model is
+pulled first — see above.)
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { OllamaSDK } from "@warlock.js/ai-ollama";
+
+const ollama = new OllamaSDK();
+
+const assistant = ai.agent({
+  model: ollama.model({ name: "llama3.1" }),
+  systemPrompt: "You are a concise senior TypeScript engineer.",
+});
+
+const { text, usage, error } = await assistant.execute("Why use generics?");
+
+if (error) {
+  console.warn(error.code, error.category);
+} else {
+  console.log(text, usage.total);
+}
+```
+
+## Use as a model
+
+`name` is the Ollama model tag — whatever you've pulled.
+
+```ts
+ollama.model({ name: "llama3.1", temperature: 0.7 });
+ollama.model({ name: "qwen2.5:14b" });
+ollama.model({ name: "llama3.2-vision" });
+```
+
+## Use as an embedder
+
+```ts
+const embedder = ollama.embedder({ name: "nomic-embed-text" });
+const { vector } = await embedder.embed("Hello world");
+const { vectors } = await embedder.embedMany(["doc 1", "doc 2"]);
+```
+
+Ollama's `embed` accepts a string array natively, so `embedMany` is a
+single request — vectors come back in input order. Pass `dimensions` to
+forward the truncation hint (supported by newer embedding models):
+
+```ts
+ollama.embedder({ name: "nomic-embed-text", dimensions: 512 });
+```
+
+## Capabilities
+
+- **Tool calling** — vendor-neutral `ToolConfig`s map to Ollama
+  `tool_calls`. Ollama has no tool-call id concept, so the adapter
+  synthesizes the neutral id from the tool name. One consequence:
+  parallel calls to the *same* tool in a single turn share an id — a v1
+  limitation inherent to Ollama's wire format.
+- **Streaming** — `stream()` yields text `delta`s, a `tool-call` per
+  function call (Ollama streams a fully-formed call, not partial JSON),
+  and a terminal `done` with the final finish reason and usage.
+  Cancellation via `signal` aborts the underlying stream.
+- **Structured output** — on by default. A root-object JSON Schema is
+  forwarded to Ollama's native `format` field. Otherwise it degrades to
+  the agent's soft system-prompt hint plus client-side validation.
+- **Vision** — auto-detected from the model tag substring. Covers the
+  common multimodal families on the registry: `llava`, `bakllava`,
+  `moondream`, `minicpm-v`, `qwen2-vl` / `qwen2.5-vl`, `llama4`,
+  `gemma3`, and any tag containing `vision` (e.g. `llama3.2-vision`).
+  Text-only tags stay off. Override either way with the `vision` flag.
+- **Embeddings** — `nomic-embed-text`, `mxbai-embed-large`, native batch
+  (see above).
+
+Image attachments are sent as inlined `base64` bytes.
+
+## Pricing and usage
+
+Every response reports token `usage` derived from Ollama's eval counts
+(`prompt_eval_count` → `input`, `eval_count` → `output`, summed to
+`total`). Because Ollama runs locally with no prompt cache, there is no
+`cachedTokens`.
+
+Local Ollama is free, so pricing is usually unset. The `pricing`
+registry still exists for parity — hosted Ollama, internal chargeback —
+keyed by model name, in USD per million tokens, SDK-level or per-model
+(per-model wins).
+
+```ts
+const ollama = new OllamaSDK({
+  host: "https://ollama.internal",
+  pricing: {
+    "llama3.1": { input: 0.1, output: 0.1 },
+  },
+});
+```
+
+Need an offline token estimate? `ollama.count(text)` returns a fast
+character-heuristic approximation — handy for context-window guards.
+
+For the agent/workflow surface these models plug into, see
+[`@warlock.js/ai`](/v/latest/ai/). For provider-specific notes and the
+latest model tags, see the `setup-ollama` skill.

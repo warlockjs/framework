@@ -1,0 +1,126 @@
+---
+title: "Installation"
+description: Install @warlock.js/auth, register migrations, wire the CLI commands, generate the JWT secret.
+sidebar:
+  order: 2
+  label: "Installation"
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+Auth is coupled to `@warlock.js/core` — you're already inside a Warlock project before this page makes sense. If you don't have one, scaffold it via `core`'s getting-started first.
+
+## Install the package
+
+<Tabs syncKey="pm">
+  <TabItem label="npm">
+    ```bash
+    npm install @warlock.js/auth
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn add @warlock.js/auth
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm add @warlock.js/auth
+    ```
+  </TabItem>
+</Tabs>
+
+## Register migrations + CLI commands
+
+`@warlock.js/auth` ships two Cascade migrations (one per token table) and two CLI commands. Wire them in `warlock.config.ts`:
+
+```ts title="warlock.config.ts"
+import {
+  authMigrations,
+  registerAuthCleanupCommand,
+  registerJWTSecretGeneratorCommand,
+} from "@warlock.js/auth";
+import { defineConfig } from "@warlock.js/core";
+
+export default defineConfig({
+  cli: {
+    commands: [
+      registerJWTSecretGeneratorCommand(),
+      registerAuthCleanupCommand(),
+    ],
+  },
+  database: {
+    migrations: authMigrations,
+  },
+});
+```
+
+`authMigrations` is an array — `[AccessTokenMigration, RefreshTokenMigration]`. If you already have a `migrations` array, spread them in: `migrations: [...mine, ...authMigrations]`.
+
+## Generate the JWT secret
+
+The package signs tokens with secrets from `.env`. Generate them once per environment:
+
+<Tabs syncKey="pm">
+  <TabItem label="npm">
+    ```bash
+    npx warlock jwt.generate
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn warlock jwt.generate
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm warlock jwt.generate
+    ```
+  </TabItem>
+</Tabs>
+
+This writes `JWT_SECRET=...` and `JWT_REFRESH_SECRET=...` into `.env` (or `.env.development` / `.env.production` if `.env` is missing). The command is idempotent — it skips keys that already exist.
+
+:::caution
+Don't commit `.env`. The default Warlock `.gitignore` already excludes it. In production, the secrets come from your secret manager (Vault, AWS Secrets Manager, k8s secrets) — generate them there directly and skip this command.
+:::
+
+## Run the migrations
+
+<Tabs syncKey="pm">
+  <TabItem label="npm">
+    ```bash
+    npx warlock migrate
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn warlock migrate
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm warlock migrate
+    ```
+  </TabItem>
+</Tabs>
+
+You should now have `access_tokens` and `refresh_tokens` tables in your database.
+
+## Verify the install
+
+```ts
+import { authService, authMiddleware, Auth } from "@warlock.js/auth";
+
+console.log(typeof authService.login);       // "function"
+console.log(typeof authMiddleware);          // "function"
+console.log(Auth.name);                       // "Auth"
+```
+
+All three should resolve. If they don't, the package isn't in your `node_modules` — re-run the install.
+
+## Related
+
+- [Configuration](./03-configuration.mdx) — set up `src/config/auth.ts`.
+- [First protected route](./04-first-protected-route.md) — build the smallest end-to-end auth flow.
+- [Run auth commands](../guides/run-auth-commands.mdx) — `jwt.generate` + `auth.cleanup` details.

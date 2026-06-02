@@ -1,0 +1,94 @@
+---
+title: "Installation"
+description: Install @warlock.js/seal standalone in any Node project, or use it transitively inside a Warlock app.
+sidebar:
+  order: 2
+  label: "Installation"
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+Seal is standalone — no framework required. Inside a Warlock app it ships transitively through `@warlock.js/core`, so if you're already on core you can import `v` directly without installing anything. Otherwise, add it with your package manager:
+
+<Tabs syncKey="pm">
+  <TabItem label="npm">
+    ```bash
+    npm install @warlock.js/seal
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn add @warlock.js/seal
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm add @warlock.js/seal
+    ```
+  </TabItem>
+</Tabs>
+
+Seal has two runtime dependencies (`@mongez/supportive-is` and `dayjs`), both pulled in transitively. No peer dependencies to install separately.
+
+## Use it directly
+
+Import the `v` factory, `validate`, and the `Infer` type helper — no framework primitives required:
+
+```ts
+import { v, validate, type Infer } from "@warlock.js/seal";
+
+const userSchema = v.object({
+  email: v.string().email(),
+  name: v.string().min(2),
+});
+
+type User = Infer<typeof userSchema>;
+
+const result = await validate(userSchema, { email: "ada@example.com", name: "Ada" });
+
+if (result.isValid) {
+  console.log(result.data); // typed as User
+} else {
+  console.error(result.errors);
+}
+```
+
+Inside a Warlock app, the same schema slots into any `StandardSchemaV1<T>`-typed slot — request validation, AI tool input, Cascade `Model.schema` — because every seal schema implements Standard Schema. New to Warlock? Start with [core / getting-started](/v/latest/core/getting-started/01-introduction/).
+
+## Global configuration (optional)
+
+For centralized translation hooks or to collect every error instead of the first per field, configure once at boot:
+
+```ts
+import { configureSeal } from "@warlock.js/seal";
+
+configureSeal({
+  firstErrorOnly: false, // collect every error, not just the first per field
+  translateRule: ({ rule, attributes }) => {
+    // Hook into your i18n layer; return the localized message.
+    return t(`validation.${rule.name}`, attributes);
+  },
+});
+```
+
+`firstErrorOnly` defaults to `true` — most apps surface one error per field at a time, which keeps the response payload small.
+
+## Verify the install
+
+Drop this into a `tsx` file or a script and run it:
+
+```ts
+import { v, validate } from "@warlock.js/seal";
+
+const schema = v.string().email();
+const result = await validate(schema, "ada@example.com");
+
+console.log(result.isValid); // true
+console.log(result.data);    // "ada@example.com"
+```
+
+If that prints `true` and the email back, you're set.
+
+## Next
+
+[Your first schema](./03-your-first-schema/) — the full define → validate → infer → emit-JSON-Schema loop in one runnable example.

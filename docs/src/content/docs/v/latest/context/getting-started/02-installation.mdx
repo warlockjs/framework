@@ -1,0 +1,118 @@
+---
+title: "Installation"
+description: Install @warlock.js/context in any Node project — standalone or inside a Warlock app.
+sidebar:
+  order: 2
+  label: "Installation"
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+`@warlock.js/context` has zero runtime dependencies — it builds on Node's built-in `async_hooks` module. Two minutes from `add` to your first `run()`.
+
+## Prerequisites
+
+- **Node.js 16+** (AsyncLocalStorage is stable from 16.4; 20 LTS recommended).
+- **TypeScript 5+** if you want typed stores (the package ships as ESM + CJS with `.d.ts`).
+
+## Install
+
+<Tabs syncKey="context">
+  <TabItem label="Standalone">
+
+    Drop it into any Node project — Express, Fastify, Koa, a worker, a CLI script. No framework required.
+
+    <Tabs syncKey="pm">
+      <TabItem label="yarn">
+        ```bash
+        yarn add @warlock.js/context
+        ```
+      </TabItem>
+      <TabItem label="npm">
+        ```bash
+        npm install @warlock.js/context
+        ```
+      </TabItem>
+      <TabItem label="pnpm">
+        ```bash
+        pnpm add @warlock.js/context
+        ```
+      </TabItem>
+    </Tabs>
+
+    Then import directly:
+
+    ```ts
+    import { Context, contextManager } from "@warlock.js/context";
+    ```
+
+    That is the entire surface. Two exports — the abstract `Context<TStore>` class you extend, and the `contextManager` singleton for orchestrating multiple contexts in one scope.
+
+  </TabItem>
+  <TabItem label="Warlock.js">
+
+    Inside a Warlock app, the framework already uses `@warlock.js/context` for its request, storage, and database contexts. The package is installed as a transitive dependency of `@warlock.js/core` — you do not have to add it explicitly to read those contexts.
+
+    To define your own contexts (a tenant context, a trace context), install it directly so your `package.json` records the dependency:
+
+    <Tabs syncKey="pm">
+      <TabItem label="yarn">
+        ```bash
+        yarn add @warlock.js/context
+        ```
+      </TabItem>
+      <TabItem label="npm">
+        ```bash
+        npm install @warlock.js/context
+        ```
+      </TabItem>
+      <TabItem label="pnpm">
+        ```bash
+        pnpm add @warlock.js/context
+        ```
+      </TabItem>
+    </Tabs>
+
+    Register your contexts at boot — typically in a startup file that runs before route registration — so the framework's request lifecycle picks them up:
+
+    ```ts title="src/app/contexts/index.ts"
+    import { contextManager } from "@warlock.js/context";
+    import { tenantContext } from "./tenant-context";
+    import { traceContext } from "./trace-context";
+
+    contextManager
+      .register("tenant", tenantContext)
+      .register("trace", traceContext);
+    ```
+
+    New to the framework? See [core / getting-started](../../../core/getting-started/01-introduction).
+
+  </TabItem>
+</Tabs>
+
+## Verify
+
+A two-line sanity check:
+
+```ts
+import { Context } from "@warlock.js/context";
+
+class PingContext extends Context<{ value: string }> {
+  public buildStore(): { value: string } {
+    return { value: "pong" };
+  }
+}
+
+const pingContext = new PingContext();
+
+await pingContext.run({ value: "pong" }, async () => {
+  console.log(pingContext.get("value")); // "pong"
+});
+```
+
+If that logs `pong`, you are set. Next page builds a real working example.
+
+## Related
+
+- [Your first context](./03-your-first-context) — five-minute working example.
+- [Define a context](../guides/define-a-context) — patterns for typed contexts.

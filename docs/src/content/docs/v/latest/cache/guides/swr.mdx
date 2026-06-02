@@ -1,0 +1,179 @@
+---
+title: "Stale-While-Revalidate"
+slug: v/latest/cache/swr
+---
+
+`cache.swr(key, options, fn)` is the cache pattern you reach for when a slow upstream shouldn't make a fast endpoint slow. It returns the cached value immediately whenever it can, refreshes in the background when the value is *getting* old, and only blocks for a fresh fetch when the entry is fully expired.
+
+## The problem it solves
+
+```ts
+// remember(): every miss blocks every caller until the upstream responds
+const product = await cache.remember("product.42", "1h", () =>
+  db.products.find(42),
+);
+```
+
+If the upstream takes 800ms, every cache-miss request takes 800ms. With SWR:
+
+```ts
+const product = await cache.swr(
+  "product.42",
+  { freshTtl: "1m", staleTtl: "1h" },
+  () => db.products.find(42),
+);
+```
+
+The first call still blocks (you have to fetch *something*). After that, **every read for an hour returns instantly**. Within the first minute it's "fresh." Between 1 minute and 1 hour it's "stale" — you get the cached value while the cache refreshes in the background. Past an hour it falls back to a normal miss.
+
+## Three windows, three behaviors
+
+```
+   write              freshTtl              staleTtl
+     │                    │                    │
+     ▼                    ▼                    ▼
+─────┬──── fresh ─────────┬──── stale ─────────┬──── expired ──→
+     │  return cached     │  return cached +   │  block, refetch
+     │  no upstream call  │  bg refresh        │  like a miss
+```
+
+| Window | What happens |
+|---|---|
+| `now < freshTtl` | Return cached value. No upstream call. |
+| `freshTtl <= now < staleTtl` | Return cached value immediately. Kick off `fn()` in the background; the next read sees the refreshed value. |
+| `now >= staleTtl` | Block on `fn()`. Same behavior as `remember()`. |
+
+## Concurrent callers share one refresh
+
+When 100 requests hit the same stale key at once, only one runs `fn()`. The other 99 all return the cached value instantly. No thundering herd.
+
+## Background refresh failures don't break callers
+
+If the upstream is down when the background refresh runs, the stale entry is preserved and an `error` event is emitted. The caller that triggered the refresh already got their (stale) data — they never see the failure. The next stale-window read tries again.
+
+```ts
+cache.on("error", ({ key, error }) => {
+  logger.warn(`SWR refresh failed for ${key}`, error);
+});
+```
+
+This is a deliberate design choice: SWR optimizes for "the user always gets a response." A failed refresh is observability work, not a user-facing error.
+
+## When to choose SWR over `remember()`
+
+| Scenario | Use |
+|---|---|
+| The upstream is fast and freshness matters | `remember()` |
+| The upstream is slow and slightly-stale data is acceptable | `swr()` |
+| You want zero p99 spikes on cache misses | `swr()` |
+| You're caching a function with a strict accuracy requirement (auth, balances, billing) | `remember()` |
+| You're caching read-heavy data that changes occasionally | `swr()` |
+
+The shape of your `freshTtl` / `staleTtl` encodes how much staleness your product can tolerate. Tight pair (`freshTtl: "1m", staleTtl: "5m"`) keeps things fresh; wide pair (`freshTtl: "10m", staleTtl: "24h"`) prioritizes availability.
+
+## Tags work the same as everywhere else
+
+```ts
+await cache.swr(
+  `user.${id}.feed`,
+  { freshTtl: "30s", staleTtl: "10m", tags: [`user.${id}`, "feeds"] },
+  () => buildFeed(id),
+);
+
+// Later — bulk invalidation
+await cache.tags(["feeds"]).invalidate();
+```
+
+Tags attach on the first miss-fetch and on every successful background refresh.
+
+## Through scoped caches
+
+`cache.namespace()` works with SWR; scope tags merge additively with per-call tags:
+
+```ts
+const feed = cache.namespace(`feed.${userId}`, { tags: [`user.${userId}`] });
+
+await feed.swr(
+  "home",
+  { freshTtl: "30s", staleTtl: "10m", tags: ["computed"] },
+  () => buildHomeFeed(userId),
+);
+// Stored at feed.<userId>.home, tagged [user.<userId>, computed]
+```
+
+Note: scope-level `ttl` defaults are NOT applied to SWR — `freshTtl` / `staleTtl` always come from the call site. The SWR shape is too specific to inherit.
+
+## Per-call driver override
+
+Same pattern as `remember()` and `set()`:
+
+```ts
+await cache.swr(
+  "expensive-report",
+  { freshTtl: "5m", staleTtl: "1h", driver: "redis" },
+  () => buildReport(),
+);
+```
+
+## Driver support
+
+| Driver | Background refresh | Notes |
+|---|---|---|
+| memory, memoryExtended | ✅ Full | |
+| lru | ✅ Full | |
+| file | ✅ Full | |
+| redis | ✅ Full | Uses a sidecar key (`__swrmeta:<key>`) for freshness tracking — keeps existing entry shapes backwards-compatible. |
+| pg | ✅ Full | Persists freshness in a `stale_at TIMESTAMPTZ` column on the cache table. Run `driver.schema()` once via your migration tool to provision it. |
+| mock | ✅ Full | |
+| null | ❌ Always-fetch | Null driver caches nothing, so every SWR call blocks on `fn()`. |
+
+## Common patterns
+
+### Product detail pages
+
+```ts
+async function getProduct(id: string) {
+  return cache.swr(
+    `product.${id}`,
+    { freshTtl: "1m", staleTtl: "1h" },
+    () => db.products.findById(id),
+  );
+}
+```
+
+Most product reads return instantly from cache. Stock prices and counts may be 1 minute stale, never more than 1 hour old — the catalog page never blocks waiting on the database.
+
+### Expensive aggregations / dashboards
+
+```ts
+async function dashboardKPIs(tenantId: string) {
+  return cache.swr(
+    `dashboard.${tenantId}.kpis`,
+    { freshTtl: "5m", staleTtl: "1h" },
+    () => computeKPIs(tenantId),
+  );
+}
+```
+
+The aggregation runs at most once every 5 minutes per tenant, even if 1000 users open the dashboard simultaneously.
+
+### Third-party API responses
+
+```ts
+async function getExchangeRates() {
+  return cache.swr(
+    "exchange.rates",
+    { freshTtl: "10m", staleTtl: "24h" },
+    () => fetchFromForexAPI(),
+  );
+}
+```
+
+If the upstream API is down, you keep serving the last successful rates for up to 24 hours. The `error` event tells your monitoring something is wrong without breaking the response.
+
+## Related
+
+- [`cache.remember()`](/v/latest/cache/cache-manager/#remember-get-or-compute) — block-until-fresh sibling.
+- [Stampede Prevention](/v/latest/cache/stampede-prevention/) — broader cache-miss defenses including distributed locks.
+- [Tags](/v/latest/cache/tags/) — group entries for bulk invalidation.
+- [Event System](/v/latest/cache/events/) — listen for `error` to monitor refresh failures.

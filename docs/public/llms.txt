@@ -1,0 +1,32 @@
+# Warlock.js
+
+> A modern, batteries-included TypeScript backend framework for Node.js. Warlock
+> ships an integrated ecosystem — HTTP, ORM (Cascade), validation (Seal), cache,
+> auth, logging, scheduling, messaging (Herald), and AI — built to work together
+> with first-class type-safety and a clean, convention-driven developer experience.
+
+Documentation: https://warlock.js.org
+
+## Packages
+
+- [@warlock.js/core](https://warlock.js.org/v/latest/core/): A robust nodejs framework for building blazing fast applications
+- [@warlock.js/cascade](https://warlock.js.org/v/latest/cascade/): ORM for managing databases
+- [@warlock.js/seal](https://warlock.js.org/v/latest/seal/): Comprehensive Validation library
+- [@warlock.js/cache](https://warlock.js.org/v/latest/cache/): A Robust Cache Manager for Nodejs
+- [@warlock.js/fs](https://warlock.js.org/v/latest/fs/): Filesystem primitives for Warlock.js â€” drop-in replacement for @warlock.js/fs.
+- [@warlock.js/logger](https://warlock.js.org/v/latest/logger/): A powerful logging system  for messages and errors in nodejs.
+- [@warlock.js/scheduler](https://warlock.js.org/v/latest/scheduler/): A simple scheduler package to run jobs in scheduled times
+- [@warlock.js/auth](https://warlock.js.org/v/latest/auth/): Authentication system for Warlock.js applications
+- [@warlock.js/context](https://warlock.js.org/v/latest/context/): A simple and unified way to share context using AsyncLocalStorage for the Warlock.js framework
+- [@warlock.js/herald](https://warlock.js.org/v/latest/herald/): Message bus/brokers for RabbitMQ, Kafka, and more
+- [@warlock.js/ai](https://warlock.js.org/v/latest/ai/): Core @warlock.js AI framework — contracts, agent, workflow, supervisor
+- [@warlock.js/ai-openai](https://warlock.js.org/v/latest/ai/providers/openai/): OpenAI SDK adapter for @warlock.js/ai
+- [@warlock.js/ai-anthropic](https://warlock.js.org/v/latest/ai/providers/anthropic/): Anthropic SDK adapter for @warlock.js/ai
+- [@warlock.js/ai-google](https://warlock.js.org/v/latest/ai/providers/google/): Google Gemini adapter for @warlock.js/ai
+- [@warlock.js/ai-bedrock](https://warlock.js.org/v/latest/ai/providers/bedrock/): AWS Bedrock adapter for @warlock.js/ai
+- [@warlock.js/ai-ollama](https://warlock.js.org/v/latest/ai/providers/ollama/): Ollama adapter for @warlock.js/ai
+- [create-warlock](https://warlock.js.org/v/latest/create-warlock/): Project scaffolder for the Warlock.js framework — interactive wizard and non-interactive CLI for creating new apps.
+
+## Full text
+
+- [llms-full.txt](https://warlock.js.org/llms-full.txt): The complete documentation for every package, concatenated into a single file.

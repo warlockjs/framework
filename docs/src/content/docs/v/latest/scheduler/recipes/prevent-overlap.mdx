@@ -1,0 +1,106 @@
+---
+title: "Prevent Overlapping Runs of a Long Job"
+sidebar:
+  order: 3
+---
+
+You have a job that drains a queue, and some nights the queue is huge —
+the run takes twelve minutes even though the job is scheduled every five.
+You do not want a second drain starting on top of the first and
+double-processing items. `preventOverlap()` is the guard.
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+scheduler.addJob(
+  job("drain-queue", async () => {
+    await queue.processAllPending(); // can run long
+  })
+    .everyMinutes(5)
+    .preventOverlap(),
+);
+
+scheduler.start();
+```
+
+## First, the good news you might not expect
+
+Here is the thing worth understanding before you reach for this method:
+**the scheduler already waits for each tick's jobs to finish before it
+schedules the next tick.** A single `drain-queue` started by the
+scheduler's own loop can never have a second copy started by that same
+loop — the loop is busy awaiting the first one. If the only thing that
+ever calls your job is the scheduler, `preventOverlap()` changes
+nothing.
+
+So when does overlap actually happen? When the job's callback is
+triggered from **outside** the scheduler loop while a run is in flight:
+
+- a boot-time recovery sweep that calls `job.run()` directly before
+  normal scheduling kicks in;
+- an admin "run it now" button wired to `job.run()`;
+- a second `Scheduler` instance pointed at the same `Job`.
+
+`preventOverlap()` is what makes the scheduler's tick **stand down** when
+it lands mid-flight on one of those external runs, instead of starting a
+duplicate.
+
+## The boot-sweep shape
+
+This is the most common reason the recipe earns its keep — kick the
+queue once at startup so you do not wait five minutes for the first
+drain, *and* schedule it normally:
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+const drainJob = job("drain-queue", drainQueueOnce)
+  .everyMinutes(5)
+  .preventOverlap();
+
+scheduler.addJob(drainJob);
+
+// Boot sweep — fire immediately, don't wait for the first tick.
+drainJob.run().catch((error) => {
+  console.error("boot sweep failed", error);
+});
+
+scheduler.start();
+```
+
+If that boot sweep runs long and the first scheduled tick arrives while
+it is still going, the tick is skipped instead of stacking a second
+drain on top.
+
+## Seeing the skip
+
+When a tick stands down, the scheduler emits `job:skip` with the reason
+`"Job is already running"`. Log it so a frequently-skipping job (a sign
+your interval is too tight for the work) is visible:
+
+```ts
+scheduler.on("job:skip", (name, reason) => {
+  console.warn(`${name} skipped: ${reason}`);
+});
+```
+
+## Turning it back off
+
+`preventOverlap()` defaults the flag to `true`. Pass `false` to undo it
+if some earlier code in a builder chain enabled it:
+
+```ts
+job("task", fn).everyMinute().preventOverlap(false);
+```
+
+## One honest caveat
+
+If a run hangs forever, `isRunning` stays `true` forever, and an
+overlap-protected job will then **never run again** — the guard keeps
+skipping it. There is no built-in per-job timeout to break a hung run
+yet; it is a [tracked backlog item](https://github.com/warlockjs/scheduler).
+Until then, make sure long jobs have their own internal timeouts (e.g.
+an `AbortController` on the HTTP calls they make).
+
+For the deeper rationale and the graceful-shutdown interaction, see the
+[Overlap Prevention guide](../guides/overlap-prevention/).

@@ -1,0 +1,64 @@
+---
+title: Auth
+description: Authentication for Warlock — registration, login, JWT tokens, route protection, custom user shapes.
+---
+
+`@warlock.js/auth` is the identity layer for Warlock apps. It handles
+the lifecycle of a user end-to-end: registration, login + logout, token
+issuance and rotation, and route protection.
+
+`auth` is the only `@warlock.js/*` package that's not standalone — it
+depends on `@warlock.js/core` for HTTP and module conventions.
+
+Gate any route with one middleware — `request.user` arrives hydrated, no token decoding in your handler:
+
+```ts
+import { authMiddleware } from "@warlock.js/auth";
+import { router } from "@warlock.js/core";
+
+router.get("/me", (request, response) => response.success({ user: request.user }), {
+  middleware: [authMiddleware("user")],
+});
+```
+
+Your `User` is a model that extends `Auth`, so it inherits the whole identity lifecycle — `authService.login()` verifies credentials and issues an access + refresh pair, registration hashes the password, logout revokes sessions:
+
+```ts
+import { Auth } from "@warlock.js/auth";
+import { RegisterModel } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
+
+const userSchema = v.object({
+  email: v.string().email().required(),
+  name: v.string().required(),
+  password: v.string().required(),
+});
+
+@RegisterModel()
+export class User extends Auth<typeof userSchema> {
+  public static table = "users";
+  public static schema = userSchema;
+  public static toJsonColumns = ["id", "email", "name"]; // never leak the password hash
+  public get userType() {
+    return "user";
+  }
+}
+```
+
+## What it gives you
+
+- **User registration** — typed signup flows with field validation.
+- **Login + logout** — credential checks, session establishment,
+  graceful sign-out.
+- **Token management** — JWT issuance, rotation, revocation; the
+  scaffolder can generate the signing keys for you.
+- **Route protection** — middleware that gates routes by authenticated
+  user (or by custom guard).
+- **Custom user types** — model your user with whatever fields your
+  domain needs; the framework hooks pick up the right shape via
+  generics.
+- **CLI commands** — auth-related generators wired into `warlock`.
+
+---
+
+Ready to add auth? **[Get started →](./getting-started/01-introduction/)** — install, configure, and protect your first route in a few minutes.

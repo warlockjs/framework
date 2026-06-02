@@ -1,0 +1,22 @@
+---
+title: Create Warlock
+description: The official project scaffolder — one command spins up a complete, configured Warlock app in a couple of minutes.
+---
+
+`create-warlock` is the official project scaffolder. One command drops you into a short interactive wizard, and a couple of questions later you have a complete, configured Warlock project that boots.
+
+```bash
+npm create warlock@latest my-app
+# or:  yarn create warlock my-app  ·  pnpm create warlock my-app
+cd my-app
+```
+
+The wizard asks a few questions — project name, package manager, database driver, the optional features you want (mail, caching, the scheduler, storage, and friends), and whether to initialize git and generate JWT secrets — then writes everything from your answers and runs the install for you. Scripting it in CI? Pass `--yes` with flags to skip the prompts and take the defaults.
+
+What lands is a ready-to-run app: the `src/app` (one folder per feature) + `src/config` (one file per subsystem) layout, a `warlock.config.ts`, decorators already enabled in `tsconfig.json`, and a dev server you start with `npm run dev`.
+
+## Where to go next
+
+- **Full walkthrough** → [Core · Installation](/v/latest/core/getting-started/02-installation/) — every question, the scaffolded file tree, and booting the dev server, step by step.
+- **Your first endpoint** → [Core · Getting Started](/v/latest/core/getting-started/01-introduction/) — from a fresh project to a working route.
+- **Scaffold as you build** → [Core · Generators](/v/latest/core/cli/generators/) — `warlock generate.module`, `generate.controller`, and the rest of the family.

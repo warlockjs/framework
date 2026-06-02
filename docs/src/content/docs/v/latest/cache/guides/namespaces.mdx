@@ -1,0 +1,307 @@
+---
+title: "Namespaces"
+slug: v/latest/cache/namespaces
+---
+
+Namespaces organize cache keys hierarchically using dot notation. A namespace is a prefix that groups related entries — for example, `"orders.123"` and `"orders.123.items"` belong to the `orders.123` namespace. This lets you invalidate all related cache entries at once.
+
+## Basic Usage
+
+Use dot notation to create namespaces:
+
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+// Store items in a namespace
+await cache.set("users.1", { id: 1, name: "Alice" }, CACHE_FOR.ONE_HOUR);
+await cache.set("users.2", { id: 2, name: "Bob" }, CACHE_FOR.ONE_HOUR);
+await cache.set("users.list", [{ id: 1 }, { id: 2 }], CACHE_FOR.ONE_HOUR);
+```
+
+All three keys belong to the `users` namespace because they start with `"users."`.
+
+## Scoped handles with `cache.namespace()`
+
+Once you touch the same prefix more than a couple of times, repeating it gets old:
+
+```ts
+await cache.set(`chats.${id}.messages.10`, msg, CACHE_FOR.ONE_DAY);
+await cache.get(`chats.${id}.messages.10`);
+await cache.remove(`chats.${id}.draft`);
+await cache.removeNamespace(`chats.${id}`);
+```
+
+`cache.namespace(prefix, options?)` returns a **scoped handle** — same surface as `cache`, but every key is automatically prefixed and every write picks up scope-level defaults.
+
+```ts
+const chat = cache.namespace(`chats.${id}`, { ttl: "30d" });
+
+await chat.set("messages.10", msg);          // → chats.<id>.messages.10, 30d TTL
+await chat.get("messages.10");
+await chat.remove("draft");
+await chat.clear();                           // sugar for removeNamespace
+```
+
+The scope stores nothing of its own — it's a thin view over `cache` that prepends the prefix and forwards every call. You can grab as many as you like; they share the same underlying driver and connection.
+
+### Scope-level defaults
+
+Pass an options object as the second argument to set defaults that flow through every write inside the scope:
+
+```ts
+const chat = cache.namespace(`chats.${id}`, {
+  ttl: "30d",                 // default TTL for every set/remember/setMany
+  tags: [`user.${userId}`],   // tags auto-attached to every write
+});
+
+await chat.set("messages.10", msg);
+// → key: chats.<id>.messages.10
+// → ttl: 30d
+// → tags: ["user.<userId>"]
+```
+
+**Per-call options always win over scope defaults.** Tags merge additively — scope tags + per-call tags, deduped. `expiresAt` skips the scope default since it's an absolute timestamp.
+
+```ts
+await chat.set("draft", d, { ttl: "1h" });           // 1h, not 30d
+await chat.set("ad", a, { tags: ["sponsored"] });    // user.<id> + sponsored
+```
+
+### Nested scopes
+
+Scopes compose. The child inherits the parent's defaults; child values override `ttl` and union into `tags`:
+
+```ts
+const chat = cache.namespace(`chats.${id}`, { ttl: "30d" });
+const messages = chat.namespace("messages");                 // inherits 30d
+const typing = chat.namespace("typing", { ttl: "5s" });      // overrides
+
+await messages.set("10", msg);    // chats.<id>.messages.10, 30d
+await typing.set("user.42", true); // chats.<id>.typing.user.42, 5s
+```
+
+### Clearing a scope
+
+`scope.clear()` is sugar for `cache.removeNamespace(scope.prefix)` — wipes everything under the scope's prefix without touching siblings:
+
+```ts
+await chat.clear();                  // removes chats.<id>.*
+await cache.get(`chats.${otherId}`); // ← untouched
+```
+
+### Tags on a scope
+
+Combine the scope's tags with per-call tags via `scope.tags([...])` — same one-shot pattern as `cache.tags(...)`, except the scope's prefix and default tags still flow through:
+
+```ts
+const feed = cache.namespace(`feed.${userId}`, { tags: [`user.${userId}`] });
+
+await feed.tags(["unread"]).set("messages.1", msg);
+// stored at feed.<userId>.messages.1
+// tagged with [user.<userId>, unread]
+
+await feed.tags(["unread"]).invalidate();
+// invalidates everything tagged with the union — both the scope's user tag
+// and the handle's "unread" tag.
+```
+
+### When scopes win over inline prefixes
+
+Use `cache.namespace()` when:
+- You touch the same prefix more than two or three times.
+- You want a single TTL or tag policy across a logical boundary (one chat, one tenant, one user).
+- You want `.clear()` to read like the intent ("clear this chat") rather than `removeNamespace(...)` boilerplate.
+
+Stick with inline prefixes when you write to the namespace exactly once. The scope earns its keep through repetition.
+
+## Removing Namespaces
+
+Clear all keys in a namespace at once. After a user places an order, invalidate all cached order data for that user:
+
+```ts
+const userId = 42;
+await cache.removeNamespace(`orders.${userId}`);
+// This removes: orders.42, orders.42.items, orders.42.summary, etc.
+```
+
+Removing a namespace is more efficient than removing keys individually.
+
+## Real-World Example
+
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+class UserService {
+  async getUser(id: number) {
+    // Cache individual user
+    return await cache.remember(`users.${id}`, CACHE_FOR.ONE_HOUR, async () => {
+      return await db.users.findById(id);
+    });
+  }
+
+  async getUserPosts(userId: number) {
+    // Cache user's posts
+    return await cache.remember(`users.${userId}.posts`, CACHE_FOR.ONE_HOUR, async () => {
+      return await db.posts.findByUserId(userId);
+    });
+  }
+
+  async getUserSettings(userId: number) {
+    // Cache user's settings
+    return await cache.remember(`users.${userId}.settings`, CACHE_FOR.ONE_DAY, async () => {
+      return await db.settings.findByUserId(userId);
+    });
+  }
+
+  async updateUser(id: number, data: any) {
+    // Update in database
+    await db.users.update(id, data);
+    
+    // Invalidate all user-related cache
+    await cache.removeNamespace(`users.${id}`);
+    // This removes: users.1, users.1.posts, users.1.settings, etc.
+    
+    // Also invalidate the users list if it exists
+    await cache.remove("users.list");
+  }
+}
+```
+
+## Nested Namespaces
+
+You can create nested namespaces for more granular organization:
+
+```ts
+// Top-level namespace: users
+await cache.set("users.1", user1);
+
+// Nested namespace: users.1.posts
+await cache.set("users.1.posts", posts1);
+await cache.set("users.1.posts.123", post123);
+
+// Nested namespace: users.1.settings
+await cache.set("users.1.settings", settings1);
+```
+
+When you remove `users.1`, it only removes keys starting with `users.1.`, not the entire `users` namespace.
+
+## Best Practices
+
+### Use Dot Notation
+
+```ts
+// Clear namespace structure
+await cache.set("users.1", userData);
+await cache.set("posts.123", postData);
+await cache.set("posts.123.comments", comments);
+```
+
+### Avoid Colons or Other Separators
+
+```ts
+// Colons break the namespace concept
+await cache.set("users:1", userData); // Not recommended
+await cache.set("users:1:posts", posts); // Confusing
+```
+
+### Organize by Resource Type
+
+```ts
+// Group related resources
+await cache.set("users.1", user);
+await cache.set("users.1.profile", profile);
+await cache.set("users.1.settings", settings);
+await cache.set("posts.123", post);
+await cache.set("posts.123.comments", comments);
+```
+
+### Invalidate Strategically
+
+```ts
+// When user updates, clear their namespace
+await cache.removeNamespace(`users.${userId}`);
+
+// When post is deleted, clear its namespace
+await cache.removeNamespace(`posts.${postId}`);
+
+// When all users need refresh, clear top-level namespace
+await cache.removeNamespace("users");
+```
+
+## Namespaces vs Cache Tags
+
+Both namespaces and [cache tags](/v/latest/cache/tags/) help organize cache, but they serve different purposes:
+
+| Feature | Namespaces | Cache Tags |
+|---------|------------|------------|
+| **Purpose** | Hierarchical organization | Logical grouping |
+| **Structure** | Based on key prefix (`users.1`) | Independent labels (`["user", "posts"]`) |
+| **Invalidation** | `removeNamespace()` removes keys with prefix | `invalidate()` removes keys with matching tags |
+| **Use Case** | Organize by resource hierarchy | Group unrelated keys by concept |
+
+### When to Use Namespaces
+
+- Organizing by resource hierarchy (user → posts → comments)
+- When keys naturally follow a prefix pattern
+- Simple, predictable invalidation by prefix
+
+### When to Use Tags
+
+- Grouping unrelated keys by concept (all "user-related" cache)
+- Complex invalidation scenarios
+- Keys that don't share a prefix but are logically related
+
+## Examples
+
+### E-commerce Application
+
+```ts
+// Products
+await cache.set("products.123", product, CACHE_FOR.ONE_DAY);
+await cache.set("products.123.reviews", reviews, CACHE_FOR.ONE_HOUR);
+await cache.set("products.123.inventory", inventory, CACHE_FOR.HALF_HOUR);
+
+// Orders
+await cache.set("orders.456", order, CACHE_FOR.ONE_HOUR);
+await cache.set("orders.456.items", orderItems, CACHE_FOR.ONE_HOUR);
+
+// When product updates
+await cache.removeNamespace("products.123");
+
+// When order completes
+await cache.removeNamespace("orders.456");
+```
+
+### Blog Application
+
+```ts
+// Posts
+await cache.set("posts.789", post, CACHE_FOR.ONE_DAY);
+await cache.set("posts.789.author", author, CACHE_FOR.ONE_DAY);
+await cache.set("posts.789.comments", comments, CACHE_FOR.ONE_HOUR);
+
+// Categories
+await cache.set("categories.tech", category, CACHE_FOR.ONE_WEEK);
+await cache.set("categories.tech.posts", categoryPosts, CACHE_FOR.ONE_HOUR);
+```
+
+## Global Prefix vs Namespaces
+
+Both help organize keys, but serve different purposes:
+
+- **Global Prefix**: Separates your application's keys from other applications (e.g., `myapp.users.1`)
+- **Namespaces**: Organizes keys within your application (e.g., `users.1`, `users.2`)
+
+Use both together:
+```ts
+// With globalPrefix: "myapp"
+// Key "users.1" becomes "myapp.users.1"
+await cache.set("users.1", userData);
+```
+
+## Related Documentation
+
+- [Cache Manager](/v/latest/cache/cache-manager/) - Basic operations and driver management
+- [Cache Tags](/v/latest/cache/tags/) - Alternative grouping method with tags
+- [Cache Keys Best Practices](/v/latest/cache/cache-manager/#cache-keys) - Key naming conventions
+

@@ -1,0 +1,167 @@
+---
+/**
+ * Side-by-side code preview showing Warlock's elegance.
+ * Two cards: an HTTP route and an AI agent — same shape, same brevity.
+ */
+import { Code } from "@astrojs/starlight/components";
+
+const routeSnippet = `import { router } from "@warlock.js/core";
+import { listProducts } from "./controllers/list-products.controller";
+
+router.get("/products", listProducts);`;
+
+const agentSnippet = `import { ai } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
+
+const supportAgent = ai.agent({
+  model: openai.model({ name: "gpt-4o-mini" }),
+  systemPrompt: "You are a concise senior engineer.",
+});
+
+const { text } = await supportAgent.execute("Why use generics?");`;
+---
+
+<section class="warlock-showcase">
+  <div class="warlock-section-head">
+    <p class="warlock-section-kicker">[ Same shape, different layer ]</p>
+    <h2 class="warlock-section-title">Backends and AI on the same primitives</h2>
+    <p class="warlock-section-sub">
+      No bolted-on AI. No different mental model for the AI layer. An agent
+      is just another piece of code with typed inputs and outputs.
+    </p>
+  </div>
+
+  <div class="warlock-showcase-grid">
+    <article class="warlock-showcase-card">
+      <header class="warlock-showcase-head">
+        <span class="warlock-showcase-tag">HTTP route</span>
+        <span class="warlock-showcase-file">src/app/products/routes.ts</span>
+      </header>
+      <Code code={routeSnippet} lang="ts" />
+      <p class="warlock-showcase-note">
+        One line registers a route. The controller, validation, response
+        helpers, and module conventions live in
+        <a href="/v/latest/core/the-basics/02-routing/">core</a>.
+      </p>
+    </article>
+
+    <article class="warlock-showcase-card">
+      <header class="warlock-showcase-head">
+        <span class="warlock-showcase-tag">AI agent</span>
+        <span class="warlock-showcase-file">src/app/support/agents/triage.ts</span>
+      </header>
+      <Code code={agentSnippet} lang="ts" />
+      <p class="warlock-showcase-note">
+        Pick a provider, define an agent, call it. Tools, retries,
+        structured output, and middleware live in
+        <a href="/v/latest/ai/">ai</a>.
+      </p>
+    </article>
+  </div>
+</section>
+
+<style>
+  .warlock-showcase {
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: clamp(3rem, 4rem + 2vw, 5rem) clamp(1.25rem, 4vw, 2.5rem);
+  }
+
+  .warlock-showcase-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    margin-block-start: 2.5rem;
+  }
+
+  @media (min-width: 60rem) {
+    .warlock-showcase-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+  }
+
+  .warlock-showcase-card {
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--warlock-radius);
+    background-color: var(--warlock-surface-dark);
+    overflow: hidden;
+    transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  :root[data-theme="light"] .warlock-showcase-card {
+    background-color: #ffffff;
+  }
+
+  .warlock-showcase-card:hover {
+    border-color: color-mix(in srgb, var(--sl-color-text-accent) 50%, var(--sl-color-hairline));
+    transform: translateY(-2px);
+  }
+
+  .warlock-showcase-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
+    font-family: var(--sl-font-mono);
+    font-size: 0.75rem;
+  }
+
+  .warlock-showcase-tag {
+    color: var(--sl-color-text-accent);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .warlock-showcase-file {
+    color: var(--sl-color-gray-3);
+    font-weight: 500;
+  }
+
+  .warlock-showcase-card :global(.expressive-code) {
+    margin: 0 !important;
+  }
+
+  .warlock-showcase-card :global(.expressive-code .frame) {
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Ensure code shrinks to fit the card — no overflow into adjacent. */
+  .warlock-showcase-card :global(.expressive-code pre) {
+    font-size: 0.78rem !important;
+    line-height: 1.55 !important;
+  }
+
+  .warlock-showcase-card :global(.expressive-code pre code) {
+    white-space: pre;
+  }
+
+  /* Side-scroll the code rather than letting it overflow the card. */
+  .warlock-showcase-card :global(.expressive-code .copy) {
+    top: 0.35rem !important;
+    right: 0.35rem !important;
+  }
+
+  .warlock-showcase-note {
+    padding: 1rem;
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.55;
+    color: var(--sl-color-gray-2);
+    border-top: 1px solid var(--sl-color-hairline);
+  }
+
+  .warlock-showcase-note a {
+    color: var(--sl-color-text-accent);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--sl-color-text-accent) 40%, transparent);
+    text-underline-offset: 3px;
+  }
+</style>

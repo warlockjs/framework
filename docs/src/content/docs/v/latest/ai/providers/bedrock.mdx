@@ -1,0 +1,179 @@
+---
+title: Bedrock provider
+description: AWS Bedrock provider adapter for @warlock.js/ai — Claude, Llama, Titan, and other Bedrock-hosted models.
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+> Standalone — usable in any Node project, no `@warlock.js/core` required.
+
+`@warlock.js/ai-bedrock` is the AWS Bedrock provider adapter for
+[`@warlock.js/ai`](/v/latest/ai/). It speaks Bedrock's **Converse API** —
+the model-agnostic surface — so one wire mapping covers every
+Bedrock-hosted family (Anthropic Claude, Amazon Nova, Meta Llama,
+Mistral, Cohere) and hands it all back as a vendor-neutral
+`ModelContract`. Auth uses your AWS credentials, exactly like any other
+AWS SDK call.
+
+## Install
+
+<Tabs syncKey="pm">
+  <TabItem label="npm">
+    ```bash
+    npm install @warlock.js/ai @warlock.js/ai-bedrock
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn add @warlock.js/ai @warlock.js/ai-bedrock
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm add @warlock.js/ai @warlock.js/ai-bedrock
+    ```
+  </TabItem>
+</Tabs>
+
+## Construct
+
+One `BedrockSDK` holds one live `BedrockRuntimeClient`. Build it once
+per account/region and reuse it everywhere — every model and embedder
+it produces shares the same client, credential refresh, and retry
+config.
+
+```ts
+import { BedrockSDK } from "@warlock.js/ai-bedrock";
+
+const bedrock = new BedrockSDK({
+  region: "us-east-1",
+  // Standard AWS SDK credential resolution — env vars, ~/.aws/credentials,
+  // IAM role on EC2/ECS, SSO. Pass explicit credentials only if needed.
+});
+```
+
+`region` is the one required field. The whole config object is forwarded
+straight to `BedrockRuntimeClient`, so any client option works — explicit
+`credentials`, a custom `endpoint`, a `requestHandler`, retry settings.
+`provider` relabels the upstream (defaults to `"bedrock"`).
+
+```ts
+const bedrock = new BedrockSDK({
+  region: "us-east-1",
+  credentials: { accessKeyId: "AKIA...", secretAccessKey: "..." },
+});
+```
+
+## First call
+
+Build a model, hand it to an agent, run it. `execute()` never throws —
+failures land in `error` as a typed `AIError`.
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { BedrockSDK } from "@warlock.js/ai-bedrock";
+
+const bedrock = new BedrockSDK({ region: "us-east-1" });
+
+const assistant = ai.agent({
+  model: bedrock.model({ name: "anthropic.claude-sonnet-4-5-20250929-v1:0" }),
+  systemPrompt: "You are a concise senior TypeScript engineer.",
+});
+
+const { text, usage, error } = await assistant.execute("Why use generics?");
+
+if (error) {
+  console.warn(error.code, error.category);
+} else {
+  console.log(text, usage.total);
+}
+```
+
+## Use as a model
+
+`name` is the Bedrock model id or inference-profile id — Claude, Nova,
+Llama, and friends all go through the same call.
+
+```ts
+bedrock.model({ name: "anthropic.claude-sonnet-4-5-20250929-v1:0" });
+bedrock.model({ name: "us.amazon.nova-pro-v1:0" });
+bedrock.model({ name: "meta.llama3-1-8b-instruct-v1:0" });
+```
+
+## Use as an embedder
+
+The embedder targets the **Amazon Titan Text Embeddings** family
+(`amazon.titan-embed-text-v2:0` and v1) via Bedrock's `InvokeModel`.
+
+```ts
+const embedder = bedrock.embedder({ name: "amazon.titan-embed-text-v2:0" });
+const { vector } = await embedder.embed("Hello world");
+const { vectors } = await embedder.embedMany(["doc 1", "doc 2"]);
+```
+
+Titan v2 supports output truncation — pass `dimensions` (256 / 512 /
+1024) and the adapter forwards it:
+
+```ts
+bedrock.embedder({ name: "amazon.titan-embed-text-v2:0", dimensions: 256 });
+```
+
+> **Titan has no batch endpoint.** Its `InvokeModel` body accepts one
+> `inputText` per call, so `embedMany` issues one request per input
+> sequentially and aggregates token usage. For high-throughput batch
+> embedding, reach for the
+> [OpenAI](/v/latest/ai/providers/openai/) or
+> [Google](/v/latest/ai/providers/google/) adapter, which batch natively.
+
+## Capabilities
+
+- **Tool calling** — vendor-neutral `ToolConfig`s map to Converse
+  `toolUse` blocks; results round-trip back as `toolResult` blocks on a
+  `user` turn.
+- **Streaming** — `stream()` runs ConverseStream and yields text
+  `delta`s, a `tool-call` once a `toolUse` block's input JSON is
+  complete, and a terminal `done` with the final finish reason and usage.
+- **Structured output** — on by default. A root-object JSON Schema is
+  forwarded to Converse's native `outputConfig.textFormat` (Bedrock
+  wants it as a stringified schema; the adapter handles that). Otherwise
+  it degrades to the agent's soft system-prompt hint plus client-side
+  validation.
+- **Vision** — auto-detected from the model id substring. Multimodal
+  families covered: Anthropic Claude 3 / 3.5 / 3.7 / 4, Amazon Nova
+  Lite/Pro/Premier, Meta Llama 3.2 (11B/90B) and Llama 4. Text-only
+  families (Llama 3/3.1, Titan Text, Mistral 7B, Cohere Command) stay
+  off. Override either way with the `vision` flag.
+- **Embeddings** — Amazon Titan Text Embeddings, single-input (see above).
+
+> **Images must be base64 bytes.** Bedrock Converse has no remote-URL
+> image source — supply inlined `base64` (`image/jpeg`, `image/png`,
+> `image/gif`, `image/webp`). Passing a `{ url }` image raises a typed
+> `InvalidRequestError` upfront rather than a downstream Bedrock fault.
+
+## Pricing and usage
+
+Every response reports token `usage` (`input`, `output`, `total`).
+Bedrock supplies a pre-summed `total`; prompt-cache reads surface as
+`cachedTokens` when present.
+
+Attach a `pricing` registry — keyed by Bedrock model id, in USD per
+million tokens — to turn tokens into money. SDK-level or per-model
+(per-model wins). With pricing set, cost rolls up through every node of
+the `AgentReport`.
+
+```ts
+const bedrock = new BedrockSDK({
+  region: "us-east-1",
+  pricing: {
+    "anthropic.claude-sonnet-4-5-20250929-v1:0": { input: 3, output: 15 },
+  },
+});
+```
+
+Need an offline token estimate? `bedrock.count(text)` returns a fast
+character-heuristic approximation — Bedrock has no offline tokenizer and
+per-model tokenizers differ, so this is for budgeting, not billing.
+
+For the agent/workflow surface these models plug into, see
+[`@warlock.js/ai`](/v/latest/ai/). For provider-specific notes and the
+latest model ids, see the `setup-bedrock` skill.

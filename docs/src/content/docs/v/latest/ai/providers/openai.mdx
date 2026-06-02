@@ -1,0 +1,80 @@
+---
+title: OpenAI provider
+description: OpenAI provider adapter for @warlock.js/ai — works with OpenAI, Azure OpenAI, OpenRouter, and any OpenAI-compatible endpoint.
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+> Standalone — usable in any Node project, no `@warlock.js/core` required.
+
+`@warlock.js/ai-openai` is the OpenAI provider adapter for
+[`@warlock.js/ai`](/v/latest/ai/). It turns OpenAI Chat Completions into
+a vendor-neutral `ModelContract` you pass to any agent, workflow, or
+supervisor.
+
+It also works with **any OpenAI-compatible endpoint** — Azure OpenAI,
+OpenRouter, local LLM gateways — by passing a custom `baseURL`.
+
+## Install
+
+<Tabs syncKey="pm">
+  <TabItem label="npm">
+    ```bash
+    npm install @warlock.js/ai @warlock.js/ai-openai
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn add @warlock.js/ai @warlock.js/ai-openai
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm add @warlock.js/ai @warlock.js/ai-openai
+    ```
+  </TabItem>
+</Tabs>
+
+## Construct
+
+```ts
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
+
+// Or route through an OpenAI-compatible endpoint:
+const openrouter = new OpenAISDK({
+  apiKey: process.env.OPENROUTER_API_KEY!,
+  baseURL: "https://openrouter.ai/api/v1",
+  provider: "openrouter",
+});
+```
+
+## Use as a model
+
+```ts
+const model = openai.model({ name: "gpt-4o-mini" });
+// Pass to any @warlock.js/ai agent / workflow / supervisor.
+```
+
+## Use as an embedder
+
+```ts
+const embedder = openai.embedder({ name: "text-embedding-3-small" });
+const { vector } = await embedder.embed("Hello world");
+```
+
+## Capabilities
+
+- **Structured output** — always on (`response_format: json_schema, strict: true`).
+- **Vision** — auto-detected for `gpt-4o*`, `gpt-4-turbo*`, `gpt-4.1*`,
+  `o1*`, `o3*`, `chatgpt-4o*`. Override with the `vision` flag.
+- **Streaming** — token deltas, tool-call fragments, terminal `done`.
+- **Per-model pricing** — pass a `pricing` map (USD per million tokens)
+  for a cost breakdown in the agent's usage report.
+
+For the full surface (pricing config, streaming caveats, embedding
+dimension truncation, token counting), see the
+`setup-openai` skill.

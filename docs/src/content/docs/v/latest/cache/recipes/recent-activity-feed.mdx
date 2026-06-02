@@ -1,0 +1,75 @@
+---
+title: "Recent-Activity Feed"
+slug: v/latest/cache/recent-activity-feed
+---
+
+A capped "last N events" list — recent activity, notifications, a tail of log
+lines — is a perfect fit for [cache lists](/v/latest/cache/lists/). Push new
+items at the head, trim to a fixed length, and you have an O(1)-ish ring buffer
+that any driver can serve.
+
+## The pattern
+
+Push onto the **head** with `unshift`, then `trim` to the first N. Newest item
+stays at index `0`; anything past the cap falls off the tail:
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+const MAX_ITEMS = 20;
+
+async function recordActivity(userId: number, event: ActivityEvent) {
+  const feed = cache.list<ActivityEvent>(`user.${userId}.activity`);
+
+  await feed.unshift(event);        // newest at the head
+  await feed.trim(0, MAX_ITEMS - 1); // keep the first 20, drop the rest
+}
+```
+
+:::note How `trim` indexes
+`trim(start, end)` keeps the inclusive range `[start, end]` — internally it's a
+`slice(start, end + 1)`. So `trim(0, 19)` keeps the 20 head items. Pair it with
+`unshift` (head = newest) and the feed self-caps on every write.
+:::
+
+## Reading the feed
+
+```ts
+const feed = cache.list<ActivityEvent>(`user.${userId}.activity`);
+
+const latest = await feed.all();          // all (≤ 20) items, newest first
+const topFive = await feed.slice(0, 5);   // first 5, end-exclusive like Array.slice
+const count = await feed.length();
+```
+
+## Clearing a feed
+
+A feed lives until you drop it. Wipe one explicitly when the user logs out or
+clears their notifications:
+
+```ts
+const feed = cache.list<ActivityEvent>(`user.${userId}.activity`);
+
+await feed.clear();   // removes the whole list
+```
+
+:::note Feeds and TTL
+Every list mutation rewrites the backing entry with the driver's **default**
+TTL — `push`/`unshift`/`trim` have no per-call TTL knob. So a feed either never
+expires (default `Infinity`) or slides forward on each write (a finite driver
+default). For deterministic expiry, clear feeds explicitly or on a schedule
+rather than relying on a TTL.
+:::
+
+:::note List performance on Redis
+Lists are stored as a single JSON entry and mutated read-modify-write on
+**every** driver today, including [`redis`](/v/latest/cache/redis/). Native
+Redis list commands (`LPUSH` / `LRANGE` / `LTRIM`) are planned for v2.1 — until
+then, keep feeds modest in size on Redis.
+:::
+
+## Related Documentation
+
+- [Cache Lists](/v/latest/cache/lists/) — the full list accessor API
+- [Choosing a Driver](/v/latest/cache/choosing-a-driver/) — list support per driver
+- [Redis Cache Driver](/v/latest/cache/redis/)

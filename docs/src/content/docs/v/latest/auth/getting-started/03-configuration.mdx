@@ -1,0 +1,135 @@
+---
+title: "Configuration"
+description: The src/config/auth.ts shape — user-type registry, JWT secrets, refresh-token policy, password salt.
+sidebar:
+  order: 3
+  label: "Configuration"
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+Auth's runtime config lives at `src/config/auth.ts`. It is shaped by the `AuthConfigurations` type — import it for IntelliSense.
+
+## The whole config, minimal version
+
+```ts title="src/config/auth.ts"
+import type { AuthConfigurations } from "@warlock.js/auth";
+import { env } from "@warlock.js/core";
+import { User } from "@/app/users/models/user.model";
+
+const authConfig: AuthConfigurations = {
+  userType: {
+    user: User,
+  },
+  jwt: {
+    secret: env("JWT_SECRET"),
+    expiresIn: "1h",
+    refresh: {
+      secret: env("JWT_REFRESH_SECRET"),
+      enabled: true,
+      expiresIn: "30d",
+      rotation: true,
+      maxPerUser: 5,
+    },
+  },
+};
+
+export default authConfig;
+```
+
+## Every option, explained
+
+### `userType` — required
+
+The slug-to-model registry. Each key is a user-type slug; each value is a Cascade model class extending `Auth`.
+
+```ts
+userType: {
+  user: User,
+  admin: Admin,
+  vendor: Vendor,
+}
+```
+
+Every token carries its slug; the middleware looks it up here to hydrate the right model. The slug appears in the `user_type` column on `access_tokens` + `refresh_tokens` rows.
+
+See [Customize user type](../guides/customize-user-type.md) for the multi-user-type model.
+
+### `jwt.secret` — required
+
+The signing key for access tokens. Pull it from `env("JWT_SECRET")` — never hard-code it.
+
+### `jwt.algorithm`
+
+The signing algorithm passed to `fast-jwt`. Default: `"HS256"`. Accepts any `Algorithm` value from `fast-jwt`. Most apps stay on the default.
+
+### `jwt.expiresIn`
+
+Access-token lifetime, as a `ms` package string (`"1h"`, `"15m"`, `"7d"`). Default: `"1h"`.
+
+For "never expires", use the exported sentinel:
+
+```ts
+import { NO_EXPIRATION } from "@warlock.js/auth";
+
+jwt: {
+  secret: env("JWT_SECRET"),
+  expiresIn: NO_EXPIRATION,  // resolves to "100y"
+}
+```
+
+`NO_EXPIRATION` is `"100y"` — practically forever. Useful for service tokens; almost never right for end-user access tokens.
+
+### `jwt.refresh.secret`
+
+Separate signing key for refresh tokens. Generated alongside `JWT_SECRET` by `warlock jwt.generate`. Keeping it distinct from `jwt.secret` prevents an access-token compromise from forging refresh tokens (and vice versa).
+
+### `jwt.refresh.enabled`
+
+Default: `true`. When `false`, `login` / `createTokenPair` return only `accessToken`.
+
+### `jwt.refresh.expiresIn`
+
+Refresh-token lifetime as a `ms` string. Default: `"7d"` — used both as the documented recommendation and as the runtime fallback when the value is omitted. To issue non-expiring refresh tokens, set `expiresIn: NO_EXPIRATION` (resolves to `"100y"`).
+
+### `jwt.refresh.rotation`
+
+Default: `true`. When `true`, each successful `refreshTokens(...)` call revokes the old refresh token and issues a new one in the same family. The first re-use of a revoked token triggers family-wide revocation — the canonical JWT replay defense.
+
+:::caution
+Don't disable rotation unless you really know why. You lose replay detection.
+:::
+
+### `jwt.refresh.maxPerUser`
+
+Default: `5`. Hard cap on simultaneous active refresh tokens per user. The oldest get revoked when the cap is hit. Lower = smaller revocation surface; higher = more devices a user can stay logged in on.
+
+### `jwt.refresh.logoutWithoutToken`
+
+Behavior when `authService.logout(user)` is called without a refresh token:
+
+- `"revoke-all"` (default) — revoke every refresh token for this user. Fail-safe.
+- `"error"` — throw. Forces the client to send the refresh token.
+
+The default is right for most apps. If the client lost the refresh token, logout still works; the user has to log back in on every device.
+
+### `password.salt`
+
+Default: `12`. The bcrypt cost factor for `hashPassword`. Higher = more secure but slower per login. The default is a sane balance for 2026 hardware.
+
+## Reading config at runtime
+
+Auth reads its config via `@warlock.js/core`'s `config.key("auth...")`. You don't usually need to read it directly — but if you do:
+
+```ts
+import { config } from "@warlock.js/core";
+
+const expiresIn = config.key("auth.jwt.expiresIn", "1h");
+const maxPerUser = config.key("auth.jwt.refresh.maxPerUser", 5);
+```
+
+## Related
+
+- [First protected route](./04-first-protected-route.md) — the smallest end-to-end flow.
+- [Customize user type](../guides/customize-user-type.md) — multi-user-type setup.
+- [Manage tokens](../guides/manage-tokens.md) — rotation, family revocation, max-per-user in depth.

@@ -1,0 +1,100 @@
+---
+/**
+ * Stats band — at-a-glance metrics, custom layout (not a card grid).
+ */
+const stats = [
+  { value: "14", label: "Standalone packages", note: "Pick what you need" },
+  { value: "256", label: "Documentation pages", note: "Written & verified" },
+  { value: "120+", label: "AI-readable skills", note: "Per-task surface" },
+  { value: "5", label: "AI provider adapters", note: "Same agent API" },
+];
+---
+
+<section class="warlock-stats">
+  <div class="warlock-stats-inner">
+    {stats.map((stat) => (
+      <div class="warlock-stat">
+        <div class="warlock-stat-value">{stat.value}</div>
+        <div class="warlock-stat-label">{stat.label}</div>
+        <div class="warlock-stat-note">{stat.note}</div>
+      </div>
+    ))}
+  </div>
+</section>
+
+<style>
+  .warlock-stats {
+    border-block: 1px solid var(--sl-color-hairline);
+    background:
+      linear-gradient(180deg, transparent, var(--warlock-yellow-glow) 50%, transparent),
+      var(--warlock-surface-darker);
+    background-size: 100% 1px, 100% 100%;
+    background-position: top, center;
+    background-repeat: no-repeat;
+  }
+
+  :root[data-theme="light"] .warlock-stats {
+    background:
+      linear-gradient(180deg, transparent, rgba(202, 138, 4, 0.12) 50%, transparent),
+      #f9fafb;
+    background-size: 100% 1px, 100% 100%;
+    background-position: top, center;
+    background-repeat: no-repeat;
+  }
+
+  .warlock-stats-inner {
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: clamp(2rem, 2.5rem + 1vw, 3.5rem) clamp(1.25rem, 4vw, 2.5rem);
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  @media (min-width: 40rem) {
+    .warlock-stats-inner {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 60rem) {
+    .warlock-stats-inner {
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+    }
+
+    .warlock-stat + .warlock-stat {
+      border-left: 1px solid var(--sl-color-hairline);
+    }
+  }
+
+  .warlock-stat {
+    text-align: center;
+    padding: 0.5rem 1rem;
+  }
+
+  .warlock-stat-value {
+    font-family: var(--sl-font);
+    font-size: clamp(2rem, 1.5rem + 2vw, 3rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    color: var(--sl-color-text-accent);
+    font-feature-settings: "tnum" 1, "ss01" 1;
+    text-shadow: 0 0 30px var(--warlock-yellow-glow);
+  }
+
+  .warlock-stat-label {
+    margin-block-start: 0.75rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--sl-color-white);
+    letter-spacing: -0.01em;
+  }
+
+  .warlock-stat-note {
+    margin-block-start: 0.25rem;
+    font-size: 0.78rem;
+    color: var(--sl-color-gray-3);
+  }
+</style>

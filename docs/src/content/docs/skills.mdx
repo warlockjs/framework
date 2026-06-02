@@ -1,0 +1,55 @@
+---
+title: Skills
+description: How AI agents work with Warlock.js via per-task SKILL.md files and agent-kit.
+template: splash
+---
+
+Every Warlock.js package ships **per-task skill files** — small Markdown
+documents that teach an AI coding agent how to perform one specific job
+inside that package: write a migration, register a route, pick a cache
+driver, define an AI tool.
+
+When an agent works on Warlock code, it loads the relevant skill into
+its context and gets the same orientation a senior engineer would give
+in a code review: which identifiers matter, when to skip this skill for
+a sibling, common footguns, canonical imports.
+
+## How they sync
+
+Skills live alongside each package's source at
+`@warlock.js/<pkg>/skills/<task>/SKILL.md`. The
+[`agent-kit`](https://github.com/hassanzohdy/agent-kit) CLI discovers
+them and syncs flat-named copies into `.claude/skills/`,
+`.cursor/skills/`, and any other AI-tool target.
+
+```bash
+yarn add -D @mongez/agent-kit
+npx agent-kit sync
+```
+
+Skills appear in your AI tool as `warlock-js-<pkg>-<skill>` — for
+example, `warlock-js-core-build-url` or `warlock-js-cascade-define-model`.
+
+## Per-package skill counts
+
+Roughly 120 skills across the framework today:
+
+| Package | Skills |
+| --- | ---: |
+| `core` | 33 |
+| `cache` | 16 |
+| `cascade` | 15 |
+| `ai` | 12 |
+| `logger` | 10 |
+| `seal` | 8 |
+| `auth` | 7 |
+| `scheduler` | 6 |
+| `herald` | 4 |
+| `fs` | 4 |
+| `context` | 2 |
+| Provider adapters | 1 each |
+
+Each skill's full text is browsable in the GitHub repo. Their
+descriptions follow an enriched format (Triggers / Skip / typical
+import / competing patterns) so your agent's skill matcher picks the
+right one fast.

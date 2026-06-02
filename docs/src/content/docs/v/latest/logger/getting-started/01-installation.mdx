@@ -1,0 +1,109 @@
+---
+title: "Installation"
+description: "Install @warlock.js/logger in any Node project. Standalone or inside a Warlock app."
+sidebar:
+  order: 1
+  label: "Installation"
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+`@warlock.js/logger` is structured logging for Node. Instead of scattering `console.log` everywhere, you emit entries tagged with a **module**, an **action**, and a **message**, and the logger fans each one out to every destination you've registered — the terminal in dev, a rotating file in prod, Slack for errors. You get level filtering, secret redaction, and a clean shutdown that doesn't drop the last few lines — without rewriting a single call site when you add a new destination.
+
+Here's the whole thing in one screen. Copy it into a file, run it, and you're logging:
+
+```ts title="src/logger-demo.ts"
+import { log, ConsoleLog } from "@warlock.js/logger";
+
+// 1. Register where logs should go (just the terminal for now).
+log.addChannel(new ConsoleLog());
+
+// 2. Log with a module, an action, a message, and optional structured context.
+await log.info("users", "register", "New account created", { userId: 42 });
+await log.warn("auth", "login", "Password attempt failed", { attempts: 3 });
+await log.success("billing", "charge", "Payment captured", { amount: 4999 });
+
+// 3. Pass an Error straight through — file channels keep the full stack.
+try {
+  throw new Error("Stripe declined the card");
+} catch (error) {
+  await log.error("billing", "charge", error);
+}
+```
+
+```text
+ℹ (2024-03-15T10:22:01.482Z) [users] [register] New account created
+⚠ (2024-03-15T10:22:01.486Z) [auth] [login] Password attempt failed
+✓ (2024-03-15T10:22:01.488Z) [billing] [charge] Payment captured
+✗ (2024-03-15T10:22:01.491Z) [billing] [charge] Stripe declined the card
+```
+
+That's the core value: one consistent call shape, colored and searchable, ready to route anywhere. The rest of these docs build on exactly this.
+
+---
+
+`@warlock.js/logger` is a standalone package — no framework required. Install it in any Node project and configure it in plain TypeScript or JavaScript.
+
+<Tabs syncKey="pm">
+  <TabItem label="npm">
+    ```bash
+    npm install @warlock.js/logger
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn add @warlock.js/logger
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm add @warlock.js/logger
+    ```
+  </TabItem>
+</Tabs>
+
+Inside a Warlock app, the logger ships transitively through `@warlock.js/core` — you can import `log` directly without adding the dependency yourself.
+
+## No channels = no output
+
+The logger starts with **no channels attached**. Nothing is printed or written until you add at least one:
+
+```ts title="src/index.ts"
+import { log, ConsoleLog } from "@warlock.js/logger";
+
+log.addChannel(new ConsoleLog());
+
+await log.info("users", "register", "New user created successfully");
+```
+
+Three lines of setup, then you're logging. Adding channels is covered in full on the [Configuration](./02-configuration/) page.
+
+## `log` vs `Logger`
+
+The package exports one default instance and one class:
+
+| Export | What it is | When to use |
+| --- | --- | --- |
+| `log` | The `Logger` singleton — pre-instantiated with zero channels | Almost always. Day-to-day logging *and* configuration go through it. |
+| `Logger` | The class | When you need an isolated logger (libraries, sandboxes, parallel test suites). |
+
+```ts
+import { log, Logger, ConsoleLog, FileLog } from "@warlock.js/logger";
+
+// Singleton — most code uses this
+log.addChannel(new ConsoleLog());
+
+// Custom isolated instance
+const auditLog = new Logger();
+auditLog.addChannel(new FileLog({ name: "audit" }));
+```
+
+`log` is a `Logger` instance, **not** a function — every method is reachable through it (`info`, `debug`, `warn`, `error`, `success`, `addChannel`, `configure`, `setMinLevel`, `setRedact`, `assert`, `timer`, `channel`, `flushSync`, `enableAutoFlush`, `disableAutoFlush`).
+
+:::tip[Watch for shadowing]
+`log` is a common local variable name. Avoid `for (const log of logEntries)` — it'll hide the singleton inside that block. Rename your loop variable to `entry` or `record` instead.
+:::
+
+## Next
+
+Continue to [Configuration](./02-configuration/) to wire up channels, set a minimum level, and configure the logger for each environment.

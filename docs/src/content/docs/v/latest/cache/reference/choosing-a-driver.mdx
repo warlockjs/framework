@@ -1,0 +1,108 @@
+---
+title: "Choosing a Driver"
+slug: v/latest/cache/choosing-a-driver
+---
+
+`@warlock.js/cache` ships eight drivers. They all speak the same API — you can
+swap one for another without touching call sites — but they trade off
+durability, scale, and capabilities. This page helps you pick.
+
+## Quick pick
+
+| Your situation | Driver |
+|---|---|
+| Local dev, single process | [`memory`](/v/latest/cache/memory/) |
+| Session-style data that should stay alive while used | [`memoryExtended`](/v/latest/cache/memory-extended/) |
+| Bounded memory footprint (cap the entry count) | [`lru`](/v/latest/cache/lru-memory/) |
+| Small persistent cache, no server (CLI, build cache) | [`file`](/v/latest/cache/file/) |
+| Production, multiple instances, shared cache + locks | [`redis`](/v/latest/cache/redis/) |
+| You already run Postgres, or need vector similarity | [`pg`](/v/latest/cache/pg/) |
+| Disable caching without changing code | [`null`](/v/latest/cache/null/) |
+| Asserting cache behavior in tests | `mock` |
+
+## The 30-second decision
+
+1. **Running more than one instance?** You need a *shared* store — go
+   [`redis`](/v/latest/cache/redis/) (or [`pg`](/v/latest/cache/pg/) if
+   Postgres is already in your stack). In-memory drivers are per-process, so
+   each instance would hold its own copy and invalidation wouldn't propagate.
+2. **Need vector similarity in production?** [`pg`](/v/latest/cache/pg/) with
+   the `vector` config block — real pgvector index, same `cache.similar()` code.
+3. **Single process, just want speed?** [`memory`](/v/latest/cache/memory/).
+   Add `maxSize` to cap it, or reach for [`lru`](/v/latest/cache/lru-memory/)
+   when you want a hard entry ceiling with eviction.
+4. **Need it to survive a restart but don't want a server?**
+   [`file`](/v/latest/cache/file/).
+
+## Capability matrix
+
+| Driver | Survives restart | Multi-instance | Native locks | Native lists | Similarity | Eviction |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| `memory` | ❌ | ❌ | emulated | read-modify-write | brute force | `maxSize` (LRU) |
+| `memoryExtended` | ❌ | ❌ | emulated | read-modify-write | brute force | `maxSize` (LRU) |
+| `lru` | ❌ | ❌ | emulated | read-modify-write | brute force | `capacity` (LRU) |
+| `file` | ✅ | ⚠️ same host | emulated | read-modify-write | ❌ | TTL only |
+| `redis` | ✅ | ✅ | native `NX`/`XX` | read-modify-write¹ | ❌ *(backlog)* | TTL / Redis policy |
+| `pg` | ✅ | ✅ | emulated | read-modify-write | ✅ pgvector | TTL only |
+| `null` | n/a | n/a | n/a | n/a | returns `[]` | n/a |
+
+¹ Lists are stored as a single JSON entry and mutated read-modify-write on every
+driver today. Native Redis list commands (`LPUSH` / `LRANGE` / `LTRIM`) are
+planned for v2.1.
+
+:::note `update()` / `merge()` support
+The [`file`](/v/latest/cache/file/) driver throws `CacheUnsupportedError` for
+`update()` and `merge()` (no atomic read-modify-write primitive on disk yet).
+All other drivers support them. See
+[Update & Merge](/v/latest/cache/update-merge/).
+:::
+
+## Driver one-liners
+
+- **[`memory`](/v/latest/cache/memory/)** — an in-process `Map`. Fastest
+  option, zero setup, gone on restart. The default for dev and single-instance
+  apps. Optional `maxSize` evicts the least-recently-used entry past the limit.
+- **[`memoryExtended`](/v/latest/cache/memory-extended/)** — `memory` with
+  **sliding expiration**: every read refreshes the entry's TTL. Use it for
+  data that should stay cached as long as it's actively used (session-ish
+  reads) and expire only after a quiet period.
+- **[`lru`](/v/latest/cache/lru-memory/)** — a hard `capacity` ceiling
+  (default 1000) with least-recently-used eviction. Reach for it when bounding
+  memory matters more than keeping every entry.
+- **[`file`](/v/latest/cache/file/)** — JSON-on-disk. Survives restarts
+  without running a server, but it's single-host and doesn't support
+  `update()`/`merge()`. Good for CLIs and build caches.
+- **[`redis`](/v/latest/cache/redis/)** — the production workhorse. Shared
+  across instances, native `SET NX`/`XX` for real distributed locks, native
+  list commands for O(1) list ops. Similarity isn't wired yet.
+- **[`pg`](/v/latest/cache/pg/)** — Postgres-backed and durable. The only
+  driver with a real similarity index (pgvector, HNSW or IVFFlat). Bring your
+  own `pg.Pool`/`Client`; the driver doesn't own the connection lifecycle.
+- **[`null`](/v/latest/cache/null/)** — a black hole. Every write is a no-op,
+  every read a miss. Swap it in to disable caching globally without touching
+  call sites.
+- **`mock`** — an in-memory store plus a `callLog` of every operation, for
+  behavioral assertions in tests. See
+  [Testing](/v/latest/cache/testing/).
+
+## Mixing drivers
+
+You're not locked into one. Register several and route per call with the
+`driver` option — keep your default hot path in `memory` while sending durable
+or audit writes to `redis`:
+
+```ts
+await cache.set("user.1", user, "1h");                       // default driver
+await cache.set("audit.event", event, { driver: "redis", ttl: "30d" });
+```
+
+See [Configuration](/v/latest/cache/configurations/) for registering drivers
+and [Set Options](/v/latest/cache/set-options/#per-call-driver-override) for
+per-call overrides.
+
+## Related Documentation
+
+- [Configuration](/v/latest/cache/configurations/) — register and wire drivers
+- [Cache Driver Interface](/v/latest/cache/cache-driver-interface/) — the contract every driver implements
+- [Make Your Own Cache Driver](/v/latest/cache/make-your-own-cache-driver/) — build a custom backend
+- [Comparison with Other Libraries](/v/latest/cache/comparison/)

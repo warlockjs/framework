@@ -1,0 +1,71 @@
+---
+title: "@warlock.js/ai"
+description: Provider-agnostic AI orchestration — agents, tools, workflows, supervisors, embeddings, middleware — under one unified result envelope.
+sidebar:
+  order: 1
+  label: "Introduction"
+---
+
+> Standalone — usable in any Node project, no `@warlock.js/core` required.
+
+`@warlock.js/ai` is the AI orchestration layer of Warlock. It gives you a small ladder of primitives — agents, workflows, supervisors — that share one result envelope, one error hierarchy, one event model, and one persistence story. You pair it with a provider adapter (`@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, etc.) and you have a typed, testable, resumable AI runtime.
+
+The package is provider-agnostic on purpose. The model, the embedder, the pricing — those live in the adapter. The orchestration — tool loops, retries, snapshot resume, structured output, middleware — lives here.
+
+## The 4-primitive ladder
+
+```text
+ai.agent()        →  single LLM turn, tool loop, structured output
+ai.workflow()     →  deterministic multi-step pipeline, resumable
+ai.supervisor()   →  multi-intent router with specialists, iterative
+ai.orchestrator() →  stateful session-aware orchestration   (v2 — not shipped)
+```
+
+Each primitive is an escape hatch to the next rung of complexity. Start at the bottom; graduate up only when you need to. Every primitive returns the same envelope (`{ data, error, usage, report }`) and exposes `.asTool()`, so they compose freely.
+
+## Why a separate package
+
+- **Standalone.** Drop it into a CLI, a worker, a script, an existing Express app. No Warlock framework required.
+- **Typed end to end.** `ai.agent({ output: schema })` flows the schema's inferred type through to `result.data`. Same for `ai.workflow<TInput, TOutput, TState>`.
+- **`execute()` never throws.** Failures funnel into `result.error` as a typed `AIError` subclass. You branch on `instanceof` or on the stable `error.code` string.
+- **One result shape.** `{ data, error, usage, report }` — agents, workflows, supervisors. Cost rolls up the tree.
+- **Persistence is delegated.** Snapshot resume + semantic cache both accept any `CacheDriver` from `@warlock.js/cache`. The AI package owns no storage.
+- **Logging is delegated.** Every primitive emits through the `log` singleton from `@warlock.js/logger`. Configure channels once at boot; the framework picks it up.
+
+## What's in this section
+
+- [Installation](./getting-started/02-installation) — install the core package plus a provider adapter.
+- [Pick a provider](./getting-started/03-pick-a-provider) — OpenAI vs Anthropic vs Bedrock vs Google vs Ollama.
+- [Your first agent](./getting-started/04-your-first-agent) — five-minute walkthrough from zero to a streaming agent.
+
+## Where to go after
+
+- [Architecture and concepts](./architecture-concepts/agents) — the mental model behind agents, workflows, supervisors, middleware.
+- [The basics](./the-basics/run-agent) — the surface you'll touch every day.
+- [Digging deeper](./digging-deeper/run-workflow) — workflows, supervisors, persistence, errors.
+- [Recipes](./recipes/basic-agent) — copy-paste solutions for common patterns.
+- [Reference](./reference/api) — every public export grouped by primitive.
+
+## A 30-second example
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
+
+const myAgent = ai.agent({
+  model: openai.model({ name: "gpt-4o-mini" }),
+  systemPrompt: "You are a concise senior TypeScript engineer.",
+});
+
+const { text, usage, error } = await myAgent.execute("Why use generics?");
+
+if (error) {
+  console.warn(error.code, error.category);
+} else {
+  console.log(text, usage.total);
+}
+```
+
+No `try/catch`. No exception leaks. Typed errors with stable codes. That's the contract you get from every primitive in this package.

@@ -1,0 +1,107 @@
+---
+title: "Caching an External API"
+slug: v/latest/cache/cached-api
+---
+
+Third-party APIs are slow, rate-limited, and occasionally down. Wrapping them
+in the cache turns a fragile network call into a fast local read — and with
+[`cached()`](/v/latest/cache/cached/) you declare the strategy once and forget
+about it.
+
+## The simple case — `cached()`
+
+Wrap the fetch function. Every call routes through
+[`remember()`](/v/latest/cache/cache-manager/#remember-get-or-compute), so you
+inherit its stampede protection for free, and the auto-key expands with the
+arguments:
+
+```ts
+import { cached } from "@warlock.js/cache";
+
+const getExchangeRates = cached(
+  (base: string) => api.fetchRates(base),
+  "rates",     // key prefix → getExchangeRates("USD") caches under "rates.USD"
+  "10m",       // TTL on miss
+);
+
+const usd = await getExchangeRates("USD");   // fetches, caches
+const usd2 = await getExchangeRates("USD");  // cache hit — no network
+```
+
+Need tags (for bulk invalidation) or a custom key? Use the options form:
+
+```ts
+const searchProducts = cached(
+  (filters: ProductFilters) => api.searchProducts(filters),
+  {
+    key: (filters) => `products.search.${filters.category}.${filters.sort}`,
+    ttl: "15m",
+    tags: ["products"],
+  },
+);
+```
+
+## Invalidating
+
+`cached()` hands back an `invalidate` helper that uses the same key scheme, so
+you can drop one entry by its arguments:
+
+```ts
+await getExchangeRates.invalidate("USD");   // drops "rates.USD"
+```
+
+Or, if you tagged the writes, wipe the whole group at once:
+
+```ts
+await cache.tags(["products"]).invalidate();
+```
+
+## Surviving upstream outages — `swr()`
+
+When an endpoint is hot and you'd rather serve slightly-stale data than block
+(or fail) on a slow upstream, reach for
+[stale-while-revalidate](/v/latest/cache/swr/). It returns the cached value
+instantly inside the fresh window, serves stale + refreshes in the background
+in the stale window, and only blocks once the entry is fully expired:
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+async function getRates(base: string) {
+  return cache.swr(
+    `rates.${base}`,
+    { freshTtl: "1m", staleTtl: "1h", tags: ["rates"] },
+    () => api.fetchRates(base),
+  );
+}
+```
+
+The win: if the upstream is down when the background refresh fires, the stale
+entry is **kept** and an `error` event is emitted — the caller that triggered
+the refresh already has its (stale) data and never sees the failure.
+
+:::tip `cached()` vs. `swr()`
+Use **`cached()`** for the everyday "memoize this call" case — simplest API,
+stampede-safe. Reach for **`swr()`** on hot, latency-sensitive endpoints where
+serving slightly-stale data beats waiting on (or failing with) the upstream.
+:::
+
+## Pinning to a durable driver
+
+If most of your cache is in-memory but you want API responses to survive a
+restart, route just these writes to a durable driver — no change to your
+default:
+
+```ts
+const getRates = cached(
+  (base: string) => api.fetchRates(base),
+  { key: (base) => `rates.${base}`, ttl: "10m", driver: "redis" },
+);
+```
+
+## Related Documentation
+
+- [cached()](/v/latest/cache/cached/) — the higher-order wrapper in full
+- [Stale-While-Revalidate](/v/latest/cache/swr/) — the resilience pattern
+- [Stampede Prevention](/v/latest/cache/stampede-prevention/) — why concurrent misses collapse to one fetch
+- [Cache Tags](/v/latest/cache/tags/) — bulk invalidation

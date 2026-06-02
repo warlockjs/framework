@@ -1,0 +1,45 @@
+name: Deploy Docs
+
+# Build the Astro/Starlight site and publish it to the gh-pages branch, which
+# GitHub Pages serves at warlock.js.org. Every push to main redeploys.
+#
+# Note: site-level llms.txt / llms-full.txt are committed under public/ (they are
+# generated locally from the @warlock.js/* packages via scripts/generate-site-llms.mjs,
+# which can't run in a docs-only CI checkout). The build just copies them to dist.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-docs
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build site
+        run: yarn build
+
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: gh-pages
+          cname: warlock.js.org
