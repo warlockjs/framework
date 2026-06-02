@@ -1,4 +1,4 @@
-import { env } from "@mongez/dotenv";
+import path from "node:path";
 import { fileURLToPath } from "url";
 import { Worker, type WorkerOptions } from "worker_threads";
 
@@ -15,8 +15,9 @@ export type CreateWorkerOptions = WorkerOptions & {
 /**
  * Create a worker that works in both dev (TypeScript) and production (JavaScript) environments.
  *
- * In development mode (DEV_SERVER_CORE env set), workers are loaded with tsx
- * to support TypeScript execution. In production, compiled .js files are used.
+ * The worker shares the CALLING module's extension: `.ts` when core runs from
+ * source (loaded via tsx), `.mjs` when core is published. Source workers are
+ * run through the tsx loader; published `.mjs` workers run as-is.
  *
  * @param workerPath - Relative path to worker file WITHOUT extension (e.g., "./workers/ts-health.worker")
  * @param baseUrl - The import.meta.url of the calling module (used to resolve relative paths)
@@ -38,20 +39,19 @@ export function createWorker(
   baseUrl: string,
   options?: CreateWorkerOptions,
 ): Worker {
-  const isDevServerCore = env("DEV_SERVER_CORE");
-
-  // In dev (running core from source): .ts file with tsx loader.
-  // When published, core ships ESM modules with the .mjs extension (preserveModules).
-  const extension = isDevServerCore ? ".ts" : ".mjs";
-  const workerUrl = new URL(`${workerPath}${extension}`, baseUrl);
+  // The worker shares the CALLING module's extension: `.ts` from source (needs the
+  // tsx loader to execute), `.mjs` when core is published.
+  const callerExtension = path.extname(fileURLToPath(baseUrl));
+  const isSource = callerExtension === ".ts" || callerExtension === ".tsx";
+  const workerUrl = new URL(`${workerPath}${callerExtension}`, baseUrl);
   const workerFilePath = fileURLToPath(workerUrl);
 
   const workerOptions: WorkerOptions = {
     ...options,
   };
 
-  // Add tsx loader for TypeScript in dev environment
-  if (isDevServerCore) {
+  // Source workers are TypeScript — run them through the tsx loader.
+  if (isSource) {
     workerOptions.execArgv = [...(options?.execArgv || []), "--import", "tsx/esm"];
   }
 

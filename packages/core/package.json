@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/core",
-  "version": "4.1.7",
+  "version": "4.1.8",
   "description": "A robust nodejs framework for building blazing fast applications",
   "main": "./esm/index.js",
   "bin": {
@@ -46,7 +46,7 @@
     "mime": "^4.1.0",
     "bcryptjs": "^3.0.3",
     "pluralize-esm": "^9.0.5",
-    "get-tsconfig": "^5.0.0-beta.4"
+    "get-tsconfig": "^5.0.0-beta.5"
   },
   "peerDependencies": {
     "sharp": "^0.34.5",
