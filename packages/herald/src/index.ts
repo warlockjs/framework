@@ -58,3 +58,6 @@ export * from "./message-managers";
 
 // Export decorators
 export * from "./decorators";
+
+// Export the use-case broadcast channel adapter
+export * from "./use-case-broadcast";

@@ -43,10 +43,10 @@ npm install kafkajs
 ## 🚀 Quick Start
 
 ```typescript
-import { connectToCommunicator, communicators } from "@warlock.js/herald";
+import { connectToBroker, herald } from "@warlock.js/herald";
 
 // Connect to RabbitMQ
-await connectToCommunicator({
+await connectToBroker({
   driver: "rabbitmq",
   host: "localhost",
   port: 5672,
@@ -55,13 +55,13 @@ await connectToCommunicator({
 });
 
 // Publish a message
-await communicators().channel("user.created").publish({
+await herald().channel("user.created").publish({
   userId: 1,
   email: "user@example.com",
 });
 
 // Subscribe to messages
-communicators()
+herald()
   .channel<{ userId: number; email: string }>("user.created")
   .subscribe(async (message, ctx) => {
     console.log("User created:", message.payload.userId);
@@ -71,45 +71,45 @@ communicators()
 
 ## 🎯 Core Concepts
 
-### Communicators
+### Brokers
 
-A communicator wraps a message broker connection. You can have multiple communicators for different brokers or purposes.
+A broker wraps a message broker connection (e.g. RabbitMQ, Kafka). You can have multiple brokers for different clusters or purposes.
 
 ```typescript
-// Single communicator (default)
-await connectToCommunicator({
+// Single broker (default)
+await connectToBroker({
   driver: "rabbitmq",
   host: "localhost",
 });
 
-// Multiple communicators
-await connectToCommunicator({
+// Multiple brokers
+await connectToBroker({
   driver: "rabbitmq",
   name: "notifications",
   isDefault: true,
   host: process.env.NOTIFICATIONS_HOST,
 });
 
-await connectToCommunicator({
+await connectToBroker({
   driver: "rabbitmq",
   name: "analytics",
   host: process.env.ANALYTICS_HOST,
 });
 
 // Use default
-communicators().channel("notifications").publish({ ... });
+herald().channel("notifications").publish({ ... });
 
-// Use specific communicator
-communicators("analytics").channel("events").publish({ ... });
+// Use specific broker
+herald("analytics").channel("events").publish({ ... });
 ```
 
 ### Channels
 
-Channels represent queues (RabbitMQ) or topics (Kafka). They provide a unified pub/sub interface.
+Channels represent queues (RabbitMQ) or topics (Kafka). They provide a unified pub/sub interface via `herald()`.
 
 ```typescript
 // Get a channel
-const userChannel = communicators().channel("user.created");
+const userChannel = herald().channel("user.created");
 
 // Publish
 await userChannel.publish({ userId: 1 });
@@ -132,7 +132,7 @@ interface UserPayload {
 }
 
 // Typed channel
-const channel = communicators().channel<UserPayload>("user.created");
+const channel = herald().channel<UserPayload>("user.created");
 
 // TypeScript knows the payload type
 await channel.publish({ userId: 1, email: "test@example.com" });
@@ -157,7 +157,7 @@ const UserSchema = v.object({
 });
 
 // Channel with validation
-const channel = communicators().channel("user.created", {
+const channel = herald().channel("user.created", {
   schema: UserSchema,
 });
 
@@ -173,12 +173,12 @@ channel.subscribe(async (message, ctx) => {
 
 ## 📚 API Reference
 
-### connectToCommunicator
+### connectToBroker
 
-Connect to a message broker and register the communicator:
+Connect to a message broker and register it:
 
 ```typescript
-const communicator = await connectToCommunicator({
+const broker = await connectToBroker({
   driver: "rabbitmq",
   name: "default",       // Optional, defaults to "default"
   isDefault: true,       // Optional, defaults to true
@@ -195,22 +195,22 @@ const communicator = await connectToCommunicator({
 });
 ```
 
-### communicators(name?)
+### herald(name?)
 
-Get a communicator by name or the default one:
+Get a broker by name or the default one:
 
 ```typescript
-// Default communicator
-communicators().channel("events");
+// Default broker
+herald().channel("events");
 
-// Named communicator
-communicators("analytics").channel("events");
+// Named broker
+herald("analytics").channel("events");
 ```
 
 ### Channel Methods
 
 ```typescript
-const channel = communicators().channel<MyPayload>("channel.name");
+const channel = herald().channel<MyPayload>("channel.name");
 
 // Publishing
 await channel.publish(payload, options?);
@@ -293,7 +293,10 @@ await channel.publish(payload, {
 ### RabbitMQ
 
 ```typescript
-await connectToCommunicator({
+### RabbitMQ
+
+```typescript
+await connectToBroker({
   driver: "rabbitmq",
   host: "localhost",
   port: 5672,
@@ -308,7 +311,7 @@ await connectToCommunicator({
 ### Kafka (Coming Soon)
 
 ```typescript
-await connectToCommunicator({
+await connectToBroker({
   driver: "kafka",
   brokers: ["localhost:9092"],
   clientId: "my-app",
@@ -327,10 +330,10 @@ await connectToCommunicator({
 ┌─────────────────────────────────────────────────┐
 │                Your Application                  │
 ├─────────────────────────────────────────────────┤
-│     communicators() → channel() → publish()      │
-│                                   subscribe()    │
+│        herald() → channel() → publish()          │
+│                               subscribe()        │
 ├─────────────────────────────────────────────────┤
-│              Communicator Registry               │
+│                Broker Registry                   │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐       │
 │  │ default  │  │analytics │  │  events  │       │
 │  └────┬─────┘  └────┬─────┘  └────┬─────┘       │
