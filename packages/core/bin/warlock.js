@@ -1,3 +1,3 @@
 #!/usr/bin/env node
 
-import "./../esm/cli/start.js";
+import "../esm/cli/start.mjs";
