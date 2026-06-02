@@ -1,8 +1,29 @@
 import { colors } from "@mongez/copper";
+import { inspect } from "util";
 import { LogChannel } from "../log-channel";
 import type { BasicLogConfigurations, LoggingData } from "../types";
 
-export class ConsoleLog extends LogChannel<BasicLogConfigurations> {
+export type ConsoleLogConfig = BasicLogConfigurations & {
+  /**
+   * Render the log entry's `context` object on a second line after the main
+   * message. When `false`, context is silently dropped (the historical
+   * behavior). When `true`, contexts are pretty-printed with `util.inspect`
+   * — colored, depth-limited, ideal for development. Persistent channels
+   * (`FileLog`, `JSONFileLog`) always retain context regardless of this flag.
+   *
+   * @default false
+   */
+  showContext?: boolean;
+  /**
+   * Depth passed to `util.inspect` when rendering context. Only applies when
+   * `showContext` is enabled.
+   *
+   * @default 4
+   */
+  contextDepth?: number;
+};
+
+export class ConsoleLog extends LogChannel<ConsoleLogConfig> {
   /**
    * {@inheritdoc}
    */
@@ -88,6 +109,17 @@ export class ConsoleLog extends LogChannel<BasicLogConfigurations> {
 
     if (typeof message === "object") {
       console.log(message);
+    }
+
+    // Render context on a second line when explicitly enabled. We only
+    // attempt rendering if there's anything meaningful to show — empty
+    // objects clutter the terminal without adding signal.
+    if (this.config("showContext") && data.context && Object.keys(data.context).length > 0) {
+      const depth = this.config("contextDepth") ?? 4;
+      console.log(
+        colors.gray("  ↳"),
+        inspect(data.context, { colors: true, depth, breakLength: 80 }),
+      );
     }
   }
 }

@@ -1,0 +1,1296 @@
+# Warlock Logger — full skills
+
+> Package: `@warlock.js/logger`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/logger/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## capture-unhandled-errors  `@warlock.js/logger/capture-unhandled-errors/SKILL.md`
+
+---
+name: capture-unhandled-errors
+description: 'captureAnyUnhandledRejection() installs process.on(''unhandledRejection'') + (''uncaughtException'') listeners routing failures through log.error(''app'', ...). Triggers: `captureAnyUnhandledRejection`, `unhandledRejection`, `uncaughtException`, `log.error`; "log unhandled promise rejections", "catch uncaught exceptions to a file", "record crashes before exit", "global error handler with logger"; typical import `import { captureAnyUnhandledRejection, log } from "@warlock.js/logger"`. Skip: flushing — `@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`; filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; competing `Sentry.init`, `@sentry/node`; native `process.on(''unhandledRejection'')`.'
+---
+
+# Error capture — routing Node's unhandled errors through the logger
+
+`captureAnyUnhandledRejection()` installs two process-level listeners so crashes are logged (not silently swallowed) before Node exits.
+
+## What it does
+
+```ts
+import { captureAnyUnhandledRejection } from "@warlock.js/logger";
+
+captureAnyUnhandledRejection();
+```
+
+Registers:
+- `process.on("unhandledRejection", reason => log.error("app", "unhandledRejection", reason))`
+- `process.on("uncaughtException", error => log.error("app", "uncaughtException", error))`
+
+Nothing else — the failure goes through `log.error` only, so it lands in your configured channels rather than bypassing them with a raw `console.log`.
+
+## When to call it
+
+**Once**, at startup, **after** channels are registered. Typical place: immediately after your `log.configure({...})` call.
+
+```ts title="src/index.ts"
+import {
+  log,
+  ConsoleLog,
+  FileLog,
+  captureAnyUnhandledRejection,
+} from "@warlock.js/logger";
+
+log.configure({
+  channels: [new ConsoleLog(), new FileLog({ levels: ["error"] })],
+  autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"],   // ← important; see below
+});
+
+captureAnyUnhandledRejection();
+```
+
+## Pair with `autoFlushOn: ["beforeExit"]`
+
+Without a flush on exit, here's what happens on a crash:
+
+1. Promise rejection fires → `log.error(...)` queues the error into `FileLog`'s buffer.
+2. Node exits.
+3. Buffer is never flushed. **The error that killed your app is lost.**
+
+Including `"beforeExit"` in `autoFlushOn` closes the gap. Node fires `beforeExit` after the rejection handler resolves, the logger flushes, then Node exits. See [`@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`](@warlock.js/logger/flush-logs-on-shutdown/SKILL.md).
+
+## Idempotency — don't call it twice
+
+Calling `captureAnyUnhandledRejection()` a second time registers a second pair of listeners. Your next rejection gets logged twice. There's no dedup; just call it once.
+
+## What it does **not** do
+
+- **Does not swallow errors.** Node still exits after `uncaughtException` (this is the safe behavior — state is undefined). The logger just ensures the error is recorded first.
+- **Does not install Node's `--unhandled-rejections` policy.** That's a Node flag; set it in your launch script if you want strict mode.
+- **Does not hook `SIGTERM` / `SIGINT`** — use `enableAutoFlush` for signal flushes.
+- **Does not filter.** Every rejection/exception is logged at `error` level with `module: "app"`. Filter per-channel if some noise slips in.
+
+## Checking an error was captured in tests
+
+Don't mock `process.on` — use a capturing channel and emit the listener directly:
+
+```ts
+import { log, captureAnyUnhandledRejection, LogChannel } from "@warlock.js/logger";
+import type { LoggingData } from "@warlock.js/logger";
+
+class Capture extends LogChannel {
+  public name = "capture";
+  public received: LoggingData[] = [];
+  public log(data: LoggingData) { this.received.push({ ...data }); }
+}
+
+it("routes unhandled rejections to the logger", async () => {
+  const capture = new Capture();
+  const originalChannels = log.channels;
+  log.channels = [capture];
+
+  captureAnyUnhandledRejection();
+  process.emit("unhandledRejection", new Error("boom"), Promise.resolve());
+
+  await new Promise((r) => setTimeout(r, 0));
+
+  expect(capture.received[0]!.module).toBe("app");
+  expect(capture.received[0]!.action).toBe("unhandledRejection");
+
+  log.channels = originalChannels;
+});
+```
+
+## Module + action the capture uses
+
+Both listeners log with:
+- `module: "app"`
+- `action: "unhandledRejection"` or `action: "uncaughtException"`
+- `message`: the rejection reason / exception (keep it as the raw `Error` object — file channels capture the stack).
+
+If you want these routed to a specific file, filter on `data.module === "app"`. See [`@warlock.js/logger/filter-log-entries/SKILL.md`](@warlock.js/logger/filter-log-entries/SKILL.md).
+
+
+## configure-logger  `@warlock.js/logger/configure-logger/SKILL.md`
+
+---
+name: configure-logger
+description: 'Register channels via log.addChannel / log.setChannels / log.configure({channels, autoFlushOn, redact, minLevel}) at boot. Triggers: `log.configure`, `log.addChannel`, `log.setChannels`, `Logger`, `autoFlushOn`, `disableAutoFlush`; "wire channels at startup", "branch logger by NODE_ENV", "isolate a library''s logger", "replace channel list"; typical import `import { log, Logger, ConsoleLog, FileLog } from "@warlock.js/logger"`. Skip: channel picks — `@warlock.js/logger/pick-log-channel/SKILL.md`; flushing — `@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`; redaction — `@warlock.js/logger/redact-sensitive-log-fields/SKILL.md`; competing libs `winston.createLogger`, `pino`.'
+---
+
+# Setup — registering channels at startup
+
+The logger is a singleton. Do all setup in one place, as early in the app entry point as possible.
+
+## The three channel-registration methods
+
+| Method | Semantics |
+|---|---|
+| `log.addChannel(channel)` | **Appends.** Safe to call multiple times. |
+| `log.setChannels([...])` | **Replaces** the full list. |
+| `log.configure({ channels, autoFlushOn, redact, minLevel })` | **Replaces** channels if provided; installs auto-flush if provided; sets redact / minLevel if provided. All four are optional. |
+
+All three return `this` — chainable.
+
+## Recommended pattern — one dedicated file
+
+```ts title="src/logger.ts"
+import { log, ConsoleLog, FileLog, JSONFileLog } from "@warlock.js/logger";
+
+if (process.env.NODE_ENV === "production") {
+  log.configure({
+    channels: [
+      new FileLog({ storagePath: "./storage/logs", chunk: "daily", rotate: true }),
+      new JSONFileLog({ storagePath: "./storage/logs-json", chunk: "daily" }),
+    ],
+    autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"],
+  });
+} else if (process.env.NODE_ENV === "test") {
+  log.setChannels([]);   // silence logger during tests
+} else {
+  log.setChannels([new ConsoleLog()]);
+}
+```
+
+Import it once at the top of `src/index.ts`:
+
+```ts title="src/index.ts"
+import "./logger";                     // side-effect: configures singleton
+import { log } from "@warlock.js/logger";
+
+log.info("app", "start", "Server listening on :3000");
+```
+
+## What `configure({ autoFlushOn })` does
+
+Registers one process-level handler per event that calls `log.flushSync()` before Node exits. See [`@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`](@warlock.js/logger/flush-logs-on-shutdown/SKILL.md) for the full behavior table.
+
+```ts
+log.configure({
+  channels: [new FileLog()],
+  autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"],
+});
+// Now a buffered FileLog flushes on Ctrl+C, container stop, and natural exit.
+```
+
+Calling `configure({ autoFlushOn })` a second time **replaces** previous handlers (not stacks them). Call `log.disableAutoFlush()` to tear them down.
+
+## Creating an isolated Logger
+
+Rarely needed. Useful when a library wants its own channel list that doesn't share with the host app:
+
+```ts
+import { Logger, ConsoleLog } from "@warlock.js/logger";
+
+export const libraryLogger = new Logger();
+libraryLogger.addChannel(new ConsoleLog({ filter: (d) => d.module === "my-lib" }));
+```
+
+Every `new Logger()` gets a unique `id` (string, prefixed `"logger-"`).
+
+## Order matters — ANSI stripping across channels
+
+`Logger.log` shallow-clones the entry per non-terminal channel before stripping ANSI codes. Registering a terminal channel (ConsoleLog) **after** a non-terminal one (FileLog) still works — ConsoleLog sees the original colored message. But if you register them in reverse and add a channel that mutates `data` in place, the non-terminal channel will see the terminal channel's version. Prefer the built-ins; custom channels should not mutate `data`.
+
+## When to call what
+
+- **`addChannel`** — most common. Add channels as you discover you need them during setup.
+- **`setChannels`** — when env branching makes the full list clear at once (production vs dev).
+- **`configure`** — when you also want to install auto-flush, redact, or minLevel in the same call.
+
+## Combining everything
+
+```ts
+log.configure({
+  channels: [
+    new ConsoleLog({ showContext: true }),
+    new FileLog({ chunk: "daily" }),
+  ],
+  autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"],
+  redact: { paths: ["context.password", "context.headers.authorization"] },
+  minLevel: process.env.LOG_LEVEL === "debug" ? "debug" : "info",
+});
+```
+
+See [`@warlock.js/logger/redact-sensitive-log-fields/SKILL.md`](@warlock.js/logger/redact-sensitive-log-fields/SKILL.md) for the redact contract and [`@warlock.js/logger/filter-log-entries/SKILL.md`](@warlock.js/logger/filter-log-entries/SKILL.md) for `minLevel`.
+
+## See also
+
+- [`@warlock.js/logger/pick-log-channel/SKILL.md`](@warlock.js/logger/pick-log-channel/SKILL.md) — what each built-in channel does
+- [`@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`](@warlock.js/logger/flush-logs-on-shutdown/SKILL.md) — `autoFlushOn` event behavior
+
+
+## filter-log-entries  `@warlock.js/logger/filter-log-entries/SKILL.md`
+
+---
+name: filter-log-entries
+description: 'Drop log entries — per-channel levels whitelist, per-channel filter predicate, logger-wide setMinLevel(level) fast path. Triggers: `levels`, `filter`, `minLevel`, `log.setMinLevel`, `shouldBeLogged`, `LoggingData`, `LogLevel`; "silence a noisy module", "route errors to a dedicated file", "raise global severity floor", "drop debug logs in prod"; typical import `import { log } from "@warlock.js/logger"`. Skip: custom sinks — `@warlock.js/logger/write-custom-log-channel/SKILL.md`; channel picks — `@warlock.js/logger/pick-log-channel/SKILL.md`; competing libs `pino.levels`, `winston.format.filter`, `debug` env var.'
+---
+
+# Filtering — `levels` + `filter` predicate + `minLevel`
+
+Every channel can silently drop entries it doesn't care about. Three mechanisms stack: a logger-wide `minLevel` floor (cheapest), then per-channel `levels` whitelist, then per-channel `filter` predicate.
+
+## 1. `levels` — the per-channel whitelist
+
+```ts
+new FileLog({ levels: ["error", "warn"] });
+// debug/info/success entries → skipped
+// error/warn entries → written
+```
+
+- Omitting `levels` (or passing `[]`) means **allow all five**.
+- No regex / no range — it's a literal whitelist of `LogLevel` strings.
+
+## 2. `filter` — the per-channel custom predicate
+
+```ts
+new ConsoleLog({
+  filter: (data) => data.module !== "healthcheck",
+});
+// Every entry is passed to the predicate; return false → skip.
+```
+
+- `data` is the full `LoggingData`: `{ type, module, action, message, context? }`.
+- Predicate runs **after** `levels` — an entry blocked by `levels` never reaches `filter`.
+
+## 3. `minLevel` — the logger-wide severity floor
+
+For the common "drop everything below X" case, skip the per-channel `levels` array and use the logger-wide fast path:
+
+```ts
+log.setMinLevel("info");
+// debug entries are dropped before fan-out — no channel ever sees them.
+
+log.configure({ minLevel: "warn" });   // shorthand inside configure()
+```
+
+Severity ordering: `debug < info ≈ success < warn < error`. `success` is treated as informational severity — `setMinLevel("warn")` drops it.
+
+Pass `undefined` to clear:
+
+```ts
+log.setMinLevel(undefined);   // accept everything again
+```
+
+This runs **before** the channel loop — cheaper than per-channel `levels` filters when you want a uniform floor. Per-channel `levels` and `filter` still run on top for channels that need a tighter or differently-shaped rule.
+
+## Combining — real patterns
+
+### Route errors to a dedicated file
+
+```ts
+log.setChannels([
+  new ConsoleLog(),
+  new FileLog({
+    name: "errors",
+    levels: ["error", "warn"],
+    chunk: "daily",
+  }),
+]);
+// ConsoleLog sees everything; errors.log only grows with warnings and errors.
+```
+
+### Silence a noisy module
+
+```ts
+new ConsoleLog({
+  filter: (data) => data.module !== "socket.io",
+});
+```
+
+### Keep the dev terminal focused
+
+```ts
+// Only surface the subsystem you're actively working on
+new ConsoleLog({
+  filter: (data) => data.module === "auth",
+});
+```
+
+### Errors always pass, info only for one module
+
+```ts
+new ConsoleLog({
+  filter: (data) => data.type === "error" || data.module === "payments",
+});
+```
+
+## Where filtering happens
+
+`LogChannel.shouldBeLogged(data)` runs both checks in order:
+
+```ts
+// levels check — fast path
+if (this.config("levels")?.length && !this.config("levels").includes(data.type)) return false;
+
+// filter predicate — only runs if levels allowed it
+const filter = this.config("filter");
+if (filter) return filter(data);
+
+return true;
+```
+
+If you extend `LogChannel` to write a custom channel, call `this.shouldBeLogged(data)` first thing inside your `log(data)` method — you inherit both mechanisms for free. See [`@warlock.js/logger/write-custom-log-channel/SKILL.md`](@warlock.js/logger/write-custom-log-channel/SKILL.md).
+
+## Logger-wide custom filtering — not a thing
+
+There is no `logger.setGlobalFilter()`. Each channel filters itself. If you want the same predicate everywhere, pass it to every channel constructor (or wrap your channels in a helper).
+
+## Performance note
+
+Filters run on **every** entry per channel. A synchronous, cheap predicate is fine. Avoid `await` inside — the channel receives a fully-formed `LoggingData` and the filter is sync-only (type: `(data: LoggingData) => boolean`).
+
+The `minLevel` check is the fastest of the three (single comparison before fan-out), so prefer it when "drop everything below X uniformly" matches your need.
+
+
+## flush-logs-on-shutdown  `@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`
+
+---
+name: flush-logs-on-shutdown
+description: 'Drain buffered channels before exit — log.flushSync() or log.configure({autoFlushOn: [''SIGINT'', ''SIGTERM'', ''beforeExit'']}) installs handlers that re-raise the signal. Triggers: `log.flushSync`, `autoFlushOn`, `enableAutoFlush`, `disableAutoFlush`, `SIGINT`, `SIGTERM`, `beforeExit`; "drain logs before exit", "wire SIGTERM for container shutdown", "my logs never showed after a crash", "graceful shutdown logging"; typical import `import { log, FileLog } from "@warlock.js/logger"`. Skip: error capture — `@warlock.js/logger/capture-unhandled-errors/SKILL.md`; custom sinks — `@warlock.js/logger/write-custom-log-channel/SKILL.md`; competing `pino.final`, `winston.end`; native `process.on(''exit'')`.'
+---
+
+# Lifecycle — flushing buffered channels before exit
+
+`FileLog` and `JSONFileLog` buffer entries in memory. A process that exits without draining loses the buffer.
+
+## The easy way — `autoFlushOn`
+
+Tell the logger which process events should trigger a flush. It installs the handlers for you.
+
+```ts
+log.configure({
+  channels: [new ConsoleLog(), new FileLog({ chunk: "daily" })],
+  autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"],
+});
+```
+
+### What each event does
+
+| Event | Behavior |
+|---|---|
+| `SIGINT` / `SIGTERM` / `SIGHUP` / `SIGBREAK` / `SIGUSR2` | Flush → remove this handler → re-raise the signal so Node's default exit code runs (e.g. 130 for SIGINT). |
+| `beforeExit` | Flush in place. Node continues its natural exit. |
+
+### Default recommendation
+
+`["SIGINT", "SIGTERM", "beforeExit"]` covers:
+- Local `Ctrl+C` (SIGINT)
+- Container orchestrators (`docker stop`, Kubernetes sending SIGTERM)
+- Natural exit (Node finished all work)
+
+Add `"SIGHUP"` if you care about terminal disconnects. Add `"SIGUSR2"` if you use nodemon or pm2 restart.
+
+### Idempotency
+
+Calling `enableAutoFlush` twice **replaces** previous handlers — it does not stack. `disableAutoFlush()` removes every handler this logger instance registered; safe to call when nothing is registered.
+
+## The manual way — your own handler
+
+Use this when you need async work (close an HTTP server, drain a queue) **before** flushing:
+
+```ts
+async function gracefulShutdown() {
+  await httpServer.close();
+  await queue.drain();
+  log.flushSync();          // still sync — guarantees disk write before exit
+  process.exit(0);
+}
+
+process.once("SIGINT", gracefulShutdown);
+process.once("SIGTERM", gracefulShutdown);
+```
+
+**If you go manual for a signal, skip it in `autoFlushOn`** — otherwise both handlers fire and ours re-raises the signal mid-way through your async work.
+
+## What `flushSync()` actually does
+
+```ts
+log.flushSync();
+// For every registered channel:
+//   if (channel.flushSync) channel.flushSync();
+```
+
+- Synchronous I/O — blocks the event loop.
+- Channels without `flushSync` (e.g. `ConsoleLog` — nothing to flush) are skipped silently.
+- Works with and without `groupBy` on `FileLog` / `JSONFileLog`.
+- No-op if every channel's buffer is empty.
+
+`ConsoleLog` has no `flushSync` — it writes synchronously on every entry. `FileLog` and `JSONFileLog` both implement it.
+
+## Unhandled errors
+
+If you use [`captureAnyUnhandledRejection()`](@warlock.js/logger/capture-unhandled-errors/SKILL.md), **include `"beforeExit"` in `autoFlushOn`**. Otherwise a crash logs the error into the buffer, then the process exits before the 5-second flush interval fires.
+
+```ts
+log.configure({
+  channels: [new FileLog({ levels: ["error"] })],
+  autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"],
+});
+
+captureAnyUnhandledRejection();
+```
+
+## What NOT to do
+
+- **Don't `await` inside a signal handler you wrote yourself and then call `flushSync`** — if an async step rejects, you skip the flush. Wrap in `try { await x } finally { log.flushSync(); process.exit(1); }`.
+- **Don't call `process.exit()` inside `autoFlushOn` handlers** — signal handlers here already re-raise the signal. Forcing an exit breaks exit codes.
+- **Don't rely on the 5-second flush interval for shutdown safety.** It's a throughput optimization, not a durability guarantee.
+
+
+## logger-basics  `@warlock.js/logger/logger-basics/SKILL.md`
+
+---
+name: logger-basics
+description: 'Start with @warlock.js/logger — the log singleton, five levels (debug / info / warn / error / success), channel fan-out, foundations. Triggers: `log`, `Logger`, `log.info`, `log.error`, `log.debug`, `log.warn`, `log.success`, `ConsoleLog`, `FileLog`, `JSONFileLog`; "how do I log in node", "warlock logger basics", "which logger skill do I need"; typical import `import { log, ConsoleLog, FileLog } from "@warlock.js/logger"`. Skip: channel picks — `@warlock.js/logger/pick-log-channel/SKILL.md`; setup — `@warlock.js/logger/configure-logger/SKILL.md`; competing libs `winston`, `pino`, `bunyan`, `log4js`, `signale`; native `console.log`.'
+---
+
+# Log with channels
+
+Multi-channel structured logger for Node.js. Three built-in channels (`ConsoleLog`, `FileLog`, `JSONFileLog`), an abstract `LogChannel` base for custom sinks, five severity levels, and a safe shutdown path via `Logger.enableAutoFlush(events)`.
+
+> This skill is the logger **map** — read it first, then load the specific skill for the task.
+
+## Install
+
+```bash
+yarn add @warlock.js/logger
+```
+
+## Foundations
+
+The 11 things that are true in every logger use:
+
+1. **Public API is the `log` singleton** (`import { log } from "@warlock.js/logger"`). It's a `Logger` instance — call `log.info(...)`, `log.configure(...)`, etc. No callable `log(data)` form.
+2. **The singleton starts with zero channels.** Nothing is written until at least one channel is registered via `addChannel`, `setChannels`, or `configure`.
+3. **Custom instances:** `new Logger()` gives an isolated logger with the identical API. Almost always you want the singleton — reach for the class only when you need an isolated channel set (libraries, test sandboxes).
+4. **Five levels, closed union:** `"debug" | "info" | "warn" | "error" | "success"`. There are no custom levels today.
+5. **Channels can be filtered two ways:** a `levels` array (whitelist) and a `filter` predicate (custom logic). Both run on every entry. See [`@warlock.js/logger/filter-log-entries/SKILL.md`](@warlock.js/logger/filter-log-entries/SKILL.md).
+6. **Logger-wide minimum severity** is available via `log.setMinLevel("info")` (or `configure({ minLevel })`). Entries below the rank are dropped before fan-out — cheaper than per-channel filters.
+7. **Redaction** is two-layer additive: `configure({ redact })` sets the logger floor; `new XxxChannel({ redact: { paths: [...] } })` adds more paths on top. Channels can never remove paths from the logger floor. See [`@warlock.js/logger/redact-sensitive-log-fields/SKILL.md`](@warlock.js/logger/redact-sensitive-log-fields/SKILL.md).
+8. **`FileLog` and `JSONFileLog` buffer in memory.** They flush when `maxMessagesToWrite` (default `100`) is hit, when 5 seconds have elapsed since the last write, or when `flushSync()` is called. See [`@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`](@warlock.js/logger/flush-logs-on-shutdown/SKILL.md).
+9. **Non-terminal channels receive ANSI-stripped messages.** `Logger.log` shallow-clones the entry per non-terminal channel before stripping, so later terminal channels still get the colored original.
+10. **`JSONFileLog.extension` is always `"json"`.** The option is ignored for this channel.
+11. **`captureAnyUnhandledRejection()` registers process listeners.** Call it once at startup, after channels are registered. Calling it twice installs duplicate listeners. See [`@warlock.js/logger/capture-unhandled-errors/SKILL.md`](@warlock.js/logger/capture-unhandled-errors/SKILL.md).
+
+## Minimal startup example
+
+```ts
+import { log, ConsoleLog, FileLog } from "@warlock.js/logger";
+
+log.configure({
+  channels: [
+    new ConsoleLog(),
+    new FileLog({ chunk: "daily", storagePath: "./storage/logs" }),
+  ],
+  autoFlushOn: ["SIGINT", "SIGTERM", "beforeExit"],
+});
+
+await log.info("users", "register", "New user created");
+await log.error("payments", "charge", new Error("Card declined"));
+```
+
+## The five levels
+
+```ts
+log.debug("module", "action", "verbose detail");      // dev-only diagnostics
+log.info("module", "action", "neutral event");        // user-visible event
+log.warn("module", "action", "something off");         // recoverable concern
+log.error("module", "action", error);                 // failure path
+log.success("module", "action", "operation done");    // explicit success
+```
+
+Every call signature is the same — `module`, `action`, `message`, optional `context`. `message` can be a string, object, or `Error` instance (file channels capture the stack).
+
+## Pick a skill
+
+| If the task is about… | Load |
+| --- | --- |
+| Picking a channel — what each built-in does, when to use which | [`@warlock.js/logger/pick-log-channel/SKILL.md`](@warlock.js/logger/pick-log-channel/SKILL.md) |
+| Startup — registering channels, environment-based setup, the `configure` method | [`@warlock.js/logger/configure-logger/SKILL.md`](@warlock.js/logger/configure-logger/SKILL.md) |
+| Filtering log output (`levels`, `filter`, per-channel routing, `minLevel`) | [`@warlock.js/logger/filter-log-entries/SKILL.md`](@warlock.js/logger/filter-log-entries/SKILL.md) |
+| Graceful shutdown — `flushSync`, `autoFlushOn`, signal behavior | [`@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`](@warlock.js/logger/flush-logs-on-shutdown/SKILL.md) |
+| Extending `LogChannel` to build a custom sink (Slack, database, HTTP) | [`@warlock.js/logger/write-custom-log-channel/SKILL.md`](@warlock.js/logger/write-custom-log-channel/SKILL.md) |
+| Routing Node's `unhandledRejection` / `uncaughtException` through the logger | [`@warlock.js/logger/capture-unhandled-errors/SKILL.md`](@warlock.js/logger/capture-unhandled-errors/SKILL.md) |
+| `log.assert(...)` and `log.timer(...)` shorthand helpers | [`@warlock.js/logger/use-log-helpers/SKILL.md`](@warlock.js/logger/use-log-helpers/SKILL.md) |
+| Redacting secrets — logger floor + additive channel paths | [`@warlock.js/logger/redact-sensitive-log-fields/SKILL.md`](@warlock.js/logger/redact-sensitive-log-fields/SKILL.md) |
+| Tests that assert on log output, or code under test that logs | [`@warlock.js/logger/test-logging-code/SKILL.md`](@warlock.js/logger/test-logging-code/SKILL.md) |
+
+## Things NOT to do
+
+- Don't try `log(module, action, message)` or `log({...})` directly — `log` is a `Logger` instance, not a function. Use `log.info(...)`, `log.error(...)`, etc., or the explicit `log.log({ type, module, action, message })` for the data-object form.
+- Don't set `extension` on `JSONFileLog` — it's hardcoded to `"json"` and your value is silently ignored.
+- Don't register multiple `FileLog` instances with the same `name` in the same `storagePath` — the lookup via `log.channel("file")` returns only one, and they'll fight over the same file.
+- Don't mix `autoFlushOn: ["SIGINT"]` with your own `process.on("SIGINT", ...)` handler — both fire, and ours re-raises mid-way through your async work.
+- Don't `await log.info(...)` expecting the write to be on disk — `FileLog` buffers. Call `log.flushSync()` (or rely on `autoFlushOn`) before the process exits.
+- Don't call `captureAnyUnhandledRejection()` more than once — it re-registers listeners every call and your rejections get logged N times.
+- Don't shadow the import in local code: `for (const log of logEntries) { ... }` will hide the singleton inside that block. Rename loop variables (`entry`, `record`) when working with logger imports.
+
+
+## overview  `@warlock.js/logger/overview/SKILL.md`
+
+---
+name: overview
+description: 'Front-door orientation for `@warlock.js/logger` — structured channel-based logging with five severity levels, PII redaction floor, buffered file/JSON channels, signal-flush on shutdown, ergonomic helpers (timer, assert). Standalone — no `@warlock.js/core` required. TRIGGER when: code imports anything from `@warlock.js/logger`; user asks "what does @warlock.js/logger do", "compare with pino / winston / bunyan", "structured logging for Node", "which logger should I use", "how do channels work"; package.json adds `@warlock.js/logger`. Skip: specific task already known — load the matching task skill directly (`logger-basics`, `configure-logger`, `pick-log-channel`, `write-custom-log-channel`, `redact-sensitive-log-fields`, `filter-log-entries`, `flush-logs-on-shutdown`, `capture-unhandled-errors`, `use-log-helpers`, `test-logging-code`); plain `console.log` in throwaway scripts.'
+---
+
+# `@warlock.js/logger` — overview
+
+Structured logging for Node. Five severity levels, a singleton plus a `Logger` class, channel-based fan-out (one entry → many sinks), PII redaction as a floor that channels can extend, buffered file writes with signal-triggered flush on shutdown, and a couple of ergonomic helpers (`timer`, `assert`) that turn boilerplate into one-liners.
+
+Ships standalone — `@warlock.js/core` is not required. Drop it into any Node project.
+
+## When to reach for it
+
+- Building a Node service that needs **structured** logs (key-value pairs, not bare strings) and you want them to land in multiple destinations (console for dev, JSON file for prod, third-party sink for audits) without rewriting the call sites.
+- You'd reach for **pino** or **winston** but want a smaller surface that's already wired into Warlock conventions (`module / action / message` shape, redaction floor, signal flush built-in).
+- Your team agrees that **`console.log` doesn't survive contact with production** — you need filtering, level routing, channel-specific sinks, and a redaction story before secrets leak into Slack/Datadog.
+
+Skip if your code is a throwaway script where `console.log` is genuinely fine — there's no value in adding a dependency for one-off logs.
+
+## The mental model in one paragraph
+
+You write `log.info("auth", "login", "user signed in", { userId })`. The logger fans that single entry out to every registered channel (`ConsoleLog`, `FileLog`, `JSONFileLog`, or your custom subclass). Each channel decides whether to emit it (per-level whitelist, per-channel filter predicate, logger-wide minimum severity). Redaction runs once at the logger level and can be extended per channel — never relaxed. Buffered channels (file + JSON file) drain on flush, either manually (`log.flushSync()`) or automatically via signal handlers (`enableAutoFlush(['SIGINT', 'SIGTERM', 'beforeExit'])`). That's the whole package.
+
+## Skills index
+
+Ten task skills cover everything. Load the one that matches your job — most callers only ever need `logger-basics` + `configure-logger` + `pick-log-channel`.
+
+### Foundations
+
+#### [`logger-basics`](@warlock.js/logger/logger-basics/SKILL.md)
+Start here. The `log` singleton, the five levels (`debug` / `info` / `warn` / `error` / `success`), how fan-out works, the `module / action / message / context` shape every entry carries.
+
+#### [`configure-logger`](@warlock.js/logger/configure-logger/SKILL.md)
+Wire channels at boot — `log.addChannel`, `log.setChannels`, `log.configure({ channels, autoFlushOn, redact, minLevel })`. Branch on `NODE_ENV`, replace the channel list, isolate a library's logger from the host singleton.
+
+### Channels
+
+#### [`pick-log-channel`](@warlock.js/logger/pick-log-channel/SKILL.md)
+Pick one of the three built-ins: `ConsoleLog` (terminal, colored), `FileLog` (plain `.log` on disk with rotation), `JSONFileLog` (structured JSON for aggregators — Datadog, Loki, ELK).
+
+#### [`write-custom-log-channel`](@warlock.js/logger/write-custom-log-channel/SKILL.md)
+Extend `LogChannel<Options>` for sinks the built-ins don't cover — Slack, HTTP endpoint, in-memory buffer, database. The lazy `init()` lifecycle (`setTimeout(0)`) and the `terminal: true/false` ANSI-stripping behavior are subtle — read this skill before subclassing.
+
+### Production concerns
+
+#### [`redact-sensitive-log-fields`](@warlock.js/logger/redact-sensitive-log-fields/SKILL.md)
+Strip secrets before they reach a sink. Logger-wide `setRedact({ paths, censor })` is the security floor; per-channel `redact` configs add paths (never remove). Dotted-glob paths (`*`, `**`); censor as string or function `(value, path) => any`.
+
+#### [`filter-log-entries`](@warlock.js/logger/filter-log-entries/SKILL.md)
+Drop entries before they cost anything. Logger-wide `setMinLevel("info")` is the fast path; per-channel `levels` array + `filter` predicate for fine control.
+
+#### [`flush-logs-on-shutdown`](@warlock.js/logger/flush-logs-on-shutdown/SKILL.md)
+Buffered channels (file + JSON file) need explicit drain. `log.flushSync()` manually, or `enableAutoFlush(['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK', 'SIGUSR2', 'beforeExit'])` to wire process signals. Signals are re-raised after flush so Node's default exit still runs.
+
+#### [`capture-unhandled-errors`](@warlock.js/logger/capture-unhandled-errors/SKILL.md)
+`captureAnyUnhandledRejection()` hooks `unhandledRejection` + `uncaughtException` and routes both through `log.error("app", ...)`. One call at startup, pair with `autoFlushOn: ['beforeExit']` to land the entry on disk.
+
+### Ergonomics + testing
+
+#### [`use-log-helpers`](@warlock.js/logger/use-log-helpers/SKILL.md)
+Two shortcuts every `Logger` exposes: `log.assert(condition, module, action, message, context?)` logs an error only when the condition is falsy (free on the happy path); `log.timer(module, action)` returns an end-function that emits `info` with a measured `durationMs`.
+
+#### [`test-logging-code`](@warlock.js/logger/test-logging-code/SKILL.md)
+Silence the logger globally in tests via `log.setChannels([])` in `setupFiles`. Assert specific entries with a capturing `LogChannel` subclass — it proves an entry was actually delivered through the pipeline (filters, redaction), not merely that a method was called, and it isolates cleanly by swapping `log.channels`.
+
+## Built-in channels at a glance
+
+| Channel | Sink | `terminal` | Buffered |
+| --- | --- | --- | --- |
+| `ConsoleLog` | `process.stdout` | `true` (colors kept) | no |
+| `FileLog` | `.log` files | `false` (ANSI stripped) | yes (5s timer or 100-entry buffer) |
+| `JSONFileLog` | `.json` files | `false` (ANSI stripped) | yes (same buffering) |
+
+`terminal: true` is the flag that decides whether the channel sees raw colored messages or stripped plain text. Custom channels: pick `true` if you write to a terminal, `false` for anything else.
+
+## What this package deliberately doesn't do
+
+- **Distributed tracing.** Use OpenTelemetry. Logger gets you structured local logs with `module / action`; trace correlation is a different problem.
+- **Log shipping.** Write a custom channel that POSTs to your aggregator, or use `JSONFileLog` + a sidecar (fluentbit, vector, promtail). The package doesn't bundle network sinks.
+- **Pretty-printing of arbitrary objects.** `ConsoleLog` has a `showContext` flag that runs `util.inspect` on the context object; for richer formatting, use `JSONFileLog` and view the file through your favorite viewer.
+- **Log analysis.** Querying / aggregating / alerting is on the sink side (Loki, ELK, Datadog).
+
+## See also
+
+- [`@warlock.js/core/warlock-conventions`](@warlock.js/core/warlock-conventions/SKILL.md) — the parent framework's conventions; logger is one of its foundation packages and ships transitively when you install core.
+- When synced via agent-kit, this `overview/SKILL.md` is flattened to the front-door skill `.claude/skills/warlock-js-logger-overview/` — every cross-link above uses the `@warlock.js/logger/<skill>/SKILL.md` name form so it survives that flattening.
+
+
+## pick-log-channel  `@warlock.js/logger/pick-log-channel/SKILL.md`
+
+---
+name: pick-log-channel
+description: 'Pick one of the three built-in channels — ConsoleLog (terminal), FileLog (plain text on disk), JSONFileLog (structured JSON for aggregators like Loki / Datadog / Elastic). Triggers: `ConsoleLog`, `FileLog`, `JSONFileLog`, `chunk`, `rotate`, `groupBy`, `maxFileSize`, `showContext`, `log.channel`; "log to a file", "rotate log files", "daily log chunks", "json logs for datadog / loki / elastic"; typical import `import { ConsoleLog, FileLog, JSONFileLog } from "@warlock.js/logger"`. Skip: custom sinks — `@warlock.js/logger/write-custom-log-channel/SKILL.md`; registration — `@warlock.js/logger/configure-logger/SKILL.md`; competing libs `winston-daily-rotate-file`, `pino-pretty`.'
+---
+
+# Channels — which one to pick and how to configure it
+
+Three built-in channels. A channel is a destination for a log entry — the logger fans out every entry to every registered channel in parallel.
+
+## The decision
+
+| Need | Pick |
+|---|---|
+| Local dev, colored output in the terminal | `ConsoleLog` |
+| Plain text `.log` files on disk — humans read them | `FileLog` |
+| Structured `.json` files — a log aggregator (Loki / Datadog / Elastic) reads them | `JSONFileLog` |
+
+Most production setups use **two** channels: `ConsoleLog` + one file channel. Dev uses `ConsoleLog` only.
+
+## `ConsoleLog`
+
+Zero config. Colored, icon-prefixed lines to the terminal.
+
+```ts
+import { ConsoleLog } from "@warlock.js/logger";
+
+new ConsoleLog();
+// ⚙ (2024-03-15T10:22:00.000Z) [auth] [hashPassword] Hashing started
+// ℹ (2024-03-15T10:22:01.482Z) [users] [register] New user created
+// ✗ (2024-03-15T10:22:03.111Z) [payments] [charge] Card declined
+```
+
+Properties:
+- `name = "console"`, `terminal = true`
+- Accepts `ConsoleLogConfig` — `levels`, `filter`, `dateFormat`, `showContext`, `contextDepth`
+- If `message` is an object, a second `console.log(message)` is issued so Node's inspector can expand it
+
+### Showing context
+
+By default `ConsoleLog` drops the `context` payload (the file/JSON channels still keep it). Flip `showContext: true` to render it on a second line — useful in development:
+
+```ts
+new ConsoleLog({ showContext: true });
+
+log.info("payments", "charge", "card declined", { userId: 42, amount: 1999 });
+// ℹ (…) [payments] [charge] card declined
+//   ↳ { userId: 42, amount: 1999 }
+```
+
+Tune `contextDepth` (default `4`) to clamp how deep `util.inspect` recurses into nested objects.
+
+## `FileLog`
+
+Plain text. Buffers in memory, flushes to disk periodically.
+
+```ts
+import { FileLog } from "@warlock.js/logger";
+
+new FileLog({
+  storagePath: "./storage/logs",  // default: process.cwd() + "/storage/logs"
+  name: "app",                    // default: "app"
+  extension: "log",               // default: "log"
+  chunk: "daily",                 // "single" (default) | "daily" | "hourly"
+  rotate: true,                   // default: true
+  maxFileSize: 10 * 1024 * 1024,  // default: 10MB — triggers rotation
+  maxMessagesToWrite: 100,        // default: 100 — flush threshold
+  groupBy: ["level", "module"],   // optional subdirectory nesting
+});
+```
+
+Line format: `[date time] [level] [module][action]: message` — or a `[trace]` block when `message` is an `Error`.
+
+### Key gotchas
+
+- **Buffers!** Messages sit in memory until either `maxMessagesToWrite` is reached, 5 seconds pass, or `flushSync()` is called. A process that crashes without flushing loses buffered entries.
+- **`chunk: "daily"` picks a filename per day.** File name becomes `DD-MM-YYYY.log`. Combined with `rotate: true`, rotated archives get `Date.now()` suffixed.
+- **`groupBy` nests directories.** `groupBy: ["level", "module"]` produces `storage/logs/error/payments/app.log`. Order matters.
+- **Dispose channels you discard.** A live `FileLog` keeps a 5-second flush interval running. If you swap the channel list at runtime (reconfigure the logger), call `channel.dispose()` on the old instance — it clears that timer and drains the buffer one last time. Skipping it leaks one timer per discarded channel and keeps the event loop alive. (Channels that live for the whole process don't need this — process exit clears the timer.)
+
+## `JSONFileLog`
+
+Subclass of `FileLog` — same buffering, chunking, rotation, grouping. Output is a JSON object with a `messages` array:
+
+```json
+{
+  "messages": [
+    {
+      "content": "Card declined",
+      "level": "error",
+      "date": "15-03-2024 10:22:03",
+      "module": "payments",
+      "action": "charge",
+      "stack": [
+        "Error: Card declined",
+        "    at chargeCard (/app/src/payments.ts:42:11)"
+      ]
+    }
+  ]
+}
+```
+
+Differences from `FileLog`:
+- `name = "fileJson"` (**not** `"json"` — use this exact string for `log.channel("fileJson")`)
+- `extension` is always `"json"` — the option is silently ignored
+- Error `stack` is stored as `string[]` (split on newlines) — easy to query in aggregators
+- `content` holds the original user-supplied `message` (not a pre-formatted line)
+- Corrupted existing file → reinitialized to `{ messages: [] }` on next write (does not throw)
+- **Safe serialization by construction.** All writes go through `safe-stable-stringify` with a custom `Error` replacer — circular refs become `"[Circular]"`, BigInt is stringified, functions/symbols are dropped, nested `Error` instances expand to `{ name, message, stack, ...enumerable }`. A context payload with a class graph or circular reference will never throw during the write.
+
+## Shared config — `BasicLogConfigurations`
+
+Every channel constructor accepts at minimum:
+
+```ts
+type BasicLogConfigurations = {
+  levels?: LogLevel[];                       // whitelist — omit or [] to allow all
+  filter?: (data: LoggingData) => boolean;   // custom predicate
+  dateFormat?: { date?: string; time?: string }; // Day.js format strings
+  context?: (data) => Promise<Record<string, any>>; // reserved — not yet read
+};
+```
+
+Concrete file channels extend this with their storage/chunk/rotate/groupBy options via intersection.
+
+## Picking a channel by name at runtime
+
+```ts
+log.channel("console");   // → ConsoleLog | undefined
+log.channel("file");      // → FileLog | undefined
+log.channel("fileJson");  // ← note the name — NOT "json"
+```
+
+If two channels share a `name`, only one is reachable this way — the search returns the first match.
+
+## See also
+
+- [`@warlock.js/logger/configure-logger/SKILL.md`](@warlock.js/logger/configure-logger/SKILL.md) — registering channels at startup
+- [`@warlock.js/logger/filter-log-entries/SKILL.md`](@warlock.js/logger/filter-log-entries/SKILL.md) — `levels` and `filter` config in detail
+- [`@warlock.js/logger/write-custom-log-channel/SKILL.md`](@warlock.js/logger/write-custom-log-channel/SKILL.md) — extending `LogChannel` for custom sinks
+
+
+## redact-sensitive-log-fields  `@warlock.js/logger/redact-sensitive-log-fields/SKILL.md`
+
+---
+name: redact-sensitive-log-fields
+description: 'Strip secrets from log output — two-layer additive redaction via log.configure({redact: {paths}}) (logger floor) + per-channel redact (more paths on top). Dotted glob paths (*, **). Triggers: `redact`, `paths`, `censor`, `log.setRedact`, `applyRedact`; "redact passwords in logs", "strip tokens from log output", "hide authorization headers", "scrub PII before logging"; typical import `import { log } from "@warlock.js/logger"`. Skip: filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; custom sinks — `@warlock.js/logger/write-custom-log-channel/SKILL.md`; competing libs `pino.redact`, `fast-redact`.'
+---
+
+# Redaction — keeping secrets out of logs
+
+Two layers, both opt-in. Configured at the logger and/or per channel.
+
+## The model in one line
+
+> Logger-wide redaction is the security floor. Per-channel redaction adds more paths. **No channel can ever undo a logger-wide redaction.**
+
+That guarantee is the whole point — once you've set `password` to redact at the logger, you can audit one place to know nothing leaks it, regardless of how many channels you add.
+
+## Logger-wide floor
+
+```ts
+import { log } from "@warlock.js/logger";
+
+log.configure({
+  redact: {
+    paths: [
+      "context.password",
+      "context.*.token",
+      "context.headers.authorization",
+    ],
+    censor: "[REDACTED]",  // default — string or function
+  },
+});
+
+// runtime equivalent:
+log.setRedact({ paths: ["context.password"] });
+log.setRedact(undefined);  // clear
+```
+
+Every channel sees the redacted entry. Cheap: applied **once** before fan-out; channels share the redacted clone unless they add their own paths.
+
+## Per-channel additive
+
+```ts
+new SlackChannel({
+  webhook: "...",
+  redact: {
+    paths: ["context.user.email", "context.metadata.*"],
+    // censor inherited from logger-wide when omitted
+  },
+});
+```
+
+The channel's `paths` are **merged** with the logger floor — the channel runs a single combined redact pass, never replaces the floor. The channel's `censor` (if provided) wins for both its own and the logger's paths in this channel only; the logger floor still uses its own censor for other channels.
+
+### When to set redact per-channel
+
+- Loud destinations with broader audiences (Slack, Discord, error trackers, anything off your machine) — redact more aggressively.
+- Local-only destinations (FileLog you alone read, the dev terminal) — keep the floor minimal so you can debug.
+
+### When NOT to set it
+
+If you want raw context in your dev terminal, **don't add redact at the logger level** — set it only on the file/JSON/network channels. Logger-wide is the floor, so it applies everywhere; you can't opt a single channel out.
+
+## Path syntax
+
+Paths are dotted glob patterns evaluated against the full `LoggingData`:
+
+```
+type LoggingData = {
+  type: "info" | ...,
+  module: string,
+  action: string,
+  message: any,        // ← prefix paths with "message." to redact here
+  context?: object,    // ← prefix paths with "context." to redact here
+};
+```
+
+| Pattern | Matches |
+| --- | --- |
+| `context.password` | exactly `data.context.password` |
+| `context.*.token` | `data.context.<any>.token` (one segment in between) |
+| `**.password` | `data.context.password`, `data.context.user.password`, … any depth |
+| `message.apiKey` | when message is an object, `data.message.apiKey` |
+| `context.users.*.token` | array element redaction (`*` matches indices too) |
+
+Wildcards:
+
+- `*` — exactly one segment (any object key, any array index).
+- `**` — zero or more segments, greedily; matches at any depth.
+
+## Censor variants
+
+```ts
+// String — replace with a literal.
+{ censor: "[REDACTED]" }
+{ censor: "***" }
+
+// Function — receives original value + dotted path, returns the replacement.
+{
+  censor: (value, path) => {
+    if (typeof value !== "string") return "[REDACTED]";
+    return value.length > 4 ? `${value.slice(0, 2)}***${value.slice(-2)}` : "***";
+  },
+}
+```
+
+Function censors are called for every match — keep them cheap. The path is the actual matched location (e.g. `"context.users.0.token"` for an array hit).
+
+## Immutability
+
+`applyRedact` always returns a deep clone — your input data is never mutated. `Date` and `Error` instances are reconstructed (so `instanceof` checks still work). Circular references are tolerated.
+
+## What about the `message` field?
+
+If `message` is a plain object, paths under `message.*` work as expected. If `message` is a string (the most common case), redaction won't scan it — string scrubbing requires regex and is out of scope for this primitive. Wrap secrets in `context` and they'll be redacted reliably.
+
+## Performance notes
+
+- **No redact configured** → zero overhead (no clone, no walk).
+- **Logger-wide redact only** → one deep clone + one path-walk per `log()` call, shared by every channel.
+- **Channel adds paths** → that channel re-clones from the original input and runs the merged pass once. Other channels still share the cheaper logger-wide clone.
+- Each path is matched independently; cost grows linearly with `paths.length`.
+
+For most apps with `<10` redact paths and shallow context, the cost is below 100µs per entry. If you're logging millions of entries per second through paths like `**.something`, profile before scaling up — `**` is the only pattern that recurses through every key.
+
+
+## test-logging-code  `@warlock.js/logger/test-logging-code/SKILL.md`
+
+---
+name: test-logging-code
+description: 'Test code that touches the logger — silence globally via log.setChannels([]) in setupFiles, assert specific log lines via a capturing LogChannel subclass (prefer it over vi.spyOn — it asserts on delivered entries, not just method calls, and isolates the shared singleton cleanly). Triggers: `log.setChannels`, `LogChannel`, `LoggingData`, `Logger`, `log.channels`; "silence logger in vitest", "assert a log line was emitted", "capture log output in tests", "test code that logs"; typical import `import { log, Logger, LogChannel, type LoggingData } from "@warlock.js/logger"`. Skip: custom sinks — `@warlock.js/logger/write-custom-log-channel/SKILL.md`; filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; competing `vi.spyOn(console)`, `jest.spyOn`.'
+---
+
+# Testing — code that logs, and asserting on log output
+
+Two scenarios: **silencing the logger during tests** (most common) and **asserting that a specific log line was emitted**.
+
+## Silence the logger during tests
+
+Clear every channel once, globally. No output, no file handles, no noise.
+
+```ts title="src/setupTests.ts"
+import { log } from "@warlock.js/logger";
+
+log.setChannels([]);
+```
+
+Wire it in Vitest:
+
+```ts title="vitest.config.ts"
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    setupFiles: ["src/setupTests.ts"],
+  },
+});
+```
+
+## Assert on log output — use a capturing channel
+
+Don't spy on `console.log` and don't mock `log.info` — assert on what a channel actually received instead (see "Why not spy on `log.info`?" below). The cleanest pattern is a tiny channel that records what it sees:
+
+```ts
+import { LogChannel } from "@warlock.js/logger";
+import type { LoggingData } from "@warlock.js/logger";
+
+class CapturingChannel extends LogChannel {
+  public name = "capture";
+  public terminal = false;
+  public received: LoggingData[] = [];
+  public log(data: LoggingData) { this.received.push({ ...data }); }
+}
+```
+
+### Test against the singleton
+
+```ts
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { log } from "@warlock.js/logger";
+import { createUser } from "./users";
+
+describe("createUser", () => {
+  let capture: CapturingChannel;
+  let originalChannels: typeof log.channels;
+
+  beforeEach(() => {
+    capture = new CapturingChannel();
+    originalChannels = log.channels;
+    log.channels = [capture];
+  });
+
+  afterEach(() => {
+    log.channels = originalChannels;
+  });
+
+  it("logs a success entry when the user is created", async () => {
+    await createUser({ email: "a@b.com" });
+
+    expect(capture.received).toContainEqual(
+      expect.objectContaining({
+        type: "success",
+        module: "users",
+        action: "create",
+      }),
+    );
+  });
+});
+```
+
+### Test an isolated logger (avoid touching the singleton)
+
+If the code under test accepts a logger via injection, create one per test:
+
+```ts
+import { Logger } from "@warlock.js/logger";
+
+const testLogger = new Logger();
+const capture = new CapturingChannel();
+testLogger.addChannel(capture);
+
+await createUser({ email: "a@b.com" }, testLogger);
+
+expect(capture.received[0]!.type).toBe("success");
+```
+
+No cleanup needed — the local `Logger` is garbage-collected.
+
+## Why not spy on `log.info`?
+
+`log` is a plain `Logger` instance (`export const log = new Logger()`) and every level method lives on the prototype, so `vi.spyOn(log, "info")` *does* technically work. Prefer the capturing channel anyway:
+
+- A spy on `log.info` proves the method was **called**, not that an entry was **delivered** — it skips the whole pipeline (`minLevel` floor, redaction, per-channel `levels` / `filter`). A capturing channel asserts on the entry your code under test actually produced after all of that ran.
+- The `log` singleton is shared global state. A spy you forget to `mockRestore()` leaks into the next test; swapping `log.channels` and restoring it in `afterEach` is the same amount of code and isolates cleanly.
+- Code that logs through `log.error(...)` and the bare object form `log.log({ type, ... })` both land in channels, but only the level shortcut goes through `log.info` — a channel catches both.
+
+So capture through a channel as shown above; reach for a method spy only when you specifically want to assert "this exact shortcut was invoked".
+
+## Testing a custom channel
+
+Write specs against the channel directly; don't route through `Logger`:
+
+```ts
+import { describe, it, expect, vi } from "vitest";
+import { SlackLog } from "./slack-log";
+
+describe("SlackLog", () => {
+  it("skips non-error levels", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response());
+
+    const channel = new SlackLog({ webhookUrl: "https://test", levels: ["error"] });
+    await channel.log({ type: "info", module: "x", action: "y", message: "z" });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+```
+
+## Testing `FileLog` and `JSONFileLog`
+
+Use real temp directories — it's the only way to exercise file IO, rotation, chunking, and JSON I/O with fidelity:
+
+```ts
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { randomUUID } from "node:crypto";
+
+function tempDir() {
+  const dir = path.join(os.tmpdir(), "logger-test", randomUUID());
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+```
+
+Clean up in `afterEach(() => fs.rmSync(dir, { recursive: true, force: true }))`.
+
+## Waiting for async init
+
+`LogChannel.init()` runs inside a `setTimeout(0)`. Before asserting on post-init behavior, yield once:
+
+```ts
+const channel = new FileLog({ storagePath: tempDir() });
+await new Promise((r) => setTimeout(r, 10));
+// Now `channel.isInitialized` is true and it's safe to call `channel.log(...)` for real I/O.
+```
+
+## Testing `captureAnyUnhandledRejection`
+
+Don't actually throw unhandled rejections in tests — emit the listener directly:
+
+```ts
+captureAnyUnhandledRejection();
+process.emit("unhandledRejection", new Error("test"), Promise.resolve());
+```
+
+See [`@warlock.js/logger/capture-unhandled-errors/SKILL.md`](@warlock.js/logger/capture-unhandled-errors/SKILL.md) for a full example.
+
+
+## use-log-helpers  `@warlock.js/logger/use-log-helpers/SKILL.md`
+
+---
+name: use-log-helpers
+description: 'Two DX shortcuts on every Logger — log.assert(condition, module, action, message, context?) logs an error when condition is falsy (free on the happy path), log.timer(module, action) returns an end-function emitting an info entry with measured duration. Triggers: `log.assert`, `log.timer`, `durationMs`; "assert an invariant via logger", "measure how long an operation took", "time a request", "log operation duration"; typical import `import { log } from "@warlock.js/logger"`. Skip: basics — `@warlock.js/logger/logger-basics/SKILL.md`; filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; competing `console.assert`, `console.time`, `console.timeEnd`, `perf_hooks.performance.now`.'
+---
+
+# Helpers — `assert`, `timer`
+
+Two small DX shortcuts on every `Logger` (and the bound `log` helper). They route through the normal log pipeline — every channel sees what they emit.
+
+## `log.assert(condition, module, action, message, context?)`
+
+Logs an `error` entry when `condition` is falsy. Genuinely free in the happy path: when the condition is truthy, the entry is never built and channels are never invoked.
+
+```ts
+log.assert(user !== null, "auth", "session", "user vanished mid-flight", {
+  sessionId,
+});
+
+// truthy → no log call
+// falsy  → equivalent to log.error("auth", "session", "user vanished...", { sessionId })
+```
+
+The level is implicitly `error` — assertions express failures, not warnings. If you need a non-error level, use `log.error` / `log.warn` directly with your own `if`.
+
+### Why not `console.assert`?
+
+`console.assert` writes to stderr only and bypasses your file/JSON channels. `log.assert` runs through the logger pipeline, so a failed assertion is captured by every persistent channel you've configured. See [`@warlock.js/logger/pick-log-channel/SKILL.md`](@warlock.js/logger/pick-log-channel/SKILL.md).
+
+## `log.timer(module, action)`
+
+Returns an end-function. Calling it emits an `info` entry with `completed in <ms>ms` and a `durationMs` field in `context`.
+
+```ts
+const end = log.timer("db", "users.findById");
+const user = await usersRepo.findById(id);
+end({ id, found: !!user });
+// ℹ [db] [users.findById] completed in 12ms
+//   ↳ { durationMs: 12, id: "abc", found: true } (when ConsoleLog has showContext: true)
+```
+
+Common patterns:
+
+```ts
+// Around an HTTP handler
+async function handle(req) {
+  const end = log.timer("http", `${req.method} ${req.url}`);
+  try {
+    return await runHandler(req);
+  } finally {
+    end({ status: res.statusCode });
+  }
+}
+
+// Around a job
+const end = log.timer("jobs", "nightly-report");
+await report.run();
+end({ rowsProcessed: report.rowCount });
+```
+
+`end()` can be called more than once if you want intermediate checkpoints — each call emits a fresh entry with the duration measured from the original `timer()` call.
+
+### Caveats
+
+- The duration is `Date.now()` based — millisecond resolution. For sub-millisecond profiling, reach for `performance.now()` directly.
+- The end-function captures `this` at construction; calling it after the logger is reconfigured still routes through the same `Logger` instance.
+- `log.timer` shorthand binds to the singleton — see [`@warlock.js/logger/test-logging-code/SKILL.md`](@warlock.js/logger/test-logging-code/SKILL.md) for how to swap channels per test.
+
+
+## write-custom-log-channel  `@warlock.js/logger/write-custom-log-channel/SKILL.md`
+
+---
+name: write-custom-log-channel
+description: 'Extend the abstract LogChannel class for custom sinks — Slack, database, HTTP endpoint, in-memory buffer. Triggers: `LogChannel`, `LogContract`, `LoggingData`, `shouldBeLogged`, `init`, `flushSync`, `terminal`; "log to slack", "log to a database", "send logs to datadog / loki HTTP api", "in-memory test capture channel", "build a custom log sink"; typical import `import { LogChannel, type LoggingData, type LogContract } from "@warlock.js/logger"`. Skip: built-in channels — `@warlock.js/logger/pick-log-channel/SKILL.md`; filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; competing libs `winston-transport`, `pino-transport`.'
+---
+
+# Custom channels — extending `LogChannel`
+
+Build a sink for any destination — Slack, a database, an HTTP endpoint — by extending the abstract `LogChannel` class.
+
+## The 5-line minimum
+
+```ts
+import { LogChannel, type LoggingData } from "@warlock.js/logger";
+
+export class NullChannel extends LogChannel {
+  public name = "null";
+  public log(_data: LoggingData) {}
+}
+```
+
+Then:
+```ts
+log.addChannel(new NullChannel());
+```
+
+That's a working channel. `LogChannel` provides the scaffolding; you only need to supply `name` and `log()`.
+
+## What `LogChannel` gives you
+
+| Thing | Who provides it |
+|---|---|
+| `name`, `description`, `terminal` | You (fields on your subclass) |
+| `log(data)` | **You must implement** — abstract |
+| `flushSync()` | You (optional — only if you buffer) |
+| `init()` | You (optional async hook — see below) |
+| `shouldBeLogged(data)` | `LogChannel` — combines `levels` + `filter` |
+| `config<K>(key)` | `LogChannel` — merges user config with `defaultConfigurations` |
+| `getDateAndTimeFormat()` | `LogChannel` — returns resolved `dateFormat` |
+
+## Complete example — SlackLog
+
+```ts title="src/channels/slack-log.ts"
+import { LogChannel, type BasicLogConfigurations, type LoggingData } from "@warlock.js/logger";
+
+// `LogChannel<Options>` constrains `Options extends BasicLogConfigurations`,
+// so extend the base to keep the inherited levels / filter / redact options.
+type SlackConfig = BasicLogConfigurations & {
+  webhookUrl: string;
+};
+
+export class SlackLog extends LogChannel<SlackConfig> {
+  public name = "slack";
+  public description = "Posts errors + warnings to a Slack webhook";
+
+  public async log(data: LoggingData) {
+    if (!this.shouldBeLogged(data)) return;   // ← inherit levels + filter
+
+    await fetch(this.config("webhookUrl"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: `[${data.type.toUpperCase()}] [${data.module}][${data.action}]: ${data.message}`,
+      }),
+    });
+  }
+}
+```
+
+Register it alongside built-ins:
+
+```ts
+log.setChannels([
+  new ConsoleLog(),
+  new FileLog({ chunk: "daily" }),
+  new SlackLog({
+    webhookUrl: process.env.SLACK_WEBHOOK_URL!,
+    levels: ["error", "warn"],
+  }),
+]);
+```
+
+## The `init()` hook
+
+Override `protected async init()` for one-time setup — open a socket, connect to a DB, prepare a write stream. Runs automatically after construction (inside a `setTimeout(0)`); `isInitialized` flips to `true` once resolved.
+
+```ts
+export class DatabaseLog extends LogChannel<
+  BasicLogConfigurations & { connectionString: string }
+> {
+  public name = "database";
+  private client!: SomeDbClient;
+
+  protected async init() {
+    this.client = await SomeDbClient.connect(this.config("connectionString"));
+  }
+
+  public async log(data: LoggingData) {
+    if (!this.shouldBeLogged(data)) return;
+    await this.client.insert("logs", data);
+  }
+}
+```
+
+## Implementing `flushSync()`
+
+Only if your channel buffers. Signature: `flushSync?(): void`. Synchronous — no `await`, no promises.
+
+```ts
+export class BatchHttpLog extends LogChannel<BasicLogConfigurations & { url: string }> {
+  public name = "batch-http";
+  private buffer: LoggingData[] = [];
+
+  public log(data: LoggingData) {
+    if (!this.shouldBeLogged(data)) return;
+    this.buffer.push(data);
+    if (this.buffer.length >= 100) void this.drain();
+  }
+
+  public flushSync() {
+    // Synchronous HTTP — use `node:http` or `XMLHttpRequest` polyfill.
+    // If sync HTTP isn't possible, at least dump the buffer to disk here
+    // so a follow-up async drain can recover it next boot.
+  }
+
+  private async drain() { /* async post to this.config("url") */ }
+}
+```
+
+## The `terminal` property
+
+- `terminal = true` (ConsoleLog default) → the logger passes the **original** message, ANSI codes intact.
+- `terminal = false` (base default, all file channels) → the logger passes a shallow-cloned copy whose `message` has ANSI codes stripped.
+
+Set `terminal = true` on a channel only if its output is a TTY that should render colors.
+
+## `LogContract` — the minimal interface
+
+If you don't want anything `LogChannel` provides (level filtering, config merging), implement `LogContract` directly:
+
+```ts
+import type { LogContract, LoggingData } from "@warlock.js/logger";
+
+class MinimalSlack implements LogContract {
+  public name = "slack";
+
+  public async log(data: LoggingData) {
+    if (data.type !== "error") return;
+    await fetch(process.env.SLACK_WEBHOOK!, { /* ... */ });
+  }
+}
+```
+
+Prefer extending `LogChannel` unless you have a concrete reason not to — the level/filter plumbing is worth keeping.
+
+## Don't do
+
+- Don't mutate `data` inside `log()`. Later channels see the mutation if the logger passes the same reference.
+- Don't throw synchronously from `log()`. The logger fires it without awaiting; an unhandled rejection takes down the process (unless `captureAnyUnhandledRejection` is wired up — and then it's embarrassing to be the cause).
+- Don't block the event loop. `log()` may be sync or async; if your work takes >100ms, make it async and return the promise.
+- Don't forget `shouldBeLogged(data)` at the top of `log()` — or your channel silently ignores `levels` / `filter` config.
+
+

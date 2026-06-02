@@ -1,40 +1,39 @@
 {
-    "name": "@warlock.js/logger",
-    "version": "4.0.174",
-    "description": "A powerful logging system  for messages and errors in nodejs.",
-    "main": "./cjs/index.js",
-    "scripts": {
-        "test:coverage": "jest ./tests --coverage",
-        "test:watch": "jest ./tests --watch",
-        "test": "jest ./tests",
-        "test:file": "jest"
-    },
-    "dependencies": {
-        "@mongez/fs": "^3.0.4",
-        "@mongez/copper": "^1.0.1",
-        "@mongez/reinforcements": "^2.3.17",
-        "dayjs": "^1.11.9"
-    },
-    "devDependencies": {
-        "@types/jest": "^29.5.0",
-        "jest": "^29.5.0",
-        "ts-jest": "^29.0.5",
-        "typescript": "^5.0.2"
-    },
-    "keywords": [
-        "password",
-        "hash",
-        "make",
-        "generate",
-        "verify",
-        "brute-force"
-    ],
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/hassanzohdy/mongez-password"
-    },
-    "author": "hassanzohdy",
-    "license": "MIT",
-    "module": "./esm/index.js",
-    "typings": "./cjs/index.d.ts"
+  "name": "@warlock.js/logger",
+  "version": "4.1.0",
+  "type": "module",
+  "description": "A powerful logging system  for messages and errors in nodejs.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@warlock.js/fs": "*",
+    "@mongez/copper": "^2.1.2",
+    "@mongez/reinforcements": "^3.2.0",
+    "dayjs": "^1.11.9",
+    "safe-stable-stringify": "^2.5.0"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.0.16",
+    "typescript": "^5.0.2",
+    "vitest": "^4.0.16"
+  },
+  "keywords": [
+    "logger",
+    "log",
+    "logging",
+    "file-log",
+    "console-log"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warlockjs/logger"
+  },
+  "author": "hassanzohdy",
+  "license": "MIT",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "typings": "./src/index.ts"
 }

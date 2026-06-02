@@ -1,4 +1,4 @@
-import { ensureDirectoryAsync } from "@mongez/fs";
+import { ensureDirectoryAsync } from "@warlock.js/fs";
 import dayjs from "dayjs";
 import fs from "fs";
 import { EOL } from "os";
@@ -129,6 +129,13 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
   protected isWriting = false;
 
   /**
+   * Handle for the periodic flush interval. Stored so it can be cleared
+   * in `dispose()` — long-lived processes that create channels dynamically
+   * would otherwise leak one timer per channel.
+   */
+  protected flushIntervalHandle?: NodeJS.Timeout;
+
+  /**
    * Check file size for file rotation
    */
   protected async checkAndRotateFile(filePath = this.filePath) {
@@ -140,10 +147,9 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
         await this.rotateLogFile();
       }
     } catch (error: any) {
-      if (error.code === "ENOENT") {
-        // File doesn't exist, this can be normal if it's a new file
-        console.log("Log file does not exist, will be created on first write.");
-      } else {
+      // ENOENT is expected when the file hasn't been created yet — there is
+      // nothing to rotate, so stay silent. Surface anything else.
+      if (error.code !== "ENOENT") {
         console.error("Error checking log file:", error);
       }
     }
@@ -166,16 +172,37 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
 
   /**
    * Flush messages
+   *
+   * Starts a periodic re-check so low-traffic channels don't sit on buffered
+   * entries indefinitely. The handle is stored on the instance so `dispose()`
+   * can stop it — without this, every channel leaks a timer for the lifetime
+   * of the process.
    */
   protected initMessageFlush() {
-    setInterval(() => {
+    this.flushIntervalHandle = setInterval(() => {
       if (
         this.messages.length > 0 &&
         (this.messages.length >= this.maxMessagesToWrite || Date.now() - this.lastWriteTime > 5000)
       ) {
         this.writeMessagesToFile();
       }
-    }, 5000); // Periodic check
+    }, 5000);
+  }
+
+  /**
+   * Stop the background flush interval and drain any buffered entries.
+   *
+   * Call this when discarding a channel (e.g. reconfiguring the logger at
+   * runtime) so the 5-second timer doesn't keep the event loop alive. Safe to
+   * call more than once.
+   */
+  public dispose(): void {
+    if (this.flushIntervalHandle) {
+      clearInterval(this.flushIntervalHandle);
+      this.flushIntervalHandle = undefined;
+    }
+
+    this.flushSync();
   }
 
   /**

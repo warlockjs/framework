@@ -1,9 +1,71 @@
-import type { LogChannel } from "./log-channel";
-import type { Logger } from "./logger";
-
 export type LogLevel = "debug" | "info" | "warn" | "error" | "success";
 
+/**
+ * Process-level events that `Logger.enableAutoFlush()` can hook to drain
+ * buffered channels before the process terminates.
+ *
+ * - Signals (`SIGINT`, `SIGTERM`, `SIGHUP`, `SIGBREAK`, `SIGUSR2`) are flushed
+ *   then re-raised so Node's default exit behavior runs.
+ * - `beforeExit` is flushed in place — Node exits on its own afterwards.
+ */
+export type AutoFlushEvent =
+  | "SIGINT"
+  | "SIGTERM"
+  | "SIGHUP"
+  | "SIGBREAK"
+  | "SIGUSR2"
+  | "beforeExit";
+
 export type DebugMode = "daily" | "monthly" | "yearly" | "hourly";
+
+/**
+ * Replacement value used by `RedactConfig`. Either a literal string
+ * (e.g. `"[REDACTED]"`) or a function that receives the original value plus
+ * the dotted path it sits at and returns whatever should replace it.
+ */
+export type RedactCensor =
+  | string
+  | ((value: any, path: string) => any);
+
+/**
+ * Strip sensitive fields from log entries before they reach a channel.
+ *
+ * Paths are dotted glob patterns evaluated against the `LoggingData` itself —
+ * use `context.password`, `message.token`, etc. Wildcards:
+ *
+ * - `*`  — matches a single segment (any one key)
+ * - `**` — matches zero or more segments (any depth, any key)
+ *
+ * Configurable in two places:
+ *
+ * 1. **Logger-wide** via `Logger.configure({ redact })` — applied once before
+ *    fan-out. This is the security floor; no channel can undo it.
+ * 2. **Per channel** via the channel's options. Channel paths are *additive*:
+ *    they extend (never replace) the logger-wide list, so a channel can only
+ *    redact more, never less.
+ *
+ * @example
+ * logger.configure({
+ *   redact: {
+ *     paths: ["context.password", "context.*.token", "context.headers.authorization"],
+ *     censor: "[REDACTED]",
+ *   },
+ * });
+ */
+export type RedactConfig = {
+  /**
+   * Glob path patterns to redact. Paths are evaluated against the full
+   * `LoggingData` object — so prefix with `context.` or `message.` to scope
+   * to either field.
+   */
+  paths: string[];
+  /**
+   * Replacement applied at each matched path.
+   *
+   * @default "[REDACTED]"
+   */
+  censor?: RedactCensor;
+};
 
 export type BasicLogConfigurations = {
   /**
@@ -27,6 +89,12 @@ export type BasicLogConfigurations = {
    * Add additional context to the log
    */
   context?: (data: LoggingData) => Promise<Record<string, any>>;
+  /**
+   * Channel-specific redaction. Additive on top of the logger-wide config —
+   * the channel's paths extend (never replace) the logger floor. The
+   * `censor` here, when omitted, falls back to the logger-wide censor.
+   */
+  redact?: RedactConfig;
 };
 
 export type LogMessage = {
@@ -76,40 +144,3 @@ export type LoggingData = {
 };
 
 export type OmittedLoggingData = Omit<LoggingData, "type">;
-
-export interface Log {
-  (data: LoggingData): Promise<Logger>;
-  /**
-   * Make info log
-   */
-  info(data: OmittedLoggingData): Promise<Logger>;
-  info(module: string, action: string, message: any): Promise<Logger>;
-  /**
-   * Make debug log
-   */
-  debug(data: OmittedLoggingData): Promise<Logger>;
-  debug(module: string, action: string, message: any): Promise<Logger>;
-  /**
-   * Make warn log
-   */
-  warn(data: OmittedLoggingData): Promise<Logger>;
-  warn(module: string, action: string, message: any): Promise<Logger>;
-  /**
-   * Make error log
-   */
-  error(data: OmittedLoggingData): Promise<Logger>;
-  error(module: string, action: string, message: any): Promise<Logger>;
-  /**
-   * Make success log
-   */
-  success(data: OmittedLoggingData): Promise<Logger>;
-  success(module: string, action: string, message: any): Promise<Logger>;
-  /**
-   * Get channel by name
-   */
-  channel(name: string): LogChannel | undefined;
-  /**
-   * Synchronously flush all logs
-   */
-  flushSync(): void;
-}

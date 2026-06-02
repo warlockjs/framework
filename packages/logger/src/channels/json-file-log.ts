@@ -1,13 +1,9 @@
-import {
-  ensureDirectoryAsync,
-  fileExistsAsync,
-  getJsonFileAsync,
-  putJsonFileAsync,
-} from "@mongez/fs";
+import { ensureDirectoryAsync, fileExistsAsync, getJsonFileAsync } from "@warlock.js/fs";
 import dayjs from "dayjs";
 import fs from "fs";
 import path from "path";
 import type { LogContract, LogMessage, LoggingData } from "../types";
+import { safeJsonStringify } from "../utils/safe-json-stringify";
 import { FileLog } from "./file-log";
 
 export class JSONFileLog extends FileLog implements LogContract {
@@ -24,15 +20,6 @@ export class JSONFileLog extends FileLog implements LogContract {
   }
 
   /**
-   * Get initial file contents
-   */
-  protected get initialFileContents(): Record<string, any> {
-    return {
-      messages: this.messages,
-    };
-  }
-
-  /**
    * Synchronously flush messages
    */
   public flushSync(): void {
@@ -44,7 +31,7 @@ export class JSONFileLog extends FileLog implements LogContract {
         const directoryPath = path.join(this.storagePath, key);
         fs.mkdirSync(directoryPath, { recursive: true });
         const filePath = path.join(directoryPath, `${this.fileName}.${this.extension}`);
-        
+
         let fileContents = { messages: [] as any[] };
         if (fs.existsSync(filePath)) {
           try {
@@ -55,7 +42,7 @@ export class JSONFileLog extends FileLog implements LogContract {
           }
         }
         fileContents.messages.push(...this.groupedMessages[key]);
-        fs.writeFileSync(filePath, JSON.stringify(fileContents, null, 2));
+        fs.writeFileSync(filePath, safeJsonStringify(fileContents, 2));
       }
     } else {
       fs.mkdirSync(this.storagePath, { recursive: true });
@@ -69,7 +56,7 @@ export class JSONFileLog extends FileLog implements LogContract {
         }
       }
       fileContents.messages.push(...this.messages);
-      fs.writeFileSync(this.filePath, JSON.stringify(fileContents, null, 2));
+      fs.writeFileSync(this.filePath, safeJsonStringify(fileContents, 2));
     }
 
     this.onSave();
@@ -112,7 +99,7 @@ export class JSONFileLog extends FileLog implements LogContract {
    * Write messages to the file
    */
   protected async writeMessagesToFile(): Promise<void> {
-    if (this.messages.length === 0 || this.isWriting) return;
+    if (this.messages.length === 0 || this.isWriting || !this.isInitialized) return;
 
     this.isWriting = true;
 
@@ -122,10 +109,11 @@ export class JSONFileLog extends FileLog implements LogContract {
 
     await this.checkAndRotateFile(); // Ensure file rotation is handled
 
-    let fileContents;
+    let fileContents = { messages: [] as any[] };
+
     if (await fileExistsAsync(this.filePath)) {
       try {
-        fileContents = await getJsonFileAsync(this.filePath);
+        fileContents = (await getJsonFileAsync(this.filePath)) as { messages: any[] };
       } catch (error) {
         console.error("Error reading log file, reinitializing:", error);
         fileContents = { messages: [] }; // Reinitialize the file if corrupted
@@ -137,7 +125,7 @@ export class JSONFileLog extends FileLog implements LogContract {
     fileContents.messages.push(...this.messages);
 
     try {
-      await putJsonFileAsync(this.filePath, fileContents, { spaces: 2 });
+      await fs.promises.writeFile(this.filePath, safeJsonStringify(fileContents, 2));
 
       this.onSave();
     } catch (error) {
@@ -164,11 +152,10 @@ export class JSONFileLog extends FileLog implements LogContract {
 
       await this.checkAndRotateFile(filePath); // Ensure we check file size before writing
 
-      let fileContents;
+      let fileContents: { messages: any[] } = { messages: [] };
       if (await fileExistsAsync(filePath)) {
         try {
-          fileContents = await getJsonFileAsync(filePath);
-          if (!Array.isArray(fileContents.messages)) fileContents.messages = [];
+          fileContents = (await getJsonFileAsync(filePath)) as { messages: any[] };
         } catch (error) {
           console.error("Error reading log file, reinitializing:", error);
           fileContents = { messages: [] };
@@ -180,7 +167,7 @@ export class JSONFileLog extends FileLog implements LogContract {
       fileContents.messages.push(...this.groupedMessages[key]);
 
       try {
-        await putJsonFileAsync(filePath, fileContents, { spaces: 2 });
+        await fs.promises.writeFile(filePath, safeJsonStringify(fileContents, 2));
       } catch (error) {
         console.error("Failed to write log:", error);
         this.isWriting = false;

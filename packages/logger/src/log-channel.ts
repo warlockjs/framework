@@ -1,4 +1,9 @@
-import type { BasicLogConfigurations, LogContract, LoggingData } from "./types";
+import type {
+  BasicLogConfigurations,
+  LogContract,
+  LoggingData,
+  RedactConfig,
+} from "./types";
 
 export abstract class LogChannel<
   Options extends BasicLogConfigurations = BasicLogConfigurations,
@@ -105,6 +110,18 @@ export abstract class LogChannel<
    * Synchronously flush messages
    */
   public flushSync?(): void;
+
+  /**
+   * Read the channel's redact config (if any). Used by `Logger` to apply
+   * per-channel additive redaction on top of the logger-wide floor.
+   * Subclasses normally don't override this — set `redact` in your channel
+   * configuration instead.
+   */
+  public getRedactConfig(): RedactConfig | undefined {
+    return this.config("redact" as keyof Options) as
+      | RedactConfig
+      | undefined;
+  }
 
   /**
    * Get date and time formats
