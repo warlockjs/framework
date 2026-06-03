@@ -17,9 +17,9 @@ export default {
 `;
 
 export const communicatorsConfigStub = `import { env } from "@mongez/dotenv";
-import type { CommunicatorConfigurations, RabbitMQClientOptions } from "@warlock.js/herald";
+import type { BrokerConfigurations, RabbitMQClientOptions } from "@warlock.js/herald";
 
-const communicatorConfigurations: CommunicatorConfigurations<RabbitMQClientOptions> = {
+const heraldConfigurations: BrokerConfigurations<RabbitMQClientOptions> = {
   driver: "rabbitmq",
   name: "default",
   isDefault: true,
@@ -95,5 +95,5 @@ const communicatorConfigurations: CommunicatorConfigurations<RabbitMQClientOptio
   },
 };
 
-export default communicatorConfigurations;
+export default heraldConfigurations;
 `;

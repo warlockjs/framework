@@ -278,7 +278,7 @@ const featuresMap: Record<
     },
     ejectConfig: {
       content: communicatorsConfigStub,
-      name: "communicator",
+      name: "herald",
     },
   },
   socket: {
