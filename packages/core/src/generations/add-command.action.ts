@@ -223,18 +223,8 @@ const featuresMap: Record<
       "@warlock.js/scheduler": "~4.0.0",
     },
   },
-  swagger: {
-    description: "Installs warlock swagger for API documentation",
-    dependencies: {
-      "@warlock.js/swagger": "~4.0.0",
-    },
-  },
-  postman: {
-    description: "Installs warlock postman for API documentation",
-    dependencies: {
-      "@warlock.js/postman": "~4.0.0",
-    },
-  },
+  // swagger / postman intentionally omitted — those packages do not exist yet;
+  // they will ship together in the unified @warlock.js/api-docs package.
   postgres: {
     description: "Installs pg for Postgres database (Cascade Package)",
     dependencies: {
