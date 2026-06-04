@@ -12,6 +12,7 @@ import { appPath } from "../utils";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 import { CLICommand } from "./cli-command";
 import {
+  displayBootError,
   displayCommandError,
   displayCommandHelp,
   displayCommandNotFound,
@@ -425,7 +426,21 @@ export class CLICommandsManager {
 
     // load preloaders
     if (command.commandPreload) {
-      await this.loadPreloaders(command);
+      try {
+        await this.loadPreloaders(command);
+      } catch (error) {
+        // A preload failure (a bad import in a config file, a connector that
+        // throws on boot, a missing module export) happens BEFORE the command's
+        // action runs — there is no run loop to recover into, so it is ALWAYS
+        // fatal, persistent command (dev/start) or not. Surface the real cause
+        // and the offending file, then exit. This MUST stay outside the
+        // command-execute try/catch below: letting a preload rejection escape
+        // turned `warlock dev` into a silent hang — the unhandled rejection slid
+        // past while the already-started loader worker thread kept the process
+        // alive, freezing just after the banner with no error printed.
+        displayBootError(command.name, error as Error);
+        process.exit(1);
+      }
     }
 
     try {

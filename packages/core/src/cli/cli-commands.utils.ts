@@ -106,6 +106,37 @@ export function displayCommandError(commandName: string, error: Error) {
 }
 
 /**
+ * Display a FATAL boot/preload failure and exit information.
+ *
+ * Preload failures — a bad import in a config file, a connector that throws
+ * on startup, a missing module export — happen BEFORE the command's run loop
+ * exists, so there is nothing to recover into: they are always fatal. Unlike
+ * `displayCommandError`, this prints the full stack (not just `error.message`)
+ * because the stack names the exact file + line of the offending import, which
+ * is the single most useful clue when a config file pulls in a broken module.
+ *
+ * Surfacing this loudly is the difference between a clear error and a silent
+ * hang: an unhandled preload rejection used to escape while the already-started
+ * loader worker thread kept the process alive, leaving `warlock dev` frozen
+ * just after the banner with no message at all.
+ *
+ * @example
+ * // SyntaxError: The requested module '@warlock.js/cascade' does not
+ * //   provide an export named 'belongsTo'
+ * //   at src/app/.../permission.model.ts:2
+ */
+export function displayBootError(commandName: string, error: Error) {
+  console.log();
+  console.log(`  ${colors.red("✖")} ${colors.bold(commandName)} failed to start`);
+  console.log(`  ${colors.red(error.message)}`);
+  if (error.stack) {
+    console.log();
+    console.log(colors.dim(error.stack));
+  }
+  console.log();
+}
+
+/**
  * Display missing required options error
  */
 export function displayMissingOptions(options: { name: string; text: string }[]) {

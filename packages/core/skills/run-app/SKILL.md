@@ -50,6 +50,8 @@ preload: {
 
 HTTP + Socket connectors are **Late** phase — they boot later in the dev-server startup sequence, after app modules load. That ordering is what guarantees `app.http` / `app.socket` are live by the time your `main.ts` runs.
 
+**Boot failures are fatal and loud.** Anything that throws during preload — a bad import in a `src/config/*.ts` file, a removed package export, a connector that fails to start — stops `dev`/`start` immediately with the error message and the offending file/line, then exits `1`. A common cause is upgrading `@warlock.js/*` and hitting a removed export (e.g. a config file that pulls in a model importing a symbol the new version no longer exports). If `warlock dev` ever just freezes right after the banner with no message, treat it as a bug and report it — preload errors are meant to print, never hang.
+
 ### `devServer.*` config knobs
 
 ```ts title="warlock.config.ts"

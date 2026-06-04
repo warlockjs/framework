@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CLICommand } from "../../../src/cli/cli-command";
 import { CLICommandsManager } from "../../../src/cli/cli-commands.manager";
-import { isMatchingCommandName } from "../../../src/cli/cli-commands.utils";
-import type { ResolvedCLICommandOption } from "../../../src/cli/types";
+import { displayBootError, isMatchingCommandName } from "../../../src/cli/cli-commands.utils";
+import type { CommandActionData, ResolvedCLICommandOption } from "../../../src/cli/types";
 
 /**
  * Exposes the protected validation/default-application helpers so they can be
@@ -16,6 +16,19 @@ class TestableManager extends CLICommandsManager {
 
   public applyDefaults(command: CLICommand, options: Record<string, string | boolean | number>) {
     return this.applyDefaultOptions(command, options);
+  }
+}
+
+/**
+ * Simulates a preload that throws — e.g. a `src/config/*.ts` file importing a
+ * symbol the upgraded framework no longer exports. Used to assert the boot
+ * path fails loudly (prints + exits) instead of hanging.
+ */
+class BootFailManager extends CLICommandsManager {
+  protected async loadPreloaders(): Promise<void> {
+    throw new SyntaxError(
+      "The requested module '@warlock.js/cascade' does not provide an export named 'belongsTo'",
+    );
   }
 }
 
@@ -140,6 +153,53 @@ describe("CLICommandsManager — applyDefaultOptions", () => {
     const command = commandWithOption({ name: "fresh" });
 
     expect(manager.applyDefaults(command, { other: "kept" })).toMatchObject({ other: "kept" });
+  });
+});
+
+describe("CLICommandsManager — fatal boot errors", () => {
+  it("prints the cause and exits 1 when a preload throws (never hangs)", async () => {
+    const manager = new BootFailManager();
+    // Any preload flag makes `execute` run loadPreloaders, which we force to throw.
+    const command = new CLICommand("dev").preload({ config: true });
+
+    const logs: string[] = [];
+    const logSpy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.join(" "));
+    });
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      // Turn the real exit into a throw so the test can assert on it instead of
+      // killing the test runner.
+      throw new Error(`__exit__:${code}`);
+    }) as never);
+
+    const data: CommandActionData = { args: [], options: {} };
+
+    await expect(manager.execute(command, data)).rejects.toThrow("__exit__:1");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(logs.join("\n")).toContain("does not provide an export named 'belongsTo'");
+
+    logSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+});
+
+describe("displayBootError", () => {
+  it("prints the message and the full stack (which names the offending file)", () => {
+    const logs: string[] = [];
+    const logSpy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.join(" "));
+    });
+
+    const error = new SyntaxError("does not provide an export named 'v'");
+    error.stack = `${error.message}\n    at src/config/auth.ts:2`;
+
+    displayBootError("dev", error);
+
+    const output = logs.join("\n");
+    expect(output).toContain("does not provide an export named 'v'");
+    expect(output).toContain("src/config/auth.ts:2");
+
+    logSpy.mockRestore();
   });
 });
 
