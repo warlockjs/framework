@@ -1,9 +1,25 @@
 import { fileExistsAsync } from "@warlock.js/fs";
 import { get } from "@mongez/reinforcements";
+import { readFile, unlink, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "url";
 import { devLogWarn } from "../dev-server/dev-logger";
 import { rootPath } from "../utils";
 import { WarlockConfig } from "./types";
+
+/**
+ * True when `error` is Node's "this runtime can't import a `.ts` file" error.
+ *
+ * Node only executes TypeScript natively from v22.18 / v23.6 onward (earlier
+ * 22.x needs `--experimental-strip-types`). On older runtimes a bare
+ * `import("warlock.config.ts")` throws `ERR_UNKNOWN_FILE_EXTENSION` — which is
+ * the signal to fall back to transpiling the config ourselves.
+ */
+export function isUnknownTsExtensionError(error: unknown): boolean {
+  return (
+    (error as { code?: string })?.code === "ERR_UNKNOWN_FILE_EXTENSION" ||
+    /Unknown file extension "\.tsx?"/.test(String((error as Error)?.message))
+  );
+}
 
 /**
  * Warlock Config Manager
@@ -66,7 +82,52 @@ export class WarlockConfigManager {
       const configModule = await import(pathToFileURL(configPath).href);
       return configModule.default;
     } catch (error) {
+      // `dev` registers a TS loader hook, and Node ≥ 22.18 / 23.6 strips types
+      // natively — in both cases the direct import above works. But `build` /
+      // `start` register no hook, so on an older Node the import throws
+      // ERR_UNKNOWN_FILE_EXTENSION. Transpile the config with esbuild ourselves
+      // so config loading is Node-version-independent rather than relying on an
+      // experimental runtime feature.
+      if (isUnknownTsExtensionError(error)) {
+        return await this.loadViaEsbuild(configPath);
+      }
+
       throw new Error(`Failed to load warlock.config.ts: ${error}`);
+    }
+  }
+
+  /**
+   * Fallback config loader for runtimes without native TypeScript support.
+   *
+   * Transpiles `warlock.config.ts` with esbuild (already a core dependency),
+   * writes the result as a sibling `.mjs` — so the config's own imports (bare
+   * `@warlock.js/*` and any relative paths) resolve exactly as they would from
+   * the original location — imports it, then removes the temp file.
+   */
+  private async loadViaEsbuild(configPath: string): Promise<WarlockConfig | undefined> {
+    const { transformSync } = await import("esbuild");
+    const source = await readFile(configPath, "utf8");
+
+    const { code } = transformSync(source, {
+      loader: "ts",
+      format: "esm",
+      target: `node${process.versions.node.split(".")[0]}`,
+      sourcefile: configPath,
+    });
+
+    // Unique sibling name so concurrent processes never clobber each other.
+    const compiledPath = configPath.replace(
+      /warlock\.config\.ts$/,
+      `.warlock.config.${process.pid}.mjs`,
+    );
+
+    await writeFile(compiledPath, code, "utf8");
+
+    try {
+      const configModule = await import(pathToFileURL(compiledPath).href);
+      return configModule.default;
+    } finally {
+      await unlink(compiledPath).catch(() => {});
     }
   }
 
