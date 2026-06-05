@@ -362,6 +362,46 @@ describe("FileLog", () => {
     });
   });
 
+  describe("flush", () => {
+    it("writes the buffer to disk asynchronously", async () => {
+      const channel = track(new FileLog({ storagePath, maxMessagesToWrite: 1000 }));
+
+      await waitForInit(channel);
+
+      await channel.log(dataFor({ message: "via-async-flush" }));
+      await channel.flush();
+
+      const contents = fs.readFileSync(channel.filePath, "utf-8");
+
+      expect(contents).toContain("[mod][act]: via-async-flush");
+    });
+
+    it("is a no-op when the buffer is empty", async () => {
+      const channel = track(new FileLog({ storagePath }));
+
+      await waitForInit(channel);
+
+      await expect(channel.flush()).resolves.toBeUndefined();
+      expect(fs.existsSync(channel.filePath)).toBe(false);
+    });
+
+    it("drains grouped buffers into per-group files", async () => {
+      const channel = track(
+        new FileLog({ storagePath, groupBy: ["level"], maxMessagesToWrite: 1000 }),
+      );
+
+      await waitForInit(channel);
+
+      await channel.log(dataFor({ type: "error", message: "grouped-flush" }));
+      await channel.flush();
+
+      const filePath = path.join(storagePath, "error", `${channel.fileName}.${channel.extension}`);
+
+      expect(fs.existsSync(filePath)).toBe(true);
+      expect(fs.readFileSync(filePath, "utf-8")).toContain("grouped-flush");
+    });
+  });
+
   describe("groupBy", () => {
     it("writes into a per-level subdirectory when groupBy=['level']", async () => {
       const channel = track(

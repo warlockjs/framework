@@ -8,6 +8,7 @@ class CapturingChannel extends LogChannel {
   public terminal = false;
   public received: LoggingData[] = [];
   public flushed = 0;
+  public asyncFlushed = 0;
 
   public log(data: LoggingData) {
     this.received.push({ ...data });
@@ -15,6 +16,10 @@ class CapturingChannel extends LogChannel {
 
   public flushSync() {
     this.flushed += 1;
+  }
+
+  public async flush() {
+    this.asyncFlushed += 1;
   }
 }
 
@@ -35,6 +40,17 @@ class NoFlushChannel extends LogChannel {
 
   public log(data: LoggingData) {
     this.received.push(data);
+  }
+}
+
+class RejectingFlushChannel extends LogChannel {
+  public name = "rejecting-flush";
+  public terminal = false;
+
+  public log(_data: LoggingData) {}
+
+  public async flush() {
+    throw new Error("flush failed");
   }
 }
 
@@ -301,6 +317,43 @@ describe("Logger", () => {
 
       expect(() => instance.flushSync()).not.toThrow();
       expect(flushable.flushed).toBe(1);
+    });
+  });
+
+  describe("flush", () => {
+    it("awaits flush on every channel that implements it", async () => {
+      const instance = new Logger();
+      const first = new CapturingChannel();
+      const second = new CapturingChannel();
+
+      instance.setChannels([first, second]);
+
+      await instance.flush();
+
+      expect(first.asyncFlushed).toBe(1);
+      expect(second.asyncFlushed).toBe(1);
+    });
+
+    it("skips channels that do not implement flush", async () => {
+      const instance = new Logger();
+      const noFlush = new NoFlushChannel();
+      const flushable = new CapturingChannel();
+
+      instance.setChannels([noFlush, flushable]);
+
+      await expect(instance.flush()).resolves.toBeUndefined();
+      expect(flushable.asyncFlushed).toBe(1);
+    });
+
+    it("isolates a channel whose flush rejects so the others still drain", async () => {
+      const instance = new Logger();
+      const rejecting = new RejectingFlushChannel();
+      const healthy = new CapturingChannel();
+
+      instance.setChannels([rejecting, healthy]);
+
+      await expect(instance.flush()).resolves.toBeUndefined();
+      expect(healthy.asyncFlushed).toBe(1);
     });
   });
 });

@@ -296,6 +296,29 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
   }
 
   /**
+   * Asynchronously drain buffered entries to disk.
+   *
+   * The async analogue of {@link flushSync}: it reuses the same async writer
+   * as the background interval, so a caller on a graceful-shutdown path can
+   * `await channel.flush()` (or `await log.flush()`) and rely on the buffer
+   * being on disk once it resolves. `JSONFileLog` inherits this unchanged —
+   * its overridden `writeMessagesToFile` performs the JSON merge.
+   */
+  public async flush(): Promise<void> {
+    if (this.messages.length === 0 && Object.keys(this.groupedMessages).length === 0) {
+      return;
+    }
+
+    // Clear the in-flight lock so a deliberate drain is never short-circuited
+    // by a half-finished background write, then await the async writer to
+    // completion — unlike the fire-and-forget interval, callers depend on the
+    // buffer reaching disk before this resolves.
+    this.isWriting = false;
+
+    await this.writeMessagesToFile();
+  }
+
+  /**
    * {@inheritdoc}
    */
   public async log(data: LoggingData) {

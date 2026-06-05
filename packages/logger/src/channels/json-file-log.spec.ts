@@ -340,6 +340,22 @@ describe("JSONFileLog", () => {
     });
   });
 
+  describe("flush", () => {
+    it("drains the buffer to a JSON file asynchronously", async () => {
+      const channel = track(new JSONFileLog({ storagePath, maxMessagesToWrite: 1000 }));
+
+      await waitForInit(channel);
+
+      await channel.log(dataFor({ message: "json-async-flush" }));
+      await channel.flush();
+
+      const contents = JSON.parse(fs.readFileSync(channel.filePath, "utf-8"));
+
+      expect(contents.messages).toHaveLength(1);
+      expect(contents.messages[0].content).toBe("json-async-flush");
+    });
+  });
+
   describe("write failures", () => {
     it("reports an async write error without throwing", async () => {
       const channel = track(new JSONFileLog({ storagePath, maxMessagesToWrite: 1 }));

@@ -1,6 +1,6 @@
 ---
 name: write-custom-log-channel
-description: 'Extend the abstract LogChannel class for custom sinks — Slack, database, HTTP endpoint, in-memory buffer. Triggers: `LogChannel`, `LogContract`, `LoggingData`, `shouldBeLogged`, `init`, `flushSync`, `terminal`; "log to slack", "log to a database", "send logs to datadog / loki HTTP api", "in-memory test capture channel", "build a custom log sink"; typical import `import { LogChannel, type LoggingData, type LogContract } from "@warlock.js/logger"`. Skip: built-in channels — `@warlock.js/logger/pick-log-channel/SKILL.md`; filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; competing libs `winston-transport`, `pino-transport`.'
+description: 'Extend the abstract LogChannel class for custom sinks — Slack, database, HTTP endpoint, in-memory buffer. Triggers: `LogChannel`, `LogContract`, `LoggingData`, `shouldBeLogged`, `init`, `flush`, `flushSync`, `terminal`; "log to slack", "log to a database", "send logs to datadog / loki HTTP api", "in-memory test capture channel", "build a custom log sink"; typical import `import { LogChannel, type LoggingData, type LogContract } from "@warlock.js/logger"`. Skip: built-in channels — `@warlock.js/logger/pick-log-channel/SKILL.md`; filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; competing libs `winston-transport`, `pino-transport`.'
 ---
 
 # Custom channels — extending `LogChannel`
@@ -31,7 +31,8 @@ That's a working channel. `LogChannel` provides the scaffolding; you only need t
 |---|---|
 | `name`, `description`, `terminal` | You (fields on your subclass) |
 | `log(data)` | **You must implement** — abstract |
-| `flushSync()` | You (optional — only if you buffer) |
+| `flushSync()` | You (optional sync drain — only if you buffer) |
+| `flush()` | You (optional async drain — only if you buffer over async I/O) |
 | `init()` | You (optional async hook — see below) |
 | `shouldBeLogged(data)` | `LogChannel` — combines `levels` + `filter` |
 | `config<K>(key)` | `LogChannel` — merges user config with `defaultConfigurations` |
@@ -125,6 +126,35 @@ export class BatchHttpLog extends LogChannel<BasicLogConfigurations & { url: str
   private async drain() { /* async post to this.config("url") */ }
 }
 ```
+
+## Implementing `flush()` — async drain
+
+`flushSync()` is synchronous, so a channel that delivers over the network (or any async I/O) can't drain that way. Implement `flush(): Promise<void>` so `await log.flush()` drains it on a graceful shutdown:
+
+```ts
+export class BatchHttpLog extends LogChannel<BasicLogConfigurations & { url: string }> {
+  public name = "batch-http";
+  private buffer: LoggingData[] = [];
+
+  public log(data: LoggingData) {
+    if (!this.shouldBeLogged(data)) return;
+    this.buffer.push(data);
+    if (this.buffer.length >= 100) void this.drain();
+  }
+
+  public async flush() {
+    await this.drain();   // awaited by log.flush() on shutdown
+  }
+
+  private async drain() {
+    if (this.buffer.length === 0) return;
+    const batch = this.buffer.splice(0);
+    await fetch(this.config("url"), { method: "POST", body: JSON.stringify(batch) });
+  }
+}
+```
+
+`Logger.flush()` isolates each channel — a rejecting `flush()` won't break the others — but handle your own failures so a shutdown drain doesn't silently drop the batch. Implement `flushSync()` too (e.g. dump to disk) when you also want a best-effort sync path for `autoFlushOn`.
 
 ## The `terminal` property
 

@@ -112,6 +112,15 @@ export abstract class LogChannel<
   public flushSync?(): void;
 
   /**
+   * Asynchronously flush buffered messages.
+   *
+   * Optional — channels that write synchronously per entry (e.g. `ConsoleLog`)
+   * don't implement it. Buffering channels override this to drain their buffer
+   * over async I/O so callers can `await log.flush()` on graceful shutdown.
+   */
+  public flush?(): void | Promise<void>;
+
+  /**
    * Read the channel's redact config (if any). Used by `Logger` to apply
    * per-channel additive redaction on top of the logger-wide floor.
    * Subclasses normally don't override this — set `redact` in your channel

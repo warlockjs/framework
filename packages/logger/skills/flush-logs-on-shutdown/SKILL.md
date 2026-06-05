@@ -1,6 +1,6 @@
 ---
 name: flush-logs-on-shutdown
-description: 'Drain buffered channels before exit — log.flushSync() or log.configure({autoFlushOn: [''SIGINT'', ''SIGTERM'', ''beforeExit'']}) installs handlers that re-raise the signal. Triggers: `log.flushSync`, `autoFlushOn`, `enableAutoFlush`, `disableAutoFlush`, `SIGINT`, `SIGTERM`, `beforeExit`; "drain logs before exit", "wire SIGTERM for container shutdown", "my logs never showed after a crash", "graceful shutdown logging"; typical import `import { log, FileLog } from "@warlock.js/logger"`. Skip: error capture — `@warlock.js/logger/capture-unhandled-errors/SKILL.md`; custom sinks — `@warlock.js/logger/write-custom-log-channel/SKILL.md`; competing `pino.final`, `winston.end`; native `process.on(''exit'')`.'
+description: 'Drain buffered channels before exit — log.flushSync() or log.configure({autoFlushOn: [''SIGINT'', ''SIGTERM'', ''beforeExit'']}) installs handlers that re-raise the signal. Triggers: `log.flush`, `log.flushSync`, `autoFlushOn`, `enableAutoFlush`, `disableAutoFlush`, `SIGINT`, `SIGTERM`, `beforeExit`; "drain logs before exit", "await log.flush() before process.exit", "drain async or network channels on shutdown", "wire SIGTERM for container shutdown", "my logs never showed after a crash", "graceful shutdown logging"; typical import `import { log, FileLog } from "@warlock.js/logger"`. Skip: error capture — `@warlock.js/logger/capture-unhandled-errors/SKILL.md`; custom sinks — `@warlock.js/logger/write-custom-log-channel/SKILL.md`; competing `pino.final`, `winston.end`; native `process.on(''exit'')`.'
 ---
 
 # Lifecycle — flushing buffered channels before exit
@@ -55,6 +55,32 @@ process.once("SIGTERM", gracefulShutdown);
 ```
 
 **If you go manual for a signal, skip it in `autoFlushOn`** — otherwise both handlers fire and ours re-raises the signal mid-way through your async work.
+
+## Async drain — `log.flush()`
+
+`flushSync()` blocks the event loop with synchronous I/O. That's correct for the file channels and required inside the handlers `autoFlushOn` installs (a re-raised signal kills the process before any promise could settle). But a channel whose delivery is **async** — a network transport, an async disk write — can't drain synchronously. For those, `await` the async sibling on a graceful path you control:
+
+```ts
+async function gracefulShutdown() {
+  await httpServer.close();
+  await log.flush();        // awaits every channel's async flush() to completion
+  process.exit(0);
+}
+
+process.once("SIGTERM", gracefulShutdown);
+```
+
+`log.flush()` fans out to every channel that implements `flush()` and awaits them together (`Promise.allSettled`). Each channel is isolated — one channel's flush rejecting neither aborts the others nor escapes as an unhandled rejection. Channels without `flush()` are skipped.
+
+| | `flushSync()` | `flush()` |
+|---|---|---|
+| I/O | synchronous — blocks the loop | asynchronous — awaited |
+| Safe in a re-raising signal handler | yes | no — the signal exits before the promise settles |
+| Used by `autoFlushOn` | yes | no |
+| Reach for it when | file channels, last-resort durability | network/async channels, manual `await` before `process.exit` |
+| `FileLog` / `JSONFileLog` | ✓ | ✓ (async write) |
+
+`autoFlushOn` always uses `flushSync()` — signal re-raising can't wait on a promise. If a channel needs async delivery on shutdown, drive `await log.flush()` from your own handler and leave that signal out of `autoFlushOn`.
 
 ## What `flushSync()` actually does
 

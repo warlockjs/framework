@@ -354,6 +354,43 @@ export class Logger {
   }
 
   /**
+   * Asynchronously drain every channel that implements `flush()`.
+   *
+   * Unlike {@link flushSync}, this awaits each channel's async I/O — the
+   * correct call for a graceful shutdown that can afford to wait
+   * (`await log.flush()` after closing the HTTP server, before
+   * `process.exit`). A channel whose delivery is async (a network transport,
+   * an async disk write) implements `flush()`, not `flushSync()`.
+   *
+   * Channels are isolated: a channel whose flush rejects can neither prevent
+   * the others from draining nor escape as an unhandled rejection. Channels
+   * without `flush()` are skipped.
+   *
+   * @example
+   * async function shutdown() {
+   *   await httpServer.close();
+   *   await log.flush();
+   *   process.exit(0);
+   * }
+   */
+  public async flush(): Promise<void> {
+    await Promise.allSettled(
+      this.channels.map(async (channel) => {
+        if (!channel.flush) {
+          return;
+        }
+
+        try {
+          await channel.flush();
+        } catch {
+          // A single channel must never break shutdown for the others —
+          // a graceful drain is best-effort across every channel.
+        }
+      }),
+    );
+  }
+
+  /**
    * Register one process-level handler per event that calls `flushSync()`
    * before the process terminates.
    *

@@ -1,6 +1,6 @@
 # @warlock.js/logger
 
-Structured, multi-channel logging for Node.js — five severity levels, a clean three-argument API, and full TypeScript support. Non-blocking by default; synchronous flush on demand.
+Structured, multi-channel logging for Node.js — five severity levels, a clean three-argument API, and full TypeScript support. Non-blocking by default; synchronous or async flush on demand.
 
 ## Install
 
@@ -65,7 +65,7 @@ All three share the `BasicLogConfigurations` options (`levels`, `filter`, `dateF
 
 The package exports one default singleton and one class:
 
-- **`log`** — a pre-instantiated `Logger`. Day-to-day logging *and* configuration both go through it: `log.info(...)`, `log.configure(...)`, `log.flushSync()`, `log.addChannel(...)`.
+- **`log`** — a pre-instantiated `Logger`. Day-to-day logging *and* configuration both go through it: `log.info(...)`, `log.configure(...)`, `log.flush()` / `log.flushSync()`, `log.addChannel(...)`.
 - **`Logger`** — the class. Use it when you need an isolated logger (libraries, sandboxes, parallel test suites).
 
 `log` is a `Logger` instance, not a function — every level shortcut and configuration method is reachable on it. The bare-callable `log(data)` form was removed; use `log.log(data)` for the data-object form, or `log.info(...)` / `log.error(...)` / etc. for the positional form.
@@ -81,7 +81,7 @@ log.configure({
 });
 ```
 
-Signal events flush then re-raise (so Node exits with its normal signal semantics); `beforeExit` flushes in place. For full control, call `log.flushSync()` manually inside your own handler instead.
+Signal events flush then re-raise (so Node exits with its normal signal semantics); `beforeExit` flushes in place. For full control, call `log.flushSync()` (sync) — or `await log.flush()` (async, for network/async channels) — inside your own handler instead.
 
 ## Capturing unhandled errors
 

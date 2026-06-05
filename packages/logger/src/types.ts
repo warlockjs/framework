@@ -130,6 +130,14 @@ export interface LogContract {
   log(data: LoggingData): void | Promise<void>;
 
   /**
+   * Asynchronously flush buffered logs. Awaited on a graceful shutdown path
+   * (`await log.flush()`); implement this on channels whose delivery is async
+   * (network transports, async disk writes) where {@link flushSync} cannot
+   * wait on the I/O.
+   */
+  flush?(): void | Promise<void>;
+
+  /**
    * Synchronously flush logs
    */
   flushSync?(): void;
