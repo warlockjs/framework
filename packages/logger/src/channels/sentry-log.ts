@@ -2,15 +2,82 @@ import { LogChannel } from "../log-channel";
 import type { BasicLogConfigurations, LoggingData, LogLevel } from "../types";
 import { safeJsonStringify } from "../utils/safe-json-stringify";
 
-// ── Lazily-loaded @sentry/node SDK ──────────────────────────────────────────
-// @sentry/node is an OPTIONAL peer: an app that never registers SentryLog never
-// installs it. We dynamic-import it the first time a channel needs it and
-// surface a curated install message instead of a raw module-resolution stack
-// trace. Mirrors the optional-driver convention in @warlock.js/cascade.
+// ── @sentry/node as an optional peer ─────────────────────────────────────────
+// @sentry/node is referenced ONLY through the local minimal types below — never
+// via `typeof import("@sentry/node")`. This package is served as source
+// (`main` → `./src/index.ts`), so its `.ts` becomes part of a consumer's TS
+// program; a static type reference to the SDK would force module resolution and
+// break every consumer who (correctly) never installs the optional peer with a
+// TS2307 "cannot find module". The runtime import uses an indirect specifier for
+// the same reason, and its result is cast to these shapes. The shapes mirror the
+// stable `@sentry/node` public API (unchanged across v8–v10).
 
-type SentrySdk = typeof import("@sentry/node");
+/**
+ * Sentry severity levels — the `@sentry/node` `SeverityLevel` union.
+ */
+type SentrySeverityLevel =
+  | "fatal"
+  | "error"
+  | "warning"
+  | "log"
+  | "info"
+  | "debug";
 
-let Sentry: SentrySdk | undefined;
+/**
+ * The Sentry `Scope` surface used while building a single event.
+ */
+export interface SentryScopeLike {
+  setLevel(level: SentrySeverityLevel): void;
+  setTags(tags: Record<string, string>): void;
+  setContext(name: string, context: Record<string, unknown> | null): void;
+}
+
+/**
+ * A Sentry breadcrumb, as passed to `addBreadcrumb`.
+ */
+export type SentryBreadcrumb = {
+  category?: string;
+  message?: string;
+  level?: SentrySeverityLevel;
+  data?: Record<string, unknown>;
+};
+
+/**
+ * The subset of the `@sentry/node` API `SentryLog` calls. The `@sentry/node`
+ * namespace satisfies this shape, so an app can pass it straight through as
+ * `client`; a test (or a custom forwarder) can supply a compatible stand-in.
+ */
+export interface SentryForwarder {
+  captureException(exception: unknown): string;
+  captureMessage(message: string, level?: SentrySeverityLevel): string;
+  addBreadcrumb(breadcrumb: SentryBreadcrumb): void;
+  withScope(callback: (scope: SentryScopeLike) => void): void;
+  flush(timeout?: number): Promise<boolean>;
+}
+
+/**
+ * Sentry initialization options. Mirrors the common `@sentry/node` `NodeOptions`
+ * fields; the index signature keeps any other SDK option valid without coupling
+ * to the SDK's types.
+ */
+export type SentryInitOptions = {
+  dsn?: string;
+  environment?: string;
+  release?: string;
+  sampleRate?: number;
+  [key: string]: unknown;
+};
+
+/**
+ * The lazily-imported `@sentry/node` namespace surface — the forwarder plus the
+ * lifecycle calls the channel uses when it owns initialization.
+ */
+interface SentryNamespace extends SentryForwarder {
+  init(options?: SentryInitOptions): unknown;
+  getClient(): unknown;
+}
+
+let Sentry: SentryNamespace | undefined;
 let isModuleExists: boolean | null = null;
 let loadingPromise: Promise<void> | undefined;
 
@@ -42,7 +109,10 @@ function loadSentry(): Promise<void> {
 
   loadingPromise = (async () => {
     try {
-      Sentry = await import("@sentry/node");
+      // Indirect specifier (typed `string`, not a literal) so TypeScript never
+      // statically resolves the optional peer — see the file header.
+      const sentryModule: string = "@sentry/node";
+      Sentry = (await import(sentryModule)) as unknown as SentryNamespace;
       isModuleExists = true;
     } catch {
       isModuleExists = false;
@@ -51,29 +121,6 @@ function loadSentry(): Promise<void> {
 
   return loadingPromise;
 }
-
-/**
- * Sentry severity levels — the `@sentry/node` `SeverityLevel` union, declared
- * locally so the level mapping stays readable and is not coupled to a runtime
- * SDK import.
- */
-type SentrySeverityLevel =
-  | "fatal"
-  | "error"
-  | "warning"
-  | "log"
-  | "info"
-  | "debug";
-
-/**
- * The subset of the `@sentry/node` surface `SentryLog` calls. The `@sentry/node`
- * namespace satisfies this shape, so an app can pass it straight through as
- * `client`; a test (or a custom forwarder) can supply a compatible stand-in.
- */
-export type SentryForwarder = Pick<
-  SentrySdk,
-  "captureException" | "captureMessage" | "addBreadcrumb" | "withScope" | "flush"
->;
 
 export type SentryLogConfig = BasicLogConfigurations & {
   /**
@@ -87,7 +134,7 @@ export type SentryLogConfig = BasicLogConfigurations & {
    * channel lazily imports `@sentry/node` and calls `Sentry.init(options)` once,
    * guarded so it never clobbers an existing client.
    */
-  options?: import("@sentry/node").NodeOptions;
+  options?: SentryInitOptions;
   /**
    * Levels delivered as Sentry *events* (these consume the error quota). Every
    * other level is recorded as a breadcrumb that rides along with the next

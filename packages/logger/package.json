@@ -16,7 +16,6 @@
     "safe-stable-stringify": "^2.5.0"
   },
   "devDependencies": {
-    "@sentry/node": "^10.56.0",
     "@vitest/coverage-v8": "^4.0.16",
     "typescript": "^5.0.2",
     "vitest": "^4.0.16"

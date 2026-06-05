@@ -99,7 +99,7 @@ The channel never crashes your app: the dynamic import failure is swallowed, the
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `client` | Sentry namespace / forwarder | — | Reuse an already-initialized Sentry instance. |
-| `options` | `NodeOptions` | — | Init options when the channel owns Sentry. |
+| `options` | `SentryInitOptions` | — | Sentry init options (mirrors `@sentry/node`'s `NodeOptions`) — used when the channel owns Sentry. |
 | `eventLevels` | `LogLevel[]` | `["error", "warn"]` | Levels sent as events; the rest become breadcrumbs. |
 | `flushTimeout` | `number` | `2000` | Ms `flush()` waits for the transport to drain. |
 | `levels`, `filter`, `dateFormat`, `redact` | — | — | Inherited from `BasicLogConfigurations`. |
