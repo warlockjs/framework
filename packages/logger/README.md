@@ -58,8 +58,9 @@ await log.error({
 | `ConsoleLog` | `"console"` | Colorized terminal output |
 | `FileLog` | `"file"` | Plain-text files, optional chunking + rotation + grouping |
 | `JSONFileLog` | `"fileJson"` | Structured JSON files — ideal for aggregators |
+| `SentryLog` | `"sentry"` | Forwards to Sentry (events + breadcrumbs); needs the optional `@sentry/node` peer |
 
-All three share the `BasicLogConfigurations` options (`levels`, `filter`, `dateFormat`); `FileLog` / `JSONFileLog` add storage, chunking, rotation, and grouping options on top.
+All channels share the `BasicLogConfigurations` options (`levels`, `filter`, `dateFormat`); `FileLog` / `JSONFileLog` add storage, chunking, rotation, and grouping options, and `SentryLog` adds `client` / `options` / `eventLevels`.
 
 ## `log` and `Logger`
 
@@ -124,7 +125,7 @@ The complete guide lives in the project docs:
 
 - Getting Started
 - Configuration
-- Channels (ConsoleLog, FileLog, JSONFileLog)
+- Channels (ConsoleLog, FileLog, JSONFileLog, SentryLog)
 - Lifecycle & Flushing
 - Capturing Unhandled Errors
 - Custom Channels

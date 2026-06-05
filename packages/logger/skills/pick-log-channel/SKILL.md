@@ -5,7 +5,7 @@ description: 'Pick one of the three built-in channels — ConsoleLog (terminal),
 
 # Channels — which one to pick and how to configure it
 
-Three built-in channels. A channel is a destination for a log entry — the logger fans out every entry to every registered channel in parallel.
+Four built-in channels (`SentryLog` needs the optional `@sentry/node` peer). A channel is a destination for a log entry — the logger fans out every entry to every registered channel in parallel.
 
 ## The decision
 
@@ -14,6 +14,7 @@ Three built-in channels. A channel is a destination for a log entry — the logg
 | Local dev, colored output in the terminal | `ConsoleLog` |
 | Plain text `.log` files on disk — humans read them | `FileLog` |
 | Structured `.json` files — a log aggregator (Loki / Datadog / Elastic) reads them | `JSONFileLog` |
+| Errors & warnings into Sentry (events + breadcrumbs) | `SentryLog` |
 
 Most production setups use **two** channels: `ConsoleLog` + one file channel. Dev uses `ConsoleLog` only.
 
@@ -107,6 +108,19 @@ Differences from `FileLog`:
 - Corrupted existing file → reinitialized to `{ messages: [] }` on next write (does not throw)
 - **Safe serialization by construction.** All writes go through `safe-stable-stringify` with a custom `Error` replacer — circular refs become `"[Circular]"`, BigInt is stringified, functions/symbols are dropped, nested `Error` instances expand to `{ name, message, stack, ...enumerable }`. A context payload with a class graph or circular reference will never throw during the write.
 
+## `SentryLog`
+
+Forwards entries to Sentry — `error` / `warn` become events (`captureException` for `Error` messages, `captureMessage` otherwise), every other level a breadcrumb (no quota). `@sentry/node` is an optional peer, lazily imported; pass an existing `client` or `options`.
+
+```ts
+import * as Sentry from "@sentry/node";
+import { SentryLog } from "@warlock.js/logger";
+
+new SentryLog({ client: Sentry, eventLevels: ["error", "warn"] });
+```
+
+Full guide — level mapping, init modes, shutdown draining: [`ship-logs-to-sentry`](@warlock.js/logger/ship-logs-to-sentry/SKILL.md).
+
 ## Shared config — `BasicLogConfigurations`
 
 Every channel constructor accepts at minimum:
@@ -128,6 +142,7 @@ Concrete file channels extend this with their storage/chunk/rotate/groupBy optio
 log.channel("console");   // → ConsoleLog | undefined
 log.channel("file");      // → FileLog | undefined
 log.channel("fileJson");  // ← note the name — NOT "json"
+log.channel("sentry");    // → SentryLog | undefined
 ```
 
 If two channels share a `name`, only one is reachable this way — the search returns the first match.
@@ -136,4 +151,5 @@ If two channels share a `name`, only one is reachable this way — the search re
 
 - [`@warlock.js/logger/configure-logger/SKILL.md`](@warlock.js/logger/configure-logger/SKILL.md) — registering channels at startup
 - [`@warlock.js/logger/filter-log-entries/SKILL.md`](@warlock.js/logger/filter-log-entries/SKILL.md) — `levels` and `filter` config in detail
+- [`@warlock.js/logger/ship-logs-to-sentry/SKILL.md`](@warlock.js/logger/ship-logs-to-sentry/SKILL.md) — the `SentryLog` channel in depth
 - [`@warlock.js/logger/write-custom-log-channel/SKILL.md`](@warlock.js/logger/write-custom-log-channel/SKILL.md) — extending `LogChannel` for custom sinks
