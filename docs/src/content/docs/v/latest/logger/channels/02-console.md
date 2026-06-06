@@ -43,6 +43,7 @@ Real output:
 | `warn` | ⚠ |
 | `error` | ✗ |
 | `success` | ✓ |
+| `fatal` | ☠ (bright-red background) |
 
 **Colors by part**
 
@@ -56,6 +57,7 @@ Real output:
 | Message — `warn` | Yellow bright |
 | Message — `error` | Red bright |
 | Message — `success` | Green bright |
+| Message — `fatal` | Red bright + bold |
 
 :::tip[Object messages]
 If `message` is an object, `ConsoleLog` issues a second `console.log` call with the raw object on its own line, so the Node.js inspector (or browser DevTools) can expand it interactively.

@@ -57,7 +57,7 @@ log.setChannels([
 ]);
 ```
 
-Valid `LogLevel` values: `"debug"` | `"info"` | `"warn"` | `"error"` | `"success"`.
+Valid `LogLevel` values: `"debug"` | `"info"` | `"warn"` | `"error"` | `"success"` | `"fatal"`.
 
 ### Custom filter predicate
 
@@ -105,6 +105,7 @@ A channel can also carry a per-channel `redact` config that adds paths on top of
 | [`ConsoleLog`](./02-console/) | `"console"` | `true` | Colorized, icon-prefixed terminal lines |
 | [`FileLog`](./03-file/) | `"file"` | `false` | Plain-text `.log` files with rotation + chunking |
 | [`JSONFileLog`](./04-json-file/) | `"fileJson"` | `false` | Structured `.json` files for aggregators |
+| [`SentryLog`](./06-sentry/) | `"sentry"` | `false` | Sentry events + breadcrumbs (needs the optional `@sentry/node` peer) |
 
 Need a different destination — Slack, a database, an HTTP endpoint? Write a [Custom Channel](./05-custom/).
 

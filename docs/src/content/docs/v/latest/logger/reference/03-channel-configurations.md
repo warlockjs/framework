@@ -41,6 +41,19 @@ Every built-in channel extends `BasicLogConfigurations` (the shared options — 
 
 See [JSON File Channel](../channels/04-json-file/) for the output-format differences.
 
+## `SentryLogConfig`
+
+`SentryLog` options — `BasicLogConfigurations` plus:
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `client` | Sentry namespace / forwarder | — | Reuse an already-initialized Sentry instance (e.g. the `@sentry/node` namespace). |
+| `options` | `SentryInitOptions` | — | Sentry init options (mirrors `@sentry/node`'s `NodeOptions`), used when the channel owns initialization. |
+| `eventLevels` | `LogLevel[]` | `["error", "warn"]` | Levels delivered as Sentry events; every other level becomes a breadcrumb. |
+| `flushTimeout` | `number` | `2000` | Milliseconds `flush()` waits for the Sentry transport to drain on shutdown. |
+
+`@sentry/node` is an optional peer — install it only when using this channel. See [Sentry channel](../channels/06-sentry/).
+
 ## See also
 
 - [Channels Overview](../channels/01-overview/) — the shared options in practice

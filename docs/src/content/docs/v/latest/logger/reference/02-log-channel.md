@@ -25,6 +25,7 @@ abstract class LogChannel<Options extends BasicLogConfigurations = BasicLogConfi
 | `constructor` | `(configurations?: Options)` | Accepts the channel's options. Schedules `init()` on the next tick. |
 | `log` | `abstract (data: LoggingData): void \| Promise<void>` | **Implement this.** Your write/send logic. |
 | `flushSync` | `(): void` *(optional)* | Implement when the channel buffers in memory and needs a synchronous drain on shutdown. |
+| `flush` | `(): void \| Promise<void>` *(optional)* | Implement for an async drain when the channel buffers and delivers over async I/O (network, async disk). Awaited by `log.flush()` on shutdown. |
 | `getRedactConfig` | `(): RedactConfig \| undefined` | Returns the channel's `redact` config (additive on top of the logger-wide floor). Subclasses normally don't override — set `redact` in the channel options instead. |
 
 ## Protected members (for subclasses)

@@ -10,13 +10,13 @@ Every type exported from `@warlock.js/logger`.
 
 ## `LogLevel`
 
-The five severity levels.
+The six severity levels.
 
 ```ts
-type LogLevel = "debug" | "info" | "warn" | "error" | "success";
+type LogLevel = "debug" | "info" | "warn" | "error" | "success" | "fatal";
 ```
 
-`success` ranks the same as `info` — it's informational, not a warning. Ranking for `minLevel`: `debug < info ≈ success < warn < error`.
+`success` ranks the same as `info` — it's informational, not a warning. `fatal` is strictly above `error` — use it for unrecoverable failures where the app is going down (failed bootstrap, `uncaughtException`). Ranking for `minLevel`: `debug < info ≈ success < warn < error < fatal`.
 
 ## `LoggingData`
 
@@ -24,7 +24,7 @@ The entry passed through `log.log(...)` and to every channel's `log()`.
 
 ```ts
 type LoggingData = {
-  type: "info" | "debug" | "warn" | "error" | "success";
+  type: LogLevel;
   module: string;
   action: string;
   message: any;

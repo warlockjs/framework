@@ -42,15 +42,16 @@ await log.success("orders", "fulfillment", "Order shipped via FedEx");
 Pick one style and stay consistent — `module` and `action` become searchable keys in file and JSON channels. Both `camelCase` (`"tokenExpired"`) and `kebab-case` (`"abandon-stale"`) are common; the Warlock backend codebases lean on kebab-case so action names read like the verb-phrase they describe.
 :::
 
-## The five log levels
+## The six log levels
 
 | Level | Method | When to use | Console style |
 | --- | --- | --- | --- |
 | `debug` | `log.debug()` | Dev diagnostics, variable dumps, flow tracing | magenta |
 | `info` | `log.info()` | Normal operational events (user registered, job queued) | blue |
 | `warn` | `log.warn()` | Unexpected but recoverable conditions (retry, fallback) | yellow |
-| `error` | `log.error()` | Failures that need attention; accepts `Error` objects | red |
+| `error` | `log.error()` | Handled failures that need attention; app continues | red |
 | `success` | `log.success()` | Explicit happy-path confirmation (payment completed) | green |
+| `fatal` | `log.fatal()` | Unrecoverable failures; the app is going down (boot fail, `uncaughtException`) | bright red on red background |
 
 ```ts
 await log.debug("cache", "miss", "Key not found, fetching from DB");
@@ -58,7 +59,12 @@ await log.info("jobs", "queued", "SendInvoice job added to queue");
 await log.warn("api", "rateLimitApproaching", "80% of quota used");
 await log.error("db", "connectionFailed", new Error("ECONNREFUSED 5432"));
 await log.success("payments", "captured", "Payment of $49.99 captured");
+await log.fatal("config", "missingSecret", new Error("STRIPE_KEY is required to boot"));
 ```
+
+:::note[`fatal` is a level, not an action]
+`log.fatal(...)` writes a log entry at the highest severity — it does NOT call `process.exit()` or auto-flush. The caller decides what to do next (typically `await log.flush()` then exit). This keeps `fatal` composable with the rest of the pipeline.
+:::
 
 ## Structured logging — the context object
 

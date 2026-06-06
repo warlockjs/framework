@@ -9,6 +9,10 @@
     "url": "https://github.com/warlockjs/docs"
   },
   "scripts": {
+    "sync:changelog": "node scripts/generate-changelog.mjs",
+    "predev": "node scripts/generate-changelog.mjs",
+    "prestart": "node scripts/generate-changelog.mjs",
+    "prebuild": "node scripts/generate-changelog.mjs",
     "dev": "astro dev",
     "start": "astro dev",
     "build": "astro build",

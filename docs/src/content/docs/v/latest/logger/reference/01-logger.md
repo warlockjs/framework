@@ -37,10 +37,12 @@ sidebar:
 | `warn` | `(dataOrModule, action?, message?, context?): Promise<this>` | Log at `warn`. |
 | `error` | `(dataOrModule, action?, message?, context?): Promise<this>` | Log at `error`. |
 | `success` | `(dataOrModule, action?, message?, context?): Promise<this>` | Log at `success`. |
+| `fatal` | `(dataOrModule, action?, message?, context?): Promise<this>` | Log at `fatal` — unrecoverable failures, app is going down. Does NOT auto-flush or exit. |
 | `assert` | `(condition: unknown, module: string, action: string, message: any, context?: Record<string, any>): Promise<this> \| this` | Log an `error` entry when `condition` is falsy; genuinely free no-op when truthy. |
 | `timer` | `(module: string, action: string): (extra?: Record<string, any>) => Promise<this>` | Start a duration timer. The returned function emits an `info` entry with `completed in <ms>ms` and a `durationMs` field in `context`. |
 | `channel` | `(name: string): LogChannel \| undefined` | Find a registered channel by its `name` property. |
 | `flushSync` | `(): void` | Synchronously invoke `flushSync()` on every channel that implements it. |
+| `flush` | `(): Promise<void>` | Asynchronously `await` `flush()` on every channel that implements it (`Promise.allSettled`, per-channel isolation). The async path for graceful shutdown of network/async channels. |
 | `enableAutoFlush` | `(events: AutoFlushEvent[]): this` | Register one process handler per event that flushes before exit. Signals are flushed + re-raised; `beforeExit` is flushed in place. Idempotent — replaces previous handlers. |
 | `disableAutoFlush` | `(): this` | Remove every handler installed by `enableAutoFlush`. Safe with none registered. |
 | `setMinLevel` | `(level: LogLevel \| undefined): this` | Drop entries below `level` before fan-out. `undefined` clears. |

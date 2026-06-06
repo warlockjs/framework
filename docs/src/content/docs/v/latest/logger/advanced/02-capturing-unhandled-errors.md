@@ -15,7 +15,9 @@ Calling the helper attaches two process-level listeners:
 | Node event | Forwarded to | Module | Action |
 | --- | --- | --- | --- |
 | `unhandledRejection` | `log.error(...)` | `"app"` | `"unhandledRejection"` |
-| `uncaughtException` | `log.error(...)` | `"app"` | `"uncaughtException"` |
+| `uncaughtException` | `log.fatal(...)` | `"app"` | `"uncaughtException"` |
+
+The split is intentional: an `uncaughtException` terminates the Node process by default, so it's semantically `fatal`. An `unhandledRejection` is a failure but not necessarily process-ending (depends on Node's `--unhandled-rejections` policy and your app's recovery), so it stays at `error`. This makes "page only on fatal" alerting clean.
 
 The original error is passed as the `message` argument, so `FileLog` captures the full stack trace and `JSONFileLog` stores the stack as a `string[]`.
 
@@ -61,7 +63,7 @@ If you need different routing (send only `uncaughtException` to the logger, for 
 import { log } from "@warlock.js/logger";
 
 process.on("uncaughtException", (error) => {
-  log.error("app", "uncaughtException", error);
+  log.fatal("app", "uncaughtException", error);
 });
 ```
 

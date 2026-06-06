@@ -265,7 +265,7 @@ const topics = [
 // Global pages that don't belong to any package topic (landing, packages
 // grid, skills explainer, 404). They render with no sidebar — fine for
 // landing-style pages.
-const excludedFromTopics = ["/", "/index", "/packages", "/skills", "/404"];
+const excludedFromTopics = ["/", "/index", "/packages", "/skills", "/changelog", "/404"];
 
 // https://astro.build/config
 export default defineConfig({

@@ -19,12 +19,14 @@ const navLinks = [
   { label: "Documentation", href: "/v/latest/core/getting-started/01-introduction/" },
   { label: "Packages", href: "/packages/" },
   { label: "Skills", href: "/skills/" },
+  { label: "Change Log", href: "/changelog/" },
 ];
 
 const currentPath = Astro.url.pathname;
 function isActive(href) {
   if (href === "/packages/") return currentPath === "/packages/";
   if (href === "/skills/") return currentPath === "/skills/";
+  if (href === "/changelog/") return currentPath === "/changelog/";
   if (href.startsWith("/v/latest/")) return currentPath.startsWith("/v/");
   return false;
 }

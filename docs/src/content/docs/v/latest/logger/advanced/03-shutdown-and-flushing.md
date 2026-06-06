@@ -14,9 +14,9 @@ For `FileLog` and `JSONFileLog`, every `log()` call adds an entry to an in-memor
 
 1. The buffer reaches `maxMessagesToWrite` (default **100**).
 2. More than 5 seconds have elapsed since the last write — checked both immediately after each `log()` call and by a 5-second background interval.
-3. You call `log.flushSync()` explicitly.
+3. You call `log.flush()` (async) or `log.flushSync()` (sync) explicitly.
 
-The first two are **asynchronous** (Node streams). The third is **synchronous** (`fs.appendFileSync`).
+The first two are **asynchronous** (Node streams), as is `log.flush()`. Only `log.flushSync()` is **synchronous** (`fs.appendFileSync`).
 
 :::tip[ConsoleLog never buffers]
 `ConsoleLog` writes every entry to stdout immediately. Nothing on this page applies to it.
@@ -85,6 +85,35 @@ process.once("SIGTERM", gracefulShutdown);
 If you register your own `SIGINT` listener, skip `"SIGINT"` in `autoFlushOn` — otherwise both handlers run and the signal is re-raised before your async work completes.
 :::
 
+## Async drain — `log.flush()`
+
+`flushSync()` blocks the event loop with synchronous I/O — correct for the file channels, and required inside the handlers `autoFlushOn` installs (a re-raised signal kills the process before any promise could settle). A channel whose delivery is **asynchronous** — a network transport, an async disk write — can't drain synchronously. For those, `await log.flush()` on a graceful path you control:
+
+```ts title="src/shutdown.ts"
+import { log } from "@warlock.js/logger";
+
+async function gracefulShutdown() {
+  await httpServer.close();
+  await log.flush(); // awaits every channel's async flush()
+  process.exit(0);
+}
+
+process.once("SIGTERM", gracefulShutdown);
+```
+
+`log.flush()` fans out to every channel that implements `flush()` and awaits them together (`Promise.allSettled`). Each channel is isolated — one channel's flush rejecting neither aborts the others nor escapes as an unhandled rejection. Channels without `flush()` are skipped. `FileLog` and `JSONFileLog` implement both `flush()` (async write) and `flushSync()`.
+
+| | `flushSync()` | `flush()` |
+| --- | --- | --- |
+| I/O | synchronous — blocks the loop | asynchronous — awaited |
+| Safe in a re-raising signal handler | yes | no — the signal exits before the promise settles |
+| Used by `autoFlushOn` | yes | no |
+| Reach for it when | file channels, last-resort durability | network/async channels, manual `await` before `process.exit` |
+
+:::note[autoFlushOn always uses flushSync]
+The handlers installed by `autoFlushOn` call `flushSync()` — re-raising a signal can't wait on a promise. If a channel needs async delivery on shutdown, drive `await log.flush()` from your own handler and leave that signal out of `autoFlushOn`.
+:::
+
 ## Shutdown with captured unhandled errors
 
 If you use [`captureAnyUnhandledRejection()`](./02-capturing-unhandled-errors/), include `"beforeExit"` in `autoFlushOn` so the terminal error entry reaches disk before Node tears down:
@@ -117,4 +146,4 @@ Channels that don't buffer (like `ConsoleLog`) skip the call. If every registere
 ## See also
 
 - [Capturing unhandled errors](./02-capturing-unhandled-errors/) — wire unhandled rejections + uncaught exceptions through the logger
-- [Custom Channel](../channels/05-custom/) — implement `flushSync` in your own buffered channel
+- [Custom Channel](../channels/05-custom/) — implement `flush` / `flushSync` in your own buffered channel
