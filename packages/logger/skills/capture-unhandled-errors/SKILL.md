@@ -1,6 +1,6 @@
 ---
 name: capture-unhandled-errors
-description: 'captureAnyUnhandledRejection() installs process.on(''unhandledRejection'') + (''uncaughtException'') listeners routing failures through log.error(''app'', ...). Triggers: `captureAnyUnhandledRejection`, `unhandledRejection`, `uncaughtException`, `log.error`; "log unhandled promise rejections", "catch uncaught exceptions to a file", "record crashes before exit", "global error handler with logger"; typical import `import { captureAnyUnhandledRejection, log } from "@warlock.js/logger"`. Skip: flushing — `@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`; filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; competing `Sentry.init`, `@sentry/node`; native `process.on(''unhandledRejection'')`.'
+description: 'captureAnyUnhandledRejection() installs process.on(''unhandledRejection'') → log.error and process.on(''uncaughtException'') → log.fatal so process-level failures land in your configured channels. Triggers: `captureAnyUnhandledRejection`, `unhandledRejection`, `uncaughtException`, `log.error`, `log.fatal`; "log unhandled promise rejections", "catch uncaught exceptions to a file", "record crashes before exit", "global error handler with logger"; typical import `import { captureAnyUnhandledRejection, log } from "@warlock.js/logger"`. Skip: flushing — `@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`; filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; competing `Sentry.init`, `@sentry/node`; native `process.on(''unhandledRejection'')`.'
 ---
 
 # Error capture — routing Node's unhandled errors through the logger
@@ -17,9 +17,9 @@ captureAnyUnhandledRejection();
 
 Registers:
 - `process.on("unhandledRejection", reason => log.error("app", "unhandledRejection", reason))`
-- `process.on("uncaughtException", error => log.error("app", "uncaughtException", error))`
+- `process.on("uncaughtException", error => log.fatal("app", "uncaughtException", error))`
 
-Nothing else — the failure goes through `log.error` only, so it lands in your configured channels rather than bypassing them with a raw `console.log`.
+The split is intentional: an `uncaughtException` terminates the Node process by default, so it's semantically `fatal`. An `unhandledRejection` is a failure but not always process-ending (depends on Node's `--unhandled-rejections` policy and your app's recovery), so it stays at `error`. This makes "page on fatal" alerting clean — only true crashes ring the pager.
 
 ## When to call it
 
@@ -60,7 +60,7 @@ Calling `captureAnyUnhandledRejection()` a second time registers a second pair o
 - **Does not swallow errors.** Node still exits after `uncaughtException` (this is the safe behavior — state is undefined). The logger just ensures the error is recorded first.
 - **Does not install Node's `--unhandled-rejections` policy.** That's a Node flag; set it in your launch script if you want strict mode.
 - **Does not hook `SIGTERM` / `SIGINT`** — use `enableAutoFlush` for signal flushes.
-- **Does not filter.** Every rejection/exception is logged at `error` level with `module: "app"`. Filter per-channel if some noise slips in.
+- **Does not filter.** Every rejection is logged at `error` and every uncaught exception at `fatal`, both with `module: "app"`. Filter per-channel if some noise slips in.
 
 ## Checking an error was captured in tests
 
@@ -97,7 +97,7 @@ it("routes unhandled rejections to the logger", async () => {
 
 Both listeners log with:
 - `module: "app"`
-- `action: "unhandledRejection"` or `action: "uncaughtException"`
+- `action: "unhandledRejection"` (at `error`) or `action: "uncaughtException"` (at `fatal`)
 - `message`: the rejection reason / exception (keep it as the raw `Error` object — file channels capture the stack).
 
 If you want these routed to a specific file, filter on `data.module === "app"`. See [`@warlock.js/logger/filter-log-entries/SKILL.md`](@warlock.js/logger/filter-log-entries/SKILL.md).

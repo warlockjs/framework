@@ -104,6 +104,30 @@ describe("SentryLog", () => {
       expect(fake.forwarder.captureException).not.toHaveBeenCalled();
     });
 
+    it("sends a fatal Error via captureException at Sentry severity 'fatal'", async () => {
+      const fake = createFakeSentry();
+      const channel = createChannel(fake);
+
+      await waitForInit(channel);
+
+      const error = new Error("unrecoverable");
+      await channel.log(dataFor({ type: "fatal", message: error }));
+
+      expect(fake.forwarder.captureException).toHaveBeenCalledWith(error);
+      expect(fake.scope.setLevel).toHaveBeenCalledWith("fatal");
+    });
+
+    it("sends a fatal string via captureMessage at Sentry severity 'fatal'", async () => {
+      const fake = createFakeSentry();
+      const channel = createChannel(fake);
+
+      await waitForInit(channel);
+
+      await channel.log(dataFor({ type: "fatal", message: "process going down" }));
+
+      expect(fake.forwarder.captureMessage).toHaveBeenCalledWith("process going down", "fatal");
+    });
+
     it("maps warn to a 'warning' event", async () => {
       const fake = createFakeSentry();
       const channel = createChannel(fake);
@@ -196,6 +220,18 @@ describe("SentryLog", () => {
   });
 
   describe("eventLevels config", () => {
+    it("treats fatal as an event by default (alongside error and warn)", async () => {
+      const fake = createFakeSentry();
+      const channel = createChannel(fake);
+
+      await waitForInit(channel);
+
+      await channel.log(dataFor({ type: "fatal", message: "boom" }));
+
+      expect(fake.forwarder.captureMessage).toHaveBeenCalled();
+      expect(fake.forwarder.addBreadcrumb).not.toHaveBeenCalled();
+    });
+
     it("respects a custom eventLevels list (warn becomes a breadcrumb)", async () => {
       const fake = createFakeSentry();
       const channel = createChannel(fake, { eventLevels: ["error"] });

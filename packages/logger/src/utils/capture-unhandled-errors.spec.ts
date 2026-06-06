@@ -74,7 +74,9 @@ describe("captureAnyUnhandledRejection", () => {
     expect(channel.received[0]!.message).toBe(reason);
   });
 
-  it("routes captured uncaughtException through log.error with module 'app'", async () => {
+  it("routes captured uncaughtException through log.fatal with module 'app'", async () => {
+    // uncaughtException terminates the Node process, so it's semantically fatal
+    // — the helper escalates beyond log.error to make alerting/paging clean.
     captureAnyUnhandledRejection();
 
     const error = new Error("uncaught");
@@ -84,7 +86,7 @@ describe("captureAnyUnhandledRejection", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(channel.received).toHaveLength(1);
-    expect(channel.received[0]!.type).toBe("error");
+    expect(channel.received[0]!.type).toBe("fatal");
     expect(channel.received[0]!.module).toBe("app");
     expect(channel.received[0]!.action).toBe("uncaughtException");
     expect(channel.received[0]!.message).toBe(error);

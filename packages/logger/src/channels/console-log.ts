@@ -97,6 +97,18 @@ export class ConsoleLog extends LogChannel<ConsoleLogConfig> {
         );
         break;
 
+      case "fatal":
+        // background-red ☠ — visually distinct from `error` so a fatal entry
+        // can't be missed in a wall of red logs
+        console.log(
+          colors.bgRedBright(colors.white.bold(" ☠ ")),
+          colors.yellow(`(${date})`),
+          colors.cyan(`[${module}]`),
+          colors.magenta(`[${action}]`),
+          colors.redBright.bold(message),
+        );
+        break;
+
       default:
         console.log(
           "[log]",

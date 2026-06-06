@@ -31,6 +31,7 @@ const LEVEL_RANK: Record<LogLevel, number> = {
   success: 1,
   warn: 2,
   error: 3,
+  fatal: 4,
 };
 
 export class Logger {
@@ -287,6 +288,26 @@ export class Logger {
     context?: Record<string, any>,
   ) {
     const data = this.normalizeLogData(dataOrModule, action, message, "success", context);
+
+    return this.log(data);
+  }
+
+  /**
+   * Make fatal log — for unrecoverable failures where the application is going
+   * down (failed bootstrap, lost connection to a required dependency that the
+   * caller has decided not to retry, an `uncaughtException`).
+   *
+   * Identical shape to {@link error}; the level is purely informational —
+   * `fatal` does NOT auto-flush or exit. The caller decides whether to call
+   * `await log.flush()` and `process.exit(...)`.
+   */
+  public fatal(
+    dataOrModule: OmittedLoggingData | string,
+    action?: string,
+    message: any = "",
+    context?: Record<string, any>,
+  ) {
+    const data = this.normalizeLogData(dataOrModule, action, message, "fatal", context);
 
     return this.log(data);
   }

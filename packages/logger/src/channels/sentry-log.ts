@@ -191,7 +191,7 @@ export class SentryLog extends LogChannel<SentryLogConfig> {
    * {@inheritdoc}
    */
   protected defaultConfigurations: SentryLogConfig = {
-    eventLevels: ["error", "warn"],
+    eventLevels: ["fatal", "error", "warn"],
     flushTimeout: 2000,
   };
 
@@ -335,7 +335,7 @@ export class SentryLog extends LogChannel<SentryLogConfig> {
       case "success":
         return "info";
       default:
-        return level; // debug | info | error map 1:1
+        return level; // debug | info | error | fatal map 1:1
     }
   }
 

@@ -52,6 +52,7 @@ This is the quota-control decision. Only `eventLevels` create Sentry **events** 
 
 | Logger level | Default | Sentry call |
 |---|---|---|
+| `fatal` | event | `captureException` for an `Error` message, else `captureMessage(…, "fatal")` |
 | `error` | event | `captureException` for an `Error` message, else `captureMessage(…, "error")` |
 | `warn` | event | `captureMessage(…, "warning")` |
 | `success` | breadcrumb | `addBreadcrumb({ level: "info" })` |
@@ -100,7 +101,7 @@ The channel never crashes your app: the dynamic import failure is swallowed, the
 |---|---|---|---|
 | `client` | Sentry namespace / forwarder | — | Reuse an already-initialized Sentry instance. |
 | `options` | `SentryInitOptions` | — | Sentry init options (mirrors `@sentry/node`'s `NodeOptions`) — used when the channel owns Sentry. |
-| `eventLevels` | `LogLevel[]` | `["error", "warn"]` | Levels sent as events; the rest become breadcrumbs. |
+| `eventLevels` | `LogLevel[]` | `["fatal", "error", "warn"]` | Levels sent as events; the rest become breadcrumbs. |
 | `flushTimeout` | `number` | `2000` | Ms `flush()` waits for the transport to drain. |
 | `levels`, `filter`, `dateFormat`, `redact` | — | — | Inherited from `BasicLogConfigurations`. |
 

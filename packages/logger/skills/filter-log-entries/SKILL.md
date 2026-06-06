@@ -15,7 +15,7 @@ new FileLog({ levels: ["error", "warn"] });
 // error/warn entries → written
 ```
 
-- Omitting `levels` (or passing `[]`) means **allow all five**.
+- Omitting `levels` (or passing `[]`) means **allow all six**.
 - No regex / no range — it's a literal whitelist of `LogLevel` strings.
 
 ## 2. `filter` — the per-channel custom predicate
@@ -41,7 +41,7 @@ log.setMinLevel("info");
 log.configure({ minLevel: "warn" });   // shorthand inside configure()
 ```
 
-Severity ordering: `debug < info ≈ success < warn < error`. `success` is treated as informational severity — `setMinLevel("warn")` drops it.
+Severity ordering: `debug < info ≈ success < warn < error < fatal`. `success` is treated as informational severity — `setMinLevel("warn")` drops it. `fatal` is strictly above `error`, so `setMinLevel("fatal")` admits only fatal entries (handy for "page me only on fatal" routing).
 
 Pass `undefined` to clear:
 

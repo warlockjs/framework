@@ -8,7 +8,7 @@
 
 ---
 name: capture-unhandled-errors
-description: 'captureAnyUnhandledRejection() installs process.on(''unhandledRejection'') + (''uncaughtException'') listeners routing failures through log.error(''app'', ...). Triggers: `captureAnyUnhandledRejection`, `unhandledRejection`, `uncaughtException`, `log.error`; "log unhandled promise rejections", "catch uncaught exceptions to a file", "record crashes before exit", "global error handler with logger"; typical import `import { captureAnyUnhandledRejection, log } from "@warlock.js/logger"`. Skip: flushing — `@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`; filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; competing `Sentry.init`, `@sentry/node`; native `process.on(''unhandledRejection'')`.'
+description: 'captureAnyUnhandledRejection() installs process.on(''unhandledRejection'') → log.error and process.on(''uncaughtException'') → log.fatal so process-level failures land in your configured channels. Triggers: `captureAnyUnhandledRejection`, `unhandledRejection`, `uncaughtException`, `log.error`, `log.fatal`; "log unhandled promise rejections", "catch uncaught exceptions to a file", "record crashes before exit", "global error handler with logger"; typical import `import { captureAnyUnhandledRejection, log } from "@warlock.js/logger"`. Skip: flushing — `@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`; filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; competing `Sentry.init`, `@sentry/node`; native `process.on(''unhandledRejection'')`.'
 ---
 
 # Error capture — routing Node's unhandled errors through the logger
@@ -25,9 +25,9 @@ captureAnyUnhandledRejection();
 
 Registers:
 - `process.on("unhandledRejection", reason => log.error("app", "unhandledRejection", reason))`
-- `process.on("uncaughtException", error => log.error("app", "uncaughtException", error))`
+- `process.on("uncaughtException", error => log.fatal("app", "uncaughtException", error))`
 
-Nothing else — the failure goes through `log.error` only, so it lands in your configured channels rather than bypassing them with a raw `console.log`.
+The split is intentional: an `uncaughtException` terminates the Node process by default, so it's semantically `fatal`. An `unhandledRejection` is a failure but not always process-ending (depends on Node's `--unhandled-rejections` policy and your app's recovery), so it stays at `error`. This makes "page on fatal" alerting clean — only true crashes ring the pager.
 
 ## When to call it
 
@@ -68,7 +68,7 @@ Calling `captureAnyUnhandledRejection()` a second time registers a second pair o
 - **Does not swallow errors.** Node still exits after `uncaughtException` (this is the safe behavior — state is undefined). The logger just ensures the error is recorded first.
 - **Does not install Node's `--unhandled-rejections` policy.** That's a Node flag; set it in your launch script if you want strict mode.
 - **Does not hook `SIGTERM` / `SIGINT`** — use `enableAutoFlush` for signal flushes.
-- **Does not filter.** Every rejection/exception is logged at `error` level with `module: "app"`. Filter per-channel if some noise slips in.
+- **Does not filter.** Every rejection is logged at `error` and every uncaught exception at `fatal`, both with `module: "app"`. Filter per-channel if some noise slips in.
 
 ## Checking an error was captured in tests
 
@@ -105,7 +105,7 @@ it("routes unhandled rejections to the logger", async () => {
 
 Both listeners log with:
 - `module: "app"`
-- `action: "unhandledRejection"` or `action: "uncaughtException"`
+- `action: "unhandledRejection"` (at `error`) or `action: "uncaughtException"` (at `fatal`)
 - `message`: the rejection reason / exception (keep it as the raw `Error` object — file channels capture the stack).
 
 If you want these routed to a specific file, filter on `data.module === "app"`. See [`@warlock.js/logger/filter-log-entries/SKILL.md`](@warlock.js/logger/filter-log-entries/SKILL.md).
@@ -239,7 +239,7 @@ new FileLog({ levels: ["error", "warn"] });
 // error/warn entries → written
 ```
 
-- Omitting `levels` (or passing `[]`) means **allow all five**.
+- Omitting `levels` (or passing `[]`) means **allow all six**.
 - No regex / no range — it's a literal whitelist of `LogLevel` strings.
 
 ## 2. `filter` — the per-channel custom predicate
@@ -265,7 +265,7 @@ log.setMinLevel("info");
 log.configure({ minLevel: "warn" });   // shorthand inside configure()
 ```
 
-Severity ordering: `debug < info ≈ success < warn < error`. `success` is treated as informational severity — `setMinLevel("warn")` drops it.
+Severity ordering: `debug < info ≈ success < warn < error < fatal`. `success` is treated as informational severity — `setMinLevel("warn")` drops it. `fatal` is strictly above `error`, so `setMinLevel("fatal")` admits only fatal entries (handy for "page me only on fatal" routing).
 
 Pass `undefined` to clear:
 
@@ -469,12 +469,12 @@ captureAnyUnhandledRejection();
 
 ---
 name: logger-basics
-description: 'Start with @warlock.js/logger — the log singleton, five levels (debug / info / warn / error / success), channel fan-out, foundations. Triggers: `log`, `Logger`, `log.info`, `log.error`, `log.debug`, `log.warn`, `log.success`, `ConsoleLog`, `FileLog`, `JSONFileLog`; "how do I log in node", "warlock logger basics", "which logger skill do I need"; typical import `import { log, ConsoleLog, FileLog } from "@warlock.js/logger"`. Skip: channel picks — `@warlock.js/logger/pick-log-channel/SKILL.md`; setup — `@warlock.js/logger/configure-logger/SKILL.md`; competing libs `winston`, `pino`, `bunyan`, `log4js`, `signale`; native `console.log`.'
+description: 'Start with @warlock.js/logger — the log singleton, six levels (debug / info / warn / error / success / fatal), channel fan-out, foundations. Triggers: `log`, `Logger`, `log.info`, `log.error`, `log.fatal`, `log.debug`, `log.warn`, `log.success`, `ConsoleLog`, `FileLog`, `JSONFileLog`; "how do I log in node", "warlock logger basics", "which logger skill do I need"; typical import `import { log, ConsoleLog, FileLog } from "@warlock.js/logger"`. Skip: channel picks — `@warlock.js/logger/pick-log-channel/SKILL.md`; setup — `@warlock.js/logger/configure-logger/SKILL.md`; competing libs `winston`, `pino`, `bunyan`, `log4js`, `signale`; native `console.log`.'
 ---
 
 # Log with channels
 
-Multi-channel structured logger for Node.js. Three built-in channels (`ConsoleLog`, `FileLog`, `JSONFileLog`), an abstract `LogChannel` base for custom sinks, five severity levels, and a safe shutdown path via `Logger.enableAutoFlush(events)`.
+Multi-channel structured logger for Node.js. Four built-in channels (`ConsoleLog`, `FileLog`, `JSONFileLog`, `SentryLog`), an abstract `LogChannel` base for custom sinks, six severity levels, and a safe shutdown path via `Logger.enableAutoFlush(events)` plus async `log.flush()` for network channels.
 
 > This skill is the logger **map** — read it first, then load the specific skill for the task.
 
@@ -491,7 +491,7 @@ The 11 things that are true in every logger use:
 1. **Public API is the `log` singleton** (`import { log } from "@warlock.js/logger"`). It's a `Logger` instance — call `log.info(...)`, `log.configure(...)`, etc. No callable `log(data)` form.
 2. **The singleton starts with zero channels.** Nothing is written until at least one channel is registered via `addChannel`, `setChannels`, or `configure`.
 3. **Custom instances:** `new Logger()` gives an isolated logger with the identical API. Almost always you want the singleton — reach for the class only when you need an isolated channel set (libraries, test sandboxes).
-4. **Five levels, closed union:** `"debug" | "info" | "warn" | "error" | "success"`. There are no custom levels today.
+4. **Six levels, closed union:** `"debug" | "info" | "warn" | "error" | "success" | "fatal"`. `fatal` ranks strictly above `error` — use it for unrecoverable failures where the app is going down (failed bootstrap, `uncaughtException`). There are no custom levels.
 5. **Channels can be filtered two ways:** a `levels` array (whitelist) and a `filter` predicate (custom logic). Both run on every entry. See [`@warlock.js/logger/filter-log-entries/SKILL.md`](@warlock.js/logger/filter-log-entries/SKILL.md).
 6. **Logger-wide minimum severity** is available via `log.setMinLevel("info")` (or `configure({ minLevel })`). Entries below the rank are dropped before fan-out — cheaper than per-channel filters.
 7. **Redaction** is two-layer additive: `configure({ redact })` sets the logger floor; `new XxxChannel({ redact: { paths: [...] } })` adds more paths on top. Channels can never remove paths from the logger floor. See [`@warlock.js/logger/redact-sensitive-log-fields/SKILL.md`](@warlock.js/logger/redact-sensitive-log-fields/SKILL.md).
@@ -517,15 +517,18 @@ await log.info("users", "register", "New user created");
 await log.error("payments", "charge", new Error("Card declined"));
 ```
 
-## The five levels
+## The six levels
 
 ```ts
 log.debug("module", "action", "verbose detail");      // dev-only diagnostics
 log.info("module", "action", "neutral event");        // user-visible event
 log.warn("module", "action", "something off");         // recoverable concern
-log.error("module", "action", error);                 // failure path
+log.error("module", "action", error);                 // handled failure, app continues
 log.success("module", "action", "operation done");    // explicit success
+log.fatal("module", "action", error);                 // unrecoverable, app is going down
 ```
+
+`fatal` is purely informational — it does NOT auto-flush or exit. The caller decides whether to `await log.flush()` and `process.exit(...)`. See [`@warlock.js/logger/capture-unhandled-errors/SKILL.md`](@warlock.js/logger/capture-unhandled-errors/SKILL.md) for the `uncaughtException` → `fatal` routing.
 
 Every call signature is the same — `module`, `action`, `message`, optional `context`. `message` can be a string, object, or `Error` instance (file channels capture the stack).
 
@@ -985,6 +988,7 @@ This is the quota-control decision. Only `eventLevels` create Sentry **events** 
 
 | Logger level | Default | Sentry call |
 |---|---|---|
+| `fatal` | event | `captureException` for an `Error` message, else `captureMessage(…, "fatal")` |
 | `error` | event | `captureException` for an `Error` message, else `captureMessage(…, "error")` |
 | `warn` | event | `captureMessage(…, "warning")` |
 | `success` | breadcrumb | `addBreadcrumb({ level: "info" })` |
@@ -1033,7 +1037,7 @@ The channel never crashes your app: the dynamic import failure is swallowed, the
 |---|---|---|---|
 | `client` | Sentry namespace / forwarder | — | Reuse an already-initialized Sentry instance. |
 | `options` | `SentryInitOptions` | — | Sentry init options (mirrors `@sentry/node`'s `NodeOptions`) — used when the channel owns Sentry. |
-| `eventLevels` | `LogLevel[]` | `["error", "warn"]` | Levels sent as events; the rest become breadcrumbs. |
+| `eventLevels` | `LogLevel[]` | `["fatal", "error", "warn"]` | Levels sent as events; the rest become breadcrumbs. |
 | `flushTimeout` | `number` | `2000` | Ms `flush()` waits for the transport to drain. |
 | `levels`, `filter`, `dateFormat`, `redact` | — | — | Inherited from `BasicLogConfigurations`. |
 

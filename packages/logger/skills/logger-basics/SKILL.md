@@ -1,11 +1,11 @@
 ---
 name: logger-basics
-description: 'Start with @warlock.js/logger — the log singleton, five levels (debug / info / warn / error / success), channel fan-out, foundations. Triggers: `log`, `Logger`, `log.info`, `log.error`, `log.debug`, `log.warn`, `log.success`, `ConsoleLog`, `FileLog`, `JSONFileLog`; "how do I log in node", "warlock logger basics", "which logger skill do I need"; typical import `import { log, ConsoleLog, FileLog } from "@warlock.js/logger"`. Skip: channel picks — `@warlock.js/logger/pick-log-channel/SKILL.md`; setup — `@warlock.js/logger/configure-logger/SKILL.md`; competing libs `winston`, `pino`, `bunyan`, `log4js`, `signale`; native `console.log`.'
+description: 'Start with @warlock.js/logger — the log singleton, six levels (debug / info / warn / error / success / fatal), channel fan-out, foundations. Triggers: `log`, `Logger`, `log.info`, `log.error`, `log.fatal`, `log.debug`, `log.warn`, `log.success`, `ConsoleLog`, `FileLog`, `JSONFileLog`; "how do I log in node", "warlock logger basics", "which logger skill do I need"; typical import `import { log, ConsoleLog, FileLog } from "@warlock.js/logger"`. Skip: channel picks — `@warlock.js/logger/pick-log-channel/SKILL.md`; setup — `@warlock.js/logger/configure-logger/SKILL.md`; competing libs `winston`, `pino`, `bunyan`, `log4js`, `signale`; native `console.log`.'
 ---
 
 # Log with channels
 
-Multi-channel structured logger for Node.js. Three built-in channels (`ConsoleLog`, `FileLog`, `JSONFileLog`), an abstract `LogChannel` base for custom sinks, five severity levels, and a safe shutdown path via `Logger.enableAutoFlush(events)`.
+Multi-channel structured logger for Node.js. Four built-in channels (`ConsoleLog`, `FileLog`, `JSONFileLog`, `SentryLog`), an abstract `LogChannel` base for custom sinks, six severity levels, and a safe shutdown path via `Logger.enableAutoFlush(events)` plus async `log.flush()` for network channels.
 
 > This skill is the logger **map** — read it first, then load the specific skill for the task.
 
@@ -22,7 +22,7 @@ The 11 things that are true in every logger use:
 1. **Public API is the `log` singleton** (`import { log } from "@warlock.js/logger"`). It's a `Logger` instance — call `log.info(...)`, `log.configure(...)`, etc. No callable `log(data)` form.
 2. **The singleton starts with zero channels.** Nothing is written until at least one channel is registered via `addChannel`, `setChannels`, or `configure`.
 3. **Custom instances:** `new Logger()` gives an isolated logger with the identical API. Almost always you want the singleton — reach for the class only when you need an isolated channel set (libraries, test sandboxes).
-4. **Five levels, closed union:** `"debug" | "info" | "warn" | "error" | "success"`. There are no custom levels today.
+4. **Six levels, closed union:** `"debug" | "info" | "warn" | "error" | "success" | "fatal"`. `fatal` ranks strictly above `error` — use it for unrecoverable failures where the app is going down (failed bootstrap, `uncaughtException`). There are no custom levels.
 5. **Channels can be filtered two ways:** a `levels` array (whitelist) and a `filter` predicate (custom logic). Both run on every entry. See [`@warlock.js/logger/filter-log-entries/SKILL.md`](@warlock.js/logger/filter-log-entries/SKILL.md).
 6. **Logger-wide minimum severity** is available via `log.setMinLevel("info")` (or `configure({ minLevel })`). Entries below the rank are dropped before fan-out — cheaper than per-channel filters.
 7. **Redaction** is two-layer additive: `configure({ redact })` sets the logger floor; `new XxxChannel({ redact: { paths: [...] } })` adds more paths on top. Channels can never remove paths from the logger floor. See [`@warlock.js/logger/redact-sensitive-log-fields/SKILL.md`](@warlock.js/logger/redact-sensitive-log-fields/SKILL.md).
@@ -48,15 +48,18 @@ await log.info("users", "register", "New user created");
 await log.error("payments", "charge", new Error("Card declined"));
 ```
 
-## The five levels
+## The six levels
 
 ```ts
 log.debug("module", "action", "verbose detail");      // dev-only diagnostics
 log.info("module", "action", "neutral event");        // user-visible event
 log.warn("module", "action", "something off");         // recoverable concern
-log.error("module", "action", error);                 // failure path
+log.error("module", "action", error);                 // handled failure, app continues
 log.success("module", "action", "operation done");    // explicit success
+log.fatal("module", "action", error);                 // unrecoverable, app is going down
 ```
+
+`fatal` is purely informational — it does NOT auto-flush or exit. The caller decides whether to `await log.flush()` and `process.exit(...)`. See [`@warlock.js/logger/capture-unhandled-errors/SKILL.md`](@warlock.js/logger/capture-unhandled-errors/SKILL.md) for the `uncaughtException` → `fatal` routing.
 
 Every call signature is the same — `module`, `action`, `message`, optional `context`. `message` can be a string, object, or `Error` instance (file channels capture the stack).
 

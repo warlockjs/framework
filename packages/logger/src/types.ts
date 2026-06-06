@@ -1,4 +1,13 @@
-export type LogLevel = "debug" | "info" | "warn" | "error" | "success";
+/**
+ * Severity levels, ordered debug < info ≈ success < warn < error < fatal.
+ *
+ * - `debug` — verbose dev diagnostics
+ * - `info` / `success` — neutral and explicit-completion events (same severity)
+ * - `warn` — recoverable concern
+ * - `error` — handled failure; the app continues
+ * - `fatal` — unrecoverable failure; the app is going down
+ */
+export type LogLevel = "debug" | "info" | "warn" | "error" | "success" | "fatal";
 
 /**
  * Process-level events that `Logger.enableAutoFlush()` can hook to drain
@@ -144,7 +153,7 @@ export interface LogContract {
 }
 
 export type LoggingData = {
-  type: "info" | "debug" | "warn" | "error" | "success";
+  type: LogLevel;
   module: string;
   action: string;
   message: any;

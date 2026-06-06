@@ -49,7 +49,7 @@ await log.error({
 
 ## Levels
 
-`debug` · `info` · `warn` · `error` · `success` — each has a shorthand method on the `log` singleton (and on every `Logger` instance).
+`debug` · `info` · `warn` · `error` · `success` · `fatal` — each has a shorthand method on the `log` singleton (and on every `Logger` instance). `fatal` is strictly above `error` for unrecoverable failures where the app is going down (failed bootstrap, `uncaughtException`); it does not auto-flush or exit on its own.
 
 ## Built-in channels
 

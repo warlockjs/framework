@@ -33,7 +33,7 @@ describe("ConsoleLog", () => {
   });
 
   describe("level handling", () => {
-    const levels = ["debug", "info", "warn", "error", "success"] as const;
+    const levels = ["debug", "info", "warn", "error", "success", "fatal"] as const;
 
     for (const level of levels) {
       it(`logs a ${level} message through console.log`, () => {

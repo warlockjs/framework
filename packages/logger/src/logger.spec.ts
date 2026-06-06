@@ -196,7 +196,7 @@ describe("Logger", () => {
   });
 
   describe("level shortcut methods", () => {
-    const levels = ["debug", "info", "warn", "error", "success"] as const;
+    const levels = ["debug", "info", "warn", "error", "success", "fatal"] as const;
 
     for (const level of levels) {
       it(`${level}() produces type "${level}" using 4-arg form`, async () => {
@@ -586,11 +586,12 @@ describe("Logger — minLevel", () => {
     await instance.success("m", "a", "x");
     await instance.warn("m", "a", "x");
     await instance.error("m", "a", "x");
+    await instance.fatal("m", "a", "x");
 
-    expect(channel.received).toHaveLength(5);
+    expect(channel.received).toHaveLength(6);
   });
 
-  it("an error minimum admits only error entries", async () => {
+  it("an error minimum admits error and fatal entries (fatal is strictly above error)", async () => {
     const instance = new Logger();
     const channel = new CapturingChannel();
     instance.addChannel(channel);
@@ -602,8 +603,26 @@ describe("Logger — minLevel", () => {
     await instance.success("m", "a", "x");
     await instance.warn("m", "a", "x");
     await instance.error("m", "a", "x");
+    await instance.fatal("m", "a", "x");
 
-    expect(channel.received.map((e) => e.type)).toEqual(["error"]);
+    expect(channel.received.map((e) => e.type)).toEqual(["error", "fatal"]);
+  });
+
+  it("a fatal minimum admits only fatal entries", async () => {
+    const instance = new Logger();
+    const channel = new CapturingChannel();
+    instance.addChannel(channel);
+
+    instance.setMinLevel("fatal");
+
+    await instance.debug("m", "a", "x");
+    await instance.info("m", "a", "x");
+    await instance.success("m", "a", "x");
+    await instance.warn("m", "a", "x");
+    await instance.error("m", "a", "x");
+    await instance.fatal("m", "a", "x");
+
+    expect(channel.received.map((e) => e.type)).toEqual(["fatal"]);
   });
 
   it("skips fan-out entirely when an entry is below the minimum", async () => {
