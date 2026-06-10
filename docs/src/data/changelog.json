@@ -74,23 +74,58 @@
     {
       "version": "4.2.0",
       "id": "v4-2-0",
-      "date": "June 6, 2026",
+      "date": "June 9, 2026",
       "isUnreleased": false,
-      "summaryHtml": "Graceful-shutdown logging — the logger gains an awaitable async <code>flush()</code> and a Sentry channel for forwarding errors and breadcrumbs.",
+      "summaryHtml": "A security and correctness overhaul of <code>@warlock.js/auth</code> — brute-force login throttling, atomic refresh-token rotation with replay detection, CSPRNG signing secrets, a corrected default token lifetime, and overridable token storage for multi-tenant schemas. The <code>jwt</code> config block is superseded by <code>accessToken</code> / <code>refreshToken</code>.",
       "mode": "detail",
       "sections": [
         {
           "type": "Added",
           "items": [
             {
-              "package": "@warlock.js/logger",
-              "slug": "logger",
-              "html": "awaitable async <code>log.flush()</code> (counterpart to <code>flushSync()</code>)"
+              "package": "@warlock.js/auth",
+              "slug": "auth",
+              "html": "<code>loginThrottleMiddleware</code> — failure-aware brute-force / credential-stuffing protection that counts only failed logins, resets on a successful one, locks per-account and per-IP, and rejects pre-controller with <code>429</code> (cache-backed, fails open on a cache outage). Adds <code>AuthErrorCodes.TooManyAttempts</code> (<code>EC004</code>)."
+            },
+            {
+              "package": "@warlock.js/auth",
+              "slug": "auth",
+              "html": "<code>accessToken</code> / <code>refreshToken</code> configuration blocks, making a separate refresh-token secret first-class."
+            },
+            {
+              "package": "@warlock.js/auth",
+              "slug": "auth",
+              "html": "Overridable token storage — register a custom model under <code>config.auth.accessToken.model</code> / <code>config.auth.refreshToken.model</code> and <code>.extend()</code> the exported <code>accessTokenSchema</code> / <code>refreshTokenSchema</code> to add columns (e.g. a multi-tenant <code>organization_id</code>). Models own issuance through <code>issue()</code> and expose named statics, so the service hard-codes no column names."
+            },
+            {
+              "package": "@warlock.js/auth",
+              "slug": "auth",
+              "html": "<code>tokenType</code> (<code>access</code> | <code>refresh</code>) claim, stamped on issue and verified on read, so an access token can no longer be presented as a refresh token."
+            },
+            {
+              "package": "@warlock.js/auth",
+              "slug": "auth",
+              "html": "<code>expires_at</code> on access tokens; <code>warlock auth.cleanup</code> now purges expired access tokens as well as refresh tokens."
             },
             {
               "package": "@warlock.js/logger",
               "slug": "logger",
-              "html": "<code>SentryLog</code> channel — forwards entries to Sentry (<code>@sentry/node</code> is an optional peer)"
+              "html": "<code>log.flush()</code> — awaitable async counterpart to <code>flushSync()</code>. Drains every channel that implements <code>flush()</code> via <code>Promise.allSettled</code> with per-channel isolation, so one channel's failure can't break shutdown. <code>FileLog</code> / <code>JSONFileLog</code> implement it; <code>ConsoleLog</code> writes synchronously and doesn't need it."
+            },
+            {
+              "package": "@warlock.js/logger",
+              "slug": "logger",
+              "html": "<code>SentryLog</code> channel — forwards entries to Sentry. <code>eventLevels</code> (<code>fatal</code> / <code>error</code> / <code>warn</code> by default) become events (<code>captureException</code> for <code>Error</code> messages, <code>captureMessage</code> otherwise); every other level becomes a breadcrumb. <code>module</code> / <code>action</code> are tags, <code>context</code> is a structured Sentry context. <code>@sentry/node</code> is an <strong>optional peer</strong>, lazily imported — pass an existing <code>client</code> or <code>options</code>."
+            },
+            {
+              "package": "@warlock.js/logger",
+              "slug": "logger",
+              "html": "<code>log.fatal()</code> + <code>fatal</code> log level — ranked strictly above <code>error</code> for unrecoverable failures (failed bootstrap, <code>uncaughtException</code>). Does not auto-flush or exit; caller decides."
+            },
+            {
+              "package": "@warlock.js/logger",
+              "slug": "logger",
+              "html": "<code>ConsoleLog</code> renders <code>fatal</code> with a <code>☠</code> icon on a bright-red background and bold red-bright message, distinct from <code>error</code>'s <code>✗</code>."
             }
           ]
         },
@@ -100,7 +135,97 @@
             {
               "package": "@warlock.js/logger",
               "slug": "logger",
-              "html": "<code>LogContract</code> and <code>LogChannel</code> now expose an optional <code>flush?()</code>; <code>FileLog</code> and <code>JSONFileLog</code> implement it"
+              "html": "<code>captureAnyUnhandledRejection()</code> now escalates <code>uncaughtException</code> to <code>log.fatal</code> (was <code>log.error</code>). Node terminates the process by default, so it's semantically fatal — makes \"page only on fatal\" alerting clean. <code>unhandledRejection</code> stays at <code>error</code>."
+            },
+            {
+              "package": "@warlock.js/logger",
+              "slug": "logger",
+              "html": "<code>LoggingData.type</code> is now typed as <code>LogLevel</code> (was a duplicated inline union — code-standards cleanup)."
+            },
+            {
+              "package": "@warlock.js/logger",
+              "slug": "logger",
+              "html": "<code>LogContract</code> and the <code>LogChannel</code> base now expose an optional <code>flush?()</code> alongside the existing <code>flushSync?()</code>."
+            }
+          ]
+        },
+        {
+          "type": "Fixed",
+          "items": [
+            {
+              "package": "@warlock.js/auth",
+              "slug": "auth",
+              "html": "Default access-token lifetime was ~3.6 seconds (a numeric <code>expiresIn</code> interpreted as milliseconds) and is now <strong>1 hour</strong>."
+            },
+            {
+              "package": "@warlock.js/auth",
+              "slug": "auth",
+              "html": "Targeted revocation queried <code>userId</code> instead of the <code>user_id</code> column, so logout and refresh-token removal threw on Postgres and silently no-oped on MongoDB. The service now routes every token query through named model statics, so no column name is hard-coded."
+            },
+            {
+              "package": "@warlock.js/auth",
+              "slug": "auth",
+              "html": "Token deletions were fire-and-forget inside <code>Promise&lt;void&gt;</code> methods (false success for callers, uncatchable rejections) and are now awaited."
+            },
+            {
+              "package": "@warlock.js/auth",
+              "slug": "auth",
+              "html": "The route middleware matched on <code>userType</code> instead of the <code>user_type</code> column."
+            },
+            {
+              "package": "@warlock.js/auth",
+              "slug": "auth",
+              "html": "<code>revokeAllTokens</code> / <code>revokeTokenFamily</code> reported an empty set — a re-query on <code>revoked_at: null</code> after the update matched nothing — so the <code>token.revoked</code> / <code>token.familyRevoked</code> events never fired. The revoked rows are now captured before revocation."
+            },
+            {
+              "package": "@warlock.js/auth",
+              "slug": "auth",
+              "html": "A throwing synchronous auth-event listener no longer turns a completed login into a <code>500</code>."
+            },
+            {
+              "package": "@warlock.js/logger",
+              "slug": "logger",
+              "html": "<code>@sentry/node</code> is now referenced only via local minimal types + an indirect dynamic import, so source-served consumers (the package's <code>main</code> → <code>./src/index.ts</code>) no longer get a <code>TS2307: Cannot find module '@sentry/node'</code> when they (correctly) don't install the optional peer. Proven by pruning the SDK and running the full suite + <code>tsc --noEmit</code> clean."
+            }
+          ]
+        },
+        {
+          "type": "Deprecated",
+          "items": [
+            {
+              "package": "@warlock.js/auth",
+              "slug": "auth",
+              "html": "The <code>auth.jwt.*</code> configuration block (<code>jwt: { secret, expiresIn, refresh }</code>). Use <code>accessToken</code> / <code>refreshToken</code> instead — the legacy shape is still read and mapped forward with a one-time deprecation warning."
+            }
+          ]
+        },
+        {
+          "type": "Removed",
+          "items": [
+            {
+              "package": "@warlock.js/auth",
+              "slug": "auth",
+              "html": "Unread <code>access_tokens</code> columns <code>is_active</code> and <code>last_access</code>."
+            },
+            {
+              "package": "@warlock.js/auth",
+              "slug": "auth",
+              "html": "The unused <code>auth.password.salt</code> configuration key."
+            }
+          ]
+        },
+        {
+          "type": "Security",
+          "items": [
+            {
+              "package": "@warlock.js/auth",
+              "slug": "auth",
+              "html": "<code>warlock jwt.generate</code> now derives <code>JWT_SECRET</code> / <code>JWT_REFRESH_SECRET</code> from a CSPRNG (<code>Random.token</code>) instead of <code>Math.random()</code>-backed <code>Random.string</code>."
+            },
+            {
+              "package": "@warlock.js/auth",
+              "slug": "auth",
+              "html": "Refresh-token rotation is atomic: a guarded conditional <code>UPDATE</code> means two concurrent rotations of the same token can never both succeed, and a replayed token revokes its entire family."
             }
           ]
         }
