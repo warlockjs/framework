@@ -116,7 +116,7 @@ log.setMinLevel("warn");
 log.setMinLevel(undefined);
 ```
 
-Severity ranking: `debug < info ≈ success < warn < error`. Setting `minLevel: "warn"` drops `debug`, `info`, and `success`. The `success` level shares `info` severity — it's treated as informational, not as a warning.
+Severity ranking: `debug < info ≈ success < warn < error < fatal`. Setting `minLevel: "warn"` drops `debug`, `info`, and `success`. The `success` level shares `info` severity — it's treated as informational, not as a warning. `fatal` is strictly above `error`, so `minLevel: "fatal"` admits only fatal entries.
 
 :::tip[Per-channel filters still apply]
 `minLevel` is the global floor. Each channel's own `levels` array and `filter` predicate run on top of it — useful when one destination needs to be louder or quieter than the global default. See [Channels Overview](../channels/01-overview/).

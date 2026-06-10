@@ -52,12 +52,12 @@ log.setChannels([
   new FileLog({ chunk: "daily" }), // everything to disk
   new SlackLog({
     webhookUrl: process.env.SLACK_WEBHOOK_URL!,
-    levels: ["error", "warn"], // ← only these reach Slack
+    levels: ["fatal", "error", "warn"], // ← only these reach Slack
   }),
 ]);
 ```
 
-The `levels: ["error", "warn"]` whitelist means `debug` / `info` / `success` never hit the network — `shouldBeLogged` drops them before your `fetch` runs. The console and file channels still see everything; filtering is per channel.
+The `levels: ["fatal", "error", "warn"]` whitelist means `debug` / `info` / `success` never hit the network — `shouldBeLogged` drops them before your `fetch` runs. The console and file channels still see everything; filtering is per channel. Include `fatal` so unrecoverable failures (`uncaughtException`, failed bootstrap) ring the same Slack channel as everything else worth paging on.
 
 ## Don't let a flaky webhook crash your app
 

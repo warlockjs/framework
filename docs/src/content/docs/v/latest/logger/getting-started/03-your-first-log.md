@@ -1,6 +1,6 @@
 ---
 title: "Your first log"
-description: "The call-site API — module / action / message, the five levels, structured context, errors, and the timer + assert helpers."
+description: "The call-site API — module / action / message, the six levels, structured context, errors, and the timer + assert helpers."
 sidebar:
   order: 3
   label: "Your first log"

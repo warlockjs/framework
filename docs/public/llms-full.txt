@@ -2301,6 +2301,64 @@ There is no `warlock add` feature for password hashing — `bcryptjs` is a plain
 - [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — service layering, where the password boundary should sit.
 
 
+## lower-stage3-decorators  `@warlock.js/core/lower-stage3-decorators/SKILL.md`
+
+---
+name: lower-stage3-decorators
+description: 'Vite/Vitest plugin `lowerStage3Decorators()` that lowers TC39 Stage-3 (native) decorators with esbuild before oxc / the SSR rewrite mangles them — so `@RegisterModel`-decorated Cascade models load under Vitest 4 / Vite 8. Triggers: `lowerStage3Decorators`, "SyntaxError: Invalid or unexpected token" on a decorated class, "@(0, __vite_ssr_import__.X)()", "decorator crashes vitest", "models won''t load in tests", "Vite 8 oxc decorators"; typical import `import { lowerStage3Decorators } from "@warlock.js/core"` in `vite.config.ts` / `vitest.config.ts`. Skip: writing the tests themselves — `@warlock.js/core/test-service/SKILL.md` / `@warlock.js/core/test-http/SKILL.md`; runtime migrations — `@warlock.js/cascade/write-migration/SKILL.md`.'
+---
+
+# Lower Stage-3 decorators for Vite/Vitest
+
+Cascade declares relations with **native** decorators — `@RegisterModel`, `@BelongsTo`, `@HasMany`. Under Vitest 4 / Vite 8 those crash on load:
+
+```
+SyntaxError: Invalid or unexpected token
+```
+
+The cause is two transforms that don't understand each other. Vite 8 transpiles `.ts` with **oxc**, which only lowers *legacy* (`experimentalDecorators`) decorators — it leaves native ones in place. Then Vite's SSR `moduleRunnerTransform` rewrites the decorator's imported name into `@(0, __vite_ssr_import__.RegisterModel)()` — which is no longer valid decorator syntax. V8 throws on the first decorated model it evaluates, and your whole suite is dead before a single test runs.
+
+`lowerStage3Decorators()` fixes it by getting **esbuild** to lower the decorators *first*.
+
+## Use it
+
+Drop it **first** in your `plugins` array:
+
+```ts title="vite.config.ts"
+import { lowerStage3Decorators } from "@warlock.js/core";
+import mongezVite from "@mongez/vite";
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  plugins: [lowerStage3Decorators(), mongezVite()],
+  test: {
+    environment: "node",
+    include: ["src/app/**/*.test.ts"],
+  },
+});
+```
+
+That's the whole fix. Any file that imports a decorated model now loads.
+
+## Why it works
+
+The plugin runs `enforce: "pre"`, so it executes **ahead of** Vite's core transform and the SSR rewrite. For every `.ts`/`.tsx` file that actually contains a decorator it runs esbuild with `target: "es2022"` and `experimentalDecorators: false` — esbuild lowers the Stage-3 decorator into a plain helper call (no `@` left), preserving the `(value, context)` runtime semantics the decorators depend on. By the time oxc and the SSR step see the file, there's no decorator syntax left to mangle — just ordinary import references.
+
+It's the **same esbuild transform the production `tsx`/build path uses**, so a file lowered in tests behaves identically in dev and prod. Two cheap gates keep the fast path fast: files in `node_modules`, non-TypeScript files, and files with no `@decorator` are skipped entirely and never pay esbuild's cost.
+
+## Things NOT to do
+
+- **Don't reach for `oxc: { target: "es2022" }`** — it's insufficient. oxc can only lower *legacy* decorators, and the breakage is the SSR rewrite, not the transpile target. Legacy lowering would also mangle the Stage-3 `(value, context)` signature.
+- **Don't put it after `@mongez/vite`** — it must run `pre`, before any other transform. Keep it first.
+- **Don't set `experimentalDecorators: true`** anywhere in the test tsconfig — Cascade's decorators are native (Stage-3), not legacy. Legacy mode changes their call signature and breaks `context.kind` / `context.metadata`.
+
+## See also
+
+- [`@warlock.js/core/test-service/SKILL.md`](@warlock.js/core/test-service/SKILL.md) — `setupTest()` bootstrap for unit-testing services/models once the harness loads.
+- [`@warlock.js/core/test-http/SKILL.md`](@warlock.js/core/test-http/SKILL.md) — integration tests over the real HTTP server.
+- [`@warlock.js/cascade/write-migration/SKILL.md`](@warlock.js/cascade/write-migration/SKILL.md) — the decorated models this plugin lets you load.
+
+
 ## process-image  `@warlock.js/core/process-image/SKILL.md`
 
 ---
@@ -4281,11 +4339,12 @@ export async function teardown() {
 ```
 
 ```ts title="vite.config.ts"
+import { lowerStage3Decorators } from "@warlock.js/core";
 import mongezVite from "@mongez/vite";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  plugins: [mongezVite()],
+  plugins: [lowerStage3Decorators(), mongezVite()],
   test: {
     globalSetup: "./src/test-global-setup.ts",  // ← starts the HTTP server
     setupFiles: ["./src/test-setup.ts"],         // ← per-worker setupTest (see test-service skill)
@@ -4296,7 +4355,7 @@ export default defineConfig({
 });
 ```
 
-Both files are created by `warlock add test`. The split is intentional: `globalSetup` runs ONCE in the main vitest process; `setupFiles` runs per worker thread.
+Both files (and this config, with `lowerStage3Decorators()` first so decorated models load) are created by `warlock add test`. The split is intentional: `globalSetup` runs ONCE in the main vitest process; `setupFiles` runs per worker thread.
 
 ## HTTP request helpers
 
@@ -4588,11 +4647,12 @@ await setupTest({ connectors: true });
 ```
 
 ```ts title="vite.config.ts"
+import { lowerStage3Decorators } from "@warlock.js/core";
 import mongezVite from "@mongez/vite";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  plugins: [mongezVite()],
+  plugins: [lowerStage3Decorators(), mongezVite()],
   test: {
     globalSetup: "./src/test-global-setup.ts",  // ← HTTP server (see test-http skill)
     setupFiles: ["./src/test-setup.ts"],         // ← runs setupTest per worker
@@ -4603,7 +4663,7 @@ export default defineConfig({
 });
 ```
 
-The `mongezVite()` plugin handles TypeScript path resolution and the framework's module shape. Without it, your imports break the moment vitest tries to load a Warlock module.
+The `mongezVite()` plugin handles TypeScript path resolution and the framework's module shape. Without it, your imports break the moment vitest tries to load a Warlock module. `lowerStage3Decorators()` goes **first** — it lets decorated Cascade models (`@RegisterModel`, …) load under Vitest 4 / Vite 8; see [`@warlock.js/core/lower-stage3-decorators/SKILL.md`](@warlock.js/core/lower-stage3-decorators/SKILL.md).
 
 Tests live colocated with the module: `src/app/<module>/tests/*.test.ts`. The `include` pattern picks them up.
 
@@ -8357,6 +8417,541 @@ The `orderBy` reference matches the alias from the aggregates object.
 
 - [`@warlock.js/cascade/query-data/SKILL.md`](@warlock.js/cascade/query-data/SKILL.md) — the broader query vocabulary
 - [`@warlock.js/cache/use-cached-hof/SKILL.md`](@warlock.js/cache/use-cached-hof/SKILL.md) — caching expensive aggregate results
+
+
+## alter-migration  `@warlock.js/cascade/alter-migration/SKILL.md`
+
+---
+name: alter-migration
+description: 'Evolve an existing table with `Migration.alter(Model, schema, options?)` — add/drop/rename/modify columns; add/drop regular, unique, expression, full-text, geo, vector, and TTL indexes; add/drop foreign keys and CHECK constraints; write rollbacks with class-form methods in `down()`. Triggers: "alter a table", "add a column to existing table", "drop a column", "rename a column", "add an index", "drop a unique constraint", "change a column type", `Migration.alter`, `dropUnique`, `addIndex`, `addForeign`. Skip: creating a brand-new table — `@warlock.js/cascade/write-migration/SKILL.md`.'
+---
+
+# Alter a migration
+
+Use `Migration.alter` to evolve an existing table — adding or dropping columns, renaming them, changing their type, and managing every variety of index or constraint. It's the declarative counterpart to `Migration.create` and inherits the table name and data source straight from the model.
+
+> **Key difference from `Migration.create`:** `alter` does **not** auto-infer rollbacks. You must supply a `down()` function in options whenever you need to be able to roll back.
+
+---
+
+## Minimal example
+
+```ts title="src/app/users/models/user/migrations/06-09-2026_00-00-00-add-phone-to-users.migration.ts"
+import { Migration, text } from "@warlock.js/cascade";
+import { User } from "../user.model";
+
+export default Migration.alter(User, {
+  add: {
+    phone: text().nullable(),
+  },
+}, {
+  down() {
+    this.dropColumn("phone");
+  },
+});
+```
+
+---
+
+## Signature
+
+```ts
+Migration.alter(
+  model: ModelClass,
+  schema: AlterSchema,
+  options?: MigrationAlterOptions,
+): MigrationConstructor
+```
+
+- **`model`** — the model class; provides `table` and `dataSource` automatically.
+- **`schema`** — any combination of the keys below; omit everything you don't need.
+- **`options`** — rollback logic + order/transaction overrides (see [Options](#options)).
+
+---
+
+## Column operations
+
+### `add` — new columns
+
+```ts
+import { Migration, text, integer, bool, uuid } from "@warlock.js/cascade";
+import { Organization } from "app/organizations/models/organization";
+import { User } from "../user.model";
+
+export default Migration.alter(User, {
+  add: {
+    phone:           text().nullable(),
+    login_attempts:  integer().notNullable().default(0),
+    is_verified:     bool().notNullable().default(false),
+    organization_id: uuid().references(Organization.table).onDelete("cascade").notNullable(),
+  },
+}, {
+  down() {
+    this.dropColumn("phone");
+    this.dropColumn("login_attempts");
+    this.dropColumn("is_verified");
+    this.dropColumn("organization_id");
+  },
+});
+```
+
+Column helpers (`text`, `integer`, `bool`, `uuid`, `double`, `json`, `timestamp`, `date`, …) are imported from `@warlock.js/cascade` and support the same modifier chain as in `Migration.create`.
+
+### `drop` — remove columns
+
+```ts
+export default Migration.alter(User, {
+  drop: ["legacy_token", "old_avatar_url"],
+}, {
+  down() {
+    // re-add with the original definition if rollback is meaningful
+    this.text("legacy_token").nullable();
+    this.text("old_avatar_url").nullable();
+  },
+});
+```
+
+### `rename` — rename columns
+
+```ts
+export default Migration.alter(Post, {
+  rename: {
+    body:      "content",
+    thumb_url: "thumbnail_url",
+  },
+}, {
+  down() {
+    this.renameColumn("content",       "body");
+    this.renameColumn("thumbnail_url", "thumb_url");
+  },
+});
+```
+
+### `modify` — change column type or nullability
+
+```ts
+import { Migration, string } from "@warlock.js/cascade";
+import { User } from "../user.model";
+
+export default Migration.alter(User, {
+  modify: {
+    // widen email from text to varchar(320) and keep not-null
+    email: string(320).notNullable(),
+  },
+}, {
+  down() {
+    // revert to unbounded text
+    this.text("email").notNullable();
+  },
+});
+```
+
+> `modify` re-declares the column. Include every modifier you want to keep (`.notNullable()`, `.default(…)`, etc.) — the declaration replaces the old one entirely.
+
+---
+
+## Index operations
+
+### Regular indexes — `addIndex` / `dropIndex`
+
+```ts
+export default Migration.alter(Order, {
+  // single column
+  addIndex: [{ columns: "status" }],
+}, {
+  down() {
+    this.dropIndex("status");
+  },
+});
+```
+
+```ts
+// composite index with an explicit name
+export default Migration.alter(Order, {
+  addIndex: [
+    { columns: ["organization_id", "status"], name: "idx_org_status" },
+    { columns: "created_at" },
+  ],
+}, {
+  down() {
+    this.dropIndex("idx_org_status");
+    this.dropIndex("created_at");
+  },
+});
+```
+
+`dropIndex` accepts a name string or a columns array:
+
+```ts
+export default Migration.alter(Order, {
+  dropIndex: ["idx_org_status", ["created_at"]],
+});
+```
+
+`options.concurrently: true` builds the index without locking the table (Postgres):
+
+```ts
+addIndex: [{ columns: "email", options: { concurrently: true } }]
+```
+
+### Unique constraints — `addUnique` / `dropUnique`
+
+```ts
+// promote an indexed column to unique
+export default Migration.alter(User, {
+  addUnique: [{ columns: "email" }],
+}, {
+  down() {
+    this.dropUnique("email");
+  },
+});
+```
+
+Composite unique constraint:
+
+```ts
+export default Migration.alter(Membership, {
+  addUnique: [{ columns: ["organization_id", "user_id"], name: "uq_org_member" }],
+}, {
+  down() {
+    this.dropUnique(["organization_id", "user_id"]);
+  },
+});
+```
+
+Downgrade a unique to a plain index (the pattern used in this session):
+
+```ts
+export default Migration.alter(User, {
+  dropUnique: [["email"]],
+  addIndex:   [{ columns: "email", name: "users_email_index" }],
+}, {
+  down() {
+    this.dropIndex("users_email_index");
+    this.unique("email");
+  },
+});
+```
+
+### Expression indexes — `addExpressionIndex` (Postgres)
+
+```ts
+export default Migration.alter(User, {
+  addExpressionIndex: [
+    { expressions: "lower(email)",          name: "idx_email_ci" },
+    { expressions: "lower(name)",           name: "idx_name_ci" },
+    { expressions: ["year(created_at)", "status"] },
+  ],
+}, {
+  down() {
+    this.dropIndex("idx_email_ci");
+    this.dropIndex("idx_name_ci");
+  },
+});
+```
+
+---
+
+## Specialized indexes
+
+### Full-text — `addFullText` / `dropFullText`
+
+```ts
+export default Migration.alter(Article, {
+  addFullText: [
+    {
+      columns: ["title", "body"],
+      options: { name: "ft_article_search", language: "english" },
+    },
+  ],
+}, {
+  down() {
+    this.dropFullText("ft_article_search");
+  },
+});
+```
+
+### Geo-spatial — `addGeoIndex` / `dropGeoIndex`
+
+```ts
+export default Migration.alter(Store, {
+  addGeoIndex: [{ column: "location" }],
+}, {
+  down() {
+    this.dropGeoIndex("location");
+  },
+});
+```
+
+Options: `{ name?, type?: "2dsphere" | "2d", min?, max? }`
+
+### Vector (AI embeddings) — `addVectorIndex` / `dropVectorIndex`
+
+```ts
+export default Migration.alter(Document, {
+  addVectorIndex: [{
+    column: "embedding",
+    options: { dimensions: 1536, similarity: "cosine", name: "idx_doc_embedding" },
+  }],
+}, {
+  down() {
+    this.dropVectorIndex("embedding");
+  },
+});
+```
+
+Similarity options: `"cosine"` | `"euclidean"` | `"dotProduct"`.
+
+### TTL (MongoDB) — `addTTLIndex` / `dropTTLIndex`
+
+Expires documents automatically after a fixed duration:
+
+```ts
+export default Migration.alter(Session, {
+  addTTLIndex: [{ column: "created_at", expireAfterSeconds: 86400 }], // 24 h
+}, {
+  down() {
+    this.dropTTLIndex("created_at");
+  },
+});
+```
+
+---
+
+## Constraints
+
+### Foreign keys — `addForeign` / `dropForeign`
+
+Pass a model class or a raw table-name string for `references`:
+
+```ts
+import { Migration } from "@warlock.js/cascade";
+import { Team } from "app/teams/models/team";
+import { User } from "../user.model";
+
+export default Migration.alter(User, {
+  addForeign: [
+    { column: "team_id",  references: Team,     onDelete: "cascade" },
+    { column: "owner_id", references: "users",  on: "id", onDelete: "setNull" },
+  ],
+}, {
+  down() {
+    this.dropForeign("team_id",  Team.table);
+    this.dropForeign("owner_id", "users");
+  },
+});
+```
+
+`onDelete` / `onUpdate` values: `"cascade"` | `"restrict"` | `"setNull"` | `"noAction"`. Both default to `"restrict"` when omitted.
+
+Drop by constraint name when you named it manually:
+
+```ts
+dropForeign: [{ columnOrConstraint: "fk_my_custom_name" }]
+```
+
+### CHECK constraints — `addCheck` / `dropCheck`
+
+```ts
+export default Migration.alter(Product, {
+  addCheck: [
+    { name: "price_positive",    expression: "price_cents >= 0" },
+    { name: "stock_non_negative", expression: "stock >= 0" },
+  ],
+}, {
+  down() {
+    this.dropCheck("price_positive");
+    this.dropCheck("stock_non_negative");
+  },
+});
+```
+
+---
+
+## Raw SQL inside an alter
+
+Use `raw` when you need a one-off SQL statement alongside declarative changes (e.g. backfilling a new column in the same migration when the table is small):
+
+```ts
+export default Migration.alter(User, {
+  add: {
+    full_name: text().nullable(),
+  },
+  raw: `UPDATE users SET full_name = first_name || ' ' || last_name`,
+}, {
+  down() {
+    this.dropColumn("full_name");
+  },
+});
+```
+
+Pass an array for multiple statements:
+
+```ts
+raw: [
+  `UPDATE users SET status = 'active' WHERE status IS NULL`,
+  `UPDATE users SET role = 'member' WHERE role IS NULL`,
+]
+```
+
+---
+
+## Writing `down()` — the rollback function
+
+`Migration.alter` **never** auto-infers rollback. Supply `down()` in options whenever you want `cascade migrate:rollback` to work. Inside `down()`, `this` is a full `Migration` instance — every class-form builder is available:
+
+| Operation | Class-form call in `down()` |
+|---|---|
+| Drop an added column | `this.dropColumn("name")` |
+| Re-add a dropped column | `this.text("name").nullable()` |
+| Undo a rename | `this.renameColumn("new", "old")` |
+| Undo a column modify | `this.text("col").notNullable()` |
+| Drop a plain index (by name) | `this.dropIndex("idx_name")` |
+| Drop a plain index (by columns) | `this.dropIndex(["col_a", "col_b"])` |
+| Drop a unique constraint | `this.dropUnique("email")` or `this.dropUnique(["a", "b"])` |
+| Add a unique constraint back | `this.unique("email")` |
+| Add a plain index back | `this.index("email", "idx_name")` |
+| Drop a foreign key | `this.dropForeign("col", "ref_table")` |
+| Drop a CHECK constraint | `this.dropCheck("constraint_name")` |
+| Drop full-text index | `this.dropFullText("ft_name")` |
+| Drop geo index | `this.dropGeoIndex("column")` |
+| Drop vector index | `this.dropVectorIndex("column")` |
+| Drop TTL index | `this.dropTTLIndex("column")` |
+| Raw SQL | `this.raw("SQL statement")` |
+
+If a migration is genuinely irreversible, throw inside `down()` so accidental rollbacks fail loudly:
+
+```ts
+{
+  down() {
+    throw new Error("This migration is irreversible — restore from backup.");
+  },
+}
+```
+
+---
+
+## Options (`MigrationAlterOptions`)
+
+| Key | Type | Purpose |
+|---|---|---|
+| `down` | `(this: Migration) => void \| Promise<void>` | Rollback logic (not auto-inferred) |
+| `up` | `(this: Migration) => void \| Promise<void>` | Extra imperative logic to run after declarative changes |
+| `order` | `number` | Execution order override (default `0`) |
+| `createdAt` | `string` | ISO timestamp override for migration name ordering |
+| `transactional` | `boolean` | Wrap the migration in a DB transaction |
+
+The `up` hook runs **after** the declarative schema changes, making it useful for data backfills or conditional DDL that depends on the added schema:
+
+```ts
+export default Migration.alter(User, {
+  add: { verified_at: timestamp().nullable() },
+}, {
+  up() {
+    // backfill: mark existing confirmed users as verified
+    this.raw(`UPDATE users SET verified_at = updated_at WHERE status = 'confirmed'`);
+  },
+  down() {
+    this.dropColumn("verified_at");
+  },
+});
+```
+
+---
+
+## Common recipes
+
+### Add a column + foreign key together
+
+```ts
+import { Migration, uuid } from "@warlock.js/cascade";
+import { Team } from "app/teams/models/team";
+import { User } from "../user.model";
+
+export default Migration.alter(User, {
+  add: {
+    team_id: uuid().nullable(),
+  },
+  addForeign: [
+    { column: "team_id", references: Team, onDelete: "setNull" },
+  ],
+  addIndex: [{ columns: "team_id" }],
+}, {
+  down() {
+    this.dropForeign("team_id", Team.table);
+    this.dropIndex("team_id");
+    this.dropColumn("team_id");
+  },
+});
+```
+
+### Swap unique → plain index
+
+```ts
+export default Migration.alter(User, {
+  dropUnique: [["email"]],
+  addIndex:   [{ columns: "email", name: "users_email_index" }],
+}, {
+  down() {
+    this.dropIndex("users_email_index");
+    this.unique("email");
+  },
+});
+```
+
+### Rename + widen a column
+
+```ts
+export default Migration.alter(Post, {
+  rename: { body: "content" },
+  modify: { content: text().notNullable() },
+}, {
+  down() {
+    this.renameColumn("content", "body");
+  },
+});
+```
+
+### Multiple operations in one migration
+
+Combine freely — all operations run in a single `up()` call:
+
+```ts
+export default Migration.alter(Product, {
+  add:    { sku: text().unique().notNullable() },
+  drop:   ["old_code"],
+  rename: { price: "price_cents" },
+  modify: { price_cents: integer().notNullable() },
+  addIndex:  [{ columns: ["category_id", "status"], name: "idx_cat_status" }],
+  addCheck:  [{ name: "price_non_negative", expression: "price_cents >= 0" }],
+}, {
+  down() {
+    this.dropCheck("price_non_negative");
+    this.dropIndex("idx_cat_status");
+    this.renameColumn("price_cents", "price");
+    this.text("old_code").nullable();
+    this.dropColumn("sku");
+  },
+});
+```
+
+---
+
+## Things NOT to do
+
+- **Don't edit a shipped migration.** If it's already run in any environment, add a new migration on top.
+- **Don't skip `down()` for reversible changes.** Without it, `cascade migrate:rollback` is a no-op on your migration.
+- **Don't put large backfills and schema changes together.** Schema change first (nullable column or default), backfill second — in its own migration or a background job. This keeps rollback safe.
+- **Don't use `raw` for something the declarative API already covers.** Use `addIndex`, `addUnique`, etc. — raw SQL bypasses Cascade's driver abstraction and breaks on non-Postgres sources.
+- **Don't declare `id`, `createdAt`, or `updatedAt`** — they're managed by the framework.
+
+---
+
+## See also
+
+- [`@warlock.js/cascade/write-migration/SKILL.md`](@warlock.js/cascade/write-migration/SKILL.md) — `Migration.create` for brand-new tables + all column helpers
+- [`@warlock.js/cascade/run-cascade-cli/SKILL.md`](@warlock.js/cascade/run-cascade-cli/SKILL.md) — CLI flags + programmatic Operations API
+- [`@warlock.js/cascade/manage-data-sources/SKILL.md`](@warlock.js/cascade/manage-data-sources/SKILL.md) — multi-DB migrations
 
 
 ## cascade-basics  `@warlock.js/cascade/cascade-basics/SKILL.md`
@@ -15669,12 +16264,12 @@ Every call signature is the same — `module`, `action`, `message`, optional `co
 
 ---
 name: overview
-description: 'Front-door orientation for `@warlock.js/logger` — structured channel-based logging with five severity levels, PII redaction floor, buffered file/JSON channels, signal-flush on shutdown, ergonomic helpers (timer, assert). Standalone — no `@warlock.js/core` required. TRIGGER when: code imports anything from `@warlock.js/logger`; user asks "what does @warlock.js/logger do", "compare with pino / winston / bunyan", "structured logging for Node", "which logger should I use", "how do channels work"; package.json adds `@warlock.js/logger`. Skip: specific task already known — load the matching task skill directly (`logger-basics`, `configure-logger`, `pick-log-channel`, `write-custom-log-channel`, `redact-sensitive-log-fields`, `filter-log-entries`, `flush-logs-on-shutdown`, `capture-unhandled-errors`, `use-log-helpers`, `test-logging-code`); plain `console.log` in throwaway scripts.'
+description: 'Front-door orientation for `@warlock.js/logger` — structured channel-based logging with six severity levels (debug / info / warn / error / success / fatal), PII redaction floor, buffered file/JSON channels, optional SentryLog forwarding, async log.flush() + signal-flush on shutdown, ergonomic helpers (timer, assert). Standalone — no `@warlock.js/core` required. TRIGGER when: code imports anything from `@warlock.js/logger`; user asks "what does @warlock.js/logger do", "compare with pino / winston / bunyan", "structured logging for Node", "which logger should I use", "how do channels work"; package.json adds `@warlock.js/logger`. Skip: specific task already known — load the matching task skill directly (`logger-basics`, `configure-logger`, `pick-log-channel`, `write-custom-log-channel`, `ship-logs-to-sentry`, `redact-sensitive-log-fields`, `filter-log-entries`, `flush-logs-on-shutdown`, `capture-unhandled-errors`, `use-log-helpers`, `test-logging-code`); plain `console.log` in throwaway scripts.'
 ---
 
 # `@warlock.js/logger` — overview
 
-Structured logging for Node. Five severity levels, a singleton plus a `Logger` class, channel-based fan-out (one entry → many sinks), PII redaction as a floor that channels can extend, buffered file writes with signal-triggered flush on shutdown, and a couple of ergonomic helpers (`timer`, `assert`) that turn boilerplate into one-liners.
+Structured logging for Node. Six severity levels (with `fatal` strictly above `error`), a singleton plus a `Logger` class, channel-based fan-out (one entry → many sinks), PII redaction as a floor that channels can extend, buffered file writes with signal-triggered flush on shutdown, an awaitable async `log.flush()` for network/async channels, an optional Sentry channel, and a couple of ergonomic helpers (`timer`, `assert`) that turn boilerplate into one-liners.
 
 Ships standalone — `@warlock.js/core` is not required. Drop it into any Node project.
 
@@ -15688,16 +16283,16 @@ Skip if your code is a throwaway script where `console.log` is genuinely fine �
 
 ## The mental model in one paragraph
 
-You write `log.info("auth", "login", "user signed in", { userId })`. The logger fans that single entry out to every registered channel (`ConsoleLog`, `FileLog`, `JSONFileLog`, or your custom subclass). Each channel decides whether to emit it (per-level whitelist, per-channel filter predicate, logger-wide minimum severity). Redaction runs once at the logger level and can be extended per channel — never relaxed. Buffered channels (file + JSON file) drain on flush, either manually (`log.flushSync()`) or automatically via signal handlers (`enableAutoFlush(['SIGINT', 'SIGTERM', 'beforeExit'])`). That's the whole package.
+You write `log.info("auth", "login", "user signed in", { userId })`. The logger fans that single entry out to every registered channel (`ConsoleLog`, `FileLog`, `JSONFileLog`, `SentryLog`, or your custom subclass). Each channel decides whether to emit it (per-level whitelist, per-channel filter predicate, logger-wide minimum severity). Redaction runs once at the logger level and can be extended per channel — never relaxed. Buffered channels (file + JSON file) drain on flush — synchronously via `log.flushSync()` / `enableAutoFlush(['SIGINT', 'SIGTERM', 'beforeExit'])`, or asynchronously via `await log.flush()` (the only path that works for network channels like `SentryLog`). That's the whole package.
 
 ## Skills index
 
-Ten task skills cover everything. Load the one that matches your job — most callers only ever need `logger-basics` + `configure-logger` + `pick-log-channel`.
+Eleven task skills cover everything. Load the one that matches your job — most callers only ever need `logger-basics` + `configure-logger` + `pick-log-channel`.
 
 ### Foundations
 
 #### [`logger-basics`](@warlock.js/logger/logger-basics/SKILL.md)
-Start here. The `log` singleton, the five levels (`debug` / `info` / `warn` / `error` / `success`), how fan-out works, the `module / action / message / context` shape every entry carries.
+Start here. The `log` singleton, the six levels (`debug` / `info` / `warn` / `error` / `success` / `fatal`), how fan-out works, the `module / action / message / context` shape every entry carries.
 
 #### [`configure-logger`](@warlock.js/logger/configure-logger/SKILL.md)
 Wire channels at boot — `log.addChannel`, `log.setChannels`, `log.configure({ channels, autoFlushOn, redact, minLevel })`. Branch on `NODE_ENV`, replace the channel list, isolate a library's logger from the host singleton.
@@ -15705,10 +16300,13 @@ Wire channels at boot — `log.addChannel`, `log.setChannels`, `log.configure({ 
 ### Channels
 
 #### [`pick-log-channel`](@warlock.js/logger/pick-log-channel/SKILL.md)
-Pick one of the three built-ins: `ConsoleLog` (terminal, colored), `FileLog` (plain `.log` on disk with rotation), `JSONFileLog` (structured JSON for aggregators — Datadog, Loki, ELK).
+Pick one of the four built-ins: `ConsoleLog` (terminal, colored), `FileLog` (plain `.log` on disk with rotation), `JSONFileLog` (structured JSON for aggregators — Datadog, Loki, ELK), `SentryLog` (errors + breadcrumbs to Sentry; `@sentry/node` is an optional peer).
+
+#### [`ship-logs-to-sentry`](@warlock.js/logger/ship-logs-to-sentry/SKILL.md)
+The `SentryLog` channel in depth — event-vs-breadcrumb level mapping, dual init modes (reuse an existing client or pass `options`), draining via `Sentry.flush(timeout)`, behavior when the optional peer isn't installed.
 
 #### [`write-custom-log-channel`](@warlock.js/logger/write-custom-log-channel/SKILL.md)
-Extend `LogChannel<Options>` for sinks the built-ins don't cover — Slack, HTTP endpoint, in-memory buffer, database. The lazy `init()` lifecycle (`setTimeout(0)`) and the `terminal: true/false` ANSI-stripping behavior are subtle — read this skill before subclassing.
+Extend `LogChannel<Options>` for sinks the built-ins don't cover — Slack, HTTP endpoint, in-memory buffer, database. The lazy `init()` lifecycle (`setTimeout(0)`), the `terminal: true/false` ANSI-stripping behavior, and the difference between `flush()` (async, network) and `flushSync()` (sync, files) are subtle — read this skill before subclassing.
 
 ### Production concerns
 
@@ -15719,10 +16317,10 @@ Strip secrets before they reach a sink. Logger-wide `setRedact({ paths, censor }
 Drop entries before they cost anything. Logger-wide `setMinLevel("info")` is the fast path; per-channel `levels` array + `filter` predicate for fine control.
 
 #### [`flush-logs-on-shutdown`](@warlock.js/logger/flush-logs-on-shutdown/SKILL.md)
-Buffered channels (file + JSON file) need explicit drain. `log.flushSync()` manually, or `enableAutoFlush(['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK', 'SIGUSR2', 'beforeExit'])` to wire process signals. Signals are re-raised after flush so Node's default exit still runs.
+Buffered channels need explicit drain. `log.flushSync()` (sync) for file channels — also wired by `enableAutoFlush(['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK', 'SIGUSR2', 'beforeExit'])`. `await log.flush()` (async) for network/async channels like `SentryLog` — the only path that can await an HTTPS round-trip on a graceful shutdown.
 
 #### [`capture-unhandled-errors`](@warlock.js/logger/capture-unhandled-errors/SKILL.md)
-`captureAnyUnhandledRejection()` hooks `unhandledRejection` + `uncaughtException` and routes both through `log.error("app", ...)`. One call at startup, pair with `autoFlushOn: ['beforeExit']` to land the entry on disk.
+`captureAnyUnhandledRejection()` hooks `unhandledRejection` (→ `log.error("app", ...)`) and `uncaughtException` (→ `log.fatal("app", ...)` — Node terminates by default, so it's semantically fatal). One call at startup, pair with `autoFlushOn: ['beforeExit']` to land the entry on disk.
 
 ### Ergonomics + testing
 
@@ -15739,13 +16337,14 @@ Silence the logger globally in tests via `log.setChannels([])` in `setupFiles`. 
 | `ConsoleLog` | `process.stdout` | `true` (colors kept) | no |
 | `FileLog` | `.log` files | `false` (ANSI stripped) | yes (5s timer or 100-entry buffer) |
 | `JSONFileLog` | `.json` files | `false` (ANSI stripped) | yes (same buffering) |
+| `SentryLog` | Sentry events + breadcrumbs | `false` | via the Sentry SDK's own transport (`@sentry/node` is an optional peer) |
 
 `terminal: true` is the flag that decides whether the channel sees raw colored messages or stripped plain text. Custom channels: pick `true` if you write to a terminal, `false` for anything else.
 
 ## What this package deliberately doesn't do
 
 - **Distributed tracing.** Use OpenTelemetry. Logger gets you structured local logs with `module / action`; trace correlation is a different problem.
-- **Log shipping.** Write a custom channel that POSTs to your aggregator, or use `JSONFileLog` + a sidecar (fluentbit, vector, promtail). The package doesn't bundle network sinks.
+- **Log aggregator integrations beyond Sentry.** `SentryLog` is bundled (with `@sentry/node` as an optional peer). For Datadog, Loki, ELK, etc., either write a custom channel that POSTs to the aggregator or use `JSONFileLog` + a sidecar (fluentbit, vector, promtail).
 - **Pretty-printing of arbitrary objects.** `ConsoleLog` has a `showContext` flag that runs `util.inspect` on the context object; for richer formatting, use `JSONFileLog` and view the file through your favorite viewer.
 - **Log analysis.** Querying / aggregating / alerting is on the sink side (Loki, ELK, Datadog).
 
@@ -15759,7 +16358,7 @@ Silence the logger globally in tests via `log.setChannels([])` in `setupFiles`. 
 
 ---
 name: pick-log-channel
-description: 'Pick one of the three built-in channels — ConsoleLog (terminal), FileLog (plain text on disk), JSONFileLog (structured JSON for aggregators like Loki / Datadog / Elastic). Triggers: `ConsoleLog`, `FileLog`, `JSONFileLog`, `chunk`, `rotate`, `groupBy`, `maxFileSize`, `showContext`, `log.channel`; "log to a file", "rotate log files", "daily log chunks", "json logs for datadog / loki / elastic"; typical import `import { ConsoleLog, FileLog, JSONFileLog } from "@warlock.js/logger"`. Skip: custom sinks — `@warlock.js/logger/write-custom-log-channel/SKILL.md`; registration — `@warlock.js/logger/configure-logger/SKILL.md`; competing libs `winston-daily-rotate-file`, `pino-pretty`.'
+description: 'Pick one of the four built-in channels — ConsoleLog (terminal), FileLog (plain text on disk), JSONFileLog (structured JSON for aggregators like Loki / Datadog / Elastic), SentryLog (forwards errors + breadcrumbs to Sentry). Triggers: `ConsoleLog`, `FileLog`, `JSONFileLog`, `SentryLog`, `chunk`, `rotate`, `groupBy`, `maxFileSize`, `showContext`, `log.channel`; "log to a file", "rotate log files", "daily log chunks", "json logs for datadog / loki / elastic", "send logs to Sentry"; typical import `import { ConsoleLog, FileLog, JSONFileLog, SentryLog } from "@warlock.js/logger"`. Skip: Sentry-specific setup — `@warlock.js/logger/ship-logs-to-sentry/SKILL.md`; custom sinks — `@warlock.js/logger/write-custom-log-channel/SKILL.md`; registration — `@warlock.js/logger/configure-logger/SKILL.md`; competing libs `winston-daily-rotate-file`, `pino-pretty`.'
 ---
 
 # Channels — which one to pick and how to configure it
@@ -17561,15 +18160,16 @@ export default {
     user: User,
     // admin: Admin,  // for multi-user-type
   },
-  jwt: {
+  accessToken: {
     secret: env("JWT_SECRET"),
     expiresIn: "1h",
-    refresh: {
-      enabled: true,
-      expiresIn: "30d",
-      rotation: true,
-      maxPerUser: 5,
-    },
+  },
+  refreshToken: {
+    secret: env("JWT_REFRESH_SECRET"), // recommended: a separate refresh secret
+    enabled: true,
+    expiresIn: "30d",
+    rotation: true,
+    maxPerUser: 5,
   },
 };
 ```
@@ -17591,6 +18191,122 @@ export default {
 - Don't store the JWT secret in the model layer or anywhere user-modifiable. It lives in `.env` only.
 - Don't return the raw `User` from a login endpoint without shaping output. Configure `static toJsonColumns` or `static resource` (see [`@warlock.js/cascade/define-model/SKILL.md`](@warlock.js/cascade/define-model/SKILL.md)).
 - Don't run `auth.cleanup` from app boot. Schedule it (cron, scheduler) as a periodic task — see [`@warlock.js/scheduler/scheduler-basics/SKILL.md`](@warlock.js/scheduler/scheduler-basics/SKILL.md).
+
+
+## customize-token-storage  `@warlock.js/auth/customize-token-storage/SKILL.md`
+
+---
+name: customize-token-storage
+description: 'Override the persisted AccessToken / RefreshToken models to add columns (multi-tenant `organization_id`, device metadata), rename, or change storage — without forking the package. Extend the model + `schema.extend(...)`, register it under `config.auth.accessToken.model` / `config.auth.refreshToken.model`, override `issue()` to populate the new column, and add a migration. Triggers: `accessToken.model`, `refreshToken.model`, `AccessToken.issue`, `RefreshToken.issue`, `accessTokenSchema`, `refreshTokenSchema`, "add a column to the token table", "multi-tenant tokens", "organization_id on access token", "override the token model", "custom token storage"; typical import `import { AccessToken, accessTokenSchema } from "@warlock.js/auth"`. Skip: multiple user TYPES (not token storage) — `@warlock.js/auth/customize-user-type/SKILL.md`; the token lifecycle API — `@warlock.js/auth/manage-tokens/SKILL.md`; the config blocks themselves — `@warlock.js/auth/auth-basics/SKILL.md`.'
+---
+
+# Customize token storage
+
+The package ships `AccessToken` and `RefreshToken` models and runs the whole token flow through their **named statics** — `issue`, `findByToken`, `activeFor`, `revokeAllFor`, etc. The auth service never references a column name directly; it resolves the *active* model from config. So you change token storage by **registering a subclass**, not by forking.
+
+Reach for this when you need an extra column on the token tables — the common case is a tenant key (`organization_id`) so tokens are partitioned per organization, or richer device metadata.
+
+## The three pieces
+
+A storage override is always three coordinated steps. Miss any one and it breaks — see the strict-mode note below.
+
+### 1. Extend the model + its schema
+
+`accessTokenSchema` / `refreshTokenSchema` are exported so you compose them with `.extend(...)` instead of re-declaring the base shape. Override `issue()` to populate your new column (the user is in hand there).
+
+```ts title="src/app/auth/models/app-access-token.ts"
+import { AccessToken, accessTokenSchema, type Auth } from "@warlock.js/auth";
+import { v } from "@warlock.js/seal";
+
+export class AppAccessToken extends AccessToken {
+  public static schema = accessTokenSchema.extend({
+    organization_id: v.string().exists("Organization", { column: "id" }),
+  });
+
+  // populate the tenant key on issue — read it off the authenticating user
+  public static issue(user: Auth, token: string, expiresAt: Date) {
+    return this.create({
+      token,
+      user_id: user.id,
+      user_type: user.userType,
+      expires_at: expiresAt,
+      organization_id: user.get("organization_id"),
+    });
+  }
+}
+```
+
+Refresh tokens follow the same shape — extend `refreshTokenSchema`, and override `issue(user, token, options)` (`options` is `{ familyId, expiresAt, deviceInfo? }`) the same way, copying the base fields plus your column.
+
+### 2. Register the subclass in config
+
+```ts title="src/config/auth.ts"
+import { AppAccessToken } from "app/auth/models/app-access-token";
+import { AppRefreshToken } from "app/auth/models/app-refresh-token";
+
+export default {
+  userType: { user: User },
+  accessToken: {
+    model: AppAccessToken,            // ← the override
+    secret: env("JWT_SECRET"),
+    expiresIn: "1h",
+  },
+  refreshToken: {
+    model: AppRefreshToken,           // ← the override
+    secret: env("JWT_REFRESH_SECRET"),
+    expiresIn: "30d",
+  },
+};
+```
+
+From here the service, the middleware, and every `authService` helper transparently use your model — `findByToken`, `revokeAllFor`, `enforceMax`, and the rest all run against your columns.
+
+### 3. Add the column to the migration
+
+The new column needs a real database column. Add it to your token-table migration (the FK + index match your `User` model's tenant convention):
+
+```ts
+this.uuid("organization_id").references("organizations").onDelete("cascade").index();
+```
+
+See [`@warlock.js/cascade/write-migration/SKILL.md`](@warlock.js/cascade/write-migration/SKILL.md) for the migration mechanics.
+
+## Why all three — the strict-mode trap
+
+This is the failure people hit. Cascade's `strictMode: "strip"` **drops any field your schema doesn't declare** before the INSERT. So if you set `organization_id` in `issue()` but don't add it to the schema (step 1), the value is silently stripped, and a NOT-NULL `organization_id` column then **fails the INSERT**. The chain is: `issue()` sets it → the *schema* must declare it so it survives → the *migration* must create the column. All three, or nothing.
+
+## You do NOT need read-side scoping
+
+Token lookups go by the unique `token` string (`findByToken`), which already uniquely identifies a row regardless of tenant. So you don't need a tenant-scoped global query scope on the token model — `organization_id` is there for FK cascade-cleanup when an org is deleted, plus partitioning and analytics, not for lookup safety.
+
+## What you're overriding (the contract)
+
+Your subclass inherits and may override these statics — the service calls them, never raw queries:
+
+| Static | Role |
+| --- | --- |
+| `issue(user, token, …)` | persist a freshly-signed token (override to add columns) |
+| `findByToken(token)` | look a row up by its token string |
+| `findForUser(user, token)` | a user-scoped lookup (logout) |
+| `activeFor(user)` | active, unexpired sessions, newest-first |
+| `revokeAllFor(user)` / `revokeFamily(id)` | revoke a set, returning the revoked rows |
+| `enforceMax(user, max)` | cap concurrent refresh tokens |
+| `purgeExpired()` | delete expired rows (CLI cleanup) |
+
+If you rename a column, override the statics that reference it so they map to your name — the service depends on the method, not the column.
+
+## Things NOT to do
+
+- **Don't set a column without declaring it in `schema.extend(...)`.** `strictMode: "strip"` removes it; a NOT-NULL column then fails the INSERT.
+- **Don't add a tenant-scoped global scope to the token model.** Lookups are by unique token; a leaky scope is a cross-tenant exposure risk for no lookup benefit.
+- **Don't fork the package to add a column.** Extend + register — you keep receiving package fixes.
+- **Don't forget the migration.** The schema declares the field; only the migration creates the database column.
+
+## See also
+
+- [`@warlock.js/auth/customize-user-type/SKILL.md`](@warlock.js/auth/customize-user-type/SKILL.md) — multiple user *types* (a different axis from token *storage*).
+- [`@warlock.js/auth/manage-tokens/SKILL.md`](@warlock.js/auth/manage-tokens/SKILL.md) — the token lifecycle your statics power.
+- [`@warlock.js/cascade/define-model/SKILL.md`](@warlock.js/cascade/define-model/SKILL.md) — extending models and schemas.
 
 
 ## customize-user-type  `@warlock.js/auth/customize-user-type/SKILL.md`
@@ -17648,10 +18364,15 @@ export default {
     // staff: Staff,
     // client: Client,
   },
-  jwt: {
+  accessToken: {
     secret: env("JWT_SECRET"),
     expiresIn: "1h",
-    refresh: { enabled: true, expiresIn: "30d", rotation: true },
+  },
+  refreshToken: {
+    secret: env("JWT_REFRESH_SECRET"),
+    enabled: true,
+    expiresIn: "30d",
+    rotation: true,
   },
 };
 ```
@@ -17834,7 +18555,7 @@ async function logoutController(request: Request, response: Response) {
 The contract:
 - **Pass the access token** → that specific access-token row is deleted.
 - **Pass the refresh token** → that specific refresh-token row is revoked.
-- **Omit refresh token** → behavior depends on `config.auth.jwt.refresh.logoutWithoutToken`:
+- **Omit refresh token** → behavior depends on `config.auth.refreshToken.logoutWithoutToken`:
   - `"revoke-all"` (default) — every refresh token for this user is revoked. Fail-safe.
   - `"error"` — throws. Force the client to send the refresh token.
 
@@ -17917,7 +18638,7 @@ type RefreshTokenOutput = { token: string; expiresAt: string };
 
 type TokenPair = {
   accessToken: AccessTokenOutput;
-  refreshToken?: RefreshTokenOutput;   // omitted if config.auth.jwt.refresh.enabled = false
+  refreshToken?: RefreshTokenOutput;   // omitted if config.auth.refreshToken.enabled = false
 };
 ```
 
@@ -17936,7 +18657,7 @@ const refresh = await authService.createRefreshToken(user, deviceInfo);
 const pair = await authService.createTokenPair(user, deviceInfo);
 ```
 
-`createTokenPair` is the typical issuance path. It respects `config.auth.jwt.refresh.enabled` — if disabled, returns only `accessToken`.
+`createTokenPair` is the typical issuance path. It respects `config.auth.refreshToken.enabled` — if disabled, returns only `accessToken`.
 
 ## Refresh with rotation — `refreshTokens`
 
@@ -17950,7 +18671,7 @@ What happens internally:
 1. Verify the JWT signature on the old refresh token.
 2. Find the row in `RefreshToken` — must exist + not be revoked.
 3. Look up the user via `config.auth.userType[token.userType]`.
-4. **Rotation** (default — `config.auth.jwt.refresh.rotation = true`): revoke the old refresh token, create a new pair from the same `family_id`.
+4. **Rotation** (default — `config.auth.refreshToken.rotation = true`): revoke the old refresh token, create a new pair from the same `family_id`.
 5. **No rotation**: mark the old as "used" but keep it valid.
 
 **Replay detection.** If the old refresh token is presented again after rotation (already revoked but still in the DB):
@@ -17994,7 +18715,7 @@ Use this for "active sessions" UIs. Revoke a specific session by calling `.revok
 await authService.removeAccessToken(user, accessTokenString);
 
 // Specific refresh token (via the RefreshToken instance)
-const rt = await RefreshToken.first({ token: refreshString });
+const rt = await RefreshToken.findByToken(refreshString);
 await rt?.revoke();
 
 // All access tokens for a user
@@ -18010,7 +18731,7 @@ await authService.revokeTokenFamily(familyId);
 ## Max refresh tokens per user
 
 ```ts
-// In config.auth.jwt.refresh:
+// In config.auth.refreshToken:
 {
   maxPerUser: 5,   // default
 }
@@ -18022,7 +18743,7 @@ When issuing a new refresh token, the service counts active tokens for the user 
 
 ```ts
 const cleaned = await authService.cleanupExpiredTokens();
-// Returns: number of expired refresh tokens removed.
+// Returns: number of expired refresh tokens removed (also purges expired access-token rows).
 // Fires "token.expired" event per token + "cleanup.completed" with the count.
 ```
 
@@ -18048,19 +18769,19 @@ For low-level JWT signing/verification (outside the authService flow):
 ```ts
 import { jwt } from "@warlock.js/auth";
 
-const token = await jwt.generate(payload, { expiresIn: 3600 });
+const token = await jwt.generate(payload, { expiresIn: "1h" }); // string or ms; a bare number is milliseconds
 const decoded = await jwt.verify(token);
 
 const refreshToken = await jwt.generateRefreshToken(payload, { expiresIn });
 const decodedRefresh = await jwt.verifyRefreshToken(refreshToken);
 ```
 
-The package signs access and refresh tokens with independent secrets — `config.auth.jwt.secret` and `config.auth.jwt.refresh.secret`. Setting a distinct `refresh.secret` is recommended: it prevents an access-token compromise from forging refresh tokens (and vice versa). The refresh secret is **optional** — when `config.auth.jwt.refresh.secret` is unset, refresh tokens fall back to the main `config.auth.jwt.secret`, so refresh works out of the box without a second secret.
+The package signs access and refresh tokens with independent secrets — `config.auth.accessToken.secret` and `config.auth.refreshToken.secret`. Setting a distinct `refresh.secret` is recommended: it prevents an access-token compromise from forging refresh tokens (and vice versa). The refresh secret is **optional** — when `config.auth.refreshToken.secret` is unset, refresh tokens fall back to the main `config.auth.accessToken.secret`, so refresh works out of the box without a second secret.
 
 ## Things NOT to do
 
 - Don't use raw JWT libraries directly. The package handles signing, verification, secret loading, and the access/refresh split.
-- Don't disable rotation (`config.auth.jwt.refresh.rotation = false`) unless you genuinely understand the tradeoff — you lose replay detection.
+- Don't disable rotation (`config.auth.refreshToken.rotation = false`) unless you genuinely understand the tradeoff — you lose replay detection.
 - Don't increase `maxPerUser` to a huge number "to be safe." Each active refresh token is a revocation surface; fewer simultaneous tokens means less attack surface.
 - Don't manually delete `AccessToken` rows in a service. The user might be hitting a request mid-revoke and get an inconsistent state. Use the `authService` helpers.
 
@@ -18098,7 +18819,7 @@ Your user model extends the `Auth` base model and declares its `userType`. A log
 
 ## Skills index
 
-Seven task skills. Most apps need `auth-basics` + `protect-routes` + `handle-login-and-logout`.
+Nine task skills. Most apps need `auth-basics` + `protect-routes` + `handle-login-and-logout`.
 
 ### Foundations
 
@@ -18123,6 +18844,12 @@ The token lifecycle — `generateAccessToken`, `createRefreshToken`, `createToke
 
 #### [`customize-user-type`](@warlock.js/auth/customize-user-type/SKILL.md)
 Support multiple user types in one system — each `Auth` subclass overrides `userType`, `config.auth.userType.<slug>` maps the slug to a model class, `authMiddleware("admin")` / `authMiddleware(["admin", "staff"])` gates per type.
+
+#### [`customize-token-storage`](@warlock.js/auth/customize-token-storage/SKILL.md)
+Override the persisted `AccessToken` / `RefreshToken` models to add columns (multi-tenant `organization_id`), rename, or change storage — extend the model + schema and register it under `config.auth.accessToken.model` / `config.auth.refreshToken.model`.
+
+#### [`throttle-login-attempts`](@warlock.js/auth/throttle-login-attempts/SKILL.md)
+Brute-force / credential-stuffing protection — `loginThrottleMiddleware()` counts only failed logins, resets on success, locks per-account + per-IP after a threshold, and rejects pre-controller with 429. Cache-backed, fails open on a cache outage.
 
 #### [`run-auth-commands`](@warlock.js/auth/run-auth-commands/SKILL.md)
 Two CLI commands — `warlock jwt.generate` (strong JWT secret → `.env`) and `warlock auth.cleanup` (remove expired refresh tokens). Register via `registerJWTSecretGeneratorCommand()` and `registerAuthCleanupCommand()`.
@@ -18248,6 +18975,7 @@ The middleware uses the framework's `response.unauthorized({...})` shape. To ove
 
 - [`@warlock.js/auth/customize-user-type/SKILL.md`](@warlock.js/auth/customize-user-type/SKILL.md) — config and multi-user-type semantics
 - [`@warlock.js/auth/handle-login-and-logout/SKILL.md`](@warlock.js/auth/handle-login-and-logout/SKILL.md) — where the access token gets issued in the first place
+- [`@warlock.js/auth/throttle-login-attempts/SKILL.md`](@warlock.js/auth/throttle-login-attempts/SKILL.md) — brute-force throttle to stack in front of the login route
 
 
 ## register-user  `@warlock.js/auth/register-user/SKILL.md`
@@ -18516,6 +19244,126 @@ Register it the same way as the bundled commands — call the factory inside `de
 
 - [`@warlock.js/auth/manage-tokens/SKILL.md`](@warlock.js/auth/manage-tokens/SKILL.md) — `cleanupExpiredTokens` internals
 - [`@warlock.js/scheduler/scheduler-basics/SKILL.md`](@warlock.js/scheduler/scheduler-basics/SKILL.md) — in-process scheduling
+
+
+## throttle-login-attempts  `@warlock.js/auth/throttle-login-attempts/SKILL.md`
+
+---
+name: throttle-login-attempts
+description: 'Brute-force / credential-stuffing protection via `loginThrottleMiddleware` — a failure-aware route gate that counts only failed logins (resets on success), locks per-account and per-source after a threshold, and rejects pre-controller with 429 so the DB lookup and bcrypt verify are skipped. Cache-backed (shared across replicas), fixed-window, fails open on a cache outage. Triggers: `loginThrottleMiddleware`, `AuthErrorCodes.TooManyAttempts`, `EC004`, "rate limit login", "brute force protection", "lock account after failed logins", "throttle login attempts", "too many login attempts 429"; typical import `import { loginThrottleMiddleware } from "@warlock.js/auth"`. Skip: generic per-route request rate limiting that counts every request (use core `middleware.rateLimit`); gating a route by auth — `@warlock.js/auth/protect-routes/SKILL.md`; issuing tokens — `@warlock.js/auth/handle-login-and-logout/SKILL.md`.'
+---
+
+# Throttle login attempts with `loginThrottleMiddleware`
+
+`loginThrottleMiddleware(options?)` returns a Warlock middleware that defends the login (and refresh / password-reset) routes against brute-force and credential-stuffing — without punishing a user who fat-fingers a password then gets it right.
+
+The trick that makes it different from a plain rate limiter: it's **failure-aware**. It hooks the response *after* your controller runs (`response.onSent`), counts only the attempts that actually failed, and **clears the counter the moment a login succeeds**. A generic request limiter can't do that — it runs before the controller and counts every hit, success or not.
+
+## The shortest version
+
+```ts
+import { loginThrottleMiddleware } from "@warlock.js/auth";
+
+router.post("/auth/login", loginController, {
+  middleware: [loginThrottleMiddleware()], // 5 failures / 15m → 15m lockout, per email + ip
+});
+```
+
+That's the whole feature for most apps. Defaults: **5** failed attempts within a **15m** window trips a **15m** lockout, tracked independently per account (the `email` field) **and** per source IP.
+
+> **Heads-up — account-lockout is a DoS surface.** Because the default tracks per-`email`, an attacker who knows a victim's address can lock them out by spamming failed logins. The per-IP counter mitigates it (the attacker's own IP trips too); for purely anonymous endpoints prefer `by: ["ip"]`, and for high-value accounts consider a CAPTCHA step over a hard lock. See [Gotchas](#gotchas).
+
+## How it behaves
+
+1. **Before the controller** — if the account or the IP is currently locked, it short-circuits with `429` and never touches the database or the bcrypt verify (this is also what neutralises the CPU-DoS angle of brute-forcing). The body carries `AuthErrorCodes.TooManyAttempts` (`EC004`).
+2. **After the controller** — it inspects the outcome. A non-2xx response is a failed login: it bumps a fixed-window counter for each tracked identifier, and once a counter reaches `max` it writes a lock key. A 2xx response is a success: it **clears** the counter and lock for that identifier.
+
+Per-account tracking stops a password-spray against one user from many IPs; per-source tracking stops one IP from stuffing many accounts. A lock on **either** identifier rejects the request — defense-in-depth.
+
+## Options
+
+```ts
+loginThrottleMiddleware({
+  max: 5,                 // failures allowed in the window before lockout
+  window: "15m",          // counting window — ms-format string or seconds (number)
+  lockoutDuration: "15m", // how long the lock lasts once tripped
+  by: ["email", "ip"],    // identifiers tracked, each independently
+  identifierKey: "email", // which credential field is the account key
+  errorMessage: "Too many attempts. Try again later.",
+});
+```
+
+Two escape hatches for non-standard setups:
+
+```ts
+loginThrottleMiddleware({
+  // your controller signals failure with a 200 body instead of a status code
+  isFailure: (response) => response.parsedBody?.ok === false,
+
+  // derive the account key from somewhere other than email/ip
+  identify: (request) => [`tenant.${request.input("tenant")}.${request.input("username")}`],
+});
+```
+
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `max` | `5` | Failures within the window before lockout |
+| `window` | `"15m"` | Counting window (`ms`-string or seconds) |
+| `lockoutDuration` | `"15m"` | Lock TTL once tripped |
+| `by` | `["email", "ip"]` | Identifiers tracked independently |
+| `identifierKey` | `"email"` | Credential field used as the account key |
+| `errorMessage` | i18n `auth.errors.tooManyAttempts` | 429 message override |
+| `isFailure` | `(res) => !res.isOk` | What counts as a failed attempt |
+| `identify` | built-in email + ip extraction | Custom identifier list |
+
+## The 429 response
+
+On lockout the middleware sends:
+
+```jsonc
+{ "error": "...", "errorCode": "EC004" } // AuthErrorCodes.TooManyAttempts
+```
+
+Define the `auth.errors.tooManyAttempts` translation key (or pass `errorMessage`) so clients see a real message instead of the raw key. Map `EC004` in your error transformer the same way you map the other `AuthErrorCodes`.
+
+## Beyond login
+
+The middleware isn't login-specific — drop it on any route where repeated failures should lock something out. For the refresh and reset endpoints there's no email in the body, so track by IP only:
+
+```ts
+router.post("/auth/refresh-token", refreshController, {
+  middleware: [loginThrottleMiddleware({ by: ["ip"], max: 10, window: "1m" })],
+});
+
+router.post("/auth/forgot-password", forgotController, {
+  middleware: [loginThrottleMiddleware({ max: 3, window: "1h", lockoutDuration: "1h" })],
+});
+```
+
+## When to use this vs core's `rateLimit`
+
+| | `loginThrottleMiddleware` (auth) | `middleware.rateLimit` (core) |
+| --- | --- | --- |
+| Counts | only **failed** logins | **every** request |
+| Resets on a successful login | yes | no |
+| Locks per account / per IP | yes | per key (default IP) |
+| Storage | `@warlock.js/cache` (shared across replicas) | in-process map |
+
+They compose. For a hard ceiling on request volume *and* failure-aware account lockout, stack both: `middleware: [middleware.rateLimit({ max: 30, duration: 60_000 }), loginThrottleMiddleware()]`.
+
+## Gotchas
+
+- **Needs an initialised cache driver.** Storage is `@warlock.js/cache` (a peer dep, transitively present via core). If the driver isn't configured at runtime, the middleware **fails open** — it logs and lets the request through, because a throttle outage must never become an auth outage. That also means: no cache, no protection. Verify your cache config in production.
+- **Account lockout can be weaponised.** An attacker who knows a victim's email can lock them out by spamming failures. The per-IP counter mitigates this (the attacker's IP locks too), but for purely anonymous endpoints prefer `by: ["ip"]`. For high-value accounts, consider a CAPTCHA step instead of a hard lock.
+- **Fixed window, not sliding.** The window is anchored at the first failure and does not extend on each subsequent one — predictable lockout timing. The lock key is independent and always lasts `lockoutDuration`.
+- **Defense-in-depth, not a WAF.** This is application-layer. It won't stop a volumetric L3/L4 flood — pair it with an edge/CDN rate limit for that.
+- **Don't call it per-request.** Like every middleware, call it once at route definition; it returns the function that runs per request.
+
+## See also
+
+- [`@warlock.js/auth/protect-routes/SKILL.md`](@warlock.js/auth/protect-routes/SKILL.md) — gate a route behind a valid token (`authMiddleware`); stack the throttle in front of it on login routes.
+- [`@warlock.js/auth/handle-login-and-logout/SKILL.md`](@warlock.js/auth/handle-login-and-logout/SKILL.md) — the login flow whose failures this middleware counts.
+- [`@warlock.js/core/use-middleware/SKILL.md`](@warlock.js/core/use-middleware/SKILL.md) — `middleware.rateLimit` and the built-in middleware suite.
 
 
 ================================================================================

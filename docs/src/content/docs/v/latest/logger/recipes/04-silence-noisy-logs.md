@@ -33,7 +33,7 @@ log.setMinLevel("warn");
 log.setMinLevel(undefined); // clear — accept all levels again
 ```
 
-Severity order is `debug < info ≈ success < warn < error`. `minLevel: "warn"` drops `debug`, `info`, **and** `success` (success shares info's rank). This is the right tool for "production should be quieter than dev."
+Severity order is `debug < info ≈ success < warn < error < fatal`. `minLevel: "warn"` drops `debug`, `info`, **and** `success` (success shares info's rank). `fatal` is strictly above `error`, so it's never dropped by `minLevel` short of disabling the floor. This is the right tool for "production should be quieter than dev."
 
 ## Restrict a single channel — `levels`
 
@@ -51,7 +51,7 @@ log.setChannels([
 ]);
 ```
 
-Omitting `levels` (or passing `[]`) means "allow all five." (With `chunk: "daily"` the file is named by date, not by `name` — see the [rotating-file recipe](./01-rotating-file-in-production/) for the gotcha.)
+Omitting `levels` (or passing `[]`) means "allow all six." (With `chunk: "daily"` the file is named by date, not by `name` — see the [rotating-file recipe](./01-rotating-file-in-production/) for the gotcha.)
 
 ## Mute a chatty module — `filter`
 
