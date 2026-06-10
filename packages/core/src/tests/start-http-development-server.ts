@@ -13,6 +13,7 @@ import { Application } from "../application";
 import { bootstrap } from "../bootstrap";
 import { loadConfigFiles } from "../config/load-config-files";
 import { connectorsManager } from "../connectors/connectors-manager";
+import { ConnectorLifecyclePhase } from "../connectors/types";
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 
@@ -46,11 +47,19 @@ export async function startHttpTestServer(): Promise<void> {
     // Load config files
     await loadConfigFiles(true);
 
-    // Load application modules
+    // Early-phase connectors (database, cache, logger, storage, mailer,
+    // herald) must start BEFORE app modules load: a module's `main.ts` boot
+    // side-effect can query the DB at import time, so the data source has to
+    // be registered first. This mirrors the dev/prod boot order (see
+    // `cli-commands.manager`, `production-builder`, and `DevelopmentServer`).
+    await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);
+
+    // Load application modules (their boot side-effects now see a live DB).
     await filesOrchestrator.moduleLoader.loadAll();
 
-    // Start ALL connectors (including HTTP)
-    await connectorsManager.start();
+    // Late-phase connectors (http, socket) bind after app code has
+    // registered its routes and listeners.
+    await connectorsManager.startPhase(ConnectorLifecyclePhase.Late);
 
     isServerRunning = true;
   } catch (error) {

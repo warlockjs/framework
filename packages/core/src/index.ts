@@ -32,6 +32,7 @@ export * from "./tests";
 export * from "./use-cases";
 export * from "./utils";
 export * from "./validation";
+export * from "./vite";
 export * from "./warlock-config";
 
 export { colors, env };

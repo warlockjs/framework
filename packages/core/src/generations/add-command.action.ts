@@ -68,11 +68,15 @@ await setupTest({ connectors: true });
   if (!viteConfigExists) {
     await putFileAsync(
       viteConfigPath,
-      `import mongezVite from "@mongez/vite";
+      `import { lowerStage3Decorators } from "@warlock.js/core";
+import mongezVite from "@mongez/vite";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  plugins: [mongezVite()],
+  // lowerStage3Decorators MUST come first: it lowers native (@RegisterModel, …)
+  // decorators with esbuild before oxc / the SSR rewrite can mangle them, so
+  // decorated Cascade models load under Vitest.
+  plugins: [lowerStage3Decorators(), mongezVite()],
   test: {
     globalSetup: "./src/test-global-setup.ts", // HTTP server - runs once
     setupFiles: ["./src/test-setup.ts"],       // DB/cache - runs per worker
@@ -255,8 +259,8 @@ const featuresMap: Record<
     description: "Installs warlock test for testing",
     onExecuting: completeTestInstallation,
     script: {
-      test: "vitest",
-      "test:coverage": "vitest --coverage",
+      test: "vitest run",
+      "test:coverage": "vitest run --coverage",
       "test:ui": "vitest --ui",
       "test:watch": "vitest --watch",
     },

@@ -91,11 +91,12 @@ await setupTest({ connectors: true });
 ```
 
 ```ts title="vite.config.ts"
+import { lowerStage3Decorators } from "@warlock.js/core";
 import mongezVite from "@mongez/vite";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  plugins: [mongezVite()],
+  plugins: [lowerStage3Decorators(), mongezVite()],
   test: {
     globalSetup: "./src/test-global-setup.ts",  // ← HTTP server (see test-http skill)
     setupFiles: ["./src/test-setup.ts"],         // ← runs setupTest per worker
@@ -106,7 +107,7 @@ export default defineConfig({
 });
 ```
 
-The `mongezVite()` plugin handles TypeScript path resolution and the framework's module shape. Without it, your imports break the moment vitest tries to load a Warlock module.
+The `mongezVite()` plugin handles TypeScript path resolution and the framework's module shape. Without it, your imports break the moment vitest tries to load a Warlock module. `lowerStage3Decorators()` goes **first** — it lets decorated Cascade models (`@RegisterModel`, …) load under Vitest 4 / Vite 8; see [`@warlock.js/core/lower-stage3-decorators/SKILL.md`](@warlock.js/core/lower-stage3-decorators/SKILL.md).
 
 Tests live colocated with the module: `src/app/<module>/tests/*.test.ts`. The `include` pattern picks them up.
 

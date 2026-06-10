@@ -75,11 +75,12 @@ export async function teardown() {
 ```
 
 ```ts title="vite.config.ts"
+import { lowerStage3Decorators } from "@warlock.js/core";
 import mongezVite from "@mongez/vite";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  plugins: [mongezVite()],
+  plugins: [lowerStage3Decorators(), mongezVite()],
   test: {
     globalSetup: "./src/test-global-setup.ts",  // ← starts the HTTP server
     setupFiles: ["./src/test-setup.ts"],         // ← per-worker setupTest (see test-service skill)
@@ -90,7 +91,7 @@ export default defineConfig({
 });
 ```
 
-Both files are created by `warlock add test`. The split is intentional: `globalSetup` runs ONCE in the main vitest process; `setupFiles` runs per worker thread.
+Both files (and this config, with `lowerStage3Decorators()` first so decorated models load) are created by `warlock add test`. The split is intentional: `globalSetup` runs ONCE in the main vitest process; `setupFiles` runs per worker thread.
 
 ## HTTP request helpers
 
