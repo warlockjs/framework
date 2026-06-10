@@ -1,11 +1,11 @@
 ---
 name: overview
-description: 'Front-door orientation for `@warlock.js/logger` — structured channel-based logging with five severity levels, PII redaction floor, buffered file/JSON channels, signal-flush on shutdown, ergonomic helpers (timer, assert). Standalone — no `@warlock.js/core` required. TRIGGER when: code imports anything from `@warlock.js/logger`; user asks "what does @warlock.js/logger do", "compare with pino / winston / bunyan", "structured logging for Node", "which logger should I use", "how do channels work"; package.json adds `@warlock.js/logger`. Skip: specific task already known — load the matching task skill directly (`logger-basics`, `configure-logger`, `pick-log-channel`, `write-custom-log-channel`, `redact-sensitive-log-fields`, `filter-log-entries`, `flush-logs-on-shutdown`, `capture-unhandled-errors`, `use-log-helpers`, `test-logging-code`); plain `console.log` in throwaway scripts.'
+description: 'Front-door orientation for `@warlock.js/logger` — structured channel-based logging with six severity levels (debug / info / warn / error / success / fatal), PII redaction floor, buffered file/JSON channels, optional SentryLog forwarding, async log.flush() + signal-flush on shutdown, ergonomic helpers (timer, assert). Standalone — no `@warlock.js/core` required. TRIGGER when: code imports anything from `@warlock.js/logger`; user asks "what does @warlock.js/logger do", "compare with pino / winston / bunyan", "structured logging for Node", "which logger should I use", "how do channels work"; package.json adds `@warlock.js/logger`. Skip: specific task already known — load the matching task skill directly (`logger-basics`, `configure-logger`, `pick-log-channel`, `write-custom-log-channel`, `ship-logs-to-sentry`, `redact-sensitive-log-fields`, `filter-log-entries`, `flush-logs-on-shutdown`, `capture-unhandled-errors`, `use-log-helpers`, `test-logging-code`); plain `console.log` in throwaway scripts.'
 ---
 
 # `@warlock.js/logger` — overview
 
-Structured logging for Node. Five severity levels, a singleton plus a `Logger` class, channel-based fan-out (one entry → many sinks), PII redaction as a floor that channels can extend, buffered file writes with signal-triggered flush on shutdown, and a couple of ergonomic helpers (`timer`, `assert`) that turn boilerplate into one-liners.
+Structured logging for Node. Six severity levels (with `fatal` strictly above `error`), a singleton plus a `Logger` class, channel-based fan-out (one entry → many sinks), PII redaction as a floor that channels can extend, buffered file writes with signal-triggered flush on shutdown, an awaitable async `log.flush()` for network/async channels, an optional Sentry channel, and a couple of ergonomic helpers (`timer`, `assert`) that turn boilerplate into one-liners.
 
 Ships standalone — `@warlock.js/core` is not required. Drop it into any Node project.
 
@@ -19,16 +19,16 @@ Skip if your code is a throwaway script where `console.log` is genuinely fine �
 
 ## The mental model in one paragraph
 
-You write `log.info("auth", "login", "user signed in", { userId })`. The logger fans that single entry out to every registered channel (`ConsoleLog`, `FileLog`, `JSONFileLog`, or your custom subclass). Each channel decides whether to emit it (per-level whitelist, per-channel filter predicate, logger-wide minimum severity). Redaction runs once at the logger level and can be extended per channel — never relaxed. Buffered channels (file + JSON file) drain on flush, either manually (`log.flushSync()`) or automatically via signal handlers (`enableAutoFlush(['SIGINT', 'SIGTERM', 'beforeExit'])`). That's the whole package.
+You write `log.info("auth", "login", "user signed in", { userId })`. The logger fans that single entry out to every registered channel (`ConsoleLog`, `FileLog`, `JSONFileLog`, `SentryLog`, or your custom subclass). Each channel decides whether to emit it (per-level whitelist, per-channel filter predicate, logger-wide minimum severity). Redaction runs once at the logger level and can be extended per channel — never relaxed. Buffered channels (file + JSON file) drain on flush — synchronously via `log.flushSync()` / `enableAutoFlush(['SIGINT', 'SIGTERM', 'beforeExit'])`, or asynchronously via `await log.flush()` (the only path that works for network channels like `SentryLog`). That's the whole package.
 
 ## Skills index
 
-Ten task skills cover everything. Load the one that matches your job — most callers only ever need `logger-basics` + `configure-logger` + `pick-log-channel`.
+Eleven task skills cover everything. Load the one that matches your job — most callers only ever need `logger-basics` + `configure-logger` + `pick-log-channel`.
 
 ### Foundations
 
 #### [`logger-basics`](@warlock.js/logger/logger-basics/SKILL.md)
-Start here. The `log` singleton, the five levels (`debug` / `info` / `warn` / `error` / `success`), how fan-out works, the `module / action / message / context` shape every entry carries.
+Start here. The `log` singleton, the six levels (`debug` / `info` / `warn` / `error` / `success` / `fatal`), how fan-out works, the `module / action / message / context` shape every entry carries.
 
 #### [`configure-logger`](@warlock.js/logger/configure-logger/SKILL.md)
 Wire channels at boot — `log.addChannel`, `log.setChannels`, `log.configure({ channels, autoFlushOn, redact, minLevel })`. Branch on `NODE_ENV`, replace the channel list, isolate a library's logger from the host singleton.
@@ -36,10 +36,13 @@ Wire channels at boot — `log.addChannel`, `log.setChannels`, `log.configure({ 
 ### Channels
 
 #### [`pick-log-channel`](@warlock.js/logger/pick-log-channel/SKILL.md)
-Pick one of the three built-ins: `ConsoleLog` (terminal, colored), `FileLog` (plain `.log` on disk with rotation), `JSONFileLog` (structured JSON for aggregators — Datadog, Loki, ELK).
+Pick one of the four built-ins: `ConsoleLog` (terminal, colored), `FileLog` (plain `.log` on disk with rotation), `JSONFileLog` (structured JSON for aggregators — Datadog, Loki, ELK), `SentryLog` (errors + breadcrumbs to Sentry; `@sentry/node` is an optional peer).
+
+#### [`ship-logs-to-sentry`](@warlock.js/logger/ship-logs-to-sentry/SKILL.md)
+The `SentryLog` channel in depth — event-vs-breadcrumb level mapping, dual init modes (reuse an existing client or pass `options`), draining via `Sentry.flush(timeout)`, behavior when the optional peer isn't installed.
 
 #### [`write-custom-log-channel`](@warlock.js/logger/write-custom-log-channel/SKILL.md)
-Extend `LogChannel<Options>` for sinks the built-ins don't cover — Slack, HTTP endpoint, in-memory buffer, database. The lazy `init()` lifecycle (`setTimeout(0)`) and the `terminal: true/false` ANSI-stripping behavior are subtle — read this skill before subclassing.
+Extend `LogChannel<Options>` for sinks the built-ins don't cover — Slack, HTTP endpoint, in-memory buffer, database. The lazy `init()` lifecycle (`setTimeout(0)`), the `terminal: true/false` ANSI-stripping behavior, and the difference between `flush()` (async, network) and `flushSync()` (sync, files) are subtle — read this skill before subclassing.
 
 ### Production concerns
 
@@ -50,10 +53,10 @@ Strip secrets before they reach a sink. Logger-wide `setRedact({ paths, censor }
 Drop entries before they cost anything. Logger-wide `setMinLevel("info")` is the fast path; per-channel `levels` array + `filter` predicate for fine control.
 
 #### [`flush-logs-on-shutdown`](@warlock.js/logger/flush-logs-on-shutdown/SKILL.md)
-Buffered channels (file + JSON file) need explicit drain. `log.flushSync()` manually, or `enableAutoFlush(['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK', 'SIGUSR2', 'beforeExit'])` to wire process signals. Signals are re-raised after flush so Node's default exit still runs.
+Buffered channels need explicit drain. `log.flushSync()` (sync) for file channels — also wired by `enableAutoFlush(['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK', 'SIGUSR2', 'beforeExit'])`. `await log.flush()` (async) for network/async channels like `SentryLog` — the only path that can await an HTTPS round-trip on a graceful shutdown.
 
 #### [`capture-unhandled-errors`](@warlock.js/logger/capture-unhandled-errors/SKILL.md)
-`captureAnyUnhandledRejection()` hooks `unhandledRejection` + `uncaughtException` and routes both through `log.error("app", ...)`. One call at startup, pair with `autoFlushOn: ['beforeExit']` to land the entry on disk.
+`captureAnyUnhandledRejection()` hooks `unhandledRejection` (→ `log.error("app", ...)`) and `uncaughtException` (→ `log.fatal("app", ...)` — Node terminates by default, so it's semantically fatal). One call at startup, pair with `autoFlushOn: ['beforeExit']` to land the entry on disk.
 
 ### Ergonomics + testing
 
@@ -70,13 +73,14 @@ Silence the logger globally in tests via `log.setChannels([])` in `setupFiles`. 
 | `ConsoleLog` | `process.stdout` | `true` (colors kept) | no |
 | `FileLog` | `.log` files | `false` (ANSI stripped) | yes (5s timer or 100-entry buffer) |
 | `JSONFileLog` | `.json` files | `false` (ANSI stripped) | yes (same buffering) |
+| `SentryLog` | Sentry events + breadcrumbs | `false` | via the Sentry SDK's own transport (`@sentry/node` is an optional peer) |
 
 `terminal: true` is the flag that decides whether the channel sees raw colored messages or stripped plain text. Custom channels: pick `true` if you write to a terminal, `false` for anything else.
 
 ## What this package deliberately doesn't do
 
 - **Distributed tracing.** Use OpenTelemetry. Logger gets you structured local logs with `module / action`; trace correlation is a different problem.
-- **Log shipping.** Write a custom channel that POSTs to your aggregator, or use `JSONFileLog` + a sidecar (fluentbit, vector, promtail). The package doesn't bundle network sinks.
+- **Log aggregator integrations beyond Sentry.** `SentryLog` is bundled (with `@sentry/node` as an optional peer). For Datadog, Loki, ELK, etc., either write a custom channel that POSTs to the aggregator or use `JSONFileLog` + a sidecar (fluentbit, vector, promtail).
 - **Pretty-printing of arbitrary objects.** `ConsoleLog` has a `showContext` flag that runs `util.inspect` on the context object; for richer formatting, use `JSONFileLog` and view the file through your favorite viewer.
 - **Log analysis.** Querying / aggregating / alerting is on the sink side (Loki, ELK, Datadog).
 

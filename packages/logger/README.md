@@ -1,6 +1,6 @@
 # @warlock.js/logger
 
-Structured, multi-channel logging for Node.js — five severity levels, a clean three-argument API, and full TypeScript support. Non-blocking by default; synchronous or async flush on demand.
+Structured, multi-channel logging for Node.js — six severity levels (debug / info / warn / error / success / fatal), a clean three-argument API, and full TypeScript support. Non-blocking by default; synchronous or async flush on demand.
 
 ## Install
 
