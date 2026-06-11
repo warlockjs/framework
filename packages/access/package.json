@@ -1,0 +1,36 @@
+{
+  "name": "@warlock.js/access",
+  "version": "4.1.15",
+  "type": "module",
+  "description": "Authorization (RBAC + ABAC) for Warlock.js applications",
+  "main": "./esm/index.js",
+  "scripts": {
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "peerDependencies": {
+    "@warlock.js/auth": "*",
+    "@warlock.js/cache": "*",
+    "@warlock.js/cascade": "*",
+    "@warlock.js/core": "*",
+    "@warlock.js/logger": "*",
+    "@warlock.js/seal": "*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warlockjs/access"
+  },
+  "keywords": [
+    "nodejs",
+    "authorization",
+    "rbac",
+    "abac",
+    "permissions",
+    "roles",
+    "access-control"
+  ],
+  "author": "hassanzohdy",
+  "license": "MIT",
+  "module": "./esm/index.js",
+  "typings": "./esm/index.d.ts"
+}
