@@ -1,0 +1,45 @@
+{
+  "name": "@warlock.js/notifications",
+  "version": "4.1.15",
+  "type": "module",
+  "description": "Multi-channel notifications for Warlock.js — define once, fire anywhere; mail / in-app database / pluggable custom channels with preferences, rate limits, and idempotency.",
+  "main": "./cjs/index.js",
+  "module": "./esm/index.js",
+  "typings": "./cjs/index.d.ts",
+  "dependencies": {
+    "@warlock.js/cache": "*",
+    "@warlock.js/cascade": "*",
+    "@warlock.js/core": "*",
+    "@warlock.js/logger": "*"
+  },
+  "optionalDependencies": {
+    "@warlock.js/herald": "*"
+  },
+  "scripts": {
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest --watch",
+    "generate:llms": "node scripts/generate-llms.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warlockjs/notifications"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@vitest/coverage-v8": "^4.0.6",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.6"
+  },
+  "keywords": [
+    "notifications",
+    "mail",
+    "in-app",
+    "multi-channel",
+    "warlock.js",
+    "typescript"
+  ],
+  "author": "hassanzohdy",
+  "license": "MIT"
+}
