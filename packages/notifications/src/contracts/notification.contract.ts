@@ -3,7 +3,7 @@ import type { Id } from "../types";
 /**
  * The stored in-app record contract the database channel + `inApp` depend on.
  * Accessors are the STABLE surface; physical columns vary per app and are
- * mapped in the user model's getters + the repository's `filterBy` tuples.
+ * resolved from the model's `columnMap` (see `DatabaseNotification`).
  */
 export interface NotificationContract {
   readonly recipientId: Id;

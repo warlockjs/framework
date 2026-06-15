@@ -8,8 +8,8 @@ import type { ChannelName, Notifiable } from "../types";
  * - Bypassed when `SendOptions.force === true`.
  * - Dropped channels fire a `skipped` event with reason `"preference"`.
  *
- * App-owned (passed to `setNotificationConfig({ preferences })`). The package
- * reserves the slot but ships no default implementation.
+ * App-owned (set in the `preferences` slot of `config/notifications.ts`). The
+ * package reserves the slot but ships no default implementation.
  */
 export interface PreferenceProvider {
   resolveChannels(

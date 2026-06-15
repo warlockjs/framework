@@ -20,6 +20,7 @@ type EventName = keyof NotificationEvents;
 type Handler<E extends EventName> = (data: NotificationEvents[E]) => void | Promise<void>;
 
 const handlers: { [E in EventName]: Set<Handler<E>> } = {
+  sending: new Set(),
   sent: new Set(),
   failed: new Set(),
   skipped: new Set(),

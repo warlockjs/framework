@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  notifications,
   notify,
   resetNotificationConfig,
   setNotificationConfig,
@@ -106,6 +107,32 @@ describe("notify", () => {
 
     await notify.database(makeNotifiable(), { type: "welcome", title: "Hi!" });
     expect(seen).toEqual(["welcome"]);
+  });
+
+  it("emits `sending` before the transport; `sending` + `sent` share a dispatchId", async () => {
+    let sendingId: string | undefined;
+    let sentId: string | undefined;
+    let sentDuration: unknown;
+    let sendCallsAtSending = -1;
+
+    const offSending = notifications.on("sending", ({ dispatchId }) => {
+      sendingId = dispatchId;
+      sendCallsAtSending = mailSend.mock.calls.length;
+    });
+    const offSent = notifications.on("sent", ({ dispatchId, durationMs }) => {
+      sentId = dispatchId;
+      sentDuration = durationMs;
+    });
+
+    await notify.mail(makeNotifiable({ email: "x@y.com" }), { subject: "hi", html: "<p>x</p>" });
+
+    expect(sendCallsAtSending).toBe(0); // `sending` fired before the transport ran
+    expect(sendingId).toBeDefined();
+    expect(sentId).toBe(sendingId); // same dispatch → same id
+    expect(sentDuration).toBeTypeOf("number");
+
+    offSending();
+    offSent();
   });
 
   it("`SendOptions.type` overrides a payload's type for ad-hoc gating", async () => {

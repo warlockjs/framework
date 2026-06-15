@@ -22,8 +22,10 @@ It is NOT a queue, a template engine, a transport library, or an analytics pipel
 
 ## Minimal end-to-end
 
+`npx warlock add notifications` ejects the config + model + migration. The config is **declarative** — the notifications connector registers its default export at boot, so you never call `setNotificationConfig` yourself.
+
 ```ts title="src/config/notifications.ts"
-import { type NotificationConfig, mailChannel, inApp, setNotificationConfig } from "@warlock.js/notifications";
+import { type NotificationConfig, mailChannel, inApp } from "@warlock.js/notifications";
 import { Notification } from "app/notifications/notification.model";
 
 const config: NotificationConfig = {
@@ -33,7 +35,7 @@ const config: NotificationConfig = {
   },
 };
 
-setNotificationConfig(config);
+export default config;
 ```
 
 ```ts title="src/app/orders/notifications/order-shipped.ts"
@@ -88,5 +90,5 @@ await inApp.markAsRead(user, "ntf_123");
 - [`send-ad-hoc/SKILL.md`](../send-ad-hoc/SKILL.md) — `notify.<channel>` shorthand.
 - [`use-in-app/SKILL.md`](../use-in-app/SKILL.md) — `inApp` read API.
 - [`define-channel/SKILL.md`](../define-channel/SKILL.md) — custom channels.
-- [`write-notification-migration/SKILL.md`](../write-notification-migration/SKILL.md) — driver-aware columns.
+- [`write-notification-migration/SKILL.md`](../write-notification-migration/SKILL.md) — columnMap-driven columns.
 - [`observe-notifications/SKILL.md`](../observe-notifications/SKILL.md) — events + metrics.

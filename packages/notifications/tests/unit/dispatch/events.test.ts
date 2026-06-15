@@ -13,9 +13,11 @@ describe("notifications event bus", () => {
     const off = notifications.on("sent", handler);
 
     await emit("sent", {
+      dispatchId: "d1",
       channel: "mail",
       payload: { subject: "Hi", html: "<p>x</p>" },
       options: {},
+      durationMs: 0,
     });
 
     expect(handler).toHaveBeenCalledTimes(1);
@@ -32,10 +34,12 @@ describe("notifications event bus", () => {
     off();
 
     await emit("failed", {
+      dispatchId: "d1",
       channel: "mail",
       payload: {},
       error: new Error("boom"),
       options: {},
+      durationMs: 0,
     });
 
     expect(handler).not.toHaveBeenCalled();
@@ -52,6 +56,7 @@ describe("notifications event bus", () => {
 
     await expect(
       emit("skipped", {
+        dispatchId: "d1",
         channel: "push",
         reason: "preference",
         options: {},
@@ -72,7 +77,7 @@ describe("notifications event bus", () => {
 
     notifications.off("sent", a);
 
-    await emit("sent", { channel: "mail", payload: {}, options: {} });
+    await emit("sent", { dispatchId: "d1", channel: "mail", payload: {}, options: {}, durationMs: 0 });
 
     expect(a).not.toHaveBeenCalled();
     expect(b).toHaveBeenCalledTimes(1);

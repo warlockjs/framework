@@ -78,7 +78,7 @@ await notify.slack(staff, { text: "Deploy starting" });
 |---|---|
 | `delay` | Reserved for `.queue` paths; not used by `notify.<channel>` (sync). |
 | `locale` | Forwarded to the channel's `send({ options })`. |
-| `meta` | Forwarded to the channel + included in `sent`/`failed`/`skipped` events. |
+| `meta` | Forwarded to the channel + included in every observability event. |
 | `idempotencyKey` | Injected into the database payload (dedupe). |
 | `force` | Bypass `PreferenceProvider`. Does NOT bypass `RateLimiter`. |
 | `type` | Notification type for gating (ad-hoc only). |
@@ -92,4 +92,4 @@ await notify.slack(staff, { text: "Deploy starting" });
 - [`notifications-basics/SKILL.md`](../notifications-basics/SKILL.md) — front door + mental model.
 - [`define-notification/SKILL.md`](../define-notification/SKILL.md) — reusable multi-channel.
 - [`define-channel/SKILL.md`](../define-channel/SKILL.md) — register a custom channel.
-- [`observe-notifications/SKILL.md`](../observe-notifications/SKILL.md) — `sent` / `failed` / `skipped` events.
+- [`observe-notifications/SKILL.md`](../observe-notifications/SKILL.md) — `sending` / `sent` / `failed` / `skipped` events.

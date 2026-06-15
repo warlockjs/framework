@@ -66,68 +66,89 @@ await inApp.dismiss(user);
 
 The recipient-id is forced into the `where` clause. A controller that receives an `id` from the request and naively calls `inApp.markAsRead(currentUser, id)` cannot accidentally flip another user's row — even if the request contains a forged id. The mutation will simply update 0 rows.
 
-## Behind the scenes — the model + repo
+## Behind the scenes — `columnMap` drives everything
 
-The package ships:
+The model declares its physical columns ONCE via `static columnMap`. The
+shipped `DatabaseNotification` accessors and `BaseNotificationsRepository`
+(read filter + write mapping) both derive from it, so they can never drift:
 
 ```ts
-// extend this in your app's notification model
 abstract class DatabaseNotification extends Model implements NotificationContract {
-  public get recipientId(): Id      { return this.get("user_id"); }
-  public get type(): string         { return this.get("type"); }
-  public get isRead(): boolean      { return this.get("is_read") ?? false; }
-  public get readAt(): Date | null  { return this.get("read_at") ?? null; }
-  public async markRead(): Promise<void> {
-    this.set("is_read", true).set("read_at", new Date());
-    await this.save();
-  }
+  public static columnMap: NotificationColumnMap = {};
+  // recipientId / tenantId / isRead / readAt / markRead all read `columnMap`.
 }
 
-// shipped behavior repository (concrete — extend only for filterBy overrides)
 class BaseNotificationsRepository extends RepositoryManager {
-  public filterBy = {
-    id:              "=",
-    type:            "=",
-    isRead:          ["=", "is_read"],
-    recipientId:     ["=", "user_id"],
-    idempotencyKey:  ["=", "idempotency_key"],
-  };
-  public createFor(recipientId, input)            { /* one insert, isRead: false */ }
-  public createManyFor(recipientIds, input)       { /* bulk fan-out */ }
+  // constructor resolves the model's columnMap → builds `filterBy` +
+  // createFor / markRead / markUnread / deleteFor from it.
+  public createFor(recipientId, input, tenantId?)   { /* one insert, starts unread */ }
 }
 ```
 
-## Your model — override only what differs
+### `columnMap` — map logical roles → your columns
+
+```ts
+export type NotificationColumnMap = {
+  recipient?: string; // recipient FK. Default "user_id"
+  tenant?: string;    // multi-tenant scope, written from the recipient. Omit → single-tenant
+  readAt?: string;    // read-timestamp column
+  isRead?: string;    // read-flag column (indexed)
+};
+```
+
+**Read-state is chosen by which keys are PRESENT:**
+
+- `readAt` only → unread = `read_at IS NULL`; marking read stamps it.
+- `isRead` only → unread = `is_read = false`; no timestamp.
+- both → `is_read` is the indexed filter flag, `read_at` records WHEN.
+
+Declare neither and you get the `readAt`-only default — so a model can omit
+`columnMap` entirely. `unread` is the mode-agnostic read filter on `inApp` /
+the repo; there is no `isRead` filter key to remember.
+
+## Your model — declare `table`, `schema`, and `columnMap`
 
 ```ts title="src/app/notifications/notification.model.ts"
 import { RegisterModel } from "@warlock.js/cascade";
-import { DatabaseNotification } from "@warlock.js/notifications";
+import { v } from "@warlock.js/seal";
+import { DatabaseNotification, type NotificationColumnMap } from "@warlock.js/notifications";
+
+// Mirrors the migration columns; cascade validates + casts every write.
+const notificationSchema = v.object({
+  user_id: v.string(),
+  type: v.string(),
+  title: v.string(),
+  body: v.string().nullish(),
+  payload: v.record(v.any()).nullish(),
+  read_at: v.date().nullish(),
+  idempotency_key: v.string().nullish(),
+});
 
 @RegisterModel()
 export class Notification extends DatabaseNotification {
   public static table = "notifications";
-  // Override accessors ONLY when your columns or driver diverge.
-  // Example (MongoDB nested doc): public get recipientId() { return this.get("user.id"); }
+  public static schema = notificationSchema;
+  // read_at-only, single-tenant. Add `tenant: "organization_id"` for multi-tenant,
+  // swap to `isRead: "is_read"` (or add it) to change the read-state representation.
+  public static columnMap: NotificationColumnMap = { readAt: "read_at" };
 }
 ```
 
+To change columns, edit `columnMap` — the migration (`notificationColumns`), the
+repo filter, and the accessors all follow. For a different driver's naming
+(e.g. MongoDB camelCase), name the columns in `columnMap`
+(`{ recipient: "userId", readAt: "readAt" }`).
+
 ## Custom repository (advanced, optional)
 
-Only when you need custom `filterBy` mappings or extra query methods:
+`columnMap` already covers column naming. Subclass only for EXTRA query methods:
 
 ```ts title="src/app/notifications/notifications.repository.ts"
 import { BaseNotificationsRepository } from "@warlock.js/notifications";
 import { Notification } from "./notification.model";
 
 export class NotificationsRepository extends BaseNotificationsRepository<Notification> {
-  public source = Notification;
-
-  public filterBy = {
-    ...this.filterBy,
-    recipientId: ["=", "audience_id"],   // remap to your column
-    isRead:      ["=", "seen"],
-  };
-
+  public source = Notification; // its columnMap still drives filter + write mapping
   // …extra methods specific to your app
 }
 export const notificationsRepository = new NotificationsRepository();
@@ -143,5 +164,5 @@ database: inApp.configure({ repository: notificationsRepository }),
 
 - [`notifications-basics/SKILL.md`](../notifications-basics/SKILL.md) — package front door.
 - [`configure-notifications/SKILL.md`](../configure-notifications/SKILL.md) — wire `inApp.configure` into the config.
-- [`write-notification-migration/SKILL.md`](../write-notification-migration/SKILL.md) — `notificationColumns(Notification)` driver-aware factory.
+- [`write-notification-migration/SKILL.md`](../write-notification-migration/SKILL.md) — `notificationColumns(Notification)`, named from `columnMap`.
 - [`define-notification/SKILL.md`](../define-notification/SKILL.md) — create rows via the database channel.

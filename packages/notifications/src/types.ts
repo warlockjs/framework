@@ -86,14 +86,16 @@ export type ChannelName = keyof NotificationChannels;
  */
 export type SendOptions = {
   /**
-   * Delay the dispatch, e.g. `"10m"` / `"3d"` / `600` (seconds). Honored ONLY
-   * by `.queue()` (Phase 2 herald worker) — a synchronous `.send()` dispatches
-   * immediately and IGNORES `delay`.
+   * Delay the dispatch, e.g. `"10m"` / `"3d"` / `600` (seconds). RESERVED —
+   * NOT honored yet: `.send()` always dispatches immediately, and the current
+   * `.queue()` worker runs each job the moment it's consumed. Delayed delivery
+   * lands with the delay-aware worker (Phase 2); until then this field is a
+   * no-op on both paths.
    */
   delay?: number | string;
   /** Locale for rendering — passed to renderers via `RenderContext`. */
   locale?: string;
-  /** Passthrough to channels + `sent` / `failed` / `skipped` events. */
+  /** Passthrough to channels + every observability event (via `options`). */
   meta?: Record<string, unknown>;
   /** Dedupe key for retry-safe sends. */
   idempotencyKey?: string;
@@ -111,22 +113,43 @@ export type RenderContext = Pick<SendOptions, "locale" | "meta">;
 /**
  * Event surface for metrics, logging, audits. Fires per (channel, recipient)
  * — fan-out emits N events.
+ *
+ * `dispatchId` is a unique id for ONE (channel, recipient) dispatch: `sending`
+ * and its terminal `sent` / `failed` share it, so observers can pair them (for
+ * spans, latency, or detecting a `sending` with no terminal — a hung send). A
+ * `skipped` carries its own id (nothing precedes it).
+ *
+ * `durationMs` on `sent` / `failed` is the transport time for a synchronous
+ * send; on a queued send it is the enqueue time (real delivery timing is
+ * worker-side).
  */
 export type NotificationEvents = {
-  sent: {
+  sending: {
+    dispatchId: string;
     channel: string;
     notifiable?: Notifiable;
     payload: unknown;
     options: SendOptions;
   };
+  sent: {
+    dispatchId: string;
+    channel: string;
+    notifiable?: Notifiable;
+    payload: unknown;
+    options: SendOptions;
+    durationMs: number;
+  };
   failed: {
+    dispatchId: string;
     channel: string;
     notifiable?: Notifiable;
     payload: unknown;
     error: Error;
     options: SendOptions;
+    durationMs: number;
   };
   skipped: {
+    dispatchId: string;
     channel: string;
     notifiable?: Notifiable;
     reason: "preference" | "rate-limit";

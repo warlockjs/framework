@@ -1,6 +1,6 @@
 ---
 name: queue-notifications
-description: 'Send notifications asynchronously via the herald-backed queue. `heraldQueue({ channel?, broker? })` is a `QueueDispatcher` you pass to `setNotificationConfig({ queue })`; then `notif.queue(to, data, options?)` / `notify` publish a rendered job instead of sending inline. `startNotificationsWorker({ channel?, broker? })` runs the consumer (in a worker or the web process) that pulls jobs and runs `channel.send`. Both lazy-import `@warlock.js/herald` (optional peer) — a missing package throws a curated install message at use time. `defineNotification` renders payloads + resolves routes BEFORE queuing, so the job (`{ channel, route, payload, options }`) is fully serializable — no model re-hydration. Without a queue configured, `.queue()` rejects `NoQueueDispatcherError`. Triggers: `heraldQueue`, `startNotificationsWorker`, `QueueDispatcher`, `.queue(`, "async notifications", "queue notifications", "notification worker", "background notifications", `notifications.dispatch`; typical import `import { heraldQueue, startNotificationsWorker } from "@warlock.js/notifications"`. Skip: synchronous sends — `@warlock.js/notifications/define-notification/SKILL.md`; herald itself — `@warlock.js/herald/*`.'
+description: 'Send notifications asynchronously via the herald-backed queue. `heraldQueue({ channel?, broker? })` is a `QueueDispatcher` you add to the `queue` slot of the declarative `config/notifications.ts` (the connector registers it at boot); then `notif.queue(to, data, options?)` / `notify` publish a rendered job instead of sending inline. `startNotificationsWorker({ channel?, broker? })` runs the consumer (in a worker or the web process) that pulls jobs and runs `channel.send`. Both lazy-import `@warlock.js/herald` (optional peer) — a missing package throws a curated install message at use time. `defineNotification` renders payloads + resolves routes BEFORE queuing, so the job (`{ channel, route, payload, options }`) is fully serializable — no model re-hydration. Without a queue configured, `.queue()` rejects `NoQueueDispatcherError`. Triggers: `heraldQueue`, `startNotificationsWorker`, `QueueDispatcher`, `.queue(`, "async notifications", "queue notifications", "notification worker", "background notifications", `notifications.dispatch`; typical import `import { heraldQueue, startNotificationsWorker } from "@warlock.js/notifications"`. Skip: synchronous sends — `@warlock.js/notifications/define-notification/SKILL.md`; herald itself — `@warlock.js/herald/*`.'
 ---
 
 # Queue notifications (async)
@@ -11,12 +11,15 @@ rendered job to herald; a worker delivers it.
 ## Wire the dispatcher
 
 ```ts title="src/config/notifications.ts"
-import { setNotificationConfig, heraldQueue, inApp, mailChannel } from "@warlock.js/notifications";
+import { type NotificationConfig, heraldQueue, inApp, mailChannel } from "@warlock.js/notifications";
+import { Notification } from "app/notifications/notification.model";
 
-setNotificationConfig({
+const config: NotificationConfig = {
   channels: { mail: mailChannel(), database: inApp.configure({ model: Notification }) },
   queue: heraldQueue(), // → `.queue()` now works
-});
+};
+
+export default config; // the notifications connector registers it at boot
 ```
 
 `heraldQueue({ channel?, broker? })` publishes to `"notifications.dispatch"` on

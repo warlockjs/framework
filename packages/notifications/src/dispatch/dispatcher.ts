@@ -16,6 +16,7 @@
 import { getNotificationConfig } from "../config";
 import { ChannelNotFoundError, NoQueueDispatcherError, UnresolvableRouteError } from "../errors";
 import type { ChannelName, Id, Notifiable, SendOptions } from "../types";
+import { newDispatchId } from "./dispatch-id";
 import { emit } from "./notifications-event-bus";
 
 export type DispatchMode = "send" | "queue";
@@ -50,6 +51,10 @@ export async function dispatchChannel(args: DispatchChannelArgs): Promise<void> 
     throw new ChannelNotFoundError(args.channelName);
   }
 
+  // One id for this (channel, recipient) dispatch — `sending` and its terminal
+  // `sent` / `failed` share it so observers can pair them.
+  const dispatchId = newDispatchId();
+
   // Rate-limit gate. Only applies when we have a notifiable + a notification
   // type (otherwise there's nothing to rate-limit on). `force` does NOT
   // bypass — rate limits are a safety valve, not a UX preference.
@@ -66,6 +71,7 @@ export async function dispatchChannel(args: DispatchChannelArgs): Promise<void> 
 
     if (!allowed) {
       await emit("skipped", {
+        dispatchId,
         channel: args.channelName,
         notifiable: args.to,
         reason: "rate-limit",
@@ -88,6 +94,19 @@ export async function dispatchChannel(args: DispatchChannelArgs): Promise<void> 
     payload = { ...(payload as object), idempotencyKey: args.options.idempotencyKey };
   }
 
+  // `sending` fires after the gates pass + the route resolves, BEFORE the
+  // transport — awaited so it always precedes the send. Observers can't abort
+  // the send, but a slow handler delays it; keep them fast.
+  await emit("sending", {
+    dispatchId,
+    channel: args.channelName,
+    notifiable: args.to,
+    payload,
+    options: args.options,
+  });
+
+  const startedAt = Date.now();
+
   try {
     if (args.mode === "queue") {
       if (!config.queue) {
@@ -109,18 +128,22 @@ export async function dispatchChannel(args: DispatchChannelArgs): Promise<void> 
     }
 
     await emit("sent", {
+      dispatchId,
       channel: args.channelName,
       notifiable: args.to,
       payload,
       options: args.options,
+      durationMs: Date.now() - startedAt,
     });
   } catch (error) {
     await emit("failed", {
+      dispatchId,
       channel: args.channelName,
       notifiable: args.to,
       payload,
       error: error as Error,
       options: args.options,
+      durationMs: Date.now() - startedAt,
     });
     throw error;
   }

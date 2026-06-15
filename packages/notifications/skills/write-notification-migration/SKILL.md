@@ -1,11 +1,13 @@
 ---
 name: write-notification-migration
-description: 'Create the notifications table with the driver-aware `notificationColumns(Notification)` factory + cascade `Migration.create`. Returns snake_case columns on PG/MySQL (`user_id`, `is_read`, `read_at`, `idempotency_key`) or camelCase on MongoDB (`userId`, `isRead`, `readAt`, `idempotencyKey`) — picked from the model''s `static dataSource`. Spread + extend for extras (multi-tenant `organization_id`, etc.). Triggers: `notificationColumns`, `Migration.create` for notifications, "create the notifications table", "notification migration", "add organization_id to notifications", `is_read` column, `idempotency_key` column; typical import `import { Migration } from "@warlock.js/cascade"; import { notificationColumns } from "@warlock.js/notifications"`. Skip: generic cascade migration writing — `@warlock.js/cascade/write-migration/SKILL.md`; the model itself — `@warlock.js/notifications/use-in-app/SKILL.md`.'
+description: 'Create the notifications table with the `notificationColumns(Notification)` factory + cascade `Migration.create`. Column NAMES come from the model''s `columnMap` (recipient / tenant / readAt / isRead); the fixed columns are `type` / `title` / `body` / `payload` / `idempotency_key`. Read-state follows columnMap presence: `readAt` → nullable timestamp, `isRead` → indexed boolean, both → both. Defaults to `user_id` + `read_at` when no columnMap. Spread + extend for extras (FK references, composite indexes). Triggers: `notificationColumns`, `Migration.create` for notifications, "create the notifications table", "notification migration", "add organization_id to notifications", `is_read` column, `read_at` column, `idempotency_key` column; typical import `import { Migration } from "@warlock.js/cascade"; import { notificationColumns } from "@warlock.js/notifications"`. Skip: generic cascade migration writing — `@warlock.js/cascade/write-migration/SKILL.md`; the model itself — `@warlock.js/notifications/use-in-app/SKILL.md`.'
 ---
 
 # Write the notifications migration
 
-The package ships no table or migration (thin eject). You own the migration; the package gives you a driver-aware column factory so it's one line.
+The package ships no table or migration (thin eject). You own the migration; the package gives you a column factory that names columns from your model's `columnMap`, so it's one line.
+
+> `npx warlock add notifications` scaffolds this migration (+ the model) for you. Reach for this skill when you need to customize columns or add extras.
 
 ## Common case — one line
 
@@ -17,43 +19,49 @@ import { Notification } from "../notification.model";
 export default Migration.create(Notification, notificationColumns(Notification));
 ```
 
-`notificationColumns(Notification)` reads the model's `static dataSource` and returns:
+`notificationColumns(Notification)` reads the model's `columnMap` and returns the
+matching columns:
 
-| Driver | Columns (`user_id` / `userId` etc.) |
+| columnMap | Columns |
 |---|---|
-| PG / MySQL (default) | `user_id`, `type`, `title`, `body`, `payload`, `is_read`, `read_at`, `idempotency_key` |
-| MongoDB | `userId`, `type`, `title`, `body`, `payload`, `isRead`, `readAt`, `idempotencyKey` |
+| _(none / default)_ | `user_id`, `type`, `title`, `body`, `payload`, `read_at`, `idempotency_key` |
+| `{ tenant: "organization_id", readAt: "read_at" }` | adds `organization_id`; read_at-only |
+| `{ isRead: "is_read" }` | swaps `read_at` for `is_read` (indexed boolean) |
+| `{ isRead: "is_read", readAt: "read_at" }` | both read-state columns |
 
-`id` / `createdAt` / `updatedAt` are added automatically by cascade.
+The recipient / tenant / read-state column NAMES come from `columnMap`; `type` /
+`title` / `body` / `payload` / `idempotency_key` are fixed. `id` / `createdAt` /
+`updatedAt` are added automatically by cascade.
 
 ## With extras — spread + extend
 
-Add multi-tenant `organization_id`, category, or anything else:
+Add your own columns — a category, a source channel, a tenant id, anything:
 
 ```ts
-import { Migration, uuid } from "@warlock.js/cascade";
+import { Migration, string } from "@warlock.js/cascade";
 import { notificationColumns } from "@warlock.js/notifications";
 import { Notification } from "../notification.model";
 
 export default Migration.create(Notification, {
   ...notificationColumns(Notification),
-  organization_id: uuid().index().notNullable(),
+  category: string().index().nullable(),
 });
 ```
 
-The dev's repository's `filterBy` should reference the extra columns if you want them addressable from `inApp.list({ organizationId })` etc.
+Mirror any extra column in the model `schema`. To make it filterable, add a method to a custom repository (see `use-in-app/SKILL.md`).
 
-## Detection
+## Column naming follows `columnMap`
 
-`notificationColumns(model)` returns camelCase **only** when the model declares `static dataSource = "mongodb"` (or a `DataSource` object whose `name` is `"mongodb"`). Everything else — PG / MySQL / unset — returns snake_case.
+The factory does NOT guess names from the driver — it reads the model's `columnMap`. To match a different convention (e.g. MongoDB camelCase), name the columns there and the migration follows:
 
 ```ts
 class Notification extends DatabaseNotification {
-  public static dataSource = "mongodb"; // ← triggers camelCase
+  public static columnMap = { recipient: "userId", readAt: "readAt" };
 }
+// → notificationColumns(Notification) emits `userId` + `readAt`
 ```
 
-Without a model passed, defaults to SQL (snake_case).
+Without a model passed, defaults to `user_id` + `read_at` (read_at-only). See [`use-in-app/SKILL.md`](../use-in-app/SKILL.md) for the full `columnMap` shape.
 
 ## See also
 

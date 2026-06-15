@@ -11,8 +11,8 @@ import type { ChannelName, Notifiable } from "../types";
  * For `.queue()` it is currently consumed at ENQUEUE time (Phase 1) — when the
  * Phase-2 herald worker lands, delivery-time accounting moves into the worker.
  *
- * App-owned (passed to `setNotificationConfig({ rateLimit })`). The package
- * reserves the slot but ships no default implementation.
+ * App-owned (set in the `rateLimit` slot of `config/notifications.ts`). The
+ * package reserves the slot but ships no default implementation.
  */
 export interface RateLimiter {
   allow(

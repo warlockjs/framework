@@ -1,19 +1,23 @@
 /**
- * Notification configuration holder. The runtime singleton the dispatch core
- * reads from. Called once at boot (typically by the notifications connector
- * or `config/notifications.ts`).
+ * Notification configuration holder — the runtime singleton the dispatch core
+ * reads from. In a Warlock app you do NOT call `setNotificationConfig`
+ * directly: `src/config/notifications.ts` exports a `NotificationConfig` as its
+ * default, and the notifications connector calls this at boot. Tests (and
+ * non-Warlock embeddings) may call it directly.
  *
- * @example
- *   import { setNotificationConfig, mailChannel, inApp } from "@warlock.js/notifications";
+ * @example  src/config/notifications.ts — declarative; the connector registers it
+ *   import { type NotificationConfig, mailChannel, inApp } from "@warlock.js/notifications";
  *   import { Notification } from "app/notifications/notification.model";
  *
- *   setNotificationConfig({
+ *   const config: NotificationConfig = {
  *     channels: {
  *       mail: mailChannel({ from: "no-reply@store.com" }),
  *       database: inApp.configure({ model: Notification }),
  *     },
  *     // preferences / rateLimit / queue all optional
- *   });
+ *   };
+ *
+ *   export default config;
  */
 import type {
   Channel,
@@ -55,9 +59,10 @@ export type NotificationConfig = {
 let activeConfig: NotificationConfig | undefined;
 
 /**
- * Set the active notifications configuration. Called once at boot.
- * Subsequent calls REPLACE the active config (does not merge) — pass the
- * complete config, not a partial.
+ * Set the active notifications configuration. In a Warlock app the
+ * notifications connector calls this at boot with the default export of
+ * `src/config/notifications.ts`. Subsequent calls REPLACE the active config
+ * (does not merge) — pass the complete config, not a partial.
  */
 export function setNotificationConfig(config: NotificationConfig): void {
   activeConfig = config;

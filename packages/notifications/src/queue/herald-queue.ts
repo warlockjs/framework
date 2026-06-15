@@ -10,13 +10,15 @@
  * Connection is the app's job — the `@warlock.js/herald` connector connects the
  * broker from `config/herald.ts` at boot; this dispatcher only calls `herald()`.
  *
- * @example
- *   import { setNotificationConfig, heraldQueue, inApp, mailChannel } from "@warlock.js/notifications";
+ * @example  src/config/notifications.ts — declarative; the connector registers it
+ *   import { type NotificationConfig, heraldQueue, inApp, mailChannel } from "@warlock.js/notifications";
  *
- *   setNotificationConfig({
+ *   const config: NotificationConfig = {
  *     channels: { mail: mailChannel(), database: inApp.configure({ model: Notification }) },
  *     queue: heraldQueue(),                 // → `.queue()` now works
- *   });
+ *   };
+ *
+ *   export default config;
  */
 import type { QueueDispatcher } from "../contracts";
 import { DEFAULT_QUEUE_CHANNEL, loadHerald } from "./load-herald";

@@ -27,6 +27,7 @@
  *   await inApp.dismiss(user, "ntf_123");    // delete one
  *   await inApp.dismiss(user);               // clear all for this recipient
  */
+import type { TypedRepositoryOptionsWithPages } from "@warlock.js/core";
 import { databaseChannel } from "../channels/database-channel";
 import type { Channel } from "../contracts";
 import type { DatabasePayload, Id, Notifiable } from "../types";
@@ -35,6 +36,13 @@ import {
   type NotificationModelClass,
   type NotificationsFilter,
 } from "./base-notifications-repository";
+
+/**
+ * List options for the read methods — the repository's paginated options
+ * (`page` / `limit` / `orderBy` / filter keys). `recipientId` is always forced
+ * from the recipient argument, so passing it here has no effect.
+ */
+export type NotificationsListOptions = TypedRepositoryOptionsWithPages<NotificationsFilter>;
 
 /**
  * Configure options — discriminated so `model` and `repository` are mutually
@@ -73,14 +81,14 @@ class InApp {
     return this.repo;
   }
 
-  /** General list — scoped to recipient, plus any extra filter. */
-  public list(recipient: Notifiable | Id, filter?: NotificationsFilter) {
-    return this.repository.list({ ...filter, recipientId: idOf(recipient) });
+  /** General list — scoped to recipient; pass `options` for paging + filters. */
+  public list(recipient: Notifiable | Id, options?: NotificationsListOptions) {
+    return this.repository.list({ ...options, recipientId: idOf(recipient) });
   }
 
   /** Unread-only list — common case for badges + dashboards. */
-  public listUnread(recipient: Notifiable | Id, filter?: NotificationsFilter) {
-    return this.repository.list({ ...filter, recipientId: idOf(recipient), isRead: false });
+  public listUnread(recipient: Notifiable | Id, options?: NotificationsListOptions) {
+    return this.repository.list({ ...options, recipientId: idOf(recipient), unread: true });
   }
 
   /**
@@ -88,7 +96,7 @@ class InApp {
    * model create/update events (`RepositoryManager.registerEvents`).
    */
   public countUnread(recipient: Notifiable | Id) {
-    return this.repository.countCached({ recipientId: idOf(recipient), isRead: false });
+    return this.repository.countCached({ recipientId: idOf(recipient), unread: true });
   }
 
   /** Find one notification for a recipient — for a detail view. */

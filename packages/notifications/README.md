@@ -14,8 +14,8 @@ Multi-channel notifications for Warlock.js — **define once, fire anywhere**.
 ## Quick start
 
 ```bash
-yarn add @warlock.js/notifications
-# scaffolds src/app/notifications/* (model + migration + config)
+# installs the package, ejects a declarative config/notifications.ts,
+# and scaffolds the in-app model + migration into src/app/notifications/*
 npx warlock add notifications
 ```
 

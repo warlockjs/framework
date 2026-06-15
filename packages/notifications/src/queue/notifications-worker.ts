@@ -7,7 +7,7 @@
  * only looks the channel up by name and dispatches — no notifiable needed.
  *
  * @example
- *   // in a worker entrypoint, after setNotificationConfig + connectToBroker
+ *   // in a worker entrypoint, after the notifications config + broker are up
  *   import { startNotificationsWorker } from "@warlock.js/notifications";
  *   await startNotificationsWorker();
  */
@@ -36,8 +36,8 @@ export async function startNotificationsWorker(options: WorkerOptions = {}): Pro
 
   await herald(options.broker)
     .channel(channelName)
-    .subscribe(async (message: { payload: NotificationJob }, ctx: { ack(): Promise<void> }) => {
-      const job = message.payload;
+    .subscribe(async (message: { payload: unknown }, ctx: { ack(): Promise<void> }) => {
+      const job = message.payload as NotificationJob;
 
       try {
         const channel = getNotificationConfig().channels[job.channel as ChannelName];

@@ -7,7 +7,7 @@
  * the cascade convention.
  */
 
-function captureStack(target: object, ctor: (...args: any[]) => unknown): void {
+function captureStack(target: object, ctor: new (...args: any[]) => unknown): void {
   // V8 only; guarded for non-V8 runtimes.
   (Error as unknown as { captureStackTrace?: (t: object, c: unknown) => void }).captureStackTrace?.(
     target,
@@ -18,8 +18,8 @@ function captureStack(target: object, ctor: (...args: any[]) => unknown): void {
 export class NotificationsNotConfiguredError extends Error {
   public constructor() {
     super(
-      "Notifications not configured — call `setNotificationConfig(config)` at boot " +
-        "(or wait for the notifications connector to start).",
+      "Notifications not configured — add `src/config/notifications.ts` with a " +
+        "default-exported config; the notifications connector registers it at boot.",
     );
     this.name = "NotificationsNotConfiguredError";
     captureStack(this, NotificationsNotConfiguredError);
@@ -29,8 +29,8 @@ export class NotificationsNotConfiguredError extends Error {
 export class ChannelNotFoundError extends Error {
   public constructor(channelName: string) {
     super(
-      `Channel "${channelName}" is not configured. Add it to ` +
-        "`setNotificationConfig({ channels: { ... } })`.",
+      `Channel "${channelName}" is not configured. Add it to the ` +
+        "`channels` map in `src/config/notifications.ts`.",
     );
     this.name = "ChannelNotFoundError";
     captureStack(this, ChannelNotFoundError);
@@ -41,7 +41,7 @@ export class NoQueueDispatcherError extends Error {
   public constructor(channelName: string) {
     super(
       `Cannot queue to channel "${channelName}" — no queue dispatcher configured. ` +
-        "Pass `queue` to `setNotificationConfig` or call `.send()` instead of `.queue()`.",
+        "Add a `queue` to `src/config/notifications.ts`, or call `.send()` instead of `.queue()`.",
     );
     this.name = "NoQueueDispatcherError";
     captureStack(this, NoQueueDispatcherError);

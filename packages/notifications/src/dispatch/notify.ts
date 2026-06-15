@@ -20,6 +20,7 @@
  */
 import { getNotificationConfig } from "../config";
 import type { ChannelName, Notifiable, NotificationChannels, SendOptions } from "../types";
+import { newDispatchId } from "./dispatch-id";
 import { dispatchChannel } from "./dispatcher";
 import { emit } from "./notifications-event-bus";
 
@@ -88,6 +89,7 @@ async function notifyImpl(
 
       if (!allowed.includes(channelName as ChannelName)) {
         await emit("skipped", {
+          dispatchId: newDispatchId(),
           channel: channelName,
           notifiable,
           reason: "preference",

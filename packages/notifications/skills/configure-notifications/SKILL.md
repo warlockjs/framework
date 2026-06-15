@@ -1,21 +1,18 @@
 ---
 name: configure-notifications
-description: 'Wire `@warlock.js/notifications` at boot — `setNotificationConfig({ default, channels, queue?, preferences?, rateLimit? })` exports the active config the dispatcher reads. `default`: channels used as fallback when no `via` is given; `channels`: registry mapping name → factory result (`mailChannel`, `inApp.configure`, custom `defineChannel`); `queue`: optional `QueueDispatcher` (`.queue()` throws without it); `preferences`: optional `PreferenceProvider` (drops channels the recipient muted); `rateLimit`: optional `RateLimiter` (drops channels exceeding per-recipient budgets). Triggers: `setNotificationConfig`, `getNotificationConfig`, `NotificationConfig`, `config/notifications.ts`, `mailChannel`, `inApp.configure`, "configure notifications", "wire notifications at boot", "set preferences provider", "set rate limit"; typical import `import { type NotificationConfig, mailChannel, inApp, setNotificationConfig } from "@warlock.js/notifications"`. Skip: building a reusable notification — `@warlock.js/notifications/define-notification/SKILL.md`; the in-app read API — `@warlock.js/notifications/use-in-app/SKILL.md`; adding a custom channel — `@warlock.js/notifications/define-channel/SKILL.md`.'
+description: 'Wire `@warlock.js/notifications` via a declarative `src/config/notifications.ts` that exports a `NotificationConfig` default — the notifications connector registers it at boot, so app code never calls `setNotificationConfig`. `channels`: registry mapping name → factory result (`mailChannel`, `inApp.configure`, custom `defineChannel`); `queue`: optional `QueueDispatcher` (`.queue()` throws without it); `preferences`: optional `PreferenceProvider` (drops channels the recipient muted); `rateLimit`: optional `RateLimiter` (drops channels exceeding per-recipient budgets). Triggers: `config/notifications.ts`, `NotificationConfig`, `setNotificationConfig`, `getNotificationConfig`, `mailChannel`, `inApp.configure`, "configure notifications", "wire notifications at boot", "set preferences provider", "set rate limit"; typical import `import { type NotificationConfig, mailChannel, inApp } from "@warlock.js/notifications"`. Skip: building a reusable notification — `@warlock.js/notifications/define-notification/SKILL.md`; the in-app read API — `@warlock.js/notifications/use-in-app/SKILL.md`; adding a custom channel — `@warlock.js/notifications/define-channel/SKILL.md`.'
 ---
 
 # Configure notifications
 
-One call at boot wires every channel + the optional gates. The dispatcher reads from this config on every send.
+`src/config/notifications.ts` exports a `NotificationConfig` as its default; the notifications connector registers it at boot and the dispatcher reads from it on every send. The file is **declarative** — you never call `setNotificationConfig` yourself (the connector does, the same way the rest of `src/config/*.ts` is wired).
+
+> `npx warlock add notifications` ejects this file pre-wired (mail + in-app) alongside the `Notification` model + migration. Edit the ejected config to taste — the sections below are the full surface.
 
 ## Minimal
 
 ```ts title="src/config/notifications.ts"
-import {
-  type NotificationConfig,
-  inApp,
-  mailChannel,
-  setNotificationConfig,
-} from "@warlock.js/notifications";
+import { type NotificationConfig, inApp, mailChannel } from "@warlock.js/notifications";
 import { Notification } from "app/notifications/notification.model";
 
 const config: NotificationConfig = {
@@ -25,7 +22,7 @@ const config: NotificationConfig = {
   },
 };
 
-setNotificationConfig(config);
+export default config;
 ```
 
 The `database` channel is returned by `inApp.configure({ model | repository })` — it binds the in-app store AND returns the channel, so the read side + the write side share ONE repository instance.
@@ -45,10 +42,10 @@ const config: NotificationConfig = {
   // optional gates — both app-owned; package ships no defaults
   preferences: userPreferences,            // drops channels recipient muted
   rateLimit,                               // drops channels over budget
-  queue: heraldQueue,                      // backs `.queue()` (Phase 2)
+  queue: heraldQueue(),                    // backs `.queue()` (needs @warlock.js/herald)
 };
 
-setNotificationConfig(config);
+export default config;
 ```
 
 ## Channel keys must match the registry
@@ -74,7 +71,8 @@ Two paths; mutually exclusive at the type level.
 // 90% case — pass the model class; default repo built internally.
 database: inApp.configure({ model: Notification }),
 
-// 10% case — pass a custom repo (when you need filterBy overrides or extras).
+// 10% case — pass a custom repo (only for EXTRA query methods; column names
+// come from the model's columnMap, not a repo override).
 database: inApp.configure({ repository: notificationsRepository }),
 ```
 
@@ -123,7 +121,7 @@ const cfg = getNotificationConfig();   // throws NotificationsNotConfiguredError
 
 ## Tests
 
-For tests, reset between cases:
+Tests call `setNotificationConfig` directly — bypassing the connector — to set state, then `resetNotificationConfig` to tear down:
 
 ```ts
 import { resetNotificationConfig, setNotificationConfig } from "@warlock.js/notifications";

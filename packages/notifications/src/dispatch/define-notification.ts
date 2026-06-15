@@ -43,6 +43,7 @@ import type {
   RenderContext,
   SendOptions,
 } from "../types";
+import { newDispatchId } from "./dispatch-id";
 import { dispatchChannel, type DispatchMode } from "./dispatcher";
 import { emit } from "./notifications-event-bus";
 
@@ -158,7 +159,13 @@ async function dispatchToRecipient<Data>(
     if (!options.force && config.preferences) {
       const allowed = await config.preferences.resolveChannels(to, def.type, channels);
       for (const channel of channels.filter((c) => !allowed.includes(c))) {
-        await emit("skipped", { channel, notifiable: to, reason: "preference", options });
+        await emit("skipped", {
+          dispatchId: newDispatchId(),
+          channel,
+          notifiable: to,
+          reason: "preference",
+          options,
+        });
       }
       channels = channels.filter((c) => allowed.includes(c));
     }

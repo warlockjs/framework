@@ -74,7 +74,7 @@ await marketing.queue(user, payload, {
 });
 ```
 
-`ctx` carries `locale` + `meta` from `SendOptions`. `meta` flows through to the `sent` / `failed` / `skipped` events too.
+`ctx` carries `locale` + `meta` from `SendOptions`. `meta` flows through to every observability event too.
 
 ## Database channel — `type` is defaulted
 
@@ -107,16 +107,16 @@ await orderShipped.only("mail").send(user, { order });
 
 ```ts
 await orderShipped.queue(user, { order }, { delay: "10m" });
-// Throws NoQueueDispatcherError if `setNotificationConfig({ queue })` not set.
+// Throws NoQueueDispatcherError if no `queue` is configured in config/notifications.ts.
 ```
 
 ## SendOptions
 
 | Field | Effect |
 |---|---|
-| `delay` | Defer the dispatch — `"10m"` / `"3d"` / `600` (seconds). |
+| `delay` | Reserved — `"10m"` / `"3d"` / `600` (seconds). NOT honored yet: both `.send()` and the current `.queue()` worker dispatch immediately; delay-aware delivery is a follow-up. |
 | `locale` | Passed to renderers via `RenderContext.locale`. |
-| `meta` | Passed to renderers + included in `sent`/`failed`/`skipped` events. |
+| `meta` | Passed to renderers + included in every observability event. |
 | `idempotencyKey` | Injected into the database payload (dedupe via unique index). |
 | `force` | Bypass `PreferenceProvider`. Does NOT bypass `RateLimiter`. |
 | `type` | Ignored by `defineNotification` — see `send-ad-hoc` for ad-hoc gating. |
@@ -130,4 +130,4 @@ Per-recipient: each recipient gets an independent `Promise.allSettled`. Per-chan
 - [`notifications-basics/SKILL.md`](../notifications-basics/SKILL.md) — package front door.
 - [`send-ad-hoc/SKILL.md`](../send-ad-hoc/SKILL.md) — `notify.<channel>` per-channel shorthand.
 - [`configure-notifications/SKILL.md`](../configure-notifications/SKILL.md) — wire channels + preferences + rate-limit + queue.
-- [`observe-notifications/SKILL.md`](../observe-notifications/SKILL.md) — `notifications.on("sent" | "failed" | "skipped", …)`.
+- [`observe-notifications/SKILL.md`](../observe-notifications/SKILL.md) — `notifications.on("sending" | "sent" | "failed" | "skipped", …)`.

@@ -53,18 +53,18 @@ describe("inApp facade", () => {
     expect(repo.list).toHaveBeenCalledWith({ type: "x", recipientId: "u42" });
   });
 
-  it("`listUnread` adds isRead:false", async () => {
+  it("`listUnread` adds unread:true", async () => {
     const repo = new FakeRepo();
     inApp.configure({ repository: repo as any });
     await inApp.listUnread(makeNotifiable({ id: "u42" }));
-    expect(repo.list).toHaveBeenCalledWith({ recipientId: "u42", isRead: false });
+    expect(repo.list).toHaveBeenCalledWith({ recipientId: "u42", unread: true });
   });
 
   it("`countUnread` uses the cached path", async () => {
     const repo = new FakeRepo();
     inApp.configure({ repository: repo as any });
     await inApp.countUnread(makeNotifiable({ id: "u42" }));
-    expect(repo.countCached).toHaveBeenCalledWith({ recipientId: "u42", isRead: false });
+    expect(repo.countCached).toHaveBeenCalledWith({ recipientId: "u42", unread: true });
   });
 
   it("`find` delegates to repo.findFor scoped to the recipient", async () => {
