@@ -148,7 +148,9 @@ function makeRelationDecorator<Options extends AnyRelationOptions | undefined>(t
       const resolvedOptions = resolveOptions(options);
       const definition = buildRelationDefinition(type, modelRelation, resolvedOptions);
 
-      stashRelationInMetadata(context.metadata, relationName, definition);
+      if (context.metadata) {
+        stashRelationInMetadata(context.metadata, relationName, definition);
+      }
     };
   };
 }

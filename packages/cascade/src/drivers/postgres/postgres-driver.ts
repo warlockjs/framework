@@ -258,7 +258,10 @@ export class PostgresDriver implements DriverContract {
       this._isConnected = true;
       this.emit("connected");
     } catch (error) {
-      log.error("database.postgres", "connection", "Failed to connect to database");
+      // Boot-time database connection failure is unrecoverable in every
+      // realistic caller (app boot, CLI migrations, workers) — `fatal` makes
+      // "page on fatal only" alerting clean. Per-query failures stay at error.
+      log.fatal("database.postgres", "connection", "Failed to connect to database");
       throw error;
     }
   }

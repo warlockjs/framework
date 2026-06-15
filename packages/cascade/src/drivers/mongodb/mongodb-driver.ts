@@ -359,7 +359,10 @@ export class MongoDbDriver implements DriverContract {
     } catch (error: any) {
       await client.close().catch(() => undefined);
       this.emit("disconnected");
-      log.error(
+      // Boot-time database connection failure is unrecoverable in every
+      // realistic caller (app boot, CLI migrations, workers) — `fatal` makes
+      // "page on fatal only" alerting clean. Per-query failures stay at error.
+      log.fatal(
         "database.mongodb",
         "connection",
         `Failed to connect to database: ${error.message}`,

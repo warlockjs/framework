@@ -4,6 +4,10 @@ Per-task skills. All cross-references use the form `@warlock.js/<pkg>/<skill>/SK
 
 ## Skills
 
+### [`alter-migration/`](./alter-migration/SKILL.md)
+
+Evolve an existing table with `Migration.alter(Model, schema, options?)` — add/drop/rename/modify columns; add/drop regular, unique, expression, full-text, geo, vector, and TTL indexes; add/drop foreign keys and CHECK constraints; write rollbacks with class-form methods in `down()`. Load when changing an existing table — adding columns, swapping unique→index, wiring new foreign keys, or any DDL that's not creating a brand-new table.
+
 ### [`aggregate-data/`](./aggregate-data/SKILL.md)
 
 Compute aggregates over a query — `.count()`, `.sum(field)`, `.avg`, `.min`, `.max`, plus the two-arg `.groupBy(fields, { alias: $agg.* })` + `.having` for group-level rollups. Load when building reports, dashboards, 'X per category' rollups, or any query returning numbers rather than rows.
