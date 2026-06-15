@@ -104,6 +104,13 @@ export class HttpConnector extends BaseConnector {
     } catch (error) {
       devLogError("Error while starting http server", error);
 
+      // A failed listen()/port-bind at boot means the app can't serve — fatal.
+      // devLogError above is the dev-server console UI and bypasses the logger
+      // pipeline, so also route it through `log.fatal` to reach Sentry/file,
+      // then `await log.flush()` to drain buffered/async channels before exit.
+      await log.fatal("http", "connection", error);
+      await log.flush();
+
       process.exit(1); // stop the process, exit with error
     }
 

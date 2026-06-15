@@ -35,7 +35,10 @@ export class HeraldConnector extends BaseConnector {
       log.success(`herald.${heraldConfig.driver}`, "connection", "Connected to message broker");
       this.active = true;
     } catch (error) {
-      log.error(
+      // Boot-time broker connection failure is unrecoverable — `fatal` makes
+      // "page on fatal only" alerting clean, aligned with the cascade and
+      // cache drivers. Disconnect failures (shutdown path) stay at error.
+      log.fatal(
         `herald.${heraldConfig.driver}`,
         "connection",
         "Failed to connect to message broker",

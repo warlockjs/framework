@@ -2,6 +2,7 @@ import { colors } from "@mongez/copper";
 import {
   ensureDirectoryAsync,
   fileExistsAsync,
+  getFileAsync,
   getJsonFileAsync,
   putFileAsync,
   putJsonFileAsync,
@@ -10,7 +11,38 @@ import { execSync } from "node:child_process";
 import { CommandActionData } from "../cli/types";
 import { rootPath, srcPath } from "../utils";
 import { getWarlockVersion } from "../utils/framework-vesion";
-import { communicatorsConfigStub, socketConfigStub } from "./stubs";
+import {
+  accessConfigStub,
+  accessResolverStub,
+  accessRoleMigrationStub,
+  accessRoleModelIndexStub,
+  accessRoleModelStub,
+  accessUserRoleMigrationStub,
+  accessUserRoleModelIndexStub,
+  accessUserRoleModelStub,
+  communicatorsConfigStub,
+  notificationMigrationStub,
+  notificationModelStub,
+  notificationsConfigStub,
+  socketConfigStub,
+} from "./stubs";
+
+/**
+ * Build a migration filename timestamp prefix in the framework's
+ * MM-DD-YYYY_HH-MM-SS form. Cascade infers a migration's createdAt from this
+ * prefix and orders migrations deterministically by it. Pass `offsetSeconds` to
+ * stamp sibling migrations created in the same scaffold a second apart so they
+ * never collide and keep a stable relative order.
+ */
+function migrationTimestamp(offsetSeconds = 0): string {
+  const now = new Date(Date.now() + offsetSeconds * 1000);
+  const pad = (value: number) => String(value).padStart(2, "0");
+
+  return (
+    `${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${now.getFullYear()}_` +
+    `${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`
+  );
+}
 
 async function completeTestInstallation(options: CommandActionData) {
   // Create test-global-setup.ts (runs once before all tests)
@@ -148,6 +180,164 @@ export default function WelcomeEmail({ name }: WelcomeEmailProps) {
     await putJsonFileAsync(tsconfigPath, tsconfig);
     console.log(`${colors.green("âœ“")} Added "emails" to tsconfig.json include`);
   }
+}
+
+async function completeNotificationsInstallation(_options: CommandActionData) {
+  const modelPath = srcPath("app/notifications/notification.model.ts");
+
+  // The model file is the sentinel for "notifications already scaffolded" —
+  // its presence means the migration was created too (timestamped, so we must
+  // not re-emit a duplicate on a second run).
+  if (await fileExistsAsync(modelPath)) {
+    console.log(
+      `${colors.yellowBright("src/app/notifications")} already scaffolded, skipping model + migration...`,
+    );
+    return;
+  }
+
+  // 1. Notification model — extends the package's DatabaseNotification base.
+  await ensureDirectoryAsync(srcPath("app/notifications"));
+  await putFileAsync(modelPath, notificationModelStub);
+  console.log(`${colors.green("âœ“")} Created src/app/notifications/notification.model.ts`);
+
+  // 2. Migration — timestamped MM-DD-YYYY_HH-MM-SS prefix so cascade infers its
+  //    createdAt and orders it deterministically (migrate-action discovers
+  //    src/app/*/migrations/*).
+  await ensureDirectoryAsync(srcPath("app/notifications/migrations"));
+
+  const migrationFile = `${migrationTimestamp()}-notification.migration.ts`;
+
+  await putFileAsync(
+    srcPath("app/notifications/migrations", migrationFile),
+    notificationMigrationStub,
+  );
+  console.log(
+    `${colors.green("âœ“")} Created src/app/notifications/migrations/${migrationFile}`,
+  );
+}
+
+async function registerAccessLocale() {
+  // Register the access locale in the project's shared translations file so a
+  // denied check returns a real sentence, not the raw "access.errors.forbidden"
+  // key. Append when the file exists, create it otherwise; skip if already there.
+  const localesPath = srcPath("app/shared/utils/locales.ts");
+
+  const accessLocale = `groupedTranslations("access", {
+  errors: {
+    forbidden: {
+      en: "You do not have permission to perform this action.",
+      ar: "ليس لديك صلاحية لتنفيذ هذا الإجراء.",
+    },
+  },
+});
+`;
+
+  if (await fileExistsAsync(localesPath)) {
+    const current = await getFileAsync(localesPath);
+
+    if (current.includes(`groupedTranslations("access"`)) {
+      console.log(`${colors.yellowBright("access")} locale already registered, skipping...`);
+
+      return;
+    }
+
+    // The file uses groupedTranslations already iff it calls it — only inject the
+    // import when no call is present yet.
+    const importLine = `import { groupedTranslations } from "@warlock.js/core";`;
+    const prefix = current.includes("groupedTranslations(") ? "" : `${importLine}\n\n`;
+
+    await putFileAsync(localesPath, `${prefix}${current.trimEnd()}\n\n${accessLocale}`);
+
+    console.log(
+      `${colors.green("✓")} Registered the access locale in src/app/shared/utils/locales.ts`,
+    );
+
+    return;
+  }
+
+  await ensureDirectoryAsync(srcPath("app/shared/utils"));
+
+  await putFileAsync(
+    localesPath,
+    `import { groupedTranslations } from "@warlock.js/core";\n\n${accessLocale}`,
+  );
+
+  console.log(`${colors.green("✓")} Created src/app/shared/utils/locales.ts with the access locale`);
+}
+
+async function scaffoldAccessFiles() {
+  // The resolver file is the sentinel for "access already scaffolded" — its
+  // presence means the role/user-role model folders and their timestamped
+  // migrations were created too, so we must not re-emit duplicate migrations on
+  // a second run.
+  const resolverPath = srcPath("app/access/services/access-resolver.ts");
+
+  if (await fileExistsAsync(resolverPath)) {
+    console.log(
+      `${colors.yellowBright("src/app/access")} already scaffolded, skipping resolver + role tables...`,
+    );
+
+    return;
+  }
+
+  // 1. Role catalog model folder (model + barrel + migration). The catalog row
+  //    is role name → granted permissions; managed at runtime in the DB.
+  await ensureDirectoryAsync(srcPath("app/access/models/role"));
+  await putFileAsync(srcPath("app/access/models/role/role.model.ts"), accessRoleModelStub);
+  await putFileAsync(srcPath("app/access/models/role/index.ts"), accessRoleModelIndexStub);
+  console.log(`${colors.green("✓")} Created src/app/access/models/role`);
+
+  await ensureDirectoryAsync(srcPath("app/access/models/role/migrations"));
+
+  // Migration filenames carry a MM-DD-YYYY_HH-MM-SS prefix so cascade infers
+  // their createdAt and orders them deterministically (the migrate action
+  // discovers src/app/*/models/*/migrations/*). The two tables are independent
+  // (no FK between them), but the user-role migration is stamped a second later
+  // so the relative order is stable.
+  const roleMigrationFile = `${migrationTimestamp()}-role.migration.ts`;
+  await putFileAsync(
+    srcPath("app/access/models/role/migrations", roleMigrationFile),
+    accessRoleMigrationStub,
+  );
+  console.log(
+    `${colors.green("✓")} Created src/app/access/models/role/migrations/${roleMigrationFile}`,
+  );
+
+  // 2. UserRole assignment model folder (model + barrel + migration). The model
+  //    statics scope an unresolved tenant to GLOBAL rows only (security
+  //    invariant) — see the stub for the reasoning.
+  await ensureDirectoryAsync(srcPath("app/access/models/user-role"));
+  await putFileAsync(
+    srcPath("app/access/models/user-role/user-role.model.ts"),
+    accessUserRoleModelStub,
+  );
+  await putFileAsync(
+    srcPath("app/access/models/user-role/index.ts"),
+    accessUserRoleModelIndexStub,
+  );
+  console.log(`${colors.green("✓")} Created src/app/access/models/user-role`);
+
+  await ensureDirectoryAsync(srcPath("app/access/models/user-role/migrations"));
+
+  const userRoleMigrationFile = `${migrationTimestamp(1)}-user-role.migration.ts`;
+  await putFileAsync(
+    srcPath("app/access/models/user-role/migrations", userRoleMigrationFile),
+    accessUserRoleMigrationStub,
+  );
+  console.log(
+    `${colors.green("✓")} Created src/app/access/models/user-role/migrations/${userRoleMigrationFile}`,
+  );
+
+  // 3. The DatabaseAccessResolver — the one required config seam, wired into
+  //    config/access.ts by the ejected stub.
+  await ensureDirectoryAsync(srcPath("app/access/services"));
+  await putFileAsync(resolverPath, accessResolverStub);
+  console.log(`${colors.green("✓")} Created src/app/access/services/access-resolver.ts`);
+}
+
+async function completeAccessInstallation(_options: CommandActionData) {
+  await registerAccessLocale();
+  await scaffoldAccessFiles();
 }
 
 const featuresMap: Record<
@@ -294,6 +484,33 @@ const featuresMap: Record<
       content: socketConfigStub,
       name: "socket",
     },
+  },
+  notifications: {
+    description:
+      "Installs @warlock.js/notifications — multi-channel notifications (mail + in-app database). Pulls the mail feature, ejects config/notifications.ts, and scaffolds the Notification model + migration into src/app/notifications",
+    // The ejected config wires a `mail` channel by default, which needs
+    // nodemailer — pulled in via the `mail` feature.
+    requires: ["mail"],
+    dependencies: {
+      "@warlock.js/notifications": "~4.0.0",
+    },
+    ejectConfig: {
+      content: notificationsConfigStub,
+      name: "notifications",
+    },
+    onExecuting: completeNotificationsInstallation,
+  },
+  access: {
+    description:
+      "Installs @warlock.js/access — authorization (RBAC + ABAC): permission checks, ABAC policies, and roles. Ejects config/access.ts, the DatabaseAccessResolver + Role/UserRole models and migrations into src/app/access, and registers the access locale in src/app/shared/utils/locales.ts",
+    dependencies: {
+      "@warlock.js/access": "~4.0.0",
+    },
+    ejectConfig: {
+      content: accessConfigStub,
+      name: "access",
+    },
+    onExecuting: completeAccessInstallation,
   },
   ai: {
     description: "Installs @warlock.js/ai — the core AI toolkit (agents, tools, workflows)",

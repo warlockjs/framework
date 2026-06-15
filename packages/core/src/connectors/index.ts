@@ -2,6 +2,7 @@
  * Connectors Module
  * Exports all connector types and implementations
  */
+export * from "./access-connector";
 export * from "./base-connector";
 export * from "./cache-connector";
 export * from "./herald-connector";
@@ -10,6 +11,7 @@ export * from "./database-connector";
 export * from "./http-connector";
 export * from "./logger-connector";
 export * from "./mail-connector";
+export * from "./notifications-connector";
 export * from "./socket-connector";
 export * from "./storage.connector";
 export * from "./types";
