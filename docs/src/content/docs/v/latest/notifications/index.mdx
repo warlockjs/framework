@@ -1,0 +1,60 @@
+---
+title: Notifications
+description: Multi-channel notifications — define once, fire anywhere. Mail, in-app database, and custom channels with preferences, rate limits, and idempotency.
+---
+
+> Built on `@warlock.js/core` (mail) and `@warlock.js/cascade` (in-app store). Not standalone — it orchestrates over the transports the framework already gives you.
+
+`@warlock.js/notifications` answers one question: *something happened — how do I tell the right people, through the right channels, without rewriting the plumbing every time?* You describe a notification once; it renders per channel and fans out to every recipient.
+
+Define a notification, then fire it anywhere — sync or queued:
+
+```ts
+import { defineNotification } from "@warlock.js/notifications";
+
+export const orderShipped = defineNotification<{ order: Order }>({
+  type: "order.shipped",
+  via: ["database", "mail"],
+  database: ({ order }) => ({ title: `Order #${order.number} shipped`, payload: { id: order.id } }),
+  mail: ({ order }, to) => ({
+    subject: `Order #${order.number} shipped`,
+    html: `<p>Hi ${to.get("name")}, it's on the way.</p>`,
+  }),
+});
+
+// anywhere — one recipient, a list, or queued
+await orderShipped.send(user, { order });
+await orderShipped.send([buyer, salesRep], { order });
+await orderShipped.queue(user, { order }, { delay: "10m" });
+```
+
+Need a one-off? Skip the definition and use the per-channel proxy:
+
+```ts
+import { notify } from "@warlock.js/notifications";
+
+await notify.mail(user, { subject: "Welcome", html: "<p>Thanks for joining</p>" });
+await notify.database(user, { type: "welcome", title: "Welcome!" });
+```
+
+## What it gives you
+
+- **Define once, fire anywhere** — `defineNotification` carries the channels + a renderer per channel; `.send` / `.queue` / `.only` dispatch it.
+- **A typed channel registry** — `notify.mail`, `notify.database`, … are payload-typed; custom channels extend the registry with a 3-line `declare module`.
+- **An in-app store with a clean read side** — `inApp.listUnread` / `countUnread` / `markAsRead` / `dismiss`, **recipient-scoped by construction** (no IDOR).
+- **Pre-send gates** — plug in a `PreferenceProvider` (mute lists, quiet hours) and a `RateLimiter` (per-user budgets). Both optional.
+- **Idempotency** — `idempotencyKey` makes a retried send a no-op instead of a duplicate row.
+- **Observability** — subscribe to `sending` / `sent` / `failed` / `skipped` (shared `dispatchId` + `durationMs`) for metrics, logs, tracing, and drop accounting.
+
+## Read by intent
+
+- **New here?** [getting-started / introduction](./getting-started/01-introduction.md), then [your first notification](./getting-started/03-your-first-notification.md) end to end.
+- **Mental model** — channels, the registry, and how recipients are addressed: [essentials / channels and the registry](./essentials/01-channels-and-the-registry.md).
+- **The in-app store** — model, repository, read API, IDOR-safety: [essentials / the in-app store](./essentials/02-the-in-app-store.md).
+- **Task guides** — [define a notification](./guides/define-notification.md), [ad-hoc sends](./guides/send-ad-hoc.md), [custom channels](./guides/custom-channels.md), [preferences & rate limits](./guides/preferences-and-rate-limits.md), [observability](./guides/observability.md).
+- **Recipes** — [transactional, security & marketing](./recipes/transactional-and-marketing.md), end to end.
+- **Reference** — every public export in the [API reference](./reference/api.md).
+
+> WhatsApp, Telegram, Slack, and push channels arrive with `@warlock.js/bridges`. Until then, any HTTP channel is a 30-line `defineChannel` — see [custom channels](./guides/custom-channels.md).
+
+Source: `@warlock.js/notifications/`.

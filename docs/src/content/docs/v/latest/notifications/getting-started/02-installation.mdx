@@ -1,0 +1,52 @@
+---
+title: "Installation"
+description: Add @warlock.js/notifications with the generator — it installs the package, ejects a declarative config/notifications.ts, and scaffolds the in-app model + migration.
+sidebar:
+  order: 2
+  label: "Installation"
+---
+
+## Add the package
+
+One command installs the package, ejects `config/notifications.ts`, and scaffolds the in-app model + migration:
+
+```bash
+npx warlock add notifications
+```
+
+It also pulls in the `mail` feature (the package's one required dependency), so a fresh app is wired end to end. `@warlock.js/core` and `@warlock.js/cascade` are already present in a Warlock app.
+
+This ejects into your project — yours to edit:
+
+- `src/config/notifications.ts` — a **declarative** config wired to the scaffolded model (see below).
+- `src/app/notifications/notification.model.ts` — extends `DatabaseNotification`; declares its physical columns via `columnMap`.
+- `src/app/notifications/migrations/…notification.migration.ts` — `Migration.create(Notification, notificationColumns(Notification))`.
+
+> Prefer to wire it by hand? `yarn add @warlock.js/notifications` (npm / pnpm work too), then create the three files yourself. The generator is the recommended path — it keeps them in sync and matches the conventions below.
+
+## What `config/notifications.ts` looks like
+
+The file is **declarative**: it exports a config object, and Warlock's notifications connector reads that default export at boot and registers it. You never call `setNotificationConfig` yourself — the connector does, the same way the rest of `src/config/*.ts` is wired.
+
+```ts title="src/config/notifications.ts"
+import { type NotificationConfig, mailChannel, inApp } from "@warlock.js/notifications";
+import { Notification } from "app/notifications/notification.model";
+
+const config: NotificationConfig = {
+  channels: {
+    mail:     mailChannel({ from: "no-reply@store.com" }),
+    database: inApp.configure({ model: Notification }),
+  },
+  // optional gates:
+  // preferences: userPreferences,
+  // rateLimit,
+};
+
+export default config;
+```
+
+`inApp.configure({ model })` does double duty: it binds the in-app store **and** returns the `database` channel, so reads and writes share one repository.
+
+## Next
+
+- [Your first notification](./03-your-first-notification.md) — define one and fire it end to end.
