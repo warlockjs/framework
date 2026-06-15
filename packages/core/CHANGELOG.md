@@ -13,6 +13,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `warlock add notifications` — new feature in the `add` command: installs `@warlock.js/notifications` (and pulls the `mail` feature for the default mail channel), ejects `config/notifications.ts` (mail + in-app channels wired), and scaffolds the app-owned `Notification` model + a timestamped migration into `src/app/notifications/`. Re-running is idempotent (the model file is the sentinel — no duplicate migration). The async queue stays opt-in (commented in the config; enable with `warlock add herald` + `heraldQueue()`).
 - **Notifications connector** — a built-in connector (priority `8`, early phase) reads `config/notifications.ts` at boot and hands its default export to `setNotificationConfig`. `@warlock.js/notifications` is lazy-imported (gated on the config's presence), so core keeps no hard dependency on it — the same pattern as the herald connector. Config files stay declarative (`export default config`); the side-effect moves out of the config file.
 
+## 4.2.1
+
+### Fixed
+
+- Ship the `bin` folder so the `warlock` CLI works from the published package — it was omitted from the 4.2.0 build.
+
 ## 4.2.0
 
 ### Changed
