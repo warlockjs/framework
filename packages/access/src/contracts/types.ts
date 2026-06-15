@@ -12,7 +12,7 @@ export type RolesMap = Record<string, string[]>;
 export type AccessContext = {
   /** The object being authorized. Its presence is what enables the ABAC policy. */
   resource?: unknown;
-  /** Tenant scope. Defaults to `config.access.tenant.resolve()`. */
+  /** Tenant scope. Defaults to the resolver's optional `resolveTenant()`. */
   tenant?: string;
   [key: string]: unknown;
 };
@@ -33,17 +33,17 @@ export type PolicyFn = (
   context: PolicyContext,
 ) => boolean | Promise<boolean>;
 
-/**
- * `config.access.*` shape. Most apps set only `roles` and let the built-in
- * resolver do the rest.
- */
 export type AccessConfigurations = {
-  /** role → permissions map (your code-defined catalog). */
-  roles?: RolesMap;
-  /** The resolver. Defaults to `DefaultAccessResolver(roles)`. */
-  resolver?: AccessResolver;
-  /** Cache TTL for resolved permission sets. @default "10m" */
-  cacheTtl?: string | number;
-  /** Resolve the ambient tenant when a check doesn't pass one explicitly. */
-  tenant?: { resolve?: () => string | undefined };
+  /**
+   * REQUIRED. The adapter that reads a user's roles + permissions (and,
+   * optionally, the ambient tenant). The role→permission catalog lives INSIDE
+   * the resolver — there is no separate config map.
+   */
+  resolver: AccessResolver;
+
+  /** Cache settings for resolved permission sets. */
+  cache?: {
+    /** TTL for a cached set. @default "10m" */
+    ttl?: string | number;
+  };
 };

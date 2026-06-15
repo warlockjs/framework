@@ -1,1 +1,1 @@
-export * from "./require-permission.middleware";
+export * from "./gate.middleware";

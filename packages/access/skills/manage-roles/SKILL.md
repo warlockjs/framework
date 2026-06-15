@@ -1,23 +1,44 @@
 ---
 name: manage-roles
-description: 'Assign and read roles in `@warlock.js/access` — `access.assign` / `access.revoke` (backed by the `user_roles` table) and `hasRole` / `hasAnyRole` / `hasAllRoles`. Covers the overridable `UserRole` model + migration and why to prefer permission checks. TRIGGER: `access.assign`, `access.revoke`, `hasRole`, `hasAnyRole`, `hasAllRoles`, `UserRole`, `UserRoleMigration`, "give a user a role", "assign role", "check a user role", "roles per tenant". Skip: permission checks — `@warlock.js/access/check-permissions/SKILL.md`; resolver choice — `@warlock.js/access/configure-access/SKILL.md`.'
+description: 'Assign and read roles in `@warlock.js/access` — the ejected `UserRole.assign` / `UserRole.revoke` (the `user_roles` table) followed by `access.flush`, plus `hasRole` / `hasAnyRole` / `hasAllRoles`. The role→permission catalog is the ejected `Role` table (dynamic). TRIGGER: `UserRole.assign`, `UserRole.revoke`, `access.flush`, `hasRole`, `hasAnyRole`, `hasAllRoles`, `Role` table, "give a user a role", "assign role", "check a user role", "roles per tenant". Skip: permission checks — `@warlock.js/access/check-permissions/SKILL.md`; resolver choice — `@warlock.js/access/configure-access/SKILL.md`.'
 ---
 
 # Manage roles
 
-## Assign / revoke (with the `user_roles` table)
+Role storage is **ejected into your app** (`npx warlock add access`): a `UserRole` table (who holds which role) and a `Role` catalog table (role → permissions). Both are dynamic — admins manage them at runtime. The package itself only reads them through the `DatabaseAccessResolver`.
 
-Use `ModelAccessResolver` (see [`configure-access`](@warlock.js/access/configure-access/SKILL.md)) and wire `UserRoleMigration` into `warlock.config.ts`. Then:
+## Assign / revoke
+
+Assign and revoke with the ejected `UserRole` model. Both **flush the affected user's cached set for you** — no manual `access.flush` after a role change:
+
+```ts
+import { UserRole } from "app/access/models/user-role";
+
+await UserRole.assign(user, "editor", "tenant-1"); // editor in tenant-1 (auto-flushes that user)
+await UserRole.assign(user, "viewer", "tenant-2"); // viewer in tenant-2 — same user, different role
+
+await UserRole.revoke(user, "editor", "tenant-1"); // auto-flushes too
+```
+
+The `tenant` arg is optional — omit it for single-tenant apps (roles are stored globally). In a **multi-tenant** app, always pass the tenant: an omitted or unresolved tenant scopes to *global* roles only, never the union across tenants.
+
+### When you still need `access.flush`
+
+`assign` / `revoke` cover the common case. The cache keys off `(user, tenant)`, so flush manually only for **out-of-band** changes those two methods can't see:
 
 ```ts
 import { access } from "@warlock.js/access";
 
-await access.assign(user, "editor", "tenant-1"); // editor in tenant-1
-await access.assign(user, "viewer", "tenant-2"); // viewer in tenant-2 — same user, different role
-await access.revoke(user, "editor", "tenant-1");
+// A role's permission set changed in the `Role` catalog — every holder's cached
+// permissions are now stale, so flush each affected user:
+await access.flush(user, "tenant-1");
+
+// You changed a user's role membership WITHOUT UserRole (e.g. wrote the user's
+// `role` column directly, or a bulk SQL update):
+await access.flush(user, "tenant-1");
 ```
 
-Both invalidate the user's cached set. The `tenant` arg is optional — omit it for single-tenant apps (roles are stored globally). In a **multi-tenant** app, always pass the tenant: an omitted or unresolved tenant scopes to *global* roles only, never the union across tenants.
+`access.flush(user, tenant)` is per-user — it has no "drop everything" form. For a sweeping catalog change with many holders, flush each affected user, or let the entries expire on their own (`cache.ttl`, default `10m`).
 
 ## Read roles
 
@@ -31,24 +52,20 @@ await hasAllRoles(user, ["staff", "verified"]);
 
 > **Prefer permission checks over role checks.** Role checks couple your code to the role taxonomy; `can(user, "orders.update")` survives a role rename. Reach for `hasRole` only for coarse UI gating.
 
+## The catalog (the `Role` table)
+
+A role's permissions live in the ejected `Role` table — `{ name, permissions }`. Add a role, or change what it grants, by writing rows; the `DatabaseAccessResolver` joins `user_roles` through it. No redeploy needed.
+
 ## The model (overridable)
 
-`UserRole` is a thin cascade model — `{ user_id, user_type, role, tenant }`. Extend + swap it to add columns:
-
-```ts
-export class AppUserRole extends UserRole {
-  public static schema = userRoleSchema.extend({ granted_by: v.scalar().optional() });
-}
-// then: new ModelAccessResolver(roles, AppUserRole)
-```
-
-`user_id` defaults to `uuid` — override `UserRoleMigration` if your user ids are integers.
+The ejected `UserRole` is a thin cascade model — `{ user_id, user_type, role, tenant }`. `user_id` defaults to `uuid` — edit the ejected migration in `src/app/access/models/user-role/migrations/` if your user ids are integers.
 
 ## Roles stored elsewhere?
 
-If roles live on the user (a `roles` column) or in a token claim, you don't use `access.assign` — you manage assignment your way and a resolver reads them. See [`implement-resolver`](@warlock.js/access/implement-resolver/SKILL.md).
+If roles live on the user (a `roles` column) or in a token claim, you don't use `UserRole` — you manage assignment your way and a resolver reads them. See [`implement-resolver`](@warlock.js/access/implement-resolver/SKILL.md).
 
 ## See also
 
 - [`@warlock.js/access/configure-access/SKILL.md`](@warlock.js/access/configure-access/SKILL.md) — choosing the resolver.
 - [`@warlock.js/access/implement-resolver/SKILL.md`](@warlock.js/access/implement-resolver/SKILL.md) — non-table role storage.
+```

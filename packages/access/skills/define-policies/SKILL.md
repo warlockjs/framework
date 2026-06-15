@@ -9,13 +9,19 @@ RBAC says "can update orders". A **policy** adds "...but only THIS order" — th
 
 ## Register a condition
 
-```ts title="src/app/access/policies.ts (loaded once at boot)"
+Policies live **per module**, in `src/app/<module>/policies/`, and are loaded by an `import "./policies";` side-effect in that module's `main.ts` — a policy defined in an unimported file silently never registers.
+
+```ts title="src/app/orders/policies/index.ts"
 import { definePolicy } from "@warlock.js/access";
 
 definePolicy("orders.update", (user, order, ctx) =>
   order.get("organization_id") === ctx.tenant &&
   (order.get("customer_id") === user.id || ctx.hasRole("manager")),
 );
+```
+
+```ts title="src/app/orders/main.ts"
+import "./policies"; // register this module's policies at boot
 ```
 
 ## It runs ONLY on an instance check
@@ -25,7 +31,7 @@ await authorize(user, "orders.update"); //                     class-level → g
 await authorize(user, "orders.update", { resource: order }); // instance → grant AND policy
 ```
 
-So `requirePermission("orders.update")` (a route gate, no resource) checks the grant; the per-order rule runs in your service, after you load the order.
+So `gate("orders.update")` (a route gate, no resource) checks the grant; the per-order rule runs in your service, after you load the order.
 
 ## The decision = grant AND policy
 

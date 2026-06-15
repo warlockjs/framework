@@ -5,8 +5,7 @@
   "description": "Authorization (RBAC + ABAC) for Warlock.js applications",
   "main": "./esm/index.js",
   "scripts": {
-    "test": "vitest run",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test": "vitest run"
   },
   "peerDependencies": {
     "@warlock.js/auth": "*",

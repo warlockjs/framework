@@ -30,17 +30,19 @@ export class DefaultAccessResolver implements AccessResolver {
       user.get("roles") ?? user.get("role"),
   ) {}
 
-  public async rolesOf(user: Auth): Promise<string[]> {
+  public async resolveRoles(user: Auth): Promise<string[]> {
     return toRoleList(await this.readRoles(user));
   }
 
-  public async permissionsOf(user: Auth): Promise<string[]> {
-    const roles = await this.rolesOf(user);
+  public async resolvePermissions(user: Auth): Promise<string[]> {
+    const roles = await this.resolveRoles(user);
 
     // Guard against a role named `__proto__` / `constructor` resolving to an
     // inherited (non-array) value.
     return roles.flatMap((role) =>
-      Object.prototype.hasOwnProperty.call(this.roles, role) ? this.roles[role] : [],
+      Object.prototype.hasOwnProperty.call(this.roles, role)
+        ? this.roles[role]
+        : [],
     );
   }
 }

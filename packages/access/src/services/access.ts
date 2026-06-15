@@ -1,12 +1,15 @@
 import type { Auth } from "@warlock.js/auth";
 import { ForbiddenError, t } from "@warlock.js/core";
 import type { AccessContext } from "../contracts/types";
-import { UserRole } from "../models/user-role.model";
 import { AccessErrorCodes } from "../utils/access-error-codes";
 import { check, flush as flushUser, rolesFor } from "./engine";
 
 /** Whether the user holds `permission` (and passes its policy when a resource is given). */
-export function can(user: Auth, permission: string, context?: AccessContext): Promise<boolean> {
+export function can(
+  user: Auth,
+  permission: string,
+  context?: AccessContext,
+): Promise<boolean> {
   return check(user, permission, context);
 }
 
@@ -79,34 +82,45 @@ export async function authorizeAny(
 }
 
 /** Whether the user has the given role. */
-export async function hasRole(user: Auth, role: string, tenant?: string): Promise<boolean> {
+export async function hasRole(
+  user: Auth,
+  role: string,
+  tenant?: string,
+): Promise<boolean> {
   return (await rolesFor(user, tenant)).includes(role);
 }
 
 /** Whether the user has ANY of the given roles. */
-export async function hasAnyRole(user: Auth, roles: string[], tenant?: string): Promise<boolean> {
+export async function hasAnyRole(
+  user: Auth,
+  roles: string[],
+  tenant?: string,
+): Promise<boolean> {
   const held = await rolesFor(user, tenant);
 
   return roles.some((role) => held.includes(role));
 }
 
 /** Whether the user has ALL of the given roles. */
-export async function hasAllRoles(user: Auth, roles: string[], tenant?: string): Promise<boolean> {
+export async function hasAllRoles(
+  user: Auth,
+  roles: string[],
+  tenant?: string,
+): Promise<boolean> {
   const held = await rolesFor(user, tenant);
 
   return roles.every((role) => held.includes(role));
 }
 
 /**
- * The access facade — every check plus role-management helpers backed by the
- * default `UserRole` table. `assign` / `revoke` invalidate the user's cached
- * set; apps that store roles elsewhere manage assignment themselves and call
- * `flush`.
+ * The access facade — every check plus `flush` to drop a user's cached set.
+ * Role assignment lives on the ejected `UserRole` model in app-land; callers do
+ * `UserRole.assign(...)` then `access.flush(user, tenant)`.
  *
  * @example
  * import { access } from "@warlock.js/access";
  * if (await access.can(user, "orders.update", { resource: order })) { ... }
- * await access.assign(user, "editor", "tenant-1");
+ * await access.flush(user, "tenant-1");
  */
 export const access = {
   can,
@@ -119,19 +133,6 @@ export const access = {
   hasRole,
   hasAnyRole,
   hasAllRoles,
-
-  /** Assign a role and invalidate the user's cached set. */
-  async assign(user: Auth, role: string, tenant?: string): Promise<void> {
-    await UserRole.assign(user, role, tenant);
-    await flushUser(user, tenant);
-  },
-
-  /** Revoke a role and invalidate the user's cached set. */
-  async revoke(user: Auth, role: string, tenant?: string): Promise<void> {
-    await UserRole.revoke(user, role, tenant);
-    await flushUser(user, tenant);
-  },
-
-  /** Drop the user's cached role/permission set. */
+  /** Drop the user's cached role/permission set (call after you mutate role rows). */
   flush: flushUser,
 };

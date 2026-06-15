@@ -8,7 +8,7 @@
 
 ---
 name: check-permissions
-description: 'Check permissions in `@warlock.js/access` — `can` / `cannot` / `canAll` / `canAny` (boolean), `authorize` / `authorizeAll` / `authorizeAny` (throw 403), and the `requirePermission` / `requireAny` / `requireAll` route middleware. Class-level vs instance-level (pass a `resource` to run its policy). TRIGGER: `can(`, `authorize(`, `canAll`, `canAny`, `requirePermission`, `requireAny`, `requireAll`, "check a permission", "protect route by permission", "403 forbidden", "any vs all permissions". Skip: ownership / tenant conditions — `@warlock.js/access/define-policies/SKILL.md`; role checks — `@warlock.js/access/manage-roles/SKILL.md`.'
+description: 'Check permissions in `@warlock.js/access` — `can` / `cannot` / `canAll` / `canAny` (boolean), `authorize` / `authorizeAll` / `authorizeAny` (throw 403), and the `gate` / `gateAny` / `gateAll` route middleware. Class-level vs instance-level (pass a `resource` to run its policy). TRIGGER: `can(`, `authorize(`, `canAll`, `canAny`, `gate`, `gateAny`, `gateAll`, "check a permission", "protect route by permission", "403 forbidden", "any vs all permissions". Skip: ownership / tenant conditions — `@warlock.js/access/define-policies/SKILL.md`; role checks — `@warlock.js/access/manage-roles/SKILL.md`.'
 ---
 
 # Check permissions
@@ -19,14 +19,14 @@ Stack it AFTER `authMiddleware` (which sets `request.user`):
 
 ```ts
 import { authMiddleware } from "@warlock.js/auth";
-import { requirePermission } from "@warlock.js/access";
+import { gate } from "@warlock.js/access";
 
 router.post("/orders", createOrder, {
-  middleware: [authMiddleware([]), requirePermission("orders.create")],
+  middleware: [authMiddleware([]), gate("orders.create")],
 });
 ```
 
-A missing permission → `403` before your controller runs. Use `requireAny([...])` / `requireAll([...])` for sets.
+A missing permission → `403` before your controller runs. Use `gateAny([...])` / `gateAll([...])` for sets.
 
 ## In code — boolean
 
@@ -39,7 +39,7 @@ await canAll(user, ["orders.update", "orders.viewCost"]); // needs BOTH
 await canAny(user, ["orders.update", "orders.updateStatus"]); // needs EITHER
 ```
 
-> **Multi-permission checks are named, never defaulted.** Use `canAll` / `canAny` (and `requireAll` / `requireAny`). There is no `can(user, [array])` — a wrong implicit any/all default is a silent privilege-escalation or a lockout.
+> **Multi-permission checks are named, never defaulted.** Use `canAll` / `canAny` (and `gateAll` / `gateAny`). There is no `can(user, [array])` — a wrong implicit any/all default is a silent privilege-escalation or a lockout.
 
 ## In a service — throw
 
@@ -60,17 +60,17 @@ const order = await Order.find(orderId);
 await authorize(user, "orders.update", { resource: order, tenant }); // grant AND policy
 ```
 
-- `requirePermission` is **class-level only** — no resource, runs before the controller ("can they update orders at all?").
+- `gate` is **class-level only** — no resource, runs before the controller ("can they update orders at all?").
 - `authorize(…, { resource })` is **instance-level** — after you load the row ("can they update THIS order?").
 
 ## Wildcards
 
-`*` grants everything; `orders.*` covers `orders.update` and any nested `orders.update.status`. Give a role `["*"]` to make it a super-admin.
+`*` grants everything; `orders.*` covers `orders.update` and any nested `orders.update.status` — but **not** the bare `orders` (the prefix needs a trailing `.`, so granting `orders.*` and checking `orders` is silently denied). Give a role `["*"]` to make it a super-admin.
 
 ## Gotchas
 
-- **Fails closed.** Any error resolving the decision → denied (and logged). A user with no roles is denied, never allowed by accident.
-- Stack `requirePermission` **after** `authMiddleware` — it reads `request.user`; without an authenticated user it `403`s.
+- **Fails closed, but config errors are loud.** A resolver or policy that throws → denied and logged (a user with no roles is denied, never allowed by accident). The one exception: `AccessConfigError` (e.g. no resolver configured) is **re-thrown**, not denied — a misconfig must surface, not hide. A cache outage is different again: it degrades to the resolver (the cache fails *open*; the decision still fails closed).
+- Stack `gate` **after** `authMiddleware` — it reads `request.user`; without an authenticated user it `403`s.
 - The boolean `can*` family never throws; the `authorize*` family throws `ForbiddenError`. Pick per layer (controllers gate with middleware, services assert with `authorize`).
 
 ## See also
@@ -83,24 +83,26 @@ await authorize(user, "orders.update", { resource: order, tenant }); // grant AN
 
 ---
 name: configure-access
-description: 'Configure `@warlock.js/access` — the `roles` → permissions map, the resolver (built-in `DefaultAccessResolver` for an inline role column vs `ModelAccessResolver` for the `user_roles` table), `cacheTtl`, and the ambient `tenant.resolve` hook. TRIGGER: `AccessConfigurations`, `config.access`, `src/config/access.ts`, "set up permissions", "roles map", "DefaultAccessResolver", "ModelAccessResolver", "access cache ttl", "access tenant". Skip: checking permissions — `@warlock.js/access/check-permissions/SKILL.md`; custom storage — `@warlock.js/access/implement-resolver/SKILL.md`.'
+description: 'Configure `@warlock.js/access` — the REQUIRED `resolver` (the quickstart `DefaultAccessResolver` over a fixed code map vs the ejected, DB-backed `DatabaseAccessResolver`), `cache: { ttl }`, and the ambient tenant via the resolver''s optional `resolveTenant()`. TRIGGER: `AccessConfigurations`, `config.access`, `src/config/access.ts`, "set up permissions", "DefaultAccessResolver", "DatabaseAccessResolver", "access cache ttl", "access tenant". Skip: checking permissions — `@warlock.js/access/check-permissions/SKILL.md`; custom storage — `@warlock.js/access/implement-resolver/SKILL.md`.'
 ---
 
 # Configure access
 
-## Zero-config — roles in code, roles on the user
+The resolver is the **one required piece**. It tells the engine how to read a user's roles + permissions. There is no separate `roles` config map — the role→permission catalog lives INSIDE the resolver.
 
-Define what each role grants and tell the package nothing else. The built-in `DefaultAccessResolver` reads `user.get("roles")` (or a single `user.get("role")`).
+## Quickstart — a fixed, code-defined catalog
+
+`DefaultAccessResolver` reads a user's roles from `user.get("roles")` (or a single `user.get("role")`) and maps them to permissions through a code map. No tables, no migrations.
 
 ```ts title="src/config/access.ts"
-import { type AccessConfigurations } from "@warlock.js/access";
+import { type AccessConfigurations, DefaultAccessResolver } from "@warlock.js/access";
 
 const access: AccessConfigurations = {
-  roles: {
+  resolver: new DefaultAccessResolver({
     owner: ["*"], //                                 `*` is the super-grant
     editor: ["orders.*", "posts.create"], //         `orders.*` covers orders.update, orders.view, …
     viewer: ["orders.view"],
-  },
+  }),
 };
 
 export default access;
@@ -108,52 +110,57 @@ export default access;
 
 `can(user, "orders.update")` now works for any user whose `roles` column includes `editor`.
 
-> `DefaultAccessResolver` is **not tenant-aware** — it returns the same roles in every tenant. For per-tenant roles (a user who is `editor` in one tenant and `viewer` in another), use `ModelAccessResolver` below.
+> `DefaultAccessResolver` is **not tenant-aware** — it returns the same roles in every tenant. For per-tenant roles, use the dynamic resolver below.
 
-## Roles in a table (multi-role / per-tenant)
+## Real apps — dynamic, DB-backed roles
 
-Switch the resolver to the `user_roles` table — this is what multi-tenant apps want (a user can hold different roles per tenant):
+`npx warlock add access` ejects a `DatabaseAccessResolver` (plus the `Role` + `UserRole` tables) into `src/app/access/`. Roles come from the `user_roles` table (multi-role, tenant-aware); permissions are joined through the `roles` catalog table — so admins manage both at runtime, in the DB.
 
-```ts
-import { ModelAccessResolver } from "@warlock.js/access";
-
-const roles = { editor: ["orders.*"], viewer: ["orders.view"] };
+```ts title="src/config/access.ts"
+import { type AccessConfigurations } from "@warlock.js/access";
+import { DatabaseAccessResolver } from "app/access/services/access-resolver";
 
 const access: AccessConfigurations = {
-  roles,
-  resolver: new ModelAccessResolver(roles),
+  resolver: new DatabaseAccessResolver(),
 };
+
+export default access;
 ```
 
-Wire `UserRoleMigration` into `warlock.config.ts` `database.migrations`, then assign roles via `access.assign(user, "editor", tenant)` (see [`manage-roles`](@warlock.js/access/manage-roles/SKILL.md)).
+Assign roles via the ejected `UserRole.assign(user, "editor", tenant)` — it flushes that user's cached set for you (see [`manage-roles`](@warlock.js/access/manage-roles/SKILL.md)).
 
 ## The full shape
 
 ```ts
 type AccessConfigurations = {
-  roles?: Record<string, string[]>; //               role → permissions
-  resolver?: AccessResolver; //                       default: DefaultAccessResolver(roles)
-  cacheTtl?: string | number; //                      resolved-set TTL, default "10m"
-  tenant?: { resolve?: () => string | undefined }; // ambient tenant
+  resolver: AccessResolver; //          REQUIRED — reads roles + permissions (+ optional tenant)
+  cache?: {
+    ttl?: string | number; //           resolved-set TTL, default "10m"
+  };
 };
 ```
 
+A missing resolver throws `AccessConfigError` **at boot** — the framework's access connector wires `src/config/access.ts` (the same way the notifications connector wires `config/notifications.ts`), so a misconfig fails at startup, never a silent deny.
+
 ## Tenant
 
-Checks accept an explicit tenant (`can(user, "x", { tenant })`), but set an ambient default so you never pass it on the happy path:
+Checks accept an explicit tenant (`can(user, "x", { tenant })`), but add a `resolveTenant(user)` to your resolver so you never pass it on the happy path. Derive the tenant from the **user**, not from request input — a client-supplied `organizationId` is attacker-controlled and would let a user check (or act) across tenant boundaries:
 
 ```ts
-tenant: { resolve: () => currentRequest().input("organizationId") },
+public resolveTenant(user: Auth): string | undefined {
+  return user.get("organization_id");
+}
 ```
 
 ## Caching
 
-The engine caches each user's resolved set (`cacheTtl`, default `10m`). Roles changed out of band? Call `access.flush(user, tenant)` — `assign` / `revoke` already do. The cache is **best-effort**: an outage degrades to the resolver, it never denies.
+The engine caches each user's resolved set (`cache.ttl`, default `10m`). Roles changed out of band? Call `access.flush(user, tenant)`. The cache is **best-effort**: an outage degrades to the resolver, it never denies.
 
 ## See also
 
-- [`@warlock.js/access/implement-resolver/SKILL.md`](@warlock.js/access/implement-resolver/SKILL.md) — when neither built-in resolver fits.
-- [`@warlock.js/access/manage-roles/SKILL.md`](@warlock.js/access/manage-roles/SKILL.md) — assign / revoke with the table.
+- [`@warlock.js/access/implement-resolver/SKILL.md`](@warlock.js/access/implement-resolver/SKILL.md) — write a resolver for your own storage.
+- [`@warlock.js/access/manage-roles/SKILL.md`](@warlock.js/access/manage-roles/SKILL.md) — assign / revoke with the ejected table.
+```
 
 
 ## define-policies  `@warlock.js/access/define-policies/SKILL.md`
@@ -169,13 +176,19 @@ RBAC says "can update orders". A **policy** adds "...but only THIS order" — th
 
 ## Register a condition
 
-```ts title="src/app/access/policies.ts (loaded once at boot)"
+Policies live **per module**, in `src/app/<module>/policies/`, and are loaded by an `import "./policies";` side-effect in that module's `main.ts` — a policy defined in an unimported file silently never registers.
+
+```ts title="src/app/orders/policies/index.ts"
 import { definePolicy } from "@warlock.js/access";
 
 definePolicy("orders.update", (user, order, ctx) =>
   order.get("organization_id") === ctx.tenant &&
   (order.get("customer_id") === user.id || ctx.hasRole("manager")),
 );
+```
+
+```ts title="src/app/orders/main.ts"
+import "./policies"; // register this module's policies at boot
 ```
 
 ## It runs ONLY on an instance check
@@ -185,7 +198,7 @@ await authorize(user, "orders.update"); //                     class-level → g
 await authorize(user, "orders.update", { resource: order }); // instance → grant AND policy
 ```
 
-So `requirePermission("orders.update")` (a route gate, no resource) checks the grant; the per-order rule runs in your service, after you load the order.
+So `gate("orders.update")` (a route gate, no resource) checks the grant; the per-order rule runs in your service, after you load the order.
 
 ## The decision = grant AND policy
 
@@ -226,34 +239,68 @@ definePolicy("orders.refund", (user, order, ctx) =>
 
 ---
 name: implement-resolver
-description: 'Connect `@warlock.js/access` to your role/permission storage by implementing the `AccessResolver` contract (`rolesOf` / `permissionsOf`) — for a user column, a pivot table, a token claim, an external directory, or a hybrid. The engine owns matching / caching / policies; the resolver only fetches. TRIGGER: `AccessResolver`, "custom resolver", "where do roles come from", "roles in a token claim", "permissions from an external API", "direct permissions per user", "implement resolver". Skip: the built-in resolvers — `@warlock.js/access/configure-access/SKILL.md`.'
+description: 'Connect `@warlock.js/access` to your role/permission storage by implementing the `AccessResolver` contract (`resolveRoles` / `resolvePermissions`, optional `resolveTenant`) — for a DB-backed catalog, a user column, a pivot table, a token claim, or an external directory. The engine owns matching / caching / policies; the resolver only fetches. TRIGGER: `AccessResolver`, `DatabaseAccessResolver`, `resolveTenant`, "custom resolver", "where do roles come from", "roles in a token claim", "permissions from an external API", "implement resolver". Skip: the quickstart `DefaultAccessResolver` — `@warlock.js/access/configure-access/SKILL.md`.'
 ---
 
 # Implement a resolver
 
-When neither built-in (`DefaultAccessResolver`, `ModelAccessResolver`) fits your storage, implement the contract. It's the ONE thing only you can write — your schema — and it's just a function over your own data. The engine does the rest.
+The resolver is the ONE thing only you can write — your schema — and it's just a function over your own data. The engine does matching, caching, policies, and fail-closed for you.
 
 ```ts
 export interface AccessResolver {
-  rolesOf(user: Auth, tenant?: string): Promise<string[]>; //       powers hasRole
-  permissionsOf(user: Auth, tenant?: string): Promise<string[]>; // powers can / authorize
+  resolveRoles(user: Auth, tenant?: string): Promise<string[]>; //       powers hasRole
+  resolvePermissions(user: Auth, tenant?: string): Promise<string[]>; // powers can / authorize
+  resolveTenant?(user: Auth): string | undefined; //                     optional ambient tenant
 }
 ```
 
 Register it: `access: { resolver: new MyResolver() }`.
 
-## Recipes
+## The default: dynamic, DB-backed (ejected)
+
+`npx warlock add access` ejects this `DatabaseAccessResolver` — roles come from the `user_roles` table, permissions are joined through the `roles` catalog table. This is what most apps run, because admins manage roles + permissions at runtime.
+
+```ts
+import type { AccessResolver } from "@warlock.js/access";
+import type { Auth } from "@warlock.js/auth";
+import { Role } from "app/access/models/role";
+import { UserRole } from "app/access/models/user-role";
+
+export class DatabaseAccessResolver implements AccessResolver {
+  public async resolveRoles(user: Auth, tenant?: string): Promise<string[]> {
+    return UserRole.rolesFor(user, tenant);
+  }
+
+  public async resolvePermissions(user: Auth, tenant?: string): Promise<string[]> {
+    const names = await this.resolveRoles(user, tenant);
+
+    if (names.length === 0) return [];
+
+    const roles = await Role.query().whereIn("name", names).get();
+
+    return [...new Set(roles.flatMap((role) => role.permissions))];
+  }
+
+  // Multi-tenant? Uncomment to scope checks to the user's tenant. Derive it from
+  // the user — never trust client-supplied request input for the tenant boundary:
+  // public resolveTenant(user: Auth): string | undefined {
+  //   return user.get("organization_id");
+  // }
+}
+```
+
+## Other recipes
 
 **A single role column, permissions mapped in code**
 
 ```ts
 class ColumnResolver implements AccessResolver {
   public constructor(private readonly roles: Record<string, string[]>) {}
-  async rolesOf(user) {
+  public async resolveRoles(user: Auth): Promise<string[]> {
     return [user.get("role")].filter(Boolean);
   }
-  async permissionsOf(user) {
-    return (await this.rolesOf(user)).flatMap((role) => this.roles[role] ?? []);
+  public async resolvePermissions(user: Auth): Promise<string[]> {
+    return (await this.resolveRoles(user)).flatMap((role) => this.roles[role] ?? []);
   }
 }
 ```
@@ -262,10 +309,10 @@ class ColumnResolver implements AccessResolver {
 
 ```ts
 class ClaimResolver implements AccessResolver {
-  async rolesOf(user) {
+  public async resolveRoles(user: Auth): Promise<string[]> {
     return user.get("decodedAccessToken")?.roles ?? [];
   }
-  async permissionsOf(user) {
+  public async resolvePermissions(user: Auth): Promise<string[]> {
     return user.get("decodedAccessToken")?.permissions ?? [];
   }
 }
@@ -275,10 +322,10 @@ class ClaimResolver implements AccessResolver {
 
 ```ts
 class DirectResolver implements AccessResolver {
-  async rolesOf(user) {
+  public async resolveRoles(user: Auth): Promise<string[]> {
     return [user.get("role")];
   }
-  async permissionsOf(user) {
+  public async resolvePermissions(user: Auth): Promise<string[]> {
     const rows = await UserPermission.query().where({ user_id: user.id }).get();
     return rows.map((row) => row.get("name") as string);
   }
@@ -289,36 +336,58 @@ class DirectResolver implements AccessResolver {
 
 - **Only fetch — never cache inside the resolver.** The engine caches per `(user, tenant)`; caching twice causes stale grants. Invalidate with `access.flush(user, tenant)` when your data changes.
 - Return plain `string[]`. Wildcards (`orders.*`, `*`) in the returned permissions are honored by the engine.
-- `rolesOf` and `permissionsOf` may read **different** sources — roles and permissions are independent axes (a role can be a pure label with permissions granted directly).
+- `resolveRoles` and `resolvePermissions` may read **different** sources — roles and permissions are independent axes (a role can be a pure label with permissions granted directly).
 - Throwing from the resolver fails the check **closed** (denied + logged).
 
 ## See also
 
-- [`@warlock.js/access/configure-access/SKILL.md`](@warlock.js/access/configure-access/SKILL.md) — the built-in resolvers.
+- [`@warlock.js/access/configure-access/SKILL.md`](@warlock.js/access/configure-access/SKILL.md) — the quickstart `DefaultAccessResolver`.
+```
 
 
 ## manage-roles  `@warlock.js/access/manage-roles/SKILL.md`
 
 ---
 name: manage-roles
-description: 'Assign and read roles in `@warlock.js/access` — `access.assign` / `access.revoke` (backed by the `user_roles` table) and `hasRole` / `hasAnyRole` / `hasAllRoles`. Covers the overridable `UserRole` model + migration and why to prefer permission checks. TRIGGER: `access.assign`, `access.revoke`, `hasRole`, `hasAnyRole`, `hasAllRoles`, `UserRole`, `UserRoleMigration`, "give a user a role", "assign role", "check a user role", "roles per tenant". Skip: permission checks — `@warlock.js/access/check-permissions/SKILL.md`; resolver choice — `@warlock.js/access/configure-access/SKILL.md`.'
+description: 'Assign and read roles in `@warlock.js/access` — the ejected `UserRole.assign` / `UserRole.revoke` (the `user_roles` table) followed by `access.flush`, plus `hasRole` / `hasAnyRole` / `hasAllRoles`. The role→permission catalog is the ejected `Role` table (dynamic). TRIGGER: `UserRole.assign`, `UserRole.revoke`, `access.flush`, `hasRole`, `hasAnyRole`, `hasAllRoles`, `Role` table, "give a user a role", "assign role", "check a user role", "roles per tenant". Skip: permission checks — `@warlock.js/access/check-permissions/SKILL.md`; resolver choice — `@warlock.js/access/configure-access/SKILL.md`.'
 ---
 
 # Manage roles
 
-## Assign / revoke (with the `user_roles` table)
+Role storage is **ejected into your app** (`npx warlock add access`): a `UserRole` table (who holds which role) and a `Role` catalog table (role → permissions). Both are dynamic — admins manage them at runtime. The package itself only reads them through the `DatabaseAccessResolver`.
 
-Use `ModelAccessResolver` (see [`configure-access`](@warlock.js/access/configure-access/SKILL.md)) and wire `UserRoleMigration` into `warlock.config.ts`. Then:
+## Assign / revoke
+
+Assign and revoke with the ejected `UserRole` model. Both **flush the affected user's cached set for you** — no manual `access.flush` after a role change:
+
+```ts
+import { UserRole } from "app/access/models/user-role";
+
+await UserRole.assign(user, "editor", "tenant-1"); // editor in tenant-1 (auto-flushes that user)
+await UserRole.assign(user, "viewer", "tenant-2"); // viewer in tenant-2 — same user, different role
+
+await UserRole.revoke(user, "editor", "tenant-1"); // auto-flushes too
+```
+
+The `tenant` arg is optional — omit it for single-tenant apps (roles are stored globally). In a **multi-tenant** app, always pass the tenant: an omitted or unresolved tenant scopes to *global* roles only, never the union across tenants.
+
+### When you still need `access.flush`
+
+`assign` / `revoke` cover the common case. The cache keys off `(user, tenant)`, so flush manually only for **out-of-band** changes those two methods can't see:
 
 ```ts
 import { access } from "@warlock.js/access";
 
-await access.assign(user, "editor", "tenant-1"); // editor in tenant-1
-await access.assign(user, "viewer", "tenant-2"); // viewer in tenant-2 — same user, different role
-await access.revoke(user, "editor", "tenant-1");
+// A role's permission set changed in the `Role` catalog — every holder's cached
+// permissions are now stale, so flush each affected user:
+await access.flush(user, "tenant-1");
+
+// You changed a user's role membership WITHOUT UserRole (e.g. wrote the user's
+// `role` column directly, or a bulk SQL update):
+await access.flush(user, "tenant-1");
 ```
 
-Both invalidate the user's cached set. The `tenant` arg is optional — omit it for single-tenant apps (roles are stored globally). In a **multi-tenant** app, always pass the tenant: an omitted or unresolved tenant scopes to *global* roles only, never the union across tenants.
+`access.flush(user, tenant)` is per-user — it has no "drop everything" form. For a sweeping catalog change with many holders, flush each affected user, or let the entries expire on their own (`cache.ttl`, default `10m`).
 
 ## Read roles
 
@@ -332,34 +401,30 @@ await hasAllRoles(user, ["staff", "verified"]);
 
 > **Prefer permission checks over role checks.** Role checks couple your code to the role taxonomy; `can(user, "orders.update")` survives a role rename. Reach for `hasRole` only for coarse UI gating.
 
+## The catalog (the `Role` table)
+
+A role's permissions live in the ejected `Role` table — `{ name, permissions }`. Add a role, or change what it grants, by writing rows; the `DatabaseAccessResolver` joins `user_roles` through it. No redeploy needed.
+
 ## The model (overridable)
 
-`UserRole` is a thin cascade model — `{ user_id, user_type, role, tenant }`. Extend + swap it to add columns:
-
-```ts
-export class AppUserRole extends UserRole {
-  public static schema = userRoleSchema.extend({ granted_by: v.scalar().optional() });
-}
-// then: new ModelAccessResolver(roles, AppUserRole)
-```
-
-`user_id` defaults to `uuid` — override `UserRoleMigration` if your user ids are integers.
+The ejected `UserRole` is a thin cascade model — `{ user_id, user_type, role, tenant }`. `user_id` defaults to `uuid` — edit the ejected migration in `src/app/access/models/user-role/migrations/` if your user ids are integers.
 
 ## Roles stored elsewhere?
 
-If roles live on the user (a `roles` column) or in a token claim, you don't use `access.assign` — you manage assignment your way and a resolver reads them. See [`implement-resolver`](@warlock.js/access/implement-resolver/SKILL.md).
+If roles live on the user (a `roles` column) or in a token claim, you don't use `UserRole` — you manage assignment your way and a resolver reads them. See [`implement-resolver`](@warlock.js/access/implement-resolver/SKILL.md).
 
 ## See also
 
 - [`@warlock.js/access/configure-access/SKILL.md`](@warlock.js/access/configure-access/SKILL.md) — choosing the resolver.
 - [`@warlock.js/access/implement-resolver/SKILL.md`](@warlock.js/access/implement-resolver/SKILL.md) — non-table role storage.
+```
 
 
 ## overview  `@warlock.js/access/overview/SKILL.md`
 
 ---
 name: overview
-description: 'Front-door for `@warlock.js/access` — authorization (RBAC + ABAC) for Warlock apps: `can` / `authorize` / `requirePermission` permission checks, `definePolicy` attribute conditions, role management, and a pluggable `AccessResolver` that connects the engine to however you store roles. Depends on `@warlock.js/auth` (reads `request.user`). TRIGGER when: importing from `@warlock.js/access`; "permissions in Warlock", "RBAC", "can this user do X", "protect a route by permission", "role-based access", "ownership / policy check". Skip: authentication / login (that is `@warlock.js/auth`); a known task — load the matching skill (`check-permissions`, `define-policies`, `manage-roles`, `implement-resolver`, `configure-access`).'
+description: 'Front-door for `@warlock.js/access` — authorization (RBAC + ABAC) for Warlock apps: `can` / `authorize` / `gate` permission checks, `definePolicy` attribute conditions, role management, and a pluggable `AccessResolver` that connects the engine to however you store roles. Depends on `@warlock.js/auth` (reads `request.user`). TRIGGER when: importing from `@warlock.js/access`; "permissions in Warlock", "RBAC", "can this user do X", "protect a route by permission", "role-based access", "ownership / policy check". Skip: authentication / login (that is `@warlock.js/auth`); a known task — load the matching skill (`check-permissions`, `define-policies`, `manage-roles`, `implement-resolver`, `configure-access`).'
 ---
 
 # `@warlock.js/access` — overview
@@ -368,7 +433,7 @@ Authorization for Warlock apps. `@warlock.js/auth` answers _who you are_; `acces
 
 ## The mental model in one paragraph
 
-The package owns the **engine** — wildcard matching, caching, ABAC policies, fail-closed decisions. You hand it **one adapter**, an `AccessResolver`, that reads a user's roles from however YOUR app stores them. Roles map to permissions in your code (the `roles` map). Then `can(user, "orders.update")` and `requirePermission("orders.update")` just work. The two concepts inside are **permissions** (RBAC grants) and **policies** (ABAC conditions) — which is why the package is called `access`, not either half.
+The package owns the **engine** — wildcard matching, caching, ABAC policies, fail-closed decisions. You hand it **one required adapter**, an `AccessResolver`, that reads a user's roles + permissions from however YOUR app stores them (the role→permission catalog lives inside the resolver). Then `can(user, "orders.update")` and `gate("orders.update")` just work. The two concepts inside are **permissions** (RBAC grants) and **policies** (ABAC conditions) — which is why the package is called `access`, not either half.
 
 ## When to reach for it
 
@@ -380,26 +445,26 @@ Skip if you only need "is the user an admin" — `authMiddleware("admin")` from 
 
 ## The two-stage model (important)
 
-- **Class-level** (no resource): _"can this user update orders at all?"_ → `requirePermission("orders.update")` in middleware, `can(user, "orders.update")` in code. Cheap, cached, runs before the controller.
+- **Class-level** (no resource): _"can this user update orders at all?"_ → `gate("orders.update")` in middleware, `can(user, "orders.update")` in code. Cheap, cached, runs before the controller.
 - **Instance-level** (a resource): _"can they update THIS order?"_ → `authorize(user, "orders.update", { resource: order })` in the service, after you load the row. Runs the registered policy on top of the grant.
 
 ## Skills index
 
-- [`configure-access`](@warlock.js/access/configure-access/SKILL.md) — the `roles` map, the resolver, `tenant` + cache config.
-- [`check-permissions`](@warlock.js/access/check-permissions/SKILL.md) — `can` / `cannot` / `canAll` / `canAny` / `authorize*` + the `require*Permission(s)` middleware.
+- [`configure-access`](@warlock.js/access/configure-access/SKILL.md) — the required resolver (`DefaultAccessResolver` vs the ejected `DatabaseAccessResolver`), cache + tenant.
+- [`check-permissions`](@warlock.js/access/check-permissions/SKILL.md) — `can` / `cannot` / `canAll` / `canAny` / `authorize*` + the `gate*` middleware.
 - [`define-policies`](@warlock.js/access/define-policies/SKILL.md) — `definePolicy` for ownership / tenant / state conditions (ABAC).
-- [`manage-roles`](@warlock.js/access/manage-roles/SKILL.md) — assign / revoke roles + `hasRole` / `hasAnyRole` / `hasAllRoles` + the `UserRole` table.
-- [`implement-resolver`](@warlock.js/access/implement-resolver/SKILL.md) — connect the engine to your storage (a column, a pivot, a token claim).
+- [`manage-roles`](@warlock.js/access/manage-roles/SKILL.md) — assign / revoke via the ejected `UserRole` + `access.flush`, `hasRole` / `hasAnyRole` / `hasAllRoles`.
+- [`implement-resolver`](@warlock.js/access/implement-resolver/SKILL.md) — connect the engine to your storage (a DB catalog, a column, a pivot, a token claim).
 
 ## What it deliberately doesn't do
 
 - **Authentication.** Use `@warlock.js/auth`; `access` reads `request.user`.
-- **A runtime permission admin UI.** Permissions are code-defined strings (your catalog).
+- **Ship a permission admin UI.** The engine reads permission strings; whether the catalog is code-defined (`DefaultAccessResolver`) or DB-managed (the ejected `DatabaseAccessResolver`) is your resolver's choice — the package ships no admin screens.
 - **ReBAC graphs / row-level query scoping.** Use a policy for "own resource"; graph-scale relationships are out of scope.
 
 ## See also
 
 - [`@warlock.js/auth/overview/SKILL.md`](@warlock.js/auth/overview/SKILL.md) — authentication, the layer below.
-- [`@warlock.js/auth/protect-routes/SKILL.md`](@warlock.js/auth/protect-routes/SKILL.md) — `authMiddleware`; stack `requirePermission` after it.
+- [`@warlock.js/auth/protect-routes/SKILL.md`](@warlock.js/auth/protect-routes/SKILL.md) — `authMiddleware`; stack `gate` after it.
 
 

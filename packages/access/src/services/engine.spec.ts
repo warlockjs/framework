@@ -21,22 +21,14 @@ vi.mock("@warlock.js/logger", () => ({
   log: { error: vi.fn() },
 }));
 
-const configValues: Record<string, unknown> = {};
-
-vi.mock("@warlock.js/core", () => ({
-  config: {
-    key: (path: string, fallback?: unknown) =>
-      path in configValues ? configValues[path] : fallback,
-  },
-}));
-
 import { log } from "@warlock.js/logger";
-import { resetAccessConfig } from "./access-config";
 import { check, flush, permissionsFor, rolesFor } from "./engine";
 import { clearPolicies, definePolicy } from "./policies";
+import { resetAccessConfig, setAccessConfig } from "./access-config";
+import { AccessConfigError } from "../utils/access-config-error";
 
-const permissionsOf = vi.fn(async () => ["orders.*"]);
-const rolesOf = vi.fn(async () => ["editor"]);
+const resolvePermissions = vi.fn(async () => ["orders.*"]);
+const resolveRoles = vi.fn(async () => ["editor"]);
 
 const user = { id: 1, userType: "user" } as never;
 
@@ -44,16 +36,14 @@ beforeEach(() => {
   store.clear();
   vi.clearAllMocks();
   clearPolicies();
-  resetAccessConfig();
-  permissionsOf.mockResolvedValue(["orders.*"]);
-  rolesOf.mockResolvedValue(["editor"]);
-  configValues["access.resolver"] = { permissionsOf, rolesOf };
-  delete configValues["access.cacheTtl"];
-  delete configValues["access.tenant.resolve"];
+  resolvePermissions.mockResolvedValue(["orders.*"]);
+  resolveRoles.mockResolvedValue(["editor"]);
+  setAccessConfig({ resolver: { resolvePermissions, resolveRoles } });
 });
 
 afterEach(() => {
   clearPolicies();
+  resetAccessConfig();
 });
 
 describe("permissionsFor (caching)", () => {
@@ -63,7 +53,7 @@ describe("permissionsFor (caching)", () => {
 
     expect(first).toEqual(["orders.*"]);
     expect(second).toEqual(["orders.*"]);
-    expect(permissionsOf).toHaveBeenCalledTimes(1);
+    expect(resolvePermissions).toHaveBeenCalledTimes(1);
     expect(cacheSet).toHaveBeenCalledTimes(1);
   });
 
@@ -85,7 +75,7 @@ describe("cache is best-effort", () => {
     const result = await permissionsFor(user);
 
     expect(result).toEqual(["orders.*"]);
-    expect(permissionsOf).toHaveBeenCalledTimes(1);
+    expect(resolvePermissions).toHaveBeenCalledTimes(1);
     expect(log.error).toHaveBeenCalled();
   });
 });
@@ -110,11 +100,17 @@ describe("check — grant matching", () => {
 });
 
 describe("check — fail closed", () => {
-  it("denies and logs when the resolver throws", async () => {
-    permissionsOf.mockRejectedValueOnce(new Error("db down"));
+  it("denies and logs when the resolver throws a generic error", async () => {
+    resolvePermissions.mockRejectedValueOnce(new Error("db down"));
 
     expect(await check(user, "orders.update")).toBe(false);
     expect(log.error).toHaveBeenCalled();
+  });
+
+  it("re-throws AccessConfigError instead of swallowing it to a silent deny", async () => {
+    resolvePermissions.mockRejectedValueOnce(new AccessConfigError("no resolver"));
+
+    await expect(check(user, "orders.update")).rejects.toBeInstanceOf(AccessConfigError);
   });
 });
 
@@ -136,7 +132,7 @@ describe("check — policies", () => {
     definePolicy("orders.update", () => true);
 
     // grant missing → policy never consulted
-    permissionsOf.mockResolvedValue(["posts.*"]);
+    resolvePermissions.mockResolvedValue(["posts.*"]);
 
     expect(await check(user, "orders.update", { resource: { id: 9 } })).toBe(false);
   });
@@ -163,7 +159,7 @@ describe("rolesFor", () => {
   it("resolves and caches the role list", async () => {
     expect(await rolesFor(user)).toEqual(["editor"]);
     expect(await rolesFor(user)).toEqual(["editor"]);
-    expect(rolesOf).toHaveBeenCalledTimes(1);
+    expect(resolveRoles).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -174,7 +170,7 @@ describe("engine — best-effort cache (write + flush failure)", () => {
     const result = await permissionsFor(user);
 
     expect(result).toEqual(["orders.*"]);
-    expect(permissionsOf).toHaveBeenCalledTimes(1);
+    expect(resolvePermissions).toHaveBeenCalledTimes(1);
     expect(log.error).toHaveBeenCalled();
   });
 
@@ -188,16 +184,16 @@ describe("engine — best-effort cache (write + flush failure)", () => {
   it("serves the cached set on a later resolver outage (real read-through)", async () => {
     await permissionsFor(user); // populate
 
-    permissionsOf.mockRejectedValue(new Error("db down"));
+    resolvePermissions.mockRejectedValue(new Error("db down"));
 
     expect(await permissionsFor(user)).toEqual(["orders.*"]); // served from cache
-    expect(permissionsOf).toHaveBeenCalledTimes(1); // resolver not re-hit
+    expect(resolvePermissions).toHaveBeenCalledTimes(1); // resolver not re-hit
   });
 });
 
 describe("engine — ambient tenant + policy helpers", () => {
-  it("resolves the ambient tenant via the config hook into the cache key", async () => {
-    configValues["access.tenant.resolve"] = () => "ambient-t";
+  it("resolves the ambient tenant via the resolver's resolveTenant into the cache key", async () => {
+    setAccessConfig({ resolver: { resolvePermissions, resolveRoles, resolveTenant: () => "ambient-t" } });
 
     await check(user, "orders.update");
 

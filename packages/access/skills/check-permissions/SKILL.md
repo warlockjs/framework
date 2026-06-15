@@ -1,6 +1,6 @@
 ---
 name: check-permissions
-description: 'Check permissions in `@warlock.js/access` — `can` / `cannot` / `canAll` / `canAny` (boolean), `authorize` / `authorizeAll` / `authorizeAny` (throw 403), and the `requirePermission` / `requireAny` / `requireAll` route middleware. Class-level vs instance-level (pass a `resource` to run its policy). TRIGGER: `can(`, `authorize(`, `canAll`, `canAny`, `requirePermission`, `requireAny`, `requireAll`, "check a permission", "protect route by permission", "403 forbidden", "any vs all permissions". Skip: ownership / tenant conditions — `@warlock.js/access/define-policies/SKILL.md`; role checks — `@warlock.js/access/manage-roles/SKILL.md`.'
+description: 'Check permissions in `@warlock.js/access` — `can` / `cannot` / `canAll` / `canAny` (boolean), `authorize` / `authorizeAll` / `authorizeAny` (throw 403), and the `gate` / `gateAny` / `gateAll` route middleware. Class-level vs instance-level (pass a `resource` to run its policy). TRIGGER: `can(`, `authorize(`, `canAll`, `canAny`, `gate`, `gateAny`, `gateAll`, "check a permission", "protect route by permission", "403 forbidden", "any vs all permissions". Skip: ownership / tenant conditions — `@warlock.js/access/define-policies/SKILL.md`; role checks — `@warlock.js/access/manage-roles/SKILL.md`.'
 ---
 
 # Check permissions
@@ -11,14 +11,14 @@ Stack it AFTER `authMiddleware` (which sets `request.user`):
 
 ```ts
 import { authMiddleware } from "@warlock.js/auth";
-import { requirePermission } from "@warlock.js/access";
+import { gate } from "@warlock.js/access";
 
 router.post("/orders", createOrder, {
-  middleware: [authMiddleware([]), requirePermission("orders.create")],
+  middleware: [authMiddleware([]), gate("orders.create")],
 });
 ```
 
-A missing permission → `403` before your controller runs. Use `requireAny([...])` / `requireAll([...])` for sets.
+A missing permission → `403` before your controller runs. Use `gateAny([...])` / `gateAll([...])` for sets.
 
 ## In code — boolean
 
@@ -31,7 +31,7 @@ await canAll(user, ["orders.update", "orders.viewCost"]); // needs BOTH
 await canAny(user, ["orders.update", "orders.updateStatus"]); // needs EITHER
 ```
 
-> **Multi-permission checks are named, never defaulted.** Use `canAll` / `canAny` (and `requireAll` / `requireAny`). There is no `can(user, [array])` — a wrong implicit any/all default is a silent privilege-escalation or a lockout.
+> **Multi-permission checks are named, never defaulted.** Use `canAll` / `canAny` (and `gateAll` / `gateAny`). There is no `can(user, [array])` — a wrong implicit any/all default is a silent privilege-escalation or a lockout.
 
 ## In a service — throw
 
@@ -52,17 +52,17 @@ const order = await Order.find(orderId);
 await authorize(user, "orders.update", { resource: order, tenant }); // grant AND policy
 ```
 
-- `requirePermission` is **class-level only** — no resource, runs before the controller ("can they update orders at all?").
+- `gate` is **class-level only** — no resource, runs before the controller ("can they update orders at all?").
 - `authorize(…, { resource })` is **instance-level** — after you load the row ("can they update THIS order?").
 
 ## Wildcards
 
-`*` grants everything; `orders.*` covers `orders.update` and any nested `orders.update.status`. Give a role `["*"]` to make it a super-admin.
+`*` grants everything; `orders.*` covers `orders.update` and any nested `orders.update.status` — but **not** the bare `orders` (the prefix needs a trailing `.`, so granting `orders.*` and checking `orders` is silently denied). Give a role `["*"]` to make it a super-admin.
 
 ## Gotchas
 
-- **Fails closed.** Any error resolving the decision → denied (and logged). A user with no roles is denied, never allowed by accident.
-- Stack `requirePermission` **after** `authMiddleware` — it reads `request.user`; without an authenticated user it `403`s.
+- **Fails closed, but config errors are loud.** A resolver or policy that throws → denied and logged (a user with no roles is denied, never allowed by accident). The one exception: `AccessConfigError` (e.g. no resolver configured) is **re-thrown**, not denied — a misconfig must surface, not hide. A cache outage is different again: it degrades to the resolver (the cache fails *open*; the decision still fails closed).
+- Stack `gate` **after** `authMiddleware` — it reads `request.user`; without an authenticated user it `403`s.
 - The boolean `can*` family never throws; the `authorize*` family throws `ForbiddenError`. Pick per layer (controllers gate with middleware, services assert with `authorize`).
 
 ## See also

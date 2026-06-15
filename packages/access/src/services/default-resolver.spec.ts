@@ -11,7 +11,7 @@ describe("DefaultAccessResolver", () => {
   it("reads a `roles` array column", async () => {
     const resolver = new DefaultAccessResolver(roles);
 
-    expect(await resolver.rolesOf(user({ roles: ["editor", "viewer"] }))).toEqual([
+    expect(await resolver.resolveRoles(user({ roles: ["editor", "viewer"] }))).toEqual([
       "editor",
       "viewer",
     ]);
@@ -20,19 +20,19 @@ describe("DefaultAccessResolver", () => {
   it("reads a single `role` string column", async () => {
     const resolver = new DefaultAccessResolver(roles);
 
-    expect(await resolver.rolesOf(user({ role: "editor" }))).toEqual(["editor"]);
+    expect(await resolver.resolveRoles(user({ role: "editor" }))).toEqual(["editor"]);
   });
 
   it("returns no roles when neither field is present", async () => {
     const resolver = new DefaultAccessResolver(roles);
 
-    expect(await resolver.rolesOf(user({}))).toEqual([]);
+    expect(await resolver.resolveRoles(user({}))).toEqual([]);
   });
 
   it("maps roles to the union of their permissions", async () => {
     const resolver = new DefaultAccessResolver(roles);
 
-    expect(await resolver.permissionsOf(user({ roles: ["editor", "viewer"] }))).toEqual([
+    expect(await resolver.resolvePermissions(user({ roles: ["editor", "viewer"] }))).toEqual([
       "orders.*",
       "posts.create",
       "orders.view",
@@ -42,12 +42,12 @@ describe("DefaultAccessResolver", () => {
   it("ignores unknown roles when mapping permissions", async () => {
     const resolver = new DefaultAccessResolver(roles);
 
-    expect(await resolver.permissionsOf(user({ roles: ["ghost"] }))).toEqual([]);
+    expect(await resolver.resolvePermissions(user({ roles: ["ghost"] }))).toEqual([]);
   });
 
   it("honours a custom readRoles function", async () => {
     const resolver = new DefaultAccessResolver({ a: ["x"] }, (u) => u.get("memberRoles"));
 
-    expect(await resolver.rolesOf(user({ memberRoles: ["a"] }))).toEqual(["a"]);
+    expect(await resolver.resolveRoles(user({ memberRoles: ["a"] }))).toEqual(["a"]);
   });
 });

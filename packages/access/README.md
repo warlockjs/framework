@@ -1,44 +1,53 @@
 # Warlock Access
 
-Authorization (RBAC + ABAC) for [Warlock.js](https://github.com/warlockjs/core) applications — permission checks (`can` / `authorize` / `requirePermission`), attribute-based `definePolicy` conditions, role management, and a pluggable `AccessResolver` that connects the engine to however your app stores roles.
+Authorization (RBAC + ABAC) for [Warlock.js](https://github.com/warlockjs/core) applications — permission checks (`can` / `authorize` / `gate`), attribute-based `definePolicy` conditions, role checks, and a pluggable `AccessResolver` that connects the engine to however your app stores roles.
 
 `@warlock.js/auth` answers _who you are_; `@warlock.js/access` answers _what you can do_.
 
 ## Installation
 
 ```bash
-yarn add @warlock.js/access
+npx warlock add access
 ```
 
-`@warlock.js/access` reads `request.user`, so install it inside a Warlock project alongside `@warlock.js/auth`.
+This ejects `src/config/access.ts`, a DB-backed `DatabaseAccessResolver`, the `Role` + `UserRole` tables, and registers the locale. `@warlock.js/access` reads `request.user`, so it lives inside a Warlock project alongside `@warlock.js/auth`.
 
 ## Configure
 
+The resolver is the **one required piece** — it tells the engine how to read a user's roles + permissions. The ejected `DatabaseAccessResolver` reads roles from the `user_roles` table and maps them through the `roles` catalog table (so roles + their permissions are managed at runtime, in the DB):
+
 ```ts title="src/config/access.ts"
 import { type AccessConfigurations } from "@warlock.js/access";
+import { DatabaseAccessResolver } from "app/access/services/access-resolver";
 
 const access: AccessConfigurations = {
-  roles: {
-    owner: ["*"], //                          `*` is the super-grant
-    editor: ["orders.*", "posts.create"], //  `orders.*` covers orders.update, orders.view, …
-    viewer: ["orders.view"],
-  },
+  resolver: new DatabaseAccessResolver(),
 };
 
 export default access;
 ```
 
-The built-in resolver reads a user's roles from `user.get("roles")` (or a single `user.get("role")`) and maps them through the `roles` catalog. For a `user_roles` table or any other storage, swap the resolver — see the `configure-access` and `implement-resolver` skills.
+For a fixed, code-defined catalog with no tables, swap in `DefaultAccessResolver` (reads `user.get("roles")` and maps through an inline map):
+
+```ts
+import { DefaultAccessResolver } from "@warlock.js/access";
+
+const access: AccessConfigurations = {
+  resolver: new DefaultAccessResolver({ owner: ["*"], editor: ["orders.*"] }),
+};
+```
+
+See the `configure-access` and `implement-resolver` skills for the full story.
 
 ## Use it
 
 ```ts
 import { authMiddleware } from "@warlock.js/auth";
-import { authorize, can, definePolicy, requirePermission } from "@warlock.js/access";
+import { authorize, can, definePolicy, gate } from "@warlock.js/access";
 
 // route gate (class-level)
 router.post("/orders", createOrder, {
-  middleware: [authMiddleware([]), requirePermission("orders.create")],
+  middleware: [authMiddleware([]), gate("orders.create")],
 });
 
 // in a service (instance-level — runs the policy)
@@ -49,18 +58,18 @@ await authorize(user, "orders.update", { resource: order });
 if (await can(user, "orders.viewCost")) { /* … */ }
 ```
 
-> Register `definePolicy` calls in a boot side-effect file that is actually imported (e.g. `src/app/access/policies.ts`, imported from your `main.ts`) — a policy defined in an unimported module silently never registers.
+> Register `definePolicy` calls per module, in `src/app/<module>/policies/`, loaded by an `import "./policies";` side-effect in that module's `main.ts` — a policy defined in an unimported module silently never registers.
 
 ## Documentation
 
 Task-focused guides live under [`skills/`](./skills):
 
 - **overview** — what the package does and the engine + resolver mental model
-- **configure-access** — the `roles` map, the resolver, tenant + cache
-- **check-permissions** — `can` / `authorize` / `requirePermission` and friends
+- **configure-access** — the required resolver (`DefaultAccessResolver` vs the ejected `DatabaseAccessResolver`), cache + tenant
+- **check-permissions** — `can` / `authorize` / `gate` and friends
 - **define-policies** — attribute conditions (ownership / tenant / state)
-- **manage-roles** — assign / revoke roles + `hasRole` and the `UserRole` table
-- **implement-resolver** — connect the engine to your storage (column, pivot, token claim)
+- **manage-roles** — assign / revoke via the ejected `UserRole` (auto-flushes), plus `hasRole` and out-of-band `access.flush`
+- **implement-resolver** — connect the engine to your storage (DB catalog, column, pivot, token claim)
 
 ## License
 

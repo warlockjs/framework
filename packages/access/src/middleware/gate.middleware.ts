@@ -15,10 +15,10 @@ function deny(response: Response) {
  *
  * @example
  * router.post("/orders", createOrder, {
- *   middleware: [authMiddleware([]), requirePermission("orders.create")],
+ *   middleware: [authMiddleware([]), gate("orders.create")],
  * });
  */
-export function requirePermission(permission: string): Middleware {
+export function gate(permission: string): Middleware {
   return async (request: Request, response: Response) => {
     if (!request.user) return deny(response);
 
@@ -27,7 +27,7 @@ export function requirePermission(permission: string): Middleware {
 }
 
 /** Gate a route on holding ANY of the listed permissions. */
-export function requireAny(permissions: string[]): Middleware {
+export function gateAny(permissions: string[]): Middleware {
   return async (request: Request, response: Response) => {
     if (!request.user) return deny(response);
 
@@ -36,7 +36,7 @@ export function requireAny(permissions: string[]): Middleware {
 }
 
 /** Gate a route on holding ALL of the listed permissions. */
-export function requireAll(permissions: string[]): Middleware {
+export function gateAll(permissions: string[]): Middleware {
   return async (request: Request, response: Response) => {
     if (!request.user) return deny(response);
 

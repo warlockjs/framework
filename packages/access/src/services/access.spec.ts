@@ -10,16 +10,6 @@ vi.mock("./engine", () => ({
   flush: (...args: unknown[]) => flush(...args),
 }));
 
-const userRoleAssign = vi.fn();
-const userRoleRevoke = vi.fn();
-
-vi.mock("../models/user-role.model", () => ({
-  UserRole: {
-    assign: (...args: unknown[]) => userRoleAssign(...args),
-    revoke: (...args: unknown[]) => userRoleRevoke(...args),
-  },
-}));
-
 vi.mock("@warlock.js/core", () => ({
   t: (key: string) => key,
   ForbiddenError: class ForbiddenError extends Error {
@@ -35,7 +25,6 @@ vi.mock("@warlock.js/core", () => ({
 import { ForbiddenError } from "@warlock.js/core";
 import { AccessErrorCodes } from "../utils/access-error-codes";
 import {
-  access,
   authorize,
   authorizeAll,
   authorizeAny,
@@ -127,6 +116,18 @@ describe("authorize variants", () => {
 
     await expect(authorizeAny(user, ["a", "b"])).rejects.toBeInstanceOf(ForbiddenError);
   });
+
+  it("authorizeAll resolves when every permission passes", async () => {
+    check.mockResolvedValue(true);
+
+    await expect(authorizeAll(user, ["a", "b"])).resolves.toBeUndefined();
+  });
+
+  it("authorizeAny resolves when at least one permission passes", async () => {
+    check.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+    await expect(authorizeAny(user, ["a", "b"])).resolves.toBeUndefined();
+  });
 });
 
 describe("role checks", () => {
@@ -147,21 +148,5 @@ describe("role checks", () => {
   it("hasAllRoles", async () => {
     expect(await hasAllRoles(user, ["editor", "viewer"])).toBe(true);
     expect(await hasAllRoles(user, ["editor", "admin"])).toBe(false);
-  });
-});
-
-describe("access.assign / revoke", () => {
-  it("assign writes the role then flushes the cached set", async () => {
-    await access.assign(user, "editor", "t1");
-
-    expect(userRoleAssign).toHaveBeenCalledWith(user, "editor", "t1");
-    expect(flush).toHaveBeenCalledWith(user, "t1");
-  });
-
-  it("revoke deletes the role then flushes the cached set", async () => {
-    await access.revoke(user, "editor");
-
-    expect(userRoleRevoke).toHaveBeenCalledWith(user, "editor", undefined);
-    expect(flush).toHaveBeenCalledWith(user, undefined);
   });
 });

@@ -2,6 +2,7 @@ import type { Auth } from "@warlock.js/auth";
 import { cache } from "@warlock.js/cache";
 import { log } from "@warlock.js/logger";
 import type { AccessContext } from "../contracts/types";
+import { AccessConfigError } from "../utils/access-config-error";
 import { accessConfig } from "./access-config";
 import { matchesPermission } from "./matcher";
 import { getPolicy } from "./policies";
@@ -10,8 +11,8 @@ const PERMISSIONS_PREFIX = "access.perms.";
 const ROLES_PREFIX = "access.roles.";
 
 /** Resolve the effective tenant for a check (explicit → ambient → undefined). */
-function tenantFor(context: AccessContext): string | undefined {
-  return context.tenant ?? accessConfig.tenant();
+function tenantFor(user: Auth, context: AccessContext): string | undefined {
+  return context.tenant ?? accessConfig.tenant(user);
 }
 
 function cacheKey(prefix: string, user: Auth, tenant?: string): string {
@@ -29,7 +30,10 @@ function cacheKey(prefix: string, user: Auth, tenant?: string): string {
  * source of truth) and is logged, never denied. A loader failure propagates —
  * so the DECISION fails closed in {@link check}.
  */
-async function cached(key: string, loader: () => Promise<string[]>): Promise<string[]> {
+async function cached(
+  key: string,
+  loader: () => Promise<string[]>,
+): Promise<string[]> {
   try {
     const hit = await cache.get<string[]>(key);
 
@@ -52,18 +56,18 @@ async function cached(key: string, loader: () => Promise<string[]>): Promise<str
 /** The user's effective permission set for a tenant (cached). */
 export function permissionsFor(user: Auth, tenant?: string): Promise<string[]> {
   return cached(cacheKey(PERMISSIONS_PREFIX, user, tenant), () =>
-    accessConfig.resolver().permissionsOf(user, tenant),
+    accessConfig.resolver().resolvePermissions(user, tenant),
   );
 }
 
 /** The user's roles for a tenant (cached). */
 export function rolesFor(user: Auth, tenant?: string): Promise<string[]> {
   return cached(cacheKey(ROLES_PREFIX, user, tenant), () =>
-    accessConfig.resolver().rolesOf(user, tenant),
+    accessConfig.resolver().resolveRoles(user, tenant),
   );
 }
 
-/** Drop the cached role/permission sets for a user (call after assign/revoke). */
+/** Drop the cached role/permission sets for a user (after any out-of-band role change). */
 export async function flush(user: Auth, tenant?: string): Promise<void> {
   try {
     await cache.remove(cacheKey(PERMISSIONS_PREFIX, user, tenant));
@@ -85,7 +89,7 @@ export async function check(
   context: AccessContext = {},
 ): Promise<boolean> {
   try {
-    const tenant = tenantFor(context);
+    const tenant = tenantFor(user, context);
     const permissions = await permissionsFor(user, tenant);
 
     if (!matchesPermission(permissions, permission)) return false;
@@ -93,7 +97,7 @@ export async function check(
     const policy = getPolicy(permission);
 
     // A policy only runs on an instance check (a resource was supplied);
-    // class-level checks (`requirePermission`) stop at the grant.
+    // class-level checks (`gate`) stop at the grant.
     if (policy === undefined || context.resource === undefined) return true;
 
     const roles = await rolesFor(user, tenant);
@@ -107,6 +111,8 @@ export async function check(
       }),
     );
   } catch (error) {
+    if (error instanceof AccessConfigError) throw error; // misconfig is loud, not a silent deny
+
     log.error("access", "check", error);
 
     return false;
