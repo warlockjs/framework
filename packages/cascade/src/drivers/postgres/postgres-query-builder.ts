@@ -808,14 +808,18 @@ export class PostgresQueryBuilder<T = unknown>
   public async increment(field: string, amount = 1): Promise<number> {
     this.applyPendingScopes();
     const { sql: filterSql, params: filterParams } = this.buildFilter();
+    // The filter's placeholders are numbered $1..$N, so the amount must bind
+    // AFTER them as $N+1 — otherwise it collides with the first filter param
+    // (e.g. `... + $1 WHERE id = $1`) and the wrong value lands in each slot.
+    const amountPlaceholder = `$${filterParams.length + 1}`;
     const updateSql =
       `UPDATE ${this.driver.dialect.quoteIdentifier(this.table)} ` +
-      `SET ${this.driver.dialect.quoteIdentifier(field)} = COALESCE(${this.driver.dialect.quoteIdentifier(field)}, 0) + $1 ` +
+      `SET ${this.driver.dialect.quoteIdentifier(field)} = COALESCE(${this.driver.dialect.quoteIdentifier(field)}, 0) + ${amountPlaceholder} ` +
       (filterSql ? `WHERE ${filterSql.replace("WHERE ", "")} ` : "") +
       `RETURNING ${this.driver.dialect.quoteIdentifier(field)}`;
     const result = await this.driver.query<Record<string, number>>(updateSql, [
-      amount,
       ...filterParams,
+      amount,
     ]);
     return result.rows[0]?.[field] ?? 0;
   }
@@ -829,11 +833,13 @@ export class PostgresQueryBuilder<T = unknown>
   public async incrementMany(field: string, amount = 1): Promise<number> {
     this.applyPendingScopes();
     const { sql: filterSql, params: filterParams } = this.buildFilter();
+    // Amount binds last ($N+1) so it never collides with the filter's $1..$N.
+    const amountPlaceholder = `$${filterParams.length + 1}`;
     const updateSql =
       `UPDATE ${this.driver.dialect.quoteIdentifier(this.table)} ` +
-      `SET ${this.driver.dialect.quoteIdentifier(field)} = COALESCE(${this.driver.dialect.quoteIdentifier(field)}, 0) + $1` +
+      `SET ${this.driver.dialect.quoteIdentifier(field)} = COALESCE(${this.driver.dialect.quoteIdentifier(field)}, 0) + ${amountPlaceholder}` +
       (filterSql ? ` WHERE ${filterSql.replace("WHERE ", "")}` : "");
-    const result = await this.driver.query(updateSql, [amount, ...filterParams]);
+    const result = await this.driver.query(updateSql, [...filterParams, amount]);
     return result.rowCount ?? 0;
   }
 
