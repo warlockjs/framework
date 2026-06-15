@@ -155,9 +155,12 @@ async function main() {
   const seenPackages = new Map();
   const scanned = [];
 
+  // Each version bucket groups changes BY PACKAGE: pkgs is a Map<slug, {name,
+  // slug, byType: Map<type, html[]>}>. order preserves first-seen package order
+  // for stable output.
   const bucketFor = (version) => {
     if (!byVersion.has(version)) {
-      byVersion.set(version, { date: null, typed: new Map(), present: [] });
+      byVersion.set(version, { date: null, pkgs: new Map(), present: [] });
     }
     return byVersion.get(version);
   };
@@ -188,14 +191,16 @@ async function main() {
       bucket.present.push({ name: pkg.name, slug });
       seenPackages.set(slug, pkg.name);
 
-      // Fold this package's typed changes into the release's type buckets.
+      // Fold this package's typed changes under the package (then by type).
       for (const cat of v.categories) {
         if (!cat.title || !cat.items.length) continue; // skip loose/empty
-        if (!bucket.typed.has(cat.title)) bucket.typed.set(cat.title, []);
-        const arr = bucket.typed.get(cat.title);
-        for (const item of cat.items) {
-          arr.push({ package: pkg.name, slug, html: renderInline(item) });
+        if (!bucket.pkgs.has(slug)) {
+          bucket.pkgs.set(slug, { name: pkg.name, slug, byType: new Map() });
         }
+        const byType = bucket.pkgs.get(slug).byType;
+        if (!byType.has(cat.title)) byType.set(cat.title, []);
+        const arr = byType.get(cat.title);
+        for (const item of cat.items) arr.push(renderInline(item));
       }
     }
   }
@@ -218,28 +223,36 @@ async function main() {
     const date = m.date || bucket.date || null;
     const summaryHtml = m.summary ? renderInline(m.summary) : null;
 
-    const sections = TYPE_ORDER.filter((t) => bucket.typed.has(t)).map((type) => {
-      const items = bucket.typed
-        .get(type)
-        .slice()
-        .sort((a, b) => a.package.localeCompare(b.package));
-      items.forEach((it) => shownSlugs.add(it.slug));
-      return { type, items };
+    // Group BY PACKAGE: one block per package, with per-type counts + a
+    // type-tagged item list (ordered by TYPE_ORDER within the package).
+    const pkgBlocks = [...bucket.pkgs.values()].map((p) => {
+      const counts = [];
+      const items = [];
+      for (const type of TYPE_ORDER) {
+        const arr = p.byType.get(type);
+        if (!arr || !arr.length) continue;
+        counts.push({ type, n: arr.length });
+        for (const html of arr) items.push({ type, html });
+      }
+      shownSlugs.add(p.slug);
+      return { name: p.name, slug: p.slug, total: items.length, counts, items };
     });
 
-    const mode = sections.length ? "detail" : "compact";
+    // Featured packages (per-release `featured` in releases.json) float to the
+    // top in the listed order; the rest follow most-changed-first, then alpha.
+    const featured = Array.isArray(m.featured) ? m.featured : [];
+    const featuredRank = (name) => {
+      const i = featured.indexOf(name);
+      return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+    };
+    pkgBlocks.sort(
+      (a, b) =>
+        featuredRank(a.name) - featuredRank(b.name) ||
+        b.total - a.total ||
+        a.name.localeCompare(b.name),
+    );
 
-    // Compact (no typed changes): list the packages the release covers as chips.
-    const seen = new Set();
-    const chips = [];
-    if (mode === "compact") {
-      for (const p of bucket.present) {
-        if (seen.has(p.slug)) continue;
-        seen.add(p.slug);
-        shownSlugs.add(p.slug);
-        chips.push(p);
-      }
-    }
+    const mode = pkgBlocks.length ? "detail" : "notes";
 
     return {
       version: /unreleased/i.test(version) ? "Unreleased" : version,
@@ -248,8 +261,7 @@ async function main() {
       isUnreleased: /unreleased/i.test(version),
       summaryHtml,
       mode,
-      sections,
-      chips,
+      packages: pkgBlocks,
     };
   });
 

@@ -40,6 +40,50 @@
   ],
   "releases": [
     {
+      "version": "4.2.1",
+      "id": "v4-2-1",
+      "date": "June 15, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "Patch release: <strong><code>@warlock.js/core</code></strong> and <strong><code>@warlock.js/cascade</code></strong> now ship their <code>bin</code> folder, so the <code>warlock</code> and <code>cascade</code> CLIs work from the published package — they were omitted from the 4.2.0 build. The rest of the family is re-published at 4.2.1 to keep the lockstep version line; no other functional changes.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Ship the <code>bin</code> folder so the <code>warlock</code> CLI works from the published package — it was omitted from the 4.2.0 build."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Ship the <code>bin</code> folder so the <code>cascade</code> CLI works from the published package — it was omitted from the 4.2.0 build."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "4.2.0",
       "id": "v4-2-0",
       "date": "June 15, 2026",
