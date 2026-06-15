@@ -74,6 +74,22 @@ describe("SentryLog", () => {
     });
   });
 
+  describe("initialization timing", () => {
+    it("resolves an injected client synchronously — a log before init() still sends", async () => {
+      const fake = createFakeSentry();
+
+      // Construct and log on the SAME tick (no waitForInit) — mirrors logging
+      // at app boot, before the base's setTimeout(0) init() has run.
+      const channel = new SentryLog({
+        client: fake.forwarder as unknown as SentryForwarder,
+      });
+
+      await channel.log(dataFor({ type: "error", message: new Error("boot") }));
+
+      expect(fake.forwarder.captureException).toHaveBeenCalled();
+    });
+  });
+
   describe("event vs breadcrumb mapping", () => {
     it("sends an Error at error level via captureException with module/action tags", async () => {
       const fake = createFakeSentry();

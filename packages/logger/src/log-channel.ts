@@ -7,8 +7,7 @@ import type {
 
 export abstract class LogChannel<
   Options extends BasicLogConfigurations = BasicLogConfigurations,
-> implements LogContract
-{
+> implements LogContract {
   /**
    * Channel name
    */
@@ -127,9 +126,7 @@ export abstract class LogChannel<
    * configuration instead.
    */
   public getRedactConfig(): RedactConfig | undefined {
-    return this.config("redact" as keyof Options) as
-      | RedactConfig
-      | undefined;
+    return this.config("redact" as keyof Options) as RedactConfig | undefined;
   }
 
   /**

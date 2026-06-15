@@ -140,7 +140,7 @@ export type SentryLogConfig = BasicLogConfigurations & {
    * other level is recorded as a breadcrumb that rides along with the next
    * event, costing no quota.
    *
-   * @default ["error", "warn"]
+   * @default ["fatal", "error", "warn"]
    */
   eventLevels?: LogLevel[];
   /**
@@ -192,7 +192,7 @@ export class SentryLog extends LogChannel<SentryLogConfig> {
    */
   protected defaultConfigurations: SentryLogConfig = {
     eventLevels: ["fatal", "error", "warn"],
-    flushTimeout: 2000,
+    flushTimeout: 2_000,
   };
 
   /**
@@ -207,6 +207,23 @@ export class SentryLog extends LogChannel<SentryLogConfig> {
    * doesn't spam stderr on every entry.
    */
   private warnedMissing = false;
+
+  /**
+   * Resolve an injected `client` (the Sentry namespace) **synchronously**, so an
+   * entry logged on the same tick as construction — e.g. at app boot, before
+   * the base schedules `init()` on the next tick via `setTimeout(0)` — is not
+   * silently dropped. The `options` (lazy-import) path is inherently async and
+   * still resolves in `init()`.
+   */
+  public constructor(configurations?: SentryLogConfig) {
+    super(configurations);
+
+    const injected = this.config("client");
+
+    if (injected) {
+      this.sentry = injected;
+    }
+  }
 
   /**
    * Resolve the forwarder: reuse the injected client, otherwise lazily import
@@ -247,6 +264,11 @@ export class SentryLog extends LogChannel<SentryLogConfig> {
       return;
     }
 
+    if (isModuleExists === null) {
+      // wait until module is fully loaded
+      await loadSentry();
+    }
+
     if (!this.sentry) {
       this.reportMissingSdk();
 
@@ -256,7 +278,13 @@ export class SentryLog extends LogChannel<SentryLogConfig> {
     const { module, action, message, type: level, context } = data;
 
     if (this.isEventLevel(level)) {
-      this.captureEvent(this.sentry, { module, action, message, level, context });
+      this.captureEvent(this.sentry, {
+        module,
+        action,
+        message,
+        level,
+        context,
+      });
 
       return;
     }
