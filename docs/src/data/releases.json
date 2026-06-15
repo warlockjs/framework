@@ -1,9 +1,10 @@
 {
-  "_doc": "Release-level metadata for the unified changelog — the DATE and the 'what shipped' SUMMARY for each version. Per-package change details (Added/Changed/Fixed/Removed) live in each package's CHANGELOG.md and are aggregated by scripts/generate-changelog.mjs; this file supplies the release date + summary that the per-package files don't carry. Hand-maintained: add one entry per release, keyed by the version string. `date` is a display string (e.g. \"June 4, 2026\"); `summary` supports inline `code`, **bold**, and [links](url).",
+  "_doc": "Release-level metadata for the unified changelog — the DATE and the 'what shipped' SUMMARY for each version. Per-package change details (Added/Changed/Fixed/Removed) live in each package's CHANGELOG.md and are aggregated by scripts/generate-changelog.mjs; this file supplies the release date + summary that the per-package files don't carry. Hand-maintained: add one entry per release, keyed by the version string. `date` is a display string (e.g. \"June 4, 2026\"); `summary` supports inline `code`, **bold**, and [links](url); `featured` (optional) is an array of package names floated to the top of that release's package list, in the listed order (the rest follow most-changed-first, then alphabetical).",
 
   "4.2.0": {
-    "date": "June 6, 2026",
-    "summary": "Graceful-shutdown logging — the logger gains an awaitable async `flush()` and a Sentry channel for forwarding errors and breadcrumbs."
+    "date": "June 15, 2026",
+    "summary": "A security and correctness overhaul of `@warlock.js/auth` — brute-force login throttling, atomic refresh-token rotation with replay detection, CSPRNG signing secrets, a corrected default token lifetime, and overridable token storage for multi-tenant schemas. The `jwt` config block is superseded by `accessToken` / `refreshToken`. Also introduces **`@warlock.js/notifications`** — multi-channel notifications (mail, in-app, custom channels) with preferences, rate limits, idempotency, and a herald-backed async queue. Plus **`@warlock.js/access`** — authorization (RBAC + ABAC): permission checks, attribute-based policies, role management, and a pluggable resolver.",
+    "featured": ["@warlock.js/notifications", "@warlock.js/access"]
   },
 
   "4.1.15": {
