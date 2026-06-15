@@ -1,0 +1,61 @@
+---
+title: Access
+description: Authorization for Warlock — RBAC permission checks, ABAC policies, role management, and a pluggable resolver.
+---
+
+`@warlock.js/access` is the authorization layer for Warlock apps. Where `@warlock.js/auth` answers _who you are_, `access` answers _what you can do_.
+
+The deal is simple: the package owns the hard part — wildcard matching, caching, policies, fail-closed decisions — and you hand it **one small adapter** that reads a user's roles from however your app stores them. Then permission checks work everywhere.
+
+Gate a route with one middleware (stacked after `authMiddleware`):
+
+```ts
+import { authMiddleware } from "@warlock.js/auth";
+import { gate } from "@warlock.js/access";
+
+router.post("/orders", createOrder, {
+  middleware: [authMiddleware([]), gate("orders.create")],
+});
+```
+
+Assert inside a service, with a per-resource rule:
+
+```ts
+import { authorize, definePolicy } from "@warlock.js/access";
+
+// "you may update an order only if it's yours"
+definePolicy("orders.update", (user, order) => order.get("customer_id") === user.id);
+
+const order = await Order.find(orderId);
+await authorize(user, "orders.update", { resource: order }); // throws 403 unless the grant AND the policy pass
+```
+
+Roles map to permissions inside a **resolver** — a fixed catalog in code, or the DB-backed one that `npx warlock add access` ejects:
+
+```ts title="src/config/access.ts"
+import { DefaultAccessResolver, type AccessConfigurations } from "@warlock.js/access";
+
+const access: AccessConfigurations = {
+  resolver: new DefaultAccessResolver({
+    owner: ["*"],
+    editor: ["orders.*", "posts.create"],
+    viewer: ["orders.view"],
+  }),
+};
+
+export default access;
+```
+
+## What it gives you
+
+- **Permission checks** — `can` / `authorize` / `gate`, with wildcards (`orders.*`, `*`) and named any/all forms.
+- **Policies (ABAC)** — `definePolicy` for "only their own / only in their tenant / only while pending".
+- **Role management** — assign and revoke via the ejected `UserRole` model, and `hasRole` / `hasAnyRole` / `hasAllRoles`.
+- **A pluggable resolver** — connect the engine to any storage: a user column, a pivot table, a token claim, an external directory.
+- **Multi-tenancy + caching** — tenant-scoped resolution, cached per user, best-effort cache with a fail-closed decision.
+
+> Requires `@warlock.js/auth` — `access` reads `request.user`. It does **not** do authentication, OAuth, or a runtime permission admin UI.
+
+---
+
+Ready to add authorization? **[Get started →](./getting-started/01-introduction/)** — install, configure, and run your first check in a few minutes.

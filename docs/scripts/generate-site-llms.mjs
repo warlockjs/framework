@@ -33,6 +33,7 @@ const PACKAGES = [
   "auth",
   "context",
   "herald",
+  "notifications",
   "ai",
   "ai-openai",
   "ai-anthropic",

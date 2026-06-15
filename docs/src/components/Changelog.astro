@@ -90,29 +90,35 @@ const hasContent = releases.length > 0;
             {rel.summaryHtml && <p class="cl-rel-summary" set:html={rel.summaryHtml} />}
 
             {rel.mode === "detail" &&
-              rel.sections.map((sec) => (
-                <div class="cl-sec" data-type={sec.type}>
-                  <div class="cl-sec-type" role="heading" aria-level="3">
-                    <span class="cl-sec-dot" aria-hidden="true" />
-                    {sec.type}
-                  </div>
-                  <ul class="cl-sec-items">
-                    {sec.items.map((it) => {
-                      const slash = it.package.lastIndexOf("/");
-                      const scope = slash === -1 ? "" : it.package.slice(0, slash + 1);
-                      const name = slash === -1 ? it.package : it.package.slice(slash + 1);
-                      return (
-                        <li class="cl-line" data-changelog-package={it.slug}>
-                          <span class="cl-line-pkg"
-                            >{scope && <span class="cl-line-pkg-scope">{scope}</span>}{name}</span
-                          >
+              rel.packages.map((pkg) => {
+                const slash = pkg.name.lastIndexOf("/");
+                const scope = slash === -1 ? "" : pkg.name.slice(0, slash + 1);
+                const name = slash === -1 ? pkg.name : pkg.name.slice(slash + 1);
+                return (
+                  <div class="cl-pkg" data-changelog-package={pkg.slug}>
+                    <div class="cl-pkg-head">
+                      <span class="cl-pkg-name" role="heading" aria-level="3"
+                        >{scope && <span class="cl-pkg-scope">{scope}</span>}{name}</span
+                      >
+                      <span class="cl-pkg-counts">
+                        {pkg.counts.map((c) => (
+                          <span class="cl-pkg-count" data-type={c.type}>
+                            {c.type} <b>{c.n}</b>
+                          </span>
+                        ))}
+                      </span>
+                    </div>
+                    <ul class="cl-pkg-items">
+                      {pkg.items.map((it) => (
+                        <li class="cl-line" data-type={it.type}>
+                          <span class="cl-line-type">{it.type}</span>
                           <span class="cl-line-text" set:html={it.html} />
                         </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ))}
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
           </div>
         </details>
       ))
@@ -138,8 +144,8 @@ const hasContent = releases.length > 0;
     if (!trigger || !popover || !current) return;
 
     const options = Array.from(popover.querySelectorAll<HTMLButtonElement>("[data-filter]"));
-    const lines = Array.from(document.querySelectorAll<HTMLElement>("[data-changelog-package]"));
-    const sections = Array.from(document.querySelectorAll<HTMLElement>(".cl-sec"));
+    // Package blocks (each carries data-changelog-package) — the filter unit.
+    const blocks = Array.from(document.querySelectorAll<HTMLElement>("[data-changelog-package]"));
     const releases = Array.from(document.querySelectorAll<HTMLDetailsElement>(".cl-rel"));
     const empty = document.querySelector<HTMLElement>("[data-cl-empty]");
     let activeIndex = 0;
@@ -167,14 +173,10 @@ const hasContent = releases.length > 0;
       });
 
       let total = 0;
-      lines.forEach((b) => {
+      blocks.forEach((b) => {
         const match = slug === "all" || b.dataset.changelogPackage === slug;
         b.hidden = !match;
         if (match) total++;
-      });
-      sections.forEach((sec) => {
-        const any = Array.from(sec.querySelectorAll<HTMLElement>("[data-changelog-package]")).some((b) => !b.hidden);
-        sec.hidden = !any;
       });
       releases.forEach((rel, i) => {
         const any = Array.from(rel.querySelectorAll<HTMLElement>("[data-changelog-package]")).some((b) => !b.hidden);
@@ -430,100 +432,116 @@ const hasContent = releases.length > 0;
   .cl-rel-date svg { color: var(--sl-color-text-accent); }
 
   .cl-rel-summary {
-    margin: 0 0 1.75rem;
-    color: var(--sl-color-gray-1, var(--sl-color-white));
-    font-size: 1.02rem;
+    /* Treat the summary as a calmer lede so it doesn't compete with the
+       sections below — slightly smaller, dimmer, and divided by a hairline
+       so the eye knows where the bullet stream begins. */
+    margin: 0 0 0;
+    padding-bottom: 1.6rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
+    color: var(--sl-color-gray-2);
+    font-size: 0.98rem;
     line-height: 1.7;
+    max-width: 44rem;
   }
   .cl-rel-summary :global(code) {
     font-family: var(--sl-font-mono);
-    font-size: 0.85em;
-    padding: 0.08em 0.34em;
-    border-radius: 0.3em;
-    background: color-mix(in srgb, var(--sl-color-text-accent) 12%, transparent);
+    font-size: 0.86em;
+    padding: 0.05em 0.32em;
+    border-radius: 0.25em;
+    /* Same Starlight specificity issue as .cl-line-text code. */
+    background: color-mix(in srgb, var(--sl-color-text-accent) 6%, transparent) !important;
+    color: color-mix(in srgb, var(--sl-color-text-accent) 78%, white) !important;
+  }
+  .cl-rel-summary :global(strong) { color: var(--sl-color-white); font-weight: 600; }
+
+  /* Per-type colours, set on each line / count via [data-type]. */
+  [data-type="Added"] { --_c: var(--cl-added); }
+  [data-type="Changed"] { --_c: var(--cl-changed); }
+  [data-type="Fixed"] { --_c: var(--cl-fixed); }
+  [data-type="Deprecated"] { --_c: var(--cl-deprecated); }
+  [data-type="Removed"] { --_c: var(--cl-removed); }
+  [data-type="Security"] { --_c: var(--cl-security); }
+
+  /* ---- Per-package block ---- */
+  .cl-pkg { padding: 1.6rem 0; }
+  .cl-pkg:first-of-type { padding-top: 1.8rem; }
+  .cl-pkg + .cl-pkg { border-top: 1px solid var(--sl-color-hairline); }
+
+  .cl-pkg-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem 1.25rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.1rem;
+  }
+  .cl-pkg-name {
+    font-family: var(--sl-font-mono);
+    font-weight: 700;
+    font-size: 1.02rem;
     color: var(--sl-color-white);
   }
-  .cl-rel-summary :global(strong) { color: var(--sl-color-white); }
+  .cl-pkg-scope { color: var(--sl-color-gray-3, var(--sl-color-gray-2)); font-weight: 400; }
 
-  /* ---- Type sections (Added / Changed / Fixed / Deprecated / Removed) ---- */
-  .cl-sec { margin-top: 1.85rem; }
-  .cl-sec:first-of-type { margin-top: 1.25rem; }
-
-  .cl-sec-type {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    margin: 0 0 0.9rem;
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--_c, var(--sl-color-white));
+  .cl-pkg-counts { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .cl-pkg-count {
+    font-family: var(--sl-font-mono);
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    padding: 0.18em 0.55em;
+    border-radius: 999px;
+    color: color-mix(in srgb, var(--_c, var(--sl-color-gray-2)) 85%, white);
+    background: color-mix(in srgb, var(--_c, var(--sl-color-gray-2)) 11%, transparent);
   }
-  .cl-sec-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 3px;
-    background: var(--_c, var(--sl-color-gray-2));
-  }
-  .cl-sec[data-type="Added"] { --_c: var(--cl-added); }
-  .cl-sec[data-type="Changed"] { --_c: var(--cl-changed); }
-  .cl-sec[data-type="Fixed"] { --_c: var(--cl-fixed); }
-  .cl-sec[data-type="Deprecated"] { --_c: var(--cl-deprecated); }
-  .cl-sec[data-type="Removed"] { --_c: var(--cl-removed); }
-  .cl-sec[data-type="Security"] { --_c: var(--cl-security); }
+  .cl-pkg-count b { font-weight: 700; font-variant-numeric: tabular-nums; }
 
-  .cl-sec-items {
+  /* ---- One change line: [type] + text, type-coloured ---- */
+  .cl-pkg-items {
     margin: 0;
     padding: 0;
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: 0.7rem;
+    gap: 0.85rem;
   }
-
-  /* One change line: "@warlock.js/pkg: <change>" */
   .cl-line {
-    position: relative;
-    padding-inline-start: 1.1rem;
+    display: grid;
+    grid-template-columns: 5.25rem 1fr;
+    gap: 0.85rem;
+    align-items: baseline;
     line-height: 1.7;
     font-size: 0.93rem;
     color: var(--sl-color-gray-1, var(--sl-color-white));
   }
-  .cl-line::before {
-    content: "";
-    position: absolute;
-    inset-inline-start: 0.05rem;
-    top: 0.62em;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--_c, var(--sl-color-gray-2)) 80%, transparent);
-  }
-  .cl-line-pkg {
-    display: inline-block;
+  .cl-line-type {
+    justify-self: start;
     font-family: var(--sl-font-mono);
-    font-weight: 600;
-    font-size: 0.8em;
-    line-height: 1.4;
-    padding: 0.12em 0.5em;
-    margin-inline-end: 0.55rem;
-    border-radius: 0.4em;
-    background: color-mix(in srgb, var(--sl-color-white) 6%, transparent);
-    border: 1px solid var(--sl-color-hairline);
-    color: var(--sl-color-white);
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.22em 0.55em;
+    border-radius: 0.35em;
+    color: var(--_c, var(--sl-color-gray-2));
+    background: color-mix(in srgb, var(--_c, var(--sl-color-gray-2)) 13%, transparent);
     white-space: nowrap;
-  }
-  .cl-line-pkg-scope {
-    color: var(--sl-color-gray-3, var(--sl-color-gray-2));
-    font-weight: 400;
   }
   .cl-line-text :global(strong) { color: var(--sl-color-white); font-weight: 650; }
   .cl-line-text :global(code) {
     font-family: var(--sl-font-mono);
-    font-size: 0.85em;
-    padding: 0.08em 0.34em;
-    border-radius: 0.3em;
-    background: color-mix(in srgb, var(--sl-color-text-accent) 10%, transparent);
-    color: var(--sl-color-white);
+    font-size: 0.86em;
+    padding: 0.05em 0.32em;
+    border-radius: 0.25em;
+    /* Calmer chip — much lower yellow saturation. !important because
+       Starlight's `.sl-markdown-content :not(pre) > code` outranks the
+       Astro-scoped `:where(...)` selector this component uses. */
+    background: color-mix(in srgb, var(--sl-color-text-accent) 5%, transparent) !important;
+    color: color-mix(in srgb, var(--sl-color-text-accent) 78%, white) !important;
+  }
+
+  @media (max-width: 38rem) {
+    .cl-line { grid-template-columns: 1fr; gap: 0.3rem; }
   }
 
   /* ---- Compact: package chips (baseline) ---- */

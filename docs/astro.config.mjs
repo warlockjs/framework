@@ -231,8 +231,10 @@ const topics = [
 
   // Lifecycle
   pkgTopic({ label: "Auth", slug: "auth", sections: fullSections }),
+  pkgTopic({ label: "Access", slug: "access", sections: fullSections }),
   pkgTopic({ label: "Scheduler", slug: "scheduler", sections: fullSections }),
   pkgTopic({ label: "Herald", slug: "herald", sections: fullSections }),
+  pkgTopic({ label: "Notifications", slug: "notifications", sections: fullSections }),
 
   // AI uses Laravel-style sections + a Providers subgroup with the 5
   // adapter pages nested in. Custom items array (not via pkgTopic) so we

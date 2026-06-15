@@ -19,6 +19,7 @@ Documentation: https://warlock.js.org
 - [@warlock.js/auth](https://warlock.js.org/v/latest/auth/): Authentication system for Warlock.js applications
 - [@warlock.js/context](https://warlock.js.org/v/latest/context/): A simple and unified way to share context using AsyncLocalStorage for the Warlock.js framework
 - [@warlock.js/herald](https://warlock.js.org/v/latest/herald/): Message bus/brokers for RabbitMQ, Kafka, and more
+- [@warlock.js/notifications](https://warlock.js.org/v/latest/notifications/): Multi-channel notifications for Warlock.js — define once, fire anywhere; mail / in-app database / pluggable custom channels with preferences, rate limits, and idempotency.
 - [@warlock.js/ai](https://warlock.js.org/v/latest/ai/): Core @warlock.js AI framework — contracts, agent, workflow, supervisor
 - [@warlock.js/ai-openai](https://warlock.js.org/v/latest/ai/providers/openai/): OpenAI SDK adapter for @warlock.js/ai
 - [@warlock.js/ai-anthropic](https://warlock.js.org/v/latest/ai/providers/anthropic/): Anthropic SDK adapter for @warlock.js/ai

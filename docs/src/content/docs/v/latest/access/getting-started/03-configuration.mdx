@@ -1,0 +1,54 @@
+---
+title: "Configuration"
+description: Every @warlock.js/access config option — the required resolver and the cache.
+sidebar:
+  order: 3
+  label: "Configuration"
+---
+
+The whole config surface is two keys — one required, one optional:
+
+```ts title="src/config/access.ts"
+import { type AccessConfigurations } from "@warlock.js/access";
+import { DatabaseAccessResolver } from "app/access/services/access-resolver";
+
+const access: AccessConfigurations = {
+  resolver: new DatabaseAccessResolver(), // REQUIRED — how the engine reads roles + permissions
+  cache: { ttl: "10m" }, //                  resolved-set cache TTL (optional)
+};
+
+export default access;
+```
+
+## `resolver` (required)
+
+The resolver is the one piece you must supply: it tells the engine how to read a user's roles and permissions. There is **no separate role map in config** — the role→permission catalog lives *inside* the resolver. Two paths:
+
+- **Dynamic, DB-backed (the default eject)** — `new DatabaseAccessResolver()`. Reads roles from the `user_roles` table and maps them through the `roles` catalog table. Roles and their permissions are managed at runtime, so admins add a role or change a grant without a deploy. This is what `npx warlock add access` wires up.
+- **Fixed, code-defined** — `new DefaultAccessResolver({ editor: ["orders.*"], viewer: ["orders.view"] })`. The catalog is passed inline and the user's roles are read from `user.get("roles")` (or a single `user.get("role")`). No tables, no migration. Best for a small, stable role set.
+
+Neither fits? Implement the [`AccessResolver`](../essentials/02-the-resolver.md) contract — it's two methods over your own data.
+
+:::caution[A missing resolver throws]
+Omitting `resolver` is a developer mistake, not a runtime denial — the framework's access connector wires `config/access.ts` at boot and throws `AccessConfigError` loudly at startup rather than silently denying every request.
+:::
+
+## `cache.ttl`
+
+How long a user's resolved permission/role set is cached (default `"10m"`). The cache is **best-effort**: if it's down, the engine reads straight from the resolver — it never denies because the cache failed. After changing a user's roles out of band, call `access.flush(user, tenant)`.
+
+```ts
+cache: { ttl: "10m" }; // string duration or a number of seconds
+```
+
+## Tenant resolution
+
+Most checks take an explicit tenant — `can(user, "x", { tenant })`. To supply an ambient default so you don't pass it on every call, add an optional `resolveTenant(user)` to your resolver — it's a method on the resolver, not a config key. It receives the user, so derive the tenant from there (safer than trusting client-supplied request input):
+
+```ts title="src/app/access/services/access-resolver.ts"
+public resolveTenant(user: Auth): string | undefined {
+  return user.get("organization_id");
+}
+```
+
+A check resolves its tenant as `ctx.tenant ?? resolver.resolveTenant(user) ?? undefined`. With the DB-backed resolver, an **unresolved** tenant scopes to global (no-tenant) roles only — never the union across tenants — so always implement `resolveTenant` (or pass `tenant`) in a multi-tenant app.

@@ -1,0 +1,73 @@
+---
+title: "Installation"
+description: Add @warlock.js/access with one command — it ejects the config, resolver, and role tables.
+sidebar:
+  order: 2
+  label: "Installation"
+---
+
+`@warlock.js/access` composes with `@warlock.js/auth` — add it inside a Warlock project that already has authentication.
+
+## Install
+
+```bash
+npx warlock add access
+```
+
+That single command does everything:
+
+- ejects `config/access.ts` (wired under the `access` key, the same way `auth` is registered),
+- ejects the **resolver** — `DatabaseAccessResolver` in `src/app/access/services/access-resolver.ts`,
+- ejects the **role tables** — the `Role` catalog and the `UserRole` assignments models under `src/app/access/models/`, each with its own migration,
+- registers the access locale (an `access` group with `errors.forbidden` in `en` + `ar`) into `src/app/shared/utils/locales.ts`, creating that file if it's missing.
+
+The ejected migrations auto-discover from `src/app/access/models/*/migrations/` — there is no `database.migrations` list to register by hand. Run your migrations once to create the tables:
+
+```bash
+npx warlock migrate
+```
+
+## What you get
+
+The ejected `config/access.ts` points the engine at the **resolver**, the one required seam:
+
+```ts title="src/config/access.ts"
+import { type AccessConfigurations } from "@warlock.js/access";
+import { DatabaseAccessResolver } from "app/access/services/access-resolver";
+
+const access: AccessConfigurations = {
+  resolver: new DatabaseAccessResolver(),
+
+  // Cache resolved permission sets (default "10m").
+  // cache: { ttl: "10m" },
+};
+
+export default access;
+```
+
+`DatabaseAccessResolver` reads each user's roles from the `user_roles` table and maps them through the `roles` catalog table — so roles **and** the permissions they grant are managed at runtime, in the database. That's the right default for a real app where admins create roles and edit grants without a deploy.
+
+## Prefer a fixed catalog?
+
+If your roles are code-defined and you don't want any tables, swap the resolver for the built-in `DefaultAccessResolver` — it takes the role→permission catalog inline and reads each user's roles from `user.get("roles")` (or a single `user.get("role")`):
+
+```ts title="src/config/access.ts"
+import { DefaultAccessResolver, type AccessConfigurations } from "@warlock.js/access";
+
+const access: AccessConfigurations = {
+  resolver: new DefaultAccessResolver({
+    owner: ["*"], //                          the super-grant
+    editor: ["orders.*", "posts.create"], //  orders.* covers orders.update, orders.view, …
+    viewer: ["orders.view"],
+  }),
+};
+
+export default access;
+```
+
+No tables, no migration — the catalog lives in code and the user's roles ride on the user model.
+
+## Next
+
+- [Configuration](./03-configuration.mdx) — every config option.
+- [Your first check](./04-first-permission-check.md) — gate a route and assert in a service.
