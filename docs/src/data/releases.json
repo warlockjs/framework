@@ -1,6 +1,12 @@
 {
   "_doc": "Release-level metadata for the unified changelog — the DATE and the 'what shipped' SUMMARY for each version. Per-package change details (Added/Changed/Fixed/Removed) live in each package's CHANGELOG.md and are aggregated by scripts/generate-changelog.mjs; this file supplies the release date + summary that the per-package files don't carry. Hand-maintained: add one entry per release, keyed by the version string. `date` is a display string (e.g. \"June 4, 2026\"); `summary` supports inline `code`, **bold**, and [links](url); `featured` (optional) is an array of package names floated to the top of that release's package list, in the listed order (the rest follow most-changed-first, then alphabetical).",
 
+  "4.2.5": {
+    "date": "June 15, 2026",
+    "summary": "Patch release: `warlock add notifications` now scaffolds the in-app read/dismiss HTTP surface — `routes.ts` + a notifications controller (list / unread-count / mark-read / mark-all-read / clear / delete), gated by `authMiddleware` and recipient-scoped via `inApp`. The family is re-published in lockstep; no other functional changes.",
+    "featured": ["@warlock.js/core"]
+  },
+
   "4.2.4": {
     "date": "June 15, 2026",
     "summary": "Patch release: corrects the worker-loader path in **`@warlock.js/core`**'s build entry points — a wrong path in 4.2.3 left the worker entry broken. The family is re-published in lockstep; no other functional changes.",

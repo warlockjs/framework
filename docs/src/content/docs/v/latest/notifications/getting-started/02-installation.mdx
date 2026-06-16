@@ -21,8 +21,9 @@ This ejects into your project — yours to edit:
 - `src/config/notifications.ts` — a **declarative** config wired to the scaffolded model (see below).
 - `src/app/notifications/notification.model.ts` — extends `DatabaseNotification`; declares its physical columns via `columnMap`.
 - `src/app/notifications/migrations/…notification.migration.ts` — `Migration.create(Notification, notificationColumns(Notification))`.
+- `src/app/notifications/routes.ts` + `controllers/notifications.controller.ts` — the recipient-scoped read/dismiss endpoints (list / unread-count / mark-read / mark-all-read / clear / delete), gated by `authMiddleware`. Delete them if your app exposes notifications another way (sockets, GraphQL, …).
 
-> Prefer to wire it by hand? `yarn add @warlock.js/notifications` (npm / pnpm work too), then create the three files yourself. The generator is the recommended path — it keeps them in sync and matches the conventions below.
+> Prefer to wire it by hand? `yarn add @warlock.js/notifications` (npm / pnpm work too), then create the files yourself. The generator is the recommended path — it keeps them in sync and matches the conventions below.
 
 ## What `config/notifications.ts` looks like
 

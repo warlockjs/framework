@@ -40,6 +40,33 @@
   ],
   "releases": [
     {
+      "version": "4.2.5",
+      "id": "v4-2-5",
+      "date": "June 15, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "Patch release: <code>warlock add notifications</code> now scaffolds the in-app read/dismiss HTTP surface — <code>routes.ts</code> + a notifications controller (list / unread-count / mark-read / mark-all-read / clear / delete), gated by <code>authMiddleware</code> and recipient-scoped via <code>inApp</code>. The family is re-published in lockstep; no other functional changes.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>warlock add notifications</code> now scaffolds the in-app read/dismiss HTTP surface — <code>routes.ts</code> + a <code>notifications.controller.ts</code> (list / unread-count / mark-read / mark-all-read / clear / delete), gated by <code>authMiddleware</code> and recipient-scoped via <code>inApp</code>. Pulls <code>@warlock.js/auth</code>."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "4.2.4",
       "id": "v4-2-4",
       "date": "June 15, 2026",
