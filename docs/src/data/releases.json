@@ -1,6 +1,24 @@
 {
   "_doc": "Release-level metadata for the unified changelog — the DATE and the 'what shipped' SUMMARY for each version. Per-package change details (Added/Changed/Fixed/Removed) live in each package's CHANGELOG.md and are aggregated by scripts/generate-changelog.mjs; this file supplies the release date + summary that the per-package files don't carry. Hand-maintained: add one entry per release, keyed by the version string. `date` is a display string (e.g. \"June 4, 2026\"); `summary` supports inline `code`, **bold**, and [links](url); `featured` (optional) is an array of package names floated to the top of that release's package list, in the listed order (the rest follow most-changed-first, then alphabetical).",
 
+  "4.2.4": {
+    "date": "June 15, 2026",
+    "summary": "Patch release: corrects the worker-loader path in **`@warlock.js/core`**'s build entry points — a wrong path in 4.2.3 left the worker entry broken. The family is re-published in lockstep; no other functional changes.",
+    "featured": ["@warlock.js/core"]
+  },
+
+  "4.2.3": {
+    "date": "June 15, 2026",
+    "summary": "Patch release: adds the worker scripts as **`@warlock.js/core`** build entry points so they ship in the published package. A wrong entry-point path in this build blocked the npm publish for some packages — corrected in 4.2.4.",
+    "featured": ["@warlock.js/core"]
+  },
+
+  "4.2.2": {
+    "date": "June 15, 2026",
+    "summary": "Patch release: adds `cli/start` to **`@warlock.js/core`**'s build entry points so the `warlock` CLI entry ships in the published package. The family is re-published in lockstep; no other functional changes.",
+    "featured": ["@warlock.js/core"]
+  },
+
   "4.2.1": {
     "date": "June 15, 2026",
     "summary": "Patch release: **`@warlock.js/core`** and **`@warlock.js/cascade`** now ship their `bin` folder, so the `warlock` and `cascade` CLIs work from the published package — they were omitted from the 4.2.0 build. The rest of the family is re-published at 4.2.1 to keep the lockstep version line; no other functional changes.",

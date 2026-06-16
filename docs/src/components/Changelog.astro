@@ -261,6 +261,7 @@ const hasContent = releases.length > 0;
     --cl-deprecated: #db6d28;
     --cl-removed: #f85149;
     --cl-security: #bc8cff;
+    --cl-new: var(--warlock-yellow, #f5b800);
 
     max-width: 50rem;
     margin-inline: auto;
@@ -455,6 +456,7 @@ const hasContent = releases.length > 0;
   .cl-rel-summary :global(strong) { color: var(--sl-color-white); font-weight: 600; }
 
   /* Per-type colours, set on each line / count via [data-type]. */
+  [data-type="New"] { --_c: var(--cl-new); }
   [data-type="Added"] { --_c: var(--cl-added); }
   [data-type="Changed"] { --_c: var(--cl-changed); }
   [data-type="Fixed"] { --_c: var(--cl-fixed); }
@@ -527,6 +529,41 @@ const hasContent = releases.length > 0;
     background: color-mix(in srgb, var(--_c, var(--sl-color-gray-2)) 13%, transparent);
     white-space: nowrap;
   }
+
+  /* `New` — a brand-new package's debut. Gold, with a shiny wave sweeping
+     across it on a loop (disabled for reduced-motion). */
+  [data-type="New"] .cl-line-type {
+    position: relative;
+    overflow: hidden;
+    font-weight: 800;
+    color: color-mix(in srgb, var(--cl-new) 88%, white);
+    background: color-mix(in srgb, var(--cl-new) 18%, transparent);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--cl-new) 35%, transparent),
+      0 0 14px -3px color-mix(in srgb, var(--cl-new) 50%, transparent);
+  }
+  [data-type="New"] .cl-line-type::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      110deg,
+      transparent 25%,
+      color-mix(in srgb, var(--cl-new) 60%, white) 50%,
+      transparent 75%
+    );
+    transform: translateX(-160%);
+    animation: cl-new-shine 4.2s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes cl-new-shine {
+    0%, 55% { transform: translateX(-160%); }
+    100% { transform: translateX(160%); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-type="New"] .cl-line-type::after { animation: none; opacity: 0; }
+  }
+
   .cl-line-text :global(strong) { color: var(--sl-color-white); font-weight: 650; }
   .cl-line-text :global(code) {
     font-family: var(--sl-font-mono);

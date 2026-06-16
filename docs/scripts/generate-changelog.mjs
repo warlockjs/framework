@@ -32,7 +32,7 @@ const OUT_FILE = resolve(OUT_DIR, "changelog.json");
 const SHOW_UNRELEASED = false;
 
 // Section order on the page (Keep-a-Changelog, the order requested).
-const TYPE_ORDER = ["Added", "Changed", "Fixed", "Deprecated", "Removed", "Security"];
+const TYPE_ORDER = ["New", "Added", "Changed", "Fixed", "Deprecated", "Removed", "Security"];
 
 function slugOf(name) {
   const i = name.lastIndexOf("/");
@@ -146,7 +146,20 @@ async function loadReleaseMeta() {
 }
 
 async function main() {
-  const rootPkg = JSON.parse(await readFile(resolve(WORKSPACE_ROOT, "package.json"), "utf8"));
+  // In a docs-only checkout (e.g. the GitHub Pages CI build) the sibling
+  // packages + the workspace package.json aren't present. Skip regeneration
+  // and keep the committed changelog.json — it's generated locally where the
+  // packages exist, then committed (same pattern as the site llms.txt files).
+  const rootPkgPath = resolve(WORKSPACE_ROOT, "package.json");
+  if (!existsSync(rootPkgPath)) {
+    console.log(
+      `changelog: workspace package.json not found (${rootPkgPath}) — keeping the ` +
+        `committed changelog.json (docs-only checkout).`,
+    );
+    return;
+  }
+
+  const rootPkg = JSON.parse(await readFile(rootPkgPath, "utf8"));
   const entries = rootPkg.workspaces || [];
   const meta = await loadReleaseMeta();
 

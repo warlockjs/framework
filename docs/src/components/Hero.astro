@@ -7,6 +7,7 @@
  * backdrop. Respects prefers-reduced-motion.
  */
 import logo from "../assets/logo.png";
+import { currentVersion } from "../utils/current-version";
 ---
 
 <section class="warlock-hero">
@@ -31,7 +32,7 @@ import logo from "../assets/logo.png";
       <span class="warlock-hero-dot"></span>
       <span>AI-native TypeScript framework</span>
       <span class="warlock-hero-eyebrow-sep">·</span>
-      <span class="warlock-hero-eyebrow-version">v4</span>
+      <span class="warlock-hero-eyebrow-version">v{currentVersion}</span>
     </p>
 
     <h1 class="warlock-hero-headline">

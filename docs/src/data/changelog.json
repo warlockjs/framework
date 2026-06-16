@@ -40,6 +40,87 @@
   ],
   "releases": [
     {
+      "version": "4.2.4",
+      "id": "v4-2-4",
+      "date": "June 15, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "Patch release: corrects the worker-loader path in <strong><code>@warlock.js/core</code></strong>'s build entry points — a wrong path in 4.2.3 left the worker entry broken. The family is re-published in lockstep; no other functional changes.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Fix the worker-loader path in the build entry points — a wrong path in 4.2.3 left the worker entry broken (and blocked the 4.2.3 publish for some packages)."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "4.2.3",
+      "id": "v4-2-3",
+      "date": "June 15, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "Patch release: adds the worker scripts as <strong><code>@warlock.js/core</code></strong> build entry points so they ship in the published package. A wrong entry-point path in this build blocked the npm publish for some packages — corrected in 4.2.4.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Add the worker scripts as build entry points so they ship in the published package."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "4.2.2",
+      "id": "v4-2-2",
+      "date": "June 15, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "Patch release: adds <code>cli/start</code> to <strong><code>@warlock.js/core</code></strong>'s build entry points so the <code>warlock</code> CLI entry ships in the published package. The family is re-published in lockstep; no other functional changes.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Add <code>cli/start</code> to the build entry points so the <code>warlock</code> CLI entry ships in the published package."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "4.2.1",
       "id": "v4-2-1",
       "date": "June 15, 2026",
@@ -97,13 +178,13 @@
           "total": 1,
           "counts": [
             {
-              "type": "Added",
+              "type": "New",
               "n": 1
             }
           ],
           "items": [
             {
-              "type": "Added",
+              "type": "New",
               "html": "Shipped Warlock.js Notifications Package."
             }
           ]
@@ -114,13 +195,13 @@
           "total": 1,
           "counts": [
             {
-              "type": "Added",
+              "type": "New",
               "n": 1
             }
           ],
           "items": [
             {
-              "type": "Added",
+              "type": "New",
               "html": "Shipped Warlock.js Access Package."
             }
           ]

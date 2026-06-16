@@ -14,6 +14,7 @@
 import Search from "@astrojs/starlight/components/Search.astro";
 import ThemeSelect from "@astrojs/starlight/components/ThemeSelect.astro";
 import logo from "../assets/logo.png";
+import { currentVersion } from "../utils/current-version";
 
 const navLinks = [
   { label: "Documentation", href: "/v/latest/core/getting-started/01-introduction/" },
@@ -39,7 +40,7 @@ function isActive(href) {
         <img src={logo.src} alt="" width="28" height="28" class="warlock-brand-mark" />
       </span>
       <span class="warlock-brand-name">Warlock<span class="warlock-brand-tld">.js</span></span>
-      <span class="warlock-brand-version">v4</span>
+      <span class="warlock-brand-version">v{currentVersion}</span>
     </a>
 
     <nav class="warlock-topnav" aria-label="Top">
