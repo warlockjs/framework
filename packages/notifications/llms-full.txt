@@ -15,7 +15,7 @@ description: 'Wire `@warlock.js/notifications` via a declarative `src/config/not
 
 `src/config/notifications.ts` exports a `NotificationConfig` as its default; the notifications connector registers it at boot and the dispatcher reads from it on every send. The file is **declarative** — you never call `setNotificationConfig` yourself (the connector does, the same way the rest of `src/config/*.ts` is wired).
 
-> `npx warlock add notifications` ejects this file pre-wired (mail + in-app) alongside the `Notification` model + migration. Edit the ejected config to taste — the sections below are the full surface.
+> `npx warlock add notifications` ejects this file pre-wired (mail + in-app) alongside the `Notification` model + migration and the recipient-scoped read/dismiss routes + controllers. Edit the ejected config to taste — the sections below are the full surface.
 
 ## Minimal
 
