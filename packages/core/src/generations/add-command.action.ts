@@ -21,8 +21,10 @@ import {
   accessUserRoleModelIndexStub,
   accessUserRoleModelStub,
   communicatorsConfigStub,
+  notificationControllersStub,
   notificationMigrationStub,
   notificationModelStub,
+  notificationRoutesStub,
   notificationsConfigStub,
   socketConfigStub,
 } from "./stubs";
@@ -214,6 +216,16 @@ async function completeNotificationsInstallation(_options: CommandActionData) {
   console.log(
     `${colors.green("âœ“")} Created src/app/notifications/migrations/${migrationFile}`,
   );
+
+  // 3. HTTP surface — the in-app read/dismiss endpoints (routes + controllers),
+  //    gated by authMiddleware. Delete if the app exposes notifications another way.
+  await ensureDirectoryAsync(srcPath("app/notifications/controllers"));
+  await putFileAsync(
+    srcPath("app/notifications/controllers/notifications.controller.ts"),
+    notificationControllersStub,
+  );
+  await putFileAsync(srcPath("app/notifications/routes.ts"), notificationRoutesStub);
+  console.log(`${colors.green("✓")} Created src/app/notifications/routes.ts + controllers`);
 }
 
 async function registerAccessLocale() {
@@ -487,12 +499,14 @@ const featuresMap: Record<
   },
   notifications: {
     description:
-      "Installs @warlock.js/notifications — multi-channel notifications (mail + in-app database). Pulls the mail feature, ejects config/notifications.ts, and scaffolds the Notification model + migration into src/app/notifications",
-    // The ejected config wires a `mail` channel by default, which needs
-    // nodemailer — pulled in via the `mail` feature.
+      "Installs @warlock.js/notifications — multi-channel notifications (mail + in-app database). Pulls the mail feature, ejects config/notifications.ts, and scaffolds the Notification model + migration plus the recipient-scoped read/dismiss routes + controllers into src/app/notifications",
+    // The ejected config wires a `mail` channel by default (needs nodemailer,
+    // via the `mail` feature); the scaffolded routes are gated by
+    // `authMiddleware`, so `@warlock.js/auth` is pulled in too.
     requires: ["mail"],
     dependencies: {
       "@warlock.js/notifications": "~4.0.0",
+      "@warlock.js/auth": "~4.0.0",
     },
     ejectConfig: {
       content: notificationsConfigStub,

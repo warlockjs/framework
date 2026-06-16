@@ -441,3 +441,119 @@ import { Notification } from "../notification.model";
  */
 export default Migration.create(Notification, notificationColumns(Notification));
 `;
+
+export const notificationControllersStub = `import { type Request, type RequestHandler, type Response } from "@warlock.js/core";
+import { inApp } from "@warlock.js/notifications";
+
+/**
+ * The authenticated user's notification HTTP surface — thin wrappers over the
+ * recipient-scoped \`inApp\` facade (a foreign id can never touch another user's
+ * rows). Notifications are produced by domain events, never over HTTP, so there
+ * is no create. Trim or split these as your app grows.
+ */
+
+/** GET /notifications — list, most recent first (page / limit / type / unread via query). */
+export const listNotificationsController: RequestHandler = async (
+  request: Request,
+  response: Response,
+) => {
+  const { data, pagination } = await inApp.list(request.user!, request.all());
+
+  return response.success({ notifications: data, pagination });
+};
+
+listNotificationsController.description = "List notifications";
+
+/** GET /notifications/unread-count — drives the bell badge. */
+export const unreadNotificationsCountController: RequestHandler = async (
+  request: Request,
+  response: Response,
+) => {
+  const count = await inApp.countUnread(request.user!);
+
+  return response.success({ count });
+};
+
+unreadNotificationsCountController.description = "Unread notifications count";
+
+/** PATCH /notifications/:id/read — mark one read, return the updated row. */
+export const markNotificationReadController: RequestHandler = async (
+  request: Request,
+  response: Response,
+) => {
+  const id = request.input("id");
+
+  await inApp.markAsRead(request.user!, id);
+  const notification = await inApp.find(request.user!, id);
+
+  return response.success({ notification });
+};
+
+markNotificationReadController.description = "Mark notification read";
+
+/** PATCH /notifications/read-all — mark every unread one read. */
+export const markAllNotificationsReadController: RequestHandler = async (
+  request: Request,
+  response: Response,
+) => {
+  const count = await inApp.markAsRead(request.user!);
+
+  return response.success({ count });
+};
+
+markAllNotificationsReadController.description = "Mark all notifications read";
+
+/** DELETE /notifications — dismiss all for the user. */
+export const clearNotificationsController: RequestHandler = async (
+  request: Request,
+  response: Response,
+) => {
+  await inApp.dismiss(request.user!);
+
+  return response.noContent();
+};
+
+clearNotificationsController.description = "Clear notifications";
+
+/** DELETE /notifications/:id — dismiss one. */
+export const deleteNotificationController: RequestHandler = async (
+  request: Request,
+  response: Response,
+) => {
+  await inApp.dismiss(request.user!, request.input("id"));
+
+  return response.noContent();
+};
+
+deleteNotificationController.description = "Delete notification";
+`;
+
+export const notificationRoutesStub = `import { authMiddleware } from "@warlock.js/auth";
+import { router } from "@warlock.js/core";
+import {
+  clearNotificationsController,
+  deleteNotificationController,
+  listNotificationsController,
+  markAllNotificationsReadController,
+  markNotificationReadController,
+  unreadNotificationsCountController,
+} from "./controllers/notifications.controller";
+
+/**
+ * Notification routes — the authenticated user's read + dismiss surface.
+ *
+ * Notifications are produced by domain events (never created over HTTP), so
+ * there is no POST. Every route is gated by \`authMiddleware\` and recipient-
+ * scoped by \`inApp\` (a foreign id touches zero rows). Delete any endpoint you
+ * don't need; if your app reads notifications over sockets/GraphQL instead,
+ * delete this file + the controllers entirely.
+ */
+router.group({ prefix: "/notifications", middleware: [authMiddleware([])] }, () => {
+  router.get("/", listNotificationsController);
+  router.get("/unread-count", unreadNotificationsCountController);
+  router.patch("/read-all", markAllNotificationsReadController);
+  router.patch("/:id/read", markNotificationReadController);
+  router.delete("/", clearNotificationsController);
+  router.delete("/:id", deleteNotificationController);
+});
+`;
