@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## 4.2.8
+
+### Changed
+
+- `ConsoleLog` now prints the level name beside each level's icon — `⚙ debug`, `ℹ info`, `⚠ warn`, `✗ error`, `✓ success`, `☠ fatal` — so entries are readable at a glance without memorizing icons. `fatal` also switches from a bright-red **background** badge to a bold red-bright `☠ fatal` label, consistent with the other levels.
+
 ## 4.2.0
 
 ### Added

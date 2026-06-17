@@ -48,7 +48,7 @@ export class ConsoleLog extends LogChannel<ConsoleLogConfig> {
       case "debug":
         // add a debug icon
         console.log(
-          colors.magentaBright("⚙"),
+          colors.magentaBright("⚙ debug"),
           colors.yellow(`(${date})`),
           colors.cyan(`[${module}]`),
           colors.magenta(`[${action}]`),
@@ -58,7 +58,7 @@ export class ConsoleLog extends LogChannel<ConsoleLogConfig> {
       case "info":
         // add an info icon
         console.log(
-          colors.blueBright("ℹ"),
+          colors.blueBright("ℹ info"),
           colors.yellow(`(${date})`),
           colors.cyan(`[${module}]`),
           colors.magenta(`[${action}]`),
@@ -68,7 +68,7 @@ export class ConsoleLog extends LogChannel<ConsoleLogConfig> {
       case "warn":
         // add a warning icon
         console.log(
-          colors.yellow("⚠"),
+          colors.yellow("⚠ warn"),
           colors.yellow(`(${date})`),
           colors.cyan(`[${module}]`),
           colors.magenta(`[${action}]`),
@@ -78,7 +78,7 @@ export class ConsoleLog extends LogChannel<ConsoleLogConfig> {
       case "error":
         // add an error icon
         console.log(
-          colors.red("✗"),
+          colors.red("✗ error"),
           colors.yellow(`(${date})`),
           colors.cyan(`[${module}]`),
           colors.magenta(`[${action}]`),
@@ -89,7 +89,7 @@ export class ConsoleLog extends LogChannel<ConsoleLogConfig> {
       case "success":
         // add a success icon
         console.log(
-          colors.green("✓"),
+          colors.green("✓ success"),
           colors.yellow(`(${date})`),
           colors.cyan(`[${module}]`),
           colors.magenta(`[${action}]`),
@@ -98,10 +98,10 @@ export class ConsoleLog extends LogChannel<ConsoleLogConfig> {
         break;
 
       case "fatal":
-        // background-red ☠ — visually distinct from `error` so a fatal entry
+        // bold red-bright ☠ — visually distinct from `error` so a fatal entry
         // can't be missed in a wall of red logs
         console.log(
-          colors.bgRedBright(colors.bold(" ☠ ")),
+          colors.redBright(colors.bold("☠ fatal")),
           colors.yellow(`(${date})`),
           colors.cyan(`[${module}]`),
           colors.magenta(`[${action}]`),
