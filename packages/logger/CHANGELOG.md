@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## 4.2.9
+
+### Changed
+
+- `ConsoleLog` output is retuned for scannability:
+  - **Time-only timestamp** (`HH:mm:ss.SSS`) instead of the full ISO string — within a dev session the date is just noise. Persistent channels (`FileLog` / `JSONFileLog`) still record the full ISO timestamp.
+  - The timestamp moves from yellow to **gray** so the colored level + message lead the eye; `module` (cyan) and `action` (magenta) keep their colors for at-a-glance subsystem scanning.
+  - **Aligned columns** — each level tag is padded to a fixed width so the timestamp / module / action columns line up vertically across a stream of logs.
+  - **`fatal` is restored to a background badge** — white, bold text on a bright-red background (`☠ fatal`), the same column width as the other tags but deliberately louder than `error`'s plain red, so an unrecoverable failure can't be missed (4.2.8 had briefly flattened it to a plain label).
+
 ## 4.2.8
 
 ### Changed

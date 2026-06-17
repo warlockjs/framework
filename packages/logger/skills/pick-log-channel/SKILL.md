@@ -26,9 +26,9 @@ Zero config. Colored, icon-prefixed lines to the terminal.
 import { ConsoleLog } from "@warlock.js/logger";
 
 new ConsoleLog();
-// ⚙ (2024-03-15T10:22:00.000Z) [auth] [hashPassword] Hashing started
-// ℹ (2024-03-15T10:22:01.482Z) [users] [register] New user created
-// ✗ (2024-03-15T10:22:03.111Z) [payments] [charge] Card declined
+// ⚙ debug (10:22:00.000) [auth] [hashPassword] Hashing started
+// ℹ info (10:22:01.482) [users] [register] New user created
+// ✗ error (10:22:03.111) [payments] [charge] Card declined
 ```
 
 Properties:
@@ -44,7 +44,7 @@ By default `ConsoleLog` drops the `context` payload (the file/JSON channels stil
 new ConsoleLog({ showContext: true });
 
 log.info("payments", "charge", "card declined", { userId: 42, amount: 1999 });
-// ℹ (…) [payments] [charge] card declined
+// ℹ info (…) [payments] [charge] card declined
 //   ↳ { userId: 42, amount: 1999 }
 ```
 

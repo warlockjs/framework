@@ -34,7 +34,7 @@ Returns an end-function. Calling it emits an `info` entry with `completed in <ms
 const end = log.timer("db", "users.findById");
 const user = await usersRepo.findById(id);
 end({ id, found: !!user });
-// ℹ [db] [users.findById] completed in 12ms
+// ℹ info [db] [users.findById] completed in 12ms
 //   ↳ { durationMs: 12, id: "abc", found: true } (when ConsoleLog has showContext: true)
 ```
 

@@ -1,7 +1,7 @@
 import { colors } from "@mongez/copper";
 import { inspect } from "util";
 import { LogChannel } from "../log-channel";
-import type { BasicLogConfigurations, LoggingData } from "../types";
+import type { BasicLogConfigurations, LoggingData, LogLevel } from "../types";
 
 export type ConsoleLogConfig = BasicLogConfigurations & {
   /**
@@ -23,6 +23,77 @@ export type ConsoleLogConfig = BasicLogConfigurations & {
   contextDepth?: number;
 };
 
+/**
+ * The longest level name (`success`) sets the tag column width. Padding every
+ * level name to this width keeps the timestamp / module / action columns
+ * aligned across lines. The level icons are bare (text-style, single-cell)
+ * glyphs, so padding the name alone produces true columns.
+ */
+const LEVEL_NAME_WIDTH = 7;
+
+/**
+ * Per-level console presentation: the colored, fixed-width `{icon} {name}` tag
+ * and the function that colors the message body.
+ */
+type LevelStyle = {
+  tag: string;
+  message: (message: LoggingData["message"]) => string;
+};
+
+/**
+ * Build a single-color, fixed-width tag — `{icon} {name}` with the name padded
+ * so every tag spans the same number of columns.
+ */
+function buildTag(
+  icon: string,
+  name: string,
+  color: (text: string) => string,
+): string {
+  return color(`${icon} ${name.padEnd(LEVEL_NAME_WIDTH)}`);
+}
+
+/**
+ * Console styling per log level. The `fatal` tag is a bright-red background
+ * badge — the same column width as the others (`" ☠ fatal "` is 9 cells, like
+ * `{icon} {name.padEnd(7)}`), but impossible to miss in a wall of red `error`
+ * lines, where a plain red tag would blend in.
+ */
+const LEVEL_STYLES: Record<LogLevel, LevelStyle> = {
+  debug: {
+    tag: buildTag("⚙", "debug", colors.magentaBright),
+    message: colors.magentaBright,
+  },
+  info: {
+    tag: buildTag("ℹ", "info", colors.blueBright),
+    message: colors.blueBright,
+  },
+  warn: {
+    tag: buildTag("⚠", "warn", colors.yellow),
+    message: colors.yellowBright,
+  },
+  error: {
+    tag: buildTag("✗", "error", colors.red),
+    message: colors.redBright,
+  },
+  success: {
+    tag: buildTag("✓", "success", colors.green),
+    message: colors.greenBright,
+  },
+  fatal: {
+    tag: colors.bgRedBright(colors.whiteBright(colors.bold(" ☠ fatal "))),
+    message: colors.redBright.bold,
+  },
+};
+
+/**
+ * Fallback for an unrecognized level — a plain `[log]` tag padded to the same
+ * width so the columns stay aligned.
+ */
+const DEFAULT_STYLE: LevelStyle = {
+  tag: "[log]".padEnd(LEVEL_NAME_WIDTH + 2),
+  message: message => message as string,
+};
+
 export class ConsoleLog extends LogChannel<ConsoleLogConfig> {
   /**
    * {@inheritdoc}
@@ -42,82 +113,22 @@ export class ConsoleLog extends LogChannel<ConsoleLogConfig> {
 
     if (!this.shouldBeLogged(data)) return;
 
-    // display date and time with milliseconds
-    const date = new Date().toISOString(); // i.e 2021-01-01T00:00:00.000Z
-    switch (level) {
-      case "debug":
-        // add a debug icon
-        console.log(
-          colors.magentaBright("⚙ debug"),
-          colors.yellow(`(${date})`),
-          colors.cyan(`[${module}]`),
-          colors.magenta(`[${action}]`),
-          colors.magentaBright(message),
-        );
-        break;
-      case "info":
-        // add an info icon
-        console.log(
-          colors.blueBright("ℹ info"),
-          colors.yellow(`(${date})`),
-          colors.cyan(`[${module}]`),
-          colors.magenta(`[${action}]`),
-          colors.blueBright(message),
-        );
-        break;
-      case "warn":
-        // add a warning icon
-        console.log(
-          colors.yellow("⚠ warn"),
-          colors.yellow(`(${date})`),
-          colors.cyan(`[${module}]`),
-          colors.magenta(`[${action}]`),
-          colors.yellowBright(message),
-        );
-        break;
-      case "error":
-        // add an error icon
-        console.log(
-          colors.red("✗ error"),
-          colors.yellow(`(${date})`),
-          colors.cyan(`[${module}]`),
-          colors.magenta(`[${action}]`),
-          colors.redBright(message),
-        );
-        break;
+    // Console shows time-only (HH:mm:ss.SSS) — within a dev session the date
+    // rarely changes, so the full ISO date + `T`/`Z` are just noise. Persistent
+    // channels (FileLog / JSONFileLog) keep the full ISO timestamp.
+    const time = new Date().toISOString().slice(11, 23); // i.e. "10:22:00.000"
 
-      case "success":
-        // add a success icon
-        console.log(
-          colors.green("✓ success"),
-          colors.yellow(`(${date})`),
-          colors.cyan(`[${module}]`),
-          colors.magenta(`[${action}]`),
-          colors.greenBright(message),
-        );
-        break;
+    const style = LEVEL_STYLES[level] ?? DEFAULT_STYLE;
 
-      case "fatal":
-        // bold red-bright ☠ — visually distinct from `error` so a fatal entry
-        // can't be missed in a wall of red logs
-        console.log(
-          colors.redBright(colors.bold("☠ fatal")),
-          colors.yellow(`(${date})`),
-          colors.cyan(`[${module}]`),
-          colors.magenta(`[${action}]`),
-          colors.redBright.bold(message),
-        );
-        break;
-
-      default:
-        console.log(
-          "[log]",
-          colors.yellow(`(${date})`),
-          colors.cyan(`[${module}]`),
-          colors.magenta(`[${action}]`),
-          message,
-        );
-    }
+    // The gray timestamp recedes so the colored level + message lead the eye;
+    // module (cyan) and action (magenta) stay colored for subsystem scanning.
+    console.log(
+      style.tag,
+      colors.gray(`(${time})`),
+      colors.cyan(`[${module}]`),
+      colors.magenta(`[${action}]`),
+      style.message(message),
+    );
 
     if (typeof message === "object") {
       console.log(message);

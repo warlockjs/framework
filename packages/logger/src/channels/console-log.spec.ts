@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LoggingData } from "../types";
 import { ConsoleLog } from "./console-log";
 
+const stripAnsi = (value: string) => value.replace(/\[[0-9;]*m/g, "");
+
 function dataFor(overrides: Partial<LoggingData> = {}): LoggingData {
   return {
     type: "info",
@@ -57,6 +59,19 @@ describe("ConsoleLog", () => {
       expect(args).toContain("ok");
     });
 
+    it("renders a time-only timestamp (HH:mm:ss.SSS), not the full ISO date", () => {
+      const channel = new ConsoleLog();
+
+      channel.log(dataFor());
+
+      const args = consoleSpy.mock.calls[0]!.join(" ");
+
+      // Console is time-only, e.g. (10:22:00.000) — the date + `T`/`Z` are
+      // dropped here (persistent channels keep the full ISO timestamp).
+      expect(args).toMatch(/\(\d{2}:\d{2}:\d{2}\.\d{3}\)/);
+      expect(args).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+    });
+
     it("logs the object as a second entry when message is an object", () => {
       const channel = new ConsoleLog();
       const payload = { foo: "bar" };
@@ -85,6 +100,51 @@ describe("ConsoleLog", () => {
       expect(args).toContain("[log]");
       expect(args).toContain("[diag]");
       expect(args).toContain("unknown level line");
+    });
+  });
+
+  describe("tag formatting & alignment", () => {
+    const levels = ["debug", "info", "warn", "error", "success", "fatal"] as const;
+
+    it("pads every level tag to a single, aligned column width", () => {
+      const widths = levels.map(level => {
+        consoleSpy.mockClear();
+        new ConsoleLog().log(dataFor({ type: level }));
+        const tag = consoleSpy.mock.calls[0]![0] as string;
+
+        return stripAnsi(tag).length;
+      });
+
+      // Identical visible width across levels → the timestamp / module / action
+      // columns line up vertically in a stream of logs.
+      expect(new Set(widths).size).toBe(1);
+    });
+
+    it("renders fatal as a background badge, distinct from error", () => {
+      const channel = new ConsoleLog();
+
+      consoleSpy.mockClear();
+      channel.log(dataFor({ type: "error" }));
+      const errorTag = consoleSpy.mock.calls[0]![0] as string;
+
+      consoleSpy.mockClear();
+      channel.log(dataFor({ type: "fatal" }));
+      const fatalTag = consoleSpy.mock.calls[0]![0] as string;
+
+      // Both carry their level text...
+      expect(stripAnsi(fatalTag)).toContain("☠ fatal");
+      expect(stripAnsi(errorTag)).toContain("✗ error");
+
+      // ...but only fatal wraps it in a bright-red *background* badge (CSI 101)
+      // so it can't be missed in a wall of red `error` lines. When color is off
+      // the badge degrades to plain text, so we only assert codes when the
+      // output actually carries ANSI (derived from the error tag itself).
+      const colorOn = errorTag !== stripAnsi(errorTag);
+
+      if (colorOn) {
+        expect(fatalTag).toContain("101m");
+        expect(errorTag).not.toContain("101m");
+      }
     });
   });
 
