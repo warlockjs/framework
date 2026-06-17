@@ -120,11 +120,13 @@ export class ConsoleLog extends LogChannel<ConsoleLogConfig> {
 
     const style = LEVEL_STYLES[level] ?? DEFAULT_STYLE;
 
-    // The gray timestamp recedes so the colored level + message lead the eye;
+    // The slate timestamp recedes so the colored level + message lead the eye;
     // module (cyan) and action (magenta) stay colored for subsystem scanning.
+    // `slate` (256-color neutral gray) reads cleaner than bright-black `gray`,
+    // which sits too close to the background on most terminal themes.
     console.log(
       style.tag,
-      colors.gray(`(${time})`),
+      colors.slate(`(${time})`),
       colors.cyan(`[${module}]`),
       colors.magenta(`[${action}]`),
       style.message(message),
@@ -140,7 +142,7 @@ export class ConsoleLog extends LogChannel<ConsoleLogConfig> {
     if (this.config("showContext") && data.context && Object.keys(data.context).length > 0) {
       const depth = this.config("contextDepth") ?? 4;
       console.log(
-        colors.gray("  ↳"),
+        colors.slate("  ↳"),
         inspect(data.context, { colors: true, depth, breakLength: 80 }),
       );
     }

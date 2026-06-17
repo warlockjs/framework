@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## 4.2.10
+
+### Changed
+
+- `ConsoleLog`'s timestamp (and the `↳` context arrow) switch from bright-black `gray` to the 256-color neutral `slate`. Bright-black sits too close to the background on most terminal themes and reads muddy; `slate` is recessive but cleanly legible.
+
 ## 4.2.9
 
 ### Changed
