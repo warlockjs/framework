@@ -45,15 +45,34 @@ export class User extends Model<UserSchema> {
 - `static table` matches the migration. Plural, lowercase, snake_case is the convention on both drivers.
 - `static schema` attaches the validator. On every `save()`, the data goes through `userSchema` before it hits the database.
 
-## Read state — `.id` and `.get(field)`
+## Read state — `.id`, `.uuid`, and `.get(field)`
 
 ```ts
 user.id;                   // direct property — ID is so common cascade exposes it directly
+user.uuid;                 // the same id, narrowed to `string` (see below)
 user.get("status");        // canonical reader for every other column
 user.get<number>("age");   // TypeScript generic for typed reads
 ```
 
 Use the direct `.id` property; use `.get("field")` for everything else. Add a typed getter on the model class when the same field is read in many places — turns N typed-cast call sites into one named accessor.
+
+### `.id` vs `.uuid` — a TypeScript convenience, same value
+
+Both getters return the model's primary id (`this.get("id")`); the only difference is the **static type**:
+
+| Accessor | Return type | Use when |
+|---|---|---|
+| `model.id` | `string \| number` | You want the real id type — SQL auto-increment is `number`, MongoDB's ObjectId is `string`. |
+| `model.uuid` | `string` | You want to pass the id to code typed for a single `string` id, without leaking the engine's `string \| number` union everywhere. |
+
+`uuid` does **not** validate or coerce the value to a UUID — the name is historical. It simply returns the same id, typed as `string`, so a helper typed for a string id accepts it on either engine:
+
+```ts
+function shareLink(modelId: string) { /* ... */ }
+
+shareLink(user.uuid);  // ✓ typechecks on both Postgres and MongoDB
+shareLink(user.id);    // ✗ TS error on SQL: `number` is not assignable to `string`
+```
 
 ## Write — three update idioms
 

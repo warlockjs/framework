@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `model.uuid` documented — a string-typed accessor returning the primary id as `string` (where `model.id` is `string | number`); name is historical, no UUID validation
+
 ## 4.2.11
 
 ### Added
