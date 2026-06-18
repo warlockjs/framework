@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/logger",
-  "version": "4.2.10",
+  "version": "4.2.11",
   "type": "module",
   "description": "A powerful logging system  for messages and errors in nodejs.",
   "scripts": {
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@mongez/copper": "^2.1.2",
-    "@mongez/reinforcements": "^3.2.0",
+    "@mongez/reinforcements": "^3.3.0",
     "@warlock.js/fs": "*",
     "dayjs": "^1.11.9",
     "safe-stable-stringify": "^2.5.0"
