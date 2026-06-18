@@ -340,6 +340,28 @@ export default defineConfig({
             content: "ARcACUyhaNj7uvsLp5qhjGhzWvOQMqX9ZGxS8wpHT0I",
           },
         },
+        // Open Graph / Twitter social-card image (link previews in
+        // WhatsApp, Slack, Telegram, X, …). og:title/description/url are
+        // emitted per-page by Starlight; only the image needs adding.
+        { tag: "meta", attrs: { property: "og:type", content: "website" } },
+        {
+          tag: "meta",
+          attrs: { property: "og:image", content: "https://warlock.js.org/og.png" },
+        },
+        { tag: "meta", attrs: { property: "og:image:width", content: "1200" } },
+        { tag: "meta", attrs: { property: "og:image:height", content: "630" } },
+        {
+          tag: "meta",
+          attrs: {
+            property: "og:image:alt",
+            content: "Warlock.js — AI-native TypeScript framework",
+          },
+        },
+        { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } },
+        {
+          tag: "meta",
+          attrs: { name: "twitter:image", content: "https://warlock.js.org/og.png" },
+        },
       ],
       components: {
         // Full chrome replacement — header, sidebar, footer all custom.
