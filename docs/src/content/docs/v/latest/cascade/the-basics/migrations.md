@@ -9,6 +9,34 @@ The [Migrations intro](../getting-started/04-migrations-intro.md) covers the sma
 
 The guiding principle: **`Migration.create` and `Migration.alter` are declarative and cover almost everything.** You pass an object describing the end state; Cascade emits the DDL and infers the rollback. The `extends Migration` class form is a narrow escape hatch for genuinely imperative migrations — reach for it last, not first.
 
+## What `Migration.create` adds for you
+
+Beyond the columns you declare, `Migration.create` wires a few system columns automatically so you never declare them by hand:
+
+- **Primary key** — resolved from the `primaryKey` option → the data source's `migrationDefaults.primaryKey` → `"int"`. Pass `{ primaryKey: "uuid" | "bigInt" | false }` to override.
+- **Timestamps** — `createdAt` / `updatedAt`, on by default. Disable with `{ timestamps: false }`.
+- **Soft-delete column** — `deletedAt`, added **only when the model's delete strategy resolves to `"soft"`**.
+
+### The soft-delete column
+
+The strategy is resolved exactly as `destroy()` resolves it: the model's static `deleteStrategy` → the data source's `defaultDeleteStrategy` → `"permanent"`. Because soft delete is usually an app-wide policy set once on the data source, every `Migration.create` then gets the `deletedAt` column with no extra config — and the schema stays in step with what `destroy()` writes at runtime.
+
+```ts
+// User (or the data source) sets deleteStrategy "soft" → deletedAt is added.
+export default Migration.create(User, {
+  name: text().notNullable(),
+});
+```
+
+Details:
+
+- The column name comes from the model's `deletedAtColumn` (default `"deletedAt"`), so it matches the runtime exactly.
+- It fires for `"soft"` only — `"permanent"` and `"trash"` add nothing. No driver defaults to `"soft"`, so it never appears unless soft delete is opted into.
+- Tri-state opt-out via the third argument: `{ softDeletes: false }` never adds it; `{ softDeletes: true }` always adds it; omitted follows the resolved strategy.
+- A model with `deletedAtColumn = false` is never wired, and a `deletedAt` you declare yourself in the column map is not duplicated.
+
+See [delete strategies](../digging-deeper/delete-strategies.md) for the strategies themselves and how to query soft-deleted rows.
+
 ## Column helpers — the full vocabulary
 
 Every column starts with a helper imported from `@warlock.js/cascade`. Each returns a builder you chain modifiers onto.

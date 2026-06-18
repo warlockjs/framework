@@ -30,15 +30,427 @@
       "slug": "core"
     },
     {
+      "name": "@warlock.js/herald",
+      "slug": "herald"
+    },
+    {
       "name": "@warlock.js/logger",
       "slug": "logger"
     },
     {
       "name": "@warlock.js/notifications",
       "slug": "notifications"
+    },
+    {
+      "name": "@warlock.js/seal",
+      "slug": "seal"
+    },
+    {
+      "name": "create-warlock",
+      "slug": "create-warlock"
     }
   ],
   "releases": [
+    {
+      "version": "4.2.11",
+      "id": "v4-2-11",
+      "date": "June 17, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "Soft deletes go end-to-end in <strong><code>@warlock.js/cascade</code></strong> — <code>Migration.create</code> auto-wires the <code>deletedAt</code> column for soft-delete models and soft <code>destroy()</code> keeps the in-memory model in sync. <strong><code>@warlock.js/core</code></strong> adds the <code>lowerStage3Decorators()</code> test plugin and <code>warlock add notifications</code>; <strong><code>@warlock.js/notifications</code></strong> gains model-driven <code>columnMap</code>, presence-based read-state, and multi-tenant support. The whole family — and the <code>create-warlock</code> project template — moves to <code>@mongez/reinforcements</code> 3.3.0.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>Migration.create</code> auto-wires the <code>deletedAt</code> column when the model's delete strategy is <code>\"soft\"</code> (opt out with <code>{ softDeletes: false }</code>)"
+            },
+            {
+              "type": "Changed",
+              "html": "Require <code>@mongez/reinforcements</code> ≥ 3.3.0 — the update validator now uses its new <code>when</code> helper for conditional schema fields"
+            },
+            {
+              "type": "Fixed",
+              "html": "Soft <code>destroy()</code> now sets <code>deletedAt</code> on the in-memory model — the instance was left stale before"
+            },
+            {
+              "type": "Fixed",
+              "html": "Update validation no longer strips or rejects the <code>deletedAt</code> column under strict mode (now whitelisted like the timestamps)"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>lowerStage3Decorators()</code> — Vite/Vitest plugin that lowers TC39 Stage-3 decorators with esbuild before oxc / the SSR rewrite mangles them; drop it first in a config's <code>plugins</code> so model-decorated files load under Vitest 4 / Vite 8."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock add notifications</code> — installs <code>@warlock.js/notifications</code> (+ the <code>mail</code> feature), ejects <code>config/notifications.ts</code>, and scaffolds the app-owned <code>Notification</code> model + migration into <code>src/app/notifications/</code> (idempotent; async queue opt-in)."
+            },
+            {
+              "type": "Added",
+              "html": "Notifications connector — built-in connector (priority <code>8</code>, early phase) reads <code>config/notifications.ts</code> at boot and passes it to <code>setNotificationConfig</code>; lazy-imports <code>@warlock.js/notifications</code> (config-gated), so core keeps no hard dependency on it."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock add test</code> now scaffolds a <code>vite.config.ts</code> that includes <code>lowerStage3Decorators()</code>, so a fresh project can test decorated models out of the box."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock add test</code> <code>test</code> / <code>test:coverage</code> scripts now run one-shot (<code>vitest run</code>) instead of watch mode — CI-safe by default."
+            },
+            {
+              "type": "Changed",
+              "html": "Bumped <code>@mongez/reinforcements</code> to 3.3.0"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>startHttpTestServer</code> now starts early-phase connectors (database, cache, logger, …) before loading app modules, then late-phase (http, socket) after — mirroring dev/prod boot order; fixes a <code>MissingDataSourceError</code> when a module's boot side-effect queries the DB at import under the Vitest integration harness."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "In-app column mapping moved onto the model as <code>static columnMap</code> (<code>recipient</code> / <code>tenant</code> / <code>readAt</code> / <code>isRead</code>); accessors, the repository, the <code>database</code> channel, and <code>notificationColumns</code> all derive from it. New exported <code>NotificationColumnMap</code> type."
+            },
+            {
+              "type": "Changed",
+              "html": "Read-state is presence-based: declaring <code>readAt</code>, <code>isRead</code>, or both selects the representation; omitting both defaults to a <code>read_at</code> timestamp. The mode-agnostic <code>unread</code> filter replaces the <code>isRead</code> filter key."
+            },
+            {
+              "type": "Changed",
+              "html": "Multi-tenant support: when the model declares a <code>tenant</code> column, the <code>database</code> channel reads it off the recipient and <code>createFor(recipientId, input, tenantId?)</code> writes it."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>inApp.list</code> / <code>inApp.listUnread</code> now forward full list options (<code>page</code> / <code>limit</code> / <code>orderBy</code> + filters), not just filter keys."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>notificationColumns(model)</code> derives recipient / tenant / read-state columns from <code>columnMap</code>; the SQL-vs-MongoDB <code>dataSource</code> branch is removed."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Bumped <code>@mongez/reinforcements</code> to 3.3.0"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Bumped <code>@mongez/reinforcements</code> to 3.3.0"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Bumped <code>@mongez/reinforcements</code> to 3.3.0"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Bumped <code>@mongez/reinforcements</code> to 3.3.0"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Bumped <code>@mongez/reinforcements</code> to 3.3.0"
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Bumped <code>@mongez/reinforcements</code> to 3.3.0 (package dependency + project template)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "4.2.10",
+      "id": "v4-2-10",
+      "date": "June 17, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "Patch release: <strong><code>@warlock.js/auth</code></strong> moves <code>@mongez/copper</code> / <code>@mongez/events</code> / <code>@mongez/reinforcements</code> from peer to regular dependencies, clearing the <code>unmet peer dependency</code> warnings on install — they're framework-internal utilities your app never provides. <strong><code>@warlock.js/logger</code></strong>'s console timestamp switches to a cleaner 256-color <code>slate</code> gray. <strong><code>create-warlock</code></strong> ships the latest <code>@mongez/*</code> versions in its project template. The rest of the family is re-published at 4.2.10 to keep the lockstep version line.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>@mongez/copper</code>, <code>@mongez/events</code>, and <code>@mongez/reinforcements</code> are now regular <code>dependencies</code> instead of <code>peerDependencies</code> — matching every other framework package. They're framework-internal utilities your app never imports directly, so declaring them as peers forced consumers to install them and produced <code>unmet peer dependency</code> warnings on install. They now resolve transitively and silently."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<code>ConsoleLog</code>'s timestamp (and the <code>↳</code> context arrow) switch from bright-black <code>gray</code> to the 256-color neutral <code>slate</code>. Bright-black sits too close to the background on most terminal themes and reads muddy; <code>slate</code> is recessive but cleanly legible."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The project template now pins the latest <code>@mongez/*</code> versions — <code>@mongez/reinforcements@^3.2.0</code> and <code>@mongez/agent-kit@^1.2.0</code> — so freshly scaffolded apps start on current dependencies. (<code>@warlock.js/*</code> versions in the template are still rewritten to the scaffolder's own version at install time.)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "4.2.9",
+      "id": "v4-2-9",
+      "date": "June 17, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "Patch release: <strong><code>@warlock.js/logger</code></strong>'s <code>ConsoleLog</code> is retuned for scannability — a time-only timestamp (<code>HH:mm:ss.SSS</code>) dimmed to gray, fixed-width level tags so the timestamp / module / action columns align, and <code>fatal</code> restored to a white-on-bright-red <strong>background badge</strong> so it can't be missed next to <code>error</code>. The rest of the family is re-published at 4.2.9 to keep the lockstep version line; no other functional changes.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<code>ConsoleLog</code> output is retuned for scannability: - <strong>Time-only timestamp</strong> (<code>HH:mm:ss.SSS</code>) instead of the full ISO string — within a dev session the date is just noise. Persistent channels (<code>FileLog</code> / <code>JSONFileLog</code>) still record the full ISO timestamp. - The timestamp moves from yellow to <strong>gray</strong> so the colored level + message lead the eye; <code>module</code> (cyan) and <code>action</code> (magenta) keep their colors for at-a-glance subsystem scanning. - <strong>Aligned columns</strong> — each level tag is padded to a fixed width so the timestamp / module / action columns line up vertically across a stream of logs. - <strong><code>fatal</code> is restored to a background badge</strong> — white, bold text on a bright-red background (<code>☠ fatal</code>), the same column width as the other tags but deliberately louder than <code>error</code>'s plain red, so an unrecoverable failure can't be missed (4.2.8 had briefly flattened it to a plain label)."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "4.2.8",
+      "id": "v4-2-8",
+      "date": "June 17, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "Patch release: <strong><code>@warlock.js/logger</code></strong>'s <code>ConsoleLog</code> now prints the level name beside each icon (<code>⚙ debug</code>, <code>ℹ info</code>, <code>⚠ warn</code>, <code>✗ error</code>, <code>✓ success</code>, <code>☠ fatal</code>) for at-a-glance readability; <code>fatal</code> drops the bright-red background badge for a bold red-bright <code>☠ fatal</code> label. The rest of the family is re-published at 4.2.8 to keep the lockstep version line; no other functional changes.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<code>ConsoleLog</code> now prints the level name beside each level's icon — <code>⚙ debug</code>, <code>ℹ info</code>, <code>⚠ warn</code>, <code>✗ error</code>, <code>✓ success</code>, <code>☠ fatal</code> — so entries are readable at a glance without memorizing icons. <code>fatal</code> also switches from a bright-red <strong>background</strong> badge to a bold red-bright <code>☠ fatal</code> label, consistent with the other levels."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "4.2.7",
+      "id": "v4-2-7",
+      "date": "June 17, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "Patch release: <strong><code>create-warlock</code></strong> now ships its <code>templates/</code> folder, so scaffolding a new project works from the installed package — it was missing from the build, which made the wizard fail with \"Something went wrong\" at the template-copy step. The rest of the family is re-published at 4.2.7 to keep the lockstep version line; no other functional changes.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "The published package now ships its <code>templates/</code> folder, so scaffolding a new project works from the installed package — it was missing from the build, which made the wizard fail with \"Something went wrong\" at the template-copy step. The rest of the family is re-published at 4.2.7 to keep the lockstep version line; no other functional changes."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "4.2.6",
+      "id": "v4-2-6",
+      "date": "June 17, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "Patch release: <strong><code>create-warlock</code></strong> now ships its <code>bin</code> folder again, so the <code>create-warlock</code> CLI works from the installed package — it was omitted from the 4.2.5 build. The rest of the family is re-published at 4.2.6 to keep the lockstep version line; no other functional changes.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "The published package now ships its <code>bin</code> folder again, so the <code>create-warlock</code> CLI works from the installed package — it was omitted from the 4.2.5 build. The rest of the family is re-published at 4.2.6 to keep the lockstep version line; no other functional changes."
+            }
+          ]
+        }
+      ]
+    },
     {
       "version": "4.2.5",
       "id": "v4-2-5",

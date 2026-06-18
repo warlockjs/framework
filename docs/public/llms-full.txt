@@ -9086,6 +9086,8 @@ export class User extends Model<UserSchema> {
 }
 ```
 
+When the strategy resolves to `"soft"`, `Migration.create(Model, { … })` adds the `deletedAt` column for you (using `deletedAtColumn`), so the schema matches what `destroy()` writes — no need to declare it in the migration. Opt out per table with `{ softDeletes: false }`. See [`@warlock.js/cascade/write-migration/SKILL.md`](@warlock.js/cascade/write-migration/SKILL.md).
+
 ## Override per-call
 
 ```ts
@@ -9095,6 +9097,8 @@ await user.destroy({ strategy: "trash" });       // move to the trash table
 ```
 
 Resolution order: `destroy({ strategy })` → `static deleteStrategy` → data source `defaultDeleteStrategy` → `"permanent"`.
+
+After a `"soft"` destroy the in-memory instance reflects the change — `model.get(deletedAtColumn)` returns the persisted timestamp (the row stays, so the instance stays usable).
 
 ## Restoring — static, by id
 
@@ -10752,9 +10756,27 @@ What happens:
 - `Migration.create(Model, columns)` reads `User.table` for the table name and builds the DDL from the column map; it infers the rollback for you.
 - Column helpers (`text`, `uuid`, `string`, `integer`, …) are imported from `@warlock.js/cascade`. Each returns a builder you chain modifiers onto (`.notNullable()`, `.unique()`, `.nullable()`, `.default(...)`, `.references(table)`).
 - The `id` primary key and `createdAt` / `updatedAt` timestamps are added **automatically** — don't declare them. Naming follows the data source convention (snake_case on Postgres, camelCase on MongoDB).
+- The soft-delete column is added **automatically when the model's delete strategy resolves to `"soft"`** — don't declare it. See below.
 - `export default` is required — the runner imports each file's default export.
 
 Evolve an existing table with `Migration.alter(Model, { ... })` (add / drop / rename / modify columns and indexes); it's declarative the same way.
+
+## Soft-delete column is auto-wired
+
+If the model uses soft deletes, `Migration.create` adds the `deletedAt` column for you — you don't declare it, the same way you don't declare `createdAt` / `updatedAt`. The strategy is resolved exactly as `destroy()` resolves it: model static `deleteStrategy` → data source `defaultDeleteStrategy` → `"permanent"`. Since soft delete is usually an app-wide policy set on the data source, every `Migration.create` then gets the column with zero extra config.
+
+```ts
+// User (or the data source) has deleteStrategy "soft" → deletedAt is added.
+export default Migration.create(User, {
+  name: text().notNullable(),
+});
+```
+
+- The column name comes from the model's `deletedAtColumn` (default `"deletedAt"`), so it matches what `destroy()` writes at runtime.
+- It only fires for the `"soft"` strategy — `"permanent"` and `"trash"` add nothing. No driver defaults to `"soft"`, so this never fires unless soft delete is opted into.
+- Opt out for one table with `{ softDeletes: false }`; force it on with `{ softDeletes: true }`. A model with `deletedAtColumn = false` is never wired. An already-declared `deletedAt` in the map is not duplicated.
+
+See [`@warlock.js/cascade/configure-delete-strategy/SKILL.md`](@warlock.js/cascade/configure-delete-strategy/SKILL.md) for the strategies themselves.
 
 ## Running migrations
 
@@ -10858,7 +10880,7 @@ For a class-form migration not bound to a model, set `public readonly dataSource
 ## Things NOT to do
 
 - Don't reach for a `migration({ up(driver) {...} })` factory or `driver.createTable(name, (table) => {...})` — that API doesn't exist. Use `Migration.create(Model, { columns })`, or `extends Migration` with `this.createTable()` for the imperative case.
-- Don't declare `id` / `createdAt` / `updatedAt` — they're added for you.
+- Don't declare `id` / `createdAt` / `updatedAt` — they're added for you. Same for `deletedAt` when the model's strategy is `"soft"` — it's auto-wired (opt out with `{ softDeletes: false }`).
 - Don't auto-run migrations from app code in production. Run them as a deploy step.
 - Don't put irreversible data backfills in the same file as a schema change — split them so rollback only undoes the schema.
 - Don't change a committed migration. Add a new one. Editing a migration that already ran in production puts environments out of sync.
@@ -10867,6 +10889,7 @@ For a class-form migration not bound to a model, set `public readonly dataSource
 
 - [`@warlock.js/cascade/run-cascade-cli/SKILL.md`](@warlock.js/cascade/run-cascade-cli/SKILL.md) — CLI flags + Operations API for programmatic runs
 - [`@warlock.js/cascade/manage-data-sources/SKILL.md`](@warlock.js/cascade/manage-data-sources/SKILL.md) — multi-DB migrations
+- [`@warlock.js/cascade/configure-delete-strategy/SKILL.md`](@warlock.js/cascade/configure-delete-strategy/SKILL.md) — soft / trash / permanent deletes and the `deletedAt` column
 
 
 ================================================================================
@@ -16384,9 +16407,9 @@ Zero config. Colored, icon-prefixed lines to the terminal.
 import { ConsoleLog } from "@warlock.js/logger";
 
 new ConsoleLog();
-// ⚙ (2024-03-15T10:22:00.000Z) [auth] [hashPassword] Hashing started
-// ℹ (2024-03-15T10:22:01.482Z) [users] [register] New user created
-// ✗ (2024-03-15T10:22:03.111Z) [payments] [charge] Card declined
+// ⚙ debug (10:22:00.000) [auth] [hashPassword] Hashing started
+// ℹ info (10:22:01.482) [users] [register] New user created
+// ✗ error (10:22:03.111) [payments] [charge] Card declined
 ```
 
 Properties:
@@ -16402,7 +16425,7 @@ By default `ConsoleLog` drops the `context` payload (the file/JSON channels stil
 new ConsoleLog({ showContext: true });
 
 log.info("payments", "charge", "card declined", { userId: 42, amount: 1999 });
-// ℹ (…) [payments] [charge] card declined
+// ℹ info (…) [payments] [charge] card declined
 //   ↳ { userId: 42, amount: 1999 }
 ```
 
@@ -16972,7 +16995,7 @@ Returns an end-function. Calling it emits an `info` entry with `completed in <ms
 const end = log.timer("db", "users.findById");
 const user = await usersRepo.findById(id);
 end({ id, found: !!user });
-// ℹ [db] [users.findById] completed in 12ms
+// ℹ info [db] [users.findById] completed in 12ms
 //   ↳ { durationMs: 12, id: "abc", found: true } (when ConsoleLog has showContext: true)
 ```
 
@@ -20373,22 +20396,19 @@ Each `request()` generates its own correlation ID and an exclusive reply queue u
 
 ---
 name: configure-notifications
-description: 'Wire `@warlock.js/notifications` at boot — `setNotificationConfig({ default, channels, queue?, preferences?, rateLimit? })` exports the active config the dispatcher reads. `default`: channels used as fallback when no `via` is given; `channels`: registry mapping name → factory result (`mailChannel`, `inApp.configure`, custom `defineChannel`); `queue`: optional `QueueDispatcher` (`.queue()` throws without it); `preferences`: optional `PreferenceProvider` (drops channels the recipient muted); `rateLimit`: optional `RateLimiter` (drops channels exceeding per-recipient budgets). Triggers: `setNotificationConfig`, `getNotificationConfig`, `NotificationConfig`, `config/notifications.ts`, `mailChannel`, `inApp.configure`, "configure notifications", "wire notifications at boot", "set preferences provider", "set rate limit"; typical import `import { type NotificationConfig, mailChannel, inApp, setNotificationConfig } from "@warlock.js/notifications"`. Skip: building a reusable notification — `@warlock.js/notifications/define-notification/SKILL.md`; the in-app read API — `@warlock.js/notifications/use-in-app/SKILL.md`; adding a custom channel — `@warlock.js/notifications/define-channel/SKILL.md`.'
+description: 'Wire `@warlock.js/notifications` via a declarative `src/config/notifications.ts` that exports a `NotificationConfig` default — the notifications connector registers it at boot, so app code never calls `setNotificationConfig`. `channels`: registry mapping name → factory result (`mailChannel`, `inApp.configure`, custom `defineChannel`); `queue`: optional `QueueDispatcher` (`.queue()` throws without it); `preferences`: optional `PreferenceProvider` (drops channels the recipient muted); `rateLimit`: optional `RateLimiter` (drops channels exceeding per-recipient budgets). Triggers: `config/notifications.ts`, `NotificationConfig`, `setNotificationConfig`, `getNotificationConfig`, `mailChannel`, `inApp.configure`, "configure notifications", "wire notifications at boot", "set preferences provider", "set rate limit"; typical import `import { type NotificationConfig, mailChannel, inApp } from "@warlock.js/notifications"`. Skip: building a reusable notification — `@warlock.js/notifications/define-notification/SKILL.md`; the in-app read API — `@warlock.js/notifications/use-in-app/SKILL.md`; adding a custom channel — `@warlock.js/notifications/define-channel/SKILL.md`.'
 ---
 
 # Configure notifications
 
-One call at boot wires every channel + the optional gates. The dispatcher reads from this config on every send.
+`src/config/notifications.ts` exports a `NotificationConfig` as its default; the notifications connector registers it at boot and the dispatcher reads from it on every send. The file is **declarative** — you never call `setNotificationConfig` yourself (the connector does, the same way the rest of `src/config/*.ts` is wired).
+
+> `npx warlock add notifications` ejects this file pre-wired (mail + in-app) alongside the `Notification` model + migration and the recipient-scoped read/dismiss routes + controllers. Edit the ejected config to taste — the sections below are the full surface.
 
 ## Minimal
 
 ```ts title="src/config/notifications.ts"
-import {
-  type NotificationConfig,
-  inApp,
-  mailChannel,
-  setNotificationConfig,
-} from "@warlock.js/notifications";
+import { type NotificationConfig, inApp, mailChannel } from "@warlock.js/notifications";
 import { Notification } from "app/notifications/notification.model";
 
 const config: NotificationConfig = {
@@ -20398,7 +20418,7 @@ const config: NotificationConfig = {
   },
 };
 
-setNotificationConfig(config);
+export default config;
 ```
 
 The `database` channel is returned by `inApp.configure({ model | repository })` — it binds the in-app store AND returns the channel, so the read side + the write side share ONE repository instance.
@@ -20418,10 +20438,10 @@ const config: NotificationConfig = {
   // optional gates — both app-owned; package ships no defaults
   preferences: userPreferences,            // drops channels recipient muted
   rateLimit,                               // drops channels over budget
-  queue: heraldQueue,                      // backs `.queue()` (Phase 2)
+  queue: heraldQueue(),                    // backs `.queue()` (needs @warlock.js/herald)
 };
 
-setNotificationConfig(config);
+export default config;
 ```
 
 ## Channel keys must match the registry
@@ -20447,7 +20467,8 @@ Two paths; mutually exclusive at the type level.
 // 90% case — pass the model class; default repo built internally.
 database: inApp.configure({ model: Notification }),
 
-// 10% case — pass a custom repo (when you need filterBy overrides or extras).
+// 10% case — pass a custom repo (only for EXTRA query methods; column names
+// come from the model's columnMap, not a repo override).
 database: inApp.configure({ repository: notificationsRepository }),
 ```
 
@@ -20496,7 +20517,7 @@ const cfg = getNotificationConfig();   // throws NotificationsNotConfiguredError
 
 ## Tests
 
-For tests, reset between cases:
+Tests call `setNotificationConfig` directly — bypassing the connector — to set state, then `resetNotificationConfig` to tear down:
 
 ```ts
 import { resetNotificationConfig, setNotificationConfig } from "@warlock.js/notifications";
@@ -20702,7 +20723,7 @@ await marketing.queue(user, payload, {
 });
 ```
 
-`ctx` carries `locale` + `meta` from `SendOptions`. `meta` flows through to the `sent` / `failed` / `skipped` events too.
+`ctx` carries `locale` + `meta` from `SendOptions`. `meta` flows through to every observability event too.
 
 ## Database channel — `type` is defaulted
 
@@ -20735,16 +20756,16 @@ await orderShipped.only("mail").send(user, { order });
 
 ```ts
 await orderShipped.queue(user, { order }, { delay: "10m" });
-// Throws NoQueueDispatcherError if `setNotificationConfig({ queue })` not set.
+// Throws NoQueueDispatcherError if no `queue` is configured in config/notifications.ts.
 ```
 
 ## SendOptions
 
 | Field | Effect |
 |---|---|
-| `delay` | Defer the dispatch — `"10m"` / `"3d"` / `600` (seconds). |
+| `delay` | Reserved — `"10m"` / `"3d"` / `600` (seconds). NOT honored yet: both `.send()` and the current `.queue()` worker dispatch immediately; delay-aware delivery is a follow-up. |
 | `locale` | Passed to renderers via `RenderContext.locale`. |
-| `meta` | Passed to renderers + included in `sent`/`failed`/`skipped` events. |
+| `meta` | Passed to renderers + included in every observability event. |
 | `idempotencyKey` | Injected into the database payload (dedupe via unique index). |
 | `force` | Bypass `PreferenceProvider`. Does NOT bypass `RateLimiter`. |
 | `type` | Ignored by `defineNotification` — see `send-ad-hoc` for ad-hoc gating. |
@@ -20758,7 +20779,7 @@ Per-recipient: each recipient gets an independent `Promise.allSettled`. Per-chan
 - [`notifications-basics/SKILL.md`](../notifications-basics/SKILL.md) — package front door.
 - [`send-ad-hoc/SKILL.md`](../send-ad-hoc/SKILL.md) — `notify.<channel>` per-channel shorthand.
 - [`configure-notifications/SKILL.md`](../configure-notifications/SKILL.md) — wire channels + preferences + rate-limit + queue.
-- [`observe-notifications/SKILL.md`](../observe-notifications/SKILL.md) — `notifications.on("sent" | "failed" | "skipped", …)`.
+- [`observe-notifications/SKILL.md`](../observe-notifications/SKILL.md) — `notifications.on("sending" | "sent" | "failed" | "skipped", …)`.
 
 
 ## notifications-basics  `@warlock.js/notifications/notifications-basics/SKILL.md`
@@ -20787,8 +20808,10 @@ It is NOT a queue, a template engine, a transport library, or an analytics pipel
 
 ## Minimal end-to-end
 
+`npx warlock add notifications` ejects the config + model + migration. The config is **declarative** — the notifications connector registers its default export at boot, so you never call `setNotificationConfig` yourself.
+
 ```ts title="src/config/notifications.ts"
-import { type NotificationConfig, mailChannel, inApp, setNotificationConfig } from "@warlock.js/notifications";
+import { type NotificationConfig, mailChannel, inApp } from "@warlock.js/notifications";
 import { Notification } from "app/notifications/notification.model";
 
 const config: NotificationConfig = {
@@ -20798,7 +20821,7 @@ const config: NotificationConfig = {
   },
 };
 
-setNotificationConfig(config);
+export default config;
 ```
 
 ```ts title="src/app/orders/notifications/order-shipped.ts"
@@ -20853,7 +20876,7 @@ await inApp.markAsRead(user, "ntf_123");
 - [`send-ad-hoc/SKILL.md`](../send-ad-hoc/SKILL.md) — `notify.<channel>` shorthand.
 - [`use-in-app/SKILL.md`](../use-in-app/SKILL.md) — `inApp` read API.
 - [`define-channel/SKILL.md`](../define-channel/SKILL.md) — custom channels.
-- [`write-notification-migration/SKILL.md`](../write-notification-migration/SKILL.md) — driver-aware columns.
+- [`write-notification-migration/SKILL.md`](../write-notification-migration/SKILL.md) — columnMap-driven columns.
 - [`observe-notifications/SKILL.md`](../observe-notifications/SKILL.md) — events + metrics.
 
 
@@ -20861,30 +20884,43 @@ await inApp.markAsRead(user, "ntf_123");
 
 ---
 name: observe-notifications
-description: 'Wire metrics, logging, and audits via `notifications.on(event, handler)` — three events (`sent`, `failed`, `skipped`) fire per (channel, recipient). `sent`: dispatch succeeded. `failed`: channel threw (carries the Error). `skipped`: pre-send gate dropped this channel (carries `reason: "preference" | "rate-limit"`). Handler exceptions are logged-and-swallowed so one bad listener can not break the dispatcher. `on(...)` returns an unsubscribe function; `off(event, handler)` exists for symmetry. Triggers: `notifications.on`, `notifications.off`, `"sent"` event, `"failed"` event, `"skipped"` event, `NotificationEvents`, "notification metrics", "notification audit log", "track notification drops", "track preference drops"; typical import `import { notifications } from "@warlock.js/notifications"`. Skip: building notifications — `@warlock.js/notifications/define-notification/SKILL.md`; configuring the preference/rate-limit gates that produce `skipped` — `@warlock.js/notifications/configure-notifications/SKILL.md`.'
+description: 'Wire metrics, logging, tracing, and audits via `notifications.on(event, handler)` — four events fire per (channel, recipient): `sending` (gates passed, about to hit the transport), `sent` (succeeded), `failed` (channel threw — carries the Error), `skipped` (a pre-send gate dropped it — carries `reason: "preference" | "rate-limit"`). Every event carries the recipient as `notifiable?` (undefined only for raw-target ad-hoc sends) and a `dispatchId` — `sending` and its terminal `sent`/`failed` share it, so observers can pair them (spans, latency, hung-send detection). `sent`/`failed` also carry `durationMs`. Handler exceptions are logged-and-swallowed so one bad listener can not break the dispatcher. `on(...)` returns an unsubscribe function; `off(event, handler)` exists for symmetry. Triggers: `notifications.on`, `notifications.off`, `"sending"` event, `"sent"` event, `"failed"` event, `"skipped"` event, `dispatchId`, `durationMs`, `NotificationEvents`, "notification metrics", "notification latency", "trace notifications", "notification audit log", "track notification drops"; typical import `import { notifications } from "@warlock.js/notifications"`. Skip: building notifications — `@warlock.js/notifications/define-notification/SKILL.md`; configuring the preference/rate-limit gates that produce `skipped` — `@warlock.js/notifications/configure-notifications/SKILL.md`.'
 ---
 
 # Observe notifications
 
-Every dispatch emits one of three events per (channel, recipient).
+Every dispatch emits a `sending` event then a terminal `sent` / `failed` — or a `skipped` if a gate dropped it — per (channel, recipient).
 
 ```ts
 import { notifications } from "@warlock.js/notifications";
 
-notifications.on("sent",    ({ channel, options }) => metrics.inc(`notif.${channel}.sent`, options.meta));
-notifications.on("failed",  ({ channel, error }) => log.error(`notif.${channel}`, error));
-notifications.on("skipped", ({ channel, reason }) => metrics.inc(`notif.${channel}.skipped.${reason}`));
+// latency + delivery, keyed by recipient
+notifications.on("sent", ({ channel, notifiable, durationMs, options }) =>
+  metrics.timing(`notif.${channel}.sent`, durationMs, { userId: notifiable?.id, ...options.meta }));
+
+notifications.on("failed", ({ channel, notifiable, error }) =>
+  log.error(`notif.${channel}`, error, { userId: notifiable?.id }));
+
+notifications.on("skipped", ({ channel, reason }) =>
+  metrics.inc(`notif.${channel}.skipped.${reason}`));
+
+// pair `sending` → terminal by dispatchId — open a span / arm a hung-send watchdog
+notifications.on("sending", ({ dispatchId, channel, notifiable }) =>
+  tracer.open(dispatchId, { channel, userId: notifiable?.id }));
 ```
 
 ## Events
 
 | Event | Fires when | Payload |
 |---|---|---|
-| `sent` | Channel dispatched OR job enqueued | `{ channel, notifiable?, payload, options }` |
-| `failed` | `channel.send` (or `queue.dispatch`) threw | `{ channel, notifiable?, payload, error, options }` |
-| `skipped` | A pre-send gate dropped this channel | `{ channel, notifiable?, reason, options }` — `reason: "preference" \| "rate-limit"` |
+| `sending` | Gates passed; about to hit the transport (sync) / enqueue (queue) | `{ dispatchId, channel, notifiable?, payload, options }` |
+| `sent` | Channel dispatched OR job enqueued | `{ dispatchId, channel, notifiable?, payload, options, durationMs }` |
+| `failed` | `channel.send` (or `queue.dispatch`) threw | `{ dispatchId, channel, notifiable?, payload, error, options, durationMs }` |
+| `skipped` | A pre-send gate dropped this channel | `{ dispatchId, channel, notifiable?, reason, options }` — `reason: "preference" \| "rate-limit"` |
 
-`notifiable` is undefined for raw-target ad-hoc sends (`notify.mail("x@y.com", …)`).
+`notifiable` is the recipient **model** (undefined only for raw-target ad-hoc sends like `notify.mail("x@y.com", …)`) — read `notifiable?.id` / `notifiable?.get(...)` to key your metrics or logs.
+
+`dispatchId` is unique per (channel, recipient) dispatch — `sending` and its terminal `sent`/`failed` share it, so you can pair them for a span, a latency measurement, or a watchdog that flags a `sending` with no terminal (a hung send). `durationMs` is transport time on a sync send, enqueue time on a queued one.
 
 `options` is the `SendOptions` passed at the call site — including `meta`. Tagging a send with `meta: { campaignId }` lets downstream observers join the event back to the campaign.
 
@@ -20905,7 +20941,7 @@ notifications.off("sent", handler);
 
 ## Handler isolation
 
-A handler that throws is logged and swallowed — the other handlers for the same event still run, and the dispatcher itself never observes the throw. Don't depend on observer side-effects to "block" a send.
+A handler that throws is logged and swallowed — the other handlers for the same event still run, and the dispatcher never observes the throw. Observers can't **abort** a send (there's no veto here — use `preferences` / `rateLimit` for that). They can delay it, though: `sending` is awaited before the transport, so keep that handler fast.
 
 ## See also
 
@@ -20918,7 +20954,7 @@ A handler that throws is logged and swallowed — the other handlers for the sam
 
 ---
 name: queue-notifications
-description: 'Send notifications asynchronously via the herald-backed queue. `heraldQueue({ channel?, broker? })` is a `QueueDispatcher` you pass to `setNotificationConfig({ queue })`; then `notif.queue(to, data, options?)` / `notify` publish a rendered job instead of sending inline. `startNotificationsWorker({ channel?, broker? })` runs the consumer (in a worker or the web process) that pulls jobs and runs `channel.send`. Both lazy-import `@warlock.js/herald` (optional peer) — a missing package throws a curated install message at use time. `defineNotification` renders payloads + resolves routes BEFORE queuing, so the job (`{ channel, route, payload, options }`) is fully serializable — no model re-hydration. Without a queue configured, `.queue()` rejects `NoQueueDispatcherError`. Triggers: `heraldQueue`, `startNotificationsWorker`, `QueueDispatcher`, `.queue(`, "async notifications", "queue notifications", "notification worker", "background notifications", `notifications.dispatch`; typical import `import { heraldQueue, startNotificationsWorker } from "@warlock.js/notifications"`. Skip: synchronous sends — `@warlock.js/notifications/define-notification/SKILL.md`; herald itself — `@warlock.js/herald/*`.'
+description: 'Send notifications asynchronously via the herald-backed queue. `heraldQueue({ channel?, broker? })` is a `QueueDispatcher` you add to the `queue` slot of the declarative `config/notifications.ts` (the connector registers it at boot); then `notif.queue(to, data, options?)` / `notify` publish a rendered job instead of sending inline. `startNotificationsWorker({ channel?, broker? })` runs the consumer (in a worker or the web process) that pulls jobs and runs `channel.send`. Both lazy-import `@warlock.js/herald` (optional peer) — a missing package throws a curated install message at use time. `defineNotification` renders payloads + resolves routes BEFORE queuing, so the job (`{ channel, route, payload, options }`) is fully serializable — no model re-hydration. Without a queue configured, `.queue()` rejects `NoQueueDispatcherError`. Triggers: `heraldQueue`, `startNotificationsWorker`, `QueueDispatcher`, `.queue(`, "async notifications", "queue notifications", "notification worker", "background notifications", `notifications.dispatch`; typical import `import { heraldQueue, startNotificationsWorker } from "@warlock.js/notifications"`. Skip: synchronous sends — `@warlock.js/notifications/define-notification/SKILL.md`; herald itself — `@warlock.js/herald/*`.'
 ---
 
 # Queue notifications (async)
@@ -20929,12 +20965,15 @@ rendered job to herald; a worker delivers it.
 ## Wire the dispatcher
 
 ```ts title="src/config/notifications.ts"
-import { setNotificationConfig, heraldQueue, inApp, mailChannel } from "@warlock.js/notifications";
+import { type NotificationConfig, heraldQueue, inApp, mailChannel } from "@warlock.js/notifications";
+import { Notification } from "app/notifications/notification.model";
 
-setNotificationConfig({
+const config: NotificationConfig = {
   channels: { mail: mailChannel(), database: inApp.configure({ model: Notification }) },
   queue: heraldQueue(), // → `.queue()` now works
-});
+};
+
+export default config; // the notifications connector registers it at boot
 ```
 
 `heraldQueue({ channel?, broker? })` publishes to `"notifications.dispatch"` on
@@ -21078,7 +21117,7 @@ await notify.slack(staff, { text: "Deploy starting" });
 |---|---|
 | `delay` | Reserved for `.queue` paths; not used by `notify.<channel>` (sync). |
 | `locale` | Forwarded to the channel's `send({ options })`. |
-| `meta` | Forwarded to the channel + included in `sent`/`failed`/`skipped` events. |
+| `meta` | Forwarded to the channel + included in every observability event. |
 | `idempotencyKey` | Injected into the database payload (dedupe). |
 | `force` | Bypass `PreferenceProvider`. Does NOT bypass `RateLimiter`. |
 | `type` | Notification type for gating (ad-hoc only). |
@@ -21092,7 +21131,7 @@ await notify.slack(staff, { text: "Deploy starting" });
 - [`notifications-basics/SKILL.md`](../notifications-basics/SKILL.md) — front door + mental model.
 - [`define-notification/SKILL.md`](../define-notification/SKILL.md) — reusable multi-channel.
 - [`define-channel/SKILL.md`](../define-channel/SKILL.md) — register a custom channel.
-- [`observe-notifications/SKILL.md`](../observe-notifications/SKILL.md) — `sent` / `failed` / `skipped` events.
+- [`observe-notifications/SKILL.md`](../observe-notifications/SKILL.md) — `sending` / `sent` / `failed` / `skipped` events.
 
 
 ## use-in-app  `@warlock.js/notifications/use-in-app/SKILL.md`
@@ -21165,68 +21204,89 @@ await inApp.dismiss(user);
 
 The recipient-id is forced into the `where` clause. A controller that receives an `id` from the request and naively calls `inApp.markAsRead(currentUser, id)` cannot accidentally flip another user's row — even if the request contains a forged id. The mutation will simply update 0 rows.
 
-## Behind the scenes — the model + repo
+## Behind the scenes — `columnMap` drives everything
 
-The package ships:
+The model declares its physical columns ONCE via `static columnMap`. The
+shipped `DatabaseNotification` accessors and `BaseNotificationsRepository`
+(read filter + write mapping) both derive from it, so they can never drift:
 
 ```ts
-// extend this in your app's notification model
 abstract class DatabaseNotification extends Model implements NotificationContract {
-  public get recipientId(): Id      { return this.get("user_id"); }
-  public get type(): string         { return this.get("type"); }
-  public get isRead(): boolean      { return this.get("is_read") ?? false; }
-  public get readAt(): Date | null  { return this.get("read_at") ?? null; }
-  public async markRead(): Promise<void> {
-    this.set("is_read", true).set("read_at", new Date());
-    await this.save();
-  }
+  public static columnMap: NotificationColumnMap = {};
+  // recipientId / tenantId / isRead / readAt / markRead all read `columnMap`.
 }
 
-// shipped behavior repository (concrete — extend only for filterBy overrides)
 class BaseNotificationsRepository extends RepositoryManager {
-  public filterBy = {
-    id:              "=",
-    type:            "=",
-    isRead:          ["=", "is_read"],
-    recipientId:     ["=", "user_id"],
-    idempotencyKey:  ["=", "idempotency_key"],
-  };
-  public createFor(recipientId, input)            { /* one insert, isRead: false */ }
-  public createManyFor(recipientIds, input)       { /* bulk fan-out */ }
+  // constructor resolves the model's columnMap → builds `filterBy` +
+  // createFor / markRead / markUnread / deleteFor from it.
+  public createFor(recipientId, input, tenantId?)   { /* one insert, starts unread */ }
 }
 ```
 
-## Your model — override only what differs
+### `columnMap` — map logical roles → your columns
+
+```ts
+export type NotificationColumnMap = {
+  recipient?: string; // recipient FK. Default "user_id"
+  tenant?: string;    // multi-tenant scope, written from the recipient. Omit → single-tenant
+  readAt?: string;    // read-timestamp column
+  isRead?: string;    // read-flag column (indexed)
+};
+```
+
+**Read-state is chosen by which keys are PRESENT:**
+
+- `readAt` only → unread = `read_at IS NULL`; marking read stamps it.
+- `isRead` only → unread = `is_read = false`; no timestamp.
+- both → `is_read` is the indexed filter flag, `read_at` records WHEN.
+
+Declare neither and you get the `readAt`-only default — so a model can omit
+`columnMap` entirely. `unread` is the mode-agnostic read filter on `inApp` /
+the repo; there is no `isRead` filter key to remember.
+
+## Your model — declare `table`, `schema`, and `columnMap`
 
 ```ts title="src/app/notifications/notification.model.ts"
 import { RegisterModel } from "@warlock.js/cascade";
-import { DatabaseNotification } from "@warlock.js/notifications";
+import { v } from "@warlock.js/seal";
+import { DatabaseNotification, type NotificationColumnMap } from "@warlock.js/notifications";
+
+// Mirrors the migration columns; cascade validates + casts every write.
+const notificationSchema = v.object({
+  user_id: v.string(),
+  type: v.string(),
+  title: v.string(),
+  body: v.string().nullish(),
+  payload: v.record(v.any()).nullish(),
+  read_at: v.date().nullish(),
+  idempotency_key: v.string().nullish(),
+});
 
 @RegisterModel()
 export class Notification extends DatabaseNotification {
   public static table = "notifications";
-  // Override accessors ONLY when your columns or driver diverge.
-  // Example (MongoDB nested doc): public get recipientId() { return this.get("user.id"); }
+  public static schema = notificationSchema;
+  // read_at-only, single-tenant. Add `tenant: "organization_id"` for multi-tenant,
+  // swap to `isRead: "is_read"` (or add it) to change the read-state representation.
+  public static columnMap: NotificationColumnMap = { readAt: "read_at" };
 }
 ```
 
+To change columns, edit `columnMap` — the migration (`notificationColumns`), the
+repo filter, and the accessors all follow. For a different driver's naming
+(e.g. MongoDB camelCase), name the columns in `columnMap`
+(`{ recipient: "userId", readAt: "readAt" }`).
+
 ## Custom repository (advanced, optional)
 
-Only when you need custom `filterBy` mappings or extra query methods:
+`columnMap` already covers column naming. Subclass only for EXTRA query methods:
 
 ```ts title="src/app/notifications/notifications.repository.ts"
 import { BaseNotificationsRepository } from "@warlock.js/notifications";
 import { Notification } from "./notification.model";
 
 export class NotificationsRepository extends BaseNotificationsRepository<Notification> {
-  public source = Notification;
-
-  public filterBy = {
-    ...this.filterBy,
-    recipientId: ["=", "audience_id"],   // remap to your column
-    isRead:      ["=", "seen"],
-  };
-
+  public source = Notification; // its columnMap still drives filter + write mapping
   // …extra methods specific to your app
 }
 export const notificationsRepository = new NotificationsRepository();
@@ -21242,7 +21302,7 @@ database: inApp.configure({ repository: notificationsRepository }),
 
 - [`notifications-basics/SKILL.md`](../notifications-basics/SKILL.md) — package front door.
 - [`configure-notifications/SKILL.md`](../configure-notifications/SKILL.md) — wire `inApp.configure` into the config.
-- [`write-notification-migration/SKILL.md`](../write-notification-migration/SKILL.md) — `notificationColumns(Notification)` driver-aware factory.
+- [`write-notification-migration/SKILL.md`](../write-notification-migration/SKILL.md) — `notificationColumns(Notification)`, named from `columnMap`.
 - [`define-notification/SKILL.md`](../define-notification/SKILL.md) — create rows via the database channel.
 
 
@@ -21250,12 +21310,14 @@ database: inApp.configure({ repository: notificationsRepository }),
 
 ---
 name: write-notification-migration
-description: 'Create the notifications table with the driver-aware `notificationColumns(Notification)` factory + cascade `Migration.create`. Returns snake_case columns on PG/MySQL (`user_id`, `is_read`, `read_at`, `idempotency_key`) or camelCase on MongoDB (`userId`, `isRead`, `readAt`, `idempotencyKey`) — picked from the model''s `static dataSource`. Spread + extend for extras (multi-tenant `organization_id`, etc.). Triggers: `notificationColumns`, `Migration.create` for notifications, "create the notifications table", "notification migration", "add organization_id to notifications", `is_read` column, `idempotency_key` column; typical import `import { Migration } from "@warlock.js/cascade"; import { notificationColumns } from "@warlock.js/notifications"`. Skip: generic cascade migration writing — `@warlock.js/cascade/write-migration/SKILL.md`; the model itself — `@warlock.js/notifications/use-in-app/SKILL.md`.'
+description: 'Create the notifications table with the `notificationColumns(Notification)` factory + cascade `Migration.create`. Column NAMES come from the model''s `columnMap` (recipient / tenant / readAt / isRead); the fixed columns are `type` / `title` / `body` / `payload` / `idempotency_key`. Read-state follows columnMap presence: `readAt` → nullable timestamp, `isRead` → indexed boolean, both → both. Defaults to `user_id` + `read_at` when no columnMap. Spread + extend for extras (FK references, composite indexes). Triggers: `notificationColumns`, `Migration.create` for notifications, "create the notifications table", "notification migration", "add organization_id to notifications", `is_read` column, `read_at` column, `idempotency_key` column; typical import `import { Migration } from "@warlock.js/cascade"; import { notificationColumns } from "@warlock.js/notifications"`. Skip: generic cascade migration writing — `@warlock.js/cascade/write-migration/SKILL.md`; the model itself — `@warlock.js/notifications/use-in-app/SKILL.md`.'
 ---
 
 # Write the notifications migration
 
-The package ships no table or migration (thin eject). You own the migration; the package gives you a driver-aware column factory so it's one line.
+The package ships no table or migration (thin eject). You own the migration; the package gives you a column factory that names columns from your model's `columnMap`, so it's one line.
+
+> `npx warlock add notifications` scaffolds this migration (+ the model) for you. Reach for this skill when you need to customize columns or add extras.
 
 ## Common case — one line
 
@@ -21267,43 +21329,49 @@ import { Notification } from "../notification.model";
 export default Migration.create(Notification, notificationColumns(Notification));
 ```
 
-`notificationColumns(Notification)` reads the model's `static dataSource` and returns:
+`notificationColumns(Notification)` reads the model's `columnMap` and returns the
+matching columns:
 
-| Driver | Columns (`user_id` / `userId` etc.) |
+| columnMap | Columns |
 |---|---|
-| PG / MySQL (default) | `user_id`, `type`, `title`, `body`, `payload`, `is_read`, `read_at`, `idempotency_key` |
-| MongoDB | `userId`, `type`, `title`, `body`, `payload`, `isRead`, `readAt`, `idempotencyKey` |
+| _(none / default)_ | `user_id`, `type`, `title`, `body`, `payload`, `read_at`, `idempotency_key` |
+| `{ tenant: "organization_id", readAt: "read_at" }` | adds `organization_id`; read_at-only |
+| `{ isRead: "is_read" }` | swaps `read_at` for `is_read` (indexed boolean) |
+| `{ isRead: "is_read", readAt: "read_at" }` | both read-state columns |
 
-`id` / `createdAt` / `updatedAt` are added automatically by cascade.
+The recipient / tenant / read-state column NAMES come from `columnMap`; `type` /
+`title` / `body` / `payload` / `idempotency_key` are fixed. `id` / `createdAt` /
+`updatedAt` are added automatically by cascade.
 
 ## With extras — spread + extend
 
-Add multi-tenant `organization_id`, category, or anything else:
+Add your own columns — a category, a source channel, a tenant id, anything:
 
 ```ts
-import { Migration, uuid } from "@warlock.js/cascade";
+import { Migration, string } from "@warlock.js/cascade";
 import { notificationColumns } from "@warlock.js/notifications";
 import { Notification } from "../notification.model";
 
 export default Migration.create(Notification, {
   ...notificationColumns(Notification),
-  organization_id: uuid().index().notNullable(),
+  category: string().index().nullable(),
 });
 ```
 
-The dev's repository's `filterBy` should reference the extra columns if you want them addressable from `inApp.list({ organizationId })` etc.
+Mirror any extra column in the model `schema`. To make it filterable, add a method to a custom repository (see `use-in-app/SKILL.md`).
 
-## Detection
+## Column naming follows `columnMap`
 
-`notificationColumns(model)` returns camelCase **only** when the model declares `static dataSource = "mongodb"` (or a `DataSource` object whose `name` is `"mongodb"`). Everything else — PG / MySQL / unset — returns snake_case.
+The factory does NOT guess names from the driver — it reads the model's `columnMap`. To match a different convention (e.g. MongoDB camelCase), name the columns there and the migration follows:
 
 ```ts
 class Notification extends DatabaseNotification {
-  public static dataSource = "mongodb"; // ← triggers camelCase
+  public static columnMap = { recipient: "userId", readAt: "readAt" };
 }
+// → notificationColumns(Notification) emits `userId` + `readAt`
 ```
 
-Without a model passed, defaults to SQL (snake_case).
+Without a model passed, defaults to `user_id` + `read_at` (read_at-only). See [`use-in-app/SKILL.md`](../use-in-app/SKILL.md) for the full `columnMap` shape.
 
 ## See also
 

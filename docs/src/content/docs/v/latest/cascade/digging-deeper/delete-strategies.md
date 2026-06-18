@@ -63,6 +63,7 @@ await post.destroy();
 How it works:
 
 - Cascade writes the current time to the `deletedAtColumn` (default `"deletedAt"`). The row stays in the table.
+- The in-memory instance is updated too — after `await model.destroy()`, `model.get("deletedAt")` returns the timestamp that was persisted.
 - The model instance is **not** marked as new — its primary key is still valid, and a `restore()` call later can clear the timestamp.
 - If `deletedAtColumn` is `false` or unset on a model configured for soft delete, `.destroy()` throws — soft delete needs somewhere to store the timestamp.
 
@@ -71,6 +72,8 @@ Override the column name when your schema uses a different convention:
 ```ts
 public static deletedAtColumn = "archived_at";
 ```
+
+**The migration adds the column for you.** When the model's strategy resolves to `"soft"`, `Migration.create(Model, { … })` auto-wires the `deletedAt` column (using `deletedAtColumn`) — you don't declare it. Opt out per table with `{ softDeletes: false }`. See [Migrations](../the-basics/migrations.md#the-soft-delete-column).
 
 **Where the filtering happens.** Cascade does **not** automatically hide soft-deleted rows from queries. If you want every `Post.where(...)` query to exclude soft-deleted rows, add a global scope on the model:
 

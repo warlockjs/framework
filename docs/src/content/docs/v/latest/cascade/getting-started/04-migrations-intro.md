@@ -37,6 +37,7 @@ What's happening:
 - `Migration.create(User, { ... })` is the factory. Cascade reads `User.table` for the table name and builds the column definitions from the object you pass.
 - `text()`, `uuid()`, plus modifiers (`.notNullable()`, `.unique()`, `.nullable()`) are column helpers exported from `@warlock.js/cascade`. Each one returns a builder you can chain modifiers on.
 - The `id` primary key and the `createdAt` / `updatedAt` timestamps are added automatically — you don't declare them here. Naming follows your data source's convention (snake_case for Postgres, camelCase for MongoDB by default), and the exact `id` shape (auto-increment integer, UUID, custom) is a configuration choice covered in the [configuration guide](../architecture-concepts/configuration.md).
+- The soft-delete column (`deletedAt`) is added automatically too — but only when the model's delete strategy resolves to `"soft"`. See [delete strategies](../digging-deeper/delete-strategies.md).
 - `export default` is required — the runner imports each migration file as its default export.
 
 ## Step 2 — Run the migration
@@ -103,7 +104,7 @@ This says "the value lives in `User.id`, and if the user is deleted, delete depe
 - Migrations sit in `<model>/migrations/`, named with a timestamp prefix
 - `Migration.create(Model, { columns })` is the entire API for a basic table
 - `npx cascade migrate` runs whatever's pending; idempotent
-- `id`, `createdAt`, and `updatedAt` are added for you
+- `id`, `createdAt`, and `updatedAt` are added for you — plus `deletedAt` when the model uses soft deletes
 
 ## Next
 

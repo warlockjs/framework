@@ -1,6 +1,42 @@
 {
   "_doc": "Release-level metadata for the unified changelog — the DATE and the 'what shipped' SUMMARY for each version. Per-package change details (Added/Changed/Fixed/Removed) live in each package's CHANGELOG.md and are aggregated by scripts/generate-changelog.mjs; this file supplies the release date + summary that the per-package files don't carry. Hand-maintained: add one entry per release, keyed by the version string. `date` is a display string (e.g. \"June 4, 2026\"); `summary` supports inline `code`, **bold**, and [links](url); `featured` (optional) is an array of package names floated to the top of that release's package list, in the listed order (the rest follow most-changed-first, then alphabetical).",
 
+  "4.2.11": {
+    "date": "June 17, 2026",
+    "summary": "Soft deletes go end-to-end in **`@warlock.js/cascade`** — `Migration.create` auto-wires the `deletedAt` column for soft-delete models and soft `destroy()` keeps the in-memory model in sync. **`@warlock.js/core`** adds the `lowerStage3Decorators()` test plugin and `warlock add notifications`; **`@warlock.js/notifications`** gains model-driven `columnMap`, presence-based read-state, and multi-tenant support. The whole family — and the `create-warlock` project template — moves to `@mongez/reinforcements` 3.3.0.",
+    "featured": ["@warlock.js/cascade", "@warlock.js/core", "@warlock.js/notifications"]
+  },
+
+  "4.2.10": {
+    "date": "June 17, 2026",
+    "summary": "Patch release: **`@warlock.js/auth`** moves `@mongez/copper` / `@mongez/events` / `@mongez/reinforcements` from peer to regular dependencies, clearing the `unmet peer dependency` warnings on install — they're framework-internal utilities your app never provides. **`@warlock.js/logger`**'s console timestamp switches to a cleaner 256-color `slate` gray. **`create-warlock`** ships the latest `@mongez/*` versions in its project template. The rest of the family is re-published at 4.2.10 to keep the lockstep version line.",
+    "featured": ["@warlock.js/auth", "@warlock.js/logger"]
+  },
+
+  "4.2.9": {
+    "date": "June 17, 2026",
+    "summary": "Patch release: **`@warlock.js/logger`**'s `ConsoleLog` is retuned for scannability — a time-only timestamp (`HH:mm:ss.SSS`) dimmed to gray, fixed-width level tags so the timestamp / module / action columns align, and `fatal` restored to a white-on-bright-red **background badge** so it can't be missed next to `error`. The rest of the family is re-published at 4.2.9 to keep the lockstep version line; no other functional changes.",
+    "featured": ["@warlock.js/logger"]
+  },
+
+  "4.2.8": {
+    "date": "June 17, 2026",
+    "summary": "Patch release: **`@warlock.js/logger`**'s `ConsoleLog` now prints the level name beside each icon (`⚙ debug`, `ℹ info`, `⚠ warn`, `✗ error`, `✓ success`, `☠ fatal`) for at-a-glance readability; `fatal` drops the bright-red background badge for a bold red-bright `☠ fatal` label. The rest of the family is re-published at 4.2.8 to keep the lockstep version line; no other functional changes.",
+    "featured": ["@warlock.js/logger"]
+  },
+
+  "4.2.7": {
+    "date": "June 17, 2026",
+    "summary": "Patch release: **`create-warlock`** now ships its `templates/` folder, so scaffolding a new project works from the installed package — it was missing from the build, which made the wizard fail with \"Something went wrong\" at the template-copy step. The rest of the family is re-published at 4.2.7 to keep the lockstep version line; no other functional changes.",
+    "featured": ["create-warlock"]
+  },
+
+  "4.2.6": {
+    "date": "June 17, 2026",
+    "summary": "Patch release: **`create-warlock`** now ships its `bin` folder again, so the `create-warlock` CLI works from the installed package — it was omitted from the 4.2.5 build. The rest of the family is re-published at 4.2.6 to keep the lockstep version line; no other functional changes.",
+    "featured": ["create-warlock"]
+  },
+
   "4.2.5": {
     "date": "June 15, 2026",
     "summary": "Patch release: `warlock add notifications` now scaffolds the in-app read/dismiss HTTP surface — `routes.ts` + a notifications controller (list / unread-count / mark-read / mark-all-read / clear / delete), gated by `authMiddleware` and recipient-scoped via `inApp`. The family is re-published in lockstep; no other functional changes.",
