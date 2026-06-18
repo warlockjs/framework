@@ -204,7 +204,7 @@ Two notes on ordering:
 
 A real example of the auth pattern from the reference codebase:
 
-```ts title="@warlock.js/auth/src/middleware/auth.middleware.ts (excerpt)"
+```ts title="authMiddleware (from @warlock.js/auth)"
 export function authMiddleware(allowedUserType?: string | string[]) {
   // ...
   if (allowedTypes.length && !allowedTypes.includes(userType)) {

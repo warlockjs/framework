@@ -172,7 +172,7 @@ groupedTranslations("validation", {
 });
 ```
 
-The framework's seal initialization looks up `validation.<rule.name>` automatically (`@warlock.js/core/src/validation/init.ts`). No extra wiring on your end.
+The framework's seal initialization looks up `validation.<rule.name>` automatically. No extra wiring on your end.
 
 ## Step 7 — An async / remote-API validator
 

@@ -59,7 +59,7 @@ export type CreateProductSchema = Infer<typeof createProductSchema>;
 
 ### The validator surface
 
-The full toolbox lives in `@warlock.js/seal/src/factory/validators.ts`. Highlights:
+The full toolbox lives in `@warlock.js/seal`. Highlights:
 
 #### Primitives
 

@@ -28,9 +28,9 @@ What it means for you: save a file, the change appears within a hundred millisec
 
 ## The transpile cache
 
-TypeScript transpilation is fast — fast enough that you don't notice it on one file. Across a 500-file project on a fresh boot, those milliseconds add up. The transpile cache stores the JS output of every successfully-transpiled file, keyed by file content hash, in memory inside the loader-hook worker thread.
+TypeScript transpilation is fast — fast enough that you don't notice it on one file. Across a 500-file project on a fresh boot, those milliseconds add up. The transpile cache stores the JS output of every successfully-transpiled file, keyed by a hash of the source content plus a transform-options fingerprint (esbuild version, a cache-format epoch, and your `tsconfig` `compilerOptions`).
 
-On reboot, files that haven't changed hit the cache and skip transpilation. Cold-boot times stay reasonable as your project grows. The cache is in-memory only (not on disk), so it warms on each fresh process — but within a single dev session, every file pays the transpile cost once.
+The cache is persisted to disk under `.warlock/transpile/`, content-hash addressed — entries are sharded by the first two hex chars of the key, and the on-disk filename is opaque (the source identity lives only inside the source map). Because it survives between processes, files that haven't changed hit the cache and skip transpilation on the *next* boot, not just within the current session. Change a file's content and you get a different key, so a fresh transpile — there's no stale-output risk.
 
 ## The ESM loader hook
 
@@ -42,7 +42,7 @@ What it means for you: zero config. TypeScript files just work in `import` state
 
 ## The production builder
 
-For production, the dev server's loader hook is the wrong tool — it's optimized for fast change-and-reload cycles, not bundle size. `warlock build` uses [`esbuild`](https://esbuild.github.io/) to bundle your project into the `dist/` folder (or wherever `warlock.config.ts > build.outDir` points).
+For production, the dev server's loader hook is the wrong tool — it's optimized for fast change-and-reload cycles, not bundle size. `warlock build` uses [`esbuild`](https://esbuild.github.io/) to bundle your project into the `dist/` folder (or wherever `warlock.config.ts > build.outDirectory` points — it defaults to `"dist"`).
 
 The builder generates a single combined `bootstrap.ts`, a config loader, route registrations, and an entry file, then esbuild produces the final bundle. `warlock start` runs that bundle with `node --enable-source-maps`. No `tsx`, no loader hook, no watch — just a Node process running a bundled artifact.
 
@@ -50,9 +50,9 @@ What it means for you: prod is a clean separation. Dev runs through the custom l
 
 ## The manifest cache
 
-The dev server keeps a `.warlock/manifest.json` file that records each project file's last-known dependencies, file type (controller, model, route, etc.), and CLI command registrations. On subsequent boots, it loads this manifest and skips re-parsing files that haven't changed — only fresh or modified files get re-read from disk.
+The manifest module keeps a `.warlock/commands.json` file that records each registered CLI command's metadata — its source (`framework`, `plugin`, or `project`), description, alias, and option definitions. On subsequent boots, the dev server loads this file and skips re-parsing command registrations that haven't changed — only fresh or modified files get re-read from disk.
 
-The `--fresh` flag on `warlock dev` deletes the manifest before starting, forcing a full re-parse. You'd do that after pulling a branch with significant restructuring, or when the dev server is behaving in ways the manifest could plausibly explain.
+The `--fresh` flag on `warlock dev` clears the cache before starting, forcing a full re-parse. You'd do that after pulling a branch with significant restructuring, or when the dev server is behaving in ways the cache could plausibly explain.
 
 What it means for you: boot times stay fast even as your project grows. The cache is invisible until it goes wrong — at which point `warlock dev --fresh` is the lever.
 
@@ -84,4 +84,4 @@ If you need to extend any of this — write a custom loader, plug into the bundl
 
 ## A note on stability
 
-The dev server, the manifest, the loader hook, the production builder — these are internals. The team treats their *behavior* as stable but their *interfaces* as not. Reaching into `@warlock.js/core/src/dev-server/` from a user project will work today and break in two months. If you find yourself wanting to do that, file an issue first — there's usually a public-API path we can extend instead.
+The dev server, the manifest, the loader hook, the production builder — these are internals. The team treats their *behavior* as stable but their *interfaces* as not. Reaching into core's internal modules (the dev server, manifest, loader, production builder) from a user project will work today and break in two months. If you find yourself wanting to do that, file an issue first — there's usually a public-API path we can extend instead.

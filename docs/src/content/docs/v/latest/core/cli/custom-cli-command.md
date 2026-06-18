@@ -244,7 +244,7 @@ Two reasons to prefer factories for package commands:
 
 ### Framework commands — read-only
 
-`migrate`, `seed`, `dev`, `build`, `generate.*`, `storage.put`, `drop.tables`, `jwt.generate` (when authored by core, not auth) — these are built into `@warlock.js/core`. You don't write these. Read their source under `@warlock.js/core/src/cli/commands/` when you want a template for your own.
+`migrate`, `seed`, `dev`, `build`, `generate.*`, `storage.put`, `drop.tables`, `jwt.generate` (when authored by core, not auth) — these are built into `@warlock.js/core`. You don't write these. Read the built-in commands' source on GitHub when you want a template for your own.
 
 ## Step 6 — Take positional arguments
 

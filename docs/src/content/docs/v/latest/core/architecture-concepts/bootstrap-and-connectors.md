@@ -8,7 +8,7 @@ sidebar:
 
 Every Warlock app starts the same way. A tiny prelude prepares the process, then a sequence of *connectors* spin up each subsystem in priority order, around the app code that depends on them. By the time the first request hits the router, the database is connected, the logger is flushing, the storage adapter is wired, and the HTTP server is listening.
 
-This guide walks the boot sequence end-to-end, names every built-in connector and what it owns, and shows you how to plug in a custom one when "we have one more subsystem with a lifecycle" lands on your plate.
+This guide walks the boot sequence end-to-end, names every built-in connector and what it owns, and shows you how to plug in a custom one when "we have one more subsystem with a lifecycle" lands on your plate. For a flat catalog of all ten built-ins at a glance — and the rule that the config file (not registration) is what activates each subsystem — see [Connectors](./connectors.md).
 
 ## The 30-second look
 
@@ -16,7 +16,7 @@ This guide walks the boot sequence end-to-end, names every built-in connector an
 flowchart TD
     cli["yarn dev / production bundle"]
     boot["bootstrap()<br/><i>loadEnv · initializeDayjs · capture rejections</i>"]
-    early["Early phase connectors<br/><i>logger · mailer · database · herald · cache · storage</i>"]
+    early["Early phase connectors<br/><i>logger · mailer · database · herald · cache · storage · notifications · access</i>"]
     appcode["App code imports<br/><i>routes.ts · main.ts · models · events</i>"]
     late["Late phase connectors<br/><i>http · socket</i>"]
     listening["Server listening<br/><i>process awaits requests</i>"]
@@ -36,7 +36,7 @@ Three takeaways:
 
 ## Phase 0 — bootstrap()
 
-```ts title="@warlock.js/core/src/bootstrap.ts"
+```ts title="bootstrap() — the prelude"
 import { loadEnv } from "@mongez/dotenv";
 import { initializeDayjs } from "@mongez/time-wizard";
 import { captureAnyUnhandledRejection } from "@warlock.js/logger";
@@ -71,14 +71,18 @@ Each connector implements three lifecycle hooks: `boot()`, `start()`, `shutdown(
 
 Connectors run in **priority order** (lower number first):
 
-| Priority | Connector       | Class               | Watches                          | Lives in                                             |
-| -------- | --------------- | ------------------- | -------------------------------- | ---------------------------------------------------- |
-| 0        | `logger`        | `LoggerConnector`   | `src/config/log.ts`              | `@warlock.js/core/src/connectors/logger-connector.ts`|
-| 1        | `mailer`        | `MailerConnector`   | `src/config/mail.ts`, `.env`     | `mail-connector.ts`                                  |
-| 2        | `database`      | `DatabaseConnector` | `src/config/database.ts`         | `database-connector.ts`                              |
-| 3        | `herald`        | `HeraldConnector`   | `src/config/herald.ts`           | `herald-connector.ts` (message broker / queues)      |
-| 4        | `cache`         | `CacheConnector`    | `src/config/cache.ts`            | `cache-connector.ts`                                 |
-| 6        | `storage`       | `StorageConnector`  | `src/config/storage.ts`          | `storage.connector.ts`                               |
+| Priority | Connector       | Class               | Watches                          |
+| -------- | --------------- | ------------------- | -------------------------------- |
+| 0        | `logger`        | `LoggerConnector`   | `src/config/log.ts`              |
+| 1        | `mailer`        | `MailerConnector`   | `src/config/mail.ts`, `.env`     |
+| 2        | `database`      | `DatabaseConnector` | `src/config/database.ts`         |
+| 3        | `herald`        | `HeraldConnector`   | `src/config/herald.ts`           |
+| 4        | `cache`         | `CacheConnector`    | `src/config/cache.ts`            |
+| 6        | `storage`       | `StorageConnector`  | `src/config/storage.ts`          |
+| 8        | `notifications` | `NotificationsConnector` | `src/config/notifications.ts` |
+| 9        | `access`        | `AccessConnector`   | `src/config/access.ts`           |
+
+(Priorities `5` and `7` — `http` and `socket` — are Late phase and live in the table further down.)
 
 Each connector reads its own subsystem's config (via `config.get("<name>")`) and bails quietly if it's missing — you only pay for the subsystems you configured.
 
@@ -119,6 +123,14 @@ It's fourth because repositories cache lookups; the cache must exist before the 
 Calls `loadS3()` (lazy-loads the AWS SDK only if s3 driver is configured) then `await storage.init()`. On shutdown, calls `storage.reset()` to release whatever the driver was holding.
 
 Storage doesn't need a config check to bail — `loadS3` and `storage.init` no-op themselves when no disks are configured.
+
+### notifications (priority 8)
+
+Reads `config.get("notifications")`, dynamically imports `@warlock.js/notifications`, and calls `setNotificationConfig(...)`. The config file stays declarative — it exports the config object, the connector performs the side-effect. The package is lazy-imported only when a notifications config is present, so core carries no hard dependency on it (same pattern as herald). Shutdown holds no external connection of its own; it just clears the active flag so a dev restart re-registers from the (possibly changed) config.
+
+### access (priority 9)
+
+Reads `config.get("access")`, dynamically imports `@warlock.js/access`, and calls `setAccessConfig(...)`, which validates that a resolver is present — so a misconfigured authorization layer fails at **startup**, not on the first protected request. On shutdown it calls `resetAccessConfig()` and clears the active flag, so a dev restart re-registers from the (possibly changed, or now-removed) config file. Like herald and notifications, the package is lazy-imported only when an access config exists.
 
 ## Phase 2 — App code imports
 
@@ -164,6 +176,8 @@ The connectors manager hooks into `SIGINT` and `SIGTERM` (plus `SIGHUP` on Windo
 ```mermaid
 flowchart LR
     sig["SIGINT / SIGTERM / SIGHUP"]
+    access["access.shutdown()"]
+    notifications["notifications.shutdown()"]
     socket["socket.shutdown()"]
     storage["storage.shutdown()"]
     http["http.shutdown()"]
@@ -174,7 +188,9 @@ flowchart LR
     logger["logger.shutdown()"]
     exit["process.exit(0)"]
 
-    sig --> socket
+    sig --> access
+    access --> notifications
+    notifications --> socket
     socket --> storage
     storage --> http
     http --> cache
@@ -272,6 +288,8 @@ The built-in priorities are:
 5  HTTP
 6  STORAGE
 7  SOCKET
+8  NOTIFICATIONS
+9  ACCESS
 ```
 
 For a custom connector, pick a number that fits the dependency story:
@@ -350,6 +368,7 @@ public async restart(): Promise<void> {
 
 ## See also
 
+- **[Connectors](./connectors.md)** — the catalog page: every built-in connector, its priority and phase, and the rule that the config file (not registration) activates each subsystem.
 - **[`application.md`](./application.md)** — the static gateway to environment, paths, and runtime mode that connectors and config files both lean on.
 - **[`configuration-deep.md`](./configuration-deep.md)** — how `config.get(...)` reads the values each connector consults during `start()`.
 - **[`warlock-config.md`](./warlock-config.md)** — project-level config that runs before any connector starts.

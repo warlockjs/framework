@@ -87,7 +87,7 @@ The `default` field picks which driver every cache call uses unless you override
 
 The framework wires this automatically:
 
-```ts title="@warlock.js/core/src/repositories/repository.manager.ts (excerpt)"
+```ts title="How the repository caches"
 protected isCacheable = config.get("repository.isCacheable") ?? true;
 protected cacheDriver: CacheDriver<any, any> = config.get("repository.cacheDriver") || cache;
 ```
@@ -173,7 +173,7 @@ The repository's `listCached(...)` returns the exact same `PaginationResult<T>` 
 
 The framework hashes the filter object into a deterministic key:
 
-```ts title="@warlock.js/core/src/repositories/repository.manager.ts (excerpt)"
+```ts title="How the cache key is built"
 protected cacheKey(key: string | Record<string, any>, moreOptions?: Record<string, any>): string {
   let cacheKey = `repositories.${this.getName()}`;
   if (key) {
@@ -194,7 +194,7 @@ The implication that catches people out: **the order of keys in the filter objec
 
 The repository registers model events at construction time:
 
-```ts title="@warlock.js/core/src/repositories/repository.manager.ts (excerpt)"
+```ts title="Cache invalidation on write"
 public registerEvents() {
   this.eventsCallbacks.push(
     ...this.adapter.registerEvents((source: any) => {

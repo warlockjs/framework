@@ -123,7 +123,7 @@ Five files, 50 MB each, allowed types declared once.
 
 ## The `UploadedFile` API
 
-The class is in `@warlock.js/core/src/http/uploaded-file.ts`. The surface is split into properties, type-checks, transforms, and save operations.
+The `UploadedFile` surface is split into properties, type-checks, transforms, and save operations.
 
 ### Properties
 

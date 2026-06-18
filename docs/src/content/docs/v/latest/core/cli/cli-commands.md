@@ -1,6 +1,6 @@
 ---
 title: "CLI commands"
-description: Every built-in warlock command — dev, build, start, migrate, seed, add, generate.*, storage.put — what they do, what flags they take, and how to write your own.
+description: Every built-in warlock command — dev, build, start, migrate, seed, add, update, generate.*, storage.put — what they do, what flags they take, and how to write your own.
 sidebar:
   order: 1
   label: "CLI commands"
@@ -54,6 +54,8 @@ warlock dev --skip-health            # skip health checkers
 | `--skip-health, -sh`  | boolean   | Skip file health checkers for this run.                                        |
 
 Persistent — the process stays alive until you Ctrl+C it. Boots the full app: env, all configs, every connector, then your modules. See [How it works](../architecture-concepts/how-it-works.md) for what's happening behind the scenes.
+
+On start, `warlock dev` also checks npm for a newer `@warlock.js/core` release and prints a one-line notice when one is available — run [`update`](#update) to upgrade. The check is best-effort and non-blocking: it never delays or breaks startup, and is automatically skipped in CI and non-interactive (non-TTY) shells. Turn it off with `devServer.checkForUpdates: false` in `warlock.config.ts`.
 
 ### `generate.typings`
 
@@ -199,6 +201,7 @@ warlock add auth
 warlock add auth mail storage
 warlock add --list                           # see what's available
 warlock add auth --package-manager yarn
+warlock add auth --no-install                # record deps, run setup, skip the install
 ```
 
 | Positional      | Description                                                       |
@@ -207,10 +210,28 @@ warlock add auth --package-manager yarn
 
 | Flag                       | Description                                                              |
 | -------------------------- | ------------------------------------------------------------------------ |
-| `--package-manager, -pm`   | Package manager to use (auto-detected if omitted).                       |
+| `--package-manager`        | Package manager to use (auto-detected if omitted).                       |
 | `--list, -l`               | List every available feature.                                            |
+| `--no-install`             | Record the dependencies in `package.json` and run the setup (eject configs, add scripts, run setup hooks) without invoking the package manager install. Pass it last, after the feature list. Used by scaffolders that run a single install afterwards. |
 
 The command installs the npm package(s), runs their post-install hooks (configuration files, migrations, etc.), and updates your `warlock.config.ts` where needed.
+
+### `update`
+
+Update every `@warlock.js/*` package in your project to its latest published version, then reinstall.
+
+```bash
+warlock update                  # bump all @warlock.js/* deps to latest, then install
+warlock update --no-install     # rewrite package.json only; install yourself later
+```
+
+| Flag           | Type    | Description                                                                          |
+| -------------- | ------- | ------------------------------------------------------------------------------------ |
+| `--no-install` | boolean | Rewrite the versions in `package.json` without running the package manager install.  |
+
+Scans `dependencies` and `devDependencies` for `@warlock.js/*` packages, looks up each one's latest version on npm, and rewrites the matching specs — **preserving each range operator** (`^`, `~`, or an exact pin). Non-semver specs (`workspace:*`, `*`, git/file URLs) are left untouched, and packages already at or ahead of latest are skipped. It then runs your project's install — `npm` / `yarn` / `pnpm`, auto-detected from the lockfile — to reconcile `node_modules`.
+
+Because the whole `@warlock.js/*` family is versioned in lockstep, this keeps every framework package on the same release. The [`dev`](#dev) server surfaces a notice when a newer version is published, so you know when to run it.
 
 ---
 
@@ -249,12 +270,11 @@ The whole `generate.*` family lives in [Generators](./generators.md) — that pa
 | ------------------------------------------------ | ------------ | ------------------------------------------------------------------ |
 | `generate <generator> [args...]`                 | `g`          | Master dispatch — `warlock g module products`.                     |
 | `generate.module <name>`                         | `gen.m`      | A new module folder with the standard subfolders.                  |
-| `generate.controller <module>/<name>`            | `gen.c`      | A controller, optionally with schema + request type.               |
+| `generate.controller <module>/<name>`            | `gen.c`      | A controller, optionally with a validation schema (`--with-validation`). |
 | `generate.service <module>/<name>`               | `gen.s`      | A service.                                                         |
 | `generate.model <module>/<name>`                 | `gen.md`     | A Cascade model with its migration file.                           |
 | `generate.repository <module>/<name>`            | `gen.r`      | A `RepositoryManager` subclass.                                    |
 | `generate.resource <module>/<name>`              | `gen.rs`     | A `Resource` subclass.                                             |
-| `generate.validation <module>/<name>`            | `gen.v`      | A schema, optionally with the request type.                        |
 | `generate.migration <model-path>`                | `gen.mig`    | A migration file with add/drop/rename DSL support.                 |
 
 See [Generators](./generators.md) for the full surface.
@@ -348,9 +368,9 @@ preload: {
 }
 ```
 
-Connector names: `"logger"`, `"mailer"`, `"http"`, `"database"`, `"cache"`, `"storage"`, `"communicator"` (herald), `"socket"`. Pass `connectors: true` to start every Early-phase connector. The `http` and `socket` connectors are Late phase and stay off unless you explicitly list them.
+Connector names: `"logger"`, `"mailer"`, `"http"`, `"database"`, `"herald"`, `"cache"`, `"storage"`, `"socket"`, `"notifications"`, `"access"`. Pass `connectors: true` to start every Early-phase connector. The `http` and `socket` connectors are Late phase and stay off unless you explicitly list them.
 
-Picking the right preload matters: `migrate` only needs database and logger; `seed` needs the full bootstrap because seeds use app models. Inspect `@warlock.js/core/src/cli/commands/*.command.ts` for canonical pairings.
+Picking the right preload matters: `migrate` only needs database and logger; `seed` needs the full bootstrap because seeds use app models. Inspect the built-in commands' source on GitHub for canonical pairings.
 
 ### Inside `action` — `CommandActionData`
 
@@ -367,7 +387,7 @@ For positional capture in `name`, declare slots: `name: "storage.put <localPath>
 
 The convention for external packages is a **factory function** that returns a fresh `CLICommand`:
 
-```ts title="@warlock.js/auth/src/commands/jwt-secret-generator-command.ts"
+```ts title="A package-exported command factory"
 import { command } from "@warlock.js/core";
 import { generateJWTSecret } from "../services/generate-jwt-secret";
 

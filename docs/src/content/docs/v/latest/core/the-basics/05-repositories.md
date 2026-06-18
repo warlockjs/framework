@@ -28,7 +28,7 @@ type ProductListFilter = {
 
 export type ProductListOptions = RepositoryOptions & ProductListFilter;
 
-class ProductsRepository extends RepositoryManager<Product, ProductListOptions> {
+class ProductsRepository extends RepositoryManager<Product, ProductListFilter> {
   public source = Product;
 
   public simpleSelectColumns: string[] = ["id", "name", "price"];
@@ -48,6 +48,8 @@ class ProductsRepository extends RepositoryManager<Product, ProductListOptions> 
 
 export const productsRepository = new ProductsRepository();
 ```
+
+The second generic argument is the **filter shape** (`ProductListFilter`), not the merged options type — it's what gives `repo.list({...})` autocomplete on your filter keys. The framework merges it with `RepositoryOptions` internally.
 
 Four properties on the class:
 
@@ -227,7 +229,7 @@ type FaqListFilter = {
 
 export type FaqListOptions = RepositoryOptions & FaqListFilter;
 
-class FaqsRepository extends RepositoryManager<Faq, FaqListOptions> {
+class FaqsRepository extends RepositoryManager<Faq, FaqListFilter> {
   public source = Faq;
 
   public simpleSelectColumns: string[] = ["id"];
@@ -299,35 +301,45 @@ export async function getFaqService(id: number | string) {
 
 `ResourceNotFoundError` extends `HttpError` (status 404) — the framework maps it to a 404 response automatically. The controller doesn't need a branching `if (!faq) return response.notFound(...)` — it just calls `getFaqService(id)` and trusts the throw.
 
-## Lifecycle hooks
+## Running code around writes
 
-Repositories expose protected hooks you can override in your subclass to inject behaviour around CRUD:
+The base class defines a set of protected hook methods (`onCreating`, `onCreate`, `onUpdating`, `onUpdate`, `onSaving`, `onSave`, `onDeleting`, `onDelete`, `beforeListing`, `onList`), but **they are not currently wired** — `create()`, `update()`, `delete()`, and `list()` never call them, so overriding them does nothing today. Don't build on them.
 
-```ts
-class ProductsRepository extends RepositoryManager<Product, ProductListOptions> {
-  public source = Product;
+To run side effects around a write, use one of these two paths instead:
 
-  protected async onCreating(data: any) {
-    data.slug = slugify(data.name);
+**Cascade model events** — fire on every write (repository or direct `Product.create(...)`), and are exactly what the repository's cache invalidation already listens to:
+
+```ts title="src/app/products/models/product.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Product extends Model {
+  public static collection = "products";
+
+  protected async onCreating() {
+    this.set("slug", slugify(this.get("name")));
   }
 
-  protected async onCreate(product: Product) {
-    await searchIndex.add(product);
-  }
-
-  protected async onUpdate(product: Product) {
-    await searchIndex.update(product);
-  }
-
-  protected async onDelete(id: string | number) {
-    await searchIndex.remove(id);
+  protected async onCreated() {
+    await searchIndex.add(this);
   }
 }
 ```
 
-The full list: `beforeListing`, `onList`, `onCreating`, `onCreate`, `onUpdating`, `onUpdate`, `onSaving`, `onSave`, `onDeleting`, `onDelete`. They're protected (subclass-only) and async.
+**Override the action method** — when the behaviour belongs at the repository layer, override `create()` / `update()` / `delete()` and call `super`:
 
-For model-level lifecycle (rather than repository-level), use the Cascade model events — see **[Events and hooks](/v/latest/cascade/architecture-concepts/events-and-hooks/)**.
+```ts
+class ProductsRepository extends RepositoryManager<Product, ProductListFilter> {
+  public source = Product;
+
+  public async create(data: any) {
+    const product = await super.create(data);
+    await searchIndex.add(product);
+    return product;
+  }
+}
+```
+
+For the full model event surface, see **[Events and hooks](/v/latest/cascade/architecture-concepts/events-and-hooks/)** in the Cascade docs.
 
 ## Gotchas
 

@@ -1,11 +1,11 @@
 ---
 title: "Custom connector"
-description: Plug a new subsystem (queue worker, scheduler, search client, custom broker) into Warlock's lifecycle — extend `BaseConnector`, pick a priority, decide Early vs Late, drop in `src/connectors/`, and get graceful SIGINT shutdown for free.
+description: Plug a new subsystem (queue worker, scheduler, search client, custom broker) into Warlock's lifecycle — extend `BaseConnector`, pick a priority, decide Early vs Late, register it with connectorsManager, and get graceful SIGINT shutdown for free.
 sidebar:
   label: "Custom connector"
 ---
 
-A **connector** is a long-lived subsystem owned by the framework's lifecycle — `boot` → `start` → (run) → `shutdown`. The built-in ones are the database, HTTP server, cache, storage, mailer, logger, herald (message broker), and socket. Adding your own lets you plug a new subsystem into the same lifecycle: priority-based startup, graceful SIGINT shutdown, dev-server restart on config change. This recipe walks you through building one — we'll wire a background queue worker that depends on the database.
+A **connector** is a long-lived subsystem owned by the framework's lifecycle — `boot` → `start` → (run) → `shutdown`. The built-in ones are the logger, mailer, database, herald (message broker), cache, HTTP server, storage, socket, notifications, and access (authorization). Adding your own lets you plug a new subsystem into the same lifecycle: priority-based startup, graceful SIGINT shutdown, dev-server restart on config change. This recipe walks you through building one — we'll wire a background queue worker that depends on the database.
 
 ## When a connector is the right answer
 
@@ -49,7 +49,7 @@ export class QueueWorkerConnector extends BaseConnector {
 }
 ```
 
-That's the entire shape. Drop the file under `src/connectors/<name>.ts` and the framework picks it up. Five things to know — covered below in order.
+That's the entire shape. Put the file under `src/connectors/<name>.ts` (a convention, not a requirement) and register it with `connectorsManager.register(...)` — see [Registering the connector](#registering-the-connector) below. Five things to know — covered below in order.
 
 ## The required surface
 
@@ -74,27 +74,31 @@ Optional overrides:
 
 ## Picking a priority
 
-Connectors start in ascending order of `priority` and shut down in reverse. The built-in ordering, from `ConnectorPriority` in `@warlock.js/core/src/connectors/types.ts`:
+Connectors start in ascending order of `priority` and shut down in reverse. The built-in ordering, from the `ConnectorPriority` enum:
 
 | Connector       | Priority | Phase   |
 | --------------- | -------- | ------- |
 | `logger`        | `0`      | Early   |
 | `mailer`        | `1`      | Early   |
 | `database`      | `2`      | Early   |
-| `communicator`  | `3`      | Early   |
+| `herald`        | `3`      | Early   |
 | `cache`         | `4`      | Early   |
 | `http`          | `5`      | **Late** |
 | `storage`       | `6`      | Early   |
 | `socket`        | `7`      | **Late** |
+| `notifications` | `8`      | Early   |
+| `access`        | `9`      | Early   |
+
+(The priority **constant** for herald is `COMMUNICATOR`, but the connector's runtime name is `herald`.)
 
 Pick a number that places your connector where it belongs:
 
 - **Queue worker that depends on the database**: `priority: 10`. After DB (2), after cache (4), before nothing in particular. The exact number doesn't matter as long as it's > 2.
 - **A logger replacement**: `priority: -1`. Wins against `logger` (0).
 - **Something that has to start before everything**: `priority: -10`. The project's `src/connectors/custom-connector.ts` does exactly this — it's the catch-all earliest slot.
-- **Something that has to start after HTTP**: `priority: 8` and `lifecyclePhase: Late`. After socket would be `priority: 100` and `Late`.
+- **Something that has to start after HTTP**: pick `> 5` (e.g. `priority: 50`) and `lifecyclePhase: Late`. To run after socket (7), pick something higher like `priority: 100` and `Late`.
 
-There's no priority registry. Pick a number, spread your project's connectors out by 10s (10, 20, 30) so you can squeeze new ones in later without renumbering.
+There's no priority registry and no clash detection — two connectors with the same priority just run in registration order. The built-ins occupy `0`–`9`, so spread your project's connectors out by 10s (10, 20, 30) above that range so you can squeeze new ones in later without renumbering.
 
 ## Early vs Late phase
 
@@ -107,28 +111,26 @@ If your connector is a **self-contained service** (queue client, scheduler, sear
 
 A scheduler that reads job definitions from `src/app/<module>/main.ts`? `Late`. A queue worker that talks to Redis and doesn't care what your routes are? `Early`.
 
-## Auto-discovery vs explicit registration
+## Registering the connector
 
-**Auto-discovery.** Drop `src/connectors/<name>.ts` exporting your `class extends BaseConnector`. The dev-server's file watcher scans `src/connectors/` and the framework instantiates each class on boot. This is the path you want 95% of the time.
-
-**Explicit registration.** For connectors that ship in a package, or that need conditional registration (feature flags, environment-gated):
+There is **one** way to register a connector: call `connectorsManager.register(new YourConnector())`. There is no auto-discovery — the framework does **not** scan `src/connectors/` and instantiate classes for you. The built-in connectors are registered the same way, in the `ConnectorsManager` constructor; yours go through the same door from your app's `main.ts`:
 
 ```ts title="src/app/main.ts"
 import { connectorsManager } from "@warlock.js/core";
-import { QueueWorkerConnector } from "./connectors/queue-worker-connector";
+import { QueueWorkerConnector } from "../connectors/queue-worker-connector";
 
 connectorsManager.register(new QueueWorkerConnector());
 ```
 
-`connectorsManager` is the singleton exported from `@warlock.js/core/connectors`. `register(...connectors)` appends + re-sorts by priority. Do this at module top-level — `main.ts` is auto-loaded once at boot, _before_ the manager calls `startPhase()`.
+`connectorsManager` is the singleton exported from `@warlock.js/core`. `register(...connectors)` appends and re-sorts by priority, so registration order doesn't matter — only the `priority` property does. Do this at module top-level: `main.ts` is auto-loaded once at boot, _before_ the manager starts the connectors.
 
-Conditional version:
+Because registration is explicit, conditional registration is trivial — gate it behind a config key, an env flag, anything:
 
 ```ts title="src/app/main.ts"
 import { config, connectorsManager } from "@warlock.js/core";
-import { ExperimentalIndexerConnector } from "./connectors/experimental-indexer-connector";
+import { ExperimentalIndexerConnector } from "../connectors/experimental-indexer-connector";
 
-if (config.key("search.experimental.enabled")) {
+if (config.get("search.experimental.enabled")) {
   connectorsManager.register(new ExperimentalIndexerConnector());
 }
 ```
@@ -284,13 +286,14 @@ public async shutdown(): Promise<void> {
 - **Set `this.active = true` only on success.** If `start()` throws partway through and you've flipped the flag too early, `shutdown()` thinks it has real work to do and may double-close half-initialized resources.
 - **`shutdown()` must be idempotent.** SIGINT can fire twice on Windows. The manager guards re-entry with its own flag, but individual connectors get called once per shutdown loop — guard with `if (!this.active) return;`.
 - **Don't reach across connector boundaries in `start()`.** The manager's loop runs all `boot()`s first, then all `start()`s — wiring across connectors goes through the DI container (`container.get("http.server")`), not through imports.
-- **Auto-loaded files run in dev only.** The production build re-bundles `src/connectors/*.ts` into the output. Test that your connector imports nothing dev-only (no `@warlock.js/core/src/dev-server/*`).
+- **Registration is explicit — there is no auto-discovery.** Putting a file in `src/connectors/` does nothing on its own. You must call `connectorsManager.register(new YourConnector())` (typically from `src/app/main.ts`). The framework never scans the folder for connector classes.
 - **`watchedFiles` is a restart trigger, not a dependency.** It says "I want to restart when this file changes." It does _not_ mean the framework reloads that file first — that's the file orchestrator's job.
-- **Don't pick `name`s the framework already uses.** `"http"`, `"database"`, `"cache"`, `"storage"`, `"mailer"`, `"logger"`, `"communicator"`, `"socket"` are taken. Pick something distinctive.
+- **Don't pick `name`s the framework already uses.** `"logger"`, `"mailer"`, `"database"`, `"herald"`, `"cache"`, `"http"`, `"storage"`, `"socket"`, `"notifications"`, and `"access"` are taken. Pick something distinctive.
 
 ## See also
 
 - ``add-connector` skill` — concise reference covering the same surface
+- [Connectors](../architecture-concepts/connectors.md) — the catalog of all ten built-ins, their priorities, phases, and watched config files
 - [Bootstrap and connectors](../architecture-concepts/bootstrap-and-connectors.md) — how the framework boots and where connectors slot in
 - ``configure-app` skill` — `warlock.config.ts`, config files, env
 - ``use-app-context` skill` — checking the environment and resolving paths inside `start()`

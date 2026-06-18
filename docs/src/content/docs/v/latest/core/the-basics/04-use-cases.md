@@ -309,13 +309,13 @@ Invocation-level callbacks fire **first**, before the use-case-level callback, b
 Use-cases don't import `request` or `response`. They take plain data and return plain data. That's deliberate — the same use-case can be called from:
 
 - A controller (HTTP)
-- A queue worker (Bull / Redis-backed jobs)
+- A queue / broker worker (`@warlock.js/herald`)
 - A CLI command (`yarn warlock <command>`)
-- A cron-scheduled task
+- A scheduled task (`@warlock.js/scheduler`)
 - A test (no mocking framework needed)
 - Another use-case
 
-If your handler reaches for `request.something`, you've coupled to HTTP — and now the queue worker has to fake a request. Keep the handler clean; do all the request-reading in the controller and pass the data in.
+If your handler reaches for `request.something`, you've coupled to HTTP — and now the worker has to fake a request. Keep the handler clean; do all the request-reading in the controller and pass the data in. (Core itself ships no distributed job queue — background work lives in `@warlock.js/herald`; the after-hooks here are fire-and-forget, not queued jobs.)
 
 ## When to reach for a use-case (vs a service)
 

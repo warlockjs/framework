@@ -72,36 +72,39 @@ src/app/products/
 The generated model is a stub — you'll fill in the schema fields:
 
 ```ts title="src/app/products/models/product/product.model.ts"
-import { Model, RegisterModel } from "@warlock.js/cascade";
-import { type Infer, v } from "@warlock.js/seal";
-import { ProductResource } from "app/products/resources/product.resource";
+import { Model } from "@warlock.js/core";
+import type { StrictMode } from "@warlock.js/cascade";
+import { v, type Infer } from "@warlock.js/core";
+import { ProductResource } from "../../resources/product.resource";
 
-export const productSchema = v.object({
-  // TODO: Add more fields
+const productSchema = v.object({
+  // TODO: Define model schema
 });
 
-export type ProductSchema = Infer<typeof productSchema>;
+export type ProductType = Infer.Output<typeof productSchema>;
 
-@RegisterModel()
-export class Product extends Model<ProductSchema> {
+export class Product extends Model<ProductType> {
   public static table = "products";
+  public static strictMode: StrictMode = "fail";
+  public static resource = ProductResource;
 
   public static schema = productSchema;
 
-  public static relations = {};
-
-  public static resource = ProductResource;
+  public static relations = {
+    // TODO: Define relations
+  };
 }
 ```
 
 Replace the schema with real fields:
 
 ```ts title="src/app/products/models/product/product.model.ts"
-import { Model, RegisterModel } from "@warlock.js/cascade";
-import { type Infer, v } from "@warlock.js/seal";
-import { ProductResource } from "app/products/resources/product.resource";
+import { Model } from "@warlock.js/core";
+import type { StrictMode } from "@warlock.js/cascade";
+import { v, type Infer } from "@warlock.js/core";
+import { ProductResource } from "../../resources/product.resource";
 
-export const productSchema = v.object({
+const productSchema = v.object({
   name: v.string().min(2).max(120),
   slug: v.string().min(2).max(160),
   price: v.number().min(0),
@@ -109,15 +112,14 @@ export const productSchema = v.object({
   in_stock: v.boolean(),
 });
 
-export type ProductSchema = Infer<typeof productSchema>;
+export type ProductType = Infer.Output<typeof productSchema>;
 
-@RegisterModel()
-export class Product extends Model<ProductSchema> {
+export class Product extends Model<ProductType> {
   public static table = "products";
+  public static strictMode: StrictMode = "fail";
+  public static resource = ProductResource;
 
   public static schema = productSchema;
-
-  public static resource = ProductResource;
 }
 ```
 
@@ -129,24 +131,25 @@ Two notes on what changed:
 The resource is even thinner:
 
 ```ts title="src/app/products/resources/product.resource.ts"
-import { defineResource } from "@warlock.js/core";
+import { Resource } from "@warlock.js/core";
 
-export const ProductResource = defineResource({
-  schema: {
-    id: "number",
-    // TODO: Add more resource fields
-  },
-});
+export class ProductResource extends Resource {
+  public schema = {
+    id: "int",
+    name: "string",
+    // TODO: Define resource schema
+  };
+}
 ```
 
 Make it match the model:
 
 ```ts title="src/app/products/resources/product.resource.ts"
-import { defineResource } from "@warlock.js/core";
+import { Resource } from "@warlock.js/core";
 
-export const ProductResource = defineResource({
-  schema: {
-    id: "string",
+export class ProductResource extends Resource {
+  public schema = {
+    id: "int",
     name: "string",
     slug: "string",
     price: "number",
@@ -154,8 +157,8 @@ export const ProductResource = defineResource({
     in_stock: "boolean",
     createdAt: "date",
     updatedAt: "date",
-  },
-});
+  };
+}
 ```
 
 Resources are output-only — they map model fields to wire fields and nothing else. No hydration, no reconciliation, no computed side effects. Those belong in services or model accessors.
@@ -203,7 +206,7 @@ yarn warlock generate.repository products/product
 Output:
 
 ```ts title="src/app/products/repositories/products.repository.ts"
-import type { FilterRules, RepositoryOptions } from "@warlock.js/core";
+import type { FilterByOptions, RepositoryOptions } from "@warlock.js/core";
 import { RepositoryManager } from "@warlock.js/core";
 import { Product } from "../models/product";
 
@@ -213,20 +216,14 @@ type ProductListFilter = {
 
 export type ProductListOptions = RepositoryOptions & ProductListFilter;
 
-class ProductsRepository extends RepositoryManager<Product, ProductListOptions> {
+export class ProductsRepository extends RepositoryManager<Product, ProductListFilter> {
   public source = Product;
 
-  public simpleSelectColumns: string[] = ["id"];
+  protected defaultOptions: RepositoryOptions = this.withDefaultOptions({});
 
-  public filterBy: FilterRules = {
-    id: "=",
-  };
-
-  public defaultOptions: RepositoryOptions = {
-    orderBy: {
-      id: "desc",
-    },
-  };
+  protected filterBy: FilterByOptions = this.withDefaultFilters({
+    name: "like",
+  });
 }
 
 export const productsRepository = new ProductsRepository();
@@ -235,7 +232,7 @@ export const productsRepository = new ProductsRepository();
 Three knobs to set before this is useful:
 
 ```ts title="src/app/products/repositories/products.repository.ts"
-import type { FilterRules, RepositoryOptions } from "@warlock.js/core";
+import type { FilterByOptions, RepositoryOptions } from "@warlock.js/core";
 import { RepositoryManager } from "@warlock.js/core";
 import { Product } from "../models/product";
 
@@ -249,32 +246,29 @@ type ProductListFilter = {
 
 export type ProductListOptions = RepositoryOptions & ProductListFilter;
 
-class ProductsRepository extends RepositoryManager<Product, ProductListOptions> {
+export class ProductsRepository extends RepositoryManager<Product, ProductListFilter> {
   public source = Product;
 
-  public simpleSelectColumns: string[] = ["id", "name", "slug", "price", "in_stock"];
+  protected defaultOptions: RepositoryOptions = this.withDefaultOptions({
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
 
-  public filterBy: FilterRules = {
+  protected filterBy: FilterByOptions = this.withDefaultFilters({
     id: "=",
     ids: ["in", "id"],
     slug: "=",
     in_stock: "=",
     search: ["like", "name"],
-  };
-
-  public defaultOptions: RepositoryOptions = {
-    orderBy: {
-      createdAt: "desc",
-    },
-  };
+  });
 }
 
 export const productsRepository = new ProductsRepository();
 ```
 
-- **`simpleSelectColumns`** — the columns returned when the repository is embedded as a relation. Smaller payloads, faster joins.
-- **`filterBy`** — a map of "query-string key" to "(operator, column?)". `["in", "id"]` means `?ids[]=...` filters by `WHERE id IN (...)`. `["like", "name"]` means `?search=foo` becomes `WHERE name LIKE '%foo%'`.
-- **`defaultOptions`** — the default sort. Override per-request via `request.input("orderBy")` if you expose it.
+- **`filterBy`** — a map of "query-string key" to "(operator, column?)". `["in", "id"]` means `?ids[]=...` filters by `WHERE id IN (...)`. `["like", "name"]` means `?search=foo` becomes `WHERE name LIKE '%foo%'`. `withDefaultFilters(...)` merges your rules on top of the framework defaults.
+- **`defaultOptions`** — the default sort. `withDefaultOptions(...)` merges over the framework defaults. Override per-request via `request.input("orderBy")` if you expose it.
 
 ## Step 5 — Generate the controllers
 
@@ -509,8 +503,10 @@ guarded(() => {
 | `list`    | `GET`    | `/products`      |
 | `show`    | `GET`    | `/products/:id`  |
 | `create`  | `POST`   | `/products`      |
-| `update`  | `PATCH`  | `/products/:id`  |
+| `update`  | `PUT`    | `/products/:id`  |
 | `destroy` | `DELETE` | `/products/:id`  |
+
+`.update()` registers `PUT /products/:id` — a full replacement of the resource. If you want a partial update, the builder also exposes a separate `.patch()` slot that registers `PATCH /products/:id`; the two are independent and can coexist on the same path.
 
 The `guarded(...)` wrapper is a project-local helper from `src/app/shared/utils/router.ts` — it applies `authMiddleware("user")` to every route inside. Drop it if your routes are public, or use `router.route(...)` directly outside the wrapper.
 
@@ -574,7 +570,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 # Update
 curl -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
-     -X PATCH \
+     -X PUT \
      -d '{"price":12.99}' \
      http://localhost:3000/products/<id>
 
@@ -606,6 +602,7 @@ A few drift notes worth flagging if you compare the generator output to the cano
 - [First route](../getting-started/04-first-route.md) — the minimal walkthrough this recipe expands on
 - [Project layout](../getting-started/05-project-layout.md) — the module convention in full
 - [Routing](../the-basics/02-routing.md) — `router.route(...)`, prefix groups, middleware groups
+- [RESTful routes](../the-basics/restful.md) — the full `.list().show().create().update().destroy()` chain, the `.patch()` slot, and `restfulResource(...)`
 - [Controllers](../the-basics/03-controllers.md) — controller signature, validation, response shape
 - [Repositories](../the-basics/05-repositories.md) — `filterBy`, `listCached`, custom queries
 - [Resources](../the-basics/06-resources.md) — output shaping, computed fields

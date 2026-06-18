@@ -27,8 +27,8 @@ vite.config.ts              ← wires globalSetup + setupFiles, sets the include
 It also adds `vitest`, `@vitest/coverage-v8`, `vite`, `@mongez/vite` to `devDependencies`, and registers four scripts in `package.json`:
 
 ```json
-"test": "vitest",
-"test:coverage": "vitest --coverage",
+"test": "vitest run",
+"test:coverage": "vitest run --coverage",
 "test:ui": "vitest --ui",
 "test:watch": "vitest --watch"
 ```
@@ -58,11 +58,12 @@ await setupTest({ connectors: true });
 ```
 
 ```ts title="vite.config.ts"
+import { lowerStage3Decorators } from "@warlock.js/core";
 import mongezVite from "@mongez/vite";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  plugins: [mongezVite()],
+  plugins: [lowerStage3Decorators(), mongezVite()],
   test: {
     globalSetup: "./src/test-global-setup.ts",
     setupFiles: ["./src/test-setup.ts"],
@@ -72,6 +73,8 @@ export default defineConfig({
   },
 });
 ```
+
+`lowerStage3Decorators()` **must** be the first entry in `plugins` — it lowers the native stage-3 decorators (`@RegisterModel`, `@BelongsTo`, …) with esbuild before the rest of the transform pipeline can mangle them, so decorated Cascade models load under Vitest. Drop it or reorder it and every model load throws a `SyntaxError`.
 
 The split matters: `globalSetup` runs ONCE in the main vitest process (boots the HTTP server); `setupFiles` runs in each worker thread (gives each worker its own DB connection for direct calls).
 

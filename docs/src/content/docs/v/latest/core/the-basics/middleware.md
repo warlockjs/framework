@@ -17,7 +17,7 @@ That's the whole contract. Let's unpack what it means in practice.
 
 ## The function shape
 
-```ts title="@warlock.js/core/src/router/types.ts"
+```ts title="The Middleware type"
 export type MiddlewareResponse = ReturnedResponse | undefined | void;
 
 export type Middleware<MiddlewareRequest extends Request = Request> = {
@@ -327,7 +327,7 @@ Downstream controllers read `request.organization` if it's set. If you need it t
 
 The auth middleware in `@warlock.js/auth` is a clean example of both patterns combined. Stripped to the essentials:
 
-```ts title="@warlock.js/auth/src/middleware/auth.middleware.ts"
+```ts title="authMiddleware (from @warlock.js/auth)"
 import { type Middleware, type Request, type Response, t } from "@warlock.js/core";
 
 export function authMiddleware(allowedUserType?: string | string[]) {

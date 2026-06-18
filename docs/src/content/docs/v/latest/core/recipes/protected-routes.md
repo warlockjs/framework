@@ -66,7 +66,7 @@ const requireAdmin = authMiddleware("admin");
 const requireAny = authMiddleware();
 ```
 
-What the factory does, from `@warlock.js/auth/src/middleware/auth.middleware.ts`:
+What the factory does:
 
 1. Reads `Authorization: Bearer <token>` from the request.
 2. Verifies the JWT (signature + expiry).

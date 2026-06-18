@@ -30,7 +30,7 @@ flowchart LR
 
 Three layers to know:
 
-1. **Levels** — `debug`, `info`, `success`, `warn`, `error`. The min-level filter drops anything below the threshold before fan-out runs.
+1. **Levels** — `debug`, `info`, `success`, `warn`, `error`, `fatal`. The min-level filter drops anything below the threshold before fan-out runs.
 2. **Channels** — destinations the entry fans out to. Console for terminal, FileLog for human-readable files, JSONFileLog for structured logs that observability tools can ingest. Subscribe to as many as you need.
 3. **Redaction** — strip sensitive fields by dotted path before any channel sees the entry. Configured logger-wide; channels can add more paths but never fewer.
 
@@ -52,7 +52,7 @@ The shape is **module / action / message / context** — four positional argumen
 
 ## Levels
 
-Five levels with conventional severity ordering:
+Six levels with conventional severity ordering:
 
 | Level     | When to use                                                            |
 | --------- | ---------------------------------------------------------------------- |
@@ -61,6 +61,7 @@ Five levels with conventional severity ordering:
 | `success` | An outcome you want to highlight — same severity as info, separate icon |
 | `warn`    | Something unexpected but not actionable — partial failures, fallbacks  |
 | `error`   | Something went wrong and you should know about it                      |
+| `fatal`   | Unrecoverable failure — the app is going down                          |
 
 Set a minimum level to drop noise before any channel runs:
 
@@ -72,9 +73,14 @@ log.setMinLevel(undefined); // accept all
 
 This is cheaper than per-channel `levels` filters — the fan-out loop never runs for dropped entries.
 
-## Configuration
+## Configuration — the core wrapper surface
 
-`src/config/log.ts` declares channels per environment. Channels come from `@warlock.js/logger`.
+`src/config/log.ts` declares channels per environment. Channels come from `@warlock.js/logger`. The core wrapper that reads this file is `setLogConfigurations()` — and it is deliberately small. **It only reads two things:**
+
+1. `options.channels` — channels active in every environment.
+2. `options[env].channels` — extra channels for the current environment, where `env` is **only** `development` or `production`.
+
+It concatenates those two lists and calls `log.configure({ channels })`. That's the whole behaviour.
 
 ```ts title="src/config/log.ts"
 import { type LogConfigurations } from "@warlock.js/core";
@@ -85,16 +91,9 @@ const consoleLog = new ConsoleLog({
 });
 
 const logConfigurations: LogConfigurations = {
-  enabled: true,
-  development: {
-    channels: [consoleLog],
-  },
-  test: {
-    channels: [consoleLog],
-  },
+  channels: [consoleLog],   // runs in every environment
   production: {
     channels: [
-      consoleLog,
       new JSONFileLog({
         storagePath: "/var/log/app",
         rotate: true,
@@ -106,15 +105,34 @@ const logConfigurations: LogConfigurations = {
 export default logConfigurations;
 ```
 
-| Field           | Purpose                                                          |
-| --------------- | ---------------------------------------------------------------- |
-| `enabled`       | Master switch — `false` disables every channel                   |
-| `channels`      | Channels active in **all** environments (merged with env-specific) |
-| `development`   | Channels added on top in dev                                     |
-| `test`          | Channels added on top in test                                    |
-| `production`    | Channels added on top in production                              |
+| Field           | Read by the core wrapper? | Behaviour                                                          |
+| --------------- | ------------------------- | ----------------------------------------------------------------- |
+| `channels`      | Yes                       | Channels active in **all** environments (merged with env-specific) |
+| `development`   | Yes (its `.channels`)     | Channels added on top when the environment is `development`        |
+| `production`    | Yes (its `.channels`)     | Channels added on top when the environment is `production`         |
 
-The framework merges `channels` (always) with the matching env block — so a channel in `channels` runs everywhere, and `production.channels` adds production-only destinations.
+The merge is `[...channels, ...env.channels]` — a channel in `channels` runs everywhere, and `production.channels` adds production-only destinations.
+
+### What the core wrapper does NOT do
+
+The `LogConfigurations` type also exposes `enabled` and `test` fields, but `setLogConfigurations()` **never reads them**:
+
+- **`enabled` is not honoured.** There is no master on/off switch in the core wrapper — setting `enabled: false` does nothing. To silence logging, ship an empty `channels` list (or raise the min-level / use per-channel `levels` — see below).
+- **The `test` block is not read.** Only `development` and `production` env blocks are consulted. Under `NODE_ENV=test` (or any environment that isn't `development`/`production`), `options[env]?.channels` resolves to `undefined`, so a `test:` block is silently ignored — only the top-level `channels` apply. Put test channels in `channels` if you need them during tests.
+
+These fields exist on the type for forward-compatibility, but as of today they are inert at the core wrapper. Don't rely on them.
+
+### Reading the resolved config back
+
+The merged channel list is what was handed to `@warlock.js/logger`; the raw declarative object is still available through the config service:
+
+```ts
+import { config } from "@warlock.js/core";
+
+const logConfig = config.get("log"); // the LogConfigurations object you exported
+```
+
+That returns your exported object as-is (`channels`, `development`, `production`, and the inert `enabled`/`test` fields) — useful for inspection, but remember only `channels` + the current env's `channels` actually drove the logger.
 
 ## Channels
 
@@ -143,7 +161,7 @@ Writes entries to a file in the same format the console prints (minus the ANSI c
 
 ### JSONFileLog — structured logs
 
-Writes one JSON object per line — the format observability tools (Datadog, Splunk, Loki, ELK) ingest natively. Each line is `{ timestamp, level, module, action, message, context }`. Pair with log rotation (`rotate: true`) and a forwarder.
+Writes a single pretty-printed (2-space indented) JSON document of shape `{ messages: [ ... ] }` — each new batch is appended into the `messages` array. Every record is `{ content, level, date, module, action, stack?, context?, timestamp }` — note the message text lives under `content`, not `message`. This is an array-wrapped indented document, not newline-delimited JSON, so it isn't ingested line-by-line by tools like Datadog/Splunk/Loki/ELK without a parser. Pair with log rotation (`rotate: true`) and a forwarder.
 
 ## The call signature
 
@@ -383,6 +401,7 @@ The timer always logs — even on error — so you get both the happy-path timin
 - **Auto-flush doesn't re-raise `beforeExit`.** Only signal events are re-raised. `beforeExit` flushes in place; Node exits on its own.
 - **Min-level filter is logger-wide.** If you want one channel to accept debug but another to drop it, leave `log.setMinLevel(undefined)` and use `levels: ["info", "warn", "error"]` per-channel.
 - **`log.assert(condition, ...)` is free on truthy conditions.** No string formatting runs, no channel is called. Cheap to use liberally.
+- **`enabled` and `test` in `src/config/log.ts` are inert.** The core `setLogConfigurations()` wrapper only reads `channels` plus the `development`/`production` env blocks' `channels`. `enabled: false` does not disable anything, and a `test:` block is never consulted (under test, only top-level `channels` apply). To turn logging off, ship an empty `channels` list or filter per-channel with `levels`.
 
 ## See also
 

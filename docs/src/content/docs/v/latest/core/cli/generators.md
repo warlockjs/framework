@@ -1,6 +1,6 @@
 ---
 title: "Generators"
-description: The scaffolding family — add, generate.module, generate.controller, generate.model and the rest. What each one produces, how naming works, and the three workflows people actually use.
+description: The scaffolding family — add, generate.module, generate.controller, generate.model and the rest. What each one produces, how naming works, and the workflows people actually use.
 sidebar:
   order: 2
   label: "Generators"
@@ -8,7 +8,7 @@ sidebar:
 
 Warlock's CLI ships a scaffolding suite that creates files in the layout the framework expects. The generators are the structure made executable — every module they produce reads the same as every other module, so your fifth feature works like your first.
 
-This page is the deep dive on the `generate.*` family and the `add` installer. For the bare command reference, see [CLI commands](./cli-commands.md). Here we cover *what* each generator produces, *how* the naming pipeline transforms your input, and the three workflows you'll actually use day to day.
+This page is the deep dive on the `generate.*` family and the `add` installer. For the bare command reference, see [CLI commands](./cli-commands.md). Here we cover *what* each generator produces, *how* the naming pipeline transforms your input, and the two workflows you'll actually use day to day.
 
 ## The mental model
 
@@ -44,9 +44,9 @@ Example: `warlock generate.module product`
 
 Type whatever feels natural — the generator handles the rest.
 
-## The three workflows
+## The workflows
 
-There's no single "right" way to use these. Three common ones:
+There's no single "right" way to use these. Two common ones:
 
 ### Workflow 1 — Full CRUD bootstrap
 
@@ -111,7 +111,7 @@ That gives you:
 
 ```
 src/app/users/
-  controllers/verify-email.controller.ts     ← new (typed as `RequestHandler<Request<VerifyEmailSchema>>`)
+  controllers/verify-email.controller.ts     ← new (typed as `GuardedRequestHandler<VerifyEmailSchema>`)
   schema/verify-email.schema.ts              ← new (from --with-validation); exports value + inferred type
   services/verify-email.service.ts           ← new
 ```
@@ -119,27 +119,6 @@ src/app/users/
 The controller imports the schema and its inferred type from the schema file directly — no separate `*.request.ts` alias. The service is an empty function with the right signature. Wire the route by hand in `users/routes.ts` (the controller generator doesn't touch `routes.ts` — only `generate.module` pre-wires routes, and it does that by default).
 
 This is the workflow you'll use most. Each generator does one job; combine them as needed.
-
-### Workflow 3 — Validation-first
-
-You're building an endpoint that takes complex input. Get the schema right before writing the controller:
-
-```bash
-warlock generate.validation products/create-product
-```
-
-```
-src/app/products/
-  schema/create-product.schema.ts     ← seal schema with placeholder fields + inferred type
-```
-
-Now edit `create-product.schema.ts` to lock down the input shape. When you're happy:
-
-```bash
-warlock generate.controller products/create-product --with-validation
-```
-
-The controller generator sees you already have a schema and re-uses it. The handler is typed as `RequestHandler<Request<CreateProductSchema>>` (or `GuardedRequestHandler<CreateProductSchema>` for auth'd routes), pulling the type directly from the schema file.
 
 ## The generators in detail
 
@@ -159,7 +138,7 @@ What you always get (either mode):
 - `main.ts` — empty, comment explaining what it's for.
 - `utils/locales.ts` — translation grouping stub.
 
-What the default (full) scaffold adds on top: models, migrations, controllers, services, resource, repository, schema files, request types, a seed file — and a pre-wired `routes.ts`. `--minimal` leaves `routes.ts` empty and skips all of that.
+What the default (full) scaffold adds on top: models, migrations, controllers, services, resource, repository, schema files (value + inferred type per file), a seed file — and a pre-wired `routes.ts`. `--minimal` leaves `routes.ts` empty and skips all of that.
 
 Module names are pluralized automatically — `product` becomes `products/`.
 
@@ -171,7 +150,19 @@ warlock generate.controller products/create-product --with-validation
 warlock generate.controller products/list-products --force
 ```
 
-Creates `controllers/<name>.controller.ts` inside an existing module. With `--with-validation`, also creates the schema and request type and wires them together.
+Creates `controllers/<name>.controller.ts` inside an existing module. With `--with-validation` (`-v`), also creates `schema/<name>.schema.ts` — one file exporting both the schema value and its inferred type — and wires it onto the controller.
+
+The schema uses `@warlock.js/seal`:
+
+```ts title="src/app/products/schema/create-product.schema.ts (generated)"
+import { v, type Infer } from "@warlock.js/seal";
+
+export const createProductSchema = v.object({
+  // Add your validation rules here
+});
+
+export type CreateProductSchema = Infer<typeof createProductSchema>;
+```
 
 The module must already exist. The generator errors with "Module 'products' does not exist" otherwise — run `generate.module products` first.
 
@@ -219,26 +210,6 @@ warlock generate.resource products/product
 
 Creates `resources/<name>.resource.ts` — a `Resource` subclass that defines how the model gets mapped to the wire. Resources are output-only: column-name to wire-key mapping, type-marshaling, no logic.
 
-### `generate.validation <module>/<name>`
-
-```bash
-warlock generate.validation products/create-product
-```
-
-Creates `schema/<name>.schema.ts` — one file exporting both the schema value and its inferred type. There's no longer a `--with-request` companion flag; the controller annotates `RequestHandler<Request<CreateProductSchema>>` directly off the schema's `Infer<>` output.
-
-The schema uses `@warlock.js/seal`:
-
-```ts title="src/app/products/schema/create-product.schema.ts (generated)"
-import { v, type Infer } from "@warlock.js/seal";
-
-export const createProductSchema = v.object({
-  // Add your validation rules here
-});
-
-export type CreateProductSchema = Infer<typeof createProductSchema>;
-```
-
 ### `generate.migration <model-path>`
 
 ```bash
@@ -278,9 +249,10 @@ Not a generator — an installer. Adds a Warlock feature package to the project 
 warlock add auth
 warlock add auth mail storage
 warlock add --list
+warlock add auth --no-install     # record deps + run setup, skip the install
 ```
 
-The setup typically installs the npm package, registers commands in `warlock.config.ts > cli.commands`, and runs any package-specific configuration files. The `--list` flag shows available features.
+The setup typically installs the npm package, registers commands in `warlock.config.ts > cli.commands`, and runs any package-specific configuration files. The `--list` flag shows available features. Pass `--no-install` (last, after the feature list) to record the dependencies and run setup without invoking the package manager — handy when a scaffolder runs a single install afterwards. Full flag reference lives in [CLI commands](./cli-commands.md#add-features).
 
 Use this for major feature packages from the `@warlock.js/*` ecosystem. For project-local code, the `generate.*` family is what you want.
 
@@ -303,11 +275,11 @@ A few naming conventions that pay off:
 
 ## Customizing the stubs
 
-The stubs are baked into `@warlock.js/core/src/cli/commands/generate/templates/stubs.ts`. There's no project-level override hook today — if you need different stubs, the path is to fork or wrap the generator in a custom `command()` of your own (see [CLI commands](./cli-commands.md) for how to write one). The roadmap includes a stub-override hook; it's not shipped.
+The stubs are baked into the framework's generator templates. There's no project-level override hook today — if you need different stubs, the path is to fork or wrap the generator in a custom `command()` of your own (see [CLI commands](./cli-commands.md) for how to write one). The roadmap includes a stub-override hook; it's not shipped.
 
 ## Gotchas
 
-- **`--with-validation` and `--with-request` are different generators' flags.** `generate.controller --with-validation` creates the schema + the request *and* wires them in the controller. `generate.validation --with-request` creates just the schema + the request (no controller). Pick the one that matches your workflow.
+- **There's no standalone validation generator.** Schemas are produced as a side effect of `generate.controller --with-validation` (`-v`), which writes `schema/<name>.schema.ts` and wires it onto the controller. There is no `generate.validation` command and no `--with-request` flag — the controller annotates its handler directly off the schema's inferred type.
 - **The module must exist before module-scoped generators run.** Run `generate.module <name>` first, then `generate.controller <name>/...` and friends.
 - **`--force` overwrites without diffing.** It doesn't merge changes back into your existing file — it replaces. If you've added custom logic to a generated file, `--force` deletes it. Use sparingly.
 - **The model generator singularizes the name.** `warlock generate.model products/products` writes `product.model.ts` (with `Product` class) — not `products.model.ts`. The generator picks the right singular form; type the entity name however reads naturally to you.

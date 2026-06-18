@@ -46,7 +46,7 @@ The arrows go one way. A repository never calls a service. A resource never fetc
 
 Before any subsystem starts, the framework runs a tiny prelude:
 
-```ts title="@warlock.js/core/src/bootstrap.ts"
+```ts title="bootstrap() — the prelude"
 export async function bootstrap() {
   await loadEnv();
 
@@ -72,15 +72,17 @@ A *connector* is the framework's word for a subsystem that has a lifecycle (conn
 | 0        | logger          | early           | Everything else logs                                            |
 | 1        | mailer          | early           | Other connectors may queue startup emails                       |
 | 2        | database        | early           | Models register at import time and need the connection ready    |
-| 3        | communicator    | early           | Shared HTTP client; safer to bring up before app code           |
+| 3        | herald          | early           | Message broker (queues, event fan-out); up before app code      |
 | 4        | cache           | early           | Repositories cache lookups; needs to exist before they're used  |
 | 5        | http            | late            | Reads the router; only safe after `routes.ts` is imported       |
 | 6        | storage         | early           | Apps reference storage at import time                           |
 | 7        | socket          | late            | Wraps http's Fastify instance after it's been created           |
+| 8        | notifications   | early           | Wires `@warlock.js/notifications` from its config (lazy import)  |
+| 9        | access          | early           | Wires `@warlock.js/access`; fails fast on a bad auth config      |
 
 Each connector boots in two halves around your app code:
 
-- **Early phase** runs first: logger, mailer, database, cache, storage. These are services your code needs *at import time* — a model registers itself against the database connection when its file loads.
+- **Early phase** runs first: logger, mailer, database, herald, cache, storage, notifications, access. These are services your code needs *at import time* — a model registers itself against the database connection when its file loads.
 - **App code imports** — `src/app/**/main.ts`, every `routes.ts`, every `events.ts`. Models, routes, and event listeners are all registered now.
 - **Late phase** runs second: http and socket. Both read state your code just registered; http scans the router, socket reads http's listening server.
 

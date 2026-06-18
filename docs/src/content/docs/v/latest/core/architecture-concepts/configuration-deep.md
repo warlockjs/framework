@@ -122,7 +122,7 @@ Some config files trigger framework-level reactions when they load. The `config-
 
 The built-in handler is for `app.ts`:
 
-```ts title="@warlock.js/core/src/config/config-handlers.ts"
+```ts title="A config special-handler"
 export const registerAppConfig = async (appConfig: AppConfigurations) => {
   const locales = appConfig.locales || ["en"];
 

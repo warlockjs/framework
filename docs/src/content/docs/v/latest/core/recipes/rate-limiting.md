@@ -28,7 +28,7 @@ flowchart LR
     request --> plugin --> routeOverride --> handler
 ```
 
-- **Plugin-level** (`src/config/http.ts → http.rateLimit`) — the default `max` and `duration` every route inherits. The plugin is registered once at boot from `@warlock.js/core/src/http/plugins.ts`.
+- **Plugin-level** (`src/config/http.ts → http.rateLimit`) — the default `max` and `duration` every route inherits. The plugin is registered once at boot.
 - **Route-level** — each route can override via `RouteOptions.rateLimit` (`max`, `timeWindow`, `errorMessage`). The framework merges this into the per-route `config.rateLimit` block that fastify reads.
 
 What the framework gives you out of the box: shared global limits + per-route overrides. What it doesn't give you out of the box: per-user keying or fully custom 429 bodies — those need a small middleware on top. We'll cover all three.
@@ -119,7 +119,7 @@ router.post("/auth/reset-password", resetPasswordController, {
 });
 ```
 
-The shape (verified from `@warlock.js/core/src/router/types.ts`):
+The shape:
 
 ```ts
 type RouteOptions = {

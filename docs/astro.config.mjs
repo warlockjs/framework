@@ -332,6 +332,15 @@ export default defineConfig({
       title: "Warlock.js",
       description:
         "AI-native TypeScript framework for backend, real-time, and AI operations.",
+      head: [
+        {
+          tag: "meta",
+          attrs: {
+            name: "google-site-verification",
+            content: "ARcACUyhaNj7uvsLp5qhjGhzWvOQMqX9ZGxS8wpHT0I",
+          },
+        },
+      ],
       components: {
         // Full chrome replacement — header, sidebar, footer all custom.
         Header: "./src/components/Header.astro",

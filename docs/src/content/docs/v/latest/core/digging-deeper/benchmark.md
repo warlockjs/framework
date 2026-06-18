@@ -214,6 +214,20 @@ const stats = profiler.stats("db.findUser");
 
 Wire it in `src/config/benchmark.ts` and every `measure()` call records by default — no per-call wiring needed.
 
+### Lifecycle — `reset()` and `dispose()`
+
+The profiler keeps two pieces of state you may need to manage explicitly:
+
+- **`profiler.reset(name?)`** — clears the rolling latency ring buffer for one operation (or all of them when `name` is omitted). It does **not** reset the unbounded `count`/`errors` counters, so `errorRate` keeps its historical denominator. Reach for it when you want fresh percentiles after a deploy without losing lifetime totals.
+- **`profiler.dispose()`** — stops the auto-flush `setInterval` started by `flushEvery`. This is a real leak footgun: a profiler constructed with `flushEvery` holds a live timer, and if you build profilers per-request or per-test instead of once at config time, every one of them keeps the process (or the Vitest worker) alive until you call `dispose()`. The single config-time profiler doesn't need it; throwaway profilers do.
+
+```ts
+const profiler = new BenchmarkProfiler({ flushEvery: 60_000 });
+// ... use it ...
+profiler.reset();    // wipe ring buffers, keep lifetime counters
+profiler.dispose();  // clear the flush interval so the process can exit
+```
+
 ### `BenchmarkChannel` — where stats go
 
 A channel is anything that implements `onFlush(stats)`:
@@ -281,19 +295,11 @@ Wire snapshots globally in `src/config/benchmark.ts` the same way as the profile
 
 ## Auto-integration with use-cases
 
-Every [`useCase()`](../the-basics/use-cases-deep.md) wraps its pipeline in `measure()` by default. You get a per-use-case latency and a `benchmarkResult` field on every execution snapshot without writing any timing code. The defaults are reasonable:
+Every [`useCase()`](../the-basics/use-cases-deep.md) wraps its **handler** in `measure()` by default — `benchmark` defaults to `true`. You get a per-use-case latency and a `benchmarkResult` field (`{ latency, state }`) on every execution snapshot without writing any timing code.
 
-```ts
-{
-  enabled: true,
-  latencyRange: {
-    excellent: 100,
-    poor: 200,
-  },
-}
-```
+The use-case layer adds **no thresholds of its own**. When `benchmark: true`, it calls `measure()` with no per-call options, so the `state` falls back to whatever `latencyRange` you set in `src/config/benchmark.ts` — and without that config the state is just `"good"`/`"poor"`. There is no built-in `{ excellent: 100, poor: 200 }` default; set one globally if you want meaningful classification.
 
-Override per use-case via `benchmarkOptions`:
+Override per use-case by passing a `BenchmarkOptions` object to the `benchmark` field (the field is `benchmark`, not `benchmarkOptions`):
 
 ```ts
 import { useCase } from "@warlock.js/core";
@@ -301,7 +307,7 @@ import { useCase } from "@warlock.js/core";
 export const placeOrder = useCase<Order, PlaceOrderInput>({
   name: "place_order",
   handler: async (input) => placeOrderService(input),
-  benchmarkOptions: {
+  benchmark: {
     latencyRange: { excellent: 200, poor: 1000 },
     tags: { domain: "orders" },
     onComplete: (result) => metrics.histogram("place_order.latency", result.latency),
@@ -309,9 +315,9 @@ export const placeOrder = useCase<Order, PlaceOrderInput>({
 });
 ```
 
-Set `benchmarkOptions: false` to disable benchmarking for one use-case — useful for use-cases that wrap genuinely long-running work where latency stats don't carry meaning.
+Set `benchmark: false` to disable benchmarking for one use-case — useful for use-cases that wrap genuinely long-running work where latency stats don't carry meaning.
 
-When the use-case has both `retryOptions` and `benchmarkOptions`, the latency you get is the **total wall-clock time including retries**. That's almost always what you want for SLO tracking — your customers don't care that you retried three times, they care it took 1.2 seconds.
+The handler benchmark wraps **only the handler, per retry attempt** — not the guard/validation prelude and not the retry backoff delays. So when a use-case sets both `retry` and `benchmark`, the `benchmarkResult.latency` reflects the latest attempt's handler time, not the total wall-clock across retries. (If you want total-including-retries latency, wrap the whole call in your own `measure()` as shown below.)
 
 ## Common patterns
 
@@ -347,11 +353,14 @@ Higher thresholds (Stripe round-trips are slow), tagged for slicing, validation 
 
 ### Compose with `retry()`
 
+`retry` lives in `@mongez/reinforcements`, not in `@warlock.js/core` — import it from there. Its retry-count option is `attempts` (default `3`), not `count`:
+
 ```ts
-import { measure, retry } from "@warlock.js/core";
+import { measure } from "@warlock.js/core";
+import { retry } from "@mongez/reinforcements";
 
 const result = await measure("publish-event", () =>
-  retry(() => bus.publish(event), { count: 3, delay: 200 }),
+  retry(() => bus.publish(event), { attempts: 3, delay: 200 }),
 );
 
 console.log(result.latency); // total wall-clock, including all retry attempts
@@ -379,9 +388,10 @@ If you've wired a profiler in `src/config/benchmark.ts`, you can drop into a deb
 - **Snapshots with `"value"` retain references.** If `value` holds a streamed body or a large buffer, you've kept it in memory until eviction. Default `capture: "error"` keeps you safe.
 - **`shouldBenchmarkError` re-throws.** Make sure the caller is ready for an unwrapped throw on that error class. The discriminated-result contract holds for every other path; this one carves out an exception.
 - **Hook errors crash the call.** Throwing inside `onComplete`/`onError`/`onFinish` propagates up and discards the measurement. Keep hooks side-effect-only; wrap risky work in their own try/catch.
+- **A profiler with `flushEvery` holds a live timer.** The auto-flush `setInterval` keeps the process (and Vitest workers) alive. Construct profilers once at config time. If you ever build a throwaway profiler with `flushEvery`, call `profiler.dispose()` when you're done or it leaks the interval.
 
 ## Going further
 
 - [`guides/retry.md`](./retry.md) — composes inside `measure()`. The latency story for retried operations.
-- [`guides/use-cases-deep.md`](../the-basics/use-cases-deep.md) — `benchmarkOptions` field on `useCase()` and how the pipeline-level wrap stacks.
+- [`guides/use-cases-deep.md`](../the-basics/use-cases-deep.md) — the `benchmark` field on `useCase()` and how the handler-level wrap stacks.
 - [`guides/configuration-deep.md`](../architecture-concepts/configuration-deep.md) — `src/config/benchmark.ts` and the global config surface.

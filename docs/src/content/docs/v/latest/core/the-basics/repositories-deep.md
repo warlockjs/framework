@@ -1,14 +1,14 @@
 ---
 title: "Repositories deep dive"
-description: Everything on RepositoryManager — every method, every filter operator, cursor pagination, lifecycle hooks, custom queries, the caching story, and the active-record convenience surface.
+description: Everything on RepositoryManager — every method, every filter operator, cursor pagination, custom queries, the caching story, and the active-record convenience surface.
 sidebar:
   order: 11
   label: "Repositories deep dive"
 ---
 
-The [essentials page on repositories](./05-repositories.md) introduces the shape and the everyday methods. This page covers the rest — every method on `RepositoryManager`, every filter operator, both pagination modes, the lifecycle hooks, custom queries past the filter system, the cache layer underneath, and the `*Active` convenience tier.
+The [essentials page on repositories](./05-repositories.md) introduces the shape and the everyday methods. This page covers the rest — every method on `RepositoryManager`, every filter operator, both pagination modes, custom queries past the filter system, the cache layer underneath, and the `*Active` convenience tier.
 
-Reach for this page when "list and find" stops being enough — when you need cursor pagination on a million-row table, a `near(latitude, longitude)` filter, a hook that runs every time a record is created, or you're swapping the cache driver per repository.
+Reach for this page when "list and find" stops being enough — when you need cursor pagination on a million-row table, a `near(latitude, longitude)` filter, an extra clause the filter system can't express, or you're swapping the cache driver per repository.
 
 ## The class shape
 
@@ -188,12 +188,9 @@ type RepositoryOptions = {
   simpleSelect?: true;
   deselect?: string[];
   orderBy?: "random" | [string, "asc" | "desc"] | { [col]: "asc" | "desc" };
-  sortBy?: string;
-  sortDirection?: "asc" | "desc";
   cursor?: string | number;
   direction?: "next" | "prev";
   cursorColumn?: string;
-  purgeCache?: boolean;
   perform?: (query, options) => void;
 };
 ```
@@ -208,9 +205,10 @@ The interesting ones:
 | `select`         | Explicit column allow-list.                                                    |
 | `simpleSelect`   | When `true`, use `simpleSelectColumns` from the repository.                    |
 | `deselect`       | Explicit deny-list of columns.                                                 |
-| `orderBy`        | Three forms — see below.                                                       |
+| `orderBy`        | The only ordering field that's honored. Three forms — see below.              |
 | `perform`        | Escape hatch — custom query callback. Covered in [Custom queries](#custom-queries-beyond-filterby). |
-| `purgeCache`     | Set `true` on a write path if you want to invalidate after.                    |
+
+> **`sortBy` / `sortDirection` are not honored.** The `RepositoryOptions` type still carries them, but `applyOptionsToQuery` only reads `orderBy` — passing `sortBy`/`sortDirection` does nothing. Use `orderBy` for all ordering. Likewise, there is no working `purgeCache` option: invalidation is driven by model events (see [Caching](#caching)), so a `purgeCache` flag on the options object is inert.
 
 `orderBy` has three forms:
 
@@ -485,7 +483,7 @@ class ContactsRepository extends RepositoryManager<Contact, ContactsRepositoryFi
 }
 ```
 
-This is from the reference codebase. The method wraps `first()` with a more meaningful name and a tighter type. Same caching story (none here — these aren't `*Cached`). Same lifecycle hooks.
+This is from the reference codebase. The method wraps `first()` with a more meaningful name and a tighter type. Same caching story (none here — these aren't `*Cached`).
 
 ### 3. Drop to the query builder directly
 
@@ -551,76 +549,63 @@ All single-record writes fire the Cascade model events (`creating` → `created`
 
 You can also `create()` directly on the model (`Product.create(...)`) when you're inside a service that has the model imported. Both paths fire the same events; pick whichever reads cleaner.
 
-## Lifecycle hooks — `onCreating`, `onCreate`, ...
+## Lifecycle hooks are not currently wired
 
-The repository class exposes protected hooks. Override them in your subclass to inject behaviour around CRUD:
+The repository base class defines a set of protected, no-op hook methods — `beforeListing`, `onList`, `onCreating`, `onCreate`, `onUpdating`, `onUpdate`, `onSaving`, `onSave`, `onDeleting`, `onDelete`. **These are not invoked anywhere.** `create()`, `update()`, `delete()`, and `list()` all call the adapter directly and never reach into these methods. Overriding them in a subclass compiles, but the override never runs.
 
-```ts
-class ProductsRepository extends RepositoryManager<Product, ProductListFilter> {
-  public source = Product;
+Treat them as dead surface until a future release wires them in. Do not build behaviour on them today — to run code around a write, reach for one of the two paths that actually fire:
 
-  protected async onCreating(data: any) {
-    data.slug = slugify(data.name);
+### Use Cascade model events for create/update/delete side effects
+
+Model events fire on every write — whether it came through the repository or a direct `Product.create(...)`. This is also exactly what the repository's cache invalidation listens to. Register `onCreated` / `onUpdated` / `onDeleted` (and the `-ing` pre-save variants) on the model:
+
+```ts title="src/app/products/models/product.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Product extends Model {
+  public static collection = "products";
+
+  protected async onCreating() {
+    this.set("slug", slugify(this.get("name")));
   }
 
-  protected async onCreate(product: Product, data: any) {
-    await searchIndex.add(product);
+  protected async onCreated() {
+    await searchIndex.add(this);
   }
 
-  protected async onUpdating(id: string | number, data: any) {
-    if (data.name) {
-      data.slug = slugify(data.name);
-    }
+  protected async onUpdated() {
+    await searchIndex.update(this);
   }
 
-  protected async onUpdate(product: Product, data: any) {
-    await searchIndex.update(product);
-  }
-
-  protected async onSaving(data: any, mode: "create" | "update" | "patch") {
-    data.touchedAt = new Date();
-  }
-
-  protected async onSave(product: Product, data: any, mode: "create" | "update" | "patch") {
-    // Fires for both create and update.
-  }
-
-  protected async onDeleting(id: string | number) {
-    await this.unlinkExternalReferences(id);
-  }
-
-  protected async onDelete(id: string | number) {
-    await searchIndex.remove(id);
-  }
-
-  protected async beforeListing(options: any) {
-    // Inspect or mutate options before list() runs.
-  }
-
-  protected async onList(result: PaginationResult<Product>, options: any) {
-    // Inspect or augment results after list() returns.
+  protected async onDeleted() {
+    await searchIndex.remove(this.id);
   }
 }
 ```
 
-The full list:
+See [Events and hooks](/v/latest/cascade/architecture-concepts/events-and-hooks/) for the full model event surface (`creating`/`created`, `updating`/`updated`, `saving`/`saved`, `deleting`/`deleted`, `fetching`, and so on).
 
-| Hook            | When it fires                                  | Signature                                |
-| --------------- | ---------------------------------------------- | ---------------------------------------- |
-| `beforeListing` | Before `list()` runs the query                 | `(options) => void`                      |
-| `onList`        | After `list()` returns                         | `(result, options) => void`              |
-| `onCreating`    | Before `create()` calls the adapter            | `(data) => void`                         |
-| `onCreate`      | After `create()` returns                       | `(record, data) => void`                 |
-| `onUpdating`    | Before `update()` calls the adapter            | `(id, data) => void`                     |
-| `onUpdate`      | After `update()` returns                       | `(record, data) => void`                 |
-| `onSaving`      | Before save (both create and update)           | `(data, mode) => void`                   |
-| `onSave`        | After save (both create and update)            | `(record, data, mode) => void`           |
-| `onDeleting`    | Before `delete()` calls the adapter            | `(id) => void`                           |
-| `onDelete`      | After `delete()` returns                       | `(id) => void`                           |
+### Override the repository action method for repository-level interception
 
-All hooks are async and protected — you only see them inside your subclass.
+When the behaviour genuinely belongs at the repository layer — not the model — override `create()` / `update()` / `delete()` / `list()` directly and call `super`:
 
-For model-level lifecycle (`fetching`, `validating`, `restoring`, ...) use Cascade's model events instead — see [Events and hooks](/v/latest/cascade/architecture-concepts/events-and-hooks/). Repository hooks are about repository-level interception; model events fire even when you `Product.create(...)` directly on the model.
+```ts title="src/app/products/repositories/products.repository.ts"
+class ProductsRepository extends RepositoryManager<Product, ProductListFilter> {
+  public source = Product;
+
+  public async create(data: any) {
+    data.slug = slugify(data.name);
+
+    const product = await super.create(data);
+
+    await searchIndex.add(product);
+
+    return product;
+  }
+}
+```
+
+This is explicit, runs reliably, and reads clearly — there's no hidden hook indirection.
 
 ## Caching
 
@@ -861,6 +846,8 @@ What's interesting here:
 - **`simpleSelect: true` is opt-in.** Callers ask for it. Repositories never apply it by default.
 - **`defaultLimit` is 15 at the framework level.** Override in `defaultOptions` to change per repository.
 - **Filter rules are not optional.** A caller passing `{ status: "active" }` with no `status` key in `filterBy` gets an unfiltered query and a silent drop. Wire every filter key you accept.
+- **The repository lifecycle hooks are not wired.** `onCreating`, `onCreate`, `onUpdating`, `onUpdate`, `onSaving`, `onSave`, `onDeleting`, `onDelete`, `beforeListing`, and `onList` exist on the base class but are never called. Use Cascade model events or override the action method instead.
+- **`sortBy` / `sortDirection` / `purgeCache` are ignored.** Only `orderBy` controls ordering, and cache invalidation runs off model events — these option fields are inert.
 - **Cursor pagination owns the sort order for its `cursorColumn`.** Passing `orderBy` on the same column is silently overridden with a console warning.
 - **`updateMany` / `deleteMany` skip the model lifecycle.** Fast, but no `creating` / `updating` / `deleting` events fire — and therefore no cache invalidation. Call `clearCache()` manually after a bulk write, or accept stale cache until next mutation.
 - **Bulk paginate methods (`listCached`) only support page mode.** Cursor pagination skips the cache entirely.

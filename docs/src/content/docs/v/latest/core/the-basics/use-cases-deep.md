@@ -15,6 +15,7 @@ Reach for this page when you're past "I made one work" and into "I want it to be
 ```ts
 useCase<TOutput, TInput>({
   name,
+  description,
   schema,
   guards,
   before,
@@ -23,28 +24,57 @@ useCase<TOutput, TInput>({
   onExecuting,
   onCompleted,
   onError,
-  retryOptions,
-  benchmarkOptions,
+  retry,
+  benchmark,
+  broadcast,
 });
 ```
 
-Every field except `name` and `handler` is optional. The two type parameters are the output shape and the input shape — TypeScript infers the runtime types from these.
+Every field except `name` and `handler` is optional. The two type parameters are the output shape and the input shape — TypeScript infers the runtime types from these. (When you pass a `schema` and no explicit `TInput`, the handler's `data` is inferred straight from the schema — see [Schema-only inference](#schema-only-inference) below.)
 
-| Field              | Type                                         | When you reach for it                                                                  |
-| ------------------ | -------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `name`             | `string`                                     | Always. The registry key, cache key, log key.                                          |
-| `handler`          | `(data, ctx) => Promise<TOutput>`            | Always. The actual work.                                                               |
-| `schema`           | `ObjectValidator` (from `@warlock.js/seal`)  | When input shape is non-trivial. Runs after guards.                                    |
-| `guards`           | `UseCaseGuard<TInput>[]`                     | Authorization / preconditions that should kill the request before validation runs.     |
-| `before`           | `UseCaseBeforeMiddleware<TInput>[]`          | Data transforms — normalise email, calculate tax, enrich with pricing.                 |
-| `after`            | `UseCaseAfterMiddleware<TOutput>[]`          | Fire-and-forget side effects — emails, webhooks, cache invalidation.                   |
-| `onExecuting`      | `(ctx) => void`                              | Per-use-case start hook — log every login attempt, kick off a tracing span.            |
-| `onCompleted`      | `(result) => void`                           | Per-use-case success hook — push metrics, record analytics.                            |
-| `onError`          | `(ctx) => void`                              | Per-use-case error hook — alerting, error budget tracking.                             |
-| `retryOptions`     | `{ count, delay, shouldRetry }`              | When the handler talks to a flaky external system that's worth retrying.               |
-| `benchmarkOptions` | `BenchmarkOptions \| false`                  | Latency classification + hooks. Set to `false` to disable for one use-case.            |
+| Field         | Type                                         | When you reach for it                                                                  |
+| ------------- | -------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `name`        | `string`                                     | Always. The registry key, cache key, log key.                                          |
+| `handler`     | `(data, ctx) => Promise<TOutput>`            | Always. The actual work.                                                               |
+| `description` | `string`                                     | Optional human-readable label surfaced in the registry and observability.              |
+| `schema`      | `ObjectValidator` (from `@warlock.js/seal`)  | When input shape is non-trivial. Runs after guards. Infers `TInput` when set.           |
+| `guards`      | `UseCaseGuard<TInput>[]`                     | Authorization / preconditions that should kill the request before validation runs.     |
+| `before`      | `UseCaseBeforeMiddleware<TInput>[]`          | Data transforms — normalise email, calculate tax, enrich with pricing.                 |
+| `after`       | `UseCaseAfterMiddleware<TOutput>[]`          | Fire-and-forget side effects — emails, webhooks, cache invalidation.                   |
+| `onExecuting` | `(ctx) => void`                              | Per-use-case start hook — log every login attempt, kick off a tracing span.            |
+| `onCompleted` | `(result) => void`                           | Per-use-case success hook — push metrics, record analytics.                            |
+| `onError`     | `(ctx) => void`                              | Per-use-case error hook — alerting, error budget tracking.                             |
+| `retry`       | `RetryOptions` (from `@mongez/reinforcements`) | When the handler talks to a flaky external system that's worth retrying.             |
+| `benchmark`   | `boolean \| BenchmarkOptions`                | Latency classification + hooks. Set to `false` to disable for one use-case.            |
+| `broadcast`   | `boolean \| { event?, output? }`             | Emit the result on success through the globally-configured broadcast channels.         |
 
-Two of these — `retryOptions` and `benchmarkOptions` — also accept defaults from `config.get("use-cases")`. Per-use-case settings win; the config is what you fall through to.
+Two of these — `retry` and `benchmark` — also accept defaults from `config.get("use-cases")`. Per-use-case settings win; the config is what you fall through to. `broadcast` is opt-in per use-case but only fires when the config registers at least one channel.
+
+### Schema-only inference
+
+`useCase()` has two overloads. The everyday one takes `<TOutput, TInput>` explicitly. But when you pass a `schema` and **omit** the input generic, the handler's `data` is inferred straight from the schema via `Infer<Schema>` — no second type parameter, no separate input type to keep in sync:
+
+```ts
+import { useCase } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
+
+const createTagSchema = v.object({
+  name: v.string().min(2),
+  color: v.string().optional(),
+});
+
+// No <Output, Input> generics — `data` is inferred as { name: string; color?: string }
+export const createTagUseCase = useCase({
+  name: "tags.create",
+  schema: createTagSchema,
+  handler: async (data) => {
+    // data.name is string, data.color is string | undefined — both inferred
+    return tagsRepository.create(data);
+  },
+});
+```
+
+Pass an explicit `TInput` only when the input shape and the schema differ (for example, the handler accepts a richer object than the schema validates), or when there is no schema at all.
 
 ## The pipeline, in order
 
@@ -61,6 +91,7 @@ flowchart TD
     after[after middleware<br/><i>fire-and-forget, errors logged</i>]
     history[history snapshot written]
     completedEvent[onCompleted fires<br/><i>invocation → use-case → global</i>]
+    broadcast[broadcast<br/><i>if opted in + channels configured</i>]
 
     start --> execEvent
     execEvent --> guards
@@ -70,6 +101,7 @@ flowchart TD
     handler --> after
     after --> history
     history --> completedEvent
+    completedEvent --> broadcast
 
     guards -. throws .-> errorEvent[onError fires<br/>error re-thrown]
     schema -. invalid .-> errorEvent
@@ -93,7 +125,7 @@ type UseCaseOnExecutingContext = {
   id: string;
   name: string;
   data: any;
-  schema: ObjectValidator;
+  schema?: ObjectValidator;
   startedAt: Date;
 };
 ```
@@ -200,7 +232,7 @@ Throwing aborts the pipeline. The return value becomes the use-case's output.
 
 ### Phase 6 — after middleware
 
-Runs on success only. Errors are caught and logged via `console.error("[use-case] After middleware error in <name>:", err)`. They never re-throw and never affect the return value:
+Runs on success only. Errors are caught and logged via `@warlock.js/logger` — `log.error("use-cases", name, "after middleware failed", { error })`. They never re-throw and never affect the return value:
 
 ```ts
 const sendConfirmationEmail: UseCaseAfterMiddleware<OrderOutput> = async (output, ctx) => {
@@ -236,10 +268,14 @@ type UseCaseResult<TOutput> = {
   id: string;
   name: string;
   calls: number;
-  retries?: { count, currentRetry?, delay? };
-  benchmarkResult?: { latency, state };
+  retries?: { attempts: number; delay?: number; currentRetry: number };
+  benchmarkResult?: { latency: number; state: "poor" | "good" | "excellent" };
 };
 ```
+
+`retries` is present only when `retry` was configured. `attempts` echoes the configured total-attempt budget (default 3), `delay` the configured base delay, and `currentRetry` the number of retries actually performed (`0` means it succeeded on the first try).
+
+After `onCompleted` fires, the framework runs the **broadcast** step (the last thing in the success path): if the use case opted in with `broadcast` *and* the config registered at least one channel, the result is fanned out to those channels via `Promise.allSettled` — a failing channel is logged and never affects the return value. If `broadcast` is omitted or no channels are configured, this step is a no-op.
 
 ### Phase 8 — `onError`
 
@@ -304,54 +340,66 @@ The invocation-level callbacks fire **first**, then the use-case-level callbacks
 
 ## Retries
 
-`retryOptions` wraps the pipeline (excluding `after` middleware) in a retry loop:
+`retry` wraps **only the handler** in a retry loop — the guard / validation / `before` prelude runs once, and `after` middleware runs once after the final successful attempt. The shape is the `RetryOptions` type from `@mongez/reinforcements`:
 
 ```ts
 useCase({
   name: "billing.charge-card",
-  retryOptions: {
-    count: 3,
+  retry: {
+    attempts: 3,
     delay: 500,
+    backoff: "exponential",
     shouldRetry: (error) => !(error instanceof ValidationError),
   },
   handler: async (data) => paymentGateway.charge(data),
 });
 ```
 
-The shape:
+The shape (from `@mongez/reinforcements`):
 
 ```ts
 type RetryOptions = {
-  count?: number;
+  attempts?: number;
   delay?: number;
-  shouldRetry?: (error: unknown, attempt: number) => boolean;
+  backoff?: "linear" | "exponential" | ((attempt: number, baseDelay: number) => number);
+  maxDelay?: number;
+  jitter?: boolean | "full" | "equal";
+  onError?: (error: unknown, attempt: number) => void;
+  shouldRetry?: (error: unknown, attempt: number) => boolean | Promise<boolean>;
+  signal?: AbortSignal;
 };
 ```
 
-| Field         | Default | What it does                                                                              |
-| ------------- | ------- | ----------------------------------------------------------------------------------------- |
-| `count`       | `0`     | Number of retries **after** the first failure. Total attempts = `count + 1`.              |
-| `delay`       | `0`     | Milliseconds to wait between attempts. The final failure does not wait.                   |
-| `shouldRetry` | none    | Predicate. Return `false` to bail out early — useful for "don't retry on 4xx".            |
+| Field         | Default      | What it does                                                                                          |
+| ------------- | ------------ | ---------------------------------------------------------------------------------------------------- |
+| `attempts`    | `3`          | **Total** attempts including the first try. `attempts: 3` = one try plus two retries.                |
+| `delay`       | `0`          | Base milliseconds to wait between attempts (scaled by `backoff`, capped by `maxDelay`, spread by `jitter`). |
+| `backoff`     | `"linear"`   | Delay growth strategy, or a custom `(attempt, baseDelay) => ms` function.                             |
+| `maxDelay`    | none         | Ceiling applied to the computed delay before jitter.                                                  |
+| `jitter`      | `false`      | Randomise each delay to avoid a thundering herd.                                                      |
+| `onError`     | none         | Observe each failed attempt — `attempt` is 1-based. Fires per failure, for logging/metrics.           |
+| `shouldRetry` | none         | Predicate. Return `false` to bail out immediately without retrying — useful for "don't retry on 4xx". May be async. |
+| `signal`      | none         | `AbortSignal` to cancel the retry loop between or during attempts.                                    |
 
-If every attempt fails, the last error is what re-throws. `onError` fires once with that final error; intermediate failures aren't reported separately.
+There is no `count` field — the budget is expressed as the total `attempts`, not "retries after the first failure". If every attempt fails, the last error is what re-throws. The use-case-level `onError` lifecycle callback fires once with that final error; the per-attempt observer is the `retry.onError` hook above (the use case wraps it to also track `currentRetry`).
 
 Two things to watch:
 
 - **Retries don't replay `after` middleware on success.** After only runs once, after the final successful attempt.
-- **`shouldRetry` runs after `onError`'s normal path doesn't.** A failed attempt where `shouldRetry` returns `false` re-throws immediately without retry — `onError` fires once with that error, same as any other terminal failure.
+- **`shouldRetry` returning `false` re-throws immediately** without a further attempt or delay — the use-case-level `onError` then fires once with that error, same as any other terminal failure.
 
 A real shape for a flaky external API:
 
 ```ts
 useCase({
   name: "shipments.create-label",
-  retryOptions: {
-    count: 5,
+  retry: {
+    attempts: 5,
     delay: 1000,
+    backoff: "exponential",
     shouldRetry: (error) => {
       if (error instanceof BadSchemaUseCaseError) return false;
-      if (error instanceof HttpError && error.statusCode < 500) return false;
+      if (error instanceof HttpError && error.status < 500) return false;
       return true;
     },
   },
@@ -359,16 +407,16 @@ useCase({
 });
 ```
 
-Five retries with one-second delays — but skip the retry on any 4xx response, because retrying a "your input is bad" error doesn't help.
+Five total attempts with exponentially growing one-second-base delays — but skip the retry on any 4xx response, because retrying a "your input is bad" error doesn't help.
 
 ## Benchmark
 
-`benchmarkOptions` wraps the pipeline in a timing measurement. Set it to `true` to use config defaults, an object to customize, or `false` to disable for one use-case:
+`benchmark` wraps **the handler** in a timing measurement (the latency reflects the business logic, not the guard / validation prelude or the retry backoff delays). Set it to `true` to use config defaults, an object to customize, or `false` to disable for one use-case:
 
 ```ts
 useCase({
   name: "catalog.import",
-  benchmarkOptions: {
+  benchmark: {
     latencyRange: { excellent: 200, poor: 2000 },
     onComplete: (result) => metrics.record("catalog.import.duration", result.latency),
     tags: { domain: "catalog" },
@@ -483,7 +531,7 @@ use-case:history:<name>:<id>           → UseCaseResult
 use-case:history:<name>:list           → string[]   (list of ids)
 ```
 
-The TTL comes from `config.get("use-cases").history.ttl` (default 1 hour). Set `history.enabled: false` to turn it off globally. Set `history.ttl: false` to fall back to the cache driver's default.
+The TTL comes from `config.get("use-cases").history.ttl` (default `3600` — one hour). Set `history.enabled: false` to turn it off globally. Set `history.ttl: false` to fall back to the cache driver's default. The list is capped at `history.maxEntries` (default `100`) per use case — once it overflows, the oldest snapshot (and its entry) is evicted, so history stays bounded by both TTL and count.
 
 Read history programmatically:
 
@@ -498,30 +546,43 @@ Useful for debugging slow endpoints in dev. In production, prefer pushing benchm
 
 ## App-level config
 
-`config.get("use-cases")` is the source for defaults that apply to every use-case unless the per-use-case config overrides them. Live in `src/config/use-cases.ts`:
+`config.get("use-cases")` is the source for defaults that apply to every use-case unless the per-use-case config overrides them. The namespace value is typed as `UseCaseConfigurations` and lives in `src/config/use-cases.ts`:
 
 ```ts title="src/config/use-cases.ts"
 import { defineConfig } from "@warlock.js/core";
 
 export default defineConfig({
   "use-cases": {
-    benchmarkOptions: {
+    // boolean | BenchmarkOptions — default benchmark for every use case
+    benchmark: {
       enabled: true,
       latencyRange: { excellent: 100, poor: 1000 },
     },
-    retryOptions: {
-      count: 0,
+    // RetryOptions — default retry for every use case (omit to not retry by default)
+    retry: {
+      attempts: 3,
       delay: 0,
     },
+    // per-step debug logging through @warlock.js/logger (default: false)
+    log: false,
+    // execution history cache settings
     history: {
       enabled: true,
       ttl: 3600,
+      maxEntries: 100,
+    },
+    // broadcast transport — registered channels plus a global kill-switch
+    broadcast: {
+      enabled: true,
+      channels: [],
     },
   },
 });
 ```
 
-Resolution order is per-use-case → app config → framework defaults (`benchmark.enabled = true`, `retry.count = 0`, `history.enabled = true`, `history.ttl = 3600`).
+The keys are `benchmark`, `retry`, `log`, `history`, and `broadcast` — not `benchmarkOptions` / `retryOptions`. The per-use-case field names match (`benchmark`, `retry`, `broadcast`), so the resolution is "the use-case's `retry` wins over the config's `retry`," and so on.
+
+Resolution order is per-use-case → app config → framework defaults. When neither the use case nor the config sets `retry`, the handler runs exactly once (retry is fully opt-in). `benchmark` defaults to `true`. `history.enabled` defaults to `true`, `history.ttl` to `3600`, and `history.maxEntries` to `100`.
 
 ## The registry
 
@@ -546,6 +607,20 @@ The registry is in-memory (the history goes to the cache). Useful for:
 - Tests that assert a use-case is registered before exercising it.
 
 Dev-mode warning: registering the same name twice logs `Use case "<name>" is already registered. Overwriting.` It's a guardrail for catching accidental duplicate names — the second registration wins.
+
+### `$cleanup`
+
+The function returned by `useCase()` carries a `$cleanup()` method. Calling it unregisters the use case from the in-memory registry **and** drops its history namespace from the cache:
+
+```ts
+const tempUseCase = useCase({ name: "tests.temp", handler: async () => "ok" });
+
+// ... exercise it in a test ...
+
+tempUseCase.$cleanup(); // removes it from getUseCases() and clears use-case:history:tests.temp:*
+```
+
+This is mainly for tests and short-lived/dynamically-defined use cases — anywhere you register a use case and want to leave the registry clean afterward. Production use cases are typically defined once at module load and never cleaned up.
 
 ## Error classes
 
@@ -665,15 +740,15 @@ export const placeOrderUseCase = useCase<PlaceOrderOutput, PlaceOrderInput>({
     return { orderId: order.id, total: order.total, tax: ctx.tax };
   },
   after: [sendConfirmation, notifyWarehouse],
-  retryOptions: {
-    count: 2,
+  retry: {
+    attempts: 3,
     delay: 500,
     shouldRetry: (error) => {
       if (error instanceof ForbiddenError) return false;
       return true;
     },
   },
-  benchmarkOptions: {
+  benchmark: {
     latencyRange: { excellent: 300, poor: 2000 },
   },
   onError: (ctx) => {
@@ -728,11 +803,12 @@ The `listFaqsService` from the reference codebase is the textbook plain-service 
 
 - **Guards see `Readonly<TInput>`.** TypeScript catches mutation at compile time, and the framework `Object.freeze`s the value at runtime. Transform in `before` middleware.
 - **Schema runs after guards, not before.** Opposite of some frameworks. Don't rely on schema-validated data inside a guard — the guard runs first.
-- **After-middleware errors are silent.** Logged via `console.error` with the prefix `[use-case] After middleware error in "<name>":`. They don't escalate. If a side-effect must succeed, put it in `before` or as a separate controller call.
-- **`benchmarkOptions: false` disables benchmarking for that one use-case** even if the app config enables it globally.
-- **`history.ttl: false` is "use cache default,"** not "no expiry." Set `enabled: false` if you want no history at all.
-- **`name` should be unique across the app.** Duplicates warn in dev mode and the second one wins — usually a bug.
-- **Retries don't replay `after`.** After runs once, after the final successful attempt.
+- **After-middleware errors are silent.** Logged via `@warlock.js/logger` — `log.error("use-cases", name, "after middleware failed", { error })`. They don't escalate. If a side-effect must succeed, put it in `before` or as a separate controller call.
+- **The field is `benchmark`, not `benchmarkOptions`.** `benchmark: false` disables benchmarking for that one use-case even if the app config enables it globally. Same for `retry` (not `retryOptions`).
+- **`retry.attempts` is the _total_ attempt count, not the retry count.** `attempts: 3` means one try plus two retries. There is no `count` field. Omit `retry` entirely to run the handler exactly once.
+- **`history.ttl: false` is "use cache default,"** not "no expiry." Set `enabled: false` if you want no history at all. History is also capped at `history.maxEntries` (default `100`) per use case.
+- **`name` should be unique across the app.** Duplicates warn in dev mode (`Use case "<name>" is already registered. Overwriting.`) and the second one wins — usually a bug.
+- **Retries don't replay `after`.** After runs once, after the final successful attempt. Retry and benchmark wrap the **handler** only — not the guard / validation / `before` prelude.
 - **The invocation `id` is `uc-<name>-<random>` by default.** Override it via `runtime.id` when you want to correlate logs across the use-case and an external system.
 
 ## See also

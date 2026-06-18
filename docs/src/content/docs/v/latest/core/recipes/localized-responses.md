@@ -54,7 +54,7 @@ The framework's `Request` class resolves the locale at construction time. Three 
 2. **`locale` query param** — `?locale=ar`
 3. **The configured default** — `config.key("app.localeCode")`
 
-```ts title="@warlock.js/core/src/http/request.ts"
+```ts title="How the request resolves locale"
 public get localized() {
   if (this._locale) return this._locale;
 

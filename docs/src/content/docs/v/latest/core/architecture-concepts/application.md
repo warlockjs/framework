@@ -170,7 +170,7 @@ Six absolute paths cover the well-known locations in a Warlock project. Every ge
 | `Application.uploadsPath`| Either `<cwd>/storage/uploads` or the path set in `config.uploads.root` | The uploads bucket for user-submitted files |
 | `Application.publicPath` | `<cwd>/public`                       | Static assets served via `router.directory(...)`      |
 
-Each getter is a thin wrapper over the corresponding helper in `@warlock.js/core/src/utils/paths.ts`. The helpers themselves accept extra path segments — if you want to compose deeper paths, import them directly:
+Each getter is a thin wrapper over the corresponding path helper. The helpers themselves accept extra path segments — if you want to compose deeper paths, import them directly:
 
 ```ts
 import { storagePath, uploadsPath } from "@warlock.js/core";
