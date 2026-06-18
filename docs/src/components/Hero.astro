@@ -15,61 +15,74 @@ import { currentVersion } from "../utils/current-version";
   <div class="warlock-hero-grid" aria-hidden="true"></div>
 
   <div class="warlock-hero-inner">
-    <div class="warlock-hero-logo-wrap">
-      <div class="warlock-hero-logo-halo" aria-hidden="true"></div>
-      <img
-        class="warlock-hero-logo"
-        src={logo.src}
-        width="120"
-        height="120"
-        alt="Warlock.js"
-        loading="eager"
-        fetchpriority="high"
-      />
+    <div class="warlock-hero-content">
+      <p class="warlock-hero-eyebrow">
+        <span class="warlock-hero-dot"></span>
+        <span>AI-native TypeScript framework</span>
+        <span class="warlock-hero-eyebrow-sep">·</span>
+        <span class="warlock-hero-eyebrow-version">v{currentVersion}</span>
+      </p>
+
+      <h1 class="warlock-hero-headline">
+        Build backends and AI agents
+        <span class="warlock-hero-accent">on the same primitives.</span>
+      </h1>
+
+      <p class="warlock-hero-tagline">
+        Fourteen standalone packages — HTTP, ORM, cache, queues, auth,
+        observability, and a first-class AI layer with typed agents, tools,
+        and workflows. Pick what you need; ship faster.
+      </p>
+
+      <div class="warlock-hero-cta">
+        <a class="warlock-cta warlock-cta-primary" href="/v/latest/core/getting-started/01-introduction/">
+          Get started
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 12h14M13 5l7 7-7 7" />
+          </svg>
+        </a>
+        <a class="warlock-cta warlock-cta-secondary" href="/packages/">
+          Browse packages
+        </a>
+        <a class="warlock-cta warlock-cta-ghost" href="https://github.com/warlockjs/core" target="_blank" rel="noopener">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2.16c-3.2.7-3.88-1.36-3.88-1.36-.52-1.34-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18A11.02 11.02 0 0 1 12 6.8c.98 0 1.97.13 2.89.39 2.21-1.49 3.18-1.18 3.18-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.82 1.19 3.08 0 4.42-2.69 5.39-5.26 5.68.41.35.78 1.05.78 2.12v3.14c0 .31.21.67.79.56C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5Z" />
+          </svg>
+          GitHub
+        </a>
+      </div>
+
+      <div class="warlock-hero-trust" aria-label="At a glance">
+        <span><strong>14</strong> packages</span>
+        <span class="warlock-hero-trust-sep"></span>
+        <span><strong>120+</strong> skills</span>
+        <span class="warlock-hero-trust-sep"></span>
+        <span><strong>MIT</strong> licensed</span>
+      </div>
     </div>
 
-    <p class="warlock-hero-eyebrow">
-      <span class="warlock-hero-dot"></span>
-      <span>AI-native TypeScript framework</span>
-      <span class="warlock-hero-eyebrow-sep">·</span>
-      <span class="warlock-hero-eyebrow-version">v{currentVersion}</span>
-    </p>
-
-    <h1 class="warlock-hero-headline">
-      Build backends and AI agents
-      <span class="warlock-hero-accent">on the same primitives.</span>
-    </h1>
-
-    <p class="warlock-hero-tagline">
-      Fourteen standalone packages — HTTP, ORM, cache, queues, auth,
-      observability, and a first-class AI layer with typed agents, tools,
-      and workflows. Pick what you need; ship faster.
-    </p>
-
-    <div class="warlock-hero-cta">
-      <a class="warlock-cta warlock-cta-primary" href="/v/latest/core/getting-started/01-introduction/">
-        Get started
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M5 12h14M13 5l7 7-7 7" />
+    <div class="warlock-hero-visual" aria-hidden="true">
+      <div class="warlock-hero-logo-wrap">
+        <div class="warlock-hero-logo-halo"></div>
+        <svg class="warlock-hero-rings" viewBox="0 0 320 320" fill="none" aria-hidden="true">
+          <circle cx="160" cy="160" r="158" stroke="currentColor" stroke-width="1" opacity="0.1" />
+          <circle cx="160" cy="160" r="118" stroke="currentColor" stroke-width="1" opacity="0.16" />
+          <circle cx="160" cy="160" r="80" stroke="currentColor" stroke-width="1" opacity="0.22" />
+          <circle class="warlock-hero-rings-dash" cx="160" cy="160" r="140" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 12" opacity="0.5" />
+          <circle cx="160" cy="20" r="3" fill="currentColor" opacity="0.7" />
+          <circle cx="281.2" cy="230" r="3" fill="currentColor" opacity="0.7" />
+          <circle cx="38.8" cy="230" r="3" fill="currentColor" opacity="0.7" />
         </svg>
-      </a>
-      <a class="warlock-cta warlock-cta-secondary" href="/packages/">
-        Browse packages
-      </a>
-      <a class="warlock-cta warlock-cta-ghost" href="https://github.com/warlockjs/core" target="_blank" rel="noopener">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2.16c-3.2.7-3.88-1.36-3.88-1.36-.52-1.34-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18A11.02 11.02 0 0 1 12 6.8c.98 0 1.97.13 2.89.39 2.21-1.49 3.18-1.18 3.18-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.82 1.19 3.08 0 4.42-2.69 5.39-5.26 5.68.41.35.78 1.05.78 2.12v3.14c0 .31.21.67.79.56C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5Z" />
-        </svg>
-        GitHub
-      </a>
-    </div>
-
-    <div class="warlock-hero-trust" aria-label="At a glance">
-      <span><strong>14</strong> packages</span>
-      <span class="warlock-hero-trust-sep"></span>
-      <span><strong>120+</strong> skills</span>
-      <span class="warlock-hero-trust-sep"></span>
-      <span><strong>MIT</strong> licensed</span>
+        <img
+          class="warlock-hero-logo"
+          src={logo.src}
+          width="120"
+          height="120"
+          alt="Warlock.js"
+          loading="eager"
+          fetchpriority="high"
+        />
+      </div>
     </div>
   </div>
 </section>
@@ -119,26 +132,76 @@ import { currentVersion } from "../utils/current-version";
   }
 
   .warlock-hero-inner {
-    max-width: 60rem;
+    max-width: 72rem;
     margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: center;
+    gap: clamp(2.5rem, 5vw, 4rem);
+  }
+
+  @media (min-width: 52rem) {
+    .warlock-hero-inner {
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: clamp(2rem, 4vw, 4rem);
+    }
+  }
+
+  /* ---------- Left: content ---------- */
+  .warlock-hero-content {
     text-align: center;
   }
 
-  /* Logo with electric halo */
+  @media (min-width: 52rem) {
+    .warlock-hero-content {
+      text-align: start;
+    }
+  }
+
+  /* ---------- Right: brand visual ---------- */
+  .warlock-hero-visual {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  /* Logo with electric halo + orbit rings */
   .warlock-hero-logo-wrap {
     position: relative;
-    display: inline-block;
-    margin-block-end: 1.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: clamp(220px, 30vw, 360px);
+    aspect-ratio: 1;
   }
 
   .warlock-hero-logo-halo {
     position: absolute;
-    inset: -25%;
-    background: radial-gradient(circle, var(--warlock-yellow-glow) 0%, transparent 65%);
-    filter: blur(20px);
+    inset: 8%;
+    background: radial-gradient(circle, var(--warlock-yellow-glow) 0%, transparent 62%);
+    filter: blur(26px);
     animation: warlock-hero-halo-pulse 3.5s ease-in-out infinite;
     z-index: -1;
     pointer-events: none;
+  }
+
+  .warlock-hero-rings {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    color: var(--sl-color-text-accent);
+    pointer-events: none;
+  }
+
+  .warlock-hero-rings-dash {
+    transform-origin: 160px 160px;
+    animation: warlock-hero-rings-spin 38s linear infinite;
+  }
+
+  @keyframes warlock-hero-rings-spin {
+    to { transform: rotate(360deg); }
   }
 
   @keyframes warlock-hero-halo-pulse {
@@ -147,10 +210,11 @@ import { currentVersion } from "../utils/current-version";
   }
 
   .warlock-hero-logo {
+    position: relative;
     display: block;
-    width: clamp(72px, 8vw + 40px, 120px);
+    width: 54%;
     height: auto;
-    filter: drop-shadow(0 0 24px var(--warlock-yellow-glow));
+    filter: drop-shadow(0 0 28px var(--warlock-yellow-glow));
     animation: warlock-hero-logo-float 6s ease-in-out infinite;
   }
 
@@ -234,6 +298,21 @@ import { currentVersion } from "../utils/current-version";
     gap: 0.75rem;
     flex-wrap: wrap;
     margin-block-start: 2.5rem;
+  }
+
+  /* Left-align the content block on the split layout */
+  @media (min-width: 52rem) {
+    .warlock-hero-headline {
+      margin-inline: 0;
+    }
+
+    .warlock-hero-tagline {
+      margin-inline: 0;
+    }
+
+    .warlock-hero-cta {
+      justify-content: flex-start;
+    }
   }
 
   .warlock-cta {

@@ -21,35 +21,37 @@ It sets `terminal: true`, so ANSI color codes in your messages are preserved (un
 Each line follows this format:
 
 ```
-{icon} ({ISO timestamp}) [{module}] [{action}] {message}
+{icon} {level} ({time}) [{module}] [{action}] {message}
 ```
+
+The console shows a **time-only** timestamp (`HH:mm:ss.SSS`) — within a dev session the date rarely changes, so the full ISO date is dropped here. The persistent channels (`FileLog` / `JSONFileLog`) keep the full ISO timestamp.
 
 Real output:
 
 ```
-⚙ (2024-03-15T10:22:00.000Z) [auth] [hashPassword] Hashing started
-ℹ (2024-03-15T10:22:01.482Z) [users] [register] New user created
-⚠ (2024-03-15T10:22:02.300Z) [queue] [process] Retry limit approaching
-✗ (2024-03-15T10:22:03.111Z) [payments] [charge] Card declined
-✓ (2024-03-15T10:22:03.890Z) [email] [send] Welcome email delivered
+⚙ debug (10:22:00.000) [auth] [hashPassword] Hashing started
+ℹ info (10:22:01.482) [users] [register] New user created
+⚠ warn (10:22:02.300) [queue] [process] Retry limit approaching
+✗ error (10:22:03.111) [payments] [charge] Card declined
+✓ success (10:22:03.890) [email] [send] Welcome email delivered
 ```
 
-**Icons by level**
+**Prefix by level** — each line is prefixed with the level's icon and name. The name is padded to a fixed width so the timestamp, module, and action columns line up vertically across a stream of logs:
 
-| Level | Icon |
+| Level | Prefix |
 | --- | --- |
-| `debug` | ⚙ |
-| `info` | ℹ |
-| `warn` | ⚠ |
-| `error` | ✗ |
-| `success` | ✓ |
-| `fatal` | ☠ (bright-red background) |
+| `debug` | ⚙ debug |
+| `info` | ℹ info |
+| `warn` | ⚠ warn |
+| `error` | ✗ error |
+| `success` | ✓ success |
+| `fatal` | ☠ fatal — white on a bright-red **background badge** (deliberately louder than `error` so a fatal entry can't be missed) |
 
 **Colors by part**
 
 | Part | Color |
 | --- | --- |
-| Timestamp `(…)` | Yellow |
+| Timestamp `(…)` | Gray (dimmed, so the message stands out) |
 | Module `[…]` | Cyan |
 | Action `[…]` | Magenta |
 | Message — `debug` | Magenta bright |
@@ -76,7 +78,7 @@ log.info("payments", "charge", "card declined", {
   userId: 42,
   amount: 1999,
 });
-// ℹ (…) [payments] [charge] card declined
+// ℹ info (…) [payments] [charge] card declined
 //   ↳ { userId: 42, amount: 1999 }
 ```
 

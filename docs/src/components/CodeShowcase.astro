@@ -84,6 +84,10 @@ const { text } = await supportAgent.execute("Why use generics?");`;
   }
 
   .warlock-showcase-card {
+    /* Reset Starlight's `.sl-markdown-content` auto-flow margin
+     * (`:where(…) + :where(…) { margin-top: 1rem }`) — it leaks onto the
+     * second grid item and knocks the two code cards 16px out of line. */
+    margin: 0;
     border: 1px solid var(--sl-color-hairline);
     border-radius: var(--warlock-radius);
     background-color: var(--warlock-surface-dark);

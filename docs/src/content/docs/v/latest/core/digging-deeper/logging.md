@@ -133,7 +133,7 @@ new ConsoleLog({
 });
 ```
 
-Each level gets an icon and a color: `⚙ debug`, `ℹ info`, `✓ success`, `⚠ warn`, `✗ error`. Best for development; in production, prefer a structured channel.
+Each line is prefixed with the level's icon and name, in a per-level color: `⚙ debug`, `ℹ info`, `✓ success`, `⚠ warn`, `✗ error`, `☠ fatal`. Best for development; in production, prefer a structured channel.
 
 `showContext: true` is gold in dev — you get the full context object pretty-printed below the message. Production logs usually skip this and rely on JSONFileLog instead.
 

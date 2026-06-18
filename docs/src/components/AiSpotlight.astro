@@ -1,0 +1,207 @@
+---
+/**
+ * AI-native spotlight — tells the differentiator louder than the single code
+ * card up top: what the AI layer gives you (left) and the provider adapters it
+ * speaks to (right). Capabilities + providers are sourced from packages.mdx.
+ */
+const capabilities = [
+  { title: "Typed agents", body: "Inputs and outputs are typed; structured output is validated, not parsed by hope." },
+  { title: "Tools", body: "Define a tool with Seal and hand it to an agent — the schema is the contract." },
+  { title: "Workflows & supervisors", body: "Compose agents into multi-step workflows, with a supervisor routing the work." },
+  { title: "Same envelope", body: "Retries, middleware, and errors behave exactly like the rest of the framework." },
+];
+
+const providers = [
+  { name: "OpenAI", href: "/v/latest/ai/providers/openai/" },
+  { name: "Anthropic", href: "/v/latest/ai/providers/anthropic/" },
+  { name: "Bedrock", href: "/v/latest/ai/providers/bedrock/" },
+  { name: "Google", href: "/v/latest/ai/providers/google/" },
+  { name: "Ollama", href: "/v/latest/ai/providers/ollama/" },
+];
+---
+
+<section class="warlock-ai">
+  <div class="warlock-section-head">
+    <p class="warlock-section-kicker">[ AI-native ]</p>
+    <h2 class="warlock-section-title">A first-class AI layer, not a plugin</h2>
+    <p class="warlock-section-sub">
+      Typed agents, tools, and workflows that behave like everything else you
+      write. Swap the model provider without touching your agent code.
+    </p>
+  </div>
+
+  <div class="warlock-ai-grid">
+    <ul class="warlock-ai-caps">
+      {capabilities.map((c) => (
+        <li class="warlock-ai-cap">
+          <span class="warlock-ai-cap-mark" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+          </span>
+          <span>
+            <span class="warlock-ai-cap-title">{c.title}</span>
+            <span class="warlock-ai-cap-body">{c.body}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
+
+    <aside class="warlock-ai-providers">
+      <p class="warlock-ai-providers-label">Five provider adapters</p>
+      <ul class="warlock-ai-providers-list">
+        {providers.map((p) => (
+          <li>
+            <a href={p.href}>
+              <span class="warlock-ai-provider-dot" aria-hidden="true"></span>
+              {p.name}
+            </a>
+          </li>
+        ))}
+      </ul>
+      <p class="warlock-ai-providers-note">One agent API. Pick a model, swap it freely.</p>
+    </aside>
+  </div>
+</section>
+
+<style>
+  .warlock-ai {
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: clamp(3rem, 4rem + 2vw, 5rem) clamp(1.25rem, 4vw, 2.5rem);
+  }
+
+  .warlock-ai-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    margin-block-start: 2.5rem;
+  }
+
+  @media (min-width: 56rem) {
+    .warlock-ai-grid {
+      grid-template-columns: 1.6fr 1fr;
+      gap: 2rem;
+      align-items: start;
+    }
+  }
+
+  /* Capabilities */
+  .warlock-ai-caps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.1rem;
+  }
+
+  @media (min-width: 30rem) {
+    .warlock-ai-caps {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.25rem 1.5rem;
+    }
+  }
+
+  .warlock-ai-cap {
+    display: flex;
+    gap: 0.7rem;
+  }
+
+  .warlock-ai-cap-mark {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--sl-color-text-accent) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--sl-color-text-accent) 30%, var(--sl-color-hairline));
+    color: var(--sl-color-text-accent);
+    margin-block-start: 0.1rem;
+  }
+
+  .warlock-ai-cap-title {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--sl-color-white);
+  }
+
+  .warlock-ai-cap-body {
+    display: block;
+    margin-block-start: 0.2rem;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: var(--sl-color-gray-2);
+  }
+
+  /* Providers panel */
+  .warlock-ai-providers {
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--warlock-radius);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--sl-color-text-accent) 4%, var(--warlock-surface-dark)), var(--warlock-surface-dark));
+    padding: 1.35rem 1.35rem 1.25rem;
+  }
+
+  :root[data-theme="light"] .warlock-ai-providers {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--sl-color-text-accent) 5%, #ffffff), #ffffff);
+  }
+
+  .warlock-ai-providers-label {
+    margin: 0 0 0.85rem;
+    font-family: var(--sl-font-mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--sl-color-gray-3);
+  }
+
+  .warlock-ai-providers-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .warlock-ai-providers-list a {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: var(--warlock-radius-sm);
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--sl-color-white) !important;
+    text-decoration: none !important;
+    transition: background-color 0.14s ease, color 0.14s ease;
+  }
+
+  .warlock-ai-providers-list a:hover {
+    background-color: color-mix(in srgb, var(--sl-color-text-accent) 10%, transparent);
+    color: var(--sl-color-text-accent) !important;
+  }
+
+  .warlock-ai-provider-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--sl-color-text-accent);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--sl-color-text-accent) 60%, transparent);
+    flex: none;
+  }
+
+  .warlock-ai-providers-note {
+    margin: 1rem 0 0;
+    padding-block-start: 0.9rem;
+    border-top: 1px solid var(--sl-color-hairline);
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--sl-color-gray-3);
+  }
+</style>

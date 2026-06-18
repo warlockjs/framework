@@ -1,0 +1,139 @@
+---
+/**
+ * Closing CTA band — the last beat before the footer. Mirrors the stats band's
+ * full-bleed framed treatment (hairline + yellow glow) so the page ends on a
+ * deliberate note instead of trailing off after the path picker.
+ */
+---
+
+<section class="warlock-finalcta">
+  <div class="warlock-finalcta-inner">
+    <p class="warlock-finalcta-kicker">[ Ship it ]</p>
+    <h2 class="warlock-finalcta-title">Ready to build?</h2>
+    <p class="warlock-finalcta-sub">
+      Scaffold a project, register a route, run your first agent — all on the
+      same primitives. You'll be productive in an afternoon.
+    </p>
+
+    <div class="warlock-finalcta-actions">
+      <a class="warlock-finalcta-btn warlock-finalcta-btn--primary" href="/v/latest/core/getting-started/01-introduction/">
+        Get started
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5 12h14M13 5l7 7-7 7" />
+        </svg>
+      </a>
+      <a class="warlock-finalcta-btn warlock-finalcta-btn--secondary" href="/packages/">
+        Browse packages
+      </a>
+    </div>
+  </div>
+</section>
+
+<style>
+  .warlock-finalcta {
+    border-block: 1px solid var(--sl-color-hairline);
+    background:
+      linear-gradient(180deg, transparent, var(--warlock-yellow-glow) 50%, transparent),
+      var(--warlock-surface-darker);
+    background-size: 100% 1px, 100% 100%;
+    background-position: top, center;
+    background-repeat: no-repeat;
+  }
+
+  :root[data-theme="light"] .warlock-finalcta {
+    background:
+      linear-gradient(180deg, transparent, rgba(202, 138, 4, 0.12) 50%, transparent),
+      #f9fafb;
+    background-size: 100% 1px, 100% 100%;
+    background-position: top, center;
+    background-repeat: no-repeat;
+  }
+
+  .warlock-finalcta-inner {
+    max-width: 44rem;
+    margin: 0 auto;
+    padding: clamp(3rem, 3.5rem + 2vw, 5rem) clamp(1.25rem, 4vw, 2.5rem);
+    text-align: center;
+  }
+
+  .warlock-finalcta-kicker {
+    font-family: var(--sl-font-mono);
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--sl-color-text-accent);
+    letter-spacing: 0.03em;
+    margin: 0 0 0.85rem;
+    text-transform: lowercase;
+    opacity: 0.85;
+  }
+
+  .warlock-finalcta-title {
+    margin: 0;
+    font-size: clamp(1.75rem, 1.25rem + 1.5vw, 2.5rem);
+    font-weight: 700;
+    letter-spacing: -0.028em;
+    line-height: 1.15;
+    color: var(--sl-color-white);
+  }
+
+  .warlock-finalcta-sub {
+    margin: 1.1rem auto 0;
+    max-width: 34rem;
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--sl-color-gray-2);
+  }
+
+  .warlock-finalcta-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-block-start: 2rem;
+  }
+
+  .warlock-finalcta-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.7rem 1.2rem;
+    border-radius: var(--warlock-radius);
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: -0.01em;
+    text-decoration: none !important;
+    border: 1px solid transparent;
+    transition: transform 0.06s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .warlock-finalcta-btn:active {
+    transform: translateY(1px);
+  }
+
+  .warlock-finalcta-btn--primary {
+    background-color: var(--sl-color-text-accent);
+    color: var(--warlock-midnight) !important;
+    box-shadow: 0 4px 30px var(--warlock-yellow-glow);
+  }
+
+  .warlock-finalcta-btn--primary:hover {
+    background-color: var(--warlock-yellow-bright);
+    box-shadow: 0 6px 40px var(--warlock-yellow-glow);
+  }
+
+  .warlock-finalcta-btn--secondary {
+    background-color: var(--warlock-surface-dark);
+    border-color: var(--sl-color-gray-5);
+    color: var(--sl-color-white) !important;
+  }
+
+  :root[data-theme="light"] .warlock-finalcta-btn--secondary {
+    background-color: #ffffff;
+    color: var(--sl-color-text) !important;
+  }
+
+  .warlock-finalcta-btn--secondary:hover {
+    border-color: var(--sl-color-text-accent);
+  }
+</style>

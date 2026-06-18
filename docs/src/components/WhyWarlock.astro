@@ -1,0 +1,114 @@
+---
+/**
+ * "Why Warlock" — the positioning, as four principles. Editorial column
+ * layout (numbered, thin accent rule) so it reads distinct from the bordered
+ * PathPicker cards further down. Copy is grounded in the package descriptions,
+ * not marketing invention.
+ */
+const principles = [
+  {
+    title: "Same primitives, top to bottom",
+    body: "An HTTP controller and an AI agent are both just typed code with typed inputs and outputs. No second mental model for the AI layer.",
+  },
+  {
+    title: "Typed end to end",
+    body: "Seal schemas are validation, TypeScript types, and JSON schema at once. Define a shape once; it holds at the edge, in the compiler, and in tool calls.",
+  },
+  {
+    title: "Pick what you need",
+    body: "Every package is independently installable. Start with Core, add Cascade, cache, auth, or the AI layer only when your app actually reaches for them.",
+  },
+  {
+    title: "AI-native, not bolted on",
+    body: "Agents, tools, workflows, and supervisors are first-class — with five provider adapters behind a single API. Swap models without touching agent code.",
+  },
+];
+---
+
+<section class="warlock-why">
+  <div class="warlock-section-head">
+    <p class="warlock-section-kicker">[ Why Warlock ]</p>
+    <h2 class="warlock-section-title">One framework, one mental model</h2>
+    <p class="warlock-section-sub">
+      The AI layer isn't a separate world bolted to the side. It's the same
+      shape as everything else you write.
+    </p>
+  </div>
+
+  <div class="warlock-why-grid">
+    {principles.map((p, i) => (
+      <div class="warlock-why-item">
+        <span class="warlock-why-num">0{i + 1}</span>
+        <span class="warlock-why-rule" aria-hidden="true"></span>
+        <h3 class="warlock-why-title">{p.title}</h3>
+        <p class="warlock-why-body">{p.body}</p>
+      </div>
+    ))}
+  </div>
+</section>
+
+<style>
+  .warlock-why {
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: clamp(3rem, 4rem + 2vw, 5rem) clamp(1.25rem, 4vw, 2.5rem);
+  }
+
+  .warlock-why-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    margin-block-start: 2.5rem;
+  }
+
+  @media (min-width: 40rem) {
+    .warlock-why-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 2rem 2.5rem;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .warlock-why-grid {
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.75rem;
+    }
+  }
+
+  .warlock-why-item {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .warlock-why-num {
+    font-family: var(--sl-font-mono);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--sl-color-text-accent);
+  }
+
+  .warlock-why-rule {
+    width: 2rem;
+    height: 2px;
+    margin-block: 0.85rem 1.1rem;
+    background: linear-gradient(90deg, var(--sl-color-text-accent), transparent);
+    border-radius: 2px;
+  }
+
+  .warlock-why-title {
+    margin: 0 0 0.6rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: -0.012em;
+    line-height: 1.3;
+    color: var(--sl-color-white);
+  }
+
+  .warlock-why-body {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: var(--sl-color-gray-2);
+  }
+</style>

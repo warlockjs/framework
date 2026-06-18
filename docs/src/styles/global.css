@@ -917,28 +917,32 @@ starlight-tabs [role="tab"][aria-selected="true"] {
 
 /* ---------- Landing — full-bleed + suppress Starlight chrome ---------- */
 
+/* Landing-style splash pages are flagged by a marker section: the home Hero
+ * (`.warlock-hero`) or the /features catalogue (`.warlock-features`). Both get
+ * the same full-bleed treatment. */
+
 /* Splash template renders TWO `.content-panel` divs: the first holds
- * only the auto page-title h1, the second holds the actual content.
- * When our Hero is anywhere on the page, hide every content-panel that
- * doesn't contain it (i.e. the title-only panel). */
-body:has(.warlock-hero) .content-panel:not(:has(.warlock-hero)) {
+ * only the auto page-title h1, the second holds the actual content. Hide
+ * every content-panel that doesn't contain our marker (i.e. the title-only
+ * panel). */
+body:has(:is(.warlock-hero, .warlock-features)) .content-panel:not(:has(:is(.warlock-hero, .warlock-features))) {
   display: none !important;
 }
 
 /* Hide Starlight default `.hero` div (splash placeholder) and the
  * "Edit page" footer on landing. */
 .content-panel > .hero,
-body:has(.warlock-hero) footer.sl-flex:not(.warlock-footer) {
+body:has(:is(.warlock-hero, .warlock-features)) footer.sl-flex:not(.warlock-footer) {
   display: none !important;
 }
 
 /* Release every wrapper Starlight stacks so sections can go full-bleed.
- * Use `body:has(.warlock-hero)` instead of `:has(.warlock-hero)` on
- * the wrapper itself — the latter fails when warlock-hero is too deep. */
-body:has(.warlock-hero) .content-panel,
-body:has(.warlock-hero) .content-panel > .sl-container,
-body:has(.warlock-hero) .content-panel .sl-markdown-content,
-body:has(.warlock-hero) .main-frame {
+ * Use `body:has(…)` on an ancestor instead of `:has(…)` on the wrapper
+ * itself — the latter fails when the marker is nested too deep. */
+body:has(:is(.warlock-hero, .warlock-features)) .content-panel,
+body:has(:is(.warlock-hero, .warlock-features)) .content-panel > .sl-container,
+body:has(:is(.warlock-hero, .warlock-features)) .content-panel .sl-markdown-content,
+body:has(:is(.warlock-hero, .warlock-features)) .main-frame {
   padding: 0 !important;
   max-width: none !important;
   margin: 0 !important;
@@ -979,6 +983,22 @@ body:has(.warlock-hero) .main-frame {
   line-height: 1.6;
   color: var(--sl-color-gray-2);
   max-width: 38rem;
+}
+
+/* ---------- Landing — neutralize Starlight's markdown auto-flow margin ----------
+ *
+ * Starlight spaces out prose with
+ *   :where(.sl-markdown-content …) + :where(…) { margin-top: 1rem }
+ * Our landing components render INSIDE that markdown body, so the rule leaks
+ * onto their grid/flex items: every item after the first is pushed 1rem down,
+ * knocking rows (stats, path cards, code cards) out of alignment.
+ *
+ * This guard is written entirely with :where() so its specificity stays (0,0,0)
+ * — it loses to any margin a component sets on itself (≥ 0,1,0) and only cancels
+ * the leak where nothing else applies. It's the safety net that keeps future
+ * landing rows aligned without each component remembering to reset `margin`. */
+:where(body:has(.warlock-hero)) :where([class*="warlock-"]) > :where(* + *) {
+  margin-top: 0;
 }
 
 /* ---------- Respect motion preferences ---------- */

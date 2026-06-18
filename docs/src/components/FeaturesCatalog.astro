@@ -1,0 +1,395 @@
+---
+/**
+ * Capability catalogue for the /features page.
+ *
+ * Layout: one row per category — a sticky "rail" on the left (icon, name,
+ * tagline, count) and a 2-column card grid on the right. The rail pattern reads
+ * as intentional at any card count and avoids the ragged orphan rows a single
+ * fixed grid produces. Counts are kept even so the 2-column grid never orphans;
+ * a defensive rule spans a trailing odd card full-width just in case.
+ *
+ * Every claim is grounded in the package docs (verified routes) and the
+ * scaffolder's feature manifest (create-warlock/src/features/features-map.ts).
+ * `not-content` keeps Starlight's markdown auto-flow margin off the grids.
+ */
+const base = "/v/latest";
+
+interface Feature {
+  name: string;
+  blurb: string;
+  href: string;
+  /** Optional tech badge — the concrete answer to "does it support X?". */
+  tag?: string;
+}
+
+interface Group {
+  /** Single SVG path drawn at a 24x24 viewBox. */
+  icon: string;
+  label: string;
+  tagline: string;
+  features: Feature[];
+}
+
+const groups: Group[] = [
+  {
+    label: "HTTP & API",
+    tagline: "The request layer.",
+    icon: "M3 12h18M12 3a15 15 0 0 1 4 9 15 15 0 0 1-4 9 15 15 0 0 1-4-9 15 15 0 0 1 4-9Z",
+    features: [
+      { name: "Routing & controllers", blurb: "Declarative routes, controllers, and use-cases.", href: `${base}/core/the-basics/02-routing/` },
+      { name: "Middleware", blurb: "Composable, ordered request middleware.", href: `${base}/core/the-basics/middleware/` },
+      { name: "Validation", blurb: "Request validation backed by Seal schemas.", href: `${base}/core/the-basics/validation/` },
+      { name: "RESTful resources", blurb: "Resource controllers and typed API resources.", href: `${base}/core/the-basics/restful/` },
+      { name: "Rate limiting", blurb: "Throttle routes out of the box.", href: `${base}/core/recipes/rate-limiting/` },
+      { name: "Modules & conventions", blurb: "Feature modules with batteries-included structure.", href: `${base}/core/getting-started/05-project-layout/` },
+    ],
+  },
+  {
+    label: "Data & ORM",
+    tagline: "One ORM, two databases.",
+    icon: "M12 8c4.42 0 8-1.34 8-3s-3.58-3-8-3-8 1.34-8 3 3.58 3 8 3ZM4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3",
+    features: [
+      { name: "Unified ORM", blurb: "One typed model API that runs on either database.", href: `${base}/cascade/digging-deeper/multi-database/`, tag: "MongoDB · Postgres" },
+      { name: "Relations & migrations", blurb: "Model relations, migrations, and atomic operations.", href: `${base}/cascade/` },
+      { name: "Vector search", blurb: "Store and query embeddings for semantic search and RAG.", href: `${base}/cascade/digging-deeper/vector-search/`, tag: "Vectors" },
+      { name: "Transactions & aggregates", blurb: "Transactions, joins, and aggregation pipelines.", href: `${base}/cascade/digging-deeper/transactions/` },
+    ],
+  },
+  {
+    label: "Real-time & Messaging",
+    tagline: "Events across your system.",
+    icon: "M22 12h-4l-3 9L9 3l-3 9H2",
+    features: [
+      { name: "Real-time sockets", blurb: "Push real-time events to clients from the server.", href: `${base}/core/digging-deeper/socket/`, tag: "Socket.IO" },
+      { name: "Message bus", blurb: "Publish/subscribe and request-respond over a broker.", href: `${base}/herald/`, tag: "RabbitMQ" },
+      { name: "Notifications", blurb: "Mail, in-app, and custom channels with preferences.", href: `${base}/notifications/` },
+      { name: "Mail", blurb: "Transactional email over SMTP or Amazon SES.", href: `${base}/core/digging-deeper/mail/`, tag: "SMTP · SES" },
+    ],
+  },
+  {
+    label: "Storage & Files",
+    tagline: "Files, anywhere.",
+    icon: "M21 8H3m18 0v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8m18 0-2.5-4.5a1 1 0 0 0-.9-.5H6.4a1 1 0 0 0-.9.5L3 8m4 5h.01",
+    features: [
+      { name: "Unified storage", blurb: "One driver API over local disk or object storage.", href: `${base}/core/digging-deeper/storage/`, tag: "S3-compatible" },
+      { name: "File uploads", blurb: "Handle multipart uploads and stream to storage.", href: `${base}/core/digging-deeper/file-uploads/` },
+      { name: "Image processing", blurb: "Resize, convert, and optimize images.", href: `${base}/core/digging-deeper/image-processing/`, tag: "Sharp" },
+      { name: "File-system utilities", blurb: "Atomic writes and directory management.", href: `${base}/fs/` },
+    ],
+  },
+  {
+    label: "Caching",
+    tagline: "Fast by default.",
+    icon: "M13 2 3 14h7l-1 8 10-12h-7z",
+    features: [
+      { name: "Multi-driver cache", blurb: "Memory, Redis, and Postgres drivers behind one API.", href: `${base}/cache/`, tag: "Redis · Postgres" },
+      { name: "Tags, locks & SWR", blurb: "Tag invalidation, locks, and stale-while-revalidate.", href: `${base}/cache/` },
+      { name: "Similarity search", blurb: "Semantic cache lookups for LLM responses.", href: `${base}/cache/` },
+      { name: "Cache metrics", blurb: "Hit/miss metrics for observability.", href: `${base}/cache/` },
+    ],
+  },
+  {
+    label: "AI",
+    tagline: "Agents on the same stack.",
+    icon: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM5 4v3M3.5 5.5h3M18 16v3M16.5 17.5h3",
+    features: [
+      { name: "Typed agents", blurb: "Agents with typed inputs and validated structured output.", href: `${base}/ai/` },
+      { name: "Tools", blurb: "Define a tool with Seal — the schema is the contract.", href: `${base}/ai/` },
+      { name: "Workflows & supervisors", blurb: "Compose agents into multi-step workflows.", href: `${base}/ai/` },
+      { name: "Provider adapters", blurb: "Swap between providers without touching agent code.", href: `${base}/ai/`, tag: "5 providers" },
+    ],
+  },
+  {
+    label: "Auth & Access",
+    tagline: "Who, and what they can do.",
+    icon: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10ZM9 12l2 2 4-4",
+    features: [
+      { name: "Authentication", blurb: "Tokens, route protection, and custom user types.", href: `${base}/auth/` },
+      { name: "Authorization", blurb: "Permission checks, policies, and roles.", href: `${base}/access/`, tag: "RBAC · ABAC" },
+    ],
+  },
+  {
+    label: "Platform & DX",
+    tagline: "The operational backbone.",
+    icon: "m4 17 6-6-6-6M12 19h8",
+    features: [
+      { name: "Scheduler", blurb: "Cron jobs with retry, overlap prevention, and timezones.", href: `${base}/scheduler/` },
+      { name: "Structured logging", blurb: "Channels, redaction, and shutdown flushing.", href: `${base}/logger/` },
+      { name: "Typed schemas", blurb: "Validation that doubles as types and JSON schema.", href: `${base}/seal/`, tag: "Seal" },
+      { name: "Request context", blurb: "Request-scoped context without prop-drilling.", href: `${base}/context/` },
+      { name: "Encryption", blurb: "Built-in encryption helpers.", href: `${base}/core/digging-deeper/encryption/` },
+      { name: "CLI & generators", blurb: "Scaffold modules, commands, and connectors.", href: `${base}/core/cli/generators/` },
+      { name: "Testing", blurb: "Per-worker database and cache isolation.", href: `${base}/core/testing/testing/`, tag: "Vitest" },
+      { name: "Configuration", blurb: "Typed, layered application configuration.", href: `${base}/core/architecture-concepts/configuration-deep/` },
+    ],
+  },
+];
+---
+
+<section class="warlock-features not-content">
+  <div class="warlock-section-head warlock-features-head">
+    <h1 class="warlock-section-title">Everything Warlock ships</h1>
+    <p class="warlock-section-sub">
+      One framework, batteries included — from HTTP and real-time sockets to a
+      MongoDB/Postgres ORM, S3 storage, a message bus, and a typed AI layer.
+      Every capability links to its docs.
+    </p>
+  </div>
+
+  {groups.map((group) => (
+    <div class="warlock-features-group">
+      <div class="warlock-features-rail">
+        <span class="warlock-features-groupicon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d={group.icon} />
+          </svg>
+        </span>
+        <h2 class="warlock-features-grouplabel">{group.label}</h2>
+        <p class="warlock-features-grouptagline">{group.tagline}</p>
+        <p class="warlock-features-groupcount">{group.features.length} capabilities</p>
+      </div>
+
+      <div class="warlock-features-grid">
+        {group.features.map((f) => (
+          <a class="warlock-feature" href={f.href}>
+            <span class="warlock-feature-top">
+              <span class="warlock-feature-name">{f.name}</span>
+              {f.tag && <span class="warlock-feature-tag">{f.tag}</span>}
+            </span>
+            <span class="warlock-feature-blurb">{f.blurb}</span>
+            <svg class="warlock-feature-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12h14M13 5l7 7-7 7" />
+            </svg>
+          </a>
+        ))}
+      </div>
+    </div>
+  ))}
+</section>
+
+<style>
+  .warlock-features {
+    max-width: 72rem;
+    margin: 0 auto;
+    /* Top padding clears the 64px fixed header (the page is full-bleed, so
+     * there's no normal content offset) plus breathing room. */
+    padding: clamp(6rem, 4rem + 4vw, 8.5rem) clamp(1.25rem, 4vw, 2.5rem) clamp(3rem, 4rem + 2vw, 5rem);
+  }
+
+  .warlock-features-head {
+    margin-block-end: clamp(2.75rem, 2rem + 2.5vw, 4rem);
+  }
+
+  /* ---------- One row per category: rail + card grid ---------- */
+  .warlock-features-group {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    /* Top divider on every category — incl. the first, so a full-width line
+     * separates the page header + description from the catalogue. */
+    padding-block-start: clamp(2.75rem, 2rem + 2.5vw, 4rem);
+    border-top: 1px solid var(--sl-color-hairline);
+  }
+
+  @media (min-width: 56rem) {
+    .warlock-features-group {
+      grid-template-columns: 15rem 1fr;
+      gap: 2.5rem;
+      align-items: start;
+    }
+  }
+
+  /* Divider + breathing room between categories */
+  .warlock-features-group + .warlock-features-group {
+    margin-block-start: clamp(2.5rem, 2rem + 2vw, 3.75rem);
+  }
+
+  /* ---------- Rail ---------- */
+  .warlock-features-rail {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    column-gap: 0.75rem;
+    row-gap: 0.35rem;
+  }
+
+  @media (min-width: 56rem) {
+    .warlock-features-rail {
+      position: sticky;
+      top: 6rem;
+      grid-template-columns: 1fr;
+      align-items: start;
+    }
+  }
+
+  .warlock-features-groupicon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: var(--warlock-radius);
+    border: 1px solid color-mix(in srgb, var(--sl-color-text-accent) 28%, var(--sl-color-hairline));
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--sl-color-text-accent) 16%, transparent), color-mix(in srgb, var(--sl-color-text-accent) 7%, transparent));
+    color: var(--sl-color-text-accent);
+    box-shadow: 0 0 22px -8px color-mix(in srgb, var(--sl-color-text-accent) 70%, transparent);
+    flex: none;
+  }
+
+  @media (min-width: 56rem) {
+    .warlock-features-groupicon {
+      margin-block-end: 0.9rem;
+    }
+  }
+
+  .warlock-features-grouplabel {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    color: var(--sl-color-white);
+  }
+
+  .warlock-features-grouptagline {
+    margin: 0;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    color: var(--sl-color-gray-3);
+  }
+
+  /* tagline sits beside the label on mobile (col 2), under it on desktop */
+  .warlock-features-grouptagline {
+    grid-column: 2;
+  }
+
+  @media (min-width: 56rem) {
+    .warlock-features-grouptagline {
+      grid-column: auto;
+      margin-block-start: 0.4rem;
+    }
+  }
+
+  .warlock-features-groupcount {
+    grid-column: 2;
+    margin: 0;
+    font-family: var(--sl-font-mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--sl-color-gray-4);
+  }
+
+  @media (min-width: 56rem) {
+    .warlock-features-groupcount {
+      grid-column: auto;
+      margin-block-start: 0.85rem;
+      padding-block-start: 0.85rem;
+      border-top: 1px solid var(--sl-color-hairline);
+    }
+  }
+
+  /* ---------- Card grid ---------- */
+  .warlock-features-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.9rem;
+  }
+
+  @media (max-width: 30rem) {
+    .warlock-features-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* Defensive: if a group ever has an odd count, the last card spans full
+   * width instead of leaving a gap. */
+  .warlock-features-grid > .warlock-feature:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .warlock-feature {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 1.15rem 1.2rem;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--warlock-radius);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--sl-color-text-accent) 3.5%, transparent), transparent 60%),
+      var(--warlock-surface-dark);
+    text-decoration: none !important;
+    transition: border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+  }
+
+  :root[data-theme="light"] .warlock-feature {
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--sl-color-text-accent) 4%, transparent), transparent 60%),
+      #ffffff;
+  }
+
+  .warlock-feature:hover {
+    border-color: color-mix(in srgb, var(--sl-color-text-accent) 55%, var(--sl-color-hairline));
+    transform: translateY(-3px);
+    box-shadow: 0 16px 36px -22px color-mix(in srgb, var(--sl-color-text-accent) 65%, transparent);
+  }
+
+  .warlock-feature-top {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding-inline-end: 1.25rem; /* room for the hover arrow */
+  }
+
+  .warlock-feature-name {
+    font-size: 0.97rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--sl-color-white) !important;
+  }
+
+  .warlock-feature-tag {
+    font-family: var(--sl-font-mono);
+    font-size: 0.64rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--sl-color-text-accent);
+    padding: 0.13rem 0.42rem;
+    border-radius: var(--warlock-radius-sm);
+    background: color-mix(in srgb, var(--sl-color-text-accent) 13%, transparent);
+    border: 1px solid color-mix(in srgb, var(--sl-color-text-accent) 26%, transparent);
+    white-space: nowrap;
+  }
+
+  .warlock-feature-blurb {
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: var(--sl-color-gray-2);
+  }
+
+  .warlock-feature-arrow {
+    position: absolute;
+    top: 1.15rem;
+    right: 1.1rem;
+    color: var(--sl-color-text-accent);
+    opacity: 0;
+    transform: translateX(-4px);
+    transition: opacity 0.16s ease, transform 0.16s ease;
+  }
+
+  .warlock-feature:hover .warlock-feature-arrow {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .warlock-feature:hover {
+      transform: none;
+    }
+  }
+</style>

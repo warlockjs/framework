@@ -69,6 +69,10 @@ const stats = [
   }
 
   .warlock-stat {
+    /* Reset Starlight's `.sl-markdown-content` auto-flow margin
+     * (`:where(…) + :where(…) { margin-top: 1rem }`) — it leaks onto every
+     * grid item after the first and pushes the first stat 16px out of line. */
+    margin: 0;
     text-align: center;
     padding: 0.5rem 1rem;
   }
