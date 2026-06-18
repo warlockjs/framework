@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## 4.2.11
+
+### Added
+
+- `Migration.create` auto-wires the `deletedAt` column when the model's delete strategy is `"soft"` (opt out with `{ softDeletes: false }`)
+
+### Changed
+
+- Require `@mongez/reinforcements` ≥ 3.3.0 — the update validator now uses its new `when` helper for conditional schema fields
+
+### Fixed
+
+- Soft `destroy()` now sets `deletedAt` on the in-memory model — the instance was left stale before
+- Update validation no longer strips or rejects the `deletedAt` column under strict mode (now whitelisted like the timestamps)
+
 ## 4.2.1
 
 ### Fixed

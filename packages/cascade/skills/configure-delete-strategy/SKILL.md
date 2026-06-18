@@ -31,6 +31,8 @@ export class User extends Model<UserSchema> {
 }
 ```
 
+When the strategy resolves to `"soft"`, `Migration.create(Model, { … })` adds the `deletedAt` column for you (using `deletedAtColumn`), so the schema matches what `destroy()` writes — no need to declare it in the migration. Opt out per table with `{ softDeletes: false }`. See [`@warlock.js/cascade/write-migration/SKILL.md`](@warlock.js/cascade/write-migration/SKILL.md).
+
 ## Override per-call
 
 ```ts
@@ -40,6 +42,8 @@ await user.destroy({ strategy: "trash" });       // move to the trash table
 ```
 
 Resolution order: `destroy({ strategy })` → `static deleteStrategy` → data source `defaultDeleteStrategy` → `"permanent"`.
+
+After a `"soft"` destroy the in-memory instance reflects the change — `model.get(deletedAtColumn)` returns the persisted timestamp (the row stays, so the instance stays usable).
 
 ## Restoring — static, by id
 

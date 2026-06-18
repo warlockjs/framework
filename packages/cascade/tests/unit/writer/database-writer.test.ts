@@ -1,9 +1,13 @@
+import { v } from "@warlock.js/seal";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DriverContract } from "../../../src/contracts/database-driver.contract";
 import type { DataSource } from "../../../src/data-source/data-source";
 import { Model } from "../../../src/model/model";
 import { DatabaseWriter } from "../../../src/writer/database-writer";
-import { createMockDataSource, createMockDriver } from "../../utils/test-helpers";
+import {
+  createMockDataSource,
+  createMockDriver,
+} from "../../utils/test-helpers";
 
 // Mock model class for testing
 class TestModel extends Model {
@@ -176,7 +180,11 @@ describe("DatabaseWriter", () => {
       const writer = new DatabaseWriter(model);
       await writer.save({ replace: true });
 
-      expect(mockDriver.replace).toHaveBeenCalledWith("test_models", { id: 1 }, expect.any(Object));
+      expect(mockDriver.replace).toHaveBeenCalledWith(
+        "test_models",
+        { id: 1 },
+        expect.any(Object),
+      );
       expect(mockDriver.update).not.toHaveBeenCalled();
     });
   });
@@ -304,7 +312,11 @@ describe("DatabaseWriter", () => {
     });
 
     it("should track multiple field changes in $set", async () => {
-      const model = new TestModel({ id: 1, name: "Test", email: "old@test.com" });
+      const model = new TestModel({
+        id: 1,
+        name: "Test",
+        email: "old@test.com",
+      });
       model.isNew = false;
       model.dirtyTracker.reset();
       model.set("name", "Updated");
@@ -344,17 +356,21 @@ describe("DatabaseWriter", () => {
         idGenerator: mockIdGenerator,
       });
 
-      vi.spyOn(AutoIdModel, "getDataSource").mockReturnValue(dataSourceWithIdGen);
+      vi.spyOn(AutoIdModel, "getDataSource").mockReturnValue(
+        dataSourceWithIdGen,
+      );
 
       const model = new AutoIdModel({ name: "Test using idGenerator" });
       model.isNew = true;
 
       // Make driver mock return the data it received, including the generated ID
-      (mockDriver.insert as any).mockImplementation((_table: string, data: any) => {
-        return Promise.resolve({
-          document: { ...data, _id: "mock_mongo_id" },
-        });
-      });
+      (mockDriver.insert as any).mockImplementation(
+        (_table: string, data: any) => {
+          return Promise.resolve({
+            document: { ...data, _id: "mock_mongo_id" },
+          });
+        },
+      );
 
       const writer = new DatabaseWriter(model);
       await writer.save();
@@ -383,17 +399,21 @@ describe("DatabaseWriter", () => {
         idGenerator: mockIdGenerator,
       });
 
-      vi.spyOn(AutoIdModel, "getDataSource").mockReturnValue(dataSourceWithIdGen);
+      vi.spyOn(AutoIdModel, "getDataSource").mockReturnValue(
+        dataSourceWithIdGen,
+      );
 
       const model = new AutoIdModel({ id: 100, name: "Test II" });
       model.isNew = true;
 
       // Make driver mock return the data it received
-      (mockDriver.insert as any).mockImplementation((_table: string, data: any) => {
-        return Promise.resolve({
-          document: { ...data, _id: "mock_mongo_id" },
-        });
-      });
+      (mockDriver.insert as any).mockImplementation(
+        (_table: string, data: any) => {
+          return Promise.resolve({
+            document: { ...data, _id: "mock_mongo_id" },
+          });
+        },
+      );
 
       const writer = new DatabaseWriter(model);
       await writer.save();
@@ -420,7 +440,9 @@ describe("DatabaseWriter", () => {
         idGenerator: mockIdGenerator,
       });
 
-      vi.spyOn(CustomIdModel, "getDataSource").mockReturnValue(dataSourceWithIdGen);
+      vi.spyOn(CustomIdModel, "getDataSource").mockReturnValue(
+        dataSourceWithIdGen,
+      );
 
       const model = new CustomIdModel({ name: "Test" });
       model.isNew = true;
@@ -452,7 +474,9 @@ describe("DatabaseWriter", () => {
         idGenerator: mockIdGenerator,
       });
 
-      vi.spyOn(RandomIdModel, "getDataSource").mockReturnValue(dataSourceWithIdGen);
+      vi.spyOn(RandomIdModel, "getDataSource").mockReturnValue(
+        dataSourceWithIdGen,
+      );
 
       const model = new RandomIdModel({ name: "Test" });
       model.isNew = true;
@@ -517,7 +541,9 @@ describe("DatabaseWriter", () => {
         idGenerator: mockIdGenerator,
       });
 
-      vi.spyOn(IncrementModel, "getDataSource").mockReturnValue(dataSourceWithIdGen);
+      vi.spyOn(IncrementModel, "getDataSource").mockReturnValue(
+        dataSourceWithIdGen,
+      );
 
       const model = new IncrementModel({ name: "Test" });
       model.isNew = true;
@@ -549,7 +575,9 @@ describe("DatabaseWriter", () => {
         idGenerator: mockIdGenerator,
       });
 
-      vi.spyOn(RandomIncrModel, "getDataSource").mockReturnValue(dataSourceWithIdGen);
+      vi.spyOn(RandomIncrModel, "getDataSource").mockReturnValue(
+        dataSourceWithIdGen,
+      );
 
       const model = new RandomIncrModel({ name: "Test" });
       model.isNew = true;
@@ -581,7 +609,9 @@ describe("DatabaseWriter", () => {
         idGenerator: mockIdGenerator,
       });
 
-      vi.spyOn(FnIncrModel, "getDataSource").mockReturnValue(dataSourceWithIdGen);
+      vi.spyOn(FnIncrModel, "getDataSource").mockReturnValue(
+        dataSourceWithIdGen,
+      );
 
       const model = new FnIncrModel({ name: "Test" });
       model.isNew = true;
@@ -609,7 +639,9 @@ describe("DatabaseWriter", () => {
         static updatedAtColumn = "modified_date";
       }
 
-      vi.spyOn(CustomTimestampModel, "getDataSource").mockReturnValue(mockDataSource);
+      vi.spyOn(CustomTimestampModel, "getDataSource").mockReturnValue(
+        mockDataSource,
+      );
 
       const model = new CustomTimestampModel({ name: "Test" });
       model.isNew = true;
@@ -624,6 +656,61 @@ describe("DatabaseWriter", () => {
           modified_date: expect.any(Date),
         }),
       );
+    });
+  });
+
+  describe("Soft-delete column in update validation", () => {
+    it("keeps deletedAt on update under strict 'strip' mode (not stripped)", async () => {
+      vi.clearAllMocks();
+
+      class SoftStripModel extends Model {
+        static table = "soft_strip_models";
+        static primaryKey = "id";
+        static schema = v.object({ name: v.string() });
+        static deletedAtColumn = "deletedAt";
+        static strictMode = "strip" as const;
+      }
+      vi.spyOn(SoftStripModel, "getDataSource").mockReturnValue(mockDataSource);
+
+      const model = new SoftStripModel({
+        id: 1,
+        name: "Test",
+        deletedAt: new Date(),
+      });
+      model.isNew = false;
+      model.set("name", "Updated"); // make the model dirty so the update runs
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      // deletedAt is whitelisted, so it survives validation instead of being
+      // stripped out of the model.
+      expect(model.get("deletedAt")).toBeInstanceOf(Date);
+    });
+
+    it("does not reject an update carrying deletedAt under strict 'fail' mode", async () => {
+      vi.clearAllMocks();
+
+      class SoftFailModel extends Model {
+        static table = "soft_fail_models";
+        static primaryKey = "id";
+        static schema = v.object({ name: v.string() });
+        static deletedAtColumn = "deletedAt";
+        static strictMode = "fail" as const;
+      }
+      vi.spyOn(SoftFailModel, "getDataSource").mockReturnValue(mockDataSource);
+
+      const model = new SoftFailModel({
+        id: 1,
+        name: "Test",
+        deletedAt: new Date(),
+      });
+      model.isNew = false;
+      model.set("name", "Updated");
+
+      const writer = new DatabaseWriter(model);
+
+      await expect(writer.save()).resolves.toMatchObject({ success: true });
     });
   });
 });

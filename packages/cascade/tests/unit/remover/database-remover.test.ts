@@ -3,7 +3,10 @@ import type { DriverContract } from "../../../src/contracts/database-driver.cont
 import type { DataSource } from "../../../src/data-source/data-source";
 import { Model } from "../../../src/model/model";
 import { DatabaseRemover } from "../../../src/remover/database-remover";
-import { createMockDataSource, createMockDriver } from "../../utils/test-helpers";
+import {
+  createMockDataSource,
+  createMockDriver,
+} from "../../utils/test-helpers";
 
 // Mock model class for testing
 class TestModel extends Model {
@@ -60,7 +63,9 @@ describe("DatabaseRemover", () => {
 
       const remover = new DatabaseRemover(model);
 
-      await expect(remover.destroy()).rejects.toThrow("primary key (id) is missing");
+      await expect(remover.destroy()).rejects.toThrow(
+        "primary key (id) is missing",
+      );
     });
   });
 
@@ -140,13 +145,45 @@ describe("DatabaseRemover", () => {
       expect(model.isNew).toBe(false);
     });
 
+    it("should set deletedAt on the in-memory model, matching what was persisted", async () => {
+      const model = new TestModel({ id: 1, name: "Test" });
+      model.isNew = false;
+
+      const remover = new DatabaseRemover(model);
+      await remover.destroy({ strategy: "soft" });
+
+      const inMemory = model.get("deletedAt");
+      expect(inMemory).toBeInstanceOf(Date);
+
+      // The in-memory value is exactly the timestamp written to the database.
+      const persisted = (mockDriver.update as any).mock.calls[0][2].$set
+        .deletedAt;
+      expect(inMemory).toEqual(persisted);
+    });
+
+    it("should NOT touch the in-memory model when the update modified nothing", async () => {
+      (mockDriver.update as any).mockResolvedValueOnce({ modifiedCount: 0 });
+
+      const model = new TestModel({ id: 1, name: "Test" });
+      model.isNew = false;
+
+      const remover = new DatabaseRemover(model);
+
+      await expect(remover.destroy({ strategy: "soft" })).rejects.toThrow(
+        "record not found",
+      );
+      expect(model.get("deletedAt")).toBeUndefined();
+    });
+
     it("should use custom deletedAtColumn if defined", async () => {
       class CustomDeletedAtModel extends Model {
         static table = "custom_models";
         static primaryKey = "id";
         static deletedAtColumn = "removed_at";
       }
-      vi.spyOn(CustomDeletedAtModel, "getDataSource").mockReturnValue(mockDataSource);
+      vi.spyOn(CustomDeletedAtModel, "getDataSource").mockReturnValue(
+        mockDataSource,
+      );
 
       const model = new CustomDeletedAtModel({ id: 1 });
       model.isNew = false;
@@ -166,7 +203,11 @@ describe("DatabaseRemover", () => {
 
   describe("destroy() - Trash Strategy", () => {
     it("should move record to trash table before deleting", async () => {
-      const model = new TestModel({ id: 1, name: "Test", email: "test@example.com" });
+      const model = new TestModel({
+        id: 1,
+        name: "Test",
+        email: "test@example.com",
+      });
       model.isNew = false;
 
       const remover = new DatabaseRemover(model);
@@ -201,7 +242,10 @@ describe("DatabaseRemover", () => {
       const remover = new DatabaseRemover(model);
       await remover.destroy({ strategy: "trash" });
 
-      expect(mockDriver.insert).toHaveBeenCalledWith("RecycleBin", expect.any(Object));
+      expect(mockDriver.insert).toHaveBeenCalledWith(
+        "RecycleBin",
+        expect.any(Object),
+      );
     });
 
     it("should use defaultTrashTable from data source if set", async () => {
@@ -213,7 +257,10 @@ describe("DatabaseRemover", () => {
       const remover = new DatabaseRemover(model);
       await remover.destroy({ strategy: "trash" });
 
-      expect(mockDriver.insert).toHaveBeenCalledWith("GlobalTrash", expect.any(Object));
+      expect(mockDriver.insert).toHaveBeenCalledWith(
+        "GlobalTrash",
+        expect.any(Object),
+      );
     });
 
     it("should mark model as new after trash deletion", async () => {
@@ -362,7 +409,9 @@ describe("DatabaseRemover", () => {
       const remover = new DatabaseRemover(model);
       await remover.destroy();
 
-      expect(mockDriver.delete).toHaveBeenCalledWith("custom_pk_models", { uuid: "abc-123" });
+      expect(mockDriver.delete).toHaveBeenCalledWith("custom_pk_models", {
+        uuid: "abc-123",
+      });
     });
   });
 });

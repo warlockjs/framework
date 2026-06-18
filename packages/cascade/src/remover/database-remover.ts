@@ -1,5 +1,8 @@
 import events from "@mongez/events";
-import type { DriverContract, UpdateOperations } from "../contracts/database-driver.contract";
+import type {
+  DriverContract,
+  UpdateOperations,
+} from "../contracts/database-driver.contract";
 import type {
   RemoverContract,
   RemoverOptions,
@@ -151,26 +154,40 @@ export class DatabaseRemover implements RemoverContract {
       case "soft": {
         // Set deletedAt timestamp (using resolved column name)
         const deletedAtColumn = this.ctor.deletedAtColumn;
-        
+
         // Only proceed if deletedAtColumn is configured (not false or undefined)
         if (deletedAtColumn === false || deletedAtColumn === undefined) {
           throw new Error(
             `Cannot perform soft delete on ${this.ctor.name}: deletedAtColumn is not configured. ` +
-            `Set a column name or use a different delete strategy.`,
+              `Set a column name or use a different delete strategy.`,
           );
         }
-        
+
+        const deletedAt = new Date();
         const updateOperations: UpdateOperations = {
-          $set: { [deletedAtColumn]: new Date() },
+          $set: { [deletedAtColumn]: deletedAt },
         };
-        const updateResult = await this.driver.update(this.table, filter, updateOperations);
+        const updateResult = await this.driver.update(
+          this.table,
+          filter,
+          updateOperations,
+        );
         deletedCount = updateResult.modifiedCount > 0 ? 1 : 0;
+
+        // The row stays (unlike trash/permanent), so reflect the persisted
+        // timestamp on the in-memory model — otherwise the instance is stale
+        // and `model.get(deletedAtColumn)` stays undefined after destroy().
+        if (deletedCount > 0) {
+          this.model.set(deletedAtColumn, deletedAt);
+        }
         break;
       }
     }
 
     if (deletedCount === 0) {
-      throw new Error(`Failed to destroy ${this.ctor.name} instance: record not found.`);
+      throw new Error(
+        `Failed to destroy ${this.ctor.name} instance: record not found.`,
+      );
     }
 
     context.deletedCount = deletedCount;
@@ -219,7 +236,9 @@ export class DatabaseRemover implements RemoverContract {
    * @returns Prepared trash record data with all original fields + deletedAt + originalTable
    * @private
    */
-  private prepareTrashRecord(documentData: Record<string, unknown>): Record<string, unknown> {
+  private prepareTrashRecord(
+    documentData: Record<string, unknown>,
+  ): Record<string, unknown> {
     // Preserve all original fields and add deletion metadata
     return {
       ...documentData,

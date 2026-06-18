@@ -1,4 +1,5 @@
 import events from "@mongez/events";
+import { when } from "@mongez/reinforcements";
 import { getSealConfig, v, type ObjectValidator } from "@warlock.js/seal";
 import type {
   DriverContract,
@@ -160,7 +161,9 @@ export class DatabaseWriter implements WriterContract {
       success: true,
       document: this.model.data,
       isNew: isInsert,
-      modifiedCount: isInsert ? undefined : (result as UpdateResult).modifiedCount,
+      modifiedCount: isInsert
+        ? undefined
+        : (result as UpdateResult).modifiedCount,
     };
   }
 
@@ -174,7 +177,10 @@ export class DatabaseWriter implements WriterContract {
    * @throws {ValidationError} If validation fails
    * @private
    */
-  private async validateAndCast(isInsert: boolean, options: WriterOptions): Promise<void> {
+  private async validateAndCast(
+    isInsert: boolean,
+    options: WriterOptions,
+  ): Promise<void> {
     // Emit validating event
     if (!options.skipEvents) {
       await this.model.emitEvent("validating", {
@@ -189,14 +195,27 @@ export class DatabaseWriter implements WriterContract {
       return;
     }
 
-    // Clone schema for partial data (updates only)
+    // Clone schema for partial data (updates only).
+    // Whitelist the framework-managed system columns so a model carrying them
+    // (id / _id / timestamps / soft-delete deletedAt) validates cleanly instead
+    // of being stripped (strictMode "strip") or rejected (strictMode "fail").
+    // `when(...)` adds each timestamp/soft-delete column only when configured
+    // (truthy) — the lazy factory means a disabled column (`false`) never even
+    // builds a bogus schema key.
     const validationSchema = isInsert
       ? this.schema.clone()
       : this.schema.clone(Object.keys(this.model.data)).extend({
           id: v.scalar().optional(),
           _id: v.any().optional(),
-          [this.ctor.createdAtColumn as string]: v.date().optional(),
-          [this.ctor.updatedAtColumn as string]: v.date().optional(),
+          ...when(this.ctor.createdAtColumn, () => ({
+            [this.ctor.createdAtColumn as string]: v.date().optional(),
+          })),
+          ...when(this.ctor.updatedAtColumn, () => ({
+            [this.ctor.updatedAtColumn as string]: v.date().optional(),
+          })),
+          ...when(this.ctor.deletedAtColumn, () => ({
+            [this.ctor.deletedAtColumn as string]: v.date().optional(),
+          })),
         });
 
     // Apply strict mode
@@ -482,6 +501,10 @@ export class DatabaseWriter implements WriterContract {
    */
   private async triggerSync(changedFields: string[]): Promise<void> {
     // Emit model.updated event - ModelSyncOperation listens to these
-    await events.triggerAll(getModelUpdatedEvent(this.ctor), this.model, changedFields);
+    await events.triggerAll(
+      getModelUpdatedEvent(this.ctor),
+      this.model,
+      changedFields,
+    );
   }
 }

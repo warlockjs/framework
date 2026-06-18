@@ -27,9 +27,27 @@ What happens:
 - `Migration.create(Model, columns)` reads `User.table` for the table name and builds the DDL from the column map; it infers the rollback for you.
 - Column helpers (`text`, `uuid`, `string`, `integer`, …) are imported from `@warlock.js/cascade`. Each returns a builder you chain modifiers onto (`.notNullable()`, `.unique()`, `.nullable()`, `.default(...)`, `.references(table)`).
 - The `id` primary key and `createdAt` / `updatedAt` timestamps are added **automatically** — don't declare them. Naming follows the data source convention (snake_case on Postgres, camelCase on MongoDB).
+- The soft-delete column is added **automatically when the model's delete strategy resolves to `"soft"`** — don't declare it. See below.
 - `export default` is required — the runner imports each file's default export.
 
 Evolve an existing table with `Migration.alter(Model, { ... })` (add / drop / rename / modify columns and indexes); it's declarative the same way.
+
+## Soft-delete column is auto-wired
+
+If the model uses soft deletes, `Migration.create` adds the `deletedAt` column for you — you don't declare it, the same way you don't declare `createdAt` / `updatedAt`. The strategy is resolved exactly as `destroy()` resolves it: model static `deleteStrategy` → data source `defaultDeleteStrategy` → `"permanent"`. Since soft delete is usually an app-wide policy set on the data source, every `Migration.create` then gets the column with zero extra config.
+
+```ts
+// User (or the data source) has deleteStrategy "soft" → deletedAt is added.
+export default Migration.create(User, {
+  name: text().notNullable(),
+});
+```
+
+- The column name comes from the model's `deletedAtColumn` (default `"deletedAt"`), so it matches what `destroy()` writes at runtime.
+- It only fires for the `"soft"` strategy — `"permanent"` and `"trash"` add nothing. No driver defaults to `"soft"`, so this never fires unless soft delete is opted into.
+- Opt out for one table with `{ softDeletes: false }`; force it on with `{ softDeletes: true }`. A model with `deletedAtColumn = false` is never wired. An already-declared `deletedAt` in the map is not duplicated.
+
+See [`@warlock.js/cascade/configure-delete-strategy/SKILL.md`](@warlock.js/cascade/configure-delete-strategy/SKILL.md) for the strategies themselves.
 
 ## Running migrations
 
@@ -133,7 +151,7 @@ For a class-form migration not bound to a model, set `public readonly dataSource
 ## Things NOT to do
 
 - Don't reach for a `migration({ up(driver) {...} })` factory or `driver.createTable(name, (table) => {...})` — that API doesn't exist. Use `Migration.create(Model, { columns })`, or `extends Migration` with `this.createTable()` for the imperative case.
-- Don't declare `id` / `createdAt` / `updatedAt` — they're added for you.
+- Don't declare `id` / `createdAt` / `updatedAt` — they're added for you. Same for `deletedAt` when the model's strategy is `"soft"` — it's auto-wired (opt out with `{ softDeletes: false }`).
 - Don't auto-run migrations from app code in production. Run them as a deploy step.
 - Don't put irreversible data backfills in the same file as a schema change — split them so rollback only undoes the schema.
 - Don't change a committed migration. Add a new one. Editing a migration that already ran in production puts environments out of sync.
@@ -142,3 +160,4 @@ For a class-form migration not bound to a model, set `public readonly dataSource
 
 - [`@warlock.js/cascade/run-cascade-cli/SKILL.md`](@warlock.js/cascade/run-cascade-cli/SKILL.md) — CLI flags + Operations API for programmatic runs
 - [`@warlock.js/cascade/manage-data-sources/SKILL.md`](@warlock.js/cascade/manage-data-sources/SKILL.md) — multi-DB migrations
+- [`@warlock.js/cascade/configure-delete-strategy/SKILL.md`](@warlock.js/cascade/configure-delete-strategy/SKILL.md) — soft / trash / permanent deletes and the `deletedAt` column

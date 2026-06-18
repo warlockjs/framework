@@ -10,7 +10,7 @@ import type {
 } from "../contracts/migration-driver.contract";
 import type { DataSource } from "../data-source/data-source";
 import type { ChildModel, Model } from "../model/model";
-import type { MigrationDefaults } from "../types";
+import type { DeleteStrategy, MigrationDefaults } from "../types";
 import { DatabaseDriver } from "../utils/connect-to-database";
 import { ColumnBuilder } from "./column-builder";
 import { ForeignKeyBuilder } from "./foreign-key-builder";
@@ -365,7 +365,11 @@ export interface MigrationContract {
   arrayFloat(column: string): ColumnBuilder;
 
   /** DECIMAL[] — array of decimals (optional precision/scale). */
-  arrayDecimal(column: string, precision?: number, scale?: number): ColumnBuilder;
+  arrayDecimal(
+    column: string,
+    precision?: number,
+    scale?: number,
+  ): ColumnBuilder;
 
   /** BOOLEAN[] — array of booleans. */
   arrayBoolean(column: string): ColumnBuilder;
@@ -494,7 +498,10 @@ export interface MigrationContract {
   /**
    * Create a full-text search index.
    */
-  fullText(columns: string | string[], options?: FullTextIndexOptions): MigrationContract;
+  fullText(
+    columns: string | string[],
+    options?: FullTextIndexOptions,
+  ): MigrationContract;
 
   /**
    * Drop a full-text search index.
@@ -555,7 +562,10 @@ export interface MigrationContract {
    *
    * When omitted, `columnOrConstraint` is used as the raw constraint name.
    */
-  dropForeign(columnOrConstraint: string, referencesTable?: string): MigrationContract;
+  dropForeign(
+    columnOrConstraint: string,
+    referencesTable?: string,
+  ): MigrationContract;
 
   /**
    * Set JSON schema validation rules on the collection.
@@ -796,7 +806,9 @@ export abstract class Migration implements MigrationContract {
    * }
    * ```
    */
-  public static for<T extends ChildModel<Model>>(model: T): MigrationConstructor {
+  public static for<T extends ChildModel<Model>>(
+    model: T,
+  ): MigrationConstructor {
     abstract class BoundMigration extends Migration {
       public readonly table = model.table;
       public readonly dataSource = model.dataSource;
@@ -976,7 +988,10 @@ export abstract class Migration implements MigrationContract {
    */
   public toSQL(): string[] {
     const serializer = this.driver.driver.getSQLSerializer();
-    const statements = serializer.serializeAll(this.pendingOperations, this.table);
+    const statements = serializer.serializeAll(
+      this.pendingOperations,
+      this.table,
+    );
     this.pendingOperations.length = 0;
     return statements;
   }
@@ -1015,11 +1030,17 @@ export abstract class Migration implements MigrationContract {
       }
 
       case "modifyColumn":
-        await this.driver.modifyColumn(this.table, op.payload as ColumnDefinition);
+        await this.driver.modifyColumn(
+          this.table,
+          op.payload as ColumnDefinition,
+        );
         break;
 
       case "createIndex":
-        await this.driver.createIndex(this.table, op.payload as IndexDefinition);
+        await this.driver.createIndex(
+          this.table,
+          op.payload as IndexDefinition,
+        );
         break;
 
       case "dropIndex":
@@ -1092,7 +1113,10 @@ export abstract class Migration implements MigrationContract {
         break;
 
       case "addForeignKey":
-        await this.driver.addForeignKey(this.table, op.payload as ForeignKeyDefinition);
+        await this.driver.addForeignKey(
+          this.table,
+          op.payload as ForeignKeyDefinition,
+        );
         break;
 
       case "dropForeignKey":
@@ -1108,7 +1132,10 @@ export abstract class Migration implements MigrationContract {
         break;
 
       case "addCheck": {
-        const { name, expression } = op.payload as { name: string; expression: string };
+        const { name, expression } = op.payload as {
+          name: string;
+          expression: string;
+        };
         await this.driver.addCheck(this.table, name, expression);
         break;
       }
@@ -1156,7 +1183,9 @@ export abstract class Migration implements MigrationContract {
             // MongoDB - client is the Db instance
             await client.command({ $eval: sql });
           } else {
-            throw new Error("Unsupported database driver for statement execution");
+            throw new Error(
+              "Unsupported database driver for statement execution",
+            );
           }
         });
         break;
@@ -1330,7 +1359,10 @@ export abstract class Migration implements MigrationContract {
    * Create table if not exists
    */
   public createTableIfNotExists(): this {
-    this.pendingOperations.push({ type: "createTableIfNotExists", payload: null });
+    this.pendingOperations.push({
+      type: "createTableIfNotExists",
+      payload: null,
+    });
     return this;
   }
 
@@ -1982,7 +2014,10 @@ export abstract class Migration implements MigrationContract {
    */
   public arrayInt(column: string): ColumnBuilder {
     const builder = new ColumnBuilder(this, column, "arrayInt");
-    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+    this.pendingOperations.push({
+      type: "addColumn",
+      payload: builder.getDefinition(),
+    });
     return builder;
   }
 
@@ -1996,7 +2031,10 @@ export abstract class Migration implements MigrationContract {
    */
   public arrayBigInt(column: string): ColumnBuilder {
     const builder = new ColumnBuilder(this, column, "arrayBigInt");
-    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+    this.pendingOperations.push({
+      type: "addColumn",
+      payload: builder.getDefinition(),
+    });
     return builder;
   }
 
@@ -2010,7 +2048,10 @@ export abstract class Migration implements MigrationContract {
    */
   public arrayFloat(column: string): ColumnBuilder {
     const builder = new ColumnBuilder(this, column, "arrayFloat");
-    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+    this.pendingOperations.push({
+      type: "addColumn",
+      payload: builder.getDefinition(),
+    });
     return builder;
   }
 
@@ -2026,9 +2067,19 @@ export abstract class Migration implements MigrationContract {
    * this.arrayDecimal("amounts");        // DECIMAL[]
    * ```
    */
-  public arrayDecimal(column: string, precision?: number, scale?: number): ColumnBuilder {
-    const builder = new ColumnBuilder(this, column, "arrayDecimal", { precision, scale });
-    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+  public arrayDecimal(
+    column: string,
+    precision?: number,
+    scale?: number,
+  ): ColumnBuilder {
+    const builder = new ColumnBuilder(this, column, "arrayDecimal", {
+      precision,
+      scale,
+    });
+    this.pendingOperations.push({
+      type: "addColumn",
+      payload: builder.getDefinition(),
+    });
     return builder;
   }
 
@@ -2042,7 +2093,10 @@ export abstract class Migration implements MigrationContract {
    */
   public arrayBoolean(column: string): ColumnBuilder {
     const builder = new ColumnBuilder(this, column, "arrayBoolean");
-    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+    this.pendingOperations.push({
+      type: "addColumn",
+      payload: builder.getDefinition(),
+    });
     return builder;
   }
 
@@ -2056,7 +2110,10 @@ export abstract class Migration implements MigrationContract {
    */
   public arrayText(column: string): ColumnBuilder {
     const builder = new ColumnBuilder(this, column, "arrayText");
-    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+    this.pendingOperations.push({
+      type: "addColumn",
+      payload: builder.getDefinition(),
+    });
     return builder;
   }
 
@@ -2070,7 +2127,10 @@ export abstract class Migration implements MigrationContract {
    */
   public arrayDate(column: string): ColumnBuilder {
     const builder = new ColumnBuilder(this, column, "arrayDate");
-    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+    this.pendingOperations.push({
+      type: "addColumn",
+      payload: builder.getDefinition(),
+    });
     return builder;
   }
 
@@ -2084,7 +2144,10 @@ export abstract class Migration implements MigrationContract {
    */
   public arrayTimestamp(column: string): ColumnBuilder {
     const builder = new ColumnBuilder(this, column, "arrayTimestamp");
-    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+    this.pendingOperations.push({
+      type: "addColumn",
+      payload: builder.getDefinition(),
+    });
     return builder;
   }
 
@@ -2098,7 +2161,10 @@ export abstract class Migration implements MigrationContract {
    */
   public arrayUuid(column: string): ColumnBuilder {
     const builder = new ColumnBuilder(this, column, "arrayUuid");
-    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+    this.pendingOperations.push({
+      type: "addColumn",
+      payload: builder.getDefinition(),
+    });
     return builder;
   }
 
@@ -2112,7 +2178,10 @@ export abstract class Migration implements MigrationContract {
    */
   public arrayJson(column: string): ColumnBuilder {
     const builder = new ColumnBuilder(this, column, "arrayJson");
-    this.pendingOperations.push({ type: "addColumn", payload: builder.getDefinition() });
+    this.pendingOperations.push({
+      type: "addColumn",
+      payload: builder.getDefinition(),
+    });
     return builder;
   }
 
@@ -2416,7 +2485,10 @@ export abstract class Migration implements MigrationContract {
    * @param options - Full-text options
    * @returns This migration for chaining
    */
-  public fullText(columns: string | string[], options?: FullTextIndexOptions): this {
+  public fullText(
+    columns: string | string[],
+    options?: FullTextIndexOptions,
+  ): this {
     const cols = Array.isArray(columns) ? columns : [columns];
     this.pendingOperations.push({
       type: "createFullTextIndex",
@@ -2669,11 +2741,17 @@ export abstract class Migration implements MigrationContract {
    * @param referencesTable - Referenced table name; triggers auto-name computation when provided
    * @returns This migration for chaining
    */
-  public dropForeign(columnOrConstraint: string, referencesTable?: string): this {
+  public dropForeign(
+    columnOrConstraint: string,
+    referencesTable?: string,
+  ): this {
     const constraintName = referencesTable
       ? `fk_${this.table}_${columnOrConstraint}_${referencesTable}`
       : columnOrConstraint;
-    this.pendingOperations.push({ type: "dropForeignKey", payload: constraintName });
+    this.pendingOperations.push({
+      type: "dropForeignKey",
+      payload: constraintName,
+    });
     return this;
   }
 
@@ -2742,7 +2820,9 @@ export abstract class Migration implements MigrationContract {
    * });
    * ```
    */
-  public async withConnection<T>(callback: (connection: unknown) => Promise<T>): Promise<T> {
+  public async withConnection<T>(
+    callback: (connection: unknown) => Promise<T>,
+  ): Promise<T> {
     return this.driver.raw(callback);
   }
 
@@ -2857,7 +2937,15 @@ export type IndexEntry = {
    * Index access method (PostgreSQL).
    * Defaults to `"btree"` when omitted.
    */
-  using?: "btree" | "hash" | "gin" | "gist" | "brin" | "ivfflat" | "hnsw" | (string & {});
+  using?:
+    | "btree"
+    | "hash"
+    | "gin"
+    | "gist"
+    | "brin"
+    | "ivfflat"
+    | "hnsw"
+    | (string & {});
   /** Extra columns to include in a covering index (PostgreSQL `INCLUDE`). */
   include?: string[];
   /** Build the index without locking the table (PostgreSQL). */
@@ -2923,6 +3011,27 @@ export type MigrationCreateOptions = {
   timestamps?: boolean;
 
   /**
+   * Whether to add the soft-delete column (`deletedAt` / `deleted_at`).
+   *
+   * Tri-state:
+   * - omitted (**default**) — auto: the column is added only when the model's
+   *   resolved delete strategy is `"soft"`. The strategy is resolved exactly
+   *   as `destroy()` resolves it: model static `deleteStrategy` → DataSource
+   *   `defaultDeleteStrategy` (incl. `modelDefaults`) → `"permanent"`. No driver
+   *   defaults to `"soft"`, so this only fires when soft delete is opted into.
+   * - `true` — always add it, regardless of the resolved strategy.
+   * - `false` — never add it.
+   *
+   * The column name comes from the model's resolved `deletedAtColumn`
+   * (default `"deletedAt"`), so the schema matches what `destroy()` writes at
+   * runtime. When the model sets `deletedAtColumn = false`, no column is added.
+   * If the column is already declared in the column map, it is not duplicated.
+   *
+   * @default undefined (follow the model's delete strategy)
+   */
+  softDeletes?: boolean;
+
+  /**
    * Whether to wrap this migration in a transaction.
    * Falls back to DataSource / driver defaults when omitted.
    */
@@ -2986,7 +3095,10 @@ export type MigrationCreateOptions = {
  * Keys become the column names; values are `DetachedColumnBuilder` instances
  * produced by the standalone column helpers (`uuid()`, `text()`, etc.).
  */
-export type ColumnMap = Record<string, import("./column-helpers").DetachedColumnBuilder>;
+export type ColumnMap = Record<
+  string,
+  import("./column-helpers").DetachedColumnBuilder
+>;
 
 /**
  * Options accepted by `Migration.alter()`.
@@ -3247,6 +3359,55 @@ export type AlterSchema = {
 };
 
 /**
+ * Resolve the soft-delete column to auto-wire for a declarative `Migration.create`.
+ *
+ * Mirrors the runtime strategy resolution used by `destroy()`
+ * (`model.deleteStrategy` → DataSource `defaultDeleteStrategy` → `"permanent"`)
+ * and returns the model's resolved `deletedAtColumn` only when the column should
+ * be added — otherwise `undefined`.
+ *
+ * @param model - Model the migration is bound to
+ * @param force - The `softDeletes` option: `true` forces the column on;
+ *   `undefined` follows the resolved strategy. (`false` is short-circuited by
+ *   the caller and never reaches here.)
+ * @returns The column name to add, or `undefined` to skip
+ * @internal
+ */
+function resolveSoftDeleteColumn(
+  model: ChildModel<Model<any>>,
+  force: boolean | undefined,
+): string | undefined {
+  // Touch the data source first so `modelDefaults` (which can carry
+  // deleteStrategy / deletedAtColumn) are applied onto the model class — the
+  // same trigger destroy() relies on. Tolerate a missing data source (e.g. a
+  // unit test with no registry) by falling back to the model statics.
+  let defaultStrategy: DeleteStrategy | undefined;
+
+  try {
+    defaultStrategy = model.getDataSource().defaultDeleteStrategy;
+  } catch {
+    defaultStrategy = undefined;
+  }
+
+  const deletedAtColumn = model.deletedAtColumn;
+
+  // A model can disable soft deletes entirely with `deletedAtColumn = false`.
+  if (deletedAtColumn === false) {
+    return undefined;
+  }
+
+  const column = deletedAtColumn || "deletedAt";
+
+  if (force === true) {
+    return column;
+  }
+
+  const strategy = model.deleteStrategy ?? defaultStrategy ?? "permanent";
+
+  return strategy === "soft" ? column : undefined;
+}
+
+/**
  * Wire a `ColumnMap` onto an active migration instance.
  *
  * Fixes up the placeholder column name in each `DetachedColumnBuilder`,
@@ -3270,7 +3431,9 @@ function wireColumns(migration: Migration, columns: ColumnMap): void {
     // Transfer any index operations registered via .unique() / .index()
     // Replace the placeholder column name with the real column name before transfer.
     for (const idx of detached.sink.pendingIndexes) {
-      idx.columns = idx.columns.map((col) => (col === "__placeholder__" ? columnName : col));
+      idx.columns = idx.columns.map((col) =>
+        col === "__placeholder__" ? columnName : col,
+      );
       migration.addPendingIndex(idx);
     }
 
@@ -3298,6 +3461,8 @@ function wireColumns(migration: Migration, columns: ColumnMap): void {
  * - `createTableIfNotExists()`
  * - Primary key (type resolved from `migrationDefaults.primaryKey` → options → `"int"`)
  * - `timestamps()`
+ * - Soft-delete column when the model's delete strategy resolves to `"soft"`
+ *   (opt out with `{ softDeletes: false }`, force on with `true`)
  * - `down()` → `dropTableIfExists()`
  *
  * The class-based API remains available for complex migrations (raw SQL,
@@ -3366,6 +3531,24 @@ Migration.create = function createMigration(
         this.timestamps();
       }
 
+      // ── Soft-delete column ──────────────────────────────────────────────
+      // When the model's resolved delete strategy is "soft", auto-wire the
+      // deletedAt column so the schema matches what destroy() writes at
+      // runtime. Opt out with { softDeletes: false }; force on with `true`.
+      if (options.softDeletes !== false) {
+        const deletedAtColumn = resolveSoftDeleteColumn(
+          model,
+          options.softDeletes,
+        );
+
+        if (
+          deletedAtColumn &&
+          !Object.prototype.hasOwnProperty.call(columns, deletedAtColumn)
+        ) {
+          this.softDeletes(deletedAtColumn);
+        }
+      }
+
       // ── Composite indexes ───────────────────────────────────────────────
       if (options.index) {
         for (const entry of options.index) {
@@ -3387,7 +3570,9 @@ Migration.create = function createMigration(
       }
 
       if (options.raw) {
-        const rawQueries = Array.isArray(options.raw) ? options.raw : [options.raw];
+        const rawQueries = Array.isArray(options.raw)
+          ? options.raw
+          : [options.raw];
         for (const query of rawQueries) {
           this.raw(query);
         }
@@ -3507,7 +3692,11 @@ Migration.alter = function alterMigration(
 
       // ── Expression Indexes ───────────────────────────────────────────────
       if (schema.addExpressionIndex) {
-        for (const { expressions, name, options: opts } of schema.addExpressionIndex) {
+        for (const {
+          expressions,
+          name,
+          options: opts,
+        } of schema.addExpressionIndex) {
           this.expressionIndex(expressions, name, opts);
         }
       }
@@ -3564,7 +3753,10 @@ Migration.alter = function alterMigration(
       // ── Foreign Keys ──────────────────────────────────────────────────────
       if (schema.addForeign) {
         for (const fk of schema.addForeign) {
-          const tableName = typeof fk.references === "string" ? fk.references : fk.references.table;
+          const tableName =
+            typeof fk.references === "string"
+              ? fk.references
+              : fk.references.table;
 
           this.foreign(fk.column)
             .references(tableName, fk.on ?? "id")
@@ -3574,7 +3766,10 @@ Migration.alter = function alterMigration(
       }
 
       if (schema.dropForeign) {
-        for (const { columnOrConstraint, referencesTable } of schema.dropForeign) {
+        for (const {
+          columnOrConstraint,
+          referencesTable,
+        } of schema.dropForeign) {
           this.dropForeign(columnOrConstraint, referencesTable);
         }
       }
@@ -3594,7 +3789,9 @@ Migration.alter = function alterMigration(
 
       // ── Raw SQL ───────────────────────────────────────────────────────────
       if (schema.raw) {
-        const rawQueries = Array.isArray(schema.raw) ? schema.raw : [schema.raw];
+        const rawQueries = Array.isArray(schema.raw)
+          ? schema.raw
+          : [schema.raw];
         for (const query of rawQueries) {
           this.raw(query);
         }
