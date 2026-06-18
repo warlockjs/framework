@@ -6,12 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-- `lowerStage3Decorators()` — shared Vite/Vitest plugin that lowers TC39 Stage-3 decorators with esbuild before oxc / the SSR rewrite mangles them. Drop it first in a config's `plugins` so model-decorated files load under Vitest 4 / Vite 8.
+## 4.2.11
+
+### Added
+
+- `lowerStage3Decorators()` — Vite/Vitest plugin that lowers TC39 Stage-3 decorators with esbuild before oxc / the SSR rewrite mangles them; drop it first in a config's `plugins` so model-decorated files load under Vitest 4 / Vite 8.
+- `warlock add notifications` — installs `@warlock.js/notifications` (+ the `mail` feature), ejects `config/notifications.ts`, and scaffolds the app-owned `Notification` model + migration into `src/app/notifications/` (idempotent; async queue opt-in).
+- Notifications connector — built-in connector (priority `8`, early phase) reads `config/notifications.ts` at boot and passes it to `setNotificationConfig`; lazy-imports `@warlock.js/notifications` (config-gated), so core keeps no hard dependency on it.
+
+### Changed
+
 - `warlock add test` now scaffolds a `vite.config.ts` that includes `lowerStage3Decorators()`, so a fresh project can test decorated models out of the box.
-- `warlock add test` `test`/`test:coverage` scripts now run one-shot (`vitest run`) instead of watch mode — safe for CI by default.
-- `startHttpTestServer` now starts early-phase connectors (database, cache, logger, …) **before** loading app modules, then late-phase connectors (http, socket) after — mirroring the dev/prod boot order. Fixes a `MissingDataSourceError` when a module's `main.ts` boot side-effect queries the DB at import time under the Vitest integration harness.
-- `warlock add notifications` — new feature in the `add` command: installs `@warlock.js/notifications` (and pulls the `mail` feature for the default mail channel), ejects `config/notifications.ts` (mail + in-app channels wired), and scaffolds the app-owned `Notification` model + a timestamped migration into `src/app/notifications/`. Re-running is idempotent (the model file is the sentinel — no duplicate migration). The async queue stays opt-in (commented in the config; enable with `warlock add herald` + `heraldQueue()`).
-- **Notifications connector** — a built-in connector (priority `8`, early phase) reads `config/notifications.ts` at boot and hands its default export to `setNotificationConfig`. `@warlock.js/notifications` is lazy-imported (gated on the config's presence), so core keeps no hard dependency on it — the same pattern as the herald connector. Config files stay declarative (`export default config`); the side-effect moves out of the config file.
+- `warlock add test` `test` / `test:coverage` scripts now run one-shot (`vitest run`) instead of watch mode — CI-safe by default.
+- Bumped `@mongez/reinforcements` to 3.3.0
+
+### Fixed
+
+- `startHttpTestServer` now starts early-phase connectors (database, cache, logger, …) before loading app modules, then late-phase (http, socket) after — mirroring dev/prod boot order; fixes a `MissingDataSourceError` when a module's boot side-effect queries the DB at import under the Vitest integration harness.
 
 ## 4.2.5
 
