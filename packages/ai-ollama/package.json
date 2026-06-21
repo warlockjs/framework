@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/ai-ollama",
-  "version": "4.2.11",
+  "version": "4.3.0",
   "type": "module",
   "description": "Ollama adapter for @warlock.js/ai",
   "main": "./src/index.ts",
