@@ -1,6 +1,7 @@
 import { colors } from "@mongez/copper";
 import events from "@mongez/events";
 import { fileExistsAsync, getFileAsync, unlinkAsync } from "@warlock.js/fs";
+import { Application } from "../application";
 import { connectorsManager } from "../connectors/connectors-manager";
 import { ConnectorLifecyclePhase } from "../connectors/types";
 import { warlockConfigManager } from "../warlock-config";
@@ -69,6 +70,14 @@ export class DevelopmentServer {
 
       const duration = performance.now() - startedAt;
       devLogReady(`Development Server is ready in ${colors.greenBright(parseDuration(duration))}`);
+
+      // App modules are loaded and both connector phases are active — signal a
+      // complete boot so `Application.onceBooted(...)` listeners fire.
+      Application.markBooted({
+        environment: Application.environment,
+        runtimeStrategy: Application.runtimeStrategy,
+        bootDurationMs: duration,
+      });
 
       // Precedence: explicit CLI option > devServer.* config > default.
       const devServerConfig = await warlockConfigManager.get("devServer");

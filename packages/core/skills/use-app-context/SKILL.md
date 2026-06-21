@@ -1,6 +1,6 @@
 ---
 name: use-app-context
-description: 'Read app-wide context — the `Application` static class (env, version, uptime, runtime strategy) plus the `app` runtime accessor (live Fastify, socket.io, router, database via the DI container). Triggers: `Application.isProduction`, `Application.environment`, `Application.runtimeStrategy`, `Application.uptime`, `Application.version`, `app.http`, `app.socket`, `app.database`, `app.router`; "branch on environment", "reach the live Fastify instance", "framework version in health endpoint", "dev vs production runtime check"; typical import `import { Application, app } from "@warlock.js/core"`. Skip: path helpers — `@warlock.js/core/resolve-path/SKILL.md`; connector start order — `@warlock.js/core/add-connector/SKILL.md`; competing patterns: bare `process.env.NODE_ENV`, ad-hoc Fastify imports.'
+description: 'Read app-wide context — the `Application` static class (env, version, uptime, runtime strategy, boot lifecycle) plus the `app` runtime accessor (live Fastify, socket.io, router, database via the DI container). Triggers: `Application.isProduction`, `Application.environment`, `Application.runtimeStrategy`, `Application.uptime`, `Application.version`, `Application.onceBooted`, `Application.whenBooted`, `Application.isBooted`, `Application.onShutdown`, `Application.isShuttingDown`, `app.http`, `app.socket`, `app.database`, `app.router`; "branch on environment", "reach the live Fastify instance", "framework version in health endpoint", "dev vs production runtime check", "run code once the app is fully booted", "after all connectors started", "app booted hook", "run cleanup before shutdown", "graceful shutdown hook"; typical import `import { Application, app } from "@warlock.js/core"`. Skip: path helpers — `@warlock.js/core/resolve-path/SKILL.md`; connector start order — `@warlock.js/core/add-connector/SKILL.md`; competing patterns: bare `process.env.NODE_ENV`, ad-hoc Fastify imports.'
 ---
 
 # Warlock — use the application context
@@ -74,6 +74,64 @@ Application.setRuntimeStrategy("production");
 The dev-server CLI command sets it to `"development"`. The `build` command and `start.production` set `"production"`. Use it inside connectors that need to behave differently in the bundled output — the built-in `HttpConnector` uses `router.scanDevServer()` in dev and `router.scan()` in production.
 
 Most app code shouldn't care about `runtimeStrategy` — branch on `environment` instead, which is the orthogonal "what world is this code talking to?" axis.
+
+## Lifecycle: boot & shutdown
+
+`Application.onceBooted(callback)` runs a callback the moment the app is fully booted — every connector in **both** phases is active and all app files (locales, events, main, routes) are loaded. It's the only hook that fires *after* the late phase (http, socket) is up.
+
+```ts
+import { Application } from "@warlock.js/core";
+
+Application.onceBooted(({ environment, runtimeStrategy, bootDurationMs }) => {
+  // http is listening, socket is bound, every model is registered
+});
+```
+
+Why a dedicated hook instead of code at the bottom of `main.ts`? **App files load before the late phase.** `main.ts`, `events.ts`, `routes.ts`, and locales are all imported *between* the early and late connector phases — so when `main.ts` runs, http/socket are not listening yet. `onceBooted` defers your callback until the whole sequence finishes, which makes it the safe place to touch `app.http` / `app.socket` from `main.ts`-level code.
+
+It's a **latch**, not a plain event listener: register before boot and it queues; register *after* boot and it fires on the next microtask. A late subscriber never silently misses the signal.
+
+```ts
+Application.isBooted;           // boolean — has boot finished?
+await Application.whenBooted(); // Promise<BootContext> — await instead of a callback
+```
+
+`whenBooted()` is the promise form, resolving with the same `BootContext` (`{ environment, runtimeStrategy, bootDurationMs? }`). `bootDurationMs` is set by the dev server (which times boot) and omitted by the production entry.
+
+The framework fires the latch for you — the dev server and the production bundle each call it once, right after the late phase. App code only ever *reads* it via `onceBooted` / `whenBooted` / `isBooted`; the internal `markBooted` is a framework entry point, not for application use.
+
+### Run something once everything is listening
+
+```ts title="src/app/main.ts"
+import { Application } from "@warlock.js/core";
+import { log } from "@warlock.js/logger";
+
+Application.onceBooted(({ environment, bootDurationMs }) => {
+  log.success("app", "booted", `ready in ${environment}`, { bootDurationMs });
+});
+```
+
+This is the right home for "warm a cache", "register a recurring job", "ping a readiness endpoint", or "open an outbound connection that needs the http server already listening" — anything that must wait for a complete boot.
+
+### Shutdown — clean up before the app goes down
+
+`Application.onShutdown(callback)` is the mirror of `onceBooted`: it runs your teardown **once**, when the process is shutting down (SIGINT/SIGTERM, or the dev server stopping) — and crucially **before** the connectors (db, cache, http) are torn down, so your cleanup can still use them.
+
+```ts title="src/app/main.ts"
+import { Application } from "@warlock.js/core";
+
+Application.onceBooted(() => {
+  const consumer = startQueueConsumer();
+
+  Application.onShutdown(async () => {
+    await consumer.stop(); // db / cache / http are still up here
+  });
+});
+```
+
+Hooks run **LIFO** (reverse of registration — last opened, first closed), each is awaited, and a throwing hook is caught + logged so it can't block the rest. `Application.isShuttingDown` flips `true` the moment shutdown begins — the built-in `/ready` endpoint reads it to report not-ready so a load balancer drains the instance first. Like `onceBooted`, registering after shutdown has begun runs the callback immediately.
+
+The framework triggers this for you (the connectors manager runs the hooks at the start of shutdown); app code only ever registers via `onShutdown`. For the HTTP-side story — `/health`, `/ready`, and graceful request draining — see `@warlock.js/core/health-checks/SKILL.md`.
 
 ## Paths
 
@@ -230,7 +288,9 @@ cors: {
 
 - **`version` is `null` until the first `await`.** The version loader is async (it reads `package.json`). On a cold start before any framework code has run `getWarlockVersion()`, `Application.version` returns `null`. The framework does load it during bootstrap, so anywhere downstream of bootstrap is fine — controllers, services, connectors after `start()`. CLI commands without `preload.bootstrap` may see `null`.
 - **`Application` is static, not a DI registration.** Don't try to inject it. There's nothing to inject — it's a class with only static members.
-- **`app.*` accessors return `undefined` before their connector boots — they don't throw.** `app.socket` / `app.database` / `app.http` are populated by their respective connectors during boot; until then each getter returns `undefined` (a bare `container.get(...)`). Reading them earlier (eager module-load code, the top level of a `main.ts` for the late-phase `http`/`socket`, certain CLI commands without the right `preload.connectors`) hands you `undefined`, and chaining off it throws. Safe everywhere downstream of bootstrap.
+- **`app.*` accessors return `undefined` before their connector boots — they don't throw.** `app.socket` / `app.database` / `app.http` are populated by their respective connectors during boot; until then each getter returns `undefined` (a bare `container.get(...)`). Reading them earlier (eager module-load code, the top level of a `main.ts` for the late-phase `http`/`socket`, certain CLI commands without the right `preload.connectors`) hands you `undefined`, and chaining off it throws. Safe everywhere downstream of bootstrap — including inside `Application.onceBooted(...)`.
+- **`onceBooted` is a latch, not `events.on`.** A callback registered *after* boot completed still runs (next microtask) instead of silently missing the signal — so register it wherever it reads best, including module top-level in `main.ts`. A listener that throws is caught and logged; it can't break boot or the other listeners.
+- **`onShutdown` runs before connectors close, not after.** That ordering is deliberate so cleanup can still use db/cache/http — but it means a hook that hangs delays connector teardown (bounded only by your process manager's kill timeout). Keep teardown fast; for HTTP draining the framework already bounds it via `http.gracefulShutdown.timeout`.
 
 ## See also
 

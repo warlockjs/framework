@@ -264,7 +264,7 @@ bootstrap();
       "",
       "// 3. Start early-phase connectors (database, cache, logger, ...)",
       "//    so data sources, cache, etc. are ready before app code runs",
-      'import { connectorsManager, ConnectorLifecyclePhase } from "@warlock.js/core";',
+      'import { Application, connectorsManager, ConnectorLifecyclePhase } from "@warlock.js/core";',
       "await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);",
     ];
 
@@ -294,6 +294,9 @@ bootstrap();
       "// 5. Start late-phase connectors (http, socket) â€” routes and",
       "//    listeners registered by app code are now ready to bind",
       "await connectorsManager.startPhase(ConnectorLifecyclePhase.Late);",
+      "",
+      "// 6. Signal a complete boot so `Application.onceBooted(...)` listeners fire",
+      "Application.markBooted({ environment: Application.environment, runtimeStrategy: Application.runtimeStrategy });",
       "connectorsManager.shutdownOnProcessKill();",
     );
 

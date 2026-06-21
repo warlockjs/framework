@@ -4,7 +4,22 @@ All notable changes to `@warlock.js/core` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
-## [Unreleased]
+## 4.4.0 - 2026-06-21
+
+### Added
+
+- `Application.onceBooted(cb)` — run a callback once the app is fully booted (fires immediately if already booted)
+- `Application.whenBooted()` — promise that resolves with the boot context when the app is fully booted
+- `Application.isBooted` — whether the app has finished booting
+- `Application.onShutdown(cb)` — run teardown once on shutdown, before connectors stop (mirror of `onceBooted`)
+- `Application.isShuttingDown` — whether shutdown has begun
+- built-in `/health` (liveness) and `/ready` (readiness) endpoints with a `health` check registry (`health.addCheck`)
+- graceful HTTP shutdown — drains in-flight requests on shutdown, bounded by `http.gracefulShutdown.timeout`
+- `http.health.*` config to toggle or rename the health endpoints
+
+### Fixed
+
+- connector shutdown no longer reverses the connector list in place (could corrupt order on a repeated shutdown)
 
 ## 4.3.0 - 2026-06-21
 

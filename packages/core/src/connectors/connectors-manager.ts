@@ -1,4 +1,5 @@
 import { colors } from "@mongez/copper";
+import { Application } from "../application";
 import { devServeLog } from "../dev-server/dev-logger";
 import { AccessConnector } from "./access-connector";
 import { CacheConnector } from "./cache-connector";
@@ -106,8 +107,14 @@ export class ConnectorsManager {
    * Shutdown all connectors
    */
   public async shutdown(): Promise<void> {
-    // shut down connectors in reverse order
-    for (const connector of this.connectors.reverse()) {
+    // App-owned teardown runs first, while every connector (db, cache, http) is
+    // still up, so cleanup hooks can use them. Idempotent + error-isolated.
+    await Application.runShutdownHooks();
+
+    // Shut down connectors in reverse priority order. Copy the list first —
+    // `reverse()` mutates in place, so reversing the live array would corrupt
+    // the order on a second shutdown pass.
+    for (const connector of [...this.connectors].reverse()) {
       try {
         await connector.shutdown();
       } catch (error) {

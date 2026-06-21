@@ -5,6 +5,7 @@
  */
 
 import { ConnectorName } from "../connectors";
+import type { RuntimeStrategy } from "../utils/environment";
 
 /**
  * Indicates the origin/source of a CLI command.
@@ -80,7 +81,7 @@ export type CLICommandPreload = {
   /**
    * Set runtime strategy
    */
-  runtimeStrategy?: "production" | "development";
+  runtimeStrategy?: RuntimeStrategy;
 
   /**
    * Override current detect environment

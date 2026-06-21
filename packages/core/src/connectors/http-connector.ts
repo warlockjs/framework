@@ -3,8 +3,9 @@ import { colors } from "@mongez/copper";
 import { log } from "@warlock.js/logger";
 import { Application } from "../application";
 import { devLogError } from "../dev-server/dev-logger";
+import { health } from "../http/health";
 import { registerHttpPlugins } from "../http/plugins";
-import { FastifyInstance, getHttpServer, startHttpServer } from "../http/server";
+import { closeServerWithTimeout, FastifyInstance, getHttpServer, startHttpServer } from "../http/server";
 import { router } from "../router/router";
 import { Environment } from "../utils";
 import { setBaseUrl } from "../utils/urls";
@@ -24,6 +25,12 @@ function environmentColor(environment: Environment) {
       return colors.white(environment);
   }
 }
+
+/**
+ * Default time to wait for in-flight requests to drain on shutdown before the
+ * HTTP server is force-closed. Override via `http.gracefulShutdown.timeout`.
+ */
+const DEFAULT_SHUTDOWN_TIMEOUT = 10_000;
 
 /**
  * HTTP Connector
@@ -73,6 +80,44 @@ export class HttpConnector extends BaseConnector {
 
     // update base url
     setBaseUrl(baseUrl);
+
+    // Liveness/readiness endpoints — registered on Fastify before start() scans
+    // the app router, so they exist by the time the server listens.
+    this.registerHealthRoutes();
+  }
+
+  /**
+   * Register the built-in liveness (`/health`) and readiness (`/ready`)
+   * endpoints directly on the Fastify instance — infra routes, kept off the app
+   * router so they're immune to HMR and never collide with route scanning. Opt
+   * out via `http.health.enabled = false`; rename via `http.health.path` /
+   * `http.health.readinessPath`.
+   */
+  private registerHealthRoutes(): void {
+    if (!this.http) {
+      return;
+    }
+
+    const healthConfig = config.get("http.health");
+
+    if (healthConfig?.enabled === false) {
+      return;
+    }
+
+    const livenessPath = healthConfig?.path ?? "/health";
+    const readinessPath = healthConfig?.readinessPath ?? "/ready";
+
+    this.http.get(livenessPath, async (_request, reply) => {
+      const result = health.liveness();
+
+      return reply.code(result.status === "ok" ? 200 : 503).send(result);
+    });
+
+    this.http.get(readinessPath, async (_request, reply) => {
+      const result = await health.readiness();
+
+      return reply.code(result.status === "ok" ? 200 : 503).send(result);
+    });
   }
 
   /**
@@ -138,7 +183,18 @@ export class HttpConnector extends BaseConnector {
 
     const server = getHttpServer();
 
-    server?.close();
+    if (server) {
+      const timeout = config.get("http.gracefulShutdown.timeout", DEFAULT_SHUTDOWN_TIMEOUT);
+      const drained = await closeServerWithTimeout(server, timeout);
+
+      if (!drained) {
+        log.warn(
+          "http",
+          "shutdown",
+          `In-flight requests did not drain within ${timeout}ms; closing anyway`,
+        );
+      }
+    }
 
     this.active = false;
   }

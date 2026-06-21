@@ -263,6 +263,51 @@ export interface HttpConfigurations {
     retryAfter?: number;
   };
   /**
+   * Graceful shutdown behaviour for the HTTP server.
+   */
+  gracefulShutdown?: {
+    /**
+     * Milliseconds to wait for in-flight requests to drain on shutdown before
+     * the server is force-closed.
+     *
+     * @default 10000
+     */
+    timeout?: number;
+    /**
+     * How Fastify treats open connections on close: `"idle"` closes idle
+     * keep-alive connections and lets active requests finish, `true`
+     * force-closes everything, `false` waits for every connection.
+     *
+     * @default "idle"
+     */
+    forceCloseConnections?: boolean | "idle";
+  };
+  /**
+   * Built-in liveness (`/health`) and readiness (`/ready`) endpoints.
+   */
+  health?: {
+    /**
+     * Toggle the built-in health endpoints.
+     *
+     * @default true
+     */
+    enabled?: boolean;
+    /**
+     * Liveness endpoint path — 200 while the process is up, 503 once shutdown
+     * has begun.
+     *
+     * @default "/health"
+     */
+    path?: string;
+    /**
+     * Readiness endpoint path — 200 once booted with all checks passing, 503
+     * before boot, during shutdown, or on any failing check.
+     *
+     * @default "/ready"
+     */
+    readinessPath?: string;
+  };
+  /**
    * Host
    */
   host?: string;
