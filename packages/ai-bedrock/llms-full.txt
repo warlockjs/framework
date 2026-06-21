@@ -1,0 +1,196 @@
+# Warlock AI Bedrock — full skills
+
+> Package: `@warlock.js/ai-bedrock`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-bedrock/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## setup-bedrock  `@warlock.js/ai-bedrock/setup-bedrock/SKILL.md`
+
+---
+name: setup-bedrock
+description: 'Wire @warlock.js/ai-bedrock — new BedrockSDK({region, credentials?, provider?}) for AWS Bedrock Converse API + Titan embeddings. AWS credential chain (no apiKey). .model({name, vision?, reasoning?, promptCaching?, pdf?, audio?}) with cost-truth capabilities inferred per family, extended thinking via options.reasoning → Converse thinking budget_tokens, prompt caching via options.cacheControl → cachePoint, usage cachedTokens/cacheWriteTokens. Triggers: `BedrockSDK`, `bedrock.model`, `bedrock.embedder`, `bedrock.count`, `BedrockRuntimeClient`, `reasoning`, `thinking`, `budget_tokens`, `cachePoint`, `cacheControl`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`; "how do I use AWS Bedrock", "wire Claude/Nova/Llama on Bedrock", "Titan embeddings", "Bedrock Converse API", "Claude 3.7/4 extended thinking on Bedrock", "Bedrock prompt caching cost"; typical import `import { BedrockSDK } from "@warlock.js/ai-bedrock"`. Skip: agent wiring — `@warlock.js/ai/run-ai-agent/SKILL.md`; provider choice — `@warlock.js/ai/pick-ai-provider/SKILL.md`; embeddings concepts — `@warlock.js/ai/embed-text/SKILL.md`; competing libs `@aws-sdk/client-bedrock-runtime`, `@ai-sdk/amazon-bedrock`; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`.'
+---
+
+# `@warlock.js/ai-bedrock`
+
+Provider adapter that turns AWS Bedrock's **Converse API** into a vendor-neutral `ModelContract`, plus an Amazon **Titan** embedder. One wire mapping covers every Bedrock family.
+
+## Construction
+
+```ts
+import { BedrockSDK } from "@warlock.js/ai-bedrock";
+
+// Ambient AWS credential chain (env vars / SSO / IAM role):
+const bedrock = new BedrockSDK({ region: "us-east-1" });
+
+// Explicit static credentials:
+const bedrock2 = new BedrockSDK({
+  region: "us-east-1",
+  credentials: { accessKeyId: "AKIA...", secretAccessKey: "..." },
+  provider: "bedrock-eu",
+});
+```
+
+Bedrock authenticates via the **AWS credential chain, not an API key** — there is no `apiKey`. `region` is required; `credentials` is optional (omit to use the standard provider chain). The whole config object is forwarded to `BedrockRuntimeClient`, so any AWS client option (`endpoint`, `requestHandler`, retry config) is accepted. `provider` defaults to `"bedrock"`.
+
+## Producing a model
+
+`name` is the Bedrock **model id or inference-profile id**:
+
+```ts
+bedrock.model({ name: "anthropic.claude-sonnet-4-5-20250929-v1:0" })
+bedrock.model({ name: "us.amazon.nova-pro-v1:0", temperature: 0.2 })
+bedrock.model({ name: "meta.llama3-1-8b-instruct-v1:0", maxTokens: 1024 })
+```
+
+Uses the model-agnostic **Converse / ConverseStream** API — one wire mapping covers every Bedrock family (Claude, Nova, Llama, Mistral, Cohere) instead of per-family `InvokeModel` body shapes.
+
+## Capabilities — what's auto-set
+
+| Flag | Default |
+| --- | --- |
+| `structuredOutput` | `true` (via Converse `outputConfig.textFormat`) |
+| `vision` | Inferred from model id substring. `true` for Claude 3/3.5/3.7/4, Nova Lite/Pro/Premier, Llama 3.2-11B/90B, Llama 4. |
+| `reasoning` | Inferred from model id. `true` for Claude 3.7 + Claude 4 (Sonnet/Opus/Haiku) — they expose a configurable thinking budget on Converse. |
+| `promptCaching` | Inferred from model id. `true` for Claude 3.5+/3.7/4 and Nova Micro/Lite/Pro/Premier — the families that honor Converse `cachePoint`. |
+| `pdf` | Inferred from model id. `true` for Claude 3+ and Nova Lite/Pro/Premier (Converse `document` blocks). |
+| `audio` | `false` by default — Converse does not accept audio blocks for the families this adapter targets. Pass `audio: true` for a confirmed audio model. |
+
+Explicit config always wins — every flag is overridable per model, e.g. `bedrock.model({ name, reasoning: false, promptCaching: true, pdf: false, audio: true })`.
+
+## Reasoning / extended thinking
+
+For a `reasoning`-capable model (Claude 3.7 / 4), `ModelCallOptions.reasoning` maps to Converse's escape hatch `additionalModelRequestFields.thinking = { type: "enabled", budget_tokens }`:
+
+```ts
+// Explicit thinking budget (token cap):
+await model.complete(messages, { reasoning: { maxTokens: 2048 } });
+
+// Effort tier → conventional budget (low 1024 / medium 4096 / high 16384):
+await model.complete(messages, { reasoning: { effort: "high" } });
+```
+
+`maxTokens` wins over `effort` when both are set. For non-reasoning models — or when neither `effort` nor `maxTokens` is given — the option is a no-op, so unsupported params never reach the wire. Bedrock's Converse `TokenUsage` reports no reasoning-token channel, so `usage.reasoningTokens` is left unset (reasoning text arrives as `reasoningContent` content blocks, not a token count).
+
+## Prompt caching
+
+For a `promptCaching`-capable model, `ModelCallOptions.cacheControl.breakpoints` (any positive value) appends one Converse `cachePoint: { type: "default" }` block to the LAST message — Bedrock then caches the whole prefix up to that point:
+
+```ts
+await model.complete(messages, { cacheControl: { breakpoints: 1 } });
+```
+
+Earlier turns are untouched; only the trailing message is marked. No-ops gracefully when the model is not caching-capable or no breakpoint was requested. Read-side accounting works without any breakpoint — see the usage section below.
+
+## System prompt
+
+Converse has no `"system"` role in `messages`. The adapter hoists every neutral `role: "system"` message into the separate `system: SystemContentBlock[]` request field. Transparent to the agent.
+
+## Tool calls
+
+- Outgoing: neutral tools → `toolConfig.tools[].toolSpec` with a JSON `inputSchema`. No tools → `toolConfig` omitted entirely (Bedrock rejects an empty `tools` array).
+- Assistant tool calls in history → `assistant` message with optional leading `{ text }` + one `{ toolUse }` block per call.
+- Tool results (`role: "tool"`) → a `user` turn with one `{ toolResult: { toolUseId, content: [{ text }] } }` block.
+- Response `toolUse` blocks → neutral `toolCalls`; `stopReason: "tool_use"` → `finishReason: "tool_calls"`.
+
+## Structured output
+
+Object-root `responseSchema` + `structuredOutput`-capable → `outputConfig.textFormat = { type: "json_schema", structure: { jsonSchema: { name, schema } } }` — note Bedrock wants the schema as a **stringified JSON document**.
+
+## Multipart messages (vision)
+
+- `{ type: "text" }` → `{ text }`
+- `{ type: "image", source: { base64, mediaType } }` → `{ image: { format, source: { bytes } } }` (base64 decoded; media type → `jpeg`/`png`/`gif`/`webp`)
+- `{ type: "image", source: { url } }` → **throws `InvalidRequestError`**. Bedrock's `ImageSource` only accepts raw bytes or an S3 location. Resolve images to base64 first.
+
+## Streaming
+
+`model.stream()` drains `ConverseStreamCommand`'s `response.stream`:
+
+- `contentBlockDelta.delta.text` → `{ type: "delta", content }`
+- `toolUse`: `contentBlockStart` opens an accumulator, `contentBlockDelta.delta.toolUse.input` fragments append, `contentBlockStop` emits one consolidated `{ type: "tool-call", ... }`
+- terminal `{ type: "done", finishReason, usage }` — usage from `metadata.usage` (a `TokenUsage`), including `cachedTokens` / `cacheWriteTokens` when reported (see the usage table below)
+
+## Finish-reason mapping
+
+`end_turn` / `stop_sequence` → `stop` · `max_tokens` → `length` · `tool_use` → `tool_calls` · `content_filtered` / `guardrail_intervened` / unknown / null → `error`.
+
+## Embeddings — Amazon Titan only
+
+```ts
+const embedder = bedrock.embedder({ name: "amazon.titan-embed-text-v2:0" });
+const { vector } = await embedder.embed("Hello world");
+const { vectors } = await embedder.embedMany(["a", "b"]);   // N sequential calls
+```
+
+Targets the **Titan Text Embeddings** family via `InvokeModel`. **Titan has no batch endpoint** — `embedMany` issues one request per input sequentially and aggregates token usage. Cohere-on-Bedrock batch embeddings use an incompatible body shape and are out of scope — use the OpenAI adapter when batch throughput matters.
+
+Pass `dimensions` to forward Titan v2's truncation hint (256 / 512 / 1024).
+
+## Errors
+
+Raw AWS SDK exceptions are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy. Dispatch keys on the Smithy exception `name`:
+
+- `AccessDeniedException` / 401 / 403 → `ProviderAuthError`
+- `ThrottlingException` / 429 → `ProviderRateLimitError`
+- `ServiceQuotaExceededException` → `QuotaExceededError`
+- `ValidationException` with "too long / context window" → `ContextLengthExceededError`, else `InvalidRequestError`
+- `ModelTimeoutException` / `ETIMEDOUT` → `ProviderTimeoutError`
+- 5xx / `ModelError` / `ServiceUnavailable` → `ProviderError`
+
+## Token counting
+
+```ts
+await bedrock.count("some text")  // approximate heuristic, offline
+```
+
+Per-model tokenizers differ across Bedrock families.
+
+## Pricing — per-model registry
+
+`pricing` is an optional **registry keyed by Bedrock model id** — one entry per model, all rates in **USD per 1,000,000 tokens** (`ModelPricing`: `input`, `output`, optional `cachedInput` / `cachedOutput`). Set it on the SDK so every model it produces inherits the rates:
+
+```ts
+const bedrock = new BedrockSDK({
+  region: "us-east-1",
+  pricing: {
+    // USD per 1M tokens. Key = exact Bedrock model id / inference-profile id.
+    "anthropic.claude-sonnet-4-5-20250929-v1:0": { input: 3, output: 15 },
+    "us.amazon.nova-pro-v1:0":                    { input: 0.8, output: 3.2 },
+  },
+});
+
+const { usage } = await ai.agent({ model: bedrock.model({ name: "us.amazon.nova-pro-v1:0" }) }).execute("hi");
+usage.cost;  // per-channel USD breakdown of THIS run, computed from tokens × pricing[model]
+```
+
+Resolution at `model()` time: per-model `pricing` (`bedrock.model({ name, pricing })`) > SDK registry > `undefined` (no cost computed). When the same model id appears under a cross-region inference profile, list each id you actually invoke (`us.`, `eu.`, `apac.` prefixes are distinct keys). See [`@warlock.js/ai/pick-ai-provider/SKILL.md`](@warlock.js/ai/pick-ai-provider/SKILL.md).
+
+### Tokens & usage — cost truth
+
+Both `complete()` and `stream()` normalize Converse's `TokenUsage` into the neutral `Usage` shape:
+
+| Converse `TokenUsage` field | Neutral `Usage` field | Notes |
+| --- | --- | --- |
+| `inputTokens` | `usage.input` | Includes cached read tokens. |
+| `outputTokens` | `usage.output` | |
+| `totalTokens` | `usage.total` | Falls back to `input + output` when absent. |
+| `cacheReadInputTokens` | `usage.cachedTokens` | Only when `> 0`. Cache-hit reads — price at `pricing.cachedInput`. |
+| `cacheWriteInputTokens` | `usage.cacheWriteTokens` | Only when `> 0`. One-time cache write — price at `pricing.cachedOutput`. |
+| — | `usage.reasoningTokens` | **Never set** — Converse exposes no reasoning-token count. |
+
+Set `cachedInput` / `cachedOutput` in `ModelPricing` to have cache reads/writes billed at their distinct rates. Read-side accounting (`cachedTokens` / `cacheWriteTokens`) is populated whenever Bedrock reports it, independent of whether you sent a `cacheControl` breakpoint.
+
+## When NOT to use this skill
+
+- Direct `@aws-sdk/client-bedrock-runtime` calls without going through `@warlock.js/ai` agents.
+- OpenAI / Anthropic-direct / Gemini / Ollama models — those have their own adapter packages.
+- Batch embeddings throughput — Titan is single-input upstream; use the OpenAI / Google / Ollama adapter (those batch natively).
+
+## See also
+
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md)
+- [`@warlock.js/ai/pick-ai-provider/SKILL.md`](@warlock.js/ai/pick-ai-provider/SKILL.md)
+- [`@warlock.js/ai/embed-text/SKILL.md`](@warlock.js/ai/embed-text/SKILL.md)
+
+

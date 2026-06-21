@@ -1,0 +1,39 @@
+{
+  "name": "@warlock.js/ai-bedrock",
+  "version": "4.2.11",
+  "type": "module",
+  "description": "AWS Bedrock adapter for @warlock.js/ai",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "typings": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "warlock",
+    "ai",
+    "bedrock",
+    "aws"
+  ],
+  "author": "Hasan Zohdy",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warlockjs/ai-bedrock"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^4.1.4"
+  },
+  "peerDependencies": {
+    "@warlock.js/ai": "*"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1048.0",
+    "@warlock.js/logger": "*"
+  }
+}
