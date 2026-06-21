@@ -26,6 +26,7 @@ Documentation: https://warlock.js.org
 - [@warlock.js/ai-google](https://warlock.js.org/v/latest/ai/providers/google/): Google Gemini adapter for @warlock.js/ai
 - [@warlock.js/ai-bedrock](https://warlock.js.org/v/latest/ai/providers/bedrock/): AWS Bedrock adapter for @warlock.js/ai
 - [@warlock.js/ai-ollama](https://warlock.js.org/v/latest/ai/providers/ollama/): Ollama adapter for @warlock.js/ai
+- [@warlock.js/ai-panoptic](https://warlock.js.org/v/latest/ai/observability/ai-panoptic/): Observability collector + exporters for @warlock.js/ai
 - [create-warlock](https://warlock.js.org/v/latest/create-warlock/): Project scaffolder for the Warlock.js framework — interactive wizard and non-interactive CLI for creating new apps.
 
 ## Full text

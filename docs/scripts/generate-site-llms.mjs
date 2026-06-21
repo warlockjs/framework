@@ -40,6 +40,7 @@ const PACKAGES = [
   "ai-google",
   "ai-bedrock",
   "ai-ollama",
+  "ai-panoptic",
   "create-warlock",
 ];
 
@@ -56,6 +57,12 @@ function readDescription(llms) {
 
 /** Map a package name to its docs landing URL on the site. */
 function docUrl(pkg) {
+  // ai-panoptic is an observability companion, not a provider adapter — it
+  // lives under the AI Observability section rather than providers/.
+  if (pkg === "ai-panoptic") {
+    return `${SITE}/v/latest/ai/observability/ai-panoptic/`;
+  }
+
   if (pkg.startsWith("ai-")) {
     return `${SITE}/v/latest/ai/providers/${pkg.replace("ai-", "")}/`;
   }

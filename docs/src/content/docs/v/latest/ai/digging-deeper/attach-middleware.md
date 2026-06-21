@@ -2,7 +2,7 @@
 title: "Attach middleware"
 description: Built-in middleware (budget, guardrail, semanticCache) plus authoring your own. Ordering invariants you must follow.
 sidebar:
-  order: 3
+  order: 4
   label: "Attach middleware"
 ---
 

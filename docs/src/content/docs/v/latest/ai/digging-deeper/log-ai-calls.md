@@ -2,7 +2,7 @@
 title: "Log AI calls"
 description: Framework logging is delegated to @warlock.js/logger — configure channels once at boot, every primitive emits through it.
 sidebar:
-  order: 5
+  order: 6
   label: "Log AI calls"
 ---
 

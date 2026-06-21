@@ -26,7 +26,20 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | `ai.workflow(config)` | `<TIn, TOut, TState>(config) => WorkflowInstance` | [Run workflow](../digging-deeper/run-workflow) |
 | `ai.step(config)` | `<TIn, TState>(config) => StepDefinition` | [Run workflow](../digging-deeper/run-workflow) |
 | `ai.supervisor(config)` | `<TOutput>(config) => SupervisorContract` | [Run supervisor](../digging-deeper/run-supervisor) |
+| `ai.orchestrator(config)` | `<TOutput, TState>(config) => OrchestratorContract` | [Run orchestrator](../digging-deeper/run-orchestrator) |
+| `ai.planner(config)` | `<TOutput>(config) => PlannerContract` | [Planner](../architecture-concepts/planner) |
+| `ai.spawnSubAgent(spec)` | `<TOutput>(spec) => Promise<AgentResult<T>>` | [Spawn sub-agent](../the-basics/spawn-sub-agent) |
+| `ai.memory(config)` | `(config) => MemoryContract` | [Memory](../architecture-concepts/memory) |
+| `ai.router(config)` | `(config) => AgentContract` (generated routing agent) | [Run supervisor](../digging-deeper/run-supervisor) |
+| `ai.fanOut(unit, n, opts?)` | spread one unit into N keyed intents | [Run supervisor](../digging-deeper/run-supervisor) |
+| `ai.batch(exec, items, opts?)` | run an executable over a dataset, bounded concurrency | [Run agent](../the-basics/run-agent) |
+| `ai.fallbackModel(models, opts?)` | ordered model list with failover | [Run agent](../the-basics/run-agent) |
+| `ai.eval.{exact,contains,predicate,judge}` | built-in `agent.eval()` scorers | [Run agent](../the-basics/run-agent) |
+| `ai.mockRouter(decisions, opts?)` | canned routing decisions for tests | [Run supervisor](../digging-deeper/run-supervisor) |
 | `ai.config(partial)` | `(partial: Partial<AIConfig>) => AIConfig` | [Persist AI data](../digging-deeper/persist-ai-data) |
+| `ai.checkpoint.{memory,pg,redis}()` | orchestrator session checkpoint stores | [Run orchestrator](../digging-deeper/run-orchestrator) |
+| `ai.snapshot.{memory,pg,redis}()` | workflow / supervisor / orchestrator snapshot stores | [Persist AI data](../digging-deeper/persist-ai-data) |
+| `ai.systemPrompt.fromFile(path)` | seed a system prompt from a file | [Run agent](../the-basics/run-agent) |
 | `ai.middleware.budget(opts)` | budget cap middleware | [Attach middleware](../digging-deeper/attach-middleware) |
 | `ai.middleware.guardrail(opts)` | pre/post check middleware | [Attach middleware](../digging-deeper/attach-middleware) |
 | `ai.middleware.semanticCache(opts)` | two-tier cache middleware | [Attach middleware](../digging-deeper/attach-middleware) |
@@ -74,6 +87,71 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | `SupervisorSnapshot` | Persisted shape. |
 | `END` | Sentinel value to terminate routing. |
 
+## Orchestrators
+
+| Export | What it is |
+| --- | --- |
+| `OrchestratorContract<TOutput, TState>` | Returned by `ai.orchestrator`. `.execute()`, `.stream()`, `.resume()`, `.command()`, `.asTool()`, `.on()`, `.off()`, `.name`, `.signature`, `.version`. |
+| `OrchestratorConfig<TOutput, TState, TIntents>` | Config for `ai.orchestrator` — supervisor surface + session lifecycle. |
+| `OrchestratorResult<TOutput>` | Per-turn envelope — `{ type, data?, sessionId, turnIndex, compaction?, report, usage, error? }`. |
+| `OrchestratorReport` | Session-scoped turn report — `turns[]`, `turnIndex`, `signature`, `status` (incl. `"awaiting-input"`). |
+| `OrchestratorExecuteOptions<TState>` | Per-call options — `sessionId` (required), `history` (required), `state?`, `context?`, `signal?`, `on?`, `force?`. |
+| `OrchestratorResumeOptions` | Options for `resume()` — `context?`, `signal?`, `on?`, `force?`. |
+| `OrchestratorCommands` | Typed command map for `command()`; ships `compact`, open for module augmentation. |
+| `OrchestratorAsToolOptions<TToolInput>` | `asTool()` options — adds `sessionScope: "fresh" | "shared"`. |
+| `OrchestratorEvent` / `OrchestratorEventMap` / `OrchestratorEventHandlers` | The `orchestrator.*` event surface (3-tier). |
+| `CompactionResult` | `{ summary, replacesFromIndex, replacesToIndex }`. |
+| `SummarizeConfig` / `SummarizeCallback` | `summarize` policy shapes. |
+| `OrchestratorMemoryConfig` | The orchestrator's `memory` object form. |
+
+## Planner
+
+| Export | What it is |
+| --- | --- |
+| `PlannerContract<TOutput>` | Returned by `ai.planner`. Implements `ExecutableContract`. `.execute(goal, opts?)`, `.name`, `.signature`. |
+| `PlannerConfig<TOutput>` | Config — `model` XOR `planner`, `capabilities`, `maxSteps?`, `output?`. |
+| `PlannerCapability` | `{ name, description, executable }` — a unit the plan may reference. |
+| `PlannerResult<TOutput>` | Envelope — `{ type: "planner", data?, report, usage, error? }`. |
+| `PlannerReport` | `{ type, signature, plan?, executedSteps[], children[] }`. |
+| `PlannerStep` / `PlannerPlan` / `PlannerStepSnapshot` | Plan + per-step records. |
+| `PlannerExecuteOptions<TOutput>` | Per-call — `runId?`, `placeholders?`, `output?`, `signal?`, `sessionId?`. |
+| `SpawnSubAgentSpec<TOutput>` | Spec for `ai.spawnSubAgent` — `{ name, model, task, systemPrompt?, tools?, maxTrips?, budget?, output?, ... }`. |
+
+## Memory
+
+| Export | What it is |
+| --- | --- |
+| `MemoryContract` | Returned by `ai.memory`. `.remember()`, `.recall()`, `.clear()`, `.name`. |
+| `MemoryConfig` | Config — `working?`, `semantic?`, `defaultTier?`, `k?`, `threshold?`. |
+| `SemanticMemoryConfig` | `{ embedder, store?, namespace? }`. |
+| `MemoryItem` | `{ text, tier?, id?, metadata? }`. |
+| `MemoryTier` | `"working" | "semantic"` (episodic/procedural deferred to 4.4). |
+| `RecalledMemory` | `{ id, text, tier, score, metadata? }`. |
+| `RecallOptions` | `{ k?, tier?, threshold? }`. |
+
+## Batch + eval
+
+| Export | What it is |
+| --- | --- |
+| `BatchResult<TResult>` | `{ type: "batch", data[], items[], usage, report }`. |
+| `BatchItemResult<TResult>` | `{ index, status, result?, error?, attempts }`. |
+| `BatchOptions<TResult>` | `{ concurrency?, retry?, onItem?, signal?, sessionId?, name? }`. |
+| `BatchReport` | Per-item rollup — `{ total, succeeded, failed, cancelled }`. |
+| `EvalReport<T>` / `EvalCase` / `EvalScore` / `EvalScorer` / `EvalJudge` / `EvalOptions` / `EvalCaseResult` | `agent.eval()` surface. |
+| `registerAiMatchers()` | Vitest matchers `toRouteTo` / `toConverge` / `toPassStep` / `toOutputShape`. |
+| `matchRouteTo` / `matchConverge` / `matchPassStep` / `matchOutputShape` | Library-agnostic verdict functions; `MatcherVerdict`, `AiMatchers` types. |
+
+## Persistence stores
+
+| Export | What it is |
+| --- | --- |
+| `CheckpointStore` / `CheckpointRecord` | Orchestrator session-state store + row shape. `ai.checkpoint.{memory,pg,redis}()`. |
+| `SnapshotStore<TSnapshot>` | Workflow / supervisor / orchestrator run-snapshot store. `ai.snapshot.{memory,pg,redis}()`. `load` / `save` / `delete` / `list?` / `schema`. |
+| `PgClientLike` / `RedisClientLike` | Minimal `pg` / `redis` client surfaces the stores depend on (you pass the client in). |
+| `PgCheckpointOptions` / `RedisCheckpointOptions` | `ai.checkpoint.pg` / `.redis` options. |
+| `PgSnapshotStoreOptions` / `RedisSnapshotStoreOptions` | `ai.snapshot.pg` / `.redis` options. |
+| `FallbackModelContract` | Returned by `ai.fallbackModel(models, opts?)`. |
+
 ## Tools
 
 | Export | What it is |
@@ -108,10 +186,12 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | --- | --- |
 | `SDKAdapterContract` | Interface every provider adapter implements — `model()`, `embedder?()`. |
 | `ModelContract` | Returned by `sdk.model({...})`. Owns `complete`, `stream`, `capabilities`, `pricing`. |
-| `ModelCallOptions` | Per-call options forwarded to the model (`temperature`, `maxTokens`, etc.). |
+| `ModelCapabilities` | `{ structuredOutput?, vision?, reasoning?, promptCaching?, audio?, ... }` — feature flags the agent reads before forwarding options. |
+| `ModelCallOptions` | Per-call options forwarded to the model — `temperature`, `maxTokens`, plus `reasoning?: { effort?, maxTokens? }` and `cacheControl?: { breakpoints? }`. |
+| `ReasoningEffort` | `"low" | "medium" | "high"`. |
 | `ModelResponse` | Shape returned by `model.complete`. |
-| `ModelPricing` | `{ input, output, cachedInput?, cachedOutput? }` — USD per 1M tokens. |
-| `Usage` | `{ input, output, total, cost? }`. |
+| `ModelPricing` | `{ input, output, cachedInput?, cachedOutput?, reasoning? }` — USD per 1M tokens, per channel. |
+| `Usage` | `{ input, output, total, cachedTokens?, cacheWriteTokens?, reasoningTokens?, cost? }`. |
 | `CostBreakdown` | `{ input, output, cachedInput?, cachedOutput? }` — USD. |
 
 ## Middleware
@@ -151,12 +231,19 @@ All extend `AIError`. Stable `code` strings listed in [Handle errors](../digging
 | `GuardrailViolationError` | `GUARDRAIL_VIOLATION` | `guardrail` |
 | `SupervisorDriftError` | `SUPERVISOR_DRIFT` | `drift` |
 | `MaxIterationsError` | `SUPERVISOR_MAX_ITERATIONS` | `max-iterations` |
+| `OrchestratorFailedError` | `ORCHESTRATOR_FAILED` | varies |
+| `OrchestratorDriftError` | `ORCHESTRATOR_DRIFT` | `drift` |
+| `OrchestratorConfigError` | `ORCHESTRATOR_CONFIG` | `validation` |
+| `OrchestratorCancelledError` | `ORCHESTRATOR_CANCELLED` | `cancelled` |
+| `PlannerFailedError` | `PLANNER_FAILED` | varies |
+| `PlannerPlanInvalidError` | `PLANNER_PLAN_INVALID` | `schema` |
+| `PlannerCancelledError` | `PLANNER_CANCELLED` | `cancelled` |
 
 ## Configuration
 
 | Export | What it is |
 | --- | --- |
-| `AIConfig` | `{ defaultStore? }` — process-wide config. |
+| `AIConfig` | `{ defaultStore?, defaultCheckpointStore?, defaultSnapshotStore? }` — process-wide config. `defaultStore` is the **cache** driver (semanticCache + memory vector store); `defaultSnapshotStore` / `defaultCheckpointStore` are the snapshot / checkpoint stores. |
 | `ai.config(partial)` | Merge into the process-wide config. |
 
 ## Reports — shared shapes

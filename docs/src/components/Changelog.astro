@@ -262,6 +262,7 @@ const hasContent = releases.length > 0;
     --cl-removed: #f85149;
     --cl-security: #bc8cff;
     --cl-new: #c66bff;
+    --cl-breaking: #f85149;
 
     max-width: 50rem;
     margin-inline: auto;
@@ -456,6 +457,7 @@ const hasContent = releases.length > 0;
   .cl-rel-summary :global(strong) { color: var(--sl-color-white); font-weight: 600; }
 
   /* Per-type colours, set on each line / count via [data-type]. */
+  [data-type="⚠ BREAKING"] { --_c: var(--cl-breaking); }
   [data-type="New"] { --_c: var(--cl-new); }
   [data-type="Added"] { --_c: var(--cl-added); }
   [data-type="Changed"] { --_c: var(--cl-changed); }

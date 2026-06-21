@@ -18,7 +18,7 @@ This page is the mental model. For the API surface see [Run workflow](../digging
 - **Branch on intermediate results** — `nextStep` reads completed step outputs.
 - **Run children in parallel** when they're independent.
 
-Reach for a supervisor when the *shape* changes per call. Reach for an orchestrator (v2) when the *session* matters across runs.
+Reach for a supervisor when the *shape* changes per call. Reach for an [orchestrator](./orchestrators) when the *session* matters across runs.
 
 ## The step lifecycle
 
@@ -115,7 +115,7 @@ Exponential defaults: 500ms → 1s → 2s → 4s → 8s, capped at 30s. `AbortEr
 
 ## Snapshot resume
 
-After every step settles, the workflow checkpoints to its `snapshotStore` (or the global `ai.config({ defaultStore })`). On resume:
+After every step settles, the workflow checkpoints to its `snapshotStore` (a `SnapshotStore` from `ai.snapshot.{memory,pg,redis}()`, or the global `ai.config({ defaultSnapshotStore })`). On resume:
 
 1. Read the snapshot for `runId`.
 2. Compute the current signature from the workflow definition.
@@ -140,13 +140,15 @@ type WorkflowResult<TOutput> = {
 
 ## When a workflow isn't the right shape
 
-- **Unknown shape at author time** — wait for `ai.planner()` (v3), or model it as a supervisor where the router decides.
+- **Unknown shape at author time** — reach for [`ai.planner()`](./planner) (LLM generates the plan over your capabilities), or model it as a supervisor where the router decides.
 - **Quality loop until goal met** — use `ai.supervisor()` with `evaluate`.
-- **Multi-turn conversation with persistent session** — orchestrator (v2). For now, model as supervisor + history.
+- **Multi-turn conversation with persistent session** — [`ai.orchestrator()`](./orchestrators).
 - **Iterate a runtime list of items** — wrap a workflow with `ai.batch()` utility.
 
 ## Related
 
 - [Run workflow](../digging-deeper/run-workflow) — the API surface.
 - [Supervisors](./supervisors) — the next rung up.
+- [Orchestrators](./orchestrators) — stateful sessions across runs.
+- [Planner](./planner) — generate-then-execute over capabilities.
 - [Persist AI data](../digging-deeper/persist-ai-data) — snapshot resume + drift handling.

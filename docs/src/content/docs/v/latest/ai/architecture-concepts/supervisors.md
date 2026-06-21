@@ -158,10 +158,13 @@ Signature drift detection throws `SupervisorDriftError` on shape mismatch. `forc
 
 - **Fixed pipeline** — `ai.workflow()`. Faster, cheaper, more deterministic.
 - **One specialist** — `ai.agent()` with tools. A supervisor with one intent is wasted complexity.
-- **Long-running conversation** — orchestrator (v2). For now, persist your own history and feed it via `history` option.
+- **Long-running conversation** — [`ai.orchestrator()`](./orchestrators) wraps a supervisor with durable session state across runs.
+- **Plan generated up front** — [`ai.planner()`](./planner) asks an LLM to plan over your capabilities, then runs the plan.
 
 ## Related
 
 - [Run supervisor](../digging-deeper/run-supervisor) — the API surface.
+- [Orchestrators](./orchestrators) — the stateful primitive a supervisor delegates into.
+- [Planner](./planner) — generate-then-execute over capabilities.
 - [Define tools](../the-basics/define-tools) — `ctx.artifacts` side-channel.
 - [Persist AI data](../digging-deeper/persist-ai-data) — snapshot resume.

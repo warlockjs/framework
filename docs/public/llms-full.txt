@@ -3052,6 +3052,7 @@ export default defineConfig({
       exclude: ["**/node_modules/**", "**/dist/**", "**/.warlock/**", "**/.git/**"],
     },
     generateTypings: true,             // background type generation
+    checkForUpdates: true,             // notify on a newer @warlock.js/core at dev start
     healthCheckers: [...] /* or false */,
     transpileCacheDebug: false,        // name cache files <slug>.<hash>.js w/ // @source markers
   },
@@ -3062,6 +3063,7 @@ export default defineConfig({
 - **`generateTypings`** — turn off if you're committing generated typings and don't want them rewritten on every boot. The `--skip-typings` flag is the per-run version.
 - **`healthCheckers`** — custom file health checker contracts (or `false` to disable). The `--skip-health` flag is the per-run version.
 - **`transpileCacheDebug`** — diagnostic only. Names `.warlock/transpile/*.js` files `<slug>.<hash>.js` and appends `// @source <path>` markers so you can eyeball which cache entry came from which source. Leave off in normal use.
+- **`checkForUpdates`** — on `warlock dev` start, check npm for a newer `@warlock.js/core` and print a one-line notice if one exists. Best-effort and non-blocking; auto-skipped in CI and non-TTY shells. Run `warlock update` to upgrade. See [`update-packages/SKILL.md`](../update-packages/SKILL.md).
 
 ## `warlock build` — production bundle
 
@@ -3244,6 +3246,7 @@ NODE_OPTIONS=--max-old-space-size=4096 yarn warlock start
 - [`configure-app/SKILL.md`](../configure-app/SKILL.md) — `warlock.config.ts` shape and `defineConfig`.
 - [`use-app-context/SKILL.md`](../use-app-context/SKILL.md) — `Application.environment` vs `Application.runtimeStrategy`.
 - [`add-connector/SKILL.md`](../add-connector/SKILL.md) — Early vs Late connector phases (why HTTP/socket boot late in dev).
+- [`update-packages/SKILL.md`](../update-packages/SKILL.md) — `warlock update` + the dev-server update notice (`devServer.checkForUpdates`).
 
 
 ## send-mail  `@warlock.js/core/send-mail/SKILL.md`
@@ -4796,6 +4799,88 @@ describe("slugify", () => {
 - [`test-http/SKILL.md`](../test-http/SKILL.md) — integration tests via the real HTTP server (`startHttpTestServer` + `testGet` / `testPost` / `expectJson`).
 - [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — where tests live in a module (`tests/*.test.ts`).
 - [`write-cli-command/SKILL.md`](../write-cli-command/SKILL.md) — `warlock add test` for the initial scaffold.
+
+
+## update-packages  `@warlock.js/core/update-packages/SKILL.md`
+
+---
+name: update-packages
+description: 'Keep a project current with `warlock update` — bump every `@warlock.js/*` dependency in package.json to its latest published version (range operator preserved), then run the lockfile-detected package manager install. Also covers the `warlock dev` update notice and the `devServer.checkForUpdates` toggle. Triggers: `warlock update`, `--no-install`, `checkForUpdates`, `fetchLatestVersion`, `isNewerVersion`; "update warlock packages", "upgrade the framework", "is there a new warlock version", "update notice in the dev server", "bump @warlock.js/* to latest"; typical CLI `warlock update`. Skip: dev/build/start runtime — `@warlock.js/core/run-app/SKILL.md`; writing a custom command — `@warlock.js/core/write-cli-command/SKILL.md`; installing a NEW feature package (auth, mail, storage) — that is `warlock add`; releasing/publishing the framework — workspace release tooling, not this command.'
+---
+
+# Warlock — update the framework
+
+`warlock update` upgrades a project's Warlock packages in one step, and `warlock dev` tells you when an upgrade is available. Because the whole `@warlock.js/*` family ships in **lockstep** — every package shares one version — keeping them in sync is the normal case, and this command does exactly that.
+
+## `warlock update`
+
+```bash
+warlock update                  # bump every @warlock.js/* dep to latest, then install
+warlock update --no-install     # rewrite package.json only; install yourself later
+```
+
+| Flag           | Type    | Purpose                                                                             |
+| -------------- | ------- | ----------------------------------------------------------------------------------- |
+| `--no-install` | boolean | Rewrite the versions in `package.json` without running the package manager install. |
+
+What it does, in order:
+
+1. Reads the project's root `package.json`.
+2. Collects every `@warlock.js/*` package across `dependencies` and `devDependencies`. Only the `@warlock.js/` scope is considered — `create-warlock` and unrelated dependencies are never touched.
+3. Looks up each package's latest version on the npm registry, in parallel.
+4. Rewrites each matching spec, **preserving the range operator**: `^4.2.0` → `^4.3.0`, `~4.2.0` → `~4.3.0`, an exact `4.2.0` → `4.3.0`. Specs that are not a plain semver — `workspace:*`, `*`, `latest`, git/file URLs — are left exactly as written, and any package already at or ahead of latest is skipped.
+5. Runs the project's install to reconcile `node_modules` — `npm install` / `yarn install` / `pnpm install`, chosen by the lockfile present (`package-lock.json` / `yarn.lock` / `pnpm-lock.yaml`, npm as the fallback). Skipped with `--no-install`.
+
+Re-running on an already-current project is a no-op: nothing resolves as newer, so it prints "All @warlock.js packages are already up to date" and exits without writing or installing.
+
+## The dev-server update notice
+
+On start, `warlock dev` checks npm for a newer `@warlock.js/core` and prints a one-line notice when one exists:
+
+```
+  ⚡ A new version of Warlock.js is available  4.2.11 → 4.3.0
+     Run  npx warlock update  to update all @warlock.js packages
+     Changelog  https://warlock.js.org/changelog/
+```
+
+Core's version stands in for the whole family (lockstep), so a single lookup is enough. The check is **best-effort and non-blocking** — it runs fire-and-forget after the server is ready, never delays or breaks startup, and stays silent on any failure (offline, registry down, timeout).
+
+It is automatically skipped when:
+
+- `process.env.CI` is set (CI runs),
+- stdout is not a TTY (piped / non-interactive shells),
+- `process.env.NO_UPDATE_NOTIFIER` is set, or
+- `devServer.checkForUpdates` is `false`.
+
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+
+export default defineConfig({
+  devServer: {
+    checkForUpdates: false, // silence the "update available" notice
+  },
+});
+```
+
+## Building blocks
+
+Two small zero-dependency utilities back the tooling and are exported from `@warlock.js/core`:
+
+- `fetchLatestVersion(name, timeoutMs?)` — the latest published version of an npm package, or `undefined` on any failure. Never throws.
+- `isNewerVersion(latest, current)` — `true` when `latest` is a strictly newer semver than `current`. Compares `major.minor.patch` and orders a stable release above its prereleases.
+
+## Gotchas
+
+- **Only the `@warlock.js/` scope is updated.** Mongez packages (`@mongez/*`), `create-warlock`, and everything else are left alone — update those with your package manager directly.
+- **Non-semver specs are intentionally skipped.** A `workspace:*` or `*` dependency stays as written; `update` will not pin it to a concrete version.
+- **The notice never blocks dev.** If npm is unreachable, `warlock dev` behaves exactly as before — no delay, no error.
+- **`warlock update` is not `warlock add`.** `add` installs a *new* feature package and runs its setup hooks; `update` only bumps the versions of packages you already depend on.
+
+## See also
+
+- [`run-app/SKILL.md`](../run-app/SKILL.md) — `warlock dev` / `build` / `start` and the `devServer.*` config knobs.
+- [`write-cli-command/SKILL.md`](../write-cli-command/SKILL.md) — author your own `warlock <cmd>`.
+- [`configure-app/SKILL.md`](../configure-app/SKILL.md) — `warlock.config.ts` shape and `defineConfig`.
 
 
 ## upload-file  `@warlock.js/core/upload-file/SKILL.md`
@@ -9234,15 +9319,34 @@ export class User extends Model<UserSchema> {
 - `static table` matches the migration. Plural, lowercase, snake_case is the convention on both drivers.
 - `static schema` attaches the validator. On every `save()`, the data goes through `userSchema` before it hits the database.
 
-## Read state — `.id` and `.get(field)`
+## Read state — `.id`, `.uuid`, and `.get(field)`
 
 ```ts
 user.id;                   // direct property — ID is so common cascade exposes it directly
+user.uuid;                 // the same id, narrowed to `string` (see below)
 user.get("status");        // canonical reader for every other column
 user.get<number>("age");   // TypeScript generic for typed reads
 ```
 
 Use the direct `.id` property; use `.get("field")` for everything else. Add a typed getter on the model class when the same field is read in many places — turns N typed-cast call sites into one named accessor.
+
+### `.id` vs `.uuid` — a TypeScript convenience, same value
+
+Both getters return the model's primary id (`this.get("id")`); the only difference is the **static type**:
+
+| Accessor | Return type | Use when |
+|---|---|---|
+| `model.id` | `string \| number` | You want the real id type — SQL auto-increment is `number`, MongoDB's ObjectId is `string`. |
+| `model.uuid` | `string` | You want to pass the id to code typed for a single `string` id, without leaking the engine's `string \| number` union everywhere. |
+
+`uuid` does **not** validate or coerce the value to a UUID — the name is historical. It simply returns the same id, typed as `string`, so a helper typed for a string id accepts it on either engine:
+
+```ts
+function shareLink(modelId: string) { /* ... */ }
+
+shareLink(user.uuid);  // ✓ typechecks on both Postgres and MongoDB
+shareLink(user.id);    // ✗ TS error on SQL: `number` is not assignable to `string`
+```
 
 ## Write — three update idioms
 
@@ -23231,11 +23335,83 @@ Every payload carries `runId` and `rootRunId`.
 - [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md) — `WorkflowError` subclasses
 
 
+## run-planner  `@warlock.js/ai/run-planner/SKILL.md`
+
+---
+name: run-planner
+description: 'Goal-driven planning with ai.planner({...}) — an LLM GENERATES an ordered execution plan over your registered capabilities (agents / workflows / supervisors / tools), then the planner EXECUTES that plan step-by-step, threading each step output into the next, and returns the unified {data, report, usage, error} envelope with report.type "planner". A plan step may delegate via ai.spawnSubAgent({...}) — a GENERAL one-shot-agent helper (a fresh agent + optional per-task budget), covered fully in `@warlock.js/ai/run-ai-agent/SKILL.md`; it is not planner-specific and the planner engine does not require it. Triggers: `ai.planner`, `planner.execute`, `spawnSubAgent`, `PlannerConfig`, `PlannerCapability`, `PlannerResult`, `PlannerReport`, `PlannerPlan`, `PlannerStep`, `maxSteps`, `report.plan`, `report.executedSteps`; ''let the model plan the steps'', ''dynamic plan from a goal'', ''decompose a goal into capability calls'', ''spawn a sub-agent for a subtask''; typical import `import { ai } from "@warlock.js/ai"`. Skip: a FIXED known pipeline — `@warlock.js/ai/run-ai-workflow/SKILL.md`; routing one input to a specialist each turn — `@warlock.js/ai/run-supervisor/SKILL.md`; a single model + tools call — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langgraph`, `crewai`.'
+---
+
+# `ai.planner()` — LLM-generated, then executed, plans
+
+A planner turns a free-form **goal** into an ordered **plan** the LLM writes itself (referencing only the capabilities you registered), then runs that plan one step at a time through each capability's own `execute()`. Use it when you do NOT know the steps up front — the model decides the sequence.
+
+## When to reach for it
+
+- **`agent`** — one model + tools, single task. No multi-step decomposition.
+- **`workflow`** — a FIXED pipeline you author by hand (`steps: [...]`). The steps are known at design time.
+- **`supervisor`** — routes one input to the right specialist each turn; loops on a quality verdict.
+- **`planner`** — the steps are NOT known in advance. The LLM generates the ordered plan from the goal, then the planner executes it. Bounded v1: strictly sequential, no DAG scheduling, no mid-plan re-planning.
+
+## Shape
+
+```ts
+import { ai } from "@warlock.js/ai";
+
+const research = ai.planner({
+  name: "research-assistant",
+  model: ai.openai.model({ name: "gpt-4o" }), // the plan-GENERATION brain
+  capabilities: [
+    { name: "search", description: "Search the web for sources", executable: searchAgent },
+    { name: "summarize", description: "Summarize text into bullet points", executable: summarizer },
+    { name: "write", description: "Draft a final report", executable: writerAgent },
+  ],
+  maxSteps: 6, // hard cap; steps beyond it are recorded as "skipped"
+});
+
+const { data, report, usage, error } = await research.execute("Compare React vs Vue in 2026");
+
+console.log(report.plan?.summary);          // the LLM's one-line strategy
+for (const step of report.executedSteps) {  // forensic, in execution order
+  console.log(step.step.capability, step.status);
+}
+```
+
+- `model` builds an internal planning agent with a generated plan-prompt baked on. **Mutually exclusive** with `planner`.
+- `planner` lets you bring your own fully-configured planning agent (custom prompt, middleware). The planner injects the plan schema as that agent's per-call `output`.
+- A `capability` is `{ name, description, executable }`. The `name` is what the LLM references per step; the `description` is what it reads to pick. `executable` is any `ExecutableContract` (agent / workflow / supervisor / tool).
+
+## Execution model (bounded v1)
+
+1. **Generate** — the planning agent is asked for a `{ steps, summary? }` plan via a generated schema whose `capability` field is an `enum` of your capability names.
+2. **Execute** — steps run **strictly in array order**. Each completed step's output is threaded into the next step's input as "Context from earlier steps". `dependsOn` on a step is advisory metadata only — recorded, not scheduled on.
+3. **Finalize** — when `output` is set (factory or per-call), the LAST completed step's structured output is validated into `result.data`. A capability that should feed typed output to the planner's `output` should declare its own `output` schema (the planner reads `data`, falling back to an agent's raw `text`).
+
+`report.type === "planner"`; `report.children[]` carries every dispatched capability report (plus the planning trip), with usage rolled up. Lazy capability loading is **deferred** — every capability is fully constructed up front.
+
+## Failure + cancellation
+
+`execute()` never throws — failures surface on `result.error`:
+
+- **`PlannerPlanInvalidError`** (`PLANNER_PLAN_INVALID`, category `schema`) — empty plan or a step naming an unknown capability; also a final-output validation failure.
+- **`PlannerCancelledError`** (`PLANNER_CANCELLED`, category `cancelled`) — the `AbortSignal` fired. `report.status === "cancelled"`, `report.cancelledAt` set; remaining steps are `skipped`.
+- A child capability's own error (agent / tool / provider) flows through unchanged on the failing step's snapshot and as `result.error`. The planner stops at the first failed step and marks the rest `skipped`.
+- **`PlannerFailedError`** is the base for the `PLANNER_*` family.
+
+## Delegating a step with `ai.spawnSubAgent()`
+
+A plan step can hand a bounded subtask to a fresh single-use agent with a hard spend cap via `ai.spawnSubAgent({...})`. It is **not** a planner feature — it's a general one-shot-agent helper (a fresh `ai.agent()` + an optional per-task `budget`, run once) that works identically inside a tool, a workflow step, a supervisor intent, or hand-rolled orchestration. The planner engine never calls it; it's simply a primitive a capability *you* write can reach for. Full coverage: [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md).
+
+## Testing
+
+Use `MockSDK` for the planning model — script the plan as a JSON string matching `{ steps, summary? }`. Capabilities can be `mockAgent({ name, responses })`. See `src/planner/planner.spec.ts`.
+
+
 ## run-supervisor  `@warlock.js/ai/run-supervisor/SKILL.md`
 
 ---
 name: run-supervisor
-description: 'Multi-intent routing with ai.supervisor({...}) — classifier (iter-0 dispatch), router agent OR route callback, intents as agents / workflows / callbacks, fan-out, evaluate quality loop, ack receptionist. Triggers: `ai.supervisor`, `supervisor.execute`, `supervisor.resume`, `intents`, `router`, `route`, `classifier`, `evaluate`, `ack`, `artifactsSchema`, `END`, `ctx.intents.X.execute`; ''route one input across specialists'', ''multi-intent dispatch'', ''fan-out then evaluate'', ''classifier then router''; typical import `import { ai } from "@warlock.js/ai"`. Skip: fixed pipelines — `@warlock.js/ai/run-ai-workflow/SKILL.md`; single agent — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langgraph`, `crewai`.'
+description: 'Multi-intent routing with ai.supervisor({...}) — classifier (iter-0 dispatch), router agent OR route callback, intents as agents / workflows / callbacks, fan-out, evaluate quality loop, ack receptionist. Triggers: `ai.supervisor`, `ai.router`, `ai.fanOut`, `supervisor.execute`, `supervisor.resume`, `intents`, `router`, `route`, `classifier`, `evaluate`, `ack`, `artifactsSchema`, `END`, `ctx.intents.X.execute`; ''route one input across specialists'', ''multi-intent dispatch'', ''fan-out then evaluate'', ''classifier then router'', ''self-consistency / voting''; typical import `import { ai } from "@warlock.js/ai"`. Skip: fixed pipelines — `@warlock.js/ai/run-ai-workflow/SKILL.md`; single agent — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langgraph`, `crewai`.'
 ---
 
 # `ai.supervisor()` — multi-intent routing
@@ -23307,6 +23483,41 @@ const supportBot = ai.supervisor({
 The router agent's output MUST include `next: string | string[] | typeof END`; `reasoning: string` is optional but recommended.
 
 `evaluate` pairs with both `router` AND `route` — state-driven termination is useful in either dispatch mode.
+
+#### `ai.router()` — skip the boilerplate
+
+`ai.router({ model, intents })` builds the routing agent for you: it generates the `{ next, reasoning }` output schema (with the intent names + `END` baked in as a JSON-Schema `enum`) and auto-writes the routing system prompt listing every intent + description. Pass the **same** `intents` object you pass to `ai.supervisor()`.
+
+```ts
+const intents = { billing, shipping, returns, escalate };
+
+const supportBot = ai.supervisor({
+  router: ai.router({
+    model,
+    intents,
+    systemPrompt: "You coordinate a customer-support team.", // optional framing on top
+  }),
+  intents,
+});
+```
+
+The result is a plain `AgentContract` — usable standalone or as `router`. Hand-writing the agent (above) still works; `ai.router()` is the shortcut.
+
+#### `ai.fanOut()` — voting / self-consistency
+
+`ai.fanOut(unit, n)` spreads one agent/workflow into `n` distinctly-keyed intent entries (`writer1..writerN`) so the supervisor can dispatch them in parallel and a downstream intent can pick the best/majority answer. Spread it into `intents`:
+
+```ts
+ai.supervisor({
+  intents: {
+    ...ai.fanOut(writer, 3),                                   // writer1, writer2, writer3
+    vote: { run: pickMajority, description: "Choose the majority answer." },
+  },
+  route: (ctx) => (ctx.iteration === 0 ? ["writer1", "writer2", "writer3"] : "vote"),
+});
+```
+
+Each key references the same underlying unit; the description defaults to the unit's. Override the key base with `{ keyPrefix }` and the per-entry text with `{ description }`.
 
 ## The `intents` map — five accepted shapes
 
@@ -23691,7 +23902,7 @@ Three distinct prompts, one common foundation. Base is immutable — safe to sha
 
 ---
 name: setup-openai
-description: 'Wire @warlock.js/ai-openai — new OpenAISDK({apiKey, baseURL?, provider?, pricing?}) for OpenAI / Azure / OpenRouter, .model({name, vision?, structuredOutput?, responseFormat?}) for ModelContract, .embedder({name, dimensions?}) for embeddings. Triggers: `OpenAISDK`, `.model`, `.embedder`, `.embed`, `.embedMany`, `baseURL`, `pricing`, `responseSchema`, `responseFormat`; "wire openai into a warlock agent", "configure gpt-4o", "route through openrouter or azure openai", "openai embeddings with warlock"; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: agent wiring — `@warlock.js/ai/run-ai-agent/SKILL.md`; adapter comparison — `@warlock.js/ai/pick-ai-provider/SKILL.md`; competing adapters `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `openai` SDK, Vercel `@ai-sdk/openai`.'
+description: 'Wire @warlock.js/ai-openai — new OpenAISDK({apiKey, baseURL?, provider?, pricing?}) for OpenAI / Azure / OpenRouter, .model({name, vision?, reasoning?, structuredOutput?, responseFormat?}) for ModelContract, .embedder({name, dimensions?}) for embeddings. Triggers: `OpenAISDK`, `.model`, `.embedder`, `.embed`, `.embedMany`, `baseURL`, `pricing`, `responseSchema`, `responseFormat`, `reasoning_effort`, `reasoningTokens`, `cachedTokens`, o-series / gpt-5 reasoning, prompt caching; "wire openai into a warlock agent", "configure gpt-4o", "use o3 / gpt-5 reasoning effort", "route through openrouter or azure openai", "openai embeddings with warlock"; typical import `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: agent wiring — `@warlock.js/ai/run-ai-agent/SKILL.md`; adapter comparison — `@warlock.js/ai/pick-ai-provider/SKILL.md`; competing adapters `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `openai` SDK, Vercel `@ai-sdk/openai`.'
 ---
 
 # `@warlock.js/ai-openai`
@@ -23735,8 +23946,10 @@ Returns a `ModelContract` you pass straight into `ai.agent({ model })`.
 | --- | --- |
 | `structuredOutput` | `true`, unless `responseFormat` is set to `"json_object"` or `"text"` (loose modes) — then `false`. |
 | `vision` | Inferred from model name. `true` for `gpt-4o*`, `gpt-4-turbo*`, `gpt-4.1*`, `o1*`, `o3*`, `chatgpt-4o*`; `false` otherwise. |
+| `reasoning` | Inferred from model name. `true` for the o-series (`o1*`, `o3*`, `o4*`) and the `gpt-5*` family; `false` otherwise. Drives whether `reasoning_effort` is forwarded. |
+| `promptCaching` | Always `true`. OpenAI caches long prompt prefixes automatically and reports hits via `usage.cachedTokens` — there are no caller-supplied write breakpoints. |
 
-**Override either flag explicitly** via `.model({ name, vision?, structuredOutput? })` — an explicit value always wins over inference.
+**Override `vision`, `structuredOutput`, or `reasoning` explicitly** via `.model({ name, vision?, structuredOutput?, reasoning? })` — an explicit value always wins over inference.
 
 ## Structured output
 
@@ -23781,6 +23994,33 @@ const { vectors } = await embedder.embedMany(["doc 1", "doc 2", "doc 3"]);
 ```ts
 openai.embedder({ name: "text-embedding-3-large", dimensions: 256 });
 ```
+
+## Reasoning (o-series / gpt-5)
+
+Reasoning models accept a discrete effort knob. The agent passes it through `ModelCallOptions.reasoning`:
+
+```ts
+const model = openai.model({ name: "o3-mini" });   // reasoning auto-true
+await model.complete(messages, { reasoning: { effort: "high" } });  // → reasoning_effort: "high"
+```
+
+- `reasoning.effort` (`"low" | "medium" | "high"`) maps verbatim to OpenAI's `reasoning_effort` request param.
+- `reasoning.maxTokens` has **no Chat Completions equivalent** (it's the Anthropic extended-thinking budget) and is silently ignored here.
+- When `capabilities.reasoning` is `false` (e.g. `gpt-4o`), the option is dropped — the adapter never forwards `reasoning_effort` to a model that would 400 on it. Pin `reasoning: true` to force it for a custom/fine-tuned reasoning model.
+
+## Token usage — what's reported
+
+`usage` on the result carries the neutral channel breakdown, populated from OpenAI's `usage` block:
+
+| `Usage` field | OpenAI source | Notes |
+| --- | --- | --- |
+| `input` / `output` / `total` | `prompt_tokens` / `completion_tokens` / `total_tokens` | always present (zeroed if OpenAI omits the block). |
+| `cachedTokens` | `prompt_tokens_details.cached_tokens` | subset of `input` served from OpenAI's automatic prompt cache. Emitted only when > 0. |
+| `reasoningTokens` | `completion_tokens_details.reasoning_tokens` | hidden reasoning channel on o-series / gpt-5 (already counted within `output`). Emitted only when > 0. |
+
+Both `cachedTokens` and `reasoningTokens` are omitted (not set to `0`) when the provider reports zero, so non-reasoning / uncached calls keep the lean `{ input, output, total }` shape. Reported identically on `complete()` and the streaming `done` event.
+
+`cacheControl` write breakpoints (`ModelCallOptions.cacheControl`) are a **no-op** — OpenAI has no caller-driven cache marker on the Chat Completions wire. The read-side `cachedTokens` accounting above works without any caller action.
 
 ## Token counting
 
@@ -23840,7 +24080,7 @@ Raw OpenAI SDK errors are wrapped into the typed `@warlock.js/ai` `AIError` hier
 
 ---
 name: setup-anthropic
-description: 'Wire @warlock.js/ai-anthropic — new AnthropicSDK({apiKey, baseURL?, provider?}) for Claude, .model({name, vision?, structuredOutput?, maxTokens?}). System-prompt hoisting, max_tokens required (default 4096), no first-party embeddings. Triggers: `AnthropicSDK`, `anthropic.model`, `anthropic.count`, `maxTokens`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-opus-4-7`; "wire claude into warlock agent", "configure anthropic provider", "use claude sonnet", "anthropic gateway baseURL"; typical import `import { AnthropicSDK } from "@warlock.js/ai-anthropic"`. Skip: embeddings — `@warlock.js/ai-openai/setup-openai/SKILL.md`; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `@anthropic-ai/sdk`; Vercel `@ai-sdk/anthropic`.'
+description: 'Wire @warlock.js/ai-anthropic — new AnthropicSDK({apiKey, baseURL?, provider?}) for Claude, .model({name, vision?, structuredOutput?, reasoning?, promptCaching?, maxTokens?}). System-prompt hoisting, max_tokens required (default 4096), extended thinking via options.reasoning → thinking budget_tokens, prompt caching via promptCaching + options.cacheControl, cost-truth usage (cachedTokens/cacheWriteTokens), no first-party embeddings. Triggers: `AnthropicSDK`, `anthropic.model`, `anthropic.count`, `maxTokens`, `reasoning`, `thinking`, `budget_tokens`, `cacheControl`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-opus-4-7`; "wire claude into warlock agent", "configure anthropic provider", "use claude sonnet", "anthropic gateway baseURL", "claude extended thinking", "anthropic prompt caching cost"; typical import `import { AnthropicSDK } from "@warlock.js/ai-anthropic"`. Skip: embeddings — `@warlock.js/ai-openai/setup-openai/SKILL.md`; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `@anthropic-ai/sdk`; Vercel `@ai-sdk/anthropic`.'
 ---
 
 # `@warlock.js/ai-anthropic`
@@ -23878,8 +24118,12 @@ anthropic.model({ name: "claude-opus-4-7", maxTokens: 8192 })   // raise the cap
 | --- | --- |
 | `structuredOutput` | `true` (via Anthropic's native `output_config.format`) |
 | `vision` | Inferred from model name. `true` for Claude 3 / 3.5 / 3.7 / 4 family; `false` for pre-3 and unknown. |
+| `reasoning` | `true` — every modern Claude model accepts extended thinking. Override with `reasoning: false` for legacy/proxied targets that reject the `thinking` param. |
+| `promptCaching` | `true` — the adapter places `cache_control` breakpoints and reports both cache reads (`Usage.cachedTokens`) and writes (`Usage.cacheWriteTokens`). |
+| `pdf` | `true` — the Messages API accepts PDF/document content blocks on vision-capable models. |
+| `audio` | absent (`false`) — Anthropic has no audio-input block, so the agent rejects audio attachments upfront. |
 
-Explicit config always wins.
+Explicit config always wins (`structuredOutput`, `vision`, `reasoning`).
 
 ## Pricing & cost
 
@@ -23899,7 +24143,19 @@ const anthropic = new AnthropicSDK({
 anthropic.model({ name: "claude-sonnet-4-6", pricing: { input: 3, output: 15 } });
 ```
 
-Resolution at `model()` time: per-model `pricing` > SDK registry entry for that name > `undefined`. `ModelPricing` is `{ input, output, cachedInput?, cachedOutput? }`. Anthropic meters cache **reads** — when present they surface as `usage.cachedTokens` and bill at the `cachedInput` rate (falling back to `input` when unset).
+Resolution at `model()` time: per-model `pricing` > SDK registry entry for that name > `undefined`. `ModelPricing` is `{ input, output, cachedInput?, cachedOutput? }`.
+
+## Tokens & usage accounting
+
+Every `ModelResponse.usage` (and the streaming terminal `done`) is normalized to the neutral `Usage` shape. Anthropic reports `input_tokens` / `output_tokens` separately with no pre-summed total, so `total` is computed (`input + output`). The two cache channels are surfaced only when non-zero:
+
+| Neutral field | Anthropic source | Meaning / billing |
+| --- | --- | --- |
+| `usage.cachedTokens` | `cache_read_input_tokens` | Subset of input served from the prompt cache. Bills at `cachedInput` (falls back to `input` when unset). |
+| `usage.cacheWriteTokens` | `cache_creation_input_tokens` | Input tokens **written** to the cache on this call (the ~1.25x write surcharge). Bills at `cachedOutput` when set. |
+| `usage.reasoningTokens` | — *(not reported separately)* | Anthropic bills extended-thinking tokens **inside** `output_tokens`, so this stays unset — populating it would double-count against `output`. |
+
+In streaming, `cachedTokens` / `cacheWriteTokens` are seeded from `message_start` and then **overwritten by the cumulative counts on `message_delta`** when those are present and non-zero, so the terminal `done` carries the final tally.
 
 ## `max_tokens` is required
 
@@ -23920,6 +24176,33 @@ Anthropic has no `"system"` role inside `messages`. The adapter hoists every neu
 
 When the agent passes `responseSchema` and the model is `structuredOutput`-capable, an **object-root** schema is forwarded as `output_config: { format: { type: "json_schema", schema } }` (Anthropic native). Non-object schemas or `structuredOutput: false` omit it; the agent's soft system-prompt hint + client-side `validate()` still enforce shape.
 
+## Extended thinking (reasoning)
+
+When the model is `reasoning`-capable (default `true`) and the agent passes `options.reasoning`, the adapter forwards Anthropic extended thinking as `thinking: { type: "enabled", budget_tokens }`:
+
+- `reasoning.maxTokens` → `budget_tokens` verbatim.
+- `reasoning.effort` (`"low" | "medium" | "high"`) → a tiered budget (`1024` / `4096` / `12000`) when no explicit `maxTokens` is given.
+- Any resolved budget is floored at Anthropic's `1024`-token minimum.
+- `reasoning` with neither `effort` nor `maxTokens` emits nothing.
+
+Because Anthropic 400s when `thinking` is combined with an explicit `temperature`, the adapter **drops `temperature`** for that request (thinking pins sampling to the default). Set `reasoning: false` on the model config to suppress the param entirely for proxied/legacy targets.
+
+```ts
+await agent.execute("Prove it.", { reasoning: { effort: "high" } });   // budget_tokens: 12000
+await model.complete(messages, { reasoning: { maxTokens: 8000 } });     // budget_tokens: 8000
+```
+
+## Prompt caching (`cache_control`)
+
+Two independent breakpoint sites, both reported back via `usage.cachedTokens` / `usage.cacheWriteTokens`:
+
+- **Tools** — set `model({ promptCaching: true })` to mark the *last* tool definition with `cache_control: ephemeral`. One breakpoint caches the whole tool prefix; off by default since a write costs ~1.25x and only pays off across multiple trips.
+- **System prompt** — a per-call `options.cacheControl.breakpoints >= 1` emits the system prompt as a `TextBlockParam` carrying `cache_control: ephemeral` (the longest stable prefix on a turn). Without the hint the system prompt stays a plain string (uncached), so a one-shot call never pays the write surcharge. No system prompt → no block.
+
+```ts
+await agent.execute("…", { cacheControl: { breakpoints: 1 } });  // cache the system prefix
+```
+
 ## Multipart messages (vision)
 
 `ContentPart[]` user content maps to Anthropic content blocks:
@@ -23934,7 +24217,7 @@ When the agent passes `responseSchema` and the model is `structuredOutput`-capab
 
 - `content_block_delta` text → `{ type: "delta", content }`
 - `tool_use` blocks accumulate `input_json_delta` fragments and emit one consolidated `{ type: "tool-call", ... }` at `content_block_stop` (no partial-arg `{}` artifact — input is parsed once, whole)
-- terminal `{ type: "done", finishReason, usage }` — `usage.input` from `message_start`, `usage.output` from `message_delta`, `total` computed
+- terminal `{ type: "done", finishReason, usage }` — `usage.input` from `message_start`, `usage.output` from `message_delta`, `total` computed; `cachedTokens` / `cacheWriteTokens` from `message_start` then the cumulative `message_delta` counts (see [Tokens & usage accounting](#tokens--usage-accounting))
 
 ## Finish-reason mapping
 
@@ -23987,7 +24270,7 @@ Anthropic ships no first-party embeddings API, so `AnthropicSDK` intentionally d
 
 ---
 name: setup-google
-description: 'Wire @warlock.js/ai-google — new GoogleSDK({apiKey} | {vertexai, project, location}) for Gemini API + Vertex AI. generateContent / embedContent + thoughtSignature round-trip for thinking models, batched embeddings. Triggers: `GoogleSDK`, `google.model`, `google.embedder`, `thoughtSignature`, `responseJsonSchema`, `vertexai`; "use gemini", "wire Vertex AI", "gemini embeddings", "gemini thinking tool calls"; import `import { GoogleSDK } from "@warlock.js/ai-google"`. Skip: agent loop `@warlock.js/ai/run-ai-agent/SKILL.md`; provider picking `@warlock.js/ai/pick-ai-provider/SKILL.md`; embedder usage `@warlock.js/ai/embed-text/SKILL.md`; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-ollama`; raw `@google/genai`, `@google-cloud/vertexai`, Vercel `@ai-sdk/google`.'
+description: 'Wire @warlock.js/ai-google — new GoogleSDK({apiKey} | {vertexai, project, location}) for Gemini API + Vertex AI. generateContent / embedContent + thoughtSignature round-trip for thinking models, batched embeddings. .model({name, vision?, reasoning?, audio?, pdf?}) with cost-truth capabilities, extended thinking via options.reasoning → thinkingConfig.thinkingBudget, usage reasoningTokens (thoughtsTokenCount) / cachedTokens (cachedContentTokenCount). Triggers: `GoogleSDK`, `google.model`, `google.embedder`, `thoughtSignature`, `responseJsonSchema`, `vertexai`, `reasoning`, `thinkingConfig`, `thinkingBudget`, `thoughtsTokenCount`, `reasoningTokens`, `cachedTokens`, `promptCaching`, `cacheControl`; "use gemini", "wire Vertex AI", "gemini embeddings", "gemini thinking tool calls", "gemini 2.5 thinking budget", "gemini cached content cost"; import `import { GoogleSDK } from "@warlock.js/ai-google"`. Skip: agent loop `@warlock.js/ai/run-ai-agent/SKILL.md`; provider picking `@warlock.js/ai/pick-ai-provider/SKILL.md`; embedder usage `@warlock.js/ai/embed-text/SKILL.md`; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-ollama`; raw `@google/genai`, `@google-cloud/vertexai`, Vercel `@ai-sdk/google`.'
 ---
 
 # `@warlock.js/ai-google`
@@ -24027,8 +24310,12 @@ google.model({ name: "gemini-1.5-flash", maxTokens: 2048 })
 | --- | --- |
 | `structuredOutput` | `true` (via `responseMimeType` + `responseJsonSchema`) |
 | `vision` | Inferred from model id substring. `true` when the id contains `gemini-1.5`, `gemini-2` (covers 2.x / 2.5), `gemini-exp`, `gemini-flash`, or `gemini-pro-vision`; `false` for bare `gemini-pro` / `gemini-1.0-pro` and any unknown id. Case-insensitive, tolerates date/preview/vendor-prefix suffixes (`models/gemini-1.5-flash-001`). |
+| `reasoning` | `true` — every Gemini 2.5 model thinks; older families harmlessly ignore an empty budget. Set `reasoning: false` to stop forwarding `thinkingConfig` to a model that rejects it. |
+| `promptCaching` | Always `true` — Gemini reports cache-read hits (`cachedContentTokenCount`) via implicit caching and accepts explicit context caching. |
+| `audio` | Mirrors the `vision` inference (the multimodal Gemini families accept audio parts). Override with `audio: true \| false`. |
+| `pdf` | Mirrors the `vision` inference (the multimodal Gemini families accept PDF / document parts). Override with `pdf: true \| false`. |
 
-Explicit config always wins.
+Explicit config always wins (`google.model({ name, reasoning: false, audio: false, pdf: true })`).
 
 ## System prompt
 
@@ -24097,9 +24384,23 @@ await google.count("some text")  // approximate heuristic, offline
 
 `count(text, model?)` accepts an optional model arg for signature parity but **ignores it** — the estimate is `approximateTokenCount` (≈ `ceil(chars / 4)`) from `@warlock.js/ai`, never a `countTokens` network call.
 
+## Reasoning / thinking
+
+For `reasoning`-capable models, `ModelCallOptions.reasoning` maps to Gemini's `config.thinkingConfig`:
+
+- `reasoning.maxTokens` → `thinkingConfig.thinkingBudget` (direct token cap on the thinking phase).
+- `reasoning.effort` (when no `maxTokens`) → a bucketed budget: `low` → 1024, `medium` → 8192, `high` → 24576. Explicit `maxTokens` always wins over `effort`.
+- Nothing is emitted when `reasoning` is absent, carries neither field, or the model's `reasoning` capability is `false` — a non-thinking model never receives an unsupported `thinkingConfig`.
+
+Gemini's `thinkingBudget` semantics (for direct `maxTokens` use): `0` disables thinking, `-1` is automatic, a positive value caps thinking tokens.
+
+## Prompt caching
+
+`capabilities.promptCaching` is `true`: the read side (`Usage.cachedTokens` from `cachedContentTokenCount`) is always honored, covering Gemini's implicit auto-caching and explicit context caches. `ModelCallOptions.cacheControl.breakpoints` is accepted but a **graceful no-op** — the Gemini `generateContent` request has no per-call cache-write breakpoint marker (unlike Anthropic's `cache_control`); explicit caching is configured out-of-band via a `cachedContent` resource. Read accounting works regardless.
+
 ## Token usage
 
-`complete()` / `stream()` map Gemini's `usageMetadata` into the neutral `Usage` (`{ input, output, total }`): `promptTokenCount` → `input`, `candidatesTokenCount` → `output`, `totalTokenCount` → `total` (falling back to `input + output` when absent). `cachedContentTokenCount`, when > 0, is surfaced as `usage.cachedTokens`. Embeddings have no usage (see above).
+`complete()` / `stream()` map Gemini's `usageMetadata` into the neutral `Usage` (`{ input, output, total }`): `promptTokenCount` → `input`, `candidatesTokenCount` → `output`, `totalTokenCount` → `total` (falling back to `input + output` when absent). `cachedContentTokenCount`, when > 0, is surfaced as `usage.cachedTokens`; `thoughtsTokenCount` (a reasoning model's thinking-phase tokens), when > 0, as `usage.reasoningTokens`. Both are omitted when zero/absent. Embeddings have no usage (see above).
 
 ## Pricing
 
@@ -24145,7 +24446,7 @@ Resolution order: per-model `pricing` > SDK-level registry entry > `undefined`. 
 
 ---
 name: setup-bedrock
-description: 'Wire @warlock.js/ai-bedrock — new BedrockSDK({region, credentials?, provider?}) for AWS Bedrock Converse API + Titan embeddings. AWS credential chain (no apiKey). Triggers: `BedrockSDK`, `bedrock.model`, `bedrock.embedder`, `bedrock.count`, `BedrockRuntimeClient`; "how do I use AWS Bedrock", "wire Claude/Nova/Llama on Bedrock", "Titan embeddings", "Bedrock Converse API"; typical import `import { BedrockSDK } from "@warlock.js/ai-bedrock"`. Skip: agent wiring — `@warlock.js/ai/run-ai-agent/SKILL.md`; provider choice — `@warlock.js/ai/pick-ai-provider/SKILL.md`; embeddings concepts — `@warlock.js/ai/embed-text/SKILL.md`; competing libs `@aws-sdk/client-bedrock-runtime`, `@ai-sdk/amazon-bedrock`; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`.'
+description: 'Wire @warlock.js/ai-bedrock — new BedrockSDK({region, credentials?, provider?}) for AWS Bedrock Converse API + Titan embeddings. AWS credential chain (no apiKey). .model({name, vision?, reasoning?, promptCaching?, pdf?, audio?}) with cost-truth capabilities inferred per family, extended thinking via options.reasoning → Converse thinking budget_tokens, prompt caching via options.cacheControl → cachePoint, usage cachedTokens/cacheWriteTokens. Triggers: `BedrockSDK`, `bedrock.model`, `bedrock.embedder`, `bedrock.count`, `BedrockRuntimeClient`, `reasoning`, `thinking`, `budget_tokens`, `cachePoint`, `cacheControl`, `promptCaching`, `cachedTokens`, `cacheWriteTokens`; "how do I use AWS Bedrock", "wire Claude/Nova/Llama on Bedrock", "Titan embeddings", "Bedrock Converse API", "Claude 3.7/4 extended thinking on Bedrock", "Bedrock prompt caching cost"; typical import `import { BedrockSDK } from "@warlock.js/ai-bedrock"`. Skip: agent wiring — `@warlock.js/ai/run-ai-agent/SKILL.md`; provider choice — `@warlock.js/ai/pick-ai-provider/SKILL.md`; embeddings concepts — `@warlock.js/ai/embed-text/SKILL.md`; competing libs `@aws-sdk/client-bedrock-runtime`, `@ai-sdk/amazon-bedrock`; sibling adapters `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`.'
 ---
 
 # `@warlock.js/ai-bedrock`
@@ -24188,8 +24489,36 @@ Uses the model-agnostic **Converse / ConverseStream** API — one wire mapping c
 | --- | --- |
 | `structuredOutput` | `true` (via Converse `outputConfig.textFormat`) |
 | `vision` | Inferred from model id substring. `true` for Claude 3/3.5/3.7/4, Nova Lite/Pro/Premier, Llama 3.2-11B/90B, Llama 4. |
+| `reasoning` | Inferred from model id. `true` for Claude 3.7 + Claude 4 (Sonnet/Opus/Haiku) — they expose a configurable thinking budget on Converse. |
+| `promptCaching` | Inferred from model id. `true` for Claude 3.5+/3.7/4 and Nova Micro/Lite/Pro/Premier — the families that honor Converse `cachePoint`. |
+| `pdf` | Inferred from model id. `true` for Claude 3+ and Nova Lite/Pro/Premier (Converse `document` blocks). |
+| `audio` | `false` by default — Converse does not accept audio blocks for the families this adapter targets. Pass `audio: true` for a confirmed audio model. |
 
-Explicit config always wins.
+Explicit config always wins — every flag is overridable per model, e.g. `bedrock.model({ name, reasoning: false, promptCaching: true, pdf: false, audio: true })`.
+
+## Reasoning / extended thinking
+
+For a `reasoning`-capable model (Claude 3.7 / 4), `ModelCallOptions.reasoning` maps to Converse's escape hatch `additionalModelRequestFields.thinking = { type: "enabled", budget_tokens }`:
+
+```ts
+// Explicit thinking budget (token cap):
+await model.complete(messages, { reasoning: { maxTokens: 2048 } });
+
+// Effort tier → conventional budget (low 1024 / medium 4096 / high 16384):
+await model.complete(messages, { reasoning: { effort: "high" } });
+```
+
+`maxTokens` wins over `effort` when both are set. For non-reasoning models — or when neither `effort` nor `maxTokens` is given — the option is a no-op, so unsupported params never reach the wire. Bedrock's Converse `TokenUsage` reports no reasoning-token channel, so `usage.reasoningTokens` is left unset (reasoning text arrives as `reasoningContent` content blocks, not a token count).
+
+## Prompt caching
+
+For a `promptCaching`-capable model, `ModelCallOptions.cacheControl.breakpoints` (any positive value) appends one Converse `cachePoint: { type: "default" }` block to the LAST message — Bedrock then caches the whole prefix up to that point:
+
+```ts
+await model.complete(messages, { cacheControl: { breakpoints: 1 } });
+```
+
+Earlier turns are untouched; only the trailing message is marked. No-ops gracefully when the model is not caching-capable or no breakpoint was requested. Read-side accounting works without any breakpoint — see the usage section below.
 
 ## System prompt
 
@@ -24218,7 +24547,7 @@ Object-root `responseSchema` + `structuredOutput`-capable → `outputConfig.text
 
 - `contentBlockDelta.delta.text` → `{ type: "delta", content }`
 - `toolUse`: `contentBlockStart` opens an accumulator, `contentBlockDelta.delta.toolUse.input` fragments append, `contentBlockStop` emits one consolidated `{ type: "tool-call", ... }`
-- terminal `{ type: "done", finishReason, usage }` — usage from `metadata.usage` (a `TokenUsage`)
+- terminal `{ type: "done", finishReason, usage }` — usage from `metadata.usage` (a `TokenUsage`), including `cachedTokens` / `cacheWriteTokens` when reported (see the usage table below)
 
 ## Finish-reason mapping
 
@@ -24273,7 +24602,22 @@ const { usage } = await ai.agent({ model: bedrock.model({ name: "us.amazon.nova-
 usage.cost;  // per-channel USD breakdown of THIS run, computed from tokens × pricing[model]
 ```
 
-Resolution at `model()` time: per-model `pricing` (`bedrock.model({ name, pricing })`) > SDK registry > `undefined` (no cost computed). When the same model id appears under a cross-region inference profile, list each id you actually invoke (`us.`, `eu.`, `apac.` prefixes are distinct keys). Bedrock meters cache-read tokens via Converse `usage` — those surface as `usage.cachedTokens`, so set `cachedInput` to have them priced at the discounted rate. See [`@warlock.js/ai/pick-ai-provider/SKILL.md`](@warlock.js/ai/pick-ai-provider/SKILL.md).
+Resolution at `model()` time: per-model `pricing` (`bedrock.model({ name, pricing })`) > SDK registry > `undefined` (no cost computed). When the same model id appears under a cross-region inference profile, list each id you actually invoke (`us.`, `eu.`, `apac.` prefixes are distinct keys). See [`@warlock.js/ai/pick-ai-provider/SKILL.md`](@warlock.js/ai/pick-ai-provider/SKILL.md).
+
+### Tokens & usage — cost truth
+
+Both `complete()` and `stream()` normalize Converse's `TokenUsage` into the neutral `Usage` shape:
+
+| Converse `TokenUsage` field | Neutral `Usage` field | Notes |
+| --- | --- | --- |
+| `inputTokens` | `usage.input` | Includes cached read tokens. |
+| `outputTokens` | `usage.output` | |
+| `totalTokens` | `usage.total` | Falls back to `input + output` when absent. |
+| `cacheReadInputTokens` | `usage.cachedTokens` | Only when `> 0`. Cache-hit reads — price at `pricing.cachedInput`. |
+| `cacheWriteInputTokens` | `usage.cacheWriteTokens` | Only when `> 0`. One-time cache write — price at `pricing.cachedOutput`. |
+| — | `usage.reasoningTokens` | **Never set** — Converse exposes no reasoning-token count. |
+
+Set `cachedInput` / `cachedOutput` in `ModelPricing` to have cache reads/writes billed at their distinct rates. Read-side accounting (`cachedTokens` / `cacheWriteTokens`) is populated whenever Bedrock reports it, independent of whether you sent a `cacheControl` breakpoint.
 
 ## When NOT to use this skill
 
@@ -24302,7 +24646,7 @@ Resolution at `model()` time: per-model `pricing` (`bedrock.model({ name, pricin
 
 ---
 name: setup-ollama
-description: 'Wire @warlock.js/ai-ollama — new OllamaSDK({host?, headers?}) for local / self-hosted Ollama via the official ollama client (not OpenAI-compat). chat + embed, daemon-down error handling. Triggers: `OllamaSDK`, `ollama.model`, `ollama.embedder`, `embedder.embedMany`, `ollama.count`, `host`, `headers`; "use ollama with warlock", "run llama3 locally", "self-hosted llama"; typical import `import { OllamaSDK } from "@warlock.js/ai-ollama"`. Skip: agent loop — `@warlock.js/ai/run-ai-agent/SKILL.md`; provider choice — `@warlock.js/ai/pick-ai-provider/SKILL.md`; embeddings core — `@warlock.js/ai/embed-text/SKILL.md`; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`; raw `ollama` npm, Vercel `@ai-sdk/ollama`; OpenAI-compat gateway via `@warlock.js/ai-openai` `baseURL`.'
+description: 'Wire @warlock.js/ai-ollama — new OllamaSDK({host?, headers?}) for local / self-hosted Ollama via the official ollama client (not OpenAI-compat). chat + embed, daemon-down error handling. .model({name, vision?, reasoning?}) with cost-truth capabilities — reasoning inferred from thinking-model tags (deepseek-r1/qwq/qwen3/gpt-oss…), promptCaching/audio/pdf honestly false; options.reasoning → Ollama native `think` flag; usage reasoningTokens/cachedTokens stay undefined (none reported). Triggers: `OllamaSDK`, `ollama.model`, `ollama.embedder`, `embedder.embedMany`, `ollama.count`, `host`, `headers`, `reasoning`, `think`, thinking models, `deepseek-r1`, `qwq`, `qwen3`, `gpt-oss`; "use ollama with warlock", "run llama3 locally", "self-hosted llama", "ollama reasoning / thinking models", "deepseek-r1 with warlock"; typical import `import { OllamaSDK } from "@warlock.js/ai-ollama"`. Skip: agent loop — `@warlock.js/ai/run-ai-agent/SKILL.md`; provider choice — `@warlock.js/ai/pick-ai-provider/SKILL.md`; embeddings core — `@warlock.js/ai/embed-text/SKILL.md`; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`; raw `ollama` npm, Vercel `@ai-sdk/ollama`; OpenAI-compat gateway via `@warlock.js/ai-openai` `baseURL`.'
 ---
 
 # `@warlock.js/ai-ollama`
@@ -24338,8 +24682,28 @@ ollama.model({ name: "llama3.2-vision", maxTokens: 1024 })
 | --- | --- |
 | `structuredOutput` | `true` (via Ollama's native `format` JSON-schema field) |
 | `vision` | Inferred from model tag substring. `true` for `llava`, `bakllava`, `*-vision`, `moondream`, `minicpm-v`, `qwen2-vl`, `qwen2.5-vl`, `llama4`, `gemma3`; `false` otherwise. |
+| `reasoning` | Inferred from model tag substring. `true` for `deepseek-r1`, `qwq`, `qwen3`, `magistral`, `phi4-reasoning`, `phi4-mini-reasoning`, `cogito`, `smallthinker`, `exaone-deep`, `gpt-oss`; `false` otherwise. |
+| `promptCaching` | `false` — Ollama has no provider-side prompt cache. |
+| `audio` / `pdf` | `false` — the Ollama chat API takes no audio / PDF content parts. |
 
-Explicit config always wins.
+Explicit config always wins (`vision`, `structuredOutput`, `reasoning` overrides on `ollama.model({ … })`).
+
+## Reasoning / thinking
+
+For thinking-capable families the adapter maps `ModelCallOptions.reasoning` onto Ollama's `think` request flag (`boolean | 'low' | 'medium' | 'high'`):
+
+```ts
+ollama.model({ name: "deepseek-r1:7b" })
+await model.complete(messages, { reasoning: { effort: "high" } });   // → chat({ think: "high" })
+await model.complete(messages, { reasoning: { maxTokens: 2048 } });  // → chat({ think: true })
+```
+
+- `reasoning.effort` (`low` / `medium` / `high`) passes straight through to `think`.
+- `reasoning.maxTokens` (the thinking-budget hint) has **no Ollama equivalent** — the daemon takes no thinking-token cap, so it only acts as the on/off signal (`think: true`) and is otherwise ignored.
+- The `think` flag is sent **only** to a `reasoning`-capable model; on a plain instruct model `reasoning` options are a no-op (no `think` is sent).
+- Set `ollama.model({ name, reasoning: false })` to force it off, or `reasoning: true` to force it on for a tag the substring list doesn't recognize.
+
+`ModelCallOptions.cacheControl` is a **no-op** — Ollama has no prompt cache, so there is no breakpoint to place.
 
 ## System prompt & roles
 
@@ -24395,11 +24759,17 @@ Wrapped into the typed `@warlock.js/ai` `AIError` hierarchy. The `ollama` client
 - 4xx with context phrasing → `ContextLengthExceededError`, else `InvalidRequestError`
 - 5xx → `ProviderError`
 
-## Token counting
+## Token counting & usage (cost-truth)
 
 ```ts
 await ollama.count("some text")  // approximate heuristic, offline
 ```
+
+Per-call `Usage` comes from the chat response's `prompt_eval_count` (→ `input`) and `eval_count` (→ `output`); `total` is their sum. The adapter reports usage **truthfully** — it never fabricates a field Ollama doesn't return:
+
+- `cachedTokens` / `cacheWriteTokens` — **always undefined**. Ollama has no provider prompt cache, so there is no cache-hit or cache-write accounting (honest absence, not a false `0`).
+- `reasoningTokens` — **always undefined**. Reasoning models emit their thinking as the `message.thinking` *string*, but the wire format carries **no separate reasoning-token count** — those tokens are already folded into `eval_count`. The adapter does not estimate a count from the thinking text.
+- `cost` — populated only when a `ModelPricing` is configured (local Ollama is free, so usually undefined).
 
 ## When NOT to use this skill
 
@@ -24412,6 +24782,273 @@ await ollama.count("some text")  // approximate heuristic, offline
 - [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md)
 - [`@warlock.js/ai/pick-ai-provider/SKILL.md`](@warlock.js/ai/pick-ai-provider/SKILL.md)
 - [`@warlock.js/ai/embed-text/SKILL.md`](@warlock.js/ai/embed-text/SKILL.md)
+
+
+================================================================================
+# @warlock.js/ai-panoptic
+================================================================================
+
+# Warlock AI Panoptic — full skills
+
+> Package: `@warlock.js/ai-panoptic`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-panoptic/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## export-traces  `@warlock.js/ai-panoptic/export-traces/SKILL.md`
+
+---
+name: export-traces
+description: 'Send @warlock.js/ai-panoptic traces to an observability backend via pluggable exporters. Triggers: `consoleExporter`, `fileExporter`, `otelExporter`, `langfuseExporter`, `ExporterContract`, `toGenAiAttributes`, `walkSpans`, `totalCostUsd`, `GEN_AI_ATTRIBUTES`, `WARLOCK_ATTRIBUTES`; ''export AI traces to OpenTelemetry'', ''send traces to Langfuse'', ''log traces to console / a file'', ''gen_ai semantic conventions'', ''write a custom exporter''; typical import `import { otelExporter, langfuseExporter, consoleExporter, fileExporter } from "@warlock.js/ai-panoptic"`. Skip: wiring the subscriber/collector into a run — `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`; the core report shape — `@warlock.js/ai/run-ai-agent/SKILL.md`.'
+---
+
+# Export traces — the sink end of Panoptic
+
+An **exporter** translates a vendor-neutral `Trace` (produced by the collector) into a backend's wire format. The collector fans every completed trace out to each registered exporter via the `ExporterContract`:
+
+```ts
+export interface ExporterContract {
+  readonly name: string;
+  export(trace: Trace): void | Promise<void>;
+  exportSpan?(span: TraceSpan): void | Promise<void>; // optional live streaming
+  flush?(): void | Promise<void>;
+  shutdown?(): void | Promise<void>;
+}
+```
+
+Four exporters ship today. Each is a **factory** returning an `ExporterContract` — callers never `new`.
+
+## Pick an exporter
+
+| Exporter | Backend | Deps | Use it for |
+|---|---|---|---|
+| `consoleExporter()` | stdout/stderr | none | local dev, CI logs |
+| `fileExporter()` | JSON-Lines file | none | durable local sink, replay, out-of-band shipping |
+| `otelExporter()` | OpenTelemetry | `@opentelemetry/api` (optional peer) | OTel-native stacks, GenAI semantic conventions |
+| `langfuseExporter()` | Langfuse | `langfuse` (optional peer) | LLM-specific dashboards, generations |
+
+> `@opentelemetry/api` and `langfuse` are **OPTIONAL peer dependencies**, lazily imported by their exporter. Importing `@warlock.js/ai-panoptic` never pulls them in; a missing SDK surfaces as a curated *"install this"* error on first export, never a boot-time stack trace.
+
+## Console
+
+```ts
+import { consoleExporter } from "@warlock.js/ai-panoptic";
+
+collector.use(consoleExporter());                 // one summary line per trace
+collector.use(consoleExporter({ tree: true }));   // full indented span tree
+collector.use(consoleExporter({ streaming: true })); // also print each span as it finalizes
+```
+
+Failed/cancelled spans route to `console.error`; everything else to `console.log`. Inject a sink (`{ console: mySink }`) to redirect or to capture in tests.
+
+## File
+
+```ts
+import { fileExporter } from "@warlock.js/ai-panoptic";
+
+collector.use(fileExporter({ path: "storage/traces.jsonl" }));      // write every trace
+collector.use(fileExporter({ path: "...", flushEvery: 50 }));       // batch 50 traces per write
+collector.use(fileExporter({ path: "...", pretty: true }));         // multi-line records
+```
+
+Appends one JSON record per line (a `TraceRecord` = `{ type: "trace", exportedAt, trace }`). Buffers in memory and drains on `flush()` / `shutdown()` — call `collector.shutdown()` on teardown so the last batch lands. The parent directory is created on first write.
+
+## OpenTelemetry
+
+The exporter emits spans onto a `Tracer`; **the host app owns the SDK wiring** (`TracerProvider`, processors, span exporters), exactly as with any OTel instrumentation.
+
+```ts
+import { otelExporter } from "@warlock.js/ai-panoptic";
+
+// app already configured @opentelemetry/sdk-trace-base + a global provider
+collector.use(otelExporter({ tracerName: "my-app", system: "openai" }));
+
+// or pass a Tracer directly
+collector.use(otelExporter({ tracer: myTracer }));
+```
+
+Each `TraceSpan` becomes one OTel span with the source start/end times and parent relationship reconstructed, so the emitted tree matches the original execution tree. Attributes follow the [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/):
+
+- `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` / `gen_ai.usage.total_tokens`
+- `gen_ai.usage.cached_tokens` / `gen_ai.usage.reasoning_tokens` (when present)
+- `gen_ai.conversation.id` (from `sessionId`)
+- `gen_ai.system` / `gen_ai.request.model` (forwarded from the span's collector attributes; `system` defaults from options)
+- `warlock.report.type` / `warlock.version` / `warlock.duration_ms` / `warlock.cost.usd`
+
+Failed/cancelled spans get OTel `ERROR` status plus a recorded exception.
+
+## Langfuse
+
+```ts
+import { langfuseExporter } from "@warlock.js/ai-panoptic";
+
+collector.use(langfuseExporter({ publicKey: "pk-...", secretKey: "sk-...", baseUrl: "..." }));
+// or reuse an existing Langfuse client
+collector.use(langfuseExporter({ client: myLangfuse }));
+```
+
+- The root span becomes a Langfuse **trace**.
+- A token-producing span (`usage.total > 0`) becomes a **generation** (carries `usage`); a pure tool/callback becomes a plain **span**.
+- Children nest under their parent observation; timing, `version`, and status (failed → `ERROR` level) are mapped.
+- `flush()` / `shutdown()` delegate to the client's `flushAsync()` / `shutdownAsync()` — call `collector.shutdown()` on teardown so buffered observations are sent.
+
+## Shared utilities
+
+Reusable when authoring a **custom exporter**:
+
+```ts
+import { walkSpans, toGenAiAttributes, totalCostUsd, GEN_AI_ATTRIBUTES, WARLOCK_ATTRIBUTES } from "@warlock.js/ai-panoptic";
+
+for (const span of walkSpans(trace.root)) {        // depth-first pre-order
+  const attributes = toGenAiAttributes(span);      // gen_ai.* / warlock.* attribute map
+  const cost = totalCostUsd(span.usage);           // single USD scalar, or undefined
+}
+```
+
+`toGenAiAttributes` copies only **scalar** entries from a span's free-form `attributes` bag (objects/arrays are skipped — backend attribute values must be primitives) and lets an explicit collector attribute override a derived one.
+
+## Write a custom exporter
+
+Implement `ExporterContract` directly — `name` + `export` are the only required members:
+
+```ts
+import type { ExporterContract, Trace } from "@warlock.js/ai-panoptic";
+
+const myExporter: ExporterContract = {
+  name: "my-backend",
+  async export(trace: Trace) {
+    await sendSomewhere(trace);
+  },
+};
+
+collector.use(myExporter);
+```
+
+Wrapping a third-party SDK? Lazily `await import(...)` it **inside** the export path (never at module top) so it stays an optional peer — copy the loader pattern from `otelExporter` / `langfuseExporter`. The collector isolates a throwing exporter, so one backend's failure never crashes the originating AI run.
+
+## See also
+
+- [`@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`](@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md) — the source end: wiring the `panoptic(...)` subscriber into a run (`attach` / `middleware` / `collect`). The `collector` these exporters register on comes from there.
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent and the `BaseReport` shape Panoptic projects into a `Trace`.
+
+
+## observe-with-panoptic  `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`
+
+---
+name: observe-with-panoptic
+description: 'Wire @warlock.js/ai-panoptic into an agent/workflow/supervisor/orchestrator with the one-call `panoptic({ exporters })` subscriber. Triggers: `panoptic`, `Panoptic`, `PanopticOptions`, `.attach`, `.middleware`, `.collect`, `.toTrace`, `observe.attach(agent)`, `panoptic().middleware()`, `completedEvents`, `middlewareName`; ''observe a warlock agent'', ''trace an agent run'', ''attach observability to a workflow/supervisor'', ''add a tracing middleware'', ''collect an orchestrator turn report'', ''wire OTel/Langfuse into my agent''; typical import `import { panoptic } from "@warlock.js/ai-panoptic"`. Skip: writing/choosing an exporter (the sink end) — `@warlock.js/ai-panoptic/export-traces/SKILL.md`; the core report shape / running the agent itself — `@warlock.js/ai/run-ai-agent/SKILL.md`.'
+---
+
+# Observe a run with Panoptic — the one-call subscriber
+
+`panoptic(...)` is the entry point. It builds a collector, registers your exporters on it, and hands back a subscriber with **three ways to feed traces** in. All three converge on the same collector, so each run reaches every exporter exactly once.
+
+```ts
+import { panoptic } from "@warlock.js/ai-panoptic";
+import { consoleExporter, otelExporter } from "@warlock.js/ai-panoptic";
+
+const observe = panoptic({
+  exporters: [consoleExporter(), otelExporter({ tracerName: "my-app" })],
+});
+```
+
+## Three feed paths
+
+| Path | Use when | API |
+|---|---|---|
+| **Events** | You want every run captured automatically and the primitive emits a `*.completed` event (agent / workflow / supervisor). | `observe.attach(target)` |
+| **Middleware** | The app already composes cross-cutting concerns through the agent middleware pipeline. | `panoptic().middleware()` |
+| **Direct** | The primitive carries no result-bearing event (the orchestrator), or you captured a report out of band. | `observe.collect(report)` |
+
+### 1. Attach to the event stream
+
+`attach` subscribes to the terminal `*.completed` events and returns a **detach** function:
+
+```ts
+const agent = ai.agent({ model });
+const detach = observe.attach(agent); // agent | workflow | supervisor
+
+await agent.execute("Summarize this");
+
+// ...later, on teardown:
+detach();
+await observe.shutdown();
+```
+
+By default Panoptic subscribes to `agent.completed`, `workflow.completed`, and `supervisor.completed` — the terminal events that carry the finalized `result.report`. These fire **once per run regardless of outcome** (the matching `*.error` fires first on failure, then `*.completed` still fires), so attaching captures completed, failed, and cancelled runs alike. Panoptic silently ignores the names a given target doesn't emit, so the same subscriber attaches to any of the three primitives.
+
+Narrow or widen the surface with `completedEvents`:
+
+```ts
+panoptic({ exporters, completedEvents: ["agent.completed"] }); // agents only
+```
+
+### 2. Wire it as agent middleware
+
+```ts
+const observe = panoptic({ exporters: [langfuseExporter({ /* ... */ })] });
+
+const agent = ai.agent({
+  model,
+  middleware: [observe.middleware()],
+});
+```
+
+The middleware feeds the collector from the `execute`-level `after` (success) and `onError` (failure) hooks. It never returns a value, so it never mutates the agent's result. Register more than one Panoptic middleware on the same agent by passing a distinct `middlewareName`:
+
+```ts
+panoptic({ middlewareName: "panoptic-secondary" }).middleware();
+```
+
+### 3. Collect a report directly
+
+The **orchestrator** emits `orchestrator.turn.*` events that carry only session identity — no result. Feed its report straight in:
+
+```ts
+const result = await orchestrator.execute(input, { sessionId });
+await observe.collect(result.report);
+```
+
+`collect(report)` also covers any report captured out of band (e.g. replayed from a store).
+
+## Failure isolation
+
+An observability fault never escapes onto the AI run's hot path:
+
+- The collector wraps every exporter invocation in `Promise.allSettled`, so a throwing exporter can't crash the run or block its siblings.
+- The event handler and the middleware additionally swallow the `collect` rejection, so even a collector-level fault stays contained.
+
+A broken backend degrades to *missing telemetry*, never a failed agent run.
+
+## Lifecycle
+
+```ts
+await observe.flush();    // drain buffered exporters (between batches / checkpoints)
+await observe.shutdown(); // flush + release every exporter (process teardown)
+```
+
+Call `shutdown()` on teardown so buffered exporters (`fileExporter` batches, the Langfuse client) send their last records before exit.
+
+## Bring your own collector or store
+
+Pass a pre-built collector to share one across several subscribers or to pre-wire the in-memory store as a sink:
+
+```ts
+import { panoptic, createCollector, createInMemoryTraceStore } from "@warlock.js/ai-panoptic";
+
+const store = createInMemoryTraceStore();      // doubles as an ExporterContract
+const collector = createCollector().use(store);
+
+const observe = panoptic({ collector, exporters: [consoleExporter()] });
+// store now also receives every trace — query it later:
+store.query({ status: "failed" });
+```
+
+Add exporters after construction with `observe.use(exporter)` (chainable, deduped by `ExporterContract.name`). `observe.toTrace(report)` projects a report into a `Trace` **without** dispatching — handy for inspection or tests.
+
+## See also
+
+- [`@warlock.js/ai-panoptic/export-traces/SKILL.md`](@warlock.js/ai-panoptic/export-traces/SKILL.md) — the sink end: choosing/writing an exporter, the `gen_ai.*` / `warlock.*` attribute mapping.
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent and the `BaseReport` shape Panoptic consumes.
 
 
 ================================================================================

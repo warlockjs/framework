@@ -116,6 +116,49 @@ type AgentReport = {
 
 `trips` and `toolCalls` are flat lists with timing and outcome on every entry — easy to write reporting on top of.
 
+### Cost truth — `usage`
+
+`usage` is more than a token total. It carries the full per-channel breakdown so cost dashboards can tell *how* a number was reached:
+
+```ts
+type Usage = {
+  input: number;            // prompt tokens (includes cachedTokens)
+  output: number;           // completion tokens (includes reasoningTokens)
+  total: number;
+  cachedTokens?: number;    // input served from the provider's prompt cache (read hits)
+  cacheWriteTokens?: number;// input WRITTEN to the cache this call (Anthropic cache_creation)
+  reasoningTokens?: number; // the reasoning/thinking subset of output (priced separately when the model does)
+  cost?: {                  // computed at emit time from tokens × the model's declared pricing
+    input?: number; output?: number; cachedInput?: number; cachedOutput?: number;
+  };
+};
+```
+
+`cost` is captured as a **historical fact** at emit time — stored reports stay accurate even after the upstream pricing table changes. It's `undefined` when no pricing is available (legacy adapters, unknown model names). For one scalar total, sum the populated fields:
+
+```ts
+const total =
+  (usage.cost?.input ?? 0) + (usage.cost?.output ?? 0) +
+  (usage.cost?.cachedInput ?? 0) + (usage.cost?.cachedOutput ?? 0);
+```
+
+All five provider adapters report this surface. See the [cost tracking recipe](../recipes/cost-tracking) for rolling it up across a report tree.
+
+### Reasoning and prompt caching
+
+Reasoning-capable and prompt-caching models accept extra `modelOptions`, gated by the model's own `capabilities` — an adapter that lacks the feature **ignores** the option rather than forwarding an unsupported parameter:
+
+```ts
+await myAgent.execute(input, {
+  modelOptions: {
+    reasoning: { effort: "high" },          // honored when capabilities.reasoning
+    cacheControl: { breakpoints: 1 },       // honored when capabilities.promptCaching
+  },
+});
+```
+
+`reasoning.effort` maps to the provider-native control (OpenAI `reasoning_effort`); `reasoning.maxTokens` caps the thinking budget. `cacheControl.breakpoints` translates into provider prompt-cache breakpoints. The resulting reasoning / cache token counts flow back through `usage`.
+
 ## Structured output
 
 ```ts
@@ -245,11 +288,90 @@ ai.agent({
 
 Off by default. Set this explicitly on agents whose registered tools have been observed to leak.
 
+## DX helpers around agents
+
+A handful of small utilities take the friction out of common agent patterns. They're not new primitives — each returns a plain agent, model, or result you already know how to use.
+
+### `ai.systemPrompt.fromFile(path)`
+
+Seed a system prompt from a file, read once at construction:
+
+```ts
+const writer = ai.agent({
+  model,
+  systemPrompt: ai.systemPrompt.fromFile("./prompts/writer.md"),
+});
+```
+
+Also available as `SystemPrompt.fromFile(path)`.
+
+### Executables auto-adapt in `tools: [...]`
+
+You no longer need to call `.asTool()` by hand to compose primitives. Pass a workflow, supervisor, or orchestrator straight into an agent's `tools` array and it is auto-adapted into a tool:
+
+```ts
+const concierge = ai.agent({
+  model,
+  tools: [searchTool, refundWorkflow, supportSupervisor],   // workflow + supervisor auto-adapted
+});
+```
+
+### `ai.fallbackModel(models, opts?)`
+
+Wrap an ordered model list that fails over to the next on transient provider errors (rate limits, timeouts) — drop it in anywhere a `model` is expected:
+
+```ts
+const model = ai.fallbackModel([
+  openai.model({ name: "gpt-4o" }),
+  anthropic.model({ name: "claude-sonnet-4" }),
+]);
+
+const agent = ai.agent({ model });
+```
+
+### `ai.batch(executable, items, opts?)`
+
+Run any executable over a dataset with bounded concurrency and per-item retry. A batch never fails as a whole — each item's outcome lives on its own `BatchItemResult`:
+
+```ts
+const { items, data, usage, report } = await ai.batch(summarizer, articles, {
+  concurrency: 4,
+  retry: { attempts: 3, backoff: "exponential" },
+  onItem: (item) => log(item.index, item.status),
+});
+
+console.log(`${report.succeeded}/${report.total} ok, ${usage.total} tokens`);
+```
+
+`data` is the positional array of successful items' `result.data` (with `undefined` in failed slots); `items` is the per-item breakdown. `usage` rolls up across every item.
+
+### Evaluation — `agent.eval(...)`
+
+Run a scored evaluation suite against an agent and get an aggregate `EvalReport`. Each case runs through `execute(input)` and is scored by the resolved scorers; a case passes only when every scorer passes and the agent didn't error:
+
+```ts
+const report = await myAgent.eval({
+  cases: [
+    { name: "capital", input: "Capital of Egypt?", expected: "Cairo" },
+  ],
+  scorers: [ai.eval.contains()],     // exact / contains / predicate(fn) / judge(config)
+});
+
+expect(report.passed).toBe(true);
+```
+
+`ai.eval.judge({ agent, rubric })` is LLM-as-judge. In Vitest, `registerAiMatchers()` adds `toRouteTo` / `toConverge` / `toPassStep` / `toOutputShape`. `eval()` never throws on a case failure — failures surface on the report.
+
+### `ai.router()`, `ai.fanOut()`, `ai.mockRouter()`
+
+Supervisor-oriented helpers — see [Run supervisor](../digging-deeper/run-supervisor) for `ai.router()` (generate the routing agent) and `ai.fanOut()` (voting / self-consistency). `ai.mockRouter(decisions)` replays canned routing decisions for supervisor tests.
+
 ## When to graduate to the next rung
 
 - **Fixed pipeline of several agents** → [Run workflow](../digging-deeper/run-workflow).
 - **One input routed across specialists** → [Run supervisor](../digging-deeper/run-supervisor).
-- **Multi-turn conversation with persistent session** → orchestrator (v2). For now, persist your own messages and feed via `history`.
+- **Multi-turn conversation with persistent session** → [Run orchestrator](../digging-deeper/run-orchestrator) — durable session state across runs.
+- **Plan generated up front, then executed** → [Planner](../architecture-concepts/planner).
 
 ## Related
 

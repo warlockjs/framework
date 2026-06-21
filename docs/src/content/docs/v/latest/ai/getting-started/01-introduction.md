@@ -16,18 +16,17 @@ You'll work with three primitives in production today, plus a fourth on the road
 ai.agent()        →  one LLM turn, optional tool loop, optional structured output
 ai.workflow()     →  ordered steps with deterministic shape, resumable
 ai.supervisor()   →  classifier + router + specialists, can iterate to a goal
-ai.orchestrator() →  long-lived stateful session (v2 — not shipped)
+ai.orchestrator() →  long-lived stateful session — durable state, resume, memory
 ```
 
-Each rung handles a job the rung below can't do cleanly. Each one is built on the rung below — workflows can dispatch agents, supervisors can dispatch agents and workflows, every primitive exposes `.asTool()` so the model can call into it.
+Each rung handles a job the rung below can't do cleanly. Each one is built on the rung below — workflows can dispatch agents, supervisors can dispatch agents and workflows, the orchestrator wraps a supervisor, and every primitive exposes `.asTool()` so the model can call into it.
 
 ## When to reach for what
 
 - **One model call** with maybe a tool loop → `ai.agent({...})`. Stateless. Lowest overhead.
 - **A pipeline with a fixed shape** — fetch, extract, classify, save — and you want it to survive a crash mid-run → `ai.workflow({...})`. Resumable, deterministic.
 - **One input, multiple specialists, decided at runtime** — billing vs shipping vs returns — possibly iterated to a satisfactory answer → `ai.supervisor({...})`.
-
-If you find yourself reaching for an orchestrator-style "session that remembers everything across calls" — that's v2 territory. For now, model the session as input + history fed into an agent or supervisor on every call.
+- **A session that remembers across calls** — durable session state, history compaction, resume → `ai.orchestrator({...})`. You still own the transcript and feed it via `history`; the orchestrator persists the session state around it.
 
 ## The shape every primitive returns
 

@@ -14,6 +14,22 @@
       "slug": "ai-anthropic"
     },
     {
+      "name": "@warlock.js/ai-bedrock",
+      "slug": "ai-bedrock"
+    },
+    {
+      "name": "@warlock.js/ai-google",
+      "slug": "ai-google"
+    },
+    {
+      "name": "@warlock.js/ai-ollama",
+      "slug": "ai-ollama"
+    },
+    {
+      "name": "@warlock.js/ai-openai",
+      "slug": "ai-openai"
+    },
+    {
       "name": "@warlock.js/auth",
       "slug": "auth"
     },
@@ -51,6 +67,319 @@
     }
   ],
   "releases": [
+    {
+      "version": "4.3.0",
+      "id": "v4-3-0",
+      "date": "June 21, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "Self-update tooling for the framework. <strong><code>@warlock.js/core</code></strong> adds the <code>warlock update</code> command — it bumps every <code>@warlock.js/*</code> package in your project's <code>package.json</code> to the latest version (preserving each range operator) and runs your package manager's install — and <code>warlock dev</code> now prints a non-blocking notice when a newer release is published, toggleable via <code>devServer.checkForUpdates</code>. <strong><code>@warlock.js/ai</code></strong> ships the capstone of the primitive ladder: <code>ai.orchestrator()</code> for durable, drift-detecting, resumable multi-turn sessions (with checkpoint + snapshot stores via <code>ai.checkpoint.*</code> / <code>ai.snapshot.*</code>, history compaction, and a 3-tier event surface), plus <code>ai.planner()</code> (an LLM generates an ordered plan over your capabilities, then runs it), <code>ai.spawnSubAgent()</code>, and <code>ai.memory()</code> (working / semantic / episodic / procedural recall). A cost-truth pass lands across all five provider adapters (<code>Usage.reasoningTokens</code>, per-channel pricing, reasoning / prompt-cache controls), alongside DX helpers — <code>ai.batch</code>, <code>ai.router</code>, <code>ai.fanOut</code>, <code>ai.fallbackModel</code>, <code>ai.mockRouter</code>, <code>agent.eval</code> + Vitest matchers, and <code>systemPrompt.fromFile</code>. ⚠ <strong>Breaking:</strong> supervisor + workflow snapshot persistence moved from a <code>CacheDriver</code> to the dedicated <code>SnapshotStore</code> contract (<code>snapshotStore: ai.snapshot.&lt;tier&gt;(…)</code>; the fallback is now <code>ai.config({ defaultSnapshotStore })</code>). A new package, <strong><code>@warlock.js/ai-panoptic</code></strong>, adds observability — a collector that projects run reports into traces and exports them to OpenTelemetry, Langfuse, the console, a file, or a queryable in-memory store.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>warlock update</code> — update every <code>@warlock.js/*</code> package in package.json to its latest version (operator preserved), then run the detected package manager's install"
+            },
+            {
+              "type": "Added",
+              "html": "dev-server update notice — <code>warlock dev</code> checks npm on start and prints a one-line notice when a newer <code>@warlock.js/core</code> is published"
+            },
+            {
+              "type": "Added",
+              "html": "<code>devServer.checkForUpdates</code> config flag (default <code>true</code>) to toggle the dev-server update notice"
+            },
+            {
+              "type": "Added",
+              "html": "<code>fetchLatestVersion()</code> and <code>isNewerVersion()</code> registry/version utilities"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock dev --skip-typings</code> and <code>--skip-health</code> long-form flags now work (were silently ignored)"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 37,
+          "counts": [
+            {
+              "type": "⚠ BREAKING",
+              "n": 1
+            },
+            {
+              "type": "Added",
+              "n": 36
+            }
+          ],
+          "items": [
+            {
+              "type": "⚠ BREAKING",
+              "html": "<strong>Supervisor + workflow snapshot persistence moved from <code>CacheDriver</code> to the dedicated <code>SnapshotStore</code> contract.</strong> <code>SupervisorConfig.snapshotStore</code> and <code>WorkflowConfig.snapshotStore</code> are now typed <code>SnapshotStore</code> (from <code>src/contracts/orchestrator/</code>), no longer <code>CacheDriver&lt;…&gt;</code>. The per-primitive fallback is now <code>ai.config({ defaultSnapshotStore })</code> (a <code>SnapshotStore</code>) instead of <code>ai.config({ defaultStore })</code> (a <code>CacheDriver</code>); <code>defaultStore</code> continues to serve the semantic-cache middleware only. <strong>Migration:</strong> replace <code>snapshotStore: cache.driver(\"redis\", { client })</code> with <code>snapshotStore: ai.snapshot.redis({ client })</code> (and <code>ai.snapshot.{memory,pg}</code> for the other tiers), and move any <code>ai.config({ defaultStore })</code> you relied on for snapshot resume to <code>ai.config({ defaultSnapshotStore: ai.snapshot.&lt;tier&gt;(…) })</code>. Semantic-cache <code>defaultStore</code> wiring is unaffected."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.orchestrator()</code> — stateful session manager wrapped around a supervisor: owns durable session/history/context, drift detection, history compaction, resume, and a command surface"
+            },
+            {
+              "type": "Added",
+              "html": "<code>orchestrator.asTool()</code> — expose an orchestrator inside an agent's tool loop"
+            },
+            {
+              "type": "Added",
+              "html": "3-tier orchestrator event surface via <code>OrchestratorEmitter</code>, including <code>orchestrator.compaction.failed</code> (emitted when a post-turn <code>summarize</code> / <code>onCompact</code> step throws, instead of silently swallowing it)"
+            },
+            {
+              "type": "Added",
+              "html": "<code>OrchestratorContract</code>, <code>OrchestratorConfig</code>, <code>OrchestratorResult</code>, and the orchestrator event / command contract types (<code>src/contracts/orchestrator/</code>)"
+            },
+            {
+              "type": "Added",
+              "html": "<code>OrchestratorFailedError</code>, <code>OrchestratorConfigError</code>, <code>OrchestratorDriftError</code>, <code>OrchestratorCancelledError</code> error classes"
+            },
+            {
+              "type": "Added",
+              "html": "<code>\"orchestrator\"</code> member added to the <code>ReportType</code> union"
+            },
+            {
+              "type": "Added",
+              "html": "<code>CheckpointStore</code> + <code>CheckpointRecord</code> contracts for orchestrator session state, including an optional <code>prune?()</code> hook so <code>keepSnapshots</code> bounds growth (implemented on the in-memory store)"
+            },
+            {
+              "type": "Added",
+              "html": "<code>SnapshotStore</code> contract plus structural <code>PgClientLike</code> / <code>RedisClientLike</code> client interfaces"
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.checkpoint.{memory,pg,redis}()</code> — durable orchestrator session checkpoint stores"
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.snapshot.{memory,pg,redis}()</code> — supervisor / workflow run snapshot stores"
+            },
+            {
+              "type": "Added",
+              "html": "<code>PgCheckpointOptions</code>, <code>RedisCheckpointOptions</code>, <code>PgSnapshotStoreOptions</code>, <code>RedisSnapshotStoreOptions</code> types"
+            },
+            {
+              "type": "Added",
+              "html": "<code>defaultCheckpointStore</code> and <code>defaultSnapshotStore</code> fields on <code>ai.config()</code>, with <code>resolveDefaultCheckpointStore()</code> / <code>resolveDefaultSnapshotStore()</code> resolvers"
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.memory()</code> — agent-memory store with four tiers: <strong>working</strong> (in-run scratch, recency), <strong>semantic</strong> (durable facts by cache-driver <code>.similar()</code>), <strong>episodic</strong> (durable events, similarity blended with recency via per-entry timestamp + <code>recencyWeight</code> / <code>halfLifeMs</code>), and <strong>procedural</strong> (durable how-tos, similarity blended with reinforcement — re-remembering increments a use count, <code>reinforcementWeight</code>). Decay / forgetting remains deferred"
+            },
+            {
+              "type": "Added",
+              "html": "The <code>MemoryTier</code> union widened from <code>\"working\" | \"semantic\"</code> to add <code>\"episodic\" | \"procedural\"</code> (non-breaking). The three vector tiers default to distinct namespaces (<code>ai.memory.semantic</code> / <code>.episodic</code> / <code>.procedural</code>) so they don't collide on a shared cache driver"
+            },
+            {
+              "type": "Added",
+              "html": "Orchestrator <code>memory?</code> field wiring memory recall + write-back into each turn"
+            },
+            {
+              "type": "Added",
+              "html": "<code>MemoryContract</code>, <code>MemoryConfig</code>, <code>SemanticMemoryConfig</code>, <code>EpisodicMemoryConfig</code>, <code>ProceduralMemoryConfig</code>, <code>MemoryItem</code>, <code>MemoryTier</code>, <code>RecalledMemory</code>, <code>RecallOptions</code> types"
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.planner()</code> — LLM generates an ordered plan over your registered capabilities, then executes it step-by-step"
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.spawnSubAgent()</code> — one-shot delegation to a fresh single-use agent with an optional per-task budget. A <strong>general</strong> agent helper (lives on the agent surface, not the planner): usable from a planner step, a tool, a workflow step, or hand-rolled orchestration — the planner engine does not require it"
+            },
+            {
+              "type": "Added",
+              "html": "<code>PlannerConfig</code>, <code>PlannerCapability</code>, <code>PlannerResult</code>, <code>PlannerReport</code>, <code>PlannerStep</code>, <code>PlannerPlan</code> types"
+            },
+            {
+              "type": "Added",
+              "html": "<code>\"planner\"</code> member added to the <code>ReportType</code> union"
+            },
+            {
+              "type": "Added",
+              "html": "<code>PlannerFailedError</code>, <code>PlannerPlanInvalidError</code>, <code>PlannerCancelledError</code> error classes"
+            },
+            {
+              "type": "Added",
+              "html": "<code>Usage.reasoningTokens</code> — the reasoning / thinking subset of output tokens, priced separately"
+            },
+            {
+              "type": "Added",
+              "html": "<code>ModelPricing.{cachedInput, cachedOutput, reasoning}</code> per-channel rates; <code>Usage.cost</code> rolls up <code>{ input, output, cachedInput?, cachedOutput? }</code>"
+            },
+            {
+              "type": "Added",
+              "html": "<code>ModelCallOptions.{reasoning, cacheControl}</code> — reasoning-effort / thinking-budget and prompt-cache breakpoint controls"
+            },
+            {
+              "type": "Added",
+              "html": "<code>ModelContract.capabilities.{reasoning, cacheControl}</code> flags — adapters that lack the feature ignore the options rather than forwarding unsupported parameters"
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.router()</code> — builds a supervisor router agent with a generated <code>{ next, reasoning }</code> schema and intent-listing prompt"
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.fanOut()</code> — spreads one agent/workflow into N keyed intents for voting / self-consistency"
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.batch()</code> — run an executable over a dataset with bounded concurrency + per-item retry; <code>BatchResult</code>, <code>BatchItemResult</code>, <code>BatchOptions</code> types"
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.fallbackModel()</code> — wraps an ordered model list, failing over on transient provider errors"
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.mockRouter()</code> — canned routing-decision replay for supervisor tests"
+            },
+            {
+              "type": "Added",
+              "html": "<code>agent.eval()</code> — runs scored evaluation cases and returns an aggregate <code>EvalReport</code>; <code>EvalCase</code>, <code>EvalScore</code>, <code>EvalScorer</code>, <code>EvalJudge</code>, <code>EvalOptions</code>, <code>EvalCaseResult</code>, <code>EvalReport</code> types"
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.eval.{exact,contains,predicate,judge}()</code> built-in eval scorers (incl. LLM-as-judge)"
+            },
+            {
+              "type": "Added",
+              "html": "<code>registerAiMatchers()</code> — Vitest matchers <code>toRouteTo</code> / <code>toConverge</code> / <code>toPassStep</code> / <code>toOutputShape</code> (plus library-agnostic <code>matchRouteTo</code> / <code>matchConverge</code> / <code>matchPassStep</code> / <code>matchOutputShape</code> verdict functions and the <code>AiMatchers</code> type)"
+            },
+            {
+              "type": "Added",
+              "html": "Supervisor-level middleware via the <code>supervisor</code> hook map on <code>AgentMiddleware</code> and <code>SupervisorConfig.middleware</code>"
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.systemPrompt.fromFile(path)</code> (and <code>SystemPrompt.fromFile(path)</code>) — seed a system prompt from a file read once at construction"
+            },
+            {
+              "type": "Added",
+              "html": "Executables passed in an agent's <code>tools: [...]</code> are auto-adapted into tools (workflows / supervisors / orchestrators expose <code>.asTool()</code> and compose directly)"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong>Cost-truth contract wiring.</strong> Capabilities now report <code>reasoning</code>, <code>promptCaching</code>, <code>pdf</code>, and <code>audio</code> truthfully per model family (inferred from the model id, overridable via <code>bedrock.model({ name, reasoning?, promptCaching?, pdf?, audio? })</code>): <code>reasoning</code> for Claude 3.7 + Claude 4, <code>promptCaching</code> for Claude 3.5+/3.7/4 and Nova, <code>pdf</code> for Claude 3+ and Nova, <code>audio</code> defaulting to <code>false</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Reasoning / extended thinking.</strong> <code>ModelCallOptions.reasoning</code> maps to Converse <code>additionalModelRequestFields.thinking = { type: \"enabled\", budget_tokens }</code> for reasoning-capable models — <code>reasoning.maxTokens</code> is the explicit budget, <code>reasoning.effort</code> (low/medium/high) maps to a conventional budget. No-ops for non-reasoning models so unsupported params never reach the wire."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Prompt-cache write breakpoints.</strong> <code>ModelCallOptions.cacheControl.breakpoints</code> appends a Converse <code>cachePoint</code> block to the last message for <code>promptCaching</code>-capable models."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>Usage.cacheWriteTokens</code></strong> populated from Converse <code>usage.cacheWriteInputTokens</code> on both <code>complete()</code> and <code>stream()</code> (alongside the existing <code>cachedTokens</code> from <code>cacheReadInputTokens</code>). <code>Usage.reasoningTokens</code> is intentionally left unset — Bedrock's Converse <code>TokenUsage</code> reports no reasoning-token channel."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Cost-truth contract wiring. <code>ModelCapabilities</code> now reports <code>reasoning</code> (inferred from thinking-capable model tags — <code>deepseek-r1</code>, <code>qwq</code>, <code>qwen3</code>, <code>magistral</code>, <code>phi4-reasoning</code>, <code>cogito</code>, <code>smallthinker</code>, <code>exaone-deep</code>, <code>gpt-oss</code>; overridable via <code>ollama.model({ name, reasoning })</code>), plus <code>promptCaching</code>, <code>audio</code>, and <code>pdf</code> reported truthfully as <code>false</code> (Ollama supports none)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ModelCallOptions.reasoning</code> maps onto Ollama's native <code>think</code> request flag: <code>reasoning.effort</code> (<code>low</code>/<code>medium</code>/<code>high</code>) passes straight through, and an effort-less hint becomes <code>think: true</code>. The flag is sent only to <code>reasoning</code>-capable models; <code>reasoning.maxTokens</code> and <code>cacheControl</code> are honored as graceful no-ops (Ollama exposes no thinking-budget cap and no prompt cache)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Cost-truth wiring against the core <code>@warlock.js/ai</code> contract: - <strong>Usage accounting</strong> — <code>usage.cacheWriteTokens</code> is now populated from Anthropic's <code>cache_creation_input_tokens</code> (the cache-write surcharge), alongside the existing <code>cachedTokens</code> (from <code>cache_read_input_tokens</code>). In streaming, both are seeded from <code>message_start</code> and then refreshed from the cumulative <code>message_delta</code> counts. <code>reasoningTokens</code> is intentionally left unset because Anthropic bills extended-thinking tokens inside <code>output_tokens</code>. - <strong>Extended thinking</strong> — <code>ModelCallOptions.reasoning</code> now maps to Anthropic's <code>thinking: { type: \"enabled\", budget_tokens }</code>. <code>reasoning.maxTokens</code> sets the budget directly; <code>reasoning.effort</code> (<code>low</code>/<code>medium</code>/<code>high</code>) maps to a tiered budget (<code>1024</code>/<code>4096</code>/<code>12000</code>); any budget is floored at the <code>1024</code> minimum. <code>temperature</code> is dropped when thinking is enabled (Anthropic rejects the combination). New <code>reasoning?: boolean</code> model-config override. - <strong>System-prompt prompt caching</strong> — a per-call <code>ModelCallOptions.cacheControl.breakpoints &gt;= 1</code> now emits the hoisted system prompt as a <code>TextBlockParam</code> carrying <code>cache_control: { type: \"ephemeral\" }</code>, independent of the existing tools-caching <code>promptCaching</code> flag. - <strong>Capabilities</strong> — <code>reasoning</code> (default <code>true</code>, overridable), <code>promptCaching</code> (<code>true</code>), and <code>pdf</code> (<code>true</code>) are now advertised on <code>ModelCapabilities</code>; <code>audio</code> stays absent (Anthropic has no audio-input block)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Cost-truth contract wiring (additive, non-breaking): - <code>Usage.reasoningTokens</code> is now populated from Gemini's <code>usageMetadata.thoughtsTokenCount</code> (thinking-phase tokens), alongside the existing <code>Usage.cachedTokens</code> from <code>cachedContentTokenCount</code>. Both surface only when reported <code>&gt; 0</code>. - <code>ModelCallOptions.reasoning</code> maps to Gemini's <code>config.thinkingConfig</code>: <code>reasoning.maxTokens</code> → <code>thinkingBudget</code> directly, <code>reasoning.effort</code> → a bucketed budget (<code>low</code> 1024 / <code>medium</code> 8192 / <code>high</code> 24576). Honored only for <code>reasoning</code>-capable models. - <code>ModelCapabilities</code> now reports <code>reasoning: true</code>, <code>promptCaching: true</code>, and <code>audio</code> / <code>pdf</code> (mirroring the multimodal <code>vision</code> inference) for Gemini models. New <code>GoogleModelConfig</code> overrides: <code>reasoning</code>, <code>audio</code>, <code>pdf</code>. - <code>ModelCallOptions.cacheControl</code> is accepted as a graceful no-op (Gemini has no per-call cache-write breakpoint; read-side <code>cachedTokens</code> accounting is unaffected)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Cost-truth wiring (additive, non-breaking): - <code>Usage.reasoningTokens</code> now populated from <code>completion_tokens_details.reasoning_tokens</code> on both <code>complete()</code> and the streaming <code>done</code> event (o-series / gpt-5 hidden reasoning channel). Emitted only when &gt; 0. - <code>ModelCallOptions.reasoning.effort</code> mapped to the provider-native <code>reasoning_effort</code> request param. Forwarded only for reasoning-capable models; <code>reasoning.maxTokens</code> has no Chat Completions equivalent and is ignored. - <code>ModelCapabilities.reasoning</code> inferred from the model name (<code>o1*</code> / <code>o3*</code> / <code>o4*</code> / <code>gpt-5*</code>), overridable via <code>.model({ name, reasoning })</code>. New <code>known-reasoning-models.ts</code> prefix helper. - <code>ModelCapabilities.promptCaching</code> advertised as always <code>true</code> (OpenAI caches automatically and reports hits via <code>Usage.cachedTokens</code>). <code>ModelCallOptions.cacheControl</code> write breakpoints are a graceful no-op."
+            }
+          ]
+        }
+      ]
+    },
     {
       "version": "4.2.11",
       "id": "v4-2-11",

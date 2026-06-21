@@ -5,9 +5,11 @@
  * speaks to (right). Capabilities + providers are sourced from packages.mdx.
  */
 const capabilities = [
-  { title: "Typed agents", body: "Inputs and outputs are typed; structured output is validated, not parsed by hope." },
-  { title: "Tools", body: "Define a tool with Seal and hand it to an agent — the schema is the contract." },
+  { title: "Typed agents & tools", body: "Inputs and outputs are typed; structured output is validated, not parsed by hope." },
   { title: "Workflows & supervisors", body: "Compose agents into multi-step workflows, with a supervisor routing the work." },
+  { title: "Stateful orchestrators", body: "Multi-turn sessions with durable state, resume, and compaction — plus working and semantic memory." },
+  { title: "Self-directed planner", body: "Hand the agent a goal and a toolbox; it generates its own plan and runs it." },
+  { title: "Built-in observability", body: "Trace every run and export to OpenTelemetry or Langfuse with Panoptic." },
   { title: "Same envelope", body: "Retries, middleware, and errors behave exactly like the rest of the framework." },
 ];
 
@@ -25,8 +27,9 @@ const providers = [
     <p class="warlock-section-kicker">[ AI-native ]</p>
     <h2 class="warlock-section-title">A first-class AI layer, not a plugin</h2>
     <p class="warlock-section-sub">
-      Typed agents, tools, and workflows that behave like everything else you
-      write. Swap the model provider without touching your agent code.
+      Typed agents, workflows, supervisors, orchestrators, a self-directed
+      planner, and memory — all behaving like everything else you write. Swap
+      the model provider without touching your agent code.
     </p>
   </div>
 

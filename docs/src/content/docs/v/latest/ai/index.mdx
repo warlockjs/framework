@@ -18,10 +18,12 @@ The package is provider-agnostic on purpose. The model, the embedder, the pricin
 ai.agent()        →  single LLM turn, tool loop, structured output
 ai.workflow()     →  deterministic multi-step pipeline, resumable
 ai.supervisor()   →  multi-intent router with specialists, iterative
-ai.orchestrator() →  stateful session-aware orchestration   (v2 — not shipped)
+ai.orchestrator() →  stateful session-aware orchestration (durable sessions, resume)
 ```
 
 Each primitive is an escape hatch to the next rung of complexity. Start at the bottom; graduate up only when you need to. Every primitive returns the same envelope (`{ data, error, usage, report }`) and exposes `.asTool()`, so they compose freely.
+
+Beyond the ladder, 4.3.0 adds `ai.planner()` (an LLM generates an ordered plan over your capabilities, then runs it), `ai.memory()` (working + semantic recall across turns), and a separate observability package, `@warlock.js/ai-panoptic`, that exports run traces to OpenTelemetry, Langfuse, the console, a file, or a queryable store.
 
 ## Why a separate package
 
@@ -40,9 +42,10 @@ Each primitive is an escape hatch to the next rung of complexity. Start at the b
 
 ## Where to go after
 
-- [Architecture and concepts](./architecture-concepts/agents) — the mental model behind agents, workflows, supervisors, middleware.
+- [Architecture and concepts](./architecture-concepts/agents) — the mental model behind agents, workflows, supervisors, orchestrators, memory, planner, middleware.
 - [The basics](./the-basics/run-agent) — the surface you'll touch every day.
-- [Digging deeper](./digging-deeper/run-workflow) — workflows, supervisors, persistence, errors.
+- [Digging deeper](./digging-deeper/run-workflow) — workflows, supervisors, orchestrators, persistence, errors.
+- [Observability](./observability/ai-panoptic) — export traces with `@warlock.js/ai-panoptic`.
 - [Recipes](./recipes/basic-agent) — copy-paste solutions for common patterns.
 - [Reference](./reference/api) — every public export grouped by primitive.
 

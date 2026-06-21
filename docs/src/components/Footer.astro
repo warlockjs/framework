@@ -1,5 +1,6 @@
 ---
 import Default from "@astrojs/starlight/components/Footer.astro";
+import logo from "../assets/logo.png";
 
 const year = new Date().getFullYear();
 ---
@@ -9,7 +10,7 @@ const year = new Date().getFullYear();
 <footer class="warlock-footer">
   <div class="warlock-footer-inner">
     <div class="warlock-footer-brand">
-      <span class="warlock-footer-mark">⚡</span>
+      <img src={logo.src} alt="" width="20" height="20" class="warlock-footer-mark" />
       <span class="warlock-footer-name">Warlock.js</span>
       <span class="warlock-footer-tag">AI-native TypeScript framework</span>
     </div>
@@ -59,9 +60,10 @@ const year = new Date().getFullYear();
   }
 
   .warlock-footer-mark {
-    color: var(--sl-color-text-accent);
-    font-size: 1.1rem;
-    line-height: 1;
+    width: 20px;
+    height: 20px;
+    display: block;
+    flex: none;
   }
 
   .warlock-footer-name {

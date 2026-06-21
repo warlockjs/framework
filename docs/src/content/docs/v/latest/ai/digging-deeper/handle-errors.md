@@ -2,7 +2,7 @@
 title: "Handle errors"
 description: The typed AIError hierarchy — stable codes, coarse categories, retry strategy per family.
 sidebar:
-  order: 6
+  order: 7
   label: "Handle errors"
 ---
 
@@ -10,7 +10,7 @@ Every error surfaced by `@warlock.js/ai` and every adapter package is an `AIErro
 
 ## Two invariants
 
-1. **`execute()` never throws.** Every `agent.execute()` / `workflow.execute()` / `supervisor.execute()` resolves with a well-formed result. Failures funnel into `result.error`. Same for `stream.result`.
+1. **`execute()` never throws.** Every `agent.execute()` / `workflow.execute()` / `supervisor.execute()` / `orchestrator.execute()` / `planner.execute()` resolves with a well-formed result. Failures funnel into `result.error`. Same for `stream.result`. (Author-time misconfiguration — e.g. a bad `ai.orchestrator()` config — still throws at the factory call, not on execute.)
 2. **Every error is an `AIError`.** Both core and adapter packages funnel everything through `AIError` subclasses. Branch on `error.code` (stable string) or `instanceof`.
 
 ## Dispatch pattern
@@ -87,6 +87,16 @@ AIError  (base — code, category, message, cause?, context?)
 │   ├── WorkflowCancelledError   WORKFLOW_CANCELLED         { cancelledAt, reason }
 │   ├── MaxStepsExceededError    WORKFLOW_MAX_STEPS         { maxSteps }
 │   └── RoutingError             WORKFLOW_INVALID_GOTO      { stepName, targetName }
+├── SupervisorFailedError (base)
+│   ├── SupervisorDriftError     SUPERVISOR_DRIFT           { savedSignature, currentSignature }
+│   └── MaxIterationsError       SUPERVISOR_MAX_ITERATIONS  { maxIterations }
+├── OrchestratorFailedError (base)  ORCHESTRATOR_FAILED
+│   ├── OrchestratorDriftError   ORCHESTRATOR_DRIFT         { savedSignature, currentSignature } — drift
+│   ├── OrchestratorConfigError  ORCHESTRATOR_CONFIG        — validation (thrown at factory call)
+│   └── OrchestratorCancelledError ORCHESTRATOR_CANCELLED   — cancelled
+├── PlannerFailedError (base)       PLANNER_FAILED
+│   ├── PlannerPlanInvalidError  PLANNER_PLAN_INVALID       — schema (the LLM's plan failed validation)
+│   └── PlannerCancelledError    PLANNER_CANCELLED          — cancelled
 ├── ProviderError                PROVIDER_ERROR  (base + catch-all)
 │   ├── ProviderRateLimitError   PROVIDER_RATE_LIMIT        { retryAfter? } — transient
 │   ├── QuotaExceededError       PROVIDER_QUOTA_EXCEEDED    — NOT retryable (billing cap)
@@ -122,9 +132,11 @@ Typed fields (`retryAfter`, `toolName`, `issues`, `stepName`, etc.) are first-cl
 | `ContentFilterError` | Usually **no** — the prompt is the issue |
 | `SchemaValidationError` | Use agent `repair: { maxAttempts }` instead |
 | `ToolExecutionError` | Depends on `cause` |
-| `WorkflowDriftError` | **No** — manual migration or `force: true` |
-| `WorkflowCancelledError` | **No** — caller-driven cancel |
-| `MaxStepsExceededError` / `RoutingError` | **No** — programmer error |
+| `WorkflowDriftError` / `SupervisorDriftError` / `OrchestratorDriftError` | **No** — manual migration or `force: true` |
+| `WorkflowCancelledError` / `OrchestratorCancelledError` / `PlannerCancelledError` | **No** — caller-driven cancel |
+| `MaxStepsExceededError` / `MaxIterationsError` / `RoutingError` | **No** — programmer error / cap |
+| `OrchestratorConfigError` | **No** — fix the config (thrown at the factory call) |
+| `PlannerPlanInvalidError` | **No** — the LLM's plan failed schema validation; adjust capabilities / prompt |
 | `BudgetExceededError` | **No** — raise the cap, split the workload |
 | `GuardrailViolationError` (`phase: "input"`) | **No** — block / sanitize at the product layer |
 | `GuardrailViolationError` (`phase: "output"`) | Sometimes — re-prompt with adjusted system message |
@@ -180,5 +192,7 @@ async function runWithFallbacks(input: string) {
 
 - [Run agent](../the-basics/run-agent) — `AgentResult.error`.
 - [Run workflow](./run-workflow) — `WorkflowError` subclasses.
+- [Run orchestrator](./run-orchestrator) — `OrchestratorDriftError`, `OrchestratorConfigError`.
+- [Planner](../architecture-concepts/planner) — `PlannerPlanInvalidError`, `PlannerCancelledError`.
 - [Define tools](../the-basics/define-tools) — `ToolExecutionError` wrapping.
 - [Log AI calls](./log-ai-calls) — error logging.

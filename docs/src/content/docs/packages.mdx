@@ -6,7 +6,7 @@ template: splash
 
 import { Card, CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-Thirteen packages, four groups — plus five AI provider adapters nested under
+Fourteen packages, four groups — plus five AI provider adapters nested under
 the AI package. Each one is independently installable; together they form a
 cohesive framework.
 
@@ -40,7 +40,8 @@ cohesive framework.
 ## AI
 
 <CardGrid>
-  <LinkCard title="AI" href="/v/latest/ai/" description="Agents, workflows, supervisors, tools, system prompts." />
+  <LinkCard title="AI" href="/v/latest/ai/" description="Agents, tools, workflows, supervisors, orchestrators, a planner, and memory." />
+  <LinkCard title="AI Panoptic" href="/v/latest/ai/observability/ai-panoptic/" description="Observability for AI — a trace collector with OpenTelemetry, Langfuse, console, and file exporters." />
   <LinkCard title="OpenAI" href="/v/latest/ai/providers/openai/" description="OpenAI provider adapter." />
   <LinkCard title="Anthropic" href="/v/latest/ai/providers/anthropic/" description="Anthropic provider adapter." />
   <LinkCard title="Bedrock" href="/v/latest/ai/providers/bedrock/" description="AWS Bedrock provider adapter." />

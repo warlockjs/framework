@@ -32,7 +32,10 @@ const OUT_FILE = resolve(OUT_DIR, "changelog.json");
 const SHOW_UNRELEASED = false;
 
 // Section order on the page (Keep-a-Changelog, the order requested).
-const TYPE_ORDER = ["New", "Added", "Changed", "Fixed", "Deprecated", "Removed", "Security"];
+// `⚠ BREAKING` is surfaced first when a package's CHANGELOG flags a
+// breaking change with that heading, so the most consequential change
+// in a release reads at the top of the package block.
+const TYPE_ORDER = ["⚠ BREAKING", "New", "Added", "Changed", "Fixed", "Deprecated", "Removed", "Security"];
 
 function slugOf(name) {
   const i = name.lastIndexOf("/");

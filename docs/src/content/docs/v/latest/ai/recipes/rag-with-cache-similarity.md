@@ -121,7 +121,10 @@ const { text, report } = await supportAgent.execute(
 console.log(text);
 
 // Inspect what the agent retrieved
-const searchCalls = report.toolCalls.filter((c) => c.name === "search_kb");
+const searchCalls = report.children.filter(
+  (c): c is import("@warlock.js/ai").ToolCall =>
+    c.type === "tool" && c.name === "search_kb",
+);
 for (const call of searchCalls) {
   console.log("retrieved:", call.output);
 }

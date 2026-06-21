@@ -89,10 +89,10 @@ const costTracker: AgentMiddleware = {
       if (!result.usage.cost) return;
 
       await spendsRepo.create({
-        sessionId: ctx.sessionId,
+        sessionId: ctx.options?.sessionId,
         agentName: ctx.agent.name,
-        modelName: ctx.agent.model.name,
-        provider: ctx.agent.model.provider,
+        modelName: ctx.model.name,
+        provider: ctx.model.provider,
         inputTokens: result.usage.input,
         outputTokens: result.usage.output,
         inputUSD: result.usage.cost.input,

@@ -12,10 +12,9 @@ sidebar:
 
 ```ts
 import { ai } from "@warlock.js/ai";
-import { MemoryCacheDriver } from "@warlock.js/cache";
 import { v } from "@warlock.js/seal";
 
-ai.config({ defaultStore: new MemoryCacheDriver() });
+ai.config({ defaultSnapshotStore: ai.snapshot.memory() });   // for resume; see Persist AI data
 
 type CatalogInput = { url: string };
 type CatalogOutput = { id: string };
@@ -236,14 +235,15 @@ Every payload carries `runId` and `rootRunId`.
 
 ## When NOT to use a workflow
 
-- **Unknown shape at author time** — wait for `ai.planner()` (v3) or model as a supervisor.
+- **Unknown shape at author time** — reach for [`ai.planner()`](../architecture-concepts/planner) (LLM generates the plan) or model as a supervisor.
 - **Quality loop until goal met** — `ai.supervisor()` with `evaluate`.
-- **Multi-turn conversation with persistent session** — orchestrator (v2).
+- **Multi-turn conversation with persistent session** — [`ai.orchestrator()`](./run-orchestrator).
 - **Iterate a runtime list of items** — wrap a workflow with the `ai.batch()` utility.
 
 ## Related
 
 - [Run agent](../the-basics/run-agent) — agents inside steps.
 - [Run supervisor](./run-supervisor) — the next rung up.
+- [Run orchestrator](./run-orchestrator) — durable sessions across runs.
 - [Persist AI data](./persist-ai-data) — snapshot resume.
 - [Handle errors](./handle-errors) — `WorkflowError` subclasses.

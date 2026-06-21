@@ -142,7 +142,7 @@ The agent doesn't remember anything across calls. State you need to persist live
 - **Workflow snapshots** — when you graduate to `ai.workflow()`, the snapshot store keeps a per-step checkpoint.
 - **Supervisor snapshots** — same idea for supervisors, per-iteration.
 
-If you want a long-lived conversation that "remembers" across runs, today the pattern is: persist messages yourself, replay them via `history`. The `ai.orchestrator()` primitive (v2) will own this for you.
+If you want a long-lived conversation that "remembers" across runs, the [`ai.orchestrator()`](./orchestrators) primitive owns this for you — durable session state, history windowing, and optional [memory](./memory). You still hold the raw transcript and replay it via `history`; the orchestrator persists the *session state* around it.
 
 ## Related
 

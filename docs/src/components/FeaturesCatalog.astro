@@ -3,10 +3,12 @@
  * Capability catalogue for the /features page.
  *
  * Layout: one row per category — a sticky "rail" on the left (icon, name,
- * tagline, count) and a 2-column card grid on the right. The rail pattern reads
- * as intentional at any card count and avoids the ragged orphan rows a single
- * fixed grid produces. Counts are kept even so the 2-column grid never orphans;
- * a defensive rule spans a trailing odd card full-width just in case.
+ * tagline, count) and a 2-column card grid on the right. Each category carries
+ * its own accent colour (set as `--feat-accent` on the group); cards stay calm
+ * at rest (neutral surface, colour only in the small icon badge) and light up
+ * with the category colour on hover — colour as a categorisation cue, not a
+ * wash over the whole page. Counts are kept even so the 2-column grid never
+ * orphans; a defensive rule spans a trailing odd card full-width.
  *
  * Every claim is grounded in the package docs (verified routes) and the
  * scaffolder's feature manifest (create-warlock/src/features/features-map.ts).
@@ -18,6 +20,8 @@ interface Feature {
   name: string;
   blurb: string;
   href: string;
+  /** Single SVG path, 24x24 viewBox, stroked. */
+  icon: string;
   /** Optional tech badge — the concrete answer to "does it support X?". */
   tag?: string;
 }
@@ -27,6 +31,8 @@ interface Group {
   icon: string;
   label: string;
   tagline: string;
+  /** Category accent colour (hex). Yellow stays the page-level brand. */
+  accent: string;
   features: Feature[];
 }
 
@@ -34,93 +40,105 @@ const groups: Group[] = [
   {
     label: "HTTP & API",
     tagline: "The request layer.",
+    accent: "#FACC15",
     icon: "M3 12h18M12 3a15 15 0 0 1 4 9 15 15 0 0 1-4 9 15 15 0 0 1-4-9 15 15 0 0 1 4-9Z",
     features: [
-      { name: "Routing & controllers", blurb: "Declarative routes, controllers, and use-cases.", href: `${base}/core/the-basics/02-routing/` },
-      { name: "Middleware", blurb: "Composable, ordered request middleware.", href: `${base}/core/the-basics/middleware/` },
-      { name: "Validation", blurb: "Request validation backed by Seal schemas.", href: `${base}/core/the-basics/validation/` },
-      { name: "RESTful resources", blurb: "Resource controllers and typed API resources.", href: `${base}/core/the-basics/restful/` },
-      { name: "Rate limiting", blurb: "Throttle routes out of the box.", href: `${base}/core/recipes/rate-limiting/` },
-      { name: "Modules & conventions", blurb: "Feature modules with batteries-included structure.", href: `${base}/core/getting-started/05-project-layout/` },
+      { name: "Routing & controllers", blurb: "Declarative routes, controllers, and use-cases.", href: `${base}/core/the-basics/02-routing/`, icon: "M6 3v12M18 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM15 6a9 9 0 0 0-9 9" },
+      { name: "Middleware", blurb: "Composable, ordered request middleware.", href: `${base}/core/the-basics/middleware/`, icon: "m12 2 9 5-9 5-9-5zM3 12l9 5 9-5M3 17l9 5 9-5" },
+      { name: "Validation", blurb: "Request validation backed by Seal schemas.", href: `${base}/core/the-basics/validation/`, icon: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10ZM9 12l2 2 4-4" },
+      { name: "RESTful resources", blurb: "Resource controllers and typed API resources.", href: `${base}/core/the-basics/restful/`, icon: "M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" },
+      { name: "Rate limiting", blurb: "Throttle routes out of the box.", href: `${base}/core/recipes/rate-limiting/`, icon: "M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM13.4 12.6 16 10M5 20a9 9 0 1 1 14 0" },
+      { name: "Modules & conventions", blurb: "Feature modules with batteries-included structure.", href: `${base}/core/getting-started/05-project-layout/`, icon: "m12 2 9 5v10l-9 5-9-5V7zM3.3 7 12 12l8.7-5M12 22V12" },
     ],
   },
   {
     label: "Data & ORM",
     tagline: "One ORM, two databases.",
+    accent: "#38BDF8",
     icon: "M12 8c4.42 0 8-1.34 8-3s-3.58-3-8-3-8 1.34-8 3 3.58 3 8 3ZM4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3",
     features: [
-      { name: "Unified ORM", blurb: "One typed model API that runs on either database.", href: `${base}/cascade/digging-deeper/multi-database/`, tag: "MongoDB · Postgres" },
-      { name: "Relations & migrations", blurb: "Model relations, migrations, and atomic operations.", href: `${base}/cascade/` },
-      { name: "Vector search", blurb: "Store and query embeddings for semantic search and RAG.", href: `${base}/cascade/digging-deeper/vector-search/`, tag: "Vectors" },
-      { name: "Transactions & aggregates", blurb: "Transactions, joins, and aggregation pipelines.", href: `${base}/cascade/digging-deeper/transactions/` },
+      { name: "Unified ORM", blurb: "One typed model API that runs on either database.", href: `${base}/cascade/digging-deeper/multi-database/`, tag: "MongoDB · Postgres", icon: "M12 8c4.42 0 8-1.34 8-3s-3.58-3-8-3-8 1.34-8 3 3.58 3 8 3ZM4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3" },
+      { name: "Relations & migrations", blurb: "Model relations, migrations, and atomic operations.", href: `${base}/cascade/`, icon: "M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8" },
+      { name: "Vector search", blurb: "Store and query embeddings for semantic search and RAG.", href: `${base}/cascade/digging-deeper/vector-search/`, tag: "Vectors", icon: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12ZM12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" },
+      { name: "Transactions & aggregates", blurb: "Transactions, joins, and aggregation pipelines.", href: `${base}/cascade/digging-deeper/transactions/`, icon: "m17 2 4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3" },
     ],
   },
   {
     label: "Real-time & Messaging",
     tagline: "Events across your system.",
+    accent: "#A78BFA",
     icon: "M22 12h-4l-3 9L9 3l-3 9H2",
     features: [
-      { name: "Real-time sockets", blurb: "Push real-time events to clients from the server.", href: `${base}/core/digging-deeper/socket/`, tag: "Socket.IO" },
-      { name: "Message bus", blurb: "Publish/subscribe and request-respond over a broker.", href: `${base}/herald/`, tag: "RabbitMQ" },
-      { name: "Notifications", blurb: "Mail, in-app, and custom channels with preferences.", href: `${base}/notifications/` },
-      { name: "Mail", blurb: "Transactional email over SMTP or Amazon SES.", href: `${base}/core/digging-deeper/mail/`, tag: "SMTP · SES" },
+      { name: "Real-time sockets", blurb: "Push real-time events to clients from the server.", href: `${base}/core/digging-deeper/socket/`, tag: "Socket.IO", icon: "M22 12h-4l-3 9L9 3l-3 9H2" },
+      { name: "Message bus", blurb: "Publish/subscribe and request-respond over a broker.", href: `${base}/herald/`, tag: "RabbitMQ", icon: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" },
+      { name: "Notifications", blurb: "Mail, in-app, and custom channels with preferences.", href: `${base}/notifications/`, icon: "M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9ZM13.73 21a2 2 0 0 1-3.46 0" },
+      { name: "Mail", blurb: "Transactional email over SMTP or Amazon SES.", href: `${base}/core/digging-deeper/mail/`, tag: "SMTP · SES", icon: "M22 6 12 13 2 6M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" },
     ],
   },
   {
     label: "Storage & Files",
     tagline: "Files, anywhere.",
+    accent: "#34D399",
     icon: "M21 8H3m18 0v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8m18 0-2.5-4.5a1 1 0 0 0-.9-.5H6.4a1 1 0 0 0-.9.5L3 8m4 5h.01",
     features: [
-      { name: "Unified storage", blurb: "One driver API over local disk or object storage.", href: `${base}/core/digging-deeper/storage/`, tag: "S3-compatible" },
-      { name: "File uploads", blurb: "Handle multipart uploads and stream to storage.", href: `${base}/core/digging-deeper/file-uploads/` },
-      { name: "Image processing", blurb: "Resize, convert, and optimize images.", href: `${base}/core/digging-deeper/image-processing/`, tag: "Sharp" },
-      { name: "File-system utilities", blurb: "Atomic writes and directory management.", href: `${base}/fs/` },
+      { name: "Unified storage", blurb: "One driver API over local disk or object storage.", href: `${base}/core/digging-deeper/storage/`, tag: "S3-compatible", icon: "M4 4h16a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM4 13h16a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2zM6 7h.01M6 16h.01" },
+      { name: "File uploads", blurb: "Handle multipart uploads and stream to storage.", href: `${base}/core/digging-deeper/file-uploads/`, icon: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" },
+      { name: "Image processing", blurb: "Resize, convert, and optimize images.", href: `${base}/core/digging-deeper/image-processing/`, tag: "Sharp", icon: "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM8.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM21 15l-5-5L5 21" },
+      { name: "File-system utilities", blurb: "Atomic writes and directory management.", href: `${base}/fs/`, icon: "M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" },
     ],
   },
   {
     label: "Caching",
     tagline: "Fast by default.",
+    accent: "#FB923C",
     icon: "M13 2 3 14h7l-1 8 10-12h-7z",
     features: [
-      { name: "Multi-driver cache", blurb: "Memory, Redis, and Postgres drivers behind one API.", href: `${base}/cache/`, tag: "Redis · Postgres" },
-      { name: "Tags, locks & SWR", blurb: "Tag invalidation, locks, and stale-while-revalidate.", href: `${base}/cache/` },
-      { name: "Similarity search", blurb: "Semantic cache lookups for LLM responses.", href: `${base}/cache/` },
-      { name: "Cache metrics", blurb: "Hit/miss metrics for observability.", href: `${base}/cache/` },
+      { name: "Multi-driver cache", blurb: "Memory, Redis, and Postgres drivers behind one API.", href: `${base}/cache/`, tag: "Redis · Postgres", icon: "M13 2 3 14h7l-1 8 10-12h-7z" },
+      { name: "Tags, locks & SWR", blurb: "Tag invalidation, locks, and stale-while-revalidate.", href: `${base}/cache/`, icon: "M20.59 13.41 13.42 20.6a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82ZM7 7h.01" },
+      { name: "Similarity search", blurb: "Semantic cache lookups for LLM responses.", href: `${base}/cache/`, icon: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM21 21l-4.35-4.35" },
+      { name: "Cache metrics", blurb: "Hit/miss metrics for observability.", href: `${base}/cache/`, icon: "M3 3v18h18M7 16V11M12 16V8M17 16v-5" },
     ],
   },
   {
     label: "AI",
     tagline: "Agents on the same stack.",
+    accent: "#F472B6",
     icon: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM5 4v3M3.5 5.5h3M18 16v3M16.5 17.5h3",
     features: [
-      { name: "Typed agents", blurb: "Agents with typed inputs and validated structured output.", href: `${base}/ai/` },
-      { name: "Tools", blurb: "Define a tool with Seal — the schema is the contract.", href: `${base}/ai/` },
-      { name: "Workflows & supervisors", blurb: "Compose agents into multi-step workflows.", href: `${base}/ai/` },
-      { name: "Provider adapters", blurb: "Swap between providers without touching agent code.", href: `${base}/ai/`, tag: "5 providers" },
+      { name: "Typed agents", blurb: "Agents with typed inputs and validated structured output.", href: `${base}/ai/`, icon: "M12 3V5M9 7h6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zM9 13h.01M15 13h.01M4 11v4M20 11v4" },
+      { name: "Tools", blurb: "Define a tool with Seal — the schema is the contract.", href: `${base}/ai/`, icon: "M14.7 6.3a4 4 0 0 0-5.6 5.6L3 18l3 3 6.1-6.1a4 4 0 0 0 5.6-5.6l-2.9 2.9-2.6-2.6z" },
+      { name: "Workflows & supervisors", blurb: "Compose agents into multi-step workflows with dynamic routing.", href: `${base}/ai/architecture-concepts/supervisors/`, icon: "M3 3h6v6H3zM15 15h6v6h-6zM9 6h6a2 2 0 0 1 2 2v7" },
+      { name: "Orchestrators", blurb: "Stateful multi-turn sessions with durable state, resume, and compaction.", href: `${base}/ai/architecture-concepts/orchestrators/`, tag: "Sessions", icon: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" },
+      { name: "Planner", blurb: "Hand it a goal; the agent generates its own plan, then runs it.", href: `${base}/ai/architecture-concepts/planner/`, icon: "M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" },
+      { name: "Memory", blurb: "Working and semantic recall, wired into sessions.", href: `${base}/ai/architecture-concepts/memory/`, icon: "M12 2a7 7 0 0 1 7 7c0 2-1 3.5-2 5l-1 5H8l-1-5c-1-1.5-2-3-2-5a7 7 0 0 1 7-7zM9 21h6" },
+      { name: "Observability", blurb: "Trace every run and export to OpenTelemetry or Langfuse.", href: `${base}/ai/observability/ai-panoptic/`, tag: "Panoptic", icon: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7ZM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" },
+      { name: "Provider adapters", blurb: "Swap between providers without touching agent code.", href: `${base}/ai/`, tag: "5 providers", icon: "M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0zM12 17v5" },
     ],
   },
   {
     label: "Auth & Access",
     tagline: "Who, and what they can do.",
+    accent: "#60A5FA",
     icon: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10ZM9 12l2 2 4-4",
     features: [
-      { name: "Authentication", blurb: "Tokens, route protection, and custom user types.", href: `${base}/auth/` },
-      { name: "Authorization", blurb: "Permission checks, policies, and roles.", href: `${base}/access/`, tag: "RBAC · ABAC" },
+      { name: "Authentication", blurb: "Tokens, route protection, and custom user types.", href: `${base}/auth/`, icon: "M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" },
+      { name: "Authorization", blurb: "Permission checks, policies, and roles.", href: `${base}/access/`, tag: "RBAC · ABAC", icon: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10ZM9 12l2 2 4-4" },
     ],
   },
   {
     label: "Platform & DX",
     tagline: "The operational backbone.",
+    accent: "#2DD4BF",
     icon: "m4 17 6-6-6-6M12 19h8",
     features: [
-      { name: "Scheduler", blurb: "Cron jobs with retry, overlap prevention, and timezones.", href: `${base}/scheduler/` },
-      { name: "Structured logging", blurb: "Channels, redaction, and shutdown flushing.", href: `${base}/logger/` },
-      { name: "Typed schemas", blurb: "Validation that doubles as types and JSON schema.", href: `${base}/seal/`, tag: "Seal" },
-      { name: "Request context", blurb: "Request-scoped context without prop-drilling.", href: `${base}/context/` },
-      { name: "Encryption", blurb: "Built-in encryption helpers.", href: `${base}/core/digging-deeper/encryption/` },
-      { name: "CLI & generators", blurb: "Scaffold modules, commands, and connectors.", href: `${base}/core/cli/generators/` },
-      { name: "Testing", blurb: "Per-worker database and cache isolation.", href: `${base}/core/testing/testing/`, tag: "Vitest" },
-      { name: "Configuration", blurb: "Typed, layered application configuration.", href: `${base}/core/architecture-concepts/configuration-deep/` },
+      { name: "Scheduler", blurb: "Cron jobs with retry, overlap prevention, and timezones.", href: `${base}/scheduler/`, icon: "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" },
+      { name: "Structured logging", blurb: "Channels, redaction, and shutdown flushing.", href: `${base}/logger/`, icon: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M9 13h6M9 17h6" },
+      { name: "Typed schemas", blurb: "Validation that doubles as types and JSON schema.", href: `${base}/seal/`, tag: "Seal", icon: "M7 3H6a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1M17 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1" },
+      { name: "Request context", blurb: "Request-scoped context without prop-drilling.", href: `${base}/context/`, icon: "M18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM18 17a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM8.6 13.5l6.8 4M15.4 6.5 8.6 10.5" },
+      { name: "Encryption", blurb: "Built-in encryption helpers.", href: `${base}/core/digging-deeper/encryption/`, icon: "M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2zM7 11V7a5 5 0 0 1 10 0v4" },
+      { name: "CLI & generators", blurb: "Scaffold modules, commands, and connectors.", href: `${base}/core/cli/generators/`, icon: "m4 17 6-6-6-6M12 19h8" },
+      { name: "Testing", blurb: "Per-worker database and cache isolation.", href: `${base}/core/testing/testing/`, tag: "Vitest", icon: "M9 3h6M10 3v6L4.5 18a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 9V3M8 14h8" },
+      { name: "Configuration", blurb: "Typed, layered application configuration.", href: `${base}/core/architecture-concepts/configuration-deep/`, icon: "M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4" },
     ],
   },
 ];
@@ -137,7 +155,7 @@ const groups: Group[] = [
   </div>
 
   {groups.map((group) => (
-    <div class="warlock-features-group">
+    <div class="warlock-features-group" style={`--feat-accent: ${group.accent};`}>
       <div class="warlock-features-rail">
         <span class="warlock-features-groupicon" aria-hidden="true">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -150,16 +168,25 @@ const groups: Group[] = [
       </div>
 
       <div class="warlock-features-grid">
-        {group.features.map((f) => (
+        {group.features.map((f, i) => (
           <a class="warlock-feature" href={f.href}>
+            <span class="warlock-feature-rule" aria-hidden="true"></span>
+            <span class="warlock-feature-corner" aria-hidden="true">
+              <span class="warlock-feature-index">{String(i + 1).padStart(2, "0")}</span>
+              <svg class="warlock-feature-arrow" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14M13 5l7 7-7 7" />
+              </svg>
+            </span>
+            <span class="warlock-feature-icon" aria-hidden="true">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d={f.icon} />
+              </svg>
+            </span>
             <span class="warlock-feature-top">
               <span class="warlock-feature-name">{f.name}</span>
               {f.tag && <span class="warlock-feature-tag">{f.tag}</span>}
             </span>
             <span class="warlock-feature-blurb">{f.blurb}</span>
-            <svg class="warlock-feature-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M5 12h14M13 5l7 7-7 7" />
-            </svg>
           </a>
         ))}
       </div>
@@ -199,7 +226,6 @@ const groups: Group[] = [
     }
   }
 
-  /* Divider + breathing room between categories */
   .warlock-features-group + .warlock-features-group {
     margin-block-start: clamp(2.5rem, 2rem + 2vw, 3.75rem);
   }
@@ -229,11 +255,11 @@ const groups: Group[] = [
     width: 42px;
     height: 42px;
     border-radius: var(--warlock-radius);
-    border: 1px solid color-mix(in srgb, var(--sl-color-text-accent) 28%, var(--sl-color-hairline));
+    border: 1px solid color-mix(in srgb, var(--feat-accent) 32%, var(--sl-color-hairline));
     background:
-      linear-gradient(180deg, color-mix(in srgb, var(--sl-color-text-accent) 16%, transparent), color-mix(in srgb, var(--sl-color-text-accent) 7%, transparent));
-    color: var(--sl-color-text-accent);
-    box-shadow: 0 0 22px -8px color-mix(in srgb, var(--sl-color-text-accent) 70%, transparent);
+      linear-gradient(180deg, color-mix(in srgb, var(--feat-accent) 18%, transparent), color-mix(in srgb, var(--feat-accent) 8%, transparent));
+    color: var(--feat-accent);
+    box-shadow: 0 0 24px -8px color-mix(in srgb, var(--feat-accent) 75%, transparent);
     flex: none;
   }
 
@@ -253,15 +279,11 @@ const groups: Group[] = [
   }
 
   .warlock-features-grouptagline {
+    grid-column: 2;
     margin: 0;
     font-size: 0.88rem;
     line-height: 1.45;
     color: var(--sl-color-gray-3);
-  }
-
-  /* tagline sits beside the label on mobile (col 2), under it on desktop */
-  .warlock-features-grouptagline {
-    grid-column: 2;
   }
 
   @media (min-width: 56rem) {
@@ -314,27 +336,111 @@ const groups: Group[] = [
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 0.45rem;
-    padding: 1.15rem 1.2rem;
+    gap: 0.55rem;
+    padding: 1.3rem 1.35rem 1.35rem;
     border: 1px solid var(--sl-color-hairline);
     border-radius: var(--warlock-radius);
-    background:
-      linear-gradient(180deg, color-mix(in srgb, var(--sl-color-text-accent) 3.5%, transparent), transparent 60%),
-      var(--warlock-surface-dark);
+    background: var(--warlock-surface-dark);
     text-decoration: none !important;
-    transition: border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+    overflow: hidden;
+    transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
   }
 
   :root[data-theme="light"] .warlock-feature {
-    background:
-      linear-gradient(180deg, color-mix(in srgb, var(--sl-color-text-accent) 4%, transparent), transparent 60%),
-      #ffffff;
+    background: #ffffff;
   }
 
   .warlock-feature:hover {
-    border-color: color-mix(in srgb, var(--sl-color-text-accent) 55%, var(--sl-color-hairline));
+    border-color: color-mix(in srgb, var(--feat-accent) 55%, var(--sl-color-hairline));
     transform: translateY(-3px);
-    box-shadow: 0 16px 36px -22px color-mix(in srgb, var(--sl-color-text-accent) 65%, transparent);
+    background:
+      radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--feat-accent) 10%, transparent), transparent 55%),
+      var(--warlock-surface-dark);
+    box-shadow: 0 18px 40px -24px color-mix(in srgb, var(--feat-accent) 75%, transparent);
+  }
+
+  :root[data-theme="light"] .warlock-feature:hover {
+    background:
+      radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--feat-accent) 14%, transparent), transparent 55%),
+      #ffffff;
+  }
+
+  /* Top accent line — sweeps in on hover (echoes the PathPicker cards) */
+  .warlock-feature-rule {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: 1.1rem;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--feat-accent), transparent);
+    opacity: 0;
+    transform: scaleX(0.4);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+  }
+
+  .warlock-feature:hover .warlock-feature-rule {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+
+  /* Icon badge — the card's spot of category colour */
+  .warlock-feature-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--warlock-radius);
+    border: 1px solid color-mix(in srgb, var(--feat-accent) 26%, var(--sl-color-hairline));
+    background: color-mix(in srgb, var(--feat-accent) 12%, transparent);
+    color: var(--feat-accent);
+    transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .warlock-feature:hover .warlock-feature-icon {
+    background: color-mix(in srgb, var(--feat-accent) 20%, transparent);
+    border-color: color-mix(in srgb, var(--feat-accent) 45%, var(--sl-color-hairline));
+    box-shadow: 0 0 22px -8px color-mix(in srgb, var(--feat-accent) 80%, transparent);
+  }
+
+  /* Corner: mono index at rest, crossfades to a sliding arrow on hover */
+  .warlock-feature-corner {
+    position: absolute;
+    inset-block-start: 1.3rem;
+    inset-inline-end: 1.25rem;
+    display: grid;
+    place-items: center end;
+    min-width: 1.5rem;
+    height: 1rem;
+  }
+
+  .warlock-feature-index,
+  .warlock-feature-arrow {
+    grid-area: 1 / 1;
+    transition: opacity 0.18s ease, transform 0.2s ease;
+  }
+
+  .warlock-feature-index {
+    font-family: var(--sl-font-mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--sl-color-gray-4);
+  }
+
+  .warlock-feature-arrow {
+    color: var(--feat-accent);
+    opacity: 0;
+    transform: translateX(-5px);
+  }
+
+  .warlock-feature:hover .warlock-feature-index {
+    opacity: 0;
+    transform: translateX(5px);
+  }
+
+  .warlock-feature:hover .warlock-feature-arrow {
+    opacity: 1;
+    transform: translateX(0);
   }
 
   .warlock-feature-top {
@@ -342,13 +448,14 @@ const groups: Group[] = [
     align-items: center;
     flex-wrap: wrap;
     gap: 0.5rem;
-    padding-inline-end: 1.25rem; /* room for the hover arrow */
+    margin-block-start: 0.15rem;
+    padding-inline-end: 1.5rem; /* room for the corner index/arrow */
   }
 
   .warlock-feature-name {
-    font-size: 0.97rem;
+    font-size: 1rem;
     font-weight: 700;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.012em;
     color: var(--sl-color-white) !important;
   }
 
@@ -358,11 +465,11 @@ const groups: Group[] = [
     font-weight: 600;
     letter-spacing: 0.02em;
     text-transform: uppercase;
-    color: var(--sl-color-text-accent);
+    color: var(--feat-accent);
     padding: 0.13rem 0.42rem;
     border-radius: var(--warlock-radius-sm);
-    background: color-mix(in srgb, var(--sl-color-text-accent) 13%, transparent);
-    border: 1px solid color-mix(in srgb, var(--sl-color-text-accent) 26%, transparent);
+    background: color-mix(in srgb, var(--feat-accent) 13%, transparent);
+    border: 1px solid color-mix(in srgb, var(--feat-accent) 26%, transparent);
     white-space: nowrap;
   }
 
@@ -372,23 +479,20 @@ const groups: Group[] = [
     color: var(--sl-color-gray-2);
   }
 
-  .warlock-feature-arrow {
-    position: absolute;
-    top: 1.15rem;
-    right: 1.1rem;
-    color: var(--sl-color-text-accent);
-    opacity: 0;
-    transform: translateX(-4px);
-    transition: opacity 0.16s ease, transform 0.16s ease;
-  }
-
-  .warlock-feature:hover .warlock-feature-arrow {
-    opacity: 1;
-    transform: translateX(0);
-  }
-
   @media (prefers-reduced-motion: reduce) {
     .warlock-feature:hover {
+      transform: none;
+    }
+
+    .warlock-feature-rule,
+    .warlock-feature-index,
+    .warlock-feature-arrow {
+      transition: opacity 0.18s ease;
+    }
+
+    .warlock-feature:hover .warlock-feature-rule,
+    .warlock-feature:hover .warlock-feature-index,
+    .warlock-feature:hover .warlock-feature-arrow {
       transform: none;
     }
   }

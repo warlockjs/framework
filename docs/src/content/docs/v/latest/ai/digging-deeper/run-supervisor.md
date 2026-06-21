@@ -13,7 +13,7 @@ A supervisor takes one input, picks which intent(s) handle it, runs them, option
 - **`agent`** — one model with tools, single task. Doesn't fit when the right specialist depends on the input.
 - **`workflow`** — fixed step order. Doesn't fit when routing varies per request.
 - **`supervisor`** — when the right specialist is decided per call and you may iterate to a goal.
-- **`orchestrator` (v2)** — when the session matters across runs.
+- **[`orchestrator`](./run-orchestrator)** — when the session matters across runs (durable session state, drift detection, resume).
 
 ## Three dispatch surfaces
 
@@ -70,6 +70,41 @@ const supportBot = ai.supervisor({
 ```
 
 The router agent's output MUST include `next: string | string[] | typeof END`. `reasoning: string` is optional but recommended for traceability. `evaluate` pairs only with `router`.
+
+#### `ai.router()` — generate the router agent
+
+`ai.router({ model, intents })` builds the routing agent so you don't hand-write its output schema or system prompt. It generates the `{ next, reasoning }` schema — with the intent names plus `END` baked in as a JSON-Schema `enum` — and auto-writes the routing prompt listing every intent and its description. Pass the **same** `intents` object you give `ai.supervisor()`:
+
+```ts
+const intents = { billing, shipping, returns, escalate };
+
+const supportBot = ai.supervisor({
+  router: ai.router({
+    model,
+    intents,
+    systemPrompt: "You coordinate a customer-support team.", // optional framing
+  }),
+  intents,
+});
+```
+
+The result is a plain `AgentContract` — usable standalone or as `router`. Hand-writing the agent still works; `ai.router()` is the shortcut.
+
+#### `ai.fanOut()` — voting / self-consistency
+
+`ai.fanOut(unit, n)` spreads one agent or workflow into `n` distinctly-keyed intent entries (`writer1..writerN`) so the supervisor can dispatch them in parallel and a downstream intent can pick the best or majority answer. Spread it into `intents`:
+
+```ts
+ai.supervisor({
+  intents: {
+    ...ai.fanOut(writer, 3),                                  // writer1, writer2, writer3
+    vote: { run: pickMajority, description: "Choose the majority answer." },
+  },
+  route: (ctx) => (ctx.iteration === 0 ? ["writer1", "writer2", "writer3"] : "vote"),
+});
+```
+
+Every key references the same underlying unit; the description defaults to the unit's own. Override the key base with `{ keyPrefix }` and the per-entry text with `{ description }`.
 
 ## The `intents` map — five accepted shapes
 
@@ -272,12 +307,16 @@ Token-level streaming requires the dispatched agents to be streamed (supervisor 
 
 ## Snapshot resume
 
+Wire a `SnapshotStore` (constructed with `ai.snapshot.{memory,pg,redis}()`), not a raw cache driver:
+
 ```ts
-ai.config({ defaultStore: cache.driver("redis", { client }) });
+ai.config({ defaultSnapshotStore: ai.snapshot.redis({ client }) });
 
 await supportBot.execute(message, { runId: "support-7" });
 await supportBot.resume("support-7");
 ```
+
+> **⚠ Changed in 4.3.0** — `snapshotStore` is now typed `SnapshotStore` and the fallback is `ai.config({ defaultSnapshotStore })`, not `defaultStore` / a `CacheDriver`. See the migration note in [Persist AI data](./persist-ai-data).
 
 Signature drift detection throws `SupervisorDriftError` on shape mismatch. `force: true` bypasses for safe edits. See [Persist AI data](./persist-ai-data).
 
@@ -296,6 +335,7 @@ const escalationAgent = ai.agent({ model, tools: [supportTool] });
 
 - [Run agent](../the-basics/run-agent) — dispatchable units.
 - [Run workflow](./run-workflow) — when steps are known up front.
+- [Run orchestrator](./run-orchestrator) — when the session matters across runs.
 - [Persist AI data](./persist-ai-data) — snapshot store and resume.
 - [Define tools](../the-basics/define-tools) — tool artifacts side-channel.
 - [Attach middleware](./attach-middleware) — `semanticCache` fits under each agent's middleware.

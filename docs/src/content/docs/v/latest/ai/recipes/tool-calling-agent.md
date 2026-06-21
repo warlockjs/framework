@@ -95,7 +95,12 @@ const { text, report } = await support.execute(
 
 console.log(text);
 
-for (const call of report.toolCalls) {
+// Tool dispatches live in the report tree as children with type "tool".
+// `ToolCall` (type: "tool") is exported from @warlock.js/ai.
+const toolCalls = report.children.filter(
+  (c): c is import("@warlock.js/ai").ToolCall => c.type === "tool",
+);
+for (const call of toolCalls) {
   console.log(`  tool ${call.name} (trip ${call.tripIndex}, ${call.duration}ms)`);
 }
 ```
@@ -122,7 +127,7 @@ execute: async ({ orderId }) => {
 }
 ```
 
-The model gets a chance to retry with a corrected input. Inspect the failure on `report.toolCalls[i].error`.
+The model gets a chance to retry with a corrected input. Inspect the failure on the tool call's `error` field — each tool dispatch is a `type: "tool"` child of `report.children`.
 
 ## Inject context via artifacts
 
