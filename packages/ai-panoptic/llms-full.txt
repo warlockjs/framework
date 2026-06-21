@@ -1,0 +1,450 @@
+# Warlock AI Panoptic — full skills
+
+> Package: `@warlock.js/ai-panoptic`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-panoptic/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## export-traces  `@warlock.js/ai-panoptic/export-traces/SKILL.md`
+
+---
+name: export-traces
+description: 'Send @warlock.js/ai-panoptic traces to an observability backend via pluggable exporters. Triggers: `consoleExporter`, `fileExporter`, `otelExporter`, `langfuseExporter`, `ExporterContract`, `toGenAiAttributes`, `walkSpans`, `totalCostUsd`, `GEN_AI_ATTRIBUTES`, `WARLOCK_ATTRIBUTES`, `reportToTrace`, `reportToSpan`, `extractSpanAttributes`, `normalizeError`, `formatSpanLine`, `createPanopticMiddleware`; ''export AI traces to OpenTelemetry'', ''send traces to Langfuse'', ''log traces to console / a file'', ''gen_ai semantic conventions'', ''write a custom exporter''; typical import `import { otelExporter, langfuseExporter, consoleExporter, fileExporter } from "@warlock.js/ai-panoptic"`. Skip: wiring the subscriber/collector into a run — `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`; the core report shape — `@warlock.js/ai/run-ai-agent/SKILL.md`.'
+---
+
+# Export traces — the sink end of Panoptic
+
+An **exporter** translates a vendor-neutral `Trace` (produced by the collector) into a backend's wire format. The collector fans every completed trace out to each registered exporter via the `ExporterContract`:
+
+```ts
+export interface ExporterContract {
+  readonly name: string;
+  export(trace: Trace): void | Promise<void>;
+  exportSpan?(span: TraceSpan): void | Promise<void>; // optional live streaming
+  flush?(): void | Promise<void>;
+  shutdown?(): void | Promise<void>;
+}
+```
+
+Four exporters ship today. Each is a **factory** returning an `ExporterContract` — callers never `new`.
+
+## Pick an exporter
+
+| Exporter | Backend | Deps | Use it for |
+|---|---|---|---|
+| `consoleExporter()` | stdout/stderr | none | local dev, CI logs |
+| `fileExporter()` | JSON-Lines file | none | durable local sink, replay, out-of-band shipping |
+| `otelExporter()` | OpenTelemetry | `@opentelemetry/api` (optional peer) | OTel-native stacks, GenAI semantic conventions |
+| `langfuseExporter()` | Langfuse | `langfuse` (optional peer) | LLM-specific dashboards, generations |
+
+> `@opentelemetry/api` and `langfuse` are **OPTIONAL peer dependencies**, lazily imported by their exporter. Importing `@warlock.js/ai-panoptic` never pulls them in; a missing SDK surfaces as a curated *"install this"* error on first export, never a boot-time stack trace.
+
+## Console
+
+```ts
+import { consoleExporter } from "@warlock.js/ai-panoptic";
+
+collector.use(consoleExporter());                 // one summary line per trace
+collector.use(consoleExporter({ tree: true }));   // full indented span tree
+collector.use(consoleExporter({ streaming: true })); // also print each span as it finalizes
+```
+
+Failed/cancelled spans route to `console.error`; everything else to `console.log`. Inject a sink (`{ console: mySink }`) to redirect or to capture in tests.
+
+## File
+
+```ts
+import { fileExporter } from "@warlock.js/ai-panoptic";
+
+collector.use(fileExporter({ path: "storage/traces.jsonl" }));      // write every trace
+collector.use(fileExporter({ path: "...", flushEvery: 50 }));       // batch 50 traces per write
+collector.use(fileExporter({ path: "...", pretty: true }));         // multi-line records
+```
+
+Appends one JSON record per line (a `TraceRecord` = `{ type: "trace", exportedAt, trace }`). Buffers in memory and drains on `flush()` / `shutdown()` — call `collector.shutdown()` on teardown so the last batch lands. The parent directory is created on first write.
+
+## OpenTelemetry
+
+The exporter emits spans onto a `Tracer`; **the host app owns the SDK wiring** (`TracerProvider`, processors, span exporters), exactly as with any OTel instrumentation.
+
+```ts
+import { otelExporter } from "@warlock.js/ai-panoptic";
+
+// app already configured @opentelemetry/sdk-trace-base + a global provider
+collector.use(otelExporter({ tracerName: "my-app", system: "openai" }));
+
+// or pass a Tracer directly
+collector.use(otelExporter({ tracer: myTracer }));
+```
+
+Each `TraceSpan` becomes one OTel span with the source start/end times and parent relationship reconstructed, so the emitted tree matches the original execution tree. Attributes follow the [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/):
+
+- `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` / `gen_ai.usage.total_tokens` (from the span's typed `usage` rollup)
+- `gen_ai.usage.cached_tokens` / `gen_ai.usage.reasoning_tokens` (when the span reported them)
+- `gen_ai.conversation.id` (from the span's `sessionId`)
+- `gen_ai.system` / `gen_ai.request.model` / `gen_ai.operation.name` — **never invented**: these appear only when the span's free-form `attributes` bag already carried that exact key. `otelExporter`'s `system` option backfills `gen_ai.system` when the span supplied none (and never overrides one it did).
+- `warlock.report.type` / `warlock.version` / `warlock.duration_ms` / `warlock.cost.usd`
+- the collector's own per-primitive keys ride along verbatim — `agent.model.name` / `agent.model.provider` / `agent.trips`, `workflow.steps`, `supervisor.iterations` / `supervisor.terminatedBy`, `tool.tripIndex`, `retries`, … — since `toGenAiAttributes` copies every scalar entry of the span's `attributes` bag.
+
+Failed/cancelled spans get OTel `ERROR` status plus a recorded exception.
+
+## Langfuse
+
+```ts
+import { langfuseExporter } from "@warlock.js/ai-panoptic";
+
+collector.use(langfuseExporter({ publicKey: "pk-...", secretKey: "sk-...", baseUrl: "..." }));
+// or reuse an existing Langfuse client
+collector.use(langfuseExporter({ client: myLangfuse }));
+```
+
+- The root span becomes a Langfuse **trace**.
+- A token-producing span (`usage.total > 0`) becomes a **generation** (carries `usage`); a pure tool/callback becomes a plain **span**.
+- Children nest under their parent observation; timing, `version`, and status (failed → `ERROR` level) are mapped.
+- `flush()` / `shutdown()` delegate to the client's `flushAsync()` / `shutdownAsync()` — call `collector.shutdown()` on teardown so buffered observations are sent.
+
+## Shared utilities
+
+Reusable when authoring a **custom exporter**:
+
+```ts
+import { walkSpans, toGenAiAttributes, totalCostUsd, GEN_AI_ATTRIBUTES, WARLOCK_ATTRIBUTES } from "@warlock.js/ai-panoptic";
+
+for (const span of walkSpans(trace.root)) {        // depth-first pre-order
+  const attributes = toGenAiAttributes(span);      // gen_ai.* / warlock.* attribute map
+  const cost = totalCostUsd(span.usage);           // single USD scalar, or undefined
+}
+```
+
+`toGenAiAttributes` copies only **scalar** entries from a span's free-form `attributes` bag (objects/arrays are skipped — backend attribute values must be primitives) and lets an explicit collector attribute override a derived one.
+
+## Write a custom exporter
+
+Implement `ExporterContract` directly — `name` + `export` are the only required members:
+
+```ts
+import type { ExporterContract, Trace } from "@warlock.js/ai-panoptic";
+
+const myExporter: ExporterContract = {
+  name: "my-backend",
+  async export(trace: Trace) {
+    await sendSomewhere(trace);
+  },
+};
+
+collector.use(myExporter);
+```
+
+Wrapping a third-party SDK? Lazily `await import(...)` it **inside** the export path (never at module top) so it stays an optional peer — copy the loader pattern from `otelExporter` / `langfuseExporter`. The collector isolates a throwing exporter, so one backend's failure never crashes the originating AI run.
+
+## Lower-level building blocks
+
+Most apps only need `panoptic(...)`, an exporter, and the store. These lower-level exports exist for **custom collectors / exporters and bespoke pipelines** — each is a pure function over the report tree:
+
+```ts
+import {
+  reportToTrace, // (report: BaseReport) => Trace — project a finished report into a vendor-neutral Trace
+  reportToSpan, // (report: BaseReport) => TraceSpan — project one report node into a span (recurses into children)
+  extractSpanAttributes, // (report: BaseReport) => Record<string, unknown> | undefined — the per-primitive attribute bag (agent.model.name, workflow.steps, …)
+  normalizeError, // (error: unknown) => TraceSpanError | undefined — coerce any thrown value into the typed span-error shape
+  formatSpanLine, // (span: TraceSpan, depth?: number) => string — render one indented console line (consoleExporter's tree mode uses this)
+  createPanopticMiddleware, // (collector: CollectorContract, name?: string) => AgentMiddleware — build a middleware from a collector you already hold (panoptic(...) wires this for you)
+} from "@warlock.js/ai-panoptic";
+```
+
+Reach for `reportToTrace` when you already hold a finished `result.report` and want a `Trace` without the live subscriber; `formatSpanLine` to build a custom console renderer; `createPanopticMiddleware` when you assemble the agent's `middleware` array by hand instead of letting `panoptic(...)` do it.
+
+## See also
+
+- [`@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`](@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md) — the source end: wiring the `panoptic(...)` subscriber into a run (`attach` / `middleware` / `collect`). The `collector` these exporters register on comes from there.
+- [`@warlock.js/ai-panoptic/query-traces/SKILL.md`](@warlock.js/ai-panoptic/query-traces/SKILL.md) — the in-memory trace store: a sibling sink that *retains* traces (instead of shipping them out) so you can `query` / `aggregate` them after the fact.
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent and the `BaseReport` shape Panoptic projects into a `Trace`.
+
+
+## observe-with-panoptic  `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`
+
+---
+name: observe-with-panoptic
+description: 'Wire @warlock.js/ai-panoptic into an agent/workflow/supervisor/orchestrator with the one-call `panoptic({ exporters })` subscriber. Triggers: `panoptic`, `Panoptic`, `PanopticOptions`, `.attach`, `.middleware`, `.collect`, `.toTrace`, `observe.attach(agent)`, `panoptic().middleware()`, `completedEvents`, `middlewareName`; ''observe a warlock agent'', ''trace an agent run'', ''attach observability to a workflow/supervisor'', ''add a tracing middleware'', ''collect an orchestrator turn report'', ''wire OTel/Langfuse into my agent''; typical import `import { panoptic } from "@warlock.js/ai-panoptic"`. Skip: writing/choosing an exporter (the sink end) — `@warlock.js/ai-panoptic/export-traces/SKILL.md`; the core report shape / running the agent itself — `@warlock.js/ai/run-ai-agent/SKILL.md`.'
+---
+
+# Observe a run with Panoptic — the one-call subscriber
+
+`panoptic(...)` is the entry point. It builds a collector, registers your exporters on it, and hands back a subscriber with **three ways to feed traces** in. All three converge on the same collector, so each run reaches every exporter exactly once.
+
+```ts
+import { panoptic } from "@warlock.js/ai-panoptic";
+import { consoleExporter, otelExporter } from "@warlock.js/ai-panoptic";
+
+const observe = panoptic({
+  exporters: [consoleExporter(), otelExporter({ tracerName: "my-app" })],
+});
+```
+
+## Three feed paths
+
+| Path | Use when | API |
+|---|---|---|
+| **Events** | You want every run captured automatically and the primitive emits a `*.completed` event (agent / workflow / supervisor). | `observe.attach(target)` |
+| **Middleware** | The app already composes cross-cutting concerns through the agent middleware pipeline. | `panoptic().middleware()` |
+| **Direct** | The primitive carries no result-bearing event (the orchestrator), or you captured a report out of band. | `observe.collect(report)` |
+
+### 1. Attach to the event stream
+
+`attach` subscribes to the terminal `*.completed` events and returns a **detach** function:
+
+```ts
+const agent = ai.agent({ model });
+const detach = observe.attach(agent); // agent | workflow | supervisor
+
+await agent.execute("Summarize this");
+
+// ...later, on teardown:
+detach();
+await observe.shutdown();
+```
+
+By default Panoptic subscribes to `agent.completed`, `workflow.completed`, and `supervisor.completed` — the terminal events that carry the finalized `result.report`. These fire **once per run regardless of outcome** (the matching `*.error` fires first on failure, then `*.completed` still fires), so attaching captures completed, failed, and cancelled runs alike. Panoptic silently ignores the names a given target doesn't emit, so the same subscriber attaches to any of the three primitives.
+
+Narrow or widen the surface with `completedEvents`:
+
+```ts
+panoptic({ exporters, completedEvents: ["agent.completed"] }); // agents only
+```
+
+### 2. Wire it as agent middleware
+
+```ts
+const observe = panoptic({ exporters: [langfuseExporter({ /* ... */ })] });
+
+const agent = ai.agent({
+  model,
+  middleware: [observe.middleware()],
+});
+```
+
+The middleware feeds the collector from the `execute`-level `after` (success) and `onError` (failure) hooks. It never returns a value, so it never mutates the agent's result. Register more than one Panoptic middleware on the same agent by passing a distinct `middlewareName`:
+
+```ts
+panoptic({ middlewareName: "panoptic-secondary" }).middleware();
+```
+
+### 3. Collect a report directly
+
+The **orchestrator** emits `orchestrator.turn.*` events that carry only session identity — no result. Feed its report straight in:
+
+```ts
+const result = await orchestrator.execute(input, { sessionId });
+await observe.collect(result.report);
+```
+
+`collect(report)` also covers any report captured out of band (e.g. replayed from a store).
+
+## Failure isolation
+
+An observability fault never escapes onto the AI run's hot path:
+
+- The collector wraps every exporter invocation in `Promise.allSettled`, so a throwing exporter can't crash the run or block its siblings.
+- The event handler and the middleware additionally swallow the `collect` rejection, so even a collector-level fault stays contained.
+
+A broken backend degrades to *missing telemetry*, never a failed agent run.
+
+## Lifecycle
+
+```ts
+await observe.flush();    // drain buffered exporters (between batches / checkpoints)
+await observe.shutdown(); // flush + release every exporter (process teardown)
+```
+
+Call `shutdown()` on teardown so buffered exporters (`fileExporter` batches, the Langfuse client) send their last records before exit.
+
+## Bring your own collector or store
+
+The in-memory trace store doubles as an `ExporterContract`, so the simplest way to retain runs for later querying is to pass it as an exporter — it then receives every trace alongside your other sinks:
+
+```ts
+import { panoptic, createInMemoryTraceStore } from "@warlock.js/ai-panoptic";
+
+const store = createInMemoryTraceStore();        // an ExporterContract + queryable store
+const observe = panoptic({ exporters: [store, consoleExporter()] });
+
+// store now receives every trace — query/aggregate it later:
+store.query({ status: "failed" });
+store.aggregate({ sessionId });
+```
+
+Pass a pre-built `collector` instead when you want to share one collector across several subscribers (each subscriber's `attach` / `middleware` feeds the same exporters):
+
+```ts
+import { panoptic, createCollector } from "@warlock.js/ai-panoptic";
+
+const collector = createCollector().use(store);
+const observe = panoptic({ collector, exporters: [consoleExporter()] });
+```
+
+Add exporters after construction with `observe.use(exporter)` (chainable, deduped by `ExporterContract.name`). `observe.toTrace(report)` projects a report into a `Trace` **without** dispatching — handy for inspection or tests.
+
+> The store's full query / aggregate / capacity surface is its own skill — see [`query-traces/SKILL.md`](@warlock.js/ai-panoptic/query-traces/SKILL.md).
+
+## See also
+
+- [`@warlock.js/ai-panoptic/export-traces/SKILL.md`](@warlock.js/ai-panoptic/export-traces/SKILL.md) — the sink end: choosing/writing an exporter, the `gen_ai.*` / `warlock.*` attribute mapping.
+- [`@warlock.js/ai-panoptic/query-traces/SKILL.md`](@warlock.js/ai-panoptic/query-traces/SKILL.md) — retaining traces in the queryable in-memory store and slicing them (`query` / `aggregate` / `capacity`).
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent and the `BaseReport` shape Panoptic consumes.
+
+
+## query-traces  `@warlock.js/ai-panoptic/query-traces/SKILL.md`
+
+---
+name: query-traces
+description: 'Retain @warlock.js/ai-panoptic traces in a queryable in-memory store and slice them after the fact — get one run by id, list a session, filter failed runs in a window, roll up usage + cost. Triggers: `createInMemoryTraceStore`, `TraceStoreContract`, `TraceQuery`, `TraceAggregate`, `InMemoryTraceStoreOptions`, `store.query`, `store.aggregate`, `store.get`, `store.add`, `store.clear`, `store.size`, `capacity`, `sumUsage`, `emptyUsage`, `matchTrace`; ''query collected traces'', ''aggregate AI cost per session'', ''how much did this session spend'', ''list failed runs'', ''retain traces in memory'', ''roll up token usage''; typical import `import { createInMemoryTraceStore } from "@warlock.js/ai-panoptic"`. Skip: sending traces to an external backend (OTel/Langfuse/console/file) — `@warlock.js/ai-panoptic/export-traces/SKILL.md`; wiring the subscriber into a run — `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`.'
+---
+
+# Query traces — the in-memory queryable store
+
+The collector fans every completed `Trace` out to its exporters. A **trace store** is one such sink that *retains* traces so you can answer observability questions after the fact: pull one run by id, list every run for a session, slice failed runs in a time window, or roll usage + cost across any of those slices.
+
+`createInMemoryTraceStore()` returns an object that satisfies **both** `TraceStoreContract` and `ExporterContract` — so wiring it into a collector is a single `collector.use(store)` and the store fills as traces complete.
+
+```ts
+import { panoptic, createInMemoryTraceStore } from "@warlock.js/ai-panoptic";
+
+const store = createInMemoryTraceStore();
+
+// The store doubles as an exporter — register it like any other sink.
+const observe = panoptic({ exporters: [store] });
+
+const agent = ai.agent({ model });
+observe.attach(agent);
+
+await agent.execute("Summarize this");
+
+// ...later, off the hot path:
+const failed = store.query({ status: "failed" });
+const spend = store.aggregate({ sessionId: "session-42" });
+```
+
+> The store is also a valid `collector.use(...)` target directly — `panoptic({ collector: createCollector().use(store) })` — see [`observe-with-panoptic/SKILL.md`](@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md) for bring-your-own-collector wiring.
+
+## The store contract
+
+`TraceStoreContract` is the queryable surface; the in-memory implementation adds the `ExporterContract` `name` + `export` so it can be a sink.
+
+```ts
+interface TraceStoreContract {
+  add(trace: Trace): void;                 // ingest; overwrites same traceId
+  get(traceId: string): Trace | undefined; // one run by id
+  query(filter?: TraceQuery): Trace[];     // matching traces, newest-started first
+  aggregate(filter?: TraceQuery): TraceAggregate; // usage + cost + status rollup
+  readonly size: number;                   // retained count
+  clear(): void;                           // drop everything
+}
+```
+
+- **`add` overwrites** any existing trace with the same `traceId` — re-collecting a run replaces rather than duplicates it.
+- **`export(trace)` is an alias for `add`** — that is what makes the store a drop-in exporter (`store.name === "in-memory-trace-store"`).
+- **`query` returns newest-started first** (sorted by root `startedAt`, descending). An empty / omitted filter returns every retained trace.
+
+## Filtering with `TraceQuery`
+
+Every field is optional and **ANDed** together — an absent field is "don't care", so `{}` matches everything. The same filter type drives both `query` and `aggregate`.
+
+```ts
+type TraceQuery = {
+  traceId?: string;                         // exact one run
+  sessionId?: string;                       // every run for a session
+  status?: ReportStatus | ReportStatus[];   // single status or membership set
+  startedAfter?: string | Date;             // inclusive lower bound on root startedAt
+  startedBefore?: string | Date;            // inclusive upper bound on root startedAt
+};
+```
+
+```ts
+// One run by id:
+store.query({ traceId: "run-abc" });
+
+// Every run for a conversation:
+store.query({ sessionId: "session-42" });
+
+// Failed or cancelled runs since midnight (status accepts an array):
+store.query({
+  status: ["failed", "cancelled"],
+  startedAfter: "2026-06-18T00:00:00.000Z",
+});
+
+// A Date works anywhere a time bound is accepted:
+store.query({ startedAfter: new Date(Date.now() - 3_600_000) }); // last hour
+```
+
+Time bounds compare against each trace's root `startedAt`, **inclusive on both ends**, accepting either an ISO-8601 string or a `Date`. Status is exact equality (or array membership). The pure matcher behind this is `matchTrace(trace, filter)` — exported for testing or filtering a trace list you hold yourself.
+
+## Rolling up with `aggregate`
+
+`aggregate(filter?)` answers the headline questions — how many runs, how many tokens, how much did it cost, how many failed — for whatever slice the filter selects:
+
+```ts
+type TraceAggregate = {
+  traces: number;        // matched count
+  completed: number;     // root status === "completed"
+  failed: number;        // root status === "failed"
+  cancelled: number;     // root status === "cancelled"
+  usage: Usage;          // summed token usage (input/output/total always present)
+  cost?: ModelPricing;   // merged per-channel USD, or undefined if no trace was priced
+  totalDuration: number; // summed wall-clock ms
+};
+```
+
+```ts
+const stats = store.aggregate({ sessionId: "session-42" });
+
+console.log(`${stats.traces} runs, ${stats.usage.total} tokens, ${stats.failed} failed`);
+
+const totalUsd =
+  (stats.cost?.input ?? 0) +
+  (stats.cost?.output ?? 0) +
+  (stats.cost?.cachedInput ?? 0) +
+  (stats.cost?.cachedOutput ?? 0);
+```
+
+Notes that matter when reading the numbers:
+
+- **`usage`** sums each trace's *root* `Usage` (already a rollup of own cost + children), so the totals reflect the whole run tree without re-walking spans. `input` / `output` / `total` are always present (zero when nothing matched); the optional `cachedTokens` / `cacheWriteTokens` / `reasoningTokens` channels are summed only when at least one matched trace reported them.
+- **`cost`** is a per-channel `ModelPricing` breakdown (not one opaque number), merged with the framework's own cost-rollup logic — an unpriced trace never erases the cost of priced ones. It stays `undefined` only when **no** matched trace carried pricing.
+- **`completed` + `failed` + `cancelled` need not equal `traces`** — non-terminal statuses (`awaiting-input`, `max-iterations`) count toward `traces` but none of the three headline counters.
+- An empty match returns a zeroed aggregate (`usage` all `0`, `cost` `undefined`, `totalDuration` `0`).
+
+## Bounding retention with `capacity`
+
+Unbounded by default (keep everything until `clear()`). For a long-lived process, cap it — the oldest-ingested trace is evicted FIFO once the cap is exceeded:
+
+```ts
+type InMemoryTraceStoreOptions = { capacity?: number }; // absent / 0 = unbounded
+
+const store = createInMemoryTraceStore({ capacity: 1000 });
+```
+
+Overwriting an existing `traceId` refreshes its insertion position, so a re-collected run is treated as newest for eviction — eviction stays honest under overwrite.
+
+> The in-memory store has no secondary indexes: `get` / `add` are O(1), `query` / `aggregate` are O(n) scans. That is the right trade-off for dev/test and modest-volume runtime use. For high-volume or durable retention, write a custom `TraceStoreContract` (or export to a backend with [`export-traces`](@warlock.js/ai-panoptic/export-traces/SKILL.md)) backed by a real datastore.
+
+## Summing usage yourself
+
+`sumUsage` / `emptyUsage` are the pure folds `aggregate` is built on — reuse them to roll a `Usage` set the store didn't produce (e.g. a list of traces you filtered by hand):
+
+```ts
+import { emptyUsage, sumUsage } from "@warlock.js/ai-panoptic";
+
+let total = emptyUsage(); // { input: 0, output: 0, total: 0 } — optional channels absent
+for (const trace of store.query({ sessionId })) {
+  total = sumUsage(total, trace.usage);
+}
+```
+
+`sumUsage` is pure (returns a fresh `Usage`, mutates neither argument): token channels always sum; the optional cache/reasoning channels sum only when a side reported them (so a never-metered channel stays absent rather than fabricating a `0`); `cost` merges with the framework's `accumulateCost` so an unpriced contributor never erases a priced one.
+
+## See also
+
+- [`@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`](@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md) — wiring the `panoptic(...)` subscriber and bring-your-own-collector so the store fills as runs complete.
+- [`@warlock.js/ai-panoptic/export-traces/SKILL.md`](@warlock.js/ai-panoptic/export-traces/SKILL.md) — sending traces to an external backend instead of (or alongside) retaining them in memory; writing a custom sink.
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — the `BaseReport` the collector projects into the `Trace` this store retains.
+
+
