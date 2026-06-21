@@ -4,11 +4,11 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
-## [Unreleased]
+## 4.4.0 - 2026-06-21
 
-### Added
+### Changed
 
-- `model.uuid` documented — a string-typed accessor returning the primary id as `string` (where `model.id` is `string | number`); name is historical, no UUID validation
+- **Documented `model.uuid`** — clarified that the accessor returns the model's primary id as `string` (where `model.id` is `string | number`); the name is historical and performs no UUID validation or coercion.
 
 ## 4.2.11
 
