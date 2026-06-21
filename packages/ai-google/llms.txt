@@ -1,0 +1,9 @@
+# Warlock AI Google
+
+> Package: `@warlock.js/ai-google`
+
+> Google Gemini adapter for @warlock.js/ai
+
+## Skills
+
+- [setup-google](@warlock.js/ai-google/setup-google/SKILL.md): Wire @warlock.js/ai-google — new GoogleSDK({apiKey} | {vertexai, project, location}) for Gemini API + Vertex AI. generateContent / embedContent + thoughtSignature round-trip for thinking models, batched embeddings. .model({name, vision?, reasoning?, audio?, pdf?}) with cost-truth capabilities, extended thinking via options.reasoning → thinkingConfig.thinkingBudget, usage reasoningTokens (thoughtsTokenCount) / cachedTokens (cachedContentTokenCount). Triggers: `GoogleSDK`, `google.model`, `google.embedder`, `thoughtSignature`, `responseJsonSchema`, `vertexai`, `reasoning`, `thinkingConfig`, `thinkingBudget`, `thoughtsTokenCount`, `reasoningTokens`, `cachedTokens`, `promptCaching`, `cacheControl`; "use gemini", "wire Vertex AI", "gemini embeddings", "gemini thinking tool calls", "gemini 2.5 thinking budget", "gemini cached content cost"; import `import { GoogleSDK } from "@warlock.js/ai-google"`. Skip: agent loop `@warlock.js/ai/run-ai-agent/SKILL.md`; provider picking `@warlock.js/ai/pick-ai-provider/SKILL.md`; embedder usage `@warlock.js/ai/embed-text/SKILL.md`; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-ollama`; raw `@google/genai`, `@google-cloud/vertexai`, Vercel `@ai-sdk/google`.
