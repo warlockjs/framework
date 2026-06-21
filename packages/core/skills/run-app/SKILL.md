@@ -66,6 +66,7 @@ export default defineConfig({
       exclude: ["**/node_modules/**", "**/dist/**", "**/.warlock/**", "**/.git/**"],
     },
     generateTypings: true,             // background type generation
+    checkForUpdates: true,             // notify on a newer @warlock.js/core at dev start
     healthCheckers: [...] /* or false */,
     transpileCacheDebug: false,        // name cache files <slug>.<hash>.js w/ // @source markers
   },
@@ -76,6 +77,7 @@ export default defineConfig({
 - **`generateTypings`** — turn off if you're committing generated typings and don't want them rewritten on every boot. The `--skip-typings` flag is the per-run version.
 - **`healthCheckers`** — custom file health checker contracts (or `false` to disable). The `--skip-health` flag is the per-run version.
 - **`transpileCacheDebug`** — diagnostic only. Names `.warlock/transpile/*.js` files `<slug>.<hash>.js` and appends `// @source <path>` markers so you can eyeball which cache entry came from which source. Leave off in normal use.
+- **`checkForUpdates`** — on `warlock dev` start, check npm for a newer `@warlock.js/core` and print a one-line notice if one exists. Best-effort and non-blocking; auto-skipped in CI and non-TTY shells. Run `warlock update` to upgrade. See [`update-packages/SKILL.md`](../update-packages/SKILL.md).
 
 ## `warlock build` — production bundle
 
@@ -258,3 +260,4 @@ NODE_OPTIONS=--max-old-space-size=4096 yarn warlock start
 - [`configure-app/SKILL.md`](../configure-app/SKILL.md) — `warlock.config.ts` shape and `defineConfig`.
 - [`use-app-context/SKILL.md`](../use-app-context/SKILL.md) — `Application.environment` vs `Application.runtimeStrategy`.
 - [`add-connector/SKILL.md`](../add-connector/SKILL.md) — Early vs Late connector phases (why HTTP/socket boot late in dev).
+- [`update-packages/SKILL.md`](../update-packages/SKILL.md) — `warlock update` + the dev-server update notice (`devServer.checkForUpdates`).

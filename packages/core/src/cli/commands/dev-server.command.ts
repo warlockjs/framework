@@ -1,3 +1,4 @@
+import { checkForFrameworkUpdate } from "../../dev-server/check-for-updates";
 import { startDevelopmentServer } from "../../dev-server/start-development-server";
 import { command } from "../cli-command";
 import { displayStartupBanner } from "../cli-commands.utils";
@@ -24,9 +25,14 @@ export const devServerCommand = command({
       fresh: Boolean(data.options.fresh),
       // Pass `false` only when the CLI flag is explicitly set; `undefined`
       // lets `warlock.config.ts > devServer.*` defaults apply.
-      generateTypings: data.options["skip-typings"] ? false : undefined,
-      healthCheckers: data.options["skip-health"] ? false : undefined,
+      generateTypings: data.options.skipTypings ? false : undefined,
+      healthCheckers: data.options.skipHealth ? false : undefined,
     });
+
+    // Fire-and-forget: once the server is ready, surface a one-line notice if
+    // a newer @warlock.js/core has been published. Fully self-guarded — it
+    // never blocks startup nor breaks dev if the registry is unreachable.
+    void checkForFrameworkUpdate();
   },
   options: [
     {

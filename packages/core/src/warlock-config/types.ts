@@ -85,6 +85,15 @@ export type WarlockConfig = {
      */
     generateTypings?: boolean;
     /**
+     * Check npm for a newer `@warlock.js/core` release when the dev server
+     * starts and print a one-line notice if one is available. Because the
+     * family is versioned in lockstep, core stands in for every package.
+     * Best-effort and non-blocking; automatically skipped in CI and in
+     * non-interactive (non-TTY) shells.
+     * @default true
+     */
+    checkForUpdates?: boolean;
+    /**
      * Debug aid for the (always-on) persisted transpile cache. Names cache
      * files `<slug>.<hash>.js` (last 3 source path segments) and appends a
      * trailing `// @source <path>` marker, so you can eyeball which entry

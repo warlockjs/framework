@@ -18,6 +18,7 @@ import { seedCommand } from "./commands/seed.command";
 import { startProductionCommand } from "./commands/start-production.command";
 import { storagePutCommand } from "./commands/storage-put.command";
 import { typingsGeneratorCommand } from "./commands/typings-generator.command";
+import { updateCommand } from "./commands/update.command";
 
 export const frameworkCommands = [
   // development commands
@@ -36,6 +37,7 @@ export const frameworkCommands = [
 
   // generation/installation commands
   addCommand,
+  updateCommand,
 
   // scaffolding commands
   generateCommand,

@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## 4.3.0 - 2026-06-21
+
+### Added
+
+- `warlock update` — update every `@warlock.js/*` package in package.json to its latest version (operator preserved), then run the detected package manager's install
+- dev-server update notice — `warlock dev` checks npm on start and prints a one-line notice when a newer `@warlock.js/core` is published
+- `devServer.checkForUpdates` config flag (default `true`) to toggle the dev-server update notice
+- `fetchLatestVersion()` and `isNewerVersion()` registry/version utilities
+
+### Fixed
+
+- `warlock dev --skip-typings` and `--skip-health` long-form flags now work (were silently ignored)
+
 ## 4.2.11
 
 ### Added
