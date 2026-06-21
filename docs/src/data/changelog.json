@@ -30,6 +30,10 @@
       "slug": "ai-openai"
     },
     {
+      "name": "@warlock.js/ai-panoptic",
+      "slug": "ai-panoptic"
+    },
+    {
       "name": "@warlock.js/auth",
       "slug": "auth"
     },
@@ -67,6 +71,149 @@
     }
   ],
   "releases": [
+    {
+      "version": "4.4.0",
+      "id": "v4-4-0",
+      "date": "June 21, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong><code>@warlock.js/core</code></strong> completes the production lifecycle — safe boot → safe serve → safe shutdown. A boot hook, <code>Application.onceBooted(cb)</code> (plus <code>whenBooted()</code> and <code>isBooted</code>), runs code once the app is fully booted, _after_ the late phase (http, socket) is up; a shutdown hook, <code>Application.onShutdown(cb)</code> (plus <code>isShuttingDown</code>), runs teardown _before_ the connectors close, so cleanup can still use db/cache/http. Both are latches — a callback registered after the event still fires instead of missing it. On top of that, the HTTP server now <strong>drains gracefully</strong> on shutdown (in-flight requests finish, bounded by <code>http.gracefulShutdown.timeout</code>), and core ships built-in <strong><code>/health</code> (liveness)</strong> and <strong><code>/ready</code> (readiness)</strong> endpoints with a <code>health</code> check registry, so a load balancer drains an instance the moment it starts shutting down — the building blocks for zero-downtime deploys. On the AI side: <strong><code>@warlock.js/ai</code></strong> fixes <code>ai.planner()</code>'s OpenAI strict-mode <code>400</code> and a strict-TypeScript <code>never</code> reduction on <code>result.report</code>; <strong><code>@warlock.js/ai-openai</code></strong> makes the strict structured-output compatibility check recursive (degrading to loose <code>json_object</code> instead of failing the call); and <strong><code>@warlock.js/ai-panoptic</code></strong> adds opt-in content capture — prompts, responses, and tool I/O flow onto each span and into the console (<code>io</code>), file, OTel (<code>gen_ai.prompt</code> / <code>gen_ai.completion</code>), and Langfuse (<code>input</code> / <code>output</code>) exporters — plus corrects Langfuse token accounting to own-usage with the root execution metered, so trace totals no longer double-count. <strong><code>@warlock.js/cascade</code></strong> documents the string-typed <code>model.uuid</code> accessor.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 9,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 8
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>Application.onceBooted(cb)</code> — run a callback once the app is fully booted (fires immediately if already booted)"
+            },
+            {
+              "type": "Added",
+              "html": "<code>Application.whenBooted()</code> — promise that resolves with the boot context when the app is fully booted"
+            },
+            {
+              "type": "Added",
+              "html": "<code>Application.isBooted</code> — whether the app has finished booting"
+            },
+            {
+              "type": "Added",
+              "html": "<code>Application.onShutdown(cb)</code> — run teardown once on shutdown, before connectors stop (mirror of <code>onceBooted</code>)"
+            },
+            {
+              "type": "Added",
+              "html": "<code>Application.isShuttingDown</code> — whether shutdown has begun"
+            },
+            {
+              "type": "Added",
+              "html": "built-in <code>/health</code> (liveness) and <code>/ready</code> (readiness) endpoints with a <code>health</code> check registry (<code>health.addCheck</code>)"
+            },
+            {
+              "type": "Added",
+              "html": "graceful HTTP shutdown — drains in-flight requests on shutdown, bounded by <code>http.gracefulShutdown.timeout</code>"
+            },
+            {
+              "type": "Added",
+              "html": "<code>http.health.*</code> config to toggle or rename the health endpoints"
+            },
+            {
+              "type": "Fixed",
+              "html": "connector shutdown no longer reverses the connector list in place (could corrupt order on a repeated shutdown)"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<strong>Planner: OpenAI strict structured-output 400.</strong> The generated plan schema now lists every property in <code>required</code> (the optional <code>id</code> / <code>reason</code> / <code>dependsOn</code> are nullable) and no longer emits <code>minItems</code> / <code>maxItems</code>, so <code>ai.planner()</code> no longer fails with <code>400 Invalid schema for response_format … 'required' … Missing 'id'</code> against OpenAI strict <code>json_schema</code> mode. <code>maxSteps</code> and the non-empty-plan check are enforced at runtime / in <code>validate()</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Report / result types no longer collapse to <code>never</code> under strict TypeScript.</strong> The narrowing report types (<code>PlannerReport</code>, <code>OrchestratorReport</code>, <code>SupervisorReport</code>, <code>WorkflowReport</code>, <code>ToolCall</code>) and the two result types that re-declare <code>report</code> (<code>PlannerResult</code>, <code>OrchestratorResult</code>) now override the discriminant via <code>Omit&lt;BaseReport, \"type\"&gt;</code> / <code>Omit&lt;ExecuteResult, \"report\"&gt;</code> instead of intersecting <code>BaseReport &amp; { type: \"…\" }</code>, so <code>result.report</code> no longer types as <code>never</code> (*\"Property 'plan' does not exist on type 'never'\"*). Type-only — no runtime change."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong>Opt-in content capture.</strong> <code>createCollector</code> / <code>panoptic({ captureContent, redactContent })</code> copies the agent prompt/response (first-trip input, last non-empty trip output) and each tool's args/result onto <code>TraceSpan.input</code> / <code>output</code>. Surfaced by <code>consoleExporter({ io, ioMaxChars })</code> (new <code>in:</code> / <code>out:</code> lines), the file exporter's JSON, OTel <code>gen_ai.prompt</code> / <code>gen_ai.completion</code>, and Langfuse native <code>input</code> / <code>output</code>. Off by default — payloads are large and often sensitive; a <code>ContentRedactor</code> masks each value. New exports: <code>ContentCaptureOptions</code>, <code>ContentRedactor</code>, <code>formatSpanIO</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Langfuse token accounting.</strong> Generations now meter their OWN usage (rolled-up minus children); composite nodes with no own tokens emit as plain spans; the root execution is now emitted as an observation (its own tokens were previously unmetered); and the rolled-up usage/cost is stripped from observation metadata (the <code>usage</code> block is authoritative). Together these stop the trace total from double-counting nested spans."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<strong>Strict structured-output compatibility check is now recursive.</strong> <code>json_schema</code> (strict) mode is used only when every object in the schema lists all of its properties in <code>required</code> — OpenAI strict has no optional fields, so a schema that omits one anywhere in the tree would <code>400</code>. Such schemas now degrade to loose <code>json_object</code> instead of failing the call; client-side validation still enforces the full shape."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<strong>Documented <code>model.uuid</code></strong> — clarified that the accessor returns the model's primary id as <code>string</code> (where <code>model.id</code> is <code>string | number</code>); the name is historical and performs no UUID validation or coercion."
+            }
+          ]
+        }
+      ]
+    },
     {
       "version": "4.3.0",
       "id": "v4-3-0",
@@ -274,6 +421,135 @@
             {
               "type": "Added",
               "html": "Executables passed in an agent's <code>tools: [...]</code> are auto-adapted into tools (workflows / supervisors / orchestrators expose <code>.asTool()</code> and compose directly)"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 27,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 22
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>panoptic()</code> — the one-call subscriber factory. Builds a collector, registers exporters, and feeds traces three ways: <code>attach()</code> to an agent/workflow/supervisor <code>*.completed</code> event stream, <code>middleware()</code> for the agent pipeline, and <code>collect()</code> for a report directly (e.g. an orchestrator turn). Plus <code>use()</code>, <code>toTrace()</code>, <code>flush()</code>, <code>shutdown()</code>, and a <code>collector</code> accessor."
+            },
+            {
+              "type": "Added",
+              "html": "<code>createPanopticMiddleware()</code> — the underlying <code>AgentMiddleware</code> adapter feeding the collector from the <code>execute.after</code> / <code>execute.onError</code> hooks"
+            },
+            {
+              "type": "Added",
+              "html": "<code>Panoptic</code> / <code>PanopticOptions</code> / <code>PanopticTarget</code> / <code>CompletedEventPayload</code> types"
+            },
+            {
+              "type": "Added",
+              "html": "<code>panoptic</code> + middleware + types exported from the root barrel"
+            },
+            {
+              "type": "Added",
+              "html": "<code>scripts/generate-llms.mjs</code> and the generated <code>llms.txt</code> / <code>llms-full.txt</code> projections of <code>skills/</code>"
+            },
+            {
+              "type": "Added",
+              "html": "<code>skills/observe-with-panoptic/SKILL.md</code> — wiring the subscriber into a run"
+            },
+            {
+              "type": "Added",
+              "html": "<code>consoleExporter()</code> — zero-dep exporter printing trace summary or full span tree"
+            },
+            {
+              "type": "Added",
+              "html": "<code>fileExporter()</code> — zero-dep buffered JSON-Lines exporter with <code>flushEvery</code>"
+            },
+            {
+              "type": "Added",
+              "html": "<code>otelExporter()</code> — OpenTelemetry exporter mapping spans to GenAI semantic conventions (<code>gen_ai.*</code>)"
+            },
+            {
+              "type": "Added",
+              "html": "<code>langfuseExporter()</code> — Langfuse exporter mapping spans to traces, generations, and spans"
+            },
+            {
+              "type": "Added",
+              "html": "<code>toGenAiAttributes()</code> / <code>walkSpans()</code> / <code>totalCostUsd()</code> exporter utilities"
+            },
+            {
+              "type": "Added",
+              "html": "Optional peers <code>@opentelemetry/api</code> and <code>langfuse</code> are lazily imported by their exporters"
+            },
+            {
+              "type": "Added",
+              "html": "<code>createCollector()</code> — consumes the core <code>BaseReport</code> tree, projects it to a <code>Trace</code>, fans out to exporters"
+            },
+            {
+              "type": "Added",
+              "html": "<code>reportToTrace()</code> / <code>reportToSpan()</code> pure projections of a report node to spans"
+            },
+            {
+              "type": "Added",
+              "html": "<code>createInMemoryTraceStore()</code> — queryable in-memory store, doubles as an <code>ExporterContract</code>"
+            },
+            {
+              "type": "Added",
+              "html": "<code>TraceStoreContract</code> with <code>query</code> / <code>aggregate</code> by runId, sessionId, status, and time window"
+            },
+            {
+              "type": "Added",
+              "html": "<code>TraceQuery</code> and <code>TraceAggregate</code> types for slicing and rolling up usage + cost"
+            },
+            {
+              "type": "Added",
+              "html": "<code>sumUsage()</code> usage + cost rollup across stored traces, backed by core <code>accumulateCost</code>"
+            },
+            {
+              "type": "Added",
+              "html": "optional <code>capacity</code> cap on the in-memory store with FIFO eviction"
+            },
+            {
+              "type": "Added",
+              "html": "contract surface: <code>CollectorContract</code>, <code>ExporterContract</code>, and the vendor-neutral trace types <code>Trace</code> / <code>TraceSpan</code> / <code>TraceSpanError</code>, derived 1:1 from the core <code>BaseReport</code> tree and event stream"
+            },
+            {
+              "type": "Added",
+              "html": "<code>@opentelemetry/api</code>, <code>@opentelemetry/sdk-trace-base</code>, and <code>langfuse</code> declared as OPTIONAL peer dependencies (lazily imported by the exporters that need them)"
+            },
+            {
+              "type": "Added",
+              "html": "<code>skills/query-traces/SKILL.md</code> — dedicated skill for the in-memory queryable trace store (<code>createInMemoryTraceStore</code>, <code>query</code> / <code>aggregate</code>, <code>TraceQuery</code> / <code>TraceAggregate</code>, <code>capacity</code> FIFO eviction, <code>sumUsage</code> / <code>emptyUsage</code> / <code>matchTrace</code> helpers)"
+            },
+            {
+              "type": "Changed",
+              "html": "<code>skills/export-traces/SKILL.md</code> — OTel attribute notes: <code>gen_ai.system</code> / <code>gen_ai.request.model</code> / <code>gen_ai.operation.name</code> are only forwarded when the span's attribute bag carried them (<code>system</code> backfilled from options), never invented"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Failed root runs now carry their error in every export</strong> — <code>collect()</code> / <code>reportToTrace()</code> / <code>attach()</code> / <code>middleware()</code> thread the result-envelope error (<code>BaseResult.error</code>) onto the root span (which <code>BaseReport</code> doesn't carry); <code>collect()</code> / <code>reportToTrace()</code> gained an optional <code>rootError</code> parameter"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Per-span exporters now receive every span</strong> — the collector's <code>dispatch</code> walks the finalized tree (<code>walkSpans</code>), invoking <code>exportSpan</code> once per node (a post-completion per-span projection, not live streaming)"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>panoptic().middleware()</code> now works on a supervisor</strong> — the middleware declares a <code>supervisor</code> hook map (not only <code>execute</code>), so <code>ai.supervisor({ middleware: [observe.middleware()] })</code> collects a trace"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>totalCostUsd()</code> folds in <code>cost.reasoning</code>; the Langfuse exporter <code>end()</code>s every observation; the OTel exporter maps <code>max-iterations</code> / <code>awaiting-input</code> to <code>UNSET</code> (a hit cap no longer reads as clean success)"
             }
           ]
         },
