@@ -157,7 +157,35 @@ function applyAttributes(
     attributes[GEN_AI_ATTRIBUTES.system] = options.system;
   }
 
+  // Captured content (only present under `captureContent`) maps onto the
+  // GenAI prompt/completion attributes, stringified since OTel attribute
+  // values must be primitives.
+  if (span.input !== undefined) {
+    attributes[GEN_AI_ATTRIBUTES.prompt] = stringifyContent(span.input);
+  }
+
+  if (span.output !== undefined) {
+    attributes[GEN_AI_ATTRIBUTES.completion] = stringifyContent(span.output);
+  }
+
   otelSpan.setAttributes(attributes);
+}
+
+/**
+ * Coerce a captured content value to a string OTel attribute. Strings
+ * pass through; structured values are JSON-encoded (falling back to
+ * `String()` if they can't be serialized).
+ */
+function stringifyContent(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
 }
 
 /**

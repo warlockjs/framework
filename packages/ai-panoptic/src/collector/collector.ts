@@ -3,6 +3,7 @@ import type { CollectorContract } from "../contracts/collector.contract";
 import type { ExporterContract } from "../contracts/exporter.contract";
 import type { Trace } from "../contracts/trace.type";
 import { walkSpans } from "../exporters/utils/walk-spans";
+import type { ContentCaptureOptions } from "./content-capture.type";
 import { reportToTrace } from "./report-to-trace";
 
 /**
@@ -29,6 +30,13 @@ class Collector implements CollectorContract {
    */
   private readonly exporters = new Map<string, ExporterContract>();
 
+  /**
+   * Content-capture options threaded into every `toTrace` projection.
+   * When `captureContent` is set, projected spans carry `input` /
+   * `output`; otherwise they stay metadata-only.
+   */
+  public constructor(private readonly options: ContentCaptureOptions = {}) {}
+
   public use(exporter: ExporterContract): this {
     if (!this.exporters.has(exporter.name)) {
       this.exporters.set(exporter.name, exporter);
@@ -38,7 +46,7 @@ class Collector implements CollectorContract {
   }
 
   public toTrace(report: BaseReport, rootError?: unknown): Trace {
-    return reportToTrace(report, rootError);
+    return reportToTrace(report, rootError, this.options);
   }
 
   public async collect(report: BaseReport, rootError?: unknown): Promise<void> {
@@ -108,6 +116,6 @@ class Collector implements CollectorContract {
  * // on shutdown:
  * await collector.shutdown();
  */
-export function createCollector(): CollectorContract {
-  return new Collector();
+export function createCollector(options: ContentCaptureOptions = {}): CollectorContract {
+  return new Collector(options);
 }

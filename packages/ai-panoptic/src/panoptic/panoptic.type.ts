@@ -1,4 +1,5 @@
 import type { AgentMiddleware, BaseReport } from "@warlock.js/ai";
+import type { ContentRedactor } from "../collector/content-capture.type";
 import type { CollectorContract } from "../contracts/collector.contract";
 import type { ExporterContract } from "../contracts/exporter.contract";
 import type { Trace } from "../contracts/trace.type";
@@ -41,6 +42,22 @@ export type PanopticOptions = {
    * registering more than one Panoptic middleware on the same agent.
    */
   middlewareName?: string;
+  /**
+   * Capture raw prompts / responses / tool I/O onto each span's
+   * `input` / `output` so exporters can surface them — e.g.
+   * `consoleExporter({ io: true })`, the file exporter's JSON, OTel
+   * `gen_ai.prompt` / `gen_ai.completion`, Langfuse `input` / `output`.
+   * Off by default: payloads are large and often sensitive. Applies only
+   * when Panoptic builds the collector — ignored when you inject your own
+   * `collector` (configure capture on it via `createCollector`).
+   */
+  captureContent?: boolean;
+  /**
+   * Optional masker applied to every captured content value before it is
+   * stored — strip secrets / PII when capturing in a sensitive
+   * environment. See {@link ContentRedactor}.
+   */
+  redactContent?: ContentRedactor;
 };
 
 /**

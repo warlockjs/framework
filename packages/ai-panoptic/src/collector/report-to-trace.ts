@@ -1,5 +1,6 @@
 import type { BaseReport } from "@warlock.js/ai";
 import type { Trace } from "../contracts/trace.type";
+import type { ContentCaptureOptions } from "./content-capture.type";
 import { normalizeError } from "./normalize-error";
 import { reportToSpan } from "./report-to-span";
 
@@ -30,8 +31,12 @@ import { reportToSpan } from "./report-to-span";
  * const trace = reportToTrace(result.report, result.error);
  * console.log(trace.traceId, trace.usage.total, trace.duration);
  */
-export function reportToTrace(report: BaseReport, rootError?: unknown): Trace {
-  const root = reportToSpan(report);
+export function reportToTrace(
+  report: BaseReport,
+  rootError?: unknown,
+  options?: ContentCaptureOptions,
+): Trace {
+  const root = reportToSpan(report, options);
 
   if (root.error === undefined) {
     const error = normalizeError(rootError);

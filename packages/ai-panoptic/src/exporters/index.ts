@@ -14,7 +14,7 @@ export {
 } from "./utils";
 
 // Types
-export { formatSpanLine } from "./console";
+export { formatSpanIO, formatSpanLine } from "./console";
 export type {
   ConsoleExporterOptions,
   ConsoleLike,

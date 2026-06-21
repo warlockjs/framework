@@ -30,4 +30,19 @@ export type ConsoleExporterOptions = {
    * present, so leaving this off omits the method entirely.
    */
   streaming?: boolean;
+  /**
+   * Also print each span's captured content — `TraceSpan.input` /
+   * `output` — as extra indented `in:` / `out:` lines beneath the span.
+   * Defaults to `false`. Requires the collector to run with content
+   * capture (`captureContent`); without it spans carry no content and
+   * this is a no-op.
+   */
+  io?: boolean;
+  /**
+   * Max characters of captured content shown per `in:` / `out:` line
+   * before truncation — only when {@link ConsoleExporterOptions.io} is on.
+   * Defaults to `500`. Raise it for fuller payloads, or use the file
+   * exporter for untruncated content.
+   */
+  ioMaxChars?: number;
 };

@@ -1,5 +1,6 @@
 import type { ExporterContract, Trace, TraceSpan } from "../../contracts";
-import { toGenAiAttributes } from "../utils";
+import type { AttributeValue } from "../utils";
+import { GEN_AI_ATTRIBUTES, toGenAiAttributes, WARLOCK_ATTRIBUTES } from "../utils";
 import type {
   LangfuseClientLike,
   LangfuseExporterOptions,
@@ -65,12 +66,16 @@ function loadLangfuse(): Promise<void> {
  * installed, and a missing SDK surfaces as a curated "install this"
  * error when the exporter first needs to build a client.
  *
- * The root {@link TraceSpan} becomes a Langfuse trace; each descendant
- * becomes a nested observation — a `generation` when it produced tokens
- * (LLM-backed agents, supervisors), otherwise a plain `span` (tools,
- * callbacks). Timing, status, version, and rolled-up `usage` are mapped
- * 1:1; the rest of the GenAI attributes ride along as observation
- * metadata.
+ * The root {@link TraceSpan} becomes a Langfuse trace AND its top
+ * observation (so the root execution's own tokens are metered, not just
+ * its children's); every node is an observation — a `generation` when it
+ * metered its OWN tokens (LLM-backed agents, supervisors), otherwise a
+ * plain `span` (tools, callbacks, and composite nodes whose tokens came
+ * only from children). Timing, status, and version map 1:1; each
+ * generation reports its own token usage (rolled-up minus children) so
+ * the trace total isn't double-counted; non-usage GenAI attributes ride
+ * along as metadata, and captured content (under `captureContent`)
+ * surfaces as native `input` / `output`.
  *
  * @example
  * collector.use(langfuseExporter({ publicKey: "pk-...", secretKey: "sk-..." }));
@@ -140,18 +145,23 @@ function emitTrace(client: LangfuseClientLike, trace: Trace): void {
     sessionId: trace.sessionId,
     version: root.version,
     timestamp: new Date(root.startedAt),
-    metadata: toGenAiAttributes(root),
+    metadata: langfuseMetadata(root),
   });
 
-  for (const child of root.children) {
-    emitObservation(langfuseTrace, child);
-  }
+  // Emit the ROOT as an observation too — not just its children — so the
+  // root execution's OWN tokens are metered. Langfuse derives the trace
+  // total by summing observation usage; leaving the root (often the single
+  // top-level agent) as trace-only would drop its own spend. Children nest
+  // under the root observation, mirroring the execution tree, and own-usage
+  // metering telescopes the per-node sums back to the true trace total.
+  emitObservation(langfuseTrace, root);
 }
 
 /**
  * Map one {@link TraceSpan} onto a Langfuse observation under `parent`,
- * then recurse its children. Token-producing spans become
- * `generation`s; everything else becomes a plain `span`.
+ * then recurse its children. Spans that metered their OWN tokens become
+ * `generation`s; everything else (tools, callbacks, composite nodes)
+ * becomes a plain `span`.
  */
 function emitObservation(
   parent: LangfuseTraceLike | LangfuseObservationLike,
@@ -165,16 +175,33 @@ function emitObservation(
     level: toLevel(span),
     statusMessage: span.error?.message,
     version: span.version,
-    metadata: toGenAiAttributes(span),
+    metadata: langfuseMetadata(span),
   };
+
+  // Captured content (only present under `captureContent`) maps onto
+  // Langfuse's native observation input/output.
+  if (span.input !== undefined) {
+    body.input = span.input;
+  }
+
+  if (span.output !== undefined) {
+    body.output = span.output;
+  }
 
   let observation: LangfuseObservationLike;
 
-  if (producedTokens(span)) {
+  // Classify + meter on OWN tokens (this node's rolled-up usage minus its
+  // children's), not the subtree rollup. A composite node whose tokens
+  // came only from descendants has zero own-usage and becomes a plain
+  // span — so its children's tokens aren't counted twice in the trace
+  // total Langfuse sums across observations.
+  const own = ownUsage(span);
+
+  if (own.total > 0) {
     body.usage = {
-      input: span.usage.input,
-      output: span.usage.output,
-      total: span.usage.total,
+      input: own.input,
+      output: own.output,
+      total: own.total,
       unit: "TOKENS",
     };
     observation = parent.generation(body);
@@ -195,20 +222,70 @@ function emitObservation(
 }
 
 /**
- * A span counts as an LLM `generation` when it metered any tokens. Pure
- * tools/callbacks contribute zero own-cost and map to plain spans.
+ * Own token usage for a span — its rolled-up {@link TraceSpan.usage}
+ * minus the rolled-up usage of its direct children. `TraceSpan.usage` is
+ * the subtree total (this node plus every descendant), so subtracting the
+ * children leaves the tokens THIS node alone metered, clamped at zero
+ * defensively.
  *
- * **Known limitation.** `TraceSpan.usage` is the ROLLED-UP usage (this
- * node's own cost plus the sum of its children), not own-usage — the
- * core `BaseReport` exposes no separate own-usage field, so a composite
- * node (e.g. an agent that itself made no model call but whose tool
- * children did) is classified as a `generation` on its children's
- * tokens. We cannot classify on own-usage until the report shape carries
- * it; the rolled-up `usage` block emitted on such a generation therefore
- * double-counts tokens already attributed to descendant observations.
+ * Langfuse sums observation usage into the trace total, so reporting
+ * own-usage on each generation (rather than the subtree rollup) is what
+ * keeps the trace total correct instead of multiply-counting nested
+ * spans. A composite node with no own tokens (e.g. a workflow whose
+ * tokens all came from agent children) yields `total: 0` and is emitted
+ * as a plain span, not a generation.
  */
-function producedTokens(span: TraceSpan): boolean {
-  return span.usage.total > 0;
+function ownUsage(span: TraceSpan): { input: number; output: number; total: number } {
+  let childInput = 0;
+  let childOutput = 0;
+  let childTotal = 0;
+
+  for (const child of span.children) {
+    childInput += child.usage.input;
+    childOutput += child.usage.output;
+    childTotal += child.usage.total;
+  }
+
+  return {
+    input: Math.max(0, span.usage.input - childInput),
+    output: Math.max(0, span.usage.output - childOutput),
+    total: Math.max(0, span.usage.total - childTotal),
+  };
+}
+
+/**
+ * Token-usage + cost keys that the per-observation `usage` block already
+ * carries authoritatively (as OWN usage). Omitting them from `metadata`
+ * avoids a confusing contradiction — metadata would otherwise show the
+ * rolled-up subtree totals next to an own-usage `usage` block. Cost is
+ * omitted for the same reason; Langfuse prices the own tokens itself.
+ */
+const LANGFUSE_METADATA_OMIT = new Set<string>([
+  GEN_AI_ATTRIBUTES.usageInputTokens,
+  GEN_AI_ATTRIBUTES.usageOutputTokens,
+  WARLOCK_ATTRIBUTES.totalTokens,
+  WARLOCK_ATTRIBUTES.cachedTokens,
+  WARLOCK_ATTRIBUTES.reasoningTokens,
+  WARLOCK_ATTRIBUTES.costUsd,
+]);
+
+/**
+ * Observation metadata — the GenAI attribute set minus the usage/cost
+ * keys that live authoritatively on the `usage` block (see
+ * {@link LANGFUSE_METADATA_OMIT}). Keeps model identity, report type,
+ * version, session id, and any collector-set attributes.
+ */
+function langfuseMetadata(span: TraceSpan): Record<string, AttributeValue> {
+  const all = toGenAiAttributes(span);
+  const metadata: Record<string, AttributeValue> = {};
+
+  for (const [key, value] of Object.entries(all)) {
+    if (!LANGFUSE_METADATA_OMIT.has(key)) {
+      metadata[key] = value;
+    }
+  }
+
+  return metadata;
 }
 
 /**

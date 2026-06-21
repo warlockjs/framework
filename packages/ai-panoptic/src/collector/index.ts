@@ -6,3 +6,6 @@ export { reportToTrace } from "./report-to-trace";
 export { reportToSpan } from "./report-to-span";
 export { extractSpanAttributes } from "./extract-span-attributes";
 export { normalizeError } from "./normalize-error";
+
+// Opt-in content capture
+export type { ContentCaptureOptions, ContentRedactor } from "./content-capture.type";

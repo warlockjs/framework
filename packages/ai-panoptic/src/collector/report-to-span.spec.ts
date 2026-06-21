@@ -111,3 +111,118 @@ describe("reportToSpan", () => {
     expect(span.attributes).toBeUndefined();
   });
 });
+
+describe("reportToSpan content capture", () => {
+  it("omits input/output by default (capture off)", () => {
+    const report = baseReport({
+      type: "agent",
+      trips: [{ input: "hello", output: "world" }],
+    } as Partial<BaseReport>);
+
+    const span = reportToSpan(report);
+
+    expect(span.input).toBeUndefined();
+    expect(span.output).toBeUndefined();
+  });
+
+  it("captures an agent's first-trip prompt and final response", () => {
+    const report = baseReport({
+      type: "agent",
+      trips: [
+        { input: "the real prompt", output: "first reply" },
+        { input: "[tool results]", output: "the final answer" },
+      ],
+    } as Partial<BaseReport>);
+
+    const span = reportToSpan(report, { captureContent: true });
+
+    expect(span.input).toBe("the real prompt");
+    expect(span.output).toBe("the final answer");
+  });
+
+  it("captures a tool's args and result", () => {
+    const report = baseReport({
+      type: "tool",
+      name: "search",
+      input: { query: "coffee" },
+      output: { hits: 3 },
+    } as Partial<BaseReport>);
+
+    const span = reportToSpan(report, { captureContent: true });
+
+    expect(span.input).toEqual({ query: "coffee" });
+    expect(span.output).toEqual({ hits: 3 });
+  });
+
+  it("applies a redactor and drops a value it returns undefined for", () => {
+    const report = baseReport({
+      type: "tool",
+      input: "secret-key",
+      output: "ok",
+    } as Partial<BaseReport>);
+
+    const span = reportToSpan(report, {
+      captureContent: true,
+      redactContent: (value, { field }) => (field === "input" ? undefined : `[${String(value)}]`),
+    });
+
+    expect(span.input).toBeUndefined(); // redactor returned undefined → field dropped
+    expect(span.output).toBe("[ok]");
+  });
+
+  it("leaves content absent for a composite node with no own I/O", () => {
+    const report = baseReport({ type: "workflow", name: "flow" } as Partial<BaseReport>);
+
+    const span = reportToSpan(report, { captureContent: true });
+
+    expect(span.input).toBeUndefined();
+    expect(span.output).toBeUndefined();
+  });
+
+  it("captures content recursively through the subtree", () => {
+    const report = baseReport({
+      type: "agent",
+      trips: [{ input: "outer", output: "outer-done" }],
+      children: [
+        baseReport({
+          runId: "t",
+          type: "tool",
+          name: "search",
+          input: { q: "x" },
+          output: { ok: true },
+        } as Partial<BaseReport>),
+      ],
+    } as Partial<BaseReport>);
+
+    const span = reportToSpan(report, { captureContent: true });
+
+    expect(span.input).toBe("outer");
+    expect(span.children[0]?.input).toEqual({ q: "x" });
+    expect(span.children[0]?.output).toEqual({ ok: true });
+  });
+
+  it("captures the last NON-EMPTY trip output (failure / max-trips safe)", () => {
+    const report = baseReport({
+      type: "agent",
+      trips: [
+        { input: "do it", output: "the answer" },
+        { input: "[tool results]", output: "" }, // empty final trip (failed / capped)
+      ],
+    } as Partial<BaseReport>);
+
+    const span = reportToSpan(report, { captureContent: true });
+
+    expect(span.output).toBe("the answer"); // not the empty final trip
+  });
+
+  it("leaves output absent when no trip produced text", () => {
+    const report = baseReport({
+      type: "agent",
+      trips: [{ input: "x", output: "" }],
+    } as Partial<BaseReport>);
+
+    const span = reportToSpan(report, { captureContent: true });
+
+    expect(span.output).toBeUndefined();
+  });
+});

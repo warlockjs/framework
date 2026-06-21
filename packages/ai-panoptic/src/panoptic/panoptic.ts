@@ -38,7 +38,12 @@ class PanopticSubscriber implements Panoptic {
   private readonly middlewareName: string;
 
   public constructor(options: PanopticOptions = {}) {
-    this.collector = options.collector ?? createCollector();
+    this.collector =
+      options.collector ??
+      createCollector({
+        captureContent: options.captureContent,
+        redactContent: options.redactContent,
+      });
 
     for (const exporter of options.exporters ?? []) {
       this.collector.use(exporter);

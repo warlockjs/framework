@@ -4,7 +4,15 @@ All notable changes to `@warlock.js/ai-panoptic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
-## [Unreleased]
+## 4.4.0 - 2026-06-21
+
+### Added
+
+- **Opt-in content capture.** `createCollector` / `panoptic({ captureContent, redactContent })` copies the agent prompt/response (first-trip input, last non-empty trip output) and each tool's args/result onto `TraceSpan.input` / `output`. Surfaced by `consoleExporter({ io, ioMaxChars })` (new `in:` / `out:` lines), the file exporter's JSON, OTel `gen_ai.prompt` / `gen_ai.completion`, and Langfuse native `input` / `output`. Off by default — payloads are large and often sensitive; a `ContentRedactor` masks each value. New exports: `ContentCaptureOptions`, `ContentRedactor`, `formatSpanIO`.
+
+### Fixed
+
+- **Langfuse token accounting.** Generations now meter their OWN usage (rolled-up minus children); composite nodes with no own tokens emit as plain spans; the root execution is now emitted as an observation (its own tokens were previously unmetered); and the rolled-up usage/cost is stripped from observation metadata (the `usage` block is authoritative). Together these stop the trace total from double-counting nested spans.
 
 ## 4.3.0 - 2026-06-21
 

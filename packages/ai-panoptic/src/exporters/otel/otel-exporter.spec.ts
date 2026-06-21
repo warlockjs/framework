@@ -181,4 +181,22 @@ describe("otelExporter", () => {
     expect(recorded[0].parentContextId).toBeUndefined();
     expect(recorded[1].parentContextId).toBe(0);
   });
+
+  it("should set gen_ai.prompt/completion from captured content (stringifying non-strings)", async () => {
+    const exporter = otelExporter();
+
+    await exporter.export(makeTrace(makeSpan({ input: "the prompt", output: { answer: 42 } })));
+
+    expect(recorded[0].attributes["gen_ai.prompt"]).toBe("the prompt");
+    expect(recorded[0].attributes["gen_ai.completion"]).toBe('{"answer":42}');
+  });
+
+  it("should omit gen_ai.prompt/completion when no content was captured", async () => {
+    const exporter = otelExporter();
+
+    await exporter.export(makeTrace(makeSpan()));
+
+    expect(recorded[0].attributes["gen_ai.prompt"]).toBeUndefined();
+    expect(recorded[0].attributes["gen_ai.completion"]).toBeUndefined();
+  });
 });

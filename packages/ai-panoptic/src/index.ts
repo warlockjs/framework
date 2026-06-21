@@ -15,6 +15,7 @@ export {
   reportToSpan,
   reportToTrace,
 } from "./collector";
+export type { ContentCaptureOptions, ContentRedactor } from "./collector";
 
 // Store
 export {
@@ -34,6 +35,7 @@ export type {
 export {
   consoleExporter,
   fileExporter,
+  formatSpanIO,
   formatSpanLine,
   GEN_AI_ATTRIBUTES,
   langfuseExporter,

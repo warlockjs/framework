@@ -12,7 +12,9 @@ import type { ReportStatus, ReportType, Usage } from "@warlock.js/ai";
  * about — identity (`spanId` / `parentSpanId` / `traceId`), timing
  * (`startedAt` / `endedAt` / `duration`), outcome (`status` / `error`),
  * and cost (`usage`) — so a collector can flatten a `BaseReport` tree
- * into spans without consulting any other source.
+ * into spans without consulting any other source. Raw content — prompts,
+ * responses, and tool payloads — is captured onto `input` / `output`
+ * only when the collector opts in via `captureContent` (off by default).
  *
  * @example
  * const root: TraceSpan = {
@@ -81,10 +83,27 @@ export type TraceSpan = {
   /**
    * Free-form attribute bag forwarded verbatim onto the backend span
    * (OTel attributes, Langfuse metadata). Collectors populate this with
-   * primitive-specific detail (trip index, step name, tool args digest)
-   * that has no first-class field here. Absent when empty.
+   * primitive-specific metadata (trip / step / iteration counts, model
+   * identity, the tool's originating trip index) that has no first-class
+   * field here. Raw prompts / completions / tool payloads do NOT live
+   * here — they go on {@link TraceSpan.input} / {@link TraceSpan.output}
+   * under content capture. Absent when empty.
    */
   attributes?: Record<string, unknown>;
+  /**
+   * Captured input for this node — an agent's first-trip prompt or a
+   * tool's call arguments — present ONLY when the collector ran with
+   * content capture enabled (`captureContent`), off by default because
+   * payloads are large and often sensitive. Typed `unknown`: agent
+   * prompts are strings, tool args are the validated argument value.
+   */
+  input?: unknown;
+  /**
+   * Captured output for this node — an agent's final response text or a
+   * tool's return value — present only under content capture (see
+   * {@link TraceSpan.input}).
+   */
+  output?: unknown;
   /**
    * Child spans, mirroring `BaseReport.children` in invocation order.
    * Empty for leaf spans (pure tools). Exporters that emit a flat

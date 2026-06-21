@@ -53,6 +53,10 @@ export type LangfuseObservationBody = {
   version?: string;
   usage?: LangfuseUsageBody;
   metadata?: Record<string, unknown>;
+  /** Captured input (prompt / tool args), set only under content capture. */
+  input?: unknown;
+  /** Captured output (completion / tool result), set only under content capture. */
+  output?: unknown;
 };
 
 /** Body accepted by `observation.end()`. */

@@ -17,6 +17,10 @@ export const GEN_AI_ATTRIBUTES = {
   usageInputTokens: "gen_ai.usage.input_tokens",
   usageOutputTokens: "gen_ai.usage.output_tokens",
   conversationId: "gen_ai.conversation.id",
+  /** Captured prompt/input (set only under content capture). */
+  prompt: "gen_ai.prompt",
+  /** Captured completion/output (set only under content capture). */
+  completion: "gen_ai.completion",
 } as const;
 
 /**

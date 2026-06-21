@@ -73,4 +73,64 @@ describe("consoleExporter", () => {
     expect(sink.log).toHaveBeenCalledTimes(1);
     expect(sink.log.mock.calls[0][0]).toContain('tool "live"');
   });
+
+  it("should print in:/out: lines beneath a span when io=true", async () => {
+    const sink = makeSink();
+    const exporter = consoleExporter({ console: sink, tree: true, io: true });
+
+    await exporter.export(
+      makeTrace(
+        makeSpan({ name: "market-research", input: "Research the market", output: "Demand is steady" }),
+      ),
+    );
+
+    const lines = sink.log.mock.calls.map((call) => call[0] as string);
+    expect(lines.some((line) => line.includes('agent "market-research"'))).toBe(true);
+    expect(lines.some((line) => line.includes("in:  Research the market"))).toBe(true);
+    expect(lines.some((line) => line.includes("out: Demand is steady"))).toBe(true);
+  });
+
+  it("should omit io lines by default", async () => {
+    const sink = makeSink();
+    const exporter = consoleExporter({ console: sink, tree: true });
+
+    await exporter.export(makeTrace(makeSpan({ input: "x", output: "y" })));
+
+    const lines = sink.log.mock.calls.map((call) => call[0] as string);
+    expect(lines.some((line) => line.includes("in:"))).toBe(false);
+  });
+
+  it("should truncate captured content to ioMaxChars", async () => {
+    const sink = makeSink();
+    const exporter = consoleExporter({ console: sink, io: true, ioMaxChars: 5 });
+
+    await exporter.export(makeTrace(makeSpan({ output: "abcdefghij" })));
+
+    const outLine = sink.log.mock.calls
+      .map((call) => call[0] as string)
+      .find((line) => line.includes("out:"));
+    expect(outLine).toContain("out: abcde…");
+  });
+
+  it("should JSON-stringify non-string captured content", async () => {
+    const sink = makeSink();
+    const exporter = consoleExporter({ console: sink, io: true });
+
+    await exporter.export(makeTrace(makeSpan({ type: "tool", input: { q: "x" } })));
+
+    const inLine = sink.log.mock.calls
+      .map((call) => call[0] as string)
+      .find((line) => line.includes("in:"));
+    expect(inLine).toContain('in:  {"q":"x"}');
+  });
+
+  it("should print io live when streaming + io", () => {
+    const sink = makeSink();
+    const exporter = consoleExporter({ console: sink, streaming: true, io: true });
+
+    exporter.exportSpan?.(makeSpan({ name: "live", output: "done" }));
+
+    const lines = sink.log.mock.calls.map((call) => call[0] as string);
+    expect(lines.some((line) => line.includes("out: done"))).toBe(true);
+  });
 });
