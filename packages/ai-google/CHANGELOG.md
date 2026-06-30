@@ -8,11 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Cost-truth contract wiring (additive, non-breaking):
-  - `Usage.reasoningTokens` is now populated from Gemini's `usageMetadata.thoughtsTokenCount` (thinking-phase tokens), alongside the existing `Usage.cachedTokens` from `cachedContentTokenCount`. Both surface only when reported `> 0`.
-  - `ModelCallOptions.reasoning` maps to Gemini's `config.thinkingConfig`: `reasoning.maxTokens` → `thinkingBudget` directly, `reasoning.effort` → a bucketed budget (`low` 1024 / `medium` 8192 / `high` 24576). Honored only for `reasoning`-capable models.
-  - `ModelCapabilities` now reports `reasoning: true`, `promptCaching: true`, and `audio` / `pdf` (mirroring the multimodal `vision` inference) for Gemini models. New `GoogleModelConfig` overrides: `reasoning`, `audio`, `pdf`.
-  - `ModelCallOptions.cacheControl` is accepted as a graceful no-op (Gemini has no per-call cache-write breakpoint; read-side `cachedTokens` accounting is unaffected).
+- `Usage.reasoningTokens` is populated from Gemini's `thoughtsTokenCount` (alongside `cachedTokens`), surfaced only when reported `> 0`.
+- `ModelCallOptions.reasoning` maps to Gemini's `thinkingConfig` (`maxTokens` → `thinkingBudget`, `effort` → a bucketed budget) for reasoning-capable models.
+- `ModelCapabilities` now reports `reasoning`, `promptCaching`, `audio`, and `pdf`; `cacheControl` is accepted as a graceful no-op.
 
 ## 4.1.15
 
