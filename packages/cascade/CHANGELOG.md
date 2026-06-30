@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- **Documented `model.uuid`** — clarified that the accessor returns the model's primary id as `string` (where `model.id` is `string | number`); the name is historical and performs no UUID validation or coercion.
+- **Documented `model.uuid`** — the accessor returns the model's primary id as `string` (where `model.id` is `string | number`); the name is historical and performs no UUID validation.
 
 ## 4.2.11
 
@@ -35,11 +35,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- MongoDB and PostgreSQL drivers now log a failed initial `connect()` at `log.fatal` (was `log.error`). Boot-time database connection failures are unrecoverable in every realistic Warlock use case (app boot, CLI migrations, workers) — `fatal` makes "page on fatal only" alerting clean. Per-query failures, `createDatabase`/`dropDatabase` lifecycle errors, and disconnect failures stay at `error`.
+- MongoDB and PostgreSQL drivers now log a failed initial `connect()` at `log.fatal` (was `log.error`) — a boot-time database connection failure is unrecoverable, so `fatal` keeps "page on fatal only" alerting clean. Per-query and disconnect failures stay at `error`.
 
 ### Fixed
 
-- PostgreSQL `increment` / `decrement` (and the `*Many` variants) bound the amount parameter as `$1`, which collided with the first filter placeholder (`SET n = n + $1 WHERE id = $1`) — the filter value bound into the amount slot, so every filtered counter update wrote the wrong number. The amount now binds after the filter params.
+- PostgreSQL `increment` / `decrement` (and the `*Many` variants) bound the amount as `$1`, colliding with the first filter placeholder (`SET n = n + $1 WHERE id = $1`) so every filtered counter update wrote the wrong number; the amount now binds after the filter params.
 
 ## 4.1.15
 
