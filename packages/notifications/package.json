@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/notifications",
-  "version": "4.4.0",
+  "version": "4.5.0",
   "type": "module",
   "description": "Multi-channel notifications for Warlock.js — define once, fire anywhere; mail / in-app database / pluggable custom channels with preferences, rate limits, and idempotency.",
   "main": "./cjs/index.js",

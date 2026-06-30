@@ -8,11 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- In-app column mapping moved onto the model as `static columnMap` (`recipient` / `tenant` / `readAt` / `isRead`); accessors, the repository, the `database` channel, and `notificationColumns` all derive from it. New exported `NotificationColumnMap` type.
-- Read-state is presence-based: declaring `readAt`, `isRead`, or both selects the representation; omitting both defaults to a `read_at` timestamp. The mode-agnostic `unread` filter replaces the `isRead` filter key.
-- Multi-tenant support: when the model declares a `tenant` column, the `database` channel reads it off the recipient and `createFor(recipientId, input, tenantId?)` writes it.
-- `inApp.list` / `inApp.listUnread` now forward full list options (`page` / `limit` / `orderBy` + filters), not just filter keys.
-- `notificationColumns(model)` derives recipient / tenant / read-state columns from `columnMap`; the SQL-vs-MongoDB `dataSource` branch is removed.
+- In-app column mapping moved onto the model as `static columnMap` (`recipient` / `tenant` / `readAt` / `isRead`); accessors, repository, and channels all derive from it. New `NotificationColumnMap` type.
+- Read-state is presence-based — declaring `readAt`, `isRead`, or both selects the representation (default `read_at`); the mode-agnostic `unread` filter replaces `isRead`.
+- Multi-tenant support — when the model declares a `tenant` column, the `database` channel reads it off the recipient and `createFor(...)` writes it.
+- `inApp.list` / `inApp.listUnread` now forward full list options (`page` / `limit` / `orderBy` + filters).
+- `notificationColumns(model)` derives its columns from `columnMap`; the SQL-vs-MongoDB `dataSource` branch is removed.
 
 ## 4.2.0
 
