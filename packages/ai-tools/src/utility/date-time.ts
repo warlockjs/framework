@@ -34,6 +34,7 @@ export interface DateTimeToolDeps {
 const inputSchema = objectSchema<DateTimeInput>({
   op: literalField<DateTimeOp>(OPS),
   iso: optionalStringField(),
+  from: optionalStringField(),
   to: optionalStringField(),
   amount: optionalNumberField(),
   unit: optionalStringField(),
@@ -215,7 +216,8 @@ export function dateTimeTool(
     name: options?.name ?? DEFAULT_NAME,
     description:
       "Work with dates and times. Set op to: \"now\" (current instant), " +
-      '"add" (shift iso by amount of unit), "diff" (signed to − iso in unit), ' +
+      '"add" (shift iso by amount of unit), "diff" (signed to − from in unit; ' +
+      "pass the start instant as iso or from), " +
       'or "format" (render iso). Units are milliseconds, seconds, minutes, ' +
       "hours, days, or weeks (month/year are not supported). Pass instants as " +
       'ISO-8601 strings; set format to "iso" (default), "date", "time", or ' +
@@ -258,7 +260,9 @@ export function dateTimeTool(
         }
 
         case "diff": {
-          const from = parseIso(input.iso, "iso");
+          // Accept `from` as an alias for `iso` — models naturally pass
+          // `from` / `to` for a difference. `iso` wins when both are set.
+          const from = parseIso(input.iso ?? input.from, "iso (or from)");
           const to = parseIso(input.to, "to");
 
           if (input.unit === undefined) {

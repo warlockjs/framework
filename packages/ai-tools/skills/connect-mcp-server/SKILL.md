@@ -17,7 +17,7 @@ const github = ai.mcp(
 );
 
 const dev = ai.agent({
-  model: ai.openai.model({ name: "gpt-4o" }),
+  model,
   systemPrompt: "Use the GitHub tools to triage issues.",
   tools: [...(await github.tools())], // handshake + tools/list, run once and cached
   maxTrips: 20,

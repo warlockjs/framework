@@ -69,6 +69,12 @@ export interface DateTimeInput {
   op: DateTimeOp;
   /** ISO-8601 instant the operation acts on (`add` / `diff` / `format`). */
   iso?: string;
+  /**
+   * Start instant for `diff`, accepted as an alias for `iso` — models
+   * naturally pass `from` / `to` for a difference. When both are set, `iso`
+   * wins.
+   */
+  from?: string;
   /** Second ISO-8601 instant for `diff`. */
   to?: string;
   /** Signed magnitude for `add`. */

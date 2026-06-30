@@ -10,9 +10,12 @@ description: 'Wire the @warlock.js/ai-tools belt — web search, fetch/scrape, H
 ```ts
 import "@warlock.js/ai-tools";
 import { ai } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 
 const agent = ai.agent({
-  model: ai.openai.model({ name: "gpt-4o" }),
+  model: openai.model({ name: "gpt-4o" }),
   systemPrompt: "Research, then call the API. Read tool errors and adjust.",
   tools: [
     ai.tools.webSearch({ provider: "tavily" }),
@@ -35,7 +38,7 @@ The construction `options` are the **rails** — they bound what the model may d
 | `ai.tools.fetchUrl(options?)` | `fetch_url` | `{ url }` | `{ url, status, content, truncated }` |
 | `ai.tools.http(options?)` | `http_request` | `{ method?, url, headers?, body? }` | `{ status, headers, body, truncated }` |
 | `ai.tools.calculator(options?)` | `calculator` | `{ expression }` | `{ result }` |
-| `ai.tools.dateTime(options?)` | `date_time` | `{ op, iso?, to?, amount?, unit?, timeZone?, format? }` | `{ value }` |
+| `ai.tools.dateTime(options?)` | `date_time` | `{ op, iso?, from?, to?, amount?, unit?, timeZone?, format? }` | `{ value }` |
 
 ## `web_search` — pick a provider, supply a key
 
@@ -96,6 +99,7 @@ await ai.tools.dateTime({ defaultTimeZone: "Africa/Cairo" }).invoke({ op: "forma
 ```
 
 - `op`: `"now"` / `"add"` / `"diff"` / `"format"`. `format`: `"iso"` (default), `"date"`, `"time"`, `"datetime"`.
+- For `diff`, pass the start instant as `iso` **or** `from` (an alias models reach for naturally with `from`/`to`); `iso` wins when both are set. The end instant is always `to`.
 - Units are millisecond-based: `milliseconds`, `seconds`, `minutes`, `hours`, `days`, `weeks` (plus singular/short aliases like `day`/`d`). Calendar-relative `month`/`year` are intentionally **unsupported** — they have no fixed length. An unknown unit → `DateTimeError` `"invalid-unit"`; an unknown IANA zone → `"invalid-time-zone"`.
 - For deterministic tests, inject a clock by calling the factory directly: `import { dateTimeTool } from "@warlock.js/ai-tools"; dateTimeTool({}, { clock: () => Date.parse("2026-06-22T00:00:00Z") })`.
 

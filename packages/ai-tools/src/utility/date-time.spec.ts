@@ -162,6 +162,29 @@ describe("dateTimeTool", () => {
       ).toBe("1.5");
     });
 
+    it("accepts `from` as an alias for the start instant", async () => {
+      expect(
+        await value({
+          op: "diff",
+          from: "2026-01-01T00:00:00Z",
+          to: "2026-01-04T00:00:00Z",
+          unit: "days",
+        }),
+      ).toBe("3");
+    });
+
+    it("prefers `iso` over `from` when both are supplied", async () => {
+      expect(
+        await value({
+          op: "diff",
+          iso: "2026-01-01T00:00:00Z",
+          from: "2026-01-03T00:00:00Z",
+          to: "2026-01-04T00:00:00Z",
+          unit: "days",
+        }),
+      ).toBe("3");
+    });
+
     it("rejects a missing second instant", async () => {
       const error = await expectError({ op: "diff", iso: "2026-01-01T00:00:00Z", unit: "days" });
 
