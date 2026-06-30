@@ -1,92 +1,110 @@
 {
-  "_doc": "Release-level metadata for the unified changelog — the DATE and the 'what shipped' SUMMARY for each version. Per-package change details (Added/Changed/Fixed/Removed) live in each package's CHANGELOG.md and are aggregated by scripts/generate-changelog.mjs; this file supplies the release date + summary that the per-package files don't carry. Hand-maintained: add one entry per release, keyed by the version string. `date` is a display string (e.g. \"June 4, 2026\"); `summary` supports inline `code`, **bold**, and [links](url); `featured` (optional) is an array of package names floated to the top of that release's package list, in the listed order (the rest follow most-changed-first, then alphabetical).",
+  "_doc": "Release-level metadata for the unified changelog — the DATE and the 'what shipped' SUMMARY for each version. Per-package change details (Added/Changed/Fixed/Removed) live in each package's CHANGELOG.md and are aggregated by scripts/generate-changelog.mjs; this file supplies the release date + summary that the per-package files don't carry. Hand-maintained: add one entry per release, keyed by the version string. `date` is a display string (e.g. \"June 4, 2026\"); `summary` supports inline `code`, **bold**, and [links](url); `featured` (optional) is an array of package names floated to the top of that release's package list, in the listed order (the rest follow most-changed-first, then alphabetical). Keep the summary to ONE short headline — what shipped and which packages — not an API-by-API tour; the per-package list below it carries the detail.",
+
+  "4.7.0": {
+    "date": "June 28, 2026",
+    "summary": "Team runs get their own identity. **`@warlock.js/ai`** now reports `ai.team` executions as a first-class `team` type (was `supervisor`), and **`@warlock.js/ai-panoptic`** picks it up with a group-by-type view, a per-type aggregate-stats panel, wall-clock span timestamps, and Title-case status / type labels throughout the dashboard.",
+    "featured": ["@warlock.js/ai", "@warlock.js/ai-panoptic"]
+  },
+
+  "4.6.0": {
+    "date": "June 25, 2026",
+    "summary": "Prompts unify and observability levels up. **`@warlock.js/ai`** collapses prompt management into one process-wide `ai.prompts` store (named, versioned `name@version` builders with `meta()` identity, `merge()` composition, `diff` / `export` / `import`, and a single deterministic-plus-judge `validate`) — `ai.prompt` is now a thin facade over it. **`@warlock.js/ai-panoptic`** ships a redesigned dashboard (theme, drawer, timeline, cost heatmap, search / filter / group-by, deep-links) backed by a new cache-persistent trace store that survives restarts.",
+    "featured": ["@warlock.js/ai", "@warlock.js/ai-panoptic"]
+  },
+
+  "4.5.0": {
+    "date": "June 23, 2026",
+    "summary": "The biggest AI release yet. **`@warlock.js/ai`** grows from a primitive ladder into a full agent platform — new `ai.rag()`, `ai.team()`, `ai.skills()`, `ai.prompt()`, `ai.dataset()`, and `ai.vcr()` verbs, a planner that runs DAGs and can pause for approval, a generic `observe` seam, and the former `ai-human` + `ai-guard` satellites folded into core. **`@warlock.js/ai-panoptic`** becomes batteries-included, with a zero-setup local trace dashboard. Plus a broad **`@warlock.js/core`** hardening pass — storage, repositories, HTTP middleware, and the dev server.",
+    "featured": ["@warlock.js/ai", "@warlock.js/ai-panoptic", "@warlock.js/core"]
+  },
 
   "4.4.0": {
     "date": "June 21, 2026",
-    "summary": "**`@warlock.js/core`** completes the production lifecycle — safe boot → safe serve → safe shutdown. A boot hook, `Application.onceBooted(cb)` (plus `whenBooted()` and `isBooted`), runs code once the app is fully booted, _after_ the late phase (http, socket) is up; a shutdown hook, `Application.onShutdown(cb)` (plus `isShuttingDown`), runs teardown _before_ the connectors close, so cleanup can still use db/cache/http. Both are latches — a callback registered after the event still fires instead of missing it. On top of that, the HTTP server now **drains gracefully** on shutdown (in-flight requests finish, bounded by `http.gracefulShutdown.timeout`), and core ships built-in **`/health` (liveness)** and **`/ready` (readiness)** endpoints with a `health` check registry, so a load balancer drains an instance the moment it starts shutting down — the building blocks for zero-downtime deploys. On the AI side: **`@warlock.js/ai`** fixes `ai.planner()`'s OpenAI strict-mode `400` and a strict-TypeScript `never` reduction on `result.report`; **`@warlock.js/ai-openai`** makes the strict structured-output compatibility check recursive (degrading to loose `json_object` instead of failing the call); and **`@warlock.js/ai-panoptic`** adds opt-in content capture — prompts, responses, and tool I/O flow onto each span and into the console (`io`), file, OTel (`gen_ai.prompt` / `gen_ai.completion`), and Langfuse (`input` / `output`) exporters — plus corrects Langfuse token accounting to own-usage with the root execution metered, so trace totals no longer double-count. **`@warlock.js/cascade`** documents the string-typed `model.uuid` accessor.",
+    "summary": "**`@warlock.js/core`** completes the production lifecycle — a booted hook, a shutdown hook, graceful HTTP draining, and built-in `/health` + `/ready` endpoints for zero-downtime deploys. Plus AI fixes across **`@warlock.js/ai`**, **`@warlock.js/ai-openai`**, and **`@warlock.js/ai-panoptic`** (opt-in content capture, corrected Langfuse token accounting).",
     "featured": ["@warlock.js/core", "@warlock.js/ai", "@warlock.js/ai-panoptic"]
   },
 
   "4.3.0": {
     "date": "June 21, 2026",
-    "summary": "Self-update tooling for the framework. **`@warlock.js/core`** adds the `warlock update` command — it bumps every `@warlock.js/*` package in your project's `package.json` to the latest version (preserving each range operator) and runs your package manager's install — and `warlock dev` now prints a non-blocking notice when a newer release is published, toggleable via `devServer.checkForUpdates`. **`@warlock.js/ai`** ships the capstone of the primitive ladder: `ai.orchestrator()` for durable, drift-detecting, resumable multi-turn sessions (with checkpoint + snapshot stores via `ai.checkpoint.*` / `ai.snapshot.*`, history compaction, and a 3-tier event surface), plus `ai.planner()` (an LLM generates an ordered plan over your capabilities, then runs it), `ai.spawnSubAgent()`, and `ai.memory()` (working / semantic / episodic / procedural recall). A cost-truth pass lands across all five provider adapters (`Usage.reasoningTokens`, per-channel pricing, reasoning / prompt-cache controls), alongside DX helpers — `ai.batch`, `ai.router`, `ai.fanOut`, `ai.fallbackModel`, `ai.mockRouter`, `agent.eval` + Vitest matchers, and `systemPrompt.fromFile`. ⚠ **Breaking:** supervisor + workflow snapshot persistence moved from a `CacheDriver` to the dedicated `SnapshotStore` contract (`snapshotStore: ai.snapshot.<tier>(…)`; the fallback is now `ai.config({ defaultSnapshotStore })`). A new package, **`@warlock.js/ai-panoptic`**, adds observability — a collector that projects run reports into traces and exports them to OpenTelemetry, Langfuse, the console, a file, or a queryable in-memory store.",
+    "summary": "Self-update tooling — **`@warlock.js/core`** gains the `warlock update` command and a new-release notice in `warlock dev`. **`@warlock.js/ai`** caps the primitive ladder with `ai.orchestrator()`, `ai.planner()`, and `ai.memory()`, plus a cost-truth pass across every provider. The new **`@warlock.js/ai-panoptic`** package adds observability. ⚠ **Breaking:** snapshot persistence moves from a `CacheDriver` to the dedicated `SnapshotStore`.",
     "featured": ["@warlock.js/core", "@warlock.js/ai", "@warlock.js/ai-panoptic"]
   },
 
   "4.2.11": {
     "date": "June 17, 2026",
-    "summary": "Soft deletes go end-to-end in **`@warlock.js/cascade`** — `Migration.create` auto-wires the `deletedAt` column for soft-delete models and soft `destroy()` keeps the in-memory model in sync. **`@warlock.js/core`** adds the `lowerStage3Decorators()` test plugin and `warlock add notifications`; **`@warlock.js/notifications`** gains model-driven `columnMap`, presence-based read-state, and multi-tenant support. The whole family — and the `create-warlock` project template — moves to `@mongez/reinforcements` 3.3.0.",
+    "summary": "Soft deletes go end-to-end in **`@warlock.js/cascade`**. **`@warlock.js/core`** adds `warlock add notifications`, and **`@warlock.js/notifications`** gains model-driven column mapping, read-state, and multi-tenant support.",
     "featured": ["@warlock.js/cascade", "@warlock.js/core", "@warlock.js/notifications"]
   },
 
   "4.2.10": {
     "date": "June 17, 2026",
-    "summary": "Patch release: **`@warlock.js/auth`** moves `@mongez/copper` / `@mongez/events` / `@mongez/reinforcements` from peer to regular dependencies, clearing the `unmet peer dependency` warnings on install — they're framework-internal utilities your app never provides. **`@warlock.js/logger`**'s console timestamp switches to a cleaner 256-color `slate` gray. **`create-warlock`** ships the latest `@mongez/*` versions in its project template. The rest of the family is re-published at 4.2.10 to keep the lockstep version line.",
+    "summary": "Patch: **`@warlock.js/auth`** moves its internal `@mongez/*` utilities from peer to regular dependencies, clearing the install warnings. **`@warlock.js/logger`** softens its console timestamp to gray.",
     "featured": ["@warlock.js/auth", "@warlock.js/logger"]
   },
 
   "4.2.9": {
     "date": "June 17, 2026",
-    "summary": "Patch release: **`@warlock.js/logger`**'s `ConsoleLog` is retuned for scannability — a time-only timestamp (`HH:mm:ss.SSS`) dimmed to gray, fixed-width level tags so the timestamp / module / action columns align, and `fatal` restored to a white-on-bright-red **background badge** so it can't be missed next to `error`. The rest of the family is re-published at 4.2.9 to keep the lockstep version line; no other functional changes.",
+    "summary": "Patch: **`@warlock.js/logger`**'s console output is retuned for scannability — a dimmed time-only timestamp, aligned level columns, and a restored white-on-red `fatal` badge.",
     "featured": ["@warlock.js/logger"]
   },
 
   "4.2.8": {
     "date": "June 17, 2026",
-    "summary": "Patch release: **`@warlock.js/logger`**'s `ConsoleLog` now prints the level name beside each icon (`⚙ debug`, `ℹ info`, `⚠ warn`, `✗ error`, `✓ success`, `☠ fatal`) for at-a-glance readability; `fatal` drops the bright-red background badge for a bold red-bright `☠ fatal` label. The rest of the family is re-published at 4.2.8 to keep the lockstep version line; no other functional changes.",
+    "summary": "Patch: **`@warlock.js/logger`** now prints each level's name beside its icon (`ℹ info`, `⚠ warn`, `✗ error`, …) for at-a-glance reading.",
     "featured": ["@warlock.js/logger"]
   },
 
   "4.2.7": {
     "date": "June 17, 2026",
-    "summary": "Patch release: **`create-warlock`** now ships its `templates/` folder, so scaffolding a new project works from the installed package — it was missing from the build, which made the wizard fail with \"Something went wrong\" at the template-copy step. The rest of the family is re-published at 4.2.7 to keep the lockstep version line; no other functional changes.",
+    "summary": "Patch: **`create-warlock`** now ships its `templates/` folder, fixing the \"Something went wrong\" error when scaffolding a new project.",
     "featured": ["create-warlock"]
   },
 
   "4.2.6": {
     "date": "June 17, 2026",
-    "summary": "Patch release: **`create-warlock`** now ships its `bin` folder again, so the `create-warlock` CLI works from the installed package — it was omitted from the 4.2.5 build. The rest of the family is re-published at 4.2.6 to keep the lockstep version line; no other functional changes.",
+    "summary": "Patch: **`create-warlock`** ships its `bin` folder again, restoring the CLI that was dropped from 4.2.5.",
     "featured": ["create-warlock"]
   },
 
   "4.2.5": {
     "date": "June 15, 2026",
-    "summary": "Patch release: `warlock add notifications` now scaffolds the in-app read/dismiss HTTP surface — `routes.ts` + a notifications controller (list / unread-count / mark-read / mark-all-read / clear / delete), gated by `authMiddleware` and recipient-scoped via `inApp`. The family is re-published in lockstep; no other functional changes.",
+    "summary": "Patch: `warlock add notifications` now scaffolds the in-app notifications HTTP surface — routes plus a list / mark-read / clear controller, gated by auth.",
     "featured": ["@warlock.js/core"]
   },
 
   "4.2.4": {
     "date": "June 15, 2026",
-    "summary": "Patch release: corrects the worker-loader path in **`@warlock.js/core`**'s build entry points — a wrong path in 4.2.3 left the worker entry broken. The family is re-published in lockstep; no other functional changes.",
+    "summary": "Patch: corrects a worker-loader build path in **`@warlock.js/core`** that 4.2.3 left broken.",
     "featured": ["@warlock.js/core"]
   },
 
   "4.2.3": {
     "date": "June 15, 2026",
-    "summary": "Patch release: adds the worker scripts as **`@warlock.js/core`** build entry points so they ship in the published package. A wrong entry-point path in this build blocked the npm publish for some packages — corrected in 4.2.4.",
+    "summary": "Patch: ships the worker scripts as **`@warlock.js/core`** build entry points. A wrong path here blocked publishing for some packages — fixed in 4.2.4.",
     "featured": ["@warlock.js/core"]
   },
 
   "4.2.2": {
     "date": "June 15, 2026",
-    "summary": "Patch release: adds `cli/start` to **`@warlock.js/core`**'s build entry points so the `warlock` CLI entry ships in the published package. The family is re-published in lockstep; no other functional changes.",
+    "summary": "Patch: ships the `warlock` CLI entry (`cli/start`) in **`@warlock.js/core`**'s build.",
     "featured": ["@warlock.js/core"]
   },
 
   "4.2.1": {
     "date": "June 15, 2026",
-    "summary": "Patch release: **`@warlock.js/core`** and **`@warlock.js/cascade`** now ship their `bin` folder, so the `warlock` and `cascade` CLIs work from the published package — they were omitted from the 4.2.0 build. The rest of the family is re-published at 4.2.1 to keep the lockstep version line; no other functional changes.",
+    "summary": "Patch: **`@warlock.js/core`** and **`@warlock.js/cascade`** ship their `bin` folders, restoring the `warlock` and `cascade` CLIs dropped from 4.2.0.",
     "featured": ["@warlock.js/core", "@warlock.js/cascade"]
   },
 
   "4.2.0": {
     "date": "June 15, 2026",
-    "summary": "A security and correctness overhaul of `@warlock.js/auth` — brute-force login throttling, atomic refresh-token rotation with replay detection, CSPRNG signing secrets, a corrected default token lifetime, and overridable token storage for multi-tenant schemas. The `jwt` config block is superseded by `accessToken` / `refreshToken`. Also introduces **`@warlock.js/notifications`** — multi-channel notifications (mail, in-app, custom channels) with preferences, rate limits, idempotency, and a herald-backed async queue. Plus **`@warlock.js/access`** — authorization (RBAC + ABAC): permission checks, attribute-based policies, role management, and a pluggable resolver.",
+    "summary": "A security overhaul of **`@warlock.js/auth`** — brute-force throttling, atomic refresh-token rotation, and CSPRNG secrets (the `jwt` config gives way to `accessToken` / `refreshToken`). Introduces two packages: **`@warlock.js/notifications`** (multi-channel notifications) and **`@warlock.js/access`** (RBAC + ABAC authorization).",
     "featured": ["@warlock.js/notifications", "@warlock.js/access"]
   },
 
   "4.1.15": {
     "date": "June 4, 2026",
-    "summary": "Initial public baseline of the **Warlock.js** framework — 17 packages published in lockstep at `4.1.15`. From this release on, every change is recorded in its package's `CHANGELOG.md` and aggregated here by version."
+    "summary": "The first public release of **Warlock.js** — 17 packages published together at `4.1.15`. Every change from here on is recorded per package and aggregated on this page."
   }
 }

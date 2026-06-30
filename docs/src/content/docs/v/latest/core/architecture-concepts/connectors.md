@@ -1,12 +1,12 @@
 ---
 title: "Connectors"
-description: What a connector is, why all ten built-ins are always registered, how the config file is the declarative on/off switch, and the full catalog of priorities, phases, and watched files.
+description: What a connector is, why all eleven built-ins are always registered, how the config file is the declarative on/off switch, and the full catalog of priorities, phases, and watched files.
 sidebar:
   order: 4.5
   label: "Connectors"
 ---
 
-A **connector** is the framework's adapter for a subsystem that has a lifecycle — connect at boot, restart on config change, disconnect cleanly at exit. The database, the HTTP server, the cache, storage, the mailer, the logger, the message broker (herald), the socket server, notifications, and the authorization layer (access) are each owned by one. The framework starts them in priority order around your app code, and tears them down in reverse order on shutdown.
+A **connector** is the framework's adapter for a subsystem that has a lifecycle — connect at boot, restart on config change, disconnect cleanly at exit. The database, the HTTP server, the cache, storage, the mailer, the logger, the message broker (herald), the socket server, notifications, the authorization layer (access), and the AI toolkit (ai) are each owned by one. The framework starts them in priority order around your app code, and tears them down in reverse order on shutdown.
 
 This is the catalog page: it names every built-in, tells you the one rule that governs whether a connector does anything (the config file), and lists the priorities and phases at a glance. For the boot *sequence* in detail — and for writing your own connector — see [Bootstrap and connectors](./bootstrap-and-connectors.md).
 
@@ -14,12 +14,12 @@ This is the catalog page: it names every built-in, tells you the one rule that g
 
 Two facts do most of the work:
 
-1. **All ten built-in connectors are ALWAYS registered.** The `ConnectorsManager` constructor instantiates every one of them, unconditionally. Your config files do **not** add or remove connectors.
+1. **All eleven built-in connectors are ALWAYS registered.** The `ConnectorsManager` constructor instantiates every one of them, unconditionally. Your config files do **not** add or remove connectors.
 2. **The config file is the declarative on/off switch.** Each connector's `start()` calls `config.get("<name>")` and returns immediately if that config is absent. Present config → the subsystem activates. Missing config → the connector is registered but no-ops. You pay only for the subsystems you actually configure.
 
 ```mermaid
 flowchart TD
-    ctor["ConnectorsManager constructor<br/><i>registers ALL 10 connectors, sorts by priority</i>"]
+    ctor["ConnectorsManager constructor<br/><i>registers ALL 11 connectors, sorts by priority</i>"]
     start["connector.start()"]
     check{"config.get('name')<br/>present?"}
     activate["activate subsystem<br/><i>connect, set this.active = true</i>"]
@@ -71,13 +71,15 @@ All ten connectors, in priority order (lower starts first). The **public name** 
 | 7        | `socket`        | `SocketConnector`        | Late  | `src/config/socket.ts`           | lazy-imports `socket.io`, builds the Socket.IO `Server` in `boot()`, stores it at `"socket"`   |
 | 8        | `notifications` | `NotificationsConnector` | Early | `src/config/notifications.ts`    | lazy-imports `@warlock.js/notifications`, `setNotificationConfig(...)`                          |
 | 9        | `access`        | `AccessConnector`        | Early | `src/config/access.ts`           | lazy-imports `@warlock.js/access`, `setAccessConfig(...)` — validates a resolver is present so a misconfigured authorization layer fails at STARTUP |
+| 10       | `ai`            | `AiConnector`            | Early | `src/config/ai.ts`               | lazy-imports `@warlock.js/ai`, `ai.config(...)` from the ejected `config/ai.ts`; satellite side-effect imports at the top of that file register their surface first |
 
 A few notes worth calling out:
 
 - **`herald`** — the priority constant is `ConnectorPriority.COMMUNICATOR` (= 3) because herald is the project's outbound channel (broker, queues, event fan-out), but the connector's public name in the registry is `"herald"`. The package is dynamically imported, so core carries no hard dependency on it.
 - **`http`** is the only `Late` connector that other connectors read from. It builds the Fastify instance in `boot()` and stores it at `"http.server"` so the `socket` connector (which boots after it within the Late phase) can share the underlying Node HTTP server.
 - **`socket`** lazy-imports `socket.io`; if a `socket` config is present but the optional `socket.io` peer isn't installed, `boot()` throws with install instructions.
-- **`notifications`** and **`access`** are the newest built-ins. Both follow the same lazy-import-on-config pattern as herald. `access` additionally validates its resolver at startup — a broken authorization config surfaces during boot rather than on the first protected request.
+- **`notifications`** and **`access`** follow the same lazy-import-on-config pattern as herald. `access` additionally validates its resolver at startup — a broken authorization config surfaces during boot rather than on the first protected request.
+- **`ai`** (priority 10, the newest built-in) lazy-imports `@warlock.js/ai` only when `src/config/ai.ts` is present and applies it via `ai.config(...)`. The config file is ejected by `warlock add ai` and carries an auto-managed `// >>> warlock:ai-packages` import block at the top, where the satellite features (`ai-tools`, `ai-panoptic`, `ai-workspace`) link their side-effect imports — so those packages augment the `ai` object (e.g. `ai.tools`, `ai.workspace`, panoptic's wiring) before this connector applies the config. See [Adding features with `warlock add`](../cli/cli-commands.md#add-features).
 
 ## What each connector adapts (the driver layer)
 
@@ -95,12 +97,13 @@ Each connector is a thin lifecycle adapter — it reads its config and hands it 
 | socket          | socket.io                  | —                                             | [Sockets](../digging-deeper/socket.md)                      |
 | notifications   | `@warlock.js/notifications`| optional queue worker + broker                | Notifications topic                                         |
 | access          | `@warlock.js/access`       | authorization resolver                        | Access topic                                                |
+| ai              | `@warlock.js/ai`           | model providers (openai/google/anthropic/…) + satellite packages | AI topic                                 |
 
 ## Early vs Late phases
 
 Connectors boot in two passes around your app code, gated by `ConnectorLifecyclePhase`:
 
-- **`Early`** (the default) — runs **before** your `main.ts` / `routes.ts` / `events.ts` / model files import. These are the subsystems your code needs *at import time*: the database must be connected before a model registers its schema, the logger must exist before a module logs. Eight of the ten built-ins are Early.
+- **`Early`** (the default) — runs **before** your `main.ts` / `routes.ts` / `events.ts` / model files import. These are the subsystems your code needs *at import time*: the database must be connected before a model registers its schema, the logger must exist before a module logs. Nine of the eleven built-ins are Early.
 - **`Late`** — runs **after** your app code imports, because it reads what that code just registered. Only `http` (scans the router your `routes.ts` files populated) and `socket` (reads HTTP's instance) are Late.
 
 Within a single phase the manager calls **every connector's `boot()` first, then every connector's `start()`** — that two-stage pass is what lets `socket.boot()` read the Fastify instance that `http.boot()` just created.
@@ -157,7 +160,7 @@ The full walkthrough — the four properties and two methods of the contract, pi
 - **All ten connectors are always registered; the config file is the only activation switch.** If a subsystem isn't running, the connector didn't fail — there's just no `src/config/<name>.ts` for it to read. Check that the config file exists and exports a default config.
 - **A missing config is silent.** A connector with no matching config `return`s from `start()` with no error and no warning. Expected a database connection and didn't get one? Confirm `src/config/database.ts` is present.
 - **Editing `src/config/socket.ts` in dev does not apply new socket options.** `restart()` is `shutdown()` + `start()` and skips `boot()`, where the socket server is built. A full dev-server restart is required to pick up new socket options.
-- **`notifications` and `access` are real built-ins.** Older docs listed only eight connectors; there are ten. Don't reuse `notifications` or `access` (or `logger`, `mailer`, `database`, `herald`, `cache`, `http`, `storage`, `socket`) as a custom connector name.
+- **`notifications`, `access`, and `ai` are real built-ins.** Older docs listed only eight connectors; there are eleven. Don't reuse `notifications`, `access`, or `ai` (or `logger`, `mailer`, `database`, `herald`, `cache`, `http`, `storage`, `socket`) as a custom connector name.
 
 ## See also
 

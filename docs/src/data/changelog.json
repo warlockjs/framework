@@ -72,11 +72,424 @@
   ],
   "releases": [
     {
+      "version": "4.7.0",
+      "id": "v4-7-0",
+      "date": "June 28, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "Team runs get their own identity. <strong><code>@warlock.js/ai</code></strong> now reports <code>ai.team</code> executions as a first-class <code>team</code> type (was <code>supervisor</code>), and <strong><code>@warlock.js/ai-panoptic</code></strong> picks it up with a group-by-type view, a per-type aggregate-stats panel, wall-clock span timestamps, and Title-case status / type labels throughout the dashboard.",
+      "mode": "notes",
+      "packages": []
+    },
+    {
+      "version": "4.6.0",
+      "id": "v4-6-0",
+      "date": "June 25, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "Prompts unify and observability levels up. <strong><code>@warlock.js/ai</code></strong> collapses prompt management into one process-wide <code>ai.prompts</code> store (named, versioned <code>name@version</code> builders with <code>meta()</code> identity, <code>merge()</code> composition, <code>diff</code> / <code>export</code> / <code>import</code>, and a single deterministic-plus-judge <code>validate</code>) — <code>ai.prompt</code> is now a thin facade over it. <strong><code>@warlock.js/ai-panoptic</code></strong> ships a redesigned dashboard (theme, drawer, timeline, cost heatmap, search / filter / group-by, deep-links) backed by a new cache-persistent trace store that survives restarts.",
+      "mode": "notes",
+      "packages": []
+    },
+    {
+      "version": "4.5.0",
+      "id": "v4-5-0",
+      "date": "June 23, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "The biggest AI release yet. <strong><code>@warlock.js/ai</code></strong> grows from a primitive ladder into a full agent platform — new <code>ai.rag()</code>, <code>ai.team()</code>, <code>ai.skills()</code>, <code>ai.prompt()</code>, <code>ai.dataset()</code>, and <code>ai.vcr()</code> verbs, a planner that runs DAGs and can pause for approval, a generic <code>observe</code> seam, and the former <code>ai-human</code> + <code>ai-guard</code> satellites folded into core. <strong><code>@warlock.js/ai-panoptic</code></strong> becomes batteries-included, with a zero-setup local trace dashboard. Plus a broad <strong><code>@warlock.js/core</code></strong> hardening pass — storage, repositories, HTTP middleware, and the dev server.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 28,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 18
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            },
+            {
+              "type": "Security",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>ai.rag(config)</code></strong> — retrieval-augmented generation in core: a chunk → embed → retrieve → cite pipeline that reuses your existing embedder and cache, with zero new dependencies. Includes hybrid retrieval (dense + BM25 reciprocal-rank fusion), keyword / LLM rerankers, and multi-query expansion."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>ai.team(config)</code></strong> — manager-led multi-agent teams: thin sugar over <code>ai.supervisor</code> for the review-then-fix and test-then-fix shapes."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>ai.skills(config)</code></strong> — runtime agent skills with progressive disclosure: a cheap always-injected catalog plus an on-demand <code>loadSkill</code> tool. Adds a <code>skills</code> option on <code>ai.agent</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>ai.streamObject(...)</code></strong> — structured-output streaming: partial-object snapshots as tokens arrive, with a strict final parse against the response schema."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>ai.serve(executable, options)</code></strong> — serve any agent / workflow / supervisor as an SSE HTTP endpoint."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Multimodal attachments</strong> — <code>ContentPart</code> gains <code>pdf</code> and <code>audio</code> variants alongside text / image, resolved to provider-ready parts (PDF wired on the Anthropic and Bedrock adapters)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Planner DAG execution, re-planning, and plan-only approval</strong> — run independent steps concurrently, revise the plan when a step fails, or return a plan for approval before it executes."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Generic <code>Observer</code> seam</strong> — route any flow's run report to pluggable observers (e.g. <code>@warlock.js/ai-panoptic</code>) without coupling core to a backend."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>ai.prompts</code> + <code>ai.prompt</code></strong> — a process-wide registry of named, versioned <code>systemPrompt(...)</code> builders (resolved by <code>name@version</code> / <code>name@tag</code>) with <code>define</code> / <code>tag</code> / <code>diff</code> / <code>export</code> / <code>import</code> and a unified <code>validate</code> (deterministic missing-placeholder check plus an optional Nova-safe LLM-judge); <code>ai.prompt</code> is a thin facade over it."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>SystemPromptContract</code> identity + provenance</strong> — <code>.meta({ name, version, description, required })</code> (a name auto-registers in <code>ai.prompts</code>), <code>.merge(...blocks)</code> / <code>.merge(contract)</code> / <code>.merge(name, { fromVersion })</code>, and deterministic <code>meta.composedFrom</code> labels."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>ai.dataset(options)</code></strong> — filterable, shardable evaluation case sets that feed <code>agent.eval</code>, with baseline / regression detection and CI reporters."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>ai.vcr(model, options)</code></strong> — record / replay any model against an on-disk cassette for deterministic, offline tests, with <code>recordRequest</code> modes and <code>redactRequest</code> / <code>redactResponse</code> / <code>redactError</code> hooks."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>ai.agent.judge(config)</code></strong> — judge-safe agent preset (also <code>ai.agent({ judge: true })</code>): lenient JSON parsing, bounded repair re-asks, and never-throw verdicts on Nova-class models."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Human-in-the-loop approval now ships in core</strong> (<code>ai.human.*</code>, formerly <code>@warlock.js/ai-human</code>) — a tool-approval gate plus durable interrupt / resume."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Content guardrails now ship in core</strong> (<code>ai.guardrail.*</code>, formerly <code>@warlock.js/ai-guard</code>) — PII / topic / injection / moderation detectors."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Orchestrator <code>sessionLock</code></strong> — per-session turn serialization (default in-process mutex keyed by <code>sessionId</code>, pluggable distributed lock) so concurrent same-session turns can't lose a checkpoint update."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Sub-agent trace nesting</strong> — a supervisor / team / orchestrator callback that calls <code>agent.execute()</code> directly now nests <code>callback → agent → tool</code> with rolled-up usage / cost."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>AgentReport.systemPrompt</code></strong> — the resolved system prompt sent to the model is now recorded on the agent report."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong><code>ai.team</code> runs report <code>type: \"team\"</code></strong> — a first-class <code>ReportType</code> (was <code>\"supervisor\"</code>) so observers distinguish team runs on the wire."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Deterministic parallel workflow state merge</strong> — parallel children merge into the parent in declaration order (last-declared wins on a conflicting key) instead of completion order; an optional per-step <code>mergeState</code> reducer overrides it."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Safer batch / RAG defaults</strong> — <code>ai.batch</code> warns once on a large unbounded run (pass an explicit <code>concurrency</code> or <code>\"unbounded\"</code>); <code>ai.rag</code> accepts <code>limits</code> (<code>maxDocuments</code> / <code>maxChunks</code> / <code>maxBytes</code>) that fail before any embedding spend."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Cancellation propagates through composite tools</strong> — a cancelled outer agent now aborts a nested agent / workflow / supervisor invoked via <code>.asTool()</code> (the run signal threads into the nested <code>execute</code>)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Observer / event-handler errors are surfaced, not swallowed</strong> — a throwing observer or <code>on</code> handler stays isolated (never crashes the run) but is now warned once / routed to a hook instead of disappearing silently."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>budget({ maxCostUSD })</code> fail-open closed</strong> — a cost cap with no matching model pricing now warns once (naming the model) instead of silently never tripping."
+            },
+            {
+              "type": "Security",
+              "html": "<strong>Shared <code>OutboundPolicy</code> + <code>redact()</code></strong> — one SSRF-safe outbound-fetch guard (scheme + host allowlist, post-DNS private-IP deny, max-bytes, timeout, injectable fetch) and one redaction utility, consumed across attachments, URL skills, VCR, and the error path."
+            },
+            {
+              "type": "Security",
+              "html": "<strong>Attachment trust boundary</strong> (<code>AttachmentPolicy</code>) — remote-text attachment fetch is default-deny (opt in with a policy), local reads honor an <code>allowedRoots</code> sandbox, and bare-string local paths warn (staged deprecation)."
+            },
+            {
+              "type": "Security",
+              "html": "<strong>URL skill sources hardened</strong> — the manifest fetch runs through <code>OutboundPolicy</code> and every record is runtime-validated before it enters model context; adds cache-TTL controls."
+            },
+            {
+              "type": "Security",
+              "html": "<strong>Guardrail coverage documented</strong> — input detectors inspect text only; non-text attachment content needs an attachment-level policy."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 13,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 9
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong>Zero-setup local dashboard</strong> — <code>dashboard(store, options)</code> serves a loopback-only mini-Langfuse (default <code>127.0.0.1:4319</code>) with no Docker and no account: light / dark / system theme, a two-pane drawer (nested call tree / detail), a metadata panel, colour-coded Title-case type labels, arrow-coded token rollups (<code>↓input · ↑output · total</code>), per-node rollup cost, and the Warlock logo."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Dashboard search / filter / grouping</strong> — client-side free-text search, status / type / session / prompt filter chips, an errors-only toggle, and group-by Session / Prompt / Type with a per-type aggregate-stats panel (count, failure rate, p50 / p95 latency, tokens, cost)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Cost heatmap, timeline view, and deep-links</strong> — each node carries a cost-tinted accent; the drawer toggles between the call tree and a Gantt timeline (critical path highlighted); the open trace + span are reflected in the URL hash for shareable views."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Prompt-version linkage</strong> — agent spans stamp <code>agent.promptName</code> / <code>agent.promptVersion</code>; the dashboard filters and groups by the resolved <code>name@version</code> key."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Cache-backed persistent trace store</strong> — <code>createCacheTraceStore(cache, options)</code> persists traces through any <code>@warlock.js/cache</code> driver, serves reads from an in-memory mirror, and re-hydrates on <code>ready()</code> so traces survive a restart; <code>ai.config({ panoptic: { cache } })</code> wires it."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Declarative <code>ai.config({ panoptic })</code></strong> — configure panoptic once; it registers on core's observer registry and starts the dashboard. Per-flow <code>observe</code> + <code>observeAll</code> opt flows into observation."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>ContentCaptureOptions.fullHistory</code></strong> — capture the agent's complete message history on the span; agent content is emitted as a <code>[system, user]</code> chat array; Langfuse gets trace-level <code>input</code> / <code>output</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>onError</code> hook</strong> — handle isolated exporter failures on <code>panoptic()</code> / <code>createCollector()</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Pure trace-list helpers</strong> exported from the package root (<code>filterTraces</code> / <code>groupBySession</code> / <code>groupByPrompt</code> / <code>groupByType</code> / <code>aggregateByType</code> / <code>rollupCost</code> / …) so your own views mirror the dashboard's rules."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Title-case status &amp; type labels</strong> across rows, drawer, chips, and group headers (underlying filter keys stay lowercase); <code>team</code> is a first-class dashboard type; type chips show only present types; drawer metadata keys are humanized; the group-by toggles became a single <code>Group</code> dropdown."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Isolated exporter failures no longer fail silently</strong> — a failing exporter still never crashes the run, but now warns once (or calls <code>onError</code>)."
+            },
+            {
+              "type": "Security",
+              "html": "<strong>Dashboard hardening</strong> — bearer-token auth (<code>authToken</code>, required when binding off-loopback), a <code>Host</code>-header allowlist (DNS-rebinding guard), and security response headers (<code>nosniff</code> / <code>X-Frame-Options: DENY</code> / locked-down CSP) on every response."
+            },
+            {
+              "type": "Security",
+              "html": "<strong>Error redaction</strong> — captured error <code>message</code> / <code>stack</code> are scrubbed of secrets (Bearer tokens, API keys) and a retained <code>cause</code> is deep-redacted (auth / cookie headers stripped) before a trace is stored or exported."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 29,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 4
+            },
+            {
+              "type": "Fixed",
+              "n": 24
+            },
+            {
+              "type": "Removed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "dev-server update notice now fires immediately on <code>warlock dev</code> — the check is spawned in parallel with server startup instead of awaiting it, so the notice surfaces as soon as npm responds"
+            },
+            {
+              "type": "Changed",
+              "html": "raised the update check's npm registry timeout from 2.5s to 30s, so a slow connection no longer drops the notice"
+            },
+            {
+              "type": "Changed",
+              "html": "repository lifecycle hooks (<code>onCreating</code> / <code>onCreate</code> / <code>onUpdating</code> / <code>onSaving</code> / <code>onDeleting</code> / …) now run on <code>create</code> / <code>update</code> / <code>delete</code> — they were defined but never invoked"
+            },
+            {
+              "type": "Changed",
+              "html": "<code>repository.list()</code> / <code>all()</code> now honor the <code>sortBy</code>, <code>sortDirection</code>, and <code>purgeCache</code> options — previously accepted but silently ignored"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>response.sendFile({ filename })</code> and <code>response.download()</code> no longer 500 on non-ASCII file names — the <code>Content-Disposition</code> header is now RFC 6266-encoded (a sanitized ASCII <code>filename</code> fallback plus an RFC 5987 <code>filename*=UTF-8''…</code>), so an Arabic / emoji / UTF-8 download name streams correctly instead of throwing Node's <code>ERR_INVALID_CHAR</code>"
+            },
+            {
+              "type": "Fixed",
+              "html": "local storage paths are contained to their disk root — <code>../</code> traversal segments and absolute paths can no longer escape the configured directory"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>storage.putFromUrl</code> adds SSRF guards — private / loopback / link-local hosts are rejected and the fetched body is size-capped"
+            },
+            {
+              "type": "Fixed",
+              "html": "S3 / R2 / DigitalOcean Spaces <code>url()</code> no longer produces a malformed double-host URL when <code>urlPrefix</code> is set"
+            },
+            {
+              "type": "Fixed",
+              "html": "cloud <code>deleteDirectory</code> paginates via the list continuation cursor instead of re-listing the first page"
+            },
+            {
+              "type": "Fixed",
+              "html": "local-storage metadata cache is invalidated on write / delete — it was serving a stale size / modified-time"
+            },
+            {
+              "type": "Fixed",
+              "html": "the cloud driver no longer reports a misleading \"SDK not installed\" error when the AWS SDK is in fact present (driver load race)"
+            },
+            {
+              "type": "Fixed",
+              "html": "repository <code>countCached</code> / <code>countActiveCached</code> now cache and return correctly — a <code>null</code> cache miss was being returned as the count"
+            },
+            {
+              "type": "Fixed",
+              "html": "repository <code>firstCached</code> / <code>lastCached</code> no longer fetch and cache the entire table to return a single row"
+            },
+            {
+              "type": "Fixed",
+              "html": "repository boolean filters no longer coerce <code>false</code> / <code>0</code> to <code>true</code>"
+            },
+            {
+              "type": "Fixed",
+              "html": "repository cache keys are now order-independent (stable key serialization)"
+            },
+            {
+              "type": "Fixed",
+              "html": "router groups restore prefix / name / middleware state via <code>try/finally</code> even when the group callback throws"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>router.any()</code> / <code>all</code> routes now match every HTTP verb under the dev server — they previously matched only GET and POST, diverging from production"
+            },
+            {
+              "type": "Fixed",
+              "html": "the HTTP concurrency limiter releases its slot on every response path (<code>noContent</code>, redirect, file, buffer) — a throwing or non-<code>send</code> handler no longer leaks a permit and permanently 429s the route"
+            },
+            {
+              "type": "Fixed",
+              "html": "the cached-response middleware replays a hit through <code>response.replay()</code> instead of re-sending an already-sent reply, preserving status and content-type"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>onSent</code> cache writes in the idempotency and cache middleware are error-handled — a cache-backend failure no longer surfaces as an unhandled rejection"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>X-Forwarded-For</code> is parsed to its first hop, so IP-filter / rate-limit / idempotency scoping cannot be spoofed with extra header hops"
+            },
+            {
+              "type": "Fixed",
+              "html": "the <code>maintenance</code> middleware allowlist matches request paths that carry a query string"
+            },
+            {
+              "type": "Fixed",
+              "html": "use-cases run their <code>after</code> middleware and broadcast for a <code>void</code> handler, and a failed history write no longer fails an otherwise-successful call"
+            },
+            {
+              "type": "Fixed",
+              "html": "the use-case retry counter reports the correct count on total failure"
+            },
+            {
+              "type": "Fixed",
+              "html": "the socket connector no longer double-closes the shared HTTP server during graceful shutdown"
+            },
+            {
+              "type": "Fixed",
+              "html": "the cache connector disconnects its drivers on shutdown — an open Redis connection was left dangling"
+            },
+            {
+              "type": "Fixed",
+              "html": "generator stubs import <code>v</code> / <code>Infer</code> from <code>@warlock.js/seal</code> (core never re-exported them), so generated models compile and run"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock dev</code> hot-reloads when a file is emptied or saved with no trailing newline — a stale no-op-change check was silently dropping those saves before they reached HMR"
+            },
+            {
+              "type": "Removed",
+              "html": "presigned-upload <code>maxSize</code> option — a presigned PUT URL cannot enforce a size cap, so the option was a false guarantee"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<strong>All upstream <code>ClientOptions</code> now reach the Anthropic client.</strong> The SDK constructor peels off the framework-only <code>provider</code> / <code>pricing</code> keys and forwards the rest (<code>timeout</code>, <code>maxRetries</code>, <code>defaultHeaders</code>, custom <code>fetch</code>, <code>baseURL</code>, …) verbatim, instead of dropping everything but <code>apiKey</code> / <code>baseURL</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<strong>All upstream <code>ClientOptions</code> now reach the OpenAI client.</strong> The SDK constructor peels off the framework-only <code>provider</code> / <code>pricing</code> keys and forwards the rest (<code>timeout</code>, <code>maxRetries</code>, <code>defaultHeaders</code>, custom <code>fetch</code>, <code>organization</code>, <code>project</code>, …) verbatim, instead of dropping everything but <code>apiKey</code> / <code>baseURL</code>."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "4.4.0",
       "id": "v4-4-0",
       "date": "June 21, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong><code>@warlock.js/core</code></strong> completes the production lifecycle — safe boot → safe serve → safe shutdown. A boot hook, <code>Application.onceBooted(cb)</code> (plus <code>whenBooted()</code> and <code>isBooted</code>), runs code once the app is fully booted, _after_ the late phase (http, socket) is up; a shutdown hook, <code>Application.onShutdown(cb)</code> (plus <code>isShuttingDown</code>), runs teardown _before_ the connectors close, so cleanup can still use db/cache/http. Both are latches — a callback registered after the event still fires instead of missing it. On top of that, the HTTP server now <strong>drains gracefully</strong> on shutdown (in-flight requests finish, bounded by <code>http.gracefulShutdown.timeout</code>), and core ships built-in <strong><code>/health</code> (liveness)</strong> and <strong><code>/ready</code> (readiness)</strong> endpoints with a <code>health</code> check registry, so a load balancer drains an instance the moment it starts shutting down — the building blocks for zero-downtime deploys. On the AI side: <strong><code>@warlock.js/ai</code></strong> fixes <code>ai.planner()</code>'s OpenAI strict-mode <code>400</code> and a strict-TypeScript <code>never</code> reduction on <code>result.report</code>; <strong><code>@warlock.js/ai-openai</code></strong> makes the strict structured-output compatibility check recursive (degrading to loose <code>json_object</code> instead of failing the call); and <strong><code>@warlock.js/ai-panoptic</code></strong> adds opt-in content capture — prompts, responses, and tool I/O flow onto each span and into the console (<code>io</code>), file, OTel (<code>gen_ai.prompt</code> / <code>gen_ai.completion</code>), and Langfuse (<code>input</code> / <code>output</code>) exporters — plus corrects Langfuse token accounting to own-usage with the root execution metered, so trace totals no longer double-count. <strong><code>@warlock.js/cascade</code></strong> documents the string-typed <code>model.uuid</code> accessor.",
+      "summaryHtml": "<strong><code>@warlock.js/core</code></strong> completes the production lifecycle — a booted hook, a shutdown hook, graceful HTTP draining, and built-in <code>/health</code> + <code>/ready</code> endpoints for zero-downtime deploys. Plus AI fixes across <strong><code>@warlock.js/ai</code></strong>, <strong><code>@warlock.js/ai-openai</code></strong>, and <strong><code>@warlock.js/ai-panoptic</code></strong> (opt-in content capture, corrected Langfuse token accounting).",
       "mode": "detail",
       "packages": [
         {
@@ -145,11 +558,11 @@
           "items": [
             {
               "type": "Fixed",
-              "html": "<strong>Planner: OpenAI strict structured-output 400.</strong> The generated plan schema now lists every property in <code>required</code> (the optional <code>id</code> / <code>reason</code> / <code>dependsOn</code> are nullable) and no longer emits <code>minItems</code> / <code>maxItems</code>, so <code>ai.planner()</code> no longer fails with <code>400 Invalid schema for response_format … 'required' … Missing 'id'</code> against OpenAI strict <code>json_schema</code> mode. <code>maxSteps</code> and the non-empty-plan check are enforced at runtime / in <code>validate()</code>."
+              "html": "<strong>Planner: OpenAI strict structured-output <code>400</code>.</strong> The generated plan schema now lists every property in <code>required</code> and drops <code>minItems</code> / <code>maxItems</code>, so <code>ai.planner()</code> no longer fails against OpenAI strict <code>json_schema</code> mode."
             },
             {
               "type": "Fixed",
-              "html": "<strong>Report / result types no longer collapse to <code>never</code> under strict TypeScript.</strong> The narrowing report types (<code>PlannerReport</code>, <code>OrchestratorReport</code>, <code>SupervisorReport</code>, <code>WorkflowReport</code>, <code>ToolCall</code>) and the two result types that re-declare <code>report</code> (<code>PlannerResult</code>, <code>OrchestratorResult</code>) now override the discriminant via <code>Omit&lt;BaseReport, \"type\"&gt;</code> / <code>Omit&lt;ExecuteResult, \"report\"&gt;</code> instead of intersecting <code>BaseReport &amp; { type: \"…\" }</code>, so <code>result.report</code> no longer types as <code>never</code> (*\"Property 'plan' does not exist on type 'never'\"*). Type-only — no runtime change."
+              "html": "<strong>Report / result types no longer collapse to <code>never</code> under strict TypeScript.</strong> The narrowing report / result types now override the discriminant via <code>Omit&lt;…&gt;</code> instead of intersection. Type-only — no runtime change."
             }
           ]
         },
@@ -170,11 +583,11 @@
           "items": [
             {
               "type": "Added",
-              "html": "<strong>Opt-in content capture.</strong> <code>createCollector</code> / <code>panoptic({ captureContent, redactContent })</code> copies the agent prompt/response (first-trip input, last non-empty trip output) and each tool's args/result onto <code>TraceSpan.input</code> / <code>output</code>. Surfaced by <code>consoleExporter({ io, ioMaxChars })</code> (new <code>in:</code> / <code>out:</code> lines), the file exporter's JSON, OTel <code>gen_ai.prompt</code> / <code>gen_ai.completion</code>, and Langfuse native <code>input</code> / <code>output</code>. Off by default — payloads are large and often sensitive; a <code>ContentRedactor</code> masks each value. New exports: <code>ContentCaptureOptions</code>, <code>ContentRedactor</code>, <code>formatSpanIO</code>."
+              "html": "<strong>Opt-in content capture.</strong> <code>panoptic({ captureContent, redactContent })</code> copies the agent prompt / response and each tool's args / result onto spans, surfaced by the console (<code>io</code>), file, OTel (<code>gen_ai.prompt</code> / <code>gen_ai.completion</code>), and Langfuse exporters. Off by default; a <code>ContentRedactor</code> masks each value."
             },
             {
               "type": "Fixed",
-              "html": "<strong>Langfuse token accounting.</strong> Generations now meter their OWN usage (rolled-up minus children); composite nodes with no own tokens emit as plain spans; the root execution is now emitted as an observation (its own tokens were previously unmetered); and the rolled-up usage/cost is stripped from observation metadata (the <code>usage</code> block is authoritative). Together these stop the trace total from double-counting nested spans."
+              "html": "<strong>Langfuse token accounting</strong> — generations now meter their own usage (rolled-up minus children) and the root execution is metered, so the trace total no longer double-counts nested spans."
             }
           ]
         },
@@ -191,7 +604,7 @@
           "items": [
             {
               "type": "Fixed",
-              "html": "<strong>Strict structured-output compatibility check is now recursive.</strong> <code>json_schema</code> (strict) mode is used only when every object in the schema lists all of its properties in <code>required</code> — OpenAI strict has no optional fields, so a schema that omits one anywhere in the tree would <code>400</code>. Such schemas now degrade to loose <code>json_object</code> instead of failing the call; client-side validation still enforces the full shape."
+              "html": "<strong>Strict structured-output compatibility check is now recursive.</strong> A schema that omits a <code>required</code> property anywhere in the tree degrades to loose <code>json_object</code> instead of <code>400</code>-ing; client-side validation still enforces the full shape."
             }
           ]
         },
@@ -208,7 +621,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "<strong>Documented <code>model.uuid</code></strong> — clarified that the accessor returns the model's primary id as <code>string</code> (where <code>model.id</code> is <code>string | number</code>); the name is historical and performs no UUID validation or coercion."
+              "html": "<strong>Documented <code>model.uuid</code></strong> — the accessor returns the model's primary id as <code>string</code> (where <code>model.id</code> is <code>string | number</code>); the name is historical and performs no UUID validation."
             }
           ]
         }
@@ -219,7 +632,7 @@
       "id": "v4-3-0",
       "date": "June 21, 2026",
       "isUnreleased": false,
-      "summaryHtml": "Self-update tooling for the framework. <strong><code>@warlock.js/core</code></strong> adds the <code>warlock update</code> command — it bumps every <code>@warlock.js/*</code> package in your project's <code>package.json</code> to the latest version (preserving each range operator) and runs your package manager's install — and <code>warlock dev</code> now prints a non-blocking notice when a newer release is published, toggleable via <code>devServer.checkForUpdates</code>. <strong><code>@warlock.js/ai</code></strong> ships the capstone of the primitive ladder: <code>ai.orchestrator()</code> for durable, drift-detecting, resumable multi-turn sessions (with checkpoint + snapshot stores via <code>ai.checkpoint.*</code> / <code>ai.snapshot.*</code>, history compaction, and a 3-tier event surface), plus <code>ai.planner()</code> (an LLM generates an ordered plan over your capabilities, then runs it), <code>ai.spawnSubAgent()</code>, and <code>ai.memory()</code> (working / semantic / episodic / procedural recall). A cost-truth pass lands across all five provider adapters (<code>Usage.reasoningTokens</code>, per-channel pricing, reasoning / prompt-cache controls), alongside DX helpers — <code>ai.batch</code>, <code>ai.router</code>, <code>ai.fanOut</code>, <code>ai.fallbackModel</code>, <code>ai.mockRouter</code>, <code>agent.eval</code> + Vitest matchers, and <code>systemPrompt.fromFile</code>. ⚠ <strong>Breaking:</strong> supervisor + workflow snapshot persistence moved from a <code>CacheDriver</code> to the dedicated <code>SnapshotStore</code> contract (<code>snapshotStore: ai.snapshot.&lt;tier&gt;(…)</code>; the fallback is now <code>ai.config({ defaultSnapshotStore })</code>). A new package, <strong><code>@warlock.js/ai-panoptic</code></strong>, adds observability — a collector that projects run reports into traces and exports them to OpenTelemetry, Langfuse, the console, a file, or a queryable in-memory store.",
+      "summaryHtml": "Self-update tooling — <strong><code>@warlock.js/core</code></strong> gains the <code>warlock update</code> command and a new-release notice in <code>warlock dev</code>. <strong><code>@warlock.js/ai</code></strong> caps the primitive ladder with <code>ai.orchestrator()</code>, <code>ai.planner()</code>, and <code>ai.memory()</code>, plus a cost-truth pass across every provider. The new <strong><code>@warlock.js/ai-panoptic</code></strong> package adds observability. ⚠ <strong>Breaking:</strong> snapshot persistence moves from a <code>CacheDriver</code> to the dedicated <code>SnapshotStore</code>.",
       "mode": "detail",
       "packages": [
         {
@@ -262,7 +675,7 @@
         {
           "name": "@warlock.js/ai",
           "slug": "ai",
-          "total": 37,
+          "total": 9,
           "counts": [
             {
               "type": "⚠ BREAKING",
@@ -270,286 +683,119 @@
             },
             {
               "type": "Added",
-              "n": 36
+              "n": 8
             }
           ],
           "items": [
             {
               "type": "⚠ BREAKING",
-              "html": "<strong>Supervisor + workflow snapshot persistence moved from <code>CacheDriver</code> to the dedicated <code>SnapshotStore</code> contract.</strong> <code>SupervisorConfig.snapshotStore</code> and <code>WorkflowConfig.snapshotStore</code> are now typed <code>SnapshotStore</code> (from <code>src/contracts/orchestrator/</code>), no longer <code>CacheDriver&lt;…&gt;</code>. The per-primitive fallback is now <code>ai.config({ defaultSnapshotStore })</code> (a <code>SnapshotStore</code>) instead of <code>ai.config({ defaultStore })</code> (a <code>CacheDriver</code>); <code>defaultStore</code> continues to serve the semantic-cache middleware only. <strong>Migration:</strong> replace <code>snapshotStore: cache.driver(\"redis\", { client })</code> with <code>snapshotStore: ai.snapshot.redis({ client })</code> (and <code>ai.snapshot.{memory,pg}</code> for the other tiers), and move any <code>ai.config({ defaultStore })</code> you relied on for snapshot resume to <code>ai.config({ defaultSnapshotStore: ai.snapshot.&lt;tier&gt;(…) })</code>. Semantic-cache <code>defaultStore</code> wiring is unaffected."
+              "html": "<strong>Supervisor + workflow snapshot persistence moved from <code>CacheDriver</code> to the dedicated <code>SnapshotStore</code> contract.</strong> The per-primitive fallback is now <code>ai.config({ defaultSnapshotStore })</code>. <strong>Migration:</strong> replace <code>snapshotStore: cache.driver(\"redis\", { client })</code> with <code>snapshotStore: ai.snapshot.redis({ client })</code> (and <code>ai.snapshot.{memory,pg}</code> for the other tiers)."
             },
             {
               "type": "Added",
-              "html": "<code>ai.orchestrator()</code> — stateful session manager wrapped around a supervisor: owns durable session/history/context, drift detection, history compaction, resume, and a command surface"
+              "html": "<code>ai.orchestrator()</code> — stateful session manager over a supervisor: durable session / history / context, drift detection, history compaction, resume, and a command surface (<code>orchestrator.asTool()</code>, a 3-tier event surface, and <code>OrchestratorContract</code> / config / error types)."
             },
             {
               "type": "Added",
-              "html": "<code>orchestrator.asTool()</code> — expose an orchestrator inside an agent's tool loop"
+              "html": "<code>ai.checkpoint.{memory,pg,redis}()</code> and <code>ai.snapshot.{memory,pg,redis}()</code> — durable orchestrator-session and supervisor / workflow run stores, with matching <code>defaultCheckpointStore</code> / <code>defaultSnapshotStore</code> config fields."
             },
             {
               "type": "Added",
-              "html": "3-tier orchestrator event surface via <code>OrchestratorEmitter</code>, including <code>orchestrator.compaction.failed</code> (emitted when a post-turn <code>summarize</code> / <code>onCompact</code> step throws, instead of silently swallowing it)"
+              "html": "<code>ai.memory()</code> — agent-memory store with four tiers: <strong>working</strong> (in-run scratch), <strong>semantic</strong> (durable facts), <strong>episodic</strong> (durable, recency-blended events), and <strong>procedural</strong> (durable, reinforcement-blended how-tos). Wired into the orchestrator via a <code>memory?</code> field."
             },
             {
               "type": "Added",
-              "html": "<code>OrchestratorContract</code>, <code>OrchestratorConfig</code>, <code>OrchestratorResult</code>, and the orchestrator event / command contract types (<code>src/contracts/orchestrator/</code>)"
+              "html": "<code>ai.planner()</code> — an LLM generates an ordered plan over your registered capabilities, then executes it step-by-step."
             },
             {
               "type": "Added",
-              "html": "<code>OrchestratorFailedError</code>, <code>OrchestratorConfigError</code>, <code>OrchestratorDriftError</code>, <code>OrchestratorCancelledError</code> error classes"
+              "html": "<code>ai.spawnSubAgent()</code> — one-shot delegation to a fresh single-use agent with an optional per-task budget; usable from a planner step, a tool, or a workflow."
             },
             {
               "type": "Added",
-              "html": "<code>\"orchestrator\"</code> member added to the <code>ReportType</code> union"
+              "html": "Cost-truth contract surface across all five adapters — <code>Usage.reasoningTokens</code>, per-channel <code>ModelPricing</code>, and <code>ModelCallOptions.{reasoning, cacheControl}</code> (ignored by adapters that lack the capability)."
             },
             {
               "type": "Added",
-              "html": "<code>CheckpointStore</code> + <code>CheckpointRecord</code> contracts for orchestrator session state, including an optional <code>prune?()</code> hook so <code>keepSnapshots</code> bounds growth (implemented on the in-memory store)"
+              "html": "DX helpers — <code>ai.router()</code>, <code>ai.fanOut()</code>, <code>ai.batch()</code>, <code>ai.fallbackModel()</code>, <code>ai.mockRouter()</code>, <code>agent.eval()</code> + built-in <code>ai.eval.*</code> scorers, Vitest matchers (<code>registerAiMatchers()</code>), supervisor-level middleware, and <code>ai.systemPrompt.fromFile(path)</code>."
             },
             {
               "type": "Added",
-              "html": "<code>SnapshotStore</code> contract plus structural <code>PgClientLike</code> / <code>RedisClientLike</code> client interfaces"
-            },
-            {
-              "type": "Added",
-              "html": "<code>ai.checkpoint.{memory,pg,redis}()</code> — durable orchestrator session checkpoint stores"
-            },
-            {
-              "type": "Added",
-              "html": "<code>ai.snapshot.{memory,pg,redis}()</code> — supervisor / workflow run snapshot stores"
-            },
-            {
-              "type": "Added",
-              "html": "<code>PgCheckpointOptions</code>, <code>RedisCheckpointOptions</code>, <code>PgSnapshotStoreOptions</code>, <code>RedisSnapshotStoreOptions</code> types"
-            },
-            {
-              "type": "Added",
-              "html": "<code>defaultCheckpointStore</code> and <code>defaultSnapshotStore</code> fields on <code>ai.config()</code>, with <code>resolveDefaultCheckpointStore()</code> / <code>resolveDefaultSnapshotStore()</code> resolvers"
-            },
-            {
-              "type": "Added",
-              "html": "<code>ai.memory()</code> — agent-memory store with four tiers: <strong>working</strong> (in-run scratch, recency), <strong>semantic</strong> (durable facts by cache-driver <code>.similar()</code>), <strong>episodic</strong> (durable events, similarity blended with recency via per-entry timestamp + <code>recencyWeight</code> / <code>halfLifeMs</code>), and <strong>procedural</strong> (durable how-tos, similarity blended with reinforcement — re-remembering increments a use count, <code>reinforcementWeight</code>). Decay / forgetting remains deferred"
-            },
-            {
-              "type": "Added",
-              "html": "The <code>MemoryTier</code> union widened from <code>\"working\" | \"semantic\"</code> to add <code>\"episodic\" | \"procedural\"</code> (non-breaking). The three vector tiers default to distinct namespaces (<code>ai.memory.semantic</code> / <code>.episodic</code> / <code>.procedural</code>) so they don't collide on a shared cache driver"
-            },
-            {
-              "type": "Added",
-              "html": "Orchestrator <code>memory?</code> field wiring memory recall + write-back into each turn"
-            },
-            {
-              "type": "Added",
-              "html": "<code>MemoryContract</code>, <code>MemoryConfig</code>, <code>SemanticMemoryConfig</code>, <code>EpisodicMemoryConfig</code>, <code>ProceduralMemoryConfig</code>, <code>MemoryItem</code>, <code>MemoryTier</code>, <code>RecalledMemory</code>, <code>RecallOptions</code> types"
-            },
-            {
-              "type": "Added",
-              "html": "<code>ai.planner()</code> — LLM generates an ordered plan over your registered capabilities, then executes it step-by-step"
-            },
-            {
-              "type": "Added",
-              "html": "<code>ai.spawnSubAgent()</code> — one-shot delegation to a fresh single-use agent with an optional per-task budget. A <strong>general</strong> agent helper (lives on the agent surface, not the planner): usable from a planner step, a tool, a workflow step, or hand-rolled orchestration — the planner engine does not require it"
-            },
-            {
-              "type": "Added",
-              "html": "<code>PlannerConfig</code>, <code>PlannerCapability</code>, <code>PlannerResult</code>, <code>PlannerReport</code>, <code>PlannerStep</code>, <code>PlannerPlan</code> types"
-            },
-            {
-              "type": "Added",
-              "html": "<code>\"planner\"</code> member added to the <code>ReportType</code> union"
-            },
-            {
-              "type": "Added",
-              "html": "<code>PlannerFailedError</code>, <code>PlannerPlanInvalidError</code>, <code>PlannerCancelledError</code> error classes"
-            },
-            {
-              "type": "Added",
-              "html": "<code>Usage.reasoningTokens</code> — the reasoning / thinking subset of output tokens, priced separately"
-            },
-            {
-              "type": "Added",
-              "html": "<code>ModelPricing.{cachedInput, cachedOutput, reasoning}</code> per-channel rates; <code>Usage.cost</code> rolls up <code>{ input, output, cachedInput?, cachedOutput? }</code>"
-            },
-            {
-              "type": "Added",
-              "html": "<code>ModelCallOptions.{reasoning, cacheControl}</code> — reasoning-effort / thinking-budget and prompt-cache breakpoint controls"
-            },
-            {
-              "type": "Added",
-              "html": "<code>ModelContract.capabilities.{reasoning, cacheControl}</code> flags — adapters that lack the feature ignore the options rather than forwarding unsupported parameters"
-            },
-            {
-              "type": "Added",
-              "html": "<code>ai.router()</code> — builds a supervisor router agent with a generated <code>{ next, reasoning }</code> schema and intent-listing prompt"
-            },
-            {
-              "type": "Added",
-              "html": "<code>ai.fanOut()</code> — spreads one agent/workflow into N keyed intents for voting / self-consistency"
-            },
-            {
-              "type": "Added",
-              "html": "<code>ai.batch()</code> — run an executable over a dataset with bounded concurrency + per-item retry; <code>BatchResult</code>, <code>BatchItemResult</code>, <code>BatchOptions</code> types"
-            },
-            {
-              "type": "Added",
-              "html": "<code>ai.fallbackModel()</code> — wraps an ordered model list, failing over on transient provider errors"
-            },
-            {
-              "type": "Added",
-              "html": "<code>ai.mockRouter()</code> — canned routing-decision replay for supervisor tests"
-            },
-            {
-              "type": "Added",
-              "html": "<code>agent.eval()</code> — runs scored evaluation cases and returns an aggregate <code>EvalReport</code>; <code>EvalCase</code>, <code>EvalScore</code>, <code>EvalScorer</code>, <code>EvalJudge</code>, <code>EvalOptions</code>, <code>EvalCaseResult</code>, <code>EvalReport</code> types"
-            },
-            {
-              "type": "Added",
-              "html": "<code>ai.eval.{exact,contains,predicate,judge}()</code> built-in eval scorers (incl. LLM-as-judge)"
-            },
-            {
-              "type": "Added",
-              "html": "<code>registerAiMatchers()</code> — Vitest matchers <code>toRouteTo</code> / <code>toConverge</code> / <code>toPassStep</code> / <code>toOutputShape</code> (plus library-agnostic <code>matchRouteTo</code> / <code>matchConverge</code> / <code>matchPassStep</code> / <code>matchOutputShape</code> verdict functions and the <code>AiMatchers</code> type)"
-            },
-            {
-              "type": "Added",
-              "html": "Supervisor-level middleware via the <code>supervisor</code> hook map on <code>AgentMiddleware</code> and <code>SupervisorConfig.middleware</code>"
-            },
-            {
-              "type": "Added",
-              "html": "<code>ai.systemPrompt.fromFile(path)</code> (and <code>SystemPrompt.fromFile(path)</code>) — seed a system prompt from a file read once at construction"
-            },
-            {
-              "type": "Added",
-              "html": "Executables passed in an agent's <code>tools: [...]</code> are auto-adapted into tools (workflows / supervisors / orchestrators expose <code>.asTool()</code> and compose directly)"
+              "html": "Executables passed in an agent's <code>tools: [...]</code> are auto-adapted into tools (workflows / supervisors / orchestrators compose directly via <code>.asTool()</code>)."
             }
           ]
         },
         {
           "name": "@warlock.js/ai-panoptic",
           "slug": "ai-panoptic",
-          "total": 27,
+          "total": 7,
           "counts": [
             {
               "type": "Added",
-              "n": 22
-            },
-            {
-              "type": "Changed",
-              "n": 1
+              "n": 4
             },
             {
               "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>panoptic()</code> — the one-call subscriber factory: builds a collector, registers exporters, and feeds traces via <code>attach()</code>, <code>middleware()</code>, or <code>collect()</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Exporters — <code>consoleExporter()</code>, <code>fileExporter()</code> (JSON-Lines), <code>otelExporter()</code> (GenAI semantic conventions), and <code>langfuseExporter()</code>. <code>@opentelemetry/*</code> and <code>langfuse</code> are optional peers, lazily imported."
+            },
+            {
+              "type": "Added",
+              "html": "<code>createInMemoryTraceStore()</code> — a queryable in-memory trace store (<code>query</code> / <code>aggregate</code> by runId, sessionId, status, time window; optional <code>capacity</code> FIFO cap) that doubles as an exporter."
+            },
+            {
+              "type": "Added",
+              "html": "Vendor-neutral trace contracts (<code>Trace</code> / <code>TraceSpan</code> / <code>CollectorContract</code> / <code>ExporterContract</code>) derived 1:1 from the core <code>BaseReport</code> tree, plus skills for observing, exporting, and querying traces."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Failed root runs now carry their error in every export</strong> (threaded from the result envelope onto the root span)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Per-span exporters now receive every span</strong> (the collector walks the finalized tree)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>panoptic().middleware()</code> now works on a supervisor</strong> (the middleware declares a <code>supervisor</code> hook map)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
               "n": 4
             }
           ],
           "items": [
             {
               "type": "Added",
-              "html": "<code>panoptic()</code> — the one-call subscriber factory. Builds a collector, registers exporters, and feeds traces three ways: <code>attach()</code> to an agent/workflow/supervisor <code>*.completed</code> event stream, <code>middleware()</code> for the agent pipeline, and <code>collect()</code> for a report directly (e.g. an orchestrator turn). Plus <code>use()</code>, <code>toTrace()</code>, <code>flush()</code>, <code>shutdown()</code>, and a <code>collector</code> accessor."
+              "html": "<strong>Usage accounting</strong> — <code>usage.cacheWriteTokens</code> is populated from Anthropic's <code>cache_creation_input_tokens</code> (alongside <code>cachedTokens</code>); <code>reasoningTokens</code> is left unset because Anthropic bills thinking inside <code>output_tokens</code>."
             },
             {
               "type": "Added",
-              "html": "<code>createPanopticMiddleware()</code> — the underlying <code>AgentMiddleware</code> adapter feeding the collector from the <code>execute.after</code> / <code>execute.onError</code> hooks"
+              "html": "<strong>Extended thinking</strong> — <code>ModelCallOptions.reasoning</code> maps to Anthropic's <code>thinking</code> budget (<code>reasoning.effort</code> → a tiered budget, floored at 1024); <code>temperature</code> is dropped when thinking is enabled."
             },
             {
               "type": "Added",
-              "html": "<code>Panoptic</code> / <code>PanopticOptions</code> / <code>PanopticTarget</code> / <code>CompletedEventPayload</code> types"
+              "html": "<strong>System-prompt prompt caching</strong> — <code>cacheControl.breakpoints &gt;= 1</code> emits the system prompt with <code>cache_control: { type: \"ephemeral\" }</code>."
             },
             {
               "type": "Added",
-              "html": "<code>panoptic</code> + middleware + types exported from the root barrel"
-            },
-            {
-              "type": "Added",
-              "html": "<code>scripts/generate-llms.mjs</code> and the generated <code>llms.txt</code> / <code>llms-full.txt</code> projections of <code>skills/</code>"
-            },
-            {
-              "type": "Added",
-              "html": "<code>skills/observe-with-panoptic/SKILL.md</code> — wiring the subscriber into a run"
-            },
-            {
-              "type": "Added",
-              "html": "<code>consoleExporter()</code> — zero-dep exporter printing trace summary or full span tree"
-            },
-            {
-              "type": "Added",
-              "html": "<code>fileExporter()</code> — zero-dep buffered JSON-Lines exporter with <code>flushEvery</code>"
-            },
-            {
-              "type": "Added",
-              "html": "<code>otelExporter()</code> — OpenTelemetry exporter mapping spans to GenAI semantic conventions (<code>gen_ai.*</code>)"
-            },
-            {
-              "type": "Added",
-              "html": "<code>langfuseExporter()</code> — Langfuse exporter mapping spans to traces, generations, and spans"
-            },
-            {
-              "type": "Added",
-              "html": "<code>toGenAiAttributes()</code> / <code>walkSpans()</code> / <code>totalCostUsd()</code> exporter utilities"
-            },
-            {
-              "type": "Added",
-              "html": "Optional peers <code>@opentelemetry/api</code> and <code>langfuse</code> are lazily imported by their exporters"
-            },
-            {
-              "type": "Added",
-              "html": "<code>createCollector()</code> — consumes the core <code>BaseReport</code> tree, projects it to a <code>Trace</code>, fans out to exporters"
-            },
-            {
-              "type": "Added",
-              "html": "<code>reportToTrace()</code> / <code>reportToSpan()</code> pure projections of a report node to spans"
-            },
-            {
-              "type": "Added",
-              "html": "<code>createInMemoryTraceStore()</code> — queryable in-memory store, doubles as an <code>ExporterContract</code>"
-            },
-            {
-              "type": "Added",
-              "html": "<code>TraceStoreContract</code> with <code>query</code> / <code>aggregate</code> by runId, sessionId, status, and time window"
-            },
-            {
-              "type": "Added",
-              "html": "<code>TraceQuery</code> and <code>TraceAggregate</code> types for slicing and rolling up usage + cost"
-            },
-            {
-              "type": "Added",
-              "html": "<code>sumUsage()</code> usage + cost rollup across stored traces, backed by core <code>accumulateCost</code>"
-            },
-            {
-              "type": "Added",
-              "html": "optional <code>capacity</code> cap on the in-memory store with FIFO eviction"
-            },
-            {
-              "type": "Added",
-              "html": "contract surface: <code>CollectorContract</code>, <code>ExporterContract</code>, and the vendor-neutral trace types <code>Trace</code> / <code>TraceSpan</code> / <code>TraceSpanError</code>, derived 1:1 from the core <code>BaseReport</code> tree and event stream"
-            },
-            {
-              "type": "Added",
-              "html": "<code>@opentelemetry/api</code>, <code>@opentelemetry/sdk-trace-base</code>, and <code>langfuse</code> declared as OPTIONAL peer dependencies (lazily imported by the exporters that need them)"
-            },
-            {
-              "type": "Added",
-              "html": "<code>skills/query-traces/SKILL.md</code> — dedicated skill for the in-memory queryable trace store (<code>createInMemoryTraceStore</code>, <code>query</code> / <code>aggregate</code>, <code>TraceQuery</code> / <code>TraceAggregate</code>, <code>capacity</code> FIFO eviction, <code>sumUsage</code> / <code>emptyUsage</code> / <code>matchTrace</code> helpers)"
-            },
-            {
-              "type": "Changed",
-              "html": "<code>skills/export-traces/SKILL.md</code> — OTel attribute notes: <code>gen_ai.system</code> / <code>gen_ai.request.model</code> / <code>gen_ai.operation.name</code> are only forwarded when the span's attribute bag carried them (<code>system</code> backfilled from options), never invented"
-            },
-            {
-              "type": "Fixed",
-              "html": "<strong>Failed root runs now carry their error in every export</strong> — <code>collect()</code> / <code>reportToTrace()</code> / <code>attach()</code> / <code>middleware()</code> thread the result-envelope error (<code>BaseResult.error</code>) onto the root span (which <code>BaseReport</code> doesn't carry); <code>collect()</code> / <code>reportToTrace()</code> gained an optional <code>rootError</code> parameter"
-            },
-            {
-              "type": "Fixed",
-              "html": "<strong>Per-span exporters now receive every span</strong> — the collector's <code>dispatch</code> walks the finalized tree (<code>walkSpans</code>), invoking <code>exportSpan</code> once per node (a post-completion per-span projection, not live streaming)"
-            },
-            {
-              "type": "Fixed",
-              "html": "<strong><code>panoptic().middleware()</code> now works on a supervisor</strong> — the middleware declares a <code>supervisor</code> hook map (not only <code>execute</code>), so <code>ai.supervisor({ middleware: [observe.middleware()] })</code> collects a trace"
-            },
-            {
-              "type": "Fixed",
-              "html": "<code>totalCostUsd()</code> folds in <code>cost.reasoning</code>; the Langfuse exporter <code>end()</code>s every observation; the OTel exporter maps <code>max-iterations</code> / <code>awaiting-input</code> to <code>UNSET</code> (a hit cap no longer reads as clean success)"
+              "html": "<strong>Capabilities</strong> — <code>reasoning</code>, <code>promptCaching</code>, and <code>pdf</code> are now advertised; <code>audio</code> stays absent."
             }
           ]
         },
@@ -566,19 +812,69 @@
           "items": [
             {
               "type": "Added",
-              "html": "<strong>Cost-truth contract wiring.</strong> Capabilities now report <code>reasoning</code>, <code>promptCaching</code>, <code>pdf</code>, and <code>audio</code> truthfully per model family (inferred from the model id, overridable via <code>bedrock.model({ name, reasoning?, promptCaching?, pdf?, audio? })</code>): <code>reasoning</code> for Claude 3.7 + Claude 4, <code>promptCaching</code> for Claude 3.5+/3.7/4 and Nova, <code>pdf</code> for Claude 3+ and Nova, <code>audio</code> defaulting to <code>false</code>."
+              "html": "<strong>Cost-truth capabilities</strong> — <code>reasoning</code>, <code>promptCaching</code>, <code>pdf</code>, and <code>audio</code> are reported truthfully per model family (inferred from the model id, overridable via <code>bedrock.model(...)</code>)."
             },
             {
               "type": "Added",
-              "html": "<strong>Reasoning / extended thinking.</strong> <code>ModelCallOptions.reasoning</code> maps to Converse <code>additionalModelRequestFields.thinking = { type: \"enabled\", budget_tokens }</code> for reasoning-capable models — <code>reasoning.maxTokens</code> is the explicit budget, <code>reasoning.effort</code> (low/medium/high) maps to a conventional budget. No-ops for non-reasoning models so unsupported params never reach the wire."
+              "html": "<strong>Reasoning / extended thinking</strong> — <code>ModelCallOptions.reasoning</code> maps to Converse <code>thinking</code> for reasoning-capable models, and no-ops elsewhere so unsupported params never reach the wire."
             },
             {
               "type": "Added",
-              "html": "<strong>Prompt-cache write breakpoints.</strong> <code>ModelCallOptions.cacheControl.breakpoints</code> appends a Converse <code>cachePoint</code> block to the last message for <code>promptCaching</code>-capable models."
+              "html": "<strong>Prompt-cache write breakpoints</strong> — <code>cacheControl.breakpoints</code> appends a Converse <code>cachePoint</code> block for caching-capable models."
             },
             {
               "type": "Added",
-              "html": "<strong><code>Usage.cacheWriteTokens</code></strong> populated from Converse <code>usage.cacheWriteInputTokens</code> on both <code>complete()</code> and <code>stream()</code> (alongside the existing <code>cachedTokens</code> from <code>cacheReadInputTokens</code>). <code>Usage.reasoningTokens</code> is intentionally left unset — Bedrock's Converse <code>TokenUsage</code> reports no reasoning-token channel."
+              "html": "<strong><code>Usage.cacheWriteTokens</code></strong> populated from Converse <code>cacheWriteInputTokens</code>; <code>reasoningTokens</code> is left unset (Bedrock reports no reasoning channel)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>Usage.reasoningTokens</code> is populated from Gemini's <code>thoughtsTokenCount</code> (alongside <code>cachedTokens</code>), surfaced only when reported <code>&gt; 0</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ModelCallOptions.reasoning</code> maps to Gemini's <code>thinkingConfig</code> (<code>maxTokens</code> → <code>thinkingBudget</code>, <code>effort</code> → a bucketed budget) for reasoning-capable models."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ModelCapabilities</code> now reports <code>reasoning</code>, <code>promptCaching</code>, <code>audio</code>, and <code>pdf</code>; <code>cacheControl</code> is accepted as a graceful no-op."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>Usage.reasoningTokens</code> is populated from <code>completion_tokens_details.reasoning_tokens</code> (o-series / gpt-5 hidden reasoning channel), emitted only when <code>&gt; 0</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ModelCallOptions.reasoning.effort</code> maps to the native <code>reasoning_effort</code> param for reasoning-capable models; <code>reasoning.maxTokens</code> has no Chat Completions equivalent."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ModelCapabilities.reasoning</code> is inferred from the model name (overridable via <code>.model(...)</code>); <code>promptCaching</code> is always <code>true</code> (OpenAI caches automatically), and <code>cacheControl</code> write breakpoints are a no-op."
             }
           ]
         },
@@ -595,62 +891,11 @@
           "items": [
             {
               "type": "Added",
-              "html": "Cost-truth contract wiring. <code>ModelCapabilities</code> now reports <code>reasoning</code> (inferred from thinking-capable model tags — <code>deepseek-r1</code>, <code>qwq</code>, <code>qwen3</code>, <code>magistral</code>, <code>phi4-reasoning</code>, <code>cogito</code>, <code>smallthinker</code>, <code>exaone-deep</code>, <code>gpt-oss</code>; overridable via <code>ollama.model({ name, reasoning })</code>), plus <code>promptCaching</code>, <code>audio</code>, and <code>pdf</code> reported truthfully as <code>false</code> (Ollama supports none)."
+              "html": "<code>ModelCapabilities.reasoning</code> is inferred from thinking-capable model tags (overridable via <code>ollama.model({ name, reasoning })</code>); <code>promptCaching</code> / <code>audio</code> / <code>pdf</code> report <code>false</code>."
             },
             {
               "type": "Added",
-              "html": "<code>ModelCallOptions.reasoning</code> maps onto Ollama's native <code>think</code> request flag: <code>reasoning.effort</code> (<code>low</code>/<code>medium</code>/<code>high</code>) passes straight through, and an effort-less hint becomes <code>think: true</code>. The flag is sent only to <code>reasoning</code>-capable models; <code>reasoning.maxTokens</code> and <code>cacheControl</code> are honored as graceful no-ops (Ollama exposes no thinking-budget cap and no prompt cache)."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-anthropic",
-          "slug": "ai-anthropic",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Added",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Added",
-              "html": "Cost-truth wiring against the core <code>@warlock.js/ai</code> contract: - <strong>Usage accounting</strong> — <code>usage.cacheWriteTokens</code> is now populated from Anthropic's <code>cache_creation_input_tokens</code> (the cache-write surcharge), alongside the existing <code>cachedTokens</code> (from <code>cache_read_input_tokens</code>). In streaming, both are seeded from <code>message_start</code> and then refreshed from the cumulative <code>message_delta</code> counts. <code>reasoningTokens</code> is intentionally left unset because Anthropic bills extended-thinking tokens inside <code>output_tokens</code>. - <strong>Extended thinking</strong> — <code>ModelCallOptions.reasoning</code> now maps to Anthropic's <code>thinking: { type: \"enabled\", budget_tokens }</code>. <code>reasoning.maxTokens</code> sets the budget directly; <code>reasoning.effort</code> (<code>low</code>/<code>medium</code>/<code>high</code>) maps to a tiered budget (<code>1024</code>/<code>4096</code>/<code>12000</code>); any budget is floored at the <code>1024</code> minimum. <code>temperature</code> is dropped when thinking is enabled (Anthropic rejects the combination). New <code>reasoning?: boolean</code> model-config override. - <strong>System-prompt prompt caching</strong> — a per-call <code>ModelCallOptions.cacheControl.breakpoints &gt;= 1</code> now emits the hoisted system prompt as a <code>TextBlockParam</code> carrying <code>cache_control: { type: \"ephemeral\" }</code>, independent of the existing tools-caching <code>promptCaching</code> flag. - <strong>Capabilities</strong> — <code>reasoning</code> (default <code>true</code>, overridable), <code>promptCaching</code> (<code>true</code>), and <code>pdf</code> (<code>true</code>) are now advertised on <code>ModelCapabilities</code>; <code>audio</code> stays absent (Anthropic has no audio-input block)."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-google",
-          "slug": "ai-google",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Added",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Added",
-              "html": "Cost-truth contract wiring (additive, non-breaking): - <code>Usage.reasoningTokens</code> is now populated from Gemini's <code>usageMetadata.thoughtsTokenCount</code> (thinking-phase tokens), alongside the existing <code>Usage.cachedTokens</code> from <code>cachedContentTokenCount</code>. Both surface only when reported <code>&gt; 0</code>. - <code>ModelCallOptions.reasoning</code> maps to Gemini's <code>config.thinkingConfig</code>: <code>reasoning.maxTokens</code> → <code>thinkingBudget</code> directly, <code>reasoning.effort</code> → a bucketed budget (<code>low</code> 1024 / <code>medium</code> 8192 / <code>high</code> 24576). Honored only for <code>reasoning</code>-capable models. - <code>ModelCapabilities</code> now reports <code>reasoning: true</code>, <code>promptCaching: true</code>, and <code>audio</code> / <code>pdf</code> (mirroring the multimodal <code>vision</code> inference) for Gemini models. New <code>GoogleModelConfig</code> overrides: <code>reasoning</code>, <code>audio</code>, <code>pdf</code>. - <code>ModelCallOptions.cacheControl</code> is accepted as a graceful no-op (Gemini has no per-call cache-write breakpoint; read-side <code>cachedTokens</code> accounting is unaffected)."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/ai-openai",
-          "slug": "ai-openai",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Added",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Added",
-              "html": "Cost-truth wiring (additive, non-breaking): - <code>Usage.reasoningTokens</code> now populated from <code>completion_tokens_details.reasoning_tokens</code> on both <code>complete()</code> and the streaming <code>done</code> event (o-series / gpt-5 hidden reasoning channel). Emitted only when &gt; 0. - <code>ModelCallOptions.reasoning.effort</code> mapped to the provider-native <code>reasoning_effort</code> request param. Forwarded only for reasoning-capable models; <code>reasoning.maxTokens</code> has no Chat Completions equivalent and is ignored. - <code>ModelCapabilities.reasoning</code> inferred from the model name (<code>o1*</code> / <code>o3*</code> / <code>o4*</code> / <code>gpt-5*</code>), overridable via <code>.model({ name, reasoning })</code>. New <code>known-reasoning-models.ts</code> prefix helper. - <code>ModelCapabilities.promptCaching</code> advertised as always <code>true</code> (OpenAI caches automatically and reports hits via <code>Usage.cachedTokens</code>). <code>ModelCallOptions.cacheControl</code> write breakpoints are a graceful no-op."
+              "html": "<code>ModelCallOptions.reasoning</code> maps onto Ollama's native <code>think</code> flag for reasoning-capable models; <code>reasoning.maxTokens</code> and <code>cacheControl</code> are graceful no-ops."
             }
           ]
         }
@@ -661,7 +906,7 @@
       "id": "v4-2-11",
       "date": "June 17, 2026",
       "isUnreleased": false,
-      "summaryHtml": "Soft deletes go end-to-end in <strong><code>@warlock.js/cascade</code></strong> — <code>Migration.create</code> auto-wires the <code>deletedAt</code> column for soft-delete models and soft <code>destroy()</code> keeps the in-memory model in sync. <strong><code>@warlock.js/core</code></strong> adds the <code>lowerStage3Decorators()</code> test plugin and <code>warlock add notifications</code>; <strong><code>@warlock.js/notifications</code></strong> gains model-driven <code>columnMap</code>, presence-based read-state, and multi-tenant support. The whole family — and the <code>create-warlock</code> project template — moves to <code>@mongez/reinforcements</code> 3.3.0.",
+      "summaryHtml": "Soft deletes go end-to-end in <strong><code>@warlock.js/cascade</code></strong>. <strong><code>@warlock.js/core</code></strong> adds <code>warlock add notifications</code>, and <strong><code>@warlock.js/notifications</code></strong> gains model-driven column mapping, read-state, and multi-tenant support.",
       "mode": "detail",
       "packages": [
         {
@@ -722,15 +967,15 @@
           "items": [
             {
               "type": "Added",
-              "html": "<code>lowerStage3Decorators()</code> — Vite/Vitest plugin that lowers TC39 Stage-3 decorators with esbuild before oxc / the SSR rewrite mangles them; drop it first in a config's <code>plugins</code> so model-decorated files load under Vitest 4 / Vite 8."
+              "html": "<code>lowerStage3Decorators()</code> — Vite/Vitest plugin that lowers TC39 Stage-3 decorators with esbuild before oxc / the SSR rewrite mangles them; drop it first in <code>plugins</code> so model-decorated files load under Vitest 4 / Vite 8."
             },
             {
               "type": "Added",
-              "html": "<code>warlock add notifications</code> — installs <code>@warlock.js/notifications</code> (+ the <code>mail</code> feature), ejects <code>config/notifications.ts</code>, and scaffolds the app-owned <code>Notification</code> model + migration into <code>src/app/notifications/</code> (idempotent; async queue opt-in)."
+              "html": "<code>warlock add notifications</code> — installs <code>@warlock.js/notifications</code> (+ the <code>mail</code> feature), ejects <code>config/notifications.ts</code>, and scaffolds the app-owned <code>Notification</code> model + migration (idempotent)."
             },
             {
               "type": "Added",
-              "html": "Notifications connector — built-in connector (priority <code>8</code>, early phase) reads <code>config/notifications.ts</code> at boot and passes it to <code>setNotificationConfig</code>; lazy-imports <code>@warlock.js/notifications</code> (config-gated), so core keeps no hard dependency on it."
+              "html": "Notifications connector — a built-in, config-gated connector that lazy-imports <code>@warlock.js/notifications</code>, so core keeps no hard dependency on it."
             },
             {
               "type": "Changed",
@@ -746,7 +991,7 @@
             },
             {
               "type": "Fixed",
-              "html": "<code>startHttpTestServer</code> now starts early-phase connectors (database, cache, logger, …) before loading app modules, then late-phase (http, socket) after — mirroring dev/prod boot order; fixes a <code>MissingDataSourceError</code> when a module's boot side-effect queries the DB at import under the Vitest integration harness."
+              "html": "<code>startHttpTestServer</code> now starts early-phase connectors (database, cache, logger, …) before app modules, then late-phase (http, socket) after — mirroring dev/prod boot order; fixes a <code>MissingDataSourceError</code> under the Vitest integration harness."
             }
           ]
         },
@@ -763,23 +1008,23 @@
           "items": [
             {
               "type": "Changed",
-              "html": "In-app column mapping moved onto the model as <code>static columnMap</code> (<code>recipient</code> / <code>tenant</code> / <code>readAt</code> / <code>isRead</code>); accessors, the repository, the <code>database</code> channel, and <code>notificationColumns</code> all derive from it. New exported <code>NotificationColumnMap</code> type."
+              "html": "In-app column mapping moved onto the model as <code>static columnMap</code> (<code>recipient</code> / <code>tenant</code> / <code>readAt</code> / <code>isRead</code>); accessors, repository, and channels all derive from it. New <code>NotificationColumnMap</code> type."
             },
             {
               "type": "Changed",
-              "html": "Read-state is presence-based: declaring <code>readAt</code>, <code>isRead</code>, or both selects the representation; omitting both defaults to a <code>read_at</code> timestamp. The mode-agnostic <code>unread</code> filter replaces the <code>isRead</code> filter key."
+              "html": "Read-state is presence-based — declaring <code>readAt</code>, <code>isRead</code>, or both selects the representation (default <code>read_at</code>); the mode-agnostic <code>unread</code> filter replaces <code>isRead</code>."
             },
             {
               "type": "Changed",
-              "html": "Multi-tenant support: when the model declares a <code>tenant</code> column, the <code>database</code> channel reads it off the recipient and <code>createFor(recipientId, input, tenantId?)</code> writes it."
+              "html": "Multi-tenant support — when the model declares a <code>tenant</code> column, the <code>database</code> channel reads it off the recipient and <code>createFor(...)</code> writes it."
             },
             {
               "type": "Changed",
-              "html": "<code>inApp.list</code> / <code>inApp.listUnread</code> now forward full list options (<code>page</code> / <code>limit</code> / <code>orderBy</code> + filters), not just filter keys."
+              "html": "<code>inApp.list</code> / <code>inApp.listUnread</code> now forward full list options (<code>page</code> / <code>limit</code> / <code>orderBy</code> + filters)."
             },
             {
               "type": "Changed",
-              "html": "<code>notificationColumns(model)</code> derives recipient / tenant / read-state columns from <code>columnMap</code>; the SQL-vs-MongoDB <code>dataSource</code> branch is removed."
+              "html": "<code>notificationColumns(model)</code> derives its columns from <code>columnMap</code>; the SQL-vs-MongoDB <code>dataSource</code> branch is removed."
             }
           ]
         },
@@ -892,7 +1137,7 @@
       "id": "v4-2-10",
       "date": "June 17, 2026",
       "isUnreleased": false,
-      "summaryHtml": "Patch release: <strong><code>@warlock.js/auth</code></strong> moves <code>@mongez/copper</code> / <code>@mongez/events</code> / <code>@mongez/reinforcements</code> from peer to regular dependencies, clearing the <code>unmet peer dependency</code> warnings on install — they're framework-internal utilities your app never provides. <strong><code>@warlock.js/logger</code></strong>'s console timestamp switches to a cleaner 256-color <code>slate</code> gray. <strong><code>create-warlock</code></strong> ships the latest <code>@mongez/*</code> versions in its project template. The rest of the family is re-published at 4.2.10 to keep the lockstep version line.",
+      "summaryHtml": "Patch: <strong><code>@warlock.js/auth</code></strong> moves its internal <code>@mongez/*</code> utilities from peer to regular dependencies, clearing the install warnings. <strong><code>@warlock.js/logger</code></strong> softens its console timestamp to gray.",
       "mode": "detail",
       "packages": [
         {
@@ -908,7 +1153,7 @@
           "items": [
             {
               "type": "Fixed",
-              "html": "<code>@mongez/copper</code>, <code>@mongez/events</code>, and <code>@mongez/reinforcements</code> are now regular <code>dependencies</code> instead of <code>peerDependencies</code> — matching every other framework package. They're framework-internal utilities your app never imports directly, so declaring them as peers forced consumers to install them and produced <code>unmet peer dependency</code> warnings on install. They now resolve transitively and silently."
+              "html": "<code>@mongez/copper</code>, <code>@mongez/events</code>, and <code>@mongez/reinforcements</code> are now regular <code>dependencies</code> instead of <code>peerDependencies</code> — they're framework-internal utilities your app never imports, so declaring them as peers produced <code>unmet peer dependency</code> warnings on install."
             }
           ]
         },
@@ -925,7 +1170,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "<code>ConsoleLog</code>'s timestamp (and the <code>↳</code> context arrow) switch from bright-black <code>gray</code> to the 256-color neutral <code>slate</code>. Bright-black sits too close to the background on most terminal themes and reads muddy; <code>slate</code> is recessive but cleanly legible."
+              "html": "<code>ConsoleLog</code>'s timestamp (and the <code>↳</code> context arrow) switch from bright-black <code>gray</code> to the 256-color <code>slate</code> — recessive but cleanly legible where bright-black read muddy."
             }
           ]
         },
@@ -942,7 +1187,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "The project template now pins the latest <code>@mongez/*</code> versions — <code>@mongez/reinforcements@^3.2.0</code> and <code>@mongez/agent-kit@^1.2.0</code> — so freshly scaffolded apps start on current dependencies. (<code>@warlock.js/*</code> versions in the template are still rewritten to the scaffolder's own version at install time.)"
+              "html": "The project template now pins the latest <code>@mongez/*</code> versions (<code>@mongez/reinforcements@^3.2.0</code>, <code>@mongez/agent-kit@^1.2.0</code>) so freshly scaffolded apps start on current dependencies. (<code>@warlock.js/*</code> versions are still rewritten to the scaffolder's own version at install time.)"
             }
           ]
         }
@@ -953,7 +1198,7 @@
       "id": "v4-2-9",
       "date": "June 17, 2026",
       "isUnreleased": false,
-      "summaryHtml": "Patch release: <strong><code>@warlock.js/logger</code></strong>'s <code>ConsoleLog</code> is retuned for scannability — a time-only timestamp (<code>HH:mm:ss.SSS</code>) dimmed to gray, fixed-width level tags so the timestamp / module / action columns align, and <code>fatal</code> restored to a white-on-bright-red <strong>background badge</strong> so it can't be missed next to <code>error</code>. The rest of the family is re-published at 4.2.9 to keep the lockstep version line; no other functional changes.",
+      "summaryHtml": "Patch: <strong><code>@warlock.js/logger</code></strong>'s console output is retuned for scannability — a dimmed time-only timestamp, aligned level columns, and a restored white-on-red <code>fatal</code> badge.",
       "mode": "detail",
       "packages": [
         {
@@ -969,7 +1214,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "<code>ConsoleLog</code> output is retuned for scannability: - <strong>Time-only timestamp</strong> (<code>HH:mm:ss.SSS</code>) instead of the full ISO string — within a dev session the date is just noise. Persistent channels (<code>FileLog</code> / <code>JSONFileLog</code>) still record the full ISO timestamp. - The timestamp moves from yellow to <strong>gray</strong> so the colored level + message lead the eye; <code>module</code> (cyan) and <code>action</code> (magenta) keep their colors for at-a-glance subsystem scanning. - <strong>Aligned columns</strong> — each level tag is padded to a fixed width so the timestamp / module / action columns line up vertically across a stream of logs. - <strong><code>fatal</code> is restored to a background badge</strong> — white, bold text on a bright-red background (<code>☠ fatal</code>), the same column width as the other tags but deliberately louder than <code>error</code>'s plain red, so an unrecoverable failure can't be missed (4.2.8 had briefly flattened it to a plain label)."
+              "html": "<code>ConsoleLog</code> output retuned for scannability — a time-only <code>HH:mm:ss.SSS</code> timestamp dimmed to gray, fixed-width level tags so the columns align, and <code>fatal</code> restored to a white-on-bright-red background badge. (<code>FileLog</code> / <code>JSONFileLog</code> keep the full ISO timestamp.)"
             }
           ]
         }
@@ -980,7 +1225,7 @@
       "id": "v4-2-8",
       "date": "June 17, 2026",
       "isUnreleased": false,
-      "summaryHtml": "Patch release: <strong><code>@warlock.js/logger</code></strong>'s <code>ConsoleLog</code> now prints the level name beside each icon (<code>⚙ debug</code>, <code>ℹ info</code>, <code>⚠ warn</code>, <code>✗ error</code>, <code>✓ success</code>, <code>☠ fatal</code>) for at-a-glance readability; <code>fatal</code> drops the bright-red background badge for a bold red-bright <code>☠ fatal</code> label. The rest of the family is re-published at 4.2.8 to keep the lockstep version line; no other functional changes.",
+      "summaryHtml": "Patch: <strong><code>@warlock.js/logger</code></strong> now prints each level's name beside its icon (<code>ℹ info</code>, <code>⚠ warn</code>, <code>✗ error</code>, …) for at-a-glance reading.",
       "mode": "detail",
       "packages": [
         {
@@ -996,7 +1241,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "<code>ConsoleLog</code> now prints the level name beside each level's icon — <code>⚙ debug</code>, <code>ℹ info</code>, <code>⚠ warn</code>, <code>✗ error</code>, <code>✓ success</code>, <code>☠ fatal</code> — so entries are readable at a glance without memorizing icons. <code>fatal</code> also switches from a bright-red <strong>background</strong> badge to a bold red-bright <code>☠ fatal</code> label, consistent with the other levels."
+              "html": "<code>ConsoleLog</code> now prints each level's name beside its icon (<code>⚙ debug</code>, <code>ℹ info</code>, <code>⚠ warn</code>, <code>✗ error</code>, <code>✓ success</code>, <code>☠ fatal</code>) for at-a-glance reading."
             }
           ]
         }
@@ -1007,7 +1252,7 @@
       "id": "v4-2-7",
       "date": "June 17, 2026",
       "isUnreleased": false,
-      "summaryHtml": "Patch release: <strong><code>create-warlock</code></strong> now ships its <code>templates/</code> folder, so scaffolding a new project works from the installed package — it was missing from the build, which made the wizard fail with \"Something went wrong\" at the template-copy step. The rest of the family is re-published at 4.2.7 to keep the lockstep version line; no other functional changes.",
+      "summaryHtml": "Patch: <strong><code>create-warlock</code></strong> now ships its <code>templates/</code> folder, fixing the \"Something went wrong\" error when scaffolding a new project.",
       "mode": "detail",
       "packages": [
         {
@@ -1023,7 +1268,7 @@
           "items": [
             {
               "type": "Fixed",
-              "html": "The published package now ships its <code>templates/</code> folder, so scaffolding a new project works from the installed package — it was missing from the build, which made the wizard fail with \"Something went wrong\" at the template-copy step. The rest of the family is re-published at 4.2.7 to keep the lockstep version line; no other functional changes."
+              "html": "The published package now ships its <code>templates/</code> folder, so scaffolding a new project works from the installed package — it was missing from the build, which failed the wizard with \"Something went wrong\" at the template-copy step."
             }
           ]
         }
@@ -1034,7 +1279,7 @@
       "id": "v4-2-6",
       "date": "June 17, 2026",
       "isUnreleased": false,
-      "summaryHtml": "Patch release: <strong><code>create-warlock</code></strong> now ships its <code>bin</code> folder again, so the <code>create-warlock</code> CLI works from the installed package — it was omitted from the 4.2.5 build. The rest of the family is re-published at 4.2.6 to keep the lockstep version line; no other functional changes.",
+      "summaryHtml": "Patch: <strong><code>create-warlock</code></strong> ships its <code>bin</code> folder again, restoring the CLI that was dropped from 4.2.5.",
       "mode": "detail",
       "packages": [
         {
@@ -1050,7 +1295,7 @@
           "items": [
             {
               "type": "Fixed",
-              "html": "The published package now ships its <code>bin</code> folder again, so the <code>create-warlock</code> CLI works from the installed package — it was omitted from the 4.2.5 build. The rest of the family is re-published at 4.2.6 to keep the lockstep version line; no other functional changes."
+              "html": "The published package now ships its <code>bin</code> folder again, so the <code>create-warlock</code> CLI works from the installed package — it was omitted from the 4.2.5 build."
             }
           ]
         }
@@ -1061,7 +1306,7 @@
       "id": "v4-2-5",
       "date": "June 15, 2026",
       "isUnreleased": false,
-      "summaryHtml": "Patch release: <code>warlock add notifications</code> now scaffolds the in-app read/dismiss HTTP surface — <code>routes.ts</code> + a notifications controller (list / unread-count / mark-read / mark-all-read / clear / delete), gated by <code>authMiddleware</code> and recipient-scoped via <code>inApp</code>. The family is re-published in lockstep; no other functional changes.",
+      "summaryHtml": "Patch: <code>warlock add notifications</code> now scaffolds the in-app notifications HTTP surface — routes plus a list / mark-read / clear controller, gated by auth.",
       "mode": "detail",
       "packages": [
         {
@@ -1088,7 +1333,7 @@
       "id": "v4-2-4",
       "date": "June 15, 2026",
       "isUnreleased": false,
-      "summaryHtml": "Patch release: corrects the worker-loader path in <strong><code>@warlock.js/core</code></strong>'s build entry points — a wrong path in 4.2.3 left the worker entry broken. The family is re-published in lockstep; no other functional changes.",
+      "summaryHtml": "Patch: corrects a worker-loader build path in <strong><code>@warlock.js/core</code></strong> that 4.2.3 left broken.",
       "mode": "detail",
       "packages": [
         {
@@ -1115,7 +1360,7 @@
       "id": "v4-2-3",
       "date": "June 15, 2026",
       "isUnreleased": false,
-      "summaryHtml": "Patch release: adds the worker scripts as <strong><code>@warlock.js/core</code></strong> build entry points so they ship in the published package. A wrong entry-point path in this build blocked the npm publish for some packages — corrected in 4.2.4.",
+      "summaryHtml": "Patch: ships the worker scripts as <strong><code>@warlock.js/core</code></strong> build entry points. A wrong path here blocked publishing for some packages — fixed in 4.2.4.",
       "mode": "detail",
       "packages": [
         {
@@ -1142,7 +1387,7 @@
       "id": "v4-2-2",
       "date": "June 15, 2026",
       "isUnreleased": false,
-      "summaryHtml": "Patch release: adds <code>cli/start</code> to <strong><code>@warlock.js/core</code></strong>'s build entry points so the <code>warlock</code> CLI entry ships in the published package. The family is re-published in lockstep; no other functional changes.",
+      "summaryHtml": "Patch: ships the <code>warlock</code> CLI entry (<code>cli/start</code>) in <strong><code>@warlock.js/core</code></strong>'s build.",
       "mode": "detail",
       "packages": [
         {
@@ -1169,7 +1414,7 @@
       "id": "v4-2-1",
       "date": "June 15, 2026",
       "isUnreleased": false,
-      "summaryHtml": "Patch release: <strong><code>@warlock.js/core</code></strong> and <strong><code>@warlock.js/cascade</code></strong> now ship their <code>bin</code> folder, so the <code>warlock</code> and <code>cascade</code> CLIs work from the published package — they were omitted from the 4.2.0 build. The rest of the family is re-published at 4.2.1 to keep the lockstep version line; no other functional changes.",
+      "summaryHtml": "Patch: <strong><code>@warlock.js/core</code></strong> and <strong><code>@warlock.js/cascade</code></strong> ship their <code>bin</code> folders, restoring the <code>warlock</code> and <code>cascade</code> CLIs dropped from 4.2.0.",
       "mode": "detail",
       "packages": [
         {
@@ -1213,7 +1458,7 @@
       "id": "v4-2-0",
       "date": "June 15, 2026",
       "isUnreleased": false,
-      "summaryHtml": "A security and correctness overhaul of <code>@warlock.js/auth</code> — brute-force login throttling, atomic refresh-token rotation with replay detection, CSPRNG signing secrets, a corrected default token lifetime, and overridable token storage for multi-tenant schemas. The <code>jwt</code> config block is superseded by <code>accessToken</code> / <code>refreshToken</code>. Also introduces <strong><code>@warlock.js/notifications</code></strong> — multi-channel notifications (mail, in-app, custom channels) with preferences, rate limits, idempotency, and a herald-backed async queue. Plus <strong><code>@warlock.js/access</code></strong> — authorization (RBAC + ABAC): permission checks, attribute-based policies, role management, and a pluggable resolver.",
+      "summaryHtml": "A security overhaul of <strong><code>@warlock.js/auth</code></strong> — brute-force throttling, atomic refresh-token rotation, and CSPRNG secrets (the <code>jwt</code> config gives way to <code>accessToken</code> / <code>refreshToken</code>). Introduces two packages: <strong><code>@warlock.js/notifications</code></strong> (multi-channel notifications) and <strong><code>@warlock.js/access</code></strong> (RBAC + ABAC authorization).",
       "mode": "detail",
       "packages": [
         {
@@ -1279,7 +1524,7 @@
           "items": [
             {
               "type": "Added",
-              "html": "<code>loginThrottleMiddleware</code> — failure-aware brute-force / credential-stuffing protection that counts only failed logins, resets on a successful one, locks per-account and per-IP, and rejects pre-controller with <code>429</code> (cache-backed, fails open on a cache outage). Adds <code>AuthErrorCodes.TooManyAttempts</code> (<code>EC004</code>)."
+              "html": "<code>loginThrottleMiddleware</code> — failure-aware brute-force / credential-stuffing protection: counts only failed logins, locks per-account and per-IP, and rejects pre-controller with <code>429</code> (cache-backed, fails open). Adds <code>AuthErrorCodes.TooManyAttempts</code> (<code>EC004</code>)."
             },
             {
               "type": "Added",
@@ -1287,27 +1532,27 @@
             },
             {
               "type": "Added",
-              "html": "Overridable token storage — register a custom model under <code>config.auth.accessToken.model</code> / <code>config.auth.refreshToken.model</code> and <code>.extend()</code> the exported <code>accessTokenSchema</code> / <code>refreshTokenSchema</code> to add columns (e.g. a multi-tenant <code>organization_id</code>). Models own issuance through <code>issue()</code> and expose named statics, so the service hard-codes no column names."
+              "html": "Overridable token storage — register a custom model under <code>config.auth.accessToken.model</code> / <code>refreshToken.model</code> and <code>.extend()</code> the exported schemas to add columns (e.g. a multi-tenant <code>organization_id</code>)."
             },
             {
               "type": "Added",
-              "html": "<code>tokenType</code> (<code>access</code> | <code>refresh</code>) claim, stamped on issue and verified on read, so an access token can no longer be presented as a refresh token."
+              "html": "<code>tokenType</code> (<code>access</code> | <code>refresh</code>) claim, stamped on issue and verified on read, so an access token can't be presented as a refresh token."
             },
             {
               "type": "Added",
-              "html": "<code>expires_at</code> on access tokens; <code>warlock auth.cleanup</code> now purges expired access tokens as well as refresh tokens."
+              "html": "<code>expires_at</code> on access tokens; <code>warlock auth.cleanup</code> now purges expired access tokens too."
             },
             {
               "type": "Fixed",
-              "html": "Default access-token lifetime was ~3.6 seconds (a numeric <code>expiresIn</code> interpreted as milliseconds) and is now <strong>1 hour</strong>."
+              "html": "Default access-token lifetime was ~3.6 seconds (a numeric <code>expiresIn</code> read as milliseconds) and is now <strong>1 hour</strong>."
             },
             {
               "type": "Fixed",
-              "html": "Targeted revocation queried <code>userId</code> instead of the <code>user_id</code> column, so logout and refresh-token removal threw on Postgres and silently no-oped on MongoDB. The service now routes every token query through named model statics, so no column name is hard-coded."
+              "html": "Targeted revocation queried <code>userId</code> instead of the <code>user_id</code> column, so logout / refresh-token removal threw on Postgres and silently no-oped on MongoDB; token queries now route through named model statics."
             },
             {
               "type": "Fixed",
-              "html": "Token deletions were fire-and-forget inside <code>Promise&lt;void&gt;</code> methods (false success for callers, uncatchable rejections) and are now awaited."
+              "html": "Token deletions were fire-and-forget (false success for callers, uncatchable rejections) and are now awaited."
             },
             {
               "type": "Fixed",
@@ -1315,7 +1560,7 @@
             },
             {
               "type": "Fixed",
-              "html": "<code>revokeAllTokens</code> / <code>revokeTokenFamily</code> reported an empty set — a re-query on <code>revoked_at: null</code> after the update matched nothing — so the <code>token.revoked</code> / <code>token.familyRevoked</code> events never fired. The revoked rows are now captured before revocation."
+              "html": "<code>revokeAllTokens</code> / <code>revokeTokenFamily</code> reported an empty set, so <code>token.revoked</code> / <code>token.familyRevoked</code> never fired; the revoked rows are now captured before revocation."
             },
             {
               "type": "Fixed",
@@ -1323,7 +1568,7 @@
             },
             {
               "type": "Deprecated",
-              "html": "The <code>auth.jwt.*</code> configuration block (<code>jwt: { secret, expiresIn, refresh }</code>). Use <code>accessToken</code> / <code>refreshToken</code> instead — the legacy shape is still read and mapped forward with a one-time deprecation warning."
+              "html": "The <code>auth.jwt.*</code> configuration block. Use <code>accessToken</code> / <code>refreshToken</code> instead — the legacy shape is still read and mapped forward with a one-time deprecation warning."
             },
             {
               "type": "Removed",
@@ -1335,11 +1580,11 @@
             },
             {
               "type": "Security",
-              "html": "<code>warlock jwt.generate</code> now derives <code>JWT_SECRET</code> / <code>JWT_REFRESH_SECRET</code> from a CSPRNG (<code>Random.token</code>) instead of <code>Math.random()</code>-backed <code>Random.string</code>."
+              "html": "<code>warlock jwt.generate</code> now derives <code>JWT_SECRET</code> / <code>JWT_REFRESH_SECRET</code> from a CSPRNG (<code>Random.token</code>) instead of <code>Math.random()</code>."
             },
             {
               "type": "Security",
-              "html": "Refresh-token rotation is atomic: a guarded conditional <code>UPDATE</code> means two concurrent rotations of the same token can never both succeed, and a replayed token revokes its entire family."
+              "html": "Refresh-token rotation is atomic — a guarded conditional <code>UPDATE</code> means two concurrent rotations can't both succeed, and a replayed token revokes its entire family."
             }
           ]
         },
@@ -1364,35 +1609,35 @@
           "items": [
             {
               "type": "Added",
-              "html": "<code>log.flush()</code> — awaitable async counterpart to <code>flushSync()</code>. Drains every channel that implements <code>flush()</code> via <code>Promise.allSettled</code> with per-channel isolation, so one channel's failure can't break shutdown. <code>FileLog</code> / <code>JSONFileLog</code> implement it; <code>ConsoleLog</code> writes synchronously and doesn't need it."
+              "html": "<code>log.flush()</code> — awaitable async counterpart to <code>flushSync()</code>, draining every channel via <code>Promise.allSettled</code> with per-channel isolation. Implemented by <code>FileLog</code> / <code>JSONFileLog</code>."
             },
             {
               "type": "Added",
-              "html": "<code>SentryLog</code> channel — forwards entries to Sentry. <code>eventLevels</code> (<code>fatal</code> / <code>error</code> / <code>warn</code> by default) become events (<code>captureException</code> for <code>Error</code> messages, <code>captureMessage</code> otherwise); every other level becomes a breadcrumb. <code>module</code> / <code>action</code> are tags, <code>context</code> is a structured Sentry context. <code>@sentry/node</code> is an <strong>optional peer</strong>, lazily imported — pass an existing <code>client</code> or <code>options</code>."
+              "html": "<code>SentryLog</code> channel — forwards entries to Sentry (<code>eventLevels</code> become events, others breadcrumbs; <code>module</code> / <code>action</code> as tags). <code>@sentry/node</code> is an optional, lazily-imported peer."
             },
             {
               "type": "Added",
-              "html": "<code>log.fatal()</code> + <code>fatal</code> log level — ranked strictly above <code>error</code> for unrecoverable failures (failed bootstrap, <code>uncaughtException</code>). Does not auto-flush or exit; caller decides."
+              "html": "<code>log.fatal()</code> + <code>fatal</code> level — ranked strictly above <code>error</code> for unrecoverable failures; does not auto-flush or exit."
             },
             {
               "type": "Added",
-              "html": "<code>ConsoleLog</code> renders <code>fatal</code> with a <code>☠</code> icon on a bright-red background and bold red-bright message, distinct from <code>error</code>'s <code>✗</code>."
+              "html": "<code>ConsoleLog</code> renders <code>fatal</code> with a <code>☠</code> icon on a bright-red background, distinct from <code>error</code>'s <code>✗</code>."
             },
             {
               "type": "Changed",
-              "html": "<code>captureAnyUnhandledRejection()</code> now escalates <code>uncaughtException</code> to <code>log.fatal</code> (was <code>log.error</code>). Node terminates the process by default, so it's semantically fatal — makes \"page only on fatal\" alerting clean. <code>unhandledRejection</code> stays at <code>error</code>."
+              "html": "<code>captureAnyUnhandledRejection()</code> now escalates <code>uncaughtException</code> to <code>log.fatal</code> (was <code>error</code>); <code>unhandledRejection</code> stays at <code>error</code>."
             },
             {
               "type": "Changed",
-              "html": "<code>LoggingData.type</code> is now typed as <code>LogLevel</code> (was a duplicated inline union — code-standards cleanup)."
+              "html": "<code>LoggingData.type</code> is now typed as <code>LogLevel</code> (was a duplicated inline union)."
             },
             {
               "type": "Changed",
-              "html": "<code>LogContract</code> and the <code>LogChannel</code> base now expose an optional <code>flush?()</code> alongside the existing <code>flushSync?()</code>."
+              "html": "<code>LogContract</code> / <code>LogChannel</code> now expose an optional <code>flush?()</code> alongside <code>flushSync?()</code>."
             },
             {
               "type": "Fixed",
-              "html": "<code>@sentry/node</code> is now referenced only via local minimal types + an indirect dynamic import, so source-served consumers (the package's <code>main</code> → <code>./src/index.ts</code>) no longer get a <code>TS2307: Cannot find module '@sentry/node'</code> when they (correctly) don't install the optional peer. Proven by pruning the SDK and running the full suite + <code>tsc --noEmit</code> clean."
+              "html": "<code>@sentry/node</code> is referenced only via local types + an indirect dynamic import, so source-served consumers no longer get <code>TS2307: Cannot find module '@sentry/node'</code> when they don't install the optional peer."
             }
           ]
         },
@@ -1413,11 +1658,11 @@
           "items": [
             {
               "type": "Changed",
-              "html": "MongoDB and PostgreSQL drivers now log a failed initial <code>connect()</code> at <code>log.fatal</code> (was <code>log.error</code>). Boot-time database connection failures are unrecoverable in every realistic Warlock use case (app boot, CLI migrations, workers) — <code>fatal</code> makes \"page on fatal only\" alerting clean. Per-query failures, <code>createDatabase</code>/<code>dropDatabase</code> lifecycle errors, and disconnect failures stay at <code>error</code>."
+              "html": "MongoDB and PostgreSQL drivers now log a failed initial <code>connect()</code> at <code>log.fatal</code> (was <code>log.error</code>) — a boot-time database connection failure is unrecoverable, so <code>fatal</code> keeps \"page on fatal only\" alerting clean. Per-query and disconnect failures stay at <code>error</code>."
             },
             {
               "type": "Fixed",
-              "html": "PostgreSQL <code>increment</code> / <code>decrement</code> (and the <code>*Many</code> variants) bound the amount parameter as <code>$1</code>, which collided with the first filter placeholder (<code>SET n = n + $1 WHERE id = $1</code>) — the filter value bound into the amount slot, so every filtered counter update wrote the wrong number. The amount now binds after the filter params."
+              "html": "PostgreSQL <code>increment</code> / <code>decrement</code> (and the <code>*Many</code> variants) bound the amount as <code>$1</code>, colliding with the first filter placeholder (<code>SET n = n + $1 WHERE id = $1</code>) so every filtered counter update wrote the wrong number; the amount now binds after the filter params."
             }
           ]
         },
@@ -1434,7 +1679,7 @@
           "items": [
             {
               "type": "Fixed",
-              "html": "No-argument tools (declared without an <code>input</code> schema) no longer crash on invocation. A schemaless tool threw <code>Cannot read properties of undefined (reading '~standard')</code>; <code>tool.invoke</code> now skips validation when no schema is present and passes the raw input straight to the handler."
+              "html": "No-argument tools (declared without an <code>input</code> schema) no longer crash on invocation — <code>tool.invoke</code> now skips validation when no schema is present and passes the raw input to the handler."
             }
           ]
         },
@@ -1451,7 +1696,7 @@
           "items": [
             {
               "type": "Added",
-              "html": "Opt-in <code>promptCaching</code> flag on the model config. When enabled, the tool definitions are marked with <code>cache_control: { type: \"ephemeral\" }</code>, so multi-trip agents reuse the static tool schemas at Anthropic's cache-read rate instead of re-sending them at full price every trip. Off by default — a cache write costs more, so it only pays off across repeated trips; the system prompt is left uncached because it carries per-turn content."
+              "html": "Opt-in <code>promptCaching</code> flag on the model config — marks tool definitions with <code>cache_control: { type: \"ephemeral\" }</code> so multi-trip agents reuse the static tool schemas at the cache-read rate. Off by default."
             }
           ]
         },
@@ -1468,7 +1713,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "Redis driver now logs a failed initial <code>connect()</code> at <code>log.fatal</code> (was <code>log.error</code>). Boot-time cache connection failures are unrecoverable in practice — <code>fatal</code> makes \"page on fatal only\" alerting clean, aligned with the cascade drivers and the herald connector."
+              "html": "Redis driver now logs a failed initial <code>connect()</code> at <code>log.fatal</code> (was <code>log.error</code>) — a boot-time cache connection failure is unrecoverable, so <code>fatal</code> keeps \"page on fatal only\" alerting clean."
             }
           ]
         },
@@ -1485,7 +1730,7 @@
           "items": [
             {
               "type": "Changed",
-              "html": "<code>herald-connector</code> and <code>http-connector</code> now log a failed boot-time connection at <code>log.fatal</code> (was <code>log.error</code> / a dev-only console write). A broker connection failure or an HTTP port-bind failure at boot is unrecoverable — <code>fatal</code> makes \"page on fatal only\" alerting clean, aligned with the cascade and cache drivers. The HTTP connector additionally <code>await log.flush()</code> before <code>process.exit(1)</code> so the fatal entry reaches Sentry/file before the process dies. Disconnect/shutdown failures stay at <code>error</code>."
+              "html": "<code>herald-connector</code> and <code>http-connector</code> now log a failed boot-time connection at <code>log.fatal</code> (was <code>log.error</code>) — an unrecoverable broker connection or HTTP port-bind failure makes \"page on fatal only\" alerting clean; the HTTP connector flushes logs before <code>process.exit(1)</code>. Disconnect / shutdown failures stay at <code>error</code>."
             }
           ]
         }
@@ -1496,7 +1741,7 @@
       "id": "v4-1-15",
       "date": "June 4, 2026",
       "isUnreleased": false,
-      "summaryHtml": "Initial public baseline of the <strong>Warlock.js</strong> framework — 17 packages published in lockstep at <code>4.1.15</code>. From this release on, every change is recorded in its package's <code>CHANGELOG.md</code> and aggregated here by version.",
+      "summaryHtml": "The first public release of <strong>Warlock.js</strong> — 17 packages published together at <code>4.1.15</code>. Every change from here on is recorded per package and aggregated on this page.",
       "mode": "notes",
       "packages": []
     }

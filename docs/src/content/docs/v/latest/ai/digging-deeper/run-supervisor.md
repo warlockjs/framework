@@ -331,6 +331,10 @@ const supportTool = supportBot.asTool({
 const escalationAgent = ai.agent({ model, tools: [supportTool] });
 ```
 
+## Observability
+
+`observe?: boolean | Observer` routes a supervisor's completed report through the same generic `Observer` seam every other flow uses. `true` sends it to the globally registered observers even when observe-all is off; `false` opts the run out; a flow-local `Observer` collects only this run's report. See [the Observer seam](../observability/observe-seam) for the value semantics.
+
 ## Related
 
 - [Run agent](../the-basics/run-agent) — dispatchable units.

@@ -588,6 +588,7 @@ Then anywhere you have an `Upload`, you can `upload.storageFile().contents()`, `
 - **Driver name keys are case-sensitive.** `"r2"`, not `"R2"`. Match the keys in `src/config/storage.ts` exactly.
 - **`putFromUrl` downloads to the server first.** It's not a server-side copy — the bytes flow through your process. For huge files in cloud-to-cloud copies, use `storage.copy(from, to)` (same driver only) or build a copy command via the cloud SDK directly.
 - **The `prefix` driver option auto-prepends to every key.** If you set `prefix: "tenant-42"` and call `storage.put(buffer, "avatar.jpg")`, the file lands at `tenant-42/avatar.jpg`. This is by design for multi-tenant isolation — but it means `storage.list("tenant-42")` would double-prefix. Use bare paths in the call, let the driver add the prefix.
+- **Treat storage keys and locations as untrusted input.** Never feed a raw request value (a filename, an `:id`, a `?path=` query) straight into `storage.get(...)`, `storage.put(...)`, or `storage.path(...)`. A key like `../../etc/passwd` is a path-traversal attempt. The local driver rejects paths that escape the storage root, but you should still sanitize and validate keys yourself — restrict them to a known prefix per tenant/user and strip `..` segments — so an attacker can't read or overwrite another tenant's files. Cloud drivers don't have a filesystem root to contain you, so key sanitization is on you there.
 
 ## See also
 

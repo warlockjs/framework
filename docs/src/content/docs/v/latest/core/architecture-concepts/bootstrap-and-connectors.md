@@ -19,13 +19,15 @@ flowchart TD
     early["Early phase connectors<br/><i>logger · mailer · database · herald · cache · storage · notifications · access</i>"]
     appcode["App code imports<br/><i>routes.ts · main.ts · models · events</i>"]
     late["Late phase connectors<br/><i>http · socket</i>"]
+    booted["Application.markBooted()<br/><i>onceBooted listeners fire</i>"]
     listening["Server listening<br/><i>process awaits requests</i>"]
 
     cli --> boot
     boot --> early
     early --> appcode
     appcode --> late
-    late --> listening
+    late --> booted
+    booted --> listening
 ```
 
 Three takeaways:
@@ -169,9 +171,26 @@ In `boot()`, it pulls the Fastify instance from the container (so Socket.IO can 
 
 If HTTP isn't configured, socket creates its own raw Node server on the configured port and binds Socket.IO to that.
 
+## Boot complete
+
+The instant the late phase finishes, the framework flips a one-time latch — `Application.markBooted(...)` — in both the dev server and the production bundle. That's the signal that **everything is up**: every connector in both phases is active, every app file is loaded, and the HTTP server is listening.
+
+App code hooks into it with `Application.onceBooted(...)`:
+
+```ts title="src/app/main.ts"
+import { Application } from "@warlock.js/core";
+import { log } from "@warlock.js/logger";
+
+Application.onceBooted(({ environment, bootDurationMs }) => {
+  log.success("app", "booted", `ready in ${environment}`, { bootDurationMs });
+});
+```
+
+This matters because app files (`main.ts`, `events.ts`, `routes.ts`) are imported in **Phase 2 — before** the late phase. So at the top level of `main.ts` the HTTP server isn't listening yet. `onceBooted` defers your callback until boot is genuinely complete, making it the safe place to touch `app.http` / `app.socket`. It's a latch, not an event: a callback registered after boot still fires (next microtask) rather than missing the signal. Full API on the [Application](./application.md#boot-lifecycle) page.
+
 ## Graceful shutdown
 
-The connectors manager hooks into `SIGINT` and `SIGTERM` (plus `SIGHUP` on Windows, where Ctrl+C is unreliable in child processes) and shuts down every connector in **reverse priority order**:
+Shutdown runs in two stages. First, the connectors manager runs every **app teardown hook** registered via `Application.onShutdown(...)` — while every connector is still up, so cleanup can use the database, cache, and HTTP. Then it shuts down every connector in **reverse priority order**:
 
 ```mermaid
 flowchart LR
@@ -202,6 +221,8 @@ flowchart LR
 ```
 
 Reverse order is important: HTTP closes its socket before the database disconnects (so in-flight requests don't read a dead connection), and the logger flushes LAST so every other connector's shutdown error makes it to disk.
+
+The HTTP connector doesn't just drop the socket — it **drains gracefully**: `Application.isShuttingDown` flips `true` at the start of shutdown (so the built-in `/ready` endpoint returns 503 and a load balancer stops routing new traffic), then Fastify stops accepting new requests and lets in-flight ones finish, bounded by `http.gracefulShutdown.timeout`. See [Health checks & graceful shutdown](../digging-deeper/health-checks.md).
 
 A re-entrant signal (Ctrl+C twice while shutdown is in progress) is ignored — the `isShuttingDown` flag prevents a second sweep from corrupting the first one.
 

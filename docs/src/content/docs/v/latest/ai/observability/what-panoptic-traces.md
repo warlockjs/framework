@@ -22,7 +22,7 @@ Every executable primitive returns a `BaseReport` tree. Each node carries identi
 | `sessionId` | `sessionId` | absent when the caller supplied none |
 | `name` | `name` | tool / agent / workflow / supervisor name |
 | `version` | `version` | dev-curated, free-form, absent when undeclared |
-| `type` | `type` | the `ReportType` discriminator |
+| `type` | `type` | the `ReportType` discriminator (`agent` / `workflow` / `supervisor` / `team` / `planner` / `orchestrator` / `tool`; `team` is its own first-class member, distinct from `supervisor`) |
 | `status` | `status` | `completed` / `failed` / `cancelled` / `max-iterations` / `awaiting-input` |
 | `startedAt` / `endedAt` / `duration` | same | ISO-8601 timestamps + ms duration |
 | `usage` | `usage` | this node's own cost **plus** the sum of its children |
@@ -208,6 +208,68 @@ ok agent "support-agent" — 1840ms, 1320 tok, $0.0094
 
 The tool spans report `0 tok` and no cost because all LLM spend rolls up onto the agent span — exactly as it does on the source `BaseReport`. The `traceId` is shared by every span; `parentSpanId` reconstructs the nesting; `tool.tripIndex` ties each tool back to the agent trip that called it.
 
+## Capturing content — `input` / `output`
+
+By default a span carries identity, timing, status, cost, and attributes — but **not** the prompt, the completion, or the tool payloads. Those are large and frequently sensitive, so they stay absent. Opt in with `captureContent` (on the collector via `createCollector(...)`, or on the subscriber via `panoptic({ captureContent: true })`) to copy raw content onto `span.input` / `span.output`, where every exporter can surface it — `consoleExporter({ io: true })`, the file exporter's JSON, OTel `gen_ai.prompt` / `gen_ai.completion`, and Langfuse `input` / `output`:
+
+```ts
+const observe = panoptic({
+  exporters: [consoleExporter({ io: true })],
+  captureContent: true,
+});
+```
+
+What lands per primitive:
+
+- **Tools** — the call arguments on `input`, the return value on `output` (read straight off the tool report).
+- **Agents** — the first-trip prompt as a `[system, user]` chat array (or the bare user string when there's no system prompt) on `input`, and the **last non-empty trip output** (the final response text — a failed / max-trips run can end on an empty trip, so Panoptic scans back for the last one that carried text) on `output`.
+
+A `ContentRedactor` masks each value before it's stored — return a masked value to keep it, or `undefined` to drop the field entirely:
+
+```ts
+const observe = panoptic({
+  exporters: [consoleExporter({ io: true })],
+  captureContent: true,
+  redactContent: (value, { field }) =>
+    field === "input" ? "[redacted prompt]" : value,
+});
+```
+
+### `fullHistory` — the complete conversation on `span.input`
+
+`captureContent` emits only the **first trip's** `[system, user]` prompt. For a multi-trip tool-using agent, that omits the tool results and follow-up turns the model actually saw. Set `fullHistory: true` to emit the agent's **complete `CapturedMessage[]`** — every trip, every role (system, user, assistant tool-calls, tool results, the final assistant message) — onto `span.input` instead:
+
+```ts
+const observe = panoptic({
+  exporters: [langfuseExporter({ publicKey, secretKey })],
+  captureContent: true,
+  fullHistory: true, // emit the whole assembled conversation
+});
+```
+
+`span.output` is unchanged — it stays the agent's last non-empty trip output (the final response text). Only `span.input` swaps from the first-trip array to the full message log.
+
+**It requires the agent to capture its messages.** `fullHistory` reads the report's `messages` array, which a core `@warlock.js/ai` agent only populates when its own `captureMessages` option is set:
+
+```ts
+const agent = ai.agent({
+  model,
+  captureMessages: true, // core must record the conversation for fullHistory to have anything to emit
+});
+```
+
+When the agent **didn't** opt into `captureMessages` (so the report has no `messages`, or an empty one), `fullHistory` **falls back gracefully** to the standard first-trip `[system, user]` capture — it never errors, it just degrades to today's behavior. So a run that didn't opt in is unaffected, and a mix of opted-in and opted-out agents under one collector each capture as much as they recorded.
+
+Other `fullHistory` behaviors worth knowing:
+
+- **Off without `captureContent`.** `fullHistory` only matters when `captureContent` is on. With `captureContent` off, no content is captured regardless of `fullHistory`.
+- **The redactor sees the whole array as one value.** Under `fullHistory`, the `ContentRedactor` is called once with the entire `CapturedMessage[]` (not per message) on the `input` field — mask or reshape the array as a unit, or return `undefined` to drop `input` entirely.
+- **Tools are unaffected.** `fullHistory` is an agent-input concern; tool spans still capture their args/result exactly as under plain `captureContent`.
+
+> Capturing full conversations means raw prompts, tool payloads, and completions ride along on every span and into every exporter. Pair `fullHistory` with a `redactContent` masker in any environment where that content is sensitive, and keep the [local dashboard](./local-dashboard) loopback-only.
+
 ## Related
 
 - [@warlock.js/ai-panoptic](./ai-panoptic) — the package overview, `panoptic()` entry point, and exporters.
+- [Configuring Panoptic](./configuring-panoptic) — wire content capture declaratively via `ai.config({ panoptic })`.
+- [The local dashboard](./local-dashboard) — inspect captured content in a loopback-only UI.

@@ -1,6 +1,6 @@
 ---
 title: "Application"
-description: The static gateway to environment, runtime mode, framework version, and every well-known path your app touches — read-only at runtime, set once at boot.
+description: The static gateway to environment, runtime mode, framework version, the boot lifecycle, and every well-known path your app touches — read-only at runtime, set once at boot.
 sidebar:
   order: 1
   label: "Application"
@@ -24,6 +24,7 @@ Think of `Application` as the framework's read-only header — the bits of state
 | ---------------- | ---------------------------------------------------- | ----------------------------------- |
 | Environment      | `development` / `production` / `test`                | `setEnvironment(env)` — bootstrap   |
 | Runtime mode     | Is this `dev-server` or the production bundle?       | `setRuntimeStrategy(mode)` — framework |
+| Boot & shutdown  | Run code after the late phase, or clean up before exit. | `onceBooted` / `whenBooted` / `onShutdown` — fired once by the framework |
 | Process timing   | When did we start? How long have we been up?         | None — derived from `process.uptime()` |
 | Framework version| What's the loaded `@warlock.js/core` version?        | Set once during boot                |
 | Paths            | Root, src, app, storage, uploads, public             | None — anchored at `process.cwd()`  |
@@ -109,6 +110,83 @@ Application.setRuntimeStrategy("production");
 The framework sets this for you. You'll see it consulted internally — for example, the HTTP connector branches on it to decide between `router.scanDevServer()` and `router.scan()`. Most app code shouldn't read it; reach for `Application.environment` instead.
 
 The split matters because `NODE_ENV=production` is one thing (it gates app behaviour: cookies, logs, caches) but the runtime strategy is another (it gates framework behaviour: HMR, watchers). You can run the production bundle with `NODE_ENV=development` for debugging, or the dev server with `NODE_ENV=production` for staging-like testing.
+
+## Boot lifecycle
+
+There's one moment every long-running app cares about: **everything is up**. Every connector in both phases has started, every `main.ts` / `events.ts` / `routes.ts` has been imported, every model is registered, and — crucially — the HTTP server is listening and the socket server is bound. `Application` exposes that moment as a small latch.
+
+```ts
+import { Application } from "@warlock.js/core";
+
+Application.onceBooted(({ environment, runtimeStrategy, bootDurationMs }) => {
+  // Runs once the app is fully booted — http listening, socket bound.
+});
+
+Application.isBooted;            // boolean — has boot finished?
+await Application.whenBooted();  // Promise<BootContext> — await form
+```
+
+### Why not just put the code at the end of `main.ts`?
+
+Because `main.ts` runs **too early**. The boot sequence imports your app code (locales, events, `main.ts`, routes) _between_ the early-phase connectors (database, cache, logger, …) and the late-phase connectors (http, socket). So at the moment `main.ts` executes, the HTTP server is not listening yet and `app.http` / `app.socket` are still `undefined`.
+
+`onceBooted` solves this: it defers the callback until the late phase has finished. Register it at the top of `main.ts` and it runs at exactly the right time — when the server is actually up.
+
+```ts title="src/app/main.ts"
+import { Application, app } from "@warlock.js/core";
+import { log } from "@warlock.js/logger";
+
+Application.onceBooted(({ environment, bootDurationMs }) => {
+  // app.http and app.socket are guaranteed populated here.
+  log.success("app", "booted", `ready in ${environment}`, { bootDurationMs });
+});
+```
+
+### It's a latch, not an event
+
+A plain event listener that subscribes after the event fired misses it forever. `onceBooted` is a latch — it remembers that boot happened:
+
+- **Register before boot** → the callback is queued and runs when boot completes.
+- **Register after boot** → the callback runs immediately (on the next microtask).
+
+So a lazily-imported module, a plugin, or any code that wires itself up after startup still gets the signal. You never have to reason about whether you subscribed "in time."
+
+### The boot context
+
+Every listener — and `whenBooted()`'s resolved value — receives a `BootContext`:
+
+| Field             | Type                                       | Notes                                                        |
+| ----------------- | ------------------------------------------ | ----------------------------------------------------------- |
+| `environment`     | `"development" \| "production" \| "test"`  | The active environment at boot                              |
+| `runtimeStrategy` | `"production" \| "development"`            | Dev server vs bundled output                                |
+| `bootDurationMs`  | `number \| undefined`                      | How long boot took — dev server only; omitted in production |
+
+Both the dev server and the production bundle fire the latch exactly once, after the late phase. App code only ever _reads_ it (`onceBooted` / `whenBooted` / `isBooted`); the internal `markBooted` is a framework concern — don't call it.
+
+### What it's for
+
+`onceBooted` is the home for work that must wait for a complete boot: warming a cache, registering a recurring job, pinging a readiness endpoint, opening an outbound connection that needs the HTTP server already listening, or simply logging a "ready" line with the boot duration. A throwing listener is caught and logged, so one bad hook can't break boot or the other hooks.
+
+### Shutdown — release resources before the app stops
+
+`Application.onShutdown(callback)` is the mirror of `onceBooted` — teardown that runs once when the process is shutting down (SIGINT/SIGTERM, or the dev server stopping), **before** the connectors (db, cache, http) close, so cleanup can still use them.
+
+```ts title="src/app/main.ts"
+import { Application } from "@warlock.js/core";
+
+Application.onceBooted(() => {
+  const consumer = startQueueConsumer();
+
+  // Pair every resource you open at boot with its teardown.
+  Application.onShutdown(async () => {
+    await consumer.stop();
+  });
+});
+```
+
+Hooks run **LIFO** (reverse of registration — last opened, first closed), each is awaited, and a throwing hook is caught and logged so it can't block the rest. `Application.isShuttingDown` flips `true` the moment shutdown begins; the built-in `/ready` endpoint reads it to report not-ready so a load balancer drains the instance first. For the HTTP-side story — `/health`, `/ready`, and graceful request draining — see [Health checks & graceful shutdown](../digging-deeper/health-checks.md).
+
+The framework triggers this for you (the connectors manager runs the hooks at the start of shutdown); app code only registers via `onShutdown`.
 
 ## Process timing
 
@@ -265,6 +343,8 @@ Wire it up at `GET /health`. Load balancers, uptime probes, and humans tracking 
 - **`Application.version` returns `null` until the framework has loaded it.** The version file is loaded asynchronously early in boot — typical user code (inside a request handler) sees the cached value. But code that runs at the top of `bootstrap()` may see `null` for a window.
 - **Paths are anchored at `process.cwd()`, not `import.meta.url`.** If you launch the process from outside the project root, every path getter is wrong. Always launch from the project root (the CLI does this for you).
 - **`runtimeStrategy` is set by the framework, not by you.** Setting it manually from app code will confuse the HTTP connector and other internals. Read it; don't write to it.
+- **`onceBooted` runs after the late phase; `main.ts` does not.** App files import _between_ the early and late connector phases, so code at the top level of `main.ts` runs before http/socket are listening. Defer anything that needs the server to `Application.onceBooted(...)`. It's a latch — registering after boot still fires (next microtask), so it never misses.
+- **`onShutdown` runs before connectors close.** Cleanup can still use db/cache/http — but a hook that hangs delays teardown (bounded only by your process manager's kill timeout). Keep teardown fast; HTTP draining is already bounded by `http.gracefulShutdown.timeout`.
 
 ## See also
 

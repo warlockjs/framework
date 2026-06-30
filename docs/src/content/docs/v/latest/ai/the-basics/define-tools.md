@@ -45,7 +45,7 @@ ai.tool({
 });
 ```
 
-`action` accepts a string or a function. The function runs AFTER input validation; throws inside it are swallowed — a UI string isn't worth aborting LLM dispatch over.
+`action` accepts a string or a function. The function receives the model's **raw, pre-validation** input — it resolves at the dispatch boundary, *before* `execute`'s schema validation runs — and throws inside it are swallowed, since a UI string isn't worth aborting LLM dispatch over.
 
 ## Schemas via Standard Schema V1
 
@@ -67,7 +67,7 @@ The agent calls `input["~standard"].validate(rawArgs)` before invoking `execute`
 
 ## What gets sent back to the model
 
-Whatever `execute` resolves with is `JSON.stringify`'d and sent back as the next trip's `tool` message. Strings pass through unchanged. Throw (or return a rejected promise) to signal failure — the agent records the error and tells the model what went wrong.
+Whatever `execute` resolves with is `JSON.stringify`'d and sent back as the next trip's `tool` message — a plain string is serialized too, so a returned `"hi"` reaches the model as `"hi"` (quotes included). Throw (or return a rejected promise) to signal failure — the agent records the error and tells the model what went wrong.
 
 ```ts
 execute: async ({ query }) => {
@@ -151,15 +151,19 @@ See [Handle errors](../digging-deeper/handle-errors).
 
 ## Inspecting tool calls
 
+Leaf tool dispatches are child nodes on the report tree — filter `report.children` by `type`:
+
 ```ts
 const result = await myAgent.execute("Pick a city and tell me the weather.");
 
-for (const call of result.report.toolCalls) {
+const toolCalls = result.report.children.filter((c) => c.type === "tool");
+
+for (const call of toolCalls) {
   console.log(call.tripIndex, call.name, call.input, call.output, call.duration);
 }
 ```
 
-Each `ToolCall` carries `startedAt`, `endedAt`, `duration`.
+Each `ToolCall` is a child report (`type: "tool"`) carrying `tripIndex`, `input`, `output`, plus the shared `name`, `startedAt`, `endedAt`, `duration`.
 
 ## Events
 

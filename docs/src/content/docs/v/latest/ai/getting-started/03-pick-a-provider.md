@@ -53,16 +53,20 @@ The agent factory call signature stays identical across adapters. Switching from
 
 ## Capabilities matter
 
-Every `ModelContract` declares what it supports — two optional flags today (absent = treat as `false`):
+Every `ModelContract` declares what it supports — six optional flags today (absent = treat as `false`):
 
 ```ts
 type ModelCapabilities = {
   structuredOutput?: boolean;   // native response_format: json_schema?
   vision?: boolean;             // can accept image attachments?
+  reasoning?: boolean;          // exposes extended-thinking / reasoning?
+  promptCaching?: boolean;      // honors cache-control breakpoints + reports cached tokens?
+  audio?: boolean;              // can accept audio attachments?
+  pdf?: boolean;                // can accept PDF / document attachments?
 };
 ```
 
-The framework reads `capabilities` to fail loud upfront. Passing `attachments: [...]` to a non-vision model throws at the boundary, not mid-trip. Adapters without native `structuredOutput` fall back to a soft "respond in JSON only" instruction.
+The framework reads `capabilities` to fail loud upfront. Passing an image / audio / PDF attachment to a model that doesn't declare the matching flag throws at the boundary, not mid-trip. Adapters without native `structuredOutput` fall back to a soft "respond in JSON only" instruction.
 
 If you fine-tuned a model or use a custom name the adapter doesn't auto-detect, override on the model call:
 

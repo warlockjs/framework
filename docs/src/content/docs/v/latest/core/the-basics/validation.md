@@ -65,7 +65,7 @@ The full toolbox lives in `@warlock.js/seal`. Highlights:
 
 | Factory                | Inferred type            | Notes                                     |
 | ---------------------- | ------------------------ | ----------------------------------------- |
-| `v.string(msg?)`       | `string`                 | `.min()`, `.max()`, `.email()`, `.url()`, `.pattern()`, `.uuid()`, `.alpha()`, `.alphanumeric()`, `.trim()` |
+| `v.string(msg?)`       | `string`                 | `.min()`, `.max()`, `.email()`, `.url()`, `.pattern()`, `.uuid()`, `.alpha()`, `.alphanumeric()`, `.trim()`, `.in([...])` / `.oneOf([...])` (allowlist) |
 | `v.email(msg?)`        | `string`                 | shortcut for `v.string().email()`         |
 | `v.number(msg?)`       | `number`                 | `.min()`, `.max()`, `.positive()`, `.negative()` |
 | `v.int(msg?)`          | `number`                 | integer-only                              |
@@ -113,7 +113,7 @@ v.string().refine((value) => value !== "admin", "Reserved username")    // custo
 
 `refine` is the escape hatch for project-specific rules — runs your function, you return `true` for valid, `false` (or an error message) for invalid.
 
-#### Composing with `v.email`, `v.password`, etc.
+#### Composing with `v.email`, `v.string`, etc.
 
 Real schemas read top to bottom like a constraint declaration:
 
@@ -253,6 +253,8 @@ export default validationConfig;
 ```
 
 For most apps the defaults are right. Override only if you need to match an external API contract.
+
+> **Two status keys, two code paths.** Schema failures (`response.failedSchema(result)`) read the status from `validation.response.status` — the `status` key inside the block above. The custom `validate` path (a controller's `validation.validate(request, response)` hook that returns an error) instead reads a separate top-level `validation.responseStatus` key, defaulting to `400`. They both default to `400`, but if you change one expecting it to cover both, the other keeps its default. Set `validation.responseStatus` too if your custom-validate handlers should return a non-400 status.
 
 ### Locale-aware error messages
 

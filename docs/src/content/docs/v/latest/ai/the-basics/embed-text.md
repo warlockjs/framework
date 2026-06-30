@@ -38,10 +38,10 @@ const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 const embedder = openai.embedder({ name: "text-embedding-3-small" });
 
 const one = await embedder.embed("Hello, world.");
-// { vector: number[], usage: Usage, dimensions: number }
+// { vector: number[], dimensions: number, usage: EmbeddingUsage }
 
 const many = await embedder.embedMany(["foo", "bar", "baz"]);
-// { vectors: number[][], usage: Usage, dimensions: number }
+// { vectors: number[][], dimensions: number, usage: EmbeddingUsage }
 ```
 
 ## Not wired into the agent loop

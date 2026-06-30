@@ -29,10 +29,17 @@ const myAgent = ai.agent({
   streamingToolGuard: {},                    // opt-in tool-call recovery
   on: { "agent.starting": handler },         // factory-level event handlers
   version: "v3-2026-05",                     // mirrored onto reports
+  captureMessages: true,                      // persist the full turn array onto report.messages
+  observe: true,                              // route this run's report to observers
 });
 ```
 
 The factory returns an `AgentContract<TOutput>`. Every execution spawns a fresh internal `Execution` — the factory holds no per-call state.
+
+Two of those options feed observability:
+
+- `captureMessages?: boolean` — off by default. When set, the full multi-turn conversation (every role, every trip) is persisted onto `report.messages`. Opt-in because the captured array can be large and may carry sensitive content (full prompts, tool inputs/outputs).
+- `observe?: boolean | Observer` — route this run's completed report to your collectors. `true` sends it to the globally registered observers even when observe-all is off; `false` opts the run out; an `Observer` object is a run-local collector. See [the Observer seam](../observability/observe-seam) for the value semantics.
 
 ## Anonymous agents
 
@@ -111,10 +118,12 @@ type AgentReport = {
   model: { name: string; provider: string };
   trips: LLMTrip[];
   toolCalls: ToolCall[];
+  systemPrompt?: string;            // the resolved system message sent as role: "system"
+  messages?: CapturedMessage[];     // full turn array — present only when captureMessages is set
 };
 ```
 
-`trips` and `toolCalls` are flat lists with timing and outcome on every entry — easy to write reporting on top of.
+`trips` and `toolCalls` are flat lists with timing and outcome on every entry — easy to write reporting on top of. `systemPrompt` carries the resolved system text (persona + instructions + any auto-appended structured-output instruction), absent when the agent ran without one. `messages` is the full assembled conversation as `CapturedMessage[]` — present only when the factory's `captureMessages` was set. See [the Observer seam](../observability/observe-seam) for the full treatment.
 
 ### Cost truth — `usage`
 

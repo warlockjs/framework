@@ -68,13 +68,12 @@ Use `files(key)` when the multipart field is repeated (`<input name="files" mult
 In schema-driven controllers, **always** prefer `request.validated()` — the schema runs first, so by the time you read files, size and mime checks already passed:
 
 ```ts title="src/app/uploads/controllers/create-upload.controller.ts"
-import { type RequestHandler } from "@warlock.js/core";
-import { type UploadRequest } from "../requests";
-import { uploadSchema } from "../schema";
+import { type Request, type RequestHandler } from "@warlock.js/core";
+import { type UploadSchema, uploadSchema } from "../schema";
 import { createUploadService } from "../services/create-upload.service";
 
 export const createUploadController: RequestHandler = async (
-  request: UploadRequest,
+  request: Request<UploadSchema>,
   response,
 ) => {
   const { files } = request.validated();   // UploadedFile[] — already validated

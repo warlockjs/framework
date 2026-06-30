@@ -349,7 +349,10 @@ useCase({
     attempts: 3,
     delay: 500,
     backoff: "exponential",
-    shouldRetry: (error) => !(error instanceof ValidationError),
+    // Don't retry input-rejection failures. seal has no runtime `ValidationError`
+    // class to `instanceof` (validation returns `{ isValid, errors }`), so match the
+    // real thrown error class — or, for a plain error, do a property check.
+    shouldRetry: (error) => (error as { name?: string })?.name !== "ValidationError",
   },
   handler: async (data) => paymentGateway.charge(data),
 });

@@ -153,17 +153,19 @@ When you're staring at three operations with the same name across five services,
 
 ## Selective error capture — `shouldBenchmarkError`
 
-Business errors (400 Bad Request, ValidationError) are not infrastructure problems. They're not slow because the database is hot — they're "fast" because the validator rejected the input in two milliseconds. Including them in latency stats poisons the percentiles.
+Business errors (a 400 Bad Request, a rejected schema) are not infrastructure problems. They're not slow because the database is hot — they're "fast" because the validator rejected the input in two milliseconds. Including them in latency stats poisons the percentiles.
 
 Return `false` to **re-throw** the error without producing a benchmark result:
 
 ```ts
-import { ValidationError } from "@warlock.js/seal";
+import { BadRequestError } from "@warlock.js/core";
 
 await measure("create-user", () => createUser(input), {
-  shouldBenchmarkError: (error) => !(error instanceof ValidationError),
+  shouldBenchmarkError: (error) => !(error instanceof BadRequestError),
 });
 ```
+
+> **Why not `instanceof ValidationError`?** seal exposes no runtime `ValidationError` class — `v.validate(...)` *returns* `{ isValid, errors }` rather than throwing, so importing one and using `instanceof` would crash with a `TypeError`. Match on a real exported error class instead (the HTTP error classes from `@warlock.js/core` all extend `HttpError`), or do a property check like `(error as { name?: string })?.name !== "ValidationError"` when you only have a plain thrown error to discriminate on.
 
 The default is `true` — every thrown error becomes a `BenchmarkErrorResult`. Override only when you have a specific class of errors that should bypass benchmarking entirely.
 

@@ -10,6 +10,7 @@ sidebar:
 
 ```ts
 import { ai } from "@warlock.js/ai";
+import { v } from "@warlock.js/seal";
 
 const result = await ai.spawnSubAgent({
   name: "extract-entities",

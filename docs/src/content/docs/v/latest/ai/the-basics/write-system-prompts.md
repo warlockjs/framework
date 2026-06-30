@@ -60,6 +60,82 @@ ai.systemPrompt([
 
 Useful when you have prebuilt persona / instruction blocks reused across many prompts.
 
+## Merge predefined blocks
+
+`base.merge(...blocks)` folds N pre-built blocks into a builder in one call. Each block is folded in order through the **same per-type rules as the chained methods**: a `persona` block sets or replaces the single, leading persona; every other block (e.g. an `instruction`) is appended in the order given. The builder is immutable — the original is untouched — and `merge` is exactly equivalent to chaining the same blocks.
+
+```ts
+const reviewer = ai.persona("You are a meticulous code reviewer.");
+const style = ai.instruction("Prefer small, focused diffs.");
+const lang = ai.instruction("Respond in {{language|English}}.");
+
+const base = ai.systemPrompt().instruction("Cite the line numbers you reference.");
+
+const prompt = base.merge(reviewer, style, lang);
+// equivalent to:
+//   base.persona(reviewer).instruction(style).instruction(lang)
+```
+
+So `base.merge(reviewer, style, lang)` keeps `base`'s existing instruction, prepends `reviewer` as the leading persona, then appends `style` and `lang` in order. Compose reusable persona / instruction blocks once and merge the relevant set per agent.
+
+## Identity — `.meta()` and auto-registration
+
+A prompt carries optional **identity + provenance** metadata: `name`, `version`, `description`, `required` (placeholder keys callers must supply), and `composedFrom` (provenance — see below). Attach it at build time or with the immutable `.meta()` updater:
+
+```ts
+// At build time — the third-form factory takes a meta object.
+const support = ai.systemPrompt("You are senior support for {{product}}.", {
+  name: "support",
+  version: "1",
+  description: "Tier-1 support persona.",
+  required: ["product"],
+});
+
+// Or update an existing builder — returns a NEW builder, original untouched.
+const renamed = base.meta({ name: "support", version: "2" });
+
+renamed.meta();        // { name: "support", version: "2", composedFrom?: [...] }
+base.meta();           // unchanged
+```
+
+**Naming a prompt auto-registers it in [`ai.prompts`](./prompt-registry)** under `name@version` (version defaults to the next integer). An anonymous prompt — no name — is never registered and exists only for inline composition. Read the snapshot with the no-argument `prompt.meta()`; it's `undefined` for a bare anonymous prompt.
+
+## Merge another prompt — by value or by name
+
+Beyond merging loose blocks, `.merge` folds in a **whole prompt** — its persona replaces, its instructions append — and records deterministic provenance in the result's `meta.composedFrom` (e.g. `["base@2", "global-instructions@1"]`, no random suffixes):
+
+```ts
+// Fold in a prompt instance by value.
+const composed = ai.systemPrompt().instruction("Cite line numbers.").merge(reviewerPrompt);
+
+// Fold in a prompt registered in `ai.prompts` by name — latest version by default.
+const fromRegistry = ai.systemPrompt().merge("global-instructions");
+
+// Pin the version to fold in.
+const pinned = ai.systemPrompt().merge("global-instructions", { fromVersion: "1" });
+
+composed.meta()?.composedFrom; // deterministic source labels
+```
+
+Merging by name resolves through `ai.prompts`; an unknown name (or requested version) throws `InvalidRequestError`. All three forms are immutable — the original builder is never touched.
+
+## Validate this prompt
+
+`.validate(options?)` is sugar over [`ai.prompts.validate(this, options)`](./prompt-registry#validate--deterministic-check--optional-judge). It always runs the deterministic missing-placeholder check, and — when `options.judge` is a model — the Nova-safe LLM-as-judge quality pass:
+
+```ts
+const report = await support.validate({ placeholders: { product: "Warlock" } });
+report.ok;       // true when no required {{key}} is missing (deterministic)
+report.missing;  // []
+
+// Add an optional judge for a quality score — it never flips `ok`.
+const graded = await support.validate({
+  placeholders: { product: "Warlock" },
+  judge: openai.model({ name: "gpt-4o-mini" }),
+});
+graded.score;    // 0..1, or undefined if the judge degraded
+```
+
 ## How blocks order
 
 `SystemPrompt` stores `blocks: readonly SystemPromptBlockContract[]` — not separate persona + instructions fields. Rendering honors insertion order.
@@ -138,5 +214,6 @@ Why: `instanceof` breaks across duplicate package copies (different `node_module
 
 ## Related
 
+- [Prompt registry](./prompt-registry) — `ai.prompts`, the process-wide `name@version` store a named prompt auto-registers into, plus `validate` / `diff` / `export`.
 - [Run agent](./run-agent) — `systemPrompt` on the factory and per-call override.
 - [Run workflow](../digging-deeper/run-workflow) — per-step agents inherit their own system prompts.

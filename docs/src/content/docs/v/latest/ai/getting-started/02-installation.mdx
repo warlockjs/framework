@@ -15,7 +15,7 @@ The adapter is a **peer dependency** in spirit: pick the one(s) you need and ins
 <Tabs syncKey="context">
   <TabItem label="Standalone">
 
-Install the core package plus the provider you want to use. Most apps start with the OpenAI adapter — it's the only adapter shipped today and also covers OpenAI-compatible gateways like OpenRouter.
+Install the core package plus the provider you want to use. Five first-party adapters ship — OpenAI, Anthropic, Bedrock, Google, and Ollama. Most apps start with the OpenAI adapter, which also covers OpenAI-compatible gateways like OpenRouter.
 
 <Tabs syncKey="pm">
   <TabItem label="yarn">
@@ -126,6 +126,16 @@ New to the framework? Start with [core / getting-started](/v/latest/core/getting
 - `@warlock.js/ai-openai` — the OpenAI adapter: `new OpenAISDK({ apiKey })`, `sdk.model({ name })`, `sdk.embedder({ name })`. Also works against any OpenAI-compatible upstream (OpenRouter, Together.ai, Azure).
 
 You can install multiple adapters side by side — they're separate packages, no conflicts.
+
+## Satellite packages register themselves
+
+A few capabilities live in optional satellite packages that **augment the shared `ai` object via a side-effect import** — import the package once and new verbs light up, fully typed, through a `declare module` augmentation:
+
+- `import "@warlock.js/ai-tools"` → `ai.tools.*` (web search, fetch, HTTP, calculator, date-time) and `ai.mcp(...)`.
+- `import "@warlock.js/ai-workspace"` → `ai.workspace(...)` (a policy-jailed filesystem + shell for coding agents).
+- `import "@warlock.js/ai-panoptic"` → the observability wiring read by `ai.config({ panoptic })`.
+
+The verb stays dark until its package is imported somewhere in your app — a bare `import "@warlock.js/ai-tools"` is enough, and any named import from the package pulls the side effect in too.
 
 ## Adapter status
 

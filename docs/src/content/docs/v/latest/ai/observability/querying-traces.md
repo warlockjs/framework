@@ -189,6 +189,72 @@ const store = createInMemoryTraceStore({ capacity: 1000 });
 
 Overwriting an existing `traceId` refreshes its insertion position, so a re-collected run counts as newest for eviction.
 
+## Persisting traces across restarts
+
+The in-memory store is wiped on process exit. For a long-lived process — or so the [dashboard](./local-dashboard) keeps your trace history across restarts — `createCacheTraceStore(cache, options?)` persists every trace through any [`@warlock.js/cache`](/v/latest/cache/getting-started/) `CacheDriver` (Redis, Postgres, file, …). It returns the **same `TraceStoreContract & ExporterContract`** as the in-memory store, plus a `ready()` hydrator — so it's a drop-in replacement, queryable identically:
+
+```ts
+import { createCacheTraceStore, panoptic } from "@warlock.js/ai-panoptic";
+import { RedisCacheDriver } from "@warlock.js/cache";
+
+// A driver, or a (possibly async) factory resolved lazily on first use.
+const store = createCacheTraceStore(async () => {
+  const driver = new RedisCacheDriver();
+  await driver.connect();
+  return driver;
+});
+
+await store.ready();                // re-hydrate the mirror from a prior run
+const observe = panoptic({ exporters: [store] });
+
+// ...same query surface as the in-memory store:
+const failed = store.query({ status: "failed" });
+const spend = store.aggregate({ sessionId: "session-42" });
+```
+
+How it reconciles a **synchronous** store contract with an **async** cache driver:
+
+- **Reads are synchronous.** The store keeps an in-memory mirror (the same insertion-ordered `Map`), and `get` / `query` / `aggregate` / `size` answer from it instantly — the dashboard polls them on every request.
+- **Writes go through.** `add` updates the mirror immediately, then fire-and-forget persists the trace + a newest-first index to the cache. The collector's hot path never waits on the cache.
+- **Durability is best-effort.** A write the cache rejects is still visible in the mirror for the life of the process — it just won't survive a restart. Cache failures are swallowed (routed to an optional `onError`), so a flaky cache never throws into a run.
+- **Restart-safe.** `ready()` reads the persisted index and replays each trace into the mirror in insertion order, so newest-first ordering and FIFO eviction stay correct after a restart. Await it once at startup (the [`ai.config({ panoptic: { cache } })`](./configuring-panoptic#persisting-traces-across-a-restart) wiring does this for you).
+
+```ts
+type CacheTraceStoreOptions = {
+  prefix?: string;   // key namespace — keys are `${prefix}:trace:${id}` / `${prefix}:index`; default "panoptic"
+  capacity?: number; // FIFO cap across both cache + mirror; absent / 0 = unbounded
+};
+```
+
+The driver (or its factory) is resolved on first use and memoized, so production can defer the Redis connect until the first trace is collected, and the dashboard can be wired with a factory at import time without a live connection.
+
+## Reusing the dashboard's trace-list logic
+
+The dashboard's search / filter / group-by / cost-heatmap rules are exported as **pure folds** from the package root, so your own trace-list UI can apply the exact same logic the dashboard mirrors 1:1:
+
+```ts
+import {
+  filterTraces, matchesFilter,     // free-text + chip filtering
+  groupBySession, groupByPrompt,   // collapsible grouping
+  tracePromptKey,                  // a trace's resolved name@version key
+  rollupCost, maxNodeCost, heatIntensity, // cost-heatmap inputs
+  NO_SESSION_KEY, NO_PROMPT_KEY,
+} from "@warlock.js/ai-panoptic";
+import type { TraceFilter, SessionGroup, PromptGroup } from "@warlock.js/ai-panoptic";
+
+const filter: TraceFilter = { text: "refund", statuses: ["failed"], errorsOnly: true };
+const visible = filterTraces(allTraces, filter);
+
+const bySession: SessionGroup[] = groupBySession(visible);
+const byPrompt: PromptGroup[] = groupByPrompt(visible); // slices `support@2` from `support@3`
+
+// Cost heatmap: each node tinted by its rollup cost vs. the trace's hottest node.
+const max = maxNodeCost(trace.root);
+const intensity = heatIntensity(rollupCost(span), max); // 0..1
+```
+
+`groupByPrompt` keys off the agent span's `agent.promptName` / `agent.promptVersion` stamps, so every run of a `name@version` prompt slices apart — the link back to the [prompt registry](/v/latest/ai/the-basics/prompt-registry/).
+
 ## Summing usage yourself
 
 `sumUsage` / `emptyUsage` are the pure folds `aggregate` is built on. Reuse them to roll a `Usage` set the store didn't produce — for example over a list of traces you filtered by hand:

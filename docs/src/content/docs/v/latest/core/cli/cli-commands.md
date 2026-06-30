@@ -216,6 +216,48 @@ warlock add auth --no-install                # record deps, run setup, skip the 
 
 The command installs the npm package(s), runs their post-install hooks (configuration files, migrations, etc.), and updates your `warlock.config.ts` where needed.
 
+#### AI features
+
+The AI toolkit is split across a core package, provider packages, and capability satellites — each a separate `add` feature:
+
+| Feature | Installs | Notes |
+| ------- | -------- | ----- |
+| `ai` | `@warlock.js/ai` | Core toolkit (agents, tools, workflows). **Ejects `src/config/ai.ts`** — see below. Required by every other AI feature. |
+| `ai-openai` | `@warlock.js/ai-openai` | OpenAI provider. |
+| `ai-google` | `@warlock.js/ai-google` | Google (Gemini) provider. |
+| `ai-anthropic` | `@warlock.js/ai-anthropic` | Anthropic (Claude) provider. |
+| `ai-bedrock` | `@warlock.js/ai-bedrock` | AWS Bedrock provider. |
+| `ai-ollama` | `@warlock.js/ai-ollama` | Ollama provider. |
+| `ai-tools` | `@warlock.js/ai-tools` | Ready-made agent tools + MCP client/server (`ai.tools.*`, `ai.mcp`). |
+| `ai-panoptic` | `@warlock.js/ai-panoptic` | Observability — collector, exporters, local dashboard, via `ai.config({ panoptic })`. |
+| `ai-workspace` | `@warlock.js/ai-workspace` | Policy-jailed filesystem + shell workspace (`ai.workspace`). |
+
+Every AI feature `requires: ["ai"]`, so adding any one pulls in the core package automatically:
+
+```bash
+warlock add ai                          # core only — ejects src/config/ai.ts
+warlock add ai-openai ai-tools          # core + OpenAI provider + tools (one install)
+```
+
+**`warlock add ai` ejects `src/config/ai.ts`.** The ejected file exports a declarative `Partial<AIConfig>` (default cache store, panoptic options) — the [`ai` connector](../architecture-concepts/connectors.md#the-built-in-catalog) applies it on boot via `ai.config(...)`, so core never hard-depends on `@warlock.js/ai`. The top of the file carries an auto-managed marker block:
+
+```ts title="src/config/ai.ts"
+import type { AIConfig } from "@warlock.js/ai";
+
+// >>> warlock:ai-packages (auto-managed) >>>
+// <<< warlock:ai-packages <<<
+
+const ai: Partial<AIConfig> = {
+  // defaultStore, panoptic, …
+};
+
+export default ai;
+```
+
+The satellite features (`ai-tools`, `ai-panoptic`, `ai-workspace`) link their **side-effect import** into that block when installed — for example `warlock add ai-workspace` inserts `import "@warlock.js/ai-workspace";` after the marker. Keeping those imports at the top of `config/ai.ts` guarantees each satellite has registered its surface on the `ai` object (`ai.tools`, `ai.workspace`, panoptic's wiring) **before** the `ai` connector runs `ai.config(...)`. The insert is idempotent — re-running `add` for an already-linked satellite is a no-op.
+
+These same features are offered in the AI step of [`create-warlock`](https://www.npmjs.com/package/@warlock.js/create-warlock) when scaffolding a new app.
+
 ### `update`
 
 Update every `@warlock.js/*` package in your project to its latest published version, then reinstall.

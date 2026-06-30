@@ -66,7 +66,7 @@ ai.config({
 });
 ```
 
-> The memory implementations ship in 4.3.0; `pg` / `redis` follow. Schema is never auto-migrated — each store exposes `.schema()`, a DDL string you run through your own migration tool.
+> All three drivers — `memory`, `pg`, `redis` — ship for both the checkpoint and snapshot stores. Schema is never auto-migrated — each store exposes `.schema()`, a DDL string you run through your own migration tool.
 
 ## A minimal orchestrator
 
@@ -147,7 +147,7 @@ await supportBot.execute(message, {
 });
 ```
 
-Child `supervisor.*` and `agent.*` events **bubble up unmodified under their own identity** — subscribers filter the bubbled stream by namespace. The orchestrator's own events are session-scoped: `turn.starting`, `session.loaded`, `drift.checked`, `lock.waiting`, `history.windowed`, `turn.routed`, `turn.streaming`, `checkpoint.persisted`, `compaction.suggested`, `compaction.applied`, and the terminals `turn.completed` / `turn.failed` / `turn.cancelled` / `turn.awaiting-input`.
+Child `supervisor.*` and `agent.*` events **bubble up unmodified under their own identity** — subscribers filter the bubbled stream by namespace. The orchestrator's own events are session-scoped: `turn.starting`, `session.loaded`, `drift.checked`, `lock.waiting`, `history.windowed`, `turn.routed`, `turn.streaming`, `checkpoint.persisted`, `compaction.suggested`, `compaction.applied`, `compaction.failed`, and the terminals `turn.completed` / `turn.failed` / `turn.cancelled` / `turn.awaiting-input`.
 
 ## Commands
 

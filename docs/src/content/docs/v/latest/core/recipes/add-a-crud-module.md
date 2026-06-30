@@ -72,9 +72,8 @@ src/app/products/
 The generated model is a stub — you'll fill in the schema fields:
 
 ```ts title="src/app/products/models/product/product.model.ts"
-import { Model } from "@warlock.js/core";
-import type { StrictMode } from "@warlock.js/cascade";
-import { v, type Infer } from "@warlock.js/core";
+import { Model, type StrictMode } from "@warlock.js/cascade";
+import { v, type Infer } from "@warlock.js/seal";
 import { ProductResource } from "../../resources/product.resource";
 
 const productSchema = v.object({
@@ -99,9 +98,8 @@ export class Product extends Model<ProductType> {
 Replace the schema with real fields:
 
 ```ts title="src/app/products/models/product/product.model.ts"
-import { Model } from "@warlock.js/core";
-import type { StrictMode } from "@warlock.js/cascade";
-import { v, type Infer } from "@warlock.js/core";
+import { Model, type StrictMode } from "@warlock.js/cascade";
+import { v, type Infer } from "@warlock.js/seal";
 import { ProductResource } from "../../resources/product.resource";
 
 const productSchema = v.object({

@@ -25,6 +25,13 @@ Read it top-down and stop at the first row that's true. The row you stop on is t
 
 The four core rungs are a strict ladder; `ai.planner` is the escape hatch for the one case the ladder can't express — *"I don't know the steps."*
 
+Two side primitives sit next to the ladder rather than on it. Reach for them by shape, not by climbing:
+
+| Your task is… | Primitive | Why this and not a rung |
+| --- | --- | --- |
+| **A named roster collaborating under a manager** — a builder, a reviewer, a fixer — with a "loop until approved/passed" quality gate. | `ai.team` | A supervisor expresses this, but you'd hand-wire the review-then-fix `evaluate` every time. `team` names the roles and ships the gate. |
+| **Grounding an agent in your documents** — retrieve relevant passages and cite them. | `ai.rag` | Retrieval isn't an orchestration rung; it's a tool an agent calls. `rag` is chunk → embed → store → retrieve → rerank → cite, exposed via `.asTool()`. |
+
 ## Rung 1 — `ai.agent` for a single task
 
 **Do this — reach for an agent when the task is "one prompt in, one answer out," even when it calls tools.** Tools don't make a task multi-primitive; a single agent runs a bounded trip loop, calling tools and looping until it has an answer.
@@ -199,6 +206,58 @@ const { data, error, usage, report } = await taskRunner.execute(
 
 **Avoid this — a planner when you already know the steps.** If the order is fixed, a planner spends an LLM trip *generating* a plan you could have written by hand as a `workflow` — and you inherit the risk that the generated plan is wrong. Plan generation is a cost and a failure mode; only pay it when the alternative is hard-coding a step list you genuinely cannot predict. Known steps → `ai.workflow`. Known intent set, model picks among them → `ai.supervisor`. Only when even the *set* of steps is open-ended does the planner earn its keep. Bound it hard with `maxSteps`.
 
+## The team rung — `ai.team` for a managed roster with a quality gate
+
+You keep building the same supervisor shape: a manager that dispatches to a small roster — a builder, a reviewer, a fixer — and an `evaluate` that loops "until the reviewer approves" or "until the tests pass," re-dispatching the fixer with the reviewer's notes in between. `ai.team` is that shape named. It is **thin, transparent sugar over `ai.supervisor`** — the manager becomes `route`/`router`, the `members` become `intents`, and the `gate` becomes `evaluate`. It returns the *unchanged* `SupervisorContract`, so `.asTool()`, `.resume()`, snapshots, and `ctx.intents.<member>` all stay intact.
+
+**Do this — reach for a team when the work is a named roster collaborating under a manager, gated on quality.** A `gate: "quality"` string desugars to a review-then-fix loop (reads `state.approved`, `reassignTo` the `fixer` with feedback on rejection); `gate: "verify"` is the test-then-fix variant (reads `state.passed`). A function `gate` forwards straight through as `evaluate` — the full escape hatch.
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { v } from "@warlock.js/seal";
+
+const codeTeam = ai.team({
+  name: "code-team",
+  goal: "Ship a tested module that passes review.",
+  manager: techLeadRouter,
+  members: { builder, reviewer, fixer },
+  gate: "quality", // review-then-fix; reads state.approved, reassigns `fixer` on rejection
+  output: v.object({ code: v.string() }),
+  maxIterations: 6,
+});
+
+const { data, error, usage, report } = await codeTeam.execute("Build a debounce<T> utility.");
+```
+
+**Avoid this — hand-wiring the same review-then-fix `evaluate` on a raw supervisor.** If you find yourself writing "read the reviewer verdict, `reassignTo` the fixer with `state.notes`, terminate on approval" by hand, you're re-implementing the gate `team` already ships and tests. Drop to a bare `ai.supervisor` only when the roster *isn't* a manager-plus-members-plus-gate shape — when the routing logic genuinely doesn't fit the team mold. When your `members` keys differ from the canonical `reviewer` / `fixer` / `tester`, map them with `roles` rather than abandoning the sugar; the missing-role check throws at construction, not at `maxIterations`.
+
+## The retrieval primitive — `ai.rag` for grounding an agent in documents
+
+Your agent needs to answer from *your* corpus — a policy handbook, a product catalog, last quarter's tickets — not just its training data. That's retrieval, and it isn't a rung on the orchestration ladder: it's a *tool* an agent calls. `ai.rag` is the pipeline behind that tool — chunk → embed → vector store → retrieve → rerank → cite — built on the existing `ai.embedder` and a `@warlock.js/cache` `CacheDriver` as the vector store, with zero new dependencies.
+
+**Do this — use `ai.rag` to index a corpus once, then expose retrieval to an agent with `.asTool()`.** `index(docs)` chunks, embeds, and stores; `retrieve(query)` embeds the query, fetches candidates, reranks, slices `topK`, and attaches citations. `asTool()` drops the whole thing into an agent's `tools: []` as a `{ query }` → `RetrieveResult` tool.
+
+```ts
+import { ai } from "@warlock.js/ai";
+
+const handbook = ai.rag({
+  name: "handbook",
+  embedder: openai.embedder({ name: "text-embedding-3-small" }),
+  store: cacheDriver, // a vector-capable @warlock.js/cache CacheDriver
+});
+
+await handbook.index([{ id: "leave-policy", text: policyMarkdown }]);
+
+const supportAgent = ai.agent({
+  name: "hr-support",
+  model: openai.model({ name: "gpt-4o-mini" }),
+  tools: [handbook.asTool()], // model calls retrieve() when it needs grounding
+  systemPrompt: ai.systemPrompt().instruction("Answer only from retrieved passages; cite them."),
+});
+```
+
+**Avoid this — building a workflow or supervisor to "do retrieval as a step."** Retrieval isn't an orchestration shape; the agent's own trip loop decides *when* it needs context and calls the tool. Wrapping `rag` in a fixed step forces a retrieval on every run even when the model didn't need one, and discards the model's judgment about *what* to look up. Index with `ai.rag`, hand the agent `rag.asTool()`, and let the trip loop do the rest.
+
 ## Climbing is cheap — the same envelope, the same tool surface
 
 The reason "start low, climb when you must" is safe advice and not a refactor tax: **every rung returns the same `ExecuteResult` and every rung composes as a tool.**
@@ -244,6 +303,8 @@ const frontDesk = ai.agent({
 - [Architecture — Supervisors](../architecture-concepts/supervisors) — `route` vs `router`, intent dispatch, and the `evaluate` verdict.
 - [Architecture — Orchestrators](../architecture-concepts/orchestrators) — sessions, checkpoints, compaction, and the per-turn lifecycle.
 - [Architecture — Planner](../architecture-concepts/planner) — plan generation over capabilities and step-by-step execution.
+- [Run a team](../digging-deeper/run-team) — a manager, role-named members, and the built-in quality / verify gate.
+- [Run RAG](../the-basics/run-rag) — chunk, embed, store, retrieve, rerank, and cite over your own corpus.
 - [Recipe — Basic agent](../recipes/basic-agent) — the rung-1 starting point.
 - [Recipe — Content pipeline workflow](../recipes/workflow-content-pipeline) — a fixed sequence, end to end.
 - [Recipe — Support triage supervisor](../recipes/supervisor-support-triage) — dynamic dispatch with a router and `evaluate` loop.

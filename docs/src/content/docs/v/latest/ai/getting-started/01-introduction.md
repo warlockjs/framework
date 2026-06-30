@@ -8,7 +8,7 @@ sidebar:
 
 `@warlock.js/ai` is the orchestration core. It does not talk to any LLM directly — that's the adapter's job. What it owns is the layer between your code and the model: tool loops, structured output, retries, streaming, snapshot resume, middleware, typed errors, cost tracking.
 
-You'll work with three primitives in production today, plus a fourth on the roadmap.
+You'll work with four primitives in production today, each a rung above the last.
 
 ## The four primitives
 
@@ -27,6 +27,10 @@ Each rung handles a job the rung below can't do cleanly. Each one is built on th
 - **A pipeline with a fixed shape** — fetch, extract, classify, save — and you want it to survive a crash mid-run → `ai.workflow({...})`. Resumable, deterministic.
 - **One input, multiple specialists, decided at runtime** — billing vs shipping vs returns — possibly iterated to a satisfactory answer → `ai.supervisor({...})`.
 - **A session that remembers across calls** — durable session state, history compaction, resume → `ai.orchestrator({...})`. You still own the transcript and feed it via `history`; the orchestrator persists the session state around it.
+
+## Beyond the four primitives
+
+The ladder is the spine, but the package is wider than four verbs. Around the primitives sit tooling (`ai.tool`, `ai.tools.*`, `ai.mcp`), knowledge (`ai.rag`, `ai.memory`, `ai.skills`), planning and teams (`ai.planner`, `ai.team`, `ai.router`, `ai.fanOut`), safety (`ai.guardrail`, `ai.human`), and evaluation / testing (`ai.eval`, `ai.dataset`, `ai.vcr`, `MockSDK`) — every one returning the same envelope and composing through `.asTool()`. See the [API reference](../reference/api) for the full surface.
 
 ## The shape every primitive returns
 

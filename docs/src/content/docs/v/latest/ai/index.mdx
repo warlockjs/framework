@@ -23,7 +23,21 @@ ai.orchestrator() →  stateful session-aware orchestration (durable sessions, r
 
 Each primitive is an escape hatch to the next rung of complexity. Start at the bottom; graduate up only when you need to. Every primitive returns the same envelope (`{ data, error, usage, report }`) and exposes `.asTool()`, so they compose freely.
 
-Beyond the ladder, 4.3.0 adds `ai.planner()` (an LLM generates an ordered plan over your capabilities, then runs it), `ai.memory()` (working + semantic recall across turns), and a separate observability package, `@warlock.js/ai-panoptic`, that exports run traces to OpenTelemetry, Langfuse, the console, a file, or a queryable store.
+## Beyond the ladder
+
+The four rungs cover the core orchestration shapes, but the package has grown a wider verb set around them — every one returning the same envelope and composing through the same tool surface.
+
+- [`ai.team()`](./digging-deeper/run-team) — a manager + role-named members (builder, reviewer, fixer) with a built-in quality gate. Thin sugar over a supervisor for the review-then-fix and test-then-fix shapes.
+- [`ai.planner()`](./architecture-concepts/planner) — an LLM generates an ordered plan over your capabilities, then runs it step by step. The escape hatch for when you can't name the steps up front.
+- [`ai.memory()`](./architecture-concepts/memory) — working (in-run scratch) plus semantic recall across turns, backed by any `CacheDriver`.
+- [`ai.rag()`](./the-basics/run-rag) — document retrieval: chunk, embed, store, retrieve, rerank, cite. Drop it into an agent's `tools` with `.asTool()`.
+- [`ai.skills()`](./digging-deeper/runtime-skills) — a runtime skills library: an always-injected metadata catalog plus an on-demand `loadSkill` tool.
+- [`ai.prompts`](./the-basics/prompt-registry) — one process-wide `name@version` prompt registry; a named `systemPrompt(...)` auto-registers, then resolves / merges / validates / diffs by name (`ai.prompt` is now a thin facade over it).
+- [`ai.dataset()`](./best-practices/evaluation-and-datasets) and [`ai.vcr()`](./best-practices/record-replay-testing) — evaluation datasets for `agent.eval(...)` and record/replay of model traffic for deterministic tests.
+- [`ai.guardrail()`](./digging-deeper/guardrails) — content-intelligence guardrails (moderation, PII, injection, topic) as composed input / output / tool middleware.
+- [`ai.human`](./digging-deeper/human-in-the-loop) — human-in-the-loop tool approval with durable interrupt / resume.
+
+A separate observability package, `@warlock.js/ai-panoptic`, exports run traces to OpenTelemetry, Langfuse, the console, a file, or a queryable store.
 
 ## Why a separate package
 
@@ -39,8 +53,11 @@ Beyond the ladder, 4.3.0 adds `ai.planner()` (an LLM generates an ordered plan o
 - [Installation](./getting-started/02-installation) — install the core package plus a provider adapter.
 - [Pick a provider](./getting-started/03-pick-a-provider) — OpenAI vs Anthropic vs Bedrock vs Google vs Ollama.
 - [Your first agent](./getting-started/04-your-first-agent) — five-minute walkthrough from zero to a streaming agent.
+- [Troubleshooting](./getting-started/05-troubleshooting) — the first errors you'll hit and the one-line fix for each.
 
 ## Where to go after
+
+There are two reading orders, depending on what you need. For the **mental model** — why each primitive exists and how they nest — read *Architecture and concepts* first; those pages are the *why*. For the **how-to** — the calls you make day to day — go to *The basics* and *Digging deeper*; those are the *how*. The two intentionally overlap: a concept page explains a primitive, its sibling how-to page runs it.
 
 - [Architecture and concepts](./architecture-concepts/agents) — the mental model behind agents, workflows, supervisors, orchestrators, memory, planner, middleware.
 - [The basics](./the-basics/run-agent) — the surface you'll touch every day.

@@ -10,22 +10,24 @@ Middleware in `@warlock.js/ai` is the pipeline that wraps an agent run. It exist
 
 This page is the mental model. For the API surface and authoring guide see [Attach middleware](../digging-deeper/attach-middleware).
 
-## Three granularities, one object
+## Four granularities, one object
 
-One middleware is one object. It can hook into any subset of three levels:
+One middleware is one object. It can hook into any subset of four levels:
 
 ```ts
 const myMiddleware: AgentMiddleware = {
   name: "my-mw",
-  execute: { before(ctx) {...}, after(ctx, result) {...}, onError(ctx, error) {...} },
-  trip:    { before(ctx) {...}, after(ctx, response) {...}, onError(ctx, error) {...} },
-  tool:    { before(ctx) {...}, after(ctx, result) {...}, onError(ctx, error) {...} },
+  execute:    { before(ctx) {...}, after(ctx, result) {...}, onError(ctx, error) {...} },
+  trip:       { before(ctx) {...}, after(ctx, response) {...}, onError(ctx, error) {...} },
+  tool:       { before(ctx) {...}, after(ctx, result) {...}, onError(ctx, error) {...} },
+  supervisor: { before(ctx) {...}, after(ctx, result) {...}, onError(ctx, error) {...} },
 };
 ```
 
 - **`execute`** — wraps the whole run. Fires once per `agent.execute()` call.
 - **`trip`** — wraps each LLM round-trip. Fires once per trip (1..N per execute).
 - **`tool`** — wraps each tool dispatch. Fires once per tool call.
+- **`supervisor`** — wraps the whole `supervisor.execute()` run. Fires once per supervisor run, and only when the middleware is registered on a supervisor (`ai.supervisor({ middleware: [...] })`) — inert on a plain agent, exactly as `execute` / `trip` / `tool` are inert on a supervisor. One object can declare both `execute` and `supervisor` to cover both surfaces.
 
 Hooks run in the obvious order: `before` outermost, `after` innermost-up, `onError` only when something throws.
 
@@ -105,7 +107,8 @@ Middleware sees `ctx.state` — a fresh `Map<string, unknown>` per `execute()` c
 | `ai.agent({ middleware: [...] })` | Wraps every `agent.execute()`. |
 | Workflow step with `agent: myAgent` | The agent's own middleware fires normally inside the step. |
 | `workflow.asTool()` called from an agent | The calling agent's `tool`-level middleware wraps the workflow. |
-| Step-level / workflow-level / supervisor-level middleware | Does NOT exist in v1. Use agent-level middleware on agents inside the workflow / supervisor. |
+| `ai.supervisor({ middleware: [...] })` | Fires the `supervisor` hook map once around the whole `supervisor.execute()` run — the supervisor-level peer of `execute`. The same middleware objects work here and on agents. |
+| Step-level / workflow-level middleware | Does NOT exist. Use agent-level middleware on the agents inside the workflow. |
 
 ## Custom middleware — when to write your own
 

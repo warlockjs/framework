@@ -200,12 +200,14 @@ const attachments = request.files("attachments");       // many files  → Uploa
 The framework's multipart plugin attaches files to the body, so a schema with `v.file()` validators picks them up automatically:
 
 ```ts title="src/app/uploads/controllers/create-upload.controller.ts"
-import { type RequestHandler } from "@warlock.js/core";
-import { type UploadRequest } from "../requests";
-import { uploadSchema } from "../schema";
+import { type Request, type RequestHandler } from "@warlock.js/core";
+import { type UploadSchema, uploadSchema } from "../schema";
 import { createUploadService } from "../services/create-upload.service";
 
-export const createUploadController: RequestHandler = async (request: UploadRequest, response) => {
+export const createUploadController: RequestHandler = async (
+  request: Request<UploadSchema>,
+  response,
+) => {
   const { files } = request.validated();
 
   const uploads = await Promise.all(

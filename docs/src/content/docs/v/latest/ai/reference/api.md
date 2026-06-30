@@ -1,6 +1,6 @@
 ---
 title: "API reference"
-description: Public exports of @warlock.js/ai grouped by primitive — agents, workflows, supervisors, tools, embeddings, middleware.
+description: Public exports of @warlock.js/ai grouped by primitive — agents, workflows, supervisors, teams, RAG, skills, prompts, evals, guardrails, tools, embeddings, middleware.
 sidebar:
   order: 1
   label: "API reference"
@@ -26,22 +26,36 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | `ai.workflow(config)` | `<TIn, TOut, TState>(config) => WorkflowInstance` | [Run workflow](../digging-deeper/run-workflow) |
 | `ai.step(config)` | `<TIn, TState>(config) => StepDefinition` | [Run workflow](../digging-deeper/run-workflow) |
 | `ai.supervisor(config)` | `<TOutput>(config) => SupervisorContract` | [Run supervisor](../digging-deeper/run-supervisor) |
+| `ai.team(config)` | `<TOutput, TState, TMembers>(config) => SupervisorContract` (manager + members + gate sugar) | [Run supervisor](../digging-deeper/run-supervisor) |
 | `ai.orchestrator(config)` | `<TOutput, TState>(config) => OrchestratorContract` | [Run orchestrator](../digging-deeper/run-orchestrator) |
 | `ai.planner(config)` | `<TOutput>(config) => PlannerContract` | [Planner](../architecture-concepts/planner) |
 | `ai.spawnSubAgent(spec)` | `<TOutput>(spec) => Promise<AgentResult<T>>` | [Spawn sub-agent](../the-basics/spawn-sub-agent) |
 | `ai.memory(config)` | `(config) => MemoryContract` | [Memory](../architecture-concepts/memory) |
+| `ai.skills(config)` | `(config: SkillsConfig) => SkillsContract` (progressive-disclosure skills library) | [Memory](../architecture-concepts/memory) |
+| `ai.rag(config)` | `(config: RagConfig) => Rag` (chunk → embed → retrieve → cite) | [Memory](../architecture-concepts/memory) |
+| `ai.rag.keywordReranker(opts?)` / `ai.rag.llmReranker(opts)` | built-in rerankers for the `reranker` slot | [Memory](../architecture-concepts/memory) |
 | `ai.router(config)` | `(config) => AgentContract` (generated routing agent) | [Run supervisor](../digging-deeper/run-supervisor) |
 | `ai.fanOut(unit, n, opts?)` | spread one unit into N keyed intents | [Run supervisor](../digging-deeper/run-supervisor) |
 | `ai.batch(exec, items, opts?)` | run an executable over a dataset, bounded concurrency | [Run agent](../the-basics/run-agent) |
 | `ai.fallbackModel(models, opts?)` | ordered model list with failover | [Run agent](../the-basics/run-agent) |
+| `ai.prompts` | `PromptsManagerContract` — the process-wide `name@version` prompt registry (resolve / merge / validate / diff / export by name) | [Prompt registry](../the-basics/prompt-registry) |
+| `ai.prompt(options?)` | thin facade over `ai.prompts`; the options form returns an isolated legacy `PromptRegistryContract` | [Prompt registry](../the-basics/prompt-registry) |
+| `ai.dataset(options)` | `<TOutput>(options: DatasetOptions) => DatasetContract` (filterable / shardable eval cases) | [Run agent](../the-basics/run-agent) |
+| `ai.vcr(model, options)` | `(model: ModelContract, options: VcrOptions) => VcrModel` (record / replay decorator) | [Run agent](../the-basics/run-agent) |
 | `ai.eval.{exact,contains,predicate,judge}` | built-in `agent.eval()` scorers | [Run agent](../the-basics/run-agent) |
+| `ai.eval.{toJUnit,toJSON,fromJSON}` | CI reporters / round-trip serialization over a finished `EvalReport` | [Run agent](../the-basics/run-agent) |
 | `ai.mockRouter(decisions, opts?)` | canned routing decisions for tests | [Run supervisor](../digging-deeper/run-supervisor) |
 | `ai.config(partial)` | `(partial: Partial<AIConfig>) => AIConfig` | [Persist AI data](../digging-deeper/persist-ai-data) |
 | `ai.checkpoint.{memory,pg,redis}()` | orchestrator session checkpoint stores | [Run orchestrator](../digging-deeper/run-orchestrator) |
 | `ai.snapshot.{memory,pg,redis}()` | workflow / supervisor / orchestrator snapshot stores | [Persist AI data](../digging-deeper/persist-ai-data) |
 | `ai.systemPrompt.fromFile(path)` | seed a system prompt from a file | [Run agent](../the-basics/run-agent) |
+| `ai.human.approval(opts)` | `(opts: HumanApprovalOptions) => AgentMiddleware` — the `tool.before` approval gate | [Attach middleware](../digging-deeper/attach-middleware) |
+| `ai.human.resume(id, decision, opts)` | `<TOutput>(...) => Promise<ResumeResult>` — out-of-process durable resume | [Attach middleware](../digging-deeper/attach-middleware) |
+| `ai.human.interrupt.{memory,pg,redis}()` | durable `InterruptStore` factories | [Attach middleware](../digging-deeper/attach-middleware) |
+| `ai.guardrail(opts)` | `(opts: GuardOptions) => AgentMiddleware` — content-intelligence guardrail suite | [Attach middleware](../digging-deeper/attach-middleware) |
+| `ai.guardrail.{pii,topic,injection,moderation}(opts?)` | built-in detector factories for the `input` / `output` / `tool` arrays | [Attach middleware](../digging-deeper/attach-middleware) |
 | `ai.middleware.budget(opts)` | budget cap middleware | [Attach middleware](../digging-deeper/attach-middleware) |
-| `ai.middleware.guardrail(opts)` | pre/post check middleware | [Attach middleware](../digging-deeper/attach-middleware) |
+| `ai.middleware.guardrail(opts)` | pre/post check middleware (the legacy guardrail seed) | [Attach middleware](../digging-deeper/attach-middleware) |
 | `ai.middleware.semanticCache(opts)` | two-tier cache middleware | [Attach middleware](../digging-deeper/attach-middleware) |
 | `ai.middleware.compose(...sources)` | flatten middleware sources | [Attach middleware](../digging-deeper/attach-middleware) |
 | `ai.middleware.forTool(name, mw)` | scope tool hooks to a tool name | [Attach middleware](../digging-deeper/attach-middleware) |
@@ -51,10 +65,11 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | Export | What it is |
 | --- | --- |
 | `AgentContract<T>` | The shape returned by `ai.agent`. Has `.execute()`, `.stream()`, `.on()`, `.off()`, `.name`, `.isAnonymous`, `.description`. |
-| `AgentConfig` | Config object accepted by `ai.agent`. |
+| `AgentConfig` | Config object accepted by `ai.agent`. Includes `captureMessages?` — opt-in full-history capture onto `AgentReport.messages` (off by default; large + sensitive). |
 | `AgentExecuteOptions` | Per-call options for `execute` / `stream`. |
 | `AgentResult<T>` | Result envelope — `{ type, data?, text?, report, usage, error? }`. |
-| `AgentReport` | Trace tree — `{ status, startedAt, endedAt, duration, model, trips, toolCalls }`. |
+| `AgentReport` | Trace tree — `BaseReport` plus `model`, `trips`, `systemPrompt?` (the resolved `role: "system"` message), and `messages?` (the full `CapturedMessage[]`, present only when `captureMessages` is on). Tool dispatches live under `children` filtered by `type === "tool"`. |
+| `CapturedMessage` | One normalized conversation turn — `{ role, content, toolCalls?, toolCallId? }`. Populates `AgentReport.messages` when `captureMessages` is enabled. |
 | `AgentEventHandlers` | Typed event handler map for `on` (factory / per-call). |
 | `AgentEventMap` | Map of event name → payload, keyed by `agent.*` event. |
 | `StreamingToolGuardConfig` | Config for `streamingToolGuard`. |
@@ -86,6 +101,17 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | `SupervisorReport` | Trace tree — iterations, intent dispatches. |
 | `SupervisorSnapshot` | Persisted shape. |
 | `END` | Sentinel value to terminate routing. |
+
+## Teams
+
+`ai.team` is transparent sugar over `ai.supervisor` — the manager becomes `route`/`router`, members become `intents`, and the gate becomes `evaluate`. It returns the unchanged `SupervisorContract<TOutput>`.
+
+| Export | What it is |
+| --- | --- |
+| `TeamConfig<TOutput, TState, TMembers>` | Config for `ai.team` — `name`, `manager`, `members`, `gate`, plus pass-throughs (`goal`, `output`, `state`, `maxIterations`, `snapshotStore`, `on`, `observe`). |
+| `TeamGate` | `"quality"` (review-then-fix) `| "verify"` (test-then-fix) — built-in gate strategies. |
+| `TeamGateFn<TState>` | Fully custom gate — same shape as `SupervisorConfig.evaluate`. |
+| `TeamMemberValue` | A role member — `AgentContract<unknown> | WorkflowInstance<unknown, unknown>`. |
 
 ## Orchestrators
 
@@ -125,9 +151,41 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | `MemoryConfig` | Config — `working?`, `semantic?`, `defaultTier?`, `k?`, `threshold?`. |
 | `SemanticMemoryConfig` | `{ embedder, store?, namespace? }`. |
 | `MemoryItem` | `{ text, tier?, id?, metadata? }`. |
-| `MemoryTier` | `"working" | "semantic"` (episodic/procedural deferred to 4.4). |
+| `MemoryTier` | `"working" | "semantic" | "episodic" | "procedural"` — all four tiers shipped in 4.3.0. |
 | `RecalledMemory` | `{ id, text, tier, score, metadata? }`. |
 | `RecallOptions` | `{ k?, tier?, threshold? }`. |
+
+## Skills
+
+`ai.skills` builds a runtime skills library — an always-injected metadata catalog plus an on-demand `loadSkill` tool (progressive disclosure), backed by directory / url / store sources.
+
+| Export | What it is |
+| --- | --- |
+| `SkillsContract` | Returned by `ai.skills`. The mechanism the agent `skills` option drives. |
+| `SkillsConfig` | Config — `sources`, `inject?`, `scope?`, `review?`, `store?`. |
+| `SkillRecord` | `{ name, description, version, body, tags?, type, metadata? }` — `type: "authored" | "promoted" | "candidate"`. |
+| `SkillCatalogEntry` | Cheap catalog entry — `Pick<SkillRecord, "name" | "description" | "version" | "tags" | "type">` (no `body`). |
+| `SkillSource` / `SkillInjectMode` / `SkillReviewGate` / `SkillAnalyticsEvent` | Source descriptors, injection policy, review gate, analytics hook. |
+| `LoadSkillInput` | `{ name, version? }` — validated input of the `loadSkill` tool. |
+| `SkillsStoreContract` | Pluggable store backing a `store` source. `MockSkillsStore` / `proceduralSkillStore()` ship as implementations. |
+
+## RAG
+
+`ai.rag` is a native core verb — chunk → embed → vector store → retrieve → rerank → cite. It reuses the `EmbedderContract` and a `@warlock.js/cache` driver as the vector store, with zero new dependencies.
+
+| Export | What it is |
+| --- | --- |
+| `Rag` | Returned by `ai.rag`. `.index()`, `.retrieve()`, `.clear()`, `.asTool()`, `.name`. |
+| `RagConfig` | Config — `embedder` (required), `store?`, `name?`, `namespace?`, `chunk?`, `reranker?`, `retrieve?`. |
+| `RagAsToolOptions` | `asTool()` options — `name?`, `description?`, `retrieve?`. |
+| `RagDocument` | A source document handed to `index()`. |
+| `Chunk` / `ChunkOptions` / `ChunkType` | The chunker surface; `ai.rag` ships fixed / sentence / markdown / recursive splitters via `chunk`. |
+| `RetrievedChunk` | A single retrieval hit — `{ text, score, citation }`. |
+| `Citation` | `{ sourceId, chunkIndex, span, score, metadata? }` — provenance for grounding. |
+| `RetrieveOptions` | `{ topK?, threshold?, candidates?, tags? }`. |
+| `RetrieveResult` | `{ query, chunks: RetrievedChunk[] }`. |
+| `RagReranker` | Reranker contract. `ai.rag.keywordReranker(opts?)` / `ai.rag.llmReranker(opts)` ship as built-ins; `KeywordRerankerOptions` / `LlmRerankerOptions` are their option shapes. |
+| `VectorStore` | Vector-store adapter. `cacheVectorStore` wraps a `@warlock.js/cache` driver. |
 
 ## Batch + eval
 
@@ -138,6 +196,11 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | `BatchOptions<TResult>` | `{ concurrency?, retry?, onItem?, signal?, sessionId?, name? }`. |
 | `BatchReport` | Per-item rollup — `{ total, succeeded, failed, cancelled }`. |
 | `EvalReport<T>` / `EvalCase` / `EvalScore` / `EvalScorer` / `EvalJudge` / `EvalOptions` / `EvalCaseResult` | `agent.eval()` surface. |
+| `DatasetContract<TOutput>` | Returned by `ai.dataset`. Immutable, `.filter()` / `.shard()`-able cases that feed `agent.eval({ cases })`. `.name`, `.cases`. |
+| `DatasetEntry<TOutput>` / `DatasetOptions<TOutput>` | A dataset row (a superset of `EvalCase` plus `tags?`); factory options (`name`, `cases?`, `fromFile?` JSONL). |
+| `EvalRegression` | Regression verdict attached when `agent.eval` gets a `baseline` — `{ regressed[], removed, added, passed }`. |
+| `ai.eval.toJUnit(report)` | JUnit-XML artifact for CI ingestion. |
+| `ai.eval.toJSON(report)` / `ai.eval.fromJSON(serialized)` | Round-trippable `EvalReport` snapshot — today's report becomes tomorrow's `baseline`. |
 | `registerAiMatchers()` | Vitest matchers `toRouteTo` / `toConverge` / `toPassStep` / `toOutputShape`. |
 | `matchRouteTo` / `matchConverge` / `matchPassStep` / `matchOutputShape` | Library-agnostic verdict functions; `MatcherVerdict`, `AiMatchers` types. |
 
@@ -166,11 +229,34 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 
 | Export | What it is |
 | --- | --- |
-| `SystemPrompt` | Immutable builder returned by `ai.systemPrompt`. `.persona(t)`, `.instruction(t)`, `.resolve(placeholders)`. |
+| `SystemPrompt` | Immutable builder returned by `ai.systemPrompt`. `.persona(t)`, `.instruction(t)`, `.merge(...)`, `.meta(...)`, `.validate(...)`, `.resolve(placeholders)`. |
+| `SystemPrompt.merge(...)` | Fold blocks (`...blocks`), a whole prompt (`merge(contract)` — persona replaces, instructions append, `composedFrom` provenance recorded), or a registered name (`merge(name, { fromVersion })`) into a new builder. Immutable. |
+| `SystemPrompt.meta(meta?)` | No-arg reads the `{ name, version, description, required, composedFrom }` snapshot (or `undefined`); the updater form returns a new builder — giving it a `name` auto-registers it in `ai.prompts`. |
+| `SystemPrompt.validate(options?)` | Sugar over `ai.prompts.validate(this, options)` — deterministic missing-placeholder check + optional Nova-safe judge. |
+| `SystemPromptMeta` | `{ name?, version?, description?, composedFrom?, required? }`. |
 | `SystemPromptContract` | Interface implemented by `SystemPrompt`. |
 | `SystemPromptBlockContract` | Discriminated union — `PersonaContract | InstructionContract`. |
 | `PersonaContract` | `{ type: "persona", text, resolve }`. |
 | `InstructionContract` | `{ type: "instruction", text, resolve }`. |
+
+### Prompt registry — `ai.prompts`
+
+`ai.prompts` is the process-wide registry of named, versioned `systemPrompt(...)` builders keyed by `name@version`. A named prompt auto-registers; resolve / merge / validate / diff by name. `prompts(options?)` builds an isolated registry. See [Prompt registry](../the-basics/prompt-registry).
+
+| Export | What it is |
+| --- | --- |
+| `ai.prompts` | The default `PromptsManagerContract`. `.register()`, `.create()`, `.get()`, `.has()`, `.list()`, `.versions()`, `.resolve()`, `.define()`, `.tag()`, `.validate()`, `.diff()`, `.export()`, `.import()`. |
+| `prompts(options?)` | Factory for an isolated manager — options `{ judgeCache? }`. |
+| `PromptsManagerContract` | The manager interface above. |
+| `PromptsManagerEntry` | One registered entry — `{ name, version, addedAt, contract, tags? }`. |
+| `PromptTemplateVersion` | A `define` entry — `{ version, template: string | block[] }`. |
+| `PromptsValidateOptions` | `validate` options — `{ placeholders?, declare?, judge?, judgeCache? }`. |
+| `PromptValidationResult` | `validate` outcome — `{ ok, missing, score?, issues? }` (`ok` is the deterministic verdict; the judge never flips it). |
+| `PromptValidateTarget` | What `validate` accepts — a name, a `SystemPromptContract`, or a raw string. |
+| `PromptDiff` / `PromptDiffBlock` | `diff(name, from, to)` outcome — `{ added, removed, changed, identical }`. |
+| `ExportedRegistry` / `ExportedPrompt` / `ExportedPromptVersion` | The portable `export()` / `import()` snapshot shapes. |
+
+> ⚠ **Breaking:** `ai.prompt` is now a thin facade over `ai.prompts`. The isolated `ai.prompt({ … })` options form (`PromptRegistryContract` with `.register()` / `.add()` / `.resolve()` / `.validate()` / `.sync()`, Langfuse sync) is unchanged; a bare `ai.prompt()` no longer mints a private registry — use `ai.prompts` or build one with `prompts(...)`.
 
 ## Embeddings
 
@@ -202,6 +288,70 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | `MiddlewareExecuteContext` | `ctx` for `execute` hooks. |
 | `MiddlewareTripContext` | `ctx` for `trip` hooks. |
 | `MiddlewareToolContext` | `ctx` for `tool` hooks. |
+
+## Guardrails
+
+`ai.guardrail` is the content-intelligence suite — a composed input / output / tool middleware built from detector factories. (The older `ai.middleware.guardrail` is the legacy pre/post-check seed; both ship.)
+
+| Export | What it is |
+| --- | --- |
+| `ai.guardrail(options)` | Build the composed guardrail `AgentMiddleware`. `GuardrailFactory` typed. |
+| `ai.guardrail.pii(opts?)` | PII detector (regex + dictionary, zero runtime dep). |
+| `ai.guardrail.topic(opts)` | Topic filter (allow / deny string `|` RegExp lists). |
+| `ai.guardrail.injection(opts?)` | Jailbreak / prompt-injection marker detector. |
+| `ai.guardrail.moderation(opts?)` | Optional OpenAI-backed moderation (lazy `openai` peer). |
+| `GuardOptions` | Factory options — `input` / `output` / `tool` detector arrays plus escalation. |
+| `GuardrailVerdict` | Discriminated union — `allow` / `redact` / `block` / `flag`, one shape per action. |
+| `GuardrailAction` | `"allow" | "redact" | "block" | "flag"`. |
+| `GuardrailPhase` | `"input" | "output" | "tool"`. |
+| `GuardrailMatch` | One detector match — `{ rule, span?, label? }`. |
+| `GuardrailDetector` / `GuardrailDetectorContext` / `GuardrailEscalation` / `GuardrailBlockEvent` | Detector contract, per-check context, escalation hook, emitted block event. |
+| `PiiDetectorOptions` / `PiiCategory` / `TopicFilterOptions` / `InjectionDetectorOptions` / `OpenAiModerationOptions` | Per-detector option shapes. |
+| `guard` | The standalone factory `ai.guardrail` wraps; `FlagRecord` is its flagged-match record. |
+
+## Human-in-the-loop
+
+`ai.human.*` adds interrupt / resume tool approval — a `tool.before` gate plus durable interrupt stores and out-of-process resume.
+
+| Export | What it is |
+| --- | --- |
+| `ai.human.approval(options)` | The `tool.before` approval-gate `AgentMiddleware`. `humanApproval` standalone. |
+| `ai.human.resume(id, decision, options)` | Out-of-process durable resume — replays a decision against a persisted interrupt. |
+| `ai.human.interrupt.{memory,pg,redis}()` | Durable `InterruptStore` factories (memory ships real; pg / redis are lazy optional peers). |
+| `HumanApprovalOptions` / `ApprovalHandler` / `ApprovalRequest` / `ApprovalRequestContext` | Gate config, handler, and the request a reviewer sees. |
+| `ApprovalDecision` / `ApprovalDecisionType` | A reviewer's decision — `approve` / `reject` / `edit`. |
+| `InterruptStore` / `InterruptPolicy` / `PendingInterrupt` / `PendingInterruptStatus` | Durable-store contract, gating policy, and the persisted interrupt row. |
+| `ResumeOptions` / `ResumeResult` | `resume()` options and outcome. |
+| `PolicyContext` / `PolicyVerdict` / `evaluatePolicy` | Policy seam used to decide whether a call needs approval. |
+| `PgInterruptOptions` / `RedisInterruptOptions` | `interrupt.pg` / `.redis` options. |
+
+## VCR (record / replay)
+
+`ai.vcr` decorates any `ModelContract` to record and replay model calls — deterministic, offline tests with no live provider hit.
+
+| Export | What it is |
+| --- | --- |
+| `VcrModel` | The decorated model returned by `ai.vcr`. Adds `.save()` and a readonly `.cassette`. |
+| `VcrOptions` | `{ path, mode?, hashOptions? }`. |
+| `VcrMode` | `"record" | "replay" | "auto"` (default `"auto"` — replay on hit, record on miss). |
+| `Cassette` | On-disk format — `{ version, model, provider, entries }`. |
+| `CassetteEntry` | One recorded request → response pair (`response` / `chunks` / `error`). |
+| `hashRequest` / `DEFAULT_HASH_OPTIONS` | Request-hashing helper + the default hashed `ModelCallOptions` fields. |
+
+## Observe
+
+A generic, panoptic-agnostic observability seam. Observability tools (panoptic, OTel, …) implement `Observer` and register themselves; flows route their completed reports through the registry with no core import.
+
+| Export | What it is |
+| --- | --- |
+| `registerObserver(observer)` | Register an `Observer` into the process-wide registry. |
+| `getObservers()` | The currently registered observers. |
+| `setObserveAll(value)` / `isObserveAll()` | Toggle / read the "observe every flow by default" flag. |
+| `clearObservers()` | Drop all registered observers (test teardown). |
+| `resolveObservers(option)` | Resolve a flow's `FlowObserveOption` against the registry. |
+| `onConfigApplied(listener)` | Subscribe to `ai.config(...)` application so a tool can pick up its opaque config slot. |
+| `Observer` | The structural observer contract a tool implements. |
+| `FlowObserveOption` | A flow's `observe` value — `true` / `false` / a flow-local `Observer`. |
 
 ## Errors
 
@@ -238,6 +388,11 @@ All extend `AIError`. Stable `code` strings listed in [Handle errors](../digging
 | `PlannerFailedError` | `PLANNER_FAILED` | varies |
 | `PlannerPlanInvalidError` | `PLANNER_PLAN_INVALID` | `schema` |
 | `PlannerCancelledError` | `PLANNER_CANCELLED` | `cancelled` |
+| `PromptNotFoundError` | `PROVIDER_INVALID_REQUEST` | `validation` |
+| `PromptValidationError` | `SCHEMA_VALIDATION_FAILED` | `validation` |
+| `VcrCassetteMissError` | `VCR_CASSETTE_MISS` | `unknown` |
+| `ApprovalRejectedError` | `APPROVAL_REJECTED` | `unknown` |
+| `InterruptSuspendedError` | `INTERRUPT_SUSPENDED` | `unknown` |
 
 ## Configuration
 
@@ -254,13 +409,15 @@ All extend `AIError`. Stable `code` strings listed in [Handle errors](../digging
 | `LLMTrip` | One round-trip — `{ index, finishReason, usage, startedAt, endedAt, duration, ... }`. |
 | `FinishReason` | `"stop" | "tool_calls" | "length" | "content_filter" | "error"`. |
 
-## Mock SDK
+## Mocks & test doubles
 
 | Export | What it is |
 | --- | --- |
 | `MockSDK` | Test double for any `SDKAdapterContract`. Use in tests instead of hitting real providers. |
 | `MockModel` | Backing model with scripted responses. |
-| `MockEmbedder` | Backing embedder with scripted vectors. |
+| `mockAgent` | Wires `MockSDK` → mock model → `agent()` in one call — a scripted agent without the boilerplate. |
+| `mockRouter` | Deterministic supervisor router double — script the per-iteration routing decisions (or a predicate over `RouteContext`). |
+| `registerAiMatchers` | Register the Vitest matchers (`matchConverge`, `matchOutputShape`, `matchPassStep`, `matchRouteTo`). |
 
 ## Related
 
