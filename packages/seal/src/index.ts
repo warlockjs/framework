@@ -15,8 +15,8 @@
  * - mutators/ - Data transformations
  * - factory/ - v object and validate function
  *
- * Framework-specific features (FileValidator, database rules) are in:
- * @warlock.js/core/v (src/warlock/v/)
+ * Framework-specific features (FileValidator, database rules) live in
+ * `@warlock.js/core` (re-exported from its package root).
  */
 
 // Export core validators (framework-agnostic)
