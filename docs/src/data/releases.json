@@ -1,22 +1,10 @@
 {
   "_doc": "Release-level metadata for the unified changelog — the DATE and the 'what shipped' SUMMARY for each version. Per-package change details (Added/Changed/Fixed/Removed) live in each package's CHANGELOG.md and are aggregated by scripts/generate-changelog.mjs; this file supplies the release date + summary that the per-package files don't carry. Hand-maintained: add one entry per release, keyed by the version string. `date` is a display string (e.g. \"June 4, 2026\"); `summary` supports inline `code`, **bold**, and [links](url); `featured` (optional) is an array of package names floated to the top of that release's package list, in the listed order (the rest follow most-changed-first, then alphabetical). Keep the summary to ONE short headline — what shipped and which packages — not an API-by-API tour; the per-package list below it carries the detail.",
 
-  "4.7.0": {
-    "date": "June 28, 2026",
-    "summary": "Team runs get their own identity. **`@warlock.js/ai`** now reports `ai.team` executions as a first-class `team` type (was `supervisor`), and **`@warlock.js/ai-panoptic`** picks it up with a group-by-type view, a per-type aggregate-stats panel, wall-clock span timestamps, and Title-case status / type labels throughout the dashboard.",
-    "featured": ["@warlock.js/ai", "@warlock.js/ai-panoptic"]
-  },
-
-  "4.6.0": {
-    "date": "June 25, 2026",
-    "summary": "Prompts unify and observability levels up. **`@warlock.js/ai`** collapses prompt management into one process-wide `ai.prompts` store (named, versioned `name@version` builders with `meta()` identity, `merge()` composition, `diff` / `export` / `import`, and a single deterministic-plus-judge `validate`) — `ai.prompt` is now a thin facade over it. **`@warlock.js/ai-panoptic`** ships a redesigned dashboard (theme, drawer, timeline, cost heatmap, search / filter / group-by, deep-links) backed by a new cache-persistent trace store that survives restarts.",
-    "featured": ["@warlock.js/ai", "@warlock.js/ai-panoptic"]
-  },
-
   "4.5.0": {
-    "date": "June 23, 2026",
-    "summary": "The biggest AI release yet. **`@warlock.js/ai`** grows from a primitive ladder into a full agent platform — new `ai.rag()`, `ai.team()`, `ai.skills()`, `ai.prompt()`, `ai.dataset()`, and `ai.vcr()` verbs, a planner that runs DAGs and can pause for approval, a generic `observe` seam, and the former `ai-human` + `ai-guard` satellites folded into core. **`@warlock.js/ai-panoptic`** becomes batteries-included, with a zero-setup local trace dashboard. Plus a broad **`@warlock.js/core`** hardening pass — storage, repositories, HTTP middleware, and the dev server.",
-    "featured": ["@warlock.js/ai", "@warlock.js/ai-panoptic", "@warlock.js/core"]
+    "date": "July 1, 2026",
+    "summary": "The biggest AI release yet — the agent-platform, prompt-unification, and team-identity milestones plus a security-hardening pass, consolidated into one release. **`@warlock.js/ai`** grows from a primitive ladder into a full agent platform: `ai.rag()`, `ai.team()`, `ai.skills()`, a unified `ai.prompts` registry (`ai.prompt` is now a facade over it), `ai.dataset()` / `ai.vcr()`, a planner that runs DAGs and can pause for approval, a generic `observe` seam, the former `ai-human` + `ai-guard` satellites folded into core, and a security pass (SSRF-safe outbound I/O, redaction, attachment policy, SSE serving, streaming structured output). **`@warlock.js/ai-panoptic`** becomes batteries-included with a redesigned, auth-gated local dashboard (group-by-type, cost heatmap, timeline, search / filter, restart-persistent store) and first-class `team`-type traces. The first releases of **`@warlock.js/ai-tools`** (ready-made tools + MCP) and **`@warlock.js/ai-workspace`** (a policy-jailed coding workspace), plus a broad **`@warlock.js/core`** hardening pass.",
+    "featured": ["@warlock.js/ai", "@warlock.js/ai-panoptic", "@warlock.js/ai-tools", "@warlock.js/ai-workspace", "@warlock.js/core"]
   },
 
   "4.4.0": {

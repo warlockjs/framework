@@ -34,6 +34,14 @@
       "slug": "ai-panoptic"
     },
     {
+      "name": "@warlock.js/ai-tools",
+      "slug": "ai-tools"
+    },
+    {
+      "name": "@warlock.js/ai-workspace",
+      "slug": "ai-workspace"
+    },
+    {
       "name": "@warlock.js/auth",
       "slug": "auth"
     },
@@ -72,29 +80,11 @@
   ],
   "releases": [
     {
-      "version": "4.7.0",
-      "id": "v4-7-0",
-      "date": "June 28, 2026",
-      "isUnreleased": false,
-      "summaryHtml": "Team runs get their own identity. <strong><code>@warlock.js/ai</code></strong> now reports <code>ai.team</code> executions as a first-class <code>team</code> type (was <code>supervisor</code>), and <strong><code>@warlock.js/ai-panoptic</code></strong> picks it up with a group-by-type view, a per-type aggregate-stats panel, wall-clock span timestamps, and Title-case status / type labels throughout the dashboard.",
-      "mode": "notes",
-      "packages": []
-    },
-    {
-      "version": "4.6.0",
-      "id": "v4-6-0",
-      "date": "June 25, 2026",
-      "isUnreleased": false,
-      "summaryHtml": "Prompts unify and observability levels up. <strong><code>@warlock.js/ai</code></strong> collapses prompt management into one process-wide <code>ai.prompts</code> store (named, versioned <code>name@version</code> builders with <code>meta()</code> identity, <code>merge()</code> composition, <code>diff</code> / <code>export</code> / <code>import</code>, and a single deterministic-plus-judge <code>validate</code>) — <code>ai.prompt</code> is now a thin facade over it. <strong><code>@warlock.js/ai-panoptic</code></strong> ships a redesigned dashboard (theme, drawer, timeline, cost heatmap, search / filter / group-by, deep-links) backed by a new cache-persistent trace store that survives restarts.",
-      "mode": "notes",
-      "packages": []
-    },
-    {
       "version": "4.5.0",
       "id": "v4-5-0",
-      "date": "June 23, 2026",
+      "date": "July 1, 2026",
       "isUnreleased": false,
-      "summaryHtml": "The biggest AI release yet. <strong><code>@warlock.js/ai</code></strong> grows from a primitive ladder into a full agent platform — new <code>ai.rag()</code>, <code>ai.team()</code>, <code>ai.skills()</code>, <code>ai.prompt()</code>, <code>ai.dataset()</code>, and <code>ai.vcr()</code> verbs, a planner that runs DAGs and can pause for approval, a generic <code>observe</code> seam, and the former <code>ai-human</code> + <code>ai-guard</code> satellites folded into core. <strong><code>@warlock.js/ai-panoptic</code></strong> becomes batteries-included, with a zero-setup local trace dashboard. Plus a broad <strong><code>@warlock.js/core</code></strong> hardening pass — storage, repositories, HTTP middleware, and the dev server.",
+      "summaryHtml": "The biggest AI release yet — the agent-platform, prompt-unification, and team-identity milestones plus a security-hardening pass, consolidated into one release. <strong><code>@warlock.js/ai</code></strong> grows from a primitive ladder into a full agent platform: <code>ai.rag()</code>, <code>ai.team()</code>, <code>ai.skills()</code>, a unified <code>ai.prompts</code> registry (<code>ai.prompt</code> is now a facade over it), <code>ai.dataset()</code> / <code>ai.vcr()</code>, a planner that runs DAGs and can pause for approval, a generic <code>observe</code> seam, the former <code>ai-human</code> + <code>ai-guard</code> satellites folded into core, and a security pass (SSRF-safe outbound I/O, redaction, attachment policy, SSE serving, streaming structured output). <strong><code>@warlock.js/ai-panoptic</code></strong> becomes batteries-included with a redesigned, auth-gated local dashboard (group-by-type, cost heatmap, timeline, search / filter, restart-persistent store) and first-class <code>team</code>-type traces. The first releases of <strong><code>@warlock.js/ai-tools</code></strong> (ready-made tools + MCP) and <strong><code>@warlock.js/ai-workspace</code></strong> (a policy-jailed coding workspace), plus a broad <strong><code>@warlock.js/core</code></strong> hardening pass.",
       "mode": "detail",
       "packages": [
         {
@@ -308,6 +298,116 @@
             {
               "type": "Security",
               "html": "<strong>Error redaction</strong> — captured error <code>message</code> / <code>stack</code> are scrubbed of secrets (Bearer tokens, API keys) and a retained <code>cause</code> is deep-redacted (auth / cookie headers stripped) before a trace is stored or exported."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "**Five ready-made agent tools, attached to the shared <code>ai</code> object under <code>ai.tools.*</code><strong> via a <code>declare module \"@warlock.js/ai\"</code> augmentation, so a bare <code>import \"@warlock.js/ai-tools\"</code> makes them available and statically typed. Each returns a <code>ToolContract</code> that drops straight into <code>ai.agent({ tools: [...] })</code>: - </strong><code>ai.tools.webSearch(options)</code><strong> (<code>web_search</code>) — web search via a chosen provider (<code>tavily</code> / <code>brave</code> / <code>serpapi</code>) over the global <code>fetch</code>; the API key falls back to <code>TAVILY_API_KEY</code> / <code>BRAVE_API_KEY</code> / <code>SERPAPI_API_KEY</code>; <code>maxResults</code> is clamped per call. - </strong><code>ai.tools.fetchUrl(options?)</code><strong> (<code>fetch_url</code>) — fetch a URL and return its content as readability-extracted <code>text</code> (default), raw <code>html</code>, or <code>markdown</code>, with a host allowlist (SSRF guardrail), a byte cap (<code>truncated</code> flag), and a request timeout. - </strong><code>ai.tools.http(options?)</code><strong> (<code>http_request</code>) — a guarded HTTP/REST client: method + host allowlists enforced before the network call, optional <code>baseUrl</code> join, static-header merge, byte cap, and timeout; JSON-parses a JSON response body. - </strong><code>ai.tools.calculator(options?)</code>** (<code>calculator</code>) — a SAFE arithmetic evaluator (<code>+ - * / % ^</code>, unary signs, parentheses, decimal/scientific literals) implemented with a shunting-yard pass — it never calls <code>eval</code>/<code>Function</code>. - <strong><code>ai.tools.dateTime(options?)</code></strong> (<code>date_time</code>) — clock/calendar operations: <code>now</code> / <code>add</code> / <code>diff</code> / <code>format</code> over ISO-8601 instants, with millisecond-based units and IANA time-zone rendering. <code>diff</code> accepts <code>from</code> as an alias for the start instant (<code>iso</code> wins when both are set)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>MCP client — <code>ai.mcp(server, options?)</code> (Direction A).</strong> Connects to an external MCP server over a stdio (<code>node:child_process</code> + <code>node:readline</code>, no dependency) or Streamable HTTP transport, runs the <code>initialize</code> handshake + <code>tools/list</code>, and adapts each remote tool into a native <code>ToolContract</code> (its JSON Schema wrapped as a Standard Schema, <code>tools/call</code> as <code>execute</code>). Supports <code>namePrefix</code>, <code>filter</code>, and a per-call <code>timeoutMs</code>; an <code>isError</code> result surfaces as <code>{ error }</code> data."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>MCP server — <code>ai.mcp.serve(source, options)</code> (Direction B).</strong> Exposes a built agent / supervisor / orchestrator (or a raw <code>ToolContract[]</code>) AS an MCP server: <code>tools/list</code> emits each tool's <code>inputSchema</code> via <code>extractJsonSchema</code> at the configured <code>schemaTarget</code> (default <code>draft-2020-12</code>), and <code>tools/call</code> routes to <code>contract.invoke()</code>, mapping <code>data</code> to a text content block and <code>error</code> to an <code>isError: true</code> result. The stdio transport is auto-pumped over <code>process.stdin</code> / <code>process.stdout</code>; the pure protocol core is also exported as <code>createServeHandler</code> for a host's own HTTP wiring."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Typed error classes</strong> — <code>WebToolError</code>, <code>HttpPolicyError</code>, <code>CalculatorError</code>, <code>DateTimeError</code>, and <code>McpTransportError</code>, each extending the <code>@warlock.js/ai</code> <code>AIError</code> base with a <code>type</code> discriminator. Every tool follows the errors-as-data contract: failures are thrown inside <code>execute</code>, wrapped by <code>tool()</code>, and reach the model as <code>{ error }</code> so the agent self-corrects instead of crashing the run."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Optional peers, lazily imported.</strong> Heavy dependencies — a search provider (<code>@tavily/core</code>), the readability scraper (<code>@mozilla/readability</code> + <code>jsdom</code>), the MCP SDK (<code>@modelcontextprotocol/sdk</code>), and the JSON-Schema validator (<code>ajv</code>) — are optional peers, <code>import()</code>ed only when the relevant path runs, surfacing a curated <code>npm install</code> string when absent rather than crashing at import time. The only required runtime peer is <code>@warlock.js/ai</code>; everything else is Node built-ins + the global <code>fetch</code> (Node 18+)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 16,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 16
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>ai.workspace(policy)</code> — the workspace verb, registered on the shared <code>ai</code> object via a <code>declare module \"@warlock.js/ai\"</code> augmentation + a runtime side-effect on import (no edit to <code>@warlock.js/ai</code>'s own source). Exported as the <code>workspace</code> factory; <code>WorkspaceCapableAi</code> is the typed view consumers cast <code>ai</code> through."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Policy jail</strong> — every path is <code>realpath</code>-resolved and must sit under <code>cwd</code> (or an <code>allowPaths</code> root); <code>denyPaths</code> globs are blocked even inside <code>cwd</code>; the shell allow/deny list gates each command's leading executable basename (deny wins, fail-closed); per-command timeout + output byte cap; and <code>process.env</code> is never inherited wholesale (opt-in <code>shell.inheritEnv</code>, plus explicit <code>shell.env</code>)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Seven agent-facing tools</strong> under <code>ws.tools.*</code>, each a <code>ToolContract</code> built on the core <code>tool()</code> factory: <code>read_file</code>, <code>edit_file</code>, <code>write_file</code>, <code>run_shell</code>, <code>run_tests</code>, <code>grep</code>, <code>glob</code>. Each factory takes an optional <code>{ name }</code> (and <code>run_tests</code> a <code>{ command }</code>) override."
+            },
+            {
+              "type": "Added",
+              "html": "<code>tools.all()</code> — every tool in canonical order — and <code>tools.pick(...names)</code> — a least-privilege subset (e.g. <code>pick(\"readFile\", \"grep\", \"glob\")</code> for a reviewer)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Direct programmatic methods</strong> sharing the same policy seam: <code>readFile</code> / <code>writeFile</code> / <code>editFile</code> / <code>exec</code> / <code>grep</code> / <code>glob</code> / <code>exists</code> / <code>mkdir</code> / <code>remove</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>readonly()</code> — a projection that vends only the read/grep/glob tools and rejects every mutating direct method with a <code>WorkspacePolicyError</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>scope(subdir)</code> — a sub-jailed workspace rooted at <code>subdir</code> (narrowed <code>cwd</code>, same sub-policies and backend selection)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Read-before-edit guard</strong> — <code>read_file</code> / <code>readFile</code> return a SHA-256 content <code>hash</code> (via <code>@warlock.js/fs</code> <code>hashString</code>); <code>edit_file</code> requires an exact, unique <code>oldString</code> (or <code>replaceAll</code>) and rejects a mismatched <code>expectHash</code> as stale."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Backends</strong> — <code>createLocalBackend</code> (default <code>\"local\"</code>; <code>@warlock.js/fs</code> for IO + <code>node:child_process</code> for the shell) and <code>createMockBackend</code> (in-memory <code>Map</code> + scripted <code>exec</code>, for hermetic disk-free tests), behind the <code>WorkspaceBackend</code> contract."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Policy engine seam</strong> exports: <code>resolveInJail</code>, <code>isCommandAllowed</code>, <code>buildEnv</code>, and the <code>ResolvedPath</code> type."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Ops layer</strong> export <code>createOps</code> — the single policy-enforced operation layer both the tools and the direct methods funnel through."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Typed errors</strong> <code>WorkspacePolicyError</code> (<code>type: \"path-escape\" | \"denied-command\"</code>) and <code>WorkspaceEditError</code> (<code>type: \"not-found\" | \"not-unique\" | \"stale-hash\"</code>), both extending the <code>@warlock.js/ai</code> <code>AIError</code> base (code <code>TOOL_EXEC_FAILED</code>) so failures surface to the agent as tool-error data, never thrown run-killers."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Public type surface</strong> re-exported from the barrel: <code>Workspace</code>, <code>WorkspaceTools</code>, <code>WorkspacePolicy</code>, <code>WorkspaceShellPolicy</code>, <code>WorkspaceReadPolicy</code>, <code>WorkspaceBackendType</code>, <code>WorkspaceToolName</code>, <code>WorkspaceOps</code>, <code>WorkspaceBackend</code> (+ <code>WorkspaceBackendExecOptions</code> / <code>WorkspaceBackendExecResult</code>), and the per-tool IO shapes (<code>ReadFileInput</code>/<code>Result</code>, <code>EditFileInput</code>/<code>Result</code>, <code>WriteFileInput</code>/<code>Result</code>, <code>RunShellInput</code>/<code>Result</code>, <code>RunTestsInput</code>, <code>GrepInput</code>/<code>Match</code>/<code>Result</code>, <code>GlobInput</code>/<code>Result</code>)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>scripts/generate-llms.mjs</code> and the generated <code>llms.txt</code> / <code>llms-full.txt</code> projections of <code>skills/</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>skills/use-a-workspace/SKILL.md</code> — building a jailed workspace and operating it (policy, the seven tools, the direct methods, <code>readonly</code> / <code>scope</code>)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>skills/build-loop-agent/SKILL.md</code> — wiring <code>ws.tools.all()</code> into a coding agent that reads → edits → runs tests until green."
             }
           ]
         },
