@@ -4,6 +4,25 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.6.0
+
+### Added
+
+- `$agg.countDistinct(field)` — a cross-driver grouped distinct-count aggregate (Postgres `COUNT(DISTINCT col)`; MongoDB `$addToSet` in `$group` finalized with `$size` in the renaming `$project`)
+- `Model.raw<T>(sql, params)` — typed, transaction-aware raw query that auto-joins the active `transaction()` scope and returns `RawQueryResult<T>`
+- `DataSource.raw<T>(sql, params)` — thin transaction-aware passthrough to `driver.query`
+- Postgres connection option `nativeArrayColumns` — opt out listed columns (`JSONB[]`/`TEXT[]`/…) from JSON-text encoding so genuine native-array columns keep their `{...}` literal form
+
+### Changed
+
+- `DriverContract.query<T>()` is now typed `Promise<RawQueryResult<T>>` (new `rows` + `rowCount` result type) instead of `Promise<any>`
+
+### Fixed
+
+- Postgres `json`/`jsonb` columns no longer corrupt: object-arrays, string-arrays, mixed arrays, empty `[]` (previously stored as `{}`), and plain objects are now JSON-encoded before binding instead of falling through to a Postgres array literal; the same encoding is applied on the UPDATE `$set` path. The pgvector all-number array form is preserved.
+- Insert no longer overwrites a caller-supplied `createdAt` — a backdated value (imports/migrations) is now honored, mirroring the upsert guard, while `updatedAt` is always stamped at persist time
+- Insert validation now whitelists the system columns (`id`/`_id`/timestamps/`deletedAt`) like the update path, so a backdated `createdAt` survives strict `strip`/`fail` mode instead of being dropped before reaching the writer
+
 ## 4.4.0 - 2026-06-21
 
 ### Changed

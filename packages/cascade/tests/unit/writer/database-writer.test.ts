@@ -659,6 +659,128 @@ describe("DatabaseWriter", () => {
     });
   });
 
+  describe("Backdated createdAt on insert", () => {
+    it("keeps the caller-supplied createdAt instead of overwriting it", async () => {
+      vi.clearAllMocks();
+
+      const backdated = new Date("2000-01-01T00:00:00.000Z");
+      const model = new TestModel({ name: "Imported", createdAt: backdated });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      expect(mockDriver.insert).toHaveBeenCalledWith(
+        "test_models",
+        expect.objectContaining({
+          createdAt: backdated,
+        }),
+      );
+    });
+
+    it("still stamps createdAt with now when the caller did not supply one", async () => {
+      vi.clearAllMocks();
+
+      const before = Date.now();
+      const model = new TestModel({ name: "Fresh" });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      const insertedData = (mockDriver.insert as any).mock.calls[0][1];
+      expect(insertedData.createdAt).toBeInstanceOf(Date);
+      expect(insertedData.createdAt.getTime()).toBeGreaterThanOrEqual(before);
+    });
+
+    it("always stamps updatedAt with now even when createdAt is backdated", async () => {
+      vi.clearAllMocks();
+
+      const before = Date.now();
+      const backdated = new Date("2000-01-01T00:00:00.000Z");
+      const model = new TestModel({ name: "Imported", createdAt: backdated });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      const insertedData = (mockDriver.insert as any).mock.calls[0][1];
+      expect(insertedData.updatedAt).toBeInstanceOf(Date);
+      expect(insertedData.updatedAt.getTime()).toBeGreaterThanOrEqual(before);
+      // updatedAt must NOT have been pinned to the backdated createdAt value.
+      expect(insertedData.updatedAt.getTime()).toBeGreaterThan(
+        backdated.getTime(),
+      );
+    });
+
+    it("preserves a backdated createdAt through insert validation under strict 'strip' mode", async () => {
+      vi.clearAllMocks();
+
+      class StripInsertModel extends Model {
+        static table = "strip_insert_models";
+        static primaryKey = "id";
+        static schema = v.object({ name: v.string() });
+        static createdAtColumn = "createdAt";
+        static updatedAtColumn = "updatedAt";
+        static strictMode = "strip" as const;
+      }
+      vi.spyOn(StripInsertModel, "getDataSource").mockReturnValue(
+        mockDataSource,
+      );
+
+      const backdated = new Date("2001-02-03T04:05:06.000Z");
+      const model = new StripInsertModel({
+        name: "Imported",
+        createdAt: backdated,
+      });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+      await writer.save();
+
+      // createdAt is whitelisted on the insert validation path, so the backdated
+      // value survives validation and reaches the driver instead of being
+      // stripped (which would let performInsert stamp "now").
+      expect(mockDriver.insert).toHaveBeenCalledWith(
+        "strip_insert_models",
+        expect.objectContaining({
+          createdAt: backdated,
+        }),
+      );
+    });
+
+    it("does not reject an insert carrying createdAt under strict 'fail' mode", async () => {
+      vi.clearAllMocks();
+
+      class FailInsertModel extends Model {
+        static table = "fail_insert_models";
+        static primaryKey = "id";
+        static schema = v.object({ name: v.string() });
+        static createdAtColumn = "createdAt";
+        static updatedAtColumn = "updatedAt";
+        static strictMode = "fail" as const;
+      }
+      vi.spyOn(FailInsertModel, "getDataSource").mockReturnValue(mockDataSource);
+
+      const backdated = new Date("2001-02-03T04:05:06.000Z");
+      const model = new FailInsertModel({
+        name: "Imported",
+        createdAt: backdated,
+      });
+      model.isNew = true;
+
+      const writer = new DatabaseWriter(model);
+
+      await expect(writer.save()).resolves.toMatchObject({ success: true });
+      expect(mockDriver.insert).toHaveBeenCalledWith(
+        "fail_insert_models",
+        expect.objectContaining({
+          createdAt: backdated,
+        }),
+      );
+    });
+  });
+
   describe("Soft-delete column in update validation", () => {
     it("keeps deletedAt on update under strict 'strip' mode (not stripped)", async () => {
       vi.clearAllMocks();

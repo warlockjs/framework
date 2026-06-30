@@ -166,11 +166,21 @@ export class PostgresDriver implements DriverContract {
   private _syncAdapter: SyncAdapterContract | undefined;
 
   /**
+   * Lookup set of column names that hold native PostgreSQL arrays
+   * (`JSONB[]`, `TEXT[]`, …) and must NOT be JSON-text encoded.
+   *
+   * @see PostgresPoolConfig.nativeArrayColumns
+   */
+  private readonly _nativeArrayColumns: ReadonlySet<string>;
+
+  /**
    * Create a new PostgreSQL driver instance.
    *
    * @param config - PostgreSQL connection configuration
    */
-  public constructor(private readonly config: PostgresPoolConfig) {}
+  public constructor(private readonly config: PostgresPoolConfig) {
+    this._nativeArrayColumns = new Set(config.nativeArrayColumns ?? []);
+  }
 
   /**
    * Get the connection pool instance.
@@ -314,28 +324,80 @@ export class PostgresDriver implements DriverContract {
         continue; // Skip undefined values
       }
 
-      if (value instanceof Date) {
-        serialized[key] = value.toISOString();
-      } else if (typeof value === "bigint") {
-        serialized[key] = value.toString();
-      } else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-        // Nested objects will be stored as JSONB
-        serialized[key] = value;
-      } else if (
-        Array.isArray(value) &&
-        value.length > 0 &&
-        value.every((v) => typeof v === "number")
-      ) {
-        // pgvector columns expect the literal '[n1,n2,...]' format.
-        // If we pass a raw JS number[] the pg driver serializes it as a
-        // PostgreSQL array '{n1,n2,...}' which the vector type rejects.
-        serialized[key] = `[${value.join(",")}]`;
-      } else {
-        serialized[key] = value;
-      }
+      serialized[key] = this.serializeValue(key, value);
     }
 
     return serialized;
+  }
+
+  /**
+   * Serialize a single column value into a node-pg bindable parameter.
+   *
+   * Shared by {@link serialize} (INSERT path) and {@link buildUpdateQuery}
+   * `$set` (UPDATE path) so both encode `json` / `jsonb` columns identically.
+   *
+   * Encoding rules (in order):
+   * - `Date` → ISO string.
+   * - `bigint` → decimal string (node-pg has no native bigint binding).
+   * - all-number array → pgvector literal `'[n1,n2,...]'`. node-pg would
+   *   otherwise emit a `{n1,n2,...}` array literal, which the `vector` type
+   *   rejects. This branch is preserved exactly.
+   * - any other array (object-array, string-array, mixed, empty `[]`) →
+   *   `JSON.stringify`. node-pg renders a raw JS array as a PostgreSQL array
+   *   literal `{...}` (and `[]` as `{}`), which a `json` / `jsonb` column
+   *   rejects — so we bind the value as JSON text instead, the form those
+   *   columns accept. Columns listed in `nativeArrayColumns` are exempt:
+   *   their raw array is passed through so node-pg emits the `{...}` literal
+   *   a genuine `JSONB[]` / `TEXT[]` column needs.
+   * - plain object → `JSON.stringify`. Equivalent to node-pg's own object
+   *   handling, made explicit so both write paths agree.
+   * - everything else (scalars: string, number, boolean, null) → untouched.
+   *
+   * Boundary note: the serializer has no access to the table schema, so it
+   * cannot tell a `json` / `jsonb` column from a native-array column purely
+   * from the value. `nativeArrayColumns` is the explicit, opt-in escape hatch
+   * for the latter. No `::jsonb` placeholder cast is added: a JSON-text string
+   * binds correctly to `json` / `jsonb` without one, and a blind cast would
+   * misfire on columns we cannot positively identify as jsonb.
+   *
+   * @param key - Column name (used to honour `nativeArrayColumns`)
+   * @param value - The raw value to serialize (never `undefined`)
+   * @returns The value ready to bind as a query parameter
+   */
+  private serializeValue(key: string, value: unknown): unknown {
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+
+    if (typeof value === "bigint") {
+      return value.toString();
+    }
+
+    if (Array.isArray(value)) {
+      if (value.length > 0 && value.every((v) => typeof v === "number")) {
+        // pgvector columns expect the literal '[n1,n2,...]' format.
+        return `[${value.join(",")}]`;
+      }
+
+      // Genuine native PostgreSQL array columns (JSONB[], TEXT[], …) must
+      // keep their raw array so node-pg emits a '{...}' array literal.
+      if (this._nativeArrayColumns.has(key)) {
+        return value;
+      }
+
+      // json / jsonb columns: bind as JSON text. Covers object-arrays,
+      // string-arrays, mixed arrays, and empty [] (which would otherwise
+      // store as '{}' instead of '[]').
+      return JSON.stringify(value);
+    }
+
+    if (typeof value === "object" && value !== null) {
+      // Plain object → JSONB. Explicit JSON.stringify matches node-pg's own
+      // object encoding while keeping both write paths consistent.
+      return JSON.stringify(value);
+    }
+
+    return value;
   }
 
   /**
@@ -1073,7 +1135,10 @@ export class PostgresDriver implements DriverContract {
         setClauses.push(
           `${this.dialect.quoteIdentifier(key)} = ${this.dialect.placeholder(paramIndex++)}`,
         );
-        params.push(value);
+        // Apply the same json/jsonb-aware serialization used on the INSERT
+        // path so object/array $set values aren't corrupted into Postgres
+        // array literals. undefined is skipped — never bind it.
+        params.push(value === undefined ? value : this.serializeValue(key, value));
       }
     }
 

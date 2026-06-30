@@ -13,6 +13,17 @@ describe("Aggregate Expressions", () => {
     });
   });
 
+  describe("$agg.countDistinct()", () => {
+    it("should create countDistinct expression with field", () => {
+      const expr = $agg.countDistinct("city");
+
+      expect(expr).toEqual({
+        __agg: "countDistinct",
+        __field: "city",
+      });
+    });
+  });
+
   describe("$agg.sum()", () => {
     it("should create sum expression with field", () => {
       const expr = $agg.sum("price");

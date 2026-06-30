@@ -51,6 +51,14 @@ export class MongoQueryParser {
   private readonly groupFieldNames = new Map<number, string | string[]>();
 
   /**
+   * Track `countDistinct` aggregate aliases per group stage. The renaming
+   * `$project` finalizes these with `{ $size: "$alias" }` over the set built
+   * by `$addToSet` in the `$group` stage.
+   * Maps pipeline index to the set of aliases needing `$size` finalization.
+   */
+  private readonly countDistinctAliases = new Map<number, Set<string>>();
+
+  /**
    * Create a new MongoDB query parser.
    *
    * @param options - Configuration options for the parser
@@ -151,6 +159,19 @@ export class MongoQueryParser {
         if (fieldNames) {
           this.groupFieldNames.set(stageIndex, fieldNames);
         }
+
+        // Record which aggregate aliases are countDistinct so the renaming
+        // $project can finalize them with `{ $size: "$alias" }`.
+        const distinctAliases = new Set<string>();
+        for (const [alias, expression] of Object.entries(op.data.aggregates)) {
+          if (isAggregateExpression(expression) && expression.__agg === "countDistinct") {
+            distinctAliases.add(alias);
+          }
+        }
+
+        if (distinctAliases.size > 0) {
+          this.countDistinctAliases.set(stageIndex, distinctAliases);
+        }
       }
     }
   }
@@ -190,10 +211,17 @@ export class MongoQueryParser {
           }
         }
 
-        // Include all aggregate fields
+        // Include all aggregate fields. countDistinct aliases are finalized
+        // with `{ $size: "$alias" }` over the set built by `$addToSet`; every
+        // other aggregate is projected through as-is.
+        const distinctAliases = this.countDistinctAliases.get(i);
         const aggregateFields = Object.keys(stage.$group).filter((key) => key !== "_id");
         for (const field of aggregateFields) {
-          projection[field] = 1;
+          if (distinctAliases?.has(field)) {
+            projection[field] = { $size: `$${field}` };
+          } else {
+            projection[field] = 1;
+          }
         }
 
         if (Object.keys(projection).length > 0) {
@@ -1539,6 +1567,16 @@ export class MongoQueryParser {
     switch (expr.__agg) {
       case "count":
         return { $sum: 1 };
+
+      case "countDistinct":
+        if (!expr.__field) {
+          throw new Error("Count distinct aggregate requires a field name");
+        }
+        // Accumulate the set of distinct values in the $group stage; the
+        // renaming $project then finalizes it with `{ $size: "$alias" }`
+        // (the standard distinct-count-per-group pattern — `$size` is not a
+        // valid $group accumulator).
+        return { $addToSet: `$${expr.__field}` };
 
       case "sum":
         if (!expr.__field) {

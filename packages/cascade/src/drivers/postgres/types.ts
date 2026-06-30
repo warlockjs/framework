@@ -51,6 +51,21 @@ export type PostgresPoolConfig = PostgresConnectionConfig & {
   readonly maxUses?: number;
   /** Application name for connection identification */
   readonly application_name?: string;
+  /**
+   * Column names whose values are native PostgreSQL arrays (e.g. `JSONB[]`,
+   * `TEXT[]`, `INTEGER[]`) rather than scalar `json` / `jsonb` columns.
+   *
+   * The serializer cannot see the table schema, so by default it
+   * `JSON.stringify`s every non-vector array (and plain object) so it binds
+   * as JSON text — the only correct form for a `json` / `jsonb` column. For a
+   * genuine native-array column (`arrayJson()` → `JSONB[]`, `arrayText()` →
+   * `TEXT[]`, …) that conversion is wrong: node-pg must receive the raw JS
+   * array so it emits a `{...}` array literal. List those columns here to
+   * opt them out of JSON-text encoding.
+   *
+   * @default undefined (no native-array columns)
+   */
+  readonly nativeArrayColumns?: readonly string[];
 };
 
 /**

@@ -43,11 +43,12 @@ const stats = await Order.query()
 
 `fields` is a string or string array (`groupBy(["status", "country"], {...})` groups by each combination). Single-arg `groupBy("category")` / `groupBy(["a","b"])` groups **without** computing aggregates.
 
-### `$agg` helpers — five cross-driver, four MongoDB-only
+### `$agg` helpers — six cross-driver, four MongoDB-only
 
 Cross-driver (identical call on MongoDB **and** Postgres):
 
-- `$agg.count()` · `$agg.sum(field)` · `$agg.avg(field)` · `$agg.min(field)` · `$agg.max(field)`
+- `$agg.count()` · `$agg.countDistinct(field)` · `$agg.sum(field)` · `$agg.avg(field)` · `$agg.min(field)` · `$agg.max(field)`
+- `$agg.countDistinct(field)` counts distinct values per group: Postgres `COUNT(DISTINCT col)`; MongoDB `$addToSet` in `$group` finalized with `$size` in the renaming `$project`.
 
 MongoDB-only — on Postgres these **throw at the `.groupBy()` call** with an actionable message (there is no honest single-scalar `GROUP BY` equivalent):
 

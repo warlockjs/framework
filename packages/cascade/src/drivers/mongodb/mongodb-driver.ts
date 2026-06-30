@@ -27,6 +27,7 @@ import type {
   InsertResult,
   MigrationDriverContract,
   QueryBuilderContract,
+  RawQueryResult,
   SyncAdapterContract,
   TransactionContext,
   UpdateOperations,
@@ -975,7 +976,10 @@ export class MongoDbDriver implements DriverContract {
    * Execute a raw SQL query.
    * Not supported for MongoDB.
    */
-  public async query<T = unknown>(_sql: string, _params?: unknown[]): Promise<any> {
+  public async query<T = Record<string, unknown>>(
+    _sql: string,
+    _params?: unknown[],
+  ): Promise<RawQueryResult<T>> {
     throw new Error("MongoDB driver does not support raw SQL queries.");
   }
 

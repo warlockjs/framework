@@ -155,6 +155,12 @@ describe("PostgresDialect", () => {
       expect(dialect.aggregateToSql({ __agg: "max", __field: "price" })).toBe(`MAX("price")`);
     });
 
+    it("translates countDistinct to COUNT(DISTINCT col) over a quoted column", () => {
+      expect(dialect.aggregateToSql({ __agg: "countDistinct", __field: "city" })).toBe(
+        `COUNT(DISTINCT "city")`,
+      );
+    });
+
     it("throws for MongoDB-only aggregates (distinct/floor/first/last)", () => {
       expect(() => dialect.aggregateToSql({ __agg: "distinct", __field: "color" })).toThrow(
         /MongoDB-only/,

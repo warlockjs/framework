@@ -1,4 +1,4 @@
-import type { DriverContract, IdGeneratorContract } from "../contracts";
+import type { DriverContract, IdGeneratorContract, RawQueryResult } from "../contracts";
 import type { DeleteStrategy, MigrationDefaults, ModelDefaults, RelationDefaults } from "../types";
 
 /**
@@ -189,5 +189,31 @@ export class DataSource {
       return driver.getIdGenerator();
     }
     return undefined;
+  }
+
+  /**
+   * Execute a raw query against this data source's driver.
+   *
+   * Thin passthrough to `driver.query`, so it is transaction-aware: inside a
+   * `transaction()` scope the query auto-joins the active transaction
+   * client/session.
+   *
+   * @typeParam T - The expected row shape.
+   * @param sql - Raw SQL string (driver dialect).
+   * @param params - Optional positional query parameters.
+   * @returns The driver's raw query result (`rows` + `rowCount`).
+   *
+   * @example
+   * ```typescript
+   * const { rows } = await dataSource.raw<{ count: number }>(
+   *   "SELECT COUNT(*)::int AS count FROM users",
+   * );
+   * ```
+   */
+  public raw<T = Record<string, unknown>>(
+    sql: string,
+    params?: unknown[],
+  ): Promise<RawQueryResult<T>> {
+    return this.driver.query<T>(sql, params);
   }
 }

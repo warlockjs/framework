@@ -109,4 +109,42 @@ describe("MongoQueryBuilder — pipeline shape", () => {
       { $project: { status: "$_id", total: 1, n: 1, _id: 0 } },
     ]);
   });
+
+  it("compiles $agg.countDistinct into $addToSet in $group + $size in the renaming $project", () => {
+    const pipeline = builder()
+      .groupBy("country", { uniqueCities: $agg.countDistinct("city") })
+      .parse().pipeline;
+
+    expect(pipeline).toEqual([
+      { $group: { _id: "$country", uniqueCities: { $addToSet: "$city" } } },
+      { $project: { country: "$_id", uniqueCities: { $size: "$uniqueCities" }, _id: 0 } },
+    ]);
+  });
+
+  it("mixes countDistinct with other aggregates, finalizing only the distinct alias", () => {
+    const pipeline = builder()
+      .groupBy("country", {
+        uniqueCities: $agg.countDistinct("city"),
+        total: $agg.sum("amount"),
+      })
+      .parse().pipeline;
+
+    expect(pipeline).toEqual([
+      {
+        $group: {
+          _id: "$country",
+          uniqueCities: { $addToSet: "$city" },
+          total: { $sum: "$amount" },
+        },
+      },
+      {
+        $project: {
+          country: "$_id",
+          uniqueCities: { $size: "$uniqueCities" },
+          total: 1,
+          _id: 0,
+        },
+      },
+    ]);
+  });
 });

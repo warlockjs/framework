@@ -4,6 +4,7 @@ import type {
   DriverContract,
   PaginationOptions,
   PaginationResult,
+  RawQueryResult,
   RemoverResult,
   UpdateOperations,
   WriterOptions,
@@ -1172,6 +1173,43 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    */
   public static getDriver(): DriverContract {
     return this.getDataSource().driver;
+  }
+
+  /**
+   * Execute a raw query against this model's driver.
+   *
+   * Delegates to `getDriver().query`, so it inherits the driver's
+   * transaction awareness: when called inside an active `transaction()`
+   * scope the query auto-joins that transaction's client/session, otherwise
+   * it runs on the pool. The return value is the driver's raw result
+   * ({@link RawQueryResult}) — `rows` typed as `T` plus `rowCount` — not
+   * hydrated model instances.
+   *
+   * Note: MongoDB drivers throw, as they do not support raw SQL.
+   *
+   * @typeParam T - The expected row shape.
+   * @param sql - Raw SQL string (driver dialect).
+   * @param params - Optional positional query parameters.
+   * @returns The driver's raw query result.
+   *
+   * @example
+   * ```typescript
+   * const { rows } = await User.raw<{ id: number; total: number }>(
+   *   "SELECT id, COUNT(*) AS total FROM orders WHERE user_id = $1 GROUP BY id",
+   *   [userId],
+   * );
+   *
+   * // Auto-joins the active transaction() scope:
+   * await User.transaction(async () => {
+   *   await User.raw("UPDATE users SET active = true WHERE id = $1", [id]);
+   * });
+   * ```
+   */
+  public static raw<T = Record<string, unknown>>(
+    sql: string,
+    params?: unknown[],
+  ): Promise<RawQueryResult<T>> {
+    return this.getDriver().query<T>(sql, params);
   }
 
   /**

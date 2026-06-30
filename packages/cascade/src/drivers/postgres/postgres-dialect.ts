@@ -301,10 +301,11 @@ export class PostgresDialect implements SqlDialectContract {
   /**
    * Translate a database-agnostic aggregate expression to PostgreSQL SQL.
    *
-   * The five scalar aggregates map to their ANSI SQL function. `distinct`,
-   * `floor`, `first` and `last` are MongoDB-only for v1 — none has a
-   * single-scalar `GROUP BY` equivalent on PostgreSQL, so they throw instead
-   * of emitting a silently-different semantic (the footgun this guards).
+   * The scalar aggregates map to their ANSI SQL function, and `countDistinct`
+   * maps to `COUNT(DISTINCT …)`. `distinct`, `floor`, `first` and `last` are
+   * MongoDB-only for v1 — none has a single-scalar `GROUP BY` equivalent on
+   * PostgreSQL, so they throw instead of emitting a silently-different semantic
+   * (the footgun this guards).
    *
    * @param expression - The abstract aggregate (`$agg.*`) to translate
    * @returns The SQL fragment (e.g. `SUM("amount")`, `COUNT(*)`)
@@ -315,6 +316,8 @@ export class PostgresDialect implements SqlDialectContract {
     switch (expression.__agg) {
       case "count":
         return "COUNT(*)";
+      case "countDistinct":
+        return `COUNT(DISTINCT ${column})`;
       case "sum":
         return `SUM(${column})`;
       case "avg":

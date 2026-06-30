@@ -1,9 +1,10 @@
 /**
  * Database-agnostic aggregation expressions.
  *
- * `count` / `sum` / `avg` / `min` / `max` are **cross-driver** — the same
- * call compiles to the native shape on every supported database (MongoDB
- * `{ $sum: "$field" }`, SQL `SUM(field)`, ...).
+ * `count` / `countDistinct` / `sum` / `avg` / `min` / `max` are **cross-driver**
+ * — the same call compiles to the native shape on every supported database
+ * (MongoDB `{ $sum: "$field" }`, SQL `SUM(field)`, ...). `countDistinct` uses
+ * MongoDB's `$addToSet` + `$size` per-group pattern and SQL `COUNT(DISTINCT …)`.
  *
  * `distinct` / `floor` / `first` / `last` are **MongoDB-only**. They have no
  * single-scalar `GROUP BY` equivalent in SQL, so on Postgres they throw a
@@ -43,6 +44,7 @@ export type AggregateExpression = {
  */
 export type AggregateFunction =
   | "count"
+  | "countDistinct"
   | "sum"
   | "avg"
   | "min"
@@ -89,6 +91,30 @@ export const $agg = {
    */
   count(): AggregateExpression {
     return { __agg: "count", __field: null };
+  },
+
+  /**
+   * Count the number of distinct values of a field in each group.
+   *
+   * @param field - The field name to count distinct values of
+   * @returns Abstract count-distinct expression
+   *
+   * @example
+   * ```typescript
+   * query.groupBy("country", {
+   *   uniqueCities: $agg.countDistinct("city")
+   * });
+   * ```
+   *
+   * **Cross-driver.** Translates to:
+   * - SQL: `COUNT(DISTINCT city)`
+   * - MongoDB: `{ $addToSet: "$city" }` in the `$group` stage, finalized with
+   *   `{ $size: "$uniqueCities" }` in the renaming `$project` (the standard
+   *   distinct-count-per-group pattern, since `$size` is not a `$group`
+   *   accumulator).
+   */
+  countDistinct(field: string): AggregateExpression {
+    return { __agg: "countDistinct", __field: field };
   },
 
   /**

@@ -61,6 +61,27 @@ export type UpdateResult = {
 };
 
 /**
+ * Result returned by a raw query execution ({@link DriverContract.query}).
+ *
+ * Mirrors the shape both the `pg` and MongoDB drivers already return: an
+ * array of typed `rows` and the affected `rowCount` (`null` for statements
+ * that don't report one). `command` / `fields` are optional driver extras
+ * (the `pg` driver populates them; MongoDB does not).
+ *
+ * @typeParam T - The row shape (defaults to a generic record).
+ */
+export type RawQueryResult<T = Record<string, unknown>> = {
+  /** Rows returned by the query, typed as `T`. */
+  readonly rows: T[];
+  /** Rows affected by INSERT/UPDATE/DELETE, or `null` when not reported. */
+  readonly rowCount: number | null;
+  /** Command executed (SELECT, INSERT, …) — driver-dependent. */
+  readonly command?: string;
+  /** Result column metadata — driver-dependent. */
+  readonly fields?: ReadonlyArray<{ readonly name: string; readonly dataTypeID: number }>;
+};
+
+/**
  * Database-agnostic update operations.
  *
  * Drivers translate these to their native syntax:
@@ -409,13 +430,17 @@ export interface DriverContract {
 
   /**
    * Execute a raw SQL query.
-   * Used by the runner to execute phase-ordered SQL.
    *
+   * Transaction-aware: when called inside a `transaction()` scope the driver
+   * routes the query through the active transaction client automatically.
+   * Used by the runner to execute phase-ordered SQL and by `Model.raw()`.
+   *
+   * @typeParam T - The expected row shape.
    * @param sql - SQL query string
    * @param params - Optional query parameters
-   * @returns Query result
+   * @returns The query result (`rows` + `rowCount`)
    */
-  query<T = unknown>(sql: string, params?: unknown[]): Promise<any>;
+  query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<RawQueryResult<T>>;
 
   // ============================================================
   // Database Lifecycle Operations

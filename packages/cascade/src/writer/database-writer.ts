@@ -195,28 +195,35 @@ export class DatabaseWriter implements WriterContract {
       return;
     }
 
-    // Clone schema for partial data (updates only).
     // Whitelist the framework-managed system columns so a model carrying them
     // (id / _id / timestamps / soft-delete deletedAt) validates cleanly instead
     // of being stripped (strictMode "strip") or rejected (strictMode "fail").
     // `when(...)` adds each timestamp/soft-delete column only when configured
     // (truthy) — the lazy factory means a disabled column (`false`) never even
     // builds a bogus schema key.
+    //
+    // The whitelist must apply to BOTH insert and update: on insert a caller may
+    // supply a backdated createdAt (e.g. data migrations / imports), and without
+    // the whitelist strictMode "strip" silently drops it before it reaches the
+    // writer, while "fail" rejects the whole insert.
+    const systemColumns = {
+      id: v.scalar().optional(),
+      _id: v.any().optional(),
+      ...when(this.ctor.createdAtColumn, () => ({
+        [this.ctor.createdAtColumn as string]: v.date().optional(),
+      })),
+      ...when(this.ctor.updatedAtColumn, () => ({
+        [this.ctor.updatedAtColumn as string]: v.date().optional(),
+      })),
+      ...when(this.ctor.deletedAtColumn, () => ({
+        [this.ctor.deletedAtColumn as string]: v.date().optional(),
+      })),
+    };
+
+    // Clone full schema for insert, partial (dirty keys only) for updates.
     const validationSchema = isInsert
-      ? this.schema.clone()
-      : this.schema.clone(Object.keys(this.model.data)).extend({
-          id: v.scalar().optional(),
-          _id: v.any().optional(),
-          ...when(this.ctor.createdAtColumn, () => ({
-            [this.ctor.createdAtColumn as string]: v.date().optional(),
-          })),
-          ...when(this.ctor.updatedAtColumn, () => ({
-            [this.ctor.updatedAtColumn as string]: v.date().optional(),
-          })),
-          ...when(this.ctor.deletedAtColumn, () => ({
-            [this.ctor.deletedAtColumn as string]: v.date().optional(),
-          })),
-        });
+      ? this.schema.clone().extend(systemColumns)
+      : this.schema.clone(Object.keys(this.model.data)).extend(systemColumns);
 
     // Apply strict mode
     if (this.strictMode === "strip") {
@@ -274,9 +281,14 @@ export class DatabaseWriter implements WriterContract {
     // Add createdAt and updatedAt to the data (using resolved column names)
     // The column names are already resolved through the hierarchy:
     // Model static property > Database config > Driver defaults > undefined
+    //
+    // Only stamp createdAt when the caller did NOT supply one, so a backdated
+    // value (e.g. data migrations / imports) is honored instead of overwritten.
+    // This mirrors the upsert path's guard. updatedAt is always stamped to
+    // reflect the moment the record is persisted.
     const createdAtColumn = this.ctor.createdAtColumn;
 
-    if (createdAtColumn) {
+    if (createdAtColumn && dataToInsert[createdAtColumn] == null) {
       dataToInsert[createdAtColumn] = new Date();
     }
 
