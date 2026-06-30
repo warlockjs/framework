@@ -14,42 +14,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- `ConsoleLog`'s timestamp (and the `↳` context arrow) switch from bright-black `gray` to the 256-color neutral `slate`. Bright-black sits too close to the background on most terminal themes and reads muddy; `slate` is recessive but cleanly legible.
+- `ConsoleLog`'s timestamp (and the `↳` context arrow) switch from bright-black `gray` to the 256-color `slate` — recessive but cleanly legible where bright-black read muddy.
 
 ## 4.2.9
 
 ### Changed
 
-- `ConsoleLog` output is retuned for scannability:
-  - **Time-only timestamp** (`HH:mm:ss.SSS`) instead of the full ISO string — within a dev session the date is just noise. Persistent channels (`FileLog` / `JSONFileLog`) still record the full ISO timestamp.
-  - The timestamp moves from yellow to **gray** so the colored level + message lead the eye; `module` (cyan) and `action` (magenta) keep their colors for at-a-glance subsystem scanning.
-  - **Aligned columns** — each level tag is padded to a fixed width so the timestamp / module / action columns line up vertically across a stream of logs.
-  - **`fatal` is restored to a background badge** — white, bold text on a bright-red background (`☠ fatal`), the same column width as the other tags but deliberately louder than `error`'s plain red, so an unrecoverable failure can't be missed (4.2.8 had briefly flattened it to a plain label).
+- `ConsoleLog` output retuned for scannability — a time-only `HH:mm:ss.SSS` timestamp dimmed to gray, fixed-width level tags so the columns align, and `fatal` restored to a white-on-bright-red background badge. (`FileLog` / `JSONFileLog` keep the full ISO timestamp.)
 
 ## 4.2.8
 
 ### Changed
 
-- `ConsoleLog` now prints the level name beside each level's icon — `⚙ debug`, `ℹ info`, `⚠ warn`, `✗ error`, `✓ success`, `☠ fatal` — so entries are readable at a glance without memorizing icons. `fatal` also switches from a bright-red **background** badge to a bold red-bright `☠ fatal` label, consistent with the other levels.
+- `ConsoleLog` now prints each level's name beside its icon (`⚙ debug`, `ℹ info`, `⚠ warn`, `✗ error`, `✓ success`, `☠ fatal`) for at-a-glance reading.
 
 ## 4.2.0
 
 ### Added
 
-- `log.flush()` — awaitable async counterpart to `flushSync()`. Drains every channel that implements `flush()` via `Promise.allSettled` with per-channel isolation, so one channel's failure can't break shutdown. `FileLog` / `JSONFileLog` implement it; `ConsoleLog` writes synchronously and doesn't need it.
-- `SentryLog` channel — forwards entries to Sentry. `eventLevels` (`fatal` / `error` / `warn` by default) become events (`captureException` for `Error` messages, `captureMessage` otherwise); every other level becomes a breadcrumb. `module` / `action` are tags, `context` is a structured Sentry context. `@sentry/node` is an **optional peer**, lazily imported — pass an existing `client` or `options`.
-- `log.fatal()` + `fatal` log level — ranked strictly above `error` for unrecoverable failures (failed bootstrap, `uncaughtException`). Does not auto-flush or exit; caller decides.
-- `ConsoleLog` renders `fatal` with a `☠` icon on a bright-red background and bold red-bright message, distinct from `error`'s `✗`.
+- `log.flush()` — awaitable async counterpart to `flushSync()`, draining every channel via `Promise.allSettled` with per-channel isolation. Implemented by `FileLog` / `JSONFileLog`.
+- `SentryLog` channel — forwards entries to Sentry (`eventLevels` become events, others breadcrumbs; `module` / `action` as tags). `@sentry/node` is an optional, lazily-imported peer.
+- `log.fatal()` + `fatal` level — ranked strictly above `error` for unrecoverable failures; does not auto-flush or exit.
+- `ConsoleLog` renders `fatal` with a `☠` icon on a bright-red background, distinct from `error`'s `✗`.
 
 ### Changed
 
-- `captureAnyUnhandledRejection()` now escalates `uncaughtException` to `log.fatal` (was `log.error`). Node terminates the process by default, so it's semantically fatal — makes "page only on fatal" alerting clean. `unhandledRejection` stays at `error`.
-- `LoggingData.type` is now typed as `LogLevel` (was a duplicated inline union — code-standards cleanup).
-- `LogContract` and the `LogChannel` base now expose an optional `flush?()` alongside the existing `flushSync?()`.
+- `captureAnyUnhandledRejection()` now escalates `uncaughtException` to `log.fatal` (was `error`); `unhandledRejection` stays at `error`.
+- `LoggingData.type` is now typed as `LogLevel` (was a duplicated inline union).
+- `LogContract` / `LogChannel` now expose an optional `flush?()` alongside `flushSync?()`.
 
 ### Fixed
 
-- `@sentry/node` is now referenced only via local minimal types + an indirect dynamic import, so source-served consumers (the package's `main` → `./src/index.ts`) no longer get a `TS2307: Cannot find module '@sentry/node'` when they (correctly) don't install the optional peer. Proven by pruning the SDK and running the full suite + `tsc --noEmit` clean.
+- `@sentry/node` is referenced only via local types + an indirect dynamic import, so source-served consumers no longer get `TS2307: Cannot find module '@sentry/node'` when they don't install the optional peer.
 
 ## 4.1.15
 
