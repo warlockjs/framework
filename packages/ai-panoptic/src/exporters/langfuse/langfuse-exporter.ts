@@ -7,6 +7,7 @@ import type {
   LangfuseObservationBody,
   LangfuseObservationLevel,
   LangfuseObservationLike,
+  LangfuseTraceBody,
   LangfuseTraceLike,
 } from "./langfuse-exporter.type";
 
@@ -139,14 +140,29 @@ export function langfuseExporter(options: LangfuseExporterOptions): ExporterCont
 function emitTrace(client: LangfuseClientLike, trace: Trace): void {
   const root = trace.root;
 
-  const langfuseTrace = client.trace({
+  const traceBody: LangfuseTraceBody = {
     id: root.traceId,
     name: root.name,
     sessionId: trace.sessionId,
     version: root.version,
     timestamp: new Date(root.startedAt),
     metadata: langfuseMetadata(root),
-  });
+  };
+
+  // Surface the root's captured content at the TRACE level too — not only on
+  // the root observation — so Langfuse's trace Preview shows the top-level
+  // input/output instead of "this trace received no input/output". Present
+  // only under content capture, and only for roots that carry I/O (an agent
+  // or tool; a composite root like a planner has none of its own).
+  if (root.input !== undefined) {
+    traceBody.input = root.input;
+  }
+
+  if (root.output !== undefined) {
+    traceBody.output = root.output;
+  }
+
+  const langfuseTrace = client.trace(traceBody);
 
   // Emit the ROOT as an observation too — not just its children — so the
   // root execution's OWN tokens are metered. Langfuse derives the trace

@@ -3,8 +3,13 @@ import { makeSpan, makeTrace } from "../test-support/make-trace";
 import type { ConsoleLike } from "./console-exporter.type";
 import { consoleExporter } from "./console-exporter";
 
-function makeSink(): ConsoleLike & { log: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn> } {
-  return { log: vi.fn(), error: vi.fn() };
+type SinkMock = ReturnType<typeof vi.fn<(...args: unknown[]) => void>>;
+
+function makeSink(): ConsoleLike & { log: SinkMock; error: SinkMock } {
+  return {
+    log: vi.fn<(...args: unknown[]) => void>(),
+    error: vi.fn<(...args: unknown[]) => void>(),
+  };
 }
 
 describe("consoleExporter", () => {

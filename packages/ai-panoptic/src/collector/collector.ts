@@ -7,6 +7,25 @@ import type { ContentCaptureOptions } from "./content-capture.type";
 import { reportToTrace } from "./report-to-trace";
 
 /**
+ * Notified when a registered exporter throws during `collect` / `flush` /
+ * `shutdown`. The failure stays isolated (the originating run never sees
+ * it) — this is purely a chance to surface it (route to your logger,
+ * bump a metric). Receives the exporter's `name` and the thrown error.
+ */
+export type ExporterErrorHandler = (exporterName: string, error: unknown) => void;
+
+/** Options for {@link createCollector}. */
+export type CollectorOptions = ContentCaptureOptions & {
+  /**
+   * Called when an exporter throws (and is isolated). Overrides the default
+   * one-time `console.warn` per exporter — route the failure to your own
+   * logger / metrics instead. Errors thrown by the handler itself are
+   * swallowed so observability never crashes the run.
+   */
+  onError?: ExporterErrorHandler;
+};
+
+/**
  * Drive the source end of the Panoptic pipeline: ingest core
  * `@warlock.js/ai` {@link BaseReport} trees, project them into {@link
  * Trace}s, and fan each trace out to every registered exporter.
@@ -20,7 +39,10 @@ import { reportToTrace } from "./report-to-trace";
  * into the originating run — `collect`, `flush`, and `shutdown` settle
  * every exporter independently (mirrors how the core event hooks
  * swallow consumer errors). One broken exporter can neither crash the
- * agent loop nor stop sibling exporters from receiving the trace.
+ * agent loop nor stop sibling exporters from receiving the trace. The
+ * failure is still **surfaced** — via the `onError` option, or a one-time
+ * `console.warn` per exporter — so a misconfiguration (e.g. a missing
+ * optional peer like `langfuse`) doesn't fail silently.
  */
 class Collector implements CollectorContract {
   /**
@@ -31,11 +53,17 @@ class Collector implements CollectorContract {
   private readonly exporters = new Map<string, ExporterContract>();
 
   /**
-   * Content-capture options threaded into every `toTrace` projection.
-   * When `captureContent` is set, projected spans carry `input` /
-   * `output`; otherwise they stay metadata-only.
+   * Exporters already warned about on the default error path — so a
+   * persistent misconfiguration surfaces once, not on every trace.
    */
-  public constructor(private readonly options: ContentCaptureOptions = {}) {}
+  private readonly warnedExporters = new Set<string>();
+
+  /**
+   * Collector options: content capture threaded into every `toTrace`
+   * projection (`captureContent` populates span `input` / `output`), plus
+   * an optional `onError` for isolated exporter failures.
+   */
+  public constructor(private readonly options: CollectorOptions = {}) {}
 
   public use(exporter: ExporterContract): this {
     if (!this.exporters.has(exporter.name)) {
@@ -98,9 +126,40 @@ class Collector implements CollectorContract {
   private async settleAll(
     task: (exporter: ExporterContract) => void | Promise<void>,
   ): Promise<void> {
-    const runs = [...this.exporters.values()].map((exporter) => Promise.resolve().then(() => task(exporter)));
+    const runs = [...this.exporters.entries()].map(([name, exporter]) =>
+      Promise.resolve()
+        .then(() => task(exporter))
+        .catch((error: unknown) => this.reportExporterError(name, error)),
+    );
 
     await Promise.allSettled(runs);
+  }
+
+  /**
+   * Surface an isolated exporter failure. The originating run never sees it
+   * (the isolation guarantee holds), but a silent failure is the wrong
+   * default for a config error — e.g. a missing optional peer like
+   * `langfuse` would otherwise drop every trace with no signal. The
+   * supplied `onError` is called, or — by default — a `console.warn` is
+   * emitted ONCE per exporter so the cause is visible without spamming.
+   */
+  private reportExporterError(name: string, error: unknown): void {
+    if (this.options.onError) {
+      try {
+        this.options.onError(name, error);
+      } catch {
+        // Never let the error handler itself escape into the run.
+      }
+      return;
+    }
+
+    if (this.warnedExporters.has(name)) {
+      return;
+    }
+
+    this.warnedExporters.add(name);
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[panoptic] exporter "${name}" failed and was isolated: ${message}`);
   }
 }
 
@@ -116,6 +175,6 @@ class Collector implements CollectorContract {
  * // on shutdown:
  * await collector.shutdown();
  */
-export function createCollector(options: ContentCaptureOptions = {}): CollectorContract {
+export function createCollector(options: CollectorOptions = {}): CollectorContract {
   return new Collector(options);
 }

@@ -120,10 +120,17 @@ export type TraceSpan = {
 export type TraceSpanError = {
   /** Stable error identifier (typed framework error name when available). */
   type: string;
-  /** Human-readable message. */
+  /** Human-readable message — secret-scrubbed before storage (S4). */
   message: string;
-  /** Optional captured stack trace, when the source error carried one. */
+  /** Optional captured stack trace, secret-scrubbed when present (S4). */
   stack?: string;
+  /**
+   * Optional redacted view of the error's `cause` (S4) — a raw provider
+   * SDK error can carry `Authorization` / `x-api-key` / `cookie` on its
+   * headers, so the cause is deep-redacted (sensitive keys stripped)
+   * before it is attached.
+   */
+  cause?: unknown;
 };
 
 /**

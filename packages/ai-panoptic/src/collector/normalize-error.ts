@@ -1,3 +1,4 @@
+import { redact, scrubSecrets } from "@warlock.js/ai";
 import type { TraceSpanError } from "../contracts/trace.type";
 
 /**
@@ -28,7 +29,7 @@ export function normalizeError(error: unknown): TraceSpanError | undefined {
   if (typeof error !== "object") {
     return {
       type: "Error",
-      message: String(error),
+      message: scrubSecrets(String(error)),
     };
   }
 
@@ -37,19 +38,30 @@ export function normalizeError(error: unknown): TraceSpanError | undefined {
     name?: unknown;
     message?: unknown;
     stack?: unknown;
+    cause?: unknown;
   };
 
   const type = pickString(candidate.code) ?? pickString(candidate.name) ?? "Error";
   const message = pickString(candidate.message) ?? "";
   const stack = pickString(candidate.stack);
 
+  // Scrub free-text secrets (Bearer tokens, api keys) from the message and
+  // stack, and deep-redact the cause (a raw provider SDK error can carry
+  // auth/cookie headers) before either is stored or exported (S4).
   const normalized: TraceSpanError = {
     type,
-    message,
+    message: scrubSecrets(message),
   };
 
   if (stack !== undefined) {
-    normalized.stack = stack;
+    normalized.stack = scrubSecrets(stack);
+  }
+
+  if (candidate.cause !== undefined && candidate.cause !== null) {
+    normalized.cause =
+      typeof candidate.cause === "object"
+        ? redact(candidate.cause)
+        : scrubSecrets(String(candidate.cause));
   }
 
   return normalized;

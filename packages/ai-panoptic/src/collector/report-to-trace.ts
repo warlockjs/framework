@@ -21,11 +21,14 @@ import { reportToSpan } from "./report-to-span";
  * without dispatching to exporters.
  *
  * The optional `rootError` threads the failing run's envelope error
- * (`BaseResult.error`) onto the root span. The error lives on the result
- * envelope, never on the `BaseReport` tree, so without this a failed root
- * would export `status` with no error type/message. Applied only when the
- * root span carries none of its own; the subtree projection stays pure
- * (each child surfaces its own report-level error, if any).
+ * (`BaseResult.error`) onto the root span — a fallback for callers that
+ * hold the result envelope (the `attach`/middleware path). Root primitives
+ * now also stamp their terminal error onto the report itself
+ * (`BaseReport.error`), so the observe path — which delivers only the
+ * report, never the envelope — still surfaces a failed root's error.
+ * `rootError` is applied only when the projected root span carries none of
+ * its own; the subtree projection stays pure (each child surfaces its own
+ * report-level error, if any).
  *
  * @example
  * const trace = reportToTrace(result.report, result.error);

@@ -17,6 +17,8 @@ import type { BaseReport } from "@warlock.js/ai";
 type ReportExtensions = {
   model?: { name?: string; provider?: string };
   trips?: unknown[];
+  promptName?: string;
+  promptVersion?: string;
   workflowName?: string;
   supervisorName?: string;
   signature?: string;
@@ -70,7 +72,10 @@ export function extractSpanAttributes(report: BaseReport): Record<string, unknow
       break;
     }
 
-    case "supervisor": {
+    case "supervisor":
+    case "team": {
+      // ai.team reuses the supervisor engine, so a team report carries the
+      // same supervisorName / terminatedBy / iterations fields.
       addSupervisorAttributes(attributes, extensions);
       break;
     }
@@ -108,6 +113,18 @@ function addAgentAttributes(attributes: Record<string, unknown>, extensions: Rep
 
   if (extensions.model?.provider !== undefined) {
     attributes["agent.model.provider"] = extensions.model.provider;
+  }
+
+  // Prompt-version linkage (core `AgentReport.promptName` / `promptVersion`).
+  // Present only when the agent ran against a *named* `ai.prompts` builder;
+  // surfaced so the dashboard can group / filter runs by `name@version` and
+  // attribute behavior shifts to a specific prompt revision.
+  if (extensions.promptName !== undefined) {
+    attributes["agent.promptName"] = extensions.promptName;
+  }
+
+  if (extensions.promptVersion !== undefined) {
+    attributes["agent.promptVersion"] = extensions.promptVersion;
   }
 }
 

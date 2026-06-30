@@ -33,9 +33,10 @@
     "vitest": "^4.1.4"
   },
   "peerDependencies": {
-    "@warlock.js/ai": "*",
     "@opentelemetry/api": "*",
     "@opentelemetry/sdk-trace-base": "*",
+    "@warlock.js/ai": "*",
+    "@warlock.js/cache": "*",
     "langfuse": "*"
   },
   "peerDependenciesMeta": {
@@ -45,8 +46,14 @@
     "@opentelemetry/sdk-trace-base": {
       "optional": true
     },
+    "@warlock.js/cache": {
+      "optional": true
+    },
     "langfuse": {
       "optional": true
     }
+  },
+  "dependencies": {
+    "langfuse": "^3.38.20"
   }
 }

@@ -110,6 +110,34 @@ describe("reportToSpan", () => {
 
     expect(span.attributes).toBeUndefined();
   });
+
+  it("surfaces prompt-version linkage (name + version) as agent attributes", () => {
+    const report = baseReport({
+      type: "agent",
+      model: { name: "gpt-4o", provider: "openai" },
+      trips: [{}],
+      promptName: "support-agent",
+      promptVersion: "3",
+    } as Partial<BaseReport>);
+
+    const span = reportToSpan(report);
+
+    expect(span.attributes?.["agent.promptName"]).toBe("support-agent");
+    expect(span.attributes?.["agent.promptVersion"]).toBe("3");
+  });
+
+  it("omits prompt linkage attributes when the run carried no named prompt", () => {
+    const report = baseReport({
+      type: "agent",
+      model: { name: "gpt-4o", provider: "openai" },
+      trips: [{}],
+    } as Partial<BaseReport>);
+
+    const span = reportToSpan(report);
+
+    expect(span.attributes?.["agent.promptName"]).toBeUndefined();
+    expect(span.attributes?.["agent.promptVersion"]).toBeUndefined();
+  });
 });
 
 describe("reportToSpan content capture", () => {
@@ -224,5 +252,32 @@ describe("reportToSpan content capture", () => {
     const span = reportToSpan(report, { captureContent: true });
 
     expect(span.output).toBeUndefined();
+  });
+
+  it("emits a [system, user] chat array when the agent has a system prompt", () => {
+    const report = baseReport({
+      type: "agent",
+      systemPrompt: "You are a senior engineer.",
+      trips: [{ input: "Review this code", output: "Looks good" }],
+    } as Partial<BaseReport>);
+
+    const span = reportToSpan(report, { captureContent: true });
+
+    expect(span.input).toEqual([
+      { role: "system", content: "You are a senior engineer." },
+      { role: "user", content: "Review this code" },
+    ]);
+    expect(span.output).toBe("Looks good");
+  });
+
+  it("keeps the bare user string when the agent has no system prompt", () => {
+    const report = baseReport({
+      type: "agent",
+      trips: [{ input: "hi", output: "hello" }],
+    } as Partial<BaseReport>);
+
+    const span = reportToSpan(report, { captureContent: true });
+
+    expect(span.input).toBe("hi");
   });
 });

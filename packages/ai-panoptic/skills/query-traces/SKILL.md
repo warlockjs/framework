@@ -1,6 +1,6 @@
 ---
 name: query-traces
-description: 'Retain @warlock.js/ai-panoptic traces in a queryable in-memory store and slice them after the fact — get one run by id, list a session, filter failed runs in a window, roll up usage + cost. Triggers: `createInMemoryTraceStore`, `TraceStoreContract`, `TraceQuery`, `TraceAggregate`, `InMemoryTraceStoreOptions`, `store.query`, `store.aggregate`, `store.get`, `store.add`, `store.clear`, `store.size`, `capacity`, `sumUsage`, `emptyUsage`, `matchTrace`; ''query collected traces'', ''aggregate AI cost per session'', ''how much did this session spend'', ''list failed runs'', ''retain traces in memory'', ''roll up token usage''; typical import `import { createInMemoryTraceStore } from "@warlock.js/ai-panoptic"`. Skip: sending traces to an external backend (OTel/Langfuse/console/file) — `@warlock.js/ai-panoptic/export-traces/SKILL.md`; wiring the subscriber into a run — `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`.'
+description: 'Retain @warlock.js/ai-panoptic traces in a queryable store — in-memory, or cache-backed so they survive a process restart — and slice them after the fact: get one run by id, list a session, filter failed runs in a window, roll up usage + cost. Triggers: `createInMemoryTraceStore`, `createCacheTraceStore`, `CacheTraceStoreHandle`, `CacheTraceStoreOptions`, `CacheDriverInput`, `store.ready`, `TraceStoreContract`, `TraceQuery`, `TraceAggregate`, `InMemoryTraceStoreOptions`, `store.query`, `store.aggregate`, `store.get`, `store.add`, `store.clear`, `store.size`, `capacity`, `prefix`, `onError`, `sumUsage`, `emptyUsage`, `matchTrace`; ''query collected traces'', ''aggregate AI cost per session'', ''how much did this session spend'', ''list failed runs'', ''retain traces in memory'', ''persist traces across a restart'', ''cache-backed trace store'', ''Redis trace store'', ''roll up token usage''; typical import `import { createInMemoryTraceStore, createCacheTraceStore } from "@warlock.js/ai-panoptic"`. Skip: sending traces to an external backend (OTel/Langfuse/console/file) — `@warlock.js/ai-panoptic/export-traces/SKILL.md`; wiring the subscriber into a run — `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`.'
 ---
 
 # Query traces — the in-memory queryable store
@@ -129,6 +129,57 @@ const store = createInMemoryTraceStore({ capacity: 1000 });
 Overwriting an existing `traceId` refreshes its insertion position, so a re-collected run is treated as newest for eviction — eviction stays honest under overwrite.
 
 > The in-memory store has no secondary indexes: `get` / `add` are O(1), `query` / `aggregate` are O(n) scans. That is the right trade-off for dev/test and modest-volume runtime use. For high-volume or durable retention, write a custom `TraceStoreContract` (or export to a backend with [`export-traces`](@warlock.js/ai-panoptic/export-traces/SKILL.md)) backed by a real datastore.
+
+## Persisting across a restart — `createCacheTraceStore`
+
+The in-memory store loses everything when the process exits. `createCacheTraceStore(cache, options?)` is a **durable** `TraceStoreContract` (and `ExporterContract`) backed by any `@warlock.js/cache` `CacheDriver` — Redis, file, Postgres, … — so traces survive a restart and the dashboard re-opens with history intact.
+
+```ts
+import { createCacheTraceStore } from "@warlock.js/ai-panoptic";
+import { RedisCacheDriver } from "@warlock.js/cache";
+
+// A driver instance, or a (possibly async) FACTORY resolved lazily on first
+// use — the factory form defers the Redis connect until the first trace is
+// collected, so module import stays connection-free.
+const store = createCacheTraceStore(async () => {
+  const driver = new RedisCacheDriver();
+  await driver.connect();
+  return driver;
+});
+
+await store.ready();   // hydrate the in-memory mirror from a prior run
+collector.use(store);  // fills as traces complete; reads stay synchronous
+
+const failed = store.query({ status: "failed" }); // queryable like any store
+```
+
+**Write-through over a sync contract.** The store keeps the same insertion-ordered in-memory **mirror** the in-memory store uses and serves every read (`get` / `query` / `aggregate` / `size`) from it synchronously — the dashboard polls these and can't await a cache. Writes go **through**: `add` updates the mirror immediately, then *fire-and-forget* persists the trace + a newest-first index to the cache. So:
+
+- **Reads never wait on the cache** — the mirror is the runtime source of truth; the cache is the durable backing store.
+- **A flaky cache never throws into the hot path** — a rejected write is routed to the optional `onError` hook and swallowed; the trace stays visible in the mirror for the life of the process, it just won't survive a restart.
+- **`ready()` re-hydrates** the mirror from the persisted index on startup (await it once — `ai.config({ panoptic: { cache } })` does this for you before serving the dashboard).
+
+```ts
+type CacheDriverInput =
+  | CacheDriver           // a live driver
+  | (() => CacheDriver | Promise<CacheDriver>); // lazy (sync or async) factory
+
+type CacheTraceStoreOptions = {
+  prefix?: string;   // key namespace; per-trace keys `${prefix}:trace:${id}`,
+                     // index at `${prefix}:index`. Default "panoptic".
+  capacity?: number; // FIFO cap (oldest-ingested evicted from cache + mirror);
+                     // absent / 0 = unbounded.
+  onError?: (error: unknown) => void; // swallowed cache-write failures land here.
+};
+
+type CacheTraceStoreHandle = TraceStoreContract & ExporterContract & {
+  ready(): Promise<void>; // hydrate the mirror from the cache on startup
+};
+```
+
+Ordering uses an **internal monotonic counter**, not `Date.now()`, so the persisted index stays a stable total order even when many traces land in the same millisecond — FIFO eviction stays honest across a restart.
+
+> The usual path is declarative: `ai.config({ panoptic: { cache, dashboard: true } })` constructs this store, awaits `ready()`, and wires it under the dashboard for you — see [`use-local-dashboard/SKILL.md`](@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md). Reach for `createCacheTraceStore` directly only when you manage the store / collector yourself.
 
 ## Summing usage yourself
 

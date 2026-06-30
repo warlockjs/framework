@@ -70,7 +70,7 @@ export function reportToSpan(report: BaseReport, options?: ContentCaptureOptions
   }
 
   if (options?.captureContent) {
-    captureContent(span, report, options.redactContent);
+    captureContent(span, report, options);
   }
 
   return span;
@@ -80,7 +80,14 @@ export function reportToSpan(report: BaseReport, options?: ContentCaptureOptions
 type ContentReport = {
   input?: unknown;
   output?: unknown;
+  systemPrompt?: string;
   trips?: Array<{ input?: unknown; output?: unknown }>;
+  /**
+   * The full assembled conversation an agent run captured when its
+   * `captureMessages` option was set (core `AgentReport.messages`).
+   * Present only on opted-in agent runs; absent otherwise.
+   */
+  messages?: unknown;
 };
 
 /**
@@ -88,18 +95,33 @@ type ContentReport = {
  *
  * - Tools carry the call arguments + return value directly on the report
  *   (`ToolCall.input` / `ToolCall.output`).
- * - Agents carry a `trips[]` history; the first trip's `input` is the
- *   real user prompt, and the last NON-EMPTY trip `output` is the final
- *   response text. (A failed / max-trips run can end on a trip whose
- *   `output` is `""` or tool-call-only, so we scan back for the last one
- *   that carried text rather than surfacing an empty string. Intermediate
- *   trips also store a `"[tool results]"` placeholder upstream.)
+ * - Agents carry a `trips[]` history plus the resolved `systemPrompt`. The
+ *   input is emitted as a `[system, user]` chat array — so backends like
+ *   Langfuse render the full prompt as sent — or the bare user string when
+ *   there's no system prompt. The output is the last NON-EMPTY trip
+ *   `output` (the final response text); a failed / max-trips run can end on
+ *   a trip whose `output` is `""` or tool-call-only, so we scan back for the
+ *   last one that carried text. Intermediate trips store a `"[tool results]"`
+ *   placeholder upstream.
+ * - When {@link ContentCaptureOptions.fullHistory} is on AND the agent run
+ *   opted into `captureMessages` (so the report carries a `messages`
+ *   array), the *whole* `CapturedMessage[]` is emitted as `span.input`
+ *   instead of the `[system, user]` first-trip array — every role, every
+ *   trip. The output stays the last non-empty trip output. When `messages`
+ *   is absent the branch falls back to today's first-trip logic, so a run
+ *   that didn't opt in degrades gracefully.
  *
  * Each value is passed through the optional {@link ContentRedactor};
- * a redactor returning `undefined` drops the field.
+ * a redactor returning `undefined` drops the field. Under `fullHistory`
+ * the redactor receives the full array as a single value.
  */
-function captureContent(span: TraceSpan, report: BaseReport, redact?: ContentRedactor): void {
+function captureContent(
+  span: TraceSpan,
+  report: BaseReport,
+  options: ContentCaptureOptions,
+): void {
   const node = report as BaseReport & ContentReport;
+  const redact = options.redactContent;
 
   let input: unknown;
   let output: unknown;
@@ -107,8 +129,27 @@ function captureContent(span: TraceSpan, report: BaseReport, redact?: ContentRed
   if (report.type === "tool") {
     input = node.input;
     output = node.output;
+  } else if (
+    options.fullHistory &&
+    Array.isArray(node.messages) &&
+    node.messages.length > 0
+  ) {
+    // Full-history capture: the entire assembled conversation as a single
+    // input value. Output remains the agent's final response text.
+    input = node.messages;
+    output = Array.isArray(node.trips) ? lastNonEmptyOutput(node.trips) : undefined;
   } else if (Array.isArray(node.trips) && node.trips.length > 0) {
-    input = node.trips[0]?.input;
+    const userInput = node.trips[0]?.input;
+    // Emit a [system, user] chat array when the agent carried a system
+    // prompt, so backends (Langfuse) render the full prompt as sent;
+    // otherwise keep the bare user string.
+    input =
+      typeof node.systemPrompt === "string" && node.systemPrompt.length > 0
+        ? [
+            { role: "system", content: node.systemPrompt },
+            { role: "user", content: userInput },
+          ]
+        : userInput;
     output = lastNonEmptyOutput(node.trips);
   }
 

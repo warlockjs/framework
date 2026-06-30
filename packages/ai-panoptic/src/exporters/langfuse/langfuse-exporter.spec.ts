@@ -310,4 +310,16 @@ describe("langfuseExporter", () => {
     expect(root?.body.metadata?.["warlock.cost.usd"]).toBeUndefined();
     expect(root?.body.metadata?.["warlock.report.type"]).toBe("agent"); // non-usage metadata stays
   });
+
+  it("sets the trace-level input/output from the root span's captured content", async () => {
+    const mock = makeMockClient();
+    const exporter = langfuseExporter({ client: mock.client });
+
+    await exporter.export(
+      makeTrace(makeSpan({ name: "agent", input: "the prompt", output: "the reply" })),
+    );
+
+    expect(mock.getTraceBody()?.input).toBe("the prompt");
+    expect(mock.getTraceBody()?.output).toBe("the reply");
+  });
 });

@@ -40,6 +40,10 @@ export type LangfuseTraceBody = {
   version?: string;
   timestamp?: Date;
   metadata?: Record<string, unknown>;
+  /** Root input surfaced at trace level (set only under content capture). */
+  input?: unknown;
+  /** Root output surfaced at trace level (set only under content capture). */
+  output?: unknown;
 };
 
 /** Subset of the Langfuse observation-creation body Panoptic populates. */

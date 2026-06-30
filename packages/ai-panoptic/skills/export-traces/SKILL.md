@@ -1,6 +1,6 @@
 ---
 name: export-traces
-description: 'Send @warlock.js/ai-panoptic traces to an observability backend via pluggable exporters. Triggers: `consoleExporter`, `fileExporter`, `otelExporter`, `langfuseExporter`, `ExporterContract`, `toGenAiAttributes`, `walkSpans`, `totalCostUsd`, `GEN_AI_ATTRIBUTES`, `WARLOCK_ATTRIBUTES`, `reportToTrace`, `reportToSpan`, `extractSpanAttributes`, `normalizeError`, `formatSpanLine`, `createPanopticMiddleware`; ''export AI traces to OpenTelemetry'', ''send traces to Langfuse'', ''log traces to console / a file'', ''gen_ai semantic conventions'', ''write a custom exporter''; typical import `import { otelExporter, langfuseExporter, consoleExporter, fileExporter } from "@warlock.js/ai-panoptic"`. Skip: wiring the subscriber/collector into a run — `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`; the core report shape — `@warlock.js/ai/run-ai-agent/SKILL.md`.'
+description: 'Send @warlock.js/ai-panoptic traces to an observability backend via pluggable exporters, including capturing prompt/response content onto spans. Triggers: `consoleExporter`, `fileExporter`, `otelExporter`, `langfuseExporter`, `ExporterContract`, `ContentCaptureOptions`, `captureContent`, `redactContent`, `fullHistory`, `ContentRedactor`, `toGenAiAttributes`, `walkSpans`, `totalCostUsd`, `GEN_AI_ATTRIBUTES`, `WARLOCK_ATTRIBUTES`, `reportToTrace`, `reportToSpan`, `extractSpanAttributes`, `normalizeError`, `formatSpanLine`, `createPanopticMiddleware`; ''export AI traces to OpenTelemetry'', ''send traces to Langfuse'', ''log traces to console / a file'', ''capture the full prompt/conversation onto a span'', ''gen_ai semantic conventions'', ''write a custom exporter''; typical import `import { otelExporter, langfuseExporter, consoleExporter, fileExporter } from "@warlock.js/ai-panoptic"`. Skip: wiring the subscriber/collector into a run — `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`; the core report shape — `@warlock.js/ai/run-ai-agent/SKILL.md`.'
 ---
 
 # Export traces — the sink end of Panoptic
@@ -93,6 +93,38 @@ collector.use(langfuseExporter({ client: myLangfuse }));
 - A token-producing span (`usage.total > 0`) becomes a **generation** (carries `usage`); a pure tool/callback becomes a plain **span**.
 - Children nest under their parent observation; timing, `version`, and status (failed → `ERROR` level) are mapped.
 - `flush()` / `shutdown()` delegate to the client's `flushAsync()` / `shutdownAsync()` — call `collector.shutdown()` on teardown so buffered observations are sent.
+
+## Content capture — what reaches the `input` / `output` fields
+
+Exporters surface `span.input` / `span.output` (console `in:` / `out:`, file JSON, OTel `gen_ai.prompt` / `gen_ai.completion`, Langfuse native `input` / `output`) only when **content capture** is enabled on the collector or subscriber. It's `ContentCaptureOptions`, set on `createCollector(...)` or `panoptic(...)`:
+
+```ts
+panoptic({
+  exporters: [langfuseExporter({ /* ... */ })],
+  captureContent: true,                 // copy prompts/responses + tool args/results onto spans
+  redactContent: (value, { field }) =>  // optional masker, per value
+    field === "input" ? "[redacted]" : value,
+  fullHistory: true,                    // emit the WHOLE conversation as span.input (see below)
+});
+```
+
+Off by default — payloads are large and frequently sensitive. With `captureContent`, an agent span's `input` is a `[system, user]` chat array (or the bare user string when there's no system prompt) and its `output` is the last non-empty trip's text; a tool span carries its call args + result.
+
+### `fullHistory` — emit the entire `CapturedMessage[]`
+
+`fullHistory: true` replaces the `[system, user]` first-trip array on `span.input` with the agent's **complete assembled conversation** — every trip, every role (system / user / assistant / tool). The `output` stays the final response text.
+
+```ts
+// upstream: the agent run MUST opt into capturing its messages
+const result = await agent.execute(input, { captureMessages: true });
+//                                          ^ core @warlock.js/ai — makes report.messages present
+
+panoptic({ exporters: [...], captureContent: true, fullHistory: true });
+```
+
+**Requires the upstream `captureMessages`.** `fullHistory` reads `report.messages` (the captured `CapturedMessage[]`). When the run did NOT opt into `captureMessages`, `report.messages` is absent and the branch **degrades gracefully** to today's first-trip `[system, user]` capture — never an error, just less history. The whole array is passed through `ContentRedactor` as a single value, so masking still applies to captured history.
+
+Reach for `fullHistory` when a backend (Langfuse) should show the full multi-turn / tool-loop transcript a run actually sent, not just its opening prompt.
 
 ## Shared utilities
 

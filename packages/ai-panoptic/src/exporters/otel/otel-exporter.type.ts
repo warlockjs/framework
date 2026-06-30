@@ -1,11 +1,11 @@
-import type { Tracer } from "@opentelemetry/api";
+import type { OtelTracer } from "./otel-api.shim.type";
 
 /**
  * Options for {@link otelExporter}.
  *
  * The exporter never owns a `TracerProvider` — wiring the SDK
  * (`@opentelemetry/sdk-trace-base`, exporters, processors) is the host
- * app's job. Pass either a ready {@link Tracer} or a name and let the
+ * app's job. Pass either a ready {@link OtelTracer} or a name and let the
  * exporter fetch one from the globally registered provider via
  * `trace.getTracer(name)`.
  */
@@ -14,8 +14,12 @@ export type OtelExporterOptions = {
    * A `Tracer` to emit spans on. When omitted, the exporter lazily calls
    * `trace.getTracer(tracerName, tracerVersion)` against the globally
    * registered provider, so it works with whatever SDK the app set up.
+   *
+   * Typed against the local {@link OtelTracer} shim so this package
+   * type-checks without the optional `@opentelemetry/api` peer installed;
+   * a real OTel `Tracer` is structurally assignable.
    */
-  tracer?: Tracer;
+  tracer?: OtelTracer;
   /**
    * Instrumentation-scope name passed to `trace.getTracer` when `tracer`
    * is not supplied. Defaults to `"@warlock.js/ai-panoptic"`.

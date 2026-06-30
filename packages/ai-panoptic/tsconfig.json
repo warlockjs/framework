@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "CommonJS",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ES2022",
     "moduleResolution": "node",
     "strict": true,
     "esModuleInterop": true,
@@ -12,7 +13,8 @@
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
-      "@warlock.js/ai": ["../ai/src"]
+      "@warlock.js/ai": ["../ai/src"],
+      "@warlock.js/cache": ["../cache/src"]
     }
   },
   "include": ["src/**/*"],

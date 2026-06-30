@@ -1,5 +1,6 @@
 // Main API
 export { createCollector } from "./collector";
+export type { CollectorOptions, ExporterErrorHandler } from "./collector";
 
 // Pure projections (for advanced use / testing without a collector)
 export { reportToTrace } from "./report-to-trace";

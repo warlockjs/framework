@@ -36,4 +36,14 @@ export type ContentCaptureOptions = {
   captureContent?: boolean;
   /** Optional masker applied to every captured value before it is stored. */
   redactContent?: ContentRedactor;
+  /**
+   * When `true`, emit the agent's complete `CapturedMessage[]` (every
+   * trip, every role) onto `span.input` instead of the `[system, user]`
+   * first-trip array. Requires the upstream run to set `captureMessages`
+   * (core `@warlock.js/ai`) so the report carries a `messages` array — a
+   * no-op falling back to first-trip capture when it doesn't. The whole
+   * array is still passed through the {@link ContentRedactor} as a single
+   * value, so masking applies to captured history too. Default `false`.
+   */
+  fullHistory?: boolean;
 };

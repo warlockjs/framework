@@ -1,11 +1,57 @@
 ---
 name: observe-with-panoptic
-description: 'Wire @warlock.js/ai-panoptic into an agent/workflow/supervisor/orchestrator with the one-call `panoptic({ exporters })` subscriber. Triggers: `panoptic`, `Panoptic`, `PanopticOptions`, `.attach`, `.middleware`, `.collect`, `.toTrace`, `observe.attach(agent)`, `panoptic().middleware()`, `completedEvents`, `middlewareName`; ''observe a warlock agent'', ''trace an agent run'', ''attach observability to a workflow/supervisor'', ''add a tracing middleware'', ''collect an orchestrator turn report'', ''wire OTel/Langfuse into my agent''; typical import `import { panoptic } from "@warlock.js/ai-panoptic"`. Skip: writing/choosing an exporter (the sink end) — `@warlock.js/ai-panoptic/export-traces/SKILL.md`; the core report shape / running the agent itself — `@warlock.js/ai/run-ai-agent/SKILL.md`.'
+description: 'Wire @warlock.js/ai-panoptic into an agent/workflow/supervisor/orchestrator — declaratively via `ai.config({ panoptic })` (registers panoptic on core''s Observer seam) or with the one-call `panoptic({ exporters })` subscriber. Triggers: `panoptic`, `Panoptic`, `PanopticOptions`, `PanopticConfig`, `ai.config({ panoptic })`, `observeAll`, per-flow `observe`, `FlowObserveOption`, `registerObserver`, `Observer`, `.attach`, `.middleware`, `.collect`, `.toTrace`, `observe.attach(agent)`, `panoptic().middleware()`, `completedEvents`, `middlewareName`; ''observe a warlock agent'', ''trace an agent run'', ''attach observability to a workflow/supervisor'', ''observe every flow by default'', ''add a tracing middleware'', ''collect an orchestrator turn report'', ''wire OTel/Langfuse into my agent''; typical import `import { ai } from "@warlock.js/ai"` + `import "@warlock.js/ai-panoptic"` (or `import { panoptic } from "@warlock.js/ai-panoptic"`). Skip: the zero-setup local dashboard — `@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md`; writing/choosing an exporter (the sink end) — `@warlock.js/ai-panoptic/export-traces/SKILL.md`; the core report shape / running the agent itself — `@warlock.js/ai/run-ai-agent/SKILL.md`.'
 ---
 
 # Observe a run with Panoptic — the one-call subscriber
 
-`panoptic(...)` is the entry point. It builds a collector, registers your exporters on it, and hands back a subscriber with **three ways to feed traces** in. All three converge on the same collector, so each run reaches every exporter exactly once.
+There are two levels. **Declarative** (`ai.config({ panoptic })`) is the high-level path: panoptic registers itself on core's generic `Observer` seam and every observed flow routes its report in automatically — no per-target wiring. **Imperative** (`panoptic(...)`) is the underlying subscriber, with three explicit feed paths. The declarative path is sugar over the imperative one; both reuse the same collection pipeline.
+
+## Declarative — `ai.config({ panoptic })` + the Observer seam
+
+The simplest wiring. Importing `@warlock.js/ai-panoptic` (even bare, for side effects) subscribes panoptic to core's config seam; a later `ai.config({ panoptic })` then builds the collector and **registers it once on core's `Observer` registry** via `registerObserver`. Core itself never imports panoptic — it depends only on the structural `Observer` interface (`{ collect(report) }`), the dependency inversion that keeps the two sides decoupled.
+
+```ts
+import { ai } from "@warlock.js/ai";
+import "@warlock.js/ai-panoptic"; // side-effect wiring — do this once at boot
+
+ai.config({
+  panoptic: {
+    exporters: [consoleExporter()],   // optional; a store-shaped exporter also feeds the dashboard
+    observeAll: true,                 // observe every flow by default
+    dashboard: true,                  // optional local viewer — see use-local-dashboard
+  },
+});
+```
+
+`PanopticConfig`: `exporters?` (the collector's sinks), `observeAll?` (default `false`), `dashboard?` (`boolean | DashboardOptions`). Applying it is **idempotent** — the observer registers once, the dashboard starts at most once; repeat `ai.config(...)` merges only refresh `observeAll`.
+
+### `observeAll` + per-flow `observe`
+
+Once a collector is registered, which flows actually route to it is controlled by core's `observe` seam:
+
+| Setting | Effect |
+|---|---|
+| `observeAll: true` (config) | Every `ai.agent` / `ai.workflow` / `ai.supervisor` / `ai.team` that left `observe` unset routes its completed report to the registered observers. |
+| `observe: true` (per-flow) | Force-observe **this** flow even when `observeAll` is off → the globally registered observers. |
+| `observe: false` (per-flow) | Opt **this** flow out entirely, even when `observeAll` is on. |
+| `observe: <Observer>` (per-flow) | A **flow-local** collector — only this flow's report, routed only to it (the global observers are skipped). A panoptic flow-local collector implements `Observer`, so pass it directly. |
+| (unset, `observeAll: false`) | Not observed — opt-in default, identical to legacy behavior. |
+
+```ts
+ai.agent({ model, observe: true });                       // always traced
+ai.workflow({ name: "billing", steps, observe: true });   // always traced
+ai.supervisor({ name: "triage", ..., observe: false });   // never traced, even under observeAll
+
+const flowLocal = panoptic({ exporters: [fileExporter({ path: "billing.jsonl" })] });
+ai.team({ name: "research", ..., observe: flowLocal });   // only this flow, only this collector
+```
+
+The flow awaits each observer's `collect`, and a throwing observer is **swallowed** — observability never breaks the run (mirrors `onUsage` / `onComplete`). `observe` lives on **all four** flow configs — `ai.agent`, `ai.workflow`, `ai.supervisor`, and `ai.team` (the agent additionally supports the imperative `attach()` / `middleware()` paths below).
+
+## Imperative — `panoptic(...)`, the one-call subscriber
+
+`panoptic(...)` builds a collector, registers your exporters on it, and hands back a subscriber with **three ways to feed traces** in. All three converge on the same collector, so each run reaches every exporter exactly once. Use it when you want explicit control, a flow-local collector, or to wire a target the declarative seam doesn't cover (the orchestrator).
 
 ```ts
 import { panoptic } from "@warlock.js/ai-panoptic";
@@ -123,6 +169,7 @@ Add exporters after construction with `observe.use(exporter)` (chainable, dedupe
 
 ## See also
 
+- [`@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md`](@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md) — the zero-setup local viewer the `ai.config({ panoptic: { dashboard } })` switch starts over the collector's store.
 - [`@warlock.js/ai-panoptic/export-traces/SKILL.md`](@warlock.js/ai-panoptic/export-traces/SKILL.md) — the sink end: choosing/writing an exporter, the `gen_ai.*` / `warlock.*` attribute mapping.
 - [`@warlock.js/ai-panoptic/query-traces/SKILL.md`](@warlock.js/ai-panoptic/query-traces/SKILL.md) — retaining traces in the queryable in-memory store and slicing them (`query` / `aggregate` / `capacity`).
 - [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent and the `BaseReport` shape Panoptic consumes.

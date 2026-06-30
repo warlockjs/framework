@@ -4,15 +4,42 @@ All notable changes to `@warlock.js/ai-panoptic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.5.0 - 2026-07-01
+
+### Added
+
+- **Zero-setup local dashboard** — `dashboard(store, options)` serves a loopback-only mini-Langfuse (default `127.0.0.1:4319`) with no Docker and no account: light / dark / system theme, a two-pane drawer (nested call tree / detail), a metadata panel, colour-coded Title-case type labels, arrow-coded token rollups (`↓input · ↑output · total`), per-node rollup cost, and the Warlock logo.
+- **Dashboard search / filter / grouping** — client-side free-text search, status / type / session / prompt filter chips, an errors-only toggle, and group-by Session / Prompt / Type with a per-type aggregate-stats panel (count, failure rate, p50 / p95 latency, tokens, cost).
+- **Cost heatmap, timeline view, and deep-links** — each node carries a cost-tinted accent; the drawer toggles between the call tree and a Gantt timeline (critical path highlighted); the open trace + span are reflected in the URL hash for shareable views.
+- **Prompt-version linkage** — agent spans stamp `agent.promptName` / `agent.promptVersion`; the dashboard filters and groups by the resolved `name@version` key.
+- **Cache-backed persistent trace store** — `createCacheTraceStore(cache, options)` persists traces through any `@warlock.js/cache` driver, serves reads from an in-memory mirror, and re-hydrates on `ready()` so traces survive a restart; `ai.config({ panoptic: { cache } })` wires it.
+- **Declarative `ai.config({ panoptic })`** — configure panoptic once; it registers on core's observer registry and starts the dashboard. Per-flow `observe` + `observeAll` opt flows into observation.
+- **`ContentCaptureOptions.fullHistory`** — capture the agent's complete message history on the span; agent content is emitted as a `[system, user]` chat array; Langfuse gets trace-level `input` / `output`.
+- **`onError` hook** — handle isolated exporter failures on `panoptic()` / `createCollector()`.
+- **Pure trace-list helpers** exported from the package root (`filterTraces` / `groupBySession` / `groupByPrompt` / `groupByType` / `aggregateByType` / `rollupCost` / …) so your own views mirror the dashboard's rules.
+
+### Changed
+
+- **Title-case status & type labels** across rows, drawer, chips, and group headers (underlying filter keys stay lowercase); `team` is a first-class dashboard type; type chips show only present types; drawer metadata keys are humanized; the group-by toggles became a single `Group` dropdown.
+
+### Fixed
+
+- **Isolated exporter failures no longer fail silently** — a failing exporter still never crashes the run, but now warns once (or calls `onError`).
+
+### Security
+
+- **Dashboard hardening** — bearer-token auth (`authToken`, required when binding off-loopback), a `Host`-header allowlist (DNS-rebinding guard), and security response headers (`nosniff` / `X-Frame-Options: DENY` / locked-down CSP) on every response.
+- **Error redaction** — captured error `message` / `stack` are scrubbed of secrets (Bearer tokens, API keys) and a retained `cause` is deep-redacted (auth / cookie headers stripped) before a trace is stored or exported.
+
 ## 4.4.0 - 2026-06-21
 
 ### Added
 
-- **Opt-in content capture.** `createCollector` / `panoptic({ captureContent, redactContent })` copies the agent prompt/response (first-trip input, last non-empty trip output) and each tool's args/result onto `TraceSpan.input` / `output`. Surfaced by `consoleExporter({ io, ioMaxChars })` (new `in:` / `out:` lines), the file exporter's JSON, OTel `gen_ai.prompt` / `gen_ai.completion`, and Langfuse native `input` / `output`. Off by default — payloads are large and often sensitive; a `ContentRedactor` masks each value. New exports: `ContentCaptureOptions`, `ContentRedactor`, `formatSpanIO`.
+- **Opt-in content capture.** `panoptic({ captureContent, redactContent })` copies the agent prompt / response and each tool's args / result onto spans, surfaced by the console (`io`), file, OTel (`gen_ai.prompt` / `gen_ai.completion`), and Langfuse exporters. Off by default; a `ContentRedactor` masks each value.
 
 ### Fixed
 
-- **Langfuse token accounting.** Generations now meter their OWN usage (rolled-up minus children); composite nodes with no own tokens emit as plain spans; the root execution is now emitted as an observation (its own tokens were previously unmetered); and the rolled-up usage/cost is stripped from observation metadata (the `usage` block is authoritative). Together these stop the trace total from double-counting nested spans.
+- **Langfuse token accounting** — generations now meter their own usage (rolled-up minus children) and the root execution is metered, so the trace total no longer double-counts nested spans.
 
 ## 4.3.0 - 2026-06-21
 
@@ -20,36 +47,17 @@ Initial release — observability collector + exporters for `@warlock.js/ai`.
 
 ### Added
 
-- `panoptic()` — the one-call subscriber factory. Builds a collector, registers exporters, and feeds traces three ways: `attach()` to an agent/workflow/supervisor `*.completed` event stream, `middleware()` for the agent pipeline, and `collect()` for a report directly (e.g. an orchestrator turn). Plus `use()`, `toTrace()`, `flush()`, `shutdown()`, and a `collector` accessor.
-- `createPanopticMiddleware()` — the underlying `AgentMiddleware` adapter feeding the collector from the `execute.after` / `execute.onError` hooks
-- `Panoptic` / `PanopticOptions` / `PanopticTarget` / `CompletedEventPayload` types
-- `panoptic` + middleware + types exported from the root barrel
-- `scripts/generate-llms.mjs` and the generated `llms.txt` / `llms-full.txt` projections of `skills/`
-- `skills/observe-with-panoptic/SKILL.md` — wiring the subscriber into a run
-- `consoleExporter()` — zero-dep exporter printing trace summary or full span tree
-- `fileExporter()` — zero-dep buffered JSON-Lines exporter with `flushEvery`
-- `otelExporter()` — OpenTelemetry exporter mapping spans to GenAI semantic conventions (`gen_ai.*`)
-- `langfuseExporter()` — Langfuse exporter mapping spans to traces, generations, and spans
-- `toGenAiAttributes()` / `walkSpans()` / `totalCostUsd()` exporter utilities
-- Optional peers `@opentelemetry/api` and `langfuse` are lazily imported by their exporters
-- `createCollector()` — consumes the core `BaseReport` tree, projects it to a `Trace`, fans out to exporters
-- `reportToTrace()` / `reportToSpan()` pure projections of a report node to spans
-- `createInMemoryTraceStore()` — queryable in-memory store, doubles as an `ExporterContract`
-- `TraceStoreContract` with `query` / `aggregate` by runId, sessionId, status, and time window
-- `TraceQuery` and `TraceAggregate` types for slicing and rolling up usage + cost
-- `sumUsage()` usage + cost rollup across stored traces, backed by core `accumulateCost`
-- optional `capacity` cap on the in-memory store with FIFO eviction
-- contract surface: `CollectorContract`, `ExporterContract`, and the vendor-neutral trace types `Trace` / `TraceSpan` / `TraceSpanError`, derived 1:1 from the core `BaseReport` tree and event stream
-- `@opentelemetry/api`, `@opentelemetry/sdk-trace-base`, and `langfuse` declared as OPTIONAL peer dependencies (lazily imported by the exporters that need them)
-- `skills/query-traces/SKILL.md` — dedicated skill for the in-memory queryable trace store (`createInMemoryTraceStore`, `query` / `aggregate`, `TraceQuery` / `TraceAggregate`, `capacity` FIFO eviction, `sumUsage` / `emptyUsage` / `matchTrace` helpers)
-
-### Changed
-
-- `skills/export-traces/SKILL.md` — OTel attribute notes: `gen_ai.system` / `gen_ai.request.model` / `gen_ai.operation.name` are only forwarded when the span's attribute bag carried them (`system` backfilled from options), never invented
+- `panoptic()` — the one-call subscriber factory: builds a collector, registers exporters, and feeds traces via `attach()`, `middleware()`, or `collect()`.
+- Exporters — `consoleExporter()`, `fileExporter()` (JSON-Lines), `otelExporter()` (GenAI semantic conventions), and `langfuseExporter()`. `@opentelemetry/*` and `langfuse` are optional peers, lazily imported.
+- `createInMemoryTraceStore()` — a queryable in-memory trace store (`query` / `aggregate` by runId, sessionId, status, time window; optional `capacity` FIFO cap) that doubles as an exporter.
+- Vendor-neutral trace contracts (`Trace` / `TraceSpan` / `CollectorContract` / `ExporterContract`) derived 1:1 from the core `BaseReport` tree, plus skills for observing, exporting, and querying traces.
 
 ### Fixed
 
-- **Failed root runs now carry their error in every export** — `collect()` / `reportToTrace()` / `attach()` / `middleware()` thread the result-envelope error (`BaseResult.error`) onto the root span (which `BaseReport` doesn't carry); `collect()` / `reportToTrace()` gained an optional `rootError` parameter
-- **Per-span exporters now receive every span** — the collector's `dispatch` walks the finalized tree (`walkSpans`), invoking `exportSpan` once per node (a post-completion per-span projection, not live streaming)
-- **`panoptic().middleware()` now works on a supervisor** — the middleware declares a `supervisor` hook map (not only `execute`), so `ai.supervisor({ middleware: [observe.middleware()] })` collects a trace
-- `totalCostUsd()` folds in `cost.reasoning`; the Langfuse exporter `end()`s every observation; the OTel exporter maps `max-iterations` / `awaiting-input` to `UNSET` (a hit cap no longer reads as clean success)
+- **Failed root runs now carry their error in every export** (threaded from the result envelope onto the root span).
+- **Per-span exporters now receive every span** (the collector walks the finalized tree).
+- **`panoptic().middleware()` now works on a supervisor** (the middleware declares a `supervisor` hook map).
+
+## 4.1.15
+
+- Baseline — per-package changelog tracking starts at this version.

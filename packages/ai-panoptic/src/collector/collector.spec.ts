@@ -151,6 +151,57 @@ describe("createCollector", () => {
     expect(healthy.traces).toHaveLength(1);
   });
 
+  it("calls onError when an exporter throws (instead of the default warn)", async () => {
+    const onError = vi.fn();
+    const broken: ExporterContract = {
+      name: "broken",
+      export() {
+        throw new Error("exporter blew up");
+      },
+    };
+    const collector = createCollector({ onError }).use(broken);
+
+    await collector.collect(rootReport());
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError.mock.calls[0]?.[0]).toBe("broken");
+    expect((onError.mock.calls[0]?.[1] as Error)?.message).toBe("exporter blew up");
+  });
+
+  it("warns once per exporter by default, even across multiple collects", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const broken: ExporterContract = {
+      name: "flaky",
+      export() {
+        throw new Error("boom");
+      },
+    };
+    const collector = createCollector().use(broken);
+
+    await collector.collect(rootReport());
+    await collector.collect(rootReport());
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toContain('exporter "flaky" failed');
+    warn.mockRestore();
+  });
+
+  it("swallows an onError handler that itself throws", async () => {
+    const broken: ExporterContract = {
+      name: "broken",
+      export() {
+        throw new Error("boom");
+      },
+    };
+    const collector = createCollector({
+      onError() {
+        throw new Error("handler also broke");
+      },
+    }).use(broken);
+
+    await expect(collector.collect(rootReport())).resolves.toBeUndefined();
+  });
+
   it("exposes toTrace as a pure projection without dispatching", () => {
     const exporter = recordingExporter("noop");
     const collector = createCollector().use(exporter);

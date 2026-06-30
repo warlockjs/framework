@@ -43,6 +43,8 @@ class PanopticSubscriber implements Panoptic {
       createCollector({
         captureContent: options.captureContent,
         redactContent: options.redactContent,
+        fullHistory: options.fullHistory,
+        onError: options.onError,
       });
 
     for (const exporter of options.exporters ?? []) {

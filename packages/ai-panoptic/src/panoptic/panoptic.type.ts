@@ -1,4 +1,5 @@
 import type { AgentMiddleware, BaseReport } from "@warlock.js/ai";
+import type { ExporterErrorHandler } from "../collector/collector";
 import type { ContentRedactor } from "../collector/content-capture.type";
 import type { CollectorContract } from "../contracts/collector.contract";
 import type { ExporterContract } from "../contracts/exporter.contract";
@@ -58,6 +59,20 @@ export type PanopticOptions = {
    * environment. See {@link ContentRedactor}.
    */
   redactContent?: ContentRedactor;
+  /**
+   * Emit the agent's full message history (every trip, every role) onto
+   * `span.input` instead of just the `[system, user]` first-trip array.
+   * Requires the agent run to set `captureMessages`. Default `false`.
+   */
+  fullHistory?: boolean;
+  /**
+   * Called when an exporter throws (and is isolated). By default a failing
+   * exporter logs a one-time `console.warn`; supply this to route the
+   * failure to your own logger / metrics instead. Applies only when
+   * Panoptic builds the collector (ignored when you inject your own
+   * `collector`). See {@link ExporterErrorHandler}.
+   */
+  onError?: ExporterErrorHandler;
 };
 
 /**

@@ -1,11 +1,12 @@
-import type {
-  Context,
-  Span,
-  SpanStatusCode as SpanStatusCodeEnum,
-  Tracer,
-} from "@opentelemetry/api";
 import type { ExporterContract, Trace, TraceSpan } from "../../contracts";
 import { toGenAiAttributes, GEN_AI_ATTRIBUTES } from "../utils";
+import type {
+  OtelApiModule,
+  OtelContext,
+  OtelSpan,
+  OtelSpanStatusCode,
+  OtelTracer,
+} from "./otel-api.shim.type";
 import type { OtelExporterOptions } from "./otel-exporter.type";
 
 const EXPORTER_NAME = "otel";
@@ -15,7 +16,7 @@ const DEFAULT_TRACER_NAME = "@warlock.js/ai-panoptic";
 // Lazily-loaded @opentelemetry/api (OPTIONAL peer)
 // ============================================================
 
-let OtelApi: typeof import("@opentelemetry/api");
+let OtelApi: OtelApiModule;
 let isModuleExists: boolean | null = null;
 let loadingPromise: Promise<void> | undefined;
 
@@ -48,7 +49,12 @@ function loadOtel(): Promise<void> {
 
   loadingPromise = (async () => {
     try {
-      OtelApi = await import("@opentelemetry/api");
+      // Indirect specifier so TS does not statically resolve the
+      // optional `@opentelemetry/api` peer at compile time (it is
+      // intentionally not installed). The result is structurally the
+      // `OtelApiModule` shim — the exporter only touches that surface.
+      const moduleName = "@opentelemetry/api";
+      OtelApi = (await import(moduleName)) as OtelApiModule;
       isModuleExists = true;
     } catch {
       isModuleExists = false;
@@ -101,7 +107,7 @@ export function otelExporter(options: OtelExporterOptions = {}): ExporterContrac
  * Resolve the `Tracer` spans are emitted on — the caller-supplied one,
  * or one fetched from the globally registered provider by name.
  */
-function resolveTracer(options: OtelExporterOptions): Tracer {
+function resolveTracer(options: OtelExporterOptions): OtelTracer {
   if (options.tracer) {
     return options.tracer;
   }
@@ -120,9 +126,9 @@ function resolveTracer(options: OtelExporterOptions): Tracer {
  * recurse under this span's context.
  */
 function emitSpan(
-  tracer: Tracer,
+  tracer: OtelTracer,
   span: TraceSpan,
-  parentContext: Context | undefined,
+  parentContext: OtelContext | undefined,
   options: OtelExporterOptions,
 ): void {
   const startTime = toEpochMillis(span.startedAt);
@@ -147,7 +153,7 @@ function emitSpan(
  * `gen_ai.system` from the exporter options when the span carried none.
  */
 function applyAttributes(
-  otelSpan: Span,
+  otelSpan: OtelSpan,
   span: TraceSpan,
   options: OtelExporterOptions,
 ): void {
@@ -192,8 +198,8 @@ function stringifyContent(value: unknown): string {
  * Map the Panoptic span status onto the OTel span status, recording the
  * normalized error as an exception event + ERROR status when present.
  */
-function applyStatus(otelSpan: Span, span: TraceSpan): void {
-  const codes: typeof SpanStatusCodeEnum = OtelApi.SpanStatusCode;
+function applyStatus(otelSpan: OtelSpan, span: TraceSpan): void {
+  const codes: OtelSpanStatusCode = OtelApi.SpanStatusCode;
 
   if (span.error) {
     otelSpan.recordException({
