@@ -905,6 +905,28 @@ query.groupBy("category", {
 
 **See also:** [Aggregates guide](../digging-deeper/aggregates.md)
 
+### `groupByDate(column, unit, aggregates?)`
+
+```ts
+groupByDate(
+  column: string,
+  unit: "day" | "week" | "month" | "year",
+  aggregates?: Record<string, RawExpression>,
+): this
+```
+
+**What it does:** portable date-bucketed `GROUP BY` — buckets `column` to the granularity and groups by the truncated value (Postgres `date_trunc`, MongoDB `$dateTrunc`), exposing the bucket under the column's own name. Optional `aggregates` follow the same rules as two-arg `groupBy`.
+
+```ts
+import { $agg, $expr } from "@warlock.js/cascade";
+
+query.groupByDate("created_at", "month", {
+  revenue: $agg.sum($expr.mul("price", "quantity")),
+});
+```
+
+**See also:** [Aggregates guide — date-bucketed grouping](../digging-deeper/aggregates.md)
+
 ### `groupByRaw(expression, bindings?)`
 
 ```ts

@@ -153,6 +153,8 @@ warlock seed --transaction       # run inside a transaction (default: true)
 
 Full `bootstrap: true` — seeds touch app models, so the whole app initializes. Slower than `migrate`; that's the price for being able to use model classes in your seed files.
 
+Authoring seed files — the `seeder()` factory, the `{ track, now, batchSize }` run context, `dependsOn` ordering, and undoing a seed — is covered in the [Seeding guide](../digging-deeper/seeding.md).
+
 ### `create-database <name>`
 
 Create a new database on the configured connection.
@@ -301,6 +303,34 @@ warlock sput ./public/logo.png assets/logo.png                  # alias
 | `--concurrency, -c`   | number  | `5`                                  | Number of concurrent uploads when uploading a directory.                             |
 
 Auto-detects file vs. directory. Files are streamed (no full-buffer-in-memory), so you can upload large assets without blowing the heap. Built for the "migrate from local storage to S3/R2" workflow.
+
+---
+
+## Diagnostics
+
+### `doctor`
+
+Run a set of read-only health checks (routes, config, connectors, optional peers, health endpoints, release hygiene) and print a pass/warn/fail report. Exits non-zero when any check fails.
+
+```bash
+warlock doctor
+```
+
+No flags. Bootstraps app code so routes and connectors are registered for introspection, but starts no connectors — it never opens a database/cache/socket connection. The full check list, statuses, exit-code semantics, and CI usage are in the [`warlock doctor` guide](./doctor.md).
+
+### `routes`
+
+List the registered HTTP routes as a verb-colored table — method, path, name, controller action, middleware count, and source file. Read-only and connector-free, like `doctor`.
+
+```bash
+warlock routes                 # the table
+warlock routes --method GET    # filter by verb
+warlock routes --path /users   # filter by path substring
+warlock routes --name users    # filter by route-name substring
+warlock routes --json          # machine-readable rows (pipe to jq / CI)
+```
+
+Bootstraps app code so route modules register, but starts no connectors. Because the route-module loader is fail-loud, a route file that throws on import surfaces here instead of being silently dropped. Full output, filters, and JSON shape are in the [`warlock routes` guide](./routes.md).
 
 ---
 

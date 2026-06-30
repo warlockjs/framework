@@ -7,7 +7,7 @@ sidebar:
 
 Cascade's query builder isn't only for finding records — it crunches numbers too. Sum a column, group by category, filter by the aggregate result, sort the report. The same vocabulary works on MongoDB and Postgres; you don't write driver-specific syntax for the common cases.
 
-This page covers the whole single-chain aggregation family: simple aggregates (`count`/`sum`/`avg`/`min`/`max`/`countDistinct`), grouping (`groupBy`), filtering grouped results (`having`), and the driver-agnostic `$agg` helpers. Multi-stage analytics (window functions, cross-table rollups) is the [Expressions guide](./expressions.md) and the [Reporting recipe](../recipes/reporting.md).
+This page covers the whole single-chain aggregation family: simple aggregates (`count`/`sum`/`avg`/`min`/`max`/`countDistinct`), grouping (`groupBy` and the portable date-bucketing `groupByDate`), filtering grouped results (`having`), the driver-agnostic `$agg` helpers, and the typed column-expression DSL for summing computed values. Multi-stage analytics (window functions, cross-table rollups) is the [Expressions guide](./expressions.md) and the [Reporting recipe](../recipes/reporting.md).
 
 ## Simple aggregates — no grouping
 
@@ -113,6 +113,101 @@ await Order.query()
 ```
 
 Driver-specific; use sparingly. The structured `groupBy` form carries across drivers, `groupByRaw` doesn't.
+
+## Date-bucketed grouping — `groupByDate`
+
+Time-series reports — "revenue per month", "signups per day" — need to group rows into date buckets. Doing that portably is fiddly: Postgres wants `date_trunc('month', column)` and MongoDB wants `$dateTrunc`. `groupByDate` is the cross-driver shape that hides the difference:
+
+```ts
+import { $agg } from "@warlock.js/cascade";
+
+const monthly = await Order.query()
+  .groupByDate("created_at", "month", {
+    revenue: $agg.sum("amount"),
+    orders: $agg.count(),
+  })
+  .get();
+// each row: { created_at, revenue, orders } — created_at is the bucket start
+```
+
+`groupByDate(column, unit, aggregates?)` buckets `column` to the given granularity and groups by the truncated value, exposing the bucket under the column's own name in the result. The `unit` is one of **`"day"` / `"week"` / `"month"` / `"year"`**. The optional `aggregates` follow the exact same rules as the two-arg `groupBy` (the `$agg.*` helpers or driver-native raw expressions).
+
+Under the hood:
+
+- **Postgres** — `date_trunc('<unit>', "column")`
+- **MongoDB** — `{ $dateTrunc: { date: "$column", unit } }` in the `$group` `_id`
+
+The same call runs on both drivers. Combine it with `orderBy` on the bucket column for a chronological report:
+
+```ts
+await Order.query()
+  .where("status", "completed")
+  .groupByDate("created_at", "day", { revenue: $agg.sum("amount") })
+  .orderBy("created_at", "asc")
+  .get();
+```
+
+## Expression-aware sums — `$agg.sum(expr)` and `$agg.sumRaw`
+
+`$agg.sum` accepts a bare column name (the everyday case), but it also accepts a **typed column expression** so you can sum a computed value such as `price * quantity` without dropping to a raw string:
+
+```ts
+import { $agg, $expr } from "@warlock.js/cascade";
+
+const revenue = await Order.query()
+  .groupByDate("created_at", "month", {
+    revenue: $agg.sum($expr.mul("price", "quantity")), // SUM(price * quantity)
+  })
+  .get();
+```
+
+The bare-column form is unchanged — `$agg.sum("amount")` still produces the identical payload it always did — so existing call sites keep working. Passing an expression node is purely additive.
+
+### The column-expression DSL
+
+The expression builders are grouped under a single `$expr` object (mirroring `$agg`), so the scalar arithmetic that feeds an aggregate reads as one discoverable namespace:
+
+```ts
+import { $expr } from "@warlock.js/cascade";
+```
+
+| Builder                  | Meaning                                       |
+| ------------------------ | --------------------------------------------- |
+| `$expr.col("price")`     | a column reference (driver-quoted/escaped)    |
+| `$expr.lit(1.2)`         | a numeric/boolean literal                     |
+| `$expr.mul(a, b, …)`     | multiply (variadic)                           |
+| `$expr.add(a, b, …)`     | add (variadic)                                |
+| `$expr.sub(left, right)` | subtract                                      |
+| `$expr.div(left, right)` | divide                                        |
+| `$expr.raw("…")`         | raw SQL fragment escape hatch                 |
+
+The nodes nest, and a bare string anywhere a node is expected is treated as a column reference (`"price"` === `$expr.col("price")`). So `$expr.mul("price", $expr.lit(1.2))` is "price × 1.2", and `$expr.mul($expr.col("price"), $expr.col("quantity"))` is "price × quantity". Each compiles portably:
+
+- **Postgres** — `SUM(("price" * "quantity"))`
+- **MongoDB** — `{ $sum: { $multiply: ["$price", "$quantity"] } }`
+
+Only `$expr.raw` ever embeds an uninterpreted string. Everything else flows column names through the driver's identifier-quoting path, so a user-supplied column name is never string-interpolated into SQL — reach for the typed builders first.
+
+### `$agg.sumRaw` — the raw escape hatch
+
+When the typed builders can't express the fragment (a vendor function, a complex parenthesized formula), `$agg.sumRaw(expression)` wraps a raw string and sums it. It's equivalent to `$agg.sum($expr.raw(expression))`:
+
+```ts
+await Order.query()
+  .groupBy("category", {
+    net: $agg.sumRaw("price * quantity * (1 - discount)"),
+  })
+  .get();
+```
+
+- **Postgres** — `SUM(price * quantity * (1 - discount))`
+- **MongoDB** — **throws.** A raw SQL fragment isn't portable to a MongoDB pipeline, so on MongoDB use the typed `$agg.sum($expr.mul(...))` form (or `groupByRaw`) instead.
+
+:::caution — `sumRaw` is a raw string
+
+The fragment is emitted verbatim into the generated query — **never build it from untrusted input.** Use the typed `$agg.sum(...)` / `$expr.col` / `$expr.mul` builders for anything driven by user data; `sumRaw` is for static, developer-authored formulas only.
+
+:::
 
 ## Filtering grouped results — `having`
 

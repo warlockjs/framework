@@ -92,7 +92,7 @@ These are the methods you'll reach for daily. Every repository inherits them fro
 | `findOrCreate(where, data)`           | `T`                                          | upsert-by-where (insert if missing)     |
 | `updateOrCreate(where, data)`         | `T`                                          | true upsert                             |
 
-There's also `chunk(size, callback)` for processing large datasets without loading everything into memory, and `listActive/findActive/...` variants that auto-add an `isActive` filter — see [Repositories — deep dive](./repositories-deep.md).
+There's also `chunk(size, callback)` for processing large datasets without loading everything into memory, the filter-aware aggregates `sum / avg / min / max / groupBy / aggregate` (see [Aggregation](#aggregation--sum--avg--min--max--groupby--aggregate) below), and `listActive/findActive/...` variants that auto-add an `isActive` filter — see [Repositories — deep dive](./repositories-deep.md).
 
 ## The pagination shape
 
@@ -209,6 +209,55 @@ await productsRepository.delete(product.id);
 These also fire the model's lifecycle events (`creating` → `created`, `updating` → `updated`, `deleting` → `deleted`), which is how the cache invalidation hook above stays in sync. See **[Events and hooks](/v/latest/cascade/architecture-concepts/events-and-hooks/)** in the Cascade docs for the full event surface.
 
 You can also `create()` directly on the model — `Product.create(...)` — when you're inside a service and don't need the repository's filter machinery. Both paths fire the same events; pick whichever reads cleaner.
+
+## Aggregation — `sum` / `avg` / `min` / `max` / `groupBy` / `aggregate`
+
+The repository exposes filter-aware aggregates that run **through the same `filterBy` machinery as `list()` and `count()`**. Each one applies the repository options first — `filterBy` (with its operator-injection guard), `where`, scopes, default options — and *then* runs the aggregate, so the result is always scoped by the same filters the rest of the repository honors. You don't reach into the model's query builder and re-implement filtering by hand.
+
+```ts
+// Scalar aggregates — same options shape as list() / count()
+const revenue = await ordersRepository.sum("total", { status: "paid" });
+const average = await ordersRepository.avg("total", { status: "paid" });
+const cheapest = await ordersRepository.min("total");
+const priciest = await ordersRepository.max("total");
+```
+
+| Method                                   | Returns               |
+| ---------------------------------------- | --------------------- |
+| `sum(field, options?)`                   | `Promise<number>`     |
+| `avg(field, options?)`                   | `Promise<number>`     |
+| `min(field, options?)`                   | `Promise<number>`     |
+| `max(field, options?)`                   | `Promise<number>`     |
+| `groupBy<R>(fields, aggregates, options?)` | `Promise<R[]>`      |
+| `aggregate<R>(aggregates, options?)`     | `Promise<R \| null>`  |
+
+`groupBy` and `aggregate` take the same driver-agnostic `$agg.*` expressions Cascade's query builder uses:
+
+```ts
+import { $agg } from "@warlock.js/cascade";
+
+// Grouped report — every group scoped by the filterBy options
+const byStatus = await ordersRepository.groupBy(
+  "status",
+  { count: $agg.count(), total: $agg.sum("total") },
+  { paidAfter: "2026-01-01" },
+);
+// each row: { status, count, total }
+
+// Whole-set summary (single row, or null when empty)
+const summary = await ordersRepository.aggregate(
+  { total: $agg.sum("total"), avg: $agg.avg("total") },
+  { status: "paid" },
+);
+```
+
+The `options` argument is the same `TypedRepositoryOptions` shape every other method takes — pass filter keys from `filterBy`, `where`, scopes, etc. The aggregate is scoped by them exactly as a `list()` would be. See the Cascade [Aggregates guide](/v/latest/cascade/digging-deeper/aggregates/) for the full `$agg.*` vocabulary, `groupByDate`, and expression-aware sums.
+
+:::note — Why filter-first matters
+
+A naive `repo.sum(...)` that skipped `filterBy` would silently sum *every* row, ignoring the caller's filters and the operator-injection guard `list()` relies on. These methods deliberately mirror `count()`: options in, query built, *then* aggregate — so a controller can hand request filters straight to `repo.sum("total", request.all())` with the same safety guarantees as `repo.list(request.all())`.
+
+:::
 
 ## A real example end-to-end
 

@@ -129,5 +129,6 @@ Continue to **[Querying](./02-querying.md)** for the read story — filtering, o
 
 - **Soft vs hard vs trash delete, plus restore:** [Delete strategies guide](../digging-deeper/delete-strategies.md)
 - **Lifecycle hooks** (`beforeSave`, `afterDestroy`, etc.): [Events & hooks guide](../architecture-concepts/events-and-hooks.md)
+- **Bulk inserts** — `Model.createMany(rows, options?)` with chunking and a native multi-row `bulk` path: [Bulk inserts guide](../digging-deeper/bulk-inserts.md)
 - **Bulk updates and deletes** — `Model.delete(filter)` and query-builder mass mutations
 - **Dirty tracking** — knowing which fields changed before save: [Dirty tracking guide](../architecture-concepts/dirty-tracking.md)
