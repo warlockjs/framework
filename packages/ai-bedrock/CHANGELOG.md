@@ -8,10 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- **Cost-truth contract wiring.** Capabilities now report `reasoning`, `promptCaching`, `pdf`, and `audio` truthfully per model family (inferred from the model id, overridable via `bedrock.model({ name, reasoning?, promptCaching?, pdf?, audio? })`): `reasoning` for Claude 3.7 + Claude 4, `promptCaching` for Claude 3.5+/3.7/4 and Nova, `pdf` for Claude 3+ and Nova, `audio` defaulting to `false`.
-- **Reasoning / extended thinking.** `ModelCallOptions.reasoning` maps to Converse `additionalModelRequestFields.thinking = { type: "enabled", budget_tokens }` for reasoning-capable models — `reasoning.maxTokens` is the explicit budget, `reasoning.effort` (low/medium/high) maps to a conventional budget. No-ops for non-reasoning models so unsupported params never reach the wire.
-- **Prompt-cache write breakpoints.** `ModelCallOptions.cacheControl.breakpoints` appends a Converse `cachePoint` block to the last message for `promptCaching`-capable models.
-- **`Usage.cacheWriteTokens`** populated from Converse `usage.cacheWriteInputTokens` on both `complete()` and `stream()` (alongside the existing `cachedTokens` from `cacheReadInputTokens`). `Usage.reasoningTokens` is intentionally left unset — Bedrock's Converse `TokenUsage` reports no reasoning-token channel.
+- **Cost-truth capabilities** — `reasoning`, `promptCaching`, `pdf`, and `audio` are reported truthfully per model family (inferred from the model id, overridable via `bedrock.model(...)`).
+- **Reasoning / extended thinking** — `ModelCallOptions.reasoning` maps to Converse `thinking` for reasoning-capable models, and no-ops elsewhere so unsupported params never reach the wire.
+- **Prompt-cache write breakpoints** — `cacheControl.breakpoints` appends a Converse `cachePoint` block for caching-capable models.
+- **`Usage.cacheWriteTokens`** populated from Converse `cacheWriteInputTokens`; `reasoningTokens` is left unset (Bedrock reports no reasoning channel).
 
 ## 4.1.15
 

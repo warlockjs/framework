@@ -147,7 +147,27 @@ function toBedrockContentBlock(part: ContentPart): ContentBlock {
 
   if ("url" in part.source) {
     throw new InvalidRequestError(
-      "Bedrock Converse does not support remote-URL image sources; supply base64 image bytes instead.",
+      "Bedrock Converse does not support remote-URL sources; supply base64 bytes instead.",
+    );
+  }
+
+  // PDF → Bedrock `document` content block (A2). Converse accepts a
+  // document block with raw bytes; the agent gates this on the model's
+  // `pdf` capability before it reaches here.
+  if (part.type === "pdf") {
+    return {
+      document: {
+        format: "pdf",
+        name: "attachment",
+        source: { bytes: Buffer.from(part.source.base64, "base64") },
+      },
+    } as unknown as ContentBlock;
+  }
+
+  // Bedrock Converse has no audio content block (capability stays false).
+  if (part.type === "audio") {
+    throw new InvalidRequestError(
+      "Bedrock Converse does not support audio attachments.",
     );
   }
 
