@@ -62,6 +62,7 @@ export type PostgresOperationType =
   | "orderByRaw"
   // GROUP operations
   | "groupBy"
+  | "groupByRaw"
   | "having"
   | "havingRaw"
   // LIMIT operations
@@ -187,9 +188,16 @@ export class PostgresQueryParser {
   public orderClauses: string[] = [];
 
   /**
-   * GROUP BY columns.
+   * GROUP BY columns (bare identifiers — get quoted).
    */
   private groupColumns: string[] = [];
+
+  /**
+   * Raw GROUP BY expressions (emitted verbatim — e.g. a `date_trunc(...)`
+   * bucket). Kept separate from `groupColumns` so they bypass identifier
+   * quoting while still landing in the same `GROUP BY` clause.
+   */
+  private groupRawExpressions: string[] = [];
 
   /**
    * HAVING clauses.
@@ -394,6 +402,9 @@ export class PostgresQueryParser {
       case "groupBy":
         this.processGroupBy(data);
         break;
+      case "groupByRaw":
+        this.processGroupByRaw(data);
+        break;
       case "having":
         this.processHaving(data);
         break;
@@ -453,10 +464,12 @@ export class PostgresQueryParser {
       parts.push(`WHERE ${this.whereClauses.join(" ")}`);
     }
 
-    // GROUP BY clause
-    if (this.groupColumns.length > 0) {
+    // GROUP BY clause — bare columns are quoted; raw expressions (e.g.
+    // date_trunc buckets) are emitted verbatim. Both share one clause.
+    if (this.groupColumns.length > 0 || this.groupRawExpressions.length > 0) {
       const quotedCols = this.groupColumns.map((c) => this.dialect.quoteIdentifier(c));
-      parts.push(`GROUP BY ${quotedCols.join(", ")}`);
+      const allGroupTerms = [...quotedCols, ...this.groupRawExpressions];
+      parts.push(`GROUP BY ${allGroupTerms.join(", ")}`);
     }
 
     // HAVING clause
@@ -1126,6 +1139,15 @@ export class PostgresQueryParser {
     const fields = data.fields as string | string[];
     const columns = Array.isArray(fields) ? fields : [fields];
     this.groupColumns.push(...columns);
+  }
+
+  /**
+   * Process a raw GROUP BY expression (emitted verbatim, no quoting). Used by
+   * `groupByDate` to add a `date_trunc(...)` bucket to the GROUP BY clause.
+   */
+  private processGroupByRaw(data: Record<string, unknown>): void {
+    const expression = data.expression as string;
+    this.groupRawExpressions.push(expression);
   }
 
   /**

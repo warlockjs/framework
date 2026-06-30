@@ -1608,6 +1608,38 @@ export interface QueryBuilderContract<T = unknown> {
   groupBy(fields: GroupByInput, aggregates: Record<string, RawExpression>): this;
 
   /**
+   * Portable date-bucketed GROUP BY.
+   *
+   * Buckets `column` to the given granularity and groups by the truncated
+   * value, exposing the bucket under the column's own name in the result.
+   * Optional `aggregates` follow the same rules as the two-arg {@link groupBy}
+   * (`$agg.*` helpers or driver-native raw expressions).
+   *
+   * - **PostgreSQL**: `date_trunc('<unit>', "column")`
+   * - **MongoDB**: `{ $dateTrunc: { date: "$column", unit } }` in the `$group` `_id`
+   *
+   * @param column - The date/timestamp column to bucket
+   * @param unit - The bucket granularity (`day` / `week` / `month` / `year`)
+   * @param aggregates - Optional aggregate projections keyed by output alias
+   *
+   * @example
+   * ```typescript
+   * import { $agg, $expr } from "@warlock.js/cascade";
+   *
+   * await Order.query()
+   *   .groupByDate("created_at", "month", {
+   *     revenue: $agg.sum($expr.mul("price", "quantity")),
+   *   })
+   *   .get();
+   * ```
+   */
+  groupByDate(
+    column: string,
+    unit: "day" | "week" | "month" | "year",
+    aggregates?: Record<string, RawExpression>,
+  ): this;
+
+  /**
    * Apply raw grouping expressions.
    *
    * @example

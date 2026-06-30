@@ -265,6 +265,66 @@ export class PostgresQueryBuilder<T = unknown>
 
     this.addOperation("select", { fields: fieldList });
 
+    this.projectGroupAggregates(aggregates);
+
+    return super.groupBy(fields);
+  }
+
+  /**
+   * Portable date-bucketed GROUP BY.
+   *
+   * Truncates `column` to the given bucket (`day` / `week` / `month` / `year`)
+   * via PostgreSQL's `date_trunc`, projects the bucket under the column's own
+   * name, and groups by the truncated expression. Optional `aggregates` follow
+   * the same rules as the two-arg `groupBy` (`$agg.*` helpers or raw SQL
+   * strings; MongoDB operator objects and MongoDB-only aggregates throw).
+   *
+   * Emits (for `groupByDate("created_at", "month", { revenue: $agg.sum(...) })`):
+   * `SELECT date_trunc('month', "created_at") AS "created_at", SUM(...) AS "revenue"
+   *  FROM ... GROUP BY date_trunc('month', "created_at")`
+   *
+   * @param column - The date/timestamp column to bucket
+   * @param unit - The bucket granularity
+   * @param aggregates - Optional aggregate projections keyed by output alias
+   *
+   * @example
+   * Order.query().groupByDate("created_at", "month", {
+   *   revenue: $agg.sum($expr.mul("price", "quantity")),
+   * });
+   */
+  public groupByDate(
+    column: string,
+    unit: "day" | "week" | "month" | "year",
+    aggregates?: Record<string, RawExpression>,
+  ): this {
+    const bucketSql = this.driver.dialect.dateTruncSql(column, unit);
+
+    // Project the bucket under the column's own name so the result row carries
+    // it (SELECT * is invalid alongside GROUP BY).
+    this.addOperation("selectRaw", {
+      expression: `${bucketSql} AS ${this.driver.dialect.quoteIdentifier(column)}`,
+      bindings: [],
+    });
+
+    if (aggregates) {
+      this.projectGroupAggregates(aggregates);
+    }
+
+    // GROUP BY the raw bucket expression (not the column alias).
+    this.addOperation("groupByRaw", { expression: bucketSql, bindings: [] });
+
+    return this;
+  }
+
+  /**
+   * Translate a `{ alias: aggregate }` map into `selectRaw` projections and
+   * record each alias → SQL so `applyGroupByAggregates` can later rewrite a
+   * `having()` on the alias. Shared by `groupBy` and `groupByDate`.
+   *
+   * `$agg.distinct/floor/first/last` throw (MongoDB-only on Postgres v1);
+   * MongoDB operator objects throw (not portable to SQL).
+   */
+  private projectGroupAggregates(aggregates: Record<string, RawExpression>): void {
     for (const [alias, expression] of Object.entries(aggregates)) {
       let sql: string;
 
@@ -287,8 +347,6 @@ export class PostgresQueryBuilder<T = unknown>
         bindings: [],
       });
     }
-
-    return super.groupBy(fields);
   }
 
   /**

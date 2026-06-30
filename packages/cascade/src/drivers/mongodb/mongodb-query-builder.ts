@@ -1458,6 +1458,43 @@ export class MongoQueryBuilder<T = unknown>
   }
 
   /**
+   * Portable date-bucketed grouping.
+   *
+   * Groups documents by `column` truncated to the given bucket
+   * (`day` / `week` / `month` / `year`) via MongoDB's `$dateTrunc`, and runs
+   * the optional aggregates over each bucket. The bucket is exposed under the
+   * column's own name in the output (the `_id` is renamed in a follow-up
+   * `$project`, the same convention as `groupBy`).
+   *
+   * @param column - The date field to bucket
+   * @param unit - The bucket granularity
+   * @param aggregates - Optional aggregate operations keyed by output alias
+   *
+   * @example
+   * ```typescript
+   * import { $agg, $expr } from "@warlock.js/cascade";
+   *
+   * query.groupByDate("created_at", "month", {
+   *   revenue: $agg.sum($expr.mul("price", "quantity")),
+   * });
+   * // $group: { _id: { $dateTrunc: { date: "$created_at", unit: "month" } },
+   * //           revenue: { $sum: { $multiply: ["$price", "$quantity"] } } }
+   * ```
+   */
+  public groupByDate(
+    column: string,
+    unit: "day" | "week" | "month" | "year",
+    aggregates?: Record<string, RawExpression>,
+  ): this {
+    this.operationsHelper.addGroupOperation(
+      "groupByDate",
+      { column, unit, aggregates: aggregates ?? {} },
+      false,
+    );
+    return this;
+  }
+
+  /**
    * Groups documents using a raw MongoDB expression.
    * @param expression - The raw grouping expression
    * @param bindings - Optional parameter bindings

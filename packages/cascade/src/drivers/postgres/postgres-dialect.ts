@@ -8,7 +8,7 @@
  * @module cascade/drivers/postgres
  */
 
-import type { AggregateExpression } from "../../expressions";
+import type { AggregateExpression, ColumnExpression } from "../../expressions";
 import type { SqlDialectContract } from "../sql/sql-dialect.contract";
 
 /**
@@ -311,6 +311,20 @@ export class PostgresDialect implements SqlDialectContract {
    * @returns The SQL fragment (e.g. `SUM("amount")`, `COUNT(*)`)
    */
   public aggregateToSql(expression: AggregateExpression): string {
+    // When a composed column expression is present, the aggregate operates on
+    // it instead of a bare column (e.g. SUM(price * quantity)). Only `sum`
+    // supports the expression form in v1.
+    if (expression.__expr) {
+      if (expression.__agg !== "sum") {
+        throw new Error(
+          `$agg.${expression.__agg} does not support a composed column ` +
+            `expression yet — only $agg.sum(...) does. Use a bare column name here.`,
+        );
+      }
+
+      return `SUM(${this.columnExpressionToSql(expression.__expr)})`;
+    }
+
     const column = expression.__field === null ? "*" : this.quoteIdentifier(expression.__field);
 
     switch (expression.__agg) {
@@ -333,5 +347,56 @@ export class PostgresDialect implements SqlDialectContract {
             `SQL (window function / DISTINCT / FLOOR) if you need it here.`,
         );
     }
+  }
+
+  /**
+   * Compile a typed {@link ColumnExpression} tree into a SQL fragment.
+   *
+   * Column references flow through {@link quoteIdentifier} (so user-supplied
+   * names are quoted/escaped, never raw-interpolated); literals are emitted as
+   * numeric/boolean SQL constants; arithmetic ops are parenthesised. The `raw`
+   * node is the only path that emits a string verbatim — it is opt-in by name.
+   *
+   * @param expression - The expression tree to compile
+   * @returns A SQL fragment (e.g. `("price" * "quantity")`)
+   */
+  public columnExpressionToSql(expression: ColumnExpression): string {
+    switch (expression.__expr) {
+      case "column":
+        return this.quoteIdentifier(expression.column);
+      case "literal":
+        return typeof expression.value === "boolean"
+          ? this.booleanLiteral(expression.value)
+          : String(expression.value);
+      case "raw":
+        return expression.expression;
+      case "add":
+      case "subtract":
+      case "multiply":
+      case "divide": {
+        const operator = { add: "+", subtract: "-", multiply: "*", divide: "/" }[expression.__expr];
+        const parts = expression.operands.map((operand) => this.columnExpressionToSql(operand));
+        return `(${parts.join(` ${operator} `)})`;
+      }
+      default:
+        throw new Error(`Unsupported column expression node: ${JSON.stringify(expression)}`);
+    }
+  }
+
+  /**
+   * Build a `date_trunc` bucket expression for a portable `groupByDate`.
+   *
+   * @param column - The date/timestamp column to truncate
+   * @param unit - The bucket granularity
+   * @returns The SQL fragment (e.g. `date_trunc('month', "created_at")`)
+   *
+   * @example
+   * ```typescript
+   * dialect.dateTruncSql("created_at", "month");
+   * // date_trunc('month', "created_at")
+   * ```
+   */
+  public dateTruncSql(column: string, unit: "day" | "week" | "month" | "year"): string {
+    return `date_trunc('${unit}', ${this.quoteIdentifier(column)})`;
   }
 }

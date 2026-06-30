@@ -3,7 +3,7 @@ import { DataSource } from "../../../../src/data-source/data-source";
 import { dataSourceRegistry } from "../../../../src/data-source/data-source-registry";
 import { PostgresDialect } from "../../../../src/drivers/postgres/postgres-dialect";
 import { PostgresQueryBuilder } from "../../../../src/drivers/postgres/postgres-query-builder";
-import { $agg } from "../../../../src/expressions";
+import { $agg, $expr } from "../../../../src/expressions";
 import { createMockDriver } from "../../../helpers/mock-driver";
 
 /**
@@ -1073,6 +1073,62 @@ describe("PostgresQueryBuilder", () => {
 
         expect(query).toContain('GROUP BY "category"');
         expect(query).not.toContain(' AS "');
+      });
+    });
+
+    describe("groupByDate()", () => {
+      it("projects date_trunc under the column name and groups by the bucket", () => {
+        queryBuilder.groupByDate("created_at", "month");
+
+        const { query = "" } = queryBuilder.parse();
+
+        expect(query).toContain(`date_trunc('month', "created_at") AS "created_at"`);
+        expect(query).toContain(`GROUP BY date_trunc('month', "created_at")`);
+      });
+
+      it("emits the correct date_trunc unit for each granularity", () => {
+        for (const unit of ["day", "week", "month", "year"] as const) {
+          const builder = new PostgresQueryBuilder("orders", mockDataSource);
+          builder.groupByDate("created_at", unit);
+
+          const { query = "" } = builder.parse();
+
+          expect(query).toContain(`date_trunc('${unit}', "created_at")`);
+        }
+      });
+
+      it("projects $agg.sum over a composed expression as SUM(price * quantity)", () => {
+        queryBuilder.groupByDate("created_at", "month", {
+          revenue: $agg.sum($expr.mul("price", "quantity")),
+        });
+
+        const { query = "" } = queryBuilder.parse();
+
+        expect(query).toContain(`SUM(("price" * "quantity")) AS "revenue"`);
+        expect(query).toContain(`date_trunc('month', "created_at") AS "created_at"`);
+        expect(query).toContain(`GROUP BY date_trunc('month', "created_at")`);
+      });
+
+      it("supports a bare-column $agg.sum alongside the date bucket", () => {
+        queryBuilder.groupByDate("created_at", "day", {
+          total: $agg.sum("amount"),
+          orders: $agg.count(),
+        });
+
+        const { query = "" } = queryBuilder.parse();
+
+        expect(query).toContain(`SUM("amount") AS "total"`);
+        expect(query).toContain(`COUNT(*) AS "orders"`);
+      });
+
+      it("emits SUM(price * quantity * (1 - discount)) for $agg.sumRaw", () => {
+        queryBuilder.groupByDate("created_at", "month", {
+          net: $agg.sumRaw("price * quantity * (1 - discount)"),
+        });
+
+        const { query = "" } = queryBuilder.parse();
+
+        expect(query).toContain(`SUM(price * quantity * (1 - discount)) AS "net"`);
       });
     });
   });

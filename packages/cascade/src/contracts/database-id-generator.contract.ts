@@ -68,6 +68,43 @@ export interface IdGeneratorContract {
   generateNextId(options: GenerateIdOptions): Promise<number>;
 
   /**
+   * Reserve a contiguous block of `count` ids in a SINGLE atomic operation.
+   *
+   * This is the batch counterpart of {@link generateNextId}, intended for
+   * multi-row inserts (`createMany`): instead of N separate counter round-trips
+   * (one per row), the counter is advanced by `count * incrementIdBy` in one
+   * atomic step and the whole block is handed back at once.
+   *
+   * Semantics:
+   * - Returns the `count` reserved ids in ascending order. The FIRST id of the
+   *   first-ever block for a table equals `initialId` (same anchor as
+   *   {@link generateNextId}); subsequent blocks continue from the stored
+   *   counter, so blocks never overlap — even across concurrent callers.
+   * - Goal of "update the stored last id" is satisfied by the same atomic op:
+   *   advancing the counter by `count * incrementIdBy` leaves the persisted
+   *   counter equal to the block's LAST id, so {@link getLastId} stays
+   *   consistent with no extra write. Do NOT pair this with {@link setLastId}.
+   * - **Not transactional.** Like {@link generateNextId} (and SQL `SERIAL`),
+   *   the counter write is standalone and durable immediately; if a surrounding
+   *   transaction rolls back, the reserved block is consumed and left as a gap.
+   *
+   * Optional: drivers without a counter (SQL with native `AUTO_INCREMENT` /
+   * `SERIAL`) do not implement this — callers must feature-detect it and fall
+   * back to per-row {@link generateNextId}.
+   *
+   * @param options - `GenerateIdOptions` plus the block `count` (`>= 1`)
+   * @returns The reserved ids in ascending order (length `count`)
+   *
+   * @example
+   * ```typescript
+   * // Reserve 100 ids in one atomic op for a bulk insert
+   * const ids = await idGenerator.generateNextIds({ table: "users", count: 100 });
+   * // ids[0] is the first, ids[99] the last; getLastId("users") === ids[99]
+   * ```
+   */
+  generateNextIds?(options: GenerateIdOptions & { count: number }): Promise<number[]>;
+
+  /**
    * Get the last generated ID for a table.
    *
    * Returns 0 if no IDs have been generated yet for this table.

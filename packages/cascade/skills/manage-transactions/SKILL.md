@@ -1,6 +1,6 @@
 ---
 name: manage-transactions
-description: 'Wrap multi-statement work in `transaction(async () => {...})` — rollback on throw, commit on resolve, optional `isolation` level (Postgres), per-`dataSource` scope. Postgres native; MongoDB requires replica set. Triggers: `transaction`, `isolation`, `SERIALIZABLE`, `READ COMMITTED`, nested savepoints; "wrap two writes atomically", "transfer balance between accounts", "rollback on error", "MongoDB replica set transactions"; typical import `import { transaction } from "@warlock.js/cascade"`. Skip: single-row atomic ops without a transaction — `@warlock.js/cascade/perform-atomic-ops/SKILL.md`; per-source scope — `@warlock.js/cascade/manage-data-sources/SKILL.md`; competing patterns `mongoose.startSession`, `pg` `BEGIN` manually, `prisma.$transaction`, `typeorm` `QueryRunner`.'
+description: 'Wrap multi-statement work in `transaction(async () => {...})` — rollback on throw, commit on resolve, optional `isolation` level (Postgres), per-`dataSource` scope. Also the home for transaction-aware raw SQL (`Model.raw` / `DataSource.raw` → `RawQueryResult`) and the Postgres `nativeArrayColumns` connection option. Postgres native; MongoDB requires replica set. Triggers: `transaction`, `isolation`, `SERIALIZABLE`, `READ COMMITTED`, nested savepoints, `Model.raw`, `DataSource.raw`, raw SQL, `RawQueryResult`, `nativeArrayColumns`, `JSONB[]`, `TEXT[]`; "wrap two writes atomically", "transfer balance between accounts", "rollback on error", "MongoDB replica set transactions", "run raw SQL", "native array column"; typical import `import { transaction } from "@warlock.js/cascade"`. Skip: single-row atomic ops without a transaction — `@warlock.js/cascade/perform-atomic-ops/SKILL.md`; per-source scope — `@warlock.js/cascade/manage-data-sources/SKILL.md`; competing patterns `mongoose.startSession`, `pg` `BEGIN` manually, `prisma.$transaction`, `typeorm` `QueryRunner`.'
 ---
 
 # Use transactions
@@ -100,6 +100,45 @@ On `SERIALIZABLE`, Postgres may abort with a serialization failure when concurre
 ## Outside the transaction
 
 Once the callback returns, the transaction is committed. Subsequent calls — including reads — see the committed state. Don't try to "share" a model instance between inside-transaction and outside contexts; reload outside if you need fresh state.
+
+## Raw SQL — `Model.raw` / `DataSource.raw` (transaction-aware)
+
+When the query builder can't express something, drop to raw SQL. Both helpers are **transaction-aware**: called inside an active `transaction()` scope they auto-join that transaction's client/session, otherwise they run on the pool.
+
+```ts
+// Off a model — uses the model's driver
+const { rows, rowCount } = await User.raw<{ id: number; total: number }>(
+  "SELECT id, COUNT(*) AS total FROM orders WHERE user_id = $1 GROUP BY id",
+  [userId],
+);
+
+// Inside a transaction — auto-joins the active scope
+await transaction(async () => {
+  await User.raw("UPDATE users SET active = true WHERE id = $1", [id]);
+});
+
+// Off a data source directly
+const { rows: counts } = await dataSource.raw<{ count: number }>(
+  "SELECT COUNT(*)::int AS count FROM users",
+);
+```
+
+`Model.raw<T>(sql, params?)` and `DataSource.raw<T>(sql, params?)` both return `Promise<RawQueryResult<T>>` — `{ rows: T[]; rowCount: number }`, **not** hydrated model instances. MongoDB drivers **throw**: there is no raw SQL on Mongo.
+
+### `nativeArrayColumns` (Postgres connection option)
+
+The Postgres serializer can't see the table schema, so by default it `JSON.stringify`s every non-vector array (and plain object) to bind it as JSON text — the correct form for a `json` / `jsonb` column. For a genuine **native-array** column (`JSONB[]` / `TEXT[]` / `INTEGER[]`, e.g. from `arrayJson()` / `arrayText()`) that's wrong: node-pg must receive the raw JS array so it emits a `{...}` array literal. List those columns in the connection's `nativeArrayColumns` to opt them out of JSON-text encoding:
+
+```ts
+connectToDatabase({
+  name: "default",
+  driver: "postgres",
+  // ...
+  nativeArrayColumns: ["tags", "category_ids"], // genuine TEXT[] / INTEGER[] columns
+});
+```
+
+The pgvector all-number array form is preserved automatically — you only need this for non-vector native arrays.
 
 ## Side effects after commit — the outbox pattern
 

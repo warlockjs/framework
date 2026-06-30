@@ -1,6 +1,6 @@
 ---
 name: perform-atomic-ops
-description: 'Avoid races on concurrent writes — `Model.increase(filter, field, n)` / `Model.decrease` for atomic counters, `Model.atomic(filter, ops)` for arbitrary mutations (`$set` / `$inc` / `$push` / `$pull`), `Model.createMany` / `Model.findAndUpdate` / `Model.delete` for bulk. Triggers: `Model.increase`, `Model.decrease`, `Model.atomic`, `Model.createMany`, `Model.findAndUpdate`, `Model.delete`, `$inc`, `$set`; "increment counter under concurrency", "bulk insert without N+1", "atomic update without loading"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: multi-row atomicity — `@warlock.js/cascade/manage-transactions/SKILL.md`; competing patterns `mongoose findOneAndUpdate`, `pg` `UPDATE ... SET x = x + 1`.'
+description: 'Avoid races on concurrent writes — `Model.increase(filter, field, n)` / `Model.decrease` for atomic counters, `Model.atomic(filter, ops)` for arbitrary mutations (`$set` / `$inc` / `$push` / `$pull`), `Model.createMany` / `Model.findAndUpdate` / `Model.delete` for bulk. Triggers: `Model.increase`, `Model.decrease`, `Model.atomic`, `Model.createMany`, `createMany bulk`, `batchSize`, `Model.findAndUpdate`, `Model.delete`, `$inc`, `$set`; "increment counter under concurrency", "bulk insert without N+1", "fast bulk insert", "insert thousands of rows", "atomic update without loading"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: multi-row atomicity — `@warlock.js/cascade/manage-transactions/SKILL.md`; competing patterns `mongoose findOneAndUpdate`, `pg` `UPDATE ... SET x = x + 1`.'
 ---
 
 # Use atomic operations
@@ -38,7 +38,25 @@ const created = await OrderItem.createMany([
 // created: OrderItem[]
 ```
 
-`Model.createMany(rows)` → `Promise<TModel[]>`. Validation runs per row; wrap in a transaction if you need strict all-or-nothing semantics.
+`Model.createMany(rows, options?)` → `Promise<TModel[]>`. `options` is `{ batchSize?: number; bulk?: boolean }`. Validation runs per row; wrap in a transaction if you need strict all-or-nothing semantics.
+
+### `batchSize` — chunking (both paths)
+
+A huge array is processed in sequential chunks so it can't flood the driver. `batchSize` sets the chunk size; the default is **500** (`DEFAULT_CREATE_MANY_BATCH_SIZE`). Each chunk completes before the next starts:
+
+```ts
+await OrderItem.createMany(millionRows, { batchSize: 1000 });
+```
+
+### `bulk: true` — native multi-row insert (10–100× faster)
+
+The default path persists each row through `save()`, so model hooks, lifecycle events (`saving` / `creating` / `created` / `saved`), casts, and generated ids are all preserved. Pass `bulk: true` to instead route each chunk to the driver's native multi-row `insertMany` for 10–100× throughput on large arrays:
+
+```ts
+const rows = await OrderItem.createMany(millionRows, { bulk: true, batchSize: 1000 });
+```
+
+**Tradeoff.** The bulk path SKIPS the per-row lifecycle — no `saving` / `creating` / `created` / `saved` events, no instance hooks, no sync. What it KEEPS: rows are still prepped through the writer pipeline, so validation, casts, timestamps, defaults, and id-generation still run and the persisted columns match the default path; driver-returned values (generated `_id`, timestamps, SQL `RETURNING *`) are merged back onto the returned models. Reach for `bulk: true` when inserting large batches where per-row events don't matter (seeders, imports, denormalization); stay on the default path when you need the hooks/events.
 
 ## Bulk update — `Model.findAndUpdate(filter, operations)`
 
@@ -79,6 +97,7 @@ for (const user of targets) {
 | Increment a counter | `Model.increase(filter, field, n)` |
 | Atomically change multiple fields on one record | `Model.atomic(filter, ops)` |
 | Insert N records | `Model.createMany(rows)` |
+| Insert a large batch fast (no per-row events) | `Model.createMany(rows, { bulk: true, batchSize })` |
 | Update many rows with operators | `Model.findAndUpdate(filter, { $set: {...} })` |
 | Update one record by id | `Model.update(id, data)` |
 | Delete many rows (raw) | `Model.delete(filter)` |
@@ -90,7 +109,8 @@ for (const user of targets) {
 - Don't `const post = await Post.find(id); post.set("views", post.get<number>("views") + 1); await post.save();` for a counter. That's a lost-update race under concurrency. Use `Post.increase(filter, "views", 1)`.
 - Don't reach for `insertMany` / `updateMany` / `deleteMany` — those names don't exist on the model. Use `createMany` / `findAndUpdate` / `delete`.
 - Don't expect `findAndUpdate` / `delete` to fire per-row `saved` / `deleted` events or honor the delete strategy. They don't. Iterate if you need that.
-- Don't bulk-insert a million rows in one `createMany` call — chunk it. Most drivers cap effectively at a few thousand per round-trip.
+- Don't hand-roll chunking around `createMany` — it already chunks by `batchSize` (default 500). Tune `batchSize` instead of slicing the array yourself.
+- Don't assume `bulk: true` fires per-row `saving` / `created` / `saved` events or runs instance hooks — it doesn't. Casts/timestamps/defaults/ids still apply, but if you need the lifecycle, use the default path (or iterate with `.save()`).
 
 ## See also
 

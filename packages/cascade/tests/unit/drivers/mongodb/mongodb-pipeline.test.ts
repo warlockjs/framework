@@ -3,6 +3,7 @@ import { DataSource } from "../../../../src/data-source/data-source";
 import { dataSourceRegistry } from "../../../../src/data-source/data-source-registry";
 import { MongoQueryBuilder } from "../../../../src/drivers/mongodb/mongodb-query-builder";
 import { $agg } from "../../../../src/expressions/aggregate-expressions";
+import { $expr } from "../../../../src/expressions/column-expressions";
 import { createMockDriver } from "../../../helpers/mock-driver";
 
 /**
@@ -146,5 +147,94 @@ describe("MongoQueryBuilder — pipeline shape", () => {
         },
       },
     ]);
+  });
+
+  it("compiles $agg.sum over a composed expression into $sum: { $multiply: [...] }", () => {
+    const pipeline = builder()
+      .groupBy("status", { revenue: $agg.sum($expr.mul("price", "quantity")) })
+      .parse().pipeline;
+
+    expect(pipeline).toEqual([
+      {
+        $group: {
+          _id: "$status",
+          revenue: { $sum: { $multiply: ["$price", "$quantity"] } },
+        },
+      },
+      { $project: { status: "$_id", revenue: 1, _id: 0 } },
+    ]);
+  });
+
+  it("compiles a nested composed expression with a literal", () => {
+    const pipeline = builder()
+      .groupBy("status", {
+        net: $agg.sum($expr.mul("price", "quantity", $expr.sub($expr.lit(1), $expr.col("discount")))),
+      })
+      .parse().pipeline;
+
+    expect(pipeline).toEqual([
+      {
+        $group: {
+          _id: "$status",
+          net: {
+            $sum: {
+              $multiply: ["$price", "$quantity", { $subtract: [1, "$discount"] }],
+            },
+          },
+        },
+      },
+      { $project: { status: "$_id", net: 1, _id: 0 } },
+    ]);
+  });
+
+  it("throws on $agg.sumRaw — a raw SQL fragment is not portable to a pipeline", () => {
+    expect(() =>
+      builder().groupBy("status", { net: $agg.sumRaw("price * quantity") }).parse(),
+    ).toThrow(/not portable to a MongoDB pipeline/);
+  });
+
+  describe("groupByDate()", () => {
+    it("buckets via $dateTrunc and renames _id back to the column", () => {
+      const pipeline = builder()
+        .groupByDate("created_at", "month", { revenue: $agg.sum($expr.mul("price", "quantity")) })
+        .parse().pipeline;
+
+      expect(pipeline).toEqual([
+        {
+          $group: {
+            _id: { $dateTrunc: { date: "$created_at", unit: "month" } },
+            revenue: { $sum: { $multiply: ["$price", "$quantity"] } },
+          },
+        },
+        { $project: { created_at: "$_id", revenue: 1, _id: 0 } },
+      ]);
+    });
+
+    it("emits the correct $dateTrunc unit for each granularity", () => {
+      for (const unit of ["day", "week", "month", "year"] as const) {
+        const pipeline = builder().groupByDate("created_at", unit).parse().pipeline;
+
+        expect(pipeline[0]).toEqual({
+          $group: { _id: { $dateTrunc: { date: "$created_at", unit } } },
+        });
+      }
+    });
+
+    it("supports a bare-column sum alongside the date bucket", () => {
+      const pipeline = builder()
+        .groupByDate("created_at", "day", { total: $agg.sum("amount"), n: $agg.count() })
+        .parse().pipeline;
+
+      expect(pipeline).toEqual([
+        {
+          $group: {
+            _id: { $dateTrunc: { date: "$created_at", unit: "day" } },
+            total: { $sum: "$amount" },
+            n: { $sum: 1 },
+          },
+        },
+        { $project: { created_at: "$_id", total: 1, n: 1, _id: 0 } },
+      ]);
+    });
   });
 });

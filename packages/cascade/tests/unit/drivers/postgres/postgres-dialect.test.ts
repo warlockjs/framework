@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PostgresDialect } from "../../../../src/drivers/postgres/postgres-dialect";
+import { $expr } from "../../../../src/expressions";
 
 /**
  * Pure-logic tests for the PostgreSQL dialect.
@@ -167,6 +168,71 @@ describe("PostgresDialect", () => {
       );
       expect(() => dialect.aggregateToSql({ __agg: "first", __field: "name" })).toThrow(
         /MongoDB-only/,
+      );
+    });
+
+    it("translates $agg.sum over a composed expression to SUM(<expr>)", () => {
+      expect(
+        dialect.aggregateToSql({ __agg: "sum", __field: null, __expr: $expr.mul("price", "quantity") }),
+      ).toBe(`SUM(("price" * "quantity"))`);
+    });
+
+    it("emits the raw expression verbatim for $agg.sumRaw", () => {
+      expect(
+        dialect.aggregateToSql({
+          __agg: "sum",
+          __field: null,
+          __expr: { __expr: "raw", expression: "price * quantity * (1 - discount)" },
+        }),
+      ).toBe("SUM(price * quantity * (1 - discount))");
+    });
+
+    it("throws when a composed expression is used with a non-sum aggregate", () => {
+      expect(() =>
+        dialect.aggregateToSql({ __agg: "avg", __field: null, __expr: $expr.mul("a", "b") }),
+      ).toThrow(/only \$agg\.sum/);
+    });
+  });
+
+  describe("columnExpressionToSql()", () => {
+    it("quotes a column reference", () => {
+      expect(dialect.columnExpressionToSql($expr.col("price"))).toBe(`"price"`);
+    });
+
+    it("emits a numeric literal verbatim and a boolean as TRUE/FALSE", () => {
+      expect(dialect.columnExpressionToSql($expr.lit(1.2))).toBe("1.2");
+      expect(dialect.columnExpressionToSql($expr.lit(true))).toBe("TRUE");
+    });
+
+    it("parenthesises multiply / add / subtract / divide", () => {
+      expect(dialect.columnExpressionToSql($expr.mul("price", "quantity"))).toBe(`("price" * "quantity")`);
+      expect(dialect.columnExpressionToSql($expr.add("a", "b"))).toBe(`("a" + "b")`);
+      expect(dialect.columnExpressionToSql($expr.sub("a", "b"))).toBe(`("a" - "b")`);
+      expect(dialect.columnExpressionToSql($expr.div("a", "b"))).toBe(`("a" / "b")`);
+    });
+
+    it("composes nested expressions: price * quantity * (1 - discount)", () => {
+      expect(dialect.columnExpressionToSql($expr.mul("price", "quantity", $expr.sub($expr.lit(1), $expr.col("discount"))))).toBe(
+        `("price" * "quantity" * (1 - "discount"))`,
+      );
+    });
+
+    it("emits a raw node verbatim", () => {
+      expect(dialect.columnExpressionToSql($expr.raw("price * 1.2"))).toBe("price * 1.2");
+    });
+  });
+
+  describe("dateTruncSql()", () => {
+    it("builds date_trunc('<unit>', \"column\") for each granularity", () => {
+      expect(dialect.dateTruncSql("created_at", "day")).toBe(`date_trunc('day', "created_at")`);
+      expect(dialect.dateTruncSql("created_at", "week")).toBe(`date_trunc('week', "created_at")`);
+      expect(dialect.dateTruncSql("created_at", "month")).toBe(`date_trunc('month', "created_at")`);
+      expect(dialect.dateTruncSql("created_at", "year")).toBe(`date_trunc('year', "created_at")`);
+    });
+
+    it("quotes a qualified column name segment-by-segment", () => {
+      expect(dialect.dateTruncSql("orders.created_at", "month")).toBe(
+        `date_trunc('month', "orders"."created_at")`,
       );
     });
   });

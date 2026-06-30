@@ -10,7 +10,7 @@ Evolve an existing table with `Migration.alter(Model, schema, options?)` — add
 
 ### [`aggregate-data/`](./aggregate-data/SKILL.md)
 
-Compute aggregates over a query — `.count()`, `.sum(field)`, `.avg`, `.min`, `.max`, plus the two-arg `.groupBy(fields, { alias: $agg.* })` + `.having` for group-level rollups. Load when building reports, dashboards, 'X per category' rollups, or any query returning numbers rather than rows.
+Compute aggregates over a query — `.count()`, `.sum(field)`, `.avg`, `.min`, `.max`, the two-arg `.groupBy(fields, { alias: $agg.* })` + `.having`, portable date-bucketing via `.groupByDate(col, unit, aggregates?)`, and expression-aware `$agg.sum(mul("price","quantity"))` / `$agg.sumRaw` for group-level rollups. Load when building reports, dashboards, 'X per category' rollups, time-series ('revenue per month'), or any query returning numbers rather than rows.
 
 ### [`cascade-basics/`](./cascade-basics/SKILL.md)
 
@@ -34,7 +34,7 @@ Configure multiple databases — register each via `connectToDatabase({ name, dr
 
 ### [`manage-transactions/`](./manage-transactions/SKILL.md)
 
-Wrap multi-statement work in transaction(async () => {...}) — rollback on throw or `ctx.rollback()`, commit on resolve, `isolationLevel` option (Postgres). Postgres native, MongoDB requires replica set; not nestable. Load when two or more writes must succeed or fail together (creating parent + children, transferring balances, multi-step state machines).
+Wrap multi-statement work in transaction(async () => {...}) — rollback on throw or `ctx.rollback()`, commit on resolve, `isolationLevel` option (Postgres). Postgres native, MongoDB requires replica set; not nestable. Also covers transaction-aware raw SQL (`Model.raw` / `DataSource.raw` → `RawQueryResult`) and the Postgres `nativeArrayColumns` connection option. Load when two or more writes must succeed or fail together (creating parent + children, transferring balances, multi-step state machines), or when running raw SQL.
 
 ### [`paginate-results/`](./paginate-results/SKILL.md)
 
@@ -42,7 +42,7 @@ Paginate query results — `.paginate({ page, limit })` for offset (returns `dat
 
 ### [`perform-atomic-ops/`](./perform-atomic-ops/SKILL.md)
 
-Avoid races on concurrent writes — Model.increase(filter, field, n) / Model.decrease for atomic counters, Model.atomic(filter, ops) for arbitrary atomic mutations, Model.createMany / Model.findAndUpdate / Model.delete for bulk. Load when incrementing counters under concurrency, bulk ops without N+1, or single-document atomic mutations without a full transaction.
+Avoid races on concurrent writes — Model.increase(filter, field, n) / Model.decrease for atomic counters, Model.atomic(filter, ops) for arbitrary atomic mutations, Model.createMany(rows, { bulk, batchSize }) / Model.findAndUpdate / Model.delete for bulk. Load when incrementing counters under concurrency, fast bulk inserts (native multi-row insertMany), bulk ops without N+1, or single-document atomic mutations without a full transaction.
 
 ### [`query-data/`](./query-data/SKILL.md)
 

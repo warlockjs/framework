@@ -5,6 +5,7 @@ import {
   isAggregateExpression,
   type AggregateExpression,
 } from "../../expressions/aggregate-expressions";
+import type { ColumnExpression } from "../../expressions/column-expressions";
 import type { MongoQueryBuilder } from "./mongodb-query-builder";
 import type { Operation, PipelineStage } from "./types";
 
@@ -160,19 +161,33 @@ export class MongoQueryParser {
           this.groupFieldNames.set(stageIndex, fieldNames);
         }
 
-        // Record which aggregate aliases are countDistinct so the renaming
-        // $project can finalize them with `{ $size: "$alias" }`.
-        const distinctAliases = new Set<string>();
-        for (const [alias, expression] of Object.entries(op.data.aggregates)) {
-          if (isAggregateExpression(expression) && expression.__agg === "countDistinct") {
-            distinctAliases.add(alias);
-          }
-        }
-
-        if (distinctAliases.size > 0) {
-          this.countDistinctAliases.set(stageIndex, distinctAliases);
-        }
+        this.trackCountDistinctAliases(stageIndex, op.data.aggregates);
+      } else if (op.type === "groupByDate") {
+        // The `$dateTrunc` bucket becomes `_id`; rename it back to the column.
+        this.groupFieldNames.set(stageIndex, op.data.column as string);
+        this.trackCountDistinctAliases(stageIndex, op.data.aggregates ?? {});
       }
+    }
+  }
+
+  /**
+   * Record which aggregate aliases in a group stage are `countDistinct` so the
+   * renaming `$project` can finalize them with `{ $size: "$alias" }` over the
+   * set built by `$addToSet` (the standard distinct-count-per-group pattern).
+   */
+  private trackCountDistinctAliases(
+    stageIndex: number,
+    aggregates: Record<string, RawExpression>,
+  ): void {
+    const distinctAliases = new Set<string>();
+    for (const [alias, expression] of Object.entries(aggregates)) {
+      if (isAggregateExpression(expression) && expression.__agg === "countDistinct") {
+        distinctAliases.add(alias);
+      }
+    }
+
+    if (distinctAliases.size > 0) {
+      this.countDistinctAliases.set(stageIndex, distinctAliases);
     }
   }
 
@@ -1460,6 +1475,17 @@ export class MongoQueryParser {
         }
         break;
       }
+      case "groupByDate": {
+        const stage = this.buildGroupByDateStage(
+          op.data.column,
+          op.data.unit,
+          op.data.aggregates ?? {},
+        );
+        if (stage) {
+          return stage;
+        }
+        break;
+      }
       case "groupByRaw": {
         const expression = op.data.expression;
         if (expression && typeof expression === "object") {
@@ -1530,6 +1556,35 @@ export class MongoQueryParser {
   }
 
   /**
+   * Build a `$group` stage that buckets documents by a `$dateTrunc` of a date
+   * field, optionally running aggregates over each bucket.
+   *
+   * @param column - The date field to bucket
+   * @param unit - The bucket granularity
+   * @param aggregates - Aggregate operations (abstract or raw)
+   * @returns The `$group` stage
+   */
+  private buildGroupByDateStage(
+    column: string,
+    unit: string,
+    aggregates: Record<string, RawExpression>,
+  ): any {
+    const groupStage: Record<string, unknown> = {
+      _id: { $dateTrunc: { date: `$${column}`, unit } },
+    };
+
+    for (const [alias, expression] of Object.entries(aggregates)) {
+      if (isAggregateExpression(expression)) {
+        groupStage[alias] = this.translateAggregateExpression(expression);
+      } else {
+        groupStage[alias] = expression;
+      }
+    }
+
+    return { $group: groupStage };
+  }
+
+  /**
    * Extract field names from GroupByInput for renaming _id.
    *
    * @param fields - The grouping fields
@@ -1579,6 +1634,12 @@ export class MongoQueryParser {
         return { $addToSet: `$${expr.__field}` };
 
       case "sum":
+        // When a composed column expression is present, sum operates on it
+        // (e.g. SUM(price * quantity) → { $sum: { $multiply: [...] } }) instead
+        // of a bare field. This is the only aggregate that accepts `__expr`.
+        if (expr.__expr) {
+          return { $sum: this.columnExpressionToMongo(expr.__expr) };
+        }
         if (!expr.__field) {
           throw new Error("Sum aggregate requires a field name");
         }
@@ -1629,6 +1690,54 @@ export class MongoQueryParser {
 
       default:
         throw new Error(`Unknown aggregate function: ${expr.__agg}`);
+    }
+  }
+
+  /**
+   * Compile a typed {@link ColumnExpression} tree into a MongoDB aggregation
+   * expression.
+   *
+   * Column references become `$field` paths; literals are emitted verbatim;
+   * arithmetic ops map to `$add` / `$subtract` / `$multiply` / `$divide`. The
+   * `raw` node is rejected — a raw SQL fragment is not portable to a MongoDB
+   * pipeline, so callers must use the typed combinators (or `groupByRaw`) here.
+   *
+   * @param expression - The expression tree to compile
+   * @returns A MongoDB aggregation expression (e.g. `{ $multiply: ["$price", "$quantity"] }`)
+   */
+  private columnExpressionToMongo(expression: ColumnExpression): unknown {
+    switch (expression.__expr) {
+      case "column":
+        return `$${expression.column}`;
+
+      case "literal":
+        return expression.value;
+
+      case "raw":
+        throw new Error(
+          `$agg.sumRaw / $expr.raw is not portable to a MongoDB pipeline — a raw ` +
+            `SQL fragment has no MongoDB equivalent. Use the typed $expr ` +
+            `combinators ($expr.mul / $expr.add / $expr.sub / $expr.div / $expr.col / $expr.lit) or groupByRaw instead.`,
+        );
+
+      case "add":
+      case "subtract":
+      case "multiply":
+      case "divide": {
+        const operator = {
+          add: "$add",
+          subtract: "$subtract",
+          multiply: "$multiply",
+          divide: "$divide",
+        }[expression.__expr];
+
+        return {
+          [operator]: expression.operands.map((operand) => this.columnExpressionToMongo(operand)),
+        };
+      }
+
+      default:
+        throw new Error(`Unsupported column expression node: ${JSON.stringify(expression)}`);
     }
   }
 

@@ -107,6 +107,7 @@ import {
   onStaticEvent,
 } from "./methods/static-event-methods";
 import {
+  type CreateManyOptions,
   createManyRecords,
   createRecord,
   findOrCreateRecord,
@@ -2068,13 +2069,46 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   }
 
   /**
-   * Create many documents and return an array of created models
+   * Create many records and return an array of created models.
+   *
+   * The work is always chunked into batches of `options.batchSize`
+   * (default 500) so a huge input array can't overwhelm the driver.
+   *
+   * **Default path** (no options, or `bulk` falsy): each row is persisted
+   * through `save()`, preserving model hooks, lifecycle events, casts and
+   * generated ids. Each chunk runs under a single `Promise.all`.
+   *
+   * **Bulk path** (`bulk: true`): each chunk is routed to the driver's native
+   * multi-row insert (`insertMany`) for 10–100× throughput. This SKIPS the
+   * per-row save lifecycle (no `saving` / `creating` / `created` / `saved`
+   * events, hooks, or sync). Casts, timestamps, defaults and id-generation are
+   * still applied (rows are prepped through the same writer pipeline) so the
+   * persisted columns match the default path.
+   *
+   * An empty array is a no-op that never touches the driver.
+   *
+   * @param data - The rows to insert.
+   * @param options - Chunking / bulk options.
+   * @returns The created model instances.
+   *
+   * @example
+   * ```typescript
+   * // Default: per-row save(), chunked in batches of 500
+   * const users = await User.createMany(rows);
+   *
+   * // Bulk: one multi-row INSERT per 1000-row chunk (skips per-row hooks)
+   * const users = await User.createMany(rows, { bulk: true, batchSize: 1000 });
+   * ```
    */
   public static async createMany<
     TModel extends Model = Model,
     TSchema extends ModelSchema = TModel extends Model<infer S> ? S : ModelSchema,
-  >(this: ChildModel<TModel>, data: Partial<TSchema>[]): Promise<TModel[]> {
-    return createManyRecords(this, data);
+  >(
+    this: ChildModel<TModel>,
+    data: Partial<TSchema>[],
+    options?: CreateManyOptions,
+  ): Promise<TModel[]> {
+    return createManyRecords(this, data, options);
   }
 
   /**

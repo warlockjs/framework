@@ -26,6 +26,8 @@
  * ```
  */
 
+import type { ColumnExpression, ColumnExpressionInput } from "./column-expressions";
+
 /**
  * Abstract aggregate expression format.
  *
@@ -35,8 +37,15 @@
 export type AggregateExpression = {
   /** The aggregate function type */
   __agg: AggregateFunction;
-  /** The field to aggregate (null for count) */
+  /** The field to aggregate (null for count, or when `__expr` carries a composed expression) */
   __field: string | null;
+  /**
+   * A typed column expression to aggregate over, when the aggregate operates
+   * on more than a bare column (e.g. `price * quantity`). When present, drivers
+   * compile this instead of `__field`. Absent for the simple bare-column form
+   * so existing `$agg.sum("col")` payloads stay byte-for-byte identical.
+   */
+  __expr?: ColumnExpression;
 };
 
 /**
@@ -118,24 +127,68 @@ export const $agg = {
   },
 
   /**
-   * Sum a numeric field across documents in each group.
+   * Sum a numeric field — or a composed arithmetic expression — across
+   * documents in each group.
    *
-   * @param field - The field name to sum
+   * Pass a bare column name to sum a single field (unchanged from v1), or a
+   * typed `$expr` node (`$expr.mul` / `$expr.add` / `$expr.sub` / `$expr.div` /
+   * `$expr.col` / `$expr.lit`) to sum a computed value such as `price * quantity`.
+   *
+   * @param input - A field name or a typed `ColumnExpression`
    * @returns Abstract sum expression
    *
    * @example
    * ```typescript
+   * import { $agg, $expr } from "@warlock.js/cascade";
+   *
+   * // Bare column
+   * query.groupBy("type", { totalDuration: $agg.sum("duration") });
+   *
+   * // Composed expression: SUM(price * quantity)
+   * query.groupBy("type", { revenue: $agg.sum($expr.mul("price", "quantity")) });
+   * ```
+   *
+   * Translates to:
+   * - SQL: `SUM("duration")` / `SUM(("price" * "quantity"))`
+   * - MongoDB: `{ $sum: "$duration" }` / `{ $sum: { $multiply: ["$price", "$quantity"] } }`
+   */
+  sum(input: ColumnExpressionInput): AggregateExpression {
+    if (typeof input === "string") {
+      return { __agg: "sum", __field: input };
+    }
+
+    return { __agg: "sum", __field: null, __expr: input };
+  },
+
+  /**
+   * Sum a raw, driver-native expression escape hatch.
+   *
+   * Equivalent to `$agg.sum($expr.raw(expression))`. The raw string is emitted
+   * verbatim into the generated query — never build it from untrusted input.
+   * Reach for the typed {@link sum} form first; this exists only for fragments
+   * the typed combinators can't express.
+   *
+   * @param expression - A raw expression fragment (e.g. `"price * quantity"`)
+   * @returns Abstract sum expression wrapping the raw fragment
+   *
+   * @example
+   * ```typescript
    * query.groupBy("type", {
-   *   totalDuration: $agg.sum("duration")
+   *   net: $agg.sumRaw("price * quantity * (1 - discount)"),
    * });
    * ```
    *
    * Translates to:
-   * - MongoDB: `{ $sum: "$duration" }`
-   * - SQL: `SUM(duration)`
+   * - SQL: `SUM(price * quantity * (1 - discount))`
+   * - MongoDB: throws — raw SQL fragments are not portable to a pipeline; use
+   *   the typed {@link sum} form (or `groupByRaw`) on MongoDB instead.
    */
-  sum(field: string): AggregateExpression {
-    return { __agg: "sum", __field: field };
+  sumRaw(expression: string): AggregateExpression {
+    return {
+      __agg: "sum",
+      __field: null,
+      __expr: { __expr: "raw", expression },
+    };
   },
 
   /**

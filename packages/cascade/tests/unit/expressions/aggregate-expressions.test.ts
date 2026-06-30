@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { $agg, isAggregateExpression } from "../../../src/expressions/aggregate-expressions";
+import { $expr } from "../../../src/expressions/column-expressions";
 
 describe("Aggregate Expressions", () => {
   describe("$agg.count()", () => {
@@ -31,6 +32,39 @@ describe("Aggregate Expressions", () => {
       expect(expr).toEqual({
         __agg: "sum",
         __field: "price",
+      });
+    });
+
+    it("should carry a composed expression under __expr when given an expression node", () => {
+      const expr = $agg.sum($expr.mul("price", "quantity"));
+
+      expect(expr).toEqual({
+        __agg: "sum",
+        __field: null,
+        __expr: {
+          __expr: "multiply",
+          operands: [
+            { __expr: "column", column: "price" },
+            { __expr: "column", column: "quantity" },
+          ],
+        },
+      });
+    });
+
+    it("keeps the bare-string payload byte-for-byte identical (no __expr key)", () => {
+      const expr = $agg.sum("price");
+      expect("__expr" in expr).toBe(false);
+    });
+  });
+
+  describe("$agg.sumRaw()", () => {
+    it("wraps a raw fragment as a sum over a raw column expression", () => {
+      const expr = $agg.sumRaw("price * quantity");
+
+      expect(expr).toEqual({
+        __agg: "sum",
+        __field: null,
+        __expr: { __expr: "raw", expression: "price * quantity" },
       });
     });
   });

@@ -8,7 +8,7 @@
 
 ---
 name: aggregate-data
-description: 'Compute aggregates over a query — scalar `.count()` / `.sum(field)` / `.avg` / `.min` / `.max`, plus grouped rollups via the two-arg `.groupBy(fields, { alias: $agg.* })` with the `$agg` helpers and `.having(alias, op, value)` on computed aggregates. Triggers: `.count`, `.sum`, `.avg`, `.min`, `.max`, `.groupBy`, `.having`, `$agg`, `$agg.sum`, `$agg.count`; "monthly revenue report", "X per category", "group by status", "dashboard rollup"; typical import `import { Model, $agg } from "@warlock.js/cascade"`. Skip: row queries — `@warlock.js/cascade/query-data/SKILL.md`; cached aggregates — `@warlock.js/cache/use-cached-hof/SKILL.md`; competing tools raw SQL `GROUP BY`, `mongoose aggregate`, `prisma` `groupBy`.'
+description: 'Compute aggregates over a query — scalar `.count()` / `.sum(field)` / `.avg` / `.min` / `.max`, plus grouped rollups via the two-arg `.groupBy(fields, { alias: $agg.* })`, portable date-bucketing via `.groupByDate(col, unit, aggregates?)`, the `$agg` helpers (including expression-aware `$agg.sum($expr.mul("price","quantity"))` / `$agg.sumRaw`), and `.having(alias, op, value)` on computed aggregates. Triggers: `.count`, `.sum`, `.avg`, `.min`, `.max`, `.groupBy`, `.groupByDate`, `.having`, `$agg`, `$agg.sum`, `$agg.sumRaw`, `$agg.count`, `$expr`, `$expr.mul`, `$expr.col`, `$expr.lit`; "monthly revenue report", "revenue per month", "X per category", "group by status", "sum price times quantity", "dashboard rollup"; typical import `import { Model, $agg, $expr } from "@warlock.js/cascade"`. Skip: row queries — `@warlock.js/cascade/query-data/SKILL.md`; cached aggregates — `@warlock.js/cache/use-cached-hof/SKILL.md`; competing tools raw SQL `GROUP BY`, `mongoose aggregate`, `prisma` `groupBy`.'
 ---
 
 # Use aggregates and groupBy
@@ -51,11 +51,31 @@ const stats = await Order.query()
 
 `fields` is a string or string array (`groupBy(["status", "country"], {...})` groups by each combination). Single-arg `groupBy("category")` / `groupBy(["a","b"])` groups **without** computing aggregates.
 
-### `$agg` helpers — five cross-driver, four MongoDB-only
+### `$agg` helpers — six cross-driver, four MongoDB-only
 
 Cross-driver (identical call on MongoDB **and** Postgres):
 
-- `$agg.count()` · `$agg.sum(field)` · `$agg.avg(field)` · `$agg.min(field)` · `$agg.max(field)`
+- `$agg.count()` · `$agg.countDistinct(field)` · `$agg.sum(input)` · `$agg.sumRaw(expression)` · `$agg.avg(field)` · `$agg.min(field)` · `$agg.max(field)`
+- `$agg.countDistinct(field)` counts distinct values per group: Postgres `COUNT(DISTINCT col)`; MongoDB `$addToSet` in `$group` finalized with `$size` in the renaming `$project`.
+
+### Summing a computed expression — `$agg.sum(expr)` / `$agg.sumRaw`
+
+`$agg.sum` accepts either a bare column name (`$agg.sum("amount")`, unchanged) **or** a typed, cross-driver column expression so you can sum a computed value like `price * quantity` without dropping to raw SQL. Build the expression with the `$expr` combinators (grouped under one object, like `$agg`): `$expr.col` / `$expr.lit` / `$expr.mul` / `$expr.add` / `$expr.sub` / `$expr.div`.
+
+```ts
+import { $agg, $expr } from "@warlock.js/cascade";
+
+const revenue = await OrderItem.query()
+  .groupBy("product_id", {
+    revenue: $agg.sum($expr.mul("price", "quantity")),                       // SUM(price * quantity)
+    net:     $agg.sum($expr.mul($expr.sub($expr.lit(1), "discount"), "price")),// SUM((1 - discount) * price)
+  })
+  .get();
+```
+
+Cross-driver: Postgres emits `SUM(("price" * "quantity"))`, MongoDB emits `{ $sum: { $multiply: ["$price", "$quantity"] } }`. Column names flow through the driver's identifier-quoting path — they're never string-interpolated. The bare-string form (`$agg.sum("amount")`) produces a byte-for-byte-identical payload to before, so existing call sites are unchanged.
+
+When the typed combinators can't express what you need, reach for the raw escape hatch `$agg.sumRaw("price * quantity * (1 - discount)")` — the string is emitted verbatim (**never** build it from untrusted input). `$agg.sumRaw` is **Postgres-only**: on MongoDB it throws, since a raw SQL fragment isn't portable to a pipeline. Use the typed `$agg.sum(...)` form for cross-driver code.
 
 MongoDB-only — on Postgres these **throw at the `.groupBy()` call** with an actionable message (there is no honest single-scalar `GROUP BY` equivalent):
 
@@ -73,6 +93,26 @@ When `$agg.*` can't express it, pass a raw expression in the same slot:
 ```
 
 Raw strings pass through verbatim. A MongoDB operator object passed on Postgres throws ("not portable to SQL") — keep raw expressions driver-correct.
+
+## Date-bucketed rollups — `.groupByDate(column, unit, aggregates?)`
+
+For time-series reports ("revenue per month", "signups per week") use `groupByDate` instead of grouping on the raw timestamp — it truncates the column to a bucket and groups by the bucket, portably across drivers:
+
+```ts
+import { $agg, $expr } from "@warlock.js/cascade";
+
+const monthly = await Order.query()
+  .whereDateAfter("created_at", startOfYear)
+  .groupByDate("created_at", "month", {
+    revenue: $agg.sum($expr.mul("price", "quantity")),
+    orders: $agg.count(),
+  })
+  .orderBy("created_at", "asc")
+  .get();
+// each row: { created_at: <bucket start>, revenue, orders }
+```
+
+`unit` is `"day" | "week" | "month" | "year"`. The bucketed value comes back under the **column's own name** (`created_at` above). The optional third argument is the same aggregates object as the two-arg `groupBy` (`$agg.*` helpers or driver-native raw expressions). Cross-driver: Postgres emits `date_trunc('<unit>', "column")`; MongoDB emits `{ $dateTrunc: { date: "$column", unit } }` in the `$group` `_id`. Calling `groupByDate` with no aggregates buckets and groups without computing any.
 
 ## `.having(...)` — filter groups by a computed aggregate
 
@@ -1392,7 +1432,7 @@ There is no `has(name)` / `list()` / `setDefault()` — guard with a `try/catch`
 
 ---
 name: manage-transactions
-description: 'Wrap multi-statement work in `transaction(async () => {...})` — rollback on throw, commit on resolve, optional `isolation` level (Postgres), per-`dataSource` scope. Postgres native; MongoDB requires replica set. Triggers: `transaction`, `isolation`, `SERIALIZABLE`, `READ COMMITTED`, nested savepoints; "wrap two writes atomically", "transfer balance between accounts", "rollback on error", "MongoDB replica set transactions"; typical import `import { transaction } from "@warlock.js/cascade"`. Skip: single-row atomic ops without a transaction — `@warlock.js/cascade/perform-atomic-ops/SKILL.md`; per-source scope — `@warlock.js/cascade/manage-data-sources/SKILL.md`; competing patterns `mongoose.startSession`, `pg` `BEGIN` manually, `prisma.$transaction`, `typeorm` `QueryRunner`.'
+description: 'Wrap multi-statement work in `transaction(async () => {...})` — rollback on throw, commit on resolve, optional `isolation` level (Postgres), per-`dataSource` scope. Also the home for transaction-aware raw SQL (`Model.raw` / `DataSource.raw` → `RawQueryResult`) and the Postgres `nativeArrayColumns` connection option. Postgres native; MongoDB requires replica set. Triggers: `transaction`, `isolation`, `SERIALIZABLE`, `READ COMMITTED`, nested savepoints, `Model.raw`, `DataSource.raw`, raw SQL, `RawQueryResult`, `nativeArrayColumns`, `JSONB[]`, `TEXT[]`; "wrap two writes atomically", "transfer balance between accounts", "rollback on error", "MongoDB replica set transactions", "run raw SQL", "native array column"; typical import `import { transaction } from "@warlock.js/cascade"`. Skip: single-row atomic ops without a transaction — `@warlock.js/cascade/perform-atomic-ops/SKILL.md`; per-source scope — `@warlock.js/cascade/manage-data-sources/SKILL.md`; competing patterns `mongoose.startSession`, `pg` `BEGIN` manually, `prisma.$transaction`, `typeorm` `QueryRunner`.'
 ---
 
 # Use transactions
@@ -1492,6 +1532,45 @@ On `SERIALIZABLE`, Postgres may abort with a serialization failure when concurre
 ## Outside the transaction
 
 Once the callback returns, the transaction is committed. Subsequent calls — including reads — see the committed state. Don't try to "share" a model instance between inside-transaction and outside contexts; reload outside if you need fresh state.
+
+## Raw SQL — `Model.raw` / `DataSource.raw` (transaction-aware)
+
+When the query builder can't express something, drop to raw SQL. Both helpers are **transaction-aware**: called inside an active `transaction()` scope they auto-join that transaction's client/session, otherwise they run on the pool.
+
+```ts
+// Off a model — uses the model's driver
+const { rows, rowCount } = await User.raw<{ id: number; total: number }>(
+  "SELECT id, COUNT(*) AS total FROM orders WHERE user_id = $1 GROUP BY id",
+  [userId],
+);
+
+// Inside a transaction — auto-joins the active scope
+await transaction(async () => {
+  await User.raw("UPDATE users SET active = true WHERE id = $1", [id]);
+});
+
+// Off a data source directly
+const { rows: counts } = await dataSource.raw<{ count: number }>(
+  "SELECT COUNT(*)::int AS count FROM users",
+);
+```
+
+`Model.raw<T>(sql, params?)` and `DataSource.raw<T>(sql, params?)` both return `Promise<RawQueryResult<T>>` — `{ rows: T[]; rowCount: number }`, **not** hydrated model instances. MongoDB drivers **throw**: there is no raw SQL on Mongo.
+
+### `nativeArrayColumns` (Postgres connection option)
+
+The Postgres serializer can't see the table schema, so by default it `JSON.stringify`s every non-vector array (and plain object) to bind it as JSON text — the correct form for a `json` / `jsonb` column. For a genuine **native-array** column (`JSONB[]` / `TEXT[]` / `INTEGER[]`, e.g. from `arrayJson()` / `arrayText()`) that's wrong: node-pg must receive the raw JS array so it emits a `{...}` array literal. List those columns in the connection's `nativeArrayColumns` to opt them out of JSON-text encoding:
+
+```ts
+connectToDatabase({
+  name: "default",
+  driver: "postgres",
+  // ...
+  nativeArrayColumns: ["tags", "category_ids"], // genuine TEXT[] / INTEGER[] columns
+});
+```
+
+The pgvector all-number array form is preserved automatically — you only need this for non-vector native arrays.
 
 ## Side effects after commit — the outbox pattern
 
@@ -1640,7 +1719,7 @@ The total count requires an extra query. On very large filtered tables, this can
 
 ---
 name: perform-atomic-ops
-description: 'Avoid races on concurrent writes — `Model.increase(filter, field, n)` / `Model.decrease` for atomic counters, `Model.atomic(filter, ops)` for arbitrary mutations (`$set` / `$inc` / `$push` / `$pull`), `Model.createMany` / `Model.findAndUpdate` / `Model.delete` for bulk. Triggers: `Model.increase`, `Model.decrease`, `Model.atomic`, `Model.createMany`, `Model.findAndUpdate`, `Model.delete`, `$inc`, `$set`; "increment counter under concurrency", "bulk insert without N+1", "atomic update without loading"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: multi-row atomicity — `@warlock.js/cascade/manage-transactions/SKILL.md`; competing patterns `mongoose findOneAndUpdate`, `pg` `UPDATE ... SET x = x + 1`.'
+description: 'Avoid races on concurrent writes — `Model.increase(filter, field, n)` / `Model.decrease` for atomic counters, `Model.atomic(filter, ops)` for arbitrary mutations (`$set` / `$inc` / `$push` / `$pull`), `Model.createMany` / `Model.findAndUpdate` / `Model.delete` for bulk. Triggers: `Model.increase`, `Model.decrease`, `Model.atomic`, `Model.createMany`, `createMany bulk`, `batchSize`, `Model.findAndUpdate`, `Model.delete`, `$inc`, `$set`; "increment counter under concurrency", "bulk insert without N+1", "fast bulk insert", "insert thousands of rows", "atomic update without loading"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: multi-row atomicity — `@warlock.js/cascade/manage-transactions/SKILL.md`; competing patterns `mongoose findOneAndUpdate`, `pg` `UPDATE ... SET x = x + 1`.'
 ---
 
 # Use atomic operations
@@ -1678,7 +1757,25 @@ const created = await OrderItem.createMany([
 // created: OrderItem[]
 ```
 
-`Model.createMany(rows)` → `Promise<TModel[]>`. Validation runs per row; wrap in a transaction if you need strict all-or-nothing semantics.
+`Model.createMany(rows, options?)` → `Promise<TModel[]>`. `options` is `{ batchSize?: number; bulk?: boolean }`. Validation runs per row; wrap in a transaction if you need strict all-or-nothing semantics.
+
+### `batchSize` — chunking (both paths)
+
+A huge array is processed in sequential chunks so it can't flood the driver. `batchSize` sets the chunk size; the default is **500** (`DEFAULT_CREATE_MANY_BATCH_SIZE`). Each chunk completes before the next starts:
+
+```ts
+await OrderItem.createMany(millionRows, { batchSize: 1000 });
+```
+
+### `bulk: true` — native multi-row insert (10–100× faster)
+
+The default path persists each row through `save()`, so model hooks, lifecycle events (`saving` / `creating` / `created` / `saved`), casts, and generated ids are all preserved. Pass `bulk: true` to instead route each chunk to the driver's native multi-row `insertMany` for 10–100× throughput on large arrays:
+
+```ts
+const rows = await OrderItem.createMany(millionRows, { bulk: true, batchSize: 1000 });
+```
+
+**Tradeoff.** The bulk path SKIPS the per-row lifecycle — no `saving` / `creating` / `created` / `saved` events, no instance hooks, no sync. What it KEEPS: rows are still prepped through the writer pipeline, so validation, casts, timestamps, defaults, and id-generation still run and the persisted columns match the default path; driver-returned values (generated `_id`, timestamps, SQL `RETURNING *`) are merged back onto the returned models. Reach for `bulk: true` when inserting large batches where per-row events don't matter (seeders, imports, denormalization); stay on the default path when you need the hooks/events.
 
 ## Bulk update — `Model.findAndUpdate(filter, operations)`
 
@@ -1719,6 +1816,7 @@ for (const user of targets) {
 | Increment a counter | `Model.increase(filter, field, n)` |
 | Atomically change multiple fields on one record | `Model.atomic(filter, ops)` |
 | Insert N records | `Model.createMany(rows)` |
+| Insert a large batch fast (no per-row events) | `Model.createMany(rows, { bulk: true, batchSize })` |
 | Update many rows with operators | `Model.findAndUpdate(filter, { $set: {...} })` |
 | Update one record by id | `Model.update(id, data)` |
 | Delete many rows (raw) | `Model.delete(filter)` |
@@ -1730,7 +1828,8 @@ for (const user of targets) {
 - Don't `const post = await Post.find(id); post.set("views", post.get<number>("views") + 1); await post.save();` for a counter. That's a lost-update race under concurrency. Use `Post.increase(filter, "views", 1)`.
 - Don't reach for `insertMany` / `updateMany` / `deleteMany` — those names don't exist on the model. Use `createMany` / `findAndUpdate` / `delete`.
 - Don't expect `findAndUpdate` / `delete` to fire per-row `saved` / `deleted` events or honor the delete strategy. They don't. Iterate if you need that.
-- Don't bulk-insert a million rows in one `createMany` call — chunk it. Most drivers cap effectively at a few thousand per round-trip.
+- Don't hand-roll chunking around `createMany` — it already chunks by `batchSize` (default 500). Tune `batchSize` instead of slicing the array yourself.
+- Don't assume `bulk: true` fires per-row `saving` / `created` / `saved` events or runs instance hooks — it doesn't. Casts/timestamps/defaults/ids still apply, but if you need the lifecycle, use the default path (or iterate with `.save()`).
 
 ## See also
 

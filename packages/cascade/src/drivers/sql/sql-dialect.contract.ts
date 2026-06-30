@@ -8,7 +8,7 @@
  * @module cascade/drivers/sql
  */
 
-import type { AggregateExpression } from "../../expressions";
+import type { AggregateExpression, ColumnExpression } from "../../expressions";
 
 /**
  * Contract that SQL dialects must implement to handle database-specific
@@ -231,4 +231,25 @@ export interface SqlDialectContract {
    * ```
    */
   aggregateToSql(expression: AggregateExpression): string;
+
+  /**
+   * Compile a typed {@link ColumnExpression} tree into a SQL fragment.
+   *
+   * Used by expression-aware aggregates (e.g. `$agg.sum($expr.mul("price","qty"))`).
+   * Column references MUST be quoted/escaped via the dialect's identifier path
+   * — never raw-interpolated. Only the `raw` node emits a verbatim string.
+   *
+   * @param expression - The expression tree to compile
+   * @returns A SQL fragment (e.g. `("price" * "quantity")`)
+   */
+  columnExpressionToSql(expression: ColumnExpression): string;
+
+  /**
+   * Build a date-bucket truncation expression for a portable `groupByDate`.
+   *
+   * @param column - The date/timestamp column to truncate
+   * @param unit - The bucket granularity
+   * @returns The SQL fragment (e.g. `date_trunc('month', "created_at")`)
+   */
+  dateTruncSql(column: string, unit: "day" | "week" | "month" | "year"): string;
 }
