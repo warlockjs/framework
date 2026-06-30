@@ -11,8 +11,24 @@ import { getFilesFromDirectory } from "../dev-server/utils";
 import { srcPath } from "../utils";
 import { Seeder } from "./seeds/seeder";
 import { SeedersManager } from "./seeds/seeders.manager";
-import { SeedRecordRef } from "./seeds/types";
+import { SeedClock, SeedRecordRef } from "./seeds/types";
 import { seedRecordsTableName, seedsTableName } from "./seeds/utils";
+
+/**
+ * Programmatic-only overrides for {@link seedCommandAction}.
+ *
+ * Not derived from CLI flags (the CLI passes only {@link CommandActionData}),
+ * so a back-fill script or a test can inject behaviour the command line can't
+ * express.
+ */
+export type SeedCommandOverrides = {
+  /**
+   * Clock the run reads for the `now` handed to each seeder and for the
+   * seeds-log metadata timestamps. Defaults to `() => new Date()`. Forwarded to
+   * {@link SeedersManager}'s `clock` option.
+   */
+  clock?: SeedClock;
+};
 
 async function clearAllTables(datasource: DataSource) {
   const tables = await datasource.driver.blueprint.listTables();
@@ -98,8 +114,14 @@ export async function dropSeedRecords(
  *   options: { fresh: true, list: false }
  * });
  * ```
+ *
+ * @param overrides Programmatic-only overrides (e.g. an injected `clock`); the
+ * CLI never passes this, so the command-line signature stays unchanged.
  */
-export async function seedCommandAction(options: CommandActionData) {
+export async function seedCommandAction(
+  options: CommandActionData,
+  overrides?: SeedCommandOverrides,
+) {
   const { path, fresh, transaction, list, drop } = options.options;
 
   const datasource = dataSourceRegistry.get();
@@ -154,7 +176,7 @@ export async function seedCommandAction(options: CommandActionData) {
     ? [await loadSeedFile(Path.toAbsolute(path as string))]
     : await listSeedsFiles();
 
-  const seedersManager = new SeedersManager();
+  const seedersManager = new SeedersManager({ clock: overrides?.clock });
 
   seedersManager.register(...seeds);
 

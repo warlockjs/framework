@@ -1,6 +1,6 @@
 ---
 name: write-seeder
-description: 'Author a seed file under `src/app/<module>/seeds/<name>.ts` using the `seeder()` factory — `name`, `dependsOn`, `once`, `order`, `batchSize`, `run({ track })`. Auto-discovered by `warlock seed`; tracked in a `seeds` table; per-record refs in `seed_records` so `warlock seed --drop` can undo a seed. Triggers: `seeder`, `Seeder`, `SeedResult`, `SeedContext`, `track`, `SeedersManager`, `warlock seed`, `--fresh`, `--drop`, `--list`, `--path`; "seed default roles", "undo a seed", "one-time data migration", "auto-discovered seeds", "order seeds by dependency"; typical import `import { seeder } from "@warlock.js/core"`. Skip: module folder layout — `@warlock.js/core/create-module/SKILL.md`; repository CRUD — `@warlock.js/core/use-repository/SKILL.md`; CLI flags — `@warlock.js/core/write-cli-command/SKILL.md`; competing patterns: hand-rolled `node scripts/seed.js`, `typeorm-seeding`.'
+description: 'Author a seed file under `src/app/<module>/seeds/<name>.ts` using the `seeder()` factory — `name`, `dependsOn`, `once`, `order`, `batchSize`, `run({ track, now, batchSize })`. Auto-discovered by `warlock seed`; tracked in a `seeds` table; per-record refs in `seed_records` so `warlock seed --drop` can undo a seed. Triggers: `seeder`, `Seeder`, `SeedResult`, `SeedContext`, `SeedClock`, `track`, `now`, `batchSize`, `SeedersManager`, `warlock seed`, `--fresh`, `--drop`, `--list`, `--path`; "seed default roles", "undo a seed", "one-time data migration", "auto-discovered seeds", "order seeds by dependency", "deterministic seed timestamps", "inject a seed clock"; typical import `import { seeder } from "@warlock.js/core"`. Skip: module folder layout — `@warlock.js/core/create-module/SKILL.md`; repository CRUD — `@warlock.js/core/use-repository/SKILL.md`; CLI flags — `@warlock.js/core/write-cli-command/SKILL.md`; competing patterns: hand-rolled `node scripts/seed.js`, `typeorm-seeding`.'
 ---
 
 # Warlock — write a seeder
@@ -64,14 +64,44 @@ type Seeder = {
 
 type SeedContext = {
   track: Track;                                 // register created records for --drop
+  now: SeedClock;                               // injectable clock — () => Date, default () => new Date()
+  batchSize: number;                            // from the seeder's batchSize (0 when unset)
 };
+
+type SeedClock = () => Date;
 
 type SeedResult = {
   recordsCreated: number;                       // OPTIONAL fallback when nothing was tracked
 };
 ```
 
-`run` now receives a `{ track }` context. Declaring the parameter is optional — an existing **zero-arg `run()` keeps working unchanged** (it just ignores the context). Returning a `SeedResult` is also optional: the manager prefers the track count and only falls back to `result.recordsCreated` when you tracked nothing. A seed that neither tracks nor returns still counts as run (the `seeds` row is inserted with `recordsCreated: 0`).
+`run` now receives a `{ track, now, batchSize }` context. Declaring the parameter is optional — an existing **zero-arg `run()` keeps working unchanged** (it just ignores the context). Returning a `SeedResult` is also optional: the manager prefers the track count and only falls back to `result.recordsCreated` when you tracked nothing. A seed that neither tracks nor returns still counts as run (the `seeds` row is inserted with `recordsCreated: 0`).
+
+## `now` — the injectable clock
+
+`now` is a `SeedClock` (`() => Date`) the seed should read **instead of** an ambient `new Date()` / `dayjs()`. It defaults to `() => new Date()`, and the `SeedersManager` reads the **same clock** for its own seeds-log timestamps (`createdAt` / `firstRunAt` / `lastRunAt`) — so seed data and the tracking row never disagree.
+
+```ts
+async run({ track, now }) {
+  // every timestamp in the run reads from one clock
+  track(await User.create({ name: "Admin", created_at: now() }));
+}
+```
+
+Inject a fixed clock for deterministic tests or historical back-fills — pass `clock` to `SeedersManager` (`new SeedersManager({ clock: () => new Date("2020-01-01") })`) or, programmatically, to `seedCommandAction(options, { clock })`. Pinning the clock makes every timestamp in the run — seed data *and* the `seeds` log — resolve to that one value.
+
+## `batchSize` — bulk-insert hint
+
+`batchSize` surfaces the seeder's own `batchSize` field into the run context (`0` when unset), so a seed can forward it straight to `Model.createMany(rows, { batchSize })` without re-reading its config:
+
+```ts
+async run({ track, batchSize }) {
+  const rows = buildManyRows();
+  track(await User.createMany(rows, { batchSize }));   // chunked insert
+}
+```
+
+The manager doesn't act on `batchSize` itself — it only hands the value through; the chunking happens inside `createMany`.
 
 ## `track` — register created records
 
@@ -334,7 +364,7 @@ warlock seed --transaction    # (default true) — pass --transaction=false to s
 - **`once: true` only works if the seed run succeeds.** A throw rolls back the transaction including the `seeds` table insert — the next run will retry.
 - **`--drop` only undoes what you `track()`.** A seed that never calls `track()` has nothing in `seed_records`, so `--drop` can't reverse it. Track every row you want to be able to undo.
 - **`dependsOn` is resolved** (topological sort over `order`). An unknown dependency throws `UnknownSeederDependencyError`; a cycle throws `SeederDependencyCycleError`. A `dependsOn` pointing at a `enabled: false` seeder errors, because disabled seeds are filtered out before resolution.
-- **`batchSize` is documented on the type but unused by the manager.** It's a forward-compat field. If you need batch inserts, batch inside `run()` directly.
+- **`batchSize` is surfaced into the run context, not acted on by the manager.** Set `batchSize` on the seeder and the manager hands the value through as `run({ batchSize })` (defaulting to `0`); forward it to `Model.createMany(rows, { batchSize })` to get chunked inserts. The manager itself never chunks — it only relays the value.
 - **`--fresh` truncates `cascade: true`.** Foreign-key chains delete with their parents. If you have data outside the seeded scope that you want to keep, do NOT run `--fresh`.
 - **Seeds aren't migrations.** Schema changes go in `migrations/`. Seeds populate data into a schema that already exists. Mixing the two (creating a table in a seed) confuses the lifecycle.
 - **`enabled: false` skips the seed but it's still in the registry.** `warlock seed --list` shows it as disabled. Re-enable by flipping the flag, not by deleting the file.

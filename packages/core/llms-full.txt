@@ -2376,6 +2376,19 @@ health.removeCheck("db"); // unregister later if needed
 
 A check returns `boolean | Promise<boolean>`. **A thrown error counts as a failed check** (it's surfaced in the `checks` map + the 503, not logged — probes poll often, so a failure is a normal signal, not an error event). Keep checks cheap and fast; they run on every `/ready` poll.
 
+### Routes-registered readiness signal
+
+A booted HTTP app that ends up with **zero routes** almost always means a route module failed to register silently — without this check it would 404 every request while reporting ready. `health.addRoutesRegisteredCheck(getRouteCount)` registers a `"routes"` check that fails while the count is `0`:
+
+```ts
+import { health, router } from "@warlock.js/core";
+
+health.addRoutesRegisteredCheck(() => router.routeCount());
+// pass a second arg to rename the check, e.g. "http-routes"
+```
+
+The count is passed as a getter so the registry stays decoupled from the router. Apps with no HTTP surface simply never register it.
+
 ## Graceful shutdown (request draining)
 
 On SIGINT/SIGTERM the framework tears down in order: **app `onShutdown` hooks → connectors in reverse priority**. The HTTP connector's teardown drains instead of dropping:
@@ -6362,7 +6375,7 @@ Rule of thumb: transformers are for **pure, deterministic** transforms of the ro
 
 ---
 name: use-repository
-description: 'Subclass `RepositoryManager` for data access — declare `source`, `filterBy`, `defaultOptions`, then call `list()`/`listCached()`/`find()`/`create()`/`update()`/`delete()` (and the active/cached/cursor variants). Triggers: `RepositoryManager`, `FilterRules`, `RepositoryOptions`, `.list`, `.listCached`, `.find`, `.findCached`, `.create`, `.update`, `.delete`, `simpleSelectColumns`; "create a repository", "filter rules for a list endpoint", "cursor vs page pagination", "cached vs uncached read"; typical import `import { RepositoryManager } from "@warlock.js/core"`. Skip: cache singleton — `@warlock.js/cache/cache-basics/SKILL.md`; use-case pipelines — `@warlock.js/core/write-use-case/SKILL.md`; wire mapping — `@warlock.js/core/define-resource/SKILL.md`; competing libs `typeorm` Repository, `prisma.client.<model>`, `@nestjs/typeorm`.'
+description: 'Subclass `RepositoryManager` for data access — declare `source`, `filterBy`, `defaultOptions`, then call `list()`/`listCached()`/`find()`/`create()`/`update()`/`delete()`, the active/cached/cursor variants, and the `filterBy`-aware aggregates `sum()`/`avg()`/`min()`/`max()`/`groupBy()`/`aggregate()`. Triggers: `RepositoryManager`, `FilterRules`, `RepositoryOptions`, `.list`, `.listCached`, `.find`, `.findCached`, `.create`, `.update`, `.delete`, `.sum`, `.avg`, `.min`, `.max`, `.groupBy`, `.aggregate`, `simpleSelectColumns`; "create a repository", "filter rules for a list endpoint", "cursor vs page pagination", "cached vs uncached read", "sum/avg/group-by with filters"; typical import `import { RepositoryManager } from "@warlock.js/core"`. Skip: cache singleton — `@warlock.js/cache/cache-basics/SKILL.md`; use-case pipelines — `@warlock.js/core/write-use-case/SKILL.md`; wire mapping — `@warlock.js/core/define-resource/SKILL.md`; competing libs `typeorm` Repository, `prisma.client.<model>`, `@nestjs/typeorm`.'
 ---
 
 # Warlock — use a repository
@@ -6552,6 +6565,43 @@ await repo.count(options?);                // → number
 await repo.countActive(options?);
 await repo.countCached(options?);
 ```
+
+### Aggregation
+
+```ts
+await repo.sum(field, options?);           // → number
+await repo.avg(field, options?);           // → number
+await repo.min(field, options?);           // → number
+await repo.max(field, options?);           // → number
+
+await repo.groupBy<R>(fields, aggregates, options?);  // → R[]
+await repo.aggregate<R>(aggregates, options?);        // → R | null
+```
+
+Every aggregate runs `applyOptionsToQuery(prepareOptions(options))` **first** — exactly like `count()` — so `filterBy` (and its operator-injection guard), `where`, scopes, and the rest of the repository options scope the aggregate before it executes. Pass the same filter inputs you'd pass to `list()`:
+
+```ts
+// filtered scalar aggregates — the filterBy rules apply
+const paidTotal = await ordersRepository.sum("total", { status: "paid" });
+const avgTicket = await ordersRepository.avg("total", { status: "paid" });
+
+// group-by + aggregate expressions (use the cascade $agg helpers)
+import { $agg } from "@warlock.js/cascade";
+
+const byStatus = await ordersRepository.groupBy(
+  "status",
+  { count: $agg.count(), total: $agg.sum("total") },
+  { paidAfter: "2026-01-01" },   // a filterBy key
+);
+
+// one summary row over the whole filtered set (null when empty)
+const summary = await ordersRepository.aggregate(
+  { total: $agg.sum("total"), avg: $agg.avg("total") },
+  { status: "paid" },
+);
+```
+
+`fields` accepts a string, a `string[]`, or a column map; `aggregates` is a map of result alias → aggregate expression. Because filters are applied first, you never have to re-implement `filterBy` logic for a stats endpoint — the same inputs scope the count *and* the sums.
 
 ### Chunking
 
@@ -7183,6 +7233,240 @@ Cascade uses `@RegisterModel()` for the model registry and `@BelongsTo` / `@HasM
 - [`register-route/SKILL.md`](../register-route/SKILL.md) — how to wire URLs to controllers.
 - [`create-controller/SKILL.md`](../create-controller/SKILL.md) — controller signature, validation, response shape.
 - [`send-response/SKILL.md`](../send-response/SKILL.md) — the full Response helper surface.
+
+
+## warlock-doctor  `@warlock.js/core/warlock-doctor/SKILL.md`
+
+---
+name: warlock-doctor
+description: 'Run `warlock doctor` — a read-only diagnostics command that checks routes / config / connectors / optional-peers / health endpoints / release hygiene and prints a pass/warn/fail report, exiting non-zero on any failure. Add your own probe with the `DoctorCheck` contract and `runChecks` / `formatReportLines`. Triggers: `warlock doctor`, `doctorCommand`, `DoctorCheck`, `CheckResult`, `CheckStatus`, `DoctorReport`, `runChecks`, `formatReportLines`, `printReport`, `defaultDoctorChecks`; "diagnose my app", "preflight / preflight check", "is the app healthy", "why are there 0 routes", "pre-release sanity check", "CI smoke check"; run as `yarn warlock doctor`. Skip: the live `/health` + `/ready` HTTP probes — `@warlock.js/core/health-checks/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; releasing the package — `releasing-warlock-monorepo`; competing tools `npm doctor`, `nest info`, hand-rolled preflight scripts.'
+---
+
+# Warlock — `warlock doctor`
+
+`warlock doctor` is a read-only preflight. It boots the app far enough to introspect it — loads every config file and bootstrap code so routes and connectors register — but **starts no connectors**, so it never opens a database, cache, or socket connection. It then runs a set of checks and prints a grouped pass / warn / fail report.
+
+```bash
+yarn warlock doctor
+```
+
+```
+✓ routes: 42 registered
+✓ config: required sections present (app, http)
+✓ connectors: 3 registered, active: database, cache
+⚠ optional-peers: not installed → unavailable: sharp (image processing); redis (Redis cache driver)
+✓ health: liveness /health + readiness /ready registered
+✓ release-hygiene: package.json and CHANGELOG agree on 4.6.0
+
+Summary: 5 ok, 1 warn, 0 fail
+```
+
+## What it checks
+
+The default set is `defaultDoctorChecks` (in registration order — runtime-surface checks first, release hygiene last):
+
+| Check | `ok` | `warn` | `fail` |
+| --- | --- | --- | --- |
+| `routes` | ≥ 1 route registered | 0 routes (a route module likely failed to load) | — |
+| `config` | required sections (`app`, `http`) present | — | a required section is missing |
+| `connectors` | manager enumerable; reports registered + active set | — | (only if the probe itself throws) |
+| `optional-peers` | every known optional peer installed | a peer is missing → its feature is unavailable | — |
+| `health` | `/health` + `/ready` will be exposed | `http.health.enabled = false` (probes off) | — |
+| `release-hygiene` | `package.json` version matches the top `## x.y.z` CHANGELOG heading | no `CHANGELOG.md`, or no parseable heading | version ≠ top heading |
+
+Optional peers are resolved from the **consuming app's** `node_modules` (via `createRequire(process.cwd())`), so the report reflects what *your* project has installed, not core's own deps.
+
+## Exit code
+
+```
+warn only  → exit 0   (warnings never fail the command)
+any fail    → exit 1   (so CI / a release script can gate on it)
+```
+
+`doctor` itself can never crash: a check that throws is caught by the runner and recorded as a `fail` (detail `check threw: <message>`), not re-thrown.
+
+## The contract
+
+```ts
+type CheckStatus = "ok" | "warn" | "fail";
+
+type CheckResult = {
+  name: string;     // stable check name, e.g. "routes"
+  status: CheckStatus;
+  detail: string;   // one-line, user-facing explanation
+};
+
+type DoctorCheck = {
+  name: string;
+  run: () => CheckResult | Promise<CheckResult>;   // MUST be read-only
+};
+
+type DoctorReport = {
+  results: CheckResult[];                 // in registration order
+  summary: Record<CheckStatus, number>;   // counts per status
+  hasFailures: boolean;                   // true iff any fail
+  exitCode: 0 | 1;                        // 1 when hasFailures, else 0
+};
+```
+
+A `DoctorCheck.run` must be **read-only** — it may introspect the router, connectors, config, and `package.json`, but must never mutate state or open a connection. It may be sync or async, and may throw (the runner degrades a throw to a `fail`).
+
+## Running checks yourself
+
+The runner and formatter are exported, so you can assemble your own check set — e.g. an app-specific preflight script or a custom CLI command:
+
+```ts
+import {
+  runChecks,
+  formatReportLines,
+  printReport,
+  defaultDoctorChecks,
+  type DoctorCheck,
+} from "@warlock.js/core";
+
+const migrationsCheck: DoctorCheck = {
+  name: "migrations",
+  async run() {
+    const pending = await countPendingMigrations();   // your read-only probe
+
+    return pending === 0
+      ? { name: "migrations", status: "ok", detail: "no pending migrations" }
+      : { name: "migrations", status: "warn", detail: `${pending} pending` };
+  },
+};
+
+const report = await runChecks([...defaultDoctorChecks, migrationsCheck]);
+
+printReport(report);                  // colored, to stdout
+const lines = formatReportLines(report);   // plain strings — snapshot-friendly
+
+if (report.hasFailures) process.exit(report.exitCode);
+```
+
+`formatReportLines` returns plain (uncolored) `<symbol> <name>: <detail>` lines plus a `Summary: …` line — handy for tests. `printReport` is the colored stdout wrapper; the structured `DoctorReport` stays the source of truth for the exit code.
+
+## Patterns
+
+### CI / pre-release gate
+
+```bash
+yarn warlock doctor || exit 1   # non-zero exit fails the job
+```
+
+A red `release-hygiene` line catches the classic "bumped `package.json` but forgot the CHANGELOG heading" mistake before a publish.
+
+### Diagnosing a silent 404 surface
+
+A `⚠ routes: 0 routes registered` line is the tell that a route module threw on import or registration and the failure was surfaced (not swallowed). Re-run `warlock dev` and read the boot error.
+
+## Gotchas
+
+- **`doctor` starts no connectors.** It intentionally does not open DB / cache / socket connections — the `connectors` check reports the *registered* set and which are already active, without forcing any up. Don't expect it to detect a down database.
+- **Optional-peers resolves from the project, not core.** A peer installed only inside core's own `node_modules` still reports as missing — the probe uses `process.cwd()`.
+- **Warnings don't fail the command.** Only a `fail` flips the exit code. Missing optional peers and disabled health endpoints are deliberate-choice `warn`s.
+- **Custom checks must stay read-only.** `run()` runs against a booted-but-not-connected app; mutating state or opening a connection breaks the contract and can hang the command.
+
+## See also
+
+- [`health-checks/SKILL.md`](../health-checks/SKILL.md) — the live `/health` + `/ready` HTTP probes and the `health` registry the `health` doctor check reports on.
+- [`write-cli-command/SKILL.md`](../write-cli-command/SKILL.md) — authoring a command + its `preload` plan, the shape `doctorCommand` is built from.
+- [`add-connector/SKILL.md`](../add-connector/SKILL.md) — connector registration, which the `connectors` check enumerates.
+- [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — project layout the checks assume.
+
+
+## warlock-routes  `@warlock.js/core/warlock-routes/SKILL.md`
+
+---
+name: warlock-routes
+description: 'Run `warlock routes` — a read-only command that lists the registered HTTP routes as a verb-colored table (method / path / name / action / middleware-count / source), a sibling of `warlock doctor`. Filter with `--method` / `--path` / `--name`, or emit normalized rows as JSON with `--json`. Triggers: `warlock routes`, `routesCommand`, "list my routes", "show all routes", "route table", "what endpoints does my app expose", "dump routes as JSON", "which routes have middleware", "route map for CI"; run as `yarn warlock routes`. Skip: read-only health/preflight checks — `@warlock.js/core/warlock-doctor/SKILL.md`; defining/naming/grouping routes — `@warlock.js/core/register-route/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; competing tools `nest`/`express` route listers, `php artisan route:list`.'
+---
+
+# Warlock — `warlock routes`
+
+`warlock routes` lists every registered HTTP route as a table. It's the read-only sibling of [`warlock doctor`](../warlock-doctor/SKILL.md): it boots the app far enough to register route modules — but **starts no connectors**, so it never opens a database, cache, or socket connection.
+
+```bash
+yarn warlock routes
+```
+
+```
+METHOD  PATH              NAME           ACTION    MW  SOURCE
+GET     /users            users.list     index     2   app/users/routes.ts
+POST    /users            users.create   store     2   app/users/routes.ts
+GET     /users/:id        users.get      show      2   app/users/routes.ts
+DELETE  /users/:id        users.delete   destroy   3   app/users/routes.ts
+
+4 routes (2 GET · 1 POST · 1 DELETE)
+```
+
+The `METHOD` column is verb-colored (GET green, POST blue, PUT/PATCH yellow, DELETE red, `all`/OPTIONS/HEAD dim). Rows sort by path, then by HTTP-method order within a path.
+
+## Columns
+
+| Column   | Meaning                                                                       |
+| -------- | ----------------------------------------------------------------------------- |
+| `METHOD` | HTTP verb; a wildcard `all` route lists as `ALL`.                             |
+| `PATH`   | Full request path (group prefix already folded in).                           |
+| `NAME`   | Route name, or `—` when unnamed.                                              |
+| `ACTION` | Handler function name (`anonymous` for an unnamed handler).                   |
+| `MW`     | Count of middleware attached to the route.                                    |
+| `SOURCE` | Source file the route registered from, or `—`.                               |
+
+## Filters
+
+Optional, case-insensitive, AND-combined:
+
+```bash
+yarn warlock routes --method GET     # -m  exact HTTP method
+yarn warlock routes --path /users    # -p  path substring
+yarn warlock routes --name users     # -n  route-name substring
+yarn warlock routes -m POST -p /users
+```
+
+## JSON output
+
+`--json` (`-j`) emits the normalized rows instead of the table — for `jq`, a CI diff, or a generated API map. Filters apply before serialization.
+
+```bash
+yarn warlock routes --json
+```
+
+```json
+[
+  { "method": "GET", "path": "/users", "name": "users.list", "action": "index", "middleware": 2, "source": "app/users/routes.ts" }
+]
+```
+
+## Patterns
+
+### Audit which routes are guarded
+
+```bash
+yarn warlock routes --json | jq '[.[] | select(.middleware == 0)]'
+```
+
+Surfaces public routes (no middleware) — a quick check that auth-protected paths actually carry a guard.
+
+### Confirm a route registered
+
+```bash
+yarn warlock routes --name users.create
+```
+
+An empty result means the route isn't registered — re-run `warlock dev` and read the boot error (the route-module loader is fail-loud, so a throwing route file aborts boot rather than being silently dropped).
+
+## Gotchas
+
+- **No connectors are started.** The list reflects what's *registered*, not what would connect. It never opens a DB/cache/socket.
+- **An empty table is a tell.** `No routes registered` is the same signal `warlock doctor`'s `routes` check warns on — a route module likely failed to load.
+- **`MW` counts, it doesn't name.** It's a "is this route guarded?" signal; for the actual chain, read the route definition.
+- **`ACTION` is the handler function name.** A controller method shows its method name; an inline anonymous handler shows `anonymous`.
+
+## See also
+
+- [`warlock-doctor/SKILL.md`](../warlock-doctor/SKILL.md) — the read-only diagnostics sibling; its `routes` check warns when this table would be empty.
+- [`register-route/SKILL.md`](../register-route/SKILL.md) — defining, naming, and grouping the routes this command lists.
+- [`write-cli-command/SKILL.md`](../write-cli-command/SKILL.md) — the command + `preload` shape `routesCommand` is built from.
 
 
 ## wire-socket  `@warlock.js/core/wire-socket/SKILL.md`
@@ -7994,7 +8278,7 @@ export const optionalAuth: Middleware = async (request, response) => {
 
 ---
 name: write-seeder
-description: 'Author a seed file under `src/app/<module>/seeds/<name>.ts` using the `seeder()` factory — `name`, `dependsOn`, `once`, `order`, `batchSize`, `run()`. Auto-discovered by `warlock seed`; tracked in a `seeds` table. Triggers: `seeder`, `Seeder`, `SeedResult`, `SeedersManager`, `warlock seed`, `--fresh`, `--list`, `--path`; "seed default roles", "one-time data migration", "auto-discovered seeds", "order seeds by dependency"; typical import `import { seeder } from "@warlock.js/core"`. Skip: module folder layout — `@warlock.js/core/create-module/SKILL.md`; repository CRUD — `@warlock.js/core/use-repository/SKILL.md`; CLI flags — `@warlock.js/core/write-cli-command/SKILL.md`; competing patterns: hand-rolled `node scripts/seed.js`, `typeorm-seeding`.'
+description: 'Author a seed file under `src/app/<module>/seeds/<name>.ts` using the `seeder()` factory — `name`, `dependsOn`, `once`, `order`, `batchSize`, `run({ track, now, batchSize })`. Auto-discovered by `warlock seed`; tracked in a `seeds` table; per-record refs in `seed_records` so `warlock seed --drop` can undo a seed. Triggers: `seeder`, `Seeder`, `SeedResult`, `SeedContext`, `SeedClock`, `track`, `now`, `batchSize`, `SeedersManager`, `warlock seed`, `--fresh`, `--drop`, `--list`, `--path`; "seed default roles", "undo a seed", "one-time data migration", "auto-discovered seeds", "order seeds by dependency", "deterministic seed timestamps", "inject a seed clock"; typical import `import { seeder } from "@warlock.js/core"`. Skip: module folder layout — `@warlock.js/core/create-module/SKILL.md`; repository CRUD — `@warlock.js/core/use-repository/SKILL.md`; CLI flags — `@warlock.js/core/write-cli-command/SKILL.md`; competing patterns: hand-rolled `node scripts/seed.js`, `typeorm-seeding`.'
 ---
 
 # Warlock — write a seeder
@@ -8012,21 +8296,20 @@ export default seeder({
   description: "Insert admin / member / viewer roles",
   once: true,
   order: 1,
-  async run() {
-    let recordsCreated = 0;
-
+  async run({ track }) {
     for (const slug of ["admin", "member", "viewer"]) {
       const existing = await Role.first({ slug });
       if (existing) continue;
 
-      await Role.create({ slug, name: slug.toUpperCase() });
-      recordsCreated++;
+      // track() records the created row in `seed_records` (same transaction)
+      // AND returns its argument so you can chain inline.
+      track(await Role.create({ slug, name: slug.toUpperCase() }));
     }
-
-    return { recordsCreated };
   },
 });
 ```
+
+`recordsCreated` is **auto-derived from the track count** — you no longer have to count by hand or return a `SeedResult`.
 
 Run them:
 
@@ -8035,9 +8318,13 @@ yarn warlock seed                            # discover + run all
 yarn warlock seed --list                     # show registry, don't run
 yarn warlock seed --path=src/app/roles/seeds/default-roles.seed.ts  # one file
 yarn warlock seed --fresh                    # truncate every table first, then run all
+yarn warlock seed --drop                     # undo every tracked record, reset the log
+yarn warlock seed --drop=default-roles       # undo just one seeder's records
 ```
 
 `--fresh` truncates **every** table in the DB (`datasource.driver.truncateTable(table, { cascade: true })`), including the `seeds` tracking table. After `--fresh`, `once: true` seeds will run again.
+
+`--drop` is the surgical alternative: it deletes only the rows a seeder **tracked**, in reverse run-order, then resets the matching `seeds`-log rows so `once: true` seeds re-run. See [Undo — `seed_records` + `--drop`](#undo--seed_records----drop).
 
 ## The `Seeder` type
 
@@ -8050,15 +8337,69 @@ type Seeder = {
   once?: boolean;                               // skip if a row exists in the `seeds` table
   order?: number;                               // sort key — lower runs first
   batchSize?: number;                           // documented; not enforced by the manager
-  run(): Promise<SeedResult | void>;            // your work
+  run(ctx: SeedContext): Promise<SeedResult | void>;   // your work
 };
 
+type SeedContext = {
+  track: Track;                                 // register created records for --drop
+  now: SeedClock;                               // injectable clock — () => Date, default () => new Date()
+  batchSize: number;                            // from the seeder's batchSize (0 when unset)
+};
+
+type SeedClock = () => Date;
+
 type SeedResult = {
-  recordsCreated: number;                       // tracked in the seeds table
+  recordsCreated: number;                       // OPTIONAL fallback when nothing was tracked
 };
 ```
 
-Returning a `SeedResult` is optional — the manager uses `recordsCreated` only to populate metadata in the `seeds` table. If you don't return anything, the seed still counts as run (the row is inserted with `recordsCreated: 0`).
+`run` now receives a `{ track, now, batchSize }` context. Declaring the parameter is optional — an existing **zero-arg `run()` keeps working unchanged** (it just ignores the context). Returning a `SeedResult` is also optional: the manager prefers the track count and only falls back to `result.recordsCreated` when you tracked nothing. A seed that neither tracks nor returns still counts as run (the `seeds` row is inserted with `recordsCreated: 0`).
+
+## `now` — the injectable clock
+
+`now` is a `SeedClock` (`() => Date`) the seed should read **instead of** an ambient `new Date()` / `dayjs()`. It defaults to `() => new Date()`, and the `SeedersManager` reads the **same clock** for its own seeds-log timestamps (`createdAt` / `firstRunAt` / `lastRunAt`) — so seed data and the tracking row never disagree.
+
+```ts
+async run({ track, now }) {
+  // every timestamp in the run reads from one clock
+  track(await User.create({ name: "Admin", created_at: now() }));
+}
+```
+
+Inject a fixed clock for deterministic tests or historical back-fills — pass `clock` to `SeedersManager` (`new SeedersManager({ clock: () => new Date("2020-01-01") })`) or, programmatically, to `seedCommandAction(options, { clock })`. Pinning the clock makes every timestamp in the run — seed data *and* the `seeds` log — resolve to that one value.
+
+## `batchSize` — bulk-insert hint
+
+`batchSize` surfaces the seeder's own `batchSize` field into the run context (`0` when unset), so a seed can forward it straight to `Model.createMany(rows, { batchSize })` without re-reading its config:
+
+```ts
+async run({ track, batchSize }) {
+  const rows = buildManyRows();
+  track(await User.createMany(rows, { batchSize }));   // chunked insert
+}
+```
+
+The manager doesn't act on `batchSize` itself — it only hands the value through; the chunking happens inside `createMany`.
+
+## `track` — register created records
+
+`track` is how a seed tells the framework which rows it created, so `--drop` can undo them. It has three forms, and **every form returns its first argument** so you can wrap a `create()` call inline:
+
+```ts
+track(model)                 // single model — reads model.getTableName() + model.id
+track([modelA, modelB])      // bulk — array of models
+track("legacy_table", id)    // raw escape hatch — table name + id, no model
+```
+
+```ts
+async run({ track }) {
+  const role = track(await Role.create({ slug: "admin" }));      // chain inline
+  const users = track(await User.createMany([...]));             // bulk
+  track("audit_log", auditId);                                    // raw
+}
+```
+
+Tracked refs are written to the `seed_records` table **inside the same transaction** the seed runs in — if the seed throws, the refs roll back with the data. Only the **last run's** refs are kept: re-running a seed drops its prior refs first, so undo stays bounded to what currently exists.
 
 ## Auto-discovery
 
@@ -8102,6 +8443,34 @@ Skip-on-`once`:
 
 Use `once: true` for irreversible "starter" data (the framework's default `roles`, fixed enum tables) and leave it off for repeatable seeds (dev fixtures you re-run after rolling the DB).
 
+## Undo — `seed_records` + `--drop`
+
+Every record you `track()` is written to a `seed_records` table (created on first run via `SeedRecordsTableMigration`):
+
+| Column     | Meaning                                  |
+| ---------- | ---------------------------------------- |
+| `seeder`   | Owning seeder's `name`                   |
+| `table`    | Table the tracked record lives in        |
+| `recordId` | Primary key of the tracked record        |
+| `runAt`    | Wall time the reference was recorded      |
+
+`warlock seed --drop` reads those refs and undoes the seed:
+
+```bash
+yarn warlock seed --drop                # undo every tracked record across all seeders
+yarn warlock seed --drop=default-roles  # undo just one seeder's records
+```
+
+What it does, inside a single transaction:
+
+1. Deletes the tracked records in **reverse run-order**, and within each seed in **reverse insertion-order** (highest `seed_records.id` first — so children created after their parents are removed first).
+2. Clears the `seed_records` refs it acted on.
+3. Resets the matching `seeds`-log rows, so a `once: true` seed **re-runs** on the next `warlock seed`.
+
+Only **tracked** rows are deleted — records you created without `track()` (or rows added by hand) are untouched. A seed whose `run()` never calls `track()` can't be undone with `--drop`; it has nothing to delete and its log row stays.
+
+`--drop` vs `--fresh`: `--fresh` is the blunt reset (truncates *every* table); `--drop` is surgical (only what a seed tracked). Reach for `--drop` when you want to re-run one seeder without nuking the whole DB.
+
 ## Ordering
 
 ```ts
@@ -8120,19 +8489,34 @@ seeder({
 
 The manager sorts by `order` ascending — lower runs first. Seeds without an `order` get sorted to the end (`Number.MAX_SAFE_INTEGER`).
 
-`dependsOn: ["user-roles"]` is on the `Seeder` type but **not yet resolved** by the manager (there's an explicit `TODO: Handle dependsOn resolution` in the source — topological sort isn't implemented). For now, rely on `order` to express dependencies. The `dependsOn` field stays available for forward-compat.
+### `dependsOn` — topological order
+
+`dependsOn: ["user-roles"]` is **resolved** by the manager: it topologically sorts seeders so every dependency runs before its dependents, *layered over* the numeric `order` tie-break. Among seeders whose dependencies are already satisfied, the lowest `order` (then registration order) runs first.
+
+```ts
+seeder({ name: "roles", order: 20, async run() { /* ... */ } });
+seeder({ name: "admin-user", dependsOn: ["roles"], order: 10, async run() { /* ... */ } });
+// → roles runs FIRST despite its higher order, because admin-user depends on it.
+```
+
+Two ways it fails loudly:
+
+- **Unknown dependency** — `dependsOn` names a seeder that isn't registered (or is `enabled: false`, since disabled seeds are filtered out *before* resolution) → `UnknownSeederDependencyError`.
+- **Cycle** — `a → b → a` → `SeederDependencyCycleError` (the message includes the cycle path).
+
+Use `dependsOn` to express *hard* ordering constraints and `order` for soft sequencing within a dependency layer.
 
 ## Transactions
 
-By default, each seed runs inside a transaction:
+By default, each seed runs inside a transaction. The manager wraps `run({ track })` **and** the write of its tracked `seed_records` refs in one transaction:
 
 ```ts
 const result = withTransaction
-  ? await transaction(async () => seeder.run())
-  : await seeder.run();
+  ? await transaction(runSeeder)   // run() + seed_records writes, atomically
+  : await runSeeder();
 ```
 
-If your `run()` throws, the transaction rolls back. The CLI takes `--transaction` to flip this — pass `--transaction=false` for large seeds where you want each insert committed individually (avoid the rollback-on-failure cost; accept partial state on error).
+If your `run()` throws, the transaction rolls back — including the `seed_records` refs, so a failed seed leaves no dangling track rows. The CLI takes `--transaction` to flip this — pass `--transaction=false` for large seeds where you want each insert committed individually (avoid the rollback-on-failure cost; accept partial state on error).
 
 Within a single seed, multiple model `create()` / `insert()` calls share the same transaction — partial-on-error doesn't apply unless you opt out.
 
@@ -8148,7 +8532,7 @@ export default seeder({
   name: "default-currencies",
   description: "USD / EUR / SAR / EGP currencies",
   order: 5,
-  async run() {
+  async run({ track }) {
     const seeds = [
       { code: "USD", name: "US Dollar", decimals: 2 },
       { code: "EUR", name: "Euro", decimals: 2 },
@@ -8156,15 +8540,11 @@ export default seeder({
       { code: "EGP", name: "Egyptian Pound", decimals: 2 },
     ];
 
-    let recordsCreated = 0;
     for (const data of seeds) {
       const existing = await Currency.first({ code: data.code });
       if (existing) continue;
-      await Currency.create(data);
-      recordsCreated++;
+      track(await Currency.create(data));   // count auto-derived from track()
     }
-
-    return { recordsCreated };
   },
 });
 ```
@@ -8182,23 +8562,23 @@ export default seeder({
   name: "default-admin",
   description: "Insert the seed admin user",
   once: true,                   // never re-run
-  order: 20,                    // after roles (order: 10)
-  async run() {
+  dependsOn: ["default-roles"], // roles must exist first
+  async run({ track }) {
     const adminRole = await Role.first({ slug: "admin" });
-    if (!adminRole) throw new Error("admin role missing — run user-roles seed first");
+    if (!adminRole) throw new Error("admin role missing — run the roles seed first");
 
-    await User.create({
-      email: "admin@example.com",
-      password: "change-me-immediately",
-      role_id: adminRole.id,
-    });
-
-    return { recordsCreated: 1 };
+    track(
+      await User.create({
+        email: "admin@example.com",
+        password: "change-me-immediately",
+        role_id: adminRole.id,
+      }),
+    );
   },
 });
 ```
 
-Combining `once: true` + `order` is the canonical "starter data" pattern.
+Combining `once: true` + `dependsOn` is the canonical "starter data" pattern.
 
 ### Bulk dev fixtures (no `once`, large batch)
 
@@ -8211,16 +8591,15 @@ export default seeder({
   description: "100 sample products for dev",
   enabled: process.env.NODE_ENV === "development",
   order: 100,
-  async run() {
-    let recordsCreated = 0;
+  async run({ track }) {
     for (let i = 0; i < 100; i++) {
-      await Product.create({
-        name: `Sample ${i}`,
-        price: Math.random() * 100,
-      });
-      recordsCreated++;
+      track(
+        await Product.create({
+          name: `Sample ${i}`,
+          price: Math.random() * 100,
+        }),
+      );
     }
-    return { recordsCreated };
   },
 });
 ```
@@ -8250,17 +8629,20 @@ warlock seed                  # run all auto-discovered seeds
 warlock seed --list           # show registry (name, order, enabled), don't run
 warlock seed --path=<file>    # run one file by absolute or relative path
 warlock seed --fresh          # truncate every table first, then run all
+warlock seed --drop           # undo every tracked record, reset the seeds-log
+warlock seed --drop=<name>    # undo just one seeder's tracked records
 warlock seed --transaction    # (default true) — pass --transaction=false to skip wrapping
 ```
 
-`--fresh` is **destructive** — it truncates all tables, including the `seeds` tracking table. Treat it as "reset the dev DB," not "run pending seeds."
+`--fresh` is **destructive** — it truncates all tables, including the `seeds` tracking table. Treat it as "reset the dev DB," not "run pending seeds." `--drop` is the surgical undo — only tracked rows, scoped to one seeder if you name it.
 
 ## Gotchas
 
 - **The seed file must default-export.** A named export gets the discovery error at boot. Wrap with `export default seeder({...})`.
 - **`once: true` only works if the seed run succeeds.** A throw rolls back the transaction including the `seeds` table insert — the next run will retry.
-- **`dependsOn` is documented but not enforced yet.** Use `order` until topological sort lands (`TODO` in source).
-- **`batchSize` is documented on the type but unused by the manager.** It's a forward-compat field. If you need batch inserts, batch inside `run()` directly.
+- **`--drop` only undoes what you `track()`.** A seed that never calls `track()` has nothing in `seed_records`, so `--drop` can't reverse it. Track every row you want to be able to undo.
+- **`dependsOn` is resolved** (topological sort over `order`). An unknown dependency throws `UnknownSeederDependencyError`; a cycle throws `SeederDependencyCycleError`. A `dependsOn` pointing at a `enabled: false` seeder errors, because disabled seeds are filtered out before resolution.
+- **`batchSize` is surfaced into the run context, not acted on by the manager.** Set `batchSize` on the seeder and the manager hands the value through as `run({ batchSize })` (defaulting to `0`); forward it to `Model.createMany(rows, { batchSize })` to get chunked inserts. The manager itself never chunks — it only relays the value.
 - **`--fresh` truncates `cascade: true`.** Foreign-key chains delete with their parents. If you have data outside the seeded scope that you want to keep, do NOT run `--fresh`.
 - **Seeds aren't migrations.** Schema changes go in `migrations/`. Seeds populate data into a schema that already exists. Mixing the two (creating a table in a seed) confuses the lifecycle.
 - **`enabled: false` skips the seed but it's still in the registry.** `warlock seed --list` shows it as disabled. Re-enable by flipping the flag, not by deleting the file.

@@ -3,11 +3,13 @@ import type {
   Model,
 } from "@warlock.js/cascade";
 import type {
+  AggregateExpressions,
   ChunkCallback,
   CursorPaginationOptions,
   CursorPaginationResult,
   FilterOptions,
   FilterRules,
+  GroupByFields,
   PaginationResult,
   QueryBuilderContract,
   WhereOperator,
@@ -271,6 +273,57 @@ export class CascadeQueryBuilder<T extends Model> implements QueryBuilderContrac
    */
   public async count(): Promise<number> {
     return this.query.count();
+  }
+
+  /**
+   * {@inheritDoc QueryBuilderContract.sum}
+   */
+  public async sum(field: string): Promise<number> {
+    return this.query.sum(field);
+  }
+
+  /**
+   * {@inheritDoc QueryBuilderContract.avg}
+   */
+  public async avg(field: string): Promise<number> {
+    return this.query.avg(field);
+  }
+
+  /**
+   * {@inheritDoc QueryBuilderContract.min}
+   */
+  public async min(field: string): Promise<number> {
+    return this.query.min(field);
+  }
+
+  /**
+   * {@inheritDoc QueryBuilderContract.max}
+   */
+  public async max(field: string): Promise<number> {
+    return this.query.max(field);
+  }
+
+  /**
+   * {@inheritDoc QueryBuilderContract.groupBy}
+   */
+  public async groupBy<R = Record<string, unknown>>(
+    fields: GroupByFields,
+    aggregates: AggregateExpressions,
+  ): Promise<R[]> {
+    return this.query.groupBy(fields, aggregates).get<R>();
+  }
+
+  /**
+   * {@inheritDoc QueryBuilderContract.aggregate}
+   *
+   * Whole-set aggregation: groups with no group key so every matching record
+   * falls into a single group, then returns that one summary row.
+   */
+  public async aggregate<R = Record<string, unknown>>(
+    aggregates: AggregateExpressions,
+  ): Promise<R | null> {
+    const rows = await this.query.groupBy([], aggregates).get<R>();
+    return rows[0] ?? null;
   }
 
   /**

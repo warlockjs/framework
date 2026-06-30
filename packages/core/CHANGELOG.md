@@ -15,6 +15,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `seed_records` table (created via the new `SeedRecordsTableMigration`) records every tracked seed reference within the same transaction the seed runs in; only the last run's refs are kept per seeder
 - `warlock seed --drop [name]` undoes a seed: deletes its tracked records in reverse run/insertion order inside a transaction, then resets the matching seeds-log rows so `once: true` seeds re-run; scope to one seeder with `--drop=<name>`
 - `Seeder.dependsOn` is now resolved — seeders are topologically sorted so dependencies run before dependents, layered over the numeric `order` tie-break; throws `UnknownSeederDependencyError` for a missing dependency and `SeederDependencyCycleError` for a cycle
+- seeders receive an injectable clock and a meaningful batch size — `run({ track, now, batchSize })`; `now()` (default `() => new Date()`) drives both seed data and the seeds-log timestamps so historical/back-fill runs are deterministic, and `batchSize` surfaces the seeder's own `batchSize` for `Model.createMany(rows, { batchSize })`
+- repository-level aggregation — `aggregate()`, `sum()`, `avg()`, `min()`, `max()`, and `groupBy()` on `RepositoryManager`, each reusing `filterBy` (and its operator-injection guard), `where`, and scopes before the aggregate, exactly like `count()`
+- `warlock doctor` — a read-only diagnostics command that runs routes / config / connectors / optional-peers / health / release-hygiene checks and prints a pass/warn/fail report (exits non-zero on any failure, never opens a DB/cache/socket connection)
+- `warlock routes` — a read-only command that lists the registered HTTP routes as a verb-colored table (method / path / name / action / middleware-count / source); filter with `--method` / `--path` / `--name`, or emit the normalized rows as JSON with `--json`. Boots app code to register routes but starts no connectors
 
 ### Changed
 

@@ -38,6 +38,12 @@ function makeQuery() {
     get: vi.fn(async () => [] as Row[]),
     first: vi.fn(async () => null as Row | null),
     count: vi.fn(async () => 0),
+    sum: vi.fn(async () => 0),
+    avg: vi.fn(async () => 0),
+    min: vi.fn(async () => 0),
+    max: vi.fn(async () => 0),
+    groupBy: vi.fn(async () => [] as any[]),
+    aggregate: vi.fn(async () => null as any),
     paginate: vi.fn(async () => ({
       data: [],
       pagination: { limit: 15, result: 0, page: 1, total: 0, pages: 0 },
@@ -423,6 +429,134 @@ describe("RepositoryManager — count & existence", () => {
     const repository = new TestRepository(adapter);
 
     expect(await repository.idExists(4)).toBe(true);
+  });
+});
+
+describe("RepositoryManager — aggregation", () => {
+  /**
+   * Repository with a `filterBy` rule so we can prove the filter (and its
+   * operator-injection guard via applyFilters) is applied to the query BEFORE
+   * the aggregate runs — the whole point of putting aggregates on the
+   * repository layer instead of dropping to Model.query().
+   */
+  class OrdersRepository extends RepositoryManager<Row, { status?: string }> {
+    public constructor(adapter: RepositoryAdapterContract<Row>) {
+      super(adapter);
+      this.name = "orders";
+      this.filterBy = { status: "=" };
+    }
+  }
+
+  it("sum applies filterBy BEFORE the aggregate and returns the filtered sum", async () => {
+    const callOrder: string[] = [];
+    (query.applyFilters as any).mockImplementation(() => {
+      callOrder.push("applyFilters");
+      return query;
+    });
+    (query.sum as any).mockImplementation(async () => {
+      callOrder.push("sum");
+      return 250;
+    });
+
+    const repository = new OrdersRepository(adapter);
+
+    const total = await repository.sum("total", { status: "paid" });
+
+    // filterBy ran first, then the aggregate — same contract as count().
+    expect(callOrder).toEqual(["applyFilters", "sum"]);
+    // applyFilters received the repo's filterBy rules + the caller options
+    // (which carry the filter value the guard reads).
+    expect(query.applyFilters).toHaveBeenCalledWith(
+      { status: "=" },
+      expect.objectContaining({ status: "paid" }),
+      expect.any(Object),
+    );
+    expect(query.sum).toHaveBeenCalledWith("total");
+    expect(total).toBe(250);
+  });
+
+  it("avg / min / max thread the field and run after filterBy", async () => {
+    (query.avg as any).mockResolvedValueOnce(12.5);
+    (query.min as any).mockResolvedValueOnce(1);
+    (query.max as any).mockResolvedValueOnce(99);
+    const repository = new OrdersRepository(adapter);
+
+    expect(await repository.avg("total", { status: "paid" })).toBe(12.5);
+    expect(await repository.min("total")).toBe(1);
+    expect(await repository.max("total")).toBe(99);
+
+    expect(query.avg).toHaveBeenCalledWith("total");
+    expect(query.min).toHaveBeenCalledWith("total");
+    expect(query.max).toHaveBeenCalledWith("total");
+    // applyFilters ran for each aggregate (once per call).
+    expect(query.applyFilters).toHaveBeenCalledTimes(3);
+  });
+
+  it("groupBy applies filterBy first, threads fields + aggregates, returns grouped rows", async () => {
+    const callOrder: string[] = [];
+    (query.applyFilters as any).mockImplementation(() => {
+      callOrder.push("applyFilters");
+      return query;
+    });
+    const groupedRows = [
+      { status: "paid", count: 3 },
+      { status: "pending", count: 1 },
+    ];
+    (query.groupBy as any).mockImplementation(async () => {
+      callOrder.push("groupBy");
+      return groupedRows;
+    });
+
+    const repository = new OrdersRepository(adapter);
+    const aggregates = { count: { __agg: "count", __field: null } };
+
+    const rows = await repository.groupBy("status", aggregates, { status: "paid" });
+
+    expect(callOrder).toEqual(["applyFilters", "groupBy"]);
+    expect(query.applyFilters).toHaveBeenCalledWith(
+      { status: "=" },
+      expect.objectContaining({ status: "paid" }),
+      expect.any(Object),
+    );
+    // fields + aggregates forwarded verbatim to the query builder.
+    expect(query.groupBy).toHaveBeenCalledWith("status", aggregates);
+    expect(rows).toEqual(groupedRows);
+  });
+
+  it("aggregate applies filterBy first and returns the single summary row", async () => {
+    const callOrder: string[] = [];
+    (query.applyFilters as any).mockImplementation(() => {
+      callOrder.push("applyFilters");
+      return query;
+    });
+    (query.aggregate as any).mockImplementation(async () => {
+      callOrder.push("aggregate");
+      return { total: 250, avg: 125 };
+    });
+
+    const repository = new OrdersRepository(adapter);
+    const aggregates = {
+      total: { __agg: "sum", __field: "total" },
+      avg: { __agg: "avg", __field: "total" },
+    };
+
+    const summary = await repository.aggregate(aggregates, { status: "paid" });
+
+    expect(callOrder).toEqual(["applyFilters", "aggregate"]);
+    expect(query.aggregate).toHaveBeenCalledWith(aggregates);
+    expect(summary).toEqual({ total: 250, avg: 125 });
+  });
+
+  it("threads defaultOptions + a perform hook into the aggregate query", async () => {
+    const perform = vi.fn();
+    (query.sum as any).mockResolvedValueOnce(42);
+    const repository = new OrdersRepository(adapter);
+
+    const total = await repository.sum("total", { status: "paid", perform } as any);
+
+    // applyOptionsToQuery runs the perform hook just like every other read path.
+    expect(perform).toHaveBeenCalledTimes(1);
+    expect(total).toBe(42);
   });
 });
 

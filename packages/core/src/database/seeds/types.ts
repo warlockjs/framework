@@ -85,6 +85,17 @@ export type Track = {
 };
 
 /**
+ * Injectable clock. Returns the "current" time a seed run should treat as
+ * `now`.
+ *
+ * Defaults to `() => new Date()`. Override it (via the
+ * {@link SeedContext.now} the manager builds) to make historical seeds and the
+ * manager's own metadata timestamps deterministic — both read from this single
+ * clock, so a test or a back-fill can pin every timestamp to one value.
+ */
+export type SeedClock = () => Date;
+
+/**
  * Context passed to a seeder's `run()`.
  */
 export type SeedContext = {
@@ -93,4 +104,31 @@ export type SeedContext = {
    * `warlock seed --drop`.
    */
   track: Track;
+  /**
+   * The clock the seed should read instead of an ambient `new Date()` /
+   * `dayjs()`. The {@link SeedersManager} builds it from its `clock` option
+   * (default `() => new Date()`) and reads the SAME clock for its own metadata
+   * timestamps, so historical seeds and the seeds-log stay consistent.
+   *
+   * @example
+   * ```ts
+   * run: async ({ track, now }) => {
+   *   track(await User.create({ created_at: now() }));
+   * }
+   * ```
+   */
+  now: SeedClock;
+  /**
+   * Suggested batch size for bulk inserts, defaulted from the seeder's
+   * `batchSize`. Surfaced here so a seed can forward it to
+   * `Model.createMany(rows, { batchSize })` without re-reading its own config.
+   *
+   * @example
+   * ```ts
+   * run: async ({ track, batchSize }) => {
+   *   track(await User.createMany(rows, { batchSize }));
+   * }
+   * ```
+   */
+  batchSize: number;
 };

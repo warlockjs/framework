@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addCommand } from "../../../src/cli/commands/add.command";
 import { migrateCommand } from "../../../src/cli/commands/migrate.command";
+import { routesCommand } from "../../../src/cli/commands/routes.command";
 import { seedCommand } from "../../../src/cli/commands/seed.command";
 import {
   generateCommand,
@@ -60,6 +61,29 @@ describe("seedCommand definition", () => {
 
     expect(transaction?.defaultValue).toBe(true);
     expect(transaction?.alias).toBe("t");
+  });
+});
+
+describe("routesCommand definition", () => {
+  it("bootstraps to register routes but starts NO connectors (read-only)", () => {
+    expect(routesCommand.name).toBe("routes");
+    expect(routesCommand.commandPreload).toEqual({
+      config: true,
+      env: true,
+      bootstrap: true,
+    });
+    expect(routesCommand.commandPreload?.connectors).toBeUndefined();
+  });
+
+  it("declares the filter + json options with their aliases", () => {
+    const byName = (name: string) =>
+      routesCommand.commandOptions.find((option) => option.name === name);
+
+    expect(byName("method")?.alias).toBe("m");
+    expect(byName("path")?.alias).toBe("p");
+    expect(byName("name")?.alias).toBe("n");
+    expect(byName("json")?.alias).toBe("j");
+    expect(byName("json")?.type).toBe("boolean");
   });
 });
 

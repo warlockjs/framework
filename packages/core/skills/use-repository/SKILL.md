@@ -1,6 +1,6 @@
 ---
 name: use-repository
-description: 'Subclass `RepositoryManager` for data access — declare `source`, `filterBy`, `defaultOptions`, then call `list()`/`listCached()`/`find()`/`create()`/`update()`/`delete()` (and the active/cached/cursor variants). Triggers: `RepositoryManager`, `FilterRules`, `RepositoryOptions`, `.list`, `.listCached`, `.find`, `.findCached`, `.create`, `.update`, `.delete`, `simpleSelectColumns`; "create a repository", "filter rules for a list endpoint", "cursor vs page pagination", "cached vs uncached read"; typical import `import { RepositoryManager } from "@warlock.js/core"`. Skip: cache singleton — `@warlock.js/cache/cache-basics/SKILL.md`; use-case pipelines — `@warlock.js/core/write-use-case/SKILL.md`; wire mapping — `@warlock.js/core/define-resource/SKILL.md`; competing libs `typeorm` Repository, `prisma.client.<model>`, `@nestjs/typeorm`.'
+description: 'Subclass `RepositoryManager` for data access — declare `source`, `filterBy`, `defaultOptions`, then call `list()`/`listCached()`/`find()`/`create()`/`update()`/`delete()`, the active/cached/cursor variants, and the `filterBy`-aware aggregates `sum()`/`avg()`/`min()`/`max()`/`groupBy()`/`aggregate()`. Triggers: `RepositoryManager`, `FilterRules`, `RepositoryOptions`, `.list`, `.listCached`, `.find`, `.findCached`, `.create`, `.update`, `.delete`, `.sum`, `.avg`, `.min`, `.max`, `.groupBy`, `.aggregate`, `simpleSelectColumns`; "create a repository", "filter rules for a list endpoint", "cursor vs page pagination", "cached vs uncached read", "sum/avg/group-by with filters"; typical import `import { RepositoryManager } from "@warlock.js/core"`. Skip: cache singleton — `@warlock.js/cache/cache-basics/SKILL.md`; use-case pipelines — `@warlock.js/core/write-use-case/SKILL.md`; wire mapping — `@warlock.js/core/define-resource/SKILL.md`; competing libs `typeorm` Repository, `prisma.client.<model>`, `@nestjs/typeorm`.'
 ---
 
 # Warlock — use a repository
@@ -190,6 +190,43 @@ await repo.count(options?);                // → number
 await repo.countActive(options?);
 await repo.countCached(options?);
 ```
+
+### Aggregation
+
+```ts
+await repo.sum(field, options?);           // → number
+await repo.avg(field, options?);           // → number
+await repo.min(field, options?);           // → number
+await repo.max(field, options?);           // → number
+
+await repo.groupBy<R>(fields, aggregates, options?);  // → R[]
+await repo.aggregate<R>(aggregates, options?);        // → R | null
+```
+
+Every aggregate runs `applyOptionsToQuery(prepareOptions(options))` **first** — exactly like `count()` — so `filterBy` (and its operator-injection guard), `where`, scopes, and the rest of the repository options scope the aggregate before it executes. Pass the same filter inputs you'd pass to `list()`:
+
+```ts
+// filtered scalar aggregates — the filterBy rules apply
+const paidTotal = await ordersRepository.sum("total", { status: "paid" });
+const avgTicket = await ordersRepository.avg("total", { status: "paid" });
+
+// group-by + aggregate expressions (use the cascade $agg helpers)
+import { $agg } from "@warlock.js/cascade";
+
+const byStatus = await ordersRepository.groupBy(
+  "status",
+  { count: $agg.count(), total: $agg.sum("total") },
+  { paidAfter: "2026-01-01" },   // a filterBy key
+);
+
+// one summary row over the whole filtered set (null when empty)
+const summary = await ordersRepository.aggregate(
+  { total: $agg.sum("total"), avg: $agg.avg("total") },
+  { status: "paid" },
+);
+```
+
+`fields` accepts a string, a `string[]`, or a column map; `aggregates` is a map of result alias → aggregate expression. Because filters are applied first, you never have to re-implement `filterBy` logic for a stats endpoint — the same inputs scope the count *and* the sums.
 
 ### Chunking
 

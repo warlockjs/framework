@@ -11,11 +11,26 @@ import { Seeder } from "./seeder";
 import { SeederDependencyCycleError, UnknownSeederDependencyError } from "./seeder.errors";
 import { SeedRecordsTableMigration } from "./seed-records-table-migration";
 import { SeedsTableMigration } from "./seeds-table-migration";
-import { SeederMetadata, SeedRecordRef, SeedResult, Track, TrackableModel } from "./types";
+import {
+  SeedClock,
+  SeederMetadata,
+  SeedRecordRef,
+  SeedResult,
+  Track,
+  TrackableModel,
+} from "./types";
 import { seedRecordsTableName, seedsTableName } from "./utils";
 
 export type SeedersManagerOptions = {
   datasource?: DataSource;
+  /**
+   * Clock the manager reads for the `now` it hands each seeder AND for its own
+   * metadata timestamps (`createdAt` / `firstRunAt` / `lastRunAt` / a tracked
+   * ref's `runAt`). Defaults to `() => new Date()`. Override it to make a
+   * historical back-fill or a test deterministic — every timestamp a run
+   * produces then comes from this one clock.
+   */
+  clock?: SeedClock;
 };
 
 export class SeedersManager {
@@ -23,8 +38,15 @@ export class SeedersManager {
 
   protected datasource?: DataSource;
 
+  /**
+   * The single clock every timestamp in a run reads from. Defaults to
+   * `() => new Date()`; overridable via {@link SeedersManagerOptions.clock}.
+   */
+  protected readonly now: SeedClock;
+
   public constructor(protected options?: SeedersManagerOptions) {
     this.datasource = options?.datasource ?? dataSourceRegistry.get();
+    this.now = options?.clock ?? (() => new Date());
   }
 
   /**
@@ -82,7 +104,11 @@ export class SeedersManager {
           // writing the new ones, so `--drop` undo stays bounded.
           await this.driver.deleteMany(seedRecordsTableName, { seeder: seeder.name });
 
-          const result = await seeder.run({ track });
+          const result = await seeder.run({
+            track,
+            now: this.now,
+            batchSize: seeder.batchSize ?? 0,
+          });
 
           if (refs.length > 0) {
             await this.driver.insertMany(
@@ -142,7 +168,7 @@ export class SeedersManager {
    */
   protected createTracker(seeder: Seeder, refs: SeedRecordRef[]): Track {
     const push = (table: string, recordId: number | string) => {
-      refs.push({ seeder: seeder.name, table, recordId, runAt: new Date() });
+      refs.push({ seeder: seeder.name, table, recordId, runAt: this.now() });
     };
 
     function track<T extends TrackableModel>(model: T): T;
@@ -274,6 +300,10 @@ export class SeedersManager {
     // log with an emoji icon at beginning of text no of total craeted records
     console.log(`📊 Total records created: ${result.recordsCreated}`);
 
+    // Read the single overridable clock once so every timestamp in this write
+    // is identical (and pinned in a deterministic / historical run).
+    const now = this.now();
+
     if (oldResult) {
       // Update existing record - use query builder with WHERE clause
       await this.driver
@@ -281,7 +311,7 @@ export class SeedersManager {
         .where("name", seeder.name)
         .update({
           runCount: oldResult.runCount + 1,
-          lastRunAt: new Date(),
+          lastRunAt: now,
           totalRecordsCreated: oldResult.totalRecordsCreated + result.recordsCreated,
           lastRunRecordsCreated: result.recordsCreated,
         });
@@ -294,9 +324,9 @@ export class SeedersManager {
       // Insert new record
       await this.driver.insert(seedsTableName, {
         name: seeder.name,
-        createdAt: new Date(),
-        firstRunAt: new Date(),
-        lastRunAt: new Date(),
+        createdAt: now,
+        firstRunAt: now,
+        lastRunAt: now,
         runCount: 1,
         totalRecordsCreated: result.recordsCreated,
         lastRunRecordsCreated: result.recordsCreated,

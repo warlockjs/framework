@@ -2,10 +2,12 @@ import { cache, CacheKey, type CacheDriver } from "@warlock.js/cache";
 import { config } from "../config";
 import { CascadeAdapter } from "./adapters/cascade";
 import type {
+  AggregateExpressions,
   AllRepositoryOptions,
   ChunkCallback,
   CursorPaginationResult,
   FilterRules,
+  GroupByFields,
   PaginationResult,
   QueryBuilderContract,
   RepositoryAdapterContract,
@@ -1192,6 +1194,163 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    */
   public async countActiveCached(options?: TypedRepositoryOptions<F>): Promise<number> {
     return await this.countCached(this.asTyped({ ...this.getIsActiveFilter(), ...options }));
+  }
+
+  // ============================================================================
+  // AGGREGATION METHODS
+  // ============================================================================
+
+  /**
+   * Sum a numeric field across records matching options.
+   *
+   * Applies `filterBy` (and its operator-injection guard), `where`, scopes and
+   * every other repository option to the query FIRST — exactly like `count()` —
+   * THEN runs the aggregate, so the sum is always scoped by the same filters
+   * the rest of the repository honors.
+   *
+   * @param field - Numeric field to sum
+   * @param options - Repository options (filter values, perform, etc.)
+   * @returns Promise resolving to the filtered numeric sum
+   * @public
+   *
+   * @example
+   * await ordersRepository.sum("total", { status: "paid" });
+   */
+  public async sum(field: string, options?: TypedRepositoryOptions<F>): Promise<number> {
+    const query = this.newQuery();
+    const opts = this.prepareOptions(options);
+
+    this.applyOptionsToQuery(query, opts);
+
+    return await query.sum(field);
+  }
+
+  /**
+   * Average a numeric field across records matching options.
+   *
+   * Options (including `filterBy`) are applied before the aggregate, mirroring
+   * `count()`.
+   *
+   * @param field - Numeric field to average
+   * @param options - Repository options
+   * @returns Promise resolving to the filtered numeric average
+   * @public
+   */
+  public async avg(field: string, options?: TypedRepositoryOptions<F>): Promise<number> {
+    const query = this.newQuery();
+    const opts = this.prepareOptions(options);
+
+    this.applyOptionsToQuery(query, opts);
+
+    return await query.avg(field);
+  }
+
+  /**
+   * Minimum value of a field across records matching options.
+   *
+   * Options (including `filterBy`) are applied before the aggregate, mirroring
+   * `count()`.
+   *
+   * @param field - Field name
+   * @param options - Repository options
+   * @returns Promise resolving to the filtered minimum value
+   * @public
+   */
+  public async min(field: string, options?: TypedRepositoryOptions<F>): Promise<number> {
+    const query = this.newQuery();
+    const opts = this.prepareOptions(options);
+
+    this.applyOptionsToQuery(query, opts);
+
+    return await query.min(field);
+  }
+
+  /**
+   * Maximum value of a field across records matching options.
+   *
+   * Options (including `filterBy`) are applied before the aggregate, mirroring
+   * `count()`.
+   *
+   * @param field - Field name
+   * @param options - Repository options
+   * @returns Promise resolving to the filtered maximum value
+   * @public
+   */
+  public async max(field: string, options?: TypedRepositoryOptions<F>): Promise<number> {
+    const query = this.newQuery();
+    const opts = this.prepareOptions(options);
+
+    this.applyOptionsToQuery(query, opts);
+
+    return await query.max(field);
+  }
+
+  /**
+   * Group records by one or more fields and compute aggregates.
+   *
+   * Repository options (including `filterBy`) are applied before the grouping,
+   * mirroring `count()`, so the grouped rows are always scoped by the same
+   * filters the rest of the repository honors.
+   *
+   * @template R - Shape of each grouped row
+   * @param fields - Field(s) to group by
+   * @param aggregates - Map of result aliases to aggregate expressions (e.g. `$agg.*`)
+   * @param options - Repository options
+   * @returns Promise resolving to the array of grouped rows
+   * @public
+   *
+   * @example
+   * import { $agg } from "@warlock.js/cascade";
+   *
+   * await ordersRepository.groupBy(
+   *   "status",
+   *   { count: $agg.count(), total: $agg.sum("total") },
+   *   { paidAfter: "2026-01-01" },
+   * );
+   */
+  public async groupBy<R = Record<string, unknown>>(
+    fields: GroupByFields,
+    aggregates: AggregateExpressions,
+    options?: TypedRepositoryOptions<F>,
+  ): Promise<R[]> {
+    const query = this.newQuery();
+    const opts = this.prepareOptions(options);
+
+    this.applyOptionsToQuery(query, opts);
+
+    return await query.groupBy<R>(fields, aggregates);
+  }
+
+  /**
+   * Compute aggregates over the whole matching set as a single summary row.
+   *
+   * Repository options (including `filterBy`) are applied before the aggregate,
+   * mirroring `count()`.
+   *
+   * @template R - Shape of the summary row
+   * @param aggregates - Map of result aliases to aggregate expressions (e.g. `$agg.*`)
+   * @param options - Repository options
+   * @returns Promise resolving to the single summary row (or `null` when empty)
+   * @public
+   *
+   * @example
+   * import { $agg } from "@warlock.js/cascade";
+   *
+   * await ordersRepository.aggregate(
+   *   { total: $agg.sum("total"), avg: $agg.avg("total") },
+   *   { status: "paid" },
+   * );
+   */
+  public async aggregate<R = Record<string, unknown>>(
+    aggregates: AggregateExpressions,
+    options?: TypedRepositoryOptions<F>,
+  ): Promise<R | null> {
+    const query = this.newQuery();
+    const opts = this.prepareOptions(options);
+
+    this.applyOptionsToQuery(query, opts);
+
+    return await query.aggregate<R>(aggregates);
   }
 
   // ============================================================================

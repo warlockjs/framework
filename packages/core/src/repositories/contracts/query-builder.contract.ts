@@ -9,6 +9,32 @@ import type {
 } from "./types";
 
 /**
+ * Field(s) to group aggregated results by.
+ *
+ * ORM-agnostic mirror of the underlying driver's group-by payload: a single
+ * field name, a list of field names, or a driver-specific object form.
+ */
+export type GroupByFields = string | string[] | Record<string, unknown> | Array<Record<string, unknown>>;
+
+/**
+ * A single aggregate expression in a `groupBy` / `aggregate` projection.
+ *
+ * Either an abstract, cross-driver expression (e.g. produced by Cascade's
+ * `$agg.count()` / `$agg.sum("amount")`) or a raw, driver-specific shape
+ * (e.g. MongoDB `{ $sum: "$amount" }`, SQL `"SUM(amount)"`). The repository
+ * layer is agnostic to which form is used and forwards it verbatim.
+ */
+export type AggregateExpressionInput = string | Record<string, unknown> | unknown;
+
+/**
+ * Map of result aliases to aggregate expressions.
+ *
+ * @example
+ * { count: $agg.count(), total: $agg.sum("total") }
+ */
+export type AggregateExpressions = Record<string, AggregateExpressionInput>;
+
+/**
  * Query builder contract for building database queries
  * This interface is ORM-agnostic and can be implemented by any data source adapter
  *
@@ -302,6 +328,78 @@ export interface QueryBuilderContract<T> {
    * @returns Promise resolving to count
    */
   count(): Promise<number>;
+
+  /**
+   * Sum a numeric field across all matching records.
+   *
+   * @param field - Field name to sum
+   * @returns Promise resolving to the numeric sum (0 when no records match)
+   *
+   * @example
+   * await query.where("status", "paid").sum("total")
+   */
+  sum(field: string): Promise<number>;
+
+  /**
+   * Average a numeric field across all matching records.
+   *
+   * @param field - Field name to average
+   * @returns Promise resolving to the numeric average (0 when no records match)
+   *
+   * @example
+   * await query.where("status", "paid").avg("total")
+   */
+  avg(field: string): Promise<number>;
+
+  /**
+   * Minimum value of a field across all matching records.
+   *
+   * @param field - Field name
+   * @returns Promise resolving to the minimum value (0 when no records match)
+   */
+  min(field: string): Promise<number>;
+
+  /**
+   * Maximum value of a field across all matching records.
+   *
+   * @param field - Field name
+   * @returns Promise resolving to the maximum value (0 when no records match)
+   */
+  max(field: string): Promise<number>;
+
+  /**
+   * Group matching records by one or more fields and compute aggregates.
+   *
+   * This is a terminal executor: it applies the grouping + aggregate
+   * projection and returns the grouped rows.
+   *
+   * @template R - Shape of each grouped row
+   * @param fields - Field(s) to group by
+   * @param aggregates - Map of result aliases to aggregate expressions
+   * @returns Promise resolving to the array of grouped rows
+   *
+   * @example
+   * await query.groupBy("status", { count: $agg.count(), total: $agg.sum("total") })
+   */
+  groupBy<R = Record<string, unknown>>(
+    fields: GroupByFields,
+    aggregates: AggregateExpressions,
+  ): Promise<R[]>;
+
+  /**
+   * Compute aggregates over the whole matching set as a single summary row.
+   *
+   * Equivalent to a `groupBy` with no group key — every matching record falls
+   * into one group and the aggregate projection is returned as one object.
+   *
+   * @template R - Shape of the summary row
+   * @param aggregates - Map of result aliases to aggregate expressions
+   * @returns Promise resolving to the single summary row (or `null` when empty)
+   *
+   * @example
+   * await query.aggregate({ total: $agg.sum("total"), avg: $agg.avg("total") })
+   */
+  aggregate<R = Record<string, unknown>>(aggregates: AggregateExpressions): Promise<R | null>;
 
   /**
    * Execute query with pagination
