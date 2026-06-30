@@ -18,7 +18,7 @@ const ws = ai.workspace({
 });
 
 const dev = ai.agent({
-  model: ai.openai.model({ name: "gpt-4o" }),
+  model,
   tools: ws.tools.all(),   // read_file, edit_file, write_file, run_shell, run_tests, grep, glob
   maxTrips: 25,            // give the loop room to iterate
 });
