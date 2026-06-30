@@ -10,12 +10,14 @@ import type {
   ListOptions,
   PutDirectoryOptions,
   PutDirectoryResult,
+  PutFromUrlOptions,
   PutOptions,
   ScopedStorageContract,
   StorageDriverContract,
   StorageDriverType,
   StorageFileInfo,
 } from "./types";
+import { safeFetchToBuffer } from "./utils/safe-fetch";
 
 /**
  * ScopedStorage - Base class for storage operations
@@ -161,11 +163,15 @@ export class ScopedStorage implements ScopedStorageContract {
   /**
    * Store a file from a URL
    *
-   * Downloads the file from the URL and stores it.
+   * Downloads the file from the URL and stores it. The download is
+   * SSRF-guarded by default: the URL scheme must be https/http, the host
+   * must not resolve to a private / loopback / link-local / cloud-metadata
+   * address, the body is capped, and the request times out. Tune or relax
+   * via the {@link PutFromUrlOptions} guard fields.
    *
    * @param url - URL to download from
    * @param location - Destination path in storage
-   * @param options - Optional storage options
+   * @param options - Storage + outbound-download guard options
    * @returns StorageFile instance
    *
    * @example
@@ -179,16 +185,29 @@ export class ScopedStorage implements ScopedStorageContract {
   public async putFromUrl(
     url: string,
     location: string,
-    options?: PutOptions,
+    options?: PutFromUrlOptions,
   ): Promise<StorageFile> {
-    const response = await fetch(url);
+    const { allowPrivateHosts, maxBytes, timeoutMs, allowedSchemes, ...putOptions } =
+      options ?? {};
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch file from ${url}: ${response.statusText}`);
+    const result = await safeFetchToBuffer(url, {
+      allowPrivateHosts,
+      maxBytes,
+      timeoutMs,
+      allowedSchemes,
+    });
+
+    if (!result.ok) {
+      throw new Error(`Failed to fetch file from ${url}: ${result.statusText}`);
     }
 
-    const buffer = Buffer.from(await response.arrayBuffer());
-    return this.put(buffer, location, options);
+    if (!result.contentType) {
+      throw new Error(`Failed to fetch file from ${url}: missing content-type header`);
+    }
+
+    const mimeType = putOptions.mimeType || result.contentType;
+
+    return this.put(result.buffer, location, { ...putOptions, mimeType });
   }
 
   /**

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Name } from "../../../src/cli/commands/generate/utils/name-parser";
 import {
   controllerStub,
+  crudModelStub,
   migrationAlterStub,
   migrationStub,
   modelStub,
@@ -74,6 +75,36 @@ describe("modelStub", () => {
     expect(withResource).toContain("import { ProductResource }");
     expect(withResource).toContain("public static resource = ProductResource;");
     expect(without).not.toContain("ProductResource");
+  });
+
+  it("imports v and Infer from seal (core re-exports neither) and Model from cascade", () => {
+    const output = modelStub(new Name("product"));
+
+    expect(output).toContain('import { v, type Infer } from "@warlock.js/seal"');
+    expect(output).toContain('import { Model, type StrictMode } from "@warlock.js/cascade"');
+    // The broken pre-fix import must be gone — core never exported v / Infer.
+    expect(output).not.toContain('from "@warlock.js/core"');
+  });
+});
+
+describe("crudModelStub", () => {
+  it("imports v and Infer from seal and the model base from cascade", () => {
+    const output = crudModelStub(new Name("product"));
+
+    expect(output).toContain('import { type Infer, v } from "@warlock.js/seal"');
+    expect(output).toContain('import { Model, RegisterModel } from "@warlock.js/cascade"');
+    // v / Infer must never resolve to core — it exports neither.
+    expect(output).not.toContain('v } from "@warlock.js/core"');
+    expect(output).not.toContain('{ type Infer, v } from "@warlock.js/core"');
+  });
+
+  it("emits a registered model with schema, table, and resource wiring", () => {
+    const output = crudModelStub(new Name("product"));
+
+    expect(output).toContain("@RegisterModel()");
+    expect(output).toContain("export class Product extends Model<ProductSchema>");
+    expect(output).toContain('public static table = "products"');
+    expect(output).toContain("export type ProductSchema = Infer.Output<typeof productSchema>");
   });
 });
 

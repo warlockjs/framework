@@ -296,22 +296,59 @@ export class CascadeQueryBuilder<T extends Model> implements QueryBuilderContrac
    * The caller (e.g. RepositoryManager._listImpl) is responsible for applying
    * the cursor WHERE condition and ORDER BY BEFORE calling this method,
    * so that the cursor column is always the primary sort key.
+   *
+   * For a forward page (`direction: "next"`) the caller sorts ASC and filters
+   * `> cursor`, so the rows already arrive in ascending cursor order.
+   *
+   * For a backward page (`direction: "prev"`) the caller sorts DESC and filters
+   * `< cursor`, so rows arrive in DESCENDING order. We re-reverse the trimmed
+   * page back to ascending so callers always receive a page in the same
+   * (ascending) order regardless of direction, and we derive the next/prev
+   * cursors from the page boundaries accordingly.
    */
   public async cursorPaginate(
     options: CursorPaginationOptions,
   ): Promise<CursorPaginationResult<T>> {
-    const { limit, cursor, cursorColumn = "id" } = options;
+    const { limit, cursorColumn = "id", direction = "next" } = options;
 
-    // Fetch limit + 1 to detect whether more pages exist
+    // Fetch limit + 1 to detect whether more pages exist in the scan direction.
     this.limit(limit + 1);
 
     const results = await this.get();
     const hasMore = results.length > limit;
 
-    // Drop the extra record used for the hasMore check
-    const documents = hasMore ? results.slice(0, limit) : results;
+    // Drop the extra record used for the hasMore check. It always sits at the
+    // tail because the caller ordered the scan so the next-to-fetch row is last.
+    const trimmed = hasMore ? results.slice(0, limit) : results;
 
-    const nextCursor = hasMore ? (documents[documents.length - 1] as any)[cursorColumn] : undefined;
+    const cursorOf = (record: T | undefined): string | number | undefined =>
+      record === undefined ? undefined : ((record as any)[cursorColumn] as string | number);
+
+    if (direction === "prev") {
+      // Scan came back DESC; present it ascending.
+      const documents = [...trimmed].reverse();
+      const first = documents[0];
+      const last = documents[documents.length - 1];
+
+      return {
+        data: documents,
+        pagination: {
+          limit,
+          result: documents.length,
+          hasMore,
+          // Going further back is only possible when the backward scan saw more
+          // rows than this page; the boundary is this page's first (smallest) row.
+          prevCursor: hasMore ? cursorOf(first) : undefined,
+          // Going forward always resumes after this page's last (largest) row.
+          nextCursor: cursorOf(last),
+        },
+      };
+    }
+
+    // Forward page — rows already ascending.
+    const documents = trimmed;
+    const first = documents[0];
+    const last = documents[documents.length - 1];
 
     return {
       data: documents,
@@ -319,8 +356,11 @@ export class CascadeQueryBuilder<T extends Model> implements QueryBuilderContrac
         limit,
         result: documents.length,
         hasMore,
-        nextCursor,
-        prevCursor: cursor,
+        // Going forward is only possible when the forward scan saw more rows
+        // than this page; the boundary is this page's last (largest) row.
+        nextCursor: hasMore ? cursorOf(last) : undefined,
+        // Going back resumes before this page's first (smallest) row.
+        prevCursor: cursorOf(first),
       },
     };
   }

@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { createRequire } from "module";
 import type { Readable } from "stream";
 import { storageDriverContext } from "../context/storage-driver-context";
 import type {
@@ -90,6 +91,41 @@ export async function loadS3(): Promise<void> {
 
 loadS3();
 
+/**
+ * Synchronous fallback loader.
+ *
+ * `loadS3()` above is async and fire-and-forget at module load, so on the
+ * very first *synchronous* `CloudDriver` construction the dynamic `import()`
+ * microtask has not yet resolved — `isModuleExists` is still `null` even when
+ * the SDK is genuinely installed. The constructor's install-check would then
+ * throw the misleading "SDK not installed" error.
+ *
+ * This probes the modules synchronously via `require` (the AWS SDK ships
+ * CJS-compatible builds) so a present SDK resolves the install-check
+ * immediately, without waiting on the async path. Returns `true` when all
+ * three modules loaded, `false` otherwise. Only invoked while
+ * `isModuleExists` is still indeterminate.
+ */
+function loadS3Sync(): boolean {
+  if (isModuleExists !== null) {
+    return isModuleExists;
+  }
+
+  try {
+    // `createRequire` gives an ESM-safe synchronous `require` regardless of
+    // whether this module runs as CJS or ESM at runtime.
+    const req = createRequire(import.meta.url);
+    S3Client = req("@aws-sdk/client-s3");
+    S3Storage = req("@aws-sdk/lib-storage");
+    S3Presigner = req("@aws-sdk/s3-request-presigner");
+    isModuleExists = true;
+  } catch {
+    isModuleExists = false;
+  }
+
+  return isModuleExists;
+}
+
 // ============================================================
 // CloudDriver Base Class
 // ============================================================
@@ -129,6 +165,13 @@ export abstract class CloudDriver<
   };
 
   public constructor(public options: TOptions) {
+    // The async loadS3() may not have resolved yet on the first synchronous
+    // construction. When the flag is still indeterminate, probe synchronously
+    // so a genuinely-installed SDK never triggers the misleading throw below.
+    if (isModuleExists === null) {
+      loadS3Sync();
+    }
+
     if (!isModuleExists) {
       throw new Error(S3_INSTALL_INSTRUCTIONS);
     }
@@ -533,39 +576,58 @@ export abstract class CloudDriver<
    * @returns true when all objects are deleted
    */
   public async deleteDirectory(directoryPath: string): Promise<boolean> {
+    const { ListObjectsV2Command, DeleteObjectsCommand } = S3Client;
+
     // Apply storage prefix
     directoryPath = this.applyPrefix(directoryPath);
 
     // Ensure directory path ends with / for proper prefix matching
     const prefix = directoryPath.endsWith("/") ? directoryPath : `${directoryPath}/`;
 
-    let hasMore = true;
+    // Drive the loop with the ListObjectsV2 IsTruncated / ContinuationToken
+    // contract rather than guessing termination from page size. Each page
+    // carries its own ContinuationToken so we never re-list page one.
+    let continuationToken: string | undefined;
 
-    while (hasMore) {
-      // List up to 1000 objects (S3/R2 max per request)
-      const objects = await this.list(prefix, {
-        limit: 1000,
-        recursive: true,
-      });
+    do {
+      const listResult = await this.withRetry(
+        () =>
+          this.client.send(
+            new ListObjectsV2Command({
+              Bucket: this.options.bucket,
+              Prefix: prefix,
+              ContinuationToken: continuationToken,
+            }),
+          ),
+        "deleteDirectory:list",
+      );
 
-      if (objects.length === 0) {
-        break;
+      const keys = (listResult.Contents || [])
+        .map((object) => object.Key)
+        .filter((key): key is string => Boolean(key));
+
+      if (keys.length > 0) {
+        // Delete the raw keys directly — they already carry the full prefix
+        // from the listing, so we bypass deleteMany's applyPrefix step.
+        await this.withRetry(
+          () =>
+            this.client.send(
+              new DeleteObjectsCommand({
+                Bucket: this.options.bucket,
+                Delete: {
+                  Objects: keys.map((Key) => ({ Key })),
+                  Quiet: true,
+                },
+              }),
+            ),
+          "deleteDirectory:delete",
+        );
       }
 
-      // Filter out directories (we only delete files)
-      const filePaths = objects.filter((obj) => !obj.isDirectory).map((obj) => obj.path);
-
-      if (filePaths.length === 0) {
-        break;
-      }
-
-      // Delete batch (deleteMany already has prefix applied, so paths already have it)
-      // Note: We pass the paths as-is since they already include the prefix from list()
-      const results = await this.deleteMany(filePaths);
-
-      // Continue if we got full batch (might be more)
-      hasMore = objects.length >= 1000;
-    }
+      continuationToken = listResult.IsTruncated
+        ? listResult.NextContinuationToken
+        : undefined;
+    } while (continuationToken);
 
     return true;
   }

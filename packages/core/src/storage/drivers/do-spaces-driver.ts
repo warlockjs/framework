@@ -45,10 +45,11 @@ export class DOSpacesDriver extends CloudDriver<CloudStorageDriverOptions> {
    * Note: DO Spaces includes automatic CDN with the `.cdn.` subdomain
    */
   public url(location: string): string {
-    // 1. Use urlPrefix if configured
+    // 1. Use urlPrefix if configured — return it directly so the CDN-host
+    // URL below is NOT appended (which would yield a double-host URL).
     if (this.options.urlPrefix) {
       const prefix = this.options.urlPrefix.replace(/\/+$/, "");
-      location = `${prefix}/${ltrim(location, "/")}`;
+      return `${prefix}/${ltrim(location, "/")}`;
     }
 
     // 2. Default Spaces CDN URL

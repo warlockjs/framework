@@ -1,5 +1,6 @@
 import config from "@mongez/config";
 import { cache } from "@warlock.js/cache";
+import { log } from "@warlock.js/logger";
 import type { Middleware } from "../../router";
 import { HttpErrorCodes } from "../error-codes";
 import type { Response } from "../response";
@@ -128,16 +129,22 @@ export function idempotencyMiddleware(options: IdempotencyOptions = {}): Middlew
 
       const sentContentType = sentResponse.contentType;
 
-      cacheDriver.set(
-        cacheKey,
-        {
-          status: sentResponse.statusCode,
-          body: sentResponse.parsedBody,
-          bodyHash,
-          contentType: typeof sentContentType === "string" ? sentContentType : undefined,
-        },
-        ttl,
-      );
+      // `set` is fire-and-forget inside `onSent`; without a `.catch` a rejected
+      // write (e.g. Redis down) would surface as an unhandledRejection.
+      cacheDriver
+        .set(
+          cacheKey,
+          {
+            status: sentResponse.statusCode,
+            body: sentResponse.parsedBody,
+            bodyHash,
+            contentType: typeof sentContentType === "string" ? sentContentType : undefined,
+          },
+          ttl,
+        )
+        .catch((error: unknown) => {
+          log.error("idempotency-middleware", "set", error);
+        });
     });
   };
 }

@@ -66,7 +66,12 @@ export function maintenanceMiddleware(options: MaintenanceOptions = {}): Middlew
     const allowlist =
       options.allowlist || config.get("http.maintenance.allowlist", ["/health"]);
 
-    if (isAllowlisted(request.path, allowlist)) return;
+    // `request.path` includes the query string, but allowlist entries are
+    // path-only ("/webhooks/stripe"), so strip the query before matching —
+    // otherwise "/webhooks/stripe?sig=..." never matches its exact entry.
+    const pathname = request.path.split("?")[0];
+
+    if (isAllowlisted(pathname, allowlist)) return;
 
     const retryAfter =
       options.retryAfter || config.get("http.maintenance.retryAfter", 60);

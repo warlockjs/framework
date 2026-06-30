@@ -159,12 +159,20 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * Register events
    */
   public registerEvents() {
-    this.eventsCallbacks.push(
-      ...this.adapter.registerEvents((source: any) => {
-        // this.clearCache({ id: source.id });
-        this.clearCache();
-      }),
-    );
+    // Scheduled via setTimeout(0) in the constructor, so this runs detached:
+    // the adapter getter (or its event wiring) can throw and there is no caller
+    // to catch it. Guard the whole body so a registration failure is logged
+    // instead of surfacing as an uncaught exception that crashes the process.
+    try {
+      this.eventsCallbacks.push(
+        ...this.adapter.registerEvents((source: any) => {
+          // this.clearCache({ id: source.id });
+          this.clearCache();
+        }),
+      );
+    } catch (error) {
+      console.error(`[Repository] Failed to register events:`, error);
+    }
   }
 
   /**
@@ -585,8 +593,12 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
   public async all(options?: TypedAllRepositoryOptions<F>): Promise<T[]> {
     const query = this.newQuery();
 
-    // Apply options
+    // Apply options. all() never paginates, so flag paginate:false explicitly —
+    // this lets applyOptionsToQuery honor a provided `limit` on this path (e.g.
+    // firstCached/lastCached call all({ limit: 1 }) and rely on LIMIT 1 being
+    // applied instead of fetching+caching the entire table).
     const opts = this.prepareOptions(options);
+    opts.paginate = false;
     this.applyOptionsToQuery(query, opts);
 
     return query.get();
@@ -762,15 +774,27 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     // Apply ordering
     if (options.orderBy) {
       if (options.orderBy === "random") {
-        query.random();
+        // Pass the explicit limit through to random() when set. For the MongoDB
+        // driver `$sample` REQUIRES a size — with no argument it silently
+        // defaults to 1000, truncating larger result sets. Forwarding the
+        // caller's limit keeps the random sample bounded to what they asked for.
+        query.random(options.limit);
       } else if (Array.isArray(options.orderBy)) {
         query.orderBy(options.orderBy[0], options.orderBy[1]);
       } else if (typeof options.orderBy === "object") {
         query.sortBy(options.orderBy);
       }
+    } else if (options.sortBy) {
+      // Honor the standalone sortBy/sortDirection pair as a single orderBy clause
+      // (only when no explicit orderBy was provided, which always wins).
+      query.orderBy(options.sortBy, options.sortDirection ?? "asc");
     }
 
-    // Apply limit (for non-paginated queries)
+    // Apply limit (for non-paginated queries).
+    // The all() path sets `paginate: false` explicitly so a provided `limit`
+    // is honored there (otherwise firstCached/lastCached, which delegate to
+    // all({ limit: 1 }), would drop the LIMIT and fetch the whole table).
+    // Page-based pagination leaves paginate undefined and owns LIMIT itself.
     if (options.limit && options.paginate === false) {
       query.limit(options.limit);
     }
@@ -794,7 +818,15 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * @public
    */
   public async create(data: any): Promise<T> {
-    return this.adapter.create(data);
+    await this.onSaving(data, "create");
+    await this.onCreating(data);
+
+    const result = await this.adapter.create(data);
+
+    await this.onCreate(result, data);
+    await this.onSave(result, data, "create");
+
+    return result;
   }
 
   /**
@@ -805,7 +837,15 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * @public
    */
   public async update(id: string | number | any, data: any): Promise<T> {
-    return this.adapter.update(id, data);
+    await this.onSaving(data, "update");
+    await this.onUpdating(id, data);
+
+    const result = await this.adapter.update(id, data);
+
+    await this.onUpdate(result, data);
+    await this.onSave(result, data, "update");
+
+    return result;
   }
 
   /**
@@ -815,7 +855,11 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * @public
    */
   public async delete(id: string | number): Promise<void> {
-    return this.adapter.delete(id);
+    await this.onDeleting(id);
+
+    await this.adapter.delete(id);
+
+    await this.onDelete(id);
   }
 
   // ============================================================================
@@ -1122,11 +1166,20 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     const opts = this.prepareOptions(options);
 
     const cacheKey = this.cacheKey("count", opts);
-    let count = await this.cacheDriver.get(cacheKey);
 
-    if (count !== undefined) return count;
+    // Bypass + refresh the cache when purgeCache is requested.
+    if (!opts.purgeCache) {
+      const cachedCount = await this.cacheDriver.get(cacheKey);
 
-    count = await this.count(options);
+      // Treat BOTH null and undefined as a cache miss: every shipped cache
+      // driver returns `null` (not `undefined`) on a miss, so checking only
+      // for `undefined` would return that null as the count and never cache.
+      if (cachedCount !== null && cachedCount !== undefined) {
+        return cachedCount;
+      }
+    }
+
+    const count = await this.count(options);
     await this.cache(cacheKey, count);
     return count;
   }
@@ -1176,14 +1229,62 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     let cacheKey = `repositories.${this.getName()}`;
 
     if (key) {
-      cacheKey += "." + (typeof key === "string" ? key : JSON.stringify(key));
+      cacheKey += "." + (typeof key === "string" ? key : this.stableStringify(key));
     }
 
     if (moreOptions) {
-      cacheKey += "." + JSON.stringify(moreOptions);
+      // `purgeCache` is a control flag, not a query parameter — it must NOT
+      // affect the key, otherwise a purge would refresh a different key than a
+      // normal read consults, defeating the purpose.
+      const { purgeCache: _purgeCache, ...keyOptions } = moreOptions;
+      cacheKey += "." + this.stableStringify(keyOptions);
     }
 
     return cacheKey;
+  }
+
+  /**
+   * Deterministically serialize a value for use in a cache key.
+   *
+   * Unlike raw `JSON.stringify`, object keys are recursively sorted so that
+   * `{ a: 1, b: 2 }` and `{ b: 2, a: 1 }` produce the same key. Function-valued
+   * options (e.g. a `perform` callback) are represented by a stable marker
+   * (`[fn:<name>]`) rather than being silently dropped, so two distinct
+   * callbacks do not collide on the same cache key.
+   */
+  protected stableStringify(value: any): string {
+    const seen = new WeakSet<object>();
+
+    const normalize = (input: any): any => {
+      if (typeof input === "function") {
+        return `[fn:${input.name || "anonymous"}]`;
+      }
+
+      if (input === null || typeof input !== "object") {
+        return input;
+      }
+
+      // Guard against circular references — represent them with a stable marker.
+      if (seen.has(input)) {
+        return "[circular]";
+      }
+
+      seen.add(input);
+
+      if (Array.isArray(input)) {
+        return input.map((item) => normalize(item));
+      }
+
+      const sorted: Record<string, any> = {};
+
+      for (const objectKey of Object.keys(input).sort()) {
+        sorted[objectKey] = normalize(input[objectKey]);
+      }
+
+      return sorted;
+    };
+
+    return JSON.stringify(normalize(value));
   }
 
   /**
@@ -1194,7 +1295,14 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    */
   protected async cache(key: string, value: any): Promise<void> {
     if (!this.isCacheable || !this.cacheDriver) return;
-    await this.cacheDriver.set(key, value);
+
+    // Swallow cache write failures so a flaky/unreachable remote cache (e.g.
+    // Redis) degrades gracefully to a cache miss instead of breaking the read.
+    try {
+      await this.cacheDriver.set(key, value);
+    } catch (error) {
+      console.error(`[Repository] Failed to write cache key "${key}":`, error);
+    }
   }
 
   /**
@@ -1242,7 +1350,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
 
     if (!model) return null;
 
-    this.cache(cacheKey, this.adapter.serializeModel(model));
+    await this.cache(cacheKey, this.adapter.serializeModel(model));
     return model;
   }
 
@@ -1260,10 +1368,14 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     const opts = this.prepareOptions(options);
 
     const cacheKey = this.cacheKey("all", opts);
-    const cachedData = await this.cacheDriver.get<T[]>(cacheKey);
 
-    if (cachedData) {
-      return cachedData.map((record) => this.adapter.deserializeModel(record));
+    // Bypass + refresh the cache when purgeCache is requested.
+    if (!opts.purgeCache) {
+      const cachedData = await this.cacheDriver.get<T[]>(cacheKey);
+
+      if (cachedData) {
+        return cachedData.map((record) => this.adapter.deserializeModel(record));
+      }
     }
 
     const records = await this.all(options);
@@ -1298,13 +1410,17 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     const opts = this.prepareOptions(options);
 
     const cacheKey = this.cacheKey("list", opts);
-    const cachedData = await this.cacheDriver.get(cacheKey);
 
-    if (cachedData) {
-      return {
-        data: (cachedData?.data || []).map((record: T) => this.adapter.deserializeModel(record)),
-        pagination: cachedData.pagination,
-      };
+    // Bypass + refresh the cache when purgeCache is requested.
+    if (!opts.purgeCache) {
+      const cachedData = await this.cacheDriver.get(cacheKey);
+
+      if (cachedData) {
+        return {
+          data: (cachedData?.data || []).map((record: T) => this.adapter.deserializeModel(record)),
+          pagination: cachedData.pagination,
+        };
+      }
     }
 
     const result = (await this._listImpl(options)) as PaginationResult<T>;
@@ -1381,9 +1497,13 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * exported as cleanup
    * export const cleanup = usersRepository.cleanup.bind(usersRepository);
    */
-  public $cleanup() {
-    this.cleanup();
-    this.cacheDriver.flush();
+  public async $cleanup(): Promise<void> {
+    await this.clearCache();
+    this.cleanuEvents();
+
+    if (this.cacheDriver) {
+      await this.cacheDriver.flush();
+    }
   }
 
   /**

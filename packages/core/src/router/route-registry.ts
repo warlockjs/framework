@@ -1,5 +1,20 @@
 import FindMyWay, { type HTTPMethod, type Instance } from "find-my-way";
-import type { Route } from "./types";
+import type { RequestMethod, Route } from "./types";
+
+/**
+ * The concrete HTTP verbs an `all` route expands into.
+ * Mirrors the set Fastify's `.all()` answers in production, so `router.any()`
+ * routes behave identically under the dev server and prod Fastify.
+ */
+const ALL_METHODS: Exclude<RequestMethod, "all">[] = [
+  "GET",
+  "POST",
+  "PUT",
+  "PATCH",
+  "DELETE",
+  "OPTIONS",
+  "HEAD",
+];
 
 /**
  * Route Registry
@@ -22,15 +37,12 @@ export class RouteRegistry {
     // Register each route
     for (const route of routes) {
       if (route.method === "all") {
-        this.registerRoute({
-          ...route,
-          method: "GET",
-        });
-
-        this.registerRoute({
-          ...route,
-          method: "POST",
-        });
+        for (const method of ALL_METHODS) {
+          this.registerRoute({
+            ...route,
+            method,
+          });
+        }
       } else {
         this.registerRoute(route);
       }

@@ -21,8 +21,7 @@ HTTP layer built on Fastify. Provides the `Request` and `Response` abstractions,
 | `context/`                 | HTTP request context (AsyncLocalStorage-based)                                                                         |
 | `database/`                | Database-related HTTP utilities                                                                                        |
 | `errors/`                  | HTTP error classes                                                                                                     |
-| `middleware/`              | Built-in middleware (CORS, body parser, etc.)                                                                          |
-| `plugins/`                 | Built-in Fastify plugins                                                                                               |
+| `middleware/`              | Built-in middleware (rate-limit, idempotency, concurrency-limit, ip-filter, max-body-size, maintenance, cache)         |
 | `index.ts`                 | Barrel export                                                                                                          |
 
 ## Key Exports

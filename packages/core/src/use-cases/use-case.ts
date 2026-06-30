@@ -98,7 +98,9 @@ export function useCase<Output = any, Input = any>(
     let output: Output | undefined;
     let error: Error | undefined;
     let benchmarkResult: { latency: number; state: "excellent" | "good" | "poor" } | undefined;
-    let currentRetry = 0;
+    // 1-based count of failed attempts (reinforcements' `attempt` arg). Translated
+    // into "retries performed" at snapshot time — see the `currentRetry` derivation.
+    let failedAttempts = 0;
 
     if (logEnabled) {
       log.debug("use-cases", name, "executing", { id });
@@ -146,7 +148,7 @@ export function useCase<Output = any, Input = any>(
         ? await runWithRetry(runHandler, {
             ...retryConfig,
             onError: (retryError, attempt) => {
-              currentRetry = attempt;
+              failedAttempts = attempt;
               retryConfig.onError?.(retryError, attempt);
             },
           })
@@ -157,16 +159,25 @@ export function useCase<Output = any, Input = any>(
 
     const endedAt = new Date();
 
-    // After middleware — fire-and-forget side effects, only on success
-    if (!error && after && output !== undefined) {
+    // After middleware — fire-and-forget side effects, only on success.
+    // Keyed off the error flag alone so void handlers (which return undefined)
+    // still run their after middleware.
+    if (!error && after) {
       for (const middleware of after) {
         try {
-          await middleware(output, ctx);
+          // On the success path `output` holds the handler's return value; for a
+          // void handler that's undefined, which the middleware receives as-is.
+          await middleware(output as Output, ctx);
         } catch (afterError) {
           log.error("use-cases", name, "after middleware failed", { error: afterError });
         }
       }
     }
+
+    // Retries actually performed (0 = succeeded on the first try). On success every
+    // failed attempt was followed by a retry; on failure the final failed attempt
+    // was NOT retried, so it doesn't count as a retry performed.
+    const currentRetry = error ? Math.max(failedAttempts - 1, 0) : failedAttempts;
 
     const snapshot: UseCaseResult<Output> = {
       output,
@@ -211,7 +222,13 @@ export function useCase<Output = any, Input = any>(
       log.debug("use-cases", name, "completed", { id, latency: benchmarkResult?.latency });
     }
 
-    await addUseCaseHistory(name, snapshot);
+    // History is best-effort — a cache rejection must not turn a successful run
+    // into a thrown error or skip onCompleted/broadcast.
+    try {
+      await addUseCaseHistory(name, snapshot);
+    } catch (historyError) {
+      log.error("use-cases", name, "history persistence failed", { id, error: historyError });
+    }
 
     await fireLifecycleEvent<UseCaseResult<Output>>(snapshot, {
       invocation: invocationOnCompleted ? [invocationOnCompleted] : undefined,
@@ -224,13 +241,15 @@ export function useCase<Output = any, Input = any>(
     await broadcastUseCaseResult({
       name,
       id,
-      output: output!,
+      // A void handler resolves to undefined — broadcast it as-is rather than
+      // asserting a non-null value that would fabricate a bogus payload.
+      output: output as Output,
       result: snapshot,
       broadcast,
       config: broadcastConfig,
     });
 
-    return output!;
+    return output as Output;
   };
 
   useCaseHandler.$cleanup = () => {

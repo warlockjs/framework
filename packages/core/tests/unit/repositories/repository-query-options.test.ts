@@ -163,6 +163,53 @@ describe("RepositoryManager — applyOptionsToQuery select/order", () => {
     expect(query.callTo("sortBy")?.args).toEqual([{ name: "asc", createdAt: "desc" }]);
   });
 
+  it("forwards an explicit limit to random() for orderBy:'random'", () => {
+    const repository = new TestRepository(makeAdapter(query));
+
+    repository.exposeApply(query as unknown as QueryBuilderContract<unknown>, {
+      orderBy: "random",
+      limit: 5,
+    });
+
+    // The limit must reach random() so MongoDB's $sample is bounded to 5
+    // rather than silently defaulting to 1000.
+    expect(query.callTo("random")?.args).toEqual([5]);
+  });
+
+  it("honors sortBy + sortDirection as an orderBy clause", () => {
+    const repository = new TestRepository(makeAdapter(query));
+
+    repository.exposeApply(query as unknown as QueryBuilderContract<unknown>, {
+      sortBy: "createdAt",
+      sortDirection: "desc",
+    });
+
+    expect(query.callTo("orderBy")?.args).toEqual(["createdAt", "desc"]);
+  });
+
+  it("defaults sortDirection to 'asc' when only sortBy is given", () => {
+    const repository = new TestRepository(makeAdapter(query));
+
+    repository.exposeApply(query as unknown as QueryBuilderContract<unknown>, {
+      sortBy: "name",
+    });
+
+    expect(query.callTo("orderBy")?.args).toEqual(["name", "asc"]);
+  });
+
+  it("lets an explicit orderBy win over sortBy", () => {
+    const repository = new TestRepository(makeAdapter(query));
+
+    repository.exposeApply(query as unknown as QueryBuilderContract<unknown>, {
+      orderBy: ["id", "desc"],
+      sortBy: "name",
+    });
+
+    expect(query.callTo("orderBy")?.args).toEqual(["id", "desc"]);
+    // sortBy must NOT add a second orderBy when orderBy was provided.
+    expect(query.calls.filter((c) => c.method === "orderBy")).toHaveLength(1);
+  });
+
   it("applies simpleSelect only when simpleSelectColumns is configured", () => {
     const withColumns = new TestRepository(makeAdapter(query), {
       simpleSelectColumns: ["id", "title"],
@@ -339,5 +386,27 @@ describe("RepositoryManager — cacheKey", () => {
     expect(repository.exposeCacheKey("list", { page: 2 })).toBe(
       'repositories.widgets.list.{"page":2}',
     );
+  });
+
+  it("produces a stable key regardless of object key order", () => {
+    const repository = new TestRepository(makeAdapter(query), { name: "widgets" });
+
+    const a = repository.exposeCacheKey({ b: 2, a: 1, c: { y: 2, x: 1 } });
+    const b = repository.exposeCacheKey({ c: { x: 1, y: 2 }, a: 1, b: 2 });
+
+    expect(a).toBe(b);
+  });
+
+  it("represents function-valued options deterministically instead of dropping them", () => {
+    const repository = new TestRepository(makeAdapter(query), { name: "widgets" });
+
+    const namedPerform = function applyScope() {};
+    const keyWithFn = repository.exposeCacheKey("list", { perform: namedPerform });
+
+    // The function name is captured, so two distinct callbacks don't collide.
+    expect(keyWithFn).toContain("[fn:applyScope]");
+
+    const keyWithoutFn = repository.exposeCacheKey("list", { page: 1 });
+    expect(keyWithFn).not.toBe(keyWithoutFn);
   });
 });

@@ -96,6 +96,31 @@ function makeCache() {
   };
 }
 
+/**
+ * In-memory cache driver whose MISS returns `null` (not `undefined`). Every
+ * shipped cache driver behaves this way, so this pins that countCached treats
+ * null as a miss and still caches.
+ */
+function makeNullMissCache() {
+  const store = new Map<string, any>();
+
+  return {
+    store,
+    get: vi.fn(async (key: string) => (store.has(key) ? store.get(key) : null)),
+    set: vi.fn(async (key: string, value: any) => {
+      store.set(key, value);
+    }),
+    removeNamespace: vi.fn(async (namespace: string) => {
+      for (const key of [...store.keys()]) {
+        if (key.startsWith(namespace)) {
+          store.delete(key);
+        }
+      }
+    }),
+    flush: vi.fn(async () => store.clear()),
+  };
+}
+
 /** Test subclass that injects a cache and lets tests flip the repository name. */
 class TestRepository extends RepositoryManager<Row> {
   public constructor(adapter: RepositoryAdapterContract<Row>, cacheDriver?: any) {
@@ -156,6 +181,96 @@ describe("RepositoryManager — CRUD delegation", () => {
 
     expect(adapter.updateMany).toHaveBeenCalledWith({ isActive: false }, { archived: true });
     expect(adapter.deleteMany).toHaveBeenCalledWith({ isActive: false });
+  });
+});
+
+describe("RepositoryManager — lifecycle hooks", () => {
+  /** Repository that records the order + arguments of every lifecycle hook. */
+  class HookRepository extends RepositoryManager<Row> {
+    public readonly events: Array<{ hook: string; args: unknown[] }> = [];
+
+    public constructor(adapter: RepositoryAdapterContract<Row>) {
+      super(adapter);
+      this.name = "rows";
+    }
+
+    protected override async onSaving(data: any, mode: any): Promise<void> {
+      this.events.push({ hook: "onSaving", args: [data, mode] });
+    }
+
+    protected override async onSave(record: Row, data: any, mode: any): Promise<void> {
+      this.events.push({ hook: "onSave", args: [record, data, mode] });
+    }
+
+    protected override async onCreating(data: any): Promise<void> {
+      this.events.push({ hook: "onCreating", args: [data] });
+    }
+
+    protected override async onCreate(record: Row, data: any): Promise<void> {
+      this.events.push({ hook: "onCreate", args: [record, data] });
+    }
+
+    protected override async onUpdating(id: string | number, data: any): Promise<void> {
+      this.events.push({ hook: "onUpdating", args: [id, data] });
+    }
+
+    protected override async onUpdate(record: Row, data: any): Promise<void> {
+      this.events.push({ hook: "onUpdate", args: [record, data] });
+    }
+
+    protected override async onDeleting(id: string | number): Promise<void> {
+      this.events.push({ hook: "onDeleting", args: [id] });
+    }
+
+    protected override async onDelete(id: string | number): Promise<void> {
+      this.events.push({ hook: "onDelete", args: [id] });
+    }
+  }
+
+  it("create fires onSaving → onCreating → onCreate → onSave in order", async () => {
+    const repository = new HookRepository(adapter);
+
+    const created = await repository.create({ name: "Ada" });
+
+    expect(repository.events.map((e) => e.hook)).toEqual([
+      "onSaving",
+      "onCreating",
+      "onCreate",
+      "onSave",
+    ]);
+
+    // onCreate / onSave receive the adapter's result, not the raw input.
+    expect(repository.events.find((e) => e.hook === "onCreate")?.args[0]).toEqual(created);
+    expect(repository.events.find((e) => e.hook === "onSaving")?.args[1]).toBe("create");
+  });
+
+  it("update fires onSaving → onUpdating → onUpdate → onSave in order", async () => {
+    const repository = new HookRepository(adapter);
+
+    await repository.update(5, { name: "Grace" });
+
+    expect(repository.events.map((e) => e.hook)).toEqual([
+      "onSaving",
+      "onUpdating",
+      "onUpdate",
+      "onSave",
+    ]);
+
+    expect(repository.events.find((e) => e.hook === "onUpdating")?.args).toEqual([
+      5,
+      { name: "Grace" },
+    ]);
+    expect(repository.events.find((e) => e.hook === "onSaving")?.args[1]).toBe("update");
+  });
+
+  it("delete fires onDeleting → onDelete around the adapter call", async () => {
+    const repository = new HookRepository(adapter);
+
+    await repository.delete(9);
+
+    expect(repository.events.map((e) => e.hook)).toEqual(["onDeleting", "onDelete"]);
+    expect(repository.events[0].args).toEqual([9]);
+    expect(adapter.delete).toHaveBeenCalledWith(9);
   });
 });
 
@@ -258,6 +373,16 @@ describe("RepositoryManager — listing & pagination", () => {
 
     expect(query.orderBy).toHaveBeenCalledWith("id", "desc");
     expect(rows).toEqual([{ id: 1 }, { id: 2 }]);
+  });
+
+  it("all({ limit: 1 }) applies LIMIT 1 (not a whole-table fetch)", async () => {
+    const repository = new TestRepository(adapter);
+
+    await repository.all({ limit: 1 });
+
+    // all() flags paginate:false internally so the limit reaches the query —
+    // firstCached/lastCached rely on this to avoid fetching+caching everything.
+    expect(query.limit).toHaveBeenCalledWith(1);
   });
 
   it("latest orders by id desc; oldest orders by id asc", async () => {
@@ -422,6 +547,79 @@ describe("RepositoryManager — cached reads", () => {
 
     expect(second.pagination.total).toBe(1);
     expect(query.paginate).toHaveBeenCalledTimes(1);
+  });
+
+  it("countCached treats a null cache miss as a miss and caches the count", async () => {
+    const cache = makeNullMissCache();
+    (query.count as any).mockResolvedValue(11);
+    const repository = new TestRepository(adapter, cache);
+
+    const first = await repository.countCached();
+
+    // A null miss must NOT be returned as the count, and the result must be cached.
+    expect(first).toBe(11);
+    expect(query.count).toHaveBeenCalledTimes(1);
+    expect(cache.set).toHaveBeenCalledWith("repositories.rows.count.{}", 11);
+
+    const second = await repository.countCached();
+
+    expect(second).toBe(11);
+    // Served from cache the second time — no extra DB count.
+    expect(query.count).toHaveBeenCalledTimes(1);
+  });
+
+  it("countCached caches a zero count (0 is a valid hit, not a miss)", async () => {
+    const cache = makeNullMissCache();
+    (query.count as any).mockResolvedValue(0);
+    const repository = new TestRepository(adapter, cache);
+
+    await repository.countCached();
+    const second = await repository.countCached();
+
+    expect(second).toBe(0);
+    expect(query.count).toHaveBeenCalledTimes(1);
+  });
+
+  it("countCached with purgeCache bypasses + refreshes the cache", async () => {
+    const cache = makeCache();
+    (query.count as any).mockResolvedValueOnce(7).mockResolvedValueOnce(9);
+    const repository = new TestRepository(adapter, cache);
+
+    const first = await repository.countCached();
+    expect(first).toBe(7);
+
+    const refreshed = await repository.countCached({ purgeCache: true } as any);
+
+    // purgeCache forces a fresh DB count even though 7 was cached.
+    expect(refreshed).toBe(9);
+    expect(query.count).toHaveBeenCalledTimes(2);
+    expect(cache.set).toHaveBeenLastCalledWith("repositories.rows.count.{}", 9);
+  });
+
+  it("allCached with purgeCache bypasses the cache and re-queries", async () => {
+    const cache = makeCache();
+    (query.get as any).mockResolvedValueOnce([{ id: 1 }]).mockResolvedValueOnce([{ id: 2 }]);
+    const repository = new TestRepository(adapter, cache);
+
+    await repository.allCached();
+    const refreshed = await repository.allCached({ purgeCache: true } as any);
+
+    expect(refreshed).toEqual([{ id: 2 }]);
+    expect(query.get).toHaveBeenCalledTimes(2);
+  });
+
+  it("cache write failures are swallowed (degrade to a miss, not a throw)", async () => {
+    const cache = makeCache();
+    cache.set.mockRejectedValue(new Error("redis down"));
+    (query.count as any).mockResolvedValue(5);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const repository = new TestRepository(adapter, cache);
+
+    // Must resolve to the computed value despite the cache write blowing up.
+    await expect(repository.countCached()).resolves.toBe(5);
+    expect(errorSpy).toHaveBeenCalled();
+
+    errorSpy.mockRestore();
   });
 
   it("bypasses cache when isCacheable is false", async () => {

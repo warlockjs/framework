@@ -11,7 +11,10 @@ export * from "./context/storage-driver-context";
 export * from "./types";
 
 // Utilities
+export * from "./utils/contain-path";
 export * from "./utils/mime";
+export * from "./utils/safe-fetch";
+export * from "./utils/storage-error";
 
 // Drivers
 export * from "./drivers/cloud-driver";

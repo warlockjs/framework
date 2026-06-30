@@ -1016,11 +1016,18 @@ export class Request<RequestValidation = any> {
    * Best-effort real client IP — checks `X-Real-IP` and `X-Forwarded-For`
    * headers first, falls back to `baseRequest.ip` when neither is present.
    *
+   * For a multi-hop `X-Forwarded-For` (`client, proxy1, proxy2`) only the
+   * FIRST entry is returned (the original client), comma-split and trimmed.
+   * Without this, downstream scoping (ip-filter, rate-limit, idempotency)
+   * would key off the whole header string and break behind chained proxies.
+   *
    * **Prefer this over `request.ip` for any caller behind a proxy** (load
    * balancer, CDN, reverse proxy, k8s ingress). Only trust the result as
    * far as you trust the upstream proxy chain — `X-Forwarded-For` is
-   * client-settable; verify the request came through your trusted edge
-   * before treating the value as authoritative.
+   * client-settable, so the leftmost entry is spoofable by the immediate
+   * client when the request did NOT pass through a trusted edge that
+   * appends/overwrites the header. Verify the request came through your
+   * trusted edge before treating the value as authoritative.
    */
   public detectIp() {
     // as the server maybe used behind a proxy
@@ -1033,7 +1040,16 @@ export class Request<RequestValidation = any> {
 
     const forwardedIp = this.header("x-forwarded-for");
 
-    return forwardedIp || this.baseRequest.ip;
+    if (forwardedIp) {
+      // `X-Forwarded-For` may carry the full proxy chain ("client, proxy1, ...").
+      // The original client is the leftmost entry; split + trim so multi-hop
+      // values don't leak the whole header string into IP-scoped logic.
+      const firstHop = String(forwardedIp).split(",")[0].trim();
+
+      if (firstHop) return firstHop;
+    }
+
+    return this.baseRequest.ip;
   }
 
   /**

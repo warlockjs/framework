@@ -1,7 +1,7 @@
 import { cache } from "@warlock.js/cache";
 import { log } from "@warlock.js/logger";
 import { config } from "../config";
-import { RegisteredUseCase, UseCase, UseCaseConfigurations, UseCaseResult } from "./types";
+import { RegisteredUseCase, UseCaseConfigurations, UseCaseResult } from "./types";
 
 /**
  * Store registered use cases
@@ -27,19 +27,29 @@ export function $registerUseCase<Output, Input>(
 }
 
 /**
- * Unregister a use case
+ * Unregister a use case.
+ *
+ * Dropping the history namespace is best-effort: `$cleanup` is synchronous, so the
+ * async cache removal is fire-and-forget with a `.catch` guard — a rejecting cache
+ * driver must never turn cleanup into an unhandled rejection.
  */
 export function $unregisterUseCase(name: string) {
   useCaseRegister.delete(name);
 
-  cache.removeNamespace(`use-case:history:${name}`);
+  Promise.resolve(cache.removeNamespace(`use-case:history:${name}`)).catch((error) => {
+    log.error("use-cases", name, "history namespace removal failed", { error });
+  });
 }
 
 /**
- * Get a use case
+ * Get a use case.
+ *
+ * Returns the `RegisteredUseCase` shape — including the runtime `calls` counters
+ * the registry actually stores — so consumers can read call stats without an
+ * ad-hoc cast.
  */
 export function getUseCase<Output, Input>(name: string) {
-  return useCaseRegister.get(name) as UseCase<Output, Input> | undefined;
+  return useCaseRegister.get(name) as RegisteredUseCase<Output, Input> | undefined;
 }
 
 /**

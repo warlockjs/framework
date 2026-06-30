@@ -6,6 +6,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { LocalDriver } from "../../../src/storage/drivers/local-driver";
 import { ScopedStorage } from "../../../src/storage/scoped-storage";
 import { StorageFile } from "../../../src/storage/storage-file";
+import { StorageError } from "../../../src/storage/utils/storage-error";
 
 /**
  * Exercises ScopedStorage over a real LocalDriver in an OS temp dir. ScopedStorage
@@ -149,5 +150,23 @@ describe("ScopedStorage — path helpers", () => {
     const storage = makeStorage();
 
     expect(storage.append("README", "_old")).toBe("README_old");
+  });
+});
+
+describe("ScopedStorage — putFromUrl SSRF guard", () => {
+  it("blocks a private-IP literal host (guard is on by default)", async () => {
+    const storage = makeStorage();
+
+    await expect(
+      storage.putFromUrl("http://169.254.169.254/latest/meta-data/", "stolen.txt"),
+    ).rejects.toBeInstanceOf(StorageError);
+  });
+
+  it("blocks a disallowed scheme", async () => {
+    const storage = makeStorage();
+
+    await expect(storage.putFromUrl("file:///etc/passwd", "x.txt")).rejects.toBeInstanceOf(
+      StorageError,
+    );
   });
 });

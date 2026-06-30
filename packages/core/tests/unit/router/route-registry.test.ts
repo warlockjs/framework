@@ -105,11 +105,21 @@ describe("RouteRegistry — `all` method expansion", () => {
     expect(registry.find("POST", "/any")?.route.path).toBe("/any");
   });
 
-  it("does not register `all` routes under PUT", () => {
+  it("registers `all` routes under PUT, DELETE and PATCH (full verb parity with Fastify)", () => {
     const registry = new RouteRegistry();
     registry.register([route("all", "/any")]);
 
-    expect(registry.find("PUT", "/any")).toBeNull();
+    expect(registry.find("PUT", "/any")?.route.path).toBe("/any");
+    expect(registry.find("DELETE", "/any")?.route.path).toBe("/any");
+    expect(registry.find("PATCH", "/any")?.route.path).toBe("/any");
+  });
+
+  it("registers `all` routes under OPTIONS and HEAD too", () => {
+    const registry = new RouteRegistry();
+    registry.register([route("all", "/any")]);
+
+    expect(registry.find("OPTIONS", "/any")?.route.path).toBe("/any");
+    expect(registry.find("HEAD", "/any")?.route.path).toBe("/any");
   });
 });
 

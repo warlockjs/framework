@@ -64,10 +64,11 @@ export type ConnectorName =
   | "database"
   | "cache"
   | "storage"
-  | "communicator"
+  | "herald"
   | "socket"
   | "notifications"
   | "access"
+  | "ai"
   | (string & {});
 
 /**
@@ -98,4 +99,5 @@ export enum ConnectorPriority {
   SOCKET = 7,
   NOTIFICATIONS = 8,
   ACCESS = 9,
+  AI = 10,
 }

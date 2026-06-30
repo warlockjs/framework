@@ -53,8 +53,18 @@ export async function runPipeline<Input>(opts: PipelineOptions<Input>): Promise<
   );
 
   if (guards) {
+    // Guards get a frozen SHALLOW CLONE so a guard can't mutate the input, while
+    // the original `data` (and the reference that reaches before-middleware and the
+    // handler) stays writable. Freezing `data` in place would leak the frozen ref
+    // downstream and make a handler mutating its input throw under strict mode.
+    // The guard contract is read-only by design; the clone is shallow (deep-freeze
+    // is optional and intentionally not done here).
+    const frozenData = Object.freeze(
+      Array.isArray(data) ? [...data] : { ...(data as object) },
+    ) as Readonly<Input>;
+
     for (const guard of guards) {
-      await guard(Object.freeze(data) as Readonly<Input>, ctx);
+      await guard(frozenData, ctx);
     }
   }
 

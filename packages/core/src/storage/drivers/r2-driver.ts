@@ -49,10 +49,12 @@ export class R2Driver extends CloudDriver<R2StorageDriverOptions> {
    * - Or use a custom domain through Cloudflare
    */
   public url(location: string): string {
-    // 1. Use urlPrefix if configured
+    // 1. Use urlPrefix if configured — return it directly so the
+    // publicDomain / default-host URLs below are NOT appended (which would
+    // yield a double-host URL).
     if (this.options.urlPrefix) {
       const prefix = this.options.urlPrefix.replace(/\/+$/, "");
-      location = `${prefix}/${ltrim(location, "/")}`;
+      return `${prefix}/${ltrim(location, "/")}`;
     }
 
     // 2. Use publicDomain if configured

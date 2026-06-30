@@ -336,6 +336,14 @@ export type PresignedOptions = {
 
 /**
  * Options for presigned upload URLs
+ *
+ * NOTE: there is intentionally no `maxSize` option. The driver issues a
+ * presigned PUT URL (via `getSignedUrl` + `PutObjectCommand`), which CANNOT
+ * enforce an upload size limit — only a presigned POST policy
+ * (`createPresignedPost` + `ContentLengthRange`) can. A `maxSize` field here
+ * would advertise a guarantee the implementation does not provide, so it was
+ * removed rather than left as a no-op. Enforce size limits server-side (e.g.
+ * verify `metadata().size` after upload) or migrate to presigned POST.
  */
 export type PresignedUploadOptions = PresignedOptions & {
   /**
@@ -343,13 +351,35 @@ export type PresignedUploadOptions = PresignedOptions & {
    */
   contentType?: string;
   /**
-   * Maximum file size in bytes
-   */
-  maxSize?: number;
-  /**
    * Custom metadata to store with the file (cloud drivers only)
    */
   metadata?: Record<string, string>;
+};
+
+/**
+ * Options for `putFromUrl` operations.
+ *
+ * Extends {@link PutOptions} with SSRF / resource-exhaustion guards for the
+ * outbound download. All guard fields are optional and default to the SAFE
+ * (guards-ON) behaviour: https+http only, private/loopback/metadata hosts
+ * denied, a byte cap, and a timeout.
+ */
+export type PutFromUrlOptions = PutOptions & {
+  /**
+   * Allow private / loopback / link-local / cloud-metadata hosts. Default
+   * `false` — the SSRF guard is ON.
+   */
+  allowPrivateHosts?: boolean;
+  /**
+   * Maximum downloaded body size in bytes. Default `52_428_800` (50 MiB).
+   */
+  maxBytes?: number;
+  /** Per-request timeout in milliseconds. Default `30_000`. */
+  timeoutMs?: number;
+  /**
+   * URL schemes permitted for the download. Default `["https", "http"]`.
+   */
+  allowedSchemes?: string[];
 };
 
 /**

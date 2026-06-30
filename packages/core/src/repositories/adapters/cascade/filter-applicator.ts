@@ -1,4 +1,3 @@
-import { isEmpty } from "@mongez/supportive-is";
 import type {
   QueryBuilderContract as CascadeQueryBuilder,
   QueryBuilderContract,
@@ -228,14 +227,36 @@ export class FilterApplicator {
   // BOOLEAN FILTERS
   // ============================================================================
 
+  /**
+   * Coerce a filter value to a boolean.
+   *
+   * Recognized truthy forms: `true`, `1`, `"true"`, `"1"`.
+   * Recognized falsy forms:  `false`, `0`, `"false"`, `"0"`.
+   * Anything else falls back to `Boolean(value)`.
+   *
+   * NOTE: this intentionally does NOT treat "non-empty" as true — the previous
+   * `|| !isEmpty(value)` fallback coerced `false`/`0` to `true`, inverting the
+   * filter for explicitly-false values.
+   */
+  private coerceBoolean(value: any): boolean {
+    if (value === true || value === 1 || value === "true" || value === "1") {
+      return true;
+    }
+
+    if (value === false || value === 0 || value === "false" || value === "0") {
+      return false;
+    }
+
+    return Boolean(value);
+  }
+
   private handleBoolean(
     query: QueryBuilderContract,
     column?: string,
     columns?: string[],
     value?: any,
   ) {
-    const boolValue =
-      value === "true" || value === true || value === 1 || value === "1" || !isEmpty(value);
+    const boolValue = this.coerceBoolean(value);
     if (column) {
       query.where(column, boolValue);
     } else if (columns) {

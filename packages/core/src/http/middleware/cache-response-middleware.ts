@@ -1,7 +1,19 @@
 import { except } from "@mongez/reinforcements";
 import { cache } from "@warlock.js/cache";
+import { log } from "@warlock.js/logger";
 import type { Request } from "./../request";
 import type { Response } from "./../response";
+
+/**
+ * Shape persisted to the cache for a cached response. Stores the status and
+ * content-type alongside the body so the HIT path can replay the response
+ * faithfully via {@link Response.replay} instead of re-entering `send()`.
+ */
+type CachedResponsePayload = {
+  status: number;
+  data: unknown;
+  contentType?: string;
+};
 
 // TODO: Add option to determine whether to cache the response or not
 // TODO: add option to determine what to be cached from the response
@@ -91,12 +103,18 @@ export function cacheMiddleware(
     );
     const cacheDriver = driver ? await cache.use(driver) : cache;
 
-    const content = await cacheDriver.get(cacheKey);
+    const content = (await cacheDriver.get(cacheKey)) as CachedResponsePayload | null;
 
     if (content) {
-      const output = content.data;
-
-      return response.baseResponse.send(output);
+      // Replay through the standard pipeline (status + content-type preserved)
+      // instead of `baseResponse.send()`, which would re-enter Response.send()
+      // on an already-sent reply, trip the double-send guard, and drop the
+      // status / content-type.
+      return response.replay({
+        status: content.status ?? 200,
+        body: content.data,
+        contentType: content.contentType,
+      });
     }
 
     response.onSent((response: Response) => {
@@ -104,11 +122,19 @@ export function cacheMiddleware(
         return;
       }
 
-      const content = {
+      const sentContentType = response.contentType;
+
+      const content: CachedResponsePayload = {
+        status: response.statusCode,
         data: except(response.parsedBody, omit),
+        contentType: typeof sentContentType === "string" ? sentContentType : undefined,
       };
 
-      cacheDriver.set(cacheKey, content, ttl);
+      // `set` is fire-and-forget inside `onSent`; without a `.catch` a rejected
+      // write (e.g. Redis down) would surface as an unhandledRejection.
+      cacheDriver.set(cacheKey, content, ttl).catch((error: unknown) => {
+        log.error("cache-middleware", "set", error);
+      });
     });
   };
 }

@@ -26,10 +26,12 @@ function makeCommand(name: string) {
   };
 }
 
-const sendMock = vi.fn(async (command: any) => {
+const defaultSend = async (command: any) => {
   sentCommands.push({ name: command.constructor.name, input: command.input });
   return sendResponses.shift() ?? {};
-});
+};
+
+const sendMock = vi.fn(defaultSend);
 
 vi.mock("@aws-sdk/client-s3", () => {
   // Each command name must match how cloud-driver destructures it.
@@ -109,7 +111,10 @@ function lastCommand(name: string) {
 beforeEach(() => {
   sentCommands.length = 0;
   sendResponses = [];
-  sendMock.mockClear();
+  // Restore the default implementation so a persistent `mockRejectedValue`
+  // from a retry test cannot leak its rejection into later tests.
+  sendMock.mockReset();
+  sendMock.mockImplementation(defaultSend);
 });
 
 afterEach(() => {
@@ -414,12 +419,18 @@ describe("S3Driver — url formatting", () => {
     );
   });
 
-  it("uses a configured urlPrefix (e.g. CDN domain)", () => {
+  it("uses a configured urlPrefix (e.g. CDN domain) without the bucket host", () => {
     const driver = makeDriver({ urlPrefix: "https://cdn.example.com" });
 
-    expect(driver.url("images/x.png")).toBe(
-      "https://my-bucket.s3.us-east-1.amazonaws.com/https://cdn.example.com/images/x.png",
-    );
+    // urlPrefix short-circuits to {urlPrefix}/{key} — the bucket-host URL must
+    // NOT be appended (which previously produced a broken double-host URL).
+    expect(driver.url("images/x.png")).toBe("https://cdn.example.com/images/x.png");
+  });
+
+  it("strips a trailing slash from urlPrefix and the leading slash from the key", () => {
+    const driver = makeDriver({ urlPrefix: "https://cdn.example.com/" });
+
+    expect(driver.url("/images/x.png")).toBe("https://cdn.example.com/images/x.png");
   });
 });
 
@@ -471,5 +482,70 @@ describe("S3Driver — accessors", () => {
 
     expect(driver.getBucket()).toBe("my-bucket");
     expect(driver.getRegion()).toBe("us-east-1");
+  });
+});
+
+describe("S3Driver — deleteDirectory pagination", () => {
+  it("follows IsTruncated / ContinuationToken across pages and never re-lists page one", async () => {
+    // Page 1: truncated, hands back a continuation token. Page 2: final page.
+    sendResponses = [
+      {
+        Contents: [{ Key: "dir/a.txt" }, { Key: "dir/b.txt" }],
+        IsTruncated: true,
+        NextContinuationToken: "TOKEN-2",
+      },
+      {}, // DeleteObjects for page 1
+      {
+        Contents: [{ Key: "dir/c.txt" }],
+        IsTruncated: false,
+      },
+      {}, // DeleteObjects for page 2
+    ];
+
+    const driver = makeDriver();
+
+    expect(await driver.deleteDirectory("dir")).toBe(true);
+
+    const lists = sentCommands.filter((command) => command.name === "ListObjectsV2Command");
+
+    // Exactly two list calls — one per page, not an infinite re-list of page one.
+    expect(lists).toHaveLength(2);
+    expect(lists[0].input.ContinuationToken).toBeUndefined();
+    expect(lists[0].input.Prefix).toBe("dir/");
+    // The second page MUST carry the token from the first page's response.
+    expect(lists[1].input.ContinuationToken).toBe("TOKEN-2");
+
+    // Both batches of keys were deleted.
+    const deletes = sentCommands.filter((command) => command.name === "DeleteObjectsCommand");
+    expect(deletes).toHaveLength(2);
+    expect(deletes[0].input.Delete.Objects).toEqual([{ Key: "dir/a.txt" }, { Key: "dir/b.txt" }]);
+    expect(deletes[1].input.Delete.Objects).toEqual([{ Key: "dir/c.txt" }]);
+  });
+
+  it("stops after a single non-truncated page", async () => {
+    sendResponses = [
+      {
+        Contents: [{ Key: "solo/x.txt" }],
+        IsTruncated: false,
+      },
+      {}, // DeleteObjects
+    ];
+
+    const driver = makeDriver();
+
+    await driver.deleteDirectory("solo");
+
+    const lists = sentCommands.filter((command) => command.name === "ListObjectsV2Command");
+    expect(lists).toHaveLength(1);
+  });
+
+  it("issues no delete when a page has no objects", async () => {
+    sendResponses = [{ Contents: [], IsTruncated: false }];
+
+    const driver = makeDriver();
+
+    await driver.deleteDirectory("empty");
+
+    expect(sentCommands.some((command) => command.name === "DeleteObjectsCommand")).toBe(false);
   });
 });

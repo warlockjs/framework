@@ -11,6 +11,7 @@ import { R2Driver } from "./drivers/r2-driver";
 import { S3Driver } from "./drivers/s3-driver";
 import { ScopedStorage } from "./scoped-storage";
 import { StorageFile } from "./storage-file";
+import { safeFetchToBuffer } from "./utils/safe-fetch";
 import type {
   CloudStorageDriverContract,
   CloudStorageDriverOptions,
@@ -20,6 +21,7 @@ import type {
   LocalStorageDriverOptions,
   PresignedOptions,
   PresignedUploadOptions,
+  PutFromUrlOptions,
   PutOptions,
   R2StorageDriverOptions,
   ScopedStorageContract,
@@ -469,9 +471,15 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    *
    * Downloads content from the URL and stores it at the specified location.
    *
+   * The download is SSRF-guarded by default: the URL scheme must be
+   * https/http, the host must not resolve to a private / loopback /
+   * link-local / cloud-metadata address, the body is capped, and the
+   * request times out. Tune or relax via the {@link PutFromUrlOptions}
+   * guard fields.
+   *
    * @param url - Source URL to download from
    * @param location - Destination path
-   * @param options - Storage options
+   * @param options - Storage + outbound-download guard options
    * @returns StorageFile instance with cached metadata
    *
    * @example
@@ -485,19 +493,29 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
   public async putFromUrl(
     url: string,
     location: string,
-    options?: PutOptions,
+    options?: PutFromUrlOptions,
   ): Promise<StorageFile> {
-    const response = await fetch(url);
+    const { allowPrivateHosts, maxBytes, timeoutMs, allowedSchemes, ...putOptions } =
+      options ?? {};
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch file from URL: ${response.statusText}`);
+    const result = await safeFetchToBuffer(url, {
+      allowPrivateHosts,
+      maxBytes,
+      timeoutMs,
+      allowedSchemes,
+    });
+
+    if (!result.ok) {
+      throw new Error(`Failed to fetch file from URL: ${result.statusText}`);
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const mimeType = options?.mimeType || response.headers.get("content-type") || undefined;
+    if (!result.contentType) {
+      throw new Error(`Failed to fetch file from URL: missing content-type header`);
+    }
 
-    return this.put(buffer, location, { ...options, mimeType });
+    const mimeType = putOptions.mimeType || result.contentType;
+
+    return this.put(result.buffer, location, { ...putOptions, mimeType });
   }
 
   /**
@@ -800,7 +818,9 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * Only available for cloud drivers.
    *
    * @param location - Destination path
-   * @param options - Upload options (expiresIn, contentType, maxSize)
+   * @param options - Upload options (expiresIn, contentType, metadata).
+   *   There is no size cap: a presigned PUT URL cannot enforce one — verify
+   *   the uploaded size server-side or use a presigned POST policy instead.
    * @throws Error if current driver is not a cloud driver
    * @returns Presigned upload URL
    *

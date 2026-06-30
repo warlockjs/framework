@@ -192,7 +192,7 @@ export function crudModelStub(moduleName: Name): string {
   const plural = moduleName.plural;
 
   return `import { Model, RegisterModel } from "@warlock.js/cascade";
-import { type Infer, v } from "@warlock.js/core";
+import { type Infer, v } from "@warlock.js/seal";
 import { ${singular.pascal}Resource } from "app/${plural.kebab}/resources/${singular.kebab}.resource";
 
 export const ${singular.camel}Schema = v.object({
@@ -515,9 +515,8 @@ export function modelStub(
 ): string {
   const { tableName = `${name.plural.snake}`, withResource } = options;
 
-  return `import { Model } from "@warlock.js/core";
-import type { StrictMode } from "@warlock.js/cascade";
-import { v, type Infer } from "@warlock.js/core";
+  return `import { Model, type StrictMode } from "@warlock.js/cascade";
+import { v, type Infer } from "@warlock.js/seal";
 ${withResource ? `import { ${name.singular.pascal}Resource } from "../../resources/${name.singular.kebab}.resource";` : ""}
 
 const ${name.singular.camel}Schema = v.object({

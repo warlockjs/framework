@@ -479,21 +479,25 @@ export class Router {
       this.stacks.middleware.push(...middleware);
     }
 
-    callback();
+    try {
+      callback();
+    } finally {
+      // Always pop/splice this group's stacks, even if the callback throws,
+      // so a throwing group never leaks state onto the process-global singleton.
+      if (prefix) {
+        this.stacks.prefix.pop();
+      }
 
-    if (prefix) {
-      this.stacks.prefix.pop();
-    }
+      if (name) {
+        this.stacks.name.pop();
+      }
 
-    if (name) {
-      this.stacks.name.pop();
-    }
-
-    if (middleware) {
-      this.stacks.middleware.splice(
-        this.stacks.middleware.length - middleware.length,
-        middleware.length,
-      );
+      if (middleware) {
+        this.stacks.middleware.splice(
+          this.stacks.middleware.length - middleware.length,
+          middleware.length,
+        );
+      }
     }
 
     return this;

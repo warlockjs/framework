@@ -6,7 +6,9 @@
  * - Database validation rules (requires Cascade ORM)
  * - Upload validation rules (requires Upload model)
  *
- * Import from: @warlock.js/core/v
+ * These framework validators are re-exported from the package root
+ * (`@warlock.js/core`); the core-agnostic `v` factory and rules live in
+ * `@warlock.js/seal`.
  */
 
 // Export types (includes type augmentations)

@@ -5,6 +5,7 @@ import { join } from "path";
 import { Readable } from "stream";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { LocalDriver } from "../../../src/storage/drivers/local-driver";
+import { StorageError } from "../../../src/storage/utils/storage-error";
 
 /**
  * Round-trips the LocalDriver against a real OS temp directory. No network, no
@@ -292,5 +293,109 @@ describe("LocalDriver — temporary URL tokens", () => {
     const validation = await driver.validateTemporaryToken("anything");
 
     expect(validation).toEqual({ valid: false, error: "missing_key" });
+  });
+});
+
+describe("LocalDriver — path containment (traversal guard)", () => {
+  it("rejects POSIX-style ../ traversal that escapes the root", async () => {
+    const driver = makeDriver();
+
+    await expect(driver.get("../../etc/passwd")).rejects.toBeInstanceOf(StorageError);
+  });
+
+  it("rejects Windows-style ..\\ traversal that escapes the root", async () => {
+    const driver = makeDriver();
+
+    await expect(driver.get("..\\..\\windows\\system32\\config")).rejects.toBeInstanceOf(
+      StorageError,
+    );
+  });
+
+  it("rejects an absolute path that escapes the root", async () => {
+    const driver = makeDriver();
+
+    // On POSIX this is /etc/passwd; on Windows path.resolve treats a leading
+    // slash as drive-root, both of which escape the temp-dir root.
+    const absolute = process.platform === "win32" ? "C:\\Windows\\System32" : "/etc/passwd";
+
+    await expect(driver.get(absolute)).rejects.toBeInstanceOf(StorageError);
+  });
+
+  it("rejects a prefix breakout via ../ from inside the configured prefix", async () => {
+    const driver = makeDriver({ prefix: "tenant-1" });
+
+    // From tenant-1/, climbing two levels lands outside the root entirely.
+    await expect(driver.get("../../escape.txt")).rejects.toBeInstanceOf(StorageError);
+  });
+
+  it("allows a legitimate nested location", async () => {
+    const driver = makeDriver();
+    const payload = Buffer.from("nested-ok");
+
+    await driver.put(payload, "deep/nested/legit/file.txt");
+
+    expect((await driver.get("deep/nested/legit/file.txt")).equals(payload)).toBe(true);
+  });
+
+  it("allows a single-segment leading ./ that stays within the root", async () => {
+    const driver = makeDriver();
+    const payload = Buffer.from("dot-slash");
+
+    await driver.put(payload, "./inside.txt");
+
+    expect((await driver.get("inside.txt")).equals(payload)).toBe(true);
+  });
+
+  it("deleteDirectory refuses a path that escapes the root", async () => {
+    const driver = makeDriver();
+
+    await expect(driver.deleteDirectory("../../../tmp")).rejects.toBeInstanceOf(StorageError);
+  });
+
+  it("deleteDirectory removes a contained directory", async () => {
+    const driver = makeDriver();
+    await driver.put(Buffer.from("x"), "killme/a.txt");
+    await driver.put(Buffer.from("y"), "killme/b.txt");
+
+    expect(await driver.deleteDirectory("killme")).toBe(true);
+    expect(await driver.exists("killme/a.txt")).toBe(false);
+  });
+});
+
+describe("LocalDriver — metadata cache invalidation", () => {
+  it("reflects an updated size after a re-put (cache is invalidated)", async () => {
+    const driver = makeDriver();
+
+    await driver.put(Buffer.from("small"), "m.txt");
+    expect(await driver.size("m.txt")).toBe("small".length);
+
+    await driver.put(Buffer.from("much-larger-content"), "m.txt");
+    expect(await driver.size("m.txt")).toBe("much-larger-content".length);
+  });
+
+  it("clears cached metadata after delete so a re-created file reports fresh size", async () => {
+    const driver = makeDriver();
+
+    await driver.put(Buffer.from("first"), "c.txt");
+    await driver.metadata("c.txt"); // warm the cache
+
+    await driver.delete("c.txt");
+    await driver.put(Buffer.from("second-bigger"), "c.txt");
+
+    expect(await driver.size("c.txt")).toBe("second-bigger".length);
+  });
+
+  it("invalidates the destination cache after copy/move", async () => {
+    const driver = makeDriver();
+
+    await driver.put(Buffer.from("dest-old"), "dest.txt");
+    await driver.metadata("dest.txt"); // warm the cache with the old size
+
+    await driver.copy("src-does-not-matter-after-put", "dest.txt").catch(() => undefined);
+    // copy of a missing source throws; instead overwrite via a real put + move.
+    await driver.put(Buffer.from("brand-new-source"), "src.txt");
+    await driver.move("src.txt", "dest.txt");
+
+    expect(await driver.size("dest.txt")).toBe("brand-new-source".length);
   });
 });

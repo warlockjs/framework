@@ -19,6 +19,13 @@ export class StorageConnector extends BaseConnector {
 
   /**
    * Initialize cache connection
+   *
+   * Unlike its siblings (database, cache, herald), this connector does NOT
+   * early-return when `config.get("storage")` is absent. Storage is
+   * intentionally always-on: `storage.init()` falls back to the built-in
+   * `local` driver (see `storageConfig("default", "local")`), so file storage
+   * works out of the box even when a project ships no `src/config/storage.ts`.
+   * A config-presence guard here would break that default local storage.
    */
   public async start(): Promise<void> {
     await loadS3();

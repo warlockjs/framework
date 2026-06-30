@@ -15,7 +15,10 @@ let server: FastifyInstance | undefined = undefined;
 
 export function startHttpServer(options?: FastifyServerOptions): FastifyInstance {
   return (server = Fastify({
-    trustProxy: true,
+    // Configurable so deployments NOT behind a trusted proxy can disable
+    // `X-Forwarded-For` resolution (it's client-settable and spoofable).
+    // Defaults to `true` to preserve historical behavior for proxied apps.
+    trustProxy: config.get("http.trustProxy", true),
     bodyLimit: config.get("http.bodyLimit", DEFAULT_BODY_LIMIT),
     // Close idle keep-alive connections on shutdown while letting in-flight
     // requests finish — the basis for graceful draining. Override via

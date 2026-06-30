@@ -1,5 +1,6 @@
 import config from "@mongez/config";
 import { cache } from "@warlock.js/cache";
+import type { CacheDriver } from "@warlock.js/cache";
 import { BaseConnector } from "./base-connector";
 import { ConnectorLifecyclePhase, ConnectorPriority } from "./types";
 
@@ -34,15 +35,25 @@ export class CacheConnector extends BaseConnector {
 
   /**
    * Shutdown cache connection
+   *
+   * Disconnects every loaded cache driver so external clients (e.g. a Redis
+   * connection) are released instead of left dangling — mirroring the
+   * database and herald connectors, which disconnect all registered
+   * connections on shutdown.
    */
   public async shutdown(): Promise<void> {
     if (!this.active) {
       return;
     }
 
-    // TODO: Implement actual cache disconnection
-    // - Close all active connections
-    // - Clean up resources
+    // Disconnect every driver the manager loaded (not just the current one),
+    // so secondary drivers selected via `cache.use("...")` also release their
+    // connections.
+    const drivers: CacheDriver<unknown, unknown>[] = Object.values(cache.loadedDrivers);
+
+    for (const driver of drivers) {
+      await driver.disconnect();
+    }
 
     this.active = false;
   }

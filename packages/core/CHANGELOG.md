@@ -4,6 +4,46 @@ All notable changes to `@warlock.js/core` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.5.0
+
+### Changed
+
+- dev-server update notice now fires immediately on `warlock dev` — the check is spawned in parallel with server startup instead of awaiting it, so the notice surfaces as soon as npm responds
+- raised the update check's npm registry timeout from 2.5s to 30s, so a slow connection no longer drops the notice
+- repository lifecycle hooks (`onCreating` / `onCreate` / `onUpdating` / `onSaving` / `onDeleting` / …) now run on `create` / `update` / `delete` — they were defined but never invoked
+- `repository.list()` / `all()` now honor the `sortBy`, `sortDirection`, and `purgeCache` options — previously accepted but silently ignored
+
+### Removed
+
+- presigned-upload `maxSize` option — a presigned PUT URL cannot enforce a size cap, so the option was a false guarantee
+
+### Fixed
+
+- `response.sendFile({ filename })` and `response.download()` no longer 500 on non-ASCII file names — the `Content-Disposition` header is now RFC 6266-encoded (a sanitized ASCII `filename` fallback plus an RFC 5987 `filename*=UTF-8''…`), so an Arabic / emoji / UTF-8 download name streams correctly instead of throwing Node's `ERR_INVALID_CHAR`
+- local storage paths are contained to their disk root — `../` traversal segments and absolute paths can no longer escape the configured directory
+- `storage.putFromUrl` adds SSRF guards — private / loopback / link-local hosts are rejected and the fetched body is size-capped
+- S3 / R2 / DigitalOcean Spaces `url()` no longer produces a malformed double-host URL when `urlPrefix` is set
+- cloud `deleteDirectory` paginates via the list continuation cursor instead of re-listing the first page
+- local-storage metadata cache is invalidated on write / delete — it was serving a stale size / modified-time
+- the cloud driver no longer reports a misleading "SDK not installed" error when the AWS SDK is in fact present (driver load race)
+- repository `countCached` / `countActiveCached` now cache and return correctly — a `null` cache miss was being returned as the count
+- repository `firstCached` / `lastCached` no longer fetch and cache the entire table to return a single row
+- repository boolean filters no longer coerce `false` / `0` to `true`
+- repository cache keys are now order-independent (stable key serialization)
+- router groups restore prefix / name / middleware state via `try/finally` even when the group callback throws
+- `router.any()` / `all` routes now match every HTTP verb under the dev server — they previously matched only GET and POST, diverging from production
+- the HTTP concurrency limiter releases its slot on every response path (`noContent`, redirect, file, buffer) — a throwing or non-`send` handler no longer leaks a permit and permanently 429s the route
+- the cached-response middleware replays a hit through `response.replay()` instead of re-sending an already-sent reply, preserving status and content-type
+- `onSent` cache writes in the idempotency and cache middleware are error-handled — a cache-backend failure no longer surfaces as an unhandled rejection
+- `X-Forwarded-For` is parsed to its first hop, so IP-filter / rate-limit / idempotency scoping cannot be spoofed with extra header hops
+- the `maintenance` middleware allowlist matches request paths that carry a query string
+- use-cases run their `after` middleware and broadcast for a `void` handler, and a failed history write no longer fails an otherwise-successful call
+- the use-case retry counter reports the correct count on total failure
+- the socket connector no longer double-closes the shared HTTP server during graceful shutdown
+- the cache connector disconnects its drivers on shutdown — an open Redis connection was left dangling
+- generator stubs import `v` / `Infer` from `@warlock.js/seal` (core never re-exported them), so generated models compile and run
+- `warlock dev` hot-reloads when a file is emptied or saved with no trailing newline — a stale no-op-change check was silently dropping those saves before they reached HMR
+
 ## 4.4.0 - 2026-06-21
 
 ### Added
@@ -38,9 +78,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- `lowerStage3Decorators()` — Vite/Vitest plugin that lowers TC39 Stage-3 decorators with esbuild before oxc / the SSR rewrite mangles them; drop it first in a config's `plugins` so model-decorated files load under Vitest 4 / Vite 8.
-- `warlock add notifications` — installs `@warlock.js/notifications` (+ the `mail` feature), ejects `config/notifications.ts`, and scaffolds the app-owned `Notification` model + migration into `src/app/notifications/` (idempotent; async queue opt-in).
-- Notifications connector — built-in connector (priority `8`, early phase) reads `config/notifications.ts` at boot and passes it to `setNotificationConfig`; lazy-imports `@warlock.js/notifications` (config-gated), so core keeps no hard dependency on it.
+- `lowerStage3Decorators()` — Vite/Vitest plugin that lowers TC39 Stage-3 decorators with esbuild before oxc / the SSR rewrite mangles them; drop it first in `plugins` so model-decorated files load under Vitest 4 / Vite 8.
+- `warlock add notifications` — installs `@warlock.js/notifications` (+ the `mail` feature), ejects `config/notifications.ts`, and scaffolds the app-owned `Notification` model + migration (idempotent).
+- Notifications connector — a built-in, config-gated connector that lazy-imports `@warlock.js/notifications`, so core keeps no hard dependency on it.
 
 ### Changed
 
@@ -50,7 +90,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- `startHttpTestServer` now starts early-phase connectors (database, cache, logger, …) before loading app modules, then late-phase (http, socket) after — mirroring dev/prod boot order; fixes a `MissingDataSourceError` when a module's boot side-effect queries the DB at import under the Vitest integration harness.
+- `startHttpTestServer` now starts early-phase connectors (database, cache, logger, …) before app modules, then late-phase (http, socket) after — mirroring dev/prod boot order; fixes a `MissingDataSourceError` under the Vitest integration harness.
 
 ## 4.2.5
 
@@ -86,7 +126,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- `herald-connector` and `http-connector` now log a failed boot-time connection at `log.fatal` (was `log.error` / a dev-only console write). A broker connection failure or an HTTP port-bind failure at boot is unrecoverable — `fatal` makes "page on fatal only" alerting clean, aligned with the cascade and cache drivers. The HTTP connector additionally `await log.flush()` before `process.exit(1)` so the fatal entry reaches Sentry/file before the process dies. Disconnect/shutdown failures stay at `error`.
+- `herald-connector` and `http-connector` now log a failed boot-time connection at `log.fatal` (was `log.error`) — an unrecoverable broker connection or HTTP port-bind failure makes "page on fatal only" alerting clean; the HTTP connector flushes logs before `process.exit(1)`. Disconnect / shutdown failures stay at `error`.
 
 ## 4.1.15
 

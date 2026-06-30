@@ -1,6 +1,6 @@
 import { colors } from "@mongez/copper";
 import events from "@mongez/events";
-import { fileExistsAsync, getFileAsync, unlinkAsync } from "@warlock.js/fs";
+import { fileExistsAsync, unlinkAsync } from "@warlock.js/fs";
 import { Application } from "../application";
 import { connectorsManager } from "../connectors/connectors-manager";
 import { ConnectorLifecyclePhase } from "../connectors/types";
@@ -125,15 +125,18 @@ export class DevelopmentServer {
       devLogWarn("warlock.config.ts changed — restart the dev server to apply.");
     }
 
-    // Some editors fsync on save without writing â€” drop no-op changes.
-    if (batch.changed.length > 0) {
-      batch.changed = await dropNoOpChanges(batch.changed);
-    }
+    // No-op saves (an editor that fsyncs without a content write) are already
+    // filtered upstream by the file hash in FileEventHandler, so batch.changed
+    // only contains genuinely-changed paths by the time it reaches here.
 
     const total = batch.added.length + batch.changed.length + batch.deleted.length;
     if (total === 0) return;
 
-    const codeFiles = [...batch.added, ...batch.changed].filter((p) => !isEnvPath(p));
+    // warlock.config.ts rides along in `changed` for the restart warning above
+    // but is never hot-reloaded, so keep it out of the reload set.
+    const codeFiles = [...batch.added, ...batch.changed].filter(
+      (p) => !isEnvPath(p) && p !== "warlock.config.ts",
+    );
 
     try {
       await this.layerExecutor.executeBatchReload(
@@ -164,24 +167,6 @@ export class DevelopmentServer {
   }
 }
 
-async function dropNoOpChanges(changedPaths: string[]): Promise<string[]> {
-  const kept = await Promise.all(
-    changedPaths.map(async (relativePath) => {
-      if (isEnvPath(relativePath)) return relativePath;
-
-      const file = filesOrchestrator.files.get(relativePath);
-      if (!file) return null;
-
-      const content = await getFileAsync(file.absolutePath);
-      if (content.trim() === file.source) return null;
-
-      file.source = content;
-      return relativePath;
-    }),
-  );
-
-  return kept.filter((p): p is string => p !== null);
-}
 
 function isEnvPath(path: string): boolean {
   const basename = path.split("/").pop() ?? path;

@@ -57,6 +57,7 @@ export class FileEventHandler {
     // Both .env files and warlock.config.ts live outside src/ — they should
     // never enter the dep graph, only ride along in the batch event so the
     // dev server can react (config reload / restart warning).
+    const externalChanges = changes.filter(isExternalPath);
     const codeChanges = changes.filter(p => !isExternalPath(p));
     const codeAdds = adds.filter(p => !isExternalPath(p));
 
@@ -67,24 +68,42 @@ export class FileEventHandler {
     }
 
     await this.processBatchAdds(codeAdds);
-    await this.processBatchChanges(codeChanges);
+    const changedCodePaths = await this.processBatchChanges(codeChanges);
     await this.processBatchDeletes(deletes);
 
     this.fileOperations.updateFileDependents();
     this.fileOperations.syncFilesToManifest();
     await this.manifest.save();
 
+    // Emit only the code paths that genuinely changed (hash differs). A no-op
+    // save — an editor that fsyncs without writing — reports no change and is
+    // dropped here, where we still know the pre-change hash. (Doing this
+    // downstream is impossible: the source has already been overwritten, so a
+    // content compare always looks unchanged — which is exactly why emptying a
+    // file used to silently skip HMR.) External paths (.env / warlock.config.ts)
+    // ride along untouched so the dev server can still react to them.
     events.trigger("dev-server:batch-complete", {
       added: adds,
-      changed: changes,
+      changed: [...externalChanges, ...changedCodePaths],
       deleted: deletes,
     });
   }
 
-  private async processBatchChanges(relativePaths: string[]): Promise<void> {
-    await runInBatches(relativePaths, FILE_PROCESSING_BATCH_SIZE, path =>
-      this.fileOperations.updateFile(path),
-    );
+  /**
+   * Reprocess each changed file and return only the paths that genuinely
+   * changed. `updateFile` returns false when the on-disk hash matches the
+   * last-processed hash (e.g. an editor that fsyncs on save without writing),
+   * so those no-ops are kept out of the reload batch. Emptying a file changes
+   * its hash, so it is correctly reported as changed.
+   */
+  private async processBatchChanges(relativePaths: string[]): Promise<string[]> {
+    const changed: string[] = [];
+    await runInBatches(relativePaths, FILE_PROCESSING_BATCH_SIZE, async path => {
+      if (await this.fileOperations.updateFile(path)) {
+        changed.push(path);
+      }
+    });
+    return changed;
   }
 
   private async processBatchAdds(relativePaths: string[]): Promise<void> {

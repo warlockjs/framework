@@ -43,6 +43,16 @@ export class SocketConnector extends BaseConnector {
   protected socket?: Server;
 
   /**
+   * Whether this connector created the underlying node HTTP(S) server.
+   *
+   * When `http` is present, socket binds onto the HTTP connector's shared
+   * `fastify.server` and must NOT close it on shutdown — the HTTP connector
+   * owns the graceful drain. Socket only closes the node server when it
+   * created one itself (http absent). See {@link shutdown}.
+   */
+  protected ownsRawServer = false;
+
+  /**
    * Boot the connector
    */
   public async boot() {
@@ -62,15 +72,17 @@ export class SocketConnector extends BaseConnector {
     log.info("socket", "connection", "Starting Socket.IO server");
 
     // now we have two cases
-    // 1. http is used, then use it
-    // 2. http is not used, then create a new server
+    // 1. http is used, then use it (shared — the HTTP connector owns it)
+    // 2. http is not used, then create a new server (we own it)
     let server;
     if (container.has("http.server")) {
       const fastify = container.get("http.server");
       server = fastify.server;
+      this.ownsRawServer = false;
     } else {
       server = socketConfig.ssl ? createHttpsServer() : createHttpServer();
       server.listen(socketConfig.port);
+      this.ownsRawServer = true;
     }
 
     container.set("socket.rawServer", server);
@@ -96,7 +108,13 @@ export class SocketConnector extends BaseConnector {
   }
 
   /**
-   * Shutdown HTTP server
+   * Shutdown Socket server
+   *
+   * Always closes the Socket.IO layer (and awaits the drain). The underlying
+   * node HTTP(S) server is only closed here when this connector created it
+   * ({@link ownsRawServer}); when `http` owns the shared server, we leave it
+   * for the HTTP connector to drain and close, so the two connectors don't
+   * race to `close()` the same socket.
    */
   public async shutdown(): Promise<void> {
     if (!this.active) {
@@ -105,12 +123,24 @@ export class SocketConnector extends BaseConnector {
 
     if (container.has("socket")) {
       const socket = container.get("socket");
-      socket.close();
+      // socket.io's close() takes a callback — await it so shutdown doesn't
+      // report done while sockets are still draining.
+      await new Promise<void>((resolve) => {
+        socket.close(() => resolve());
+      });
     }
 
-    if (container.has("socket.rawServer")) {
+    if (this.ownsRawServer && container.has("socket.rawServer")) {
       const server = container.get("socket.rawServer");
-      server.close();
+      await new Promise<void>((resolve, reject) => {
+        server.close((error?: Error) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve();
+          }
+        });
+      });
     }
 
     this.active = false;

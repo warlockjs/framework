@@ -9,13 +9,14 @@ import { ltrim } from "@mongez/reinforcements";
 import crypto from "crypto";
 import { createReadStream, createWriteStream } from "fs";
 import { copyFile, readFile, readdir, rename, stat, writeFile } from "fs/promises";
-import { dirname, join } from "path";
+import { dirname, join, resolve } from "path";
 import type { Readable } from "stream";
 import { pipeline } from "stream/promises";
 import { UploadedFile } from "../../http";
 import { storagePath } from "../../utils/paths";
 import { url } from "../../utils/urls";
 import { storageDriverContext } from "../context/storage-driver-context";
+import { resolveWithinRoot } from "../utils/contain-path";
 import type {
   DeleteManyResult,
   ListOptions,
@@ -71,7 +72,10 @@ export class LocalDriver implements StorageDriverContract {
   protected _metadata = new Map<string, StorageFileInfo>();
 
   public constructor(public options: LocalStorageDriverOptions = {}) {
-    this.root = options.root ?? storagePath();
+    // Resolve the root to an absolute, normalized path up front so the
+    // path-traversal containment check (resolveWithinRoot) has a stable
+    // anchor to compare resolved locations against.
+    this.root = resolve(options.root ?? storagePath());
     this.urlPrefix = options.urlPrefix ?? "";
     this.temporaryUrlPrefix = options.temporaryUrlPrefix ?? "/temp-files";
     this.signatureKey = options.signatureKey;
@@ -131,6 +135,9 @@ export class LocalDriver implements StorageDriverContract {
 
     await writeFile(absolutePath, new Uint8Array(fileBuffer));
 
+    // Invalidate any stale cached metadata for this location.
+    this._metadata.delete(location);
+
     const stats = await stat(absolutePath);
     const mimeType = options?.mimeType || this.guessMimeType(location);
 
@@ -159,6 +166,9 @@ export class LocalDriver implements StorageDriverContract {
     // Create write stream and pipe
     const writeStream = createWriteStream(absolutePath);
     await pipeline(stream, writeStream);
+
+    // Invalidate any stale cached metadata for this location.
+    this._metadata.delete(location);
 
     // Calculate hash and get stats
     const fileBuffer = await readFile(absolutePath);
@@ -213,6 +223,10 @@ export class LocalDriver implements StorageDriverContract {
     }
 
     await unlinkAsync(absolutePath);
+
+    // Invalidate any stale cached metadata for this location.
+    this._metadata.delete(location);
+
     return true;
   }
 
@@ -240,9 +254,15 @@ export class LocalDriver implements StorageDriverContract {
 
   /**
    * Delete directory
+   *
+   * The directory path is resolved through {@link getAbsolutePath} so it is
+   * contained within the storage root — the raw, caller-supplied argument is
+   * never handed to the filesystem (preventing `../` traversal deletes).
    */
   public async deleteDirectory(directoryPath: string) {
-    await removeDirectoryAsync(directoryPath);
+    const absolutePath = this.getAbsolutePath(directoryPath);
+
+    await removeDirectoryAsync(absolutePath);
 
     return true;
   }
@@ -443,6 +463,9 @@ export class LocalDriver implements StorageDriverContract {
     await ensureDirectoryAsync(dirname(toPath));
     await copyFile(fromPath, toPath);
 
+    // Invalidate any stale cached metadata for the destination.
+    this._metadata.delete(to);
+
     const fileBuffer = await readFile(toPath);
     const hash = this.calculateHash(fileBuffer);
     const stats = await stat(toPath);
@@ -470,6 +493,10 @@ export class LocalDriver implements StorageDriverContract {
 
     await ensureDirectoryAsync(dirname(toPath));
     await rename(fromPath, toPath);
+
+    // Invalidate any stale cached metadata for both source and destination.
+    this._metadata.delete(from);
+    this._metadata.delete(to);
 
     const fileBuffer = await readFile(toPath);
     const hash = this.calculateHash(fileBuffer);
@@ -553,10 +580,14 @@ export class LocalDriver implements StorageDriverContract {
 
   /**
    * Get absolute file path
+   *
+   * Routes through {@link resolveWithinRoot} so a location can never escape
+   * the configured storage root via `..` traversal, an absolute path, or a
+   * prefix breakout.
    */
   protected getAbsolutePath(location: string): string {
     const prefixedLocation = this.applyPrefix(location);
-    return join(this.root, prefixedLocation);
+    return resolveWithinRoot(this.root, prefixedLocation);
   }
 
   /**

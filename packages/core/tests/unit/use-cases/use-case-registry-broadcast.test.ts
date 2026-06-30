@@ -1,7 +1,7 @@
 import config from "@mongez/config";
 import { cache, MemoryCacheDriver } from "@warlock.js/cache";
 import { v } from "@warlock.js/seal";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { getUseCase, getUseCases, useCase } from "../../../src/use-cases";
 import type { UseCaseBroadcastChannel, UseCaseBroadcastEvent } from "../../../src/use-cases/types";
 import { BadSchemaUseCaseError } from "../../../src/use-cases/use-case.errors";
@@ -24,6 +24,10 @@ beforeAll(async () => {
 
 beforeEach(() => {
   config.set("use-cases", { benchmark: false });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("useCase — schema validation", () => {
@@ -77,6 +81,43 @@ describe("useCase — registry", () => {
     });
 
     expect(getUseCases().has(name)).toBe(true);
+  });
+
+  it("exposes the runtime calls counters without an ad-hoc cast", async () => {
+    const name = uniqueName("calls-typed");
+
+    const run = useCase({
+      name,
+      handler: async () => ({ ok: true }),
+    });
+
+    await run({});
+
+    const registered = getUseCase(name);
+
+    // `calls` is part of the returned type (RegisteredUseCase) — no cast needed.
+    expect(registered?.calls.success).toBe(1);
+    expect(registered?.calls.total).toBe(1);
+  });
+
+  it("$cleanup does not reject when the cache namespace removal fails", async () => {
+    vi.spyOn(cache, "removeNamespace").mockRejectedValueOnce(new Error("cache down"));
+
+    const name = uniqueName("cleanup-best-effort");
+
+    const run = useCase({
+      name,
+      handler: async () => ({ ok: true }),
+    });
+
+    // $cleanup is synchronous and best-effort — a rejecting removeNamespace must
+    // not throw synchronously or surface as an unhandled rejection.
+    expect(() => run.$cleanup()).not.toThrow();
+
+    // Let the swallowed rejection settle so it can't leak into another test.
+    await Promise.resolve();
+
+    expect(getUseCase(name)).toBeUndefined();
   });
 });
 

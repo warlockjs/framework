@@ -89,12 +89,22 @@ export function concurrencyLimitMiddleware(
     let released = false;
 
     const releaseOnce = () => {
-      if (released) return;
+      if (released) {
+        return;
+      }
 
       released = true;
       release(key);
     };
 
+    // `onSent` only fires from Response.send()/stream().end()/sse().end().
+    // Bare-reply paths (noContent, redirect, sendFile, download, sendBuffer,
+    // raw send) never trigger it, so the slot would leak and the route would
+    // permanently 429 after `max` such requests. Bind to the raw socket
+    // lifecycle as well so the slot frees regardless of response path —
+    // `releaseOnce` is idempotent, so double-firing is harmless.
     response.onSent((_sentResponse: Response) => releaseOnce());
+    response.baseResponse.raw.once("finish", releaseOnce);
+    response.baseResponse.raw.once("close", releaseOnce);
   };
 }

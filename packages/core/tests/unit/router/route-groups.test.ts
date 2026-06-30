@@ -150,6 +150,31 @@ describe("Router — group options", () => {
     expect(scopedRoutes()[0].middleware).toEqual([routeMiddleware, groupMiddleware]);
   });
 
+  it("cleans up the prefix/name/middleware stacks when the group callback throws", async () => {
+    const groupMiddleware: Middleware = function groupGuard() {
+      return undefined;
+    };
+
+    await withScope(() => {
+      expect(() => {
+        router.group({ prefix: "/boom", name: "boom", middleware: [groupMiddleware] }, () => {
+          throw new Error("callback exploded");
+        });
+      }).toThrow("callback exploded");
+
+      // A route registered outside the failed group must see clean stacks:
+      // no leaked prefix, name or middleware from the throwing group.
+      router.get("/outside", () => undefined as any);
+    });
+
+    const outside = scopedRoutes().find((route) => route.path === "/outside");
+
+    expect(outside?.path).toBe("/outside");
+    expect(outside?.name).toBe("outside");
+    expect(outside?.$prefixStack).toEqual([]);
+    expect(outside?.middleware).toEqual([]);
+  });
+
   it("removes only this group's middleware from the stack after the callback", async () => {
     const groupMiddleware: Middleware = function groupGuard() {
       return undefined;
