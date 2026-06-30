@@ -229,6 +229,35 @@ attachments: [
 
 The model must declare `capabilities.vision` or you get a typed error at the boundary. OpenAI adapter auto-infers vision from the model name; override with `openai.model({ name, vision: true })`.
 
+## Attachment security
+
+Attachment references are frequently user-controlled — chat uploads, document-ingestion endpoints, anything where the model decides what to fetch. The framework treats server-side attachment I/O as hostile by default and gates it with an `AttachmentPolicy`. Set it once on the factory (`AgentConfig.attachmentPolicy`) or per call (`AgentExecuteOptions.attachmentPolicy`, which overrides the factory one):
+
+```ts
+import { resolve } from "node:path";
+
+const myAgent = ai.agent({
+  model,
+  attachmentPolicy: {
+    allowRemoteFetch: true,
+    outbound: { hostAllowlist: ["cdn.example.com"], maxBytes: 1_000_000 },
+    allowedRoots: [resolve("storage/uploads")],
+    allowBareLocalPaths: false,
+  },
+});
+```
+
+Omitting the policy keeps the safe defaults: **remote text fetch is denied**, and **bare-string local paths warn** (a staged deprecation).
+
+| Option | Default | What it gates |
+| --- | --- | --- |
+| `allowRemoteFetch` | `false` | Fetching a **remote text** attachment (an `http`/`https` URL given as `{ type: "text" }`). Default-deny — such a fetch throws `OutboundPolicyError` unless enabled. URL *image* attachments are unaffected (they're handed to the provider as a URL, never fetched server-side). |
+| `outbound` | strict `OutboundPolicy` defaults | The [`OutboundPolicy`](../digging-deeper/outbound-policy) applied to a permitted remote-text fetch — https-only, host allowlist, post-DNS private-IP deny, 5 MiB cap, 10s timeout. |
+| `allowedRoots` | unset | Sandbox roots for **local file** attachments. A local path must resolve inside one of these absolute roots or the read is rejected. When omitted, local reads are not path-restricted (back-compat). |
+| `allowBareLocalPaths` | `true` (warns once) | Allow bare-string local paths (`"./notes.txt"`). Staged deprecation — set `false` to hard-deny them now; the typed `{ source: { absolutePath } }` route stays supported (still gated by `allowedRoots`). |
+
+Both denials surface as a typed `OutboundPolicyError`, never a raw throw, so you catch and report them at the boundary. See [Outbound policy](../digging-deeper/outbound-policy) for the shared SSRF guard.
+
 ## Cancellation
 
 ```ts

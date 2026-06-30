@@ -126,6 +126,28 @@ still gets a complete answer instead of a 400.
 Image attachments accept both a remote `url` and inlined `base64`
 bytes (`image/jpeg`, `image/png`, `image/gif`, `image/webp`).
 
+## Prompt caching
+
+Claude bills the most-repeated tokens — tool schemas, the system prompt — at a fraction of the input rate when reused across trips. The adapter exposes **two independent breakpoints**:
+
+| Where | How you opt in | What it caches |
+| --- | --- | --- |
+| **Tool schemas** | `model({ promptCaching: true })` (per-model) | Marks the tools block `cache_control: { type: "ephemeral" }` so multi-trip agents reuse tool definitions at the cache-read rate. |
+| **System prompt** | `modelOptions: { cacheControl: { breakpoints: 1 } }` (per-call) | Emits the system prompt as a cached `text` block. |
+
+```ts
+const model = anthropic.model({
+  name: "claude-sonnet-4-6",
+  promptCaching: true, // cache the static tool schemas across trips
+});
+```
+
+`promptCaching` is **off by default**: a cache *write* costs ~1.25×, so a breakpoint only pays off when the cached prefix is read at least twice (multi-trip / multi-turn agents). The split is deliberate — tool schemas are static (a per-model decision), while the system prompt often carries per-turn placeholders (a per-call decision). Reads and writes flow back as `Usage.cachedTokens` / `Usage.cacheWriteTokens`.
+
+:::note[Bedrock differs]
+On the [Bedrock adapter](/v/latest/ai/providers/bedrock/), `promptCaching` is a *capability override* rather than an opt-in — auto-inferred `true` for Claude 3.5+/3.7/4 and Nova, mapping per-call `cacheControl` breakpoints to Converse `cachePoint` blocks. Set `promptCaching: false` to force it off.
+:::
+
 ## Vision
 
 Pass image parts on a user message — the agent resolves attachments

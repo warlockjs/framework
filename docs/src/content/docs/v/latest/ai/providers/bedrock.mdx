@@ -143,6 +143,16 @@ bedrock.embedder({ name: "amazon.titan-embed-text-v2:0", dimensions: 256 });
   Lite/Pro/Premier, Meta Llama 3.2 (11B/90B) and Llama 4. Text-only
   families (Llama 3/3.1, Titan Text, Mistral 7B, Cohere Command) stay
   off. Override either way with the `vision` flag.
+- **PDF / document input** — auto-detected from the model id, mirroring
+  vision minus the image-only Llama families. Inferred **on** for
+  Anthropic Claude 3 / 3.5 / 3.7 / 4 and Amazon Nova Lite/Pro/Premier
+  (they accept Converse `document` content blocks); **off** for text-only
+  and image-only families. When off, a PDF attachment raises a typed
+  capability error up front. Override with the `pdf` flag.
+- **Audio input** — **off by default and never auto-inferred**: Bedrock
+  Converse takes no audio content blocks for the families this adapter
+  targets, so every model reports `audio: false` unless you set
+  `audio: true` for a model id you've confirmed accepts audio.
 - **Embeddings** — Amazon Titan Text Embeddings, single-input (see above).
 
 > **Images must be base64 bytes.** Bedrock Converse has no remote-URL

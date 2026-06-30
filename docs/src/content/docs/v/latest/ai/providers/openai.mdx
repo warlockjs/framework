@@ -78,6 +78,43 @@ const { vector } = await embedder.embed("Hello world");
 - **Per-model pricing** — pass a `pricing` map (USD per million tokens)
   for a cost breakdown in the agent's usage report.
 
+## Pricing and usage
+
+Every response reports token `usage` (`input`, `output`, `total`). OpenAI prompt-cache hits surface as `cachedTokens`, and reasoning-model thinking tokens as `reasoningTokens` (counted within `output`) when present.
+
+Attach a `pricing` registry — keyed by model name, in USD per million tokens — to turn tokens into money. It can live on the SDK (one source of truth) or per-model (wins when both are set); with pricing set, cost rolls up through every node of the `AgentReport`. When neither is set, `Usage.cost` stays `undefined`.
+
+```ts
+const openai = new OpenAISDK({
+  apiKey: process.env.OPENAI_API_KEY!,
+  pricing: {
+    "gpt-4o-mini": { input: 0.15, output: 0.6, cachedInput: 0.075 },
+    "gpt-4o": { input: 2.5, output: 10, cachedInput: 1.25 },
+  },
+});
+
+// Or per model, overriding the SDK entry:
+const model = openai.model({ name: "gpt-4o", pricing: { input: 2.5, output: 10 } });
+```
+
+Need an offline token estimate before a call? `openai.count(text)` returns a fast character-heuristic approximation — good for budgeting and quota guards, not for billing.
+
+## Response format override
+
+By default the adapter emits strict `response_format: { type: "json_schema", strict: true }` whenever an agent passes an output schema, so the JSON always matches the shape. Some OpenAI-compatible targets reject strict `json_schema` (older models, certain OpenRouter routes, Ollama's OpenAI-compat endpoint, some fine-tunes). For those, set `responseFormat` on the model call to pick a looser wire mode:
+
+```ts
+const model = openai.model({ name: "some-legacy-model", responseFormat: "json_object" });
+```
+
+| `responseFormat` | Wire `response_format` | Shape enforcement |
+| --- | --- | --- |
+| `"json_schema"` | `{ type: "json_schema", strict: true }` | Token-level — the model can only emit JSON matching the schema. The default when omitted. |
+| `"json_object"` | `{ type: "json_object" }` | Valid JSON, but **not** the shape — re-communicated via the agent's soft system-prompt hint. |
+| `"text"` | _(none emitted)_ | No `response_format` on the wire — relies entirely on the soft prompt hint. |
+
+Picking `"json_object"` or `"text"` also flips the model's inferred `capabilities.structuredOutput` to `false`, so the agent runtime re-injects a soft "respond in JSON only" hint. Client-side validation against your output schema still runs, so `result.data` is shape-checked either way.
+
 For the full surface (pricing config, streaming caveats, embedding
 dimension truncation, token counting), see the
 `setup-openai` skill.
