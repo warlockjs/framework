@@ -168,6 +168,12 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | `SkillSource` / `SkillInjectMode` / `SkillReviewGate` / `SkillAnalyticsEvent` | Source descriptors, injection policy, review gate, analytics hook. |
 | `LoadSkillInput` | `{ name, version? }` — validated input of the `loadSkill` tool. |
 | `SkillsStoreContract` | Pluggable store backing a `store` source. `MockSkillsStore` / `proceduralSkillStore()` ship as implementations. |
+| `loadSkillTool(deps)` | Factory that builds the per-run `loadSkill` `ToolContract<LoadSkillInput, LoadSkillResult>` (progressive-disclosure body loader with a per-run load budget). `ai.skills` wires this for you. |
+| `LoadSkillResult` / `LoadSkillToolDeps` | Result fed back to the model — `{ body, name, version } \| { error }` — and the deps the tool closes over (`load`, `maxLoadsPerRun`, `onLoaded?`). |
+| `saveSkillTool(deps)` / `SaveSkillToolDeps` | Factory for the Phase-2 `saveSkill` tool (writes an inert `type: "candidate"`); auto-registered only when a `review` gate is set. |
+| `SaveSkillInput` / `SaveSkillResult` | `saveSkill` input `{ name, description, body, tags? }` and result `{ saved: true; name; status: "candidate" } \| { error }`. |
+| `runReviewGate(candidate, gate, emit?)` | Run a candidate skill through the default-DENY Phase-2 review gate; promotes on `{ approve: true }`, else denies (fail-closed). Resolves a `ReviewOutcome`; never throws. |
+| `ReviewOutcome` | `{ promoted: true; record; reason? }` \| `{ promoted: false; reason? }`. |
 
 ## RAG
 
@@ -186,6 +192,10 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | `RetrieveResult` | `{ query, chunks: RetrievedChunk[] }`. |
 | `RagReranker` | Reranker contract. `ai.rag.keywordReranker(opts?)` / `ai.rag.llmReranker(opts)` ship as built-ins; `KeywordRerankerOptions` / `LlmRerankerOptions` are their option shapes. |
 | `VectorStore` | Vector-store adapter. `cacheVectorStore` wraps a `@warlock.js/cache` driver. |
+| `bm25Rank(query, docs)` | BM25 lexical ranking over a candidate set (`k1 = 1.5`, `b = 0.75`; zero-score docs dropped). Pure; no global index. See [Hybrid retrieval](../the-basics/hybrid-retrieval). |
+| `reciprocalRankFusion(rankedLists, k?)` | Fuse several ranked id lists into one consensus ranking via RRF (`k` default `60`) — no score calibration needed. |
+| `hybridRank(params)` | Convenience wrapper — runs `bm25Rank` over `candidates` and fuses it with your `dense` ranking via RRF. |
+| `multiQuery(model, query, opts?)` | Ask a model for `opts.n` (default 3) alternative phrasings of a query; de-duped, original prepended (unless `includeOriginal: false`). Widens retrieval over vocabulary the original missed. |
 
 ## Batch + eval
 
@@ -220,10 +230,27 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | Export | What it is |
 | --- | --- |
 | `ToolContract<TIn, TOut>` | Returned by `ai.tool`. Has `.name`, `.description`, `.invoke()`. |
+| `ExecutableTool<TIn, TOut>` | Structural shape of an executable (agent / workflow / supervisor) dropped into `tools: []` without `.asTool()` — `{ name, description?, inputSchema?, execute() }`, no `invoke`. |
+| `AgentToolEntry<TIn, TOut>` | An entry accepted in `tools: []` — a `ToolContract` or a raw `ExecutableTool` the framework auto-adapts. |
+| `executableToTool(executable)` | Adapt one raw `ExecutableTool` into a `ToolContract` (manifest derived from its `name` / `description` / `inputSchema`); throws `AgentExecutionError` when it has no `name`. |
+| `normalizeAgentTools(tools?)` | Normalize an agent's `tools: []` to `ToolContract[]` — built tools pass through, raw executables auto-adapt. |
+| `isExecutableTool(entry)` | Type guard — `true` when `entry` has `execute()` but no `invoke()`. |
 | `ToolConfig<TIn, TOut>` | Config for `ai.tool`. |
 | `ToolContext<TArtifacts>` | Second argument to `execute` — `{ artifacts, signal, ... }`. |
 | `ToolCall` | One recorded tool call — `{ name, input, output, error?, tripIndex, duration, startedAt, endedAt }`. |
 | `ToolMode` | `"feedback" | "silent"`. |
+
+## Streaming structured output
+
+`ai.streamObject` streams token deltas, progressively-parsed partial snapshots, and a final strictly-validated object. See [Stream structured output](../the-basics/stream-structured-output).
+
+| Export | What it is |
+| --- | --- |
+| `ai.streamObject(params)` | `<T>(params: StreamObjectParams<T>) => AsyncIterable<ObjectStreamEvent<T>>` — the structured-output streaming verb. |
+| `collectStreamObject(stream)` | Drain a `streamObject` stream down to just its terminal `done` event. |
+| `StreamObjectParams<T>` | Config — `{ model, messages, schema, options? }`; `schema` validates the final object. |
+| `ObjectStreamEvent<T>` | `{ type: "text-delta"; delta }` \| `{ type: "partial"; value: unknown }` \| `{ type: "done"; valid: true; value: T; usage }` \| `{ type: "done"; valid: false; error: AIError; usage }`. |
+| `parsePartialJson(text)` | Tolerant best-effort parser turning an incomplete streaming JSON prefix into a partial snapshot (`undefined` until parseable). Powers `streamObject`'s `partial` events. |
 
 ## System prompts
 
@@ -353,6 +380,20 @@ A generic, panoptic-agnostic observability seam. Observability tools (panoptic, 
 | `Observer` | The structural observer contract a tool implements. |
 | `FlowObserveOption` | A flow's `observe` value — `true` / `false` / a flow-local `Observer`. |
 
+## Serve over SSE
+
+Turn any streaming primitive (agent / supervisor / orchestrator) into a `node:http` handler that streams its run to the client as Server-Sent Events. See [Serve over SSE](../digging-deeper/serve-over-sse).
+
+| Export | What it is |
+| --- | --- |
+| `ai.serve(executable, options?)` | Turn a `ServableExecutable` into a `(req, res) => void` `node:http` handler. POST `{ input, sessionId?, history? }`; responds `text/event-stream` — one frame per event, then a `result` frame, then `[DONE]`. Honors `authToken` (Bearer → `401`) and `nosniff` / `DENY` security headers. |
+| `ServeOptions<TInput>` | `serve` options — `authToken?` (Bearer gate), `toInput?` (map body → input, default `body.input`), `toOptions?` (map body → per-call stream options, default passes `sessionId` / `history`). |
+| `ServableExecutable<TInput>` | What `serve` can expose — anything whose `stream(input, options?)` returns a `StreamLike`. Agents, supervisors, and orchestrators satisfy it. |
+| `streamToSSE(stream)` | Async generator that converts a `StreamLike` into SSE frame strings — one frame per event, then a `result` (or `error`) frame, then `[DONE]`. Transport-agnostic. |
+| `encodeSSE(frame)` | Encode one SSE frame from `{ event?, data, id? }`; multi-line `data` is split into multiple `data:` lines per the spec. |
+| `SSE_DONE` | The terminal `data: [DONE]` frame a client watches for. |
+| `StreamLike<TEvent, TResult>` | `AsyncIterable<TEvent> & { result?: Promise<TResult> }` — the shape every primitive's `stream()` returns. |
+
 ## Errors
 
 All extend `AIError`. Stable `code` strings listed in [Handle errors](../digging-deeper/handle-errors).
@@ -393,6 +434,7 @@ All extend `AIError`. Stable `code` strings listed in [Handle errors](../digging
 | `VcrCassetteMissError` | `VCR_CASSETTE_MISS` | `unknown` |
 | `ApprovalRejectedError` | `APPROVAL_REJECTED` | `unknown` |
 | `InterruptSuspendedError` | `INTERRUPT_SUSPENDED` | `unknown` |
+| `OutboundPolicyError` | `OUTBOUND_POLICY_BLOCKED` | `unknown` |
 
 ## Configuration
 
@@ -400,6 +442,24 @@ All extend `AIError`. Stable `code` strings listed in [Handle errors](../digging
 | --- | --- |
 | `AIConfig` | `{ defaultStore?, defaultCheckpointStore?, defaultSnapshotStore? }` — process-wide config. `defaultStore` is the **cache** driver (semanticCache + memory vector store); `defaultSnapshotStore` / `defaultCheckpointStore` are the snapshot / checkpoint stores. |
 | `ai.config(partial)` | Merge into the process-wide config. |
+
+## Security
+
+A shared trust-boundary foundation used by every server-side outbound request (attachment fetches, URL skill sources, RAG loaders) plus secret-scrubbing for logs / errors. See [Outbound policy](../digging-deeper/outbound-policy) and [Redact secrets](../digging-deeper/redact-secrets).
+
+| Export | What it is |
+| --- | --- |
+| `OutboundPolicy` / `ResolvedOutboundPolicy` | Outbound-request controls — `allowedSchemes?` (default `["https"]`), `hostAllowlist?`, `denyPrivateIPsAfterDNS?` (default `true`), `maxBytes?` (5 MiB), `timeoutMs?` (10s), `signal?`, `fetch?`. The resolved form has every default filled. |
+| `resolveOutboundPolicy(policy?)` | Fill a partial policy with the strict defaults (idempotent). |
+| `assertUrlAllowed(url, policy)` | Validate scheme + host allowlist + post-DNS private-IP guard before any fetch. Returns the parsed `URL`; throws `OutboundPolicyError`. |
+| `guardedFetch(url, policy, init?)` | `assertUrlAllowed` + timeout-merged `fetch` → raw `Response`. Read it with `readTextCapped`. |
+| `fetchTextWithPolicy(url, policy, init?)` | `guardedFetch` + `readTextCapped` → `{ ok, status, statusText, text }`. |
+| `readTextCapped(response, maxBytes)` | Read a body as UTF-8 with a hard byte cap. |
+| `isPrivateOrReservedIp(ip)` | `true` for private / loopback / link-local / unique-local / cloud-metadata addresses — the post-DNS SSRF predicate. |
+| `redact(value, options?)` | Deep-copy with sensitive-keyed properties replaced by a placeholder (key-driven). |
+| `scrubSecrets(text)` | Scrub known secret shapes (Bearer tokens, `sk-…`, `xox…`, `ghp_…`, `AKIA…`) from free-form text. |
+| `redactError(error, options?)` | Serialize an error secret-free (`RedactedError`) — `stack` omitted unless `includeStack: true`; `cause` deep-redacted. |
+| `redactHeaders` / `DEFAULT_SENSITIVE_KEYS` / `SENSITIVE_HEADERS` / `RedactOptions` / `RedactedError` | Header scrubbing + the built-in sensitive-key/header sets + option / result types. |
 
 ## Reports — shared shapes
 
