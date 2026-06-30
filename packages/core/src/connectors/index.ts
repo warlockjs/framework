@@ -3,6 +3,7 @@
  * Exports all connector types and implementations
  */
 export * from "./access-connector";
+export * from "./ai-connector";
 export * from "./base-connector";
 export * from "./cache-connector";
 export * from "./herald-connector";

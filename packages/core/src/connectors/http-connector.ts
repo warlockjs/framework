@@ -107,13 +107,13 @@ export class HttpConnector extends BaseConnector {
     const livenessPath = healthConfig?.path ?? "/health";
     const readinessPath = healthConfig?.readinessPath ?? "/ready";
 
-    this.http.get(livenessPath, async (_request, reply) => {
+    this.http.get(livenessPath, async (_request: any, reply: any) => {
       const result = health.liveness();
 
       return reply.code(result.status === "ok" ? 200 : 503).send(result);
     });
 
-    this.http.get(readinessPath, async (_request, reply) => {
+    this.http.get(readinessPath, async (_request: any, reply: any) => {
       const result = await health.readiness();
 
       return reply.code(result.status === "ok" ? 200 : 503).send(result);

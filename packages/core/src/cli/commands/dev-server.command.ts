@@ -21,7 +21,7 @@ export const devServerCommand = command({
     await displayStartupBanner({ environment: "development" });
   },
   action: async (data) => {
-    await startDevelopmentServer({
+    startDevelopmentServer({
       fresh: Boolean(data.options.fresh),
       // Pass `false` only when the CLI flag is explicitly set; `undefined`
       // lets `warlock.config.ts > devServer.*` defaults apply.

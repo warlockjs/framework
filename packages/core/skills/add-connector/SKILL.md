@@ -71,8 +71,13 @@ Lower number = earlier. The built-in ordering, from `ConnectorPriority` in `@war
 | `http`        | 5        | **Late**|
 | `storage`     | 6        | Early   |
 | `socket`      | 7        | **Late**|
+| `notifications`| 8       | Early   |
+| `access`      | 9        | Early   |
+| `ai`          | 10       | Early   |
 
-Pick a number that places your connector where it belongs. If your queue needs the database, set `priority > 2` (e.g. `10`). If you replace the cache, set `< 4` to win.
+Pick a number that places your connector where it belongs. If your queue needs the database, set `priority > 2` (e.g. `11`). If you replace the cache, set `< 4` to win.
+
+> **Built-in `AiConnector` (priority `ConnectorPriority.AI = 10`, Early).** A reference example of a config-driven, lazy-import connector: it reads the ejected `src/config/ai.ts` and applies it via `ai.config(...)`, lazy-importing `@warlock.js/ai` only when the config is present (so core carries no hard dependency). The config file (ejected by `warlock add ai`) holds an auto-managed `// >>> warlock:ai-packages` import block where the `ai-tools` / `ai-panoptic` / `ai-workspace` satellite features link their side-effect imports. See `src/connectors/ai-connector.ts`.
 
 Negative priorities are fine for "start before everything" — the project's `src/connectors/custom-connector.ts` example uses `priority: -10`.
 

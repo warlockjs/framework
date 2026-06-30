@@ -1067,6 +1067,44 @@ export class Response {
    * Apply response options (cache, disposition, etag)
    * Shared helper for sendFile and sendBuffer
    */
+  /**
+   * Build an RFC 6266–safe `Content-Disposition` value for a file name.
+   *
+   * HTTP header values must be ISO-8859-1; Node's `setHeader` throws
+   * `ERR_INVALID_CHAR` on any other byte, so a raw `filename="تقرير.pdf"` would
+   * crash the response (a 500 the moment the name is non-ASCII). RFC 6266 solves
+   * this with two parameters emitted together:
+   *   - `filename="<ascii>"`     — sanitised ASCII fallback for legacy clients
+   *   - `filename*=UTF-8''<pct>` — RFC 5987 ext-value; modern browsers restore
+   *                                the real (e.g. Arabic) name.
+   */
+  private contentDisposition(type: "inline" | "attachment", rawName: string): string {
+    // Strip CR/LF first so a crafted file name can never inject extra headers.
+    const name = (rawName || "file").replace(/[\r\n]/g, "");
+
+    // ASCII fallback: replace quote/backslash + every non-printable-ASCII byte
+    // (covers all multibyte characters) so the quoted-string is always legal.
+    const ascii =
+      name
+        .replace(/["\\]/g, "_")
+        .replace(/[^\x20-\x7E]/g, "_")
+        .trim() || "file";
+
+    // Pure-ASCII name → the quoted form is enough; no ext-value needed.
+    if (!/[^\x20-\x7E]/.test(name)) {
+      return `${type}; filename="${ascii}"`;
+    }
+
+    // RFC 5987 ext-value. `encodeURIComponent` leaves ' ( ) * unescaped, but they
+    // are not valid `attr-char`, so percent-encode those too.
+    const encoded = encodeURIComponent(name).replace(
+      /['()*]/g,
+      (char) => "%" + char.charCodeAt(0).toString(16).toUpperCase(),
+    );
+
+    return `${type}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+  }
+
   private applyResponseOptions(options: SendBufferOptions, defaultFilename?: string): boolean {
     // Set content type if provided
     if (options.contentType) {
@@ -1099,7 +1137,7 @@ export class Response {
     if (options.inline !== undefined || options.filename) {
       const disposition = options.inline ? "inline" : "attachment";
       const filename = options.filename || defaultFilename || "file";
-      this.header("Content-Disposition", `${disposition}; filename=\"${filename}\"`);
+      this.header("Content-Disposition", this.contentDisposition(disposition, filename));
     }
 
     return false; // No 304 sent
@@ -1280,7 +1318,10 @@ export class Response {
         filename = path.basename(filePath);
       }
 
-      this.baseResponse.header("Content-Disposition", `attachment; filename="${filename}"`);
+      this.baseResponse.header(
+        "Content-Disposition",
+        this.contentDisposition("attachment", filename),
+      );
 
       // this.baseResponse.header("Content-Type", this.getFileContentType(filePath));
       this.baseResponse.header("Content-Type", "application/octet-stream");

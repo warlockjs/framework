@@ -9,7 +9,7 @@
 
 const REGISTRY_BASE_URL = "https://registry.npmjs.org";
 
-const DEFAULT_TIMEOUT_MS = 2500;
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 /**
  * Fetch the latest published version of a package from the npm registry.
@@ -20,7 +20,7 @@ const DEFAULT_TIMEOUT_MS = 2500;
  * and never throws, so callers can stay fail-silent.
  *
  * @param packageName Fully-qualified npm name, e.g. `@warlock.js/core`.
- * @param timeoutMs   Abort budget in milliseconds (defaults to 2500).
+ * @param timeoutMs   Abort budget in milliseconds (defaults to 30_000 -> 30 seconds).
  */
 export async function fetchLatestVersion(
   packageName: string,

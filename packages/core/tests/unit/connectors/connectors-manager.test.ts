@@ -54,9 +54,10 @@ class FakeConnector implements Connector {
 
 /**
  * Number of connectors the manager auto-registers in its constructor
- * (logger, mailer, http, database, herald, cache, storage, socket).
+ * (logger, mailer, http, database, herald, cache, storage, socket,
+ * notifications, access, ai).
  */
-const BUILTIN_CONNECTOR_COUNT = 8;
+const BUILTIN_CONNECTOR_COUNT = 11;
 
 /**
  * Empty the manager's auto-registered built-in connectors in place so a

@@ -133,6 +133,29 @@ That's the contract. Filename → config key. No registration, no manifest, no s
 
 Some subsystems need to do extra work when their config loads (e.g. set the active locale, register a driver). Those have a special handler attached internally — for the most part you don't see them. The takeaway: changing a config file at dev time fires the handler again automatically.
 
+## The `config/ai.ts` eject + auto-import block
+
+`warlock add ai` ejects `src/config/ai.ts` — a declarative `Partial<AIConfig>` default export applied on boot by the `ai` connector (`ai.config(...)`), the same special-handler pattern as above. Two things make it unusual:
+
+1. **An auto-managed import block at the top.** The ejected file opens with a marker pair:
+
+   ```ts title="src/config/ai.ts"
+   import type { AIConfig } from "@warlock.js/ai";
+
+   // >>> warlock:ai-packages (auto-managed) >>>
+   // <<< warlock:ai-packages <<<
+
+   const ai: Partial<AIConfig> = {
+     // defaultStore, panoptic, …
+   };
+
+   export default ai;
+   ```
+
+2. **Satellite features link side-effect imports into that block.** `warlock add ai-tools | ai-panoptic | ai-workspace` inserts e.g. `import "@warlock.js/ai-workspace";` right after the marker (idempotent — re-running is a no-op). Those side-effect imports register the satellites' surface on the `ai` object (`ai.tools` / `ai.mcp`, `ai.workspace`, panoptic's wiring) **before** the connector applies the config, so a single `ai.config(...)` call sees the full augmented surface. Keep the marker block and don't hand-reorder it.
+
+The five provider features (`ai-openai`, `ai-google`, `ai-anthropic`, `ai-bedrock`, `ai-ollama`) only add their package — they don't touch `config/ai.ts`; you wire a provider's model in your agent code.
+
 ## Multi-file or conditional config
 
 A config file is just a TS module. Branch on `env(...)` if production should differ from development:

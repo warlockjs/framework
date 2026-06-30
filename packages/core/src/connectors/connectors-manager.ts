@@ -2,6 +2,7 @@ import { colors } from "@mongez/copper";
 import { Application } from "../application";
 import { devServeLog } from "../dev-server/dev-logger";
 import { AccessConnector } from "./access-connector";
+import { AiConnector } from "./ai-connector";
 import { CacheConnector } from "./cache-connector";
 import { DatabaseConnector } from "./database-connector";
 import { HeraldConnector } from "./herald-connector";
@@ -34,6 +35,7 @@ export class ConnectorsManager {
     this.register(new SocketConnector());
     this.register(new NotificationsConnector());
     this.register(new AccessConnector());
+    this.register(new AiConnector());
   }
 
   /**
@@ -126,10 +128,14 @@ export class ConnectorsManager {
   /**
    * Shutdown connectors on process kill
    *
-   * Handles graceful shutdown for both Unix and Windows:
+   * Registers signal handlers that run an idempotent graceful shutdown:
    * - SIGINT: Ctrl+C on Unix, also caught on Windows but unreliable in child processes
    * - SIGTERM: Termination signal (Unix primarily)
-   * - beforeExit: Fires when Node.js empties its event loop (more reliable on Windows)
+   * - SIGHUP: registered on Windows (`win32`) only, to catch Ctrl+C / console close
+   *
+   * Note: no `beforeExit` handler is registered — `beforeExit` cannot reliably
+   * await async teardown (the process exits once the callback returns), so
+   * shutdown is driven entirely by the signal handlers above.
    */
   public shutdownOnProcessKill(): void {
     let isShuttingDown = false;

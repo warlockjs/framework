@@ -26,6 +26,37 @@ const access: AccessConfigurations = {
 export default access;
 `;
 
+export const aiConfigStub = `import type { AIConfig } from "@warlock.js/ai";
+
+// >>> warlock:ai-packages (auto-managed) >>>
+// Satellite packages augment the "ai" object on import — e.g. ai.workspace,
+// ai.tools / ai.mcp, and panoptic's ai.config({ panoptic }) wiring. The command
+// "warlock add ai-workspace | ai-tools | ai-panoptic" adds the matching
+// side-effect import below; keep them so the augmentation + runtime registration
+// load before the ai connector applies this config.
+// <<< warlock:ai-packages <<<
+
+/**
+ * AI configuration — applied on boot by the ai connector, which calls
+ * ai.config(...) with the object below. Cross-cutting defaults live here
+ * (shared cache / snapshot stores, observability); per-call options always win.
+ *
+ * Wire a default model from a provider you installed, e.g.:
+ *   import { OpenAISDK } from "@warlock.js/ai-openai";
+ *   const openai = OpenAISDK({ apiKey: env("OPENAI_API_KEY") });
+ *   // then pass openai.model({ name: "gpt-4o-mini" }) into your agents.
+ */
+const ai: Partial<AIConfig> = {
+  // Default cache driver for cache-backed AI features (semantic cache, rag / memory vector stores).
+  // defaultStore: cache.driver("redis", { client }),
+
+  // Observability — requires "warlock add ai-panoptic". Exporters + the local dashboard.
+  // panoptic: { exporters: [], dashboard: false, observeAll: false },
+};
+
+export default ai;
+`;
+
 export const accessRoleModelStub = `import { Model, RegisterModel } from "@warlock.js/cascade";
 import { type Infer, v } from "@warlock.js/seal";
 

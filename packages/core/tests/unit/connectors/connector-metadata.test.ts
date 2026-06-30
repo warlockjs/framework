@@ -27,7 +27,19 @@ describe("built-in connector metadata", () => {
       .sort();
 
     expect(names).toEqual(
-      ["cache", "database", "herald", "http", "logger", "mailer", "socket", "storage"].sort(),
+      [
+        "cache",
+        "database",
+        "herald",
+        "http",
+        "logger",
+        "mailer",
+        "socket",
+        "storage",
+        "notifications",
+        "access",
+        "ai",
+      ].sort(),
     );
   });
 
@@ -40,6 +52,9 @@ describe("built-in connector metadata", () => {
     ["http", ConnectorPriority.HTTP, ConnectorLifecyclePhase.Late],
     ["storage", ConnectorPriority.STORAGE, ConnectorLifecyclePhase.Early],
     ["socket", ConnectorPriority.SOCKET, ConnectorLifecyclePhase.Late],
+    ["notifications", ConnectorPriority.NOTIFICATIONS, ConnectorLifecyclePhase.Early],
+    ["access", ConnectorPriority.ACCESS, ConnectorLifecyclePhase.Early],
+    ["ai", ConnectorPriority.AI, ConnectorLifecyclePhase.Early],
   ] as const)("%s has the expected priority and phase", (name, priority, phase) => {
     const connector = byName(name);
 

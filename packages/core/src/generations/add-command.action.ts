@@ -13,6 +13,7 @@ import { rootPath, srcPath } from "../utils";
 import { getWarlockVersion } from "../utils/framework-vesion";
 import {
   accessConfigStub,
+  aiConfigStub,
   accessResolverStub,
   accessRoleMigrationStub,
   accessRoleModelIndexStub,
@@ -352,7 +353,49 @@ async function completeAccessInstallation(_options: CommandActionData) {
   await scaffoldAccessFiles();
 }
 
-const featuresMap: Record<
+/**
+ * Link a satellite AI package into src/config/ai.ts via a side-effect import.
+ *
+ * The satellites (@warlock.js/ai-tools, ai-panoptic, ai-workspace) augment the
+ * `ai` object on import — they register their runtime surface (ai.tools / ai.mcp,
+ * ai.workspace, panoptic's ai.config({ panoptic }) wiring) AND the matching TS
+ * declaration-merging so ai.* members resolve. config-loader runs config/ai.ts at
+ * boot, so dropping a bare `import "<specifier>";` at the top of that file is what
+ * actually loads the augmentation before the ai connector applies the config.
+ *
+ * No-op if config/ai.ts is missing (the `ai` feature ejects it) or the import is
+ * already present. Inserts right after the `warlock:ai-packages` marker when it
+ * exists so the satellite imports stay grouped; otherwise prepends to the top.
+ */
+async function linkAiPackageImport(specifier: string): Promise<void> {
+  const aiConfigPath = srcPath("config/ai.ts");
+
+  if (!(await fileExistsAsync(aiConfigPath))) {
+    return;
+  }
+
+  const current = await getFileAsync(aiConfigPath);
+  const importLine = `import "${specifier}";`;
+
+  if (current.includes(importLine)) {
+    return;
+  }
+
+  const marker = "// >>> warlock:ai-packages (auto-managed) >>>";
+  let next: string;
+
+  if (current.includes(marker)) {
+    next = current.replace(marker, `${marker}\n${importLine}`);
+  } else {
+    next = `${importLine}\n${current}`;
+  }
+
+  await putFileAsync(aiConfigPath, next);
+
+  console.log(`${colors.green("✓")} Linked ${specifier} in src/config/ai.ts`);
+}
+
+export const featuresMap: Record<
   string,
   {
     dependencies?: Record<string, string>;
@@ -531,45 +574,76 @@ const featuresMap: Record<
     dependencies: {
       "@warlock.js/ai": "~4.0.0",
     },
+    ejectConfig: {
+      content: aiConfigStub,
+      name: "ai",
+    },
   },
-  openai: {
-    description: "Installs the OpenAI provider for @warlock.js/ai (pulls the core ai package)",
+  "ai-openai": {
+    description: "OpenAI provider for @warlock.js/ai (pulls the core ai package)",
     requires: ["ai"],
     dependencies: {
       "@warlock.js/ai-openai": "~4.0.0",
     },
   },
-  google: {
-    description: "Installs the Google (Gemini) provider for @warlock.js/ai (pulls the core ai package)",
+  "ai-google": {
+    description: "Google (Gemini) provider for @warlock.js/ai (pulls the core ai package)",
     requires: ["ai"],
     dependencies: {
       "@warlock.js/ai-google": "~4.0.0",
     },
   },
-  anthropic: {
-    description: "Installs the Anthropic (Claude) provider for @warlock.js/ai (pulls the core ai package)",
+  "ai-anthropic": {
+    description: "Anthropic (Claude) provider for @warlock.js/ai (pulls the core ai package)",
     requires: ["ai"],
     dependencies: {
       "@warlock.js/ai-anthropic": "~4.0.0",
     },
   },
-  bedrock: {
-    description: "Installs the AWS Bedrock provider for @warlock.js/ai (pulls the core ai package)",
+  "ai-bedrock": {
+    description: "AWS Bedrock provider for @warlock.js/ai (pulls the core ai package)",
     requires: ["ai"],
     dependencies: {
       "@warlock.js/ai-bedrock": "~4.0.0",
     },
   },
-  ollama: {
-    description: "Installs the Ollama provider for @warlock.js/ai (pulls the core ai package)",
+  "ai-ollama": {
+    description: "Ollama provider for @warlock.js/ai (pulls the core ai package)",
     requires: ["ai"],
     dependencies: {
       "@warlock.js/ai-ollama": "~4.0.0",
     },
   },
+  "ai-tools": {
+    description:
+      "Installs @warlock.js/ai-tools — ready-made agent tools (web search, fetch, HTTP, calculator, date-time) + an MCP client/server, under ai.tools.* / ai.mcp (pulls the core ai package)",
+    requires: ["ai"],
+    dependencies: {
+      "@warlock.js/ai-tools": "~4.0.0",
+    },
+    onExecuting: () => linkAiPackageImport("@warlock.js/ai-tools"),
+  },
+  "ai-panoptic": {
+    description:
+      "Installs @warlock.js/ai-panoptic — observability for @warlock.js/ai (collector, exporters, zero-setup local dashboard) via ai.config({ panoptic }) (pulls the core ai package)",
+    requires: ["ai"],
+    dependencies: {
+      "@warlock.js/ai-panoptic": "~4.0.0",
+    },
+    onExecuting: () => linkAiPackageImport("@warlock.js/ai-panoptic"),
+  },
+  "ai-workspace": {
+    description:
+      "Installs @warlock.js/ai-workspace — a policy-jailed filesystem + shell workspace for coding agents, as ai.workspace (pulls the core ai package)",
+    requires: ["ai"],
+    dependencies: {
+      "@warlock.js/ai-workspace": "~4.0.0",
+    },
+    onExecuting: () => linkAiPackageImport("@warlock.js/ai-workspace"),
+  },
 };
 
-const allowedFeatures = Object.keys(featuresMap);
+export const allowedFeatures = Object.keys(featuresMap);
 
 type PackageManager = "yarn" | "pnpm" | "npm";
 
