@@ -8,9 +8,11 @@ import {
   transaction,
 } from "@warlock.js/cascade";
 import { Seeder } from "./seeder";
+import { SeederDependencyCycleError, UnknownSeederDependencyError } from "./seeder.errors";
+import { SeedRecordsTableMigration } from "./seed-records-table-migration";
 import { SeedsTableMigration } from "./seeds-table-migration";
-import { SeederMetadata, SeedResult } from "./types";
-import { seedsTableName } from "./utils";
+import { SeederMetadata, SeedRecordRef, SeedResult, Track, TrackableModel } from "./types";
+import { seedRecordsTableName, seedsTableName } from "./utils";
 
 export type SeedersManagerOptions = {
   datasource?: DataSource;
@@ -40,6 +42,10 @@ export class SeedersManager {
     if (!(await this.driver.blueprint.tableExists(seedsTableName))) {
       await migrationRunner.run(SeedsTableMigration);
     }
+
+    if (!(await this.driver.blueprint.tableExists(seedRecordsTableName))) {
+      await migrationRunner.run(SeedRecordsTableMigration);
+    }
   }
 
   /**
@@ -68,17 +74,38 @@ export class SeedersManager {
         console.log(`🔄 Running ${colors.green(seeder.name)}...`);
         const startTime = Date.now();
 
-        const result = withTransaction
-          ? await transaction(async () => seeder.run())
-          : await seeder.run();
+        const refs: SeedRecordRef[] = [];
+        const track = this.createTracker(seeder, refs);
+
+        const runSeeder = async () => {
+          // Keep LAST-RUN refs only: drop the prior refs for this seeder before
+          // writing the new ones, so `--drop` undo stays bounded.
+          await this.driver.deleteMany(seedRecordsTableName, { seeder: seeder.name });
+
+          const result = await seeder.run({ track });
+
+          if (refs.length > 0) {
+            await this.driver.insertMany(
+              seedRecordsTableName,
+              refs.map((ref) => ({ ...ref })),
+            );
+          }
+
+          return result;
+        };
+
+        const result = withTransaction ? await transaction(runSeeder) : await runSeeder();
 
         const duration = Date.now() - startTime;
-        if (result) {
-          await this.storeSeedsResults(seeder, result);
-        }
+
+        // Auto-derive recordsCreated from the track count; a returned
+        // SeedResult is an optional fallback when nothing was tracked.
+        const recordsCreated = refs.length > 0 ? refs.length : (result?.recordsCreated ?? 0);
+
+        await this.storeSeedsResults(seeder, { recordsCreated });
 
         console.log(
-          `✅ ${colors.green(seeder.name)} completed (${duration}ms, ${result?.recordsCreated ?? 0} records)\n`,
+          `✅ ${colors.green(seeder.name)} completed (${duration}ms, ${recordsCreated} records)\n`,
         );
         successCount++;
       } catch (error: any) {
@@ -108,6 +135,46 @@ export class SeedersManager {
   }
 
   /**
+   * Build a `track` helper bound to the given seeder. Tracked refs are pushed
+   * into `refs` and persisted (within the run transaction) by the caller.
+   *
+   * Every overload returns its first argument so it can be chained inline.
+   */
+  protected createTracker(seeder: Seeder, refs: SeedRecordRef[]): Track {
+    const push = (table: string, recordId: number | string) => {
+      refs.push({ seeder: seeder.name, table, recordId, runAt: new Date() });
+    };
+
+    function track<T extends TrackableModel>(model: T): T;
+    function track<T extends TrackableModel>(models: T[]): T[];
+    function track(table: string, id: number | string): string;
+    function track(
+      arg: TrackableModel | TrackableModel[] | string,
+      id?: number | string,
+    ): TrackableModel | TrackableModel[] | string {
+      if (typeof arg === "string") {
+        push(arg, id as number | string);
+
+        return arg;
+      }
+
+      if (Array.isArray(arg)) {
+        for (const model of arg) {
+          push(model.getTableName(), model.id);
+        }
+
+        return arg;
+      }
+
+      push(arg.getTableName(), arg.id);
+
+      return arg;
+    }
+
+    return track;
+  }
+
+  /**
    * Sort seeds
    */
   public sort() {
@@ -121,17 +188,81 @@ export class SeedersManager {
   }
 
   /**
-   * Prepare seeders to order by the seeder order
-   * Also keep an eye on the dependsOn for each seeder to make sure
-   * they are ordered correctly
+   * Prepare seeders to order by the seeder order, then resolve `dependsOn`.
+   *
+   * Dependencies are honored via a topological sort layered over the existing
+   * numeric `order` tie-break: among seeders whose dependencies are already
+   * satisfied, the lowest `order` (then registration order) runs first. Throws
+   * {@link UnknownSeederDependencyError} for a missing dependency and
+   * {@link SeederDependencyCycleError} for a cycle.
    */
   public prepareSeeders() {
     this.seeders = this.seeders.filter((seeder) => seeder.enabled !== false);
 
     this.sort();
 
-    // TODO: Handle dependsOn resolution
-    // This is more complex - needs topological sort
+    this.seeders = this.resolveDependencies(this.seeders);
+
+    return this;
+  }
+
+  /**
+   * Topologically sort `seeders` by their `dependsOn` names. The input is
+   * assumed pre-sorted by `order` (see {@link sort}); that ordering is used as
+   * the tie-break so dependency-free siblings keep their `order` sequence.
+   */
+  protected resolveDependencies(seeders: Seeder[]): Seeder[] {
+    const byName = new Map<string, Seeder>();
+
+    for (const seeder of seeders) {
+      byName.set(seeder.name, seeder);
+    }
+
+    // Validate dependencies up-front so an unknown name is a clear error rather
+    // than a silently dropped edge.
+    for (const seeder of seeders) {
+      for (const dependency of seeder.dependsOn ?? []) {
+        if (!byName.has(dependency)) {
+          throw new UnknownSeederDependencyError(seeder.name, dependency);
+        }
+      }
+    }
+
+    const sorted: Seeder[] = [];
+    const state = new Map<string, "visiting" | "visited">();
+
+    const visit = (seeder: Seeder, path: string[]) => {
+      const status = state.get(seeder.name);
+
+      if (status === "visited") {
+        return;
+      }
+
+      if (status === "visiting") {
+        const cycleStart = path.indexOf(seeder.name);
+        const cycle = path.slice(cycleStart >= 0 ? cycleStart : 0).concat(seeder.name);
+
+        throw new SeederDependencyCycleError(cycle);
+      }
+
+      state.set(seeder.name, "visiting");
+
+      for (const dependency of seeder.dependsOn ?? []) {
+        // Presence already validated above; the `!` is safe.
+        visit(byName.get(dependency)!, [...path, seeder.name]);
+      }
+
+      state.set(seeder.name, "visited");
+      sorted.push(seeder);
+    };
+
+    // Iterate in the incoming (order-sorted, registration-stable) sequence so
+    // dependency-free seeders preserve their `order` tie-break.
+    for (const seeder of seeders) {
+      visit(seeder, []);
+    }
+
+    return sorted;
   }
 
   /**

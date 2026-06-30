@@ -4,6 +4,29 @@ All notable changes to `@warlock.js/core` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.6.0
+
+### Added
+
+- release-hygiene tests: version↔changelog invariant + generator-stub import check
+- `router.routeCount()` exposes the number of registered routes as a boot/readiness signal
+- `health.addRoutesRegisteredCheck(getRouteCount)` registers a readiness check that reports not-ready when a booted HTTP app has zero routes
+- seeders now receive a `{ track }` context — `track(model)`, `track(models[])`, and `track(table, id)` register created records (each call returns its argument so it can be chained inline); `recordsCreated` is auto-derived from the track count
+- `seed_records` table (created via the new `SeedRecordsTableMigration`) records every tracked seed reference within the same transaction the seed runs in; only the last run's refs are kept per seeder
+- `warlock seed --drop [name]` undoes a seed: deletes its tracked records in reverse run/insertion order inside a transaction, then resets the matching seeds-log rows so `once: true` seeds re-run; scope to one seeder with `--drop=<name>`
+- `Seeder.dependsOn` is now resolved — seeders are topologically sorted so dependencies run before dependents, layered over the numeric `order` tie-break; throws `UnknownSeederDependencyError` for a missing dependency and `SeederDependencyCycleError` for a cycle
+
+### Changed
+
+- `Seeder.run` now receives a `SeedContext` (`run(ctx)`) — backward compatible, an existing zero-arg `run()` keeps working unchanged
+
+### Fixed
+
+- route-module load/registration failures are no longer swallowed: a route file that throws on import or registration now surfaces loudly instead of silently 404'ing the whole surface
+- `ModuleLoader.loadModule` rethrows after logging (wrapped in a new `ModuleLoadError` carrying the failing file + cause), so a broken module aborts boot and is caught loudly by the HMR batch-reload handler in dev
+- `ModuleLoader.loadAll` aggregates per-file failures and throws an `AggregateError` at the end, so one broken module no longer hides the others
+- `router.withSourceFile` rethrows the callback error after logging instead of consuming it with a bare `console.log` (the `try/finally` source-file stack cleanup is preserved)
+
 ## 4.5.0
 
 ### Changed

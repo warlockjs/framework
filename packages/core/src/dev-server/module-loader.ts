@@ -9,6 +9,23 @@ declare global {
 }
 
 /**
+ * Thrown when a special file (route/event/main/locale) fails to import or
+ * register. Carries the file that failed and the original cause so a broken
+ * module surfaces with its origin instead of vanishing into a 404.
+ */
+export class ModuleLoadError extends Error {
+  public constructor(
+    public readonly type: string,
+    public readonly file: FileManager,
+    public readonly cause: unknown,
+  ) {
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    super(`Failed to load ${type}: ${file.relativePath} - ${reason}`);
+    this.name = "ModuleLoadError";
+  }
+}
+
+/**
  * The four "special" file kinds that the dev server eagerly imports at boot.
  * Order matters: locales first (used by everything), events before main so
  * listeners are registered when main runs, routes last so handlers are bound.
@@ -28,12 +45,35 @@ export class ModuleLoader {
   /**
    * Eagerly load every special file at boot, in the canonical order so
    * later phases (e.g. routes) see state earlier phases registered.
+   *
+   * A failing module no longer vanishes silently: each failure is collected
+   * (so one broken file doesn't hide the others) and, once every file has been
+   * attempted, an aggregate error is thrown. The boot callers
+   * (`DevelopmentServer.start`, the HTTP test bootstrap) already wrap this in a
+   * try/catch that logs and aborts the boot — so a broken route module aborts
+   * boot loudly rather than booting into a surface that 404s.
    */
   public async loadAll(): Promise<void> {
+    const failures: ModuleLoadError[] = [];
+
     for (const type of SPECIAL_TYPES) {
       for (const file of this.specialFilesCollector.getFilesByType(type)) {
-        await this.loadModule(file, type);
+        try {
+          await this.loadModule(file, type);
+        } catch (error) {
+          failures.push(
+            error instanceof ModuleLoadError ? error : new ModuleLoadError(type, file, error),
+          );
+        }
       }
+    }
+
+    if (failures.length > 0) {
+      throw new AggregateError(
+        failures,
+        `${failures.length} module(s) failed to load during boot:\n` +
+          failures.map((failure) => `  - ${failure.message}`).join("\n"),
+      );
     }
   }
 
@@ -75,7 +115,13 @@ export class ModuleLoader {
           error,
         );
       }
-      return undefined;
+
+      // RETHROW after logging. Previously this returned undefined, so a route
+      // file that threw on import or registration disappeared with no boot
+      // error — the whole surface 404'd silently. Boot callers abort on the
+      // throw; the HMR batch-reload handler catches it, keeps the server
+      // alive, and shows it loudly.
+      throw error instanceof ModuleLoadError ? error : new ModuleLoadError(type, file, error);
     } finally {
       globalThis.__currentModuleFile = undefined;
     }

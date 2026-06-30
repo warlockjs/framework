@@ -362,17 +362,15 @@ export default seeder({
   name: "Seed ${entity.plural.pascal}",
   once: true,
   enabled: true,
-  run: async () => {
+  run: async ({ track }) => {
     const total = 10;
     for (let i = 0; i < total; i++) {
-      await ${entity.singular.pascal}.create({
-        // TODO: Add more fields
-      });
+      track(
+        await ${entity.singular.pascal}.create({
+          // TODO: Add more fields
+        }),
+      );
     }
-
-    return {
-      recordsCreated: total,
-    };
   },
 });
 `;

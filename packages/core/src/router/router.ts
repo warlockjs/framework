@@ -543,9 +543,22 @@ export class Router {
       // Execute callback (routes added here will have sourceFile injected)
       return await callback();
     } catch (error) {
-      console.log("Error in withSourceFile", error);
+      // Log loudly, then RETHROW. Swallowing here silently dropped a whole
+      // route file (duplicate name, invalid action, import error) so the
+      // surface 404'd with no boot error. The caller decides what a throw
+      // means: at boot it aborts the boot, during HMR the dev server's
+      // batch-reload handler catches it, prints it, and keeps serving.
+      log.error({
+        module: "router",
+        action: "registerRoutes",
+        message: `Failed to register routes from "${sourceFile}"`,
+        context: { sourceFile, error },
+      });
+
+      throw error;
     } finally {
-      // Always clear source file from stacks
+      // Always clear source file from stacks so a throwing file never leaks
+      // its sourceFile onto the process-global singleton.
       delete this.stacks.sourceFile;
     }
   }
@@ -640,6 +653,18 @@ export class Router {
    */
   public list() {
     return this.routes;
+  }
+
+  /**
+   * Number of routes currently registered on the singleton.
+   *
+   * Used as a readiness signal: a successful boot that ends up with zero
+   * routes almost always means a route module failed to register silently
+   * (see `withSourceFile`), so callers can surface that instead of letting
+   * the whole surface 404.
+   */
+  public routeCount(): number {
+    return this.routes.length;
   }
 
   /**

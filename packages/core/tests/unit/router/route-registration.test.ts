@@ -118,15 +118,17 @@ describe("Router — verb registration", () => {
 });
 
 describe("Router — name collisions", () => {
-  it("throws when the same name is reused for the same method", async () => {
+  it("rethrows when the same name is reused for the same method", async () => {
+    // withSourceFile no longer swallows: a duplicate-name throw propagates so
+    // the whole route file fails loudly instead of half-registering silently.
     await expect(
       withScope(() => {
         router.get("/dup", () => undefined as any, { name: "dup" });
         router.get("/dup2", () => undefined as any, { name: "dup" });
       }),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow(/Route name "dup" already exists/);
 
-    // withSourceFile swallows the throw and logs it; only the first route lands.
+    // The first route still landed before the second threw.
     expect(scopedRoutes().map((route) => route.path)).toEqual(["/dup"]);
   });
 
@@ -139,6 +141,49 @@ describe("Router — name collisions", () => {
     const names = scopedRoutes().map((route) => route.name);
 
     expect(names).toEqual(["resource", "resource.post"]);
+  });
+});
+
+describe("Router — withSourceFile failure surfacing", () => {
+  it("rethrows an arbitrary error thrown inside the callback", async () => {
+    await expect(
+      withScope(() => {
+        throw new Error("boom from a route file");
+      }),
+    ).rejects.toThrow(/boom from a route file/);
+  });
+
+  it("clears the sourceFile stack even when the callback throws", async () => {
+    await expect(
+      withScope(() => {
+        throw new Error("still cleans up");
+      }),
+    ).rejects.toThrow();
+
+    // A subsequent successful registration must not carry the failed file's
+    // sourceFile — proving the finally block cleared the stack.
+    const cleanSource = `${sourceFile}-after`;
+    await router.withSourceFile(cleanSource, () => {
+      router.get("/after-throw", () => undefined as any);
+    });
+
+    const route = router.list().find((r) => r.path === "/after-throw");
+    expect(route?.sourceFile).toBe(cleanSource);
+    router.removeRoutesBySourceFile(cleanSource);
+  });
+});
+
+describe("Router — routeCount readiness signal", () => {
+  it("reflects the number of registered routes", async () => {
+    const before = router.routeCount();
+
+    await withScope(() => {
+      router.get("/count-a", () => undefined as any);
+      router.get("/count-b", () => undefined as any);
+    });
+
+    expect(router.routeCount()).toBe(before + 2);
+    expect(router.routeCount()).toBe(router.list().length);
   });
 });
 
@@ -160,14 +205,16 @@ describe("Router — controller-array handlers", () => {
     expect((handler as any)()).toBe("listed");
   });
 
-  it("throws when the controller action is not a function", async () => {
+  it("rethrows when the controller action is not a function", async () => {
     const controller = { notAFunction: 123 };
 
+    // The invalid-action throw now propagates out of withSourceFile rather
+    // than being swallowed, so a misconfigured route file aborts loudly.
     await expect(
       withScope(() => {
         router.get("/bad-controller", [controller, "notAFunction"]);
       }),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow(/Invalid controller action "notAFunction"/);
 
     expect(scopedRoutes()).toHaveLength(0);
   });

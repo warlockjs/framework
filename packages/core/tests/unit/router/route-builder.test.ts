@@ -62,12 +62,14 @@ describe("RouteBuilder — chainable verbs", () => {
     ]);
   });
 
-  it("throws when the same verb is declared twice on one builder", async () => {
+  it("rethrows when the same verb is declared twice on one builder", async () => {
+    // withSourceFile now propagates the throw instead of swallowing it, so a
+    // route file with a duplicate verb fails loudly rather than 404'ing.
     await expect(
       withScope(() => {
         router.route("/posts").get(noop).get(noop);
       }),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow(/already has a GET method/);
 
     // The first get() lands before the duplicate throws.
     expect(methodPaths()).toEqual([["GET", "/posts"]]);

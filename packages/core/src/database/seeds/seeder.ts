@@ -1,4 +1,4 @@
-import { SeedResult } from "./types";
+import { SeedContext, SeedResult } from "./types";
 
 export type Seeder = {
   /**
@@ -30,9 +30,17 @@ export type Seeder = {
    */
   batchSize?: number;
   /**
-   * Run seed
+   * Run seed.
+   *
+   * Receives a {@link SeedContext} exposing `track`, used to register the
+   * records this seed creates so they can be undone by `warlock seed --drop`.
+   * Auto-derives `recordsCreated` from the track count; an explicitly returned
+   * {@link SeedResult} is an optional fallback.
+   *
+   * The `ctx` parameter is optional at the call site — an existing zero-arg
+   * `run()` keeps working unchanged.
    */
-  run(): Promise<SeedResult | void>;
+  run(ctx: SeedContext): Promise<SeedResult | void>;
 };
 
 /**

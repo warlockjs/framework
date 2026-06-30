@@ -52,6 +52,19 @@ health.removeCheck("db"); // unregister later if needed
 
 A check returns `boolean | Promise<boolean>`. **A thrown error counts as a failed check** (it's surfaced in the `checks` map + the 503, not logged — probes poll often, so a failure is a normal signal, not an error event). Keep checks cheap and fast; they run on every `/ready` poll.
 
+### Routes-registered readiness signal
+
+A booted HTTP app that ends up with **zero routes** almost always means a route module failed to register silently — without this check it would 404 every request while reporting ready. `health.addRoutesRegisteredCheck(getRouteCount)` registers a `"routes"` check that fails while the count is `0`:
+
+```ts
+import { health, router } from "@warlock.js/core";
+
+health.addRoutesRegisteredCheck(() => router.routeCount());
+// pass a second arg to rename the check, e.g. "http-routes"
+```
+
+The count is passed as a getter so the registry stays decoupled from the router. Apps with no HTTP surface simply never register it.
+
 ## Graceful shutdown (request draining)
 
 On SIGINT/SIGTERM the framework tears down in order: **app `onShutdown` hooks → connectors in reverse priority**. The HTTP connector's teardown drains instead of dropping:

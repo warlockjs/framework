@@ -136,6 +136,13 @@ export class HttpConnector extends BaseConnector {
       router.scan(this.http);
     }
 
+    // Surface the route table as a readiness signal + a boot log, so an empty
+    // or partial route surface (e.g. a route module that failed to register) is
+    // detectable instead of silently 404ing. `addRoutesRegisteredCheck` is
+    // keyed by name, so re-running on restart is idempotent.
+    health.addRoutesRegisteredCheck(() => router.routeCount());
+    log.info("http", "routes", `${router.routeCount()} route(s) registered`);
+
     try {
       // We can use the url of the server
       await this.http.listen({

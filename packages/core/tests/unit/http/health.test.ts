@@ -97,4 +97,33 @@ describe("health registry", () => {
 
     expect((await health.readiness()).status).toBe("ok");
   });
+
+  it("reports not-ready when the routes-registered check sees zero routes", async () => {
+    Application.markBooted(bootContext);
+    health.addRoutesRegisteredCheck(() => 0);
+
+    const result = await health.readiness();
+
+    expect(result.status).toBe("error");
+    expect(result.checks).toEqual({ routes: false });
+  });
+
+  it("reports ready when at least one route is registered", async () => {
+    Application.markBooted(bootContext);
+    health.addRoutesRegisteredCheck(() => 3);
+
+    const result = await health.readiness();
+
+    expect(result.status).toBe("ok");
+    expect(result.checks).toEqual({ routes: true });
+  });
+
+  it("honours a custom check name for the routes signal", async () => {
+    Application.markBooted(bootContext);
+    health.addRoutesRegisteredCheck(() => 0, "http-routes");
+
+    const result = await health.readiness();
+
+    expect(result.checks).toEqual({ "http-routes": false });
+  });
 });

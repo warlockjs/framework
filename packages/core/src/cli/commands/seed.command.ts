@@ -28,5 +28,11 @@ export const seedCommand = command({
       type: "boolean",
       defaultValue: true,
     },
+    {
+      text: "--drop, -d",
+      description:
+        'Undo seeded data — delete tracked records (reverse order) and reset the seed log; scope to one seeder with --drop="Seed Name"',
+      type: "string",
+    },
   ],
 });

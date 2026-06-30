@@ -73,6 +73,23 @@ class HealthRegistry {
   }
 
   /**
+   * Register a readiness check asserting the app has at least one route
+   * registered. A booted HTTP app that ends up with zero routes almost always
+   * means a route module failed to register silently, so the instance should
+   * report not-ready (503) rather than 404 every request.
+   *
+   * The route count is passed in as a getter so this registry stays decoupled
+   * from the router (no import cycle). The HTTP connector wires this in after
+   * scanning routes; apps with no HTTP surface simply never register it.
+   *
+   * @param getRouteCount Returns the number of currently-registered routes.
+   * @param name Override the check name (defaults to `"routes"`).
+   */
+  public addRoutesRegisteredCheck(getRouteCount: () => number, name = "routes"): void {
+    this.addCheck(name, () => getRouteCount() > 0);
+  }
+
+  /**
    * Run one check. A thrown error counts as a failed check rather than crashing
    * the probe. The failure is surfaced in the readiness `checks` map and the
    * 503 status — not logged, since probes poll frequently and a failed check is
