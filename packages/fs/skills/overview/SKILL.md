@@ -1,6 +1,6 @@
 ---
 name: overview
-description: 'Front-door orientation for `@warlock.js/fs` — filesystem primitives (read/write/JSON, dirs, copy/rename/delete, atomic writes, hashing, existence + stats). Two-suffix convention: `*Async` returns Promise, bare name is sync. Single canonical name per operation — no aliases. TRIGGER when: code imports anything from `@warlock.js/fs`; user asks "what does @warlock.js/fs do", "is fs the right package for X", "list all fs helpers", "fs sync vs async convention"; package.json adds `@warlock.js/fs`; user is choosing between fs vs `node:fs/promises`/`fs-extra`/`graceful-fs`. Skip: specific task already known — load the matching task skill directly (`@warlock.js/fs/read-and-write-files/SKILL.md`, `@warlock.js/fs/manage-directories/SKILL.md`, `@warlock.js/fs/write-atomically/SKILL.md`, `@warlock.js/fs/hash-files/SKILL.md`); the user is using plain `node:fs` and not touching fs imports.'
+description: 'Front-door orientation for `@warlock.js/fs` — filesystem primitives (read/write/JSON, dirs, copy/rename/delete, atomic writes, hashing, existence + stats). Two-suffix convention: `*Async` returns Promise, bare name is sync. Single canonical name per operation — no aliases. TRIGGER when: code imports anything from `@warlock.js/fs`; user asks "what does @warlock.js/fs do", "is fs the right package for X", "list all fs helpers", "fs sync vs async convention"; package.json adds `@warlock.js/fs`; user is choosing between fs vs `node:fs/promises`/`fs-extra`/`graceful-fs`. Skip: specific task already known — load the matching task skill directly (`@warlock.js/fs/read-and-write-files/SKILL.md`, `@warlock.js/fs/manage-directories/SKILL.md`, `@warlock.js/fs/write-atomically/SKILL.md`, `@warlock.js/fs/hash-files/SKILL.md`), or the ergonomic async facade (`fs.files.*` / `fs.dirs.*` / `fs.file()` / `fs.dir()`) — `@warlock.js/fs/use-the-fs-facade/SKILL.md`; the user is using plain `node:fs` and not touching fs imports.'
 ---
 
 # `@warlock.js/fs` — overview
@@ -64,9 +64,15 @@ Defaults to SHA-256; supports SHA-1 / MD5 / SHA-512.
 
 Load when fingerprinting for cache invalidation, content-addressable storage, change detection, or file-equality comparison. Never for security (password hashing, signing).
 
+### [`use-the-fs-facade/SKILL.md`](@warlock.js/fs/use-the-fs-facade/SKILL.md)
+
+The ergonomic, **async** shorthand over all the primitives: `fs.files.*` (file ops), `fs.dirs.*` (directory ops), lazy `fs.file(path)` / `fs.dir(path)` handles (`File` / `Directory`), and `fs.exists`. Adds what the flat primitives lack — `append`/`appendLine`/`appendJsonLine`, `size`/`isEmpty`/`count`, `ensure`(ensureFile)/`touch`/`empty`(emptyDir), EXDEV-safe `move`, `walk` + recursive `list*`, `readLines`, `edit`/`editJson`/`mergeJson`/`ensureJson`, schema-validated `getJson`, directory `hash`.
+
+Load when you want the grouped/OO surface, a read-modify-write (patch a file or JSON, merge a config), recursive listing/walking, or `File`/`Directory` handles. (Sync/one-shot code stays on the bare primitives above.)
+
 ## What this package deliberately doesn't do
 
-- **Globbing.** Use `tinyglobby` / `fast-glob`. Adding a glob engine here would double the surface for one use case.
+- **Globbing.** Use `tinyglobby` / `fast-glob`. Adding a glob engine here would double the surface for one use case. (Recursive listing/traversal *is* covered — `fs.dirs.walk` and `fs.dirs.list*({ recursive })`.)
 - **Watching.** Use `chokidar` or `node:fs.watch` directly. Watchers have their own lifecycle that doesn't fit the one-shot utility shape.
 - **Permissions / chmod / chown.** Out of scope. Reach for `node:fs/promises`'s `chmod` / `chown` directly when you need them.
 - **Streaming pipelines beyond hashing.** This isn't a general streams library; it's a wrapper for the common one-shot file operations.

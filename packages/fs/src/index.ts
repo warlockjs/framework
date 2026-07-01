@@ -20,3 +20,15 @@ export * from "./remove.js";
 export * from "./rename.js";
 export * from "./stats.js";
 export * from "./write.js";
+
+// ── Shorthand facade (async) — fs.files.* / fs.dirs.* + File/Directory handles ──
+export { fs } from "./facade/fs";
+export { File } from "./facade/file";
+export { Directory } from "./facade/directory";
+export * from "./facade/options";
+export {
+  JsonSchemaValidationError,
+  type StandardSchemaV1,
+  type StandardSchemaIssue,
+  type StandardSchemaResult,
+} from "./facade/standard-schema";
