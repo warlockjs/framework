@@ -1,0 +1,40 @@
+{
+  "name": "@warlock.js/ai-mistral",
+  "version": "4.6.0",
+  "type": "module",
+  "description": "Mistral AI adapter for @warlock.js/ai (OpenAI-compatible)",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "typings": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "warlock",
+    "ai",
+    "mistral",
+    "pixtral",
+    "magistral"
+  ],
+  "author": "Hasan Zohdy",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warlockjs/ai-mistral"
+  },
+  "dependencies": {
+    "@warlock.js/ai-openai": "*",
+    "@warlock.js/logger": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^4.1.4"
+  },
+  "peerDependencies": {
+    "@warlock.js/ai": "*"
+  }
+}
