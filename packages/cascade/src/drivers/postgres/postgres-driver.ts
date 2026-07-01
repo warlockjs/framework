@@ -166,12 +166,22 @@ export class PostgresDriver implements DriverContract {
   private _syncAdapter: SyncAdapterContract | undefined;
 
   /**
-   * Lookup set of column names that hold native PostgreSQL arrays
-   * (`JSONB[]`, `TEXT[]`, …) and must NOT be JSON-text encoded.
+   * Explicit, table-agnostic override list of column names that hold native
+   * PostgreSQL arrays (`JSONB[]`, `TEXT[]`, …) and must NOT be JSON-text
+   * encoded. Merged with (and superseded per-table by) the schema
+   * introspection below; kept as a manual escape hatch.
    *
    * @see PostgresPoolConfig.nativeArrayColumns
    */
   private readonly _nativeArrayColumns: ReadonlySet<string>;
+
+  /**
+   * Native-array columns discovered by introspecting the live schema on
+   * connect, keyed `table → { column, … }`. Authoritative and table-scoped, so
+   * a column that is `TEXT[]` in one table and `jsonb` in another is encoded
+   * correctly for each — no app configuration required.
+   */
+  private _introspectedArrayColumns: ReadonlyMap<string, ReadonlySet<string>> = new Map();
 
   /**
    * Create a new PostgreSQL driver instance.
@@ -266,6 +276,11 @@ export class PostgresDriver implements DriverContract {
       );
 
       this._isConnected = true;
+
+      // Learn which columns are native arrays straight from the live schema so
+      // the value serializer encodes them correctly with zero app config.
+      await this.loadNativeArrayColumns();
+
       this.emit("connected");
     } catch (error) {
       // Boot-time database connection failure is unrecoverable in every
@@ -314,9 +329,14 @@ export class PostgresDriver implements DriverContract {
    * that need special handling for PostgreSQL storage.
    *
    * @param data - The data object to serialize
+   * @param table - Optional table name; when given, columns introspected as
+   *   native arrays on that table are bound raw (see {@link serializeValue}).
    * @returns Serialized data ready for PostgreSQL
    */
-  public serialize(data: Record<string, unknown>): Record<string, unknown> {
+  public serialize(
+    data: Record<string, unknown>,
+    table?: string,
+  ): Record<string, unknown> {
     const serialized: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(data)) {
@@ -324,7 +344,7 @@ export class PostgresDriver implements DriverContract {
         continue; // Skip undefined values
       }
 
-      serialized[key] = this.serializeValue(key, value);
+      serialized[key] = this.serializeValue(key, value, table);
     }
 
     return serialized;
@@ -346,25 +366,29 @@ export class PostgresDriver implements DriverContract {
    *   `JSON.stringify`. node-pg renders a raw JS array as a PostgreSQL array
    *   literal `{...}` (and `[]` as `{}`), which a `json` / `jsonb` column
    *   rejects — so we bind the value as JSON text instead, the form those
-   *   columns accept. Columns listed in `nativeArrayColumns` are exempt:
-   *   their raw array is passed through so node-pg emits the `{...}` literal
-   *   a genuine `JSONB[]` / `TEXT[]` column needs.
+   *   columns accept. Columns known to be native arrays — via schema
+   *   introspection or the `nativeArrayColumns` config — are exempt: their raw
+   *   array is passed through so node-pg emits the `{...}` literal a genuine
+   *   `JSONB[]` / `TEXT[]` column needs.
    * - plain object → `JSON.stringify`. Equivalent to node-pg's own object
    *   handling, made explicit so both write paths agree.
    * - everything else (scalars: string, number, boolean, null) → untouched.
    *
-   * Boundary note: the serializer has no access to the table schema, so it
-   * cannot tell a `json` / `jsonb` column from a native-array column purely
-   * from the value. `nativeArrayColumns` is the explicit, opt-in escape hatch
-   * for the latter. No `::jsonb` placeholder cast is added: a JSON-text string
-   * binds correctly to `json` / `jsonb` without one, and a blind cast would
-   * misfire on columns we cannot positively identify as jsonb.
+   * Distinguishing native-array from `json` / `jsonb` columns: a value alone
+   * can't tell them apart, so the driver introspects the live schema on connect
+   * (see {@link loadNativeArrayColumns}) and consults that per-table map here
+   * via {@link isNativeArrayColumn}. The explicit `nativeArrayColumns` config
+   * still works as a table-agnostic override. No `::jsonb` placeholder cast is
+   * added: a JSON-text string binds correctly to `json` / `jsonb` without one,
+   * and a blind cast would misfire on columns we cannot positively identify as
+   * jsonb.
    *
-   * @param key - Column name (used to honour `nativeArrayColumns`)
+   * @param key - Column name (used to resolve native-array columns)
    * @param value - The raw value to serialize (never `undefined`)
+   * @param table - Optional table name; enables the per-table native-array lookup
    * @returns The value ready to bind as a query parameter
    */
-  private serializeValue(key: string, value: unknown): unknown {
+  private serializeValue(key: string, value: unknown, table?: string): unknown {
     if (value instanceof Date) {
       return value.toISOString();
     }
@@ -381,7 +405,7 @@ export class PostgresDriver implements DriverContract {
 
       // Genuine native PostgreSQL array columns (JSONB[], TEXT[], …) must
       // keep their raw array so node-pg emits a '{...}' array literal.
-      if (this._nativeArrayColumns.has(key)) {
+      if (this.isNativeArrayColumn(table, key)) {
         return value;
       }
 
@@ -398,6 +422,72 @@ export class PostgresDriver implements DriverContract {
     }
 
     return value;
+  }
+
+  /**
+   * Whether `column` on `table` is a native PostgreSQL array. True when the
+   * connect-time schema introspection saw it as `data_type = 'ARRAY'` for that
+   * table (authoritative, per-table), or when it's listed in the table-agnostic
+   * `nativeArrayColumns` config override.
+   */
+  private isNativeArrayColumn(table: string | undefined, column: string): boolean {
+    if (table && this._introspectedArrayColumns.get(table)?.has(column)) {
+      return true;
+    }
+
+    return this._nativeArrayColumns.has(column);
+  }
+
+  /**
+   * Introspect the live schema for native-array columns so array values bind
+   * correctly with zero app configuration.
+   *
+   * A JS array must be bound two opposite ways depending on the column: as JSON
+   * text for a `json` / `jsonb` column, but as a raw array (which node-pg
+   * renders `{...}`) for a native `TEXT[]` / `JSONB[]` / `INTEGER[]` column. The
+   * serializer sees values, not types, so without this it JSON-stringifies
+   * every array — which a native-array column rejects with "malformed array
+   * literal". One `information_schema` query at connect, cached for the
+   * connection lifetime, removes the need to hand-list `nativeArrayColumns`.
+   *
+   * Best-effort: any failure (e.g. restricted catalog access) is logged and
+   * leaves the map empty so the config override still applies — it never blocks
+   * connect. A schema change made within a live connection isn't reflected
+   * until the next connect.
+   */
+  private async loadNativeArrayColumns(): Promise<void> {
+    try {
+      const result = await this.query<{ table_name: string; column_name: string }>(
+        `SELECT table_name, column_name
+         FROM information_schema.columns
+         WHERE table_schema = ANY (current_schemas(false))
+           AND data_type = 'ARRAY'`,
+      );
+
+      const map = new Map<string, Set<string>>();
+
+      for (const { table_name, column_name } of result.rows) {
+        let columns = map.get(table_name);
+
+        if (!columns) {
+          columns = new Set<string>();
+          map.set(table_name, columns);
+        }
+
+        columns.add(column_name);
+      }
+
+      this._introspectedArrayColumns = map;
+    } catch {
+      // Introspection is an optimization, never a hard dependency — fall back
+      // to the `nativeArrayColumns` config so a locked-down catalog or an
+      // unusual search_path can't break connect.
+      log.warn(
+        "database.postgres",
+        "introspection",
+        "Could not introspect native-array columns; using the nativeArrayColumns config only",
+      );
+    }
   }
 
   /**
@@ -468,7 +558,7 @@ export class PostgresDriver implements DriverContract {
     document: Record<string, unknown>,
     _options?: Record<string, unknown>,
   ): Promise<InsertResult> {
-    const serialized = this.serialize(document);
+    const serialized = this.serialize(document, table);
 
     // Filter out id if null/undefined to let PostgreSQL SERIAL auto-generate
     const filteredData = Object.fromEntries(
@@ -523,7 +613,7 @@ export class PostgresDriver implements DriverContract {
     // Get all unique columns across all documents
     const allColumns = new Set<string>();
     for (const doc of documents) {
-      const serialized = this.serialize(doc);
+      const serialized = this.serialize(doc, table);
       Object.keys(serialized).forEach((key) => allColumns.add(key));
     }
     const columns = Array.from(allColumns);
@@ -537,7 +627,7 @@ export class PostgresDriver implements DriverContract {
     let paramIndex = 1;
 
     for (const doc of documents) {
-      const serialized = this.serialize(doc);
+      const serialized = this.serialize(doc, table);
       const rowPlaceholders: string[] = [];
 
       for (const col of columns) {
@@ -650,7 +740,7 @@ export class PostgresDriver implements DriverContract {
     document: Record<string, unknown>,
     _options?: Record<string, unknown>,
   ): Promise<T | null> {
-    const serialized = this.serialize(document);
+    const serialized = this.serialize(document, table);
     const columns = Object.keys(serialized);
     const values = Object.values(serialized);
 
@@ -686,7 +776,7 @@ export class PostgresDriver implements DriverContract {
     document: Record<string, unknown>,
     options?: Record<string, unknown>,
   ): Promise<T> {
-    const serialized = this.serialize(document);
+    const serialized = this.serialize(document, table);
     const columns = Object.keys(serialized);
     const values = Object.values(serialized);
 
@@ -890,12 +980,25 @@ export class PostgresDriver implements DriverContract {
     fn: (ctx: TransactionContext) => Promise<T>,
     options?: Record<string, unknown>,
   ): Promise<T> {
-    // Prevent nested transaction() calls
+    const ctx: TransactionContext = {
+      rollback(reason?: string): never {
+        throw new TransactionRollbackError(reason);
+      },
+    };
+
+    // Flat nesting: a transaction() called while one is already active JOINS it
+    // instead of opening a second, independent transaction on another pool
+    // connection. An independent inner transaction can't see the outer's
+    // uncommitted writes (a row inserted moments earlier), so a service that
+    // opens its own transaction — correct when called standalone — would hit
+    // phantom FK violations when called inside an outer transaction (e.g. a
+    // seeder that creates a row, then calls a service that references it). The
+    // outermost transaction owns BEGIN / COMMIT / ROLLBACK; the inner block
+    // runs on the same session, and a throw still unwinds the whole outer
+    // transaction. (Savepoint-based partial rollback is a separate, explicit
+    // concern — use `beginTransaction()` directly for that.)
     if (databaseTransactionContext.hasActiveTransaction()) {
-      // throw new Error(
-      //   "Nested transaction() calls are not supported. " +
-      //     "Use beginTransaction() with savepoints for advanced transaction patterns.",
-      // );
+      return fn(ctx);
     }
 
     const tx = await this.beginTransaction(options);
@@ -904,13 +1007,6 @@ export class PostgresDriver implements DriverContract {
     databaseTransactionContext.enter({ session: tx.context });
 
     try {
-      // Create transaction context with rollback method
-      const ctx: TransactionContext = {
-        rollback(reason?: string): never {
-          throw new TransactionRollbackError(reason);
-        },
-      };
-
       // Execute callback
       const result = await fn(ctx);
 
@@ -1138,7 +1234,7 @@ export class PostgresDriver implements DriverContract {
         // Apply the same json/jsonb-aware serialization used on the INSERT
         // path so object/array $set values aren't corrupted into Postgres
         // array literals. undefined is skipped — never bind it.
-        params.push(value === undefined ? value : this.serializeValue(key, value));
+        params.push(value === undefined ? value : this.serializeValue(key, value, table));
       }
     }
 

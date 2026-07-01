@@ -132,6 +132,80 @@ describe("PostgresDriver serialize() — json/jsonb encoding (B1)", () => {
   });
 });
 
+describe("PostgresDriver serialize() — native-array detection via schema introspection", () => {
+  const makeDriver = (nativeArrayColumns?: readonly string[]) =>
+    new PostgresDriver({ database: "test", nativeArrayColumns });
+
+  /**
+   * Populate the driver's introspected-column map by stubbing the
+   * information_schema query that loadNativeArrayColumns() runs on connect.
+   */
+  const introspect = async (
+    driver: PostgresDriver,
+    rows: { table_name: string; column_name: string }[],
+  ) => {
+    const querySpy = vi
+      .spyOn(driver, "query")
+      .mockResolvedValue({ rows, rowCount: rows.length } as never);
+
+    await (
+      driver as unknown as { loadNativeArrayColumns(): Promise<void> }
+    ).loadNativeArrayColumns();
+
+    querySpy.mockRestore();
+  };
+
+  it("binds an introspected native-array column's array raw (per table)", async () => {
+    const driver = makeDriver();
+    await introspect(driver, [{ table_name: "ai_models", column_name: "best_for" }]);
+
+    const result = driver.serialize({ best_for: [] }, "ai_models");
+
+    // TEXT[] column → raw array so node-pg emits '{}', not the JSON string '[]'.
+    expect(result.best_for).toEqual([]);
+    expect(Array.isArray(result.best_for)).toBe(true);
+  });
+
+  it("is per-table: the same column name is JSON text on a table without that array type", async () => {
+    const driver = makeDriver();
+    // `best_for` is a native array ONLY on ai_models; `packages` has no such column.
+    await introspect(driver, [{ table_name: "ai_models", column_name: "best_for" }]);
+
+    expect(driver.serialize({ best_for: ["a"] }, "ai_models").best_for).toEqual(["a"]);
+    expect(driver.serialize({ best_for: ["a"] }, "packages").best_for).toBe('["a"]');
+  });
+
+  it("JSON-stringifies arrays when no table is passed and the column isn't configured", () => {
+    const driver = makeDriver();
+
+    // No table context and no config → default JSON-text encoding (unchanged).
+    expect(driver.serialize({ best_for: [] }).best_for).toBe("[]");
+  });
+
+  it("still honors the explicit nativeArrayColumns config as a table-agnostic override", () => {
+    const driver = makeDriver(["history"]);
+
+    expect(driver.serialize({ history: [] }, "any_table").history).toEqual([]);
+    expect(driver.serialize({ history: [] }).history).toEqual([]);
+  });
+
+  it("falls back to the config (and never throws) when introspection fails", async () => {
+    const driver = makeDriver(["best_for"]);
+    const querySpy = vi.spyOn(driver, "query").mockRejectedValue(new Error("permission denied"));
+
+    await expect(
+      (
+        driver as unknown as { loadNativeArrayColumns(): Promise<void> }
+      ).loadNativeArrayColumns(),
+    ).resolves.toBeUndefined();
+
+    querySpy.mockRestore();
+
+    // Config override still applies despite the failed introspection.
+    expect(driver.serialize({ best_for: [] }, "ai_models").best_for).toEqual([]);
+  });
+});
+
 describe("PostgresDriver UPDATE $set — json/jsonb encoding (B1)", () => {
   const makeDriver = (nativeArrayColumns?: readonly string[]) =>
     new PostgresDriver({ database: "test", nativeArrayColumns });

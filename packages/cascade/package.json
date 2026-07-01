@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/cascade",
-  "version": "4.6.0",
+  "version": "4.6.1",
   "type": "module",
   "description": "ORM for managing databases",
   "main": "./cjs/index.js",

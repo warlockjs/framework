@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.6.1
+
+### Fixed
+
+- Native Postgres array columns (`TEXT[]` / `JSONB[]`, from `arrayText()` / `arrayJson()`) are now auto-detected by introspecting the schema on connect and bound as raw arrays — no more "malformed array literal" on insert and no need to hand-list `nativeArrayColumns` (which stays as an optional per-connection override, now consulted per-table)
+- `transaction()` now flat-nests: a nested `transaction()` joins the active one (same session, sees its uncommitted writes) instead of opening a second, independent transaction — fixes phantom foreign-key violations when a service that opens its own transaction is called inside an outer one (e.g. a seeder creating a row, then a service inserting a child that references it). MongoDB joins too, replacing its "nested not supported" throw
+
 ## 4.6.0
 
 ### Added

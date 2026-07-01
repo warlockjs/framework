@@ -737,12 +737,20 @@ export class MongoDbDriver implements DriverContract {
     fn: (ctx: TransactionContext) => Promise<T>,
     options?: Record<string, unknown>,
   ): Promise<T> {
-    // Prevent nested transaction() calls
+    const ctx: TransactionContext = {
+      rollback(reason?: string): never {
+        throw new TransactionRollbackError(reason);
+      },
+    };
+
+    // Flat nesting: a transaction() called while one is already active JOINS it
+    // instead of throwing (or opening a second, independent one). The outermost
+    // transaction owns commit / abort; the inner block runs on the same session
+    // so it sees the outer's writes — a service that opens its own transaction
+    // then works both standalone and when called inside an outer transaction
+    // (e.g. a seeder). Mirrors `PostgresDriver.transaction`.
     if (databaseTransactionContext.hasActiveTransaction()) {
-      throw new Error(
-        "Nested transaction() calls are not supported. " +
-          "Use beginTransaction() with savepoints for advanced transaction patterns.",
-      );
+      return fn(ctx);
     }
 
     // Check if MongoDB is running as a replica set (required for transactions)
@@ -761,13 +769,6 @@ export class MongoDbDriver implements DriverContract {
       databaseTransactionContext.enter({ session });
 
       try {
-        // Create transaction context with rollback method
-        const ctx: TransactionContext = {
-          rollback(reason?: string): never {
-            throw new TransactionRollbackError(reason);
-          },
-        };
-
         // Execute callback
         const result = await fn(ctx);
 
