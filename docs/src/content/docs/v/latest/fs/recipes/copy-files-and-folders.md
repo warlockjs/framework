@@ -1,86 +1,78 @@
 ---
-title: "Copy a large file (and whole folders)"
-description: copyFileAsync is already a kernel-level copy — constant memory even for multi-GB files, no streaming needed. Plus recursive folder copy and the snapshot pattern.
+title: "Copy files and folders"
+description: Copy and move single files, whole trees, or handle objects with fs.files.* / fs.dirs.* / handle.copyTo — and why move survives crossing a filesystem boundary.
 sidebar:
   order: 4
   label: "Copy files and folders"
 ---
 
-A frequent worry: "I need to copy a 4 GB video file — won't loading it into memory blow the heap?" Short answer: no, and you don't need to reach for streams. `copyFileAsync` doesn't read the file into your process at all.
+Copying and moving are the operations people reach for `child_process` or a
+shell for. You don't need to — the facade covers files, directories, and
+handle objects, and its `move` survives crossing a disk.
 
-## Copy a single (large) file
+## Copy a single file
 
-```ts
-import { copyFileAsync } from "@warlock.js/fs";
+```ts title="src/copy-file.ts"
+import { fs } from "@warlock.js/fs";
 
-await copyFileAsync("./media/source.mp4", "./backup/2026/source.mp4");
+await fs.files.copy("config.json", "config.backup.json");
 ```
 
-`copyFileAsync` wraps Node's `fs.copyFile`, which copies at the OS level — the bytes never pass through your JavaScript heap. A 4 GB file copies in constant memory. There's nothing to stream and no progress callback to wire up; the kernel handles the transfer.
+Parent directories of the destination are created for you, same as any write.
 
-It also creates the destination's parent directory (`./backup/2026` above) if it's missing, so you don't pre-`mkdir`.
+## Copy a whole tree
 
-**When you genuinely need streaming** — only if you want a progress bar or to transform bytes mid-copy — drop to `node:fs` directly; that's outside this package's one-shot-utility scope:
+`fs.dirs.copy` recurses — every file and subfolder comes along:
 
-```ts
-import { createReadStream, createWriteStream } from "node:fs";
-import { pipeline } from "node:stream/promises";
+```ts title="src/copy-tree.ts"
+import { fs } from "@warlock.js/fs";
 
-// Only reach for this if you need per-chunk progress / transforms.
-await pipeline(createReadStream(source), createWriteStream(destination));
+await fs.dirs.copy("dist", "release/dist");
 ```
 
-For a plain "make a copy", `copyFileAsync` is simpler and at least as fast.
+## Copy *into* a directory with handles
 
-## Copy a whole folder
+When you're thinking in terms of "this file, into that folder", handles read
+better. `copyTo(dir)` drops the file into a directory keeping its name and
+returns a **new** `File` handle pointing at the copy:
 
-```ts
-import { copyDirectoryAsync } from "@warlock.js/fs";
+```ts title="src/copy-into.ts"
+import { fs } from "@warlock.js/fs";
 
-await copyDirectoryAsync("./public", "./dist/public");
+const archived = await fs.file("report.pdf").copyTo(fs.dir("archive/2026"));
+archived.name;   // "report.pdf" — now living under archive/2026
 ```
 
-Recursive by default — copies the entire tree, overwriting any files that already exist at the destination. Backed by Node's `cp({ recursive: true })`.
+`copyTo` keeps the filename; `copy(to)` takes a full destination path. Both
+return a new handle — handles are immutable, so the original still points at
+the source.
 
-## The snapshot pattern
+## Moving — and the EXDEV trap
 
-Capture a build output (or any folder) under a timestamped path:
+A naive `rename` throws `EXDEV` the moment source and destination live on
+different filesystems (a temp dir on one volume, your project on another — very
+common in CI and containers). The facade's `move` handles that: it renames when
+it can and falls back to copy-then-delete when it can't.
 
-```ts
-import { copyDirectoryAsync, ensureDirectoryAsync } from "@warlock.js/fs";
+```ts title="src/move.ts"
+import { fs } from "@warlock.js/fs";
 
-async function snapshot(source: string) {
-  const target = `./snapshots/${Date.now()}`;
-  await ensureDirectoryAsync(target);
-  await copyDirectoryAsync(source, target);
+await fs.files.move("tmp/upload.bin", "storage/upload.bin"); // EXDEV-safe
+await fs.dirs.move("build/tmp", "build/final");              // trees too
 
-  return target;
-}
-
-const saved = await snapshot("./dist");
+// Handle form — moveTo(dir) returns the relocated handle:
+const moved = await fs.file("tmp/upload.bin").moveTo(fs.dir("storage"));
 ```
 
-## Copy then delete (cross-device move)
-
-`renameFileAsync` is the cheap move — but it fails with `EXDEV` when source and destination live on different mounts (e.g. `/tmp` → a mounted volume). The portable fallback is copy + delete:
-
-```ts
-import { copyFileAsync, unlinkAsync } from "@warlock.js/fs";
-
-async function moveAcrossDevices(source: string, destination: string) {
-  await copyFileAsync(source, destination);
-  await unlinkAsync(source);
-}
-```
-
-For a same-device move, prefer `renameFileAsync` — it's a single metadata operation, no byte copy.
-
-## Sync variants
-
-Every copy has a synchronous twin for scripts and codegen: `copyFile`, `copyDirectory`. Same behavior, blocking. Use them in CLI tools where blocking the event loop is fine; stick to the `*Async` versions in any server runtime.
+:::tip[Rename vs move]
+`rename(name)` on a handle changes only the filename in place and returns a new
+handle; `move` / `moveTo` relocate across folders (and volumes). Reach for
+`rename` when the file stays put, `move` when it travels.
+:::
 
 ## Related
 
-- [Manage directories](../guides/manage-directories) — copy, move, list, delete.
-- [Ensure a directory exists](./ensure-directory-before-writing) — the
-  auto-mkdir behavior copies rely on.
+- [Ensure a directory before writing](./ensure-directory-before-writing) —
+  destinations are auto-parented.
+- [Work with handles](../guides/work-with-handles) — the full `File` /
+  `Directory` handle API.

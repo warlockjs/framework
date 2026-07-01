@@ -1,95 +1,68 @@
 ---
-title: "Ensure a directory exists before writing"
-description: Writes auto-create their parent directories — so when do you still need ensureDirectoryAsync? The two cases that actually matter, plus the upload-handler pattern.
+title: "Ensure a directory before writing"
+description: Write into a nested path without pre-creating folders — fs.files.put makes parents for you — and reach for fs.dirs.ensure when the directory itself is the goal.
 sidebar:
   order: 3
-  label: "Ensure a directory exists"
+  label: "Ensure a directory before writing"
 ---
 
-The first thing every backend hits: "I tried to write `./uploads/2026/06/avatar.png` and got `ENOENT` because `./uploads/2026/06` doesn't exist." In raw `node:fs` you'd `mkdir(..., { recursive: true })` first, then write. Here you usually don't have to.
+The classic Node dance is `mkdir -p` then `writeFile`. The facade collapses
+it: writing a file just makes the folders it needs.
 
-## The short version: writes already do this
+## Just write — parents are created for you
 
-`putFileAsync`, `putJsonFileAsync`, `copyFileAsync`, and `atomicWriteAsync` all create missing parent directories for you. So the naive thing just works:
+`fs.files.put` (and every write helper built on it) creates missing parent
+directories on the way:
 
-```ts
-import { putFileAsync } from "@warlock.js/fs";
+```ts title="src/write-nested.ts"
+import { fs } from "@warlock.js/fs";
 
-// ./uploads/2026/06 does not exist yet — created automatically.
-await putFileAsync("./uploads/2026/06/note.txt", "saved");
+// cache/2026/07/report.json — none of those folders have to exist yet.
+await fs.files.put("cache/2026/07/report.json", "{}");
 ```
 
-No `ensureDirectoryAsync` call needed for the file's *own* parent. That covers 90% of "I just want to write a file" cases.
+No `ensureDir` call, no `ENOENT`. `putJson`, `append`, `create`, and the handle
+methods all inherit this.
 
-## When you DO want ensureDirectoryAsync
+:::note[Opting out]
+Auto-parenting is the default. If you want a write to *fail* when the folder is
+missing — a guard against typo'd paths — pass `{ ensureDir: false }`.
+:::
 
-Two situations:
+## When the directory itself is the point
 
-**1. You're creating an empty directory ahead of filling it** — e.g. a destination you're about to copy many files into, where no single write covers it:
+Sometimes you need the folder to exist before anything writes into it — an
+uploads root, a scratch dir, an output target you'll hand to another tool. Ask
+for the directory directly:
 
-```ts
-import { ensureDirectoryAsync, copyFileAsync } from "@warlock.js/fs";
+```ts title="src/prepare-dirs.ts"
+import { fs } from "@warlock.js/fs";
 
-const targetDir = "./dist/assets";
-await ensureDirectoryAsync(targetDir);
-
-for (const asset of assets) {
-  await copyFileAsync(asset.source, `${targetDir}/${asset.name}`);
-}
+await fs.dirs.ensure("storage/uploads");
 ```
 
-(`copyFileAsync` would create `targetDir` on the first file anyway — but making it explicit reads better and means an empty `assets` array still leaves the directory in place.)
+`ensure` is idempotent — it creates the tree if it's absent and does nothing
+if it's already there. Never throws for an existing directory, so you can call
+it freely at the top of any handler.
 
-**2. The directory itself is the deliverable** — a cache folder, a scratch dir, a per-tenant workspace that should exist even before anything lands in it:
+## Reset a directory before a run
 
-```ts
-import { ensureDirectoryAsync } from "@warlock.js/fs";
+Building into an output folder that must start clean? `empty` clears the
+contents but keeps the directory (and its permissions) in place:
 
-await ensureDirectoryAsync(`./workspaces/${tenantId}/tmp`);
+```ts title="src/clean-build.ts"
+import { fs } from "@warlock.js/fs";
+
+await fs.dirs.ensure("dist");
+await fs.dirs.empty("dist");   // wipe contents, keep the folder
 ```
 
-`ensureDirectoryAsync` is idempotent — calling it on a directory that already exists is a no-op, never an error. So you can call it freely at the top of any handler without guarding it.
-
-## The upload-handler pattern
-
-A common real shape — save an uploaded file under a date-partitioned path:
-
-```ts
-import { putFileAsync } from "@warlock.js/fs";
-
-async function saveUpload(buffer: Buffer, originalName: string) {
-  const now = new Date();
-  const folder = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const path = `./storage/uploads/${folder}/${Date.now()}-${originalName}`;
-
-  // putFileAsync is UTF-8 text only — for binary, use atomicWriteAsync.
-  await atomicWriteAsync(path, buffer);
-
-  return path;
-}
-```
-
-```ts
-import { atomicWriteAsync } from "@warlock.js/fs";
-```
-
-Note the swap: uploaded bytes are binary, and `putFile` / `putFileAsync` are text-only (UTF-8). `atomicWriteAsync` accepts `string | Buffer` *and* creates the date folders — so it's the right one-call tool for binary uploads. (It also gives you the atomic-rename guarantee for free, which is a nice bonus for files a CDN or another worker might pick up.)
-
-## Reset-a-directory pattern
-
-Wipe and recreate — useful between test runs or build passes:
-
-```ts
-import { removeDirectoryAsync, ensureDirectoryAsync } from "@warlock.js/fs";
-
-await removeDirectoryAsync("./tmp");   // rm -rf, no error if missing
-await ensureDirectoryAsync("./tmp");   // fresh empty dir
-```
-
-`removeDirectoryAsync` is also `ENOENT`-safe, so this works whether or not `./tmp` existed before.
+Prefer `empty` over remove-then-recreate when something else already holds a
+reference to the folder.
 
 ## Related
 
-- [Manage directories](../guides/manage-directories) — the full directory surface.
-- [Your first write](../getting-started/03-your-first-write) — the
-  `ensureDirectory` + `putFile` walkthrough.
+- [Copy files and folders](./copy-files-and-folders) — moving content into the
+  folders you just ensured.
+- [Manage directories](../guides/manage-directories) — the full `fs.dirs.*`
+  surface.

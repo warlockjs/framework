@@ -1,184 +1,178 @@
 ---
-title: "The helpers"
-description: A guided tour of every helper @warlock.js/fs exposes — read/write, JSON, atomic writes, directories, hashing, existence checks, stats.
+title: "The fs object"
+description: The mental model behind @warlock.js/fs — one async fs facade with files, dirs, lazy handles, hashing, and a type-agnostic exists check.
 sidebar:
   order: 1
-  label: "The helpers"
+  label: "The fs object"
 ---
 
-A quick tour of everything in the box, grouped by what they do rather than
-which file they live in. If you've read [Your first write](../getting-started/03-your-first-write),
-this is the next step — same vocabulary, full surface.
-
-## Reading text and JSON
+Everything in this package hangs off one object: `fs`. Import it once, and
+files, directories, hashing, and existence checks are all one short call
+away.
 
 ```ts
-import { getFileAsync, getFile, getJsonFileAsync, getJsonFile } from "@warlock.js/fs";
+import { fs } from "@warlock.js/fs";
 
-const text = await getFileAsync("./config.toml");           // string (UTF-8)
-const sync = getFile("./config.toml");                       // string
-
-const data = await getJsonFileAsync<MyConfig>("./config.json"); // T
-const dataSync = getJsonFile<MyConfig>("./config.json");        // T
+await fs.files.put("out/log.txt", "hello\n");
 ```
 
-Throws on missing files (`ENOENT`) and on malformed JSON. Don't try/catch
-ENOENT as control flow — use the existence checks below.
+That's the whole idea. You don't hunt for a function named
+`putFileAsync` — you reach for `fs`, then say what you're touching. This
+page is the map: five namespaces, one naming rule, and a couple of things
+`fs` deliberately does *not* do.
 
-## Writing text and JSON
+## The shape of `fs`
+
+`fs` groups its surface by *what you're acting on*, so the call reads like
+a sentence.
+
+`fs.files.*` — everything you do to a file. Read, write, JSON, append,
+edit-in-place, hash, stat, copy, move.
 
 ```ts
-import { putFileAsync, putFile, putJsonFileAsync, putJsonFile } from "@warlock.js/fs";
-
-await putFileAsync("./out/log.txt", "hello\n");
-await putJsonFileAsync("./out/state.json", { ok: true });
+await fs.files.getJson<Config>("config.json");
 ```
 
-Both variants:
-
-- Create parent directories recursively.
-- Overwrite existing files (last writer wins).
-- JSON variants pretty-print at 2-space indent.
-
-For files other processes read concurrently, use [atomic writes](#atomic-writes)
-instead.
-
-## Atomic writes
+`fs.dirs.*` — everything you do to a directory. Ensure, empty, remove,
+list, walk, size, hash the whole tree.
 
 ```ts
-import { atomicWriteAsync, atomicWriteJsonAsync } from "@warlock.js/fs";
-
-await atomicWriteAsync("./config.toml", configString);
-await atomicWriteAsync("./binary.bin", Buffer.from([0x01, 0x02])); // accepts Buffer too
-await atomicWriteJsonAsync("./manifest.json", { version: "1.0.0" });
+await fs.dirs.ensure("uploads/images");
 ```
 
-Writes to a uniquely-named temp file in the same directory, then renames
-onto the target. Readers see the old content or the complete new content,
-never anything in between. There's no sync variant — atomic writes are
-always async, because they're worth the await.
-
-Full mechanics in [Atomic vs non-atomic](./02-atomic-vs-non-atomic) and
-[Write atomically](../guides/write-atomically).
-
-## Directories
+`fs.file(path)` and `fs.dir(path)` — a **handle**: a small object bound to
+one path, with the same methods hanging off it. Handy when you'll touch
+the same path several times.
 
 ```ts
-import {
-  ensureDirectoryAsync,
-  ensureDirectory,
-  removeDirectoryAsync,
-  removeDirectory,
-} from "@warlock.js/fs";
-
-await ensureDirectoryAsync("./dist/cache/v2");   // mkdir -p, idempotent
-await removeDirectoryAsync("./dist");             // rm -rf, ENOENT-safe
+const pkg = fs.file("package.json");
+await pkg.editJson((p) => ({ ...p, version: "4.7.0" }));
 ```
 
-`ensureDirectoryAsync` is a no-op if the directory already exists.
-`removeDirectoryAsync` is a no-op if the target doesn't exist.
-
-## Listing children
+`fs.hash.*` — hashing. Strings and buffers hash in memory; files and
+directories stream from disk.
 
 ```ts
-import { listAsync, listFilesAsync, listDirectoriesAsync } from "@warlock.js/fs";
-
-await listAsync("./src");              // every immediate child, full paths
-await listFilesAsync("./src");          // only regular files
-await listDirectoriesAsync("./src");    // only subdirectories
+fs.hash.string("hello");            // sync
+await fs.hash.file("bundle.js");    // async
 ```
 
-All three return **full paths joined to the directory you passed**, not
-bare entry names — feed them straight into the next call. Non-recursive
-by design; if you need a deep walk, recurse yourself (there's a snippet in
-[Manage directories](../guides/manage-directories)).
-
-## Copying and renaming
+`fs.exists(path)` — a type-agnostic existence check. True whether the path
+is a file or a directory.
 
 ```ts
-import {
-  copyFileAsync,
-  copyDirectoryAsync,
-  renameFileAsync,
-} from "@warlock.js/fs";
-
-await copyFileAsync("./src.txt", "./dst/copy.txt");      // parent dirs auto-created
-await copyDirectoryAsync("./public", "./dist/public");    // recursive
-await renameFileAsync("./tmp/foo", "./final/foo");        // works for files and dirs
+if (await fs.exists("cache")) { /* something is there */ }
 ```
 
-Cross-mount renames may fail with `EXDEV` — for cross-device moves, copy
-then delete.
+Each namespace has its own page. Jump wherever your task lives:
 
-## Deleting
+- [Files](../guides/read-and-write-files) — `fs.files.*` in depth.
+- [Directories](../guides/manage-directories) — `fs.dirs.*` in depth.
+- [Lazy handles](../guides/the-fs-facade) — `fs.file()` / `fs.dir()`.
+- [Hashing](../guides/hash-files) — `fs.hash.*`.
+
+## Async-first — the one naming rule
+
+Every method on `fs` returns a Promise. There is no `fs.files.getSync`,
+no `Async` suffix to remember — the facade is async, full stop, so you
+just `await` it.
 
 ```ts
-import { unlinkAsync, removeDirectoryAsync } from "@warlock.js/fs";
-
-await unlinkAsync("./obsolete.txt");          // single file, ENOENT-safe
-await removeDirectoryAsync("./dist");          // recursive + force, ENOENT-safe
+const text = await fs.files.get("config.toml");   // Promise<string>
 ```
 
-Both swallow "not found" errors. Other errors (`EACCES`, `EBUSY`) still
-throw — if you're catching, you're catching a real problem.
+Under the hood, though, this package ships two layers of every operation:
+a bare synchronous primitive (`getFile`, `putFile`, `ensureDirectory`, …)
+and an async one (`getFileAsync`, `putFileAsync`, …). The facade is built
+on the async layer and hides the suffix entirely.
 
-## Existence checks
-
-Three variants, pick the strictest one that answers your question:
+You only meet that layer when you genuinely can't `await` — a code
+generator, a config loader at startup, a one-shot CLI script. There, drop
+to the bare **synchronous** primitives:
 
 ```ts
-import { pathExistsAsync, fileExistsAsync, directoryExistsAsync } from "@warlock.js/fs";
+import { getFile, putJsonFile } from "@warlock.js/fs";
 
-await pathExistsAsync("./anything");        // true if file OR directory
-await fileExistsAsync("./config.toml");      // true only if a regular file
-await directoryExistsAsync("./dist");         // true only if a directory
+const raw = getFile("config.toml");        // blocking, no await
+putJsonFile("out.json", { ok: true });
 ```
 
-Use these to gate creation, not as a try/catch replacement for read errors
-(though they do read more cleanly than that pattern). Sync variants exist
-under the bare names.
+That's the whole rule: **`fs.*` is async; the bare `*` primitives are the
+sync escape hatch.** The `*Async` primitives exist too, but the facade is
+the friendlier way to reach them — reach for `fs` first.
 
-## Metadata
+:::note[When sync is fine]
+CLI tools, build scripts, and startup config loaders are one-shot
+processes with nothing else to block. Sync reads cleaner there. In a
+server or any request handler, always stay on the async facade — one
+`await` keeps the event loop free.
+:::
 
-```ts
-import { lastModifiedAsync, statsAsync } from "@warlock.js/fs";
+## "I want to…" → use
 
-const mtime = await lastModifiedAsync("./bundle.js");   // Date
-const all = await statsAsync("./bundle.js");             // fs.Stats
-```
-
-`lastModified` is sugar around `stat().mtime`. Reach for `stats` when you
-need size, mode bits, or any of the other `fs.Stats` fields.
-
-## Hashing
-
-```ts
-import { hashFileAsync, hashString, hashBuffer, hashFileSmallAsync } from "@warlock.js/fs";
-
-await hashFileAsync("./bundle.js");                  // streaming, SHA-256, hex
-hashString("hello world");                            // in-memory string
-hashBuffer(Buffer.from([1, 2, 3]));                   // in-memory bytes
-await hashFileSmallAsync("./tiny.svg");               // one-shot read, < ~1 MB
-```
-
-All four accept a second arg picking the algorithm:
-`"sha256" | "sha1" | "md5" | "sha512"`. Default is `sha256`. Full
-walkthrough in [Hash files](../guides/hash-files).
-
-## Sync vs async — when to pick which
-
-| Context | Use |
+| I want to… | Use |
 | --- | --- |
-| Server / app runtime | `*Async` always — keep the event loop free |
-| CLI scripts | Either — blocking sync is usually fine, and reads cleaner |
-| Code generators, build scripts | Sync is fine — it's a one-shot process |
-| Config loaders at startup | Sync — there's nothing else to do yet |
+| Read a text file | `fs.files.get(path)` |
+| Read + parse JSON (typed) | `fs.files.getJson<T>(path)` |
+| Write a file (create parents) | `fs.files.put(path, content)` |
+| Write JSON | `fs.files.putJson(path, value)` |
+| Patch a JSON object | `fs.files.mergeJson(path, partial)` |
+| Transform a file in place | `fs.files.edit(path, fn)` |
+| Make a directory (mkdir -p) | `fs.dirs.ensure(path)` |
+| Empty a directory, keep it | `fs.dirs.empty(path)` |
+| Delete a directory tree | `fs.dirs.remove(path)` |
+| List / walk a tree | `fs.dirs.list(path)` / `fs.dirs.walk(path)` |
+| Hash a string or buffer | `fs.hash.string(s)` / `fs.hash.buffer(b)` |
+| Hash a file or a whole tree | `fs.hash.file(path)` / `fs.hash.dir(path)` |
+| Check if *anything* is there | `fs.exists(path)` |
+| Hold one path and reuse it | `fs.file(path)` / `fs.dir(path)` |
+| Read/write synchronously | bare `getFile` / `putFile` primitives |
 
-When in doubt: async. The cost is one `await` keyword; the benefit is
-that you never accidentally block a server's request handler.
+## Options ride along the last argument
+
+Most calls take an options object as their final argument. Same handful of
+names show up everywhere, so once you learn them once you know them
+everywhere.
+
+```ts
+await fs.files.put("cache/data.json", "{}", {
+  atomic: true,      // write to a temp file, then rename onto target
+  overwrite: false,  // fail instead of clobbering an existing file
+  ensureDir: true,   // create parent directories first
+});
+```
+
+- `atomic` — readers see the old content or the complete new content,
+  never a half-written file. See [Atomic vs non-atomic](./02-atomic-vs-non-atomic).
+- `overwrite` — set `false` for create-if-missing semantics (that's what
+  `fs.files.create` does for you).
+- `ensureDir` — create the parent path before writing.
+- `recursive` — on `fs.dirs.list` / `walk`, descend into subdirectories.
+- `schema` + `default` — on `fs.files.getJson`, validate against a
+  [Standard Schema](https://standardschema.dev) and fall back when the
+  file is missing.
+
+:::tip[Options are always optional]
+Every one of these has a sane default, so the two-argument form is the
+common case. Reach for the options object only when you want to change the
+default behavior — atomic writes, no-clobber creates, schema-checked reads.
+:::
+
+## What `fs` will not do for you
+
+:::caution[`fs` does not sandbox paths]
+The facade treats whatever path you hand it as gospel — `"../../etc/passwd"`
+resolves and reads just fine. **Path containment is the storage layer's
+job**, not this package's. If you're accepting paths from user input, run
+them through your storage layer (or validate them yourself) *before*
+they reach `fs`. `@warlock.js/fs` is the low-level toolkit; it trusts its
+caller.
+:::
 
 ## Next
 
-- [Atomic vs non-atomic](./02-atomic-vs-non-atomic) — picking between
-  `putFileAsync` and `atomicWriteAsync`.
-- [Reference / API](../reference/api) — full export list with signatures.
+- [Atomic vs non-atomic](./02-atomic-vs-non-atomic) — when to flip
+  `{ atomic: true }` on a write.
+- [The fs facade](../guides/the-fs-facade) — the full facade surface,
+  including lazy handles and read-modify-write helpers.
+- [Reference / API](../reference/api) — every export with signatures.

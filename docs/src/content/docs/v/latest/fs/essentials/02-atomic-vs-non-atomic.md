@@ -1,123 +1,155 @@
 ---
 title: "Atomic vs non-atomic writes"
-description: When putFileAsync is fine and when you need atomicWriteAsync — concurrent readers, crash mid-write, config files, manifests, state.
+description: "When fs.files.put is fine and when you need { atomic: true } — concurrent readers, file watchers, build steps, and the last-write-wins caveat."
 sidebar:
   order: 2
-  label: "Atomic vs non-atomic"
+  label: "Atomic vs non-atomic writes"
 ---
 
-Both `putFileAsync` and `atomicWriteAsync` end with "the file contains
-your bytes". The difference is what observers see in between. Picking the
-wrong one for the situation is a footgun that doesn't surface until
-production is under load.
+Every write with the [`fs` facade](../guides/the-fs-facade) ends the same way:
+the file contains your bytes. The interesting question is what a *reader*
+sees in the middle. That's the whole difference between a plain write and an
+atomic one, and it's a footgun that stays quiet until production is under
+load.
 
-## How a plain write looks to readers
+## The two calls
 
-`putFileAsync` writes directly to the destination. From a reader's point
-of view, between the moment your write starts and the moment it finishes,
-the file is:
-
-1. Existing with the old content (before you started).
-2. Truncated to zero bytes (the moment `writeFile` opens it for writing).
-3. Partially populated (as bytes stream in).
-4. Complete (after the write finishes).
-
-If another process reads the file during steps 2 or 3, it sees garbage —
-or worse, it sees something that *looks* valid but is half a file.
-JSON parsers crash. YAML parsers crash. File watchers fire twice.
-
-## How an atomic write looks
-
-`atomicWriteAsync` writes to a different file first — a uniquely-named
-temp sibling like `.manifest.json.a1b2c3d4e5f6.tmp`. After the full
-content is on disk, it `rename`s the temp onto the target. The rename is
-atomic on POSIX filesystems and effectively atomic on NTFS.
-
-From a reader's point of view, the target file goes from:
-
-1. The old content.
-2. The new content.
-
-There's no in-between state. The reader either sees the old version or
-the new version — never something half-cooked.
-
-## When non-atomic is fine
-
-`putFileAsync` is the right call when:
-
-- **No one's reading concurrently.** A throwaway log line, a temp file
-  used only by the current process, a build artifact written before any
-  reader exists.
-- **Readers tolerate eventual consistency.** A cache file that the next
-  read can simply regenerate if it's corrupt.
-- **You control the timing.** You're going to read it yourself after the
-  write completes, and nothing else touches it.
+Same method, one option. That's the entire API surface for this decision:
 
 ```ts
-// ✅ Plain write is fine — no concurrent reader, this process owns the file.
-await putFileAsync("./tmp/scratch.txt", workOutput);
-const back = await getFileAsync("./tmp/scratch.txt");
+// Plain write — fast, direct.
+await fs.files.put("./config.toml", configString);
+
+// Atomic write — reader never sees a half-written file.
+await fs.files.put("./config.toml", configString, { atomic: true });
 ```
 
-## When you want atomic
+`put` writes straight to the destination. `{ atomic: true }` writes to a
+temp sibling first, then renames it onto the target in one step.
 
-`atomicWriteAsync` is the right call when:
+## What a plain write looks like to a reader
 
-- **Other processes or tools read the file.** A dev server's file
-  watcher, a deployment script that polls for `manifest.json`, a sibling
-  process consuming an event log.
-- **The same script reads it back across runs.** A `.cache/last-run.json`
-  that the next run depends on. A crash mid-write would leave it
-  corrupt and the next run can't recover.
-- **The file is short-but-critical.** Config files, manifests, state
-  snapshots — anything where "half written" is a worse failure mode than
-  "didn't write at all".
+A direct write isn't a single instant — it's a sequence. If another process
+reads mid-flight, here's the state it can catch:
+
+```text
+old content  →  truncated (0 bytes)  →  half the new content  →  complete
+```
+
+A reader that lands on the middle two states gets garbage. JSON parsers
+throw, YAML parsers throw, and file watchers fire on a file that isn't done
+yet.
 
 ```ts
-// ✅ Atomic — the dev server's file watcher reads this any moment.
-await atomicWriteAsync("./config.toml", configString);
-
-// ✅ Atomic — next run depends on this; can't survive a crash mid-write.
-await atomicWriteJsonAsync("./.cache/last-run.json", {
-  finishedAt: new Date().toISOString(),
-  buildId: process.env.BUILD_ID,
-});
+// Deploy script polls this file. A plain write can hand it a truncated blob.
+await fs.files.putJson("./manifest.json", manifest);
 ```
 
-## A simple decision tree
+## What an atomic write looks like to a reader
 
-> Is the file read by anything other than the script that just wrote it,
-> while the write is in flight? **→ atomic.**
+With `{ atomic: true }` the facade writes the full content to a
+uniquely-named temp file in the same directory, then `rename`s it onto the
+target. Rename is atomic on POSIX and effectively atomic on NTFS, so the
+target only ever has two states:
+
+```text
+old content  →  new content
+```
+
+There is no in-between. The reader sees the old version or the new version,
+never a stitched-together mess.
+
+```ts
+// The deploy poller now only ever reads a complete manifest.
+await fs.files.putJson("./manifest.json", manifest, { atomic: true });
+```
+
+## When atomic actually matters
+
+Reach for `{ atomic: true }` the moment *someone else* can read the file
+while you write it:
+
+- A dev server's **file watcher** re-reads on every change.
+- A **build step** that polls for `manifest.json` before continuing.
+- A **sibling process** consuming a state file or an event log.
+- A **crash mid-write** would leave a config the next run can't parse.
+
+```ts
+// A file watcher can read this at any moment — atomic keeps it whole.
+await fs.files.put("./.cache/graph.json", serialized, { atomic: true });
+```
+
+## When plain is fine
+
+Skip the temp-file dance when nothing else is looking:
+
+- A **scratch file** this process owns and reads back itself.
+- A **build artifact** written before any reader exists.
+- A **regenerable cache** where a corrupt read just triggers a rebuild.
+
+```ts
+// No concurrent reader, this process owns the file — plain write is fine.
+await fs.files.put("./tmp/scratch.txt", workOutput);
+const back = await fs.files.get("./tmp/scratch.txt");
+```
+
+Plain is also a touch faster: one syscall fewer, no rename.
+
+:::note[The `{ atomic }` option travels with the JSON writers too]
+It's not just `put`. `fs.files.putJson`, `fs.files.editJson`, and
+`fs.files.mergeJson` all accept `{ atomic: true }` and route through the same
+temp-file-then-rename path. Any write you'd want atomic can be — including the
+read-modify-write helpers.
+:::
+
+## The last-write-wins caveat
+
+`fs.files.edit(path, fn)`, `fs.files.editJson(path, fn)`, and
+`fs.files.mergeJson(path, patch)` are **read-modify-write sugar, not a
+lock**. `{ atomic: true }` makes the *write* half indivisible — a reader
+never catches a partial file — but it does nothing to serialize two
+concurrent editors:
+
+```ts
+// Two runs edit the same counter at once.
+await fs.files.editJson("./counter.json", (d) => ({ n: d.n + 1 }), { atomic: true });
+```
+
+Both read `n`, both compute `n + 1`, both write. Whichever rename lands last
+wins; the other increment is silently lost. Atomicity here means "no torn
+file", not "no lost update". If you need true read-modify-write atomicity,
+wrap the whole thing in a lock — `@warlock.js/cache`'s
+`cache.lock(key, ttl, fn)` is one option.
+
+:::caution[Atomic is not durability]
+A power loss *between* the temp write and the rename leaves the temp file
+orphaned and the target unchanged (readers still see the old content — good).
+The facade skips a post-rename `fsync` for write speed, so "atomic" means
+crash-*consistent*, not crash-*durable*.
+:::
+
+## A quick decision tree
+
+> Can anything other than this script read the file while the write is in
+> flight? **→ `{ atomic: true }`.**
 >
-> Could a crash mid-write leave you with a corrupt file that breaks the
-> next run? **→ atomic.**
+> Could a crash mid-write leave a corrupt file the next run can't recover
+> from? **→ `{ atomic: true }`.**
 >
-> Otherwise → `putFileAsync` is fine. It's slightly faster (one syscall
-> fewer, no temp-file dance).
+> Otherwise a plain `fs.files.put` is fine — and slightly faster.
 
-## What atomic does NOT protect against
+## Under the hood
 
-It's worth knowing the edges:
-
-- **Power loss between `writeFile` and `rename`** leaves the temp file
-  behind. The target is unchanged, so readers see the old content — but
-  the temp file is orphaned until you clean it up. For ironclad
-  durability you'd need an `fsync` after the rename; the helper skips
-  that for write speed.
-- **Last-writer-wins.** Two concurrent `atomicWriteAsync` calls to the
-  same target both succeed. Whichever rename completes last wins; the
-  other write is lost. If you need read-modify-write atomicity, wrap the
-  call in a lock — `@warlock.js/cache`'s `cache.lock(key, ttl, fn)` is one
-  option.
-- **Cross-mount renames.** If the temp file ends up on a different mount
-  than the target (unusual, only happens if you override the helper's
-  internals), the rename falls back to copy + delete which isn't atomic.
-  The helper picks the target's directory specifically to keep the temp
-  on the same mount.
+`{ atomic: true }` delegates to the low-level `atomicWriteAsync` primitive —
+the temp-file-then-rename mechanism described above. Atomic writes are
+inherently async: there's no sync variant, because the temp-file dance is worth
+the `await` every time. If you're already working at the primitive layer you can
+call `atomicWriteAsync` directly, but for app code reach for
+`fs.files.put(path, content, { atomic: true })`.
 
 ## Next
 
 - [Write atomically](../guides/write-atomically) — the guide-level
   walkthrough with the full sequence and edge cases.
-- [Read and write files](../guides/read-and-write-files) — the everyday
-  `putFileAsync` / `getFileAsync` flow.
+- [The fs facade](../guides/the-fs-facade) — the full facade tour.
+- [The helpers](./01-the-helpers) — the low-level sync/async layer beneath it.

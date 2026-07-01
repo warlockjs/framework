@@ -1,204 +1,207 @@
 ---
 title: "Read and write files"
-description: Read text and JSON, write text and JSON with auto-parent-dirs, check existence, get metadata — the everyday file IO toolkit.
+description: The everyday file IO toolkit — read text and JSON, write text and JSON with auto-parent-dirs, validate against a schema, check existence, and read metadata, all through the fs facade.
 sidebar:
   order: 1
   label: "Read and write files"
 ---
 
-The bread-and-butter helpers. Every Node project ends up doing some flavor
-of "read a config file, write a build artifact, check if a state file
-exists". This guide covers all of that.
+Every Node project ends up doing the same handful of things: read a config
+file, write a build artifact, check whether a state file exists. This is how
+you do all of that with `@warlock.js/fs`.
+
+The facade is the front door. File operations live under `fs.files.*`, and
+each one is a single `await` — no imports to remember, no manual parent-dir
+creation, no casts.
+
+```ts title="read-write.ts"
+import { fs } from "@warlock.js/fs";
+
+const config = await fs.files.get("config.toml");
+await fs.files.put("out/log.txt", "hello world\n");
+```
+
+:::note[Async-only — sync callers use the primitives]
+The facade never blocks. Synchronous callers (CLI tools, code generators,
+one-shot scripts) reach for the bare primitives instead — `getFile`,
+`putFile`, and friends, documented in the [reference](../reference/api). The
+facade delegates straight to them, so behavior matches; it just adds the
+ergonomic surface on top.
+:::
 
 ## Reading text
 
-```ts
-import { getFileAsync, getFile } from "@warlock.js/fs";
+`fs.files.get` reads a file as a UTF-8 string — the common case in one call.
 
-const config = await getFileAsync("./config.toml");   // string, UTF-8
-const sync = getFile("./config.toml");                 // string
+```ts
+const readme = await fs.files.get("README.md");   // string
 ```
 
-Both always read as UTF-8 — there's no encoding parameter. If you need
-binary, drop down to `node:fs/promises`'s `readFile`. The helper exists to
-make the common case (text) one call.
+Need the raw bytes instead? Pass `{ encoding: null }` and you get a `Buffer`
+back. The return type follows the option, so there's no cast either way.
 
-**Errors.** Throws `ENOENT` if the file doesn't exist. Don't try/catch
-that — use [existence checks](#existence-checks) to gate reads instead.
+```ts
+const bytes = await fs.files.get("logo.png", { encoding: null });   // Buffer
+```
+
+It throws `ENOENT` if the file is missing. Don't try/catch that — gate the
+read with an [existence check](#existence) instead.
 
 ## Reading JSON
 
-```ts
-import { getJsonFileAsync, getJsonFile } from "@warlock.js/fs";
+`fs.files.getJson<T>` reads, parses, and hands you a typed value.
 
+```ts
 type Manifest = { version: string; files: string[] };
 
-const manifest = await getJsonFileAsync<Manifest>("./manifest.json");
+const manifest = await fs.files.getJson<Manifest>("manifest.json");
 //    ^? Manifest
-
-const inline = getJsonFile<Manifest>("./manifest.json");
 ```
 
-The generic is a type assertion — `JSON.parse` returns whatever's in the
-file regardless of what you typed. If you can't trust the file, run the
-result through a schema validator (`@warlock.js/seal` is one) before using
-it.
+By default a missing file throws. Pass `{ default }` to get a fallback back
+instead — perfect for optional config that may not exist yet.
 
-**Errors.** Throws if the file is missing (`ENOENT`) or contains invalid
-JSON (`SyntaxError`).
+```ts
+const settings = await fs.files.getJson("settings.json", { default: {} });
+// never throws on ENOENT — you get {} instead
+```
+
+### Validate while you read
+
+The generic above is only a type assertion — `JSON.parse` returns whatever is
+actually in the file. When you can't trust the source, pass a `schema` and the
+parsed value is validated before it reaches you.
+
+```ts title="load-config.ts"
+import { v } from "@warlock.js/seal";
+import { fs } from "@warlock.js/fs";
+
+const config = await fs.files.getJson("config.json", {
+  schema: v.object({ port: v.number(), host: v.string() }),
+  default: { port: 3000, host: "localhost" },
+});
+```
+
+The `schema` accepts any [Standard Schema](https://standardschema.dev)
+validator — `@warlock.js/seal`, Zod, or Valibot all work, because
+`@warlock.js/fs` calls the schema's own `~standard.validate` hook. That means
+the package stays **zero-dependency**: nothing is bundled, and you bring your
+validator of choice.
+
+:::tip[Validation failures are typed]
+When the data doesn't match, `getJson` throws `JsonSchemaValidationError` —
+a distinct error you can catch and surface cleanly, instead of letting a bad
+config leak downstream as an undefined field.
+:::
 
 ## Writing text
 
-```ts
-import { putFileAsync, putFile } from "@warlock.js/fs";
+`fs.files.put` writes a UTF-8 string and creates any missing parent
+directories along the way. No `ensureDir` dance first.
 
-await putFileAsync("./out/log.txt", "hello world\n");
-putFile("./out/log.txt", "hello world\n");
+```ts
+await fs.files.put("out/nested/log.txt", "hello world\n");
+// out/ and out/nested/ are created automatically
 ```
 
-Both:
+For files another process might read mid-write — a config a dev server
+watches, a manifest a deploy script consumes — pass `{ atomic: true }`. The
+write goes to a temp file and renames into place, so readers never see a
+half-written file.
 
-- Create parent directories recursively — you don't need to
-  `ensureDirectory` first.
-- Write UTF-8.
-- Overwrite the file if it exists.
+```ts
+await fs.files.put("cache/data.json", "{}", { atomic: true });
+```
 
-The content parameter is `string` only. For binary writes, either use
-[`atomicWriteAsync`](./write-atomically) (which accepts `string | Buffer`)
-or drop to `node:fs/promises`'s `writeFile`.
+By default `put` overwrites. Pass `{ overwrite: false }` to make it refuse to
+clobber an existing file (it throws instead).
+
+```ts
+await fs.files.put("seed.txt", "initial", { overwrite: false });
+```
 
 ## Writing JSON
 
-```ts
-import { putJsonFileAsync, putJsonFile } from "@warlock.js/fs";
+`fs.files.putJson` serializes and writes in one step, with the same
+auto-parents behavior.
 
-await putJsonFileAsync("./out/manifest.json", {
+```ts
+await fs.files.putJson("out/manifest.json", {
   version: "1.0.0",
   files: ["bundle.js", "styles.css"],
 });
 ```
 
-Same auto-parent-dirs and overwrite semantics. The serialization is
-pretty-printed at 2-space indent. For minified JSON, stringify yourself
-and use `putFileAsync`:
+Output is pretty-printed at 2-space indent by default. Control it with
+`{ indent }` — pass `0` for minified output.
 
 ```ts
-import { putFileAsync } from "@warlock.js/fs";
-
-await putFileAsync("./out/min.json", JSON.stringify(value));
+await fs.files.putJson("out/min.json", value, { indent: 0 });
 ```
 
-## When you want atomic semantics
+## Create-if-absent
 
-`putFileAsync` writes directly. If a concurrent reader picks up the file
-mid-write, they see truncated content. For files that other tools or
-processes read (config files watched by a dev server, manifests consumed
-by a deploy script), use [`atomicWriteAsync`](./write-atomically) instead.
-
-The rule of thumb is in [Atomic vs non-atomic](../essentials/02-atomic-vs-non-atomic);
-the short version: read by anyone but you, or has to survive a crash
-mid-write → atomic.
-
-## Existence checks
-
-Three variants, all `*Async` + sync. Pick the strictest one that fits your
-question:
+When you want to write a file *only* if it isn't there yet — a scaffolded
+default, a seed record — use `create` / `createJson`. They're exactly `put` /
+`putJson` with `{ overwrite: false }` baked in.
 
 ```ts
-import { pathExistsAsync, fileExistsAsync, directoryExistsAsync } from "@warlock.js/fs";
-
-await pathExistsAsync("./anything");        // true if file OR directory
-await fileExistsAsync("./config.toml");      // true only if regular file
-await directoryExistsAsync("./dist");         // true only if directory
+await fs.files.create("config.toml", defaultConfig);       // text
+await fs.files.createJson("state.json", { counter: 0 });   // JSON
 ```
 
-`fileExistsAsync` and `directoryExistsAsync` follow symlinks (they use
-`stat`, not `lstat`). If you need to distinguish "symlink to a file" from
-"actual file", drop to `lstat` directly.
+Both throw if the file already exists, so a re-run won't quietly wipe live
+data.
 
-The idiomatic use: gate a creation step instead of catching `ENOENT`:
+<a id="existence"></a>
+
+## Existence
+
+`fs.files.exists` answers "is there a regular file here?".
 
 ```ts
-// ✅ Clear intent
-if (!(await fileExistsAsync("./config.toml"))) {
-  await putFileAsync("./config.toml", defaultConfig);
-}
-
-// ❌ Catching ENOENT as control flow is uglier and slower
-try {
-  await getFileAsync("./config.toml");
-} catch {
-  await putFileAsync("./config.toml", defaultConfig);
+if (!(await fs.files.exists("config.toml"))) {
+  await fs.files.put("config.toml", defaultConfig);
 }
 ```
+
+Gating a write like this reads far better than catching `ENOENT` as control
+flow. If you don't care whether the path is a file or a directory, use the
+type-agnostic `fs.exists`.
+
+```ts
+await fs.exists("build-output");   // true for a file OR a directory
+```
+
+For directory-specific checks and the rest of the folder toolkit, see
+[Manage directories](./manage-directories).
 
 ## Metadata
 
-```ts
-import { lastModifiedAsync, statsAsync } from "@warlock.js/fs";
-
-const mtime = await lastModifiedAsync("./bundle.js");   // Date
-const all = await statsAsync("./bundle.js");             // fs.Stats
-```
-
-`lastModifiedAsync` is sugar around `stat().mtime`. Reach for `statsAsync`
-when you need size, mode bits, or the full `fs.Stats` object. Both throw
-`ENOENT` if the path doesn't exist — guard with `pathExistsAsync` if the
-path might be missing.
-
-## A few common shapes
-
-### Read-or-default config
+`fs.files.stats` returns a normalized `FileStats` object — the fields you
+actually reach for, without the raw `fs.Stats` noise.
 
 ```ts
-import { getJsonFileAsync, fileExistsAsync } from "@warlock.js/fs";
-
-async function loadConfig(): Promise<Config> {
-  if (await fileExistsAsync("./config.json")) {
-    return getJsonFileAsync<Config>("./config.json");
-  }
-
-  return defaultConfig;
-}
+const info = await fs.files.stats("bundle.js");
+// { path, name, size, type, lastModified, raw }
 ```
 
-### Read a JSON file, modify, write it back
+`size` is bytes, `lastModified` is a `Date`, `type` distinguishes file from
+directory, and `raw` is the underlying `fs.Stats` if you need mode bits. When
+size is all you want, `fs.files.size` skips straight to the number.
 
 ```ts
-import { getJsonFileAsync, putJsonFileAsync } from "@warlock.js/fs";
-
-const state = await getJsonFileAsync<State>("./state.json");
-state.counter += 1;
-await putJsonFileAsync("./state.json", state);
+const bytes = await fs.files.size("bundle.js");   // number
 ```
 
-If two callers run this in parallel, they can lose updates — `putJsonFile`
-isn't a CAS operation. For shared state across processes, use
-[`atomicWriteJsonAsync`](./write-atomically) and consider a distributed
-lock.
-
-### Cache "last seen" mtime to skip work
-
-```ts
-import { lastModifiedAsync, getJsonFileAsync, putJsonFileAsync } from "@warlock.js/fs";
-
-const current = (await lastModifiedAsync("./input.json")).toISOString();
-const cache = await getJsonFileAsync<{ mtime: string }>("./.cache.json").catch(() => ({ mtime: "" }));
-
-if (cache.mtime === current) {
-  return;
-}
-
-await runPipeline();
-await putJsonFileAsync("./.cache.json", { mtime: current });
-```
-
-For content-based invalidation (more robust than mtime), use
-[`hashFileAsync`](./hash-files) instead.
+Both throw `ENOENT` on a missing path — guard with `fs.files.exists` if the
+file might not be there.
 
 ## Related
 
-- [Write atomically](./write-atomically) — for files other processes read.
-- [Manage directories](./manage-directories) — list, copy, delete.
+- [The fs facade](./the-fs-facade) — the full `fs.*` surface at a glance.
+- [Write atomically](./write-atomically) — for files concurrent readers see.
+- [Manage directories](./manage-directories) — list, copy, move, delete.
 - [Hash files](./hash-files) — fingerprint for cache invalidation.
-- [Reference / API](../reference/api) — full signatures.
+- [Reference / API](../reference/api) — full signatures, including the sync
+  primitives.

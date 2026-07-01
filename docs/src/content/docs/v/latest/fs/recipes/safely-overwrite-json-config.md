@@ -1,118 +1,70 @@
 ---
 title: "Safely overwrite a JSON config"
-description: Read a JSON config, mutate it, write it back atomically — without losing data if the process crashes mid-write or another reader picks it up in flight.
+description: Read a JSON config, change a field, write it back atomically with the fs facade — no half-written file ever observable to a watcher.
 sidebar:
   order: 1
   label: "Safely overwrite a JSON config"
 ---
 
-The pattern: a config file that other tools watch (a dev server, a
-linter, your own application's hot-reload). You need to read it, change a
-field, write it back — and you don't want a half-written file to ever be
-observable.
+Every project ends up with a config file that something else is watching — a
+dev server, a linter, your own hot-reload. You need to flip a field without
+ever letting a truncated, half-written JSON file be observed.
 
 ## The recipe
 
-```ts
-import { getJsonFileAsync, atomicWriteJsonAsync, fileExistsAsync } from "@warlock.js/fs";
+The facade's `mergeJson` reads, patches, and writes in one call. Pass
+`{ atomic: true }` so the write goes through a temp file and an atomic rename.
 
-type Config = {
-  apiUrl: string;
-  features: Record<string, boolean>;
-  updatedAt: string;
-};
+```ts title="src/set-feature.ts"
+import { fs } from "@warlock.js/fs";
 
-async function setFeature(name: string, enabled: boolean) {
-  // Read current state — fall back to defaults if the file doesn't exist yet.
-  const current: Config = (await fileExistsAsync("./config.json"))
-    ? await getJsonFileAsync<Config>("./config.json")
-    : { apiUrl: "https://api.example.com", features: {}, updatedAt: "" };
-
-  // Mutate.
-  current.features[name] = enabled;
-  current.updatedAt = new Date().toISOString();
-
-  // Write atomically — any watcher sees the old config or the new, never a
-  // truncated half-written JSON file.
-  await atomicWriteJsonAsync("./config.json", current);
-}
-
-await setFeature("dark-mode", true);
+await fs.files.mergeJson(
+  "config.json",
+  { features: { "dark-mode": true }, updatedAt: new Date().toISOString() },
+  { atomic: true },
+);
 ```
 
-## Why each call
+Any watcher sees the old config or the new one, never a half-written one. A
+crash between read and write leaves the file untouched.
 
-**`fileExistsAsync` + fallback.** Better than try/catching the read —
-makes the "first run, no file yet" branch explicit and removes the
-ENOENT-as-control-flow smell.
+## When the change isn't a simple patch
 
-**`getJsonFileAsync<Config>`.** Typed read. If the file's been corrupted
-(someone hand-edited it badly), this throws `SyntaxError` — let it bubble
-up so the calling code knows.
+`mergeJson` spreads a partial over the top level. When you need to compute the
+new value from the old one — bump a counter, push into an array — reach for
+`editJson`:
 
-**Mutate in memory.** The mutation is a plain object assignment. Nothing
-touches disk between read and write.
+```ts title="src/bump-build.ts"
+import { fs } from "@warlock.js/fs";
 
-**`atomicWriteJsonAsync`.** The whole point — readers see the old file or
-the new file, never a half-written one. A crash between the read and the
-write leaves the file unchanged.
-
-## What this doesn't protect against
-
-**Lost updates.** If two callers run `setFeature` concurrently, they both
-read the same starting state and one of their writes is silently
-overwritten by the other. The atomic write doesn't lock — it just makes
-each individual write safe to observe.
-
-If lost updates matter, wrap the read-modify-write in a lock. Two
-options:
-
-- **In-process** — use a simple `async`-aware mutex (any small library, or
-  hand-rolled with a Promise queue).
-- **Cross-process** — `@warlock.js/cache`'s `cache.lock()` backed by
-  Redis or Postgres.
-
-```ts
-import { cache } from "@warlock.js/cache";
-
-// cache.lock(key, ttl, fn) acquires, runs, and auto-releases.
-const outcome = await cache.lock("config.json", "1m", async () => {
-  // Same read-modify-write as above, but now serialized across the cluster.
-  await setFeature("dark-mode", true);
-});
-
-if (!outcome.acquired) {
-  // Another worker holds the lock — your fn did not run.
-}
+await fs.files.editJson("config.json", (cfg) => ({
+  ...cfg,
+  builds: cfg.builds + 1,
+}), { atomic: true });
 ```
 
-## Variation: append-only journal
+:::tip[Missing file? Seed it first]
+Both helpers read before they write. If the file might not exist yet, call
+`fs.files.ensureJson("config.json", { features: {} })` once up front — it
+returns the parsed doc or creates it from your fallback, never truncating an
+existing file.
+:::
 
-Same idea, different shape — an event log where each call adds an entry:
+## What atomic does *not* do
 
-```ts
-import { getJsonFileAsync, atomicWriteJsonAsync, fileExistsAsync } from "@warlock.js/fs";
+`atomic` makes the *write* safe to observe. It does **not** lock the
+read-modify-write pair — two callers can both read the same starting state and
+one write silently wins. `@warlock.js/fs` has no file locking by design.
 
-type Event = { ts: string; type: string; payload: unknown };
+If lost updates matter, serialize the whole operation:
 
-async function appendEvent(event: Event) {
-  const existing: Event[] = (await fileExistsAsync("./events.json"))
-    ? await getJsonFileAsync<Event[]>("./events.json")
-    : [];
-
-  existing.push(event);
-  await atomicWriteJsonAsync("./events.json", existing);
-}
-```
-
-Same lost-update caveat applies — under concurrent appends, only one
-writer's append survives. For a real event log, use a database or a
-proper append-only file format (NDJSON with `appendFile`); the recipe
-above is for low-volume single-writer logs (build emitters, CLI tools).
+- **In-process** — an `async`-aware mutex around the `mergeJson` call.
+- **Cross-process** — `@warlock.js/cache`'s `cache.lock(key, ttl, fn)`,
+  backed by Redis or Postgres.
 
 ## Related
 
-- [Write atomically](../guides/write-atomically) — the underlying
-  mechanism.
-- [Atomic vs non-atomic](../essentials/02-atomic-vs-non-atomic) — when to
-  reach for atomic vs plain writes.
+- [Patch a JSON config](./patch-a-json-config) — deep merges and field bumps.
+- [Write atomically](../guides/write-atomically) — the mechanism underneath
+  `{ atomic: true }`.
+- [The fs facade](../guides/the-fs-facade) — the full `fs.files.*` surface.

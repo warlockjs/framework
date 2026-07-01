@@ -1,0 +1,108 @@
+---
+title: "@warlock.js/fs"
+description: A pocket-size filesystem toolkit — one fs object with files, directories, lazy handles, and hashing. The shape you wish node:fs had.
+sidebar:
+  order: 1
+  label: "Overview"
+---
+
+import { CardGrid, LinkCard, Aside } from "@astrojs/starlight/components";
+
+A pocket-size filesystem toolkit — one `fs` object with everything: files,
+directories, handles, hashing. The shape you wish `node:fs` had, minus the
+graveyard of single-purpose dependencies (`fs-extra`, `rimraf`, `mkdirp`,
+`write-file-atomic`, `hasha`) you'd otherwise reach for.
+
+You import one thing and reach for it the way you'd reach for `console`.
+`fs.files.*` handles files, `fs.dirs.*` handles directories, `fs.file()` and
+`fs.dir()` give you lazy handle objects, and `fs.hash.*` fingerprints anything.
+No factory, no config, no setup.
+
+## The whole idea, in one example
+
+Write JSON, read it back typed, patch it in place, then walk a tree — all
+through `fs`:
+
+```ts title="src/build.ts"
+import { fs } from "@warlock.js/fs";
+
+// Write JSON — parent dirs auto-created, pretty-printed.
+await fs.files.putJson("./build/manifest.json", { version: "1.0.0" });
+
+// Read it back, fully typed.
+const manifest = await fs.files.getJson<{ version: string }>("./build/manifest.json");
+
+// Read → transform → write, atomically, in one call.
+await fs.files.editJson("./build/manifest.json", m => ({ ...m, built: Date.now() }));
+
+// Walk the whole tree (recursive by default), files and folders alike.
+for await (const entry of fs.dirs.walk("./build")) {
+  console.log(entry.type, entry.path);
+}
+```
+
+That's the entire vocabulary: nouns (`files`, `dirs`) and verbs
+(`putJson`, `editJson`, `walk`). No naming ceremony to memorize.
+
+## Explore the guides
+
+<CardGrid>
+  <LinkCard
+    title="Read & write files"
+    href="./guides/read-and-write-files"
+    description="fs.files.get / put / getJson / putJson — text and JSON, with schema-validated reads."
+  />
+  <LinkCard
+    title="Edit in place"
+    href="./guides/edit-files-in-place"
+    description="fs.files.edit / editJson / mergeJson / appendLine — read-modify-write without the boilerplate."
+  />
+  <LinkCard
+    title="Manage directories"
+    href="./guides/manage-directories"
+    description="fs.dirs.ensure / list / walk / empty / size — recursive directory operations."
+  />
+  <LinkCard
+    title="File & Directory handles"
+    href="./guides/work-with-handles"
+    description="fs.file(path) and fs.dir(path) — lazy, immutable handle objects you can chain."
+  />
+  <LinkCard
+    title="Hashing"
+    href="./guides/hash-files"
+    description="fs.hash.string / buffer / file / dir — SHA-256 fingerprints for anything."
+  />
+  <LinkCard
+    title="Atomic writes"
+    href="./guides/write-atomically"
+    description="fs.files.put(path, data, { atomic: true }) — temp-file-and-rename for concurrent readers."
+  />
+</CardGrid>
+
+<Aside type="note" title="Standalone — no @warlock.js/core required">
+`@warlock.js/fs` runs in any Node project. It has zero runtime
+dependencies beyond built-in `node:fs` and `node:crypto` — including the
+schema-validated `getJson`, which accepts any [Standard Schema](https://standardschema.dev)
+validator (seal, Zod, Valibot) you already have on hand. Inside a Warlock app
+it's already on the dependency graph; everywhere else it's a plain
+`yarn add` away.
+</Aside>
+
+<Aside type="tip" title="Sync? Reach for the primitives">
+The `fs` facade is **async-only** — every method returns a Promise. When you
+need a synchronous call (a config loader at startup, a build script), drop down
+to the bare primitives the facade delegates to: `getFile`, `putFile`,
+`ensureDirectory`, `hashString`, and friends. They're the low-level layer —
+see the [API reference](./reference/api) for the full list.
+</Aside>
+
+## Where to start
+
+1. [Introduction](./getting-started/01-introduction) — what `fs` gives you over
+   raw `node:fs/promises`.
+2. [Installation](./getting-started/02-installation) — one `yarn add`, no wiring.
+3. [Your first write](./getting-started/03-your-first-write) — a five-minute
+   `fs.files.put` + `fs.files.get` walkthrough.
+
+Then dip into the [guides](./guides/read-and-write-files) for task-oriented
+walkthroughs, or the [reference](./reference/api) for the full surface.

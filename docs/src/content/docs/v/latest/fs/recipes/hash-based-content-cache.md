@@ -1,155 +1,91 @@
 ---
 title: "Hash-based content cache"
-description: Skip expensive work when an input file hasn't actually changed — using content hashes instead of mtimes. Robust against touch-without-edit.
+description: Skip expensive work when an input file or folder hasn't actually changed — using fs.hash.file / fs.dirs.hash and checksumMatches instead of fragile mtimes.
 sidebar:
-  order: 2
+  order: 5
   label: "Hash-based content cache"
 ---
 
-The pattern: an expensive pipeline (transcoding, transpiling, syncing,
-indexing) that should re-run only when its input actually changes. Using
-`mtime` for this is fragile — `touch` updates the mtime without changing
-content, and some tools rewrite a file with identical bytes. Hashing the
-content directly is robust.
+You've got an expensive step — transpiling, indexing, syncing — that should
+re-run only when its input genuinely changes. Using `mtime` for this is
+fragile: `touch` bumps the timestamp without changing a byte, and some tools
+rewrite a file with identical content. Hashing the content directly is robust.
 
-## The recipe
+## Gate on a file's content hash
 
-```ts
-import {
-  hashFileAsync,
-  fileExistsAsync,
-  getFileAsync,
-  putFileAsync,
-} from "@warlock.js/fs";
+`fs.hash.file` streams the file through SHA-256 in constant memory, no matter
+how large. Store the last digest in a sibling sentinel and compare:
 
-async function processIfChanged(inputPath: string, processor: () => Promise<void>) {
-  const sentinelPath = `${inputPath}.digest`;
+```ts title="src/process-if-changed.ts"
+import { fs } from "@warlock.js/fs";
 
-  const currentDigest = await hashFileAsync(inputPath);
-  const previousDigest = (await fileExistsAsync(sentinelPath))
-    ? await getFileAsync(sentinelPath)
-    : null;
+async function processIfChanged(input: string, run: () => Promise<void>) {
+  const sentinel = `${input}.digest`;
+  const digest = await fs.hash.file(input);
 
-  if (currentDigest === previousDigest) {
-    return { skipped: true, digest: currentDigest };
+  // Only work when the recorded digest doesn't match the current content.
+  if (await fs.files.exists(sentinel) && await fs.files.checksumMatches(sentinel, digest)) {
+    return;
   }
 
-  await processor();
-  await putFileAsync(sentinelPath, currentDigest);
-
-  return { skipped: false, digest: currentDigest };
-}
-
-const result = await processIfChanged("./data/source.json", async () => {
-  await rebuildSearchIndex();
-});
-
-if (result.skipped) {
-  console.log(`Skipped — input unchanged (${result.digest.slice(0, 8)})`);
+  await run();
+  await fs.files.put(sentinel, digest); // record AFTER, so a crash re-runs
 }
 ```
 
-## Why each piece
+`checksumMatches` compares a file's stored digest against the value you pass —
+it's the read-and-compare half of the gate in one call.
 
-**Sibling sentinel file (`${path}.digest`).** Stores the digest of the
-last successfully-processed version. Co-located with the input so it
-travels with the data — if you copy `./data/` to another machine, the
-cache state goes with it.
+:::caution[Write the sentinel last]
+Record the digest *after* the work succeeds. Update it first and a crash
+mid-run leaves the sentinel claiming "done" when it isn't. Doing it last means
+a crash re-processes on the next run — so your step must be idempotent.
+:::
 
-**`hashFileAsync`.** Streams the input file through SHA-256. Constant
-memory regardless of file size. Stable: the same content always produces
-the same digest.
+## Gate on a whole directory
 
-**Compare strings.** A digest comparison is cheap. Even on a 1 GB input,
-the only "work" you do on a skip is one stream-hash read — typically
-disk-bound, no CPU.
+When the input is a tree, not a single file, `fs.dirs.hash` gives you a stable
+fingerprint of the entire directory — filenames and contents folded together:
 
-**Update sentinel after processing.** Critically, **after**. If you
-update it before, a crash mid-processing leaves the sentinel claiming
-"done" when it isn't. Doing it after means a crash leaves you in the same
-state as if you'd never tried — next run sees a digest mismatch and
-re-processes. Idempotent processors are required for this to be safe.
+```ts title="src/dir-changed.ts"
+import { fs } from "@warlock.js/fs";
 
-## Variation: many inputs, one output
+const digest = await fs.dirs.hash("src");
+const changed = !(await fs.files.checksumMatches(".src-digest", digest));
 
-Often you've got multiple inputs feeding one output, and want to skip
-work if *any* of them haven't changed:
-
-```ts
-import { hashFileAsync } from "@warlock.js/fs";
-
-async function combinedDigest(paths: string[]): Promise<string> {
-  const digests = await Promise.all(paths.map((path) => hashFileAsync(path)));
-  return digests.join("|");   // order-sensitive — fine if `paths` is stable
-}
-
-async function buildIfChanged() {
-  const inputs = ["./src/a.ts", "./src/b.ts", "./config.json"];
-
-  const current = await combinedDigest(inputs);
-  const previous = (await fileExistsAsync("./.build-digest"))
-    ? await getFileAsync("./.build-digest")
-    : null;
-
-  if (current === previous) return;
-
-  await runBuild();
-  await putFileAsync("./.build-digest", current);
+if (changed) {
+  await rebuild();
+  await fs.files.put(".src-digest", digest);
 }
 ```
 
-The `join("|")` produces a stable composite key. For a tidier digest of
-digests, run the joined string through `hashString`:
+The fingerprint is stable: the same tree always produces the same digest, and
+reordering the walk doesn't change it.
 
-```ts
-import { hashString } from "@warlock.js/fs";
+## Content-addressed output cache
 
-const composite = hashString(digests.join("|"));
+For the digest of many small inputs, fold them once with the sync `fs.hash.string`:
+
+```ts title="src/composite-key.ts"
+import { fs } from "@warlock.js/fs";
+
+const parts = await Promise.all(inputs.map((p) => fs.hash.file(p)));
+const key = fs.hash.string(parts.join("|")); // one stable composite digest
 ```
 
-## Variation: cache the output too, not just the gate
+Key a cache file by that digest and you get free deduplication — two inputs
+with identical bytes land on the same cache entry, and invalidation is implicit
+(a new digest is a new path).
 
-If your pipeline produces an output you want to keep around (a parsed
-AST, a compiled artifact), store it under a content-addressed path:
+## When not to bother
 
-```ts
-import { hashFileAsync, fileExistsAsync, getFileAsync, putFileAsync } from "@warlock.js/fs";
-
-async function compileWithCache(inputPath: string): Promise<string> {
-  const digest = await hashFileAsync(inputPath);
-  const cachePath = `./.cache/compiled/${digest}.js`;
-
-  if (await fileExistsAsync(cachePath)) {
-    return getFileAsync(cachePath);   // cache hit
-  }
-
-  const compiled = await compile(await getFileAsync(inputPath));
-  await putFileAsync(cachePath, compiled);
-
-  return compiled;
-}
-```
-
-Content-addressed paths give you free cache deduplication — two inputs
-with identical bytes share a cache entry. And cache invalidation is
-implicit: you never delete the cache, just write a new path when the
-content changes. Garbage-collect old entries on a schedule by listing
-`./.cache/compiled/` and dropping anything older than N days.
-
-## When NOT to use this
-
-- **Inputs that change every run no matter what.** Hashing buys nothing
-  if the file has a timestamp in it. Use mtime, or remove the timestamp
-  from the input.
-- **Very small, very fast pipelines.** If the pipeline takes less time
-  than the hash read does, you're losing the trade. Hash is roughly
-  disk-IO bound (~500 MB/s on a modern SSD); below that pipeline time,
-  just always run.
-- **Streaming inputs.** Hash needs the whole file. For an unbounded
-  stream, use mtime or input checksums computed incrementally.
+- **Inputs that change every run** (a timestamp baked in) — hashing buys
+  nothing; use mtime or strip the timestamp.
+- **Pipelines faster than the hash read** — the hash is roughly disk-bound;
+  below that, just always run.
 
 ## Related
 
-- [Hash files](../guides/hash-files) — the hashing surface in depth.
-- [Read and write files](../guides/read-and-write-files) — the
-  `getFile` / `putFile` calls used here.
+- [Hash files](../guides/hash-files) — the `fs.hash.*` surface in depth.
+- [The fs facade](../guides/the-fs-facade) — `checksumMatches`, `fs.dirs.hash`,
+  and friends.

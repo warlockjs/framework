@@ -1,221 +1,174 @@
 ---
 title: "Manage directories"
-description: Ensure directories exist, list children, copy / rename / delete files and trees — with ENOENT-safe deletes and full-path listings.
+description: Ensure, empty, and remove directories; list and walk trees in constant memory; copy / move across volumes; measure size and fingerprint a tree — all through fs.dirs.
 sidebar:
-  order: 2
+  order: 3
   label: "Manage directories"
 ---
 
-Everything you need to move, list, and clean up files and folders. Same
-naming convention as the rest of the package — `*Async` returns a Promise,
-the bare name is synchronous.
+Directories are the other half of file work: you stage them before writing,
+list them to find things, and wipe them when you're done. `fs.dirs.*` is the
+async surface for all of it — grouped, ergonomic, and named for what you
+actually want.
 
-## Ensure a directory exists
+```ts title="src/setup.ts"
+import { fs } from "@warlock.js/fs";
 
-```ts
-import { ensureDirectoryAsync, ensureDirectory } from "@warlock.js/fs";
-
-await ensureDirectoryAsync("./dist/cache/v2");
-// creates ./dist, ./dist/cache, ./dist/cache/v2 if any are missing
-// no-op if they're all already there
+await fs.dirs.ensure("uploads");
 ```
 
-Idempotent. Calls `mkdir({ recursive: true })` under the hood. You usually
-don't need this before writing a file — `putFileAsync`, `putJsonFileAsync`,
-`atomicWriteAsync`, and `copyFileAsync` all auto-create the immediate
-parent of their target. Reach for `ensureDirectoryAsync` when:
+Idempotent create. That single line makes `uploads/` (and every missing
+parent) exist, and does nothing if it already does.
 
-- You're about to copy several files into a directory and want the
-  directory itself created up front (`copyDirectoryAsync` also creates
-  the destination, but the explicit call documents intent).
-- You're staging an empty directory for another tool to write into.
-- You want the create step to be visible in a multi-stage script.
+:::note[The facade is async-only]
+Everything here is `await`-ed. Synchronous callers — CLI tools, code
+generators, one-shot scripts — drop to the bare primitives
+(`ensureDirectory`, `removeDirectory`, `listDirectories`, …), which are the
+sanctioned sync layer the facade delegates to. `fs.dirs` never carries an
+`Async` suffix and never blocks.
+:::
+
+## Create, empty, remove
+
+Three verbs cover the whole lifecycle, and they read exactly as they behave.
+
+```ts
+await fs.dirs.ensure("dist/cache/v2");   // create (+ parents), no-op if present
+await fs.dirs.empty("cache");            // clear contents, keep the folder
+await fs.dirs.remove("tmp");             // delete the whole tree
+```
+
+`ensure` is recursive `mkdir` — you rarely need it before writing a file,
+since `fs.files.put` auto-creates the parent. Reach for it when you want an
+empty directory staged up front, or to make the create step visible in a
+script.
+
+`empty` is the one people reinvent by hand: it removes every child but leaves
+the directory itself in place — perfect for a scratch folder you keep reusing.
+
+`remove` deletes recursively and is safe to call on a path that doesn't
+exist — a missing target is a no-op, not an error. So a wipe-and-recreate
+needs no guards:
+
+```ts
+await fs.dirs.remove("build");
+await fs.dirs.ensure("build");
+// or, if the folder should survive: await fs.dirs.empty("build");
+```
+
+## Inspect a directory
+
+Ask questions before you act on them.
+
+```ts
+await fs.dirs.exists("logs");    // boolean
+await fs.dirs.isEmpty("logs");   // boolean — no children
+await fs.dirs.count("logs");     // number of immediate children
+```
+
+`isEmpty` is the honest gate for "should I skip this?" and `count` gives you a
+quick tally without materializing the whole listing.
 
 ## List children
 
-Three variants, all returning **full paths joined to the directory you
-passed in** — not bare entry names. This means the results feed straight
-into the next call:
+`list` returns the immediate entries; `listFiles` and `listDirs` narrow to one
+type. All three yield **full paths joined to the directory you passed**, so
+results feed straight into the next call.
 
 ```ts
-import { listAsync, listFilesAsync, listDirectoriesAsync } from "@warlock.js/fs";
-
-const everything = await listAsync("./src");           // files + subdirs
-const onlyFiles = await listFilesAsync("./src");        // regular files only
-const onlyDirs = await listDirectoriesAsync("./src");   // directories only
+const everything = await fs.dirs.list("src");        // files + subdirs
+const onlyFiles = await fs.dirs.listFiles("src");    // regular files
+const onlyDirs = await fs.dirs.listDirs("src");      // subdirectories
 ```
 
-So this just works:
+Single-level by default. Pass `{ recursive: true }` to flatten the whole tree
+into one array:
 
 ```ts
-import { listFilesAsync, getFileAsync } from "@warlock.js/fs";
-
-for (const file of await listFilesAsync("./src/components")) {
-  // file = "./src/components/Button.tsx" — full path
-  const source = await getFileAsync(file);
-  // ...
-}
+const allFiles = await fs.dirs.listFiles("src", { recursive: true });
 ```
 
-**Non-recursive by design.** All three list only the immediate children.
-If you need to walk a tree, recurse yourself:
+That's convenient for small trees, but it builds the entire list in memory
+before you see the first entry. For anything large, stream instead.
+
+## Walk a tree in constant memory
+
+`walk` is an async iterator: it yields `{ path, name, type }` one entry at a
+time, so memory stays flat no matter how deep or wide the tree is.
 
 ```ts
-import { listAsync, directoryExistsAsync } from "@warlock.js/fs";
-
-async function walk(dir: string): Promise<string[]> {
-  const entries = await listAsync(dir);
-  const results: string[] = [];
-
-  for (const entry of entries) {
-    if (await directoryExistsAsync(entry)) {
-      results.push(...(await walk(entry)));
-    } else {
-      results.push(entry);
-    }
-  }
-
-  return results;
-}
-
-const allFiles = await walk("./src");
-```
-
-Why no built-in `walk`? Because every project's needs differ — extensions
-to include, dot-files to skip, depth caps, parallel limits. A hand-rolled
-walker takes ten lines and matches your project exactly.
-
-## Copy
-
-```ts
-import { copyFileAsync, copyDirectoryAsync } from "@warlock.js/fs";
-
-// File — destination's parent dir is auto-created
-await copyFileAsync("./dist/bundle.js", "./snapshot/v2/bundle.js");
-
-// Directory — fully recursive, preserves the tree
-await copyDirectoryAsync("./public", "./dist/public");
-```
-
-`copyDirectoryAsync` uses Node's `cp` with `recursive: true`. Existing
-files at the destination are overwritten. Symlinks are preserved (not
-dereferenced).
-
-## Rename / move
-
-```ts
-import { renameFileAsync } from "@warlock.js/fs";
-
-await renameFileAsync("./tmp/foo.txt", "./final/foo.txt");
-await renameFileAsync("./old-name-dir", "./new-name-dir"); // works for dirs too
-```
-
-`renameFileAsync` is a thin wrapper around `node:fs/promises`'s `rename`.
-It does **not** auto-create the destination's parent directory — if
-`./final` doesn't exist, the call fails. Pair with `ensureDirectoryAsync`
-if you can't be sure:
-
-```ts
-import { ensureDirectoryAsync, renameFileAsync } from "@warlock.js/fs";
-import path from "node:path";
-
-const destination = "./final/foo.txt";
-await ensureDirectoryAsync(path.dirname(destination));
-await renameFileAsync("./tmp/foo.txt", destination);
-```
-
-**Cross-device gotcha.** If source and destination are on different
-mounts / volumes (e.g. `/tmp` and `/var` on Linux, or moving between two
-drives on Windows), `rename` fails with `EXDEV`. The OS can't atomically
-move bytes across filesystems. The workaround is copy + delete:
-
-```ts
-import { copyFileAsync, unlinkAsync } from "@warlock.js/fs";
-
-await copyFileAsync("/tmp/foo.txt", "/var/lib/foo.txt");
-await unlinkAsync("/tmp/foo.txt");
-```
-
-## Delete
-
-```ts
-import { unlinkAsync, removeDirectoryAsync } from "@warlock.js/fs";
-
-await unlinkAsync("./obsolete.txt");          // single file
-await removeDirectoryAsync("./dist");          // recursive force
-```
-
-**Both are ENOENT-safe** — calling them on a path that doesn't exist is a
-no-op, not an error. Other errors (`EACCES` permission denied, `EBUSY`
-file in use) still throw.
-
-This means you can write reset-style code without any guards:
-
-```ts
-import { removeDirectoryAsync, ensureDirectoryAsync } from "@warlock.js/fs";
-
-// Wipe and recreate, regardless of whether ./tmp existed before
-await removeDirectoryAsync("./tmp");
-await ensureDirectoryAsync("./tmp");
-```
-
-### Picking a delete shape
-
-| You want to... | Use |
-| --- | --- |
-| Drop one file | `unlinkAsync(path)` |
-| Drop a whole tree | `removeDirectoryAsync(path)` |
-| Drop everything in a folder, keep the folder | Iterate, delete each child appropriately |
-
-For the third case:
-
-```ts
-import {
-  listAsync,
-  fileExistsAsync,
-  unlinkAsync,
-  removeDirectoryAsync,
-} from "@warlock.js/fs";
-
-for (const entry of await listAsync("./tmp")) {
-  if (await fileExistsAsync(entry)) {
-    await unlinkAsync(entry);
-  } else {
-    await removeDirectoryAsync(entry);
+for await (const entry of fs.dirs.walk("src", { recursive: true })) {
+  if (entry.type === "file" && entry.name.endsWith(".ts")) {
+    console.log(entry.path);
   }
 }
 ```
 
-## Common shapes
+You can start processing the first match immediately instead of waiting for the
+whole scan — the right default for build steps, indexers, and cleanup passes.
+`walk` also takes `{ followSymlinks: true }` when you want to descend through
+links.
 
-### Snapshot a build output
+:::note[No glob — on purpose]
+There's intentionally no `glob`. Every project disagrees about what to include,
+which dot-files to skip, and how deep to go. `walk` + a plain filter is a few
+lines, matches your project exactly, and streams. Reach for it instead of
+pattern strings.
+:::
+
+## Copy and move
+
+Both mirror the whole tree and auto-create the destination's parent.
 
 ```ts
-import { copyDirectoryAsync } from "@warlock.js/fs";
-
-const target = `./snapshots/${Date.now()}`;
-await copyDirectoryAsync("./dist", target);
-// copyDirectoryAsync creates ./snapshots/<timestamp>/ if missing
+await fs.dirs.copy("public", "dist/public");   // recursive copy
+await fs.dirs.move("staging/build", "releases/current");
 ```
 
-### Move artifacts from a staging directory
+`move` is **EXDEV-safe**: when source and destination live on different volumes
+(a `/tmp` → `/var` hop on Linux, or two drives on Windows), the OS can't rename
+across filesystems, so `fs.dirs.move` transparently falls back to copy-then-
+delete. You don't handle `EXDEV` yourself.
+
+## Measure and fingerprint
 
 ```ts
-import { listFilesAsync, renameFileAsync, ensureDirectoryAsync } from "@warlock.js/fs";
-import path from "node:path";
+await fs.dirs.size("dist");   // total bytes, recursive
+await fs.dirs.hash("dist");   // stable fingerprint of the whole tree
+```
 
-await ensureDirectoryAsync("./final");
-for (const staged of await listFilesAsync("./staging")) {
-  const target = path.join("./final", path.basename(staged));
-  await renameFileAsync(staged, target);
+`size` sums every file underneath — the number you'd report as "build output
+size". `hash` produces a **stable** digest of the tree's structure and content
+(SHA-256 by default): the same files in the same shape always hash the same,
+regardless of walk order. It's the reliable way to answer "did this directory
+change since last time?" without diffing entry by entry — see
+[Hash files](./hash-files) for the file-level counterpart.
+
+## Prefer an object? Use a handle
+
+When you're doing several operations against one directory, `fs.dir(path)` hands
+you a lazy `Directory` — no IO until you call a method, and child handles for
+free.
+
+```ts
+const src = fs.dir("src");
+
+for (const file of await src.listFiles({ recursive: true })) {
+  if (file.extension === ".ts") {
+    console.log(await file.size());  // File handle, per entry
+  }
 }
+
+const nested = src.dir("components", "ui");  // child Directory handle
 ```
 
-(Works only if `./staging` and `./final` are on the same mount.)
+`listFiles` / `listDirs` on a handle return `File[]` / `Directory[]`, so you keep
+chaining without re-joining paths by hand. See
+[The fs facade](./the-fs-facade) for the full handle surface.
 
 ## Related
 
-- [Read and write files](./read-and-write-files) — text + JSON IO.
-- [Write atomically](./write-atomically) — for files concurrent readers
-  see.
-- [Reference / API](../reference/api) — full signatures.
+- [Read and write files](./read-and-write-files) — text + JSON IO through `fs.files.*`.
+- [The fs facade](./the-fs-facade) — the whole `fs.*` surface, including handles.
+- [Hash files](./hash-files) — fingerprinting for cache invalidation.
+- [Reference / API](../reference/api) — full signatures, including the sync primitives.

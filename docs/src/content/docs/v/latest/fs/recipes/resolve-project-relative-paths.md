@@ -1,89 +1,92 @@
 ---
 title: "Resolve project-relative paths"
-description: A relative string like "./config.json" resolves against the process working directory, not the file you wrote it in. Anchor paths reliably, then hand them to the fs helpers.
+description: Anchor a directory once with fs.dir(root), then build File/Directory handles with .file(...segs) and .dir(...segs) — normalized, cwd-independent paths that carry their own IO.
 sidebar:
-  order: 5
+  order: 6
   label: "Resolve project-relative paths"
 ---
 
-The bug everyone hits once: you write `getFileAsync("./data/seed.json")`, it works when you run from the project root, then it breaks the moment a script runs from a different directory or a cron job runs from `/`. Relative paths resolve against `process.cwd()` — the *working directory*, not the file the code lives in.
+The bug everyone hits once: `fs.files.get("./data/seed.json")` works from the
+project root, then breaks the moment a script runs from a different directory
+or a cron job runs from `/`. Relative strings resolve against `process.cwd()` —
+the *working directory*, not the file the code lives in.
 
-`@warlock.js/fs` doesn't ship a path resolver — that's `node:path`'s job. The pattern is: build an absolute path with `node:path`, then pass it to the fs helpers. Every fs function takes a plain string and is happy with absolute paths.
+The facade's fix: anchor a `Directory` handle once, then let it build child
+paths for you.
 
-## Anchor to the project root
+## Anchor once, derive everything
 
-The most common need: "this path is relative to my project root, wherever the process happens to start." Pin the root once, derive everything from it:
+`fs.dir(root)` gives you a handle. Its `.file(...segments)` and
+`.dir(...segments)` build child handles that carry the fully-resolved path —
+and the IO methods with them:
 
-```ts
-import path from "node:path";
-import { getJsonFileAsync } from "@warlock.js/fs";
+```ts title="src/paths.ts"
+import { fs } from "@warlock.js/fs";
 
-// Resolve against cwd — fine when you control where the process starts
-// (npm/yarn scripts always run from the package root).
-const projectRoot = process.cwd();
+const root = fs.dir(process.cwd());
 
-const seedPath = path.join(projectRoot, "data", "seed.json");
-const seed = await getJsonFileAsync(seedPath);
+const seed = await root.file("data", "seed.json").getJson();
+await root.dir("storage").file("state.json").putJson({ ok: true });
 ```
 
-`path.join` also normalizes separators, so the same code works on Windows (`\`) and POSIX (`/`).
+Segments are joined with `node:path`, so the same code normalizes separators on
+Windows (`\`) and POSIX (`/`) — no hand-concatenating with `+` and `/`.
 
-## Anchor to the current file (ESM)
+## Anchor to the current module (ESM)
 
-When a path must resolve relative to *the module that references it* — not the working directory — derive the directory from `import.meta.url`. This is the robust choice for library code, seeders, and anything that might be invoked from elsewhere:
+When a path must resolve next to *the module that references it* — a seeder, a
+template loader — anchor the handle to the file's own directory instead of the
+cwd:
 
-```ts
+```ts title="src/template-loader.ts"
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getFileAsync } from "@warlock.js/fs";
+import { fs } from "@warlock.js/fs";
 
-const here = path.dirname(fileURLToPath(import.meta.url));
+const here = fs.dir(path.dirname(fileURLToPath(import.meta.url)));
 
-// Always resolves next to THIS file, regardless of cwd.
-const template = await getFileAsync(path.join(here, "templates/email.html"));
+// Resolves next to THIS file regardless of where the process started.
+const html = await here.file("templates", "email.html").get();
 ```
 
-`import.meta.url` is the ESM equivalent of CommonJS's `__dirname`. `fileURLToPath` converts the `file://` URL it gives you into a real filesystem path.
+## Handles compose
 
-## Build a small path helper
+Because a handle is just a stable reference to a path (zero IO until you call a
+method), you can pass the anchored directory around and branch off it wherever
+you need:
 
-If you resolve from the root a lot, wrap it once:
+```ts title="src/branch.ts"
+const storage = fs.dir(process.cwd()).dir("storage");
 
-```ts
-import path from "node:path";
-import { putJsonFileAsync, getJsonFileAsync } from "@warlock.js/fs";
-
-const fromRoot = (...segments: string[]) => path.join(process.cwd(), ...segments);
-
-await putJsonFileAsync(fromRoot("storage", "state.json"), { ok: true });
-const state = await getJsonFileAsync(fromRoot("storage", "state.json"));
+await storage.dir("uploads").ensure();
+const manifest = storage.file("manifest.json");
+await manifest.putJson({ version: 1 });
 ```
 
-Now every path in the module reads as `fromRoot("storage", "state.json")` — anchored, normalized, and obvious.
+:::note[fs does not sandbox — storage does]
+`fs.dir(root).file("..", "..", "etc/passwd")` will happily resolve outside
+`root`. The facade builds and normalizes paths; it does **not** contain them.
+If you're resolving *untrusted* segments (an upload name, a user-supplied key),
+put your storage layer in front — sandboxing a base directory is its job, not
+the fs facade's.
+:::
 
-## Inside a Warlock.js app: use the path helpers
+## Inside a Warlock.js app
 
-If you're in a `@warlock.js/core` project, you don't need to hand-roll the root anchor — core ships path helpers that already know your project layout (`rootPath`, `storagePath`, `publicPath`, `srcPath`, `tempPath`, `uploadsPath`, and friends). Pair them with the fs IO:
+In a `@warlock.js/core` project you don't hand-roll the root at all — core
+ships path helpers (`rootPath`, `storagePath`, `publicPath`, `uploadsPath`, …)
+that already know your layout. Feed one straight into a handle:
 
-```ts
-import { atomicWriteJsonAsync, getJsonFileAsync } from "@warlock.js/fs";
+```ts title="src/app.ts"
+import { fs } from "@warlock.js/fs";
 import { storagePath } from "@warlock.js/core";
 
-await atomicWriteJsonAsync(storagePath("manifest.json"), manifest);
-const back = await getJsonFileAsync(storagePath("manifest.json"));
+await fs.file(storagePath("manifest.json")).putJson(manifest);
 ```
-
-`storagePath("manifest.json")` returns the absolute path to `manifest.json` under your app's storage directory — no `process.cwd()`, no `import.meta.url` bookkeeping. This is the idiomatic choice inside Warlock; the `node:path` patterns above are for standalone use where you don't have the framework's conventions.
-
-## Things to avoid
-
-- **Don't concatenate paths with `+` and `/`.** `dir + "/" + name` breaks on Windows and double-slashes when `dir` already ends in `/`. Use `path.join`.
-- **Don't assume `process.cwd()` is the project root** in long-running servers spawned by a process manager — it might be `/`. Anchor to `import.meta.url` (or core's path helpers) when in doubt.
-- **Don't store absolute paths in files you commit** (manifests, configs). Store paths relative to a known root and re-resolve on read.
 
 ## Related
 
-- [Read and write files](../guides/read-and-write-files) — the IO calls
-  these paths feed into.
-- [Installation](../getting-started/02-installation) — pairing fs with
-  `@warlock.js/core`'s path conventions.
+- [Work with handles](../guides/work-with-handles) — the full `File` /
+  `Directory` handle API.
+- [Copy files and folders](./copy-files-and-folders) — `copyTo` / `moveTo`
+  take these directory handles.
