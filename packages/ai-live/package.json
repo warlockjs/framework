@@ -1,0 +1,38 @@
+{
+  "name": "@warlock.js/ai-live",
+  "version": "4.6.0",
+  "description": "Live & generative rich-media for @warlock.js/ai — ai.realtime() duplex voice sessions and ai.video() text-to-video. The heavy, demand-gated modalities, kept out of core so text/image/speech stay dependency-light.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "ai",
+    "realtime",
+    "voice",
+    "video",
+    "warlock"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@warlock.js/logger": "*"
+  },
+  "peerDependencies": {
+    "@warlock.js/ai": "*"
+  },
+  "peerDependenciesMeta": {
+    "ws": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^4.1.4"
+  }
+}
