@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/core` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.6.1
+
+### Fixed
+
+- a fatal `uncaughtException` at production boot (e.g. a config file that throws) is no longer swallowed into a silent `exit 0` — bootstrap now wires the crash handler to exit non-zero in production so `warlock start` surfaces the failure; the dev server still logs-and-continues for HMR
+
 ## 4.6.0
 
 ### Added
