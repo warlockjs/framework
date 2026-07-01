@@ -8,7 +8,7 @@
 
 ---
 name: setup-google
-description: 'Wire @warlock.js/ai-google — new GoogleSDK({apiKey} | {vertexai, project, location}) for Gemini API + Vertex AI. generateContent / embedContent + thoughtSignature round-trip for thinking models, batched embeddings. .model({name, vision?, reasoning?, audio?, pdf?}) with cost-truth capabilities, extended thinking via options.reasoning → thinkingConfig.thinkingBudget, usage reasoningTokens (thoughtsTokenCount) / cachedTokens (cachedContentTokenCount). Triggers: `GoogleSDK`, `google.model`, `google.embedder`, `thoughtSignature`, `responseJsonSchema`, `vertexai`, `reasoning`, `thinkingConfig`, `thinkingBudget`, `thoughtsTokenCount`, `reasoningTokens`, `cachedTokens`, `promptCaching`, `cacheControl`; "use gemini", "wire Vertex AI", "gemini embeddings", "gemini thinking tool calls", "gemini 2.5 thinking budget", "gemini cached content cost"; import `import { GoogleSDK } from "@warlock.js/ai-google"`. Skip: agent loop `@warlock.js/ai/run-ai-agent/SKILL.md`; provider picking `@warlock.js/ai/pick-ai-provider/SKILL.md`; embedder usage `@warlock.js/ai/embed-text/SKILL.md`; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-ollama`; raw `@google/genai`, `@google-cloud/vertexai`, Vercel `@ai-sdk/google`.'
+description: 'Wire @warlock.js/ai-google — new GoogleSDK({apiKey} | {vertexai, project, location}) for Gemini API + Vertex AI. generateContent / embedContent + thoughtSignature round-trip for thinking models, batched embeddings. .model({name, vision?, reasoning?, audio?, pdf?}) with cost-truth capabilities (PDF + audio input map to Gemini inlineData), .image({name, pricing?}) for Imagen (imagen-*) image generation via ai.image, extended thinking via options.reasoning → thinkingConfig.thinkingBudget, usage reasoningTokens (thoughtsTokenCount) / cachedTokens (cachedContentTokenCount). Triggers: `GoogleSDK`, `google.model`, `google.embedder`, `google.image`, `imagen`, `generateImages`, `ai.image`, `inlineData`, `pdf input`, `audio input`, `thoughtSignature`, `responseJsonSchema`, `vertexai`, `reasoning`, `thinkingConfig`, `thinkingBudget`, `thoughtsTokenCount`, `reasoningTokens`, `cachedTokens`, `promptCaching`, `cacheControl`; "use gemini", "wire Vertex AI", "gemini embeddings", "gemini thinking tool calls", "gemini 2.5 thinking budget", "gemini cached content cost", "generate images with imagen", "send a pdf / audio to gemini"; import `import { GoogleSDK } from "@warlock.js/ai-google"`. Skip: the ai.image verb surface — `@warlock.js/ai/generate-images/SKILL.md`; agent loop `@warlock.js/ai/run-ai-agent/SKILL.md`; provider picking `@warlock.js/ai/pick-ai-provider/SKILL.md`; embedder usage `@warlock.js/ai/embed-text/SKILL.md`; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-ollama`; raw `@google/genai`, `@google-cloud/vertexai`, Vercel `@ai-sdk/google`.'
 ---
 
 # `@warlock.js/ai-google`
@@ -75,11 +75,37 @@ Gemini content roles must be `"user"` or `"model"` — there is no `"system"` ro
 
 Object-root `responseSchema` + `structuredOutput`-capable → `config.responseMimeType = "application/json"` + `config.responseJsonSchema = <schema>` (Gemini takes a **raw JSON Schema** directly, not its typed `Schema`).
 
-## Multipart messages (vision)
+## Multipart messages (image / PDF / audio input)
+
+Gemini's multimodal input is **media-agnostic** — every binary modality maps to one `inlineData` block keyed by IANA mime type:
 
 - `{ type: "text" }` → `{ text }`
 - `{ type: "image", source: { base64, mediaType } }` → `{ inlineData: { mimeType, data } }`
-- `{ type: "image", source: { url } }` → **throws `InvalidRequestError`**. `generateContent` does not fetch arbitrary remote URLs (only Files API / GCS URIs). Resolve images to base64 first.
+- `{ type: "pdf", source: { base64, mediaType: "application/pdf" } }` → `{ inlineData: { mimeType: "application/pdf", data } }` (gated on `capabilities.pdf`)
+- `{ type: "audio", source: { base64, mediaType: "audio/mpeg" } }` → `{ inlineData: { mimeType: "audio/mpeg", data } }` (gated on `capabilities.audio`)
+- any `{ source: { url } }` → **throws `InvalidRequestError`** naming the modality. `generateContent` does not fetch arbitrary remote URLs (only Files API / GCS URIs). Resolve to base64 first.
+
+PDF and audio reach the wire only when the model declares the matching capability (inferred for the multimodal Gemini families above) — so capability ≡ behavior.
+
+## Image generation (Imagen)
+
+`google.image({ name })` returns an `ImageModelContract` (Imagen, via `ai.models.generateImages`) for the `ai.image()` verb:
+
+```ts
+const imagen = google.image({ name: "imagen-4.0-generate-001", pricing: { perImage: 0.04 } });
+
+const { data, error } = await ai.image({
+  model: imagen,
+  prompt: "a watercolor lighthouse at dawn",
+  aspectRatio: "3:4",          // Imagen ratio (vs OpenAI's WxH `size`)
+  negativePrompt: "text, watermark",
+  options: { imageSize: "2K", personGeneration: "allow_adult" }, // Imagen passthroughs
+});
+```
+
+- Imagen is **per-image-metered** (price with `{ perImage }`) and returns base64 bytes — no hosted URL, no token usage.
+- When every candidate is safety-filtered, the run surfaces a typed `ContentFilterError` on `result.error`.
+- A non-Imagen model id (`google.image({ name: "gemini-2.5-flash" })`) throws `InvalidRequestError` at construction — Gemini's *native* image output (`gemini-*-image` via `generateContent`) is a separate surface, not routed here. The verb surface lives in [`@warlock.js/ai/generate-images/SKILL.md`](@warlock.js/ai/generate-images/SKILL.md).
 
 ## Streaming
 

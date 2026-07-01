@@ -150,13 +150,22 @@ function toResponseObject(raw: string): Record<string, unknown> {
 }
 
 /**
- * Map a resolved `ContentPart` to a Gemini `Part`. Images are sent as
- * inline base64 (`inlineData`). Gemini's `generateContent` does not
- * fetch arbitrary remote URLs (only Files API / GCS URIs via
- * `fileData`), so a neutral `{ url }` image surfaces a typed
- * `InvalidRequestError` upfront rather than a downstream Gemini fault.
- * The agent resolves attachments before this point, so nothing is
- * read or fetched here.
+ * Map a resolved `ContentPart` to a Gemini `Part`. All binary
+ * modalities — **image, PDF, and audio** — go to a single
+ * `inlineData: { mimeType, data }` block; Gemini's multimodal input is
+ * media-agnostic and keys off the IANA `mimeType` (`image/png`,
+ * `application/pdf`, `audio/mpeg`, …), so one mapping covers every part
+ * type the model's capabilities admit. PDF and audio reach this point
+ * only when the model declares the matching capability (`google.model`
+ * infers `pdf` / `audio` from the multimodal Gemini families); the
+ * agent's modality gate throws upfront otherwise, so capability and
+ * behavior stay in lockstep.
+ *
+ * Gemini's `generateContent` does not fetch arbitrary remote URLs (only
+ * Files API / GCS URIs via `fileData`), so a neutral `{ url }` source
+ * surfaces a typed `InvalidRequestError` upfront — for any modality —
+ * rather than a downstream Gemini fault. The agent resolves attachments
+ * before this point, so nothing is read or fetched here.
  */
 function toGooglePart(part: ContentPart): Part {
   if (part.type === "text") {
@@ -165,7 +174,7 @@ function toGooglePart(part: ContentPart): Part {
 
   if ("url" in part.source) {
     throw new InvalidRequestError(
-      "Gemini generateContent does not fetch remote-URL images; supply base64 image bytes instead.",
+      `Gemini generateContent cannot fetch remote-URL ${part.type} media; supply base64 bytes instead.`,
     );
   }
 

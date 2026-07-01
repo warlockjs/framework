@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import type {
   EmbedderContract,
+  ImageModelContract,
   ModelContract,
   ModelPricing,
   SDKAdapterContract,
@@ -8,10 +9,12 @@ import type {
 import { approximateTokenCount } from "@warlock.js/ai";
 import type {
   GoogleEmbedderConfig,
+  GoogleImageConfig,
   GoogleModelConfig,
   GoogleSDKConfig,
 } from "./config.type";
 import { GoogleEmbedder } from "./embedder";
+import { GoogleImageModel } from "./image";
 import { GoogleModel } from "./model";
 
 /**
@@ -87,5 +90,27 @@ export class GoogleSDK implements SDKAdapterContract {
    */
   public embedder(config: GoogleEmbedderConfig): EmbedderContract {
     return new GoogleEmbedder(this.ai, config, this.provider);
+  }
+
+  /**
+   * Build a `GoogleImageModel` (Imagen) bound to this SDK's client for
+   * use with `ai.image({ model, prompt })`. Accepts the `imagen-*`
+   * family; a non-Imagen model id is rejected at construction.
+   *
+   * Pricing resolution mirrors `model()`: per-model `config.pricing`
+   * wins, otherwise the SDK-level registry entry keyed by `config.name`,
+   * otherwise `undefined`. Imagen is per-image-metered, so the registry
+   * entry typically carries `{ perImage }`.
+   *
+   * @example
+   * const model = google.image({ name: "imagen-4.0-generate-001" });
+   * const { data } = await ai.image({ model, prompt: "a watercolor lighthouse" });
+   */
+  public image(config: GoogleImageConfig): ImageModelContract {
+    const resolvedPricing = config.pricing ?? this.pricing?.[config.name];
+    const resolvedConfig: GoogleImageConfig =
+      resolvedPricing === config.pricing ? config : { ...config, pricing: resolvedPricing };
+
+    return new GoogleImageModel(this.ai, resolvedConfig, this.provider);
   }
 }

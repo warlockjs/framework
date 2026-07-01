@@ -1,4 +1,9 @@
-import type { EmbedderConfig, ModelConfig, ModelPricing } from "@warlock.js/ai";
+import type {
+  EmbedderConfig,
+  ImageModelConfig,
+  ModelConfig,
+  ModelPricing,
+} from "@warlock.js/ai";
 import type { GoogleGenAIOptions } from "@google/genai";
 
 /**
@@ -103,3 +108,14 @@ export type GoogleModelConfig = ModelConfig & {
  * google.embedder({ name: "gemini-embedding-001", dimensions: 768 });
  */
 export type GoogleEmbedderConfig = EmbedderConfig;
+
+/**
+ * Per-model configuration for `GoogleSDK.image()`. Mirrors the neutral
+ * {@link ImageModelConfig} — `name` is an `imagen-*` model id and
+ * `pricing` is the optional per-model `perImage` USD override.
+ *
+ * @example
+ * google.image({ name: "imagen-4.0-generate-001" });
+ * google.image({ name: "imagen-4.0-generate-001", pricing: { perImage: 0.04 } });
+ */
+export type GoogleImageConfig = ImageModelConfig;
