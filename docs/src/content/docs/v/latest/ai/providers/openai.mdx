@@ -118,3 +118,158 @@ Picking `"json_object"` or `"text"` also flips the model's inferred `capabilitie
 For the full surface (pricing config, streaming caveats, embedding
 dimension truncation, token counting), see the
 `setup-openai` skill.
+
+## Image generation
+
+`openai.image({ name })` returns an `ImageModelContract` for the
+[`ai.image()`](/v/latest/ai/) output verb — prompt in, images out, in the
+same never-throws `{ data, error, usage, report }` envelope every
+executable returns. OpenAI ships two metering models behind one factory:
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
+
+// gpt-image-1 — token-metered; always returns base64 bytes.
+const gpt = openai.image({ name: "gpt-image-1", pricing: { input: 5, output: 40 } });
+
+// dall-e-3 — per-image pricing; base64 by default.
+const dalle = openai.image({ name: "dall-e-3", pricing: { perImage: 0.04 } });
+
+const { data, error } = await ai.image({
+  model: gpt,
+  prompt: "an isometric office desk, soft studio lighting",
+  size: "1024x1024",
+  quality: "high",
+});
+
+if (error) {
+  console.warn(error.code); // typed AIError (content-filter / rate-limit / …)
+} else {
+  for (const img of data.images) {
+    if (img.type === "base64") save(Buffer.from(img.base64, "base64"), img.mediaType);
+    else download(img.url);
+  }
+}
+```
+
+- `gpt-image-*` is **token-metered** — price it with `{ input, output }` (USD
+  per 1M tokens). The adapter never sends `response_format` (the API rejects
+  it), so it always returns base64 bytes.
+- `dall-e-*` is **per-image** — price it with `{ perImage }` (or
+  `perImageBySize`). It defaults to base64; opt into a hosted URL with
+  `options: { responseFormat: "url" }`.
+- A non-image model id (`openai.image({ name: "gpt-4o" })`) throws
+  `InvalidRequestError` **at construction** — fail fast, like the embedder
+  guard.
+
+The image spend folds into the same `Usage.cost` rollup as text — no second
+accounting path. See [`ai.image`](/v/latest/ai/) for the full verb surface
+(options, cost-truth, `GeneratedImage`).
+
+## Speech (text-to-speech)
+
+`openai.speech({ name })` returns a `SpeechModelContract` for the
+[`ai.speech()`](/v/latest/ai/) verb — text in, audio out.
+
+```ts
+// tts-1 / tts-1-hd — billed per INPUT CHARACTER.
+const classic = openai.speech({ name: "tts-1", voice: "alloy", pricing: { perMillionCharacters: 15 } });
+
+// gpt-4o-mini-tts — billed per TOKEN; supports `instructions` tone steering.
+const steered = openai.speech({ name: "gpt-4o-mini-tts", pricing: { input: 0.6, output: 12 } });
+
+const { data, error } = await ai.speech({
+  model: steered,
+  text: "Welcome aboard. Let's get you set up.",
+  voice: "verse",             // overrides the model default
+  format: "wav",              // "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm"
+  speed: 1.25,                // OpenAI 0.25–4.0
+  instructions: "calm, warm", // gpt-4o-mini-tts only
+});
+
+if (error) {
+  console.warn(error.code);
+} else {
+  const { base64, mediaType } = data.audio; // GeneratedAudio, always base64 today
+  await fs.writeFile("welcome.wav", Buffer.from(base64, "base64"));
+}
+```
+
+The OpenAI container defaults to `mp3` (→ `audio/mpeg`); `speed` and
+`instructions` are only sent when set, and the default voice is `alloy` when
+neither the call nor the model config supplies one. `tts-1` reports no token
+usage, so its cost is priced entirely from the input character count.
+
+## Transcription (speech-to-text)
+
+`openai.transcribe({ name })` returns a `TranscriptionModelContract` for the
+[`ai.transcribe()`](/v/latest/ai/) verb — audio in, text out. Build the
+`AudioInput` with `ai.audioFromFile(path)` (reads disk, infers the media type,
+recognizes WhatsApp `.ogg` / `.opus` and iOS `.m4a`) or
+`ai.audioFromBuffer(bytes, mediaType)`.
+
+```ts
+// whisper-1 — defaults to verbose_json (segments + duration); billed PER MINUTE.
+const whisper = openai.transcribe({ name: "whisper-1", pricing: { perMinute: 0.006 } });
+
+// gpt-4o-transcribe — defaults to json; billed PER TOKEN.
+const gpt4o = openai.transcribe({ name: "gpt-4o-transcribe", pricing: { input: 2.5, output: 10 } });
+
+const audio = await ai.audioFromFile("./voice-note.ogg");
+
+const { data, error } = await ai.transcribe({
+  model: whisper,
+  audio,
+  language: "en",             // BCP-47 hint — improves accuracy + latency
+});
+
+if (error) {
+  console.warn(error.code);
+} else {
+  console.log(data.text);     // full transcript
+  for (const seg of data.segments ?? []) {
+    console.log(seg.start, seg.end, seg.text); // whisper verbose_json segments
+  }
+}
+```
+
+`segments` and `report.durationSeconds` appear only in whisper's
+`verbose_json` mode — use them to build subtitles or jump-to-timestamp. The
+adapter wraps the base64 bytes in an uploadable via the SDK's `toFile`,
+declaring the codec from `audio.mediaType` / `audio.filename`. `whisper-1`
+cost derives from `durationSeconds`; if the provider reports no duration, cost
+stays `undefined` — no guessing.
+
+## PDF and audio input (opt-in)
+
+Vision is auto-detected, but **PDF and audio input parts are off by default** —
+OpenAI accepts them only on specific model families, so the capability is
+honest-off until you opt in:
+
+```ts
+const doc = openai.model({ name: "gpt-4o", pdf: true });    // PDF file parts
+const listen = openai.model({ name: "gpt-4o-audio-preview", audio: true }); // input_audio
+```
+
+| Content part | OpenAI wire mapping | Requires |
+| --- | --- | --- |
+| `{ type: "pdf", source: { base64, mediaType } }` | `{ type: "file", file: { filename, file_data } }` | `.model({ pdf: true })` |
+| `{ type: "audio", source: { base64, mediaType } }` | `{ type: "input_audio", input_audio: { data, format } }` | `.model({ audio: true })` |
+
+PDF and audio reach the wire only when the model declares the matching
+capability — the agent's modality gate throws otherwise, so capability ≡
+behavior. Only `wav` / `mp3` audio media types are accepted, and a remote-URL
+PDF/audio source raises a typed `InvalidRequestError` (OpenAI has no remote
+file/audio source — resolve to base64 first). An explicit flag always wins
+over inference.
+
+## Related
+
+- [`ai.image` / `ai.speech` / `ai.transcribe`](/v/latest/ai/) — the modality
+  verb surfaces these factories feed.
+- [Google provider](/v/latest/ai/providers/google/) — Imagen image
+  generation and Gemini `inlineData` multimodal input.
+- [API reference](/v/latest/ai/reference/api/) — every public export.

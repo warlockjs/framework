@@ -139,8 +139,72 @@ google.embedder({ name: "gemini-embedding-001", dimensions: 768 });
 - **Embeddings** — `gemini-embedding-001`, `text-embedding-004`, native
   batch (see above).
 
-Image attachments accept both a remote `url` and inlined `base64`
-bytes.
+- **PDF + audio input** — the multimodal Gemini families accept document
+  and audio parts, both mapped to Gemini's media-agnostic `inlineData`
+  block (see below). `pdf` / `audio` mirror the `vision` inference; override
+  either with `google.model({ name, pdf: true, audio: false })`.
+
+Image attachments accept inlined `base64` bytes (with `mediaType`). Note:
+`generateContent` does not fetch arbitrary remote URLs, so a `{ source: { url } }`
+PDF or audio part throws `InvalidRequestError` — resolve to base64 first.
+
+## Multimodal input maps to `inlineData`
+
+Gemini's multimodal input is **media-agnostic** — every binary modality maps
+to one `inlineData` block keyed by IANA mime type, so image, PDF, and audio
+all take the same shape:
+
+- `{ type: "image", source: { base64, mediaType } }` → `{ inlineData: { mimeType, data } }`
+- `{ type: "pdf", source: { base64, mediaType: "application/pdf" } }` → `{ inlineData: { mimeType: "application/pdf", data } }` (gated on `capabilities.pdf`)
+- `{ type: "audio", source: { base64, mediaType: "audio/mpeg" } }` → `{ inlineData: { mimeType: "audio/mpeg", data } }` (gated on `capabilities.audio`)
+
+PDF and audio reach the wire only when the model declares the matching
+capability (inferred for the multimodal Gemini families) — so capability ≡
+behavior.
+
+## Image generation (Imagen)
+
+`google.image({ name })` returns an `ImageModelContract` (Imagen, via
+`ai.models.generateImages`) for the [`ai.image()`](/v/latest/ai/) output
+verb — prompt in, images out, in the same never-throws
+`{ data, error, usage, report }` envelope every executable returns.
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { GoogleSDK } from "@warlock.js/ai-google";
+
+const google = new GoogleSDK({ apiKey: process.env.GEMINI_API_KEY! });
+const imagen = google.image({ name: "imagen-4.0-generate-001", pricing: { perImage: 0.04 } });
+
+const { data, error } = await ai.image({
+  model: imagen,
+  prompt: "a watercolor lighthouse at dawn",
+  aspectRatio: "3:4",              // Imagen ratio (vs OpenAI's WxH `size`)
+  negativePrompt: "text, watermark",
+  options: { imageSize: "2K", personGeneration: "allow_adult" }, // Imagen passthroughs
+});
+
+if (error) {
+  console.warn(error.code); // typed AIError — content-filter when every candidate is safety-filtered
+} else {
+  for (const img of data.images) {
+    save(Buffer.from(img.base64, "base64"), img.mediaType); // Imagen returns base64 bytes
+  }
+}
+```
+
+- Imagen is **per-image-metered** — price it with `{ perImage }`. It returns
+  base64 bytes (no hosted URL, no token usage), and the spend folds into the
+  same `Usage.cost` rollup as text.
+- When every candidate is safety-filtered, the run surfaces a typed
+  `ContentFilterError` on `result.error`.
+- A non-Imagen model id (`google.image({ name: "gemini-2.5-flash" })`) throws
+  `InvalidRequestError` **at construction** — Gemini's *native* image output
+  (`gemini-*-image` via `generateContent`) is a separate surface, not routed
+  here.
+
+See [`ai.image`](/v/latest/ai/) for the full verb surface (options,
+cost-truth, `GeneratedImage`).
 
 ## Pricing and usage
 

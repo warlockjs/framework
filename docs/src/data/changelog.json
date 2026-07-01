@@ -18,8 +18,24 @@
       "slug": "ai-bedrock"
     },
     {
+      "name": "@warlock.js/ai-deepseek",
+      "slug": "ai-deepseek"
+    },
+    {
       "name": "@warlock.js/ai-google",
       "slug": "ai-google"
+    },
+    {
+      "name": "@warlock.js/ai-groq",
+      "slug": "ai-groq"
+    },
+    {
+      "name": "@warlock.js/ai-live",
+      "slug": "ai-live"
+    },
+    {
+      "name": "@warlock.js/ai-mistral",
+      "slug": "ai-mistral"
     },
     {
       "name": "@warlock.js/ai-ollama",
@@ -40,6 +56,10 @@
     {
       "name": "@warlock.js/ai-workspace",
       "slug": "ai-workspace"
+    },
+    {
+      "name": "@warlock.js/ai-xai",
+      "slug": "ai-xai"
     },
     {
       "name": "@warlock.js/auth",
@@ -70,6 +90,10 @@
       "slug": "notifications"
     },
     {
+      "name": "@warlock.js/scheduler",
+      "slug": "scheduler"
+    },
+    {
       "name": "@warlock.js/seal",
       "slug": "seal"
     },
@@ -79,6 +103,459 @@
     }
   ],
   "releases": [
+    {
+      "version": "4.6.0",
+      "id": "v4-6-0",
+      "date": "July 1, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "The AI framework closes every remaining capability gap. <strong>Output modalities</strong> land — <code>ai.image()</code>, <code>ai.speech()</code>, and <code>ai.transcribe()</code>, plus the new <strong><code>@warlock.js/ai-live</code></strong> package for <code>ai.realtime()</code> duplex voice + <code>ai.video()</code>. <strong>RAG</strong> gains first-party vector stores and document loaders (<code>ai.rag.pgVectorStore</code> on Postgres/pgvector, <code>ai.rag.loadWeb</code> / <code>loadPdf</code> / <code>loadHtml</code> / <code>loadText</code>). <strong>Durable mid-run crash-resume</strong> comes to agents and planners (<code>agent.resume()</code> / <code>planner.resume()</code> via an opt-in <code>durable</code> store). And <strong>provider breadth</strong> doubles with four new OpenAI-compatible adapters — <strong><code>@warlock.js/ai-mistral</code></strong>, <strong><code>ai-groq</code></strong>, <strong><code>ai-deepseek</code></strong>, and <strong><code>ai-xai</code></strong>.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 9,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 9
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>ai.image(params)</code></strong> — image generation, the first verb of the output-modality track (Theme I). Wraps an <code>ImageModelContract</code> in the uniform never-throws <code>{ data, error, usage, report }</code> envelope, with cost-truth (per-token for <code>gpt-image</code>, per-image for DALL·E / Imagen) folded into the same <code>Usage.cost</code> rollup and a <code>type: \"image\"</code> report routed to observers. Ships on the OpenAI + Google adapters."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>SDKAdapterContract.image?(config)</code></strong> — the image-model capability seam, mirroring <code>embedder?()</code>. Adds <code>ImageModelContract</code>, <code>GeneratedImage</code> (discriminated <code>base64</code> | <code>url</code>), <code>ImageModelPricing</code>, and <code>ImageGenerationOptions</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>MockSDK().image(...)</code> + <code>MockImageModel</code></strong> — deterministic image doubles (scriptable responses, recorded calls, pricing) for tests."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>ai.speech(params)</code> + <code>ai.transcribe(params)</code></strong> — text-to-speech and speech-to-text, the audio verbs of the modality track. Same uniform never-throws envelope + cost-truth (per-character / per-minute / per-token). New <code>SpeechModelContract</code> / <code>TranscriptionModelContract</code> on <code>SDKAdapterContract.speech?()</code> / <code>transcribe?()</code>, plus <code>MockSpeechModel</code> / <code>MockTranscriptionModel</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>ai.audioFromFile(path)</code> / <code>ai.audioFromBuffer(bytes, mediaType)</code> / <code>ai.audioMediaTypeForFilename(name)</code></strong> — non-AI utilities that package audio (WhatsApp <code>.ogg</code>/<code>.opus</code>, iOS <code>.m4a</code>, …) into the <code>AudioInput</code> shape <code>ai.transcribe</code> consumes."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>ai.rag.pgVectorStore({ client })</code></strong> — a Postgres + pgvector vector store satisfying <code>VectorStoreContract</code> (upsert / query / removeNamespace), with an <code>ensureSchema()</code> DDL helper and a lazy <code>pg</code> optional peer."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>ai.rag.loadText</code> / <code>loadHtml</code> / <code>loadWeb</code> / <code>loadPdf</code></strong> — document loaders producing <code>RagDocument</code>s for <code>.index()</code>. <code>loadWeb</code> is SSRF-safe (routes through <code>guardedFetch</code> / <code>OutboundPolicy</code>); <code>loadPdf</code> uses a lazy <code>pdf-parse</code> optional peer."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Durable mid-run crash-resume</strong> — opt-in <code>durable: { store, deleteOnComplete? }</code> on <code>ai.agent</code> / <code>ai.planner</code> with a stable <code>runId</code> + <code>agent.resume(runId)</code> / <code>planner.resume(runId)</code>. Per-trip (agent) / per-node (planner) checkpoints reuse <code>ai.snapshot.{memory,pg,redis}</code>; drift detection via <code>AgentDriftError</code> / <code>PlannerDriftError</code> (bypass with <code>{ force: true }</code>); completed work never re-runs its tools and usage is never double-counted."
+            },
+            {
+              "type": "Added",
+              "html": "**<code>ai.rag.*</code> namespace** now also carries <code>chunk</code>, <code>cacheVectorStore</code>, <code>pgVectorStore</code>, <code>loadText</code>/<code>loadHtml</code>/<code>loadWeb</code>/<code>loadPdf</code>, <code>bm25Rank</code>, <code>reciprocalRankFusion</code>, <code>hybridRank</code>, <code>multiQuery</code> (previously standalone-only exports), for <code>ai.*</code>-namespace consistency."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong>First release</strong> — the live &amp; generative rich-media add-on for <code>@warlock.js/ai</code>, kept in its own package so core text/image/speech stay dependency-light. A side-effect import (<code>import \"@warlock.js/ai-live\"</code>) mounts <code>ai.video</code> + <code>ai.realtime</code> onto the shared <code>Ai</code> facade."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>ai.video(params)</code></strong> — text-to-video (Sora / Veo / Kling-class); the provider's async submit→poll job hidden behind the uniform never-throws <code>{ data, error, usage, report }</code> envelope, with per-second cost-truth folded into <code>Usage.cost</code> and a <code>type: \"video\"</code> report routed to observers."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>ai.realtime(options)</code></strong> — a stateful duplex voice session over a pluggable <code>RealtimeTransport</code>: <code>sendAudio</code> / <code>sendText</code> / <code>events()</code> out, <code>close()</code> → <code>RealtimeReport</code> for the cost/observability surfaces."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Contracts</strong> — <code>VideoModelContract</code>, <code>GeneratedVideo</code>, <code>VideoModelPricing</code>, <code>VideoOptions</code>; <code>RealtimeSession</code>, <code>RealtimeTransport</code>, <code>RealtimeConnection</code>, <code>RealtimeEvent</code>, <code>RealtimeReport</code>, <code>RealtimeOptions</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Mocks</strong> — <code>MockVideoModel</code> + <code>MockRealtimeTransport</code> for deterministic, HTTP- and socket-free tests (scripted responses / event streams, recorded calls)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>openai.image({ name })</code></strong> — image generation for the <code>gpt-image-*</code> (token-metered) and <code>dall-e-*</code> (per-image) families, for use with <code>ai.image()</code>. A non-image model id is rejected at construction."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>PDF + audio input.</strong> <code>pdf</code> and <code>audio</code> content parts now map to OpenAI <code>file</code> (base64 <code>file_data</code>) and <code>input_audio</code> (<code>wav</code> / <code>mp3</code>) parts — opt in with <code>model({ pdf: true })</code> / <code>{ audio: true }</code>. A remote-URL pdf/audio source raises a typed <code>InvalidRequestError</code> up front."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>openai.speech({ name })</code></strong> — text-to-speech for the <code>tts-1</code> / <code>tts-1-hd</code> / <code>gpt-4o-mini-tts</code> families (<code>audio.speech.create</code>), for use with <code>ai.speech()</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>openai.transcribe({ name })</code></strong> — speech-to-text for the <code>whisper-1</code> / <code>gpt-4o-transcribe</code> families (<code>audio.transcriptions.create</code>), for use with <code>ai.transcribe()</code>. <code>whisper-1</code> defaults to <code>verbose_json</code> (duration + segments); a non-TTS/STT model id is rejected at construction."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Non-text content parts are no longer coerced to <code>image_url</code>.</strong> The message mapper now branches per modality (image → <code>image_url</code>, pdf → <code>file</code>, audio → <code>input_audio</code>) instead of forcing every attachment through the image path."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong>First release.</strong> <code>MistralSDK</code> — a thin wrapper over <code>@warlock.js/ai-openai</code> that points one internal <code>OpenAISDK</code> at Mistral's OpenAI-compatible endpoint (<code>https://api.mistral.ai/v1</code>) with <code>provider: \"mistral\"</code>, delegating transport, streaming, tool calls, structured output, error wrapping, and token accounting to the battle-tested adapter. Exposes <code>.model()</code>, <code>.embedder()</code> (<code>mistral-embed</code>), and <code>.count()</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Mistral-aware capability inference</strong> — <code>vision</code> is auto-set for the <code>pixtral</code> family and recent multimodal generations (<code>mistral-large</code>, <code>mistral-medium</code>, <code>ministral-3</code>); <code>reasoning</code> for the <code>magistral</code> family and the hybrid <code>mistral-small</code> generation. An explicit <code>vision</code> / <code>reasoning</code> on <code>.model()</code> always wins. Exported as <code>inferVisionCapability</code> / <code>inferReasoningCapability</code>, with the <code>-latest</code> aliases grouped under <code>MISTRAL_MODELS</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Default pricing registry</strong> (<code>MISTRAL_DEFAULT_PRICING</code>, USD per 1,000,000 tokens) merged under any caller-supplied <code>pricing</code> so cost truth works out of the box; per-model &gt; SDK-level &gt; default &gt; <code>undefined</code>. No <code>image()</code> — Mistral has no OpenAI-compatible image endpoint."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>google.image({ name })</code></strong> — Imagen (<code>imagen-*</code>) image generation for use with <code>ai.image()</code>. Per-image-metered; when every candidate is safety-filtered the run surfaces a typed <code>ContentFilterError</code>. A non-Imagen model id is rejected at construction."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>PDF + audio input are now explicitly mapped and tested.</strong> The content-part mapper documents and proves that <code>pdf</code> / <code>audio</code> parts route to Gemini <code>inlineData</code> (the <code>pdf</code> / <code>audio</code> capabilities the adapter advertises are backed by a real mapper, not an accident of the image path), and the remote-URL rejection now names the actual modality instead of always saying \"images\"."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 16,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 11
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "release-hygiene tests: version↔changelog invariant + generator-stub import check"
+            },
+            {
+              "type": "Added",
+              "html": "<code>router.routeCount()</code> exposes the number of registered routes as a boot/readiness signal"
+            },
+            {
+              "type": "Added",
+              "html": "<code>health.addRoutesRegisteredCheck(getRouteCount)</code> registers a readiness check that reports not-ready when a booted HTTP app has zero routes"
+            },
+            {
+              "type": "Added",
+              "html": "seeders now receive a <code>{ track }</code> context — <code>track(model)</code>, <code>track(models[])</code>, and <code>track(table, id)</code> register created records (each call returns its argument so it can be chained inline); <code>recordsCreated</code> is auto-derived from the track count"
+            },
+            {
+              "type": "Added",
+              "html": "<code>seed_records</code> table (created via the new <code>SeedRecordsTableMigration</code>) records every tracked seed reference within the same transaction the seed runs in; only the last run's refs are kept per seeder"
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock seed --drop [name]</code> undoes a seed: deletes its tracked records in reverse run/insertion order inside a transaction, then resets the matching seeds-log rows so <code>once: true</code> seeds re-run; scope to one seeder with <code>--drop=&lt;name&gt;</code>"
+            },
+            {
+              "type": "Added",
+              "html": "<code>Seeder.dependsOn</code> is now resolved — seeders are topologically sorted so dependencies run before dependents, layered over the numeric <code>order</code> tie-break; throws <code>UnknownSeederDependencyError</code> for a missing dependency and <code>SeederDependencyCycleError</code> for a cycle"
+            },
+            {
+              "type": "Added",
+              "html": "seeders receive an injectable clock and a meaningful batch size — <code>run({ track, now, batchSize })</code>; <code>now()</code> (default <code>() =&gt; new Date()</code>) drives both seed data and the seeds-log timestamps so historical/back-fill runs are deterministic, and <code>batchSize</code> surfaces the seeder's own <code>batchSize</code> for <code>Model.createMany(rows, { batchSize })</code>"
+            },
+            {
+              "type": "Added",
+              "html": "repository-level aggregation — <code>aggregate()</code>, <code>sum()</code>, <code>avg()</code>, <code>min()</code>, <code>max()</code>, and <code>groupBy()</code> on <code>RepositoryManager</code>, each reusing <code>filterBy</code> (and its operator-injection guard), <code>where</code>, and scopes before the aggregate, exactly like <code>count()</code>"
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock doctor</code> — a read-only diagnostics command that runs routes / config / connectors / optional-peers / health / release-hygiene checks and prints a pass/warn/fail report (exits non-zero on any failure, never opens a DB/cache/socket connection)"
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock routes</code> — a read-only command that lists the registered HTTP routes as a verb-colored table (method / path / name / action / middleware-count / source); filter with <code>--method</code> / <code>--path</code> / <code>--name</code>, or emit the normalized rows as JSON with <code>--json</code>. Boots app code to register routes but starts no connectors"
+            },
+            {
+              "type": "Changed",
+              "html": "<code>Seeder.run</code> now receives a <code>SeedContext</code> (<code>run(ctx)</code>) — backward compatible, an existing zero-arg <code>run()</code> keeps working unchanged"
+            },
+            {
+              "type": "Fixed",
+              "html": "route-module load/registration failures are no longer swallowed: a route file that throws on import or registration now surfaces loudly instead of silently 404'ing the whole surface"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>ModuleLoader.loadModule</code> rethrows after logging (wrapped in a new <code>ModuleLoadError</code> carrying the failing file + cause), so a broken module aborts boot and is caught loudly by the HMR batch-reload handler in dev"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>ModuleLoader.loadAll</code> aggregates per-file failures and throws an <code>AggregateError</code> at the end, so one broken module no longer hides the others"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>router.withSourceFile</code> rethrows the callback error after logging instead of consuming it with a bare <code>console.log</code> (the <code>try/finally</code> source-file stack cleanup is preserved)"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 15,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 10
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Fast bulk <code>Model.createMany(data, options?: { batchSize?; bulk? })</code> — both paths chunk by <code>batchSize</code> (default 500); <code>bulk: true</code> routes each chunk to the driver's native multi-row <code>insertMany</code> for 10–100× throughput (skips per-row hooks/events; default path preserves them)"
+            },
+            {
+              "type": "Added",
+              "html": "<code>IdGeneratorContract.generateNextIds({ table, count })</code> — reserve a contiguous block of auto-increment ids in a SINGLE atomic op (MongoDB). <code>Model.createMany</code> (default + bulk) now reserves one id block per chunk instead of one counter round-trip per row; engages only for fixed-increment, auto-generated, id-less rows (random-increment or caller-supplied-id rows fall back to per-row generation)"
+            },
+            {
+              "type": "Added",
+              "html": "<code>QueryBuilder.groupByDate(column, unit, aggregates?)</code> — portable date-bucketed <code>GROUP BY</code> (<code>day</code>/<code>week</code>/<code>month</code>/<code>year</code>) across Postgres <code>date_trunc</code> and MongoDB <code>$dateTrunc</code>"
+            },
+            {
+              "type": "Added",
+              "html": "<code>$agg.sum(expr)</code> now also accepts a typed column expression (<code>$expr.mul</code>/<code>$expr.add</code>/<code>$expr.sub</code>/<code>$expr.div</code>/<code>$expr.col</code>/<code>$expr.lit</code>) so you can sum <code>price * quantity</code>; bare-string payload is unchanged. Added <code>$agg.sumRaw(expression)</code> raw escape hatch (Postgres <code>SUM(&lt;raw&gt;)</code>; throws on MongoDB)"
+            },
+            {
+              "type": "Added",
+              "html": "Column-expression DSL grouped under a single <code>$expr</code> object (mirroring <code>$agg</code>) — <code>$expr.col</code> / <code>$expr.lit</code> / <code>$expr.mul</code> / <code>$expr.add</code> / <code>$expr.sub</code> / <code>$expr.div</code> / <code>$expr.raw</code> — plus <code>isColumnExpression</code> / <code>toColumnExpression</code> and the <code>ColumnExpression</code> / <code>ColumnExpressionInput</code> types"
+            },
+            {
+              "type": "Added",
+              "html": "MongoDB id counter (<code>MasterMind</code>) now has a lazily-ensured unique index on <code>{ collection: 1 }</code> plus a bounded retry on duplicate-key (E11000), closing the cold-start race where two concurrent first inserts into a new collection could reserve overlapping ids/blocks"
+            },
+            {
+              "type": "Added",
+              "html": "<code>$agg.countDistinct(field)</code> — a cross-driver grouped distinct-count aggregate (Postgres <code>COUNT(DISTINCT col)</code>; MongoDB <code>$addToSet</code> in <code>$group</code> finalized with <code>$size</code> in the renaming <code>$project</code>)"
+            },
+            {
+              "type": "Added",
+              "html": "<code>Model.raw&lt;T&gt;(sql, params)</code> — typed, transaction-aware raw query that auto-joins the active <code>transaction()</code> scope and returns <code>RawQueryResult&lt;T&gt;</code>"
+            },
+            {
+              "type": "Added",
+              "html": "<code>DataSource.raw&lt;T&gt;(sql, params)</code> — thin transaction-aware passthrough to <code>driver.query</code>"
+            },
+            {
+              "type": "Added",
+              "html": "Postgres connection option <code>nativeArrayColumns</code> — opt out listed columns (<code>JSONB[]</code>/<code>TEXT[]</code>/…) from JSON-text encoding so genuine native-array columns keep their <code>{...}</code> literal form"
+            },
+            {
+              "type": "Changed",
+              "html": "<code>DriverContract.query&lt;T&gt;()</code> is now typed <code>Promise&lt;RawQueryResult&lt;T&gt;&gt;</code> (new <code>rows</code> + <code>rowCount</code> result type) instead of <code>Promise&lt;any&gt;</code>"
+            },
+            {
+              "type": "Fixed",
+              "html": "Postgres <code>json</code>/<code>jsonb</code> columns no longer corrupt: object-arrays, string-arrays, mixed arrays, empty <code>[]</code> (previously stored as <code>{}</code>), and plain objects are now JSON-encoded before binding instead of falling through to a Postgres array literal; the same encoding is applied on the UPDATE <code>$set</code> path. The pgvector all-number array form is preserved."
+            },
+            {
+              "type": "Fixed",
+              "html": "Insert no longer overwrites a caller-supplied <code>createdAt</code> — a backdated value (imports/migrations) is now honored, mirroring the upsert guard, while <code>updatedAt</code> is always stamped at persist time"
+            },
+            {
+              "type": "Fixed",
+              "html": "Insert validation now whitelists the system columns (<code>id</code>/<code>_id</code>/timestamps/<code>deletedAt</code>) like the update path, so a backdated <code>createdAt</code> survives strict <code>strip</code>/<code>fail</code> mode instead of being dropped before reaching the writer"
+            },
+            {
+              "type": "Fixed",
+              "html": "Corrected the MongoDB id-generator docs that falsely claimed the counter write \"participates in active transactions\" — it is a standalone, immediately-durable write (no transaction session is attached), so a rolled-back insert leaves the consumed id as a gap, exactly like SQL <code>SERIAL</code>"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong>First release.</strong> DeepSeek adapter for <code>@warlock.js/ai</code> — a thin wrapper over <code>@warlock.js/ai-openai</code>'s <code>OpenAISDK</code> pinned to <code>https://api.deepseek.com</code> (<code>provider: \"deepseek\"</code>), so all wire behavior (streaming, tool calls, structured output, error wrapping) is inherited unchanged."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>DeepSeekSDK</code></strong> — <code>.model()</code> / <code>.embedder()</code> / <code>.image()</code> / <code>.count()</code> delegated to the wrapped client. <code>baseURL</code> and <code>provider</code> are optional (default to DeepSeek's endpoint / label); every other <code>openai</code> <code>ClientOptions</code> value is forwarded verbatim."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>DeepSeek-specific capability inference</strong> (<code>inferReasoningCapability</code> / <code>inferVisionCapability</code>) — <code>reasoning</code> is auto-<code>true</code> for <code>deepseek-reasoner</code> and the <code>*-pro</code> tier, auto-<code>false</code> for <code>deepseek-chat</code> / <code>*-flash</code>; <code>vision</code> is <code>false</code> for every id (no documented vision surface). An explicit <code>reasoning</code> / <code>vision</code> per model always wins."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Built-in DeepSeek pricing defaults</strong> (USD per 1M tokens) for <code>deepseek-chat</code>, <code>deepseek-reasoner</code>, <code>deepseek-v4-flash</code>, <code>deepseek-v4-pro</code>, so <code>usage.cost</code> is computed out of the box; overridable per model or per SDK."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>DEEPSEEK_CHAT_MODELS</code></strong> — informational list of the documented chat model ids."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong>First release.</strong> xAI Grok adapter for <code>@warlock.js/ai</code> — a thin wrapper over <code>@warlock.js/ai-openai</code>'s <code>OpenAISDK</code> pinned to <code>https://api.x.ai/v1</code> (<code>provider: \"xai\"</code>), so all wire behavior (streaming, tool calls, structured output, error wrapping) is inherited unchanged."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>XaiSDK</code></strong> — <code>.model()</code> / <code>.embedder()</code> / <code>.image()</code> / <code>.count()</code> delegated to the wrapped client. <code>baseURL</code> and <code>provider</code> are optional (default to xAI's endpoint / label); every other <code>openai</code> <code>ClientOptions</code> value is forwarded verbatim."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>xAI-specific capability inference</strong> (<code>inferVisionCapability</code> / <code>inferReasoningCapability</code>, exported alongside <code>XAI_VISION_MODEL_PREFIXES</code> / <code>XAI_REASONING_MODEL_PREFIXES</code>) — Grok ids don't match OpenAI's <code>gpt-*</code> / <code>o*</code> prefixes, so <code>vision</code> is auto-<code>true</code> for <code>grok-4</code> / <code>grok-2-vision</code> and <code>reasoning</code> for <code>grok-4</code> / <code>grok-3-mini</code>. An explicit <code>vision</code> / <code>reasoning</code> per model always wins."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>XAI_CHAT_MODELS</code></strong> — convenience list of current public Grok chat ids (<code>grok-4</code>, <code>grok-3</code>, <code>grok-3-mini</code>, <code>grok-2-vision</code>, <code>grok-2</code>)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Optional per-model pricing registry</strong> — resolution at <code>model()</code> time is per-model <code>pricing</code> &gt; SDK registry &gt; <code>undefined</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong>First release.</strong> <code>GroqSDK</code> — a thin wrapper over <code>@warlock.js/ai-openai</code> that points one internal <code>OpenAISDK</code> at Groq's OpenAI-compatible endpoint (<code>https://api.groq.com/openai/v1</code>) with <code>provider: \"groq\"</code>, delegating transport, streaming, structured output, error wrapping, and token accounting to the battle-tested adapter. Serves Groq-hosted open models (<code>llama-3.3-70b-versatile</code>, <code>llama-3.1-8b-instant</code>, <code>openai/gpt-oss-*</code>, <code>deepseek-r1-distill-llama-70b</code>) on LPU hardware via <code>.model()</code> and <code>.count()</code>. <code>GROQ_BASE_URL</code> / <code>GROQ_PROVIDER</code> / <code>GROQ_KNOWN_MODELS</code> exported."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Groq-aware capability inference</strong> — because Groq ids are upstream open-weight names, not OpenAI's, the wrapper carries its own lists: <code>vision</code> is auto-set for <code>gpt-oss</code> / <code>llama-4</code> / <code>llama-3.2-*-vision</code>; <code>reasoning</code> for <code>gpt-oss</code> / <code>deepseek-r1</code> / <code>qwq</code> / <code>qwen3</code>. An explicit <code>vision</code> / <code>reasoning</code> / <code>structuredOutput</code> always wins. Exported as <code>inferVisionCapability</code> / <code>inferReasoningCapability</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Default pricing registry</strong> (USD per 1,000,000 tokens) for the known Groq models as the final fallback; resolution per-model &gt; SDK-level <code>pricing[name]</code> &gt; built-in default &gt; <code>undefined</code>. No embeddings endpoint on Groq (<code>.embedder()</code> is delegated for symmetry but calls fail upstream) and no <code>image()</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Warn in development when jobs are registered but <code>start()</code> is never called — a one-shot deferred check logs <code>N job(s) registered but scheduler.start() was never called</code>, is suppressed once <code>start()</code> runs or in production (<code>NODE_ENV=production</code>), and is unref'd so it never holds the process open."
+            }
+          ]
+        }
+      ]
+    },
     {
       "version": "4.5.0",
       "id": "v4-5-0",

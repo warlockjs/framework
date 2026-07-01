@@ -1,0 +1,178 @@
+---
+title: Groq provider
+description: Groq provider adapter for @warlock.js/ai — a thin OpenAI-compatible wrapper for open models (Llama, GPT-OSS, DeepSeek-R1 distill) served fast on Groq's LPU hardware.
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+> Standalone — usable in any Node project, no `@warlock.js/core` required.
+
+`@warlock.js/ai-groq` is the Groq provider adapter for
+[`@warlock.js/ai`](/v/latest/ai/) — open models (Llama, GPT-OSS,
+DeepSeek-R1 distill) served fast on Groq's LPU hardware. Groq speaks the
+OpenAI Chat Completions protocol, so this package is a **thin wrapper** over
+[`@warlock.js/ai-openai`](/v/latest/ai/providers/openai/): it owns an internal
+`OpenAISDK` pointed at Groq's endpoint (`https://api.groq.com/openai/v1`) and
+delegates the wire work, while injecting Groq's own capability inference and
+default pricing.
+
+## Install
+
+<Tabs syncKey="pm">
+  <TabItem label="npm">
+    ```bash
+    npm install @warlock.js/ai @warlock.js/ai-groq
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn add @warlock.js/ai @warlock.js/ai-groq
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm add @warlock.js/ai @warlock.js/ai-groq
+    ```
+  </TabItem>
+</Tabs>
+
+## Construct
+
+```ts
+import { GroqSDK } from "@warlock.js/ai-groq";
+
+const groq = new GroqSDK({
+  apiKey: process.env.GROQ_API_KEY!,
+});
+```
+
+`baseURL` defaults to `https://api.groq.com/openai/v1` (Groq's
+OpenAI-compatible endpoint) — override only to route through a proxy or
+gateway. `provider` defaults to `"groq"` and flows through to
+`ModelContract.provider`, `AgentReport.model.provider`, and logs. Every
+upstream OpenAI `ClientOptions` field (`timeout`, `maxRetries`,
+`defaultHeaders`, `fetch`, …) is forwarded verbatim to the inner client.
+
+## Use as a model
+
+```ts
+const model = groq.model({ name: "llama-3.3-70b-versatile" });
+// Pass to any @warlock.js/ai agent / workflow / supervisor.
+```
+
+`name` is the Groq-hosted **open-weight** id (the upstream name), NOT an
+OpenAI id. Any current Groq model id works — the list below is curated, not
+an allow-list:
+
+```ts
+groq.model({ name: "llama-3.3-70b-versatile" });       // flagship general-purpose text
+groq.model({ name: "llama-3.1-8b-instant" });          // fastest / cheapest small text
+groq.model({ name: "openai/gpt-oss-120b" });           // vision + reasoning auto-true
+groq.model({ name: "deepseek-r1-distill-llama-70b" }); // reasoning auto-true
+```
+
+## Capabilities
+
+The whole reason this wrapper exists: Groq's ids aren't OpenAI's, so the
+OpenAI adapter's prefix inference would never fire. `GroqSDK` carries its
+**own** name lists:
+
+- **Vision** — auto-inferred `true` for `gpt-oss`, `llama-4`, and
+  `llama-3.2-*-vision`; `false` otherwise (e.g. `llama-3.3-70b-versatile`,
+  `llama-3.1-8b-instant`).
+- **Reasoning** — auto-inferred `true` for `gpt-oss`, `deepseek-r1` /
+  `deepseek-r1-distill`, `qwq`, and `qwen3`; `false` otherwise. Drives
+  whether `reasoning_effort` is forwarded.
+- **Structured output** — `true`; Groq accepts OpenAI-style `response_format`.
+- **Prompt caching** — inherited from the inner OpenAI adapter (`true`;
+  read-side `cachedTokens` accounting).
+
+An explicit flag always wins over inference:
+
+```ts
+groq.model({ name: "some-custom-llama", vision: true });      // force on for an unlisted multimodal id
+groq.model({ name: "openai/gpt-oss-120b", reasoning: false }); // pin off
+```
+
+## Reasoning (gpt-oss / deepseek-r1 distill)
+
+Reasoning models accept a discrete effort knob, forwarded by the inner
+adapter as OpenAI's `reasoning_effort`:
+
+```ts
+const model = groq.model({ name: "deepseek-r1-distill-llama-70b" }); // reasoning auto-true
+await model.complete(messages, { reasoning: { effort: "high" } });   // → reasoning_effort: "high"
+```
+
+- `reasoning.effort` (`"low" | "medium" | "high"`) maps verbatim.
+- `reasoning.maxTokens` has no Chat Completions equivalent and is ignored
+  (same as the OpenAI adapter).
+- When `capabilities.reasoning` is `false` (e.g. `llama-3.3-70b-versatile`),
+  the option is dropped — never sent as an unsupported param.
+
+:::note
+**No embeddings, no image generation.** As of mid-2026 Groq exposes no
+OpenAI-compatible embeddings endpoint — `groq.embedder({ name })` constructs,
+but a live `.embed()` call fails at the provider; use the
+[OpenAI provider](/v/latest/ai/providers/openai/) or Google adapter for
+retrieval embeddings. Groq has no image API either, so `GroqSDK` does not
+define `image()` — `groq.image(...)` is a compile-time error.
+:::
+
+## Pricing and usage
+
+`pricing` is a registry keyed by model name, rates in **USD per 1,000,000
+tokens** (`input`, `output`, optional `cachedInput` / `cachedOutput`). The
+adapter ships built-in default rates for the known Groq models as the final
+fallback:
+
+```ts
+const groq = new GroqSDK({
+  apiKey: process.env.GROQ_API_KEY!,
+  pricing: {
+    "llama-3.3-70b-versatile": { input: 0.59, output: 0.79 }, // USD per 1M tokens
+  },
+});
+
+// Or per model, overriding the SDK entry:
+const model = groq.model({
+  name: "llama-3.1-8b-instant",
+  pricing: { input: 0.05, output: 0.08 },
+});
+```
+
+Resolution at `model()` time: per-model `pricing` > SDK `pricing[name]` >
+adapter built-in default for the id > `undefined` (no cost computed).
+Built-in defaults exist for `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`,
+`openai/gpt-oss-120b`, `openai/gpt-oss-20b`, and
+`deepseek-r1-distill-llama-70b`; supply your own for anything else.
+
+Every response reports token `usage`, and with pricing set the cost rolls up
+through every node of the `AgentReport`. Need an offline estimate before a
+call? `groq.count(text)` returns a fast character-heuristic approximation —
+good for budgeting and quota guards, not for billing.
+
+## OpenAI-compatible wire behavior
+
+Structured output and streaming are inherited unchanged from
+`@warlock.js/ai-openai`: a `responseSchema` maps to `response_format:
+json_schema` (strict) when the schema is a proper root object, else loose
+`json_object`; `model.stream()` drains the streaming Chat Completions
+response and yields `delta` / `tool-call` / `done` chunks with `include_usage`
+on. Raw errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy
+by the inner adapter (dispatch keys on `status + code`).
+
+:::caution
+Groq has documented OpenAI-compat gaps: `n` must be `1`, and `logprobs` /
+`logit_bias` / `top_logprobs` / `messages[].name` are unsupported.
+:::
+
+For the full wire-level surface — it is identical here — see the
+[OpenAI provider](/v/latest/ai/providers/openai/) page and the `setup-groq`
+skill.
+
+## See also
+
+- [OpenAI provider](/v/latest/ai/providers/openai/) — the wrapped adapter; full wire / streaming / structured-output detail.
+- [Mistral provider](/v/latest/ai/providers/mistral/) — another OpenAI-compatible wrapper, for the Mistral model families.
+- [`@warlock.js/ai`](/v/latest/ai/) — passing the model into `ai.agent({ ... })`.

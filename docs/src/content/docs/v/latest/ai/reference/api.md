@@ -30,6 +30,11 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | `ai.orchestrator(config)` | `<TOutput, TState>(config) => OrchestratorContract` | [Run orchestrator](../digging-deeper/run-orchestrator) |
 | `ai.planner(config)` | `<TOutput>(config) => PlannerContract` | [Planner](../architecture-concepts/planner) |
 | `ai.spawnSubAgent(spec)` | `<TOutput>(spec) => Promise<AgentResult<T>>` | [Spawn sub-agent](../the-basics/spawn-sub-agent) |
+| `ai.image(params)` | `(params: ImageParams) => Promise<ImageResult>` — text-to-image output verb (`GeneratedImage[]`) | [OpenAI](../providers/openai) / [Google](../providers/google) |
+| `ai.speech(params)` | `(params: SpeechParams) => Promise<SpeechResult>` — text-to-speech output verb (`GeneratedAudio`) | [OpenAI](../providers/openai) |
+| `ai.transcribe(params)` | `(params: TranscribeParams) => Promise<TranscriptionResult>` — speech-to-text input verb | [OpenAI](../providers/openai) |
+| `ai.audioFromFile(path, opts?)` | `(path, { mediaType? }) => Promise<AudioInput>` — read + package an audio file (non-AI plumbing for `ai.transcribe`) | [OpenAI](../providers/openai) |
+| `ai.audioFromBuffer(bytes, mediaType, filename?)` | `(...) => AudioInput` — package raw audio bytes (no I/O, no AI) | [OpenAI](../providers/openai) |
 | `ai.memory(config)` | `(config) => MemoryContract` | [Memory](../architecture-concepts/memory) |
 | `ai.skills(config)` | `(config: SkillsConfig) => SkillsContract` (progressive-disclosure skills library) | [Memory](../architecture-concepts/memory) |
 | `ai.rag(config)` | `(config: RagConfig) => Rag` (chunk → embed → retrieve → cite) | [Memory](../architecture-concepts/memory) |
@@ -64,8 +69,11 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 
 | Export | What it is |
 | --- | --- |
-| `AgentContract<T>` | The shape returned by `ai.agent`. Has `.execute()`, `.stream()`, `.on()`, `.off()`, `.name`, `.isAnonymous`, `.description`. |
-| `AgentConfig` | Config object accepted by `ai.agent`. Includes `captureMessages?` — opt-in full-history capture onto `AgentReport.messages` (off by default; large + sensitive). |
+| `AgentContract<T>` | The shape returned by `ai.agent`. Has `.execute()`, `.stream()`, `.resume()`, `.on()`, `.off()`, `.name`, `.isAnonymous`, `.description`. |
+| `AgentConfig` | Config object accepted by `ai.agent`. Includes `captureMessages?` — opt-in full-history capture onto `AgentReport.messages` (off by default; large + sensitive) — and `durable?` (below). |
+| `agent.resume(runId, opts?)` | Durable mid-run crash-resume. Re-hydrates completed trips + tool calls + usage from the snapshot and continues from the next trip — never re-issuing a completed trip's model call. Throws `AgentDriftError` on a structural mismatch unless `{ force: true }`. |
+| `AgentConfig.durable` | `{ store?: SnapshotStore<AgentSnapshot>; deleteOnComplete? }` — opt-in checkpointing after every settled trip. `store` falls back to `ai.config({ defaultSnapshotStore })`; when neither is set, writes skip and `resume()` throws. |
+| `AgentSnapshot` / `AgentSnapshotStatus` / `AgentResumeOptions<T>` | The persisted agent state, its status, and `resume()` options (`{ force?, ... }`). |
 | `AgentExecuteOptions` | Per-call options for `execute` / `stream`. |
 | `AgentResult<T>` | Result envelope — `{ type, data?, text?, report, usage, error? }`. |
 | `AgentReport` | Trace tree — `BaseReport` plus `model`, `trips`, `systemPrompt?` (the resolved `role: "system"` message), and `messages?` (the full `CapturedMessage[]`, present only when `captureMessages` is on). Tool dispatches live under `children` filtered by `type === "tool"`. |
@@ -134,8 +142,11 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 
 | Export | What it is |
 | --- | --- |
-| `PlannerContract<TOutput>` | Returned by `ai.planner`. Implements `ExecutableContract`. `.execute(goal, opts?)`, `.name`, `.signature`. |
-| `PlannerConfig<TOutput>` | Config — `model` XOR `planner`, `capabilities`, `maxSteps?`, `output?`. |
+| `PlannerContract<TOutput>` | Returned by `ai.planner`. Implements `ExecutableContract`. `.execute(goal, opts?)`, `.resume(runId, opts?)`, `.name`, `.signature`. |
+| `PlannerConfig<TOutput>` | Config — `model` XOR `planner`, `capabilities`, `maxSteps?`, `output?`, `durable?` (below). |
+| `planner.resume(runId, opts?)` | Durable crash-resume. Re-hydrates the plan + executed steps from the snapshot and continues; throws `PlannerDriftError` on a structural mismatch unless `{ force: true }`. |
+| `PlannerConfig.durable` | `{ store?: SnapshotStore<PlannerSnapshot>; deleteOnComplete? }` — opt-in checkpointing; `store` falls back to `ai.config({ defaultSnapshotStore })`. |
+| `PlannerSnapshot` / `PlannerSnapshotStatus` / `PlannerResumeOptions<TOutput>` | The persisted planner state, its status, and `resume()` options. |
 | `PlannerCapability` | `{ name, description, executable }` — a unit the plan may reference. |
 | `PlannerResult<TOutput>` | Envelope — `{ type: "planner", data?, report, usage, error? }`. |
 | `PlannerReport` | `{ type, signature, plan?, executedSteps[], children[] }`. |
@@ -191,7 +202,17 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | `RetrieveOptions` | `{ topK?, threshold?, candidates?, tags? }`. |
 | `RetrieveResult` | `{ query, chunks: RetrievedChunk[] }`. |
 | `RagReranker` | Reranker contract. `ai.rag.keywordReranker(opts?)` / `ai.rag.llmReranker(opts)` ship as built-ins; `KeywordRerankerOptions` / `LlmRerankerOptions` are their option shapes. |
-| `VectorStore` | Vector-store adapter. `cacheVectorStore` wraps a `@warlock.js/cache` driver. |
+| `VectorStore` | Vector-store adapter. `ai.rag.cacheVectorStore` wraps a `@warlock.js/cache` driver; `ai.rag.pgVectorStore` is a native pgvector-backed store. |
+| `ai.rag.pgVectorStore(options)` | Postgres + `pgvector` `VectorStore` — `{ client \| connectionString, dimensions, table?, ... }`. Emits reference DDL via `.schema()` / `.ensureSchema()` for a migration. |
+| `ai.rag.vectorLiteral(vector)` | Serialize a `number[]` to a pgvector literal (`"[1,0.5,-2]"`); throws on non-finite components. |
+| `PgVectorStoreOptions` / `PgVectorStoreInstance` | The `pgVectorStore` option shape and the returned store (adds `schema` / `ensureSchema`). |
+| `ai.rag.loadText(input, opts?)` | Turn a string (or strings) into `RagDocument`(s) — zero-dependency; the loader every other loader funnels into. |
+| `ai.rag.loadHtml(html, opts?)` | Strip raw HTML → text `RagDocument` (regex + entity decode, no DOM parser); lifts `<title>` into metadata. |
+| `ai.rag.loadWeb(url, opts?)` | Fetch + strip a URL → `RagDocument`. SSRF-safe — routes through `guardedFetch` / `OutboundPolicy` (scheme + host allowlist, post-DNS private-IP guard, byte cap), never a raw `fetch`. |
+| `ai.rag.loadPdf(bytes, opts?)` | PDF bytes → `RagDocument`(s) (`perPage?`). Lazy optional peer — dynamic-imports `pdf-parse` on first use; throws curated install instructions when absent. |
+| `RagLoaderResult` / `RagLoaderMetadata` / `RagLoaderType` / `RagLoaderOptions` | Shared loader output, derived metadata (`source`, `loader`, `title`), type tag, and base options. |
+| `LoadTextOptions` / `LoadHtmlOptions` / `LoadWebOptions` / `LoadPdfOptions` / `TextInput` | Per-loader option shapes + the `loadText` input type. |
+| `PDF_PARSE_INSTALL_INSTRUCTIONS` | The curated install string `loadPdf` throws when the `pdf-parse` peer is missing (exported for tests / callers that match it). |
 | `bm25Rank(query, docs)` | BM25 lexical ranking over a candidate set (`k1 = 1.5`, `b = 0.75`; zero-score docs dropped). Pure; no global index. See [Hybrid retrieval](../the-basics/hybrid-retrieval). |
 | `reciprocalRankFusion(rankedLists, k?)` | Fuse several ranked id lists into one consensus ranking via RRF (`k` default `60`) — no score calibration needed. |
 | `hybridRank(params)` | Convenience wrapper — runs `bm25Rank` over `candidates` and fuses it with your `dense` ranking via RRF. |
@@ -251,6 +272,35 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | `StreamObjectParams<T>` | Config — `{ model, messages, schema, options? }`; `schema` validates the final object. |
 | `ObjectStreamEvent<T>` | `{ type: "text-delta"; delta }` \| `{ type: "partial"; value: unknown }` \| `{ type: "done"; valid: true; value: T; usage }` \| `{ type: "done"; valid: false; error: AIError; usage }`. |
 | `parsePartialJson(text)` | Tolerant best-effort parser turning an incomplete streaming JSON prefix into a partial snapshot (`undefined` until parseable). Powers `streamObject`'s `partial` events. |
+
+## Media modality verbs
+
+The output/input-modality track — image, speech, and transcription verbs that share the uniform never-throws `{ data, error, usage, report }` envelope with cost-truth and `observe` routing. Models come from an adapter's `image()` / `speech()` / `transcribe()` factory. See [OpenAI](../providers/openai) and [Google](../providers/google).
+
+| Export | What it is |
+| --- | --- |
+| `ai.image(params)` | Text-to-image verb. `data.images` is `GeneratedImage[]`. |
+| `ImageParams` / `ImageData` / `ImageResult` / `ImageReport` | Verb config (`{ model, prompt, count?, size?, quality?, aspectRatio?, negativePrompt?, ... }`), data, envelope, and report node. |
+| `ImageModelContract` | Returned by `sdk.image({ name })`. Peer of `EmbedderContract` on the adapter. |
+| `GeneratedImage` | `{ type: "base64"; base64; mediaType; revisedPrompt? } \| { type: "url"; url; mediaType?; revisedPrompt? }`. |
+| `ImageModelPricing` | `{ input?, output?, perImage?, perImageBySize? }` — token-metered (gpt-image) or per-image (DALL·E / Imagen). |
+| `computeImageCost` | Cost helper folding image spend into the shared `Usage.cost`. |
+| `ai.speech(params)` | Text-to-speech verb. `data.audio` is `GeneratedAudio`. |
+| `SpeechParams` / `SpeechData` / `SpeechResult` / `SpeechReport` | Verb config (`{ model, text, voice?, format?, speed?, instructions?, ... }`), data, envelope, and report node (`report.characters`). |
+| `SpeechModelContract` | Returned by `sdk.speech({ name, voice? })`. |
+| `GeneratedAudio` | `{ type: "base64"; base64; mediaType }` — discriminated, leaving room for a future `url` variant. |
+| `SpeechModelPricing` | `{ input?, output?, perMillionCharacters? }` — per-token (gpt-4o-mini-tts) or per-character (tts-1). |
+| `ai.transcribe(params)` | Speech-to-text verb. `data.text` + optional `data.segments`. |
+| `TranscribeParams` / `TranscriptionData` / `TranscriptionResult` / `TranscriptionReport` | Verb config (`{ model, audio, language?, prompt?, format?, ... }`), data, envelope, and report node (`report.durationSeconds`). |
+| `TranscriptionModelContract` | Returned by `sdk.transcribe({ name })`. |
+| `TranscriptionSegment` | `{ text; start?; end? }` — timestamped segment (whisper `verbose_json`). |
+| `TranscriptionModelPricing` | `{ input?, output?, perMinute? }` — per-token (gpt-4o-transcribe) or per-minute (whisper-1). |
+| `ai.audioFromFile(path, opts?)` | Read a file → `AudioInput`; infers media type (`.ogg` / `.opus` / `.m4a` recognized), override with `{ mediaType }`. |
+| `ai.audioFromBuffer(bytes, mediaType, filename?)` | Package raw bytes → `AudioInput`. No I/O, no AI. |
+| `AudioInput` | `{ base64; mediaType; filename? }` — provider-neutral, serializable audio payload for `ai.transcribe`. |
+| `MockImageModel` / `MockSpeechModel` / `MockTranscriptionModel` | Deterministic HTTP-free doubles; also wired via `MockSDK({ imageResponses, speechResponses, transcriptionResponses, ... })`. |
+
+> **Live rich-media add-on — `@warlock.js/ai-live`.** A side-effect `import "@warlock.js/ai-live"` mounts two heavyweight modalities onto the shared `ai.*` facade: `ai.video({ model, prompt })` — text-to-video (async submit→poll hidden behind the same uniform envelope, per-second cost-truth), and `ai.realtime({ transport, model })` — a stateful duplex voice **session** over a pluggable `RealtimeTransport` (`sendAudio` / `sendText` / `events()` / `close() → RealtimeReport`). Exports include `VideoModelContract`, `GeneratedVideo`, `VideoModelPricing`, `RealtimeSession`, `RealtimeEvent`, `RealtimeReport`, plus `MockVideoModel` / `MockRealtimeTransport`. Shipped from its own package so the core stays dependency-light.
 
 ## System prompts
 
@@ -402,6 +452,7 @@ All extend `AIError`. Stable `code` strings listed in [Handle errors](../digging
 | --- | --- | --- |
 | `AIError` | (base) | varies |
 | `AgentExecutionError` | `AGENT_EXEC_FAILED` | varies |
+| `AgentDriftError` | `AGENT_DRIFT` | `drift` |
 | `SchemaValidationError` | `SCHEMA_VALIDATION_FAILED` | `schema` |
 | `ToolExecutionError` | `TOOL_EXEC_FAILED` | `tool` |
 | `WorkflowError` | (base) | varies |
@@ -428,6 +479,7 @@ All extend `AIError`. Stable `code` strings listed in [Handle errors](../digging
 | `OrchestratorCancelledError` | `ORCHESTRATOR_CANCELLED` | `cancelled` |
 | `PlannerFailedError` | `PLANNER_FAILED` | varies |
 | `PlannerPlanInvalidError` | `PLANNER_PLAN_INVALID` | `schema` |
+| `PlannerDriftError` | `PLANNER_DRIFT` | `drift` |
 | `PlannerCancelledError` | `PLANNER_CANCELLED` | `cancelled` |
 | `PromptNotFoundError` | `PROVIDER_INVALID_REQUEST` | `validation` |
 | `PromptValidationError` | `SCHEMA_VALIDATION_FAILED` | `validation` |

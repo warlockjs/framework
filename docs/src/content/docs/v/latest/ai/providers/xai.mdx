@@ -1,0 +1,209 @@
+---
+title: xAI provider
+description: xAI provider adapter for @warlock.js/ai — Grok models as a vendor-neutral model, with vision and reasoning-effort support.
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+> Standalone — usable in any Node project, no `@warlock.js/core` required.
+
+`@warlock.js/ai-xai` is the provider adapter for xAI's **Grok** models. xAI
+speaks the OpenAI Chat Completions protocol, so `XaiSDK` is a thin wrapper
+over the [OpenAI adapter](/v/latest/ai/providers/openai/): it constructs one
+internal `OpenAISDK` pointed at `https://api.x.ai/v1` and labeled
+`provider: "xai"`, then delegates everything to it — while injecting xAI's own
+capability inference so Grok model names resolve to the right vision and
+reasoning flags.
+
+You get a vendor-neutral `ModelContract` — the same shape every agent,
+workflow, and supervisor already speaks.
+
+## Install
+
+<Tabs syncKey="pm">
+  <TabItem label="npm">
+    ```bash
+    npm install @warlock.js/ai @warlock.js/ai-xai
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn add @warlock.js/ai @warlock.js/ai-xai
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm add @warlock.js/ai @warlock.js/ai-xai
+    ```
+  </TabItem>
+</Tabs>
+
+## Construct
+
+`XaiSDK` is a class holding a long-lived wrapped client. Build it once at boot
+and reuse it everywhere — every model it produces shares the same connection
+pool, auth, and rate-limit state.
+
+```ts
+import { XaiSDK } from "@warlock.js/ai-xai";
+
+const xai = new XaiSDK({ apiKey: process.env.XAI_API_KEY! });
+```
+
+- `baseURL` defaults to `https://api.x.ai/v1` (the xAI OpenAI-compatible endpoint). Override only to target a proxy/gateway.
+- `provider` defaults to `"xai"` and flows through to `ModelContract.provider`, `AgentReport.model.provider`, and logs. Set it to relabel a gateway upstream.
+- Every other upstream client option (`timeout`, `maxRetries`, `defaultHeaders`, `fetch`, …) is forwarded verbatim to the wrapped client.
+
+```ts
+const xai = new XaiSDK({
+  apiKey: process.env.XAI_API_KEY!,
+  baseURL: "https://my-gateway.internal/xai",
+  provider: "xai-gateway",
+});
+```
+
+## First call
+
+Build a model, hand it to an agent, run it. `execute()` never throws —
+failures land in `error` as a typed `AIError`.
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { XaiSDK } from "@warlock.js/ai-xai";
+
+const xai = new XaiSDK({ apiKey: process.env.XAI_API_KEY! });
+
+const assistant = ai.agent({
+  model: xai.model({ name: "grok-4" }),
+  systemPrompt: "You are a concise senior TypeScript engineer.",
+});
+
+const { text, usage, error } = await assistant.execute("Why use generics?");
+
+if (error) {
+  console.warn(error.code, error.category);
+} else {
+  console.log(text, usage.total);
+}
+```
+
+## Use as a model
+
+```ts
+xai.model({ name: "grok-4" }); // vision + reasoning auto-true
+xai.model({ name: "grok-3-mini" }); // reasoning auto-true, vision false
+xai.model({ name: "grok-2-vision" }); // vision auto-true
+xai.model({ name: "grok-4", temperature: 0.2 }); // sampling controls
+xai.model({ name: "grok-3", vision: true }); // explicit capability override
+```
+
+Returns a `ModelContract` you pass straight into any agent, workflow, or
+supervisor.
+
+## Models and capabilities
+
+This adapter ships xAI's own name lists — Grok ids don't match OpenAI's
+`gpt-*` / `o*` prefixes. Capabilities are injected per model before delegating;
+an explicit value always wins over inference.
+
+| Model | `vision` | `reasoning` |
+| --- | --- | --- |
+| `grok-4` | true | true (reasoning-first) |
+| `grok-3` | false | false |
+| `grok-3-mini` | false | true (the "think" variant) |
+| `grok-2-vision` | true | false |
+| `grok-2` | false | false |
+
+- `vision` — inferred `true` for the `grok-4` and `grok-2-vision` prefixes; `false` otherwise.
+- `reasoning` — inferred `true` for `grok-4` and `grok-3-mini`; drives whether `reasoning.effort` is forwarded as `reasoning_effort` on the wire.
+- `structuredOutput` / `promptCaching` and the image/PDF/audio wire mapping all come from the wrapped OpenAI adapter unchanged.
+
+Override `vision`, `reasoning`, or `structuredOutput` explicitly via
+`.model({ name, vision?, reasoning?, structuredOutput? })`.
+
+:::note
+Model availability changes over time — pass any current Grok id through
+`.model({ name })`; the prefix inference covers dated / `-latest` / `-fast` /
+`-beta` variants. Don't assume a model exists; check xAI's docs.
+:::
+
+## Reasoning effort
+
+`grok-4` and `grok-3-mini` are reasoning-capable. `reasoning.effort`
+(`"low" | "medium" | "high"`) maps verbatim to the OpenAI-compatible
+`reasoning_effort` param. When `capabilities.reasoning` is `false` (e.g.
+`grok-3`), the option is dropped — the adapter never forwards it. Pin
+`reasoning: true` to force it for a custom/gateway id.
+
+```ts
+const model = xai.model({ name: "grok-4" }); // reasoning auto-true
+await model.complete(messages, { reasoning: { effort: "high" } }); // → reasoning_effort: "high"
+```
+
+## Vision
+
+Image attachments reach the wire only on a vision-capable model (`grok-4`,
+`grok-2-vision`); the agent's modality gate throws otherwise. Mapping to
+OpenAI `image_url` parts is identical to the OpenAI adapter.
+
+```ts
+const model = xai.model({ name: "grok-4" });
+
+const response = await model.complete([
+  {
+    role: "user",
+    content: [
+      { type: "text", text: "What's in this photo?" },
+      { type: "image", source: { url: "https://example.com/cat.jpg" } },
+    ],
+  },
+]);
+```
+
+## Pricing and usage
+
+Every response reports token `usage` (`input`, `output`, `total`). To turn
+tokens into money, attach a `pricing` registry — keyed by model name, in USD
+per million tokens (`input`, `output`, optional `cachedInput` / `cachedOutput`).
+Resolution is delegated: per-model `pricing` > SDK registry > `undefined` (no
+cost computed).
+
+```ts
+const xai = new XaiSDK({
+  apiKey: process.env.XAI_API_KEY!,
+  pricing: {
+    "grok-4": { input: 3, output: 15 },
+    "grok-3-mini": { input: 0.3, output: 0.5 },
+  },
+});
+
+const { usage } = await ai.agent({ model: xai.model({ name: "grok-4" }) }).execute("hi");
+usage.cost; // per-channel USD breakdown of this run, or undefined when unpriced
+```
+
+:::caution
+The pricing numbers above are illustrative placeholders — set the current xAI
+rates yourself. Need an offline token estimate first? `xai.count(text)` returns
+a fast character-heuristic approximation — good for budgeting and quota guards,
+not for billing.
+:::
+
+## Embeddings and images
+
+xAI does **not** currently expose a public embeddings endpoint.
+`xai.embedder({...})` is wired for protocol parity, but a call to `embed()` /
+`embedMany()` fails upstream — point an embedder at a dedicated provider like
+[OpenAI](/v/latest/ai/providers/openai/) for vectors.
+
+`xai.image({...})` delegates to the wrapped OpenAI Images adapter, which only
+recognizes `gpt-image-*` / `dall-e-*` ids and rejects anything else at
+construction. xAI's image generation ("Grok Imagine") is a separate, non-
+OpenAI-Images-compatible surface, so use the
+[OpenAI provider](/v/latest/ai/providers/openai/)'s `image()` for OpenAI-Images
+generation.
+
+## See also
+
+- [OpenAI provider](/v/latest/ai/providers/openai/) — the wrapped adapter; full wire / streaming / structured-output / multipart surface applies here.
+- [`@warlock.js/ai`](/v/latest/ai/) — the agent, tool, and system-prompt surface these models plug into.
+- For provider-specific notes and the latest model ids, see the `setup-xai` skill.

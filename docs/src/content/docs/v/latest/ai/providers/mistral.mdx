@@ -1,0 +1,169 @@
+---
+title: Mistral provider
+description: Mistral AI provider adapter for @warlock.js/ai — a thin OpenAI-compatible wrapper for the pixtral, magistral, and mistral model families.
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+> Standalone — usable in any Node project, no `@warlock.js/core` required.
+
+`@warlock.js/ai-mistral` is the Mistral AI provider adapter for
+[`@warlock.js/ai`](/v/latest/ai/). Mistral exposes an **OpenAI-compatible**
+API, so `MistralSDK` is a **thin wrapper** over
+[`@warlock.js/ai-openai`](/v/latest/ai/providers/openai/) — it does not
+re-implement the wire protocol, streaming, tool calls, structured output,
+error wrapping, or token accounting. It builds one internal `OpenAISDK`
+pointed at Mistral's `baseURL` (`https://api.mistral.ai/v1`) with
+`provider: "mistral"`, then layers on Mistral-aware capability inference and
+default pricing.
+
+## Install
+
+<Tabs syncKey="pm">
+  <TabItem label="npm">
+    ```bash
+    npm install @warlock.js/ai @warlock.js/ai-mistral
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn add @warlock.js/ai @warlock.js/ai-mistral
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm add @warlock.js/ai @warlock.js/ai-mistral
+    ```
+  </TabItem>
+</Tabs>
+
+## Construct
+
+```ts
+import { MistralSDK } from "@warlock.js/ai-mistral";
+
+const mistral = new MistralSDK({
+  apiKey: process.env.MISTRAL_API_KEY!,
+});
+```
+
+`baseURL` defaults to `https://api.mistral.ai/v1` (the OpenAI-compatible
+endpoint serving `/chat/completions` and `/embeddings`). `provider` defaults
+to `"mistral"` and flows through to `ModelContract.provider`,
+`AgentReport.model.provider`, and logs. Override `baseURL` only to reach a
+Mistral-compatible gateway or proxy — every other upstream OpenAI
+`ClientOptions` value (`timeout`, `maxRetries`, `defaultHeaders`, `fetch`, …)
+is forwarded verbatim.
+
+## Use as a model
+
+```ts
+const model = mistral.model({ name: "mistral-large-latest" });
+// Pass to any @warlock.js/ai agent / workflow / supervisor.
+```
+
+The headline `-latest` aliases are exported as `MISTRAL_MODELS`
+(`{ chat, vision, reasoning, embedding }`) for convenience, but `mistral.model()`
+also accepts any version-pinned id (`mistral-large-2512`, `magistral-medium-2509`):
+
+```ts
+mistral.model({ name: "mistral-large-latest" });    // multimodal flagship
+mistral.model({ name: "magistral-medium-latest" }); // reasoning
+mistral.model({ name: "pixtral-large-latest" });    // vision
+```
+
+## Use as an embedder
+
+```ts
+const embedder = mistral.embedder({ name: "mistral-embed" });
+
+const { vector, dimensions, usage } = await embedder.embed("Hello world");
+const { vectors } = await embedder.embedMany(["doc 1", "doc 2"]);
+```
+
+`mistral-embed` is reachable through the OpenAI-compatible `/v1/embeddings`
+endpoint; the embedder delegates straight to the wrapped OpenAI embedder.
+
+## Capabilities
+
+The wrapper injects **Mistral-aware** inference before delegating to the
+OpenAI adapter (the OpenAI prefix lists never match Mistral names):
+
+- **Vision** — auto-inferred `true` for the `pixtral` family and the recent
+  multimodal generations (`mistral-large`, `mistral-medium`, `ministral-3`);
+  `false` otherwise.
+- **Reasoning** — auto-inferred `true` for the `magistral` family and the
+  hybrid `mistral-small` generation; `false` otherwise. Drives whether
+  `reasoning_effort` is forwarded.
+- **Structured output** — `true` by default, unless `responseFormat` is
+  forced to `"json_object"` or `"text"`.
+- **Prompt caching** — `true`, inherited from the OpenAI adapter (read-side
+  `cachedTokens` accounting).
+- **PDF / audio** — `false` by default; opt in with `.model({ pdf: true })`
+  or `{ audio: true }`.
+
+An explicit flag always wins over inference:
+
+```ts
+const model = mistral.model({ name: "some-fine-tune", vision: true });
+```
+
+:::note
+**No image generation.** Mistral has no OpenAI-compatible image endpoint, so
+`MistralSDK` intentionally does **not** expose `image()` — the structural
+absence is the capability guard, and `mistral.image(...)` is a compile-time
+error rather than a runtime failure.
+:::
+
+## Pricing and usage
+
+The adapter ships a conservative default registry
+(`MISTRAL_DEFAULT_PRICING`, USD per 1,000,000 tokens) so cost truth works out
+of the box. Pass your own `pricing` — keyed by model id — to win per model:
+
+```ts
+const mistral = new MistralSDK({
+  apiKey: process.env.MISTRAL_API_KEY!,
+  pricing: {
+    // USD per 1M tokens — billing-grade overrides.
+    "mistral-large-latest": { input: 2, output: 6 },
+    "magistral-medium-latest": { input: 2, output: 5 },
+  },
+});
+
+// Or per model, overriding the SDK entry:
+const model = mistral.model({
+  name: "mistral-large-latest",
+  pricing: { input: 2, output: 6 },
+});
+```
+
+Resolution at `model()` time: per-model `pricing` > SDK-level `pricing` >
+`MISTRAL_DEFAULT_PRICING` > `undefined`. The defaults are list-price
+approximations — pass explicit rates for billing.
+
+Every response reports token `usage` (`input`, `output`, `cachedTokens`,
+`reasoningTokens`), and with pricing set the cost rolls up through every node
+of the `AgentReport`. Need an offline estimate before a call?
+`mistral.count(text)` returns a fast character-heuristic approximation — good
+for budgeting and quota guards, not for billing.
+
+## OpenAI-compatible wire behavior
+
+Because Mistral speaks the OpenAI Chat Completions + Embeddings protocol,
+everything the OpenAI adapter does applies unchanged here: streaming deltas
+with consolidated tool calls, `response_format: json_schema` structured
+output (override per model with `responseFormat`), `reasoning_effort` for
+reasoning models, multipart image input, and the neutral `Usage` breakdown.
+Raw errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by
+the wrapped adapter (dispatch keys on `APIError.status + code`).
+
+For the full wire-level surface — it is identical here — see the
+[OpenAI provider](/v/latest/ai/providers/openai/) page and the `setup-mistral`
+skill.
+
+## See also
+
+- [OpenAI provider](/v/latest/ai/providers/openai/) — the wrapped adapter; identical wire behavior.
+- [Groq provider](/v/latest/ai/providers/groq/) — another OpenAI-compatible wrapper, for Groq-hosted open models.
+- [`@warlock.js/ai`](/v/latest/ai/) — passing the model into `ai.agent({ ... })`.

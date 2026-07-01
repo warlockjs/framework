@@ -1,0 +1,205 @@
+---
+title: DeepSeek provider
+description: DeepSeek provider adapter for @warlock.js/ai — deepseek-chat and deepseek-reasoner as a vendor-neutral model, with built-in pricing.
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+> Standalone — usable in any Node project, no `@warlock.js/core` required.
+
+`@warlock.js/ai-deepseek` is the DeepSeek provider adapter for
+[`@warlock.js/ai`](/v/latest/ai/). DeepSeek's API is **OpenAI-compatible**
+on the wire, so this package is a thin wrapper over the
+[OpenAI adapter](/v/latest/ai/providers/openai/): it constructs one internal
+`OpenAISDK` pinned to `https://api.deepseek.com` with `provider: "deepseek"`
+and delegates everything to it — while injecting DeepSeek's own capability
+inference and pricing so the right flags are set even though the model names
+aren't OpenAI names.
+
+You get a vendor-neutral `ModelContract` — the same shape every agent,
+workflow, and supervisor already speaks.
+
+## Install
+
+<Tabs syncKey="pm">
+  <TabItem label="npm">
+    ```bash
+    npm install @warlock.js/ai @warlock.js/ai-deepseek
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn add @warlock.js/ai @warlock.js/ai-deepseek
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm add @warlock.js/ai @warlock.js/ai-deepseek
+    ```
+  </TabItem>
+</Tabs>
+
+## Construct
+
+`DeepSeekSDK` is a class holding one long-lived wrapped client. Build it
+once at boot and reuse it everywhere — every model it produces shares the
+same connection pool, auth, and rate-limit state.
+
+```ts
+import { DeepSeekSDK } from "@warlock.js/ai-deepseek";
+
+const deepseek = new DeepSeekSDK({ apiKey: process.env.DEEPSEEK_API_KEY! });
+```
+
+`apiKey` is the only required field. `baseURL` defaults to
+`https://api.deepseek.com` and `provider` defaults to `"deepseek"` (it flows
+through to `ModelContract.provider`, `AgentReport.model.provider`, and logs).
+Override `baseURL` only for a proxy/gateway, or `provider` to relabel the
+upstream:
+
+```ts
+const deepseek = new DeepSeekSDK({
+  apiKey: process.env.DEEPSEEK_API_KEY!,
+  baseURL: "https://my-gateway.internal/deepseek",
+  provider: "deepseek-proxy",
+});
+```
+
+## First call
+
+Build a model, hand it to an agent, run it. `execute()` never throws —
+failures land in `error` as a typed `AIError`.
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { DeepSeekSDK } from "@warlock.js/ai-deepseek";
+
+const deepseek = new DeepSeekSDK({ apiKey: process.env.DEEPSEEK_API_KEY! });
+
+const assistant = ai.agent({
+  model: deepseek.model({ name: "deepseek-chat" }),
+  systemPrompt: "You are a concise senior TypeScript engineer.",
+});
+
+const { text, usage, error } = await assistant.execute("Why use generics?");
+
+if (error) {
+  console.warn(error.code, error.category);
+} else {
+  console.log(text, usage.total);
+}
+```
+
+## Use as a model
+
+```ts
+deepseek.model({ name: "deepseek-chat" }); // V3 lineage, non-thinking
+deepseek.model({ name: "deepseek-reasoner" }); // R1 lineage, reasoning-capable
+deepseek.model({ name: "deepseek-chat", temperature: 0.2 });
+```
+
+Returns a `ModelContract` you pass straight into any agent, workflow, or
+supervisor.
+
+## Models
+
+| Model | Notes |
+| --- | --- |
+| `deepseek-chat` | Non-thinking surface (V3 lineage). Fast, cheap, broad coverage. Reasoning **off**. |
+| `deepseek-reasoner` | Thinking surface (R1 lineage). Emits a reasoning channel. Reasoning **on**. |
+| `deepseek-v4-flash` | Newer flash tier. Reasoning **off** by default. |
+| `deepseek-v4-pro` | Newer quality tier. Reasoning **on** by default. |
+
+DeepSeek announced the legacy `deepseek-chat` / `deepseek-reasoner` names
+retire 2026/07/24 in favor of the `deepseek-v4-*` family; both name sets are
+understood by the capability inference. `deepseek.model({ name })` accepts any
+id the upstream serves.
+
+## Capabilities
+
+The wrapper injects DeepSeek's own inference so the right flags are set even
+though the model names aren't OpenAI names:
+
+| Flag | Default |
+| --- | --- |
+| `reasoning` | Inferred from the model name — `true` for `deepseek-reasoner` and the `*-pro` tier; `false` for `deepseek-chat` / `*-flash`. Drives whether the reasoning-effort knob is forwarded. |
+| `vision` | `false` for every DeepSeek model — no DeepSeek chat model documents image input (mid-2026). |
+| `structuredOutput` | `true` (inherited from the wrapped OpenAI model), unless `responseFormat` is set to a loose mode. |
+| `promptCaching` | `true` (inherited). DeepSeek reports cache hits via `usage.cachedTokens`, the same shape as OpenAI. |
+
+An explicit value always wins over the injected inference:
+
+```ts
+deepseek.model({ name: "deepseek-chat", reasoning: true }); // force the thinking flag
+deepseek.model({ name: "deepseek-reasoner", reasoning: false }); // suppress it
+```
+
+## Reasoning effort
+
+`deepseek-reasoner` (and the `*-pro` tier) emit a reasoning channel. When the
+model is reasoning-capable, `reasoning.effort` (`"low" | "medium" | "high"`)
+maps verbatim to the OpenAI-compatible `reasoning_effort` param. When
+`capabilities.reasoning` is `false` (e.g. `deepseek-chat`), the option is
+dropped — the adapter never forwards it.
+
+```ts
+const model = deepseek.model({ name: "deepseek-reasoner" }); // reasoning auto-true
+await model.complete(messages, { reasoning: { effort: "high" } }); // → reasoning_effort: "high"
+```
+
+## Inherited from the OpenAI adapter
+
+Everything on the wire — the Chat Completions request/response shape, the
+streaming loop, tool-call accumulation, structured-output `response_format`,
+multipart message mapping, and error wrapping — is inherited **unchanged**
+from the OpenAI adapter against `https://api.deepseek.com`. Structured output
+and streaming therefore behave exactly as documented for OpenAI; see
+[the OpenAI provider](/v/latest/ai/providers/openai/) for the wire-level
+detail, including the `responseFormat` override modes.
+
+## Pricing and usage
+
+Every response reports token `usage` (`input`, `output`, `total`); DeepSeek
+prompt-cache hits surface as `cachedTokens`. The adapter ships **built-in
+DeepSeek pricing defaults** (USD per million tokens, from DeepSeek's published
+table), so `usage.cost` is computed out of the box:
+
+```ts
+const deepseek = new DeepSeekSDK({ apiKey: process.env.DEEPSEEK_API_KEY! });
+// deepseek-chat → { input: 0.14, output: 0.28, cachedInput: 0.0028 }
+```
+
+Override per SDK or per model exactly like the OpenAI adapter. Resolution at
+`model()` time: per-model `pricing` > SDK `pricing` registry > built-in
+DeepSeek default > `undefined`.
+
+```ts
+const deepseek = new DeepSeekSDK({
+  apiKey: process.env.DEEPSEEK_API_KEY!,
+  pricing: { "deepseek-reasoner": { input: 0.55, output: 2.19 } },
+});
+```
+
+Need an offline token estimate before a call? `deepseek.count(text)` returns
+a fast character-heuristic approximation — good for budgeting and quota
+guards, not for billing.
+
+## Embeddings and images
+
+`deepseek.embedder({...})` and `deepseek.image({...})` delegate to the wrapped
+OpenAI adapter.
+
+:::caution
+DeepSeek does not officially document an OpenAI-compatible embeddings endpoint
+or an image-generation endpoint (mid-2026). These delegates exist for adapter
+parity and work against a compatible gateway you point `baseURL` at, but may
+fail against the stock DeepSeek endpoint. Use a dedicated provider —
+[OpenAI](/v/latest/ai/providers/openai/) or
+[Google](/v/latest/ai/providers/google/) — for RAG vectors.
+:::
+
+## See also
+
+- [OpenAI provider](/v/latest/ai/providers/openai/) — the wrapped adapter; all wire-level behavior applies here.
+- [`@warlock.js/ai`](/v/latest/ai/) — the agent, tool, and system-prompt surface these models plug into.
+- For provider-specific notes and the latest model ids, see the `setup-deepseek` skill.
