@@ -293,7 +293,7 @@ Skip this in dev (Ctrl-C is fast enough), use it in production where you don't w
 
 ## Bootstrap hook — unhandled rejections
 
-The framework's bootstrap installs `captureAnyUnhandledRejection` — unhandled promise rejections get logged at `error` level via the same `log` singleton. You don't need to wire this up; it's already there. Same for uncaught exceptions. This is why a bare `throw` deep in a controller still produces a structured log line.
+The framework's bootstrap installs `captureAnyUnhandledRejection` — unhandled promise rejections get logged at `error` level via the same `log` singleton, and the process keeps running. You don't need to wire this up; it's already there. An **uncaught exception** is logged at `fatal` and, in production, takes the process down with a non-zero exit so a fatal boot/runtime crash is never silently swallowed into `exit 0`; in dev it's logged and the server keeps running so HMR can recover.
 
 ## Common patterns
 

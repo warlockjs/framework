@@ -119,6 +119,10 @@ arrayJson()                                  // JSONB[]
 
 The array helpers (`arrayInt`, `arrayBigInt`, `arrayFloat`, `arrayDecimal`, `arrayBoolean`, `arrayText`, `arrayDate`, `arrayTimestamp`, `arrayUuid`, `arrayJson`) are Postgres-native array columns. On MongoDB, an embedded array is just a `json()` field.
 
+:::note
+Native-array columns are serialized correctly at write time with **no configuration** — the Postgres driver introspects the schema on connect and binds a raw JS array (which Postgres stores as `{...}`) for these columns, rather than JSON text (which a `json`/`jsonb` column needs). The `nativeArrayColumns` connection option remains an optional manual override for the rare cases where introspection can't see the column (a column created outside a migration, or a locked-down `information_schema`).
+:::
+
 ## Column modifiers
 
 Chain modifiers to shape each column:

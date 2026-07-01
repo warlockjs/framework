@@ -11,10 +11,12 @@ Standalone functions exported from `@warlock.js/logger` alongside the `Logger` c
 ## `captureAnyUnhandledRejection()`
 
 ```ts
-function captureAnyUnhandledRejection(): void;
+function captureAnyUnhandledRejection(
+  options?: { exitOnUncaughtException?: boolean },
+): void;
 ```
 
-Attaches process-level listeners for `unhandledRejection` and `uncaughtException`, forwarding each to `log.error("app", "<event>", error)`. Call once at startup, after channels are registered. See [Capturing unhandled errors](../advanced/02-capturing-unhandled-errors/) for the gotchas (not idempotent, doesn't prevent exit, also `console.log`s the rejected promise).
+Attaches process-level listeners: `unhandledRejection` → `log.error("app", ...)` (process kept alive), and `uncaughtException` → `log.fatal("app", ...)` then `process.exit(1)` — restoring the non-zero exit that registering the listener would otherwise suppress, so a fatal crash is never silently swallowed into `exit 0`. Pass `{ exitOnUncaughtException: false }` to log without exiting (e.g. a dev server recovering via HMR); when no terminal channel is configured yet, the fatal path also prints the stack to `console.error`. Call once at startup, after channels are registered. See [Capturing unhandled errors](../advanced/02-capturing-unhandled-errors/) for the gotchas.
 
 ## `clearMessage(message)`
 

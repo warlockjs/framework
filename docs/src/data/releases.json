@@ -1,6 +1,12 @@
 {
   "_doc": "Release-level metadata for the unified changelog — the DATE and the 'what shipped' SUMMARY for each version. Per-package change details (Added/Changed/Fixed/Removed) live in each package's CHANGELOG.md and are aggregated by scripts/generate-changelog.mjs; this file supplies the release date + summary that the per-package files don't carry. Hand-maintained: add one entry per release, keyed by the version string. `date` is a display string (e.g. \"June 4, 2026\"); `summary` supports inline `code`, **bold**, and [links](url); `featured` (optional) is an array of package names floated to the top of that release's package list, in the listed order (the rest follow most-changed-first, then alphabetical). Keep the summary to ONE short headline — what shipped and which packages — not an API-by-API tour; the per-package list below it carries the detail.",
 
+  "4.6.1": {
+    "date": "July 1, 2026",
+    "summary": "A production-hardening patch across **`@warlock.js/core`**, **`@warlock.js/logger`**, and **`@warlock.js/cascade`** — a fatal boot error now fails loudly instead of exiting `0`, native Postgres array columns (`TEXT[]` / `JSONB[]`) work with no configuration, and a nested `transaction()` joins the active transaction instead of opening an isolated one that can't see its writes.",
+    "featured": ["@warlock.js/cascade", "@warlock.js/core", "@warlock.js/logger"]
+  },
+
   "4.6.0": {
     "date": "July 1, 2026",
     "summary": "The AI framework closes every remaining capability gap. **Output modalities** land — `ai.image()`, `ai.speech()`, and `ai.transcribe()`, plus the new **`@warlock.js/ai-live`** package for `ai.realtime()` duplex voice + `ai.video()`. **RAG** gains first-party vector stores and document loaders (`ai.rag.pgVectorStore` on Postgres/pgvector, `ai.rag.loadWeb` / `loadPdf` / `loadHtml` / `loadText`). **Durable mid-run crash-resume** comes to agents and planners (`agent.resume()` / `planner.resume()` via an opt-in `durable` store). And **provider breadth** doubles with four new OpenAI-compatible adapters — **`@warlock.js/ai-mistral`**, **`ai-groq`**, **`ai-deepseek`**, and **`ai-xai`**.",

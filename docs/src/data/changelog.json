@@ -104,6 +104,71 @@
   ],
   "releases": [
     {
+      "version": "4.6.1",
+      "id": "v4-6-1",
+      "date": "July 1, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "A production-hardening patch across <strong><code>@warlock.js/core</code></strong>, <strong><code>@warlock.js/logger</code></strong>, and <strong><code>@warlock.js/cascade</code></strong> — a fatal boot error now fails loudly instead of exiting <code>0</code>, native Postgres array columns (<code>TEXT[]</code> / <code>JSONB[]</code>) work with no configuration, and a nested <code>transaction()</code> joins the active transaction instead of opening an isolated one that can't see its writes.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Native Postgres array columns (<code>TEXT[]</code> / <code>JSONB[]</code>, from <code>arrayText()</code> / <code>arrayJson()</code>) are now auto-detected by introspecting the schema on connect and bound as raw arrays — no more \"malformed array literal\" on insert and no need to hand-list <code>nativeArrayColumns</code> (which stays as an optional per-connection override, now consulted per-table)"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>transaction()</code> now flat-nests: a nested <code>transaction()</code> joins the active one (same session, sees its uncommitted writes) instead of opening a second, independent transaction — fixes phantom foreign-key violations when a service that opens its own transaction is called inside an outer one (e.g. a seeder creating a row, then a service inserting a child that references it). MongoDB joins too, replacing its \"nested not supported\" throw"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "a fatal <code>uncaughtException</code> at production boot (e.g. a config file that throws) is no longer swallowed into a silent <code>exit 0</code> — bootstrap now wires the crash handler to exit non-zero in production so <code>warlock start</code> surfaces the failure; the dev server still logs-and-continues for HMR"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<code>captureAnyUnhandledRejection()</code> now exits the process non-zero after an <code>uncaughtException</code> (and prints the stack to <code>console.error</code> when no terminal channel is configured) so a fatal error at boot is never silently swallowed into a clean <code>exit 0</code> — opt out with <code>{ exitOnUncaughtException: false }</code> where the process recovers on its own (e.g. a dev server using HMR). <code>unhandledRejection</code> is unchanged (logged at <code>error</code>, never exits)."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "4.6.0",
       "id": "v4-6-0",
       "date": "July 1, 2026",
