@@ -1,0 +1,22 @@
+{
+  "name": "@warlock.js/fs",
+  "version": "4.6.1",
+  "description": "Filesystem primitives for Warlock.js â€” drop-in replacement for @warlock.js/fs.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warlockjs/fs"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.18"
+  }
+}

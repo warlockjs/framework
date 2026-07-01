@@ -1,0 +1,570 @@
+# Warlock FS — full skills
+
+> Package: `@warlock.js/fs`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/fs/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## hash-files  `@warlock.js/fs/hash-files/SKILL.md`
+
+---
+name: hash-files
+description: 'Compute hex digests — hashFile / hashFileAsync (streaming for large files), hashFileSmallAsync, hashString, hashBuffer. Defaults to SHA-256; supports sha1 / md5 / sha512. Triggers: `hashFile`, `hashFileAsync`, `hashFileSmallAsync`, `hashString`, `hashBuffer`, `HashAlgorithm`; "fingerprint a file for cache invalidation", "compute SHA-256 checksum", "compare two files for equality", "cache key from request input"; typical import `import { hashFileAsync, hashString } from "@warlock.js/fs"`. Skip: file IO — `@warlock.js/fs/read-and-write-files/SKILL.md`; competing libs `hasha`, `md5-file`, `crypto-hash`; native `node:crypto` `createHash`.'
+---
+
+# Compute file and content hashes
+
+Hex-digest helpers backed by `node:crypto`. Picks the right strategy for the input size — streaming for files (memory stays flat), one-shot for in-memory content.
+
+## Available algorithms
+
+```ts
+type HashAlgorithm = "sha256" | "sha1" | "md5" | "sha512";
+```
+
+Default is `"sha256"` — the right choice for cache-bust, content-addressable storage, and fingerprinting. Pick `"md5"` only when matching an external system that requires it; never for security.
+
+## Hash a file
+
+```ts
+import { hashFile, hashFileAsync } from "@warlock.js/fs";
+
+// Streaming — constant memory regardless of file size
+const fingerprint = await hashFileAsync("./bundle.js");
+// → "8a7d3e2f9b4c..."
+
+// Sync, with custom algorithm
+const md5 = hashFile("./small.txt", "md5");
+```
+
+`hashFileAsync` uses a stream, so a 1 GB file doesn't blow the heap. `hashFile` (sync) reads the whole file at once — fine for small files.
+
+## Hash a small file in one shot
+
+```ts
+import { hashFileSmallAsync } from "@warlock.js/fs";
+
+const digest = await hashFileSmallAsync("./icon.svg");
+```
+
+`hashFileSmallAsync` reads the file in a single `readFile` call before hashing. Slightly faster than streaming when the file is < ~1 MB; **don't** use it on large files (it'll load the whole thing into memory).
+
+| Use | Reach for |
+| --- | --- |
+| Streaming async (default for files) | `hashFileAsync` |
+| Small file, slightly faster async | `hashFileSmallAsync` |
+| Sync (CLI / config loader only) | `hashFile` |
+| In-memory string | `hashString` |
+| In-memory Buffer / Uint8Array | `hashBuffer` |
+
+## Hash in-memory content
+
+```ts
+import { hashString, hashBuffer } from "@warlock.js/fs";
+
+const stringDigest = hashString("hello world");
+const bufferDigest = hashBuffer(Buffer.from([0x01, 0x02, 0x03]));
+```
+
+Both sync, both default to SHA-256, both accept the algorithm override.
+
+## Common shapes
+
+### Cache key from request input
+
+```ts
+import { hashString } from "@warlock.js/fs";
+
+const key = `report.${hashString(JSON.stringify(filters))}`;
+await cache.set(key, report, "1h");
+```
+
+Stable, short, collision-resistant. JSON stringification is the gotcha — key order matters; sort keys if the input might arrive in different orders.
+
+### Bust a CDN cache when a build artifact changes
+
+```ts
+import { hashFileAsync } from "@warlock.js/fs";
+
+const digest = await hashFileAsync("./dist/bundle.js");
+await renameFileAsync("./dist/bundle.js", `./dist/bundle.${digest.slice(0, 8)}.js`);
+```
+
+8 hex chars (≈32 bits) is enough for a single-app deployment — collisions on a per-build basis are vanishingly small.
+
+### Skip work if content hasn't changed
+
+```ts
+import { hashFileAsync, fileExistsAsync, getFileAsync } from "@warlock.js/fs";
+
+const inputDigest = await hashFileAsync("./input.json");
+const cachedDigest = (await fileExistsAsync("./.last-input-digest"))
+  ? await getFileAsync("./.last-input-digest")
+  : null;
+
+if (inputDigest === cachedDigest) {
+  return;   // input unchanged — skip the expensive pipeline
+}
+
+await runPipeline();
+await putFileAsync("./.last-input-digest", inputDigest);
+```
+
+### Compare two files for equality
+
+```ts
+const same = (await hashFileAsync(a)) === (await hashFileAsync(b));
+```
+
+Cheaper than `cmp`-byte-comparing two large files when the result is "yes/no different" — and you cache the digests for later comparisons against other candidates.
+
+## See also
+
+- [`@warlock.js/fs/read-and-write-files/SKILL.md`](@warlock.js/fs/read-and-write-files/SKILL.md) — reading files before hashing in-memory content
+- [`@warlock.js/cache/use-cached-hof/SKILL.md`](@warlock.js/cache/use-cached-hof/SKILL.md) — building cache keys from hashes
+
+## Things NOT to do
+
+- Don't use MD5 or SHA-1 for security purposes (password hashing, signature verification). Both are broken cryptographically — they're fine for cache keys and non-adversarial fingerprinting, nothing more.
+- Don't truncate the digest below 32 bits (8 hex chars) for collision-sensitive uses. Two builds with the same prefix do happen; full digest is 64 hex chars for SHA-256.
+- Don't load a large file via `getFileAsync` and then `hashString` it — that defeats the streaming optimization. Use `hashFileAsync` directly.
+- Don't expect digests to compare lexically meaningfully — they're random hex. For ordering, hash and then `bigint`-convert if you really need sort.
+
+
+## manage-directories  `@warlock.js/fs/manage-directories/SKILL.md`
+
+---
+name: manage-directories
+description: 'Manage directories + files — ensureDirectory (mkdir -p), list / listFiles / listDirectories, copyFile / copyDirectory, renameFile, unlink (ENOENT-safe), removeDirectory (recursive force). Triggers: `ensureDirectoryAsync`, `listAsync`, `listFilesAsync`, `listDirectoriesAsync`, `copyFileAsync`, `copyDirectoryAsync`, `renameFileAsync`, `unlinkAsync`, `removeDirectoryAsync`; "create directory recursively", "list files in folder", "delete directory recursively", "copy or rename folder", "walk a tree"; typical import `import { ensureDirectoryAsync, listFilesAsync, removeDirectoryAsync } from "@warlock.js/fs"`. Skip: file IO — `@warlock.js/fs/read-and-write-files/SKILL.md`; atomic writes — `@warlock.js/fs/write-atomically/SKILL.md`; competing libs `fs-extra`, `mkdirp`, `rimraf`, `recursive-readdir`, `glob`; native `node:fs/promises`.'
+---
+
+# Manage directories and files on disk
+
+Same two-suffix convention as the rest of `@warlock.js/fs` — `*Async` is async, the bare name is sync.
+
+## Ensure a directory exists
+
+```ts
+import { ensureDirectoryAsync } from "@warlock.js/fs";
+
+await ensureDirectoryAsync("./dist/cache/v2");
+// recursively creates dist, dist/cache, dist/cache/v2 if missing
+// no-op if everything already exists
+```
+
+Idempotent. Pair it with anything that writes — though `putFileAsync` already does this internally, so you rarely need `ensureDirectory` for the immediate parent of a file you're about to write.
+
+## List children
+
+Three variants:
+
+```ts
+import { listAsync, listFilesAsync, listDirectoriesAsync } from "@warlock.js/fs";
+
+await listAsync("./src");              // [files + subdirs] full paths
+await listFilesAsync("./src");          // only regular files
+await listDirectoriesAsync("./src");    // only directories
+```
+
+Returns **full paths** (joined to the directory you passed in), not bare entry names. Pass them straight to other fs calls.
+
+```ts
+const components = await listFilesAsync("./src/components");
+for (const file of components) {
+  // file = "./src/components/Button.tsx"
+  await processComponent(file);
+}
+```
+
+Only the immediate children — non-recursive. Recurse yourself with the directory variant + a stack/queue if you need deep traversal.
+
+## Copy
+
+```ts
+import { copyFileAsync, copyDirectoryAsync } from "@warlock.js/fs";
+
+// File — creates the destination's parent directories
+await copyFileAsync("./dist/bundle.js", "./snapshot/v2/bundle.js");
+
+// Directory — fully recursive
+await copyDirectoryAsync("./public", "./dist/public");
+```
+
+`copyFile` creates the destination's parent directories. `copyDirectory` uses Node's recursive `cp` under the hood — preserves the tree, overwrites existing files.
+
+## Rename / move
+
+```ts
+import { renameFileAsync } from "@warlock.js/fs";
+
+await renameFileAsync("./tmp/foo.txt", "./final/foo.txt");
+```
+
+Works on files and directories. Cross-device renames (e.g. `/tmp` → `/var`) may fail with `EXDEV` — the OS won't move across mounts. For cross-device, copy then delete.
+
+## Delete
+
+```ts
+import { unlinkAsync, removeDirectoryAsync } from "@warlock.js/fs";
+
+await unlinkAsync("./obsolete.txt");          // single file — ENOENT-safe
+await removeDirectoryAsync("./dist");          // recursive + force — ENOENT-safe
+```
+
+Both are **idempotent for missing targets** — calling on a path that doesn't exist is a no-op, not an error. Other errors (`EACCES`, `EBUSY`) still throw.
+
+## Picking a delete shape
+
+| Task | Reach for |
+| --- | --- |
+| Drop one file | `unlinkAsync(path)` |
+| Drop a whole tree | `removeDirectoryAsync(path)` |
+| Drop everything in a folder but keep the folder | `for (const f of await listAsync(dir)) await removeDirectoryAsync(f)` (file? unlink; dir? recurse) |
+
+## Common shapes
+
+### Snapshot a build output
+
+```ts
+import { ensureDirectoryAsync, copyDirectoryAsync, removeDirectoryAsync } from "@warlock.js/fs";
+
+const target = `./snapshots/${Date.now()}`;
+await ensureDirectoryAsync(target);
+await copyDirectoryAsync("./dist", target);
+```
+
+### Reset a temp dir between runs
+
+```ts
+await removeDirectoryAsync("./tmp");
+await ensureDirectoryAsync("./tmp");
+```
+
+### Walk every TS file under src
+
+```ts
+async function walk(dir: string): Promise<string[]> {
+  const entries = await listAsync(dir);
+  const results: string[] = [];
+
+  for (const entry of entries) {
+    if (await directoryExistsAsync(entry)) {
+      results.push(...(await walk(entry)));
+    } else if (entry.endsWith(".ts")) {
+      results.push(entry);
+    }
+  }
+
+  return results;
+}
+
+const tsFiles = await walk("./src");
+```
+
+## See also
+
+- [`@warlock.js/fs/read-and-write-files/SKILL.md`](@warlock.js/fs/read-and-write-files/SKILL.md) — text / JSON file IO and existence checks
+- [`@warlock.js/fs/write-atomically/SKILL.md`](@warlock.js/fs/write-atomically/SKILL.md) — atomic writes when concurrent readers might see the file mid-write
+- [`@warlock.js/fs/hash-files/SKILL.md`](@warlock.js/fs/hash-files/SKILL.md) — fingerprinting
+
+## Things NOT to do
+
+- Don't expect `listAsync` to recurse — it's intentionally one level. Write your own walker (see above) for deep traversal.
+- Don't catch `ENOENT` on `unlink` / `removeDirectory` — both functions already swallow missing-target errors. If you're catching, you're handling a real error and should re-throw.
+- Don't use `renameFile` across filesystems / mounts — `EXDEV` will surface. Copy + delete for cross-device.
+- Don't list a directory you're concurrently modifying — readdir snapshots aren't atomic across concurrent writes.
+
+
+## overview  `@warlock.js/fs/overview/SKILL.md`
+
+---
+name: overview
+description: 'Front-door orientation for `@warlock.js/fs` — filesystem primitives (read/write/JSON, dirs, copy/rename/delete, atomic writes, hashing, existence + stats). Two-suffix convention: `*Async` returns Promise, bare name is sync. Single canonical name per operation — no aliases. TRIGGER when: code imports anything from `@warlock.js/fs`; user asks "what does @warlock.js/fs do", "is fs the right package for X", "list all fs helpers", "fs sync vs async convention"; package.json adds `@warlock.js/fs`; user is choosing between fs vs `node:fs/promises`/`fs-extra`/`graceful-fs`. Skip: specific task already known — load the matching task skill directly (`@warlock.js/fs/read-and-write-files/SKILL.md`, `@warlock.js/fs/manage-directories/SKILL.md`, `@warlock.js/fs/write-atomically/SKILL.md`, `@warlock.js/fs/hash-files/SKILL.md`); the user is using plain `node:fs` and not touching fs imports.'
+---
+
+# `@warlock.js/fs` — overview
+
+Thin, opinionated wrapper over `node:fs` and `node:fs/promises`. Same operations you'd write by hand against the Node primitives, but with consistent naming, parent-directory auto-creation, ENOENT-safe deletes, atomic writes, and streaming hashes — the boring-but-load-bearing utilities every backend grows by month two anyway.
+
+## When to reach for it
+
+- You're inside a `@warlock.js/*` project — every other framework package already depends on this one. Use it for consistency.
+- You're outside Warlock but want one import that gives you sane defaults (auto-mkdir on writes, idempotent deletes, streaming hashes, atomic config writes).
+- You're choosing between `node:fs` and a wrapper — and want a small, opinionated surface (~40 exports) rather than the kitchen sink of `fs-extra` or the patching-Node behavior of `graceful-fs`.
+
+Skip if your code path is one-off and bare `node:fs/promises` is already imported elsewhere — there's no value in adding a dependency for a single `readFile`.
+
+## Convention — read these once and you know the shape
+
+- **`*Async` is async** (returns `Promise<…>`). Use these in server / runtime code.
+- **Bare name is synchronous.** Use these in CLI tools, code generators, and one-shot scripts where blocking the loop doesn't matter.
+- **One canonical name per operation.** No aliases (`unlinkAsync`, not `deleteAsync` or `removeAsync` for the same thing). Reach for the obvious name; if you don't find it, it doesn't exist.
+- **Writes auto-create parent directories.** `putFileAsync("./a/b/c.txt", …)` works without a separate `ensureDirectory("./a/b")` first.
+- **Deletes are ENOENT-safe.** `unlinkAsync` and `removeDirectoryAsync` no-op on missing targets. Other errors (`EACCES`, `EBUSY`) still throw.
+
+## Skills index
+
+Four task skills cover the surface. Load the one that matches what you're trying to do — don't load all four unless you're touring the package.
+
+### [`read-and-write-files/SKILL.md`](@warlock.js/fs/read-and-write-files/SKILL.md)
+
+Read and write text or JSON files; check existence and metadata. Covers
+`getFile` / `getFileAsync` / `getJsonFile` / `getJsonFileAsync`,
+`putFile` / `putFileAsync` / `putJsonFile` / `putJsonFileAsync`,
+`pathExists` / `fileExists` / `directoryExists`,
+`lastModified` / `stats`.
+
+Load when reading or writing text or JSON, or gating creation on existence.
+
+### [`manage-directories/SKILL.md`](@warlock.js/fs/manage-directories/SKILL.md)
+
+Create, list, copy, move, and delete directories and files. Covers
+`ensureDirectory(Async)`, `list(Async)` / `listFiles(Async)` / `listDirectories(Async)`,
+`copyFile(Async)` / `copyDirectory(Async)`, `renameFile(Async)`,
+`unlink(Async)`, `removeDirectory(Async)`.
+
+Load when scaffolding, walking trees, snapshotting, cleaning, or moving files around.
+
+### [`write-atomically/SKILL.md`](@warlock.js/fs/write-atomically/SKILL.md)
+
+Write files so concurrent readers never see a half-written state. Covers
+`atomicWriteAsync(path, content)` and `atomicWriteJsonAsync(path, value)`.
+Sibling temp file + atomic rename — last-writer-wins on contention, no locking.
+
+Load when writing a file that other processes / file watchers / build steps consume in parallel (config, manifest, state, lockfile).
+
+### [`hash-files/SKILL.md`](@warlock.js/fs/hash-files/SKILL.md)
+
+Compute hex digests for files (streaming) or in-memory content. Covers
+`hashFile(Async)` (streaming — constant memory),
+`hashFileSmallAsync` (one-shot for small files),
+`hashString`, `hashBuffer`, plus the `HashAlgorithm` type.
+Defaults to SHA-256; supports SHA-1 / MD5 / SHA-512.
+
+Load when fingerprinting for cache invalidation, content-addressable storage, change detection, or file-equality comparison. Never for security (password hashing, signing).
+
+## What this package deliberately doesn't do
+
+- **Globbing.** Use `tinyglobby` / `fast-glob`. Adding a glob engine here would double the surface for one use case.
+- **Watching.** Use `chokidar` or `node:fs.watch` directly. Watchers have their own lifecycle that doesn't fit the one-shot utility shape.
+- **Permissions / chmod / chown.** Out of scope. Reach for `node:fs/promises`'s `chmod` / `chown` directly when you need them.
+- **Streaming pipelines beyond hashing.** This isn't a general streams library; it's a wrapper for the common one-shot file operations.
+
+## See also
+
+- [`@warlock.js/core/warlock-conventions/SKILL.md`](@warlock.js/core/warlock-conventions/SKILL.md) — the parent framework's conventions; `fs` is one of its foundation packages.
+- `mongez-agent-kit-authoring-skills` (load via agent-kit sync) — how this `overview/SKILL.md` becomes the front-door skill in `.claude/skills/warlock-js-fs-overview/`.
+
+
+## read-and-write-files  `@warlock.js/fs/read-and-write-files/SKILL.md`
+
+---
+name: read-and-write-files
+description: 'Read and write files — getFile / getFileAsync / getJsonFile / putFile (auto-creates parent dirs), plus pathExists / fileExists / directoryExists / lastModified / stats. Triggers: `getFileAsync`, `getJsonFileAsync`, `putFileAsync`, `putJsonFileAsync`, `pathExists`, `fileExists`, `lastModifiedAsync`, `statsAsync`; "read a text file", "write a JSON file", "check if file exists"; typical import `import { getFileAsync, putJsonFileAsync, fileExists } from "@warlock.js/fs"`. Skip: atomic writes — `@warlock.js/fs/write-atomically/SKILL.md`; dirs + copy + delete — `@warlock.js/fs/manage-directories/SKILL.md`; hashing — `@warlock.js/fs/hash-files/SKILL.md`; competing libs `fs-extra`, `jsonfile`, `graceful-fs`; native `node:fs/promises`.'
+---
+
+# Read and write files
+
+Thin, opinionated wrapper around `node:fs` and `node:fs/promises`. Two-suffix convention: `*Async` returns a Promise, the bare name is synchronous. No `Sync` suffix on the sync calls — that would mean you have to remember the inverse.
+
+## Install
+
+```bash
+yarn add @warlock.js/fs
+```
+
+## Read
+
+```ts
+import { getFile, getFileAsync, getJsonFile, getJsonFileAsync } from "@warlock.js/fs";
+
+// UTF-8 text
+const config = await getFileAsync("./config.toml");
+const sync = getFile("./config.toml");
+
+// Parsed JSON, generic-typed
+type Manifest = { version: string; files: string[] };
+const manifest = await getJsonFileAsync<Manifest>("./manifest.json");
+```
+
+Behavior:
+- All read functions return UTF-8 strings (or parsed JSON in the `JsonFile` variants).
+- Throws if the file doesn't exist (`ENOENT`) or JSON is invalid. Don't try/catch for "file might not be there" — use `pathExists` / `fileExists` below.
+
+## Write
+
+```ts
+import { putFile, putFileAsync, putJsonFile, putJsonFileAsync } from "@warlock.js/fs";
+
+await putFileAsync("./dist/output.txt", "hello world");
+await putJsonFileAsync("./dist/manifest.json", { version: "1.0.0" });
+```
+
+Behavior:
+- Parent directories are created recursively — no need to `ensureDirectory` first.
+- JSON variants pretty-print at 2-space indent. For minified output, stringify yourself and use the plain `putFile`.
+- Overwrites existing files. For atomic write semantics (readers never see a half-written file), use [`write-atomically`](@warlock.js/fs/write-atomically/SKILL.md).
+
+## Existence checks
+
+Three variants — pick the strictest one that fits the question you're asking. Each has an async (`*Async`) and a sync form:
+
+```ts
+import { pathExistsAsync, fileExistsAsync, directoryExistsAsync } from "@warlock.js/fs";
+
+await pathExistsAsync("./anything");      // true if file OR directory
+await fileExistsAsync("./config.toml");   // true ONLY if a regular file
+await directoryExistsAsync("./dist");     // true ONLY if a directory
+
+// sync counterparts, same semantics
+import { pathExists, fileExists, directoryExists } from "@warlock.js/fs";
+```
+
+Match the check to the target: gate a directory operation (listing, walking) on `directoryExistsAsync`, not `fileExistsAsync` — the latter resolves `false` for a folder and would skip it entirely. Reach for `pathExistsAsync` only when the type genuinely doesn't matter.
+
+`fileExists*` and `directoryExists*` follow symlinks (they're `stat`-based, not `lstat`). Use them to gate creation logic instead of try-catching a `read`:
+
+```ts
+// ✅ Clearer intent
+if (!(await fileExists("./config.toml"))) {
+  await putFileAsync("./config.toml", defaultConfig);
+}
+
+// ❌ Don't catch ENOENT as control flow
+try {
+  await getFileAsync("./config.toml");
+} catch {
+  await putFileAsync("./config.toml", defaultConfig);
+}
+```
+
+## Metadata
+
+```ts
+import { lastModified, stats } from "@warlock.js/fs";
+
+const mtime = await lastModifiedAsync("./bundle.js");      // Date
+const all = await statsAsync("./bundle.js");                // fs.Stats
+```
+
+`lastModified` is sugar around `stat().mtime`. Reach for `stats` when you need size, mode bits, or other fields.
+
+## When to pick sync vs async
+
+- **Async by default** — everything in a Warlock server / app runtime should be async. The event loop stays free.
+- **Sync only in CLI tools and config-loaders that run once** — startup config, code generators, scripts. The blocking call is fine when there's nothing else to do.
+
+## See also
+
+- [`@warlock.js/fs/manage-directories/SKILL.md`](@warlock.js/fs/manage-directories/SKILL.md) — directory listing, copying, removing, renaming
+- [`@warlock.js/fs/write-atomically/SKILL.md`](@warlock.js/fs/write-atomically/SKILL.md) — safe writes for files that other readers depend on
+- [`@warlock.js/fs/hash-files/SKILL.md`](@warlock.js/fs/hash-files/SKILL.md) — fingerprinting files
+
+## Things NOT to do
+
+- Don't call `putFileAsync` on a file that other processes / readers consume in parallel — use `atomicWriteAsync` from [`write-atomically`](@warlock.js/fs/write-atomically/SKILL.md) instead.
+- Don't rely on `try { getFileAsync(...) } catch` for existence checks — `fileExists` is faster and reads better.
+- Don't pass binary content to `putFile` / `putFileAsync` as a `Buffer` directly — these are text-only (UTF-8). For binaries, use `node:fs/promises`'s `writeFile` directly, or use `atomicWriteAsync` (which accepts `string | Buffer`).
+
+
+## write-atomically  `@warlock.js/fs/write-atomically/SKILL.md`
+
+---
+name: write-atomically
+description: 'Atomic file writes via atomicWriteAsync(path, content) — writes to a uniquely-named sibling temp + rename onto target so readers see old or complete new content, never half-written. Triggers: `atomicWriteAsync`, `atomicWriteJsonAsync`; "atomic file write", "write config file safely with concurrent readers", "manifest written by build step", "state file across runs", "avoid half-written files"; typical import `import { atomicWriteAsync, atomicWriteJsonAsync } from "@warlock.js/fs"`. Skip: plain writes — `@warlock.js/fs/read-and-write-files/SKILL.md`; read-modify-write locking — `@warlock.js/cache/use-cache-lock/SKILL.md`; competing libs `write-file-atomic`, `steno`, `fs-extra` `outputFile`.'
+---
+
+# Atomic file writes
+
+`atomicWriteAsync` is the safe replacement for `putFileAsync` when readers can see the file at any moment. Same parent-directory auto-creation; the difference is the write strategy.
+
+## Why use it
+
+`putFileAsync` writes directly to the destination. If a reader picks the file up while you're partway through the write, they see truncated content. That's fine for ephemeral logs; not fine for:
+
+- **Config files watched by a dev server / linter.** Half-written config makes the watcher emit a spurious error.
+- **Manifests consumed by another process.** Two-process pipelines deserialize and crash on partial JSON.
+- **State files between runs of the same script.** A crash mid-write leaves you with a corrupt file you can't read on the next run.
+
+`atomicWriteAsync` writes to a uniquely-named sibling temp file first, then `rename`s it onto the target. On most filesystems the rename is atomic — readers see the old content, then the new content, never anything in between.
+
+## Shape
+
+```ts
+import { atomicWriteAsync, atomicWriteJsonAsync } from "@warlock.js/fs";
+
+await atomicWriteAsync("./config.toml", configString);
+await atomicWriteAsync("./binary.bin", Buffer.from([0x01, 0x02]));   // accepts string OR Buffer
+
+// JSON sugar — pretty-prints at 2-space indent
+await atomicWriteJsonAsync("./manifest.json", { version: "1.0.0", files: [...] });
+```
+
+## What happens internally
+
+```
+1. mkdir(dir, recursive)
+2. tempPath = `${dir}/.${name}.${randomHex(6)}.tmp`     ← unique sibling temp
+3. writeFile(tempPath, content)
+4. rename(tempPath, filePath)                            ← atomic on POSIX, near-atomic on NTFS
+   on failure: unlink(tempPath)
+```
+
+The random 6-byte suffix prevents two concurrent writers from racing on the same temp file. The temp file lives in the **same directory** as the target so the rename is intra-mount (cross-mount rename would fall back to copy + unlink, which isn't atomic).
+
+## Concurrent writers
+
+Two `atomicWriteAsync` calls to the same target serialize at the rename. Whichever rename completes last wins. **No locking** — last-writer-wins is the contract.
+
+If you need read-modify-write atomicity (each writer sees the previous writer's result), wrap the calls in a distributed lock — e.g. [`@warlock.js/cache/use-cache-lock/SKILL.md`](@warlock.js/cache/use-cache-lock/SKILL.md).
+
+## Common shapes
+
+### State file written across multiple runs
+
+```ts
+// On every successful run
+await atomicWriteJsonAsync("./.cache/last-run.json", {
+  finishedAt: new Date().toISOString(),
+  buildId: process.env.BUILD_ID,
+});
+```
+
+Crash partway through? Either the file has the previous run's content or the new run's content. Never garbage.
+
+### Manifest emitted by a build step
+
+```ts
+const manifest = computeManifest(files);
+await atomicWriteJsonAsync("./dist/manifest.json", manifest);
+```
+
+A reader (CDN purge script, deployment tool) that picks up `dist/manifest.json` while the build is mid-write doesn't crash.
+
+### Config file watched by a dev server
+
+```ts
+const config = transformConfig(input);
+await atomicWriteAsync("./config.toml", config);
+```
+
+The dev server's file watcher fires once after the rename, sees complete content. No double-event or partial-content noise.
+
+## What it doesn't protect against
+
+- **Filesystem corruption.** Power-loss between `writeFile` and `rename` leaves the temp file behind — that's `fsync` territory, not handled here. For ironclad durability, you'd need a `writeFile + fsync + rename + fsync(parent)` sequence; this helper skips the fsyncs for write speed.
+- **Cross-filesystem renames.** If `dir` is a different mount from the target's actual storage (unusual), `rename` may fall back to copy + delete, which isn't atomic. Keep the temp on the same mount — the helper does this automatically.
+- **Race conditions in your callers.** `atomicWriteAsync` makes the file write atomic; it doesn't serialize callers. Two callers stomping each other is your problem, not the helper's.
+
+## See also
+
+- [`@warlock.js/fs/read-and-write-files/SKILL.md`](@warlock.js/fs/read-and-write-files/SKILL.md) — `putFileAsync` for non-atomic writes
+- [`@warlock.js/cache/use-cache-lock/SKILL.md`](@warlock.js/cache/use-cache-lock/SKILL.md) — distributed lock for read-modify-write protection
+
+## Things NOT to do
+
+- Don't use `atomicWriteAsync` when you don't need atomicity — `putFileAsync` is slightly faster (no rename round-trip). For ephemeral files, plain write is fine.
+- Don't store the temp file outside the target directory. The helper picks the same dir on purpose so the rename is intra-mount; if you reach inside the source and change that, you lose the atomicity guarantee on cross-mount setups.
+- Don't pair atomic writes with locked reads expecting consistency. A reader between the rename and your next write sees the intermediate complete state — that's the point of the helper. If you want every read to see a particular write, serialize with a lock.
+- Don't sync after atomic write expecting "definitely persisted to disk" — the helper doesn't fsync. For durability guarantees, fsync the parent directory after the rename yourself.
+
+
