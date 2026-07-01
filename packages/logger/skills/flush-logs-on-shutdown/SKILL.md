@@ -99,7 +99,7 @@ log.flushSync();
 
 ## Unhandled errors
 
-If you use [`captureAnyUnhandledRejection()`](@warlock.js/logger/capture-unhandled-errors/SKILL.md), **include `"beforeExit"` in `autoFlushOn`**. Otherwise a crash logs the error into the buffer, then the process exits before the 5-second flush interval fires.
+The `uncaughtException` path in [`captureAnyUnhandledRejection()`](@warlock.js/logger/capture-unhandled-errors/SKILL.md) already runs a best-effort, time-bounded `log.flush()` before its own `process.exit(1)`, so the fatal entry drains without extra wiring (and `process.exit()` skips `beforeExit`, so a `beforeExit` handler would not fire on that path anyway). Still set `autoFlushOn` for the *other* shutdown routes — `"SIGINT"` / `"SIGTERM"` and a natural `"beforeExit"` — so those don't lose the last buffered batch.
 
 ```ts
 log.configure({

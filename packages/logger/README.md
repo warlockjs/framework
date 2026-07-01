@@ -92,7 +92,7 @@ import { captureAnyUnhandledRejection } from "@warlock.js/logger";
 captureAnyUnhandledRejection();
 ```
 
-Registers process-level handlers for `unhandledRejection` and `uncaughtException`, forwarding both to `log.error("app", ...)`. Call once at startup, after channels are registered.
+Registers process-level handlers for `unhandledRejection` (→ `log.error("app", ...)`, process kept alive) and `uncaughtException` (→ `log.fatal("app", ...)`, then `process.exit(1)` so a fatal crash is never silently swallowed into `exit 0`). Pass `{ exitOnUncaughtException: false }` to log without exiting. Call once at startup, after channels are registered.
 
 ## Custom channels
 

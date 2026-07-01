@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/logger` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.6.1
+
+### Changed
+
+- `captureAnyUnhandledRejection()` now exits the process non-zero after an `uncaughtException` (and prints the stack to `console.error` when no terminal channel is configured) so a fatal error at boot is never silently swallowed into a clean `exit 0` — opt out with `{ exitOnUncaughtException: false }` where the process recovers on its own (e.g. a dev server using HMR). `unhandledRejection` is unchanged (logged at `error`, never exits).
+
 ## 4.2.11
 
 ### Changed

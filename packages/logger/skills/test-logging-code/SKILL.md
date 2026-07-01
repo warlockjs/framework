@@ -166,4 +166,12 @@ captureAnyUnhandledRejection();
 process.emit("unhandledRejection", new Error("test"), Promise.resolve());
 ```
 
+The `uncaughtException` path additionally calls `process.exit(1)`, so stub it (or pass `{ exitOnUncaughtException: false }`) before emitting — otherwise the emitted exception tears the test runner down:
+
+```ts
+vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+captureAnyUnhandledRejection();
+process.emit("uncaughtException", new Error("test"), "uncaughtException");
+```
+
 See [`@warlock.js/logger/capture-unhandled-errors/SKILL.md`](@warlock.js/logger/capture-unhandled-errors/SKILL.md) for a full example.

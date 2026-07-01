@@ -56,7 +56,7 @@ Drop entries before they cost anything. Logger-wide `setMinLevel("info")` is the
 Buffered channels need explicit drain. `log.flushSync()` (sync) for file channels — also wired by `enableAutoFlush(['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK', 'SIGUSR2', 'beforeExit'])`. `await log.flush()` (async) for network/async channels like `SentryLog` — the only path that can await an HTTPS round-trip on a graceful shutdown.
 
 #### [`capture-unhandled-errors`](@warlock.js/logger/capture-unhandled-errors/SKILL.md)
-`captureAnyUnhandledRejection()` hooks `unhandledRejection` (→ `log.error("app", ...)`) and `uncaughtException` (→ `log.fatal("app", ...)` — Node terminates by default, so it's semantically fatal). One call at startup, pair with `autoFlushOn: ['beforeExit']` to land the entry on disk.
+`captureAnyUnhandledRejection()` hooks `unhandledRejection` (→ `log.error("app", ...)`, process kept alive) and `uncaughtException` (→ `log.fatal("app", ...)` then `process.exit(1)` — restoring the non-zero exit the listener would otherwise suppress, so a fatal crash never becomes a silent `exit 0`; opt out with `{ exitOnUncaughtException: false }`). It flushes before exiting and falls back to `console.error` when no terminal channel is set. One call at startup.
 
 ### Ergonomics + testing
 

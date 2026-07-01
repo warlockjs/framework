@@ -8,12 +8,12 @@
 
 ---
 name: capture-unhandled-errors
-description: 'captureAnyUnhandledRejection() installs process.on(''unhandledRejection'') → log.error and process.on(''uncaughtException'') → log.fatal so process-level failures land in your configured channels. Triggers: `captureAnyUnhandledRejection`, `unhandledRejection`, `uncaughtException`, `log.error`, `log.fatal`; "log unhandled promise rejections", "catch uncaught exceptions to a file", "record crashes before exit", "global error handler with logger"; typical import `import { captureAnyUnhandledRejection, log } from "@warlock.js/logger"`. Skip: flushing — `@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`; filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; competing `Sentry.init`, `@sentry/node`; native `process.on(''unhandledRejection'')`.'
+description: 'captureAnyUnhandledRejection() installs process.on(''unhandledRejection'') → log.error and process.on(''uncaughtException'') → log.fatal + process.exit(1) so process-level failures land in your channels and a fatal crash is never silently swallowed into exit 0. Triggers: `captureAnyUnhandledRejection`, `exitOnUncaughtException`, `unhandledRejection`, `uncaughtException`, `log.error`, `log.fatal`; "log unhandled promise rejections", "catch uncaught exceptions to a file", "record crashes before exit", "server exits 0 with no error", "silent exit / production server stopped", "global error handler with logger"; typical import `import { captureAnyUnhandledRejection, log } from "@warlock.js/logger"`. Skip: flushing — `@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`; filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; competing `Sentry.init`, `@sentry/node`; native `process.on(''unhandledRejection'')`.'
 ---
 
 # Error capture — routing Node's unhandled errors through the logger
 
-`captureAnyUnhandledRejection()` installs two process-level listeners so crashes are logged (not silently swallowed) before Node exits.
+`captureAnyUnhandledRejection()` installs two process-level listeners so crashes are logged — and, for an `uncaughtException`, made loud and terminal — instead of being silently swallowed.
 
 ## What it does
 
@@ -24,10 +24,19 @@ captureAnyUnhandledRejection();
 ```
 
 Registers:
-- `process.on("unhandledRejection", reason => log.error("app", "unhandledRejection", reason))`
-- `process.on("uncaughtException", error => log.fatal("app", "uncaughtException", error))`
+- `process.on("unhandledRejection", reason => log.error("app", "unhandledRejection", reason))` — logged; the process is kept alive.
+- `process.on("uncaughtException", error => log.fatal("app", "uncaughtException", error))` — logged, then `process.exit(1)` (by default).
 
-The split is intentional: an `uncaughtException` terminates the Node process by default, so it's semantically `fatal`. An `unhandledRejection` is a failure but not always process-ending (depends on Node's `--unhandled-rejections` policy and your app's recovery), so it stays at `error`. This makes "page on fatal" alerting clean — only true crashes ring the pager.
+The split is intentional: an `uncaughtException` leaves the process in an undefined state, so it's semantically `fatal` and takes the process down. An `unhandledRejection` is a failure but not always process-ending (depends on Node's `--unhandled-rejections` policy and your app's recovery), so it stays at `error` and never exits. This makes "page on fatal" alerting clean — only true crashes ring the pager.
+
+## Why it exits (and why that matters)
+
+Registering *any* `uncaughtException` listener **suppresses** Node's default "print the stack + exit non-zero." A listener that only logs therefore turns an unrecoverable crash into a silent `exit 0` — which is exactly how a config file that throws at boot can look like "the server started, then just stopped," with no error printed. So the handler restores the contract:
+
+- **Exits non-zero** after logging (`process.exit(1)`), following a best-effort, time-bounded `log.flush()` so buffered `FileLog` / `SentryLog` entries drain first. Opt out with `captureAnyUnhandledRejection({ exitOnUncaughtException: false })` where the process is expected to recover on its own (a dev server reloading via HMR).
+- **Falls back to `console.error`** when no terminal channel is configured yet — the early-boot window, before `log.configure(...)`, where `log.fatal` has nowhere visible to go. When a `ConsoleLog` is present it already prints the entry, so the fallback is skipped (no double output).
+
+> The framework wires this for you in `bootstrap()` as `captureAnyUnhandledRejection({ exitOnUncaughtException: Application.isProduction })` — production crashes loudly and non-zero, the dev server logs-and-continues so HMR can recover.
 
 ## When to call it
 
@@ -49,15 +58,11 @@ log.configure({
 captureAnyUnhandledRejection();
 ```
 
-## Pair with `autoFlushOn: ["beforeExit"]`
+## Flushing on the crash path
 
-Without a flush on exit, here's what happens on a crash:
+The `uncaughtException` handler runs a best-effort, time-bounded `log.flush()` **before** its own `process.exit(1)`, so buffered `FileLog` / `SentryLog` entries drain even though `process.exit()` skips `beforeExit`. You don't need `autoFlushOn: ["beforeExit"]` for the fatal entry to survive — the handler already drains.
 
-1. Promise rejection fires → `log.error(...)` queues the error into `FileLog`'s buffer.
-2. Node exits.
-3. Buffer is never flushed. **The error that killed your app is lost.**
-
-Including `"beforeExit"` in `autoFlushOn` closes the gap. Node fires `beforeExit` after the rejection handler resolves, the logger flushes, then Node exits. See [`@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`](@warlock.js/logger/flush-logs-on-shutdown/SKILL.md).
+`"beforeExit"` in `autoFlushOn` is still worth setting for the *other* exit routes (a natural drain when the event loop empties on its own). For signal-driven shutdown (`SIGINT` / `SIGTERM`), include those signals in `autoFlushOn`. See [`@warlock.js/logger/flush-logs-on-shutdown/SKILL.md`](@warlock.js/logger/flush-logs-on-shutdown/SKILL.md).
 
 ## Idempotency — don't call it twice
 
@@ -65,7 +70,8 @@ Calling `captureAnyUnhandledRejection()` a second time registers a second pair o
 
 ## What it does **not** do
 
-- **Does not swallow errors.** Node still exits after `uncaughtException` (this is the safe behavior — state is undefined). The logger just ensures the error is recorded first.
+- **Does not swallow a fatal error.** After an `uncaughtException` it records the error, then exits non-zero itself — restoring Node's own default, which merely registering the listener would otherwise suppress. Pass `{ exitOnUncaughtException: false }` only when the process is meant to survive (e.g. HMR).
+- **Does not exit on an `unhandledRejection`.** That path only logs (at `error`); the process keeps running. Set Node's `--unhandled-rejections=throw` if you want a rejection to escalate to an `uncaughtException`.
 - **Does not install Node's `--unhandled-rejections` policy.** That's a Node flag; set it in your launch script if you want strict mode.
 - **Does not hook `SIGTERM` / `SIGINT`** — use `enableAutoFlush` for signal flushes.
 - **Does not filter.** Every rejection is logged at `error` and every uncaught exception at `fatal`, both with `module: "app"`. Filter per-channel if some noise slips in.
@@ -100,6 +106,8 @@ it("routes unhandled rejections to the logger", async () => {
   log.channels = originalChannels;
 });
 ```
+
+Testing the **`uncaughtException`** path additionally trips `process.exit(1)`, so stub it (`vi.spyOn(process, "exit").mockImplementation(() => undefined as never)`) or pass `{ exitOnUncaughtException: false }` — otherwise the emitted exception tears the test runner down. See [`@warlock.js/logger/test-logging-code/SKILL.md`](@warlock.js/logger/test-logging-code/SKILL.md).
 
 ## Module + action the capture uses
 
@@ -447,7 +455,7 @@ log.flushSync();
 
 ## Unhandled errors
 
-If you use [`captureAnyUnhandledRejection()`](@warlock.js/logger/capture-unhandled-errors/SKILL.md), **include `"beforeExit"` in `autoFlushOn`**. Otherwise a crash logs the error into the buffer, then the process exits before the 5-second flush interval fires.
+The `uncaughtException` path in [`captureAnyUnhandledRejection()`](@warlock.js/logger/capture-unhandled-errors/SKILL.md) already runs a best-effort, time-bounded `log.flush()` before its own `process.exit(1)`, so the fatal entry drains without extra wiring (and `process.exit()` skips `beforeExit`, so a `beforeExit` handler would not fire on that path anyway). Still set `autoFlushOn` for the *other* shutdown routes — `"SIGINT"` / `"SIGTERM"` and a natural `"beforeExit"` — so those don't lose the last buffered batch.
 
 ```ts
 log.configure({
@@ -617,7 +625,7 @@ Drop entries before they cost anything. Logger-wide `setMinLevel("info")` is the
 Buffered channels need explicit drain. `log.flushSync()` (sync) for file channels — also wired by `enableAutoFlush(['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK', 'SIGUSR2', 'beforeExit'])`. `await log.flush()` (async) for network/async channels like `SentryLog` — the only path that can await an HTTPS round-trip on a graceful shutdown.
 
 #### [`capture-unhandled-errors`](@warlock.js/logger/capture-unhandled-errors/SKILL.md)
-`captureAnyUnhandledRejection()` hooks `unhandledRejection` (→ `log.error("app", ...)`) and `uncaughtException` (→ `log.fatal("app", ...)` — Node terminates by default, so it's semantically fatal). One call at startup, pair with `autoFlushOn: ['beforeExit']` to land the entry on disk.
+`captureAnyUnhandledRejection()` hooks `unhandledRejection` (→ `log.error("app", ...)`, process kept alive) and `uncaughtException` (→ `log.fatal("app", ...)` then `process.exit(1)` — restoring the non-zero exit the listener would otherwise suppress, so a fatal crash never becomes a silent `exit 0`; opt out with `{ exitOnUncaughtException: false }`). It flushes before exiting and falls back to `console.error` when no terminal channel is set. One call at startup.
 
 ### Ergonomics + testing
 
@@ -1226,6 +1234,14 @@ Don't actually throw unhandled rejections in tests — emit the listener directl
 ```ts
 captureAnyUnhandledRejection();
 process.emit("unhandledRejection", new Error("test"), Promise.resolve());
+```
+
+The `uncaughtException` path additionally calls `process.exit(1)`, so stub it (or pass `{ exitOnUncaughtException: false }`) before emitting — otherwise the emitted exception tears the test runner down:
+
+```ts
+vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+captureAnyUnhandledRejection();
+process.emit("uncaughtException", new Error("test"), "uncaughtException");
 ```
 
 See [`@warlock.js/logger/capture-unhandled-errors/SKILL.md`](@warlock.js/logger/capture-unhandled-errors/SKILL.md) for a full example.
