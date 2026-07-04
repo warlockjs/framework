@@ -189,6 +189,6 @@ A run on a model with no pricing entry leaves `usage.cost` as `undefined`. The m
 
 ## Related
 
-- [Pick a provider](../getting-started/03-pick-a-provider) — `ModelPricing`, the token channels, and capability flags.
-- [Cost tracking](./cost-tracking) — the per-session dashboard view of the same data.
-- [Run agent](../the-basics/run-agent) — the `usage` / `report` envelope `execute()` returns.
+- [Pick a provider](/v/latest/ai/getting-started/03-pick-a-provider/) — `ModelPricing`, the token channels, and capability flags.
+- [Cost tracking](/v/latest/ai/recipes/cost-tracking/) — the per-session dashboard view of the same data.
+- [Run agent](/v/latest/ai/agents/run-agent/) — the `usage` / `report` envelope `execute()` returns.

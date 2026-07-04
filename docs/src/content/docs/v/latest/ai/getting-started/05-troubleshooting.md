@@ -21,7 +21,7 @@ const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 const agent = ai.agent({ model: openai.model({ name: "gpt-4o" }) });
 ```
 
-Same shape for every adapter — `new AnthropicSDK(...)`, `new BedrockSDK(...)`, etc. See [Pick a provider](./03-pick-a-provider).
+Same shape for every adapter — `new AnthropicSDK(...)`, `new BedrockSDK(...)`, etc. See [Pick a provider](/v/latest/ai/getting-started/03-pick-a-provider/).
 
 ## `ai.tools` / `ai.workspace` / `ai.mcp` is undefined
 
@@ -32,7 +32,7 @@ import "@warlock.js/ai-tools";     // → ai.tools.*, ai.mcp(...)
 import "@warlock.js/ai-workspace"; // → ai.workspace(...)
 ```
 
-A bare `import` is enough; any named import from the package pulls the side effect in too. See [Use AI tools](../the-basics/use-ai-tools) and [Use a workspace](../digging-deeper/use-workspace).
+A bare `import` is enough; any named import from the package pulls the side effect in too. See [Use AI tools](/v/latest/ai/tools/use-ai-tools/) and [Use a workspace](/v/latest/ai/tools/use-workspace/).
 
 ## Passing `attachments` throws at the boundary
 
@@ -42,7 +42,7 @@ The agent gates image / audio / PDF attachments on the model's declared capabili
 const model = openai.model({ name: "my-org/custom-finetune", vision: true });
 ```
 
-The six flags are `structuredOutput`, `vision`, `reasoning`, `promptCaching`, `audio`, `pdf` — see [Pick a provider](./03-pick-a-provider).
+The six flags are `structuredOutput`, `vision`, `reasoning`, `promptCaching`, `audio`, `pdf` — see [Pick a provider](/v/latest/ai/getting-started/03-pick-a-provider/).
 
 ## "`execute()` never throws" — but I got an exception
 
@@ -55,7 +55,7 @@ if (error) {
 }
 ```
 
-An actual thrown exception means something earlier broke — a malformed config, a missing required option, or a bug in your own callback — not a model failure. See [Handle errors](../digging-deeper/handle-errors).
+An actual thrown exception means something earlier broke — a malformed config, a missing required option, or a bug in your own callback — not a model failure. See [Handle errors](/v/latest/ai/reliability/handle-errors/).
 
 ## `usage.cost` is `undefined`
 
@@ -68,7 +68,7 @@ const openai = new OpenAISDK({
 });
 ```
 
-`usage.total` (tokens) is always present; only the per-channel `usage.cost` breakdown depends on pricing. See [Cost tracking](../recipes/cost-tracking).
+`usage.total` (tokens) is always present; only the per-channel `usage.cost` breakdown depends on pricing. See [Cost tracking](/v/latest/ai/recipes/cost-tracking/).
 
 ## An "install this package" error at first use
 
@@ -84,7 +84,7 @@ ai.config({
 });
 ```
 
-With a token set, every request needs `Authorization: Bearer <token>` and its `Host` is checked against `allowedHosts`. See [The local dashboard](../observability/local-dashboard).
+With a token set, every request needs `Authorization: Bearer <token>` and its `Host` is checked against `allowedHosts`. See [The local dashboard](/v/latest/ai/observability/local-dashboard/).
 
 ## My model ignores the output schema
 
@@ -98,10 +98,10 @@ The orchestrator computes a structural signature from its definition and refuses
 await orchestrator.execute(message, { sessionId, history, force: true });
 ```
 
-See [Run orchestrator](../digging-deeper/run-orchestrator) for the full recovery paths.
+See [Run orchestrator](/v/latest/ai/orchestration/run-orchestrator/) for the full recovery paths.
 
 ## Related
 
-- [Pick a provider](./03-pick-a-provider) — adapter construction and capability flags.
-- [Handle errors](../digging-deeper/handle-errors) — the `AIError` hierarchy and the `cause` chain.
-- [API reference](../reference/api) — every public export grouped by primitive.
+- [Pick a provider](/v/latest/ai/getting-started/03-pick-a-provider/) — adapter construction and capability flags.
+- [Handle errors](/v/latest/ai/reliability/handle-errors/) — the `AIError` hierarchy and the `cause` chain.
+- [API reference](/v/latest/ai/reference/api/) — every public export grouped by primitive.

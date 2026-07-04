@@ -166,5 +166,5 @@ Majority voting only works when answers are comparable. Give the solver a struct
 
 ## Related
 
-- [Deterministic supervisor tests](./dx-deterministic-supervisor-tests) — test this supervisor without spending tokens.
-- [Basic agent](./basic-agent) — the solver agent being fanned out.
+- [Deterministic supervisor tests](/v/latest/ai/recipes/dx-deterministic-supervisor-tests/) — test this supervisor without spending tokens.
+- [Basic agent](/v/latest/ai/recipes/basic-agent/) — the solver agent being fanned out.

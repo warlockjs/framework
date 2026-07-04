@@ -166,5 +166,5 @@ The loop: recall → on a hit, reuse the stored answer for free; on a miss, answ
 
 ## Related
 
-- [A personal assistant that remembers you](./memory-assistant-with-memory) — `ai.memory` wired into an orchestrator's recall/remember lifecycle.
-- [RAG with cache similarity](./rag-with-cache-similarity) — the same `.similar()` retrieval, applied to a document knowledge base.
+- [A personal assistant that remembers you](/v/latest/ai/recipes/memory-assistant-with-memory/) — `ai.memory` wired into an orchestrator's recall/remember lifecycle.
+- [RAG with cache similarity](/v/latest/ai/recipes/rag-with-cache-similarity/) — the same `.similar()` retrieval, applied to a document knowledge base.

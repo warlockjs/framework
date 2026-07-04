@@ -293,6 +293,6 @@ Rule of thumb: **spawn when you want a named single-use delegation with its own 
 
 ## Related
 
-- [Autonomous task runner](./planner-autonomous-task-runner) — the planner basics this recipe builds on.
-- [Cost tracking](./cost-tracking) — configuring the pricing that `budget.maxCostUSD` reads.
-- [Tool-calling agent](./tool-calling-agent) — the tools (like `web_search`) you hand a spawned sub-agent.
+- [Autonomous task runner](/v/latest/ai/recipes/planner-autonomous-task-runner/) — the planner basics this recipe builds on.
+- [Cost tracking](/v/latest/ai/recipes/cost-tracking/) — configuring the pricing that `budget.maxCostUSD` reads.
+- [Tool-calling agent](/v/latest/ai/recipes/tool-calling-agent/) — the tools (like `web_search`) you hand a spawned sub-agent.

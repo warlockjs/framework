@@ -130,7 +130,7 @@ const triage = ai.supervisor({
 });
 ```
 
-Reserve the router loop for messages that *genuinely* need several specialists in sequence (billing **and** tech **and** a resolver). See the [classifier fast-path recipe](../recipes/supervisor-classifier-fast-path) for the cheap path and the [support-triage recipe](../recipes/supervisor-support-triage) for the full loop — including the cost ladder that tells you which rung your problem is actually on.
+Reserve the router loop for messages that *genuinely* need several specialists in sequence (billing **and** tech **and** a resolver). See the [classifier fast-path recipe](/v/latest/ai/recipes/supervisor-classifier-fast-path/) for the cheap path and the [support-triage recipe](/v/latest/ai/recipes/supervisor-support-triage/) for the full loop — including the cost ladder that tells you which rung your problem is actually on.
 
 ## Cache the prompt — keep the system prompt and tool schemas stable
 
@@ -211,7 +211,7 @@ ai.middleware.semanticCache({
 });
 ```
 
-> Keep the semantic cache **outermost** in the middleware chain so a hit short-circuits before any inner middleware runs, and so a guardrail rejection in `trip.after` keeps a bad response out of the store. `0.95` is a solid starting threshold for question-answering; move it only with hit-quality data, never to chase a hit-rate number. See the [RAG with cache similarity recipe](../recipes/rag-with-cache-similarity) for the full one-driver setup.
+> Keep the semantic cache **outermost** in the middleware chain so a hit short-circuits before any inner middleware runs, and so a guardrail rejection in `trip.after` keeps a bad response out of the store. `0.95` is a solid starting threshold for question-answering; move it only with hit-quality data, never to chase a hit-rate number. See the [RAG with cache similarity recipe](/v/latest/ai/recipes/rag-with-cache-similarity/) for the full one-driver setup.
 
 ## Bound the context — don't let token cost grow with conversation length
 
@@ -238,7 +238,7 @@ const supportBot = ai.orchestrator<SupportState>({
 
 **Avoid this — resending the full transcript every turn.** With no window and no compaction, the prompt grows without bound: each turn re-bills every prior message, and a long session quietly turns into your most expensive (and slowest) requests — with no improvement in the answer the customer gets.
 
-> `historyWindow` controls per-turn *visibility*; `summarize` controls history *growth*. They are complementary — the window caps what one turn pays, compaction stops the underlying log from getting longer forever. Both are essential on any session that can run past a dozen turns. See the [stateful support bot recipe](../recipes/orchestrator-stateful-support-bot) for the full multi-turn build.
+> `historyWindow` controls per-turn *visibility*; `summarize` controls history *growth*. They are complementary — the window caps what one turn pays, compaction stops the underlying log from getting longer forever. Both are essential on any session that can run past a dozen turns. See the [stateful support bot recipe](/v/latest/ai/recipes/orchestrator-stateful-support-bot/) for the full multi-turn build.
 
 ## Stream the final reply for perceived latency
 
@@ -308,7 +308,7 @@ if (cost) {
 
 **Avoid this — shipping a model loop with no ceiling.** An agent with tools and no budget has one failure mode that costs real money: a tool loop that keeps re-asking the model. Without a cap, the first time it happens in production you find out from the invoice, not from an alert.
 
-> Roll a budget out in `warn` mode first: `onExceeded: "warn"` logs once on the first breach and lets the run finish, so you can measure real traffic against a proposed cap before flipping to `"abort"`. For graceful degradation instead of a hard stop, `onViolation: "fallback"` records a typed signal an outer middleware reads back to route the *next* turn to a cheaper agent. The budget is per-execution, not per-session — for a daily or session-wide cap, read your ledger before the next call and short-circuit at the application layer. See the [budgets and SLO recipe](../recipes/cost-budgets-and-slo).
+> Roll a budget out in `warn` mode first: `onExceeded: "warn"` logs once on the first breach and lets the run finish, so you can measure real traffic against a proposed cap before flipping to `"abort"`. For graceful degradation instead of a hard stop, `onViolation: "fallback"` records a typed signal an outer middleware reads back to route the *next* turn to a cheaper agent. The budget is per-execution, not per-session — for a daily or session-wide cap, read your ledger before the next call and short-circuit at the application layer. See the [budgets and SLO recipe](/v/latest/ai/recipes/cost-budgets-and-slo/).
 
 ## Batch the offline work — don't pay interactive latency for bulk jobs
 
@@ -334,7 +334,7 @@ for (const item of batchResult.items) {
 console.log(`classified ${tickets.length} tickets, ${batchResult.usage.total} tokens`);
 ```
 
-> Bounded concurrency is the point: it keeps you under provider rate limits while still running far faster than a serial loop. Tune it to your account's limits, not to "as high as possible." See the [batch classify recipe](../recipes/dx-batch-classify-dataset).
+> Bounded concurrency is the point: it keeps you under provider rate limits while still running far faster than a serial loop. Tune it to your account's limits, not to "as high as possible." See the [batch classify recipe](/v/latest/ai/recipes/dx-batch-classify-dataset/).
 
 ## Use a fallback model for resilience — but it's a failover, not a default
 
@@ -353,7 +353,7 @@ const supportAgent = ai.agent({ name: "support", model: resilientModel });
 
 **Avoid this — leaning on the fallback as your normal model.** The fallback never fires on a healthy primary, so a *quality* problem ("answers are weak") is not a fallback problem — fix the primary model or prompt. And it advances instantly with no backoff, so for rate-limits you usually want a backoff strategy too, not just a second model to immediately hammer.
 
-> A non-transient failure (bad API key, oversized prompt, blocked content) fails identically on every downstream model, so `fallbackModel` re-throws it immediately rather than burning budget retrying. It's a failover, full stop — keep it in the resilience column, never the cost or quality column. See the [provider fallback recipe](../recipes/cost-provider-fallback).
+> A non-transient failure (bad API key, oversized prompt, blocked content) fails identically on every downstream model, so `fallbackModel` re-throws it immediately rather than burning budget retrying. It's a failover, full stop — keep it in the resilience column, never the cost or quality column. See the [provider fallback recipe](/v/latest/ai/recipes/cost-provider-fallback/).
 
 ## Avoid list
 
@@ -369,11 +369,11 @@ The short version of everything above — the mistakes that quietly inflate a su
 
 ## See also
 
-- [Recipe — Classifier fast-path triage](../recipes/supervisor-classifier-fast-path) — the cheapest triage: one classify, one specialist.
-- [Recipe — Support triage supervisor](../recipes/supervisor-support-triage) — the full router loop and the triage cost ladder.
-- [Recipe — Budget caps and SLO contracts](../recipes/cost-budgets-and-slo) — hard caps, the SLO contract, and the soft-fallback signal.
-- [Recipe — Stateful support bot](../recipes/orchestrator-stateful-support-bot) — multi-turn sessions with `historyWindow` and compaction.
-- [Recipe — RAG with cache similarity](../recipes/rag-with-cache-similarity) — one cache driver for retrieval, snapshots, and response caching.
-- [Recipe — Track cost](../recipes/cost-tracking) — reading the `Usage.cost` breakdown off a result.
-- [Architecture — Middleware](../architecture-concepts/middleware) — the onion model, install order, and the budget/cache built-ins.
-- [Architecture — Orchestrators](../architecture-concepts/orchestrators) — the session lifecycle that `historyWindow` and `summarize` bound.
+- [Recipe — Classifier fast-path triage](/v/latest/ai/recipes/supervisor-classifier-fast-path/) — the cheapest triage: one classify, one specialist.
+- [Recipe — Support triage supervisor](/v/latest/ai/recipes/supervisor-support-triage/) — the full router loop and the triage cost ladder.
+- [Recipe — Budget caps and SLO contracts](/v/latest/ai/recipes/cost-budgets-and-slo/) — hard caps, the SLO contract, and the soft-fallback signal.
+- [Recipe — Stateful support bot](/v/latest/ai/recipes/orchestrator-stateful-support-bot/) — multi-turn sessions with `historyWindow` and compaction.
+- [Recipe — RAG with cache similarity](/v/latest/ai/recipes/rag-with-cache-similarity/) — one cache driver for retrieval, snapshots, and response caching.
+- [Recipe — Track cost](/v/latest/ai/recipes/cost-tracking/) — reading the `Usage.cost` breakdown off a result.
+- [Architecture — Middleware](/v/latest/ai/architecture-concepts/middleware/) — the onion model, install order, and the budget/cache built-ins.
+- [Architecture — Orchestrators](/v/latest/ai/architecture-concepts/orchestrators/) — the session lifecycle that `historyWindow` and `summarize` bound.

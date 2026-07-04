@@ -59,7 +59,7 @@ const applyDiscount = ai.tool({
 });
 ```
 
-> When a schema field rejects the model's argument, the agent records a `SchemaValidationError` on that trip's `ToolCall.error` and feeds it back to the model as a tool error — the model gets a turn to fix its own arguments and retry. A precise schema is therefore *also* a cheaper one: the correction loop is the model's job, not yours, and the model only learns the rule once you've written it into the schema. See [Define tools](../the-basics/define-tools) for the full `name` / `description` / `input` / `execute` contract.
+> When a schema field rejects the model's argument, the agent records a `SchemaValidationError` on that trip's `ToolCall.error` and feeds it back to the model as a tool error — the model gets a turn to fix its own arguments and retry. A precise schema is therefore *also* a cheaper one: the correction loop is the model's job, not yours, and the model only learns the rule once you've written it into the schema. See [Define tools](/v/latest/ai/tools/define-tools/) for the full `name` / `description` / `input` / `execute` contract.
 
 ## Keep each tool single-purpose — one verb, one job
 
@@ -149,7 +149,7 @@ const recordResolution = ai.tool({
 });
 ```
 
-> Silent is strictly the *LLM-feedback* channel — the tool still runs to completion through middleware (logging, cost tracking), so observability isn't lost. Two constraints make a tool a good silent candidate: it must be **cheap and fast** (the HTTP request stays open until it resolves) and **idempotent** (silent tools have no channel to report failure back to the model). And mind the provider split: when a silent tool is the *only* call in a turn, OpenAI models often emit no prose alongside it, so the user sees nothing — pair it with a feedback tool, or skip silent mode, when the user needs a visible reply. The full rule set and the per-provider behavior table live in the [silent tools recipe](../recipes/silent-tools).
+> Silent is strictly the *LLM-feedback* channel — the tool still runs to completion through middleware (logging, cost tracking), so observability isn't lost. Two constraints make a tool a good silent candidate: it must be **cheap and fast** (the HTTP request stays open until it resolves) and **idempotent** (silent tools have no channel to report failure back to the model). And mind the provider split: when a silent tool is the *only* call in a turn, OpenAI models often emit no prose alongside it, so the user sees nothing — pair it with a feedback tool, or skip silent mode, when the user needs a visible reply. The full rule set and the per-provider behavior table live in the [silent tools recipe](/v/latest/ai/recipes/silent-tools/).
 
 ## Pass system-only data through `ctx.artifacts` — don't round-trip IDs through the model
 
@@ -297,7 +297,7 @@ execute: async ({ orderId, percent }) => {
 },
 ```
 
-> Let the error propagate — `execute` should throw, not catch-and-mask. The agent's job is to wrap it as a `ToolExecutionError` (carrying `toolName`, and `tripIndex` stamped by the dispatching agent) and give the model the message. Reserve `try / catch` inside a tool for *enriching* the error with context before re-throwing, never for hiding it. See [Define tools](../the-basics/define-tools) for the full error taxonomy — `SchemaValidationError` for bad arguments, `ToolExecutionError` for a crashed body.
+> Let the error propagate — `execute` should throw, not catch-and-mask. The agent's job is to wrap it as a `ToolExecutionError` (carrying `toolName`, and `tripIndex` stamped by the dispatching agent) and give the model the message. Reserve `try / catch` inside a tool for *enriching* the error with context before re-throwing, never for hiding it. See [Define tools](/v/latest/ai/tools/define-tools/) for the full error taxonomy — `SchemaValidationError` for bad arguments, `ToolExecutionError` for a crashed body.
 
 ## Lazily import heavy SDKs — keep the dependency off the boot path
 
@@ -363,7 +363,7 @@ The short version of everything above — the tool-design mistakes that let a no
 
 ## See also
 
-- [Define tools](../the-basics/define-tools) — the full `ai.tool` contract: `name`, `description`, `action`, `mode`, `input`, `execute`, `ctx.artifacts`, and the error taxonomy.
-- [Recipe — Silent tools](../recipes/silent-tools) — `mode: "silent"`, the all-silent loop-termination rule, and the per-provider prose behavior.
-- [Best Practices — Agents & Prompts](./agents-and-prompts) — how tools plug into an agent's trip loop alongside the system prompt and output schema.
-- [Best Practices — Cost and efficiency](./cost-and-efficiency) — the broader cost picture, including where silent tools and prompt caching save the most.
+- [Define tools](/v/latest/ai/tools/define-tools/) — the full `ai.tool` contract: `name`, `description`, `action`, `mode`, `input`, `execute`, `ctx.artifacts`, and the error taxonomy.
+- [Recipe — Silent tools](/v/latest/ai/recipes/silent-tools/) — `mode: "silent"`, the all-silent loop-termination rule, and the per-provider prose behavior.
+- [Best Practices — Agents & Prompts](/v/latest/ai/best-practices/agents-and-prompts/) — how tools plug into an agent's trip loop alongside the system prompt and output schema.
+- [Best Practices — Cost and efficiency](/v/latest/ai/best-practices/cost-and-efficiency/) — the broader cost picture, including where silent tools and prompt caching save the most.

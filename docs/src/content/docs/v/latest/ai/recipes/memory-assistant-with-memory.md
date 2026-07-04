@@ -190,5 +190,5 @@ Typical flow per turn:
 
 ## Related
 
-- [Semantic recall of past answers](./memory-semantic-recall) — store and recall Q&A pairs via cache similarity.
-- [RAG with cache similarity](./rag-with-cache-similarity) — the same `.similar()` delegation, applied to a knowledge base.
+- [Semantic recall of past answers](/v/latest/ai/recipes/memory-semantic-recall/) — store and recall Q&A pairs via cache similarity.
+- [RAG with cache similarity](/v/latest/ai/recipes/rag-with-cache-similarity/) — the same `.similar()` delegation, applied to a knowledge base.

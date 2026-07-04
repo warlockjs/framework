@@ -162,5 +162,5 @@ This pattern verifies the deterministic skeleton — routing order, convergence,
 
 ## Related
 
-- [Self-consistency voting](./dx-self-consistency-voting) — the fan-out supervisor these matchers test.
-- [Eval in CI](./dx-eval-in-ci) — the complementary LLM-backed quality suite.
+- [Self-consistency voting](/v/latest/ai/recipes/dx-self-consistency-voting/) — the fan-out supervisor these matchers test.
+- [Eval in CI](/v/latest/ai/recipes/dx-eval-in-ci/) — the complementary LLM-backed quality suite.

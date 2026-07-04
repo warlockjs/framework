@@ -1,6 +1,8 @@
 ---
 title: Exporter output
 description: A concrete output sample for each @warlock.js/ai-panoptic exporter — the console summary line and span tree, a file JSON-Lines TraceRecord, the gen_ai.* / warlock.* attributes an OTel span carries, and how a trace maps onto Langfuse traces, generations, and spans.
+sidebar:
+  order: 6
 ---
 
 Every Panoptic exporter receives the same vendor-neutral `Trace` and translates it into a backend's wire format. This page shows **exactly what lands** for each of the four shipped exporters, so you know what to look for in your logs, your file sink, your OTel collector, and your Langfuse dashboard.
@@ -194,5 +196,5 @@ Each observation also carries the full `toGenAiAttributes` map as its `metadata`
 
 ## See also
 
-- [`@warlock.js/ai-panoptic`](/v/latest/ai/observability/ai-panoptic) — the package overview and how to wire a collector to exporters.
+- [`@warlock.js/ai-panoptic`](/v/latest/ai/observability/ai-panoptic/) — the package overview and how to wire a collector to exporters.
 - The `export-traces` skill — picking an exporter, the optional-peer install rules, and writing a custom exporter against `ExporterContract`.

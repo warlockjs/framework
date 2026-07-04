@@ -300,9 +300,9 @@ The short version — the mistakes that make an AI test suite slow, flaky, or qu
 
 ## See also
 
-- [Recipe — Deterministic supervisor tests](../recipes/dx-deterministic-supervisor-tests) — `ai.mockRouter` + `mockAgent` + the matchers, end to end with no LLM.
-- [Recipe — Eval in CI](../recipes/dx-eval-in-ci) — `agent.eval` as a Vitest gate, with deterministic scorers and an LLM judge.
-- [Recipe — Wire Panoptic](../recipes/observability-wire-panoptic) — the collector + store the seeding workflow draws its failed traces from.
-- [Best Practices — Supervisors and routing](./supervisors-and-routing) — the routing decisions these wiring tests pin down.
-- [Best Practices — Cost and efficiency](./cost-and-efficiency) — the model-tiering and budget choices an eval gate protects from regression.
-- [Architecture — Supervisors](../architecture-concepts/supervisors) — the unified report tree every matcher reads.
+- [Recipe — Deterministic supervisor tests](/v/latest/ai/recipes/dx-deterministic-supervisor-tests/) — `ai.mockRouter` + `mockAgent` + the matchers, end to end with no LLM.
+- [Recipe — Eval in CI](/v/latest/ai/recipes/dx-eval-in-ci/) — `agent.eval` as a Vitest gate, with deterministic scorers and an LLM judge.
+- [Recipe — Wire Panoptic](/v/latest/ai/recipes/observability-wire-panoptic/) — the collector + store the seeding workflow draws its failed traces from.
+- [Best Practices — Supervisors and routing](/v/latest/ai/best-practices/supervisors-and-routing/) — the routing decisions these wiring tests pin down.
+- [Best Practices — Cost and efficiency](/v/latest/ai/best-practices/cost-and-efficiency/) — the model-tiering and budget choices an eval gate protects from regression.
+- [Architecture — Supervisors](/v/latest/ai/architecture-concepts/supervisors/) — the unified report tree every matcher reads.

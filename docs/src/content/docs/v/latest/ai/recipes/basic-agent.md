@@ -115,12 +115,12 @@ if (error) {
 
 ## Where to take it
 
-- Add a tool — see [Tool-calling agent](./tool-calling-agent).
-- Add RAG — see [RAG with cache similarity](./rag-with-cache-similarity).
-- Add cost tracking dashboard — see [Cost tracking](./cost-tracking).
+- Add a tool — see [Tool-calling agent](/v/latest/ai/recipes/tool-calling-agent/).
+- Add RAG — see [RAG with cache similarity](/v/latest/ai/recipes/rag-with-cache-similarity/).
+- Add cost tracking dashboard — see [Cost tracking](/v/latest/ai/recipes/cost-tracking/).
 
 ## Related
 
-- [Run agent](../the-basics/run-agent) — the full API surface.
-- [Write system prompts](../the-basics/write-system-prompts) — composable prompts.
-- [Handle errors](../digging-deeper/handle-errors) — the full error hierarchy.
+- [Run agent](/v/latest/ai/agents/run-agent/) — the full API surface.
+- [Write system prompts](/v/latest/ai/prompts/write-system-prompts/) — composable prompts.
+- [Handle errors](/v/latest/ai/reliability/handle-errors/) — the full error hierarchy.

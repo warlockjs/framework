@@ -229,11 +229,11 @@ console.log(
 - **`aggregate` sums each trace's root `usage`**, which is already a rollup of own cost + children — so the totals reflect the whole run tree without re-walking spans. `input` / `output` / `total` are always present; the optional `cachedTokens` / `reasoningTokens` / `cacheWriteTokens` channels are summed only when a matched run reported them.
 - **`completed + failed + cancelled` need not equal `traces`.** Non-terminal statuses (`awaiting-input` from a paused orchestrator session, `max-iterations`) count toward `traces` but none of the three headline counters — guard your failure-rate math against that, as `summarize` does by dividing `failed / traces`.
 - **`cost` stays `undefined` until something is priced.** An unpriced run never erases the cost of priced siblings (the merge uses the framework's own cost-rollup logic), so a single unpriced model in the mix won't zero out your dashboard — it just won't contribute.
-- **The in-memory store is O(n) on `query` / `aggregate`** with no secondary indexes — perfect for a dev dashboard or a modest-volume admin panel, but for a high-traffic finance report back it with a real datastore: write a custom `TraceStoreContract`, or export traces to a warehouse via the [OTel / Langfuse exporters](./observability-export-otel-langfuse) and aggregate there.
+- **The in-memory store is O(n) on `query` / `aggregate`** with no secondary indexes — perfect for a dev dashboard or a modest-volume admin panel, but for a high-traffic finance report back it with a real datastore: write a custom `TraceStoreContract`, or export traces to a warehouse via the [OTel / Langfuse exporters](/v/latest/ai/recipes/observability-export-otel-langfuse/) and aggregate there.
 - **Bound retention** with `createInMemoryTraceStore({ capacity })` in any long-lived process; the default keeps everything until `clear()`.
 
 ## Related
 
-- [Observability — wire Panoptic](./observability-wire-panoptic) — attach the subscriber and the store query basics.
-- [Observability — export OTel & Langfuse](./observability-export-otel-langfuse) — ship traces to a backend and aggregate at warehouse scale.
-- [Cost tracking](./cost-tracking) — configuring `pricing` and the `usage.cost` per-channel shape.
+- [Observability — wire Panoptic](/v/latest/ai/recipes/observability-wire-panoptic/) — attach the subscriber and the store query basics.
+- [Observability — export OTel & Langfuse](/v/latest/ai/recipes/observability-export-otel-langfuse/) — ship traces to a backend and aggregate at warehouse scale.
+- [Cost tracking](/v/latest/ai/recipes/cost-tracking/) — configuring `pricing` and the `usage.cost` per-channel shape.

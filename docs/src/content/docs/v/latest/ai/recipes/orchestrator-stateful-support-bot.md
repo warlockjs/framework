@@ -421,5 +421,5 @@ The drift signature deliberately **excludes** `config.version` (it's recorded on
 
 ## Related
 
-- [Orchestrator with production stores](./orchestrator-production-stores) — wiring `ai.checkpoint.pg` + `ai.snapshot.redis` with dev-owned clients and the migration.
-- [Orchestrator as a tool](./orchestrator-as-tool) — nesting this bot inside a concierge agent.
+- [Orchestrator with production stores](/v/latest/ai/recipes/orchestrator-production-stores/) — wiring `ai.checkpoint.pg` + `ai.snapshot.redis` with dev-owned clients and the migration.
+- [Orchestrator as a tool](/v/latest/ai/recipes/orchestrator-as-tool/) — nesting this bot inside a concierge agent.

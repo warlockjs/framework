@@ -170,6 +170,6 @@ Per-step cost lets you spot the expensive step in a workflow — usually the one
 
 ## Related
 
-- [Pick a provider](../getting-started/03-pick-a-provider) — pricing configuration.
-- [Run agent](../the-basics/run-agent) — `usage` on the result envelope.
-- [Attach middleware](../digging-deeper/attach-middleware) — the budget built-in and custom middleware.
+- [Pick a provider](/v/latest/ai/getting-started/03-pick-a-provider/) — pricing configuration.
+- [Run agent](/v/latest/ai/agents/run-agent/) — `usage` on the result envelope.
+- [Attach middleware](/v/latest/ai/reliability/attach-middleware/) — the budget built-in and custom middleware.

@@ -56,7 +56,7 @@ try {
 }
 ```
 
-> The single documented exception is `OrchestratorConfigError`, which throws *synchronously at construction* (not from `execute()`) so a misconfigured `ai.orchestrator(...)` fails fast at boot rather than at the first request. Every *runtime* failure — provider, tool, schema, budget, cancellation — surfaces on `result.error`. See the [handle-ai-errors skill](../digging-deeper/handle-errors) for the full never-throw contract.
+> The single documented exception is `OrchestratorConfigError`, which throws *synchronously at construction* (not from `execute()`) so a misconfigured `ai.orchestrator(...)` fails fast at boot rather than at the first request. Every *runtime* failure — provider, tool, schema, budget, cancellation — surfaces on `result.error`. See the [handle-ai-errors skill](/v/latest/ai/reliability/handle-errors/) for the full never-throw contract.
 
 ## Branch on the typed `AIError` taxonomy — never string-match the message
 
@@ -119,7 +119,7 @@ if (result.error?.message.toLowerCase().includes("rate limit")) {
 }
 ```
 
-> The retryability of each code is part of the taxonomy, not a judgement call: `rate-limit` and `timeout` are transient (retry with backoff); `auth`, `quota`, `content-filter`, and the various `drift` / `config` / `cancelled` codes are *not* retryable — retrying only delays the inevitable. The [handle-ai-errors skill](../digging-deeper/handle-errors) has the full code → retryable table.
+> The retryability of each code is part of the taxonomy, not a judgement call: `rate-limit` and `timeout` are transient (retry with backoff); `auth`, `quota`, `content-filter`, and the various `drift` / `config` / `cancelled` codes are *not* retryable — retrying only delays the inevitable. The [handle-ai-errors skill](/v/latest/ai/reliability/handle-errors/) has the full code → retryable table.
 
 ## Wrap the model in `ai.fallbackModel` for provider failover — it's a failover, not a default
 
@@ -162,7 +162,7 @@ const greedy = ai.fallbackModel(
 );
 ```
 
-> `fallbackModel` advances *instantly* with no backoff of its own — it owns "try a different provider," not "wait and retry this one." For a rate-limit you usually want both: a backoff (retry the same provider after `error.retryAfter`) layered around the agent, and a fallback for when the provider stays down. And a *quality* complaint ("answers are weak") is never a fallback problem — the backup only fires on transient failures, so fix the primary model or prompt instead. See the [provider-fallback recipe](../recipes/cost-provider-fallback) for narrowing `retryOn` and the streaming caveat (failover only before the first chunk).
+> `fallbackModel` advances *instantly* with no backoff of its own — it owns "try a different provider," not "wait and retry this one." For a rate-limit you usually want both: a backoff (retry the same provider after `error.retryAfter`) layered around the agent, and a fallback for when the provider stays down. And a *quality* complaint ("answers are weak") is never a fallback problem — the backup only fires on transient failures, so fix the primary model or prompt instead. See the [provider-fallback recipe](/v/latest/ai/recipes/cost-provider-fallback/) for narrowing `retryOn` and the streaming caveat (failover only before the first chunk).
 
 ## Retry transient step failures with backoff — keep the predicate narrow
 
@@ -217,7 +217,7 @@ ai.step({
 });
 ```
 
-> `retry` wraps the step's whole `before → run | agent → output → after` block, so every phase must be idempotent — a throw in `after` re-runs `before` and `run` on the next attempt. If a step reserves an external resource, acquire it in `before` and release it in `after` so a retried attempt re-acquires cleanly. The resolution precedence is `step.retry` → the workflow's `defaultRetry` → `{ attempts: 1 }` (no retry). See the [workflow retry + cancel recipe](../recipes/workflow-with-retry-cancel) for the full backoff and idempotency rules.
+> `retry` wraps the step's whole `before → run | agent → output → after` block, so every phase must be idempotent — a throw in `after` re-runs `before` and `run` on the next attempt. If a step reserves an external resource, acquire it in `before` and release it in `after` so a retried attempt re-acquires cleanly. The resolution precedence is `step.retry` → the workflow's `defaultRetry` → `{ attempts: 1 }` (no retry). See the [workflow retry + cancel recipe](/v/latest/ai/recipes/workflow-with-retry-cancel/) for the full backoff and idempotency rules.
 
 ## Cap spend with budget middleware — a runaway loop must not burn credit
 
@@ -264,7 +264,7 @@ const extractor = ai.agent({
 });
 ```
 
-> Roll a budget out in `warn` mode first (`onExceeded: "warn"` logs once on the first breach and lets the run finish) so you can measure real traffic against a proposed cap before flipping to `"abort"`. For graceful degradation instead of a hard stop, the declarative `contract` clause with `onViolation: "fallback"` records a typed signal an outer middleware reads back to route the *next* turn to a cheaper agent. The budget is per-*execution*, not per-session — for a daily or session-wide cap, read your ledger before the next call and short-circuit at the application layer. See the [budgets-and-slo recipe](../recipes/cost-budgets-and-slo) for the SLO contract and the soft-fallback path.
+> Roll a budget out in `warn` mode first (`onExceeded: "warn"` logs once on the first breach and lets the run finish) so you can measure real traffic against a proposed cap before flipping to `"abort"`. For graceful degradation instead of a hard stop, the declarative `contract` clause with `onViolation: "fallback"` records a typed signal an outer middleware reads back to route the *next* turn to a cheaper agent. The budget is per-*execution*, not per-session — for a daily or session-wide cap, read your ledger before the next call and short-circuit at the application layer. See the [budgets-and-slo recipe](/v/latest/ai/recipes/cost-budgets-and-slo/) for the SLO contract and the soft-fallback path.
 
 ## Honor `AbortSignal` for user-cancel and deadlines
 
@@ -311,7 +311,7 @@ if (result.error) {
 }
 ```
 
-> Cancellation is checked at trip / step boundaries; a mid-trip abort is best-effort and depends on the provider adapter threading the signal into its HTTP client. For workflows, a step's `onCancel` hook fires on abort so it can release whatever that in-flight step reserved — best-effort cleanup whose errors are swallowed, never a place for logic that must succeed. The workflow engine forwards its own signal into agent steps automatically, so one controller cancels the whole pipeline. See the [workflow retry + cancel recipe](../recipes/workflow-with-retry-cancel) for `onCancel` and the cancelled-report shape.
+> Cancellation is checked at trip / step boundaries; a mid-trip abort is best-effort and depends on the provider adapter threading the signal into its HTTP client. For workflows, a step's `onCancel` hook fires on abort so it can release whatever that in-flight step reserved — best-effort cleanup whose errors are swallowed, never a place for logic that must succeed. The workflow engine forwards its own signal into agent steps automatically, so one controller cancels the whole pipeline. See the [workflow retry + cancel recipe](/v/latest/ai/recipes/workflow-with-retry-cancel/) for `onCancel` and the cancelled-report shape.
 
 ## Avoid list
 
@@ -327,10 +327,10 @@ The short version — the resilience mistakes that turn a recoverable blip into 
 
 ## See also
 
-- [Handle AI errors](../digging-deeper/handle-errors) — the full `AIError` taxonomy, the never-throw contract, and the code → retryable table.
-- [Recipe — Provider fallback](../recipes/cost-provider-fallback) — `ai.fallbackModel`, narrowing `retryOn`, `lastAttempts`, and the streaming caveat.
-- [Recipe — Budget caps and SLO contracts](../recipes/cost-budgets-and-slo) — hard caps, the SLO contract, and the soft-fallback signal.
-- [Recipe — Workflow with retry + cancel](../recipes/workflow-with-retry-cancel) — step `retry` with backoff, `AbortSignal`, and the `onCancel` cleanup hook.
-- [Best Practices — Cost and efficiency](./cost-and-efficiency) — where the budget and fallback levers sit in the cost picture.
-- [Architecture — Middleware](../architecture-concepts/middleware) — the onion model and where the budget built-in runs.
-- [Architecture — Workflows](../architecture-concepts/workflows) — the step lifecycle that `retry` and cancellation bound.
+- [Handle AI errors](/v/latest/ai/reliability/handle-errors/) — the full `AIError` taxonomy, the never-throw contract, and the code → retryable table.
+- [Recipe — Provider fallback](/v/latest/ai/recipes/cost-provider-fallback/) — `ai.fallbackModel`, narrowing `retryOn`, `lastAttempts`, and the streaming caveat.
+- [Recipe — Budget caps and SLO contracts](/v/latest/ai/recipes/cost-budgets-and-slo/) — hard caps, the SLO contract, and the soft-fallback signal.
+- [Recipe — Workflow with retry + cancel](/v/latest/ai/recipes/workflow-with-retry-cancel/) — step `retry` with backoff, `AbortSignal`, and the `onCancel` cleanup hook.
+- [Best Practices — Cost and efficiency](/v/latest/ai/best-practices/cost-and-efficiency/) — where the budget and fallback levers sit in the cost picture.
+- [Architecture — Middleware](/v/latest/ai/architecture-concepts/middleware/) — the onion model and where the budget built-in runs.
+- [Architecture — Workflows](/v/latest/ai/architecture-concepts/workflows/) — the step lifecycle that `retry` and cancellation bound.

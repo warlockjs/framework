@@ -2,11 +2,11 @@
 title: "Configuring Panoptic"
 description: Wire Panoptic declaratively through ai.config({ panoptic }) — exporters, observeAll, the per-flow observe option on every primitive, idempotent side-effect registration, and how it relates to the imperative panoptic() API.
 sidebar:
-  order: 3
+  order: 4
   label: "Configuring Panoptic"
 ---
 
-There are two ways to turn Panoptic on. The [imperative `panoptic()` API](./ai-panoptic) hands you a subscriber you `attach()` / `collect()` yourself — full control, explicit wiring. This page covers the **declarative** path: set `ai.config({ panoptic: { … } })` once and let a side-effect import register the collector onto core's observe seam for you. App code never hand-wires a store, a collector, or a subscriber.
+There are two ways to turn Panoptic on. The [imperative `panoptic()` API](/v/latest/ai/observability/ai-panoptic/) hands you a subscriber you `attach()` / `collect()` yourself — full control, explicit wiring. This page covers the **declarative** path: set `ai.config({ panoptic: { … } })` once and let a side-effect import register the collector onto core's observe seam for you. App code never hand-wires a store, a collector, or a subscriber.
 
 Both paths drive the **same** collection pipeline. The declarative config is sugar layered over the `panoptic()` factory — it builds the same collector and the same exporters. Reach for it when you want "observe everything, ship it to these sinks, maybe open a dashboard" with zero plumbing; reach for the imperative API when you need to attach to a specific primitive instance or collect a report out of band (an orchestrator turn).
 
@@ -46,13 +46,13 @@ type PanopticConfig = {
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `exporters` | `[]` | The sinks the collector fans each trace out to — a store, `consoleExporter()`, `otelExporter()`, `langfuseExporter()`, … Exactly the array you'd pass to `panoptic({ exporters })`. |
-| `cache` | _unset_ | A `@warlock.js/cache` `CacheDriver` (or a `() => CacheDriver \| Promise<CacheDriver>` factory) that backs a [persistent trace store](./querying-traces#persisting-traces-across-restarts). When set — and no store-shaped exporter was supplied — the dashboard reads a cache-backed store that **survives a process restart** instead of a fresh in-memory one. |
+| `cache` | _unset_ | A `@warlock.js/cache` `CacheDriver` (or a `() => CacheDriver \| Promise<CacheDriver>` factory) that backs a [persistent trace store](/v/latest/ai/observability/querying-traces/#persisting-traces-across-restarts). When set — and no store-shaped exporter was supplied — the dashboard reads a cache-backed store that **survives a process restart** instead of a fresh in-memory one. |
 | `observeAll` | `false` | When `true`, every flow is observed unless it opts out. When `false`, only flows that set `observe: true` (or a flow-local observer) are collected. |
-| `dashboard` | _unset_ | `true` uses the [dashboard defaults](./local-dashboard); an object overrides them. See [the local dashboard](./local-dashboard) for the full option set. |
+| `dashboard` | _unset_ | `true` uses the [dashboard defaults](/v/latest/ai/observability/local-dashboard/); an object overrides them. See [the local dashboard](/v/latest/ai/observability/local-dashboard/) for the full option set. |
 
 ### Persisting traces across a restart
 
-By default the dashboard reads an in-memory store that's wiped on process exit. Set `cache` to a `@warlock.js/cache` `CacheDriver` and panoptic backs the dashboard with a [cache-persistent store](./querying-traces#persisting-traces-across-restarts) instead — traces are written through to the cache and **re-hydrated on the next boot**, so a restart no longer loses your trace history:
+By default the dashboard reads an in-memory store that's wiped on process exit. Set `cache` to a `@warlock.js/cache` `CacheDriver` and panoptic backs the dashboard with a [cache-persistent store](/v/latest/ai/observability/querying-traces/#persisting-traces-across-restarts) instead — traces are written through to the cache and **re-hydrated on the next boot**, so a restart no longer loses your trace history:
 
 ```ts
 import { ai } from "@warlock.js/ai";
@@ -152,7 +152,7 @@ const isolated = ai.agent({
 
 ## The imperative API still works
 
-Declarative config does not replace `panoptic()` — it sits on top of it. Everything on the [overview page](./ai-panoptic) is intact:
+Declarative config does not replace `panoptic()` — it sits on top of it. Everything on the [overview page](/v/latest/ai/observability/ai-panoptic/) is intact:
 
 ```ts
 const observe = panoptic({ exporters: [consoleExporter()] });
@@ -162,18 +162,18 @@ observe.middleware();                    // feed via the middleware pipeline
 await observe.collect(result.report);    // feed a report directly (orchestrator turns)
 ```
 
-The two coexist. Use declarative config for the broad "observe my whole app" stroke, and the imperative `attach()` / `collect()` for the cases the global seam can't cover — most notably an **orchestrator turn**, whose completed event carries only session identity and no result-bearing report. That still needs an explicit `collect()`; see the orchestrator-turn section of [What Panoptic traces](./what-panoptic-traces).
+The two coexist. Use declarative config for the broad "observe my whole app" stroke, and the imperative `attach()` / `collect()` for the cases the global seam can't cover — most notably an **orchestrator turn**, whose completed event carries only session identity and no result-bearing report. That still needs an explicit `collect()`; see the orchestrator-turn section of [What Panoptic traces](/v/latest/ai/observability/what-panoptic-traces/).
 
 ## Gotchas
 
 - **The side-effect import is mandatory.** `ai.config({ panoptic })` alone does nothing — core just stores an opaque slot. You must import `@warlock.js/ai-panoptic` somewhere (a bare `import "@warlock.js/ai-panoptic"`, or any named import from it) for the wiring to activate.
 - **`observeAll: false` is the default** — declaring `exporters` without `observeAll` or per-flow `observe: true` captures nothing. This is deliberate: observability is opt-in.
-- **The dashboard needs a queryable store.** If you set `dashboard` but pass no store among `exporters`, Panoptic creates an in-memory store and registers it for you. If you do pass one, it's reused — see [the local dashboard](./local-dashboard).
+- **The dashboard needs a queryable store.** If you set `dashboard` but pass no store among `exporters`, Panoptic creates an in-memory store and registers it for you. If you do pass one, it's reused — see [the local dashboard](/v/latest/ai/observability/local-dashboard/).
 - **One collector, one registration.** Because apply is idempotent, you can't register two different declarative collectors by calling `ai.config({ panoptic })` twice with different exporters — the first wins. Use the imperative `panoptic()` API (or a flow-local `observe` collector) when you genuinely need a second, independent pipeline.
 
 ## Related
 
-- [@warlock.js/ai-panoptic](./ai-panoptic) — the package overview and the imperative `panoptic()` entry point.
-- [The local dashboard](./local-dashboard) — the zero-setup UI the `dashboard` option starts.
-- [Querying traces](./querying-traces) — the in-memory store you register as an exporter, then `query()` / `aggregate()`.
-- [What Panoptic traces](./what-panoptic-traces) — the `Trace` / `TraceSpan` shape every exporter receives.
+- [@warlock.js/ai-panoptic](/v/latest/ai/observability/ai-panoptic/) — the package overview and the imperative `panoptic()` entry point.
+- [The local dashboard](/v/latest/ai/observability/local-dashboard/) — the zero-setup UI the `dashboard` option starts.
+- [Querying traces](/v/latest/ai/observability/querying-traces/) — the in-memory store you register as an exporter, then `query()` / `aggregate()`.
+- [What Panoptic traces](/v/latest/ai/observability/what-panoptic-traces/) — the `Trace` / `TraceSpan` shape every exporter receives.

@@ -167,5 +167,5 @@ A hand-rolled `Promise.all` has no concurrency ceiling, no per-item retry, and n
 
 ## Related
 
-- [Basic agent](./basic-agent) — the single-run agent this batch fans out.
-- [Cost tracking](./cost-tracking) — turning `usage` into a dashboard.
+- [Basic agent](/v/latest/ai/recipes/basic-agent/) — the single-run agent this batch fans out.
+- [Cost tracking](/v/latest/ai/recipes/cost-tracking/) — turning `usage` into a dashboard.

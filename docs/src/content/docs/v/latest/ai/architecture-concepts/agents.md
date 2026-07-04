@@ -8,7 +8,7 @@ sidebar:
 
 An agent is the lowest rung of the ladder — one LLM call, optionally wrapped in a tool loop, optionally producing structured output. It's stateless across calls: each `agent.execute()` runs in fresh isolation, even if the same agent instance is shared.
 
-This page is the mental model. For the API surface see [Run agent](../the-basics/run-agent).
+This page is the mental model. For the API surface see [Run agent](/v/latest/ai/agents/run-agent/).
 
 ## One agent, one trip loop
 
@@ -28,7 +28,7 @@ trip N:  bound by maxTrips (default 10)
 The loop terminates when:
 
 1. The model returns a response with no tool calls — the agent finalizes and returns.
-2. Every tool call this trip is `mode: "silent"` — see [Define tools](../the-basics/define-tools).
+2. Every tool call this trip is `mode: "silent"` — see [Define tools](/v/latest/ai/tools/define-tools/).
 3. `maxTrips` is hit — the agent returns with the latest text and a warning logged.
 
 Each trip is recorded on `result.report.trips[]` with its index, finish reason, usage, and timing.
@@ -74,7 +74,7 @@ Tools are typed async functions the model can call. The agent:
 
 If input validation fails or the tool throws, the error is recorded on the `ToolCall` and reported back to the model on the next trip. The model gets a chance to correct itself, bounded by `maxTrips`.
 
-There's a side-channel — `ctx.artifacts` — for system-only data the model should never see (renderable blocks, citations, telemetry). See [Define tools](../the-basics/define-tools).
+There's a side-channel — `ctx.artifacts` — for system-only data the model should never see (renderable blocks, citations, telemetry). See [Define tools](/v/latest/ai/tools/define-tools/).
 
 ## Streaming
 
@@ -142,11 +142,11 @@ The agent doesn't remember anything across calls. State you need to persist live
 - **Workflow snapshots** — when you graduate to `ai.workflow()`, the snapshot store keeps a per-step checkpoint.
 - **Supervisor snapshots** — same idea for supervisors, per-iteration.
 
-If you want a long-lived conversation that "remembers" across runs, the [`ai.orchestrator()`](./orchestrators) primitive owns this for you — durable session state, history windowing, and optional [memory](./memory). You still hold the raw transcript and replay it via `history`; the orchestrator persists the *session state* around it.
+If you want a long-lived conversation that "remembers" across runs, the [`ai.orchestrator()`](/v/latest/ai/architecture-concepts/orchestrators/) primitive owns this for you — durable session state, history windowing, and optional [memory](/v/latest/ai/architecture-concepts/memory/). You still hold the raw transcript and replay it via `history`; the orchestrator persists the *session state* around it.
 
 ## Related
 
-- [Run agent](../the-basics/run-agent) — the API surface in depth.
-- [Define tools](../the-basics/define-tools) — tool authoring.
-- [Write system prompts](../the-basics/write-system-prompts) — composable prompts.
-- [Workflows](./workflows) — when one agent isn't enough.
+- [Run agent](/v/latest/ai/agents/run-agent/) — the API surface in depth.
+- [Define tools](/v/latest/ai/tools/define-tools/) — tool authoring.
+- [Write system prompts](/v/latest/ai/prompts/write-system-prompts/) — composable prompts.
+- [Workflows](/v/latest/ai/architecture-concepts/workflows/) — when one agent isn't enough.

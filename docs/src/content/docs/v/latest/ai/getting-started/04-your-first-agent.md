@@ -62,7 +62,7 @@ const myAgent = ai.agent({
 });
 ```
 
-The builder is immutable — each call returns a new prompt — so you can fork a base prompt into variants safely. See [Write system prompts](../the-basics/write-system-prompts) for the full surface.
+The builder is immutable — each call returns a new prompt — so you can fork a base prompt into variants safely. See [Write system prompts](/v/latest/ai/prompts/write-system-prompts/) for the full surface.
 
 ## 4. Stream tokens to stdout
 
@@ -98,7 +98,7 @@ if (error) {
 console.log(text);
 ```
 
-You can branch on `instanceof ProviderRateLimitError`, on `error.code === "PROVIDER_RATE_LIMIT"`, or on the coarser `error.category` for dashboards. See [Handle errors](../digging-deeper/handle-errors).
+You can branch on `instanceof ProviderRateLimitError`, on `error.code === "PROVIDER_RATE_LIMIT"`, or on the coarser `error.category` for dashboards. See [Handle errors](/v/latest/ai/reliability/handle-errors/).
 
 ## 6. Add a tool
 
@@ -124,7 +124,7 @@ const myAgent = ai.agent({
 const { text } = await myAgent.execute("What time is it in Cairo?");
 ```
 
-The agent dispatches the tool, feeds the result back into a second trip, and the model produces the natural-language reply. See [Define tools](../the-basics/define-tools).
+The agent dispatches the tool, feeds the result back into a second trip, and the model produces the natural-language reply. See [Define tools](/v/latest/ai/tools/define-tools/).
 
 ## 7. Add structured output
 
@@ -158,13 +158,13 @@ Adapters with native `structuredOutput` forward the schema to the provider; othe
 
 ## Where to go next
 
-- **Composing several agents into a pipeline** → [Run a workflow](../digging-deeper/run-workflow).
-- **Routing across multiple agents based on input** → [Run a supervisor](../digging-deeper/run-supervisor).
-- **Cap token spend, block PII, cache responses** → [Attach middleware](../digging-deeper/attach-middleware).
-- **Survive a crash mid-pipeline** → [Persist AI data](../digging-deeper/persist-ai-data).
+- **Composing several agents into a pipeline** → [Run a workflow](/v/latest/ai/orchestration/run-workflow/).
+- **Routing across multiple agents based on input** → [Run a supervisor](/v/latest/ai/orchestration/run-supervisor/).
+- **Cap token spend, block PII, cache responses** → [Attach middleware](/v/latest/ai/reliability/attach-middleware/).
+- **Survive a crash mid-pipeline** → [Persist AI data](/v/latest/ai/reliability/persist-ai-data/).
 
 ## Related
 
-- [Run agent](../the-basics/run-agent) — the agent surface in depth.
-- [Define tools](../the-basics/define-tools) — the tool surface in depth.
-- [Recipes](../recipes/basic-agent) — copy-paste patterns.
+- [Run agent](/v/latest/ai/agents/run-agent/) — the agent surface in depth.
+- [Define tools](/v/latest/ai/tools/define-tools/) — the tool surface in depth.
+- [Recipes](/v/latest/ai/recipes/basic-agent/) — copy-paste patterns.

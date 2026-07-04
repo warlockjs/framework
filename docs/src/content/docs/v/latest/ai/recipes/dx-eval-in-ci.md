@@ -162,5 +162,5 @@ Exact/contains/predicate scorers are free and stable — run them on every PR. T
 
 ## Related
 
-- [Basic agent](./basic-agent) — the agent shape under evaluation.
-- [Deterministic supervisor tests](./dx-deterministic-supervisor-tests) — fast, no-LLM tests for multi-agent flows.
+- [Basic agent](/v/latest/ai/recipes/basic-agent/) — the agent shape under evaluation.
+- [Deterministic supervisor tests](/v/latest/ai/recipes/dx-deterministic-supervisor-tests/) — fast, no-LLM tests for multi-agent flows.

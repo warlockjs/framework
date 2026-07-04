@@ -245,9 +245,9 @@ Reach for `.asTool()` only when you genuinely need a *different* name, descripti
 
 ## See also
 
-- [Architecture — Agents](../architecture-concepts/agents) — the trip loop, the report tree, and how output parsing and repair fit in.
-- [Run an AI agent skill](/skills) — the `@warlock.js/ai/skills/run-ai-agent` playbook for wiring an agent end to end (the docs site projects every package skill under the `/skills` page).
-- [Recipe — Extract structured data with self-repair](../recipes/agent-extract-structured-data) — `output` + `repair` parsing a messy resume into a typed record.
-- [Recipe — Extract fields from a document image](../recipes/agent-vision-document-extraction) — attachments and the vision capability gate, end to end.
-- [Recipe — A multi-tool research agent](../recipes/agent-multi-tool-research-agent) — several tools in one `tools` array and the bounded trip loop.
-- [Recipe — A basic agent](../recipes/basic-agent) — the smallest agent + system prompt, if you're starting from zero.
+- [Architecture — Agents](/v/latest/ai/architecture-concepts/agents/) — the trip loop, the report tree, and how output parsing and repair fit in.
+- [Run an AI agent skill](/skills/) — the `@warlock.js/ai/skills/run-ai-agent` playbook for wiring an agent end to end (the docs site projects every package skill under the `/skills` page).
+- [Recipe — Extract structured data with self-repair](/v/latest/ai/recipes/agent-extract-structured-data/) — `output` + `repair` parsing a messy resume into a typed record.
+- [Recipe — Extract fields from a document image](/v/latest/ai/recipes/agent-vision-document-extraction/) — attachments and the vision capability gate, end to end.
+- [Recipe — A multi-tool research agent](/v/latest/ai/recipes/agent-multi-tool-research-agent/) — several tools in one `tools` array and the bounded trip loop.
+- [Recipe — A basic agent](/v/latest/ai/recipes/basic-agent/) — the smallest agent + system prompt, if you're starting from zero.

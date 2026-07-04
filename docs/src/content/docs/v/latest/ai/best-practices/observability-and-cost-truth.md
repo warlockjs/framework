@@ -71,7 +71,7 @@ try {
 }
 ```
 
-> `attach` works identically on an agent, workflow, or supervisor — Panoptic defaults to `agent.completed`, `workflow.completed`, `supervisor.completed` and silently ignores the names a target doesn't emit. The **orchestrator** is the one exception: its turn events carry no result, so feed each turn's report directly with `observe.collect(turn.report)`. See the [wire Panoptic recipe](../recipes/observability-wire-panoptic).
+> `attach` works identically on an agent, workflow, or supervisor — Panoptic defaults to `agent.completed`, `workflow.completed`, `supervisor.completed` and silently ignores the names a target doesn't emit. The **orchestrator** is the one exception: its turn events carry no result, so feed each turn's report directly with `observe.collect(turn.report)`. See the [wire Panoptic recipe](/v/latest/ai/recipes/observability-wire-panoptic/).
 
 ## Export to OTel or Langfuse in prod; console or file in dev
 
@@ -120,7 +120,7 @@ observe.attach(supportAgent);
 const observe = panoptic({ exporters: [consoleExporter()] });
 ```
 
-> A missing optional-peer SDK surfaces as a curated *"install this"* error on first export, never a boot-time stack trace — so you can register `otelExporter` without `langfuse` installed and vice versa. The OTel exporter never owns a `TracerProvider`; provider, processors, and the OTLP span exporter are your existing instrumentation, so AI spans land in the same pipeline as the rest of your service. Full setup in the [export to OTel & Langfuse recipe](../recipes/observability-export-otel-langfuse).
+> A missing optional-peer SDK surfaces as a curated *"install this"* error on first export, never a boot-time stack trace — so you can register `otelExporter` without `langfuse` installed and vice versa. The OTel exporter never owns a `TracerProvider`; provider, processors, and the OTLP span exporter are your existing instrumentation, so AI spans land in the same pipeline as the rest of your service. Full setup in the [export to OTel & Langfuse recipe](/v/latest/ai/recipes/observability-export-otel-langfuse/).
 
 ## Set ModelPricing so cost is computed honestly — never zero
 
@@ -158,7 +158,7 @@ function runCostUsd(usage: Usage): number {
 const total = result.usage.cost?.input ?? 0; // and the rest of the bill vanishes
 ```
 
-> Panoptic's rollups follow the same honesty rule: `aggregate().cost` stays `undefined` until at least one priced run lands, and an unpriced child can never erase the cost of priced siblings — the merge uses the framework's own cost-rollup logic. So one unpriced model in the mix won't zero out your dashboard; it just won't contribute. See the [cost tracking recipe](../recipes/cost-tracking) for the `pricing` shape and resolution order.
+> Panoptic's rollups follow the same honesty rule: `aggregate().cost` stays `undefined` until at least one priced run lands, and an unpriced child can never erase the cost of priced siblings — the merge uses the framework's own cost-rollup logic. So one unpriced model in the mix won't zero out your dashboard; it just won't contribute. See the [cost tracking recipe](/v/latest/ai/recipes/cost-tracking/) for the `pricing` shape and resolution order.
 
 ## Read the rolled-up `Usage.cost` to attribute spend per tenant or feature
 
@@ -212,7 +212,7 @@ console.log(
 
 **Avoid this — billing from one opaque provider invoice.** The provider's monthly total can't be split by tenant or feature after the fact. If you didn't stamp the dimension at run time, no amount of querying recovers it — you're left allocating a lump sum by guesswork.
 
-> The dimension has to be on the run when it executes — `sessionId` is the join key Panoptic mirrors onto every span (`gen_ai.conversation.id` in OTel, the session dimension in Langfuse). Pick a scheme that encodes tenant *and* feature so one filter answers both finance's and engineering's questions. See the [cost per tenant recipe](../recipes/cost-aggregate-per-tenant) for the full ledger.
+> The dimension has to be on the run when it executes — `sessionId` is the join key Panoptic mirrors onto every span (`gen_ai.conversation.id` in OTel, the session dimension in Langfuse). Pick a scheme that encodes tenant *and* feature so one filter answers both finance's and engineering's questions. See the [cost per tenant recipe](/v/latest/ai/recipes/cost-aggregate-per-tenant/) for the full ledger.
 
 ## Use the trace tree — children and lineage — for forensics
 
@@ -256,7 +256,7 @@ for (const failure of recentFailures) {
 
 **Avoid this — reconstructing the run from scattered log lines.** Grepping a request id across services gives you fragments in arrival order, not the parent/child structure. You can't tell which trip the model looped on or which tool burned the tokens, because the lineage was never captured — it was thrown away at log time.
 
-> The root span's `usage` is the whole-run rollup; each child's `usage` is its own subtree's rollup. That is what makes a span tree a flame graph for cost: the expensive node is the one whose own rollup dominates its parent's. For a cost-and-latency dashboard built entirely on `query` / `aggregate` / `walkSpans`, see the [trace cost dashboard recipe](../recipes/observability-trace-cost-dashboard).
+> The root span's `usage` is the whole-run rollup; each child's `usage` is its own subtree's rollup. That is what makes a span tree a flame graph for cost: the expensive node is the one whose own rollup dominates its parent's. For a cost-and-latency dashboard built entirely on `query` / `aggregate` / `walkSpans`, see the [trace cost dashboard recipe](/v/latest/ai/recipes/observability-trace-cost-dashboard/).
 
 ## Wire tracing before you scale — and flush it on shutdown
 
@@ -306,10 +306,10 @@ The short version — the gaps that leave you blind or holding a wrong number:
 
 ## See also
 
-- [Recipe — Wire Panoptic onto a run](../recipes/observability-wire-panoptic) — attach the subscriber and retain traces in the in-memory store.
-- [Recipe — Export to OTel & Langfuse](../recipes/observability-export-otel-langfuse) — ship the same traces to an external backend with optional-peer install notes.
-- [Recipe — Trace cost & latency dashboard](../recipes/observability-trace-cost-dashboard) — per-run cost, p95 latency, and failure cost from the collector.
-- [Recipe — Aggregate cost per tenant](../recipes/cost-aggregate-per-tenant) — read `Usage.cost` / `cachedTokens` / `reasoningTokens` into a tenant ledger.
-- [Recipe — Cost tracking](../recipes/cost-tracking) — the `ModelPricing` registry and the `Usage.cost` per-channel breakdown.
-- [Best Practices — Cost and efficiency](./cost-and-efficiency) — the levers (tiering, caching, budgets) that lower the spend you're now measuring.
-- [Architecture — Middleware](../architecture-concepts/middleware) — the pipeline `panoptic().middleware()` plugs into as an alternative feed path.
+- [Recipe — Wire Panoptic onto a run](/v/latest/ai/recipes/observability-wire-panoptic/) — attach the subscriber and retain traces in the in-memory store.
+- [Recipe — Export to OTel & Langfuse](/v/latest/ai/recipes/observability-export-otel-langfuse/) — ship the same traces to an external backend with optional-peer install notes.
+- [Recipe — Trace cost & latency dashboard](/v/latest/ai/recipes/observability-trace-cost-dashboard/) — per-run cost, p95 latency, and failure cost from the collector.
+- [Recipe — Aggregate cost per tenant](/v/latest/ai/recipes/cost-aggregate-per-tenant/) — read `Usage.cost` / `cachedTokens` / `reasoningTokens` into a tenant ledger.
+- [Recipe — Cost tracking](/v/latest/ai/recipes/cost-tracking/) — the `ModelPricing` registry and the `Usage.cost` per-channel breakdown.
+- [Best Practices — Cost and efficiency](/v/latest/ai/best-practices/cost-and-efficiency/) — the levers (tiering, caching, budgets) that lower the spend you're now measuring.
+- [Architecture — Middleware](/v/latest/ai/architecture-concepts/middleware/) — the pipeline `panoptic().middleware()` plugs into as an alternative feed path.

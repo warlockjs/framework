@@ -12,11 +12,11 @@ sidebar:
 
 | Adapter | Status | Talks to | Best for |
 | --- | --- | --- | --- |
-| [`@warlock.js/ai-openai`](../providers/openai) | Shipped | OpenAI + any OpenAI-compatible gateway | Default first choice. Works against OpenAI directly or via OpenRouter / Together.ai / Azure / local gateways. |
-| [`@warlock.js/ai-anthropic`](../providers/anthropic) | Shipped | Anthropic Claude API directly | Native Claude Opus / Sonnet / Haiku via the Messages API. |
-| [`@warlock.js/ai-bedrock`](../providers/bedrock) | Shipped | AWS Bedrock | When AWS pricing / compliance / data residency matters more than provider choice. Converse API + Titan embeddings. |
-| [`@warlock.js/ai-google`](../providers/google) | Shipped | Google Gemini directly | Gemini-specific features (long context, native multimodal), via `@google/genai`. |
-| [`@warlock.js/ai-ollama`](../providers/ollama) | Shipped | Local Ollama runtime | Local models for dev, on-prem deployments, or air-gapped systems. |
+| [`@warlock.js/ai-openai`](/v/latest/ai/providers/openai/) | Shipped | OpenAI + any OpenAI-compatible gateway | Default first choice. Works against OpenAI directly or via OpenRouter / Together.ai / Azure / local gateways. |
+| [`@warlock.js/ai-anthropic`](/v/latest/ai/providers/anthropic/) | Shipped | Anthropic Claude API directly | Native Claude Opus / Sonnet / Haiku via the Messages API. |
+| [`@warlock.js/ai-bedrock`](/v/latest/ai/providers/bedrock/) | Shipped | AWS Bedrock | When AWS pricing / compliance / data residency matters more than provider choice. Converse API + Titan embeddings. |
+| [`@warlock.js/ai-google`](/v/latest/ai/providers/google/) | Shipped | Google Gemini directly | Gemini-specific features (long context, native multimodal), via `@google/genai`. |
+| [`@warlock.js/ai-ollama`](/v/latest/ai/providers/ollama/) | Shipped | Local Ollama runtime | Local models for dev, on-prem deployments, or air-gapped systems. |
 
 All five first-party adapters ship and share the same `SDKAdapterContract`. You can also reach 100+ models through OpenRouter with the OpenAI adapter (`OpenAISDK({ baseURL: "https://openrouter.ai/api/v1" })`) when you want one key for many providers. `ai-openrouter` is intentionally deferred in favor of that path.
 
@@ -98,5 +98,5 @@ Reports label per-agent provider correctly. Pricing applies per SDK instance. Co
 
 ## Related
 
-- [Your first agent](./04-your-first-agent) — runnable walkthrough using the OpenAI adapter.
-- [OpenAI adapter](../providers/openai) — full setup docs for the default adapter.
+- [Your first agent](/v/latest/ai/getting-started/04-your-first-agent/) — runnable walkthrough using the OpenAI adapter.
+- [OpenAI adapter](/v/latest/ai/providers/openai/) — full setup docs for the default adapter.

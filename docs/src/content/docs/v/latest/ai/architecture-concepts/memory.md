@@ -123,6 +123,6 @@ Pass a bare `MemoryContract` for recall + remember with defaults, or the object 
 
 ## Related
 
-- [Orchestrators](./orchestrators) — the primary memory consumer.
-- [Persist AI data](../digging-deeper/persist-ai-data) — the cache-driver model memory shares.
-- [Attach middleware](../digging-deeper/attach-middleware) — `semanticCache`, the sibling delegation.
+- [Orchestrators](/v/latest/ai/architecture-concepts/orchestrators/) — the primary memory consumer.
+- [Persist AI data](/v/latest/ai/reliability/persist-ai-data/) — the cache-driver model memory shares.
+- [Attach middleware](/v/latest/ai/reliability/attach-middleware/) — `semanticCache`, the sibling delegation.

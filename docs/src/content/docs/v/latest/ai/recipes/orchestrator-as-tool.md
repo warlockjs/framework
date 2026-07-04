@@ -39,7 +39,7 @@ yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
 
 ## The wrapped orchestrator
 
-This is the refund orchestrator from the [stateful support bot recipe](./orchestrator-stateful-support-bot), trimmed to the essentials. Its `name` is required — `asTool()` throws without one.
+This is the refund orchestrator from the [stateful support bot recipe](/v/latest/ai/recipes/orchestrator-stateful-support-bot/), trimmed to the essentials. Its `name` is required — `asTool()` throws without one.
 
 ```ts
 import { ai } from "@warlock.js/ai";
@@ -212,5 +212,5 @@ A timeout `AbortSignal` or request-scoped `context` you pass to `concierge.execu
 
 ## Related
 
-- [Stateful refund support bot](./orchestrator-stateful-support-bot) — the orchestrator wrapped here, in full.
-- [Production stores](./orchestrator-production-stores) — durable checkpoint/snapshot wiring for the shared-session case.
+- [Stateful refund support bot](/v/latest/ai/recipes/orchestrator-stateful-support-bot/) — the orchestrator wrapped here, in full.
+- [Production stores](/v/latest/ai/recipes/orchestrator-production-stores/) — durable checkpoint/snapshot wiring for the shared-session case.

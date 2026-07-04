@@ -161,6 +161,6 @@ Build a fresh agent per request, or rebuild the tool with the customer in scope.
 
 ## Related
 
-- [Define tools](../the-basics/define-tools) — the tool factory in depth.
-- [Silent tools recipe](./silent-tools) — `mode: "silent"` patterns and provider behavior.
-- [Streaming tool guard](./streaming-tool-guard) — recovering tool calls leaked as text.
+- [Define tools](/v/latest/ai/tools/define-tools/) — the tool factory in depth.
+- [Silent tools recipe](/v/latest/ai/recipes/silent-tools/) — `mode: "silent"` patterns and provider behavior.
+- [Streaming tool guard](/v/latest/ai/recipes/streaming-tool-guard/) — recovering tool calls leaked as text.

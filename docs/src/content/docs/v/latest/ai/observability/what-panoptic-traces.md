@@ -2,7 +2,7 @@
 title: What Panoptic traces
 description: The Trace and TraceSpan model — how Panoptic projects a core report tree into spans, the span tree you get for agents, workflows, supervisors, and orchestrators, and the full gen_ai.* / warlock.* attribute catalog.
 sidebar:
-  order: 2
+  order: 3
   label: "What Panoptic traces"
 ---
 
@@ -266,10 +266,10 @@ Other `fullHistory` behaviors worth knowing:
 - **The redactor sees the whole array as one value.** Under `fullHistory`, the `ContentRedactor` is called once with the entire `CapturedMessage[]` (not per message) on the `input` field — mask or reshape the array as a unit, or return `undefined` to drop `input` entirely.
 - **Tools are unaffected.** `fullHistory` is an agent-input concern; tool spans still capture their args/result exactly as under plain `captureContent`.
 
-> Capturing full conversations means raw prompts, tool payloads, and completions ride along on every span and into every exporter. Pair `fullHistory` with a `redactContent` masker in any environment where that content is sensitive, and keep the [local dashboard](./local-dashboard) loopback-only.
+> Capturing full conversations means raw prompts, tool payloads, and completions ride along on every span and into every exporter. Pair `fullHistory` with a `redactContent` masker in any environment where that content is sensitive, and keep the [local dashboard](/v/latest/ai/observability/local-dashboard/) loopback-only.
 
 ## Related
 
-- [@warlock.js/ai-panoptic](./ai-panoptic) — the package overview, `panoptic()` entry point, and exporters.
-- [Configuring Panoptic](./configuring-panoptic) — wire content capture declaratively via `ai.config({ panoptic })`.
-- [The local dashboard](./local-dashboard) — inspect captured content in a loopback-only UI.
+- [@warlock.js/ai-panoptic](/v/latest/ai/observability/ai-panoptic/) — the package overview, `panoptic()` entry point, and exporters.
+- [Configuring Panoptic](/v/latest/ai/observability/configuring-panoptic/) — wire content capture declaratively via `ai.config({ panoptic })`.
+- [The local dashboard](/v/latest/ai/observability/local-dashboard/) — inspect captured content in a loopback-only UI.

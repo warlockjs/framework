@@ -1,6 +1,8 @@
 ---
 title: Querying traces
 description: Retain @warlock.js/ai-panoptic traces in a queryable in-memory store — register createInMemoryTraceStore() as an exporter, then query() by id/session/status/time and aggregate() usage + cost, plus the building blocks (createCollector, reportToTrace/reportToSpan, walkSpans, totalCostUsd, a custom ExporterContract) for bespoke pipelines.
+sidebar:
+  order: 7
 ---
 
 Exporters ship a trace *out* to a backend. A **trace store** does the opposite: it keeps each completed trace in memory so you can answer observability questions after the fact — pull one run by id, list every run for a session, slice failed runs in a time window, or roll usage and cost across any of those slices.
@@ -191,7 +193,7 @@ Overwriting an existing `traceId` refreshes its insertion position, so a re-coll
 
 ## Persisting traces across restarts
 
-The in-memory store is wiped on process exit. For a long-lived process — or so the [dashboard](./local-dashboard) keeps your trace history across restarts — `createCacheTraceStore(cache, options?)` persists every trace through any [`@warlock.js/cache`](/v/latest/cache/getting-started/) `CacheDriver` (Redis, Postgres, file, …). It returns the **same `TraceStoreContract & ExporterContract`** as the in-memory store, plus a `ready()` hydrator — so it's a drop-in replacement, queryable identically:
+The in-memory store is wiped on process exit. For a long-lived process — or so the [dashboard](/v/latest/ai/observability/local-dashboard/) keeps your trace history across restarts — `createCacheTraceStore(cache, options?)` persists every trace through any [`@warlock.js/cache`](/v/latest/cache/) `CacheDriver` (Redis, Postgres, file, …). It returns the **same `TraceStoreContract & ExporterContract`** as the in-memory store, plus a `ready()` hydrator — so it's a drop-in replacement, queryable identically:
 
 ```ts
 import { createCacheTraceStore, panoptic } from "@warlock.js/ai-panoptic";
@@ -217,7 +219,7 @@ How it reconciles a **synchronous** store contract with an **async** cache drive
 - **Reads are synchronous.** The store keeps an in-memory mirror (the same insertion-ordered `Map`), and `get` / `query` / `aggregate` / `size` answer from it instantly — the dashboard polls them on every request.
 - **Writes go through.** `add` updates the mirror immediately, then fire-and-forget persists the trace + a newest-first index to the cache. The collector's hot path never waits on the cache.
 - **Durability is best-effort.** A write the cache rejects is still visible in the mirror for the life of the process — it just won't survive a restart. Cache failures are swallowed (routed to an optional `onError`), so a flaky cache never throws into a run.
-- **Restart-safe.** `ready()` reads the persisted index and replays each trace into the mirror in insertion order, so newest-first ordering and FIFO eviction stay correct after a restart. Await it once at startup (the [`ai.config({ panoptic: { cache } })`](./configuring-panoptic#persisting-traces-across-a-restart) wiring does this for you).
+- **Restart-safe.** `ready()` reads the persisted index and replays each trace into the mirror in insertion order, so newest-first ordering and FIFO eviction stay correct after a restart. Await it once at startup (the [`ai.config({ panoptic: { cache } })`](/v/latest/ai/observability/configuring-panoptic/#persisting-traces-across-a-restart) wiring does this for you).
 
 ```ts
 type CacheTraceStoreOptions = {
@@ -253,7 +255,7 @@ const max = maxNodeCost(trace.root);
 const intensity = heatIntensity(rollupCost(span), max); // 0..1
 ```
 
-`groupByPrompt` keys off the agent span's `agent.promptName` / `agent.promptVersion` stamps, so every run of a `name@version` prompt slices apart — the link back to the [prompt registry](/v/latest/ai/the-basics/prompt-registry/).
+`groupByPrompt` keys off the agent span's `agent.promptName` / `agent.promptVersion` stamps, so every run of a `name@version` prompt slices apart — the link back to the [prompt registry](/v/latest/ai/prompts/prompt-registry/).
 
 ## Summing usage yourself
 

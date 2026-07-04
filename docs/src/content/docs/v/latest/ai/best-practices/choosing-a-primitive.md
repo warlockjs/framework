@@ -298,15 +298,15 @@ const frontDesk = ai.agent({
 
 ## See also
 
-- [Architecture — Agents](../architecture-concepts/agents) — the trip loop, tools, and the `AgentResult` envelope every rung shares.
-- [Architecture — Workflows](../architecture-concepts/workflows) — steps, state, retries, and resume-from-snapshot.
-- [Architecture — Supervisors](../architecture-concepts/supervisors) — `route` vs `router`, intent dispatch, and the `evaluate` verdict.
-- [Architecture — Orchestrators](../architecture-concepts/orchestrators) — sessions, checkpoints, compaction, and the per-turn lifecycle.
-- [Architecture — Planner](../architecture-concepts/planner) — plan generation over capabilities and step-by-step execution.
-- [Run a team](../digging-deeper/run-team) — a manager, role-named members, and the built-in quality / verify gate.
-- [Run RAG](../the-basics/run-rag) — chunk, embed, store, retrieve, rerank, and cite over your own corpus.
-- [Recipe — Basic agent](../recipes/basic-agent) — the rung-1 starting point.
-- [Recipe — Content pipeline workflow](../recipes/workflow-content-pipeline) — a fixed sequence, end to end.
-- [Recipe — Support triage supervisor](../recipes/supervisor-support-triage) — dynamic dispatch with a router and `evaluate` loop.
-- [Recipe — Stateful support bot](../recipes/orchestrator-stateful-support-bot) — a multi-turn session with persisted state.
-- [Recipe — Autonomous task runner](../recipes/planner-autonomous-task-runner) — a planner that generates and runs its own plan.
+- [Architecture — Agents](/v/latest/ai/architecture-concepts/agents/) — the trip loop, tools, and the `AgentResult` envelope every rung shares.
+- [Architecture — Workflows](/v/latest/ai/architecture-concepts/workflows/) — steps, state, retries, and resume-from-snapshot.
+- [Architecture — Supervisors](/v/latest/ai/architecture-concepts/supervisors/) — `route` vs `router`, intent dispatch, and the `evaluate` verdict.
+- [Architecture — Orchestrators](/v/latest/ai/architecture-concepts/orchestrators/) — sessions, checkpoints, compaction, and the per-turn lifecycle.
+- [Architecture — Planner](/v/latest/ai/architecture-concepts/planner/) — plan generation over capabilities and step-by-step execution.
+- [Run a team](/v/latest/ai/orchestration/run-team/) — a manager, role-named members, and the built-in quality / verify gate.
+- [Run RAG](/v/latest/ai/rag/run-rag/) — chunk, embed, store, retrieve, rerank, and cite over your own corpus.
+- [Recipe — Basic agent](/v/latest/ai/recipes/basic-agent/) — the rung-1 starting point.
+- [Recipe — Content pipeline workflow](/v/latest/ai/recipes/workflow-content-pipeline/) — a fixed sequence, end to end.
+- [Recipe — Support triage supervisor](/v/latest/ai/recipes/supervisor-support-triage/) — dynamic dispatch with a router and `evaluate` loop.
+- [Recipe — Stateful support bot](/v/latest/ai/recipes/orchestrator-stateful-support-bot/) — a multi-turn session with persisted state.
+- [Recipe — Autonomous task runner](/v/latest/ai/recipes/planner-autonomous-task-runner/) — a planner that generates and runs its own plan.

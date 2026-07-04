@@ -30,7 +30,7 @@ Each rung handles a job the rung below can't do cleanly. Each one is built on th
 
 ## Beyond the four primitives
 
-The ladder is the spine, but the package is wider than four verbs. Around the primitives sit tooling (`ai.tool`, `ai.tools.*`, `ai.mcp`), knowledge (`ai.rag`, `ai.memory`, `ai.skills`), planning and teams (`ai.planner`, `ai.team`, `ai.router`, `ai.fanOut`), safety (`ai.guardrail`, `ai.human`), and evaluation / testing (`ai.eval`, `ai.dataset`, `ai.vcr`, `MockSDK`) — every one returning the same envelope and composing through `.asTool()`. See the [API reference](../reference/api) for the full surface.
+The ladder is the spine, but the package is wider than four verbs. Around the primitives sit tooling (`ai.tool`, `ai.tools.*`, `ai.mcp`), knowledge (`ai.rag`, `ai.memory`, `ai.skills`), planning and teams (`ai.planner`, `ai.team`, `ai.router`, `ai.fanOut`), safety (`ai.guardrail`, `ai.human`), and evaluation / testing (`ai.eval`, `ai.dataset`, `ai.vcr`, `MockSDK`) — every one returning the same envelope and composing through `.asTool()`. See the [API reference](/v/latest/ai/reference/api/) for the full surface.
 
 ## The shape every primitive returns
 
@@ -56,7 +56,7 @@ These two invariants are the reason you can build real systems on top of this �
 
 ## What lives outside this package
 
-- **The model client.** OpenAI's SDK, Anthropic's, Bedrock's — each lives in a sibling adapter package. See [Pick a provider](./03-pick-a-provider).
+- **The model client.** OpenAI's SDK, Anthropic's, Bedrock's — each lives in a sibling adapter package. See [Pick a provider](/v/latest/ai/getting-started/03-pick-a-provider/).
 - **Persistence.** Snapshot resume and semantic cache delegate to `@warlock.js/cache`. Memory, file, Redis, Postgres (with pgvector for similarity) — all interchangeable.
 - **Logging.** `@warlock.js/logger`'s `log` singleton. Configure channels once at boot.
 - **Schemas.** Anything implementing `StandardSchemaV1<T>` works — `@warlock.js/seal` (recommended), Zod, Valibot, hand-rolled.
@@ -65,6 +65,6 @@ That's the whole picture. Next: install the package and pick an adapter.
 
 ## Related
 
-- [Installation](./02-installation) — the install steps for standalone and Warlock.js contexts.
-- [Pick a provider](./03-pick-a-provider) — comparison across the five adapters.
-- [Your first agent](./04-your-first-agent) — runnable five-minute walkthrough.
+- [Installation](/v/latest/ai/getting-started/02-installation/) — the install steps for standalone and Warlock.js contexts.
+- [Pick a provider](/v/latest/ai/getting-started/03-pick-a-provider/) — comparison across the five adapters.
+- [Your first agent](/v/latest/ai/getting-started/04-your-first-agent/) — runnable five-minute walkthrough.

@@ -167,6 +167,6 @@ When you outgrow this, swap the cache driver for a dedicated vector DB and keep 
 
 ## Related
 
-- [Embed text](../the-basics/embed-text) — the embedder primitive.
-- [Define tools](../the-basics/define-tools) — wrapping retrieval as a tool.
-- [Persist AI data](../digging-deeper/persist-ai-data) — driver catalog.
+- [Embed text](/v/latest/ai/rag/embed-text/) — the embedder primitive.
+- [Define tools](/v/latest/ai/tools/define-tools/) — wrapping retrieval as a tool.
+- [Persist AI data](/v/latest/ai/reliability/persist-ai-data/) — driver catalog.

@@ -21,7 +21,7 @@ yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/ai-panoptic @warlock.j
 OPENAI_API_KEY=sk-...
 ```
 
-`@warlock.js/ai-panoptic`'s only hard peer is `@warlock.js/ai` — the in-memory store and the console exporter pull in no extra SDK. (OpenTelemetry and Langfuse are optional peers; see the [export recipe](./observability-export-otel-langfuse).)
+`@warlock.js/ai-panoptic`'s only hard peer is `@warlock.js/ai` — the in-memory store and the console exporter pull in no extra SDK. (OpenTelemetry and Langfuse are optional peers; see the [export recipe](/v/latest/ai/recipes/observability-export-otel-langfuse/).)
 
 ## The agent, plus one attach
 
@@ -157,7 +157,7 @@ observe.attach(myWorkflow);   // workflow.completed
 observe.attach(mySupervisor); // supervisor.completed
 ```
 
-The orchestrator is the one exception: its events carry no result, so you feed its report in directly. See the [cost-dashboard recipe](./observability-trace-cost-dashboard) for that path via `observe.collect(result.report)`.
+The orchestrator is the one exception: its events carry no result, so you feed its report in directly. See the [cost-dashboard recipe](/v/latest/ai/recipes/observability-trace-cost-dashboard/) for that path via `observe.collect(result.report)`.
 
 ## Production notes
 
@@ -168,6 +168,6 @@ The orchestrator is the one exception: its events carry no result, so you feed i
 
 ## Related
 
-- [Observability — export to OTel & Langfuse](./observability-export-otel-langfuse) — ship the same traces to an external backend.
-- [Observability — trace cost dashboard](./observability-trace-cost-dashboard) — per-run cost and latency from the collector.
-- [Cost tracking](./cost-tracking) — the `usage.cost` per-channel breakdown Panoptic rolls up.
+- [Observability — export to OTel & Langfuse](/v/latest/ai/recipes/observability-export-otel-langfuse/) — ship the same traces to an external backend.
+- [Observability — trace cost dashboard](/v/latest/ai/recipes/observability-trace-cost-dashboard/) — per-run cost and latency from the collector.
+- [Cost tracking](/v/latest/ai/recipes/cost-tracking/) — the `usage.cost` per-channel breakdown Panoptic rolls up.

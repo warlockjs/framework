@@ -8,7 +8,7 @@ sidebar:
 
 Middleware in `@warlock.js/ai` is the pipeline that wraps an agent run. It exists for cross-cutting concerns — budgeting, content guardrails, caching, observability — that don't belong in any one tool or system prompt.
 
-This page is the mental model. For the API surface and authoring guide see [Attach middleware](../digging-deeper/attach-middleware).
+This page is the mental model. For the API surface and authoring guide see [Attach middleware](/v/latest/ai/reliability/attach-middleware/).
 
 ## Four granularities, one object
 
@@ -126,6 +126,6 @@ Don't write one when:
 
 ## Related
 
-- [Attach middleware](../digging-deeper/attach-middleware) — API surface, authoring rules, ordering invariants.
-- [Handle errors](../digging-deeper/handle-errors) — `BudgetExceededError`, `GuardrailViolationError`.
-- [Persist AI data](../digging-deeper/persist-ai-data) — `defaultStore` for semantic cache.
+- [Attach middleware](/v/latest/ai/reliability/attach-middleware/) — API surface, authoring rules, ordering invariants.
+- [Handle errors](/v/latest/ai/reliability/handle-errors/) — `BudgetExceededError`, `GuardrailViolationError`.
+- [Persist AI data](/v/latest/ai/reliability/persist-ai-data/) — `defaultStore` for semantic cache.

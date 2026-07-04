@@ -93,7 +93,7 @@ const triage = ai.supervisor({
 });
 ```
 
-Reserve the `router` agent for what it's actually good at: a message that needs **several** specialists in sequence, where the *next* one depends on what the last one found — a path no static rule can express. The cost ladder is the [support-triage recipe's](../recipes/supervisor-support-triage) opening table; the cheap rungs are the [classifier fast-path recipe](../recipes/supervisor-classifier-fast-path). This ties directly back to the model-tiering rule on the [cost and efficiency](./cost-and-efficiency) page: routing is cheap-tier work, so even when you do use a `router`, give it the cheap model.
+Reserve the `router` agent for what it's actually good at: a message that needs **several** specialists in sequence, where the *next* one depends on what the last one found — a path no static rule can express. The cost ladder is the [support-triage recipe's](/v/latest/ai/recipes/supervisor-support-triage/) opening table; the cheap rungs are the [classifier fast-path recipe](/v/latest/ai/recipes/supervisor-classifier-fast-path/). This ties directly back to the model-tiering rule on the [cost and efficiency](/v/latest/ai/best-practices/cost-and-efficiency/) page: routing is cheap-tier work, so even when you do use a `router`, give it the cheap model.
 
 ## Write intent descriptions like a one-line "when would you pick this?" answer
 
@@ -270,7 +270,7 @@ intents: {
 route: (ctx) => (ctx.iteration === 0 ? ["billing", "tech"] : "resolver"), // both write `status` in parallel
 ```
 
-> An intent with **no** `output` schema passes its raw result to the iteration snapshot but does **not** auto-merge into `state` — the opt-in keeps state clean. So declaring `output` is also how you say "this slice belongs in the final answer." When you genuinely need to combine same-keyed values across iterations (accumulate a `blocks` array rather than replace it), that's the job of `finalizeArtifacts` with the artifacts bag, not the default shallow-merge — see the [run-supervisor skill](/skills) for the artifacts pattern.
+> An intent with **no** `output` schema passes its raw result to the iteration snapshot but does **not** auto-merge into `state` — the opt-in keeps state clean. So declaring `output` is also how you say "this slice belongs in the final answer." When you genuinely need to combine same-keyed values across iterations (accumulate a `blocks` array rather than replace it), that's the job of `finalizeArtifacts` with the artifacts bag, not the default shallow-merge — see the [run-supervisor skill](/skills/) for the artifacts pattern.
 
 ## Avoid list
 
@@ -284,8 +284,8 @@ The short version — the routing mistakes that quietly inflate a supervisor's c
 
 ## See also
 
-- [Skill — Run a supervisor](/skills) — the full `ai.supervisor()` surface: dispatch modes, `intents` shapes, `evaluate`, `ack`, artifacts, and resume.
-- [Recipe — Support triage supervisor](../recipes/supervisor-support-triage) — the full `router` + `evaluate` loop and the triage cost ladder.
-- [Recipe — Classifier fast-path triage](../recipes/supervisor-classifier-fast-path) — the cheapest triage: classify once, dispatch once, done.
-- [Best Practices — Cost and efficiency](./cost-and-efficiency) — model tiering and the classifier-vs-router cost math this page ties back to.
-- [Best Practices — Choosing a primitive](./choosing-a-primitive) — when a supervisor is the right rung at all, versus an agent, workflow, or orchestrator.
+- [Skill — Run a supervisor](/skills/) — the full `ai.supervisor()` surface: dispatch modes, `intents` shapes, `evaluate`, `ack`, artifacts, and resume.
+- [Recipe — Support triage supervisor](/v/latest/ai/recipes/supervisor-support-triage/) — the full `router` + `evaluate` loop and the triage cost ladder.
+- [Recipe — Classifier fast-path triage](/v/latest/ai/recipes/supervisor-classifier-fast-path/) — the cheapest triage: classify once, dispatch once, done.
+- [Best Practices — Cost and efficiency](/v/latest/ai/best-practices/cost-and-efficiency/) — model tiering and the classifier-vs-router cost math this page ties back to.
+- [Best Practices — Choosing a primitive](/v/latest/ai/best-practices/choosing-a-primitive/) — when a supervisor is the right rung at all, versus an agent, workflow, or orchestrator.

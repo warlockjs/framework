@@ -161,10 +161,10 @@ await observe.shutdown(); // flush + release every exporter
 - **OTel SDK ownership stays with the app.** Panoptic emits onto a `Tracer` and nothing more — provider, processors, and the OTLP span exporter are your existing instrumentation, so AI spans land in the same pipeline (and the same backend) as the rest of your service.
 - **One throwing backend can't take down the others.** The collector isolates each exporter in `Promise.allSettled`; a Langfuse outage degrades to missing Langfuse data while OTel keeps flowing, and neither can crash the agent run.
 - **`gen_ai.*` model/system/operation keys are never invented.** They appear only when the span already carried that exact key (the `system` option is the one allowed backfill, and it never overrides a value the span supplied). If a backend dashboard shows an empty `gen_ai.request.model`, the source span didn't populate it — fix it at the collector, not the exporter.
-- **Add a retention sink alongside the wire exporters.** Register an in-memory store (or a custom `TraceStoreContract`) in the same `exporters` array to keep runs queryable locally even while they ship out — see [wire Panoptic](./observability-wire-panoptic).
+- **Add a retention sink alongside the wire exporters.** Register an in-memory store (or a custom `TraceStoreContract`) in the same `exporters` array to keep runs queryable locally even while they ship out — see [wire Panoptic](/v/latest/ai/recipes/observability-wire-panoptic/).
 
 ## Related
 
-- [Observability — wire Panoptic](./observability-wire-panoptic) — attach the subscriber and retain traces in the in-memory store.
-- [Observability — trace cost dashboard](./observability-trace-cost-dashboard) — per-run cost and latency from the collector.
-- [Cost tracking](./cost-tracking) — the `usage.cost` breakdown the exporters map to `warlock.cost.usd` / Langfuse usage.
+- [Observability — wire Panoptic](/v/latest/ai/recipes/observability-wire-panoptic/) — attach the subscriber and retain traces in the in-memory store.
+- [Observability — trace cost dashboard](/v/latest/ai/recipes/observability-trace-cost-dashboard/) — per-run cost and latency from the collector.
+- [Cost tracking](/v/latest/ai/recipes/cost-tracking/) — the `usage.cost` breakdown the exporters map to `warlock.cost.usd` / Langfuse usage.

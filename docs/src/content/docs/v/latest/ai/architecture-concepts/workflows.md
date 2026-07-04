@@ -8,7 +8,7 @@ sidebar:
 
 A workflow is a named, ordered set of steps with a stable signature. Each step is exactly one of: an `agent` call, a free-form `run` function, or a `parallel` group of children. To run another workflow as a step, wrap it with `workflow.asTool()` and call it from a `run` step. Workflows are durable — snapshot to any `CacheDriver` from `@warlock.js/cache` — observable, cancellable, resumable.
 
-This page is the mental model. For the API surface see [Run workflow](../digging-deeper/run-workflow).
+This page is the mental model. For the API surface see [Run workflow](/v/latest/ai/orchestration/run-workflow/).
 
 ## When to reach for a workflow
 
@@ -18,7 +18,7 @@ This page is the mental model. For the API surface see [Run workflow](../digging
 - **Branch on intermediate results** — `nextStep` reads completed step outputs.
 - **Run children in parallel** when they're independent.
 
-Reach for a supervisor when the *shape* changes per call. Reach for an [orchestrator](./orchestrators) when the *session* matters across runs.
+Reach for a supervisor when the *shape* changes per call. Reach for an [orchestrator](/v/latest/ai/architecture-concepts/orchestrators/) when the *session* matters across runs.
 
 ## The step lifecycle
 
@@ -122,7 +122,7 @@ After every step settles, the workflow checkpoints to its `snapshotStore` (a `Sn
 3. If signatures match → rehydrate state, continue from snapshot's `next`.
 4. If signatures differ → throw `WorkflowDriftError` without executing.
 
-Drift is the framework refusing to silently corrupt your data. You then choose: discard the snapshot, force-resume (escape hatch for trivial edits), or migrate manually. See [Persist AI data](../digging-deeper/persist-ai-data).
+Drift is the framework refusing to silently corrupt your data. You then choose: discard the snapshot, force-resume (escape hatch for trivial edits), or migrate manually. See [Persist AI data](/v/latest/ai/reliability/persist-ai-data/).
 
 ## Result envelope
 
@@ -140,15 +140,15 @@ type WorkflowResult<TOutput> = {
 
 ## When a workflow isn't the right shape
 
-- **Unknown shape at author time** — reach for [`ai.planner()`](./planner) (LLM generates the plan over your capabilities), or model it as a supervisor where the router decides.
+- **Unknown shape at author time** — reach for [`ai.planner()`](/v/latest/ai/architecture-concepts/planner/) (LLM generates the plan over your capabilities), or model it as a supervisor where the router decides.
 - **Quality loop until goal met** — use `ai.supervisor()` with `evaluate`.
-- **Multi-turn conversation with persistent session** — [`ai.orchestrator()`](./orchestrators).
+- **Multi-turn conversation with persistent session** — [`ai.orchestrator()`](/v/latest/ai/architecture-concepts/orchestrators/).
 - **Iterate a runtime list of items** — wrap a workflow with `ai.batch()` utility.
 
 ## Related
 
-- [Run workflow](../digging-deeper/run-workflow) — the API surface.
-- [Supervisors](./supervisors) — the next rung up.
-- [Orchestrators](./orchestrators) — stateful sessions across runs.
-- [Planner](./planner) — generate-then-execute over capabilities.
-- [Persist AI data](../digging-deeper/persist-ai-data) — snapshot resume + drift handling.
+- [Run workflow](/v/latest/ai/orchestration/run-workflow/) — the API surface.
+- [Supervisors](/v/latest/ai/architecture-concepts/supervisors/) — the next rung up.
+- [Orchestrators](/v/latest/ai/architecture-concepts/orchestrators/) — stateful sessions across runs.
+- [Planner](/v/latest/ai/architecture-concepts/planner/) — generate-then-execute over capabilities.
+- [Persist AI data](/v/latest/ai/reliability/persist-ai-data/) — snapshot resume + drift handling.

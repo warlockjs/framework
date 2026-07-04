@@ -251,7 +251,7 @@ A planner run bills in a predictable shape: **exactly one plan-generation call, 
 - A leaf **tool** (like `fetch_pricing`) runs deterministic code — zero LLM tokens.
 - An **agent** capability costs whatever its own trips cost (bounded by that agent's `maxTrips`).
 
-Every child's `usage` rolls up into the planner's top-level `result.usage` (and onto each snapshot's `snapshot.usage`), so the rolled-up `usage.total` already includes the planning call plus every dispatched step. Steps that were `skipped` — whether because a prior step failed, the run was cancelled, or they fell past `maxSteps` — contribute a zero `usage` and cost nothing. So the worst-case spend of a run is bounded by the planning call plus `maxSteps` capability dispatches. See [Cost tracking](./cost-tracking) for reading the rolled-up `usage` in detail.
+Every child's `usage` rolls up into the planner's top-level `result.usage` (and onto each snapshot's `snapshot.usage`), so the rolled-up `usage.total` already includes the planning call plus every dispatched step. Steps that were `skipped` — whether because a prior step failed, the run was cancelled, or they fell past `maxSteps` — contribute a zero `usage` and cost nothing. So the worst-case spend of a run is bounded by the planning call plus `maxSteps` capability dispatches. See [Cost tracking](/v/latest/ai/recipes/cost-tracking/) for reading the rolled-up `usage` in detail.
 
 ## Production notes
 
@@ -264,6 +264,6 @@ Every child's `usage` rolls up into the planner's top-level `result.usage` (and 
 
 ## Related
 
-- [Research with sub-agents](./planner-research-with-sub-agents) — a planner that delegates subtasks to isolated, budgeted sub-agents.
-- [Tool-calling agent](./tool-calling-agent) — the agents and tools you register as planner capabilities.
-- [Cost tracking](./cost-tracking) — reading the rolled-up `usage` a planner returns.
+- [Research with sub-agents](/v/latest/ai/recipes/planner-research-with-sub-agents/) — a planner that delegates subtasks to isolated, budgeted sub-agents.
+- [Tool-calling agent](/v/latest/ai/recipes/tool-calling-agent/) — the agents and tools you register as planner capabilities.
+- [Cost tracking](/v/latest/ai/recipes/cost-tracking/) — reading the rolled-up `usage` a planner returns.

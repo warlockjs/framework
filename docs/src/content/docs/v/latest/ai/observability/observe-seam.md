@@ -2,7 +2,7 @@
 title: "The Observer seam"
 description: The core observability hook — a per-flow observe option, a tiny global Observer registry, and AgentConfig.captureMessages, all decoupled from any observability tool.
 sidebar:
-  order: 0
+  order: 1
   label: "The Observer seam"
 ---
 
@@ -16,7 +16,7 @@ export interface Observer {
 
 `collect` may be sync or async — the flow awaits it. A throw is **isolated** by the flow — it never breaks the run — but it is **not silently swallowed**: the framework surfaces it with a warn-once log per observer, so a broken collector stays visible instead of failing dark. `ExecutionReport` is the shared base report shape every primitive produces — the same `report` you get back on `result.report`.
 
-> [`@warlock.js/ai-panoptic`](./ai-panoptic) is the batteries-included `Observer`: register it once and every observed flow's report tree is projected into traces and fanned out to OTEL, Langfuse, the console, a file, or a queryable store. This page is the **core seam** panoptic plugs into; you only need it directly when wiring a custom collector.
+> [`@warlock.js/ai-panoptic`](/v/latest/ai/observability/ai-panoptic/) is the batteries-included `Observer`: register it once and every observed flow's report tree is projected into traces and fanned out to OTEL, Langfuse, the console, a file, or a queryable store. This page is the **core seam** panoptic plugs into; you only need it directly when wiring a custom collector.
 
 ## Per-flow `observe` option
 
@@ -115,11 +115,11 @@ registerObserver(jsonlSink);
 await ai.agent({ model, observe: true, captureMessages: true }).execute("Summarize this.");
 ```
 
-For trace projection, span trees, cost rollups, and backend exporters, reach for [`@warlock.js/ai-panoptic`](./ai-panoptic) rather than hand-rolling — it implements `Observer` and registers itself for you.
+For trace projection, span trees, cost rollups, and backend exporters, reach for [`@warlock.js/ai-panoptic`](/v/latest/ai/observability/ai-panoptic/) rather than hand-rolling — it implements `Observer` and registers itself for you.
 
 ## Related
 
-- [@warlock.js/ai-panoptic](./ai-panoptic) — the batteries-included `Observer` that turns these reports into traces and exports.
-- [What Panoptic traces](./what-panoptic-traces) — the span model panoptic projects the report tree into.
-- [Querying traces](./querying-traces) — retain and query completed traces in memory.
-- [Run agent](../the-basics/run-agent) — the `report` shape (`trips`, `children`, `status`, `usage`) observers receive.
+- [@warlock.js/ai-panoptic](/v/latest/ai/observability/ai-panoptic/) — the batteries-included `Observer` that turns these reports into traces and exports.
+- [What Panoptic traces](/v/latest/ai/observability/what-panoptic-traces/) — the span model panoptic projects the report tree into.
+- [Querying traces](/v/latest/ai/observability/querying-traces/) — retain and query completed traces in memory.
+- [Run agent](/v/latest/ai/agents/run-agent/) — the `report` shape (`trips`, `children`, `status`, `usage`) observers receive.

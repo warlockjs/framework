@@ -102,7 +102,7 @@ At construction the orchestrator computes a structural **signature** from its de
 await supportBot.execute(message, { sessionId, history, force: true });
 ```
 
-`force: true` bypasses the check for edits you know are safe. This mirrors the supervisor / workflow drift model — see [Run orchestrator](../digging-deeper/run-orchestrator) for the recovery paths.
+`force: true` bypasses the check for edits you know are safe. This mirrors the supervisor / workflow drift model — see [Run orchestrator](/v/latest/ai/orchestration/run-orchestrator/) for the recovery paths.
 
 ## History compaction
 
@@ -181,7 +181,7 @@ const concierge = ai.agent({ model, tools: [supportTool] });
 
 ## Memory
 
-An orchestrator can recall and accumulate **memory** across turns — see [Memory](./memory). Wire a `memory` store and the orchestrator recalls relevant memories before routing (injecting them into `ctx.context[injectKey]`) and remembers the settled turn outcome afterward:
+An orchestrator can recall and accumulate **memory** across turns — see [Memory](/v/latest/ai/architecture-concepts/memory/). Wire a `memory` store and the orchestrator recalls relevant memories before routing (injecting them into `ctx.context[injectKey]`) and remembers the settled turn outcome afterward:
 
 ```ts
 ai.orchestrator({
@@ -197,7 +197,7 @@ Omit `memory` and behavior is unchanged — orchestrators without memory work ex
 
 ## Related
 
-- [Run orchestrator](../digging-deeper/run-orchestrator) — the full config surface, resume, drift recovery, production boot-drain.
-- [Supervisors](./supervisors) — the engine the orchestrator delegates to.
-- [Memory](./memory) — working + semantic recall across turns.
-- [Persist AI data](../digging-deeper/persist-ai-data) — checkpoint vs snapshot stores.
+- [Run orchestrator](/v/latest/ai/orchestration/run-orchestrator/) — the full config surface, resume, drift recovery, production boot-drain.
+- [Supervisors](/v/latest/ai/architecture-concepts/supervisors/) — the engine the orchestrator delegates to.
+- [Memory](/v/latest/ai/architecture-concepts/memory/) — working + semantic recall across turns.
+- [Persist AI data](/v/latest/ai/reliability/persist-ai-data/) — checkpoint vs snapshot stores.

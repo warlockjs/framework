@@ -9,7 +9,7 @@ The pillar this page answers: **how do you keep a long-running conversation corr
 
 `ai.orchestrator()` is a session-state manager wrapped around a supervisor. Each `execute()` call is ONE turn against a named `sessionId`; the session's accumulated `state`, drift `signature`, and compaction progress live in a `CheckpointStore` between calls, so your process stays stateless. That design only pays off if you respect its contract: one session per conversation, turns that don't race each other, history you bound and compact, a store chosen for where you're running, a startup loop that drains interrupted turns, and config changes you treat as migrations. This page is the opinionated version of each of those, grounded in the real `ai.orchestrator` surface.
 
-Everything below assumes the shape from the [run-orchestrator skill](../recipes/orchestrator-stateful-support-bot): `intents` keyed by name, `route` XOR `router` for dispatch, `execute(input, { sessionId, history })` per turn, and `result.report.status === "awaiting-input"` meaning the session continues.
+Everything below assumes the shape from the [run-orchestrator skill](/v/latest/ai/recipes/orchestrator-stateful-support-bot/): `intents` keyed by name, `route` XOR `router` for dispatch, `execute(input, { sessionId, history })` per turn, and `result.report.status === "awaiting-input"` meaning the session continues.
 
 ## One `sessionId` per conversation — and pass it every call
 
@@ -207,7 +207,7 @@ const supportBot = ai.orchestrator({ name, intents, route, checkpointStore: ai.c
 const supportBot = ai.orchestrator({ name, intents, route, iterate: true /* no snapshotStore */ });
 ```
 
-> The stores never own the connection. You build the `pg.Pool` / redis client, you keep it, you close it on shutdown (`pool.end()` / `redisClient.quit()`). The framework never auto-migrates either — run `checkpointStore.schema()` through your own migration tool before the store sees traffic. See the [production-stores recipe](../recipes/orchestrator-production-stores) for the full wiring.
+> The stores never own the connection. You build the `pg.Pool` / redis client, you keep it, you close it on shutdown (`pool.end()` / `redisClient.quit()`). The framework never auto-migrates either — run `checkpointStore.schema()` through your own migration tool before the store sees traffic. See the [production-stores recipe](/v/latest/ai/recipes/orchestrator-production-stores/) for the full wiring.
 
 ## Run the boot-drain loop on startup
 
@@ -311,8 +311,8 @@ type SupportState = {
 
 ## See also
 
-- [run-orchestrator skill](../recipes/orchestrator-stateful-support-bot) — the full `ai.orchestrator()` surface and turn lifecycle.
-- [Recipe — Stateful refund support bot](../recipes/orchestrator-stateful-support-bot) — session state, history, compaction, and resume end to end.
-- [Recipe — Wiring orchestrator stores in production](../recipes/orchestrator-production-stores) — pg/redis stores, the schema migration, and the boot-drain loop.
-- [Recipe — Orchestrator as a tool](../recipes/orchestrator-as-tool) — nesting a stored orchestrator inside an agent.
-- [Architecture — Orchestrators](../architecture-concepts/orchestrators) — the checkpoint model, the drift signature, and the per-turn lifecycle.
+- [run-orchestrator skill](/v/latest/ai/recipes/orchestrator-stateful-support-bot/) — the full `ai.orchestrator()` surface and turn lifecycle.
+- [Recipe — Stateful refund support bot](/v/latest/ai/recipes/orchestrator-stateful-support-bot/) — session state, history, compaction, and resume end to end.
+- [Recipe — Wiring orchestrator stores in production](/v/latest/ai/recipes/orchestrator-production-stores/) — pg/redis stores, the schema migration, and the boot-drain loop.
+- [Recipe — Orchestrator as a tool](/v/latest/ai/recipes/orchestrator-as-tool/) — nesting a stored orchestrator inside an agent.
+- [Architecture — Orchestrators](/v/latest/ai/architecture-concepts/orchestrators/) — the checkpoint model, the drift signature, and the per-turn lifecycle.

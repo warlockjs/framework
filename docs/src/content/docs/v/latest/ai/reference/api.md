@@ -18,52 +18,52 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 
 | Export | Shape | See |
 | --- | --- | --- |
-| `ai.agent(config)` | `(config: AgentConfig) => AgentContract<T>` | [Run agent](../the-basics/run-agent) |
-| `ai.tool(config)` | `(config: ToolConfig) => ToolContract<TIn, TOut>` | [Define tools](../the-basics/define-tools) |
-| `ai.systemPrompt(input?)` | `() / (string) / (block[]) => SystemPrompt` | [Write system prompts](../the-basics/write-system-prompts) |
-| `ai.persona(text)` | `(text: string) => PersonaContract` | [Write system prompts](../the-basics/write-system-prompts) |
-| `ai.instruction(text)` | `(text: string) => InstructionContract` | [Write system prompts](../the-basics/write-system-prompts) |
-| `ai.workflow(config)` | `<TIn, TOut, TState>(config) => WorkflowInstance` | [Run workflow](../digging-deeper/run-workflow) |
-| `ai.step(config)` | `<TIn, TState>(config) => StepDefinition` | [Run workflow](../digging-deeper/run-workflow) |
-| `ai.supervisor(config)` | `<TOutput>(config) => SupervisorContract` | [Run supervisor](../digging-deeper/run-supervisor) |
-| `ai.team(config)` | `<TOutput, TState, TMembers>(config) => SupervisorContract` (manager + members + gate sugar) | [Run supervisor](../digging-deeper/run-supervisor) |
-| `ai.orchestrator(config)` | `<TOutput, TState>(config) => OrchestratorContract` | [Run orchestrator](../digging-deeper/run-orchestrator) |
-| `ai.planner(config)` | `<TOutput>(config) => PlannerContract` | [Planner](../architecture-concepts/planner) |
-| `ai.spawnSubAgent(spec)` | `<TOutput>(spec) => Promise<AgentResult<T>>` | [Spawn sub-agent](../the-basics/spawn-sub-agent) |
-| `ai.image(params)` | `(params: ImageParams) => Promise<ImageResult>` — text-to-image output verb (`GeneratedImage[]`) | [OpenAI](../providers/openai) / [Google](../providers/google) |
-| `ai.speech(params)` | `(params: SpeechParams) => Promise<SpeechResult>` — text-to-speech output verb (`GeneratedAudio`) | [OpenAI](../providers/openai) |
-| `ai.transcribe(params)` | `(params: TranscribeParams) => Promise<TranscriptionResult>` — speech-to-text input verb | [OpenAI](../providers/openai) |
-| `ai.audioFromFile(path, opts?)` | `(path, { mediaType? }) => Promise<AudioInput>` — read + package an audio file (non-AI plumbing for `ai.transcribe`) | [OpenAI](../providers/openai) |
-| `ai.audioFromBuffer(bytes, mediaType, filename?)` | `(...) => AudioInput` — package raw audio bytes (no I/O, no AI) | [OpenAI](../providers/openai) |
-| `ai.memory(config)` | `(config) => MemoryContract` | [Memory](../architecture-concepts/memory) |
-| `ai.skills(config)` | `(config: SkillsConfig) => SkillsContract` (progressive-disclosure skills library) | [Memory](../architecture-concepts/memory) |
-| `ai.rag(config)` | `(config: RagConfig) => Rag` (chunk → embed → retrieve → cite) | [Memory](../architecture-concepts/memory) |
-| `ai.rag.keywordReranker(opts?)` / `ai.rag.llmReranker(opts)` | built-in rerankers for the `reranker` slot | [Memory](../architecture-concepts/memory) |
-| `ai.router(config)` | `(config) => AgentContract` (generated routing agent) | [Run supervisor](../digging-deeper/run-supervisor) |
-| `ai.fanOut(unit, n, opts?)` | spread one unit into N keyed intents | [Run supervisor](../digging-deeper/run-supervisor) |
-| `ai.batch(exec, items, opts?)` | run an executable over a dataset, bounded concurrency | [Run agent](../the-basics/run-agent) |
-| `ai.fallbackModel(models, opts?)` | ordered model list with failover | [Run agent](../the-basics/run-agent) |
-| `ai.prompts` | `PromptsManagerContract` — the process-wide `name@version` prompt registry (resolve / merge / validate / diff / export by name) | [Prompt registry](../the-basics/prompt-registry) |
-| `ai.prompt(options?)` | thin facade over `ai.prompts`; the options form returns an isolated legacy `PromptRegistryContract` | [Prompt registry](../the-basics/prompt-registry) |
-| `ai.dataset(options)` | `<TOutput>(options: DatasetOptions) => DatasetContract` (filterable / shardable eval cases) | [Run agent](../the-basics/run-agent) |
-| `ai.vcr(model, options)` | `(model: ModelContract, options: VcrOptions) => VcrModel` (record / replay decorator) | [Run agent](../the-basics/run-agent) |
-| `ai.eval.{exact,contains,predicate,judge}` | built-in `agent.eval()` scorers | [Run agent](../the-basics/run-agent) |
-| `ai.eval.{toJUnit,toJSON,fromJSON}` | CI reporters / round-trip serialization over a finished `EvalReport` | [Run agent](../the-basics/run-agent) |
-| `ai.mockRouter(decisions, opts?)` | canned routing decisions for tests | [Run supervisor](../digging-deeper/run-supervisor) |
-| `ai.config(partial)` | `(partial: Partial<AIConfig>) => AIConfig` | [Persist AI data](../digging-deeper/persist-ai-data) |
-| `ai.checkpoint.{memory,pg,redis}()` | orchestrator session checkpoint stores | [Run orchestrator](../digging-deeper/run-orchestrator) |
-| `ai.snapshot.{memory,pg,redis}()` | workflow / supervisor / orchestrator snapshot stores | [Persist AI data](../digging-deeper/persist-ai-data) |
-| `ai.systemPrompt.fromFile(path)` | seed a system prompt from a file | [Run agent](../the-basics/run-agent) |
-| `ai.human.approval(opts)` | `(opts: HumanApprovalOptions) => AgentMiddleware` — the `tool.before` approval gate | [Attach middleware](../digging-deeper/attach-middleware) |
-| `ai.human.resume(id, decision, opts)` | `<TOutput>(...) => Promise<ResumeResult>` — out-of-process durable resume | [Attach middleware](../digging-deeper/attach-middleware) |
-| `ai.human.interrupt.{memory,pg,redis}()` | durable `InterruptStore` factories | [Attach middleware](../digging-deeper/attach-middleware) |
-| `ai.guardrail(opts)` | `(opts: GuardOptions) => AgentMiddleware` — content-intelligence guardrail suite | [Attach middleware](../digging-deeper/attach-middleware) |
-| `ai.guardrail.{pii,topic,injection,moderation}(opts?)` | built-in detector factories for the `input` / `output` / `tool` arrays | [Attach middleware](../digging-deeper/attach-middleware) |
-| `ai.middleware.budget(opts)` | budget cap middleware | [Attach middleware](../digging-deeper/attach-middleware) |
-| `ai.middleware.guardrail(opts)` | pre/post check middleware (the legacy guardrail seed) | [Attach middleware](../digging-deeper/attach-middleware) |
-| `ai.middleware.semanticCache(opts)` | two-tier cache middleware | [Attach middleware](../digging-deeper/attach-middleware) |
-| `ai.middleware.compose(...sources)` | flatten middleware sources | [Attach middleware](../digging-deeper/attach-middleware) |
-| `ai.middleware.forTool(name, mw)` | scope tool hooks to a tool name | [Attach middleware](../digging-deeper/attach-middleware) |
+| `ai.agent(config)` | `(config: AgentConfig) => AgentContract<T>` | [Run agent](/v/latest/ai/agents/run-agent/) |
+| `ai.tool(config)` | `(config: ToolConfig) => ToolContract<TIn, TOut>` | [Define tools](/v/latest/ai/tools/define-tools/) |
+| `ai.systemPrompt(input?)` | `() / (string) / (block[]) => SystemPrompt` | [Write system prompts](/v/latest/ai/prompts/write-system-prompts/) |
+| `ai.persona(text)` | `(text: string) => PersonaContract` | [Write system prompts](/v/latest/ai/prompts/write-system-prompts/) |
+| `ai.instruction(text)` | `(text: string) => InstructionContract` | [Write system prompts](/v/latest/ai/prompts/write-system-prompts/) |
+| `ai.workflow(config)` | `<TIn, TOut, TState>(config) => WorkflowInstance` | [Run workflow](/v/latest/ai/orchestration/run-workflow/) |
+| `ai.step(config)` | `<TIn, TState>(config) => StepDefinition` | [Run workflow](/v/latest/ai/orchestration/run-workflow/) |
+| `ai.supervisor(config)` | `<TOutput>(config) => SupervisorContract` | [Run supervisor](/v/latest/ai/orchestration/run-supervisor/) |
+| `ai.team(config)` | `<TOutput, TState, TMembers>(config) => SupervisorContract` (manager + members + gate sugar) | [Run supervisor](/v/latest/ai/orchestration/run-supervisor/) |
+| `ai.orchestrator(config)` | `<TOutput, TState>(config) => OrchestratorContract` | [Run orchestrator](/v/latest/ai/orchestration/run-orchestrator/) |
+| `ai.planner(config)` | `<TOutput>(config) => PlannerContract` | [Planner](/v/latest/ai/architecture-concepts/planner/) |
+| `ai.spawnSubAgent(spec)` | `<TOutput>(spec) => Promise<AgentResult<T>>` | [Spawn sub-agent](/v/latest/ai/agents/spawn-sub-agent/) |
+| `ai.image(params)` | `(params: ImageParams) => Promise<ImageResult>` — text-to-image output verb (`GeneratedImage[]`) | [OpenAI](/v/latest/ai/providers/openai/) / [Google](/v/latest/ai/providers/google/) |
+| `ai.speech(params)` | `(params: SpeechParams) => Promise<SpeechResult>` — text-to-speech output verb (`GeneratedAudio`) | [OpenAI](/v/latest/ai/providers/openai/) |
+| `ai.transcribe(params)` | `(params: TranscribeParams) => Promise<TranscriptionResult>` — speech-to-text input verb | [OpenAI](/v/latest/ai/providers/openai/) |
+| `ai.audioFromFile(path, opts?)` | `(path, { mediaType? }) => Promise<AudioInput>` — read + package an audio file (non-AI plumbing for `ai.transcribe`) | [OpenAI](/v/latest/ai/providers/openai/) |
+| `ai.audioFromBuffer(bytes, mediaType, filename?)` | `(...) => AudioInput` — package raw audio bytes (no I/O, no AI) | [OpenAI](/v/latest/ai/providers/openai/) |
+| `ai.memory(config)` | `(config) => MemoryContract` | [Memory](/v/latest/ai/architecture-concepts/memory/) |
+| `ai.skills(config)` | `(config: SkillsConfig) => SkillsContract` (progressive-disclosure skills library) | [Memory](/v/latest/ai/architecture-concepts/memory/) |
+| `ai.rag(config)` | `(config: RagConfig) => Rag` (chunk → embed → retrieve → cite) | [Memory](/v/latest/ai/architecture-concepts/memory/) |
+| `ai.rag.keywordReranker(opts?)` / `ai.rag.llmReranker(opts)` | built-in rerankers for the `reranker` slot | [Memory](/v/latest/ai/architecture-concepts/memory/) |
+| `ai.router(config)` | `(config) => AgentContract` (generated routing agent) | [Run supervisor](/v/latest/ai/orchestration/run-supervisor/) |
+| `ai.fanOut(unit, n, opts?)` | spread one unit into N keyed intents | [Run supervisor](/v/latest/ai/orchestration/run-supervisor/) |
+| `ai.batch(exec, items, opts?)` | run an executable over a dataset, bounded concurrency | [Run agent](/v/latest/ai/agents/run-agent/) |
+| `ai.fallbackModel(models, opts?)` | ordered model list with failover | [Run agent](/v/latest/ai/agents/run-agent/) |
+| `ai.prompts` | `PromptsManagerContract` — the process-wide `name@version` prompt registry (resolve / merge / validate / diff / export by name) | [Prompt registry](/v/latest/ai/prompts/prompt-registry/) |
+| `ai.prompt(options?)` | thin facade over `ai.prompts`; the options form returns an isolated legacy `PromptRegistryContract` | [Prompt registry](/v/latest/ai/prompts/prompt-registry/) |
+| `ai.dataset(options)` | `<TOutput>(options: DatasetOptions) => DatasetContract` (filterable / shardable eval cases) | [Run agent](/v/latest/ai/agents/run-agent/) |
+| `ai.vcr(model, options)` | `(model: ModelContract, options: VcrOptions) => VcrModel` (record / replay decorator) | [Run agent](/v/latest/ai/agents/run-agent/) |
+| `ai.eval.{exact,contains,predicate,judge}` | built-in `agent.eval()` scorers | [Run agent](/v/latest/ai/agents/run-agent/) |
+| `ai.eval.{toJUnit,toJSON,fromJSON}` | CI reporters / round-trip serialization over a finished `EvalReport` | [Run agent](/v/latest/ai/agents/run-agent/) |
+| `ai.mockRouter(decisions, opts?)` | canned routing decisions for tests | [Run supervisor](/v/latest/ai/orchestration/run-supervisor/) |
+| `ai.config(partial)` | `(partial: Partial<AIConfig>) => AIConfig` | [Persist AI data](/v/latest/ai/reliability/persist-ai-data/) |
+| `ai.checkpoint.{memory,pg,redis}()` | orchestrator session checkpoint stores | [Run orchestrator](/v/latest/ai/orchestration/run-orchestrator/) |
+| `ai.snapshot.{memory,pg,redis}()` | workflow / supervisor / orchestrator snapshot stores | [Persist AI data](/v/latest/ai/reliability/persist-ai-data/) |
+| `ai.systemPrompt.fromFile(path)` | seed a system prompt from a file | [Run agent](/v/latest/ai/agents/run-agent/) |
+| `ai.human.approval(opts)` | `(opts: HumanApprovalOptions) => AgentMiddleware` — the `tool.before` approval gate | [Attach middleware](/v/latest/ai/reliability/attach-middleware/) |
+| `ai.human.resume(id, decision, opts)` | `<TOutput>(...) => Promise<ResumeResult>` — out-of-process durable resume | [Attach middleware](/v/latest/ai/reliability/attach-middleware/) |
+| `ai.human.interrupt.{memory,pg,redis}()` | durable `InterruptStore` factories | [Attach middleware](/v/latest/ai/reliability/attach-middleware/) |
+| `ai.guardrail(opts)` | `(opts: GuardOptions) => AgentMiddleware` — content-intelligence guardrail suite | [Attach middleware](/v/latest/ai/reliability/attach-middleware/) |
+| `ai.guardrail.{pii,topic,injection,moderation}(opts?)` | built-in detector factories for the `input` / `output` / `tool` arrays | [Attach middleware](/v/latest/ai/reliability/attach-middleware/) |
+| `ai.middleware.budget(opts)` | budget cap middleware | [Attach middleware](/v/latest/ai/reliability/attach-middleware/) |
+| `ai.middleware.guardrail(opts)` | pre/post check middleware (the legacy guardrail seed) | [Attach middleware](/v/latest/ai/reliability/attach-middleware/) |
+| `ai.middleware.semanticCache(opts)` | two-tier cache middleware | [Attach middleware](/v/latest/ai/reliability/attach-middleware/) |
+| `ai.middleware.compose(...sources)` | flatten middleware sources | [Attach middleware](/v/latest/ai/reliability/attach-middleware/) |
+| `ai.middleware.forTool(name, mw)` | scope tool hooks to a tool name | [Attach middleware](/v/latest/ai/reliability/attach-middleware/) |
 
 ## Agents
 
@@ -96,7 +96,7 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | `WorkflowReport` | Trace tree — `{ runId, signature, status, timings, steps }`. |
 | `StepSnapshot` | One step's recorded outcome — `{ output, status, attempts, attemptHistory, timings, steps? }`. |
 | `WorkflowRunOptions` | Per-call options for `execute` / `resume`. |
-| `WorkflowSnapshot` | Persisted shape — see [Persist AI data](../digging-deeper/persist-ai-data). |
+| `WorkflowSnapshot` | Persisted shape — see [Persist AI data](/v/latest/ai/reliability/persist-ai-data/). |
 
 ## Supervisors
 
@@ -213,7 +213,7 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | `RagLoaderResult` / `RagLoaderMetadata` / `RagLoaderType` / `RagLoaderOptions` | Shared loader output, derived metadata (`source`, `loader`, `title`), type tag, and base options. |
 | `LoadTextOptions` / `LoadHtmlOptions` / `LoadWebOptions` / `LoadPdfOptions` / `TextInput` | Per-loader option shapes + the `loadText` input type. |
 | `PDF_PARSE_INSTALL_INSTRUCTIONS` | The curated install string `loadPdf` throws when the `pdf-parse` peer is missing (exported for tests / callers that match it). |
-| `bm25Rank(query, docs)` | BM25 lexical ranking over a candidate set (`k1 = 1.5`, `b = 0.75`; zero-score docs dropped). Pure; no global index. See [Hybrid retrieval](../the-basics/hybrid-retrieval). |
+| `bm25Rank(query, docs)` | BM25 lexical ranking over a candidate set (`k1 = 1.5`, `b = 0.75`; zero-score docs dropped). Pure; no global index. See [Hybrid retrieval](/v/latest/ai/rag/hybrid-retrieval/). |
 | `reciprocalRankFusion(rankedLists, k?)` | Fuse several ranked id lists into one consensus ranking via RRF (`k` default `60`) — no score calibration needed. |
 | `hybridRank(params)` | Convenience wrapper — runs `bm25Rank` over `candidates` and fuses it with your `dense` ranking via RRF. |
 | `multiQuery(model, query, opts?)` | Ask a model for `opts.n` (default 3) alternative phrasings of a query; de-duped, original prepended (unless `includeOriginal: false`). Widens retrieval over vocabulary the original missed. |
@@ -263,7 +263,7 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 
 ## Streaming structured output
 
-`ai.streamObject` streams token deltas, progressively-parsed partial snapshots, and a final strictly-validated object. See [Stream structured output](../the-basics/stream-structured-output).
+`ai.streamObject` streams token deltas, progressively-parsed partial snapshots, and a final strictly-validated object. See [Stream structured output](/v/latest/ai/agents/stream-structured-output/).
 
 | Export | What it is |
 | --- | --- |
@@ -275,7 +275,7 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 
 ## Media modality verbs
 
-The output/input-modality track — image, speech, and transcription verbs that share the uniform never-throws `{ data, error, usage, report }` envelope with cost-truth and `observe` routing. Models come from an adapter's `image()` / `speech()` / `transcribe()` factory. See [OpenAI](../providers/openai) and [Google](../providers/google).
+The output/input-modality track — image, speech, and transcription verbs that share the uniform never-throws `{ data, error, usage, report }` envelope with cost-truth and `observe` routing. Models come from an adapter's `image()` / `speech()` / `transcribe()` factory. See [OpenAI](/v/latest/ai/providers/openai/) and [Google](/v/latest/ai/providers/google/).
 
 | Export | What it is |
 | --- | --- |
@@ -318,7 +318,7 @@ The output/input-modality track — image, speech, and transcription verbs that 
 
 ### Prompt registry — `ai.prompts`
 
-`ai.prompts` is the process-wide registry of named, versioned `systemPrompt(...)` builders keyed by `name@version`. A named prompt auto-registers; resolve / merge / validate / diff by name. `prompts(options?)` builds an isolated registry. See [Prompt registry](../the-basics/prompt-registry).
+`ai.prompts` is the process-wide registry of named, versioned `systemPrompt(...)` builders keyed by `name@version`. A named prompt auto-registers; resolve / merge / validate / diff by name. `prompts(options?)` builds an isolated registry. See [Prompt registry](/v/latest/ai/prompts/prompt-registry/).
 
 | Export | What it is |
 | --- | --- |
@@ -432,7 +432,7 @@ A generic, panoptic-agnostic observability seam. Observability tools (panoptic, 
 
 ## Serve over SSE
 
-Turn any streaming primitive (agent / supervisor / orchestrator) into a `node:http` handler that streams its run to the client as Server-Sent Events. See [Serve over SSE](../digging-deeper/serve-over-sse).
+Turn any streaming primitive (agent / supervisor / orchestrator) into a `node:http` handler that streams its run to the client as Server-Sent Events. See [Serve over SSE](/v/latest/ai/agents/serve-over-sse/).
 
 | Export | What it is |
 | --- | --- |
@@ -446,7 +446,7 @@ Turn any streaming primitive (agent / supervisor / orchestrator) into a `node:ht
 
 ## Errors
 
-All extend `AIError`. Stable `code` strings listed in [Handle errors](../digging-deeper/handle-errors).
+All extend `AIError`. Stable `code` strings listed in [Handle errors](/v/latest/ai/reliability/handle-errors/).
 
 | Class | Code | Category |
 | --- | --- | --- |
@@ -497,7 +497,7 @@ All extend `AIError`. Stable `code` strings listed in [Handle errors](../digging
 
 ## Security
 
-A shared trust-boundary foundation used by every server-side outbound request (attachment fetches, URL skill sources, RAG loaders) plus secret-scrubbing for logs / errors. See [Outbound policy](../digging-deeper/outbound-policy) and [Redact secrets](../digging-deeper/redact-secrets).
+A shared trust-boundary foundation used by every server-side outbound request (attachment fetches, URL skill sources, RAG loaders) plus secret-scrubbing for logs / errors. See [Outbound policy](/v/latest/ai/reliability/outbound-policy/) and [Redact secrets](/v/latest/ai/reliability/redact-secrets/).
 
 | Export | What it is |
 | --- | --- |
@@ -533,6 +533,6 @@ A shared trust-boundary foundation used by every server-side outbound request (a
 
 ## Related
 
-- [Pick a provider](../getting-started/03-pick-a-provider) — adapter contract.
-- [The basics](../the-basics/run-agent) — must-know surface in narrative form.
-- [Handle errors](../digging-deeper/handle-errors) — full error semantics.
+- [Pick a provider](/v/latest/ai/getting-started/03-pick-a-provider/) — adapter contract.
+- [The basics](/v/latest/ai/agents/run-agent/) — must-know surface in narrative form.
+- [Handle errors](/v/latest/ai/reliability/handle-errors/) — full error semantics.

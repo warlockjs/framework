@@ -174,7 +174,7 @@ The fallback signal is recorded in the budget's per-run state bag under its `<na
 :::
 
 :::note[Budget is per-execution, not per-session]
-A fresh counter is created at `execute.before` and dies when the run ends. Two concurrent `execute()` calls on the same agent enforce the cap independently — the middleware holds no cross-run state. For a session-wide or daily cap, read the running spend from your ledger (see [Cost per tenant](./cost-aggregate-per-tenant)) before kicking off the next call and short-circuit at the application layer.
+A fresh counter is created at `execute.before` and dies when the run ends. Two concurrent `execute()` calls on the same agent enforce the cap independently — the middleware holds no cross-run state. For a session-wide or daily cap, read the running spend from your ledger (see [Cost per tenant](/v/latest/ai/recipes/cost-aggregate-per-tenant/)) before kicking off the next call and short-circuit at the application layer.
 :::
 
 :::note[Cache hits should report zero usage]
@@ -183,6 +183,6 @@ The budget accumulates `response.usage.total` after each trip. A semantic-cache 
 
 ## Related
 
-- [Attach middleware](../digging-deeper/attach-middleware) — the budget built-in, install order, and the onion model.
-- [Handle errors](../digging-deeper/handle-errors) — `BudgetExceededError`, `error.code`, and `error.category`.
-- [Cost per tenant](./cost-aggregate-per-tenant) — record what was actually spent alongside the cap.
+- [Attach middleware](/v/latest/ai/reliability/attach-middleware/) — the budget built-in, install order, and the onion model.
+- [Handle errors](/v/latest/ai/reliability/handle-errors/) — `BudgetExceededError`, `error.code`, and `error.category`.
+- [Cost per tenant](/v/latest/ai/recipes/cost-aggregate-per-tenant/) — record what was actually spent alongside the cap.

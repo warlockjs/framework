@@ -146,6 +146,6 @@ Each successful call's usage is aggregated across every model attempted, and cos
 
 ## Related
 
-- [Pick a provider](../getting-started/03-pick-a-provider) — one SDK per provider, capabilities, and `ModelPricing`.
-- [Handle errors](../digging-deeper/handle-errors) — the `AIErrorCode` union and which codes are transient.
-- [Cost per tenant](./cost-aggregate-per-tenant) — aggregating the usage a failed-over run still reports.
+- [Pick a provider](/v/latest/ai/getting-started/03-pick-a-provider/) — one SDK per provider, capabilities, and `ModelPricing`.
+- [Handle errors](/v/latest/ai/reliability/handle-errors/) — the `AIErrorCode` union and which codes are transient.
+- [Cost per tenant](/v/latest/ai/recipes/cost-aggregate-per-tenant/) — aggregating the usage a failed-over run still reports.

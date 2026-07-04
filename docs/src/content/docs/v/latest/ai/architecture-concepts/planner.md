@@ -186,11 +186,11 @@ Set `output` and the planner validates the **last completed step's** output agai
 
 ## Delegating a step with `ai.spawnSubAgent()`
 
-When a plan step wants to hand a bounded subtask to a fresh, single-use agent with a hard spend cap, reach for [`ai.spawnSubAgent()`](../the-basics/spawn-sub-agent). It is **not** a planner feature — it's a general one-shot-agent helper (a fresh `ai.agent()` + an optional per-task `budget`, run once) that works just as well inside a tool, a workflow step, or hand-rolled orchestration. The planner engine itself does not call it; it's simply a handy primitive a capability *you* write can use. See [Spawn sub-agent](../the-basics/spawn-sub-agent) for the full surface.
+When a plan step wants to hand a bounded subtask to a fresh, single-use agent with a hard spend cap, reach for [`ai.spawnSubAgent()`](/v/latest/ai/agents/spawn-sub-agent/). It is **not** a planner feature — it's a general one-shot-agent helper (a fresh `ai.agent()` + an optional per-task `budget`, run once) that works just as well inside a tool, a workflow step, or hand-rolled orchestration. The planner engine itself does not call it; it's simply a handy primitive a capability *you* write can use. See [Spawn sub-agent](/v/latest/ai/agents/spawn-sub-agent/) for the full surface.
 
 ## Related
 
-- [Spawn sub-agent](../the-basics/spawn-sub-agent) — the general one-shot delegation helper a plan step can use.
-- [Supervisors](./supervisors) — decide one step at a time; planner generates the whole plan.
-- [Orchestrators](./orchestrators) — a planner composes as an orchestrator capability.
-- [Run agent](../the-basics/run-agent) — the full agent surface a planner step's executable is built on.
+- [Spawn sub-agent](/v/latest/ai/agents/spawn-sub-agent/) — the general one-shot delegation helper a plan step can use.
+- [Supervisors](/v/latest/ai/architecture-concepts/supervisors/) — decide one step at a time; planner generates the whole plan.
+- [Orchestrators](/v/latest/ai/architecture-concepts/orchestrators/) — a planner composes as an orchestrator capability.
+- [Run agent](/v/latest/ai/agents/run-agent/) — the full agent surface a planner step's executable is built on.

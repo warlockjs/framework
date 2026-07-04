@@ -8,7 +8,7 @@ sidebar:
 
 A supervisor takes one input, picks which intent(s) handle it, runs them, optionally evaluates the result, and either terminates or iterates. It's the right tool when the *shape* of the work depends on the input — when an agent has too many tools and a workflow has too many branches.
 
-This page is the mental model. For the API surface see [Run supervisor](../digging-deeper/run-supervisor).
+This page is the mental model. For the API surface see [Run supervisor](/v/latest/ai/orchestration/run-supervisor/).
 
 ## The three primitives compared
 
@@ -158,13 +158,13 @@ Signature drift detection throws `SupervisorDriftError` on shape mismatch. `forc
 
 - **Fixed pipeline** — `ai.workflow()`. Faster, cheaper, more deterministic.
 - **One specialist** — `ai.agent()` with tools. A supervisor with one intent is wasted complexity.
-- **Long-running conversation** — [`ai.orchestrator()`](./orchestrators) wraps a supervisor with durable session state across runs.
-- **Plan generated up front** — [`ai.planner()`](./planner) asks an LLM to plan over your capabilities, then runs the plan.
+- **Long-running conversation** — [`ai.orchestrator()`](/v/latest/ai/architecture-concepts/orchestrators/) wraps a supervisor with durable session state across runs.
+- **Plan generated up front** — [`ai.planner()`](/v/latest/ai/architecture-concepts/planner/) asks an LLM to plan over your capabilities, then runs the plan.
 
 ## Related
 
-- [Run supervisor](../digging-deeper/run-supervisor) — the API surface.
-- [Orchestrators](./orchestrators) — the stateful primitive a supervisor delegates into.
-- [Planner](./planner) — generate-then-execute over capabilities.
-- [Define tools](../the-basics/define-tools) — `ctx.artifacts` side-channel.
-- [Persist AI data](../digging-deeper/persist-ai-data) — snapshot resume.
+- [Run supervisor](/v/latest/ai/orchestration/run-supervisor/) — the API surface.
+- [Orchestrators](/v/latest/ai/architecture-concepts/orchestrators/) — the stateful primitive a supervisor delegates into.
+- [Planner](/v/latest/ai/architecture-concepts/planner/) — generate-then-execute over capabilities.
+- [Define tools](/v/latest/ai/tools/define-tools/) — `ctx.artifacts` side-channel.
+- [Persist AI data](/v/latest/ai/reliability/persist-ai-data/) — snapshot resume.

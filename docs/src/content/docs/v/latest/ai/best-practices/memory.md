@@ -181,8 +181,8 @@ await mem.clear("working");
 
 ## See also
 
-- [Use the AI memory skill](/skills) — the `@warlock.js/ai/skills/use-ai-memory` playbook: `ai.memory({...})`, the two tiers, `remember` / `recall` / `clear`, and the loud-at-construction config rules (the docs site projects every package skill under the `/skills` page).
-- [Architecture — Memory](../architecture-concepts/memory) — the two-tier model and where recall is injected.
-- [Recipe — A personal assistant that remembers you](../recipes/memory-assistant-with-memory) — working + semantic wired into an orchestrator end to end.
-- [Recipe — Semantic recall of past answers](../recipes/memory-semantic-recall) — store Q&A pairs and recall the closest by meaning.
-- [Architecture — Orchestrators](../architecture-concepts/orchestrators) — the primary memory consumer and the per-turn recall/remember lifecycle.
+- [Use the AI memory skill](/skills/) — the `@warlock.js/ai/skills/use-ai-memory` playbook: `ai.memory({...})`, the two tiers, `remember` / `recall` / `clear`, and the loud-at-construction config rules (the docs site projects every package skill under the `/skills` page).
+- [Architecture — Memory](/v/latest/ai/architecture-concepts/memory/) — the two-tier model and where recall is injected.
+- [Recipe — A personal assistant that remembers you](/v/latest/ai/recipes/memory-assistant-with-memory/) — working + semantic wired into an orchestrator end to end.
+- [Recipe — Semantic recall of past answers](/v/latest/ai/recipes/memory-semantic-recall/) — store Q&A pairs and recall the closest by meaning.
+- [Architecture — Orchestrators](/v/latest/ai/architecture-concepts/orchestrators/) — the primary memory consumer and the per-turn recall/remember lifecycle.

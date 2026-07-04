@@ -317,5 +317,5 @@ You build the `pg.Pool` / redis client, you keep it, you close it on shutdown. T
 
 ## Related
 
-- [Stateful refund support bot](./orchestrator-stateful-support-bot) — the orchestrator these stores back, end to end.
-- [Orchestrator as a tool](./orchestrator-as-tool) — nesting a stored orchestrator inside an agent.
+- [Stateful refund support bot](/v/latest/ai/recipes/orchestrator-stateful-support-bot/) — the orchestrator these stores back, end to end.
+- [Orchestrator as a tool](/v/latest/ai/recipes/orchestrator-as-tool/) — nesting a stored orchestrator inside an agent.
