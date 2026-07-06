@@ -78,6 +78,10 @@
       "slug": "core"
     },
     {
+      "name": "@warlock.js/fs",
+      "slug": "fs"
+    },
+    {
       "name": "@warlock.js/herald",
       "slug": "herald"
     },
@@ -103,6 +107,176 @@
     }
   ],
   "releases": [
+    {
+      "version": "4.7.0",
+      "id": "v4-7-0",
+      "date": "July 6, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong><code>@warlock.js/ai</code></strong> gains the prompt compiler — <code>systemPrompt().refined({ model, criteria, store })</code> lazily rewrites human-authored prompt text into a model-optimized version, pinned like a lockfile with machine-enforced placeholder parity and an always-safe fallback to the original — plus <code>ai.prompts.validate({ criteria })</code> to grade a prompt against your own rules. <strong><code>@warlock.js/fs</code></strong> gains an ergonomic async <code>fs</code> facade — <code>fs.files.*</code> / <code>fs.dirs.*</code> grouping, lazy <code>File</code> / <code>Directory</code> handles, read-modify-write helpers (<code>edit</code> / <code>editJson</code> / <code>mergeJson</code>), recursive <code>walk</code>, and zero-dependency schema-validated JSON. <strong><code>@warlock.js/cascade</code></strong> lands a driver-correctness pass — a dozen real Postgres/MongoDB driver fixes (multi-row <code>findAndUpdate</code>, <code>where</code>-scoped <code>update</code> / <code>unset</code> / <code>deleteOne</code>, pivot <code>detach</code>, MongoDB <code>with()</code> eager-loading, per-subclass global scopes) plus new <code>lockForUpdate({ skipLocked })</code> row locking (<code>FOR UPDATE SKIP LOCKED</code>).",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>systemPrompt().refined({ model, criteria, store })</code></strong> — the prompt compiler. Humans keep writing human prompt text; the refined wrapper lazily rewrites it into a model-optimized version on first agent use and pins the result like a lockfile (re-compiled only when the source text, refiner model, <code>criteria</code>, or recipe version change — never silently). <code>await refined.refine()</code> returns the compiled template <strong>string</strong> (placeholders intact — routes / previews / warmup / CI; throws <code>PromptRefinementError</code> on failure) and <code>await refined.refinePrompt()</code> returns a composable prompt with <code>meta.refinedFrom</code> / <code>meta.refinerModel</code> provenance (register it to <code>diff</code> original vs refined). Placeholder parity is machine-enforced (one repair re-ask, then rejected); the lazy agent path never throws — it warns once and serves the original."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>ai.prompts.validate({ criteria })</code></strong> — validate a prompt against your <strong>own</strong> rules. Pass <code>criteria</code> (a string or a list of short rules) and, when a <code>judge</code> model is supplied, it replaces the built-in quality rubric so the judge's <code>score</code> / <code>issues</code> reflect your criteria (a failed rule is named in <code>issues</code>). Advisory only — never flips the deterministic <code>ok</code>; folded into the <code>judgeCache</code> key so different rules re-run."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 7
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>fs</code> shorthand facade — an async, ergonomic surface over the primitives: <code>fs.files.*</code> (file ops), <code>fs.dirs.*</code> (directory ops), lazy <code>fs.file(path)</code> / <code>fs.dir(path)</code> handles (<code>File</code> / <code>Directory</code> classes), and <code>fs.exists(path)</code> (type-agnostic). Delegates to the existing <code>*Async</code> primitives; synchronous callers keep using the bare primitives (the <code>bare = sync</code> / <code>*Async = async</code> charter is unchanged)"
+            },
+            {
+              "type": "Added",
+              "html": "New file ops on the facade: <code>append</code> / <code>prepend</code> / <code>appendLine</code> / <code>appendJsonLine</code> (NDJSON), <code>size</code>, <code>isEmpty</code>, <code>ensure</code> (create-if-missing, never truncates), <code>touch</code>, <code>edit</code> (read → transform → write), <code>editJson</code>, <code>mergeJson</code> (shallow, or <code>{ deep: true }</code>), <code>ensureJson</code> (get-or-create), <code>checksumMatches</code>, <code>readLines</code> (streaming async iterator), and an EXDEV-safe <code>move</code> (creates the destination parent, falls back to copy+unlink across devices)"
+            },
+            {
+              "type": "Added",
+              "html": "New directory ops on the facade: <code>empty</code> (emptyDir), <code>size</code> (recursive byte sum), <code>count</code>, <code>isEmpty</code>, <code>walk</code> (constant-memory async iterator of <code>{ path, name, type }</code>), a <code>recursive</code> option on <code>list</code> / <code>listFiles</code> / <code>listDirs</code>, and <code>hash</code> (stable directory fingerprint)"
+            },
+            {
+              "type": "Added",
+              "html": "<code>fs.files.getJson(path, { schema })</code> — validate parsed JSON against any <a href=\"https://standardschema.dev\">Standard Schema</a> validator (seal / zod / valibot) with <strong>zero dependency</strong> (calls the schema's own <code>~standard.validate</code>); throws <code>JsonSchemaValidationError</code> on failure. <code>{ default }</code> returns a fallback when the file is missing"
+            },
+            {
+              "type": "Added",
+              "html": "<code>File</code> / <code>Directory</code> handles are lazy (no IO in the constructor) and immutable (<code>copy</code> / <code>move</code> / <code>rename</code> / <code>copyTo</code> / <code>moveTo</code> return a NEW handle); pure-path helpers <code>name</code> / <code>basename</code> / <code>extension</code> / <code>parent()</code> and child <code>file(...)</code> / <code>dir(...)</code>; <code>Directory.listFiles()</code> / <code>listDirs()</code> return <code>File[]</code> / <code>Directory[]</code>"
+            },
+            {
+              "type": "Added",
+              "html": "<code>fs.hash</code> namespace — <code>fs.hash.string</code> / <code>fs.hash.buffer</code> (sync, pure/in-memory) and <code>fs.hash.file</code> / <code>fs.hash.dir</code> (async, read from disk)"
+            },
+            {
+              "type": "Added",
+              "html": "<code>fs.files.get()</code> is overloaded: a text read returns <code>string</code> (no cast); pass <code>{ encoding: null }</code> for a <code>Buffer</code>"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 13,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 11
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>lockForUpdate({ skipLocked?, noWait? })</code> — row locking on SELECT (<code>FOR UPDATE [SKIP LOCKED | NOWAIT]</code>), the concurrent job-queue claim shape; Postgres-only, the MongoDB driver throws"
+            },
+            {
+              "type": "Added",
+              "html": "<code>DatabaseDriverContract.supportsSqlSerialization</code> — capability flag (default <code>true</code>); <code>false</code> routes the MigrationRunner through direct migration-driver execution"
+            },
+            {
+              "type": "Fixed",
+              "html": "Postgres model-level <code>sum</code>/<code>avg</code>/<code>min</code>/<code>max</code>/<code>distinct</code>/<code>countDistinct</code>/<code>pluck</code>/<code>value</code> no longer return <code>0</code>/<code>undefined</code> — the hydration callback is reset before reading, matching MongoDB"
+            },
+            {
+              "type": "Fixed",
+              "html": "Postgres <code>Model.findAndUpdate</code> / <code>Model.atomic</code> now update every matching row instead of one arbitrary row (a hidden <code>LIMIT 1</code>; MongoDB was already multi-row)"
+            },
+            {
+              "type": "Fixed",
+              "html": "Postgres query-builder <code>update()</code> / <code>unset()</code> now honor the chained <code>where</code> filter — previously they updated the whole table"
+            },
+            {
+              "type": "Fixed",
+              "html": "Postgres query-builder <code>deleteOne()</code> deletes exactly one row — the internal <code>limit(1)</code> was silently ignored, deleting every matching row"
+            },
+            {
+              "type": "Fixed",
+              "html": "Postgres pivot <code>detach(ids)</code> (and <code>sync</code> / <code>toggle</code>) works — the driver translates Mongo-style filter operators (<code>$in</code>, <code>$nin</code>, <code>$eq</code>, <code>$ne</code>, <code>$gt</code>, <code>$gte</code>, <code>$lt</code>, <code>$lte</code>) instead of binding the operator object literally"
+            },
+            {
+              "type": "Fixed",
+              "html": "CHECK constraints are no longer silently dropped on the MigrationRunner SQL path — the Postgres serializer emits <code>ADD CONSTRAINT ... CHECK</code> for <code>this.check(...)</code> and column <code>.check(...)</code>"
+            },
+            {
+              "type": "Fixed",
+              "html": "MongoDB <code>with()</code> eager loading is no longer a silent no-op — <code>get()</code> runs the relation loader, same wiring as Postgres"
+            },
+            {
+              "type": "Fixed",
+              "html": "MongoDB pipelines order <code>$match</code> before <code>$project</code> (SQL semantics), so <code>select()</code> before <code>where()</code> no longer strips the filter column and returns <code>[]</code> — fixes pivot <code>attach</code> de-duplication and <code>sync</code> / <code>toggle</code> deltas"
+            },
+            {
+              "type": "Fixed",
+              "html": "The MigrationRunner works on MongoDB — migrations execute directly through the migration driver; <code>exportSQL</code> stays SQL-only with a clear unsupported error"
+            },
+            {
+              "type": "Fixed",
+              "html": "MongoDB <code>dropIndex(table, name)</code> honors the literal index name — the string form is no longer rewritten to <code>&lt;name&gt;_1</code> (the columns-array form keeps the convention name)"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>addGlobalScope</code> / <code>addLocalScope</code> register per-subclass — a scope added on one model (e.g. a soft-delete <code>notDeleted</code>) no longer leaks onto every other model"
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Non-interactive scaffolding — <code>create-warlock &lt;name&gt; --yes</code> (with <code>--db</code>, <code>--pm</code>, <code>--features</code>, <code>--ai</code>, <code>--git</code>, <code>--jwt</code>) scaffolds the entire app in a single command, no prompts"
+            },
+            {
+              "type": "Added",
+              "html": "<code>--db=none</code> / <code>--no-db</code> and a <strong>None</strong> option in the database prompt — scaffold with no database: the driver, its package, and <code>src/config/database.ts</code> are all skipped"
+            },
+            {
+              "type": "Changed",
+              "html": "Starter models drop the baked-in <code>globalColumnsSchema</code> audit columns (<code>createdBy</code> / <code>updatedBy</code> / <code>deletedBy</code> / <code>isActive</code>) — global columns are left to the developer"
+            }
+          ]
+        }
+      ]
+    },
     {
       "version": "4.6.1",
       "id": "v4-6-1",
