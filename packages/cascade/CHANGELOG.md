@@ -4,6 +4,27 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.7.0
+
+### Added
+
+- `lockForUpdate({ skipLocked?, noWait? })` — row locking on SELECT (`FOR UPDATE [SKIP LOCKED | NOWAIT]`), the concurrent job-queue claim shape; Postgres-only, the MongoDB driver throws
+- `DatabaseDriverContract.supportsSqlSerialization` — capability flag (default `true`); `false` routes the MigrationRunner through direct migration-driver execution
+
+### Fixed
+
+- Postgres model-level `sum`/`avg`/`min`/`max`/`distinct`/`countDistinct`/`pluck`/`value` no longer return `0`/`undefined` — the hydration callback is reset before reading, matching MongoDB
+- Postgres `Model.findAndUpdate` / `Model.atomic` now update every matching row instead of one arbitrary row (a hidden `LIMIT 1`; MongoDB was already multi-row)
+- Postgres query-builder `update()` / `unset()` now honor the chained `where` filter — previously they updated the whole table
+- Postgres query-builder `deleteOne()` deletes exactly one row — the internal `limit(1)` was silently ignored, deleting every matching row
+- Postgres pivot `detach(ids)` (and `sync` / `toggle`) works — the driver translates Mongo-style filter operators (`$in`, `$nin`, `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`) instead of binding the operator object literally
+- CHECK constraints are no longer silently dropped on the MigrationRunner SQL path — the Postgres serializer emits `ADD CONSTRAINT ... CHECK` for `this.check(...)` and column `.check(...)`
+- MongoDB `with()` eager loading is no longer a silent no-op — `get()` runs the relation loader, same wiring as Postgres
+- MongoDB pipelines order `$match` before `$project` (SQL semantics), so `select()` before `where()` no longer strips the filter column and returns `[]` — fixes pivot `attach` de-duplication and `sync` / `toggle` deltas
+- The MigrationRunner works on MongoDB — migrations execute directly through the migration driver; `exportSQL` stays SQL-only with a clear unsupported error
+- MongoDB `dropIndex(table, name)` honors the literal index name — the string form is no longer rewritten to `<name>_1` (the columns-array form keeps the convention name)
+- `addGlobalScope` / `addLocalScope` register per-subclass — a scope added on one model (e.g. a soft-delete `notDeleted`) no longer leaks onto every other model
+
 ## 4.6.1
 
 ### Fixed

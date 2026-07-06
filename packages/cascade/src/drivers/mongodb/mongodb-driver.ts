@@ -966,6 +966,12 @@ export class MongoDbDriver implements DriverContract {
   // ============================================================
 
   /**
+   * MongoDB has no SQL dialect — the MigrationRunner executes migrations
+   * through the migration driver directly instead of Migration.toSQL().
+   */
+  public readonly supportsSqlSerialization = false;
+
+  /**
    * Return a SQL serializer for this driver's dialect.
    * Not supported for MongoDB.
    */

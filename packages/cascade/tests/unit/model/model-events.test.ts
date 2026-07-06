@@ -216,5 +216,57 @@ describe("Model Events System", () => {
       TestUser.removeScope(scopeName);
       expect(TestUser.localScopes.has(scopeName)).toBe(false);
     });
+
+    it("isolates global scopes per subclass — no bleed across sibling models", () => {
+      class ScopedPost extends Model {
+        public static table = "scoped_posts";
+      }
+      class SiblingComment extends Model {
+        public static table = "sibling_comments";
+      }
+
+      ScopedPost.addGlobalScope("notDeleted", vi.fn());
+
+      expect(ScopedPost.globalScopes.has("notDeleted")).toBe(true);
+      // The scope must NOT leak onto sibling models or the base Model —
+      // previously all subclasses shared the base's one inherited Map.
+      expect(SiblingComment.globalScopes.has("notDeleted")).toBe(false);
+      expect(Model.globalScopes.has("notDeleted")).toBe(false);
+    });
+
+    it("keeps inherited parent scopes when a subclass registers its own", () => {
+      class ParentPost extends Model {
+        public static table = "parent_posts";
+      }
+
+      ParentPost.addGlobalScope("tenant", vi.fn());
+
+      class SpecialPost extends ParentPost {
+        public static table = "special_posts";
+      }
+
+      SpecialPost.addGlobalScope("notDeleted", vi.fn());
+
+      // Registering on the subclass snapshots the inherited entries...
+      expect(SpecialPost.globalScopes.has("tenant")).toBe(true);
+      expect(SpecialPost.globalScopes.has("notDeleted")).toBe(true);
+      // ...and never mutates the parent upward.
+      expect(ParentPost.globalScopes.has("notDeleted")).toBe(false);
+    });
+
+    it("isolates local scopes per subclass too", () => {
+      class ScopedOrder extends Model {
+        public static table = "scoped_orders";
+      }
+      class SiblingInvoice extends Model {
+        public static table = "sibling_invoices";
+      }
+
+      ScopedOrder.addScope("recent", vi.fn());
+
+      expect(ScopedOrder.localScopes.has("recent")).toBe(true);
+      expect(SiblingInvoice.localScopes.has("recent")).toBe(false);
+      expect(Model.localScopes.has("recent")).toBe(false);
+    });
   });
 });

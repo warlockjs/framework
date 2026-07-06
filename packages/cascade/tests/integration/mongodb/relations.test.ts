@@ -22,14 +22,11 @@ import { startMongodbHarness, type MongodbHarness } from "../helpers";
  * persistence. Loaded results are cross-checked against the native collections,
  * so the assertions verify stored documents, not just the API's self-report.
  *
- * **Why `model.load()` instead of `with()` here:** the MongoDB driver's eager
- * loading is currently broken — `MongoDbQueryBuilder.get()`
- * (src/drivers/mongodb/mongodb-query-builder.ts:1807) never runs the
- * RelationLoader, so `Model.with(...)` is a silent no-op on Mongo (see the
- * skipped test under "eager loading (with) — BUG"). The relation LOADER itself
- * works fine on Mongo, so this suite exercises it through the lazy `model.load`
- * path, which routes straight to `RelationLoader`. The Postgres suite covers the
- * `with()` eager-load surface.
+ * Most of this suite exercises the lazy `model.load()` path, which routes
+ * straight to `RelationLoader`; the "eager loading (with)" block covers the
+ * builder-level `with()` wiring (MongoDbQueryBuilder.get() runs the loader
+ * after hydration, same as Postgres). The Postgres suite covers the `with()`
+ * surface more broadly.
  *
  * Collections (including the `MasterMind` id counter) are dropped per test so
  * ids restart and state stays isolated.
@@ -265,18 +262,11 @@ describe("MongoDB integration — relations", () => {
       expect(count).toBe(0);
     });
 
-    // BUG: attach() de-dupes by reading the existing pivot ids first, via
-    // PivotOperations.getExistingPivotIds (src/relations/pivot-operations.ts:313)
-    // which calls `queryBuilder(pivot).select([fk]).where(localKey, value).get()`.
-    // On Mongo the query builder emits pipeline stages in call order, so the
-    // `$project` (from select, which keeps only `rel_role_id`) runs BEFORE the
-    // `$match` on `rel_user_id` (src/drivers/mongodb/mongodb-query-parser.ts).
-    // The projection strips the column the match needs, so the read returns []
-    // and the existing-ids set is always empty → re-attaching an id inserts a
-    // duplicate row. (Selecting a column NOT involved in the filter is the trap;
-    // including the filter column in select() makes it work.) Postgres is
-    // unaffected because its select+where executes correctly.
-    it.skip("attaches ids and skips duplicates", async () => {
+    // attach() de-dupes by reading the existing pivot ids first via
+    // `select([fk]).where(localKey, value)`. The Mongo pipeline assembler
+    // orders `$match` before `$project` (SQL semantics), so the filter column
+    // survives regardless of select/where call order.
+    it("attaches ids and skips duplicates", async () => {
       const user = await RelUser.create({ name: "Mason" });
       const roleA = await RelRole.create({ name: "a" });
       const roleB = await RelRole.create({ name: "b" });
@@ -293,10 +283,7 @@ describe("MongoDB integration — relations", () => {
       );
     });
 
-    // BUG: sync() computes the delta from getExistingPivotIds (same broken
-    // select-before-match read as above), so on Mongo it sees an empty existing
-    // set and never detaches removed ids — leaving stale rows behind.
-    it.skip("syncs the pivot to exactly the target set", async () => {
+    it("syncs the pivot to exactly the target set", async () => {
       const user = await RelUser.create({ name: "Pat" });
       const roleA = await RelRole.create({ name: "a" });
       const roleB = await RelRole.create({ name: "b" });
@@ -314,10 +301,7 @@ describe("MongoDB integration — relations", () => {
       );
     });
 
-    // BUG: toggle() also reads via getExistingPivotIds, so on Mongo the broken
-    // select-before-match read makes every id look "absent" → toggle always
-    // attaches (and may duplicate) instead of flipping present ids off.
-    it.skip("toggles ids — flipping present off and absent on", async () => {
+    it("toggles ids — flipping present off and absent on", async () => {
       const user = await RelUser.create({ name: "Quinn" });
       const roleA = await RelRole.create({ name: "a" });
       const roleB = await RelRole.create({ name: "b" });
@@ -401,20 +385,15 @@ describe("MongoDB integration — relations", () => {
   });
 
   // ==========================================================================
-  // eager loading (with) — BUG: no-op on the MongoDB driver
+  // eager loading (with)
   // ==========================================================================
 
-  describe("eager loading (with) — BUG", () => {
-    // BUG: `Model.with(...)` records relations into the builder's
-    // `eagerLoadRelations` map, but the MongoDB driver's get()
-    // (src/drivers/mongodb/mongodb-query-builder.ts:1807) never invokes the
-    // RelationLoader for them — it only fetches, hydrates, and fires callbacks.
-    // The Postgres query builder DOES run the loader inside its own get(), so
-    // `with()` works there. On Mongo every `with(...)` is a silent no-op: the
-    // relation stays unloaded (`isLoaded` false, `getRelation` undefined). The
-    // lazy `model.load(...)` path used throughout this suite proves the loader
-    // itself works on Mongo — only the builder's eager-load wiring is missing.
-    it.skip("eager-loads relations via with() (broken on Mongo)", async () => {
+  describe("eager loading (with)", () => {
+    // `Model.with(...)` records relations into the builder's
+    // `eagerLoadRelations` map and the MongoDB driver's get() runs the
+    // RelationLoader for them after hydration — same wiring as the Postgres
+    // builder.
+    it("eager-loads relations via with()", async () => {
       const user = await RelUser.create({ name: "Vic" });
       await RelPost.create({ title: "p", rel_user_id: user.id });
 

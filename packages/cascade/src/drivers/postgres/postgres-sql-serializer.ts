@@ -94,11 +94,12 @@ export class PostgresSQLSerializer extends SQLSerializer {
         return this.addPrimaryKey(table, operation.payload as string[]);
       case "dropPrimaryKey":
         return this.dropPrimaryKey(table);
-      case "addCheck":
-        // addCheck is not natively implemented in MigrationDriverContract but exists in OperationType
-        return null;
+      case "addCheck": {
+        const payload = operation.payload as { name: string; expression: string };
+        return this.addCheck(table, payload.name, payload.expression);
+      }
       case "dropCheck":
-        return null;
+        return this.dropCheck(table, operation.payload as string);
       case "createTimestamps":
         // createTimestamps needs to inject two columns. We return two statements.
         return this.createTimestamps(table);
@@ -215,14 +216,25 @@ export class PostgresSQLSerializer extends SQLSerializer {
       }
     }
 
+    const statements: string[] = [sql];
+
+    // Column-level `.check(...)` becomes a table CHECK constraint emitted as a
+    // follow-up ALTER — mirrors the direct driver path (Migration.execute →
+    // driver.addColumn + driver.addCheck).
+    if (column.checkConstraint) {
+      statements.push(
+        this.addCheck(table, column.checkConstraint.name, column.checkConstraint.expression),
+      );
+    }
+
     // pgvector: ensure the extension is active before the vector column is created.
     // SQLGrammar classifies CREATE EXTENSION as Phase 1, so this will always
     // run before any CREATE TABLE / ADD COLUMN statement regardless of batch order.
     if (column.type === "vector") {
-      return ["CREATE EXTENSION IF NOT EXISTS vector", sql];
+      return ["CREATE EXTENSION IF NOT EXISTS vector", ...statements];
     }
 
-    return sql;
+    return statements.length === 1 ? statements[0] : statements;
   }
 
   private dropColumn(table: string, column: string): string {
@@ -449,6 +461,18 @@ export class PostgresSQLSerializer extends SQLSerializer {
     const quotedConstraint = this.dialect.quoteIdentifier(constraintName);
 
     return `ALTER TABLE ${quotedTable} DROP CONSTRAINT ${quotedConstraint}`;
+  }
+
+  private addCheck(table: string, name: string, expression: string): string {
+    const quotedTable = this.dialect.quoteIdentifier(table);
+    const quotedName = this.dialect.quoteIdentifier(name);
+    return `ALTER TABLE ${quotedTable} ADD CONSTRAINT ${quotedName} CHECK (${expression})`;
+  }
+
+  private dropCheck(table: string, name: string): string {
+    const quotedTable = this.dialect.quoteIdentifier(table);
+    const quotedName = this.dialect.quoteIdentifier(name);
+    return `ALTER TABLE ${quotedTable} DROP CONSTRAINT ${quotedName}`;
   }
 
   private mapForeignKeyAction(

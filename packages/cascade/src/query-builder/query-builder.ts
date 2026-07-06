@@ -31,6 +31,7 @@ import type {
   GroupByInput,
   HavingInput,
   JoinOptions,
+  LockForUpdateOptions,
   OrderDirection,
   RawExpression,
   WhereCallback,
@@ -1349,6 +1350,33 @@ export class QueryBuilder<T = unknown> {
   /** Alias for limit. */
   public take(value: number): this {
     return this.limit(value);
+  }
+
+  // ════════════════════════════════════════════════════════
+  // ROW LOCKING
+  // ════════════════════════════════════════════════════════
+
+  /**
+   * Lock the selected rows for update (`SELECT ... FOR UPDATE`).
+   *
+   * `skipLocked` skips rows other transactions hold locks on (concurrent
+   * queue-claim shape); `noWait` errors immediately instead of waiting. The
+   * two are mutually exclusive. Only meaningful inside a transaction.
+   *
+   * SQL drivers emit the locking clause; drivers without row locking
+   * (MongoDB) override this to throw.
+   */
+  public lockForUpdate(options?: LockForUpdateOptions): this {
+    if (options?.skipLocked && options?.noWait) {
+      throw new Error("lockForUpdate: `skipLocked` and `noWait` are mutually exclusive.");
+    }
+
+    this.addOperation("lock", {
+      mode: "update",
+      skipLocked: options?.skipLocked ?? false,
+      noWait: options?.noWait ?? false,
+    });
+    return this;
   }
 
   // ════════════════════════════════════════════════════════

@@ -152,14 +152,64 @@ describe("Postgres integration — persistence execution", () => {
       expect(adminCity.rows[0].city).toBeNull();
     });
 
-    // BUG: Model.findAndUpdate is documented as updating *multiple* matching
-    // records, but on Postgres it updates only one. It routes through
-    // performAtomic -> driver.atomic, and PostgresDriver.atomic always calls
-    // buildUpdateQuery(..., limit = 1), which wraps the UPDATE in
-    // `WHERE ctid IN (SELECT ctid ... LIMIT 1)` (postgres-driver.ts atomic:888,
-    // buildUpdateQuery:1117). So only a single matching row is mutated even
-    // though findAndUpdate then re-fetches and returns all matches.
-    it.skip("BUG: findAndUpdate updates every matching record", async () => {
+    // The query-builder's update()/unset() honor the chained where filter —
+    // previously they passed an empty filter and mutated the WHOLE table.
+    it("query().where(...).update(...) updates only the matching rows", async () => {
+      await QUser.createMany([
+        { name: "A", email: "a@example.com", age: 20, role: "member" },
+        { name: "B", email: "b@example.com", age: 30, role: "member" },
+        { name: "C", email: "c@example.com", age: 40, role: "admin" },
+      ]);
+
+      const affected = await QUser.query().where("role", "member").update({ city: "Cairo" });
+
+      expect(affected).toBe(2);
+
+      const adminCity = await harness.query<{ city: string | null }>(
+        `SELECT city FROM "${USERS_TABLE}" WHERE role = 'admin'`,
+      );
+      expect(adminCity.rows[0].city).toBeNull();
+    });
+
+    it("query().where(...).deleteOne() deletes exactly one matching row", async () => {
+      await QUser.createMany([
+        { name: "A", email: "a@example.com", age: 20, role: "member" },
+        { name: "B", email: "b@example.com", age: 30, role: "member" },
+        { name: "C", email: "c@example.com", age: 40, role: "admin" },
+      ]);
+
+      const deleted = await QUser.query().where("role", "member").deleteOne();
+
+      expect(deleted).toBe(1);
+
+      const remaining = await harness.query<{ count: number }>(
+        `SELECT COUNT(*)::int AS count FROM "${USERS_TABLE}" WHERE role = 'member'`,
+      );
+      expect(remaining.rows[0].count).toBe(1);
+    });
+
+    it("query().where(...).unset(...) nulls fields only on the matching rows", async () => {
+      await QUser.createMany([
+        { name: "A", email: "a@example.com", age: 20, role: "member", city: "Cairo" },
+        { name: "B", email: "b@example.com", age: 30, role: "admin", city: "Giza" },
+      ]);
+
+      const affected = await QUser.query().where("role", "member").unset("city");
+
+      expect(affected).toBe(1);
+
+      const cities = await harness.query<{ role: string; city: string | null }>(
+        `SELECT role, city FROM "${USERS_TABLE}" ORDER BY id`,
+      );
+      expect(cities.rows.find((row) => row.role === "member")!.city).toBeNull();
+      expect(cities.rows.find((row) => row.role === "admin")!.city).toBe("Giza");
+    });
+
+    // Model.findAndUpdate updates *multiple* matching records: it routes
+    // through performAtomic -> driver.atomic, which updates every matching row
+    // on both drivers (MongoDB delegates to updateMany; Postgres emits an
+    // unlimited UPDATE).
+    it("findAndUpdate updates every matching record", async () => {
       await QUser.createMany([
         { name: "A", email: "a@example.com", age: 20, role: "member" },
         { name: "B", email: "b@example.com", age: 30, role: "member" },
@@ -248,9 +298,9 @@ describe("Postgres integration — persistence execution", () => {
     });
 
     // The atomic-update path (driver.atomic with $inc) numbers its bind params
-    // correctly, so Model.atomic / model.atomicIncrement are the reliable way to
-    // bump a field by filter. (The query-builder's own increment() is buggy with
-    // a WHERE filter — see the skipped BUG specs below.)
+    // correctly, so Model.atomic / model.atomicIncrement bump a field by filter.
+    // The query-builder's increment()/incrementMany() bind the amount AFTER the
+    // filter's params ($N+1), so the filtered forms below work too.
     it("Model.atomic with $inc bumps a field for the matching row", async () => {
       const user = await QUser.create({ name: "A", email: "a@example.com", age: 30 });
 
@@ -298,16 +348,10 @@ describe("Postgres integration — persistence execution", () => {
       expect(raw.rows[0].age).toBe(33);
     });
 
-    // BUG: PostgresQueryBuilder.increment() / incrementMany() mis-number bind
-    // params when a WHERE filter is present. They hardcode the amount as `$1`
-    // and append `buildFilter()`'s params, but `buildFilter()` itself numbers
-    // its placeholders from `$1` too (postgres-query-builder.ts increment:808
-    // incrementMany:829, buildFilter:1797). The result is a placeholder
-    // collision: Postgres reports "bind message supplies N parameters, but
-    // prepared statement requires 1", or "operator does not exist: integer +
-    // text" when the filter value lands in the amount slot. Model.increase /
-    // Model.decrease route through this path, so they are affected too.
-    it.skip("BUG: Model.increase bumps a field by filter and returns the new value", async () => {
+    // increment()/incrementMany() number the amount placeholder after the WHERE
+    // filter's params, so filtered increments bind correctly. Model.increase /
+    // Model.decrease route through this path.
+    it("Model.increase bumps a field by filter and returns the new value", async () => {
       const user = await QUser.create({ name: "A", email: "a@example.com", age: 30 });
 
       const newAge = await QUser.increase({ id: user.id }, "age", 3);
@@ -315,7 +359,7 @@ describe("Postgres integration — persistence execution", () => {
       expect(newAge).toBe(33);
     });
 
-    it.skip("BUG: incrementMany bumps every matching row (filtered)", async () => {
+    it("incrementMany bumps every matching row (filtered)", async () => {
       await QUser.createMany([
         { name: "A", email: "a@example.com", age: 30, role: "member" },
         { name: "B", email: "b@example.com", age: 31, role: "member" },

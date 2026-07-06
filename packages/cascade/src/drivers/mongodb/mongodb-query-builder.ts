@@ -21,6 +21,7 @@ import type {
 import { type DataSource } from "../../data-source/data-source";
 import { dataSourceRegistry } from "../../data-source/data-source-registry";
 import { QueryBuilder } from "../../query-builder/query-builder";
+import { RelationLoader } from "../../relations/relation-loader";
 import { type MongoDbDriver } from "./mongodb-driver";
 import { MongoQueryOperations } from "./mongodb-query-operations";
 import { MongoQueryParser } from "./mongodb-query-parser";
@@ -1803,6 +1804,19 @@ export class MongoQueryBuilder<T = unknown>
   }
 
   /**
+   * Row-level locking is a SQL capability — MongoDB has no
+   * `SELECT ... FOR UPDATE`. Throwing (instead of silently ignoring the call)
+   * keeps a queue-claim pattern from silently running unlocked.
+   */
+  public override lockForUpdate(): this {
+    throw new Error(
+      "lockForUpdate() is not supported by the MongoDB driver — MongoDB has no " +
+        "row-level SELECT locking. Use an atomic claim instead (e.g. findOneAndUpdate " +
+        "with a reservation filter).",
+    );
+  }
+
+  /**
    * Executes a callback with the query builder without breaking the chain.
    * @param callback - Function to execute with the builder
    */
@@ -1865,6 +1879,11 @@ export class MongoQueryBuilder<T = unknown>
       ? rawRecords.map(this.hydrateCallback)
       : rawRecords;
 
+    // Run eager loading for relations registered via with(). Lives in get()
+    // (not the buildQuery factory) so every builder-construction path gets it
+    // — same placement as the Postgres builder's applyEagerLoading.
+    await this.applyEagerLoading(hydratedRecords as unknown[]);
+
     // Emit onFetched event
     if (this.fetchedCallback) {
       await this.fetchedCallback(hydratedRecords, {
@@ -1875,6 +1894,31 @@ export class MongoQueryBuilder<T = unknown>
     }
 
     return hydratedRecords;
+  }
+
+  /**
+   * Run the RelationLoader against the fetched documents for every relation
+   * registered via `with()`. Mutates each model instance in place — attaches
+   * loaded relations onto `model.loadedRelations` and as direct properties.
+   *
+   * Skipped silently when `modelClass` is absent (raw driver-level
+   * `queryBuilder()` usage has no relations map to consult).
+   */
+  private async applyEagerLoading(records: unknown[]): Promise<void> {
+    if (!this.modelClass || this.eagerLoadRelations.size === 0 || records.length === 0) {
+      return;
+    }
+
+    const constraints: Record<string, (query: QueryBuilderContract) => void> = {};
+
+    for (const [name, constraint] of this.eagerLoadRelations) {
+      if (typeof constraint === "function") {
+        constraints[name] = constraint as (query: QueryBuilderContract) => void;
+      }
+    }
+
+    const loader = new RelationLoader(records as never, this.modelClass as never);
+    await loader.load([...this.eagerLoadRelations.keys()], constraints);
   }
 
   /**

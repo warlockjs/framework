@@ -68,6 +68,8 @@ export type PostgresOperationType =
   // LIMIT operations
   | "limit"
   | "offset"
+  // Row locking
+  | "lock"
   // RELATION operations
   | "has"
   | "whereHas"
@@ -218,6 +220,12 @@ export class PostgresQueryParser {
    * DISTINCT flag.
    */
   private isDistinct = false;
+
+  /**
+   * Row-locking clause (`FOR UPDATE [SKIP LOCKED | NOWAIT]`). Appended after
+   * LIMIT/OFFSET — the locking clause is last in PostgreSQL's SELECT grammar.
+   */
+  private lockClause = "";
 
   /**
    * Whether the query has any JOIN operations (pre-scanned before processing).
@@ -420,6 +428,18 @@ export class PostgresQueryParser {
         this.offsetValue = data.value as number;
         break;
 
+      // Row locking
+      case "lock": {
+        let clause = "FOR UPDATE";
+        if (data.skipLocked) {
+          clause += " SKIP LOCKED";
+        } else if (data.noWait) {
+          clause += " NOWAIT";
+        }
+        this.lockClause = clause;
+        break;
+      }
+
       // Other
       case "distinct":
         this.isDistinct = true;
@@ -486,6 +506,11 @@ export class PostgresQueryParser {
     const limitOffset = this.dialect.limitOffset(this.limitValue, this.offsetValue);
     if (limitOffset) {
       parts.push(limitOffset);
+    }
+
+    // Row-locking clause — last in PostgreSQL's SELECT grammar
+    if (this.lockClause) {
+      parts.push(this.lockClause);
     }
 
     return parts.join(" ");

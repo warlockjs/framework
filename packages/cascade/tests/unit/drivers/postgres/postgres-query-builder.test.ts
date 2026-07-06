@@ -1498,4 +1498,38 @@ describe("PostgresQueryBuilder", () => {
       expect(result).toContain("Bindings:");
     });
   });
+
+  describe("lockForUpdate()", () => {
+    it("appends FOR UPDATE SKIP LOCKED to the parsed SQL (queue-claim shape)", () => {
+      const result = queryBuilder
+        .where("status", "pending")
+        .orderBy("id", "asc")
+        .limit(10)
+        .lockForUpdate({ skipLocked: true })
+        .parse();
+
+      expect(result.query).toBe(
+        `SELECT * FROM "users" WHERE "users"."status" = $1 ORDER BY "users"."id" ASC LIMIT 10 FOR UPDATE SKIP LOCKED`,
+      );
+      expect(result.bindings).toEqual(["pending"]);
+    });
+
+    it("emits a bare FOR UPDATE without options", () => {
+      const result = queryBuilder.where("id", 1).lockForUpdate().parse();
+
+      expect(result.query).toBe(`SELECT * FROM "users" WHERE "users"."id" = $1 FOR UPDATE`);
+    });
+
+    it("emits FOR UPDATE NOWAIT with noWait", () => {
+      const result = queryBuilder.lockForUpdate({ noWait: true }).parse();
+
+      expect(result.query).toBe(`SELECT * FROM "users" FOR UPDATE NOWAIT`);
+    });
+
+    it("rejects skipLocked + noWait together (mutually exclusive)", () => {
+      expect(() => queryBuilder.lockForUpdate({ skipLocked: true, noWait: true })).toThrow(
+        /mutually exclusive/,
+      );
+    });
+  });
 });

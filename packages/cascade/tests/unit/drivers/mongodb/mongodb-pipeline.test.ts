@@ -94,6 +94,29 @@ describe("MongoQueryBuilder — pipeline shape", () => {
     expect(pipeline).toEqual([{ $match: { $or: [{ a: 1 }, { b: 2 }] } }]);
   });
 
+  it("orders $match before $project even when select() is called before where()", () => {
+    // SQL semantics: WHERE applies to source columns regardless of call order.
+    // Without the hoist, the $project would strip `rel_user_id` before the
+    // $match sees it and every document would be dropped.
+    const pipeline = builder()
+      .select(["rel_role_id"])
+      .where("rel_user_id", 7)
+      .parse().pipeline;
+
+    expect(pipeline).toEqual([
+      { $match: { rel_user_id: 7 } },
+      { $project: { rel_role_id: 1 } },
+    ]);
+  });
+
+  it("does not hoist a where() past a $group barrier", () => {
+    // groupBy(...).where(...) is a having-style filter on the grouped result —
+    // the barrier keeps it after the $group stage.
+    const pipeline = builder().groupBy("status").where("n", 3).parse().pipeline;
+
+    expect(pipeline).toEqual([{ $group: { _id: "$status" } }, { $match: { n: 3 } }]);
+  });
+
   it("emits a $project stage for select() and a $skip stage for skip()", () => {
     const pipeline = builder().select("id", "name").skip(5).parse().pipeline;
 

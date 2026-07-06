@@ -8,21 +8,18 @@ import { startMongodbHarness, type MongodbHarness } from "../helpers";
  * Integration coverage for cascade's MongoDB schema operations against a REAL
  * MongoDB server (single-node replica set, via testcontainers).
  *
- * IMPORTANT — discovered during this work:
+ * The `MigrationRunner` detects drivers without SQL serialization
+ * (`driver.supportsSqlSerialization === false`) and executes each migration's
+ * pending operations DIRECTLY through the migration driver instead of
+ * `migration.toSQL()` — the first test below covers that path end to end
+ * (run creates the index, rollback drops it). `exportSQL` stays SQL-only and
+ * throws a clear unsupported error on MongoDB.
  *
- *   The `MigrationRunner` is SQL-ONLY. Every execution path
- *   (`run` / `rollback` / `runAll` / `exportSQL`) calls `migration.toSQL()`,
- *   which calls `driver.getSQLSerializer()`. The MongoDB driver's
- *   `getSQLSerializer()` (and `query()`) THROW by design. So you cannot run a
- *   migration through the runner against a MongoDB data source — the first test
- *   below pins that behavior so a future change is caught.
- *
- *   The programmatically-reachable MongoDB schema surface is therefore the
- *   MIGRATION DRIVER API directly — `dataSource.driver.migrationDriver()` —
- *   which `createIndex` / `createUniqueIndex` / `createTTLIndex` /
- *   `createFullTextIndex` / `setSchemaValidation` / `dropIndex` all hit native
- *   MongoDB commands. The rest of this suite drives that API and asserts via the
- *   native `db` handle.
+ * The rest of this suite drives the MIGRATION DRIVER API directly —
+ * `dataSource.driver.migrationDriver()` — which `createIndex` /
+ * `createUniqueIndex` / `createTTLIndex` / `createFullTextIndex` /
+ * `setSchemaValidation` / `dropIndex` all hit native MongoDB commands,
+ * asserting via the native `db` handle.
  *
  * Collections are namespaced `msync_*` to stay isolated from the CRUD suite.
  */
@@ -68,26 +65,56 @@ describe("MongoDB integration — schema operations (migration driver)", () => {
     );
   }
 
-  it("the SQL-only MigrationRunner throws on a MongoDB data source (documented limitation)", async () => {
+  it("the MigrationRunner executes migrations on a MongoDB data source via the migration driver", async () => {
     class CreateIndexMigration extends Migration {
       public static migrationName = "msync_runner_attempt";
       public readonly table = COLLECTION;
 
       public up(): void {
-        this.index("email");
+        this.index("email", "msync_runner_idx");
       }
 
       public down(): void {
-        this.dropIndex("email");
+        // string form = index name (array form = columns)
+        this.dropIndex("msync_runner_idx");
       }
     }
 
     const runner = new MigrationRunner({ dataSource: harness.dataSource, verbose: false });
 
-    // toSQL() → MongoDbDriver.getSQLSerializer() throws. The runner surfaces it.
-    await expect(runner.run(CreateIndexMigration)).rejects.toThrow(
-      /MongoDB driver does not support SQL serialization/,
-    );
+    // supportsSqlSerialization === false → the runner executes the queued
+    // operations directly through the migration driver instead of toSQL().
+    const upResult = await runner.run(CreateIndexMigration);
+    expect(upResult.success).toBe(true);
+
+    let indexes = await getIndexes(COLLECTION);
+    expect(indexes.has("msync_runner_idx")).toBe(true);
+
+    const downResult = await runner.rollback(CreateIndexMigration);
+    expect(downResult.success).toBe(true);
+
+    indexes = await getIndexes(COLLECTION);
+    expect(indexes.has("msync_runner_idx")).toBe(false);
+  });
+
+  it("exportSQL stays SQL-only and throws a clear unsupported error on MongoDB", async () => {
+    class NoopMigration extends Migration {
+      public static migrationName = "msync_export_attempt";
+      public readonly table = COLLECTION;
+
+      public up(): void {
+        this.index("email", "msync_export_idx");
+      }
+
+      public down(): void {
+        this.dropIndex("msync_export_idx");
+      }
+    }
+
+    const runner = new MigrationRunner({ dataSource: harness.dataSource, verbose: false });
+    runner.register(NoopMigration);
+
+    await expect(runner.exportSQL()).rejects.toThrow(/SQL export is not supported/);
   });
 
   it("creates a regular index and drops it by columns", async () => {
@@ -108,14 +135,10 @@ describe("MongoDB integration — schema operations (migration driver)", () => {
     expect(indexes.has("email_1")).toBe(false);
   });
 
-  // BUG: MongoMigrationDriver.dropIndex() cannot drop an index by its actual
-  // name when that name does not follow the "<col>_1" convention. The string
-  // form is documented as "Index name" (mongodb-migration-driver.ts:295-297),
-  // but the implementation unconditionally rewrites EVERY input to `${x}_1`
-  // (line 308): so dropIndex(table, "idx_email") tries to drop "idx_email_1"
-  // and throws IndexNotFound for an index that was created with name "idx_email".
-  // Evidence: mongodb-migration-driver.ts:299-311.
-  it.skip("drops a custom-named index by its name (BUG: dropIndex appends _1)", async () => {
+  // dropIndex()'s string form is the literal index name (passed through
+  // untouched); only the columns-array form resolves to the "<col>_1"
+  // convention name.
+  it("drops a custom-named index by its name", async () => {
     const driver = migrationDriverOf(harness);
 
     await driver.createIndex(COLLECTION, { columns: ["email"], name: "idx_email" });

@@ -34,7 +34,7 @@ Configure multiple databases — register each via `connectToDatabase({ name, dr
 
 ### [`manage-transactions/`](./manage-transactions/SKILL.md)
 
-Wrap multi-statement work in transaction(async () => {...}) — rollback on throw or `ctx.rollback()`, commit on resolve, `isolationLevel` option (Postgres). Postgres native, MongoDB requires replica set; not nestable. Also covers transaction-aware raw SQL (`Model.raw` / `DataSource.raw` → `RawQueryResult`) and the Postgres `nativeArrayColumns` connection option. Load when two or more writes must succeed or fail together (creating parent + children, transferring balances, multi-step state machines), or when running raw SQL.
+Wrap multi-statement work in transaction(async () => {...}) — rollback on throw or `ctx.rollback()`, commit on resolve, `isolationLevel` option (Postgres). Postgres native, MongoDB requires replica set; nested calls flat-join the outer transaction. Also covers row locking (`lockForUpdate({ skipLocked })` → `FOR UPDATE SKIP LOCKED`, Postgres-only — the concurrent queue-claim shape), transaction-aware raw SQL (`Model.raw` / `DataSource.raw` → `RawQueryResult`) and the Postgres `nativeArrayColumns` connection option. Load when two or more writes must succeed or fail together (creating parent + children, transferring balances, multi-step state machines), locking rows against concurrent workers, or when running raw SQL.
 
 ### [`paginate-results/`](./paginate-results/SKILL.md)
 

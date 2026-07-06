@@ -1458,4 +1458,12 @@ describe("MongoQueryBuilder", () => {
       expect(chain).toBe(queryBuilder);
     });
   });
+
+  describe("lockForUpdate()", () => {
+    it("throws a clear unsupported error — MongoDB has no row-level SELECT locking", () => {
+      expect(() => queryBuilder.lockForUpdate()).toThrow(
+        /not supported by the MongoDB driver/,
+      );
+    });
+  });
 });

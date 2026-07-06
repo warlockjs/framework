@@ -1033,6 +1033,9 @@ export class PostgresDriver implements DriverContract {
    * Perform an atomic update operation.
    *
    * Builds and executes an UPDATE query for the given filter and operations.
+   * Updates EVERY matching row — the MongoDB driver's atomic() delegates to
+   * updateMany, and Model.findAndUpdate documents multi-row semantics, so the
+   * two drivers must agree.
    *
    * @param table - Target table name
    * @param filter - Filter conditions
@@ -1046,7 +1049,7 @@ export class PostgresDriver implements DriverContract {
     operations: UpdateOperations,
     _options?: Record<string, unknown>,
   ): Promise<UpdateResult> {
-    const { sql, params } = this.buildUpdateQuery(table, filter, operations, 1);
+    const { sql, params } = this.buildUpdateQuery(table, filter, operations);
 
     const result = await this.query(sql, params);
 
@@ -1178,6 +1181,13 @@ export class PostgresDriver implements DriverContract {
   /**
    * Build a simple WHERE clause from a filter object.
    *
+   * Values are bound as plain equality, except Mongo-style operator objects
+   * (`{ $in: [...] }`, `{ $gt: 5 }`, ...) which are translated to their SQL
+   * equivalents — driver-level callers (e.g. pivot detach) build filters in
+   * that portable form. An unrecognized `$` operator throws instead of being
+   * bound literally, which would only surface as a cryptic type error from
+   * Postgres.
+   *
    * @param filter - Filter conditions
    * @param startParamIndex - Starting parameter index
    * @returns Object with WHERE clause string and parameters
@@ -1195,6 +1205,55 @@ export class PostgresDriver implements DriverContract {
 
       if (value === null) {
         conditions.push(`${quotedKey} IS NULL`);
+      } else if (this.isOperatorFilter(value)) {
+        for (const [operator, operand] of Object.entries(value as Record<string, unknown>)) {
+          switch (operator) {
+            case "$in":
+            case "$nin": {
+              const list = operand as unknown[];
+              if (list.length === 0) {
+                // $in [] matches nothing; $nin [] matches everything.
+                conditions.push(operator === "$in" ? "FALSE" : "TRUE");
+                break;
+              }
+              const placeholders = list.map(() => this.dialect.placeholder(paramIndex++));
+              params.push(...list);
+              conditions.push(
+                `${quotedKey} ${operator === "$in" ? "IN" : "NOT IN"} (${placeholders.join(", ")})`,
+              );
+              break;
+            }
+            case "$eq":
+              if (operand === null) {
+                conditions.push(`${quotedKey} IS NULL`);
+              } else {
+                conditions.push(`${quotedKey} = ${this.dialect.placeholder(paramIndex++)}`);
+                params.push(operand);
+              }
+              break;
+            case "$ne":
+              if (operand === null) {
+                conditions.push(`${quotedKey} IS NOT NULL`);
+              } else {
+                conditions.push(`${quotedKey} != ${this.dialect.placeholder(paramIndex++)}`);
+                params.push(operand);
+              }
+              break;
+            case "$gt":
+            case "$gte":
+            case "$lt":
+            case "$lte": {
+              const sqlOperator = { $gt: ">", $gte: ">=", $lt: "<", $lte: "<=" }[operator];
+              conditions.push(`${quotedKey} ${sqlOperator} ${this.dialect.placeholder(paramIndex++)}`);
+              params.push(operand);
+              break;
+            }
+            default:
+              throw new Error(
+                `Unsupported filter operator "${operator}" for column "${key}" on the Postgres driver.`,
+              );
+          }
+        }
       } else {
         conditions.push(`${quotedKey} = ${this.dialect.placeholder(paramIndex++)}`);
         params.push(value);
@@ -1204,6 +1263,24 @@ export class PostgresDriver implements DriverContract {
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
     return { whereClause, whereParams: params };
+  }
+
+  /**
+   * A filter value is an operator object when it is a plain object whose keys
+   * ALL start with `$`. Arrays, Dates, and value objects (e.g. jsonb equality
+   * payloads) keep their existing bind-as-value behavior.
+   */
+  private isOperatorFilter(value: unknown): boolean {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      return false;
+    }
+
+    if (value instanceof Date || Buffer.isBuffer(value)) {
+      return false;
+    }
+
+    const keys = Object.keys(value);
+    return keys.length > 0 && keys.every((key) => key.startsWith("$"));
   }
 
   /**

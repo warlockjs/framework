@@ -294,18 +294,18 @@ export class MongoMigrationDriver implements MigrationDriverContract {
   /**
    * Drop an index by name or columns.
    *
+   * A string is the literal index name and is passed through untouched; a
+   * columns array resolves to the MongoDB convention name
+   * (`"column1_1_column2_1"`) those columns auto-name to.
+   *
    * @param indexNameOrColumns - Index name (string) or columns array
    */
   public async dropIndex(table: string, indexNameOrColumns: string | string[]): Promise<void> {
     const collection = this.db.collection(table);
 
-    if (!Array.isArray(indexNameOrColumns)) {
-      indexNameOrColumns = [indexNameOrColumns];
-    }
-
-    // If columns array provided, generate MongoDB-style index name
-    // MongoDB creates index names like: "column1_1_column2_1"
-    const indexName = indexNameOrColumns.map((col) => `${col}_1`).join("_");
+    const indexName = Array.isArray(indexNameOrColumns)
+      ? indexNameOrColumns.map((col) => `${col}_1`).join("_")
+      : indexNameOrColumns;
 
     await collection.dropIndex(indexName);
   }

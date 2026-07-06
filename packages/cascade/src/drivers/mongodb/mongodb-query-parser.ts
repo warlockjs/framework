@@ -95,7 +95,7 @@ export class MongoQueryParser {
     let currentStage: PipelineStage | null = null;
     let currentBuffer: Operation[] = [];
 
-    for (const op of this.operations) {
+    for (const op of this.orderStages(this.operations)) {
       if (op.mergeable && op.stage === currentStage) {
         // Same mergeable stage, add to buffer
         currentBuffer.push(op);
@@ -143,6 +143,51 @@ export class MongoQueryParser {
 
     // Post-process: Rename _id to actual field names after $group stages with aggregates
     return this.postProcessGroupStages(pipeline);
+  }
+
+  /**
+   * Reorder operations so filters run before projections, mirroring SQL
+   * semantics: in `select(...).where(...)`, the WHERE always applies to the
+   * source columns regardless of call order. Without this, a `$project` that
+   * strips the filter column would run before the `$match` and silently drop
+   * every document (`select(["a"]).where("b", x)` → `[]`).
+   *
+   * Only *mergeable* `$match` operations are hoisted, and only within a
+   * segment of neighboring mergeable `$match` / `$project` / `$sort`
+   * operations. Any other operation — `$group`, `$lookup`, `$limit`, `$skip`,
+   * `$setWindowFields`, or a non-mergeable op (raw escapes, having-style
+   * post-group matches, `$sample`) — is a barrier: nothing moves across it.
+   * So `groupBy(...).where(...)` still filters AFTER the group, and
+   * `limit(...)` / `random()` keep their call-order meaning.
+   */
+  private orderStages(operations: Operation[]): Operation[] {
+    const reordered: Operation[] = [];
+    let segment: Operation[] = [];
+
+    const flushSegment = (): void => {
+      if (segment.length === 0) {
+        return;
+      }
+      reordered.push(...segment.filter((op) => op.stage === "$match"));
+      reordered.push(...segment.filter((op) => op.stage !== "$match"));
+      segment = [];
+    };
+
+    for (const op of operations) {
+      const isReorderable =
+        op.mergeable &&
+        (op.stage === "$match" || op.stage === "$project" || op.stage === "$sort");
+
+      if (isReorderable) {
+        segment.push(op);
+      } else {
+        flushSegment();
+        reordered.push(op);
+      }
+    }
+
+    flushSegment();
+    return reordered;
   }
 
   /**

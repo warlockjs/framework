@@ -790,6 +790,8 @@ export class PostgresQueryBuilder<T = unknown>
   /** SUM a numeric field. */
   public async sum(field: string): Promise<number> {
     this.applyPendingScopes();
+    // Scalar reads bypass model hydration — the aggregate row is not a model.
+    this.hydrateCallback = undefined;
     const result = await this.selectRaw(`SUM(${field}) as sum`).first<{ sum: string }>();
     return parseFloat(result?.sum ?? "0");
   }
@@ -797,6 +799,7 @@ export class PostgresQueryBuilder<T = unknown>
   /** AVG of a numeric field. */
   public async avg(field: string): Promise<number> {
     this.applyPendingScopes();
+    this.hydrateCallback = undefined;
     const result = await this.selectRaw(`AVG(${field}) as avg`).first<{ avg: string }>();
     return parseFloat(result?.avg ?? "0");
   }
@@ -804,6 +807,7 @@ export class PostgresQueryBuilder<T = unknown>
   /** MIN of a numeric field. */
   public async min(field: string): Promise<number> {
     this.applyPendingScopes();
+    this.hydrateCallback = undefined;
     const result = await this.selectRaw(`MIN(${field}) as min`).first<{ min: string }>();
     return parseFloat(result?.min ?? "0");
   }
@@ -811,12 +815,14 @@ export class PostgresQueryBuilder<T = unknown>
   /** MAX of a numeric field. */
   public async max(field: string): Promise<number> {
     this.applyPendingScopes();
+    this.hydrateCallback = undefined;
     const result = await this.selectRaw(`MAX(${field}) as max`).first<{ max: string }>();
     return parseFloat(result?.max ?? "0");
   }
 
   /** Get distinct values for a field. */
   public async distinct<TResult = unknown>(field: string): Promise<TResult[]> {
+    this.hydrateCallback = undefined;
     this.distinctValues(field);
     const results = await this.get<{ [key: string]: TResult }>();
     return results.map((row) => row[field]);
@@ -824,12 +830,14 @@ export class PostgresQueryBuilder<T = unknown>
 
   /** Get array of all values for a single field. */
   public async pluck(field: string): Promise<unknown[]> {
+    this.hydrateCallback = undefined;
     const results = await this.select([field]).get<Record<string, unknown>>();
     return results.map((row) => row[field]);
   }
 
   /** Get a single scalar value. */
   public async value<TResult = unknown>(field: string): Promise<TResult | null> {
+    this.hydrateCallback = undefined;
     const result = await this.select([field]).first<Record<string, TResult>>();
     return result?.[field] ?? null;
   }
@@ -847,6 +855,7 @@ export class PostgresQueryBuilder<T = unknown>
 
   /** COUNT DISTINCT a field. */
   public async countDistinct(field: string): Promise<number> {
+    this.hydrateCallback = undefined;
     const result = await this.selectRaw(`COUNT(DISTINCT ${field}) as count`).first<{
       count: string;
     }>();
@@ -1028,25 +1037,77 @@ export class PostgresQueryBuilder<T = unknown>
     return result.rowCount ?? 0;
   }
 
-  /** Delete the first matching row. */
+  /**
+   * Delete the first matching row. Wraps the filter in a ctid subquery —
+   * Postgres has no `DELETE ... LIMIT`, and `delete()`'s filter only reads
+   * `where*` ops, so a plain `limit(1)` would be silently ignored and every
+   * matching row deleted (MongoDB's deleteOne() is single-document).
+   */
   public async deleteOne(): Promise<number> {
-    return this.limit(1).delete();
+    this.applyPendingScopes();
+    const { sql: filterSql, params } = this.buildFilter();
+    const quotedTable = this.driver.dialect.quoteIdentifier(this.table);
+    const deleteSql = `DELETE FROM ${quotedTable} WHERE ctid IN (SELECT ctid FROM ${quotedTable} ${filterSql} LIMIT 1)`;
+    const result = await this.driver.query(deleteSql, params);
+    return result.rowCount ?? 0;
   }
 
-  /** Update matching rows. */
+  /**
+   * Update matching rows. Honors every chained `where*` (and applied scopes)
+   * — without a filter the whole table is updated, matching SQL semantics.
+   */
   public async update(fields: Record<string, unknown>): Promise<number> {
     this.applyPendingScopes();
-    const result = await this.driver.updateMany(this.table, {}, { $set: fields });
-    return result.modifiedCount;
+    const { sql: filterSql, params: filterParams } = this.buildFilter();
+
+    // The filter's placeholders own $1..$N; SET values bind after them, and
+    // pass through the driver's json/jsonb-aware serialization like every
+    // other write path.
+    const serialized = this.driver.serialize(fields, this.table);
+    let paramIndex = filterParams.length + 1;
+    const setClauses: string[] = [];
+    const setParams: unknown[] = [];
+
+    for (const [key, value] of Object.entries(serialized)) {
+      setClauses.push(
+        `${this.driver.dialect.quoteIdentifier(key)} = ${this.driver.dialect.placeholder(paramIndex++)}`,
+      );
+      setParams.push(value);
+    }
+
+    if (setClauses.length === 0) {
+      throw new Error("No update operations specified");
+    }
+
+    const updateSql =
+      `UPDATE ${this.driver.dialect.quoteIdentifier(this.table)} ` +
+      `SET ${setClauses.join(", ")}` +
+      (filterSql ? ` ${filterSql}` : "");
+    const result = await this.driver.query(updateSql, [...filterParams, ...setParams]);
+    return result.rowCount ?? 0;
   }
 
-  /** Unset fields from matching rows. */
+  /**
+   * Unset (NULL out) fields from matching rows. Honors every chained `where*`
+   * (and applied scopes), like `update()`.
+   */
   public async unset(...fields: string[]): Promise<number> {
     this.applyPendingScopes();
-    const updateObj: Record<string, 1> = {};
-    for (const field of fields) updateObj[field] = 1;
-    const result = await this.driver.updateMany(this.table, {}, { $unset: updateObj });
-    return result.modifiedCount;
+
+    if (fields.length === 0) {
+      throw new Error("No update operations specified");
+    }
+
+    const { sql: filterSql, params: filterParams } = this.buildFilter();
+    const setClauses = fields.map(
+      (field) => `${this.driver.dialect.quoteIdentifier(field)} = NULL`,
+    );
+    const updateSql =
+      `UPDATE ${this.driver.dialect.quoteIdentifier(this.table)} ` +
+      `SET ${setClauses.join(", ")}` +
+      (filterSql ? ` ${filterSql}` : "");
+    const result = await this.driver.query(updateSql, filterParams);
+    return result.rowCount ?? 0;
   }
 
   // ─── Inspection / Debugging ───────────────────────────────────

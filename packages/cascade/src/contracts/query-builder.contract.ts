@@ -138,6 +138,25 @@ export type HavingInput =
 export type RawExpression = string | Record<string, unknown> | unknown;
 
 /**
+ * Options for `lockForUpdate()` — row-level locking on SELECT.
+ *
+ * `skipLocked` and `noWait` are mutually exclusive (PostgreSQL grammar).
+ */
+export type LockForUpdateOptions = {
+  /**
+   * Skip rows another transaction already holds a lock on instead of waiting
+   * (`FOR UPDATE SKIP LOCKED`) — the standard shape for concurrent job-queue
+   * claims where each worker should grab different rows.
+   */
+  skipLocked?: boolean;
+  /**
+   * Error immediately when a matching row is locked instead of waiting
+   * (`FOR UPDATE NOWAIT`).
+   */
+  noWait?: boolean;
+};
+
+/**
  * Driver-agnostic representation of a parsed query.
  *
  * Each driver populates only the fields it understands:
@@ -1548,6 +1567,24 @@ export interface QueryBuilderContract<T = unknown> {
    * query.take(5)
    */
   take(value: number): this;
+
+  /**
+   * Lock the selected rows for update (`SELECT ... FOR UPDATE`), so other
+   * transactions can neither modify nor lock them until this transaction ends.
+   * Only meaningful inside a transaction.
+   *
+   * Postgres-only: the MongoDB driver throws an unsupported error.
+   *
+   * @example
+   * // Concurrent job-queue claim — each worker grabs different rows:
+   * await Job.query()
+   *   .where("status", "pending")
+   *   .orderBy("id", "asc")
+   *   .limit(10)
+   *   .lockForUpdate({ skipLocked: true })
+   *   .get();
+   */
+  lockForUpdate(options?: LockForUpdateOptions): this;
 
   /**
    * Apply cursor pagination hints.

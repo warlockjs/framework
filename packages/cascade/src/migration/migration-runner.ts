@@ -362,6 +362,22 @@ export class MigrationRunner {
       return results;
     }
 
+    // Drivers without SQL serialization (MongoDB) execute each migration's
+    // pending operations directly through the migration driver — there is no
+    // SQL pool to collect or phase-sort.
+    if (this.getDataSource().driver.supportsSqlSerialization === false) {
+      const batch = await this.getNextBatchNumber();
+      for (const MigrationClass of pending) {
+        const result = await this.runMigration(MigrationClass, "up", { dryRun, record, batch });
+        results.push(result);
+
+        if (!result.success) {
+          break;
+        }
+      }
+      return results;
+    }
+
     log.info(
       "database",
       "migration",
@@ -533,6 +549,13 @@ export class MigrationRunner {
    * By default, it exports all registered migrations. Use `pendingOnly: true` to export only pending ones.
    */
   public async exportSQL(options: { pendingOnly?: boolean; compact?: boolean } = {}): Promise<void> {
+    if (this.getDataSource().driver.supportsSqlSerialization === false) {
+      throw new Error(
+        "SQL export is not supported on this data source — its driver has no SQL dialect. " +
+          "Migrations on this driver execute native commands through the migration driver instead.",
+      );
+    }
+
     const migrationsToExport = options.pendingOnly
       ? await this.getPendingMigrations()
       : this.migrations;
@@ -819,23 +842,37 @@ export class MigrationRunner {
         // EXECUTE WITH OR WITHOUT TRANSACTION
         // ============================================================================
 
-        // Collect SQL for the requested direction
+        // Collect the requested direction's operations
         if (direction === "up") {
           await migration.up();
         } else {
           await migration.down();
         }
-        const sqlStatements = migration.toSQL();
 
         const databaseDriver = this.getDataSource().driver;
+
+        // SQL-capable drivers serialize the queued operations to SQL strings;
+        // drivers without SQL serialization (MongoDB) keep them queued and
+        // execute them directly through the migration driver.
+        const directExecution = databaseDriver.supportsSqlSerialization === false;
+        const sqlStatements = directExecution ? [] : migration.toSQL();
+
+        const applyMigration = async (): Promise<void> => {
+          if (directExecution) {
+            await migration.execute();
+            return;
+          }
+
+          // Execute generated SQL statements sequentially (no phase-sorting here since it's single execution)
+          for (const sql of sqlStatements) {
+            await databaseDriver.query(sql);
+          }
+        };
 
         if (shouldUseTransaction && databaseDriver.transaction) {
           // Transactional execution
           await databaseDriver.transaction(async () => {
-            // Execute generated SQL statements sequentially (no phase-sorting here since it's single execution)
-            for (const sql of sqlStatements) {
-              await databaseDriver.query(sql);
-            }
+            await applyMigration();
 
             // Record migration tracking
             if (record) {
@@ -853,9 +890,7 @@ export class MigrationRunner {
           });
         } else {
           // Non-transactional execution
-          for (const sql of sqlStatements) {
-            await databaseDriver.query(sql);
-          }
+          await applyMigration();
 
           if (record) {
             if (direction === "up") {

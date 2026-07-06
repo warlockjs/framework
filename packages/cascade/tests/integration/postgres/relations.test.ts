@@ -316,17 +316,10 @@ describe("Postgres integration — relations", () => {
       );
     });
 
-    // BUG: PivotOperations.detach(ids) builds a Mongo-style filter
-    // `{ pivotForeignKey: { $in: ids } }` (src/relations/pivot-operations.ts:184)
-    // and hands it to PostgresDriver.deleteMany. The Postgres driver's
-    // buildWhereClause (src/drivers/postgres/postgres-driver.ts:1024) has no
-    // operator translation — it binds the `{ $in: [...] }` object as a literal
-    // value, so PG rejects it: `invalid input syntax for type integer:
-    // "{"$in":[1]}"`. Detach-by-ids (and therefore sync/toggle, which delegate
-    // to detach) is broken on Postgres. Unit tests missed it because they use a
-    // mock driver that only records the filter. Detach-all (no ids → no $in)
-    // works, so that case stays enabled below.
-    it.skip("detaches a specific id, leaving the rest in place", async () => {
+    // PivotOperations.detach(ids) builds a Mongo-style `{ $in: ids }` filter;
+    // the Postgres driver's buildWhereClause translates it to `IN (...)`, so
+    // detach-by-ids (and sync/toggle, which delegate to it) work on Postgres.
+    it("detaches a specific id, leaving the rest in place", async () => {
       const user = await RelUser.create({ name: "Noah" });
       const roleA = await RelRole.create({ name: "a" });
       const roleB = await RelRole.create({ name: "b" });
@@ -356,11 +349,7 @@ describe("Postgres integration — relations", () => {
       expect(rows.rowCount).toBe(0);
     });
 
-    // BUG: sync() detaches the removed ids via PivotOperations.detach(ids),
-    // hitting the same Postgres `$in` translation gap described above
-    // (src/relations/pivot-operations.ts:222 → detach → deleteMany). Broken on
-    // Postgres.
-    it.skip("syncs the pivot to exactly the target set", async () => {
+    it("syncs the pivot to exactly the target set", async () => {
       const user = await RelUser.create({ name: "Pat" });
       const roleA = await RelRole.create({ name: "a" });
       const roleB = await RelRole.create({ name: "b" });
@@ -379,11 +368,7 @@ describe("Postgres integration — relations", () => {
       );
     });
 
-    // BUG: toggle() detaches the present ids via PivotOperations.detach(ids),
-    // hitting the same Postgres `$in` translation gap described above
-    // (src/relations/pivot-operations.ts:261 → detach → deleteMany). Broken on
-    // Postgres.
-    it.skip("toggles ids — flipping present off and absent on", async () => {
+    it("toggles ids — flipping present off and absent on", async () => {
       const user = await RelUser.create({ name: "Quinn" });
       const roleA = await RelRole.create({ name: "a" });
       const roleB = await RelRole.create({ name: "b" });

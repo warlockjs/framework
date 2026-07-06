@@ -77,6 +77,63 @@ describe("Postgres integration — query execution", () => {
     await harness.stop();
   });
 
+  describe("row locking — FOR UPDATE SKIP LOCKED", () => {
+    beforeEach(async () => {
+      await harness.query(`TRUNCATE TABLE "${USERS_TABLE}" RESTART IDENTITY CASCADE`);
+      await seedUsers();
+    });
+
+    /** Build the queue-claim SELECT: oldest N pending members, locked, skipping locked rows. */
+    function claimQuery(limit: number) {
+      return harness.driver
+        .queryBuilder(USERS_TABLE)
+        .where("role", "member")
+        .orderBy("id", "asc")
+        .limit(limit)
+        .lockForUpdate({ skipLocked: true })
+        .parse();
+    }
+
+    it("a concurrent claim skips rows locked by the first transaction", async () => {
+      // Two REAL transactions on separate pool clients — the exact shape a
+      // multi-worker job-queue claim takes. Worker A locks the first two
+      // member rows (Bob id=2, Carol id=3); worker B's identical claim must
+      // skip them and get only Dave (id=4) instead of blocking.
+      const txA = await harness.driver.beginTransaction();
+      try {
+        const first = claimQuery(2);
+        const claimedByA = await txA.context.query(first.query!, first.bindings);
+        expect(claimedByA.rows.map((row: { id: number }) => row.id)).toEqual([2, 3]);
+
+        const txB = await harness.driver.beginTransaction();
+        try {
+          const second = claimQuery(2);
+          const claimedByB = await txB.context.query(second.query!, second.bindings);
+
+          expect(claimedByB.rows.map((row: { id: number }) => row.id)).toEqual([4]);
+        } finally {
+          await txB.rollback();
+        }
+      } finally {
+        await txA.rollback();
+      }
+    });
+
+    it("Model.query().lockForUpdate() works inside driver.transaction()", async () => {
+      const claimed = await harness.driver.transaction(async () => {
+        return QUser.query()
+          .where("role", "member")
+          .orderBy("id", "asc")
+          .limit(1)
+          .lockForUpdate({ skipLocked: true })
+          .get();
+      });
+
+      expect(claimed).toHaveLength(1);
+      expect(claimed[0].get("name")).toBe("Bob");
+    });
+  });
+
   describe("WHERE operators", () => {
     beforeEach(async () => {
       await harness.query(`TRUNCATE TABLE "${USERS_TABLE}" RESTART IDENTITY CASCADE`);
@@ -319,21 +376,18 @@ describe("Postgres integration — query execution", () => {
       expect(names).toEqual(["Alice", "Bob", "Carol", "Dave", "Erin"]);
     });
 
-    // BUG: Postgres scalar/projection helpers (sum/avg/min/max/distinct/
-    // countDistinct/pluck/value) do not reset the model `hydrateCallback`
-    // before reading results, so through Model.query() they map over hydrated
-    // Model instances with raw bracket access and yield 0 / undefined. The
-    // MongoDB builder clears `hydrateCallback` in each of these methods; the
-    // Postgres builder does not (postgres-query-builder.ts sum:733 avg:740
-    // min:747 max:754 distinct:761 pluck:768 value:774 countDistinct:791).
-    it.skip("BUG: model-level sum/avg/min/max return numbers (hydrateCallback not reset)", async () => {
+    // The scalar/projection helpers (sum/avg/min/max/distinct/countDistinct/
+    // pluck/value) reset the model `hydrateCallback` before reading — the
+    // aggregate row is not a model — so the model path returns real values,
+    // matching the MongoDB builder's behavior.
+    it("model-level sum/avg/min/max return numbers (hydrateCallback reset)", async () => {
       expect(await QOrder.query().sum("amount")).toBe(275);
       expect(await QOrder.query().avg("amount")).toBe(55);
       expect(await QOrder.query().min("amount")).toBe(20);
       expect(await QOrder.query().max("amount")).toBe(100);
     });
 
-    it.skip("BUG: model-level distinct/countDistinct/pluck return values (hydrateCallback not reset)", async () => {
+    it("model-level distinct/countDistinct/pluck return values (hydrateCallback reset)", async () => {
       expect(await QUser.query().orderBy("city").distinct<string>("city")).toEqual([
         "Cairo",
         "Giza",

@@ -22,7 +22,6 @@
  */
 import type { QueryBuilderContract } from "../../../../src/contracts/query-builder.contract";
 import { Model } from "../../../../src/model/model";
-import type { GlobalScopeDefinition } from "../../../../src/model/model.types";
 
 export const USERS_TABLE = "q_users";
 export const ORDERS_TABLE = "q_orders";
@@ -58,12 +57,9 @@ export class QArticle extends Model {
 
   public static deletedAtColumn = "deletedAt";
 
-  // Own the scope map so the `notDeleted` scope stays local to this model.
-  // `Model.globalScopes` is a single inherited Map shared by every subclass, so
-  // without this fresh instance the scope would leak onto QUser / QOrder
-  // queries (and fail with "column deletedAt does not exist").
-  public static globalScopes = new Map<string, GlobalScopeDefinition>();
-
+  // addGlobalScope registers per-subclass (copy-on-write scope map), so the
+  // `notDeleted` scope stays local to this model — no manual
+  // `static globalScopes = new Map()` shadow needed anymore.
   static {
     this.addGlobalScope("notDeleted", (query: QueryBuilderContract) => {
       query.whereNull("deletedAt");

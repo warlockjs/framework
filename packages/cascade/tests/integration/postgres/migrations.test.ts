@@ -323,16 +323,12 @@ describe("Postgres integration — migration runner (up / down)", () => {
     expect(byName.get("create_mig_events")!.executed).toBe(false);
   });
 
-  // BUG: CHECK constraints defined via the migration builder (column `.check()`
-  // or `this.check()`) are SILENTLY DROPPED on the SQL path. PostgresSQLSerializer
-  // returns `null` for the "addCheck" operation, and addColumn() never emits a
-  // column's `checkConstraint`. So a migration run through the runner produces NO
-  // CHECK constraint in the database, despite the fluent API accepting it.
-  // (PostgresMigrationDriver.addCheck DOES emit correct DDL, but the runner uses
-  // toSQL()/the serializer, not the driver method.) Evidence:
-  //   postgres-sql-serializer.ts:97-100 → `case "addCheck": return null;`
-  //   postgres-sql-serializer.ts:158-226 (addColumn) → checkConstraint never used.
-  it.skip("creates a CHECK constraint via the builder (BUG: serializer drops it)", async () => {
+  // CHECK constraints defined via the migration builder (column `.check()` or
+  // `this.check()`) are serialized on the SQL path: PostgresSQLSerializer emits
+  // `ALTER TABLE ... ADD CONSTRAINT ... CHECK (...)` for the "addCheck"
+  // operation and for a column's `checkConstraint`, matching the direct
+  // driver path (PostgresMigrationDriver.addCheck).
+  it("creates a CHECK constraint via the builder", async () => {
     class CreateCheckTable extends (await import("../../../src/migration/migration")).Migration {
       public static migrationName = "create_mig_checks";
       public readonly table = "mig_checks";

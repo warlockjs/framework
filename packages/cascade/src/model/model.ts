@@ -462,12 +462,18 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   /**
    * Global scopes that are automatically applied to all queries.
    * These scopes are inherited by child models.
+   *
+   * Registration via `addGlobalScope` is per-subclass: the registering class
+   * gets its own map (seeded with the entries inherited so far), so a scope
+   * added on one model never leaks onto sibling models.
    */
   public static globalScopes = new Map<string, GlobalScopeDefinition>();
 
   /**
    * Local scopes that can be manually applied to queries.
    * These are reusable query snippets that developers opt into.
+   *
+   * Registration via `addLocalScope` is per-subclass, like `globalScopes`.
    */
   public static localScopes = new Map<string, LocalScopeCallback>();
 

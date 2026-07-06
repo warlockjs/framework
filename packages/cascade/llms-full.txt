@@ -1432,7 +1432,7 @@ There is no `has(name)` / `list()` / `setDefault()` — guard with a `try/catch`
 
 ---
 name: manage-transactions
-description: 'Wrap multi-statement work in `transaction(async () => {...})` — rollback on throw, commit on resolve, optional `isolation` level (Postgres), per-`dataSource` scope. Also the home for transaction-aware raw SQL (`Model.raw` / `DataSource.raw` → `RawQueryResult`) and Postgres native-array column handling (`JSONB[]` / `TEXT[]` / `INTEGER[]` auto-detected via schema introspection on connect; `nativeArrayColumns` is an optional override). Postgres native; MongoDB requires replica set. Triggers: `transaction`, `isolation`, `SERIALIZABLE`, `READ COMMITTED`, nested transaction, flat nesting, nested savepoints, `Model.raw`, `DataSource.raw`, raw SQL, `RawQueryResult`, `nativeArrayColumns`, `JSONB[]`, `TEXT[]`; "wrap two writes atomically", "transfer balance between accounts", "rollback on error", "MongoDB replica set transactions", "run raw SQL", "native array column", "malformed array literal", "array column not saving", "nested transaction not visible", "foreign key violation on insert inside transaction", "service transaction inside seeder"; typical import `import { transaction } from "@warlock.js/cascade"`. Skip: single-row atomic ops without a transaction — `@warlock.js/cascade/perform-atomic-ops/SKILL.md`; per-source scope — `@warlock.js/cascade/manage-data-sources/SKILL.md`; competing patterns `mongoose.startSession`, `pg` `BEGIN` manually, `prisma.$transaction`, `typeorm` `QueryRunner`.'
+description: 'Wrap multi-statement work in `transaction(async () => {...})` — rollback on throw, commit on resolve, optional `isolation` level (Postgres), per-`dataSource` scope. Also the home for row locking (`lockForUpdate({ skipLocked })` → `SELECT ... FOR UPDATE [SKIP LOCKED | NOWAIT]`, Postgres-only), transaction-aware raw SQL (`Model.raw` / `DataSource.raw` → `RawQueryResult`) and Postgres native-array column handling (`JSONB[]` / `TEXT[]` / `INTEGER[]` auto-detected via schema introspection on connect; `nativeArrayColumns` is an optional override). Postgres native; MongoDB requires replica set. Triggers: `transaction`, `isolation`, `SERIALIZABLE`, `READ COMMITTED`, nested transaction, flat nesting, nested savepoints, `lockForUpdate`, `skipLocked`, `FOR UPDATE`, `SKIP LOCKED`, `NOWAIT`, row lock, pessimistic lock, queue claim, `Model.raw`, `DataSource.raw`, raw SQL, `RawQueryResult`, `nativeArrayColumns`, `JSONB[]`, `TEXT[]`; "wrap two writes atomically", "transfer balance between accounts", "rollback on error", "MongoDB replica set transactions", "lock rows so workers don''t double-process", "claim jobs from a table", "run raw SQL", "native array column", "malformed array literal", "array column not saving", "nested transaction not visible", "foreign key violation on insert inside transaction", "service transaction inside seeder"; typical import `import { transaction } from "@warlock.js/cascade"`. Skip: single-row atomic ops without a transaction — `@warlock.js/cascade/perform-atomic-ops/SKILL.md`; per-source scope — `@warlock.js/cascade/manage-data-sources/SKILL.md`; competing patterns `mongoose.startSession`, `pg` `BEGIN` manually, `prisma.$transaction`, `typeorm` `QueryRunner`.'
 ---
 
 # Use transactions
@@ -1530,6 +1530,36 @@ await transaction(async () => {
 ```
 
 On `SERIALIZABLE`, Postgres may abort with a serialization failure when concurrent transactions conflict — wrap in retry logic at the caller.
+
+## Row locking — `lockForUpdate({ skipLocked })` (Postgres)
+
+Chain `lockForUpdate()` on any query to emit `SELECT ... FOR UPDATE`: the matched rows are locked until the transaction ends, so no other transaction can modify or lock them. Only meaningful **inside** a transaction — outside one the lock releases immediately.
+
+`{ skipLocked: true }` adds `SKIP LOCKED` — rows another transaction already holds are silently skipped instead of waited on. That is the standard concurrent queue-claim shape: N workers each grab *different* pending rows with no double-processing and no blocking.
+
+```ts
+import { transaction } from "@warlock.js/cascade";
+
+// Worker loop — each concurrent worker claims a disjoint batch:
+const jobs = await transaction(async () => {
+  const claimed = await Job.query()
+    .where("status", "pending")
+    .orderBy("id", "asc")
+    .limit(10)
+    .lockForUpdate({ skipLocked: true })
+    .get();
+
+  for (const job of claimed) {
+    await job.merge({ status: "processing" }).save();
+  }
+
+  return claimed;
+});
+```
+
+`{ noWait: true }` errors immediately when a matching row is locked (instead of waiting or skipping) — mutually exclusive with `skipLocked`.
+
+**Postgres-only.** MongoDB has no row-level SELECT locking — the MongoDB driver **throws** on `lockForUpdate()`. On Mongo, claim atomically instead (`findOneAndUpdate` with a reservation filter — see `@warlock.js/cascade/perform-atomic-ops/SKILL.md`).
 
 ## Outside the transaction
 

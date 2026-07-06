@@ -951,10 +951,13 @@ export abstract class Migration implements MigrationContract {
   // ============================================================================
 
   /**
-   * Execute all pending operations.
+   * Execute all pending operations directly through the migration driver.
    *
-   * @deprecated Use toSQL() instead — migrations now generate SQL rather than
-   * executing DDL directly through the driver.
+   * SQL-capable drivers go through toSQL() + raw query execution instead
+   * (phase-ordering, dry-run, export). This path is how the MigrationRunner
+   * executes migrations on drivers WITHOUT SQL serialization (MongoDB), where
+   * each pending operation maps to a native driver command.
+   *
    * @internal
    */
   public async execute(): Promise<void> {

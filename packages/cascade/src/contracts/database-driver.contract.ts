@@ -423,6 +423,15 @@ export interface DriverContract {
   migrationDriver(): MigrationDriverContract;
 
   /**
+   * Whether this driver can serialize migrations to SQL strings.
+   *
+   * Defaults to `true` (absent = SQL-capable). Drivers without a SQL dialect
+   * (MongoDB) set `false`, which routes the MigrationRunner through direct
+   * migration-driver execution instead of `Migration.toSQL()`.
+   */
+  supportsSqlSerialization?: boolean;
+
+  /**
    * Return a SQL serializer for this driver's dialect.
    * Used by Migration.toSQL() to convert pending operations to SQL strings.
    */

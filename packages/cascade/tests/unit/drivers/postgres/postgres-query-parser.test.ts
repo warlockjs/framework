@@ -215,4 +215,36 @@ describe("PostgresQueryParser", () => {
       expect(result.bindings).toEqual([18, 65]);
     });
   });
+
+  describe("lockForUpdate (lock op)", () => {
+    it("appends FOR UPDATE as the last clause", () => {
+      const result = parse([
+        { type: "lock", data: { mode: "update", skipLocked: false, noWait: false } },
+      ]);
+
+      expect(result.query).toBe(`SELECT * FROM "users" FOR UPDATE`);
+    });
+
+    it("emits SKIP LOCKED after WHERE / ORDER BY / LIMIT (queue-claim shape)", () => {
+      const result = parse([
+        { type: "where", data: { field: "status", operator: "=", value: "pending" } },
+        { type: "orderBy", data: { field: "id", direction: "asc" } },
+        { type: "limit", data: { value: 10 } },
+        { type: "lock", data: { mode: "update", skipLocked: true, noWait: false } },
+      ]);
+
+      expect(result.query).toBe(
+        `SELECT * FROM "users" WHERE "users"."status" = $1 ORDER BY "users"."id" ASC LIMIT 10 FOR UPDATE SKIP LOCKED`,
+      );
+      expect(result.bindings).toEqual(["pending"]);
+    });
+
+    it("emits NOWAIT when requested", () => {
+      const result = parse([
+        { type: "lock", data: { mode: "update", skipLocked: false, noWait: true } },
+      ]);
+
+      expect(result.query).toBe(`SELECT * FROM "users" FOR UPDATE NOWAIT`);
+    });
+  });
 });
