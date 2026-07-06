@@ -1,16 +1,7 @@
 import { spawn } from "node:child_process";
 import { realpath } from "node:fs/promises";
 import { platform } from "node:process";
-import {
-  atomicWriteAsync,
-  ensureDirectoryAsync,
-  getFileAsync,
-  listAsync,
-  pathExistsAsync,
-  removeDirectoryAsync,
-  statsAsync,
-  unlinkAsync,
-} from "@warlock.js/fs";
+import { fs } from "@warlock.js/fs";
 import type {
   WorkspaceBackend,
   WorkspaceBackendExecOptions,
@@ -95,7 +86,7 @@ function killTree(pid: number | undefined, child: { kill(signal: NodeJS.Signals)
 class LocalBackend implements WorkspaceBackend {
   /** Read a file's full UTF-8 content at an absolute path. */
   public async readFile(absPath: string): Promise<string> {
-    return getFileAsync(absPath);
+    return fs.files.get(absPath);
   }
 
   /**
@@ -104,30 +95,30 @@ class LocalBackend implements WorkspaceBackend {
    * directories are created.
    */
   public async writeFile(absPath: string, content: string): Promise<void> {
-    await atomicWriteAsync(absPath, content);
+    await fs.files.put(absPath, content, { atomic: true });
   }
 
   /** Whether anything (file or directory) exists at an absolute path. */
   public async exists(absPath: string): Promise<boolean> {
-    return pathExistsAsync(absPath);
+    return fs.exists(absPath);
   }
 
   /** Create a directory (and any missing parents) at an absolute path; idempotent. */
   public async mkdir(absPath: string): Promise<void> {
-    await ensureDirectoryAsync(absPath);
+    await fs.dirs.ensure(absPath);
   }
 
   /**
    * Remove a file or directory tree at an absolute path. Stats the target to
-   * pick the right primitive — `removeDirectoryAsync` (recursive) for a
-   * directory, `unlinkAsync` for anything else. A path that does not exist is
-   * a no-op (both primitives swallow `ENOENT`).
+   * pick the right op — `fs.dirs.remove` (recursive) for a directory,
+   * `fs.files.remove` for anything else. A path that does not exist is a no-op
+   * (the stat's ENOENT short-circuits, and both removes swallow `ENOENT`).
    */
   public async remove(absPath: string): Promise<void> {
     let isDirectory = false;
 
     try {
-      isDirectory = (await statsAsync(absPath)).isDirectory();
+      isDirectory = (await fs.files.stats(absPath)).type === "directory";
     } catch (error) {
       if ((error as NodeJS.ErrnoException)?.code === "ENOENT") {
         return;
@@ -137,17 +128,17 @@ class LocalBackend implements WorkspaceBackend {
     }
 
     if (isDirectory) {
-      await removeDirectoryAsync(absPath);
+      await fs.dirs.remove(absPath);
 
       return;
     }
 
-    await unlinkAsync(absPath);
+    await fs.files.remove(absPath);
   }
 
   /** List immediate children of an absolute directory as absolute paths. */
   public async list(absDir: string): Promise<string[]> {
-    return listAsync(absDir);
+    return fs.dirs.list(absDir);
   }
 
   /**

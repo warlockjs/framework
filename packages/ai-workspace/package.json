@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/ai-workspace",
-  "version": "4.6.1",
+  "version": "4.7.0",
   "type": "module",
   "description": "Policy-jailed filesystem + shell workspace for @warlock.js/ai agents",
   "main": "./src/index.ts",

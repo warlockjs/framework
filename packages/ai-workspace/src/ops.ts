@@ -1,5 +1,5 @@
 import path from "node:path";
-import { hashString } from "@warlock.js/fs";
+import { fs } from "@warlock.js/fs";
 import { WorkspaceEditError, WorkspacePolicyError } from "./errors";
 import { buildEnv, isCommandAllowed, resolveInJail } from "./policy/policy";
 import type {
@@ -155,7 +155,7 @@ class Ops implements WorkspaceOps {
     // not the on-disk file — the mock backend keeps content in memory,
     // and hashing the returned bytes is what the stale-edit guard later
     // compares against, so it must be the SAME source of truth.
-    const hash = hashString(raw);
+    const hash = fs.hash.string(raw);
 
     const lines = raw.split("\n");
     const totalLines = lines.length;
@@ -183,7 +183,7 @@ class Ops implements WorkspaceOps {
     await this.backend.writeFile(absolutePath, content);
 
     return {
-      hash: hashString(content),
+      hash: fs.hash.string(content),
       bytesWritten: Buffer.byteLength(content, "utf8"),
     };
   }
@@ -191,7 +191,7 @@ class Ops implements WorkspaceOps {
   public async editFile(input: EditFileInput): Promise<EditFileResult> {
     const { absolutePath, relativePath } = await resolveInJail(this.policy, input.path);
     const current = await this.backend.readFile(absolutePath);
-    const currentHash = hashString(current);
+    const currentHash = fs.hash.string(current);
 
     // Stale-hash guard: if the caller pinned a hash and the file moved
     // underneath them, refuse so they re-read before clobbering.
@@ -233,7 +233,7 @@ class Ops implements WorkspaceOps {
     return {
       path: relativePath || input.path,
       replacements: input.replaceAll ? occurrences : 1,
-      hash: hashString(updated),
+      hash: fs.hash.string(updated),
     };
   }
 
