@@ -23,6 +23,6 @@ export function resolveBuildConfig(): ResolvedBuildConfig {
 
   return {
     ...merged,
-    entryPath: path.resolve(merged.outDirectory, merged.outFile),
+    entryPath: path.resolve(merged.outdir, merged.outFile),
   };
 }

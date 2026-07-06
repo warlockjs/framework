@@ -311,15 +311,21 @@ bootstrap();
     console.log(colors.magenta("   Bundling with esbuild..."));
 
     const entryPoint = path.join(this.productionDir, "app.ts");
-    const outDir = this.options!.outDirectory!;
-    const outFileName = this.options!.outFile!;
+    const outDir = this.options.outdir!;
+    const outFileName = this.options.outFile!;
     // Strip extension so entryNames produces "<base>.js" via esbuild
     const entryName = path.basename(outFileName, path.extname(outFileName));
+
+    delete this.options.outFile;
+    delete this.options.entryPath;
 
     await ensureDirectoryAsync(outDir);
 
     const alias = this.buildAliasMapFromTsconfig();
 
+
+    try {
+      
     await esbuild.build({
       platform: "node",
       entryPoints: [entryPoint],
@@ -341,7 +347,12 @@ bootstrap();
       entryNames: entryName,
       alias,
       plugins: [nativeNodeModulesPlugin],
+      ...(this.options as any),
     });
+    } catch (e) {
+      console.log(e);
+      throw e;
+    }
   }
 
   /**

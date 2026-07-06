@@ -1,6 +1,7 @@
 import type { MigrationConstructor } from "@warlock.js/cascade";
 import type { CLICommand } from "../cli/cli-command";
 import type { FileHealthCheckerContract } from "../dev-server/health-checker/file-health-checker.contract";
+import { BuildOptions } from "esbuild";
 
 /**
  * Resolved Warlock Configuration
@@ -20,13 +21,13 @@ export type WarlockConfig = {
   /**
    * Build configuration
    */
-  build?: {
+  build?: Omit<BuildOptions, 'entryPoints'> & {
     /**
      * Output directory
      *
      * @default dist
      */
-    outDirectory?: string;
+    outdir?: string;
     /**
      * Output file
      *
