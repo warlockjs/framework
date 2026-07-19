@@ -363,6 +363,17 @@ describe("OllamaModel reasoning → think mapping", () => {
     expect(calls[0].think).toBe(true);
   });
 
+  it("maps effort 'none' to think: false (explicit reasoning-off)", async () => {
+    const { client, calls } = makeFakeClient({ response: baseResponse });
+    const model = new OllamaModel(client, { name: "deepseek-r1:7b" });
+
+    await model.complete([{ role: "user", content: "hi" }], {
+      reasoning: { effort: "none" },
+    });
+
+    expect(calls[0].think).toBe(false);
+  });
+
   it("does not send think to a non-reasoning model even when reasoning is requested", async () => {
     const { client, calls } = makeFakeClient({ response: baseResponse });
     const model = new OllamaModel(client, { name: "llama3.1" });

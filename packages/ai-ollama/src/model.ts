@@ -241,9 +241,12 @@ export class OllamaModel implements ModelContract {
   /**
    * Translate the neutral `reasoning` hint into Ollama's `think`
    * request flag. Ollama's `think` accepts `boolean | 'low' | 'medium'
-   * | 'high'`, so the neutral `ReasoningEffort` literals pass straight
-   * through; an effort-less `reasoning` (only `maxTokens`, or an empty
-   * object) becomes `think: true` to switch the channel on.
+   * | 'high'`, so the `"low" | "medium" | "high"` effort literals pass
+   * straight through; an effort-less `reasoning` (only `maxTokens`, or
+   * an empty object) becomes `think: true` to switch the channel on.
+   * The neutral `effort: "none"` ("run without reasoning") maps to
+   * `think: false` — Ollama has no `"none"` level, and this is its
+   * native reasoning-off switch.
    *
    * No-ops unless the model is reasoning-capable, so the `think` flag is
    * never sent to a plain instruct model that cannot honor it.
@@ -259,6 +262,12 @@ export class OllamaModel implements ModelContract {
   ): Pick<ChatRequest, "think"> {
     if (!reasoning || !this.capabilities.reasoning) {
       return {};
+    }
+
+    // `effort: "none"` = explicit reasoning-off → switch the channel off.
+    // Ollama's `think` has no `"none"` level, so map it to `false`.
+    if (reasoning.effort === "none") {
+      return { think: false };
     }
 
     return { think: reasoning.effort ?? true };
