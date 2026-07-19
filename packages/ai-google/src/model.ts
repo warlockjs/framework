@@ -30,7 +30,7 @@ const LOG_MODULE = "ai.google";
  * on the thinking phase; these mirror the spread the OpenAI
  * `reasoning_effort` low/medium/high tiers imply.
  */
-const EFFORT_THINKING_BUDGET: Record<ReasoningEffort, number> = {
+const EFFORT_THINKING_BUDGET: Record<Exclude<ReasoningEffort, "none">, number> = {
   low: 1024,
   medium: 8192,
   high: 24576,
@@ -273,13 +273,22 @@ export class GoogleModel implements ModelContract {
    *
    * Gemini's `thinkingBudget` semantics: `0` disables thinking, `-1`
    * lets the model decide automatically. A positive value caps the
-   * thinking tokens.
+   * thinking tokens. The neutral `effort: "none"` ("run without
+   * reasoning") maps to `thinkingBudget: 0`.
    */
   private buildThinking(
     reasoning: ModelCallOptions["reasoning"],
   ): Pick<GenerateContentConfig, "thinkingConfig"> {
     if (!reasoning || !this.capabilities.reasoning) {
       return {};
+    }
+
+    // `effort: "none"` = explicit "run without reasoning". Gemini disables
+    // thinking with `thinkingBudget: 0` (its native off switch), so emit
+    // that rather than omitting the config — an omitted config lets a
+    // thinking model reason at its default budget.
+    if (reasoning.effort === "none") {
+      return { thinkingConfig: { thinkingBudget: 0 } };
     }
 
     const thinkingBudget =

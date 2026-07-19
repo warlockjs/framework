@@ -288,6 +288,22 @@ describe("GoogleModel.complete()", () => {
     expect("thinkingConfig" in (calls[0].config as Record<string, unknown>)).toBe(false);
   });
 
+  it("maps effort 'none' to thinkingBudget 0 (Gemini's reasoning-off switch)", async () => {
+    // Unlike Anthropic (where "none" omits the block), Gemini has a native
+    // off switch — thinkingBudget: 0 — so "run without reasoning" is emitted
+    // actively rather than left to the model's default budget.
+    const { ai, calls } = makeFakeAI({ response: baseResponse });
+    const model = new GoogleModel(ai, { name: "gemini-2.5-flash" });
+
+    await model.complete([{ role: "user", content: "hi" }], {
+      reasoning: { effort: "none" },
+    });
+
+    expect((calls[0].config as Record<string, unknown>).thinkingConfig).toEqual({
+      thinkingBudget: 0,
+    });
+  });
+
   it("surfaces cachedContentTokenCount as cachedTokens", async () => {
     const { ai } = makeFakeAI({
       response: {
