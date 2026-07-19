@@ -137,8 +137,9 @@ deepseek.model({ name: "deepseek-reasoner", reasoning: false }); // suppress it
 ## Reasoning effort
 
 `deepseek-reasoner` (and the `*-pro` tier) emit a reasoning channel. When the
-model is reasoning-capable, `reasoning.effort` (`"low" | "medium" | "high"`)
-maps verbatim to the OpenAI-compatible `reasoning_effort` param. When
+model is reasoning-capable, `reasoning.effort`
+(`"low" | "medium" | "high" | "none"`) maps verbatim to the
+OpenAI-compatible `reasoning_effort` param. When
 `capabilities.reasoning` is `false` (e.g. `deepseek-chat`), the option is
 dropped — the adapter never forwards it.
 

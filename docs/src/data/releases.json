@@ -1,6 +1,12 @@
 {
   "_doc": "Release-level metadata for the unified changelog — the DATE and the 'what shipped' SUMMARY for each version. Per-package change details (Added/Changed/Fixed/Removed) live in each package's CHANGELOG.md and are aggregated by scripts/generate-changelog.mjs; this file supplies the release date + summary that the per-package files don't carry. Hand-maintained: add one entry per release, keyed by the version string. `date` is a display string (e.g. \"June 4, 2026\"); `summary` supports inline `code`, **bold**, and [links](url); `featured` (optional) is an array of package names floated to the top of that release's package list, in the listed order (the rest follow most-changed-first, then alphabetical). Keep the summary to ONE short headline — what shipped and which packages — not an API-by-API tour; the per-package list below it carries the detail.",
 
+  "4.8.0": {
+    "date": "July 19, 2026",
+    "summary": "A new `reasoning: { effort: \"none\" }` level in **`@warlock.js/ai`** runs a reasoning model without reasoning, explicitly — **`@warlock.js/ai-openai`** emits `reasoning_effort: \"none\"` so OpenAI gpt-5 / o-series models accept function tools instead of returning empty replies, and the budget-based adapters (**`@warlock.js/ai-anthropic`**, **`@warlock.js/ai-google`**, **`@warlock.js/ai-ollama`**) map it to reasoning-off.",
+    "featured": ["@warlock.js/ai-openai", "@warlock.js/ai"]
+  },
+
   "4.7.0": {
     "date": "July 6, 2026",
     "summary": "**`@warlock.js/ai`** gains the prompt compiler — `systemPrompt().refined({ model, criteria, store })` lazily rewrites human-authored prompt text into a model-optimized version, pinned like a lockfile with machine-enforced placeholder parity and an always-safe fallback to the original — plus `ai.prompts.validate({ criteria })` to grade a prompt against your own rules. **`@warlock.js/fs`** gains an ergonomic async `fs` facade — `fs.files.*` / `fs.dirs.*` grouping, lazy `File` / `Directory` handles, read-modify-write helpers (`edit` / `editJson` / `mergeJson`), recursive `walk`, and zero-dependency schema-validated JSON. **`@warlock.js/cascade`** lands a driver-correctness pass — a dozen real Postgres/MongoDB driver fixes (multi-row `findAndUpdate`, `where`-scoped `update` / `unset` / `deleteOne`, pivot `detach`, MongoDB `with()` eager-loading, per-subclass global scopes) plus new `lockForUpdate({ skipLocked })` row locking (`FOR UPDATE SKIP LOCKED`).",

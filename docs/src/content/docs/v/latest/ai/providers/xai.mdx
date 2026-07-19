@@ -130,8 +130,9 @@ Model availability changes over time — pass any current Grok id through
 ## Reasoning effort
 
 `grok-4` and `grok-3-mini` are reasoning-capable. `reasoning.effort`
-(`"low" | "medium" | "high"`) maps verbatim to the OpenAI-compatible
-`reasoning_effort` param. When `capabilities.reasoning` is `false` (e.g.
+(`"low" | "medium" | "high" | "none"`) maps verbatim to the
+OpenAI-compatible `reasoning_effort` param. When `capabilities.reasoning`
+is `false` (e.g.
 `grok-3`), the option is dropped — the adapter never forwards it. Pin
 `reasoning: true` to force it for a custom/gateway id.
 

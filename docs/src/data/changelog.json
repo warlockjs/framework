@@ -108,6 +108,101 @@
   ],
   "releases": [
     {
+      "version": "4.8.0",
+      "id": "v4-8-0",
+      "date": "July 19, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "A new <code>reasoning: { effort: \"none\" }</code> level in <strong><code>@warlock.js/ai</code></strong> runs a reasoning model without reasoning, explicitly — <strong><code>@warlock.js/ai-openai</code></strong> emits <code>reasoning_effort: \"none\"</code> so OpenAI gpt-5 / o-series models accept function tools instead of returning empty replies, and the budget-based adapters (<strong><code>@warlock.js/ai-anthropic</code></strong>, <strong><code>@warlock.js/ai-google</code></strong>, <strong><code>@warlock.js/ai-ollama</code></strong>) map it to reasoning-off.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>reasoning: { effort: \"none\" }</code></strong> now emits <code>reasoning_effort: \"none\"</code> on the wire — unblocks function tools on gpt-5 / o-series reasoning models, which otherwise reject tools on Chat Completions while reasoning is active and return empty replies."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>reasoning: { effort: \"none\" }</code></strong> — a neutral \"run without reasoning, explicitly\" level on <code>ReasoningEffort</code>; OpenAI emits <code>reasoning_effort: \"none\"</code> so gpt-5 / o-series accept function tools, and budget-based adapters (Anthropic / Bedrock / Google / Ollama) disable thinking."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<strong><code>reasoning: { effort: \"none\" }</code></strong> disables extended thinking (emits no <code>thinking</code> block) — the neutral \"run without reasoning\" level, consistent across adapters."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<strong><code>reasoning: { effort: \"none\" }</code></strong> maps to <code>thinkingBudget: 0</code> — Gemini's native reasoning-off switch, the neutral \"run without reasoning\" level."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<strong><code>reasoning: { effort: \"none\" }</code></strong> maps to <code>think: false</code> — the neutral \"run without reasoning\" level, consistent across adapters."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "4.7.0",
       "id": "v4-7-0",
       "date": "July 6, 2026",

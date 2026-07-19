@@ -104,7 +104,7 @@ const model = groq.model({ name: "deepseek-r1-distill-llama-70b" }); // reasonin
 await model.complete(messages, { reasoning: { effort: "high" } });   // → reasoning_effort: "high"
 ```
 
-- `reasoning.effort` (`"low" | "medium" | "high"`) maps verbatim.
+- `reasoning.effort` (`"low" | "medium" | "high" | "none"`) maps verbatim.
 - `reasoning.maxTokens` has no Chat Completions equivalent and is ignored
   (same as the OpenAI adapter).
 - When `capabilities.reasoning` is `false` (e.g. `llama-3.3-70b-versatile`),

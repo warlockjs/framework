@@ -351,7 +351,7 @@ The output/input-modality track — image, speech, and transcription verbs that 
 | `ModelContract` | Returned by `sdk.model({...})`. Owns `complete`, `stream`, `capabilities`, `pricing`. |
 | `ModelCapabilities` | `{ structuredOutput?, vision?, reasoning?, promptCaching?, audio?, ... }` — feature flags the agent reads before forwarding options. |
 | `ModelCallOptions` | Per-call options forwarded to the model — `temperature`, `maxTokens`, plus `reasoning?: { effort?, maxTokens? }` and `cacheControl?: { breakpoints? }`. |
-| `ReasoningEffort` | `"low" | "medium" | "high"`. |
+| `ReasoningEffort` | `"low" | "medium" | "high" | "none"`. `"none"` runs the model without reasoning (OpenAI emits `reasoning_effort: "none"` — the mode that lets gpt-5 / o-series accept function tools). |
 | `ModelResponse` | Shape returned by `model.complete`. |
 | `ModelPricing` | `{ input, output, cachedInput?, cachedOutput?, reasoning? }` — USD per 1M tokens, per channel. |
 | `Usage` | `{ input, output, total, cachedTokens?, cacheWriteTokens?, reasoningTokens?, cost? }`. |
