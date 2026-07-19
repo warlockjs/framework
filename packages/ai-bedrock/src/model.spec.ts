@@ -1058,6 +1058,19 @@ describe("BedrockModel cost-truth — reasoning / thinking", () => {
     expect(calls[0]).not.toHaveProperty("additionalModelRequestFields");
   });
 
+  it("no-ops when effort is 'none' (explicit reasoning-off, thinking omitted)", async () => {
+    const { client, calls } = makeFakeClient({ converse: baseConverse });
+    const model = new BedrockModel(client, {
+      name: "anthropic.claude-3-7-sonnet-20250219-v1:0",
+    });
+
+    await model.complete([{ role: "user", content: "hi" }], {
+      reasoning: { effort: "none" },
+    });
+
+    expect(calls[0]).not.toHaveProperty("additionalModelRequestFields");
+  });
+
   it("forwards thinking on the stream request path too", async () => {
     const { client, calls } = makeFakeClient({
       streamEvents: [
