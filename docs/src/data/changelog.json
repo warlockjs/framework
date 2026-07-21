@@ -108,6 +108,50 @@
   ],
   "releases": [
     {
+      "version": "4.8.1",
+      "id": "v4-8-1",
+      "date": "July 21, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "Fixes a split-brain bug where <strong><code>@warlock.js/core</code></strong>'s bundler vendored its own disconnected copy of <strong><code>@warlock.js/ai</code></strong> (and the same gap for <code>@warlock.js/access</code> / <code>@warlock.js/notifications</code>) because they weren't declared as peer dependencies — the vendored copy's config never reached listeners (e.g. <code>ai-panoptic</code>'s dashboard) registered against the real installed package. Also logs previously-swallowed <code>onConfigApplied</code> listener errors in <code>@warlock.js/ai</code>.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>@warlock.js/ai</code>, <code>@warlock.js/access</code>, and <code>@warlock.js/notifications</code> declared as optional <code>peerDependencies</code> (matching the existing <code>@warlock.js/herald</code> pattern) so pkgist's bundler leaves them external instead of vendoring their source into core's own build — a vendored <code>@warlock.js/ai</code> copy was a disconnected module instance whose config listeners (e.g. <code>ai-panoptic</code>'s dashboard wiring) never received <code>ai.config(...)</code> calls routed through the real, separately-installed package"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>setAIConfig</code>'s <code>onConfigApplied</code> listener notification no longer swallows a misbehaving listener's exception silently — it's now logged via <code>log.error(\"ai\", \"configListener\", error)</code>"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "4.8.0",
       "id": "v4-8-0",
       "date": "July 19, 2026",
