@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/ai-bedrock",
-  "version": "4.8.0",
+  "version": "4.8.1",
   "type": "module",
   "description": "AWS Bedrock adapter for @warlock.js/ai",
   "main": "./src/index.ts",
