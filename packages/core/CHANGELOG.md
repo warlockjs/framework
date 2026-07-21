@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/core` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.8.1 - 2026-07-21
+
+### Fixed
+
+- `@warlock.js/ai`, `@warlock.js/access`, and `@warlock.js/notifications` declared as optional `peerDependencies` (matching the existing `@warlock.js/herald` pattern) so pkgist's bundler leaves them external instead of vendoring their source into core's own build — a vendored `@warlock.js/ai` copy was a disconnected module instance whose config listeners (e.g. `ai-panoptic`'s dashboard wiring) never received `ai.config(...)` calls routed through the real, separately-installed package
+
 ## 4.6.1
 
 ### Fixed

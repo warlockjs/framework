@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/core",
-  "version": "4.8.0",
+  "version": "4.8.1",
   "description": "A robust nodejs framework for building blazing fast applications",
   "main": "./esm/index.js",
   "bin": {
@@ -59,7 +59,10 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "@react-email/render": "^2.0.5",
-    "@warlock.js/herald": "*"
+    "@warlock.js/herald": "*",
+    "@warlock.js/ai": "*",
+    "@warlock.js/access": "*",
+    "@warlock.js/notifications": "*"
   },
   "peerDependenciesMeta": {
     "sharp": {
@@ -93,6 +96,15 @@
       "optional": true
     },
     "@warlock.js/herald": {
+      "optional": true
+    },
+    "@warlock.js/ai": {
+      "optional": true
+    },
+    "@warlock.js/access": {
+      "optional": true
+    },
+    "@warlock.js/notifications": {
       "optional": true
     }
   },
