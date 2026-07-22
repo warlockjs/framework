@@ -108,6 +108,78 @@
   ],
   "releases": [
     {
+      "version": "4.8.2",
+      "id": "v4-8-2",
+      "date": "July 22, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong><code>@warlock.js/ai-panoptic</code></strong>'s dashboard gains an \"Evaluate system prompt\" drawer action — its first write-capable route — plus a round of dashboard reliability fixes (auth-token forwarding, a silent cache-store failure hook) and a <strong><code>@warlock.js/ai</code></strong> peer-dependency / <code>redact()</code> hardening pass.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>DashboardOptions.evaluate</code></strong> — an \"Evaluate system prompt\" drawer action that grades a trace's last captured system prompt via an LLM judge, editable per-run instructions included; the dashboard's first and only write-capable route (<code>POST .../spans/:spanId/evaluate</code>), off unless configured and gated by the same <code>authToken</code> / <code>allowedHosts</code> checks as every other route"
+            },
+            {
+              "type": "Added",
+              "html": "<code>evaluateSystemPrompt</code> / <code>extractLastSystemPrompt</code> / <code>findSpanById</code> — the building blocks behind the drawer action, exported for scripting a grade outside the UI"
+            },
+            {
+              "type": "Fixed",
+              "html": "The dashboard's client-side poll (<code>GET {basePath}api/aggregate</code> / <code>api/traces</code>) now carries the page's <code>?token=</code> as an <code>Authorization: Bearer</code> header on every request — previously, once <code>authToken</code> was configured the initial page load succeeded (the browser's navigation request carries the query string) but every subsequent 2s poll had no auth attached and 401'd forever, leaving the dashboard stuck on an empty/error state despite loading successfully"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>PanopticConfig.cache</code> failures (hydrate-on-startup or write-through — bad URL, unreachable Redis, auth failure) are no longer swallowed into total silence: a new <code>PanopticConfig.onError</code> hook fires on every failure, defaulting to <code>log.error(\"ai-panoptic\", \"cacheStore\", error)</code> when not supplied, so a misconfigured cache driver now surfaces in logs instead of leaving the dashboard permanently empty with zero diagnostic"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>judgePromptBody</code> / <code>formatCriteria</code> / <code>JudgeOutcome</code> — the LLM-as-judge building blocks <code>ai.prompts().validate()</code> already used internally are now public, so other packages (<code>@warlock.js/ai-panoptic</code>'s trace-level system-prompt evaluation) can grade arbitrary prompt text against a model + rubric without a second judging implementation"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>redact()</code> no longer collapses a raw <code>Error</code> (or an <code>Error</code> nested in a <code>cause</code> chain) to <code>{}</code> — <code>name</code> / <code>message</code> / <code>stack</code> aren't own-enumerable on <code>Error</code> instances, so the previous <code>Object.entries()</code> walk saw none of them. This was silently dropping tool/agent error <code>cause</code> detail wherever <code>redact()</code> runs it, including <code>@warlock.js/ai-panoptic</code>'s trace <code>cause</code> field (a failed tool's <code>ToolExecutionError.cause</code> showed as an empty object in the dashboard instead of the underlying thrown error)"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>@warlock.js/ai-openai</code> and <code>pdf-parse</code> declared as optional <code>peerDependencies</code> — both are lazily <code>import()</code>ed (the skills-catalog embedder probe; <code>ai.rag.loadPdf</code>) but weren't listed in either <code>dependencies</code> or <code>peerDependencies</code>, so pkgist's bundler vendored their source directly into <code>ai</code>'s own build instead of leaving them external (the same split-brain class of bug as <code>core</code>'s missing <code>@warlock.js/ai</code> peerDependency, fixed in 4.8.1). For <code>@warlock.js/ai-openai</code> specifically this meant the skills-catalog embedder-installed probe always resolved against the vendored copy bundled into <code>ai</code>, so it reported an embedder provider as \"installed\" even when the app never installed <code>@warlock.js/ai-openai</code> itself"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "4.8.1",
       "id": "v4-8-1",
       "date": "July 21, 2026",

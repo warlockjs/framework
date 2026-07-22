@@ -1,6 +1,12 @@
 {
   "_doc": "Release-level metadata for the unified changelog — the DATE and the 'what shipped' SUMMARY for each version. Per-package change details (Added/Changed/Fixed/Removed) live in each package's CHANGELOG.md and are aggregated by scripts/generate-changelog.mjs; this file supplies the release date + summary that the per-package files don't carry. Hand-maintained: add one entry per release, keyed by the version string. `date` is a display string (e.g. \"June 4, 2026\"); `summary` supports inline `code`, **bold**, and [links](url); `featured` (optional) is an array of package names floated to the top of that release's package list, in the listed order (the rest follow most-changed-first, then alphabetical). Keep the summary to ONE short headline — what shipped and which packages — not an API-by-API tour; the per-package list below it carries the detail.",
 
+  "4.8.2": {
+    "date": "July 22, 2026",
+    "summary": "**`@warlock.js/ai-panoptic`**'s dashboard gains an \"Evaluate system prompt\" drawer action — its first write-capable route — plus a round of dashboard reliability fixes (auth-token forwarding, a silent cache-store failure hook) and a **`@warlock.js/ai`** peer-dependency / `redact()` hardening pass.",
+    "featured": ["@warlock.js/ai-panoptic", "@warlock.js/ai"]
+  },
+
   "4.8.1": {
     "date": "July 21, 2026",
     "summary": "Fixes a split-brain bug where **`@warlock.js/core`**'s bundler vendored its own disconnected copy of **`@warlock.js/ai`** (and the same gap for `@warlock.js/access` / `@warlock.js/notifications`) because they weren't declared as peer dependencies — the vendored copy's config never reached listeners (e.g. `ai-panoptic`'s dashboard) registered against the real installed package. Also logs previously-swallowed `onConfigApplied` listener errors in `@warlock.js/ai`.",

@@ -243,6 +243,7 @@ const aiRecipesGroup = {
         recipe("Wire Panoptic", "observability-wire-panoptic"),
         recipe("Export to OTel and Langfuse", "observability-export-otel-langfuse"),
         recipe("Trace cost dashboard", "observability-trace-cost-dashboard"),
+        recipe("Evaluate a system prompt", "observability-evaluate-system-prompt"),
       ],
     },
   ],
