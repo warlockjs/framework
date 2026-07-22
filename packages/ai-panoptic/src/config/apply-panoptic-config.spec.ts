@@ -1,5 +1,5 @@
 import { getObservers, isObserveAll, setAIConfig } from "@warlock.js/ai";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // `clearObservers` is intentionally NOT on the core public barrel (it is
 // test-only isolation); import it from the core source for spec cleanup.
 import { clearObservers } from "../../../ai/src/observe/observer-registry";
@@ -112,6 +112,25 @@ describe("applyPanopticConfig", () => {
     const handle = await waitForDashboard();
     const res = await fetch(`${handle.url}api/aggregate`);
     expect(res.status).toBe(200);
+  });
+
+  it("routes a cache-store failure to onError instead of swallowing it silently", async () => {
+    const onError = vi.fn();
+    const boom = new Error("ECONNREFUSED");
+
+    applyPanopticConfig({
+      cache: () => {
+        throw boom;
+      },
+      dashboard: { port: 0 },
+      onError,
+    });
+
+    // The dashboard still starts (hydration is best-effort) — proves the
+    // failure didn't block startup, only that it must reach onError.
+    await waitForDashboard();
+
+    expect(onError).toHaveBeenCalledWith(boom);
   });
 
   it("reads ai.config().panoptic through setAIConfig + the seam", () => {

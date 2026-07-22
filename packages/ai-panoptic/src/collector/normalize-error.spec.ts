@@ -42,4 +42,16 @@ describe("normalizeError", () => {
     expect(normalized?.message).toBe("no name no code");
     expect(normalized?.stack).toBeUndefined();
   });
+
+  it("preserves name/message/stack on a raw Error cause instead of collapsing to {}", () => {
+    const cause = new TypeError("Cannot read properties of null (reading 'use_case')");
+    const error = Object.assign(new Error("ToolExecutionError"), { code: "TOOL_EXEC_FAILED", cause });
+
+    const normalized = normalizeError(error);
+
+    const normalizedCause = normalized?.cause as { name: string; message: string; stack: string };
+    expect(normalizedCause.name).toBe("TypeError");
+    expect(normalizedCause.message).toBe("Cannot read properties of null (reading 'use_case')");
+    expect(typeof normalizedCause.stack).toBe("string");
+  });
 });

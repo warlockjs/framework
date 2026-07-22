@@ -71,6 +71,17 @@ export type PanopticConfig = {
    * set `captureMessages`. Default `false`.
    */
   fullHistory?: boolean;
+  /**
+   * Called whenever the cache-backed store (see {@link cache}) fails a
+   * hydrate-on-startup or write-through — a bad URL, an unreachable Redis, an
+   * auth failure. The store is best-effort by design (a flaky cache must
+   * never throw into the collector's hot path), so without this hook a
+   * failure is otherwise invisible: the dashboard just silently shows no
+   * traces, forever, with no diagnostic anywhere. When omitted, defaults to
+   * `log.error("ai-panoptic", "cacheStore", error)` so it's never silent
+   * out of the box; pass your own (even a no-op) to override.
+   */
+  onError?: (error: unknown) => void;
 };
 
 // Panoptic AUGMENTS the core config type via declaration merging — core

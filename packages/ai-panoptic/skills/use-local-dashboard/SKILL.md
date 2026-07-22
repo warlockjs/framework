@@ -166,7 +166,7 @@ type DashboardHandle = {
 
 ## The JSON API
 
-All routes are **`GET`-only and read-only** (non-`GET` → `405`), mounted under `basePath`. The page polls them; you can curl them too. Store shapes are already JSON-safe, so responses are a plain `JSON.stringify`.
+Every route is **`GET`-only and read-only** (non-`GET` → `405`), mounted under `basePath` — EXCEPT the one opt-in `POST .../spans/:spanId/evaluate` route `DashboardOptions.evaluate` enables (see [`evaluate-system-prompt/SKILL.md`](@warlock.js/ai-panoptic/evaluate-system-prompt/SKILL.md)); absent that config, it 405s like everything else. The page polls the `GET` routes; you can curl them too. Store shapes are already JSON-safe, so responses are a plain `JSON.stringify`.
 
 | Route | Returns |
 |---|---|
@@ -174,6 +174,7 @@ All routes are **`GET`-only and read-only** (non-`GET` → `405`), mounted under
 | `GET /api/traces/:id` | `store.get(id)` — one full trace, or `404 { error: "trace_not_found" }`. |
 | `GET /api/aggregate` | `store.aggregate(...)` — the usage + cost + status rollup over the same query filter. |
 | `GET /` (basePath) | the self-contained HTML page. |
+| `POST /api/traces/:traceId/spans/:spanId/evaluate` | grades the span's last captured system prompt — only when `evaluate` is configured. |
 
 Query-string filters map 1:1 onto `TraceQuery`:
 
@@ -200,14 +201,15 @@ const handler = createRequestHandler(store, {
 createServer(handler).listen(4319, "127.0.0.1");
 ```
 
-`dashboardHtml(basePath, title)` returns the served page as a string if you embed it elsewhere. `ServeConfig` is `{ basePath; title; allowedHosts; authToken? }`.
+`dashboardHtml(basePath, title, evaluateEnabled?, evaluateDefaultInstructions?)` returns the served page as a string if you embed it elsewhere. `ServeConfig` is `{ basePath; title; allowedHosts; authToken?; evaluate? }`.
 
 ## Security note
 
-The dashboard surfaces whatever the store holds — including captured prompt/response content when content capture is on (`captureContent`). It binds **loopback-only** by default precisely so that content never leaves the machine. Binding a non-loopback host is gated — it requires an `authToken` (and checks a `Host` allowlist, sending `nosniff` / CSP / `X-Frame-Options: DENY` on every response) — but still prefer loopback for dev, and for production ship to a real backend via an exporter rather than exposing the dashboard.
+The dashboard surfaces whatever the store holds — including captured prompt/response content when content capture is on (`captureContent`). It binds **loopback-only** by default precisely so that content never leaves the machine. Binding a non-loopback host is gated — it requires an `authToken` (and checks a `Host` allowlist, sending `nosniff` / CSP / `X-Frame-Options: DENY` on every response) — but still prefer loopback for dev, and for production ship to a real backend via an exporter rather than exposing the dashboard. The dashboard has exactly one write-capable route (`evaluate`, off by default) — everything else stays read-only regardless of configuration.
 
 ## See also
 
 - [`@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`](@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md) — the `ai.config({ panoptic })` wiring and the underlying `panoptic(...)` subscriber that fills the store.
 - [`@warlock.js/ai-panoptic/query-traces/SKILL.md`](@warlock.js/ai-panoptic/query-traces/SKILL.md) — the `TraceStoreContract` (`query` / `get` / `aggregate`) the dashboard reads, the `TraceQuery` filter, and capacity eviction.
 - [`@warlock.js/ai-panoptic/export-traces/SKILL.md`](@warlock.js/ai-panoptic/export-traces/SKILL.md) — shipping traces to OTel / Langfuse / a file instead of (or alongside) the local dashboard.
+- [`@warlock.js/ai-panoptic/evaluate-system-prompt/SKILL.md`](@warlock.js/ai-panoptic/evaluate-system-prompt/SKILL.md) — the drawer's "Evaluate system prompt" action, the dashboard's one write route.

@@ -1,5 +1,6 @@
 import type { ExecutionReport, Observer } from "@warlock.js/ai";
 import { registerObserver, setObserveAll } from "@warlock.js/ai";
+import { log } from "@warlock.js/logger";
 import type { ExporterContract } from "../contracts/exporter.contract";
 import { dashboard } from "../dashboard/dashboard";
 import type { DashboardHandle, DashboardOptions } from "../dashboard/dashboard.type";
@@ -69,7 +70,11 @@ export function applyPanopticConfig(config?: PanopticConfig): void {
     // the dashboard works with no cache configured.
     if (store === undefined && config.dashboard) {
       if (config.cache !== undefined) {
-        cacheStore = createCacheTraceStore(config.cache);
+        const onError =
+          config.onError ??
+          ((error: unknown) => log.error("ai-panoptic", "cacheStore", error));
+
+        cacheStore = createCacheTraceStore(config.cache, { onError });
         store = cacheStore;
       } else {
         store = createInMemoryTraceStore();

@@ -107,4 +107,32 @@ describe("dashboardHtml", () => {
 
     expect(scoped).toContain('"/panoptic/api"');
   });
+
+  it("bakes EVALUATE_ENABLED false and wires nothing extra by default", () => {
+    expect(html).toContain("EVALUATE_ENABLED = false");
+    expect(html).toContain("data-evaluate-toggle");
+    expect(html).toContain("data-evaluate-run");
+  });
+
+  it("bakes EVALUATE_ENABLED true and the configured default instructions when evaluate is enabled", () => {
+    const enabled = dashboardHtml("/", "Panoptic", true, "Must stay under 200 words.");
+
+    expect(enabled).toContain("EVALUATE_ENABLED = true");
+    expect(enabled).toContain("Must stay under 200 words.");
+  });
+
+  it("NEVER inlines a literal backtick even when the configured instructions contain one", () => {
+    // The exact hazard encodeForInlineScript exists for: an operator's
+    // instructions containing backtick-quoted code (e.g. "grade `foo()`
+    // calls") must not leak a raw backtick into the outer template.
+    const withBacktick = dashboardHtml("/", "Panoptic", true, "Grade `foo()` calls strictly.");
+    const scriptStart = withBacktick.lastIndexOf("<script>");
+    const scriptBody = withBacktick.slice(scriptStart);
+
+    expect(scriptBody.includes("`")).toBe(false);
+    // Still reconstructs the original text at runtime via BT concatenation.
+    expect(scriptBody).toContain('"Grade "');
+    expect(scriptBody).toContain('"foo()"');
+    expect(scriptBody).toContain("+ BT +");
+  });
 });

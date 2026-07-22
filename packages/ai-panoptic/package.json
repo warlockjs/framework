@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/ai-panoptic",
-  "version": "4.8.1",
+  "version": "4.8.2",
   "type": "module",
   "description": "Observability collector + exporters for @warlock.js/ai",
   "main": "./src/index.ts",
@@ -37,6 +37,7 @@
     "@opentelemetry/sdk-trace-base": "*",
     "@warlock.js/ai": "*",
     "@warlock.js/cache": "*",
+    "@warlock.js/logger": "*",
     "langfuse": "*"
   },
   "peerDependenciesMeta": {

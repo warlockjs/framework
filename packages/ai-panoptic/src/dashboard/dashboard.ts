@@ -61,6 +61,7 @@ export function dashboard(
     title,
     authToken: options.authToken,
     allowedHosts,
+    evaluate: options.evaluate,
   });
   const server = createServer(handler);
 

@@ -39,7 +39,12 @@ import { WARLOCK_LOGO_DATA_URI } from "./warlock-logo";
  * @param basePath Normalized mount path ending in `/` (e.g. `"/"`).
  * @param title Header title shown in the page.
  */
-export function dashboardHtml(basePath: string, title: string): string {
+export function dashboardHtml(
+  basePath: string,
+  title: string,
+  evaluateEnabled: boolean = false,
+  evaluateDefaultInstructions: string = "",
+): string {
   const apiBase = `${basePath}api`;
   const safeTitle = escapeHtml(title);
 
@@ -221,6 +226,18 @@ export function dashboardHtml(basePath: string, title: string): string {
   .legend { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--dim); }
   .legend .grad { width: 64px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--surface2), var(--cost)); border: 1px solid var(--border); }
   .gantt { padding: 8px 10px; }
+
+  /* Evaluate — the drawer's one write action (config-gated). */
+  .eval-btn { background: transparent; border: 1px solid var(--border); color: var(--text2); cursor: pointer; font-size: 12px; padding: 4px 10px; border-radius: 6px; margin: 10px 0 0; }
+  .eval-btn:hover:not(:disabled) { color: var(--text); border-color: var(--border2); }
+  .eval-btn:disabled { opacity: .6; cursor: default; }
+  .eval-panel { margin-top: 8px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); }
+  .eval-panel textarea { width: 100%; min-height: 64px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px; font: 12px/1.5 ui-sans-serif, system-ui, sans-serif; resize: vertical; }
+  .eval-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .eval-error { color: var(--fail); font-size: 12px; }
+  .eval-result { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; }
+  .eval-score { font-weight: 600; }
+  .eval-issues { margin: 6px 0 0; padding-left: 18px; }
   .grow { display: flex; align-items: center; gap: 8px; padding: 2px 0; font-size: 12px; cursor: pointer; border-radius: 4px; }
   .grow:hover { background: var(--surface); }
   .grow.selected { background: var(--sel-bg); }
@@ -285,7 +302,21 @@ export function dashboardHtml(basePath: string, title: string): string {
 <script>
 (function () {
   var API = ${JSON.stringify(apiBase)};
+  var EVALUATE_ENABLED = ${JSON.stringify(evaluateEnabled)};
   var BT = String.fromCharCode(96);
+  var EVALUATE_DEFAULT_INSTRUCTIONS = ${encodeForInlineScript(evaluateDefaultInstructions)};
+
+  // Carry the ?token= the page itself was loaded with onto every
+  // subsequent poll — otherwise the API calls below inherit no auth and
+  // 401 forever once authToken is configured (the initial page load is
+  // the only request the URL's query string naturally reaches).
+  var TOKEN = new URLSearchParams(window.location.search).get("token");
+  function fetchAuthed(url, options) {
+    var opts = options || {};
+    var headers = opts.headers || {};
+    if (TOKEN) headers = Object.assign({}, headers, { Authorization: "Bearer " + TOKEN });
+    return fetch(url, Object.assign({}, opts, { headers: headers }));
+  }
 
   var state = {
     traces: [], selectedId: null, selectedSpanId: null, collapsed: {}, sig: null,
@@ -297,7 +328,8 @@ export function dashboardHtml(basePath: string, title: string): string {
     showStats: false,             // per-type aggregate-stats panel toggle (independent of grouping)
     collapsedGroups: {},          // collapsed group headers (session, prompt, or type)
     view: "tree",                 // drawer left pane: "tree" | "timeline"
-    hashApplied: false            // guards one-time deep-link open on load
+    hashApplied: false,           // guards one-time deep-link open on load
+    evaluate: {}                  // per-span evaluate UI state, keyed by spanId
   };
 
   var STATUS_FILTERS = ["completed", "failed", "cancelled"];
@@ -1006,6 +1038,80 @@ export function dashboardHtml(basePath: string, title: string): string {
     return '<div class="meta-sec"><div class="meta-title">metadata</div><div class="kv">' + kv + "</div></div>";
   }
 
+  // --- Evaluate: grade a span's last captured system prompt -------------
+  // Config-gated (EVALUATE_ENABLED) — the drawer's only write action, POSTing
+  // to a route that itself only exists when the server was configured with
+  // evaluate. UI state lives in state.evaluate, keyed by spanId, so it
+  // survives a re-render (e.g. switching to a sibling span and back).
+  function extractLastSystemPrompt(span) {
+    if (!Array.isArray(span.input)) return null;
+    for (var i = span.input.length - 1; i >= 0; i--) {
+      var m = span.input[i];
+      if (m && typeof m === "object" && m.role === "system" && typeof m.content === "string") return m.content;
+    }
+    return null;
+  }
+  function evalState(spanId) {
+    return state.evaluate[spanId] || (state.evaluate[spanId] = {
+      open: false, instructions: EVALUATE_DEFAULT_INSTRUCTIONS, status: "idle", result: null, error: null
+    });
+  }
+  function evalResultHtml(result) {
+    var score = typeof result.score === "number" ? Math.round(result.score * 100) + "%" : "n/a";
+    var issues = (result.issues || []).map(function (i) { return "<li>" + esc(i) + "</li>"; }).join("");
+    return '<div class="eval-result"><span class="eval-score">Score: ' + score + "</span>"
+      + (issues ? '<ul class="eval-issues">' + issues + "</ul>" : "") + "</div>";
+  }
+  function evalSectionHtml(span) {
+    if (!EVALUATE_ENABLED) return "";
+    var sysPrompt = extractLastSystemPrompt(span);
+    if (!sysPrompt) return "";
+    var st = evalState(span.spanId);
+    var btn = '<button type="button" class="eval-btn" data-evaluate-toggle="' + esc(span.spanId) + '">'
+      + (st.open ? "Hide evaluate" : "Evaluate system prompt") + "</button>";
+    if (!st.open) return btn;
+    var running = st.status === "running";
+    return btn + '<div class="eval-panel">'
+      + '<textarea id="eval-instructions" placeholder="Grading instructions (optional — falls back to the configured default)"' + (running ? " disabled" : "") + ">" + esc(st.instructions || "") + "</textarea>"
+      + '<div class="eval-actions">'
+      + '<button type="button" class="eval-btn" data-evaluate-run="' + esc(span.spanId) + '"' + (running ? " disabled" : "") + ">" + (running ? "Evaluating…" : "Run") + "</button>"
+      + (st.error ? '<span class="eval-error">' + esc(st.error) + "</span>" : "")
+      + "</div>"
+      + (st.result ? evalResultHtml(st.result) : "")
+      + "</div>";
+  }
+  function rerenderDetail() {
+    var t = findTrace(state.selectedId);
+    if (!t) return;
+    var sel = findSpan(t.root, state.selectedSpanId) || t.root;
+    document.getElementById("drawer-detail").innerHTML = renderDetail(sel, t);
+  }
+  function toggleEvalPanel(spanId) {
+    evalState(spanId).open = !evalState(spanId).open;
+    rerenderDetail();
+  }
+  function runEvaluate(traceId, spanId) {
+    var st = evalState(spanId);
+    var textarea = document.getElementById("eval-instructions");
+    if (textarea) st.instructions = textarea.value;
+    st.status = "running"; st.error = null;
+    rerenderDetail();
+    fetchAuthed(API + "/traces/" + encodeURIComponent(traceId) + "/spans/" + encodeURIComponent(spanId) + "/evaluate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ instructions: st.instructions })
+    }).then(function (r) {
+      return r.json().then(function (data) { return { ok: r.ok, data: data }; });
+    }).then(function (res) {
+      if (res.ok) { st.status = "done"; st.result = res.data; st.error = null; }
+      else { st.status = "error"; st.error = (res.data && (res.data.message || res.data.error)) || "evaluate failed"; st.result = null; }
+      rerenderDetail();
+    }).catch(function () {
+      st.status = "error"; st.error = "network error"; st.result = null;
+      rerenderDetail();
+    });
+  }
+
   function renderDetail(span, trace) {
     var path = findPath(trace.root, span.spanId) || [span];
     var crumb = path.map(function (p, i) { return (i ? '<span class="sep"> › </span>' : "") + "<span>" + esc(p.name) + "</span>"; }).join("");
@@ -1028,6 +1134,7 @@ export function dashboardHtml(basePath: string, title: string): string {
       + '<span class="dim">· ' + dur(span.duration) + "</span></div>"
       + metaLine
       + io
+      + evalSectionHtml(span, trace)
       + renderMeta(span, trace);
   }
 
@@ -1190,8 +1297,19 @@ export function dashboardHtml(basePath: string, title: string): string {
     if (vb) { setView(vb.getAttribute("data-view")); return; }
     var tog = e.target.closest ? e.target.closest("[data-toggle]") : null;
     if (tog) { toggleSpan(tog.getAttribute("data-toggle")); return; }
+    var evalToggle = e.target.closest ? e.target.closest("[data-evaluate-toggle]") : null;
+    if (evalToggle) { toggleEvalPanel(evalToggle.getAttribute("data-evaluate-toggle")); return; }
+    var evalRun = e.target.closest ? e.target.closest("[data-evaluate-run]") : null;
+    if (evalRun && state.selectedId) { runEvaluate(state.selectedId, evalRun.getAttribute("data-evaluate-run")); return; }
     var node = e.target.closest ? e.target.closest(".tnode[data-span], .grow[data-span]") : null;
     if (node) selectSpan(node.getAttribute("data-span"));
+  });
+  // Track the instructions textarea live (no re-render on keystroke, so
+  // typing never loses focus/cursor position).
+  document.getElementById("drawer-body").addEventListener("input", function (e) {
+    if (e.target && e.target.id === "eval-instructions" && state.selectedSpanId) {
+      evalState(state.selectedSpanId).instructions = e.target.value;
+    }
   });
   document.getElementById("backdrop").addEventListener("click", closeDrawer);
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" || e.keyCode === 27) closeDrawer(); });
@@ -1288,8 +1406,8 @@ export function dashboardHtml(basePath: string, title: string): string {
 
   function poll() {
     Promise.all([
-      fetch(API + "/aggregate").then(function (r) { return r.json(); }),
-      fetch(API + "/traces").then(function (r) { return r.json(); })
+      fetchAuthed(API + "/aggregate").then(function (r) { return r.json(); }),
+      fetchAuthed(API + "/traces").then(function (r) { return r.json(); })
     ]).then(function (res) {
       renderStats(res[0]);
       state.traces = res[1] || [];
@@ -1329,4 +1447,24 @@ function escapeHtml(value: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+/**
+ * Encode free-form text (e.g. `evaluate.instructions`, which an operator
+ * could type anything into) as a JS EXPRESSION that reconstructs it at
+ * runtime, WITHOUT ever emitting a literal backtick into the served page —
+ * the client script is itself built from a TS template literal, so a raw
+ * backtick in the output would be a real syntax hazard (see the `BT =
+ * String.fromCharCode(96)` construction already in the client script for
+ * the same reason). `JSON.stringify` alone doesn't escape backticks (they
+ * aren't JSON-significant), so a value containing one is split around it
+ * and rejoined with the client's own `BT` constant. No backticks in the
+ * input ⇒ a single plain `JSON.stringify(value)` — no unnecessary
+ * concatenation in the common case.
+ */
+function encodeForInlineScript(value: string): string {
+  return value
+    .split("`")
+    .map(part => JSON.stringify(part))
+    .join(" + BT + ");
 }

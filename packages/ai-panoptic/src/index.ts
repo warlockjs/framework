@@ -81,6 +81,11 @@ export type {
   PanopticTarget,
 } from "./panoptic";
 
+// Evaluate — grade a trace's captured system prompt via the dashboard's
+// "Evaluate system prompt" drawer action (config-gated; see DashboardOptions.evaluate).
+export { evaluateSystemPrompt, extractLastSystemPrompt, findSpanById } from "./evaluate";
+export type { EvaluateConfig, EvaluateVerdict } from "./evaluate";
+
 // Dashboard — zero-dependency local server over a trace store.
 export { dashboard } from "./dashboard";
 export type { DashboardHandle, DashboardOptions } from "./dashboard";

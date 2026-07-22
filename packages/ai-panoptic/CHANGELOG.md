@@ -4,6 +4,18 @@ All notable changes to `@warlock.js/ai-panoptic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.8.2 - 2026-07-22
+
+### Added
+
+- **`DashboardOptions.evaluate`** — an "Evaluate system prompt" drawer action that grades a trace's last captured system prompt via an LLM judge, editable per-run instructions included; the dashboard's first and only write-capable route (`POST .../spans/:spanId/evaluate`), off unless configured and gated by the same `authToken` / `allowedHosts` checks as every other route
+- `evaluateSystemPrompt` / `extractLastSystemPrompt` / `findSpanById` — the building blocks behind the drawer action, exported for scripting a grade outside the UI
+
+### Fixed
+
+- The dashboard's client-side poll (`GET {basePath}api/aggregate` / `api/traces`) now carries the page's `?token=` as an `Authorization: Bearer` header on every request — previously, once `authToken` was configured the initial page load succeeded (the browser's navigation request carries the query string) but every subsequent 2s poll had no auth attached and 401'd forever, leaving the dashboard stuck on an empty/error state despite loading successfully
+- `PanopticConfig.cache` failures (hydrate-on-startup or write-through — bad URL, unreachable Redis, auth failure) are no longer swallowed into total silence: a new `PanopticConfig.onError` hook fires on every failure, defaulting to `log.error("ai-panoptic", "cacheStore", error)` when not supplied, so a misconfigured cache driver now surfaces in logs instead of leaving the dashboard permanently empty with zero diagnostic
+
 ## 4.5.0 - 2026-07-01
 
 ### Added

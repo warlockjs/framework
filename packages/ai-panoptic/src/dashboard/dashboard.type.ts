@@ -1,11 +1,15 @@
+import type { EvaluateConfig } from "../evaluate/evaluate.type";
+
 /**
  * Options for the local Panoptic {@link dashboard} server.
  *
  * Every field is optional and has a safe default. The dashboard is a dev
  * tool over an in-memory trace store: it binds loopback-only by default
  * (so prompt content is never accidentally exposed to the LAN), serves a
- * single self-contained HTML page, and exposes a tiny read-only JSON API
- * the page polls. There is no auth, persistence, or write surface.
+ * single self-contained HTML page, and exposes a JSON API the page polls —
+ * every route is `GET`-only and read-only EXCEPT the one opt-in write route
+ * {@link DashboardOptions.evaluate} enables. There is no auth or persistence
+ * by default either.
  */
 export type DashboardOptions = {
   /**
@@ -47,6 +51,15 @@ export type DashboardOptions = {
    * bind; for a non-loopback bind you must list the expected host(s).
    */
   allowedHosts?: string[];
+  /**
+   * Enables the drawer's "Evaluate system prompt" button and its backing
+   * `POST {basePath}api/traces/:traceId/spans/:spanId/evaluate` route — the
+   * dashboard's only write-capable route, and only reachable when this is
+   * set. Absent ⇒ the button never renders and a POST there 405s like any
+   * other route. Gated by the same `authToken` / `allowedHosts` checks as
+   * every other route.
+   */
+  evaluate?: EvaluateConfig;
 };
 
 /**
