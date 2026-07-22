@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/ai-mistral",
-  "version": "4.8.1",
+  "version": "4.8.2",
   "type": "module",
   "description": "Mistral AI adapter for @warlock.js/ai (OpenAI-compatible)",
   "main": "./src/index.ts",
