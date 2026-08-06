@@ -53,6 +53,17 @@ await user.merge({ name: "Augusta Ada King", status: "active" }).save();
 
 `.merge()` copies each key from the object into the instance's pending state (only the keys present), then `.save()` persists. Existing fields not in the object are untouched. A typical update service in your codebase looks exactly like that one line.
 
+**Nested values follow one rule:** plain objects are merged key-by-key, so siblings survive; everything else — primitives, arrays, and class instances such as `Date`, `Map`, `Set`, `RegExp` — replaces the old value outright.
+
+```ts
+await user.merge({ profile: { age: 26 } }).save();   // profile.city untouched
+await user.merge({ lastSeenAt: new Date() }).save(); // replaces the previous Date
+```
+
+:::caution[Upgrade to 4.9.1 if you merge `Date` columns]
+Before 4.9.1, merging a `Date` over a column that **already held a `Date`** was silently dropped — the column never went dirty and `.save()` returned `{ success: true, modifiedCount: 0 }` without issuing an `UPDATE`. Writing into an empty column always worked, so only overwrites were affected.
+:::
+
 ### `.save()` after manual mutation — when you've already changed state
 
 Sometimes the mutations are spread across branches and an object form would be awkward. `.save()` with no args flushes whatever's pending:

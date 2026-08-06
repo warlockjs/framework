@@ -108,6 +108,33 @@
   ],
   "releases": [
     {
+      "version": "4.9.1",
+      "id": "v4-9-1",
+      "date": "August 6, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong><code>@warlock.js/cascade</code></strong> fixes a silent data-loss bug in <code>.save({ merge })</code>: a <code>Date</code> written over a column that already held a <code>Date</code> was discarded — the dirty tracker treated any <code>typeof \"object\"</code> value as mergeable and recursed into the <code>Date</code>, which has no own enumerable properties, so nothing was copied and the column never went dirty. <code>save()</code> returned <code>{ success: true, modifiedCount: 0 }</code> and issued no <code>UPDATE</code>. Only plain objects deep-merge now; <code>Date</code>, <code>Map</code>, <code>Set</code> and every other class instance replace.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>save({ merge })</code> silently dropped a <code>Date</code> written over a column that already held a <code>Date</code> — the dirty tracker's merge treated anything <code>typeof \"object\"</code> as mergeable and recursed into the <code>Date</code>, which has no own enumerable properties, so nothing was copied and the old value survived. The column never went dirty and <code>save()</code> returned <code>{ success: true, modifiedCount: 0 }</code> without issuing an <code>UPDATE</code>. Only plain objects deep-merge now; <code>Date</code>, <code>Map</code>, <code>Set</code>, <code>RegExp</code> and every other class instance replace, matching what <code>model.data</code> already did. Writing into an empty column always worked, so only overwrites were affected"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "4.9.0",
       "id": "v4-9-0",
       "date": "August 6, 2026",
