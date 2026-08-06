@@ -15,10 +15,32 @@ describe("defineConfig", () => {
     const resolved = defineConfig({});
 
     expect(resolved.build).toEqual({
-      outDirectory: process.cwd() + "/dist",
+      outdir: process.cwd() + "/dist",
       outFile: "app.js",
       sourcemap: true,
       minify: true,
+    });
+  });
+
+  describe("the outDirectory alias", () => {
+    it("folds outDirectory into the canonical outdir", () => {
+      const resolved = defineConfig({ build: { outDirectory: "build" } });
+
+      expect(resolved.build?.outdir).toBe("build");
+    });
+
+    it("lets outdir win when both names are set", () => {
+      const resolved = defineConfig({
+        build: { outdir: "wins", outDirectory: "loses" },
+      });
+
+      expect(resolved.build?.outdir).toBe("wins");
+    });
+
+    it("leaves the default outdir alone when neither is set", () => {
+      const resolved = defineConfig({ build: { minify: false } });
+
+      expect(resolved.build?.outdir).toBe(process.cwd() + "/dist");
     });
   });
 

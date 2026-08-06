@@ -1,5 +1,6 @@
 import { checkForFrameworkUpdate } from "../../dev-server/check-for-updates";
 import { startDevelopmentServer } from "../../dev-server/start-development-server";
+import { isDevWorker, superviseDevServer } from "../../dev-server/supervisor";
 import { command } from "../cli-command";
 import { displayStartupBanner } from "../cli-commands.utils";
 
@@ -18,10 +19,24 @@ export const devServerCommand = command({
     connectors: true,
   },
   preAction: async () => {
+    // Two roles share this command. The first `warlock dev` becomes a thin
+    // supervisor that owns the terminal and (re)spawns the real server; the
+    // process it spawns carries WARLOCK_DEV_WORKER and falls through to the
+    // server itself. See supervisor.ts for why the split exists.
+    //
+    // This branch has to sit in `preAction`, which runs BEFORE the command's
+    // preloaders: the supervisor must never load config or start connectors,
+    // or it would hold a second database connection open for the whole
+    // session. `superviseDevServer()` never resolves, so nothing below it —
+    // preload included — runs in the supervisor.
+    if (!isDevWorker()) {
+      return superviseDevServer();
+    }
+
     await displayStartupBanner({ environment: "development" });
   },
   action: async (data) => {
-    startDevelopmentServer({
+    const devServer = await startDevelopmentServer({
       fresh: Boolean(data.options.fresh),
       // Pass `false` only when the CLI flag is explicitly set; `undefined`
       // lets `warlock.config.ts > devServer.*` defaults apply.
@@ -30,9 +45,10 @@ export const devServerCommand = command({
     });
 
     // Fire-and-forget: once the server is ready, surface a one-line notice if
-    // a newer @warlock.js/core has been published. Fully self-guarded — it
-    // never blocks startup nor breaks dev if the registry is unreachable.
-    void checkForFrameworkUpdate();
+    // a newer @warlock.js/core has been published, and arm the `u` shortcut
+    // that updates + restarts. Fully self-guarded — it never blocks startup
+    // nor breaks dev if the registry is unreachable.
+    void checkForFrameworkUpdate(devServer);
   },
   options: [
     {

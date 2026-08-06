@@ -4,6 +4,31 @@ All notable changes to `@warlock.js/core` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.9.0 - 2026-08-06
+
+### Added
+
+- `warlock dev` keyboard shortcuts — `r` restart, `c` clear, `q` quit, `h` help — armed once the server is ready and listed by `h`. TTY-gated, and `Ctrl+C` keeps working while raw mode is held
+- press `u` on the `warlock dev` update notice to update every `@warlock.js/*` dependency, install, and restart the server in place — no Ctrl+C round-trip. Falls back to the printed `npx warlock update` command when the terminal can't deliver keypresses (CI, piped stdin, supervisors)
+- `warlock dev` now runs as a supervised pair — a thin parent that owns the terminal and a disposable worker — so restarting replaces the worker instead of stacking a process per restart, and the supervisor never loads config or connectors
+- `warlock dev` restarts automatically when `warlock.config.ts` or any `.env*` changes, since neither can be hot-reloaded; opt out with `devServer.restartOnConfigChange: false` for the previous warning
+- Bun support in `warlock update` and `warlock add` — `bun.lock` / `bun.lockb` are detected and drive `bun install` / `bun add`
+- `warlock dev` recovers from a crash: a worker that dies after running healthily for 5s is replaced automatically, while one that dies during boot is left alone so its error isn't buried under a reprint. Capped at 3 crashes per minute
+- `warlock update --dry-run` reports what would change without touching anything, and `--check` does the same but exits `1` when a package is behind — a CI gate for staying current
+
+### Changed
+
+- the dev-server update check remembers npm's answer for 24h in `.warlock/update-check.json`, so a day of restarts costs one lookup instead of one per boot; failed lookups are never cached, and the entry is dropped once an update is applied
+
+### Fixed
+
+- `warlock start` spawns `process.execPath` instead of a bare `node`, which failed with `ENOENT` wherever `node` is not on `PATH` (systemd units, cron, slim containers) and could otherwise pick a different Node version than the one running the CLI
+- `warlock add` no longer carries its own package-manager detection that silently produced an undefined install command when the project had no recognised lockfile — it shares the updater's detection
+- `build.outDirectory` — the name the docs have used for several releases — is now actually read. Only `build.outdir` ever was, so a config written from the documentation was silently ignored and the bundle still went to `dist/`. Both names now work (`outdir` wins if you set both) and the docs lead with `outdir`
+- `warlock update` no longer reports "All @warlock.js packages are already up to date" when it never reached the npm registry — an offline run now says so and changes nothing
+- a failed package-manager install during `warlock update` no longer loses the rewritten `package.json`; the CLI still exits non-zero
+- the dev server's update check now uses a 5s abort budget instead of 30s, so a hanging network can't leave a pending request behind a running server
+
 ## 4.8.1 - 2026-07-21
 
 ### Fixed

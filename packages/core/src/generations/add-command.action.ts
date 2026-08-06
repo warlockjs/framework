@@ -9,6 +9,11 @@ import {
 } from "@warlock.js/fs";
 import { execSync } from "node:child_process";
 import { CommandActionData } from "../cli/types";
+import {
+  detectPackageManager,
+  getAddCommand,
+  type PackageManager,
+} from "../updater/package-manager";
 import { rootPath, srcPath } from "../utils";
 import { getWarlockVersion } from "../utils/framework-vesion";
 import {
@@ -645,8 +650,6 @@ export const featuresMap: Record<
 
 export const allowedFeatures = Object.keys(featuresMap);
 
-type PackageManager = "yarn" | "pnpm" | "npm";
-
 function resolveFeatures(features: string[], visited = new Set<string>()): string[] {
   const resolved: string[] = [];
 
@@ -741,7 +744,7 @@ export async function addCommandAction(options: CommandActionData) {
   if (noInstall) {
     await recordDependencies(dependencies, devDependencies);
   } else {
-    await installDependencies(packageManager as PackageManager, dependencies, devDependencies);
+    await installDependencies(packageManager as PackageManager | undefined, dependencies, devDependencies);
   }
 
   for (const [name, config] of Object.entries(ejectConfigs)) {
@@ -781,11 +784,12 @@ export async function addCommandAction(options: CommandActionData) {
  * Runs two passes (prod then dev) so each lands in the correct section.
  */
 async function installDependencies(
-  packageManager: PackageManager,
+  packageManager: PackageManager | undefined,
   dependencies: Record<string, string>,
   devDependencies: Record<string, string>,
 ) {
-  const packageManagerCommand = await getPackageManagerCommand(packageManager);
+  // `--package-manager` is optional; without it, fall back to the lockfile.
+  const packageManagerCommand = getAddCommand(packageManager ?? (await detectPackageManager()));
 
   if (Object.keys(dependencies).length > 0) {
     console.log(`Installing dependencies ${colors.magenta(Object.keys(dependencies).join(", "))}`);
@@ -858,35 +862,3 @@ function validateFeatures(features: string[]) {
   }
 }
 
-async function getPackageManagerCommand(packageManager?: PackageManager) {
-  if (!packageManager) {
-    // try to detect it through checking lock files
-    packageManager = await detectPackageManager();
-  }
-
-  if (packageManager === "npm") {
-    return "npm install";
-  }
-
-  if (packageManager === "yarn") {
-    return "yarn add";
-  }
-
-  if (packageManager === "pnpm") {
-    return "pnpm add";
-  }
-}
-
-async function detectPackageManager() {
-  if (await fileExistsAsync(rootPath("package-lock.json"))) {
-    return "npm";
-  }
-
-  if (await fileExistsAsync(rootPath("yarn.lock"))) {
-    return "yarn";
-  }
-
-  if (await fileExistsAsync(rootPath("pnpm-lock.yaml"))) {
-    return "pnpm";
-  }
-}

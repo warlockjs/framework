@@ -1,6 +1,6 @@
 ---
 name: run-app
-description: 'Three operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outDirectory`, `outFile`, `sourcemap`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — `@warlock.js/core/write-cli-command/SKILL.md`; config shape — `@warlock.js/core/configure-app/SKILL.md`; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
+description: 'Three operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — `@warlock.js/core/write-cli-command/SKILL.md`; config shape — `@warlock.js/core/configure-app/SKILL.md`; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
 ---
 
 # Warlock — run the app
@@ -36,6 +36,67 @@ Boots the framework in dev mode: file watcher, HMR-style module reload, on-disk 
 
 When a flag is **not** passed, the corresponding `warlock.config.ts > devServer.*` value applies. When passed, the flag wins.
 
+### Keyboard shortcuts
+
+Once the server is ready, `warlock dev` listens for single keypresses:
+
+| Key      | Does                                                                       |
+| -------- | ---------------------------------------------------------------------------- |
+| `r`      | Restart the server on a fresh process.                                     |
+| `c`      | Clear the console.                                                         |
+| `q`      | Graceful shutdown, exit `0` — the same path as `Ctrl+C`.                    |
+| `h`      | Print the shortcuts that are armed right now.                              |
+| `u`      | **Only while an update notice is showing** — update every `@warlock.js/*` package, install, and restart. See [`update-packages/SKILL.md`](../update-packages/SKILL.md). |
+| `Ctrl+C` | Graceful shutdown, unchanged.                                              |
+
+A "restart" is a fresh process (`r` and `u` both use it) — see [The supervisor](#the-supervisor) below for how that works.
+
+Reading one key at a time needs stdin in **raw mode**, which takes `Ctrl+C` away from the terminal driver — the dev server re-raises `SIGINT` itself, and always leaves raw mode on shutdown (and while a package-manager install owns the terminal), so your shell is never left without line editing.
+
+Shortcuts are **TTY-gated**: with piped stdin, in CI, or under a process supervisor, nothing is registered, no hint is printed, and stdin is never touched.
+
+### The supervisor
+
+`warlock dev` runs as **two processes**, not one:
+
+```
+shell
+└─ warlock dev                      ← supervisor: owns the terminal, loads nothing
+   └─ warlock dev (WARLOCK_DEV_WORKER=1)  ← the actual server, disposable
+```
+
+The supervisor spawns the worker with `stdio: "inherit"` and mirrors its exit code. To restart, the worker shuts down cleanly — freeing the http port — and exits `75`; the supervisor spawns a replacement. **The tree never gets deeper**, however many restarts happen.
+
+The supervisor is chosen in the `dev` command's `preAction`, which runs *before* the preloaders — deliberately, so the supervisor never loads config or starts connectors. A supervisor holding a second database connection open for the session would be a real bug, not a cosmetic one.
+
+Signals: `SIGINT` reaches the worker directly (same process group), so the supervisor ignores it and only notes that the next exit is final — acting on it would exit the parent while the worker was still draining. `SIGTERM` / `SIGHUP` are forwarded explicitly, since they don't propagate to the group on Windows. After any worker exits, the supervisor puts stdin back out of raw mode in case the worker was killed before it could.
+
+`restartDevServer()` returns `false` instead of exiting when there is no supervisor — a programmatic `startDevelopmentServer()` call — so nothing kills a server it can't replace.
+
+### Crash recovery
+
+A worker that dies **after running healthily for at least 5s** — OOM, a native crash, a dead loader thread — is replaced automatically:
+
+```
+14:31:02 Development server was killed by SIGSEGV — restarting.
+```
+
+A worker that dies *sooner* than that failed to **boot** — a broken config, a port already taken — and it has already printed why. Restarting there would just reprint the same error and bury it, so the supervisor mirrors the exit code and stops.
+
+Flapping is capped: more than 3 crashes inside 60s and the supervisor gives up rather than restarting behind your back.
+
+An explicit restart (`r`, `u`, a config change) is a *request*, not a crash, so the uptime rule never swallows it.
+
+### Restart on config change
+
+`warlock.config.ts` and `.env*` are read at boot and feed every config that derives from them, so they cannot be hot-reloaded — a "reload" would leave running services on stale values. When one changes, the dev server restarts itself:
+
+```
+14:22:07 warlock.config.ts changed — restarting to apply.
+```
+
+Set `devServer.restartOnConfigChange: false` for the previous behaviour (a warning telling you to restart yourself). The same warning is printed if a restart is declined or isn't possible, and any ordinary code files that shared the batch still hot-reload normally.
+
 ### What it preloads
 
 ```ts
@@ -67,6 +128,7 @@ export default defineConfig({
     },
     generateTypings: true,             // background type generation
     checkForUpdates: true,             // notify on a newer @warlock.js/core at dev start
+    restartOnConfigChange: true,       // restart when warlock.config.ts / .env* changes
     healthCheckers: [...] /* or false */,
     transpileCacheDebug: false,        // name cache files <slug>.<hash>.js w/ // @source markers
   },
@@ -77,7 +139,8 @@ export default defineConfig({
 - **`generateTypings`** — turn off if you're committing generated typings and don't want them rewritten on every boot. The `--skip-typings` flag is the per-run version.
 - **`healthCheckers`** — custom file health checker contracts (or `false` to disable). The `--skip-health` flag is the per-run version.
 - **`transpileCacheDebug`** — diagnostic only. Names `.warlock/transpile/*.js` files `<slug>.<hash>.js` and appends `// @source <path>` markers so you can eyeball which cache entry came from which source. Leave off in normal use.
-- **`checkForUpdates`** — on `warlock dev` start, check npm for a newer `@warlock.js/core` and print a one-line notice if one exists. Best-effort and non-blocking; auto-skipped in CI and non-TTY shells. Run `warlock update` to upgrade. See [`update-packages/SKILL.md`](../update-packages/SKILL.md).
+- **`checkForUpdates`** — on `warlock dev` start, check npm for a newer `@warlock.js/core` and print a one-line notice if one exists. Best-effort and non-blocking; auto-skipped in CI and non-TTY shells. In an interactive terminal the notice arms a **`u` shortcut** that updates every `@warlock.js/*` package, installs, and restarts the server; elsewhere it prints `npx warlock update` instead. The registry answer is cached for 24h in `.warlock/update-check.json`, so a day of restarts costs one lookup. See [`update-packages/SKILL.md`](../update-packages/SKILL.md).
+- **`restartOnConfigChange`** — restart the dev server when `warlock.config.ts` or any `.env*` changes (default `true`). Set `false` to get a warning instead and restart by hand. Neither file can be hot-reloaded, so without a restart the running services keep the old values.
 
 ## `warlock build` — production bundle
 
@@ -88,7 +151,7 @@ esbuild bundle of the app down to a single JS file in `dist/`. No flags — ever
 ```ts title="warlock.config.ts"
 export default defineConfig({
   build: {
-    outDirectory: "dist",        // default — relative or absolute
+    outdir: "dist",        // default — relative or absolute
     outFile: "app.js",            // default — bundle filename
     minify: true,                 // default — esbuild minify
     sourcemap: true,              // default — true | false | "inline" | "linked"
@@ -98,7 +161,7 @@ export default defineConfig({
 
 Defaults are sensible for the typical "Node service" deployment. Knobs to actually reach for:
 
-- **`outDirectory`** — override when your deployment pipeline expects a different folder (e.g. `build/`, `.build/`).
+- **`outdir`** — override when your deployment pipeline expects a different folder (e.g. `build/`, `.build/`). `outDirectory` is accepted as an alias (the docs used that name for several releases while the code only read `outdir`); `outdir` wins if both are set.
 - **`outFile`** — override when bundling multiple Warlock apps into one image and they need distinct entry filenames.
 - **`minify: false`** — flip to debug a production-only bug. Larger bundle, readable stack traces.
 - **`sourcemap: "inline"`** — embed the source map in the bundle. Useful when your error reporter only captures the bundle and can't fetch a `.map` sidecar.
@@ -111,7 +174,7 @@ Just `warlockConfig: true`. Build doesn't need the app booted — it reads `warl
 ### Where the bundle lands
 
 ```
-<cwd>/<outDirectory>/<outFile>
+<cwd>/<outdir>/<outFile>
 └─ default: <cwd>/dist/app.js
 ```
 
@@ -205,7 +268,7 @@ import { defineConfig, env } from "@warlock.js/core";
 
 export default defineConfig({
   build: {
-    outDirectory: env("BUILD_OUT", "dist"),
+    outdir: env("BUILD_OUT", "dist"),
     outFile: env("BUILD_FILE", "app.js"),
   },
 });
@@ -249,7 +312,7 @@ NODE_OPTIONS=--max-old-space-size=4096 yarn warlock start
 - **`--fresh` only deletes the manifest, not the transpile cache.** If you're chasing a stale-compile bug, `rm -rf .warlock/` clears everything. The manifest restoring is what `--fresh` solves.
 - **`warlock build` does NOT run migrations.** Production bundles ship the migration files but don't apply them. Run `yarn warlock migrate` against the production DB separately.
 - **`warlock start` requires a built bundle.** Run `warlock build` first, or you'll spawn `node` against a non-existent file and crash immediately.
-- **`outDirectory` is the directory, `outFile` is the filename within it.** A common mistake is putting the full path in one and leaving the other default — you end up with `<full-path>/app.js` or `dist/<full-path>`. They concatenate.
+- **`outdir` is the directory, `outFile` is the filename within it.** A common mistake is putting the full path in one and leaving the other default — you end up with `<full-path>/app.js` or `dist/<full-path>`. They concatenate.
 - **`sourcemap: false` cascades to `start`.** Stack traces lose `.ts` precision. Keep sourcemaps on unless artifact size is a hard constraint.
 - **`NODE_ENV` is not set by these commands.** The deployment env (your Dockerfile, CI, hosting provider) sets it. Forget it on a production server and `Application.isProduction` returns `false`, which flips cookie security, CORS, logging — silently. Always set `NODE_ENV=production` in production deployments.
 - **`prestart` runs once on dev boot, not on reload.** If you're seeding test data in `src/app/prestart.ts`, it fires on `warlock dev` startup only. HMR reloads don't re-run it.

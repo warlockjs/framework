@@ -40,7 +40,11 @@ export const startProductionCommand = command({
     // Spawn child process
     // On Windows, we need to be careful with signals - the console sends Ctrl+C
     // to all processes in the group, so we just need to not interfere
-    const child = spawn("node", nodeArgs, {
+    // `process.execPath`, not "node": the bare name needs `node` on PATH, which
+    // a systemd unit, a cron job, or a slim container may not provide — and a
+    // PATH `node` that *is* present can be a different version than the one
+    // running this CLI. execPath is the binary already executing us.
+    const child = spawn(process.execPath, nodeArgs, {
       stdio: "inherit",
       cwd: process.cwd(),
       env: process.env,

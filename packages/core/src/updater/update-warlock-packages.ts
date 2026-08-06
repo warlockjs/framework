@@ -49,6 +49,41 @@ export type PackageUpdate = {
 export type UpdateWarlockPackagesOptions = {
   /** Run the package manager install after rewriting versions (default true). */
   install?: boolean;
+  /**
+   * Report what would change without touching package.json or node_modules.
+   * Resolves with the `outdated` outcome instead of `updated`.
+   */
+  dryRun?: boolean;
+};
+
+/**
+ * How an update run ended. Callers branch on this instead of re-deriving the
+ * situation from the printed output — the dev-server `u` shortcut needs to
+ * know whether restarting is warranted, and whether it may offer a retry.
+ */
+export type UpdateOutcome =
+  /** No package.json at the project root — nothing to do. */
+  | "no-package-json"
+  /** package.json carries no `@warlock.js/*` dependency. */
+  | "no-packages"
+  /** Every registry lookup failed — offline, DNS down, or npm unreachable. */
+  | "registry-unreachable"
+  /** Every package is already at (or ahead of) its latest published version. */
+  | "up-to-date"
+  /** Newer versions exist, and a dry run left everything untouched. */
+  | "outdated"
+  /** Versions were rewritten (and installed, unless `install: false`). */
+  | "updated"
+  /** Versions were rewritten but the package manager install failed. */
+  | "install-failed";
+
+/** The result of an update run. */
+export type UpdateWarlockPackagesResult = {
+  outcome: UpdateOutcome;
+  /** The bumps written to package.json — empty unless `outcome` wrote any. */
+  updates: PackageUpdate[];
+  /** The install failure, present only for `install-failed`. */
+  error?: Error;
 };
 
 /**
@@ -60,16 +95,20 @@ export type UpdateWarlockPackagesOptions = {
  * is preserved; specs that aren't a plain semver — `workspace:*`, `*`,
  * `latest`, git/file URLs — are left untouched. Only genuine upgrades are
  * written, so re-running on an already-current project is a no-op.
+ *
+ * Resolves rather than throws on the two failures a caller is expected to
+ * survive — an unreachable registry and a failed install — so the dev-server
+ * shortcut can report them and keep serving.
  */
 export async function updateWarlockPackages(
   options: UpdateWarlockPackagesOptions = {},
-): Promise<void> {
+): Promise<UpdateWarlockPackagesResult> {
   const runInstall = options.install ?? true;
   const packageJsonPath = rootPath("package.json");
 
   if (!(await fileExistsAsync(packageJsonPath))) {
     console.log(`${colors.red("✖")} No package.json found at the project root.`);
-    return;
+    return { outcome: "no-package-json", updates: [] };
   }
 
   const packageJson = (await getJsonFileAsync(packageJsonPath)) as PackageJson;
@@ -77,7 +116,7 @@ export async function updateWarlockPackages(
 
   if (dependencies.length === 0) {
     console.log(`${colors.yellow("⚠")} No @warlock.js packages found in package.json.`);
-    return;
+    return { outcome: "no-packages", updates: [] };
   }
 
   console.log(
@@ -86,11 +125,27 @@ export async function updateWarlockPackages(
   );
 
   const resolved = await resolveLatestVersions(dependencies);
+
+  // Distinguish "nothing newer" from "we never got an answer". Without this,
+  // an offline run reports every package as up to date, which is a lie.
+  if (isRegistryUnreachable(resolved)) {
+    console.log(
+      `${colors.yellow("⚠")} Could not reach the npm registry — ` +
+        `no versions were changed. Check your connection and try again.`,
+    );
+    return { outcome: "registry-unreachable", updates: [] };
+  }
+
   const updates = resolvePackageUpdates(resolved);
 
   if (updates.length === 0) {
     console.log(`${colors.green("✓")} All @warlock.js packages are already up to date.`);
-    return;
+    return { outcome: "up-to-date", updates: [] };
+  }
+
+  if (options.dryRun) {
+    printUpdates(updates, { pending: true });
+    return { outcome: "outdated", updates };
   }
 
   applyUpdates(packageJson, updates);
@@ -102,10 +157,29 @@ export async function updateWarlockPackages(
     console.log(
       colors.dim("Skipped install (--no-install). Run your package manager to apply the changes."),
     );
-    return;
+    return { outcome: "updated", updates };
   }
 
-  await installDependencies();
+  try {
+    await installDependencies();
+  } catch (error) {
+    console.log(
+      `${colors.red("✖")} The install failed. package.json is already updated — ` +
+        `re-run your package manager install to finish.`,
+    );
+    return { outcome: "install-failed", updates, error: error as Error };
+  }
+
+  return { outcome: "updated", updates };
+}
+
+/**
+ * Whether *every* lookup came back empty, which in practice means the
+ * registry was never reached. A single failed package (unpublished, renamed,
+ * private) leaves the rest resolvable and is not treated as an outage.
+ */
+export function isRegistryUnreachable(resolved: ResolvedDependency[]): boolean {
+  return resolved.length > 0 && resolved.every((dependency) => !dependency.latest);
 }
 
 /** Collect every `@warlock.js/*` dependency across the relevant sections. */
@@ -203,9 +277,13 @@ function applyUpdates(packageJson: PackageJson, updates: PackageUpdate[]): void 
   }
 }
 
-/** Print the list of applied version bumps. */
-function printUpdates(updates: PackageUpdate[]): void {
-  console.log(`${colors.green("✓")} Updated ${colors.bold(String(updates.length))} package(s):`);
+/** Print the version bumps — applied, or pending on a dry run. */
+function printUpdates(updates: PackageUpdate[], { pending = false } = {}): void {
+  const headline = pending
+    ? `${colors.yellow("↑")} ${colors.bold(String(updates.length))} package(s) can be updated:`
+    : `${colors.green("✓")} Updated ${colors.bold(String(updates.length))} package(s):`;
+
+  console.log(headline);
 
   for (const update of updates) {
     console.log(

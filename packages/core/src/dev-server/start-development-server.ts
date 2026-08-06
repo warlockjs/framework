@@ -1,6 +1,7 @@
 import { colors } from "@mongez/copper";
 import { devLogError, devServeLog } from "./dev-logger";
 import { DevelopmentServer } from "./development-server";
+import { registerDevShortcuts } from "./register-dev-shortcuts";
 
 let handlersRegistered = false;
 
@@ -52,6 +53,11 @@ export async function startDevelopmentServer(
     await safeShutdown(devServer);
     process.exit(1);
   }
+
+  // Only once the server is actually up — a half-started process has nothing
+  // worth restarting, and taking raw mode before then would swallow the
+  // Ctrl+C of a developer trying to escape a slow boot.
+  registerDevShortcuts(devServer);
 
   return devServer;
 }

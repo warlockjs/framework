@@ -29,6 +29,17 @@ export type WarlockConfig = {
      */
     outdir?: string;
     /**
+     * Alias for {@link outdir}.
+     *
+     * The docs described this name for several releases while the code only
+     * ever read `outdir`, so configs in the wild use it and were being
+     * silently ignored. Both are accepted; `outdir` wins if you set both.
+     *
+     * Prefer `outdir` — it is the name esbuild itself uses, and the value
+     * ends up there.
+     */
+    outDirectory?: string;
+    /**
      * Output file
      *
      * @default app.js
@@ -94,6 +105,15 @@ export type WarlockConfig = {
      * @default true
      */
     checkForUpdates?: boolean;
+    /**
+     * Restart the dev server automatically when a boot-time file changes —
+     * `warlock.config.ts` or any `.env*`. Neither can be hot-reloaded, so
+     * without a restart the running services keep using the old values.
+     *
+     * Set to `false` to go back to a warning telling you to restart yourself.
+     * @default true
+     */
+    restartOnConfigChange?: boolean;
     /**
      * Debug aid for the (always-on) persisted transpile cache. Names cache
      * files `<slug>.<hash>.js` (last 3 source path segments) and appends a

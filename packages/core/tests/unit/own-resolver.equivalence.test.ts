@@ -1,4 +1,4 @@
-import { createPathsMatcher, getTsconfig } from "get-tsconfig";
+import { getTsconfig, resolvePathAlias } from "get-tsconfig";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -58,7 +58,10 @@ describe("probeFile", () => {
 
 describe.skipIf(!hasGolden)("tsx-4.21 equivalence (golden replay)", () => {
   const tsconfig = getTsconfig(projectRoot);
-  const matcher = tsconfig ? createPathsMatcher(tsconfig) : null;
+  // Mirrors `resolve-hook.ts`: get-tsconfig v5 dropped the curried
+  // `createPathsMatcher(t)(spec)` for a direct `resolvePathAlias(t, spec)`,
+  // so wrap it back into the PathsMatcher closure `ownResolve` expects.
+  const matcher = tsconfig ? (specifier: string) => resolvePathAlias(tsconfig, specifier) : null;
 
   const records = hasGolden
     ? readFileSync(goldenPath, "utf8")
