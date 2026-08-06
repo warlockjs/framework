@@ -6,6 +6,7 @@ import type { MigrationDriverContract } from "../contracts/migration-driver.cont
 import type { DataSource } from "../data-source/data-source";
 import { dataSourceRegistry } from "../data-source/data-source-registry";
 import { type Migration } from "./migration";
+import { compareCreatedAt, parseCreatedAt } from "./parse-created-at";
 import { SQLGrammar } from "./sql-grammar";
 import type { MigrationRecord, MigrationResult, TaggedSQL } from "./types";
 
@@ -38,64 +39,6 @@ type ExecuteOptions = {
 };
 
 /**
- * Parse createdAt timestamp from custom format to Date.
- * Supports both: MM-DD-YYYY_HH-MM-SS and DD-MM-YYYY_HH-MM-SS
- * Intelligently detects format by checking if first value > 12 (must be day)
- * Falls back to standard Date parsing for ISO strings.
- */
-function parseCreatedAt(createdAt: string): Date | undefined {
-  const match = createdAt.match(/^(\d{2})-(\d{2})-(\d{4})_(\d{2})-(\d{2})-(\d{2})$/);
-  if (match) {
-    const [, first, second, year, hour, minute, second_time] = match;
-    const firstNum = parseInt(first);
-    const secondNum = parseInt(second);
-
-    let month: number, day: number;
-
-    // Intelligently detect format:
-    // If first > 12, it must be DD-MM-YYYY (day can't be month)
-    // If second > 12, it must be MM-DD-YYYY (day can't be month)
-    // Otherwise, assume MM-DD-YYYY (US format as default)
-    if (firstNum > 12) {
-      // DD-MM-YYYY format
-      day = firstNum;
-      month = secondNum;
-    } else if (secondNum > 12) {
-      // MM-DD-YYYY format
-      month = firstNum;
-      day = secondNum;
-    } else {
-      // Ambiguous - default to MM-DD-YYYY
-      month = firstNum;
-      day = secondNum;
-    }
-
-    const date = new Date(
-      parseInt(year),
-      month - 1, // JavaScript months are 0-indexed
-      day,
-      parseInt(hour),
-      parseInt(minute),
-      parseInt(second_time),
-    );
-
-    // Validate the date is actually valid
-    if (isNaN(date.getTime())) {
-      return undefined;
-    }
-
-    return date;
-  }
-  // Fallback to standard Date parsing for ISO strings
-  try {
-    const date = new Date(createdAt);
-    return isNaN(date.getTime()) ? undefined : date;
-  } catch {
-    return undefined;
-  }
-}
-
-/**
  * Comparator for sorting migration classes.
  *
  * Priority:
@@ -106,13 +49,11 @@ function sortMigrations(
   a: { createdAt?: string; migrationName: string },
   b: { createdAt?: string; migrationName: string },
 ): number {
-  // Sort by createdAt timestamp
-  const aDate = a.createdAt ? parseCreatedAt(a.createdAt) : undefined;
-  const bDate = b.createdAt ? parseCreatedAt(b.createdAt) : undefined;
+  const byCreatedAt = compareCreatedAt(a.createdAt, b.createdAt);
 
-  if (aDate && bDate) return aDate.getTime() - bDate.getTime();
-  if (aDate) return -1;
-  if (bDate) return 1;
+  if (byCreatedAt !== undefined) {
+    return byCreatedAt;
+  }
 
   // Last resort: alphabetical
   return a.migrationName.localeCompare(b.migrationName);

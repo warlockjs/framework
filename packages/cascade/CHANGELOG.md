@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.9.0 - 2026-08-06
+
+### Fixed
+
+- migrations ran in **filename order instead of chronological order** on any fresh database. `SQLGrammar.sort` — the comparator that decides execution order across every pending migration — parsed `createdAt` with `new Date()`, which cannot read the `MM-DD-YYYY_HH-MM-SS` stamp the framework's own generator produces; every timestamp became `NaN`, was floored to `0`, and the alphabetical tiebreaker silently decided the whole ordering. A January 2026 migration would run before a December 2025 one
+- `parseCreatedAt` now lives in its own module and backs both migration comparators through a shared `compareCreatedAt`, so the two can no longer drift apart — one of them being wrong was the symptom, two comparators sorting the same data by different rules was the defect
+
 ## 4.7.0
 
 ### Added

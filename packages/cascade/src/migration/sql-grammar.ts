@@ -1,3 +1,4 @@
+import { compareCreatedAt } from "./parse-created-at";
 import type { SQLStatementType, TaggedSQL } from "./types";
 
 /**
@@ -133,6 +134,17 @@ export class SQLGrammar {
 
   /**
    * Sort an array of tagged SQL statements by phase, then creation date, then migration name.
+   *
+   * This is the sort that decides **execution order** — it runs across every
+   * pending migration's statements at once, after the migration list itself
+   * has been ordered, so whatever it decides is final.
+   *
+   * The creation date must go through {@link compareCreatedAt}. Parsing these
+   * stamps with `new Date()` returns `Invalid Date` for the framework's own
+   * `MM-DD-YYYY_HH-MM-SS` filename format, which collapsed every timestamp to
+   * the same value and quietly handed the whole ordering to the alphabetical
+   * tiebreaker below — running, for example, a January 2026 migration before a
+   * December 2025 one.
    */
   public static sort(statements: TaggedSQL[]): TaggedSQL[] {
     return statements.slice().sort((a, b) => {
@@ -142,13 +154,10 @@ export class SQLGrammar {
       }
 
       // 2. Sort by CreatedAt (within same phase)
-      let dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      let dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      if (isNaN(dateA)) dateA = 0;
-      if (isNaN(dateB)) dateB = 0;
+      const byCreatedAt = compareCreatedAt(a.createdAt, b.createdAt);
 
-      if (dateA !== dateB) {
-        return dateA - dateB;
+      if (byCreatedAt !== undefined) {
+        return byCreatedAt;
       }
 
       // 3. Sort by Migration Name (tie-breaker)

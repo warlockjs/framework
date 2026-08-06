@@ -2636,6 +2636,20 @@ yarn cascade migrate:export-sql # write .up.sql / .down.sql instead of executing
 
 Name files with a timestamp prefix (`MM-DD-YYYY_HH-MM-SS-<name>.migration.ts`) so Cascade orders runs deterministically and infers the migration name from the filename. A timestamp prefix prevents the "two devs picked the same number" merge conflict.
 
+### How ordering actually works
+
+Every pending migration's SQL is pooled and sorted **globally**, by three keys in order:
+
+1. **Phase** — the dependency-safe DDL order, derived from the statement itself: extensions/types (1), `CREATE TABLE` (2), `ADD COLUMN` (3), foreign keys (4), drops/alters (5). A `CREATE TABLE` from a newer migration therefore still runs before an older migration's `ALTER`.
+2. **`createdAt`** — parsed from the filename prefix.
+3. **Migration name** — alphabetical, only when the timestamps can't decide.
+
+Because phase wins, cross-migration ordering matters most for statements that share a phase — two migrations both altering the same table, for instance.
+
+:::caution[`MM-DD` vs `DD-MM` is a guess]
+The parser tells the two apart by whether the first field is greater than 12 — a month can't be. When both fields are ≤ 12 the stamp is genuinely ambiguous and it assumes `MM-DD`. Two migrations generated on `01-08` and `08-01` of the same year sort by that assumption rather than by fact. If exact ordering between two such files matters, make it unambiguous — a differing hour is enough.
+:::
+
 ## Column helpers — the building blocks
 
 Every column in a `Migration.create` / `Migration.alter` map starts with a helper imported from `@warlock.js/cascade`; each returns a builder you chain modifiers onto (`.notNullable()`, `.nullable()`, `.unique()`, `.default(value)`, `.index()`, `.primary()`, `.references(table)`):
