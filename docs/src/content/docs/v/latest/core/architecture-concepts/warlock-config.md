@@ -85,7 +85,7 @@ Usually you set the port in `src/config/http.ts` via `env("HTTP_PORT", 3000)` in
 
 ```ts
 build: {
-  outDirectory: "dist",
+  outdir: "dist",
   outFile: "app.js",
   minify: true,
   sourcemap: true,
@@ -94,10 +94,12 @@ build: {
 
 | Field           | Default                  | Purpose                                                                 |
 | --------------- | ------------------------ | ----------------------------------------------------------------------- |
-| `outDirectory`  | `<cwd>/dist`             | Where the bundled output goes                                           |
+| `outdir`  | `<cwd>/dist`             | Where the bundled output goes (alias: `outDirectory`)                   |
 | `outFile`       | `"app.js"`               | The name of the bundled file                                            |
 | `minify`        | `true`                   | Whether the production bundle is minified                               |
 | `sourcemap`     | `true`                   | Sourcemap mode — `true`, `false`, `"inline"`, or `"linked"`             |
+
+`outDirectory` is accepted as an alias for `outdir`. Earlier docs used that name while the code only ever read `outdir`, so configs written from them were silently ignored — both work now, and `outdir` wins if you set both.
 
 `sourcemap: true` produces a `.js.map` next to the bundle (linked). `"inline"` embeds the sourcemap into the bundle (larger but no separate file). Set it to `false` only if you're shipping to an environment where source maps would leak source code via debuggers.
 
@@ -142,6 +144,8 @@ devServer: {
 | `watch.exclude`        | `["**/node_modules/**", "**/dist/**", "**/.warlock/**", "**/.git/**"]`     | Patterns to ignore                                               |
 | `healthCheckers`       | (enabled with defaults)                                                    | Array of file health checkers, or `false` to disable             |
 | `generateTypings`      | `true`                                                                     | Auto-regenerate ConfigRegistry / route typings on dev-server boot |
+| `checkForUpdates`      | `true`                                                                     | Check npm for a newer `@warlock.js/core` at dev-server start      |
+| `restartOnConfigChange`| `true`                                                                     | Restart the dev server when `warlock.config.ts` or `.env*` changes|
 | `transpileCacheDebug`  | `false`                                                                    | Name cache files by source path for debugging the transpile cache|
 
 You'll usually leave these alone. The defaults are tuned for typical TypeScript projects.
@@ -149,6 +153,8 @@ You'll usually leave these alone. The defaults are tuned for typical TypeScript 
 `healthCheckers: false` is for projects with custom build steps that interfere with the framework's health checks (the reference codebase sets this because it has unusual layout).
 
 `generateTypings: false` skips the typings regeneration at dev-server boot. Speeds up cold starts in big projects; turn off only if you don't rely on the autocomplete it produces.
+
+`restartOnConfigChange: false` turns the automatic restart back into a warning. `warlock.config.ts` and `.env*` are read at boot, so a hot reload would leave your running services on stale values — the restart is what actually applies the change.
 
 `transpileCacheDebug: true` names entries in `.warlock/transpile/` as `<slug>.<hash>.js` (last 3 path segments) and appends a `// @source <path>` marker — purely cosmetic, useful only when you're chasing a transpile cache bug.
 

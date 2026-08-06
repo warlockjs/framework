@@ -55,7 +55,62 @@ warlock dev --skip-health            # skip health checkers
 
 Persistent — the process stays alive until you Ctrl+C it. Boots the full app: env, all configs, every connector, then your modules. See [How it works](../architecture-concepts/how-it-works.md) for what's happening behind the scenes.
 
-On start, `warlock dev` also checks npm for a newer `@warlock.js/core` release and prints a one-line notice when one is available — run [`update`](#update) to upgrade. The check is best-effort and non-blocking: it never delays or breaks startup, and is automatically skipped in CI and non-interactive (non-TTY) shells. Turn it off with `devServer.checkForUpdates: false` in `warlock.config.ts`.
+#### Keyboard shortcuts
+
+Once the server is ready it listens for single keypresses — press `h` at any time to list the ones that are armed.
+
+| Key      | Does                                                                                          |
+| -------- | --------------------------------------------------------------------------------------------- |
+| `r`      | Restart the server on a fresh process.                                                        |
+| `c`      | Clear the console.                                                                            |
+| `q`      | Graceful shutdown, exit `0` — the same path as `Ctrl+C`.                                       |
+| `h`      | Print the shortcuts armed right now.                                                          |
+| `u`      | Only while an update notice is showing — update every `@warlock.js/*` package and restart.     |
+| `Ctrl+C` | Graceful shutdown, unchanged.                                                                 |
+
+#### The supervisor
+
+`warlock dev` runs as two processes: a thin **supervisor** that owns the terminal and loads nothing, and a **worker** that is the actual dev server.
+
+```
+shell
+└─ warlock dev            ← supervisor
+   └─ warlock dev         ← the server, replaced on every restart
+```
+
+A restart never re-launches the supervisor: the worker shuts down — freeing the http port — exits with a "restart me" code, and the supervisor spawns a replacement. The process tree stays exactly two deep however many restarts happen, and the supervisor mirrors the worker's exit code so `npm run dev` behaves normally.
+
+`Ctrl+C` reaches the worker directly, so shutdown is unchanged. `SIGTERM` and `SIGHUP` are forwarded explicitly, since they don't propagate to the process group on Windows.
+
+The supervisor also **recovers from crashes**. A worker that dies after running healthily for at least 5 seconds — out of memory, a native crash, a dead loader thread — is replaced automatically. One that dies sooner failed to *boot* and has already printed why, so it is left alone rather than having its error buried under a reprint. More than 3 crashes in a minute and the supervisor stops instead of restarting behind your back.
+
+#### Restart on config change
+
+`warlock.config.ts` and `.env*` are read at boot, so they can't be hot-reloaded — reloading would leave your running services on stale values. When one changes, the dev server restarts itself:
+
+```
+14:22:07 warlock.config.ts changed — restarting to apply.
+```
+
+Set `devServer.restartOnConfigChange: false` to get a warning instead and restart by hand.
+
+Reading one key at a time needs stdin in raw mode, which takes `Ctrl+C` away from the terminal driver. The dev server re-raises `SIGINT` itself, and always leaves raw mode on shutdown, so your shell is never left without line editing. Shortcuts are only armed on an interactive terminal — with piped stdin, in CI, or under a process supervisor, stdin is never touched.
+
+#### The update notice
+
+On start, `warlock dev` also checks npm for a newer `@warlock.js/core` release and prints a one-line notice when one is available:
+
+```
+  ⚡ A new version of Warlock.js is available  4.8.2 → 4.9.0
+     Press u to update all @warlock.js packages and restart
+     Changelog  https://warlock.js.org/changelog/
+```
+
+Press **`u`** and the dev server does the whole upgrade for you: it rewrites every `@warlock.js/*` dependency to latest, runs your package manager install, then shuts down and relaunches itself on the new version. If the registry can't be reached, nothing changes and `u` stays available to retry; if the install fails, `package.json` keeps the new versions and you finish it by hand.
+
+The shortcut needs an interactive terminal. Without one (CI, piped stdin, a process supervisor) the notice prints `Run npx warlock update` instead — see [`update`](#update).
+
+The check itself is best-effort and non-blocking: it never delays or breaks startup, stays silent when npm is unreachable, and is automatically skipped in CI and non-interactive (non-TTY) shells. The answer is cached for 24 hours in `.warlock/update-check.json`, so a day of restarts costs one lookup — failed lookups are never cached, and the entry is dropped once an update is applied. Turn the whole thing off with `devServer.checkForUpdates: false` in `warlock.config.ts`.
 
 ### `generate.typings`
 
@@ -267,15 +322,25 @@ Update every `@warlock.js/*` package in your project to its latest published ver
 ```bash
 warlock update                  # bump all @warlock.js/* deps to latest, then install
 warlock update --no-install     # rewrite package.json only; install yourself later
+warlock update --dry-run        # show what would change; touch nothing
+warlock update --check          # same, but exit 1 when behind — a CI gate
 ```
 
 | Flag           | Type    | Description                                                                          |
 | -------------- | ------- | ------------------------------------------------------------------------------------ |
 | `--no-install` | boolean | Rewrite the versions in `package.json` without running the package manager install.  |
+| `--dry-run`    | boolean | Report which packages would be updated without writing `package.json` or installing. |
+| `--check`      | boolean | Like `--dry-run`, but exits `1` when any package is behind.                           |
 
-Scans `dependencies` and `devDependencies` for `@warlock.js/*` packages, looks up each one's latest version on npm, and rewrites the matching specs — **preserving each range operator** (`^`, `~`, or an exact pin). Non-semver specs (`workspace:*`, `*`, git/file URLs) are left untouched, and packages already at or ahead of latest are skipped. It then runs your project's install — `npm` / `yarn` / `pnpm`, auto-detected from the lockfile — to reconcile `node_modules`.
+`--check` is the CI form: exit `0` means every `@warlock.js/*` package is current, exit `1` means at least one is behind (or the registry couldn't be reached). Both flags imply a dry run, so neither ever writes to `package.json`.
 
-Because the whole `@warlock.js/*` family is versioned in lockstep, this keeps every framework package on the same release. The [`dev`](#dev) server surfaces a notice when a newer version is published, so you know when to run it.
+Scans `dependencies` and `devDependencies` for `@warlock.js/*` packages, looks up each one's latest version on npm, and rewrites the matching specs — **preserving each range operator** (`^`, `~`, or an exact pin). Non-semver specs (`workspace:*`, `*`, git/file URLs) are left untouched, and packages already at or ahead of latest are skipped. It then runs your project's install — `bun` / `npm` / `yarn` / `pnpm`, auto-detected from the lockfile — to reconcile `node_modules`.
+
+Bun is checked first: a Bun project may also carry a `yarn.lock` (Bun writes one for tooling compatibility), and matching yarn there would run the wrong installer. [`add`](#add) shares the same detection.
+
+Because the whole `@warlock.js/*` family is versioned in lockstep, this keeps every framework package on the same release. The [`dev`](#dev) server surfaces a notice when a newer version is published — and lets you apply it with a single `u` keypress — so you rarely need to run this by hand.
+
+Offline runs are honest about it: if none of the registry lookups answer, the command reports that npm was unreachable and changes nothing, rather than claiming everything is up to date. If the install fails after the versions were rewritten, `package.json` keeps them (re-run your package manager to finish) and the command exits non-zero.
 
 ---
 

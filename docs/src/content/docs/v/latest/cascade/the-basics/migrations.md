@@ -408,11 +408,23 @@ The data-source-wide default lives in the `migrations.transactional` connection 
 
 ## Ordering and the timestamp prefix
 
-Cascade runs migrations sorted by `createdAt`, extracted from the filename's timestamp prefix (`MM-DD-YYYY_HH-MM-SS-name.migration.ts`). Two migrations with the same timestamp have undefined relative order — keep them unique. Override explicitly when generating migrations outside the filename convention:
+Cascade pools the SQL from every pending migration and sorts it **globally**, by three keys in order:
+
+1. **Phase** — the dependency-safe DDL order, derived from each statement: extensions and types first, then `CREATE TABLE`, then `ADD COLUMN`, then foreign keys, then drops and alters. A `CREATE TABLE` from a newer migration still runs before an older migration's `ALTER`.
+2. **`createdAt`** — extracted from the filename's timestamp prefix (`MM-DD-YYYY_HH-MM-SS-name.migration.ts`).
+3. **Migration name** — alphabetical, and only when the timestamps can't decide.
+
+Because phase wins, ordering between migrations matters most for statements that share a phase — two migrations altering the same table, for example.
+
+Two migrations with the same timestamp fall through to the name, so keep timestamps unique when the order between them matters. Override explicitly when generating migrations outside the filename convention:
 
 ```ts
 export default Migration.create(User, { /* ... */ }, { createdAt: "2026-05-16T10:00:00Z" });
 ```
+
+:::caution[`MM-DD` and `DD-MM` are told apart by a guess]
+The parser decides by whether the first field is greater than 12 — a month can't be. When both fields are `≤ 12` the stamp is genuinely ambiguous and it assumes `MM-DD`. Two migrations stamped `01-08` and `08-01` in the same year therefore sort by that assumption rather than by fact. If the order between two such files matters, make it unambiguous — a differing hour is enough.
+:::
 
 ## Programmatic use — the Operations API
 

@@ -73,7 +73,7 @@ The builder bundles with esbuild using these settings (the ones you can influenc
 | `packages`           | `external` (your `node_modules` are not inlined)                  | fixed                        |
 | `minify`             | from `build.minify`                                              | config — default `true`      |
 | `sourcemap`          | from `build.sourcemap` (`true` becomes `"linked"`)               | config — default `true`      |
-| `outdir`             | from `build.outDirectory`                                        | config — default `dist`      |
+| `outdir`             | from `build.outdir`                                        | config — default `dist`      |
 | `entryNames`         | from `build.outFile` (extension stripped; esbuild adds `.js`)    | config — default `app.js`    |
 
 Because `packages: "external"`, your dependencies are **not** bundled in — `node_modules` must be present (installed) wherever you run the result.
@@ -84,7 +84,7 @@ These live in `warlock.config.ts` under `build`. The defaults the runtime actual
 
 | Key            | Type                                     | Default  | What it does                                                              |
 | -------------- | ---------------------------------------- | -------- | ------------------------------------------------------------------------ |
-| `outDirectory` | `string`                                 | `dist/` under the project root (resolved from `process.cwd()`) | Folder the bundle is written to                                          |
+| `outdir` | `string`                                 | `dist/` under the project root (resolved from `process.cwd()`) | Folder the bundle is written to                                          |
 | `outFile`      | `string`                                 | `"app.js"` | Bundle filename (the extension is normalized to `.js` by esbuild)        |
 | `minify`       | `boolean`                                | `true`   | Minify the output                                                        |
 | `sourcemap`    | `boolean \| "inline" \| "linked"`        | `true`   | Emit source maps; `true` is treated as `"linked"`                        |
@@ -94,7 +94,7 @@ import { defineConfig } from "@warlock.js/core";
 
 export default defineConfig({
   build: {
-    outDirectory: "dist",
+    outdir: "dist",
     outFile: "app.js",
     minify: true,
     sourcemap: true,
@@ -102,7 +102,7 @@ export default defineConfig({
 });
 ```
 
-The entry the bundle produces is `{outDirectory}/{outFile}` — by default `dist/app.js`. `warlock start` resolves that exact path through the same `resolveBuildConfig()` helper, so `build` and `start` always agree on where the artifact lives.
+The entry the bundle produces is `{outdir}/{outFile}` — by default `dist/app.js`. `warlock start` resolves that exact path through the same `resolveBuildConfig()` helper, so `build` and `start` always agree on where the artifact lives.
 
 ## `warlock start`
 

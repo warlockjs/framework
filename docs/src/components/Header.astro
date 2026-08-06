@@ -18,6 +18,7 @@ import { currentVersion } from "../utils/current-version";
 
 const navLinks = [
   { label: "Documentation", href: "/v/latest/core/getting-started/01-introduction/" },
+  { label: "AI", href: "/v/latest/ai/", ai: true },
   { label: "Features", href: "/features/" },
   { label: "Packages", href: "/packages/" },
   { label: "Skills", href: "/skills/" },
@@ -25,12 +26,18 @@ const navLinks = [
 ];
 
 const currentPath = Astro.url.pathname;
-function isActive(href) {
+const onAiDocs =
+  currentPath === "/v/latest/ai" || currentPath.startsWith("/v/latest/ai/");
+function isActive(link) {
+  const { href, ai } = link;
+  if (ai) return onAiDocs;
   if (href === "/features/") return currentPath === "/features/";
   if (href === "/packages/") return currentPath === "/packages/";
   if (href === "/skills/") return currentPath === "/skills/";
   if (href === "/changelog/") return currentPath === "/changelog/";
-  if (href.startsWith("/v/latest/")) return currentPath.startsWith("/v/");
+  // Any other package's docs light up "Documentation" — but not the AI
+  // section, which owns its own nav entry.
+  if (href.startsWith("/v/latest/")) return currentPath.startsWith("/v/") && !onAiDocs;
   return false;
 }
 ---
@@ -49,8 +56,25 @@ function isActive(href) {
       {navLinks.map((link) => (
         <a
           href={link.href}
-          class:list={["warlock-topnav-link", isActive(link.href) && "is-active"]}
+          class:list={[
+            "warlock-topnav-link",
+            link.ai && "warlock-topnav-ai",
+            isActive(link) && "is-active",
+          ]}
         >
+          {link.ai && (
+            <svg
+              class="warlock-ai-spark"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M12 2.6l1.75 6.15L20 10.5l-6.25 1.75L12 18.4l-1.75-6.15L4 10.5l6.25-1.75z" />
+              <path d="M18.7 3.1l.62 2.18 2.18.62-2.18.62-.62 2.18-.62-2.18-2.18-.62 2.18-.62z" />
+            </svg>
+          )}
           {link.label}
         </a>
       ))}
@@ -201,6 +225,70 @@ function isActive(href) {
   .warlock-topnav-link.is-active {
     color: var(--sl-color-text-accent);
     background-color: color-mix(in srgb, var(--sl-color-text-accent) 12%, transparent);
+  }
+
+  /* AI — the one nav entry we deliberately elevate. An accent-tinted pill
+   * with a twinkling sparkle and a soft yellow glow, echoing the brand
+   * mark's glow and the AiSpotlight provider dots. Selectors are qualified
+   * with .warlock-topnav-link so the gradient wins over the base
+   * .is-active background. */
+  .warlock-topnav-link.warlock-topnav-ai {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--sl-color-text-accent);
+    font-weight: 600;
+    border: 1px solid color-mix(in srgb, var(--sl-color-text-accent) 32%, transparent);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sl-color-text-accent) 12%, transparent),
+      color-mix(in srgb, var(--sl-color-text-accent) 5%, transparent)
+    );
+    transition:
+      color 0.15s ease,
+      background 0.2s ease,
+      border-color 0.15s ease,
+      box-shadow 0.25s ease;
+  }
+
+  .warlock-topnav-link.warlock-topnav-ai:hover {
+    color: var(--sl-color-text-accent);
+    border-color: color-mix(in srgb, var(--sl-color-text-accent) 55%, transparent);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sl-color-text-accent) 20%, transparent),
+      color-mix(in srgb, var(--sl-color-text-accent) 8%, transparent)
+    );
+    box-shadow: 0 0 14px color-mix(in srgb, var(--sl-color-text-accent) 30%, transparent);
+  }
+
+  .warlock-topnav-link.warlock-topnav-ai.is-active {
+    border-color: color-mix(in srgb, var(--sl-color-text-accent) 55%, transparent);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--sl-color-text-accent) 22%, transparent);
+  }
+
+  .warlock-ai-spark {
+    flex: none;
+    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--sl-color-text-accent) 70%, transparent));
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .warlock-topnav-ai .warlock-ai-spark {
+      transform-origin: center;
+      animation: warlock-ai-twinkle 3.2s ease-in-out infinite;
+    }
+
+    @keyframes warlock-ai-twinkle {
+      0%,
+      100% {
+        opacity: 0.85;
+        transform: scale(1) rotate(0deg);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.14) rotate(9deg);
+      }
+    }
   }
 
   /* Right-side actions */

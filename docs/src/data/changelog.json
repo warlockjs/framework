@@ -108,6 +108,156 @@
   ],
   "releases": [
     {
+      "version": "4.9.0",
+      "id": "v4-9-0",
+      "date": "August 6, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong><code>@warlock.js/core</code></strong>'s dev server now runs supervised — a thin parent respawns the server instead of stacking a process per restart — and restarts itself when <code>warlock.config.ts</code> or <code>.env</code> changes, with keyboard shortcuts (<code>r</code> restart, <code>c</code> clear, <code>q</code> quit, <code>h</code> help, <code>u</code> update-and-restart), crash recovery, Bun lockfile support in <code>update</code> / <code>add</code>, new <code>update --dry-run</code> / <code>--check</code> flags, and an honest offline update check that no longer reports \"already up to date\" when npm was never reached. <strong><code>@warlock.js/cascade</code></strong> fixes migrations running in filename order instead of chronological order on a fresh database — the sort parsed timestamps with <code>new Date()</code>, which cannot read the framework's own <code>MM-DD-YYYY_HH-MM-SS</code> stamp, so every one collapsed to the alphabetical tiebreaker. The release also fixes <code>build.outDirectory</code> — the name the docs used for several releases while only <code>build.outdir</code> was ever read, so a config written from the documentation was silently ignored. <strong><code>@warlock.js/ai</code></strong> workflow <code>run</code> steps now correctly nest a directly-invoked agent (<code>workflow → agent → tool</code>) instead of producing two disconnected top-level traces, and <strong><code>@warlock.js/ai-openai</code></strong> now defaults <code>reasoning_effort</code> to <code>\"none\"</code> automatically whenever a reasoning-capable model is called with tools, closing the gap that left tool calls broken on gpt-5 / o-series models unless every call site opted in by hand.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 14,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 7
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 6
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>warlock dev</code> keyboard shortcuts — <code>r</code> restart, <code>c</code> clear, <code>q</code> quit, <code>h</code> help — armed once the server is ready and listed by <code>h</code>. TTY-gated, and <code>Ctrl+C</code> keeps working while raw mode is held"
+            },
+            {
+              "type": "Added",
+              "html": "press <code>u</code> on the <code>warlock dev</code> update notice to update every <code>@warlock.js/*</code> dependency, install, and restart the server in place — no Ctrl+C round-trip. Falls back to the printed <code>npx warlock update</code> command when the terminal can't deliver keypresses (CI, piped stdin, supervisors)"
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock dev</code> now runs as a supervised pair — a thin parent that owns the terminal and a disposable worker — so restarting replaces the worker instead of stacking a process per restart, and the supervisor never loads config or connectors"
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock dev</code> restarts automatically when <code>warlock.config.ts</code> or any <code>.env*</code> changes, since neither can be hot-reloaded; opt out with <code>devServer.restartOnConfigChange: false</code> for the previous warning"
+            },
+            {
+              "type": "Added",
+              "html": "Bun support in <code>warlock update</code> and <code>warlock add</code> — <code>bun.lock</code> / <code>bun.lockb</code> are detected and drive <code>bun install</code> / <code>bun add</code>"
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock dev</code> recovers from a crash: a worker that dies after running healthily for 5s is replaced automatically, while one that dies during boot is left alone so its error isn't buried under a reprint. Capped at 3 crashes per minute"
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock update --dry-run</code> reports what would change without touching anything, and <code>--check</code> does the same but exits <code>1</code> when a package is behind — a CI gate for staying current"
+            },
+            {
+              "type": "Changed",
+              "html": "the dev-server update check remembers npm's answer for 24h in <code>.warlock/update-check.json</code>, so a day of restarts costs one lookup instead of one per boot; failed lookups are never cached, and the entry is dropped once an update is applied"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock start</code> spawns <code>process.execPath</code> instead of a bare <code>node</code>, which failed with <code>ENOENT</code> wherever <code>node</code> is not on <code>PATH</code> (systemd units, cron, slim containers) and could otherwise pick a different Node version than the one running the CLI"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock add</code> no longer carries its own package-manager detection that silently produced an undefined install command when the project had no recognised lockfile — it shares the updater's detection"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>build.outDirectory</code> — the name the docs have used for several releases — is now actually read. Only <code>build.outdir</code> ever was, so a config written from the documentation was silently ignored and the bundle still went to <code>dist/</code>. Both names now work (<code>outdir</code> wins if you set both) and the docs lead with <code>outdir</code>"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock update</code> no longer reports \"All @warlock.js packages are already up to date\" when it never reached the npm registry — an offline run now says so and changes nothing"
+            },
+            {
+              "type": "Fixed",
+              "html": "a failed package-manager install during <code>warlock update</code> no longer loses the rewritten <code>package.json</code>; the CLI still exits non-zero"
+            },
+            {
+              "type": "Fixed",
+              "html": "the dev server's update check now uses a 5s abort budget instead of 30s, so a hanging network can't leave a pending request behind a running server"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "migrations ran in <strong>filename order instead of chronological order</strong> on any fresh database. <code>SQLGrammar.sort</code> — the comparator that decides execution order across every pending migration — parsed <code>createdAt</code> with <code>new Date()</code>, which cannot read the <code>MM-DD-YYYY_HH-MM-SS</code> stamp the framework's own generator produces; every timestamp became <code>NaN</code>, was floored to <code>0</code>, and the alphabetical tiebreaker silently decided the whole ordering. A January 2026 migration would run before a December 2025 one"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>parseCreatedAt</code> now lives in its own module and backs both migration comparators through a shared <code>compareCreatedAt</code>, so the two can no longer drift apart — one of them being wrong was the symptom, two comparators sorting the same data by different rules was the defect"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>StepSnapshot.children</code> — reports a workflow <code>run</code> step captured from any executable its callback invoked DIRECTLY (<code>agent.execute(...)</code> rather than the declarative <code>agent:</code> field), via the same ambient <code>RunFrame</code> a supervisor/team/orchestrator callback already gets. <code>report.children</code> now includes these alongside <code>step.agent</code> reports."
+            },
+            {
+              "type": "Fixed",
+              "html": "A workflow <code>run</code> step that calls <code>agent.execute()</code> directly no longer produces two disconnected top-level traces (one \"agent\", one \"workflow\") with the agent missing from <code>report.children</code> — it now nests correctly (<code>workflow → agent → tool</code>, usage/cost rolled up) and no longer also self-routes as a separate observed trace. Declarative <code>step.agent</code> was already correct; this closes the gap for ad-hoc calls inside <code>run</code> (self-documented in <code>workflow/engine.ts</code> as a known limitation)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>reasoning_effort</code> now defaults to <code>\"none\"</code> automatically on a reasoning-capable model called WITH <code>tools</code> and no explicit <code>reasoning.effort</code> — previously this required every call site to opt in (added in 4.8.0), so any agent/model config that didn't know to pass it kept hitting rejected tool calls (empty replies, or a hard 400 on newer model generations — <code>\"Function tools with reasoning_effort are not supported ... in /v1/chat/completions\"</code>). An explicit <code>reasoning.effort</code> still overrides the default in either direction; calls with no <code>tools</code> are unaffected."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "4.8.2",
       "id": "v4-8-2",
       "date": "July 22, 2026",

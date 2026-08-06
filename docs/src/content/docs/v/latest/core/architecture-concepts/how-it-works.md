@@ -42,7 +42,7 @@ What it means for you: zero config. TypeScript files just work in `import` state
 
 ## The production builder
 
-For production, the dev server's loader hook is the wrong tool — it's optimized for fast change-and-reload cycles, not bundle size. `warlock build` uses [`esbuild`](https://esbuild.github.io/) to bundle your project into the `dist/` folder (or wherever `warlock.config.ts > build.outDirectory` points — it defaults to `"dist"`).
+For production, the dev server's loader hook is the wrong tool — it's optimized for fast change-and-reload cycles, not bundle size. `warlock build` uses [`esbuild`](https://esbuild.github.io/) to bundle your project into the `dist/` folder (or wherever `warlock.config.ts > build.outdir` points — it defaults to `"dist"`).
 
 The builder generates a single combined `bootstrap.ts`, a config loader, route registrations, and an entry file, then esbuild produces the final bundle. `warlock start` runs that bundle with `node --enable-source-maps`. No `tsx`, no loader hook, no watch — just a Node process running a bundled artifact.
 
