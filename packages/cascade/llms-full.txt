@@ -2556,6 +2556,24 @@ for (const [field, { oldValue, newValue }] of Object.entries(dirty)) {
 }
 ```
 
+## How a merge decides what changed
+
+`.merge()` deep-merges **plain objects only**. Every other value — primitives, arrays, and class instances such as `Date`, `Map`, `Set`, `RegExp` — **replaces** the target outright.
+
+```ts
+// plain object → merged key-by-key, siblings survive
+user.merge({ profile: { age: 26 } });     // profile.city untouched
+user.getDirtyColumns();                    // ["profile.age"]
+
+// Date → replaced, not merged
+conversation.merge({ lastOutboundAt: new Date() });
+conversation.getDirtyColumns();            // ["lastOutboundAt"]
+```
+
+:::note[Fixed in 4.9.1]
+Before 4.9.1 a `Date` merged over a column that **already held a `Date`** was silently dropped: the merge treated it as a mergeable container and recursed into it, and a `Date` has no own enumerable properties, so nothing was copied. The column never went dirty and `save()` returned `{ success: true, modifiedCount: 0 }` with no `UPDATE` issued. Writing into an empty column always worked, so only overwrites were affected. If you are on 4.9.0 or earlier, upgrade.
+:::
+
 ## Things NOT to do
 
 - Don't use `hasChanges()` / `isDirty()` after `save()` to verify the save persisted. The tracker resets to clean on save — these become false regardless. Read back from the DB if you need verification.

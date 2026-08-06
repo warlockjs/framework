@@ -354,8 +354,17 @@ export class DatabaseDirtyTracker {
   /**
    * Recursively merges source object into target object, performing a deep merge.
    *
-   * For nested objects, the merge is recursive. For arrays and primitives, the source
-   * value replaces the target value. All values are cloned to prevent reference sharing.
+   * Only **plain** objects are merged recursively. Everything else — arrays,
+   * primitives, and class instances such as `Date` / `Map` / `Set` / `RegExp` —
+   * replaces the target value. All values are cloned to prevent reference sharing.
+   *
+   * The plain-object guard is load-bearing, not tidiness. A bare
+   * `typeof value === "object"` also matches a `Date`, and `Object.entries(date)`
+   * is `[]` — so merging a `Date` over a column that already held a `Date`
+   * recursed into it, copied nothing, and left the old value in the snapshot.
+   * The column then never went dirty and `save()` returned
+   * `{ success: true, modifiedCount: 0 }` without issuing an `UPDATE`. This is
+   * the same lesson `canBeFlatten` above already encodes.
    *
    * @param target - The object to merge into
    * @param source - The object to merge from
@@ -363,14 +372,7 @@ export class DatabaseDirtyTracker {
    */
   protected mergeIntoRaw(target: Record<string, unknown>, source: Record<string, unknown>): void {
     for (const [key, value] of Object.entries(source)) {
-      if (
-        value &&
-        typeof value === "object" &&
-        !Array.isArray(value) &&
-        target[key] &&
-        typeof target[key] === "object" &&
-        !Array.isArray(target[key])
-      ) {
+      if (isPlainObject(value) && isPlainObject(target[key])) {
         this.mergeIntoRaw(target[key] as Record<string, unknown>, value as Record<string, unknown>);
         continue;
       }

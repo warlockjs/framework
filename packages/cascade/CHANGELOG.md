@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.9.1
+
+### Fixed
+
+- `save({ merge })` silently dropped a `Date` written over a column that already held a `Date` — the dirty tracker's merge treated anything `typeof "object"` as mergeable and recursed into the `Date`, which has no own enumerable properties, so nothing was copied and the old value survived. The column never went dirty and `save()` returned `{ success: true, modifiedCount: 0 }` without issuing an `UPDATE`. Only plain objects deep-merge now; `Date`, `Map`, `Set`, `RegExp` and every other class instance replace, matching what `model.data` already did. Writing into an empty column always worked, so only overwrites were affected
+
 ## 4.9.0 - 2026-08-06
 
 ### Fixed
