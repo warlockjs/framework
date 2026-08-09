@@ -13,6 +13,7 @@ import mime from "mime";
 import path from "path";
 import type React from "react";
 import { type ReactNode } from "react";
+import { Application } from "../application/application";
 import type { Route } from "../router";
 import { StorageFile } from "../storage";
 import { renderReact } from "./../react";
@@ -81,6 +82,24 @@ export type SendBufferOptions = SendFileOptions & {
   contentType?: string;
   etag?: string;
 };
+
+/**
+ * The cookie flags every response cookie gets unless something overrides them.
+ *
+ * Computed per call rather than hoisted to a constant because `secure` depends
+ * on the environment, which is not known at module-evaluation time.
+ *
+ * `secure` is relaxed in development only: a `Secure` cookie is dropped by the
+ * browser over plain http, which would silently break every local login. It
+ * stays on everywhere else, including test and staging.
+ */
+function secureCookieDefaults(): CookieSerializeOptions {
+  return {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: !Application.isDevelopment,
+  };
+}
 
 export class Response {
   /**
@@ -910,13 +929,28 @@ export class Response {
    * cleanly with `request.cookie(name)`. Pass `{ raw: true }` to skip the
    * JSON wrapping for plain-string cookies (session tokens, opaque IDs).
    *
+   * **Secure by default.** `httpOnly: true`, `sameSite: "lax"`, and — outside
+   * development — `secure: true` are applied unless you override them. These
+   * are the flags whose absence never fails a test and is fatal in production:
+   * without `httpOnly` any injected script can read the cookie, without
+   * `secure` it travels in cleartext, without `sameSite` it rides along on
+   * cross-site requests. Opting out is explicit, per call or via
+   * `http.cookies.options`.
+   *
+   * Precedence, lowest to highest: framework defaults → `http.cookies.options`
+   * → the per-call `options` argument.
+   *
    * @example
    * // JSON-wrapped (default) — round-trips with request.cookie()
-   * response.cookie("prefs", { theme: "dark" }, { maxAge: 3600, httpOnly: true });
+   * response.cookie("prefs", { theme: "dark" }, { maxAge: 3600 });
    *
    * @example
    * // Raw string — no JSON quoting; useful for tokens / opaque IDs
-   * response.cookie("session", "abc.def.ghi", { raw: true, httpOnly: true });
+   * response.cookie("session", "abc.def.ghi", { raw: true });
+   *
+   * @example
+   * // Deliberately readable by client-side JS
+   * response.cookie("theme", "dark", { httpOnly: false });
    */
   public cookie(name: string, value: CookieValue, options: CookieOptions = {}) {
     const { raw, ...cookieOptions } = options;
@@ -924,6 +958,7 @@ export class Response {
     const serializedValue = raw ? String(value) : JSON.stringify(value);
 
     this.baseResponse.setCookie(name, serializedValue, {
+      ...secureCookieDefaults(),
       ...defaultOptions,
       ...cookieOptions,
     });

@@ -4,6 +4,14 @@ All notable changes to `@warlock.js/core` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.10.0
+
+### Changed
+
+- **`response.cookie` is now secure by default** — `httpOnly: true`, `sameSite: "lax"`, and `secure: true` outside development are applied unless overridden. Previously nothing set them: a cookie was readable by any injected script, sent in cleartext, and attached to cross-site requests unless the developer knew to pass three flags on every call. Nothing failed when they were missing, so the app worked and was simply insecure. Precedence is framework defaults → `http.cookies.options` → the per-call argument, so opting out stays possible and explicit. `secure` is relaxed only in development, because browsers drop a `Secure` cookie over plain http
+
+  **Upgrading:** a cookie your client-side JavaScript reads now needs `{ httpOnly: false }` stated explicitly. Anywhere you wrote `secure: Application.isProduction` by hand can be deleted — the default already tracks the environment, and the hand-written form wrongly disables `secure` in test and staging
+
 ## 4.9.2
 
 ### Fixed
