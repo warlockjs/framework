@@ -29,6 +29,8 @@ If a rule fails, transformers don't run. If a leaf validator's chain failed and 
 - **Mutator** = pre-validation reshape. `v.date()` ships one that parses string inputs. Use when you want rules to see the reshaped value.
 - **Transformer** = post-validation reshape. Lands in `result.data`. Use when you only care about the output form.
 
+**A mutator must not change the value's type out from under its own validator.** Because mutators run at step 2 and the type rule at step 5, a mutator that turns a number into a string makes the schema reject its own output. That is why `v.number().toFixed(2)` yields the number `3.14` rather than the string `"3.14"` — if you want a fixed-point string, that is a transformer's job, or format at the presentation edge.
+
 ```ts
 // trim BEFORE length check — use a mutator
 v.string().addMutator(s => s.trim()).min(3)

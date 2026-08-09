@@ -99,6 +99,22 @@ v.literal(1, 2, 3)                          // type: 1 | 2 | 3
 v.literal(true)                             // type: true
 ```
 
+**The empty string is a value, not an absence.** `v.literal("")` accepts `""` and still requires the key to be *present*:
+
+```ts
+const decorative = v.object({ decorative: v.literal(true), alt: v.literal("") });
+
+await v.validate(decorative, { decorative: true, alt: "" });      // valid
+await v.validate(decorative, { decorative: true, alt: "text" });  // invalid — not the literal
+await v.validate(decorative, { decorative: true });               // invalid — key missing
+```
+
+That distinction matters wherever empty and absent mean different things — `alt=""` marks an image decorative to a screen reader, while a missing `alt` is an authoring mistake. Add `.optional()` only when a missing key is genuinely acceptable; a present value must still match.
+
+:::note[Fixed in 4.9.2]
+Before 4.9.2 `v.literal("")` always failed with *"is required"*, and `.optional()` appeared to fix it while actually switching the literal check off — accepting `""`, `null`, and a missing key alike. `v.literal(0)` and `v.literal(false)` were never affected.
+:::
+
 `v.literal(...)` narrows to the **literal union**, not the wider primitive type. Compare:
 
 ```ts

@@ -108,6 +108,83 @@
   ],
   "releases": [
     {
+      "version": "4.9.2",
+      "id": "v4-9-2",
+      "date": "August 9, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong><code>@warlock.js/cascade</code></strong> fixes <code>migrate:rollback</code> running <code>down()</code> migrations in *apply* order — the rollback list was reversed and then re-sorted ascending, putting it straight back, so any batch with more than one migration could drop a table before dropping the column added to it. <strong><code>@warlock.js/seal</code></strong> fixes <code>v.literal(\"\")</code>, which could never pass because every validator is required by default and <code>\"\"</code> counts as empty — while <code>.optional()</code> looked like a workaround but silently disabled the literal check entirely; seal also stops returning the rejected input as <code>data</code> on a failed validation, closing a leak where an outbound DTO's internal fields reached callers who didn't branch on <code>isValid</code>, and fixes <code>v.number().toFixed(n)</code>, which returned a string its own number rule then rejected. <strong><code>@warlock.js/core</code></strong> stops the generated dev-server loader hook shipping bare <code>esbuild</code> / <code>get-tsconfig</code> imports into your project, which broke <code>warlock dev</code> on pnpm's strict layout.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>migrate:rollback</code> and <code>migrate:rollback --all</code> ran <code>down()</code> migrations in <strong>apply order</strong> instead of reverse. <code>getMigrationsToRollback</code> reversed the executed list and then re-sorted it ascending, which put it straight back into forward order and made the reverse dead code — so a rollback would drop a table before dropping the column added to it, failing with <code>relation \"…\" does not exist</code>. Any batch containing more than one migration was affected; single-migration batches hid it because one item has no order to get wrong"
+            },
+            {
+              "type": "Fixed",
+              "html": "migration ordering now lives in <code>migration-order.ts</code> with an explicit <code>sortMigrationsForRollback</code>. The descending sort is required, not cosmetic: the executed list is read back ordered by <code>batch, name</code>, so it is alphabetical rather than chronological and simply *not* re-sorting after the reverse would have produced reverse-alphabetical order — a different wrong answer"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>v.literal(\"\")</code> could never pass. Every validator is required by default and <code>required</code> rejects anything the empty-value check calls empty — which includes <code>\"\"</code> — so a schema demanding an exact empty string reported \"is required\" for a field that was present. A literal set containing an empty value now uses <code>present</code> (the key must exist) instead of <code>required</code>, leaving the literal set to judge the value. Only the empty string was affected; <code>v.literal(0)</code> and <code>v.literal(false)</code> always worked"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>v.literal(\"\").optional()</code> silently disabled the literal check rather than fixing it, accepting <code>\"\"</code>, <code>null</code> <strong>and</strong> a missing key alike. The literal rule now runs on empty values (<code>requiresValue: false</code>) while treating absence as the required/present rule's question, so <code>.optional()</code> means optional again and a present value must still match"
+            },
+            {
+              "type": "Fixed",
+              "html": "a <strong>failed</strong> validation no longer returns the input it rejected. <code>object</code> returned the raw input — including the unknown keys it had just complained about — while <code>discriminatedUnion</code> returned <code>undefined</code>; the same call shape had two contracts. Validating an outbound DTO to keep internal fields out of a response, then reading <code>data</code> without branching on <code>isValid</code>, shipped every field the schema existed to exclude. <code>data</code> is now <code>undefined</code> whenever <code>isValid</code> is <code>false</code>"
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>v.number().toFixed(n)</code> could never produce a valid result — the mutator returned <code>Number(value).toFixed(n)</code>, a *string*, which the validator's own <code>number</code> type rule then rejected. It now yields a number (<code>3.14159</code> → <code>3.14</code>), so the method works where it lives. No working code can have depended on the old output, since every such validation failed; for a fixed-point *string*, format at the presentation edge rather than asking a number schema to emit one"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "the dev server's generated <code>.warlock/loader-hook.mjs</code> no longer ships bare <code>esbuild</code> / <code>get-tsconfig</code> imports. That file is written into the <strong>consuming app's</strong> directory, so a bare specifier resolves from the app — but both packages are core's own dependencies. npm and yarn hoist flat so it worked by accident; under pnpm's strict layout the dev server died with <code>ERR_MODULE_NOT_FOUND</code> for a package the app never imported. Each npm specifier is now rewritten at generation time to an absolute path resolved from core's own install, so no consumer has to declare a phantom dependency"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "4.9.1",
       "id": "v4-9-1",
       "date": "August 6, 2026",

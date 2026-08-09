@@ -20,10 +20,26 @@ v.object({
 
 - **Required by default.** `.optional()` to opt out. The inferred type marks optional keys with `?`.
 - **Cross-field rules live here.** `.sameAs("password")`, `.requiredIf("role", "admin")` resolve siblings against the parent `v.object`. Without a parent, sibling resolution silently passes.
-- **Unknown keys are dropped silently by default.** Toggle behavior:
+- **Unknown keys are rejected by default** — validation fails with *"The schema contains unknown keys: …"*. Toggle behavior:
   - `.allowUnknown()` — forward extras as-is.
-  - `.stripUnknown()` — explicit drop (the default behavior, called out).
+  - `.stripUnknown()` — drop extras and return the clean object instead of failing.
   - `.allow("trackingId", "_meta")` — whitelist specific extras.
+
+Rejecting is the right default for **inbound** payloads. For an **outbound** DTO — a record that legitimately carries internal fields you don't want to expose — reach for `.stripUnknown()`:
+
+```ts
+const publicArticle = v.object({
+  id: v.string().required(),
+  title: v.string().required(),
+}).stripUnknown();
+
+const { isValid, data } = await v.validate(publicArticle, record);
+// record had version / authorId / status; data has only id + title
+```
+
+:::caution[`data` is `undefined` when validation fails]
+Always branch on `isValid`. A failed validation returns `data: undefined` — it never hands back the input it rejected. Before 4.9.2 a failing `v.object` returned the raw input, so code that read `data` without checking forwarded exactly the fields the schema existed to exclude.
+:::
 
 ### Composing objects
 
