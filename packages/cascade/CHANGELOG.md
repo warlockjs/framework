@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.9.2
+
+### Fixed
+
+- `migrate:rollback` and `migrate:rollback --all` ran `down()` migrations in **apply order** instead of reverse. `getMigrationsToRollback` reversed the executed list and then re-sorted it ascending, which put it straight back into forward order and made the reverse dead code — so a rollback would drop a table before dropping the column added to it, failing with `relation "…" does not exist`. Any batch containing more than one migration was affected; single-migration batches hid it because one item has no order to get wrong
+- migration ordering now lives in `migration-order.ts` with an explicit `sortMigrationsForRollback`. The descending sort is required, not cosmetic: the executed list is read back ordered by `batch, name`, so it is alphabetical rather than chronological and simply *not* re-sorting after the reverse would have produced reverse-alphabetical order — a different wrong answer
+
 ## 4.9.1
 
 ### Fixed

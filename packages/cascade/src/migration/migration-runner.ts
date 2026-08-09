@@ -6,7 +6,8 @@ import type { MigrationDriverContract } from "../contracts/migration-driver.cont
 import type { DataSource } from "../data-source/data-source";
 import { dataSourceRegistry } from "../data-source/data-source-registry";
 import { type Migration } from "./migration";
-import { compareCreatedAt, parseCreatedAt } from "./parse-created-at";
+import { sortMigrations, sortMigrationsForRollback } from "./migration-order";
+import { parseCreatedAt } from "./parse-created-at";
 import { SQLGrammar } from "./sql-grammar";
 import type { MigrationRecord, MigrationResult, TaggedSQL } from "./types";
 
@@ -37,27 +38,6 @@ type ExecuteOptions = {
   /** Record to migrations table (default: true for batch, false for single) */
   readonly record?: boolean;
 };
-
-/**
- * Comparator for sorting migration classes.
- *
- * Priority:
- *   1. `createdAt` timestamp (older = earlier)
- *   2. Alphabetical by migration name (last resort)
- */
-function sortMigrations(
-  a: { createdAt?: string; migrationName: string },
-  b: { createdAt?: string; migrationName: string },
-): number {
-  const byCreatedAt = compareCreatedAt(a.createdAt, b.createdAt);
-
-  if (byCreatedAt !== undefined) {
-    return byCreatedAt;
-  }
-
-  // Last resort: alphabetical
-  return a.migrationName.localeCompare(b.migrationName);
-}
 
 /**
  * Migration runner that executes migrations.
@@ -954,7 +934,18 @@ export class MigrationRunner {
   }
 
   /**
-   * Get migrations to rollback.
+   * Get migrations to rollback, newest-first.
+   *
+   * A rollback must undo migrations in the exact inverse of the order `up`
+   * applied them, or a `down()` will hit schema its predecessor already
+   * removed — dropping a table before dropping the column added to it, say.
+   *
+   * The sort has to be explicitly **descending**. Reversing the executed list
+   * is not enough: `getExecutedMigrations` orders by `batch, name`, so the
+   * input is alphabetical rather than chronological, and reversing it only
+   * yields reverse-alphabetical order. (Sorting *ascending* here — which is
+   * what this method used to do after a `.reverse()` — silently restored the
+   * forward `up` order and made the reverse dead code.)
    */
   private async getMigrationsToRollback(batches: number): Promise<MigrationClass[]> {
     const executed = await this.getExecutedMigrations();
@@ -964,13 +955,12 @@ export class MigrationRunner {
       .sort((a, b) => b - a)
       .slice(0, batches);
 
-    const toRollback = executed.filter((r) => batchNumbers.includes(r.batch)).reverse();
-
-    const migrations = toRollback
+    const migrations = executed
+      .filter((r) => batchNumbers.includes(r.batch))
       .map((r) => this.migrations.find((m) => m.migrationName === r.name))
       .filter((m): m is MigrationClass => !!m);
 
-    return migrations.sort(sortMigrations);
+    return migrations.sort(sortMigrationsForRollback);
   }
 
   /**
