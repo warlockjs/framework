@@ -1,17 +1,25 @@
-// Generate site-level llms.txt + llms-full.txt for warlock.js.org.
+// Generate site-level llms.txt + llms-full.txt for warlock.js.org, plus a
+// per-package pair for each package.
 //
-// - llms.txt       → an index: framework overview + one line per package with a
-//                    link to its docs section on the site.
-// - llms-full.txt  → every package's llms-full.txt concatenated, in reading order.
+// - llms.txt              → an index: framework overview, then one line per
+//                           package linking BOTH its docs section and its own
+//                           llms.txt, so an agent can discover the cheap,
+//                           package-scoped fetch instead of taking everything.
+// - llms-full.txt         → every package's llms-full.txt concatenated.
+// - <pkg>/llms.txt        → that package's own index.
+// - <pkg>/llms-full.txt   → that package's full text.
+//
+// The per-package files matter because the aggregate is ~1.5 MB: an agent that
+// only needs Cascade should not have to ingest the whole framework to get it.
 //
 // Source of truth is each package's own `llms.txt` / `llms-full.txt` (kept in
 // lockstep with the code). Run after those are regenerated:
 //   node scripts/generate-site-llms.mjs
 //
 // Output lands in `public/` so Astro copies it verbatim to the dist root, making
-// it resolve at https://warlock.js.org/llms.txt and /llms-full.txt.
+// it resolve at https://warlock.js.org/llms.txt and /<pkg>/llms.txt.
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -72,6 +80,7 @@ function docUrl(pkg) {
 
 const indexLines = [];
 const fullParts = [];
+let perPackageCount = 0;
 
 for (const pkg of PACKAGES) {
   const pkgDir = join(packagesRoot, pkg);
@@ -86,10 +95,29 @@ for (const pkg of PACKAGES) {
   const description = readDescription(llms);
   const scopedName = pkg === "create-warlock" ? "create-warlock" : `@warlock.js/${pkg}`;
 
-  indexLines.push(`- [${scopedName}](${docUrl(pkg)}): ${description}`);
+  // Copy the package's own pair to public/<pkg>/ so it is fetchable on its own.
+  const pkgPublicDir = join(publicDir, pkg);
+  mkdirSync(pkgPublicDir, { recursive: true });
+  writeFileSync(join(pkgPublicDir, "llms.txt"), llms);
 
-  if (existsSync(fullPath)) {
-    const full = readFileSync(fullPath, "utf8").trim();
+  const hasFull = existsSync(fullPath);
+  let full = "";
+
+  if (hasFull) {
+    full = readFileSync(fullPath, "utf8").trim();
+    writeFileSync(join(pkgPublicDir, "llms-full.txt"), full);
+    perPackageCount++;
+  }
+
+  // Point at BOTH the human docs and the package-scoped llms.txt — an index
+  // that only lists doc URLs gives an agent no way to find the cheaper fetch.
+  indexLines.push(
+    `- [${scopedName}](${docUrl(pkg)}): ${description}` +
+      `\n  - llms.txt: ${SITE}/${pkg}/llms.txt` +
+      (hasFull ? `\n  - llms-full.txt: ${SITE}/${pkg}/llms-full.txt` : ""),
+  );
+
+  if (hasFull) {
     fullParts.push(
       `\n\n${"=".repeat(80)}\n# ${scopedName}\n${"=".repeat(80)}\n\n${full}`,
     );
@@ -106,6 +134,10 @@ const llmsTxt = `# Warlock.js
 Documentation: ${SITE}
 
 ## Packages
+
+Each package publishes its own \`llms.txt\` (index) and \`llms-full.txt\` (complete
+text). **Prefer the package-scoped file** when you only need one package — the
+combined \`llms-full.txt\` below is the whole framework and is far larger.
 
 ${indexLines.join("\n")}
 
@@ -124,5 +156,6 @@ writeFileSync(join(publicDir, "llms.txt"), llmsTxt);
 writeFileSync(join(publicDir, "llms-full.txt"), llmsFullTxt);
 
 console.log(
-  `Generated public/llms.txt (${indexLines.length} packages) + public/llms-full.txt (${llmsFullTxt.length} bytes).`,
+  `Generated public/llms.txt (${indexLines.length} packages) + public/llms-full.txt ` +
+    `(${llmsFullTxt.length} bytes) + ${perPackageCount} per-package pair(s) under public/<pkg>/.`,
 );

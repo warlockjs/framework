@@ -1,0 +1,402 @@
+# Warlock Context — full skills
+
+> Package: `@warlock.js/context`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/context/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## define-context  `@warlock.js/context/define-context/SKILL.md`
+
+---
+name: define-context
+description: 'Extend Context<TStore> to define an AsyncLocalStorage-backed typed context — implement buildStore, use run / enter / update / get / set / getStore / clear / hasContext. Triggers: `Context`, `Context<TStore>`, `buildStore`, `run`, `enter`, `update`, `get`, `set`, `getStore`, `clear`, `hasContext`; "share user/tenant/trace id across async calls", "AsyncLocalStorage typed wrapper", "request-scoped store without thread-through"; typical import `import { Context } from "@warlock.js/context"`. Skip: orchestrating multiple contexts — `@warlock.js/context/orchestrate-contexts/SKILL.md`; native `AsyncLocalStorage`, `cls-hooked`, `nest-context`, React Context.'
+---
+
+# Define a context
+
+`@warlock.js/context` is a tiny wrapper on Node.js's `AsyncLocalStorage`. You extend the abstract `Context<TStore>` class to declare what your context stores, and you get a typed get/set/run API that propagates through every async call inside the scope.
+
+## Install
+
+```bash
+yarn add @warlock.js/context
+```
+
+## Shape
+
+```ts
+import { Context } from "@warlock.js/context";
+
+interface UserContextStore {
+  userId: string;
+  role: "admin" | "user";
+  tenantId: string;
+}
+
+class UserContext extends Context<UserContextStore> {
+  /**
+   * Called by `contextManager.buildStores(payload)` for each registered context.
+   * Override to provide initialization logic for this context's store.
+   */
+  public buildStore(payload?: Record<string, any>): UserContextStore {
+    return {
+      userId: payload?.userId ?? "",
+      role: payload?.role ?? "user",
+      tenantId: payload?.tenantId ?? "",
+    };
+  }
+}
+
+export const userContext = new UserContext();
+```
+
+`buildStore` is the **only** abstract method. Everything else is provided by `Context<TStore>`.
+
+## Usage modes
+
+### `run()` — scoped execution
+
+```ts
+await userContext.run(
+  { userId: "123", role: "admin", tenantId: "acme" },
+  async () => {
+    // Context is available throughout this async scope and any awaited calls inside it.
+    const userId = userContext.get("userId");   // "123"
+    const role = userContext.get("role");       // "admin"
+
+    await someAsyncOperation();                  // context propagates through awaits
+  },
+);
+```
+
+Use `run()` when you have a clear scope boundary (a request handler, a job, a CLI command). The context is auto-cleaned when the callback returns.
+
+### `enter()` — middleware-style, no callback
+
+```ts
+function authMiddleware(req, res, next) {
+  userContext.enter({
+    userId: req.user.id,
+    role: req.user.role,
+    tenantId: req.headers["x-tenant-id"],
+  });
+
+  next();   // context lives for the rest of the request
+}
+```
+
+Use `enter()` when the framework doesn't give you a callback to wrap (Express-style middleware). Under the hood it's `AsyncLocalStorage.enterWith(store)`.
+
+### `update()` — merge into the current context
+
+```ts
+userContext.update({ role: "admin" });
+// existing store: { userId, role, tenantId } → { userId, role: "admin", tenantId }
+```
+
+If there's no current store, `update` creates one with the partial (cast to the full type). Use for incremental enrichment as the request flows through layers.
+
+## Reading
+
+```ts
+const userId = userContext.get("userId");         // TStore[K] | undefined
+const store = userContext.getStore();              // TStore | undefined
+const inside = userContext.hasContext();           // boolean
+```
+
+`get` is the daily-use accessor. `getStore` returns the whole record. `hasContext` distinguishes "key absent" from "no context at all" (which matters for safety checks at the framework boundary).
+
+## Writing within a context
+
+```ts
+userContext.set("role", "admin");                  // sugar for update({ role: "admin" })
+```
+
+Only call `set` inside an active context. Outside one, it enters a new context with just that key set — usually not what you want.
+
+## Clearing
+
+```ts
+userContext.clear();
+// replaces the current store with an empty object of TStore
+```
+
+Rare in app code. The auto-cleanup at the end of `run()` is the normal path.
+
+## Convenience getters via subclass
+
+Add domain-friendly getters on the subclass when a key is read a lot:
+
+```ts
+class TenantContext extends Context<TenantStore> {
+  public buildStore(payload?: Record<string, any>): TenantStore {
+    return {
+      tenantId: payload?.tenantId ?? "",
+      tenantName: payload?.tenantName ?? "",
+      config: payload?.config ?? {},
+    };
+  }
+
+  public get tenantId() {
+    return this.get("tenantId");
+  }
+
+  public get config() {
+    return this.get("config");
+  }
+}
+```
+
+Now `tenantContext.tenantId` reads better than `tenantContext.get("tenantId")` at the call site.
+
+## What it's NOT for
+
+- **Persistent state across requests.** AsyncLocalStorage is per-call-tree; data dies when the scope ends. Use a cache, a database, or a singleton for cross-request data.
+- **Thread-safe shared mutable state.** Each `run()` gets a fresh store. Two parallel `run()` calls don't see each other's updates.
+- **Sync code that doesn't `await` anything.** Works, but if there's no async boundary the context add-overhead is wasted — just pass the data as a parameter.
+
+## See also
+
+- [`@warlock.js/context/orchestrate-contexts/SKILL.md`](@warlock.js/context/orchestrate-contexts/SKILL.md) — running multiple contexts together via the `contextManager` singleton.
+
+## Things NOT to do
+
+- Don't make every cross-cutting concern a context. Build one when it has its own lifecycle (request, db transaction, trace span). For one-off data, a function argument is clearer.
+- Don't capture the store reference outside the scope — it's freed when `run()` ends. Read the value out before exiting the scope if you need it later.
+- Don't mutate the store object directly without `update`/`set` — works, but obscures intent. The methods exist to make state changes searchable.
+- Don't share one context instance across unrelated concerns. One typed context per domain concept reads better than one fat `globalContext`.
+
+
+## orchestrate-contexts  `@warlock.js/context/orchestrate-contexts/SKILL.md`
+
+---
+name: orchestrate-contexts
+description: 'Orchestrate multiple Context<TStore> instances via the contextManager singleton — register, buildStores, runAll, enterAll, clearAll. Triggers: `contextManager`, `register`, `buildStores`, `runAll`, `enterAll`, `clearAll`, `unregister`, `getContext`, `hasContext`; "run multiple contexts active for the same scope", "register contexts at boot", "avoid nested run() calls for request + database + tenant"; typical import `import { contextManager } from "@warlock.js/context"`. Skip: defining a single context class — `@warlock.js/context/define-context/SKILL.md`; native `AsyncLocalStorage` nesting, `cls-hooked` namespaces.'
+---
+
+# Orchestrate contexts — `contextManager`
+
+`contextManager` is a singleton that knows about every registered `Context` and runs them all together so you don't write nested `run()` calls by hand.
+
+## Why use it
+
+You can call `context.run(store, fn)` directly when you only have one context. With two or more, the manager handles the nesting:
+
+```ts
+// ❌ Without the manager — fragile, easy to forget a layer
+await requestContext.run(reqStore, async () =>
+  databaseContext.run(dbStore, async () =>
+    tenantContext.run(tenantStore, async () => handle()),
+  ),
+);
+
+// ✅ With the manager — one call, deterministic order
+await contextManager.runAll({ request: reqStore, database: dbStore, tenant: tenantStore }, handle);
+```
+
+## Register contexts at boot
+
+```ts
+import { contextManager } from "@warlock.js/context";
+import { requestContext } from "./request-context";
+import { databaseContext } from "./database-context";
+import { tenantContext } from "./tenant-context";
+
+contextManager
+  .register("request", requestContext)
+  .register("database", databaseContext)
+  .register("tenant", tenantContext);
+```
+
+Returns the manager — chain registrations. Names must be unique; re-registering with the same name overwrites.
+
+## Build stores + run
+
+The typical flow is two-step: build initial stores from a request-like payload, then run.
+
+```ts
+app.use(async (req, res, next) => {
+  const stores = contextManager.buildStores({
+    request: req,
+    response: res,
+    tenantId: req.headers["x-tenant-id"],
+  });
+
+  await contextManager.runAll(stores, async () => {
+    await next();
+  });
+});
+```
+
+`buildStores(payload)` calls each registered context's `buildStore(payload)` (the abstract method on `Context<TStore>` — see [`@warlock.js/context/define-context/SKILL.md`](@warlock.js/context/define-context/SKILL.md)) and returns `{ [contextName]: store }`.
+
+`runAll(stores, fn)` nests every context's `run()` in registration order, then invokes `fn` at the innermost layer. All contexts are active inside `fn`.
+
+## `enterAll()` — middleware without a callback
+
+When the framework doesn't give you a callback to wrap (e.g. Express middleware where you call `next()` and return):
+
+```ts
+function contextMiddleware(req, res, next) {
+  const stores = contextManager.buildStores({ request: req, response: res });
+  contextManager.enterAll(stores);
+  next();
+}
+```
+
+`enterAll` calls `enter()` on each registered context whose name has a **truthy** store value — a `name` with no key (or a falsy value like `undefined`) is skipped, leaving any already-active store for that context untouched. The entered contexts live for the rest of the request. Each can still be `clear()`-ed later. Use `runAll` when you can — `enterAll` doesn't auto-clean.
+
+## Lookup + introspection
+
+```ts
+contextManager.hasContext("tenant");                // boolean
+const tenant = contextManager.getContext<TenantContext>("tenant");
+// returns the registered instance or undefined
+contextManager.unregister("debug");                  // remove a context
+contextManager.clearAll();                           // clear stores on every context
+```
+
+`getContext<T>` returns the registered instance cast to `T` (the generic is constrained to `Context<any>`, so pass the concrete context class — `getContext<TenantContext>("tenant")`). It's an unchecked cast: an unknown `name` returns `undefined`, and a wrong type argument won't be caught at runtime. Useful in shared utilities that want to read from a context without importing it at the call site.
+
+## Order matters
+
+`runAll` nests in **registration order**. The first-registered context is the outermost layer. If contexts have ordering constraints (database before tenant because tenant resolves via the db), register them in that order.
+
+```ts
+contextManager
+  .register("trace", traceContext)        // outermost — runs first
+  .register("request", requestContext)
+  .register("database", databaseContext)
+  .register("tenant", tenantContext);     // innermost — runs last, inside all others
+```
+
+## Real-world: multi-tenant request lifecycle
+
+```ts
+import { Context, contextManager } from "@warlock.js/context";
+import { randomUUID } from "crypto";
+
+class TraceContext extends Context<{ traceId: string; startTime: number }> {
+  public buildStore(): { traceId: string; startTime: number } {
+    return { traceId: randomUUID(), startTime: Date.now() };
+  }
+
+  public get traceId() {
+    return this.get("traceId");
+  }
+}
+
+class RequestContext extends Context<{ request: any; response: any }> {
+  public buildStore(payload?: any) {
+    return { request: payload?.request, response: payload?.response };
+  }
+}
+
+class TenantContext extends Context<{ tenantId: string }> {
+  public buildStore(payload?: any) {
+    return { tenantId: payload?.tenantId ?? "" };
+  }
+}
+
+export const traceContext = new TraceContext();
+export const requestContext = new RequestContext();
+export const tenantContext = new TenantContext();
+
+contextManager
+  .register("trace", traceContext)
+  .register("request", requestContext)
+  .register("tenant", tenantContext);
+
+// In your HTTP layer:
+async function handleRequest(req: any, res: any) {
+  const stores = contextManager.buildStores({
+    request: req,
+    response: res,
+    tenantId: req.headers["x-tenant-id"],
+  });
+
+  return contextManager.runAll(stores, async () => {
+    // All three contexts active here:
+    console.log(`Trace ${traceContext.get("traceId")} — tenant ${tenantContext.get("tenantId")}`);
+
+    await routeAndDispatch(req, res);
+  });
+}
+```
+
+## Things NOT to do
+
+- Don't register the same context under two names — every context is its own singleton and shares its store across registrations, but multiple names confuse `buildStores` (the payload is split per name).
+- Don't `runAll` an empty stores map — every key without a registered context is silently ignored, and missing contexts get `{}` as their store. Better to construct the stores explicitly and fail loudly when a key is missing.
+- Don't use the manager when only one context applies. `context.run(store, fn)` is shorter and has the same semantics.
+- Don't expect `enterAll()` to auto-clean. It's a one-way setup — pair with `clearAll()` at the end of the request, or just use `runAll` when you can.
+
+
+## overview  `@warlock.js/context/overview/SKILL.md`
+
+---
+name: overview
+description: 'Front-door orientation for `@warlock.js/context` — typed AsyncLocalStorage wrappers for sharing data (user, tenant, trace, request) across async calls without thread-through. Extend `Context<TStore>` for a single context; use `contextManager` to orchestrate several at once. TRIGGER when: code imports anything from `@warlock.js/context`; user asks "what does @warlock.js/context do", "AsyncLocalStorage but typed", "share user/tenant across async without thread-through", "compare context vs cls-hooked / nest-context"; package.json adds `@warlock.js/context`. Skip: specific task already known — load the matching task skill directly (`@warlock.js/context/define-context/SKILL.md`, `@warlock.js/context/orchestrate-contexts/SKILL.md`); plain `AsyncLocalStorage` usage with no `Context<>` wrapper; React Context (this package is server-side / Node-only).'
+---
+
+# `@warlock.js/context` — overview
+
+Two-file package: a typed wrapper over Node's `AsyncLocalStorage` and a singleton that runs several of them together. That's it. The entire surface fits in two skills below — most callers only need the first one.
+
+## When to reach for it
+
+- You have request-scoped data (user, tenant, trace id, db transaction) that you'd otherwise thread through every function as a parameter. One `userContext.get("userId")` anywhere down the call tree replaces five layers of plumbing.
+- You're inside a `@warlock.js/*` project and want consistent context handling across modules. The framework already uses this package internally for request + user + tenant contexts.
+- You'd reach for `cls-hooked`, `nest-context`, or a bare `AsyncLocalStorage<T>` and want a typed wrapper with `run` / `enter` / `update` / `get` / `set` semantics out of the box.
+
+Skip if your call chain is a single function with no `await` boundaries — just pass the data as a parameter. Skip if you need cross-request shared state — that's a cache or database, not a context.
+
+## What it is in one sentence
+
+Each `Context<TStore>` subclass declares a typed store shape and what payload builds it; the framework uses Node's `AsyncLocalStorage` under the hood so the store propagates through every `await` inside the scope and disappears when the scope ends.
+
+## Skills index
+
+Two task skills cover everything. The first one is the daily-use one; the second is for when you have multiple contexts active at the same time.
+
+### [`define-context/`](../define-context/SKILL.md)
+
+Extend `Context<TStore>` to declare what your context stores and how it's
+built. Implement `buildStore(payload?)`; use `run` / `enter` / `update` /
+`get` / `set` / `getStore` / `clear` / `hasContext` to interact with the
+store from anywhere in the async scope.
+
+Load when sharing data (user, tenant, trace id) across async calls
+without threading it through every function — i.e. ~90% of the time you
+use this package.
+
+### [`orchestrate-contexts/`](../orchestrate-contexts/SKILL.md)
+
+Register multiple `Context<TStore>` instances on the `contextManager`
+singleton and run them all together with a single call. Covers
+`register` / `unregister`, `buildStores`, `runAll` / `enterAll`,
+`clearAll`, `getContext` / `hasContext`.
+
+Load when several contexts apply to the same scope (request + database
++ trace + tenant) and you'd otherwise nest `run()` calls by hand.
+
+## Two operating modes — when to pick which
+
+| Situation | Reach for |
+| --- | --- |
+| Framework gives you a callback to wrap | `context.run(store, callback)` |
+| Framework expects middleware that returns synchronously (Express, etc.) | `context.enter(store)` |
+| You have 2+ contexts active for the same request | `contextManager.runAll(stores, callback)` |
+| Middleware-style with 2+ contexts | `contextManager.enterAll(stores)` then `clearAll()` at end |
+| You only have one context and the framework cooperates | Single `context.run(...)`. Skip the manager. |
+
+## What this package deliberately doesn't do
+
+- **Persist data across requests.** AsyncLocalStorage dies with the scope. For cross-request state, reach for `@warlock.js/cache` or a database.
+- **Cross-thread context.** Worker threads don't share AsyncLocalStorage with the main thread. Serialize the data you need across the boundary and re-enter on the other side.
+- **Browser context.** Server-side only. The browser equivalent is React Context or a state library.
+- **Implicit context for non-async code.** If your call stack has no `await`, the storage works but there's no propagation benefit — just pass the value as a parameter.
+
+## See also
+
+- [`@warlock.js/core/overview/SKILL.md`](@warlock.js/core/overview/SKILL.md) — the parent framework; `context` is one of its foundation packages.
+- `mongez-agent-kit-authoring-skills` (load via agent-kit sync) — how this `overview/SKILL.md` becomes the front-door skill in `.claude/skills/warlock-js-context-overview/`.

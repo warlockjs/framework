@@ -1,0 +1,887 @@
+# Warlock AI Panoptic — full skills
+
+> Package: `@warlock.js/ai-panoptic`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-panoptic/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## evaluate-system-prompt  `@warlock.js/ai-panoptic/evaluate-system-prompt/SKILL.md`
+
+---
+name: evaluate-system-prompt
+description: 'Grade a single trace''s LAST captured system prompt from the dashboard drawer — the dashboard''s only write-capable feature, config-gated via `DashboardOptions.evaluate` (`ai.config({ panoptic: { dashboard: { evaluate: { model, instructions } } } })`). Triggers: `evaluate`, `EvaluateConfig`, `EvaluateVerdict`, `evaluateSystemPrompt`, `extractLastSystemPrompt`, `findSpanById`, "Evaluate system prompt" button, `POST .../spans/:spanId/evaluate`, grading a prompt from a real trace, judging a captured system prompt, per-run instructions override, judge model factory; ''evaluate this trace''s prompt'', ''grade the system prompt from the dashboard'', ''judge a captured run'', ''score a live system prompt''. Skip: grading raw prompt TEXT you already have in code (no trace involved) — `@warlock.js/ai`''s `ai.prompts().validate({ criteria })`, the same judge machinery this wraps; a DATASET of test cases run through an agent — `@warlock.js/ai`''s `ai.dataset` + `agent.eval`; viewing/filtering/grouping traces without grading them — `@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md`; capturing the content this feature reads — `@warlock.js/ai-panoptic/export-traces/SKILL.md` (`captureContent`).'
+---
+
+# Evaluate a trace's system prompt from the dashboard
+
+A drawer button that grades the LAST `{role: "system"}` message captured on the selected span — not the whole conversation, not the tool code, just the system prompt that was actually in effect for that run. It's the dashboard's only write-capable feature: every other route is `GET`-only and read-only by design (see `use-local-dashboard/SKILL.md`'s security note); this one POSTs, and it's off unless you explicitly opt in.
+
+## Enable it
+
+```ts
+import { ai } from "@warlock.js/ai";
+import "@warlock.js/ai-panoptic";
+
+ai.config({
+  panoptic: {
+    dashboard: {
+      evaluate: {
+        model: openai.model("gpt-4o-mini"),
+        instructions: "Must address the user by name. Never invent prices.",
+      },
+    },
+    observeAll: true,
+    captureContent: true, // required — evaluate reads the captured span.input
+  },
+});
+```
+
+Absent `evaluate` ⇒ the drawer never renders the button and a `POST` to its route 405s like any other route would (the path is never even pattern-matched) — the dashboard stays fully read-only unless you opt in.
+
+### `EvaluateConfig`
+
+| Field | Required | Notes |
+|---|---|---|
+| `model` | yes | A `ModelContract`, or a `() => ModelContract \| Promise<ModelContract>` factory — mirrors `panoptic.cache`'s literal-or-factory ergonomics. Resolved fresh on every evaluate click (a deliberate, infrequent, human-triggered action — not the collector's hot path — so no memoization, unlike the cache store's driver). |
+| `instructions` | no | Default grading rubric/criteria, verbatim — the same shape `ai.prompts().validate({ criteria })` accepts. Seeds the dashboard's editable textarea (baked into the served page at boot, so the operator sees and can extend the actual default, not a blank box); the built-in prompt-quality rubric is used when neither this nor a per-run override is supplied. |
+
+## The UI
+
+Open a trace, select the span whose prompt you want graded (any span carrying a captured `[system, user]` pair or `fullHistory` message array — an agent span, not a tool span). An "Evaluate system prompt" button appears under the input/output block **only when that span actually has a system prompt to grade** (`extractLastSystemPrompt` finds one) — no dead button on tool spans or system-prompt-less runs.
+
+Click it to open an inline panel: a textarea pre-filled with the configured `instructions` (fully editable — type over it, append to it, or clear it to fall back to the built-in rubric) and a "Run" button. The result — `score` (0–1, shown as a percentage) and `issues` (the judge's reasoning, as a list) — renders inline once it lands. State (open/closed, typed text, last result) is kept per-span in client memory, so switching to a sibling span and back doesn't lose it; it does NOT persist to the trace store or survive a page reload.
+
+## The building blocks (for embedding elsewhere)
+
+```ts
+import { evaluateSystemPrompt, extractLastSystemPrompt, findSpanById } from "@warlock.js/ai-panoptic";
+
+const span = findSpanById(trace.root, spanId);          // walk the span tree
+const prompt = extractLastSystemPrompt(span);            // undefined if none captured
+if (prompt) {
+  const verdict = await evaluateSystemPrompt(prompt, evaluateConfig, "Per-run override, optional");
+  // verdict: { score?: number; issues: string[] }
+}
+```
+
+- **`extractLastSystemPrompt(span)`** — reads `span.input` (only present under `captureContent`). Handles both shapes `report-to-span.ts` produces: the `[system, user]` first-trip pair, and — under `fullHistory` — the full `CapturedMessage[]` conversation, where it takes the LAST system-role turn (a long-running agent can carry more than one; the most recent one is the one actually in effect). Returns `undefined` for a tool span, an agent with no system prompt, or when content capture is off.
+- **`findSpanById(root, spanId)`** — depth-first lookup inside a trace's span tree; the route uses it to resolve which node the drawer had selected.
+- **`evaluateSystemPrompt(text, config, instructionsOverride?)`** — the grading call. `instructionsOverride` (trimmed; blank-after-trim is treated as absent, never as "grade against nothing") wins over `config.instructions`. Reuses `@warlock.js/ai`'s `judgePromptBody` verbatim — the SAME LLM-as-judge machinery `ai.prompts().validate({ criteria })` runs — so there's exactly one judging implementation in the whole framework, not two. `judgePromptBody` itself never throws (a broken judge degrades to an issues-only outcome with no `score`); the only step that CAN throw is resolving `config.model` when it's a factory (e.g. constructing an SDK client) — the dashboard route catches that and returns `502`.
+
+## The route
+
+`POST {basePath}api/traces/:traceId/spans/:spanId/evaluate`, body `{ instructions?: string }` (all optional — an empty body is valid). Gated by the same `authToken` / `allowedHosts` checks as every other route (S4) — off-loopback still requires a token, exactly like the rest of the dashboard. Body reads are capped at 64 KB (`413` past that) so a hostile/oversized payload can't hold the connection open.
+
+| Status | Meaning |
+|---|---|
+| `200` | `EvaluateVerdict` — `{ score?: number; issues: string[] }` |
+| `404` | trace or span not found |
+| `422` | the span carried no captured system prompt to grade |
+| `413` | request body over 64 KB |
+| `400` | request body isn't valid JSON |
+| `502` | `config.model` (a factory) threw resolving the judge model |
+| `405` | POST hit this path but `evaluate` isn't configured |
+
+```sh
+curl -X POST 'http://127.0.0.1:4319/api/traces/tr_1/spans/sp_1/evaluate' \
+  -H 'content-type: application/json' \
+  -d '{"instructions": "Must never invent prices."}'
+```
+
+## See also
+
+- [`@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md`](@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md) — the dashboard this feature is a drawer action of; its security note now says "every route is GET-only and read-only EXCEPT the one opt-in write route `evaluate` enables."
+- [`@warlock.js/ai-panoptic/export-traces/SKILL.md`](@warlock.js/ai-panoptic/export-traces/SKILL.md) — `captureContent` (and `fullHistory`), the prerequisite for `span.input` to carry anything gradable.
+- `ai.prompts().validate({ criteria })` in `@warlock.js/ai` — the sibling capability this reuses: grading raw prompt TEXT you already have in code, no trace or dashboard involved.
+
+
+## export-traces  `@warlock.js/ai-panoptic/export-traces/SKILL.md`
+
+---
+name: export-traces
+description: 'Send @warlock.js/ai-panoptic traces to an observability backend via pluggable exporters, including capturing prompt/response content onto spans. Triggers: `consoleExporter`, `fileExporter`, `otelExporter`, `langfuseExporter`, `ExporterContract`, `ContentCaptureOptions`, `captureContent`, `redactContent`, `fullHistory`, `ContentRedactor`, `toGenAiAttributes`, `walkSpans`, `totalCostUsd`, `GEN_AI_ATTRIBUTES`, `WARLOCK_ATTRIBUTES`, `reportToTrace`, `reportToSpan`, `extractSpanAttributes`, `normalizeError`, `formatSpanLine`, `createPanopticMiddleware`; ''export AI traces to OpenTelemetry'', ''send traces to Langfuse'', ''log traces to console / a file'', ''capture the full prompt/conversation onto a span'', ''gen_ai semantic conventions'', ''write a custom exporter''; typical import `import { otelExporter, langfuseExporter, consoleExporter, fileExporter } from "@warlock.js/ai-panoptic"`. Skip: wiring the subscriber/collector into a run — `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`; the core report shape — `@warlock.js/ai/run-ai-agent/SKILL.md`.'
+---
+
+# Export traces — the sink end of Panoptic
+
+An **exporter** translates a vendor-neutral `Trace` (produced by the collector) into a backend's wire format. The collector fans every completed trace out to each registered exporter via the `ExporterContract`:
+
+```ts
+export interface ExporterContract {
+  readonly name: string;
+  export(trace: Trace): void | Promise<void>;
+  exportSpan?(span: TraceSpan): void | Promise<void>; // optional live streaming
+  flush?(): void | Promise<void>;
+  shutdown?(): void | Promise<void>;
+}
+```
+
+Four exporters ship today. Each is a **factory** returning an `ExporterContract` — callers never `new`.
+
+## Pick an exporter
+
+| Exporter | Backend | Deps | Use it for |
+|---|---|---|---|
+| `consoleExporter()` | stdout/stderr | none | local dev, CI logs |
+| `fileExporter()` | JSON-Lines file | none | durable local sink, replay, out-of-band shipping |
+| `otelExporter()` | OpenTelemetry | `@opentelemetry/api` (optional peer) | OTel-native stacks, GenAI semantic conventions |
+| `langfuseExporter()` | Langfuse | `langfuse` (optional peer) | LLM-specific dashboards, generations |
+
+> `@opentelemetry/api` and `langfuse` are **OPTIONAL peer dependencies**, lazily imported by their exporter. Importing `@warlock.js/ai-panoptic` never pulls them in; a missing SDK surfaces as a curated *"install this"* error on first export, never a boot-time stack trace.
+
+## Console
+
+```ts
+import { consoleExporter } from "@warlock.js/ai-panoptic";
+
+collector.use(consoleExporter());                 // one summary line per trace
+collector.use(consoleExporter({ tree: true }));   // full indented span tree
+collector.use(consoleExporter({ streaming: true })); // also print each span as it finalizes
+```
+
+Failed/cancelled spans route to `console.error`; everything else to `console.log`. Inject a sink (`{ console: mySink }`) to redirect or to capture in tests.
+
+## File
+
+```ts
+import { fileExporter } from "@warlock.js/ai-panoptic";
+
+collector.use(fileExporter({ path: "storage/traces.jsonl" }));      // write every trace
+collector.use(fileExporter({ path: "...", flushEvery: 50 }));       // batch 50 traces per write
+collector.use(fileExporter({ path: "...", pretty: true }));         // multi-line records
+```
+
+Appends one JSON record per line (a `TraceRecord` = `{ type: "trace", exportedAt, trace }`). Buffers in memory and drains on `flush()` / `shutdown()` — call `collector.shutdown()` on teardown so the last batch lands. The parent directory is created on first write.
+
+## OpenTelemetry
+
+The exporter emits spans onto a `Tracer`; **the host app owns the SDK wiring** (`TracerProvider`, processors, span exporters), exactly as with any OTel instrumentation.
+
+```ts
+import { otelExporter } from "@warlock.js/ai-panoptic";
+
+// app already configured @opentelemetry/sdk-trace-base + a global provider
+collector.use(otelExporter({ tracerName: "my-app", system: "openai" }));
+
+// or pass a Tracer directly
+collector.use(otelExporter({ tracer: myTracer }));
+```
+
+Each `TraceSpan` becomes one OTel span with the source start/end times and parent relationship reconstructed, so the emitted tree matches the original execution tree. Attributes follow the [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/):
+
+- `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` / `gen_ai.usage.total_tokens` (from the span's typed `usage` rollup)
+- `gen_ai.usage.cached_tokens` / `gen_ai.usage.reasoning_tokens` (when the span reported them)
+- `gen_ai.conversation.id` (from the span's `sessionId`)
+- `gen_ai.system` / `gen_ai.request.model` / `gen_ai.operation.name` — **never invented**: these appear only when the span's free-form `attributes` bag already carried that exact key. `otelExporter`'s `system` option backfills `gen_ai.system` when the span supplied none (and never overrides one it did).
+- `warlock.report.type` / `warlock.version` / `warlock.duration_ms` / `warlock.cost.usd`
+- the collector's own per-primitive keys ride along verbatim — `agent.model.name` / `agent.model.provider` / `agent.trips`, `workflow.steps`, `supervisor.iterations` / `supervisor.terminatedBy`, `tool.tripIndex`, `retries`, … — since `toGenAiAttributes` copies every scalar entry of the span's `attributes` bag.
+
+Failed/cancelled spans get OTel `ERROR` status plus a recorded exception.
+
+## Langfuse
+
+```ts
+import { langfuseExporter } from "@warlock.js/ai-panoptic";
+
+collector.use(langfuseExporter({ publicKey: "pk-...", secretKey: "sk-...", baseUrl: "..." }));
+// or reuse an existing Langfuse client
+collector.use(langfuseExporter({ client: myLangfuse }));
+```
+
+- The root span becomes a Langfuse **trace**.
+- A token-producing span (`usage.total > 0`) becomes a **generation** (carries `usage`); a pure tool/callback becomes a plain **span**.
+- Children nest under their parent observation; timing, `version`, and status (failed → `ERROR` level) are mapped.
+- `flush()` / `shutdown()` delegate to the client's `flushAsync()` / `shutdownAsync()` — call `collector.shutdown()` on teardown so buffered observations are sent.
+
+## Content capture — what reaches the `input` / `output` fields
+
+Exporters surface `span.input` / `span.output` (console `in:` / `out:`, file JSON, OTel `gen_ai.prompt` / `gen_ai.completion`, Langfuse native `input` / `output`) only when **content capture** is enabled on the collector or subscriber. It's `ContentCaptureOptions`, set on `createCollector(...)` or `panoptic(...)`:
+
+```ts
+panoptic({
+  exporters: [langfuseExporter({ /* ... */ })],
+  captureContent: true,                 // copy prompts/responses + tool args/results onto spans
+  redactContent: (value, { field }) =>  // optional masker, per value
+    field === "input" ? "[redacted]" : value,
+  fullHistory: true,                    // emit the WHOLE conversation as span.input (see below)
+});
+```
+
+Off by default — payloads are large and frequently sensitive. With `captureContent`, an agent span's `input` is a `[system, user]` chat array (or the bare user string when there's no system prompt) and its `output` is the last non-empty trip's text; a tool span carries its call args + result.
+
+### `fullHistory` — emit the entire `CapturedMessage[]`
+
+`fullHistory: true` replaces the `[system, user]` first-trip array on `span.input` with the agent's **complete assembled conversation** — every trip, every role (system / user / assistant / tool). The `output` stays the final response text.
+
+```ts
+// upstream: the agent run MUST opt into capturing its messages
+const result = await agent.execute(input, { captureMessages: true });
+//                                          ^ core @warlock.js/ai — makes report.messages present
+
+panoptic({ exporters: [...], captureContent: true, fullHistory: true });
+```
+
+**Requires the upstream `captureMessages`.** `fullHistory` reads `report.messages` (the captured `CapturedMessage[]`). When the run did NOT opt into `captureMessages`, `report.messages` is absent and the branch **degrades gracefully** to today's first-trip `[system, user]` capture — never an error, just less history. The whole array is passed through `ContentRedactor` as a single value, so masking still applies to captured history.
+
+Reach for `fullHistory` when a backend (Langfuse) should show the full multi-turn / tool-loop transcript a run actually sent, not just its opening prompt.
+
+## Shared utilities
+
+Reusable when authoring a **custom exporter**:
+
+```ts
+import { walkSpans, toGenAiAttributes, totalCostUsd, GEN_AI_ATTRIBUTES, WARLOCK_ATTRIBUTES } from "@warlock.js/ai-panoptic";
+
+for (const span of walkSpans(trace.root)) {        // depth-first pre-order
+  const attributes = toGenAiAttributes(span);      // gen_ai.* / warlock.* attribute map
+  const cost = totalCostUsd(span.usage);           // single USD scalar, or undefined
+}
+```
+
+`toGenAiAttributes` copies only **scalar** entries from a span's free-form `attributes` bag (objects/arrays are skipped — backend attribute values must be primitives) and lets an explicit collector attribute override a derived one.
+
+## Write a custom exporter
+
+Implement `ExporterContract` directly — `name` + `export` are the only required members:
+
+```ts
+import type { ExporterContract, Trace } from "@warlock.js/ai-panoptic";
+
+const myExporter: ExporterContract = {
+  name: "my-backend",
+  async export(trace: Trace) {
+    await sendSomewhere(trace);
+  },
+};
+
+collector.use(myExporter);
+```
+
+Wrapping a third-party SDK? Lazily `await import(...)` it **inside** the export path (never at module top) so it stays an optional peer — copy the loader pattern from `otelExporter` / `langfuseExporter`. The collector isolates a throwing exporter, so one backend's failure never crashes the originating AI run.
+
+## Lower-level building blocks
+
+Most apps only need `panoptic(...)`, an exporter, and the store. These lower-level exports exist for **custom collectors / exporters and bespoke pipelines** — each is a pure function over the report tree:
+
+```ts
+import {
+  reportToTrace, // (report: BaseReport) => Trace — project a finished report into a vendor-neutral Trace
+  reportToSpan, // (report: BaseReport) => TraceSpan — project one report node into a span (recurses into children)
+  extractSpanAttributes, // (report: BaseReport) => Record<string, unknown> | undefined — the per-primitive attribute bag (agent.model.name, workflow.steps, …)
+  normalizeError, // (error: unknown) => TraceSpanError | undefined — coerce any thrown value into the typed span-error shape
+  formatSpanLine, // (span: TraceSpan, depth?: number) => string — render one indented console line (consoleExporter's tree mode uses this)
+  createPanopticMiddleware, // (collector: CollectorContract, name?: string) => AgentMiddleware — build a middleware from a collector you already hold (panoptic(...) wires this for you)
+} from "@warlock.js/ai-panoptic";
+```
+
+Reach for `reportToTrace` when you already hold a finished `result.report` and want a `Trace` without the live subscriber; `formatSpanLine` to build a custom console renderer; `createPanopticMiddleware` when you assemble the agent's `middleware` array by hand instead of letting `panoptic(...)` do it.
+
+## See also
+
+- [`@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`](@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md) — the source end: wiring the `panoptic(...)` subscriber into a run (`attach` / `middleware` / `collect`). The `collector` these exporters register on comes from there.
+- [`@warlock.js/ai-panoptic/query-traces/SKILL.md`](@warlock.js/ai-panoptic/query-traces/SKILL.md) — the in-memory trace store: a sibling sink that *retains* traces (instead of shipping them out) so you can `query` / `aggregate` them after the fact.
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent and the `BaseReport` shape Panoptic projects into a `Trace`.
+
+
+## observe-with-panoptic  `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`
+
+---
+name: observe-with-panoptic
+description: 'Wire @warlock.js/ai-panoptic into an agent/workflow/supervisor/orchestrator — declaratively via `ai.config({ panoptic })` (registers panoptic on core''s Observer seam) or with the one-call `panoptic({ exporters })` subscriber. Triggers: `panoptic`, `Panoptic`, `PanopticOptions`, `PanopticConfig`, `ai.config({ panoptic })`, `observeAll`, per-flow `observe`, `FlowObserveOption`, `registerObserver`, `Observer`, `.attach`, `.middleware`, `.collect`, `.toTrace`, `observe.attach(agent)`, `panoptic().middleware()`, `completedEvents`, `middlewareName`; ''observe a warlock agent'', ''trace an agent run'', ''attach observability to a workflow/supervisor'', ''observe every flow by default'', ''add a tracing middleware'', ''collect an orchestrator turn report'', ''wire OTel/Langfuse into my agent''; typical import `import { ai } from "@warlock.js/ai"` + `import "@warlock.js/ai-panoptic"` (or `import { panoptic } from "@warlock.js/ai-panoptic"`). Skip: the zero-setup local dashboard — `@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md`; writing/choosing an exporter (the sink end) — `@warlock.js/ai-panoptic/export-traces/SKILL.md`; the core report shape / running the agent itself — `@warlock.js/ai/run-ai-agent/SKILL.md`.'
+---
+
+# Observe a run with Panoptic — the one-call subscriber
+
+There are two levels. **Declarative** (`ai.config({ panoptic })`) is the high-level path: panoptic registers itself on core's generic `Observer` seam and every observed flow routes its report in automatically — no per-target wiring. **Imperative** (`panoptic(...)`) is the underlying subscriber, with three explicit feed paths. The declarative path is sugar over the imperative one; both reuse the same collection pipeline.
+
+## Declarative — `ai.config({ panoptic })` + the Observer seam
+
+The simplest wiring. Importing `@warlock.js/ai-panoptic` (even bare, for side effects) subscribes panoptic to core's config seam; a later `ai.config({ panoptic })` then builds the collector and **registers it once on core's `Observer` registry** via `registerObserver`. Core itself never imports panoptic — it depends only on the structural `Observer` interface (`{ collect(report) }`), the dependency inversion that keeps the two sides decoupled.
+
+```ts
+import { ai } from "@warlock.js/ai";
+import "@warlock.js/ai-panoptic"; // side-effect wiring — do this once at boot
+
+ai.config({
+  panoptic: {
+    exporters: [consoleExporter()],   // optional; a store-shaped exporter also feeds the dashboard
+    observeAll: true,                 // observe every flow by default
+    dashboard: true,                  // optional local viewer — see use-local-dashboard
+  },
+});
+```
+
+`PanopticConfig`: `exporters?` (the collector's sinks), `observeAll?` (default `false`), `dashboard?` (`boolean | DashboardOptions`). Applying it is **idempotent** — the observer registers once, the dashboard starts at most once; repeat `ai.config(...)` merges only refresh `observeAll`.
+
+### `observeAll` + per-flow `observe`
+
+Once a collector is registered, which flows actually route to it is controlled by core's `observe` seam:
+
+| Setting | Effect |
+|---|---|
+| `observeAll: true` (config) | Every `ai.agent` / `ai.workflow` / `ai.supervisor` / `ai.team` that left `observe` unset routes its completed report to the registered observers. |
+| `observe: true` (per-flow) | Force-observe **this** flow even when `observeAll` is off → the globally registered observers. |
+| `observe: false` (per-flow) | Opt **this** flow out entirely, even when `observeAll` is on. |
+| `observe: <Observer>` (per-flow) | A **flow-local** collector — only this flow's report, routed only to it (the global observers are skipped). A panoptic flow-local collector implements `Observer`, so pass it directly. |
+| (unset, `observeAll: false`) | Not observed — opt-in default, identical to legacy behavior. |
+
+```ts
+ai.agent({ model, observe: true });                       // always traced
+ai.workflow({ name: "billing", steps, observe: true });   // always traced
+ai.supervisor({ name: "triage", ..., observe: false });   // never traced, even under observeAll
+
+const flowLocal = panoptic({ exporters: [fileExporter({ path: "billing.jsonl" })] });
+ai.team({ name: "research", ..., observe: flowLocal });   // only this flow, only this collector
+```
+
+The flow awaits each observer's `collect`, and a throwing observer is **swallowed** — observability never breaks the run (mirrors `onUsage` / `onComplete`). `observe` lives on **all four** flow configs — `ai.agent`, `ai.workflow`, `ai.supervisor`, and `ai.team` (the agent additionally supports the imperative `attach()` / `middleware()` paths below).
+
+## Imperative — `panoptic(...)`, the one-call subscriber
+
+`panoptic(...)` builds a collector, registers your exporters on it, and hands back a subscriber with **three ways to feed traces** in. All three converge on the same collector, so each run reaches every exporter exactly once. Use it when you want explicit control, a flow-local collector, or to wire a target the declarative seam doesn't cover (the orchestrator).
+
+```ts
+import { panoptic } from "@warlock.js/ai-panoptic";
+import { consoleExporter, otelExporter } from "@warlock.js/ai-panoptic";
+
+const observe = panoptic({
+  exporters: [consoleExporter(), otelExporter({ tracerName: "my-app" })],
+});
+```
+
+## Three feed paths
+
+| Path | Use when | API |
+|---|---|---|
+| **Events** | You want every run captured automatically and the primitive emits a `*.completed` event (agent / workflow / supervisor). | `observe.attach(target)` |
+| **Middleware** | The app already composes cross-cutting concerns through the agent middleware pipeline. | `panoptic().middleware()` |
+| **Direct** | The primitive carries no result-bearing event (the orchestrator), or you captured a report out of band. | `observe.collect(report)` |
+
+### 1. Attach to the event stream
+
+`attach` subscribes to the terminal `*.completed` events and returns a **detach** function:
+
+```ts
+const agent = ai.agent({ model });
+const detach = observe.attach(agent); // agent | workflow | supervisor
+
+await agent.execute("Summarize this");
+
+// ...later, on teardown:
+detach();
+await observe.shutdown();
+```
+
+By default Panoptic subscribes to `agent.completed`, `workflow.completed`, and `supervisor.completed` — the terminal events that carry the finalized `result.report`. These fire **once per run regardless of outcome** (the matching `*.error` fires first on failure, then `*.completed` still fires), so attaching captures completed, failed, and cancelled runs alike. Panoptic silently ignores the names a given target doesn't emit, so the same subscriber attaches to any of the three primitives.
+
+Narrow or widen the surface with `completedEvents`:
+
+```ts
+panoptic({ exporters, completedEvents: ["agent.completed"] }); // agents only
+```
+
+### 2. Wire it as agent middleware
+
+```ts
+const observe = panoptic({ exporters: [langfuseExporter({ /* ... */ })] });
+
+const agent = ai.agent({
+  model,
+  middleware: [observe.middleware()],
+});
+```
+
+The middleware feeds the collector from the `execute`-level `after` (success) and `onError` (failure) hooks. It never returns a value, so it never mutates the agent's result. Register more than one Panoptic middleware on the same agent by passing a distinct `middlewareName`:
+
+```ts
+panoptic({ middlewareName: "panoptic-secondary" }).middleware();
+```
+
+### 3. Collect a report directly
+
+The **orchestrator** emits `orchestrator.turn.*` events that carry only session identity — no result. Feed its report straight in:
+
+```ts
+const result = await orchestrator.execute(input, { sessionId });
+await observe.collect(result.report);
+```
+
+`collect(report)` also covers any report captured out of band (e.g. replayed from a store).
+
+## Failure isolation
+
+An observability fault never escapes onto the AI run's hot path:
+
+- The collector wraps every exporter invocation in `Promise.allSettled`, so a throwing exporter can't crash the run or block its siblings.
+- The event handler and the middleware additionally swallow the `collect` rejection, so even a collector-level fault stays contained.
+
+A broken backend degrades to *missing telemetry*, never a failed agent run.
+
+## Lifecycle
+
+```ts
+await observe.flush();    // drain buffered exporters (between batches / checkpoints)
+await observe.shutdown(); // flush + release every exporter (process teardown)
+```
+
+Call `shutdown()` on teardown so buffered exporters (`fileExporter` batches, the Langfuse client) send their last records before exit.
+
+## Bring your own collector or store
+
+The in-memory trace store doubles as an `ExporterContract`, so the simplest way to retain runs for later querying is to pass it as an exporter — it then receives every trace alongside your other sinks:
+
+```ts
+import { panoptic, createInMemoryTraceStore } from "@warlock.js/ai-panoptic";
+
+const store = createInMemoryTraceStore();        // an ExporterContract + queryable store
+const observe = panoptic({ exporters: [store, consoleExporter()] });
+
+// store now receives every trace — query/aggregate it later:
+store.query({ status: "failed" });
+store.aggregate({ sessionId });
+```
+
+Pass a pre-built `collector` instead when you want to share one collector across several subscribers (each subscriber's `attach` / `middleware` feeds the same exporters):
+
+```ts
+import { panoptic, createCollector } from "@warlock.js/ai-panoptic";
+
+const collector = createCollector().use(store);
+const observe = panoptic({ collector, exporters: [consoleExporter()] });
+```
+
+Add exporters after construction with `observe.use(exporter)` (chainable, deduped by `ExporterContract.name`). `observe.toTrace(report)` projects a report into a `Trace` **without** dispatching — handy for inspection or tests.
+
+> The store's full query / aggregate / capacity surface is its own skill — see [`query-traces/SKILL.md`](@warlock.js/ai-panoptic/query-traces/SKILL.md).
+
+## See also
+
+- [`@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md`](@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md) — the zero-setup local viewer the `ai.config({ panoptic: { dashboard } })` switch starts over the collector's store.
+- [`@warlock.js/ai-panoptic/export-traces/SKILL.md`](@warlock.js/ai-panoptic/export-traces/SKILL.md) — the sink end: choosing/writing an exporter, the `gen_ai.*` / `warlock.*` attribute mapping.
+- [`@warlock.js/ai-panoptic/query-traces/SKILL.md`](@warlock.js/ai-panoptic/query-traces/SKILL.md) — retaining traces in the queryable in-memory store and slicing them (`query` / `aggregate` / `capacity`).
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent and the `BaseReport` shape Panoptic consumes.
+
+
+## query-traces  `@warlock.js/ai-panoptic/query-traces/SKILL.md`
+
+---
+name: query-traces
+description: 'Retain @warlock.js/ai-panoptic traces in a queryable store — in-memory, or cache-backed so they survive a process restart — and slice them after the fact: get one run by id, list a session, filter failed runs in a window, roll up usage + cost. Triggers: `createInMemoryTraceStore`, `createCacheTraceStore`, `CacheTraceStoreHandle`, `CacheTraceStoreOptions`, `CacheDriverInput`, `store.ready`, `TraceStoreContract`, `TraceQuery`, `TraceAggregate`, `InMemoryTraceStoreOptions`, `store.query`, `store.aggregate`, `store.get`, `store.add`, `store.clear`, `store.size`, `capacity`, `prefix`, `onError`, `sumUsage`, `emptyUsage`, `matchTrace`; ''query collected traces'', ''aggregate AI cost per session'', ''how much did this session spend'', ''list failed runs'', ''retain traces in memory'', ''persist traces across a restart'', ''cache-backed trace store'', ''Redis trace store'', ''roll up token usage''; typical import `import { createInMemoryTraceStore, createCacheTraceStore } from "@warlock.js/ai-panoptic"`. Skip: sending traces to an external backend (OTel/Langfuse/console/file) — `@warlock.js/ai-panoptic/export-traces/SKILL.md`; wiring the subscriber into a run — `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`.'
+---
+
+# Query traces — the in-memory queryable store
+
+The collector fans every completed `Trace` out to its exporters. A **trace store** is one such sink that *retains* traces so you can answer observability questions after the fact: pull one run by id, list every run for a session, slice failed runs in a time window, or roll usage + cost across any of those slices.
+
+`createInMemoryTraceStore()` returns an object that satisfies **both** `TraceStoreContract` and `ExporterContract` — so wiring it into a collector is a single `collector.use(store)` and the store fills as traces complete.
+
+```ts
+import { panoptic, createInMemoryTraceStore } from "@warlock.js/ai-panoptic";
+
+const store = createInMemoryTraceStore();
+
+// The store doubles as an exporter — register it like any other sink.
+const observe = panoptic({ exporters: [store] });
+
+const agent = ai.agent({ model });
+observe.attach(agent);
+
+await agent.execute("Summarize this");
+
+// ...later, off the hot path:
+const failed = store.query({ status: "failed" });
+const spend = store.aggregate({ sessionId: "session-42" });
+```
+
+> The store is also a valid `collector.use(...)` target directly — `panoptic({ collector: createCollector().use(store) })` — see [`observe-with-panoptic/SKILL.md`](@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md) for bring-your-own-collector wiring.
+
+## The store contract
+
+`TraceStoreContract` is the queryable surface; the in-memory implementation adds the `ExporterContract` `name` + `export` so it can be a sink.
+
+```ts
+interface TraceStoreContract {
+  add(trace: Trace): void;                 // ingest; overwrites same traceId
+  get(traceId: string): Trace | undefined; // one run by id
+  query(filter?: TraceQuery): Trace[];     // matching traces, newest-started first
+  aggregate(filter?: TraceQuery): TraceAggregate; // usage + cost + status rollup
+  readonly size: number;                   // retained count
+  clear(): void;                           // drop everything
+}
+```
+
+- **`add` overwrites** any existing trace with the same `traceId` — re-collecting a run replaces rather than duplicates it.
+- **`export(trace)` is an alias for `add`** — that is what makes the store a drop-in exporter (`store.name === "in-memory-trace-store"`).
+- **`query` returns newest-started first** (sorted by root `startedAt`, descending). An empty / omitted filter returns every retained trace.
+
+## Filtering with `TraceQuery`
+
+Every field is optional and **ANDed** together — an absent field is "don't care", so `{}` matches everything. The same filter type drives both `query` and `aggregate`.
+
+```ts
+type TraceQuery = {
+  traceId?: string;                         // exact one run
+  sessionId?: string;                       // every run for a session
+  status?: ReportStatus | ReportStatus[];   // single status or membership set
+  startedAfter?: string | Date;             // inclusive lower bound on root startedAt
+  startedBefore?: string | Date;            // inclusive upper bound on root startedAt
+};
+```
+
+```ts
+// One run by id:
+store.query({ traceId: "run-abc" });
+
+// Every run for a conversation:
+store.query({ sessionId: "session-42" });
+
+// Failed or cancelled runs since midnight (status accepts an array):
+store.query({
+  status: ["failed", "cancelled"],
+  startedAfter: "2026-06-18T00:00:00.000Z",
+});
+
+// A Date works anywhere a time bound is accepted:
+store.query({ startedAfter: new Date(Date.now() - 3_600_000) }); // last hour
+```
+
+Time bounds compare against each trace's root `startedAt`, **inclusive on both ends**, accepting either an ISO-8601 string or a `Date`. Status is exact equality (or array membership). The pure matcher behind this is `matchTrace(trace, filter)` — exported for testing or filtering a trace list you hold yourself.
+
+## Rolling up with `aggregate`
+
+`aggregate(filter?)` answers the headline questions — how many runs, how many tokens, how much did it cost, how many failed — for whatever slice the filter selects:
+
+```ts
+type TraceAggregate = {
+  traces: number;        // matched count
+  completed: number;     // root status === "completed"
+  failed: number;        // root status === "failed"
+  cancelled: number;     // root status === "cancelled"
+  usage: Usage;          // summed token usage (input/output/total always present)
+  cost?: ModelPricing;   // merged per-channel USD, or undefined if no trace was priced
+  totalDuration: number; // summed wall-clock ms
+};
+```
+
+```ts
+const stats = store.aggregate({ sessionId: "session-42" });
+
+console.log(`${stats.traces} runs, ${stats.usage.total} tokens, ${stats.failed} failed`);
+
+const totalUsd =
+  (stats.cost?.input ?? 0) +
+  (stats.cost?.output ?? 0) +
+  (stats.cost?.cachedInput ?? 0) +
+  (stats.cost?.cachedOutput ?? 0);
+```
+
+Notes that matter when reading the numbers:
+
+- **`usage`** sums each trace's *root* `Usage` (already a rollup of own cost + children), so the totals reflect the whole run tree without re-walking spans. `input` / `output` / `total` are always present (zero when nothing matched); the optional `cachedTokens` / `cacheWriteTokens` / `reasoningTokens` channels are summed only when at least one matched trace reported them.
+- **`cost`** is a per-channel `ModelPricing` breakdown (not one opaque number), merged with the framework's own cost-rollup logic — an unpriced trace never erases the cost of priced ones. It stays `undefined` only when **no** matched trace carried pricing.
+- **`completed` + `failed` + `cancelled` need not equal `traces`** — non-terminal statuses (`awaiting-input`, `max-iterations`) count toward `traces` but none of the three headline counters.
+- An empty match returns a zeroed aggregate (`usage` all `0`, `cost` `undefined`, `totalDuration` `0`).
+
+## Bounding retention with `capacity`
+
+Unbounded by default (keep everything until `clear()`). For a long-lived process, cap it — the oldest-ingested trace is evicted FIFO once the cap is exceeded:
+
+```ts
+type InMemoryTraceStoreOptions = { capacity?: number }; // absent / 0 = unbounded
+
+const store = createInMemoryTraceStore({ capacity: 1000 });
+```
+
+Overwriting an existing `traceId` refreshes its insertion position, so a re-collected run is treated as newest for eviction — eviction stays honest under overwrite.
+
+> The in-memory store has no secondary indexes: `get` / `add` are O(1), `query` / `aggregate` are O(n) scans. That is the right trade-off for dev/test and modest-volume runtime use. For high-volume or durable retention, write a custom `TraceStoreContract` (or export to a backend with [`export-traces`](@warlock.js/ai-panoptic/export-traces/SKILL.md)) backed by a real datastore.
+
+## Persisting across a restart — `createCacheTraceStore`
+
+The in-memory store loses everything when the process exits. `createCacheTraceStore(cache, options?)` is a **durable** `TraceStoreContract` (and `ExporterContract`) backed by any `@warlock.js/cache` `CacheDriver` — Redis, file, Postgres, … — so traces survive a restart and the dashboard re-opens with history intact.
+
+```ts
+import { createCacheTraceStore } from "@warlock.js/ai-panoptic";
+import { RedisCacheDriver } from "@warlock.js/cache";
+
+// A driver instance, or a (possibly async) FACTORY resolved lazily on first
+// use — the factory form defers the Redis connect until the first trace is
+// collected, so module import stays connection-free.
+const store = createCacheTraceStore(async () => {
+  const driver = new RedisCacheDriver();
+  await driver.connect();
+  return driver;
+});
+
+await store.ready();   // hydrate the in-memory mirror from a prior run
+collector.use(store);  // fills as traces complete; reads stay synchronous
+
+const failed = store.query({ status: "failed" }); // queryable like any store
+```
+
+**Write-through over a sync contract.** The store keeps the same insertion-ordered in-memory **mirror** the in-memory store uses and serves every read (`get` / `query` / `aggregate` / `size`) from it synchronously — the dashboard polls these and can't await a cache. Writes go **through**: `add` updates the mirror immediately, then *fire-and-forget* persists the trace + a newest-first index to the cache. So:
+
+- **Reads never wait on the cache** — the mirror is the runtime source of truth; the cache is the durable backing store.
+- **A flaky cache never throws into the hot path** — a rejected write is routed to the optional `onError` hook and swallowed; the trace stays visible in the mirror for the life of the process, it just won't survive a restart.
+- **`ready()` re-hydrates** the mirror from the persisted index on startup (await it once — `ai.config({ panoptic: { cache } })` does this for you before serving the dashboard).
+
+```ts
+type CacheDriverInput =
+  | CacheDriver           // a live driver
+  | (() => CacheDriver | Promise<CacheDriver>); // lazy (sync or async) factory
+
+type CacheTraceStoreOptions = {
+  prefix?: string;   // key namespace; per-trace keys `${prefix}:trace:${id}`,
+                     // index at `${prefix}:index`. Default "panoptic".
+  capacity?: number; // FIFO cap (oldest-ingested evicted from cache + mirror);
+                     // absent / 0 = unbounded.
+  onError?: (error: unknown) => void; // swallowed cache-write failures land here.
+};
+
+type CacheTraceStoreHandle = TraceStoreContract & ExporterContract & {
+  ready(): Promise<void>; // hydrate the mirror from the cache on startup
+};
+```
+
+Ordering uses an **internal monotonic counter**, not `Date.now()`, so the persisted index stays a stable total order even when many traces land in the same millisecond — FIFO eviction stays honest across a restart.
+
+> The usual path is declarative: `ai.config({ panoptic: { cache, dashboard: true } })` constructs this store, awaits `ready()`, and wires it under the dashboard for you — see [`use-local-dashboard/SKILL.md`](@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md). Reach for `createCacheTraceStore` directly only when you manage the store / collector yourself.
+
+## Summing usage yourself
+
+`sumUsage` / `emptyUsage` are the pure folds `aggregate` is built on — reuse them to roll a `Usage` set the store didn't produce (e.g. a list of traces you filtered by hand):
+
+```ts
+import { emptyUsage, sumUsage } from "@warlock.js/ai-panoptic";
+
+let total = emptyUsage(); // { input: 0, output: 0, total: 0 } — optional channels absent
+for (const trace of store.query({ sessionId })) {
+  total = sumUsage(total, trace.usage);
+}
+```
+
+`sumUsage` is pure (returns a fresh `Usage`, mutates neither argument): token channels always sum; the optional cache/reasoning channels sum only when a side reported them (so a never-metered channel stays absent rather than fabricating a `0`); `cost` merges with the framework's `accumulateCost` so an unpriced contributor never erases a priced one.
+
+## See also
+
+- [`@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`](@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md) — wiring the `panoptic(...)` subscriber and bring-your-own-collector so the store fills as runs complete.
+- [`@warlock.js/ai-panoptic/export-traces/SKILL.md`](@warlock.js/ai-panoptic/export-traces/SKILL.md) — sending traces to an external backend instead of (or alongside) retaining them in memory; writing a custom sink.
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — the `BaseReport` the collector projects into the `Trace` this store retains.
+
+
+## use-local-dashboard  `@warlock.js/ai-panoptic/use-local-dashboard/SKILL.md`
+
+---
+name: use-local-dashboard
+description: 'Run the zero-setup local Panoptic dashboard — a loopback `node:http` server over a trace store served from `ai.config({ panoptic: { dashboard } })`, with a two-pane call-tree + metadata UI (light/dark/system theme, search/filter, session + prompt-version grouping, cost heatmap, Gantt timeline, errors filter, hash deep-links) and an optional cache-backed persistent store. Triggers: `dashboard`, `DashboardOptions`, `DashboardHandle`, `ai.config({ panoptic })`, `panoptic.dashboard`, `panoptic.cache`, `port: 4319`, `basePath`, `open`, `/api/traces`, `/api/aggregate`, `/api/traces/:id`, `createRequestHandler`, `dashboardHtml`, `ServeConfig`, `TraceStoreContract`, `createCacheTraceStore`, theme, dark mode, call tree, metadata panel, cost heatmap, timeline / Gantt, errors only, deep-link, group by session, prompt version, group by type, type stats panel, started / ended timestamps, team type; ''open a local AI trace dashboard'', ''view agent traces in the browser'', ''self-hosted panoptic UI'', ''inspect traces without Langfuse'', ''spin up a dev observability server'', ''dark mode dashboard'', ''persist traces across restart'', ''group traces by session / prompt version / type'', ''cost heatmap'', ''timeline / waterfall view'', ''filter failed runs in the dashboard'', ''per-type stats panel''; typical import `import { ai } from "@warlock.js/ai"` + `import "@warlock.js/ai-panoptic"`. Skip: shipping traces to a backend (OTel / Langfuse / file) — `@warlock.js/ai-panoptic/export-traces/SKILL.md`; the queryable store API the dashboard reads — `@warlock.js/ai-panoptic/query-traces/SKILL.md`; wiring the subscriber by hand — `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`.'
+---
+
+# The local Panoptic dashboard — zero-setup trace viewing
+
+A loopback-only `node:http` server that serves one self-contained HTML page polling a read-only JSON API over a trace store. No external backend and no build step; it binds `127.0.0.1` with no auth by default, and gains optional bearer-token auth + a Host allowlist (`authToken` / `allowedHosts`, **required** off-loopback). The store is the live object the collector fills, so each poll reflects the latest completed traces.
+
+## The documented path — `ai.config({ panoptic: { dashboard } })`
+
+You almost never call `dashboard(...)` directly. Set it declaratively and the side-effect import wires the store, the collector, and the server for you:
+
+```ts
+import { ai } from "@warlock.js/ai";
+import "@warlock.js/ai-panoptic"; // side-effect: subscribes panoptic to the config seam
+
+ai.config({
+  panoptic: {
+    dashboard: true,    // serve on http://127.0.0.1:4319/
+    observeAll: true,   // route every workflow/supervisor/team run to the collector
+  },
+});
+```
+
+`dashboard: true` uses the defaults. Pass an object to override:
+
+```ts
+ai.config({
+  panoptic: {
+    exporters: [createInMemoryTraceStore({ capacity: 5000 })],
+    dashboard: { port: 4319, open: true, title: "My App — AI traces" },
+    observeAll: true,
+  },
+});
+```
+
+**Where the dashboard reads its traces from.** It needs a queryable store (a `TraceStoreContract`). Panoptic resolves one in this order:
+
+1. The first **store-shaped exporter** in `config.exporters` — `createInMemoryTraceStore()` doubles as an `ExporterContract`, so a store passed in `exporters` is reused (captured AND served from the same object).
+2. If none was supplied but `dashboard` is set, panoptic creates a fresh in-memory store and registers it as an exporter so the collector fills it.
+
+So `dashboard: true` with no exporters Just Works — you get a store for free. Supply your own when you want a capacity cap or want to `query` / `aggregate` it from app code too.
+
+**Idempotent.** Applying the config is safe on every `ai.config(...)` merge: the collector is registered as a core `Observer` exactly once and the dashboard is started at most once. Repeat calls only refresh the `observeAll` flag (latest config wins). `panoptic` undefined in the config is a no-op.
+
+## What the UI shows
+
+The page is one self-contained, dependency-free vanilla-JS file (no bundler, no framework, works offline). It polls the JSON API every 2s and renders:
+
+- **Header** — the Warlock logo + your `title`, the `TraceAggregate` headline counts (traces / completed / failed / cancelled), tokens as **`↓input · ↑output · total`**, total cost, an **errors-only** toggle, a **search** box, and a **light / dark / system** theme switch (persisted to `localStorage`, so the choice survives a reload; `system` follows the OS `prefers-color-scheme`).
+- **Trace list** — newest-first clickable master rows, each led by a **colour-coded Title-case type label** (`Supervisor` / `Team` / `Workflow` / `Agent` / `Tool` / …; `ai.team` reports its own `team` type rather than `supervisor`, so it groups, filters, and labels separately). An optional **group-by-session** view collapses runs under collapsible session headers; a **group-by-prompt** view does the same over the `name@version` prompt key (see *Prompt-version linkage* below); a **group-by-type** view buckets the list by root type under collapsible `Type (N)` headers (`Agent (12)`, `Team (3)`, …). The three groupings are mutually exclusive.
+- **Two-pane drawer** (click a row) — a collapsible **nested call tree** on the left and the **selected node's detail** on the right: rich structured input/output (chat bubbles / key-value / Markdown), a per-node **token breakdown** (`↓in · ↑out · total`), the node's **rollup cost** (its own cost, else the sum of its children — so wrapper nodes that carry tokens but no cost don't double-count), and a **metadata panel** with humanized keys (`Supervisor Terminated By`, `Span ID` — not raw `supervisor.terminatedBy`), and **started** / **ended** wall-clock timestamps (`28 Jun 2026 03:16 PM` — named month, 12-hour, minute precision) alongside the elapsed duration. Zero-valued token/cost rows are hidden so the panel stays readable.
+- **Cost heatmap** — every tree node and trace row carries a left accent tinted by its rollup cost relative to the trace's most expensive node, with a small legend, so the spend hot-spots jump out at a glance.
+- **Timeline view** — the drawer's left pane toggles between the nested call **Tree** and a Gantt **Timeline** (each span drawn at its offset from the root start, width = duration, critical path highlighted).
+- **Stats panel** — a header **Stats** toggle shows a per-type aggregate table above the trace list, one row per root type (`Agent` / `Team` / `Workflow` / …) with Count, Failed (rate), p50 / p95 latency, total Tokens, and total Cost, computed over the active filtered set. Distinct from the headline counts in the header.
+
+All UI state (selected trace, selected span, collapsed nodes, theme, filters) lives in JS, **not** the DOM, so the 2s poll never disturbs an open drawer.
+
+### Filtering & grouping (all client-side over the polled list)
+
+The list narrows entirely in the browser — no server round-trip per keystroke:
+
+- **Search** — free-text, case-insensitive, matched against root span name + session id.
+- **Status / type chips** — restrict to selected terminal statuses or executable types. Chip, badge, drawer, and group-header labels are **Title-cased** everywhere (`Completed`, `Workflow`, `Team`); the underlying filter keys stay lowercase (`completed`, `workflow`, `team`).
+- **Errors-only** — header toggle that keeps just `failed` / `cancelled` runs.
+- **Session chip** — exact `sessionId`; **prompt chip** — exact `name@version` key.
+- **Group-by-type** — buckets the list by root type under `Type (N)` headers; mutually exclusive with group-by-session and group-by-prompt.
+
+The pure matching/grouping rules are unit-tested in `trace-filter.ts` and mirrored 1:1 by the inlined dashboard JS, exported for reuse / your own list views:
+
+```ts
+import {
+  filterTraces, matchesFilter, groupBySession, rollupCost, maxNodeCost, heatIntensity,
+  type TraceFilter, type SessionGroup,
+} from "@warlock.js/ai-panoptic"; // dashboard helpers, re-exported
+
+const failed = filterTraces(traces, { errorsOnly: true });
+const bySession = groupBySession(failed); // SessionGroup[], sessionless → "(no session)"
+```
+
+`TraceFilter` is `{ text?, statuses?, types?, sessionId?, promptKey?, errorsOnly? }` — every field optional and ANDed, so `{}` matches everything. `rollupCost(span)` / `maxNodeCost(root)` / `heatIntensity(nodeCost, maxCost)` are the pure heatmap folds (intensity in `[0,1]`, `0` for a free trace rather than dividing by zero).
+
+### Deep-links
+
+The open trace + span are reflected in the URL hash (`#trace=<id>&span=<id>`) and re-opened from it on load — so a drawer view is **shareable / bookmarkable**. (A live socket tail is a noted follow-up; this pass stays on the 2s poll.)
+
+### Prompt-version linkage
+
+When an agent ran against a *named* `ai.prompts` builder, the collector stamps `agent.promptName` / `agent.promptVersion` onto the root span. The dashboard derives a `name@version` key from them (`tracePromptKey(trace)`) and offers **filter-by-prompt** and **group-by-prompt** beside session — so a reviewer sees every run of `support@2` together and compares its cost / failure rate against `support@3`. Runs with no named prompt bucket under `"(no prompt)"`.
+
+```ts
+import { tracePromptKey, groupByPrompt, type PromptGroup } from "@warlock.js/ai-panoptic";
+
+const byPrompt = groupByPrompt(store.query()); // PromptGroup[] keyed by name@version
+```
+
+## Persistent traces — `cache` (survive a restart)
+
+By default the dashboard reads a fresh **in-memory** store, so traces vanish on restart. Point `panoptic.cache` at a `@warlock.js/cache` `CacheDriver` (Redis, file, …) and panoptic serves the dashboard from a **cache-backed** store instead — traces persist and re-hydrate on the next boot:
+
+```ts
+import { ai } from "@warlock.js/ai";
+import "@warlock.js/ai-panoptic";
+import { RedisCacheDriver } from "@warlock.js/cache";
+
+ai.config({
+  panoptic: {
+    dashboard: true,
+    observeAll: true,
+    // A driver, or a (possibly async) factory resolved lazily on first use —
+    // the factory form defers the Redis connect until the first trace lands.
+    cache: async () => {
+      const driver = new RedisCacheDriver();
+      await driver.connect();
+      return driver;
+    },
+  },
+});
+```
+
+Panoptic awaits the store's `ready()` hydration **before** the server starts serving, so a restart surfaces previously-persisted traces immediately. Reads stay synchronous (served from an in-memory mirror); writes go through to the cache fire-and-forget, so a flaky cache never throws into the collector's hot path. A store-shaped exporter you pass via `exporters` still wins over `cache`. The store building block (`createCacheTraceStore`) and its durability contract live in [`query-traces/SKILL.md`](@warlock.js/ai-panoptic/query-traces/SKILL.md).
+
+## The low-level building block — `dashboard(store, options)`
+
+Reach for this directly only when you manage the store yourself (e.g. a long-lived store you also query elsewhere, or a non-default lifecycle). It returns a `Promise<DashboardHandle>`:
+
+```ts
+import { dashboard, createInMemoryTraceStore } from "@warlock.js/ai-panoptic";
+
+const store = createInMemoryTraceStore();
+const handle = await dashboard(store, { port: 4319, open: true });
+
+console.log(handle.url);  // http://127.0.0.1:4319/
+console.log(handle.port); // 4319 (the REAL OS port when port: 0 was passed)
+
+// ...on teardown:
+await handle.close();
+```
+
+The store is the same object the collector writes to — wire the collector to it (pass it as an exporter to `panoptic({ exporters: [store] })` or via `ai.config`) and the dashboard reflects new traces on its next poll.
+
+### `DashboardOptions`
+
+Every field optional, every default safe:
+
+| Option | Default | Notes |
+|---|---|---|
+| `port` | `4319` | Pass `0` for an ephemeral port — the resolved port comes back on `handle.port`. A busy port rejects with a clear `Error` (`port N in use; pass { port: 0 }`), not raw `EADDRINUSE`. |
+| `host` | `"127.0.0.1"` | **Loopback only** by default, so prompt content is never exposed to the LAN. Binding a non-loopback interface is gated — it requires `authToken` (see below) or `dashboard()` rejects. |
+| `basePath` | `"/"` | Mount-path prefix for both the page and every `/api/...` route, e.g. `"/panoptic"`. Normalized to leading + trailing slash. |
+| `open` | `false` | Open the default browser at the resolved URL once listening. Best-effort and fully swallowed — failing to open a browser never rejects the start. |
+| `title` | `"Panoptic"` | Header title baked into the served page. |
+| `authToken` | _unset_ | Bearer token required on every request (`Authorization: Bearer <token>` or `?token=`); missing/wrong → `401`. **Required** when `host` is non-loopback. |
+| `allowedHosts` | loopback names | `Host`-header allowlist (DNS-rebind guard); an unlisted `Host` → `403`. Defaults to `localhost` / `127.0.0.1` / `[::1]` for a loopback bind. |
+
+### `DashboardHandle`
+
+```ts
+type DashboardHandle = {
+  readonly url: string;            // http://host:port{basePath}
+  readonly port: number;           // real OS port (when port: 0 was requested)
+  close(): Promise<void>;          // stop the server, release the port
+};
+```
+
+## The JSON API
+
+Every route is **`GET`-only and read-only** (non-`GET` → `405`), mounted under `basePath` — EXCEPT the one opt-in `POST .../spans/:spanId/evaluate` route `DashboardOptions.evaluate` enables (see [`evaluate-system-prompt/SKILL.md`](@warlock.js/ai-panoptic/evaluate-system-prompt/SKILL.md)); absent that config, it 405s like everything else. The page polls the `GET` routes; you can curl them too. Store shapes are already JSON-safe, so responses are a plain `JSON.stringify`.
+
+| Route | Returns |
+|---|---|
+| `GET /api/traces` | `store.query(...)` — the trace list, filtered by the query string (`id` / `sessionId` / `status` / time window, parsed by `parseQuery`). |
+| `GET /api/traces/:id` | `store.get(id)` — one full trace, or `404 { error: "trace_not_found" }`. |
+| `GET /api/aggregate` | `store.aggregate(...)` — the usage + cost + status rollup over the same query filter. |
+| `GET /` (basePath) | the self-contained HTML page. |
+| `POST /api/traces/:traceId/spans/:spanId/evaluate` | grades the span's last captured system prompt — only when `evaluate` is configured. |
+
+Query-string filters map 1:1 onto `TraceQuery`:
+
+```sh
+curl 'http://127.0.0.1:4319/api/traces?status=failed'
+curl 'http://127.0.0.1:4319/api/aggregate?sessionId=sess_42'
+```
+
+(The exact filter keys and the aggregate shape live in [`query-traces/SKILL.md`](@warlock.js/ai-panoptic/query-traces/SKILL.md).)
+
+## Advanced — build the handler yourself
+
+`createRequestHandler(store, config)` is the bare `(req, res) => void` the server closes over — split out from the lifecycle so it unit-tests without binding a port, and so you can mount the same routes inside an existing server:
+
+```ts
+import { createRequestHandler } from "@warlock.js/ai-panoptic";
+import { createServer } from "node:http";
+
+const handler = createRequestHandler(store, {
+  basePath: "/",
+  title: "Panoptic",
+  allowedHosts: ["127.0.0.1", "localhost"],
+});
+createServer(handler).listen(4319, "127.0.0.1");
+```
+
+`dashboardHtml(basePath, title, evaluateEnabled?, evaluateDefaultInstructions?)` returns the served page as a string if you embed it elsewhere. `ServeConfig` is `{ basePath; title; allowedHosts; authToken?; evaluate? }`.
+
+## Security note
+
+The dashboard surfaces whatever the store holds — including captured prompt/response content when content capture is on (`captureContent`). It binds **loopback-only** by default precisely so that content never leaves the machine. Binding a non-loopback host is gated — it requires an `authToken` (and checks a `Host` allowlist, sending `nosniff` / CSP / `X-Frame-Options: DENY` on every response) — but still prefer loopback for dev, and for production ship to a real backend via an exporter rather than exposing the dashboard. The dashboard has exactly one write-capable route (`evaluate`, off by default) — everything else stays read-only regardless of configuration.
+
+## See also
+
+- [`@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`](@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md) — the `ai.config({ panoptic })` wiring and the underlying `panoptic(...)` subscriber that fills the store.
+- [`@warlock.js/ai-panoptic/query-traces/SKILL.md`](@warlock.js/ai-panoptic/query-traces/SKILL.md) — the `TraceStoreContract` (`query` / `get` / `aggregate`) the dashboard reads, the `TraceQuery` filter, and capacity eviction.
+- [`@warlock.js/ai-panoptic/export-traces/SKILL.md`](@warlock.js/ai-panoptic/export-traces/SKILL.md) — shipping traces to OTel / Langfuse / a file instead of (or alongside) the local dashboard.
+- [`@warlock.js/ai-panoptic/evaluate-system-prompt/SKILL.md`](@warlock.js/ai-panoptic/evaluate-system-prompt/SKILL.md) — the drawer's "Evaluate system prompt" action, the dashboard's one write route.
