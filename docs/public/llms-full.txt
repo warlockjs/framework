@@ -4005,16 +4005,35 @@ Browsers consume SSE via `new EventSource(url)`. Cheaper than websockets when yo
 response.header("X-Total-Count", "42");
 
 // JSON-wrapped (default) — round-trips with request.cookie("prefs")
-response.cookie("prefs", { theme: "dark" }, { httpOnly: true });
+response.cookie("prefs", { theme: "dark" });
 
 // Plain string — use raw: true for session tokens / opaque IDs that
 // shouldn't be JSON-quoted on the wire
-response.cookie("session_id", "abc.def.ghi", { raw: true, httpOnly: true });
+response.cookie("session_id", "abc.def.ghi", { raw: true });
+
+// Deliberately readable by client-side JS — opt out explicitly
+response.cookie("theme", "dark", { httpOnly: false });
 
 response.clearCookie("session_id");
 ```
 
-`response.cookie()` JSON-stringifies the value by default so structured cookies round-trip cleanly with `request.cookie(name)`. Pass `{ raw: true }` to skip the wrapping for plain-string cookies (session tokens, opaque IDs, simple flags). The new `CookieOptions` type extends Fastify's `CookieSerializeOptions` with the `raw` flag.
+`response.cookie()` JSON-stringifies the value by default so structured cookies round-trip cleanly with `request.cookie(name)`. Pass `{ raw: true }` to skip the wrapping for plain-string cookies (session tokens, opaque IDs, simple flags). The `CookieOptions` type extends Fastify's `CookieSerializeOptions` with the `raw` flag.
+
+### Secure by default (4.10.0)
+
+Every response cookie gets `httpOnly: true`, `sameSite: "lax"`, and `secure: true` outside development, unless you override them:
+
+| Flag | Default | Why it's the default |
+|---|---|---|
+| `httpOnly` | `true` | without it, any injected script can read the cookie |
+| `sameSite` | `"lax"` | without it, the cookie rides along on cross-site requests |
+| `secure` | `true`, except in development | without it, the cookie travels in cleartext |
+
+`secure` is relaxed in development only — browsers drop a `Secure` cookie over plain http, which would silently break every local login. It stays on in test and staging.
+
+Precedence, lowest to highest: **framework defaults → `http.cookies.options` → the per-call `options` argument.** Set an app-wide policy in config, override per cookie when a specific one genuinely needs different treatment.
+
+These are the flags whose absence never fails a test and is fatal in production: the app works perfectly and is simply insecure. Opting out is now explicit and visible in review.
 
 These mutate the response in place; chain or call before the final `return response.<helper>()`.
 
@@ -4080,7 +4099,7 @@ return response.header("X-Cache", "HIT").replay({
 
 - **Don't manually set the status code.** Use the matching helper. `response.send(...)` with a hand-rolled status loses error-handler integration.
 - **Don't call multiple helpers.** First helper wins; subsequent calls log a "response already sent" warning.
-- **Cookie options vary by environment.** Set `secure: Application.isProduction` so cookies work in dev (HTTP) and prod (HTTPS) without changing code.
+- **Don't hand-set `secure: Application.isProduction` any more.** Since 4.10.0 `secure` already tracks the environment (on everywhere except development). Writing it by hand narrows the default — it would also switch `secure` off in test and staging.
 - **Streaming and SSE consume the response.** No `response.success(...)` afterward — call `stream.end()` / `sse.end()` to finish.
 
 ## See also
@@ -20117,6 +20136,42 @@ async function feedController(request: Request, response: Response) {
 
 The middleware uses the framework's `response.unauthorized({...})` shape. To override the response globally, hook the framework's error transformer to remap `AuthErrorCodes.*` codes.
 
+## When flat user types aren't enough — reach for `@warlock.js/access`
+
+`authMiddleware` gates on **user type** by flat string membership. That answers "is this an admin?" and nothing more. It deliberately cannot express:
+
+- a permission matrix (`articles.publish` rather than `"editor"`)
+- role hierarchy or inheritance
+- **who may act on whom** — "an `admin` may create a `teacher`, but only a `superAdmin` may create or promote an `admin`"
+
+That last one is the difference between a role check and an authorization model: without it, an account-creation endpoint gated on `authMiddleware("admin")` is a privilege-escalation path.
+
+Install [`@warlock.js/access`](@warlock.js/access/overview/SKILL.md) for that. It layers RBAC plus per-permission ABAC policies over the same authenticated user:
+
+```ts
+import { gate, can, definePolicy } from "@warlock.js/access";
+
+// Permission-based route gate, in place of a user-type gate
+router.post("/articles", articlesController, { middleware: [authMiddleware([]), gate("articles.create")] });
+
+// Who-may-act-on-whom: an ABAC policy on top of the RBAC grant
+definePolicy("users.create", (actor, target, ctx) =>
+  ctx.hasRole("superAdmin") || (target as User).userType === "teacher",
+);
+
+if (await can(request.user, "users.create", { resource: payload })) { /* ... */ }
+```
+
+Use `authMiddleware` to establish *who the caller is*, and `access` to decide *what they may do*. They compose — `access` reads the user `authMiddleware` put on the request.
+
+## Sessions are bearer-token, not cookie
+
+The token is read from the `Authorization` header (`Bearer <token>` or `Key <token>`) and nowhere else. "Session" in this package means a **refresh-token row**, not an HTTP cookie session.
+
+There is no cookie-backed guard, no session store, and no cookie strategy in `authMiddleware` — that is the intended design, not an omission. Warlock's auth optimises for API services.
+
+If you want HttpOnly cookie sessions for a server-rendered admin, that is **app-level work**: set the cookie yourself with `response.cookie` (secure by default since 4.10.0) and read it in your own middleware, then hand the token to the same `authService` rotation logic. **You also own CSRF** — the framework ships no CSRF helper, and cookie auth needs one where bearer auth does not. A synchronizer token bound to the session plus `Origin`/`Referer` checks is the usual shape.
+
 ## Things NOT to do
 
 - Don't call `authMiddleware` outside route definition. It returns a function — the function is what runs per-request. Calling it once per request creates a fresh middleware on every hit (wasteful) and a fresh allowed-types Set (correctness if the input changes per call).
@@ -20129,6 +20184,7 @@ The middleware uses the framework's `response.unauthorized({...})` shape. To ove
 - [`@warlock.js/auth/customize-user-type/SKILL.md`](@warlock.js/auth/customize-user-type/SKILL.md) — config and multi-user-type semantics
 - [`@warlock.js/auth/handle-login-and-logout/SKILL.md`](@warlock.js/auth/handle-login-and-logout/SKILL.md) — where the access token gets issued in the first place
 - [`@warlock.js/auth/throttle-login-attempts/SKILL.md`](@warlock.js/auth/throttle-login-attempts/SKILL.md) — brute-force throttle to stack in front of the login route
+- [`@warlock.js/access/overview/SKILL.md`](@warlock.js/access/overview/SKILL.md) — permissions, roles, and who-may-act-on-whom policies, when user-type gating isn't enough
 
 
 ## register-user  `@warlock.js/auth/register-user/SKILL.md`
@@ -20318,7 +20374,7 @@ Run it once when setting up a new project. Each developer typically runs it loca
 yarn warlock auth.cleanup
 ```
 
-Runs `authService.cleanupExpiredTokens()` — deletes every refresh token whose `expires_at` has passed. Fires `token.expired` per token and `cleanup.completed` once.
+Runs `authService.cleanupExpiredTokens()` — deletes every refresh token whose `expires_at` has passed, then sweeps expired access-token rows too. Fires `token.expired` per refresh token and `cleanup.completed` once.
 
 Schedule it periodically. Two common shapes:
 

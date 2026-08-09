@@ -108,6 +108,50 @@
   ],
   "releases": [
     {
+      "version": "4.10.0",
+      "id": "v4-10-0",
+      "date": "August 9, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong><code>@warlock.js/core</code></strong> makes <code>response.cookie</code> secure by default — <code>httpOnly</code>, <code>sameSite: \"lax\"</code>, and <code>secure</code> outside development are applied unless you override them. Nothing set them before, so a cookie was readable by any injected script, sent in cleartext, and attached to cross-site requests unless the developer passed three flags on every call; nothing failed when they were missing. <strong><code>@warlock.js/auth</code></strong> documents two things that were previously only findable by reading source: that <code>authMiddleware</code> gates on flat user-type matching and points at <strong><code>@warlock.js/access</code></strong> for permission matrices and who-may-act-on-whom policies, and that auth is bearer-token by design, with cookie sessions and CSRF being app-level work.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<strong><code>response.cookie</code> is now secure by default</strong> — <code>httpOnly: true</code>, <code>sameSite: \"lax\"</code>, and <code>secure: true</code> outside development are applied unless overridden. Previously nothing set them: a cookie was readable by any injected script, sent in cleartext, and attached to cross-site requests unless the developer knew to pass three flags on every call. Nothing failed when they were missing, so the app worked and was simply insecure. Precedence is framework defaults → <code>http.cookies.options</code> → the per-call argument, so opting out stays possible and explicit. <code>secure</code> is relaxed only in development, because browsers drop a <code>Secure</code> cookie over plain http"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<code>protect-routes</code> documents two things that were previously only discoverable by reading source: that <code>authMiddleware</code> gates on <strong>user type by flat string match</strong> and cannot express a permission matrix, role hierarchy, or who-may-act-on-whom — with a worked pointer to <code>@warlock.js/access</code> (<code>gate</code>, <code>can</code>, <code>definePolicy</code>) for exactly that; and that auth is <strong>bearer-token by design</strong>, with cookie sessions and CSRF being app-level work rather than an omission"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "4.9.2",
       "id": "v4-9-2",
       "date": "August 9, 2026",

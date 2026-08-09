@@ -294,31 +294,50 @@ See `@warlock.js/ai/skills/subskills/agent.md` for the agent's event surface.
 ## Cookies
 
 ```ts
-response.cookie("theme", "dark", { httpOnly: true, secure: Application.isProduction });
+response.cookie("session_id", "abc.def.ghi", { raw: true });
 response.cookie("preferences", { lang: "en", notifications: true });  // objects auto-JSON-stringified
+response.cookie("theme", "dark", { httpOnly: false });                // deliberately JS-readable
 response.clearCookie("session_id");
 ```
 
 Cookie options come from Fastify's `@fastify/cookie` (`CookieSerializeOptions`): `domain`, `path`, `secure`, `httpOnly`, `sameSite`, `maxAge`, `expires`, `signed`.
 
-The framework merges your options on top of the global defaults from `config.get("http.cookies.options")`. The reference project sets:
+### Secure by default
+
+Since **4.10.0** every response cookie gets these unless you override them:
+
+| Flag | Default | Without it |
+|---|---|---|
+| `httpOnly` | `true` | any injected script can read the cookie |
+| `sameSite` | `"lax"` | the cookie rides along on cross-site requests |
+| `secure` | `true`, except in development | the cookie travels in cleartext |
+
+`secure` is relaxed in development only — a browser drops a `Secure` cookie over plain http, which would silently break every local login. It stays on in test and staging.
+
+These are the flags whose absence never fails a test and is fatal in production: the app works perfectly and is simply insecure. Making them the default means opting out is explicit and visible in review.
+
+### Precedence
+
+Lowest to highest: **framework defaults → `http.cookies.options` → the per-call `options` argument.**
 
 ```ts title="src/config/http.ts"
-import { Application, env } from "@warlock.js/core";
+import { env } from "@warlock.js/core";
 
 const httpConfigurations = {
   cookies: {
     secret: env("COOKIE_SECRET", "super-secret-key-change-me"),
     options: {
-      httpOnly: true,
-      secure: Application.isProduction,
+      // Framework defaults already cover httpOnly / sameSite / secure —
+      // set only what you want to differ app-wide.
       path: "/",
     },
   },
 };
 ```
 
-`secure: Application.isProduction` so cookies work in dev (HTTP) and prod (HTTPS) without changing per-call code.
+:::caution[Upgrading to 4.10.0]
+Two things to check. A cookie your client-side JavaScript reads now needs `{ httpOnly: false }` stated explicitly. And anywhere you wrote `secure: Application.isProduction` by hand can be deleted — the default already tracks the environment, and the hand-written form wrongly turns `secure` **off** in test and staging.
+:::
 
 ## Headers
 

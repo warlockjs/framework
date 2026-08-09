@@ -3996,16 +3996,35 @@ Browsers consume SSE via `new EventSource(url)`. Cheaper than websockets when yo
 response.header("X-Total-Count", "42");
 
 // JSON-wrapped (default) — round-trips with request.cookie("prefs")
-response.cookie("prefs", { theme: "dark" }, { httpOnly: true });
+response.cookie("prefs", { theme: "dark" });
 
 // Plain string — use raw: true for session tokens / opaque IDs that
 // shouldn't be JSON-quoted on the wire
-response.cookie("session_id", "abc.def.ghi", { raw: true, httpOnly: true });
+response.cookie("session_id", "abc.def.ghi", { raw: true });
+
+// Deliberately readable by client-side JS — opt out explicitly
+response.cookie("theme", "dark", { httpOnly: false });
 
 response.clearCookie("session_id");
 ```
 
-`response.cookie()` JSON-stringifies the value by default so structured cookies round-trip cleanly with `request.cookie(name)`. Pass `{ raw: true }` to skip the wrapping for plain-string cookies (session tokens, opaque IDs, simple flags). The new `CookieOptions` type extends Fastify's `CookieSerializeOptions` with the `raw` flag.
+`response.cookie()` JSON-stringifies the value by default so structured cookies round-trip cleanly with `request.cookie(name)`. Pass `{ raw: true }` to skip the wrapping for plain-string cookies (session tokens, opaque IDs, simple flags). The `CookieOptions` type extends Fastify's `CookieSerializeOptions` with the `raw` flag.
+
+### Secure by default (4.10.0)
+
+Every response cookie gets `httpOnly: true`, `sameSite: "lax"`, and `secure: true` outside development, unless you override them:
+
+| Flag | Default | Why it's the default |
+|---|---|---|
+| `httpOnly` | `true` | without it, any injected script can read the cookie |
+| `sameSite` | `"lax"` | without it, the cookie rides along on cross-site requests |
+| `secure` | `true`, except in development | without it, the cookie travels in cleartext |
+
+`secure` is relaxed in development only — browsers drop a `Secure` cookie over plain http, which would silently break every local login. It stays on in test and staging.
+
+Precedence, lowest to highest: **framework defaults → `http.cookies.options` → the per-call `options` argument.** Set an app-wide policy in config, override per cookie when a specific one genuinely needs different treatment.
+
+These are the flags whose absence never fails a test and is fatal in production: the app works perfectly and is simply insecure. Opting out is now explicit and visible in review.
 
 These mutate the response in place; chain or call before the final `return response.<helper>()`.
 
@@ -4071,7 +4090,7 @@ return response.header("X-Cache", "HIT").replay({
 
 - **Don't manually set the status code.** Use the matching helper. `response.send(...)` with a hand-rolled status loses error-handler integration.
 - **Don't call multiple helpers.** First helper wins; subsequent calls log a "response already sent" warning.
-- **Cookie options vary by environment.** Set `secure: Application.isProduction` so cookies work in dev (HTTP) and prod (HTTPS) without changing code.
+- **Don't hand-set `secure: Application.isProduction` any more.** Since 4.10.0 `secure` already tracks the environment (on everywhere except development). Writing it by hand narrows the default — it would also switch `secure` off in test and staging.
 - **Streaming and SSE consume the response.** No `response.success(...)` afterward — call `stream.end()` / `sse.end()` to finish.
 
 ## See also
