@@ -54,8 +54,16 @@ export const roundMutator: Mutator = async (value, context) => {
   return round(Number(value), decimals);
 };
 
-/** To fixed mutator */
+/**
+ * To fixed mutator — rounds to a fixed number of decimal places, as a number.
+ *
+ * `Number.prototype.toFixed` returns a *string*, which the number validator's
+ * own type rule then rejected: `v.number().toFixed(2)` could never produce a
+ * valid result. Coercing back to a number keeps the method usable where it
+ * lives. For the fixed-point string form, format at the edge instead of asking
+ * a number schema to output a string.
+ */
 export const toFixedMutator: Mutator = async (value, context) => {
   const decimals = context?.options?.decimals ?? 2;
-  return Number(value).toFixed(decimals);
+  return Number(Number(value).toFixed(decimals));
 };

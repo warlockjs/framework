@@ -94,6 +94,26 @@ By default, extra keys in input are silently dropped from `data` (no error, no f
 
 `.allowUnknown()` only affects direct children — nested objects keep their own policies. For a fully permissive object including nested children, set `.allowUnknown()` on each level.
 
+### Output DTOs — stripping extras instead of rejecting them
+
+The default is to **reject** unknown keys, which is what you want for inbound payloads. For an *outbound* DTO — where the record legitimately carries internal fields you simply don't want to expose — use `.stripUnknown()`, which drops them and returns the clean object:
+
+```ts
+const publicArticle = v.object({
+  id: v.string().required(),
+  title: v.string().required(),
+}).stripUnknown();
+
+const { isValid, data } = await v.validate(publicArticle, record);
+// record had version / authorId / status; data has only id + title
+```
+
+Without `.stripUnknown()` the same record fails with *"The schema contains unknown keys: …"* rather than being cleaned.
+
+:::note[`data` is `undefined` on failure — since 4.9.2]
+A failed validation returns `data: undefined`, never the input it rejected. Before 4.9.2 an `object` returned the raw input on failure (while `discriminatedUnion` returned `undefined`), so a caller who read `data` without branching on `isValid` forwarded the exact fields the schema existed to exclude. Always branch on `isValid`.
+:::
+
 ## Object-level mutators
 
 | Method | Args | Effect |

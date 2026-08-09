@@ -134,9 +134,36 @@ describe("NumberValidator - extended coverage", () => {
   });
 
   describe("toFixed mutator", () => {
-    it("formats to fixed decimals (returns a string)", async () => {
+    // Regression cover: `toFixedMutator` used to return `Number(v).toFixed(n)`
+    // — a *string* — which the validator's own `number` type rule then
+    // rejected, so `v.number().toFixed(n)` could never produce a valid result.
+    // The old test asserted `data === "3.14"` and passed only because a failed
+    // validation still handed back its data; fixing that in 4.9.2 exposed this.
+    it("rounds to fixed decimals and stays valid", async () => {
       const result = await validate(v.number().toFixed(2), 3.14159);
-      expect(result.data).toBe("3.14");
+
+      expect(result.isValid).toBe(true);
+      expect(result.data).toBe(3.14);
+    });
+
+    it("returns a number, not a string", async () => {
+      const result = await validate(v.number().toFixed(2), 3.14159);
+
+      expect(typeof result.data).toBe("number");
+    });
+
+    it("defaults to two decimals", async () => {
+      expect((await validate(v.number().toFixed(), 1.005678)).data).toBe(1.01);
+    });
+
+    it("handles zero decimals and negatives", async () => {
+      expect((await validate(v.number().toFixed(0), 3.7)).data).toBe(4);
+      expect((await validate(v.number().toFixed(2), -3.14159)).data).toBe(-3.14);
+    });
+
+    it("composes with the validator's own rules", async () => {
+      expect((await validate(v.number().toFixed(2).max(3), 3.14159)).isValid).toBe(false);
+      expect((await validate(v.number().toFixed(2).max(4), 3.14159)).isValid).toBe(true);
     });
   });
 

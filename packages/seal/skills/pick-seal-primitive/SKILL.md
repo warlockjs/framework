@@ -65,6 +65,22 @@ v.instanceof(MyClass)                       // type: MyClass
 - `v.string().oneOf(["a", "b"])` infers as `string` (loses literal types). Use when broad type is fine.
 - `v.enum(["a", "b"])` runs the same `oneOf` rule at runtime (it builds a `StringValidator().oneOf(...)`), but the `v.enum` factory overload **preserves the literal union** — it infers `"a" | "b"`, not `string`. Pass a TS enum object (`v.enum(Direction)`) and it uses `Object.values`, inferring `Direction[keyof Direction]`.
 
+`**`v.literal("")` — the empty string is a value, not an absence.** `""` is accepted when it is one of the configured literals, and the field is still required to be *present*:
+
+```ts
+const decorative = v.object({ decorative: v.literal(true), alt: v.literal("") });
+
+await v.validate(decorative, { decorative: true, alt: "" });      // valid
+await v.validate(decorative, { decorative: true, alt: "text" });  // invalid — not the literal
+await v.validate(decorative, { decorative: true });               // invalid — key missing
+```
+
+That distinction matters wherever "empty" and "absent" mean different things — `alt=""` marks an image as decorative to a screen reader, while a missing `alt` is an authoring mistake. Add `.optional()` only when a missing key really is acceptable; a present value must still match the literal.
+
+:::note[Fixed in 4.9.2]
+Before 4.9.2 `v.literal("")` always failed with *"is required"*, and `.optional()` looked like a workaround while actually disabling the literal check — accepting `""`, `null`, and a missing key alike. `v.literal(0)` and `v.literal(false)` were never affected.
+:::
+
 `v.instanceof(Ctor)` for File/Buffer/Uint8Array/custom classes. Returns `{}` from `toJsonSchema()` (not representable). For OpenAPI `File`, attach `{ type: "string", format: "binary" }` manually after generation.
 
 ## `v.any` — escape hatch

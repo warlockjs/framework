@@ -79,9 +79,15 @@ For most numeric-shaped IDs you'd use `v.string().length(n).numeric()` instead �
 | `.ceil()` | — | round up to integer |
 | `.floor()` | — | round down to integer |
 | `.round(decimals?)` | default 0 | round to N decimals |
-| `.toFixed(decimals?)` | default 2 | format as fixed-point |
+| `.toFixed(decimals?)` | default 2 | round to N decimals — returns a **number** |
 
 These run *before* validation rules. If you mutate `1.6` with `.ceil()`, `v.int()` sees `2` and passes. Use mutators when the input arrives in a slightly wrong form and you want to coerce, not reject.
+
+That ordering is exactly why `.toFixed()` yields a number rather than a fixed-point string: the mutated value is what the validator's own type rule sees, and a `number` schema that emitted `"3.14"` would reject its own output. Format to a string at the presentation edge instead.
+
+:::note[Fixed in 4.9.2]
+Before 4.9.2 `.toFixed()` returned a string, so `v.number().toFixed(2)` **always failed validation** — masked because a failed validation still handed back its mutated `data`. No working code can have relied on it.
+:::
 
 ## JSON Schema notes
 

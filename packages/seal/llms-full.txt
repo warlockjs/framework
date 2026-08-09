@@ -743,6 +743,26 @@ By default, extra keys in input are silently dropped from `data` (no error, no f
 
 `.allowUnknown()` only affects direct children — nested objects keep their own policies. For a fully permissive object including nested children, set `.allowUnknown()` on each level.
 
+### Output DTOs — stripping extras instead of rejecting them
+
+The default is to **reject** unknown keys, which is what you want for inbound payloads. For an *outbound* DTO — where the record legitimately carries internal fields you simply don't want to expose — use `.stripUnknown()`, which drops them and returns the clean object:
+
+```ts
+const publicArticle = v.object({
+  id: v.string().required(),
+  title: v.string().required(),
+}).stripUnknown();
+
+const { isValid, data } = await v.validate(publicArticle, record);
+// record had version / authorId / status; data has only id + title
+```
+
+Without `.stripUnknown()` the same record fails with *"The schema contains unknown keys: …"* rather than being cleaned.
+
+:::note[`data` is `undefined` on failure — since 4.9.2]
+A failed validation returns `data: undefined`, never the input it rejected. Before 4.9.2 an `object` returned the raw input on failure (while `discriminatedUnion` returned `undefined`), so a caller who read `data` without branching on `isValid` forwarded the exact fields the schema existed to exclude. Always branch on `isValid`.
+:::
+
 ## Object-level mutators
 
 | Method | Args | Effect |
@@ -1441,6 +1461,22 @@ v.instanceof(MyClass)                       // type: MyClass
 - `v.string().oneOf(["a", "b"])` infers as `string` (loses literal types). Use when broad type is fine.
 - `v.enum(["a", "b"])` runs the same `oneOf` rule at runtime (it builds a `StringValidator().oneOf(...)`), but the `v.enum` factory overload **preserves the literal union** — it infers `"a" | "b"`, not `string`. Pass a TS enum object (`v.enum(Direction)`) and it uses `Object.values`, inferring `Direction[keyof Direction]`.
 
+`**`v.literal("")` — the empty string is a value, not an absence.** `""` is accepted when it is one of the configured literals, and the field is still required to be *present*:
+
+```ts
+const decorative = v.object({ decorative: v.literal(true), alt: v.literal("") });
+
+await v.validate(decorative, { decorative: true, alt: "" });      // valid
+await v.validate(decorative, { decorative: true, alt: "text" });  // invalid — not the literal
+await v.validate(decorative, { decorative: true });               // invalid — key missing
+```
+
+That distinction matters wherever "empty" and "absent" mean different things — `alt=""` marks an image as decorative to a screen reader, while a missing `alt` is an authoring mistake. Add `.optional()` only when a missing key really is acceptable; a present value must still match the literal.
+
+:::note[Fixed in 4.9.2]
+Before 4.9.2 `v.literal("")` always failed with *"is required"*, and `.optional()` looked like a workaround while actually disabling the literal check — accepting `""`, `null`, and a missing key alike. `v.literal(0)` and `v.literal(false)` were never affected.
+:::
+
 `v.instanceof(Ctor)` for File/Buffer/Uint8Array/custom classes. Returns `{}` from `toJsonSchema()` (not representable). For OpenAPI `File`, attach `{ type: "string", format: "binary" }` manually after generation.
 
 ## `v.any` — escape hatch
@@ -1846,9 +1882,15 @@ For most numeric-shaped IDs you'd use `v.string().length(n).numeric()` instead �
 | `.ceil()` | — | round up to integer |
 | `.floor()` | — | round down to integer |
 | `.round(decimals?)` | default 0 | round to N decimals |
-| `.toFixed(decimals?)` | default 2 | format as fixed-point |
+| `.toFixed(decimals?)` | default 2 | round to N decimals — returns a **number** |
 
 These run *before* validation rules. If you mutate `1.6` with `.ceil()`, `v.int()` sees `2` and passes. Use mutators when the input arrives in a slightly wrong form and you want to coerce, not reject.
+
+That ordering is exactly why `.toFixed()` yields a number rather than a fixed-point string: the mutated value is what the validator's own type rule sees, and a `number` schema that emitted `"3.14"` would reject its own output. Format to a string at the presentation edge instead.
+
+:::note[Fixed in 4.9.2]
+Before 4.9.2 `.toFixed()` returned a string, so `v.number().toFixed(2)` **always failed validation** — masked because a failed validation still handed back its mutated `data`. No working code can have relied on it.
+:::
 
 ## JSON Schema notes
 

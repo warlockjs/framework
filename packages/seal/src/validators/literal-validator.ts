@@ -1,4 +1,6 @@
+import { isEmptyValue } from "../helpers/is-empty-value";
 import { literalRule } from "../rules/common/literal";
+import { presentRule } from "../rules/core/required";
 import { applyNullable } from "../standard-schema/json-schema";
 import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 import { BaseValidator } from "./base-validator";
@@ -26,6 +28,20 @@ export class LiteralValidator<
     super();
     this.values = values;
     this.addMutableRule(literalRule, errorMessage, { values });
+
+    // `""` is a value, not an absence. Every validator is required by default,
+    // and `required` rejects anything `isEmptyValue` calls empty — including the
+    // empty string — so `v.literal("")` could never pass. When the author has
+    // explicitly listed an empty value as acceptable, swap `required` for
+    // `present`: the key must still exist, but judging the value is the literal
+    // set's job, and it is already the stricter statement of intent.
+    //
+    // Dropping the rule entirely instead would make a missing key valid, which
+    // is the opposite mistake — `alt=""` and no `alt` at all are different
+    // things to a screen reader, and to anything else reading the schema.
+    if (values.some(value => isEmptyValue(value))) {
+      this.requiredRule = this.createRule(presentRule);
+    }
   }
 
   /**

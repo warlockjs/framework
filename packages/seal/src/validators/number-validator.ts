@@ -274,7 +274,14 @@ export class NumberValidator extends PrimitiveValidator {
   }
 
   /**
-   * Format number using fixed-point notation
+   * Round to a fixed number of decimal places, keeping the value a **number**.
+   *
+   * `v.number().toFixed(2)` on `3.14159` yields `3.14`, not `"3.14"` — a number
+   * schema has to output a number, or its own type rule rejects the result.
+   * Format to a fixed-point *string* at the presentation edge instead.
+   *
+   * @example
+   * v.number().toFixed(2)   // 3.14159 → 3.14
    */
   public toFixed(decimals = 2) {
     return this.addMutator(toFixedMutator, { decimals });
