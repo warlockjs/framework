@@ -424,7 +424,7 @@ return response.success({ data });
 - **Don't manually call `send` with a hand-rolled status when a helper exists.** `response.send(data, 404)` works, but loses the error-event integration and reads worse than `response.notFound(data)`. The helpers are the public API.
 - **First helper wins.** Two terminal calls log a warning; only the first one writes to the wire. If you find yourself wanting "send-or-fail-quietly" logic, branch with an `if`.
 - **`stream()` and `sse()` consume the response.** No `success(...)` afterward — call `stream.end()` / `sse.end()` to finish. Background work writing after `end()` is silently dropped.
-- **Set `secure: Application.isProduction` for cookies.** Hard-coding `secure: true` breaks dev (HTTP); `secure: false` is a security smell in prod. Read it from the application flag.
+- **Don't set `secure: Application.isProduction` for cookies any more.** Since 4.10.0 `secure` already tracks the environment — on everywhere except development. Writing it by hand is not just redundant, it's narrower: it turns `secure` **off** in test and staging, where the default keeps it on.
 - **`response.success()` with no arg returns `{ success: true }`.** If you want truly empty, use `response.noContent()` (204).
 - **`sendFile(path)` checks file existence and returns 404 if missing.** You don't need to pre-`fs.access` it.
 - **SSE keep-alives matter.** Most proxies (nginx, Cloudflare) close idle connections after 30–60s. Send a `sse.comment("ping")` every 25 seconds for long-lived streams.
