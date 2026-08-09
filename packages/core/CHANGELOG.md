@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/core` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.9.2
+
+### Fixed
+
+- the dev server's generated `.warlock/loader-hook.mjs` no longer ships bare `esbuild` / `get-tsconfig` imports. That file is written into the **consuming app's** directory, so a bare specifier resolves from the app — but both packages are core's own dependencies. npm and yarn hoist flat so it worked by accident; under pnpm's strict layout the dev server died with `ERR_MODULE_NOT_FOUND` for a package the app never imported. Each npm specifier is now rewritten at generation time to an absolute path resolved from core's own install, so no consumer has to declare a phantom dependency
+
 ## 4.9.0 - 2026-08-06
 
 ### Added

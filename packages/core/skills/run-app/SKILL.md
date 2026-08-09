@@ -97,6 +97,16 @@ An explicit restart (`r`, `u`, a config change) is a *request*, not a crash, so 
 
 Set `devServer.restartOnConfigChange: false` for the previous behaviour (a warning telling you to restart yourself). The same warning is printed if a restart is declined or isn't possible, and any ordinary code files that shared the batch still hot-reload normally.
 
+### The generated loader hook
+
+On first boot `warlock dev` bundles its ESM loader hook and writes it to **your project's** `.warlock/loader-hook.mjs` — the hook runs in a fresh Node worker thread with no TypeScript loader of its own, so it has to be plain, pre-bundled ESM.
+
+Because that file lives in your directory rather than core's, every npm import inside it is rewritten at generation time to an **absolute path resolved from core's own install**. A bare `import "esbuild"` there would resolve from *your* `node_modules`, and `esbuild` / `get-tsconfig` are core's dependencies, not yours.
+
+:::note[Fixed in 4.9.2 — pnpm users]
+Before 4.9.2 those imports were left bare. npm and yarn hoist every transitive dependency into one flat tree, so they resolved by accident; pnpm's strict layout does not, and the dev server failed with `ERR_MODULE_NOT_FOUND: Cannot find package 'esbuild'`. The workaround was declaring `esbuild` and `get-tsconfig` in your own `package.json` — no longer needed, and you can drop them.
+:::
+
 ### What it preloads
 
 ```ts

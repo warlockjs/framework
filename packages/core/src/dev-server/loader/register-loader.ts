@@ -1,10 +1,56 @@
 import { putFileAsync } from "@warlock.js/fs";
-import { build } from "esbuild";
+import { build, type Plugin } from "esbuild";
 import { register } from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { type MessagePort, MessageChannel } from "node:worker_threads";
 import type { TranspileInit } from "./load-hook.js";
+
+/**
+ * Rewrite the hook bundle's remaining npm imports to absolute paths resolved
+ * from **core's own** location.
+ *
+ * The bundle is written into the consuming app's `.warlock/` directory, so a
+ * bare `import "esbuild"` in it resolves starting from the *app*, walking up
+ * the app's `node_modules`. `esbuild` and `get-tsconfig` are core's
+ * dependencies, not the app's — under npm/yarn's flat hoisting they happen to
+ * be reachable anyway, but under pnpm's strict layout they are not, and the
+ * dev server dies with `ERR_MODULE_NOT_FOUND` for a package the app never
+ * imported. That is a phantom dependency baked into generated code.
+ *
+ * Bundling them in instead is not an option for `esbuild`: its JS API is a
+ * thin wrapper that spawns a platform-specific native binary, so inlining the
+ * JavaScript would not remove the need for the package on disk. Resolving to
+ * an absolute `file://` URL at generation time does — the generated file then
+ * points straight at the copy core itself is using, whatever the installer's
+ * layout.
+ */
+export const resolveExternalsFromCore: Plugin = {
+  name: "warlock-resolve-externals-from-core",
+  setup(build) {
+    // The filter is deliberately loose — anything not starting `.` or `/` —
+    // so the guards below carry the real logic.
+    build.onResolve({ filter: /^[^./]/ }, args => {
+      // The entry point comes through here too, and on Windows its absolute
+      // path ("D:\\…") is not `.` or `/`. Marking it external fails the build.
+      if (args.kind === "entry-point" || path.isAbsolute(args.path)) {
+        return null;
+      }
+
+      if (args.path.startsWith("node:")) {
+        return { external: true };
+      }
+
+      try {
+        return { path: import.meta.resolve(args.path), external: true };
+      } catch {
+        // Unresolvable from here — leave it bare and let Node try, which is
+        // exactly the previous behaviour rather than a hard failure.
+        return { external: true };
+      }
+    });
+  },
+};
 
 /**
  * Bundle, write, and register the ESM loader hook.
@@ -58,9 +104,12 @@ export async function registerLoader(
     write: false,
     platform: "node",
     target: "node20",
-    // Keep npm packages and Node built-ins external â€” the hook thread resolves
-    // them normally from node_modules at runtime.
+    // npm packages and Node built-ins stay external, but the plugin rewrites
+    // each remaining npm specifier to an absolute path resolved from core's
+    // own install — see `resolveExternalsFromCore` for why bare imports break
+    // under pnpm's strict layout.
     packages: "external",
+    plugins: [resolveExternalsFromCore],
   });
 
   const bundledCode = bundleResult.outputFiles[0].text;
