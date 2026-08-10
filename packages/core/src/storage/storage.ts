@@ -3,7 +3,8 @@ import fs from "fs";
 import path from "path";
 import type { Readable } from "stream";
 import type { UploadedFile } from "../http";
-import { storageConfig } from "./config";
+import { uploadsPath } from "../utils/paths";
+import { storageConfig, storageConfigurations } from "./config";
 import { storageDriverContext } from "./context/storage-driver-context";
 import { DOSpacesDriver } from "./drivers/do-spaces-driver";
 import { LocalDriver } from "./drivers/local-driver";
@@ -172,11 +173,38 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * @internal
    */
   protected loadDriversFromConfig(): void {
+    this.registerBuiltInLocalDriver();
+
     const drivers = storageConfig<Record<string, StorageDriverConfig>>("drivers", {});
 
     for (const [name, config] of Object.entries(drivers)) {
       this.configs.set(name, config);
     }
+  }
+
+  /**
+   * Register the built-in `local` driver, rooted at `uploadsPath()`.
+   *
+   * The storage connector starts unconditionally — unlike database, cache and
+   * herald, it does not early-return when `config.get("storage")` is absent —
+   * on the stated grounds that `init()` falls back to a built-in local driver so
+   * file storage works out of the box. That fallback did not exist: `init()`
+   * resolved the default driver *name* and then found no config registered
+   * under it, so **any app without `src/config/storage.ts` failed to boot**
+   * with `Storage driver "local" is not configured`. Only scaffolded apps, which
+   * always ship that file, hid it.
+   *
+   * Registered before the configured drivers so an app that defines its own
+   * `local` entry overrides this one rather than fighting it.
+   */
+  protected registerBuiltInLocalDriver(): void {
+    this.configs.set(
+      "local",
+      storageConfigurations.local({
+        root: uploadsPath(),
+        urlPrefix: "/uploads",
+      }),
+    );
   }
 
   /**

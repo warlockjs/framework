@@ -289,7 +289,7 @@ export default {
 } as SocketOptions;
 `;
 
-export const communicatorsConfigStub = `import { env } from "@mongez/dotenv";
+export const communicatorsConfigStub = `import { env } from "@warlock.js/core";
 import type { BrokerConfigurations, RabbitMQClientOptions } from "@warlock.js/herald";
 
 const heraldConfigurations: BrokerConfigurations<RabbitMQClientOptions> = {

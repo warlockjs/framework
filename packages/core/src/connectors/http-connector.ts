@@ -150,6 +150,8 @@ export class HttpConnector extends BaseConnector {
         host: httpConfig.host || "localhost",
       });
 
+      Application.setServedPort(httpConfig.port);
+
       const baseUrl = config.get("app.baseUrl");
 
       log.success(`http`, "connection", `Server ready at ${baseUrl}`);

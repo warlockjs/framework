@@ -14,6 +14,8 @@ export * from "./errors";
 // middleware
 export * from "./middleware";
 export * from "./plugins";
+// port preflight
+export * from "./port-preflight";
 // request exports
 export * from "./request";
 // response exports

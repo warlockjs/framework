@@ -2,6 +2,8 @@ import { colors } from "@mongez/copper";
 import {
   ensureDirectoryAsync,
   fileExistsAsync,
+  getFileAsync,
+  getJsonFileAsync,
   putFileAsync,
   removeDirectoryAsync,
 } from "@warlock.js/fs";
@@ -9,7 +11,8 @@ import esbuild from "esbuild";
 import glob from "fast-glob";
 import path from "path";
 import { tsconfigManager } from "../dev-server/tsconfig-manager";
-import { appPath, warlockPath } from "../utils";
+import { appPath, rootPath, warlockPath } from "../utils";
+import { assertGeneratedImportsAreDeclared } from "./assert-generated-imports";
 import { nativeNodeModulesPlugin } from "./esbuild-plugins";
 import { resolveBuildConfig, type ResolvedBuildConfig } from "./resolve-build-config";
 import { toCamelCase, toKebabCase } from "@mongez/reinforcements";
@@ -38,10 +41,13 @@ export class ProductionBuilder {
     // Step 3: Generate entry point
     await this.generateEntryPoint();
 
-    // Step 4: Bundle with esbuild
+    // Step 4: Refuse to bundle code the app could not resolve at runtime
+    await this.assertGeneratedImports();
+
+    // Step 5: Bundle with esbuild
     await this.bundle();
 
-    // // Step 5: Remove production folder
+    // Step 6: Remove production folder
     await removeDirectoryAsync(this.productionDir);
 
     console.log(colors.green("Build complete!"));
@@ -112,6 +118,37 @@ bootstrap();
   }
 
   /**
+   * Fail the build when generated code imports a package the app does not
+   * declare.
+   *
+   * The bundler is configured `packages: "external"`, so every bare specifier
+   * written above survives verbatim into an artifact that resolves against the
+   * **consuming app's** node_modules. A framework-internal dependency imported
+   * there resolves by accident under npm/yarn hoisting and dies under pnpm —
+   * which is how a production app shipped that could not boot. Rewriting the
+   * offending import fixes today's bundle; this check is what stops the next
+   * change to the generator from quietly reintroducing it.
+   */
+  private async assertGeneratedImports(): Promise<void> {
+    const generatedPaths = await glob("**/*.{ts,tsx,js,mjs}", {
+      cwd: this.productionDir,
+      absolute: false,
+    });
+
+    const [files, appPackage] = await Promise.all([
+      Promise.all(
+        generatedPaths.map(async (file) => ({
+          file,
+          content: await getFileAsync(path.join(this.productionDir, file)),
+        })),
+      ),
+      getJsonFileAsync<{ dependencies?: Record<string, string> }>(rootPath("package.json")),
+    ]);
+
+    assertGeneratedImportsAreDeclared(files, Object.keys(appPackage.dependencies ?? {}));
+  }
+
+  /**
    * Glob for module files matching a pattern
    * Returns relative paths from .warlock/production/ to src/app/
    */
@@ -158,9 +195,12 @@ bootstrap();
 
     const configNames = files.map((f) => f.replace(/\.(ts|tsx)$/, ""));
 
+    // Only `@warlock.js/core` — the one package the app itself declares. See
+    // `assertGeneratedImportsAreDeclared`: `@mongez/config` is core's own
+    // dependency, so a bare import of it resolved by luck under npm/yarn
+    // hoisting and died under pnpm's strict layout.
     const imports: string[] = [
-      'import config from "@mongez/config";',
-      'import { configSpecialHandlers } from "@warlock.js/core";',
+      'import { setConfig, configSpecialHandlers } from "@warlock.js/core";',
     ];
     const configImports: string[] = [];
     const configSetCalls: string[] = [];
@@ -170,7 +210,7 @@ bootstrap();
       const properConfigName = toCamelCase(configName);
       const varName = `${properConfigName}Config`;
       configImports.push(`import ${varName} from "../../src/config/${configName}";`);
-      configSetCalls.push(`config.set("${properConfigName}", ${varName});`);
+      configSetCalls.push(`setConfig("${properConfigName}", ${varName});`);
       executors.push(`await configSpecialHandlers.execute("${properConfigName}", ${varName});`);
     }
 

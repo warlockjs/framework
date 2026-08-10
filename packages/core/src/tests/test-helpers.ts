@@ -5,12 +5,18 @@
  */
 
 import { config } from "../config";
+import { TEST_SERVER_PORT_ENV_KEY } from "./test-server-port-channel";
 
 /**
  * Get the test server base URL
  */
 export function getTestServerUrl(): string {
-  const port = config.key("http.port", 2031);
+  // `startHttpTestServer` publishes the port it actually bound. Test workers are
+  // separate processes whose own config resolves `http.port` from `.env`, so
+  // without this a suite started on an explicit port would send every request to
+  // the `.env` port instead of the one the server is listening on.
+  const publishedPort = process.env[TEST_SERVER_PORT_ENV_KEY];
+  const port = publishedPort || config.key("http.port", 2031);
   const host = config.key("http.host", "localhost");
   return `http://${host}:${port}`;
 }

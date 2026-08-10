@@ -5,4 +5,5 @@
  */
 export * from "./start-http-development-server";
 export * from "./test-helpers";
+export * from "./test-server-port-channel";
 export * from "./vitest-setup";

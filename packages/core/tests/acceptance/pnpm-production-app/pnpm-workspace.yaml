@@ -1,0 +1,55 @@
+# pnpm 11 no longer reads settings from package.json's `pnpm` field — it says so
+# and then ignores them:
+#
+#   [WARN] The "pnpm" field in package.json is no longer read by pnpm.
+#          The following keys were ignored: "pnpm.overrides"
+#
+# so every setting this fixture depends on lives here instead. Putting them back
+# in package.json would not fail: the install would simply reach out to the
+# registry for unpublished versions and die confusingly.
+
+# Warlock ships LOCKSTEP — core@X pins its siblings at exactly X, and none of
+# those versions exist on npm until the release publishes. Every @warlock.js/*
+# in the tree is redirected to the tarball packed from the local build.
+#
+# These overrides mask version skew by design, which is why the runner
+# separately asserts that each built manifest's pins agree with the version
+# being vendored. Do not remove that check while these exist.
+overrides:
+  "@warlock.js/access": "file:./vendor/access.tgz"
+  "@warlock.js/ai": "file:./vendor/ai.tgz"
+  "@warlock.js/auth": "file:./vendor/auth.tgz"
+  "@warlock.js/cache": "file:./vendor/cache.tgz"
+  "@warlock.js/cascade": "file:./vendor/cascade.tgz"
+  "@warlock.js/context": "file:./vendor/context.tgz"
+  "@warlock.js/core": "file:./vendor/core.tgz"
+  "@warlock.js/fs": "file:./vendor/fs.tgz"
+  "@warlock.js/herald": "file:./vendor/herald.tgz"
+  "@warlock.js/logger": "file:./vendor/logger.tgz"
+  "@warlock.js/notifications": "file:./vendor/notifications.tgz"
+  "@warlock.js/scheduler": "file:./vendor/scheduler.tgz"
+  "@warlock.js/seal": "file:./vendor/seal.tgz"
+
+# The point of this app is a minimal, strictly-laid-out node_modules.
+#
+# autoInstallPeers defaults to true and would quietly pull in core's optional
+# peers — sharp, socket.io, the AWS SDKs, react — widening the graph until the
+# accidental resolution this fixture exists to detect becomes possible again.
+autoInstallPeers: false
+
+# Those same peers are optional by design; an app legitimately has none of them,
+# and the install must not fail over their absence.
+strictPeerDependencies: false
+
+# pnpm 11 does not run a dependency's install scripts unless it is named here,
+# and it FAILS the install rather than continuing quietly — the right behaviour,
+# and a useful contrast with the `pnpm` field it silently ignored.
+#
+# esbuild's install script links its platform-native binary. `warlock build`
+# shells out to that binary, so without this the app installs and then cannot
+# build. Any Warlock app on pnpm 11 needs the same line.
+allowBuilds:
+  esbuild: true
+
+minimumReleaseAgeExclude:
+  - '@mongez/dotenv@1.3.1'

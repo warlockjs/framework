@@ -1,10 +1,12 @@
-import { loadEnv } from "@mongez/dotenv";
 import { initializeDayjs } from "@mongez/time-wizard";
 import { captureAnyUnhandledRejection } from "@warlock.js/logger";
 import { Application } from "./application";
+import { loadEnvironmentFiles } from "./utils/load-environment";
 
 export async function bootstrap() {
-  await loadEnv();
+  // Guarded: a project with no `.env` is legitimate, and a raw `loadEnv()`
+  // throws on one. See `loadEnvironmentFiles`.
+  await loadEnvironmentFiles();
 
   initializeDayjs();
 

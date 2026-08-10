@@ -1,5 +1,4 @@
 import { colors } from "@mongez/copper";
-import { loadEnv } from "@mongez/dotenv";
 import { fileExistsAsync } from "@warlock.js/fs";
 import { Application } from "../application";
 import { bootstrap } from "../bootstrap";
@@ -9,6 +8,7 @@ import { ConnectorLifecyclePhase } from "../connectors/types";
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
 import { manifestManager } from "../manifest/manifest-manager";
 import { appPath } from "../utils";
+import { loadEnvironmentFiles } from "../utils/load-environment";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 import { CLICommand } from "./cli-command";
 import {
@@ -478,15 +478,28 @@ export class CLICommandsManager {
       Application.setEnvironment(preloaders.environemnt);
     }
 
+    // Env BEFORE config, unconditionally, for every command.
+    //
+    // `warlock.config.ts` is a module whose body runs on import, and projects
+    // legitimately call `env("BUILD_OUT", "dist")` in it. Loading config first
+    // evaluated that body against an empty env store, so every such call
+    // silently returned its default — under `build` and `start`, which never
+    // loaded env at all, and under `dev` too, because config was loaded first
+    // regardless. The ordering is load-bearing in the other direction as well:
+    // `loadEnv()` reads `process.env.NODE_ENV` at call time to choose
+    // `.env.<NODE_ENV>` over `.env`, so it must follow `setEnvironment` above.
+    await loadEnvironmentFiles();
+
     await warlockConfigManager.load();
 
     if (preloaders.config || preloaders.bootstrap || preloaders.prestart) {
       await filesOrchestrator.init();
     }
 
-    if (preloaders.env && !preloaders.bootstrap) {
-      await loadEnv();
-    } else if (preloaders.bootstrap) {
+    // `preloaders.env` is gone: env is loaded above for every command, so the
+    // branch that used to serve it could only re-parse the same files and
+    // re-override `process.env` a second time.
+    if (preloaders.bootstrap) {
       await bootstrap();
 
       if (await fileExistsAsync(appPath("bootstrap.ts"))) {

@@ -90,7 +90,12 @@ export type CLICommandPreload = {
 
   /**
    * Whether to load environment variables from .env files.
-   * Note: If `bootstrap` is true, env is loaded automatically.
+   *
+   * @deprecated No longer read — env is loaded for every command that declares
+   * a preload block, before `warlock.config.ts` is evaluated. It has to be:
+   * config files call `env()` in their module body, and loading config first
+   * resolved every one of those calls to its default. Setting this flag is
+   * harmless and does nothing; remove it. Dropped at 5.0.
    */
   env?: boolean;
 

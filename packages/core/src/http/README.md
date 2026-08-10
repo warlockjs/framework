@@ -10,6 +10,7 @@ HTTP layer built on Fastify. Provides the `Request` and `Response` abstractions,
 | `response.ts`              | `Response` class — wraps Fastify reply; provides `success()`, `badRequest()`, `notFound()`, `send()`, `stream()`, etc. |
 | `uploaded-file.ts`         | `UploadedFile` class — handles multipart file uploads, validation, storage                                             |
 | `server.ts`                | Creates and exports the Fastify server instance                                                                        |
+| `port-preflight.ts`        | Checks a bind port is free before `listen()` — `isPortAvailable`, `assertPortIsAvailable`, `PortInUseError`            |
 | `createHttpApplication.ts` | Factory for creating the HTTP application with plugins                                                                 |
 | `config.ts`                | HTTP-specific config defaults                                                                                          |
 | `events.ts`                | HTTP event constants (e.g., `onRequest`, `onResponse`)                                                                 |

@@ -91,7 +91,7 @@ import { guarded } from "app/shared/utils/router";
   await putFileAsync(path.join(modulePath, "routes.ts"), routesContent);
 
   // Create utils/locales.ts
-  const localesContent = `import { groupedTranslations } from "@mongez/localization";
+  const localesContent = `import { groupedTranslations } from "@warlock.js/core";
 
 groupedTranslations("${name.camel}", {
   // Add your translations here

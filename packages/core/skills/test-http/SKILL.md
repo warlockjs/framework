@@ -1,6 +1,6 @@
 ---
 name: test-http
-description: 'Integration tests against a real HTTP server — `startHttpTestServer()` boots one shared server in globalSetup, then `testGet` / `testPost` / `expectJson` make typed requests against it. Triggers: `startHttpTestServer`, `stopHttpTestServer`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core"`. Skip: pure unit tests — `@warlock.js/core/test-service/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing libs `supertest`, `light-my-request`, `nock`.'
+description: 'Integration tests against a real HTTP server — `startHttpTestServer()` boots one shared server in globalSetup, then `testGet` / `testPost` / `expectJson` make typed requests against it. Triggers: `startHttpTestServer`, `startHttpTestServer({ port })`, `stopHttpTestServer`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`, `PortInUseError`, `assertPortIsAvailable`, `isPortAvailable`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape", "test server port already in use", "EADDRINUSE while running tests", "run tests while the dev server is up"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core"`. Skip: pure unit tests — `@warlock.js/core/test-service/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing libs `supertest`, `light-my-request`, `nock`.'
 ---
 
 # Warlock — HTTP integration tests
@@ -56,6 +56,30 @@ Unlike the dev server, it doesn't watch files, doesn't do HMR, doesn't run healt
 
 Both are idempotent. A second `start` returns early; `stop` on a non-running server logs and returns.
 
+### Choosing the port — `startHttpTestServer({ port })`
+
+```ts
+await startHttpTestServer({ port: 3999 });
+```
+
+The explicit port wins over `http.port` — including over `HTTP_PORT` in `.env`. Use it to run a suite while the dev server holds the configured port, or to run two suites side by side.
+
+**Nothing else can move the server.** `startHttpTestServer()` bootstraps the app itself, and that bootstrap re-reads `.env` (dotenv overrides by default), so any value you set before calling it is gone before the port is read. Assigning `process.env.HTTP_PORT` does not work either: `env()` reads dotenv's own store and never falls back to `process.env`. The option is applied after the bootstrap, immediately before the connector binds — that is why it is the only channel that survives.
+
+The request helpers follow with no extra wiring: the bound port is published as `WARLOCK_TEST_SERVER_PORT`, which the workers inherit, and `getTestServerUrl()` prefers it over their own `.env`-resolved `http.port`. `stopHttpTestServer()` withdraws it.
+
+### The port is preflighted
+
+Before binding, the test server checks the resolved port is free and fails with an instruction if it isn't:
+
+```
+Port 2031 is already in use on localhost. Stop the dev server (or whatever else is
+listening on port 2031) and run again, or start on a free port — e.g.
+startHttpTestServer({ port: 2032 }).
+```
+
+This runs whether or not you passed a port, so a collision never reaches you as a bare `EADDRINUSE` from inside Fastify. The failure is a `PortInUseError` carrying `port` and `host`. The same check is available on its own — `assertPortIsAvailable(port, host)` throws it, `isPortAvailable(port, host)` returns a boolean.
+
 ## Project wiring — `src/test-global-setup.ts` + `vite.config.ts`
 
 ```ts title="src/test-global-setup.ts"
@@ -105,7 +129,7 @@ import { getTestServerUrl } from "@warlock.js/core";
 const url = getTestServerUrl();  // → "http://localhost:2031" (defaults)
 ```
 
-Reads `http.host` (default `"localhost"`) and `http.port` (default `2031`) from config. If you change the HTTP config, helpers follow automatically.
+Reads `http.host` (default `"localhost"`) and `http.port` (default `2031`) from config — unless `startHttpTestServer` published a port, which wins, since a worker's own config never sees the `{ port }` option passed in `globalSetup`. If you change the HTTP config, helpers follow automatically.
 
 ### Verb helpers
 
@@ -274,7 +298,7 @@ This is fine for normal test flow. It bites when you're inside a transaction the
 ## Gotchas
 
 - **`globalSetup` must export `setup` and `teardown`.** Vitest reads them by name. A typo in the export gets you a confusing "server not running" error on the first `testGet` call.
-- **Port conflicts.** If `http.port` matches your running dev server, `startHttpTestServer()` fails to bind. Either stop the dev server or set a test-only port: `http: { port: 3999 }` in a test-config branch.
+- **Port conflicts.** If `http.port` matches your running dev server, the preflight fails with a `PortInUseError` naming the port. Either stop the dev server or pass a free one: `startHttpTestServer({ port: 3999 })`.
 - **Auth tokens need a real user.** Generating a JWT with a non-existent `user_id` works — but the auth middleware's user-loading step will reject the request with 401 because it can't find the user in the DB.
 - **`expectJson` parses the body once.** If you call it twice on the same response, the second call gets an already-consumed stream error. Capture the result.
 - **The HTTP server's connection is NOT torn down between test files.** Data persists across files within a single `vitest` run. Either truncate in `afterEach` / `afterAll`, or design your tests to be order-independent.

@@ -14,7 +14,7 @@ Test infrastructure. Provides Vitest setup, HTTP test helpers for making request
 ## Key Exports
 
 - `testGet()`, `testPost()`, `testPut()`, `testDelete()`, `testPatch()` — HTTP test request helpers
-- `startHttpDevelopmentServer()` — boots a test server
+- `startHttpTestServer(options?)` — boots a test server; `options.port` overrides `http.port` (applied after the internal bootstrap re-reads `.env`, and preflighted so a busy port fails with an instruction instead of `EADDRINUSE`)
 - Vitest setup module (configured via `vitest.config.ts`)
 
 ## Dependencies

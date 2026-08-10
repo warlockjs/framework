@@ -1,4 +1,5 @@
 import { log } from "@warlock.js/logger";
+import { BOOT_SIGNAL_VERSION, sendBootSignal } from "./boot-signal";
 import {
   environment,
   setEnvironment,
@@ -66,6 +67,14 @@ export class Application {
   private static bootListeners: BootListener[] = [];
 
   /**
+   * The http port this process actually bound, once it has. Reported in the
+   * readiness signal so a supervisor knows where to send its health check
+   * instead of re-deriving it from config it may not be able to read.
+   * Undefined for an app with no http connector — a queue worker still boots.
+   */
+  private static servedPort: number | undefined;
+
+  /**
    * Whether the application has begun (or finished) shutting down. Flipped once
    * by `runShutdownHooks`.
    */
@@ -97,6 +106,15 @@ export class Application {
    */
   public static get isBooted(): boolean {
     return this.booted;
+  }
+
+  /**
+   * Record the http port this process bound.
+   *
+   * @internal The http connector calls this after a successful `listen`.
+   */
+  public static setServedPort(port: number): void {
+    this.servedPort = port;
   }
 
   /**
@@ -144,6 +162,12 @@ export class Application {
    * is idempotent — a second call is a no-op, so a double-invoke can never
    * double-fire listeners.
    *
+   * Also reports readiness to a supervising parent process — this is the one
+   * moment in the lifecycle where "the application is serving" is true, so it
+   * is the only honest source for `warlock start`'s success banner. Sent before
+   * the listeners run: a slow or hanging `onceBooted` listener must not delay
+   * the parent's view of a server that is already accepting requests.
+   *
    * @internal Framework entry points call this; application code must not.
    */
   public static markBooted(context: BootContext): void {
@@ -153,6 +177,17 @@ export class Application {
 
     this.booted = true;
     this.bootContext = context;
+
+    sendBootSignal({
+      type: "warlock:ready",
+      version: BOOT_SIGNAL_VERSION,
+      pid: process.pid,
+      at: new Date().toISOString(),
+      environment: context.environment,
+      runtimeStrategy: context.runtimeStrategy,
+      bootDurationMs: context.bootDurationMs,
+      port: this.servedPort,
+    });
 
     const listeners = this.bootListeners;
     this.bootListeners = [];

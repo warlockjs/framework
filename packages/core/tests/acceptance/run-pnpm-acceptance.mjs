@@ -1,0 +1,728 @@
+#!/usr/bin/env node
+/**
+ * Production acceptance: build the framework, install it into a pnpm-strict
+ * app, build that app, start it, and require a real HTTP response.
+ *
+ * `warlock dev` was the only mode ever exercised, so `build` + `start` shipped
+ * broken — a bundle whose bare `@mongez/config` import resolved by accident
+ * under npm/yarn hoisting and died under pnpm. Unit tests cannot catch that
+ * class: it only appears in a real install, in a real artifact, on a real boot.
+ *
+ * Two cases run, and both must hold:
+ *
+ *   POSITIVE  the app declares only `@warlock.js/core`, and still builds,
+ *             boots, and serves a request.
+ *   NEGATIVE  an undeclared import reintroduced into generated code fails
+ *             `warlock build` — the guard against this regressing quietly.
+ *
+ * Usage:
+ *   node core/tests/acceptance/run-pnpm-acceptance.mjs
+ *   node core/tests/acceptance/run-pnpm-acceptance.mjs --reuse-stale-artifact-i-know-this-proves-nothing
+ *
+ * The long flag is deliberate. It reuses whatever artifact happens to be in the
+ * builder's output directory, which makes the run fast and its verdict
+ * worthless the moment source has moved — the artifact under test stops being
+ * the thing you changed. That is not hypothetical: a run was accepted against
+ * an artifact built before a dependency change landed, so the change was never
+ * exercised, and separately a build resolved its module graph before a new file
+ * existed and emitted a call with no import while reporting success.
+ *
+ * A run using it prints a banner saying its result does not gate a release, and
+ * exits non-zero if the artifact is older than any tracked source file.
+ */
+import { execSync, spawn } from "node:child_process";
+import { createServer } from "node:net";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const appDirectory = path.join(here, "pnpm-production-app");
+const coreDirectory = path.resolve(here, "../..");
+const warlockRoot = path.resolve(coreDirectory, "..");
+const builderDirectory = path.join(warlockRoot, "builder");
+const coreBuildsDirectory = path.join(builderDirectory, "builds", "@warlock.js", "core");
+
+const skipFrameworkBuild = process.argv.includes(
+  "--reuse-stale-artifact-i-know-this-proves-nothing",
+);
+/**
+ * The version the family is built at — read from core's own `package.json`.
+ *
+ * Passed to `pkgist --bump` explicitly. Without it the build falls back to the
+ * family's configured strategy (`patch`), so every acceptance run silently
+ * bumped the version: a gate for 4.11.0 built and tested **4.11.1**, and
+ * rewrote 27 `package.json` files on its way. A release gate must test the
+ * version being released, and must not decide what that version is.
+ */
+const targetVersion = JSON.parse(
+  readFileSync(path.resolve(fileURLToPath(import.meta.url), "../../../package.json"), "utf-8"),
+).version;
+
+const acceptancePort = 3711;
+const acceptanceUrl = `http://localhost:${acceptancePort}/acceptance`;
+
+const log = (message) => console.log(`\n▸ ${message}`);
+
+/** Run a command to completion, rejecting on a non-zero exit. */
+function run(command, args, options = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: options.cwd ?? process.cwd(),
+      env: { ...process.env, ...options.env },
+      stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit",
+      shell: process.platform === "win32",
+    });
+
+    let output = "";
+
+    if (options.capture) {
+      child.stdout.on("data", (chunk) => {
+        output += chunk;
+        process.stdout.write(chunk);
+      });
+      child.stderr.on("data", (chunk) => {
+        output += chunk;
+        process.stderr.write(chunk);
+      });
+    }
+
+    child.on("error", reject);
+
+    child.on("exit", (code) => {
+      if (code === 0 || options.allowFailure) {
+        resolve({ code, output });
+
+        return;
+      }
+
+      reject(new Error(`${command} ${args.join(" ")} exited with ${code}`));
+    });
+  });
+}
+
+/** The newest version the builder has produced for core. */
+function latestCoreVersion() {
+  if (!existsSync(coreBuildsDirectory)) {
+    throw new Error(
+      `No core build found at ${coreBuildsDirectory}. Run the framework build first (drop the reuse flag).`,
+    );
+  }
+
+  const versions = readdirSync(coreBuildsDirectory).sort((left, right) => {
+    return left.localeCompare(right, undefined, { numeric: true });
+  });
+
+  const latest = versions.at(-1);
+
+  if (!latest) {
+    throw new Error(`No versions under ${coreBuildsDirectory}.`);
+  }
+
+  return latest;
+}
+
+/**
+ * Pack the whole built family into `vendor/`, one tarball per package.
+ *
+ * Not just core, because Warlock releases in **lockstep**: core@4.11.0 pins
+ * `@warlock.js/fs@4.11.0` and six more siblings exactly, and none of them are
+ * on the registry until the release publishes. Installing core alone therefore
+ * fails on `ERR_PNPM_NO_MATCHING_VERSION` — the acceptance subject is the
+ * family, not one package. `pnpm.overrides` in the app redirects every
+ * `@warlock.js/*` in the tree to its local tarball.
+ *
+ * Tarballs, not directories: pnpm symlinks a `file:` directory dependency
+ * straight back into the monorepo, which restores the accidental resolution
+ * this whole run exists to detect.
+ */
+async function packFramework() {
+  const version = latestCoreVersion();
+  const scopeDirectory = path.dirname(coreBuildsDirectory);
+  const vendorDirectory = path.join(appDirectory, "vendor");
+
+  log(`Packing the @warlock.js family at ${version}`);
+
+  rmSync(vendorDirectory, { recursive: true, force: true });
+  mkdirSync(vendorDirectory, { recursive: true });
+
+  const packages = readdirSync(scopeDirectory).filter((name) => {
+    return existsSync(path.join(scopeDirectory, name, version));
+  });
+
+  for (const name of packages) {
+    await run("npm", [
+      "pack",
+      path.join(scopeDirectory, name, version),
+      "--pack-destination",
+      vendorDirectory,
+      "--silent",
+    ]);
+
+    const packed = readdirSync(vendorDirectory).find((file) => {
+      return file.startsWith(`warlock.js-${name}-`) && file.endsWith(".tgz");
+    });
+
+    if (!packed) {
+      throw new Error(`npm pack produced no tarball for @warlock.js/${name}`);
+    }
+
+    writeFileSync(
+      path.join(vendorDirectory, `${name}.tgz`),
+      readFileSync(path.join(vendorDirectory, packed)),
+    );
+    rmSync(path.join(vendorDirectory, packed));
+  }
+
+  console.log(`  packed ${packages.length} package(s) at ${version}`);
+
+  return version;
+}
+
+/**
+ * Kill a process and everything it spawned.
+ *
+ * `child.kill()` signals only the direct child, and here that child is
+ * `pnpm exec warlock start` — two levels above the application process that
+ * actually holds the port. Signalling it leaves the app running, so the NEXT
+ * run dies with `EADDRINUSE` on a port nothing visible is using. That happened,
+ * and on a CI agent it would make every run after the first fail for a reason
+ * that has nothing to do with the code under test.
+ */
+function killTree(pid) {
+  if (process.platform !== "win32") {
+    try {
+      // Negative pid signals the whole process group.
+      process.kill(-pid, "SIGTERM");
+    } catch {
+      // Already gone — nothing to clean up.
+    }
+
+    return Promise.resolve();
+  }
+
+  // Awaited, not fire-and-forget. An unawaited spawn returns before taskkill
+  // has done anything, so a check that runs straight afterwards races it and
+  // reports a process alive that is merely not dead *yet* — a false failure in
+  // the check that exists to catch real ones.
+  return new Promise((resolve) => {
+    const killer = spawn("taskkill", ["/pid", String(pid), "/T", "/F"], {
+      stdio: "ignore",
+      shell: true,
+    });
+
+    killer.on("error", () => resolve());
+    killer.on("exit", () => resolve());
+  });
+}
+
+/** Whichever pids are listening on a port, according to the OS. */
+function findPortHolders(port) {
+  if (process.platform !== "win32") {
+    return [];
+  }
+
+  try {
+    const output = execSync(`netstat -ano | findstr :${port}`, {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+
+    return [
+      ...new Set(
+        output
+          .split("\n")
+          .filter((line) => line.includes("LISTENING"))
+          .map((line) => line.trim().split(/\s+/).at(-1))
+          .filter(Boolean),
+      ),
+    ];
+  } catch {
+    // findstr exits non-zero when nothing matches — nothing is listening.
+    return [];
+  }
+}
+
+/** Whether a process id is still alive. Signal 0 tests without signalling. */
+function isProcessAlive(pid) {
+  try {
+    process.kill(pid, 0);
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Fail unless teardown actually reaped what it claimed to.
+ *
+ * A cleanup step that reports success without checking is the defect this whole
+ * batch is about, and `killTree` is exactly that shape — it signals and returns,
+ * with nothing observing whether anything died. Without this assertion a
+ * regression is invisible until the NEXT run fails on a port nothing visible is
+ * using, which is how the leak got here in the first place.
+ *
+ * Two checks with deliberately unequal weight, and the asymmetry matters:
+ *
+ * 1. **The port is released.** This is the check that catches the real leak.
+ *    The process that leaks is a *grandchild* — the application, two levels
+ *    below what this script spawns — and the port is the only handle we have on
+ *    it. A run where teardown failed left the app listening while the wrapper
+ *    had exited perfectly.
+ * 2. **The spawned wrapper is gone.** NARROW BY CONSTRUCTION: it observes the
+ *    `pnpm exec` process only, never the application. The wrapper essentially
+ *    always exits, so this check is essentially always green — it is here to
+ *    catch a *hung wrapper* leaking on a CI agent, and for nothing else. It
+ *    must never be read as evidence that the process tree was reaped; that is
+ *    what check 1 is for. Its failure message says so, because a permanently
+ *    green check that reads as coverage is worse than no check at all.
+ *
+ * Residual gap, stated rather than papered over: a tree member that holds
+ * neither the port nor the spawned pid escapes both checks.
+ *
+ * This is a teardown check, deliberately not a pre-bind preflight — core owns
+ * that (`assertPortIsAvailable`) and a second implementation would drift.
+ */
+async function assertTeardownComplete(pid, port, timeoutMs = 10_000) {
+  // The port first, because it is the check that can actually catch a leak.
+  // Running it second would let the narrow wrapper check fail ahead of it and
+  // mask the real finding — which is exactly what happened once.
+  await assertPortReleased(port, timeoutMs);
+
+  const deadline = Date.now() + timeoutMs;
+
+  // Polled, not checked once: even an awaited kill leaves a moment before the
+  // OS reaps the process, and a single immediate check turns that moment into a
+  // failure.
+  while (isProcessAlive(pid) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  if (isProcessAlive(pid)) {
+    throw new Error(
+      [
+        `The spawned wrapper (pid ${pid}) was still alive ${timeoutMs}ms after teardown.`,
+        "",
+        "Scope: this observes the `pnpm exec` process ONLY — never the application,",
+        "which runs two levels below it. The port check above is what proves the",
+        "application was reaped. A hung wrapper leaks a process on a CI agent, which",
+        "is the only thing this check exists to catch.",
+      ].join("\n"),
+    );
+  }
+}
+
+/**
+ * Wait for the port to come free, or fail naming the consequence.
+ *
+ * A listening socket is released when its process exits, so this is a proxy for
+ * "the application is gone" rather than a socket-state check — the `TIME_WAIT`
+ * that lingers after the acceptance request belongs to an ephemeral client port,
+ * not to this one.
+ */
+async function assertPortReleased(port, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const free = await new Promise((resolve) => {
+      const probe = createServer();
+
+      probe.once("error", () => resolve(false));
+      probe.once("listening", () => probe.close(() => resolve(true)));
+      probe.listen({ port, host: "localhost", exclusive: true });
+    });
+
+    if (free) {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  const holders = findPortHolders(port);
+
+  throw new Error(
+    [
+      `Port ${port} is still held ${timeoutMs}ms after teardown — killTree did not reap the application process.`,
+      holders.length > 0
+        ? `  still listening: pid ${holders.join(", ")}   (kill with: taskkill /pid ${holders[0]} /T /F)`
+        : "  nothing appears to be listening, so the port may simply be slow to release",
+      "",
+      "The next run would fail with EADDRINUSE against a process nothing points at.",
+    ].join("\n"),
+  );
+}
+
+/** Start the app and resolve once it answers, or reject with why it didn't. */
+function startAndRequest() {
+  return new Promise((resolve, reject) => {
+    const child = spawn("npx", ["pnpm", "exec", "warlock", "start"], {
+      cwd: appDirectory,
+      // stdin is closed, never inherited: `pnpm approve-builds` and friends are
+      // interactive, and a child waiting on a tty that will never answer blocks
+      // forever without printing why.
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: process.platform === "win32",
+      // Own process group on POSIX so `killTree` can signal the whole thing.
+      detached: process.platform !== "win32",
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+
+    const finish = (error, result) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+
+      // Settle only once the kill has actually run, so the teardown assertion
+      // downstream is not racing it.
+      void killTree(child.pid).then(() => {
+        if (error) {
+          reject(error);
+
+          return;
+        }
+
+        resolve(result);
+      });
+    };
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+      process.stdout.write(chunk);
+
+      // The started banner is the contract: it appears on stdout only after the
+      // app reported a completed boot, so it is safe to request the endpoint.
+      if (stdout.includes("production server started")) {
+        void requestAcceptanceEndpoint()
+          .then((body) => finish(undefined, { stdout, stderr, body, pid: child.pid }))
+          .catch((error) => finish(error));
+      }
+    });
+
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+      process.stderr.write(chunk);
+    });
+
+    child.on("exit", (code) => {
+      finish(
+        new Error(
+          `warlock start exited with ${code} before serving. It never printed the started banner.`,
+        ),
+      );
+    });
+
+    setTimeout(() => {
+      finish(new Error("warlock start never reported readiness within 60s"));
+    }, 60_000).unref();
+  });
+}
+
+/**
+ * Assert every `@warlock.js/*` pin in the built manifests matches the version
+ * being vendored.
+ *
+ * The `pnpm.overrides` that make this run possible also blind it: they redirect
+ * every `@warlock.js/*` to a local tarball regardless of what the manifest
+ * asked for. If a built `package.json` pinned `@warlock.js/fs@4.10.0` while the
+ * code needed 4.11.0, the override would hand it 4.11.0 anyway and the run
+ * would pass — masking exactly the version skew lockstep exists to prevent.
+ *
+ * The overrides prove the CODE works. This proves the MANIFEST is right.
+ */
+function assertFamilyPinsMatch(version) {
+  const scopeDirectory = path.dirname(coreBuildsDirectory);
+  const mismatches = [];
+
+  for (const name of readdirSync(scopeDirectory)) {
+    const manifestPath = path.join(scopeDirectory, name, version, "package.json");
+
+    if (!existsSync(manifestPath)) {
+      continue;
+    }
+
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    const ranges = {
+      ...manifest.dependencies,
+      ...manifest.peerDependencies,
+    };
+
+    for (const [dependency, range] of Object.entries(ranges)) {
+      if (!dependency.startsWith("@warlock.js/") || range === version) {
+        continue;
+      }
+
+      mismatches.push(`@warlock.js/${name} pins ${dependency}@${range}, expected ${version}`);
+    }
+  }
+
+  if (mismatches.length > 0) {
+    throw new Error(
+      [
+        `Lockstep violation — ${mismatches.length} pin(s) disagree with the vendored version:`,
+        ...mismatches.map((mismatch) => `  ${mismatch}`),
+        "",
+        "The pnpm overrides would have silently supplied the right version and hidden this.",
+      ].join("\n"),
+    );
+  }
+
+  console.log(`  every @warlock.js/* pin agrees on ${version}`);
+}
+
+/**
+ * Refuse to accept an install that is a link back into the monorepo.
+ *
+ * This is the assumption the whole run rests on. If pnpm linked
+ * `@warlock.js/core` instead of extracting it, the strict layout disappears,
+ * core's own dependencies become reachable from the app by accident, and the
+ * acceptance passes for exactly the wrong reason — reporting green on the
+ * defect it exists to catch.
+ */
+function assertFrameworkIsReallyInstalled() {
+  const installed = path.join(appDirectory, "node_modules", "@warlock.js", "core");
+
+  if (!existsSync(installed)) {
+    throw new Error(`@warlock.js/core is not installed at ${installed}`);
+  }
+
+  const realPath = realpathSync(installed);
+
+  if (!realPath.includes(`${path.sep}.pnpm${path.sep}`)) {
+    throw new Error(
+      [
+        `@warlock.js/core resolved to ${realPath}, outside pnpm's store.`,
+        "That means it was linked, not installed, so this app is NOT running under a strict layout",
+        "and the acceptance would pass for the wrong reason. Install from the packed tarball.",
+      ].join("\n"),
+    );
+  }
+
+  // The defect in one line: the app must NOT be able to resolve core's own
+  // dependency. If it can, hoisting is in play and the test proves nothing.
+  const hoisted = path.join(appDirectory, "node_modules", "@mongez", "config");
+
+  if (existsSync(hoisted)) {
+    throw new Error(
+      `@mongez/config is reachable at ${hoisted}. The layout is hoisted, not strict — this run cannot detect the defect.`,
+    );
+  }
+
+  return realPath;
+}
+
+async function requestAcceptanceEndpoint() {
+  const response = await fetch(acceptanceUrl);
+
+  if (!response.ok) {
+    throw new Error(`${acceptanceUrl} responded ${response.status}`);
+  }
+
+  return response.text();
+}
+
+/** The line the fixed generator emits into the app's config loader. */
+const GENERATED_IMPORT = 'import { setConfig, configSpecialHandlers } from "@warlock.js/core";';
+
+/** The defect as it shipped: core's own dependency, emitted bare. */
+const REINTRODUCED_IMPORT = `import config from "@mongez/config";\n${GENERATED_IMPORT}`;
+
+/**
+ * Render a string as it appears *inside a JS string literal* in source.
+ *
+ * The generator holds the line it emits as a quoted literal, so the bytes on
+ * disk are escaped — `\"` for each quote, `\n` for the newline. Matching the
+ * unescaped text finds nothing, silently, which would turn this whole check
+ * into a no-op that always reports the guard missing.
+ */
+const asLiteral = (source) => JSON.stringify(source).slice(1, -1);
+
+/**
+ * Reintroduce the exact defect **in the generator** and require the build to
+ * refuse it.
+ *
+ * It has to be patched into the installed framework, not into app source. The
+ * assertion covers code the BUILDER writes into `.warlock/production/`; an app
+ * importing an undeclared package from its own `src/` is a different rule with
+ * a different owner, and planting it there tests the assertion's neighbour
+ * rather than the assertion. An earlier version of this function did exactly
+ * that and reported the correct scope as a failure.
+ *
+ * Without this half the guard could be silently broken — or deleted — and the
+ * positive case would still pass.
+ */
+async function assertUndeclaredImportFailsTheBuild() {
+  const builderPath = path.join(
+    realpathSync(path.join(appDirectory, "node_modules", "@warlock.js", "core")),
+    "esm",
+    "production",
+    "production-builder.mjs",
+  );
+
+  const original = readFileSync(builderPath, "utf-8");
+  const needle = asLiteral(GENERATED_IMPORT);
+
+  if (!original.includes(needle)) {
+    throw new Error(
+      `Could not find the generated import line in ${builderPath}. The generator changed — update GENERATED_IMPORT so this half keeps testing the guard rather than silently passing.`,
+    );
+  }
+
+  writeFileSync(builderPath, original.replace(needle, asLiteral(REINTRODUCED_IMPORT)));
+
+  try {
+    const { code, output } = await run("npx", ["pnpm", "exec", "warlock", "build"], {
+      cwd: appDirectory,
+      capture: true,
+      allowFailure: true,
+    });
+
+    if (code === 0) {
+      throw new Error(
+        "warlock build SUCCEEDED with an undeclared @mongez/config import in generated code. The assertion is not running.",
+      );
+    }
+
+    if (!output.includes("@mongez/config")) {
+      throw new Error("The build failed, but its output never named the offending package.");
+    }
+
+    return output;
+  } finally {
+    writeFileSync(builderPath, original);
+  }
+}
+
+/**
+ * Refuse to reuse an artifact that source has moved past.
+ *
+ * The reuse flag's whole hazard is that the thing under test stops being the
+ * thing you changed, silently — the run stays green and proves the previous
+ * state of the world. Comparing the newest source mtime against the artifact's
+ * turns that from invisible into a refusal.
+ *
+ * Deliberately compares against `core/src` only. A stale sibling is possible in
+ * principle, but core is what this fixture exercises and a check nobody can
+ * satisfy gets disabled rather than obeyed.
+ */
+function assertArtifactIsNotStale(version) {
+  const artifactPath = path.join(coreBuildsDirectory, version, "package.json");
+  const artifactBuiltAt = statSync(artifactPath).mtimeMs;
+  const sourceDirectory = path.join(coreDirectory, "src");
+
+  let newestSource = 0;
+  let newestSourceFile = "";
+
+  const walk = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const entryPath = path.join(directory, entry.name);
+
+      if (entry.isDirectory()) {
+        walk(entryPath);
+
+        continue;
+      }
+
+      const { mtimeMs } = statSync(entryPath);
+
+      if (mtimeMs > newestSource) {
+        newestSource = mtimeMs;
+        newestSourceFile = entryPath;
+      }
+    }
+  };
+
+  walk(sourceDirectory);
+
+  if (newestSource > artifactBuiltAt) {
+    throw new Error(
+      [
+        `The artifact at ${version} predates core's source and cannot prove anything about it.`,
+        `  artifact built: ${new Date(artifactBuiltAt).toISOString()}`,
+        `  newest source:  ${new Date(newestSource).toISOString()} (${path.relative(coreDirectory, newestSourceFile)})`,
+        "",
+        "Drop the reuse flag and let the run build the family.",
+      ].join("\n"),
+    );
+  }
+}
+
+async function main() {
+  if (skipFrameworkBuild) {
+    console.error("");
+    console.error("  ! REUSING AN EXISTING ARTIFACT — this run does not gate a release.");
+    console.error("    The framework is not rebuilt, so it tests whatever was built last.");
+    console.error("");
+  }
+
+  if (!skipFrameworkBuild) {
+    log(`Building the framework at ${targetVersion} (no publish, no git)`);
+    await run(
+      "npx",
+      [
+        "pkgist",
+        "build:family",
+        "warlock",
+        "--no-publish",
+        "--no-git",
+        "--bump",
+        targetVersion,
+      ],
+      { cwd: builderDirectory },
+    );
+  }
+
+  if (skipFrameworkBuild) {
+    log("Checking the reused artifact is not older than core's source");
+    assertArtifactIsNotStale(latestCoreVersion());
+    console.log("  artifact is newer than every file in core/src");
+  }
+
+  const version = await packFramework();
+
+  log("Verifying the lockstep pins the overrides would otherwise mask");
+  assertFamilyPinsMatch(version);
+
+  log("Installing with pnpm (strict layout, no hoisting)");
+  rmSync(path.join(appDirectory, "node_modules"), { recursive: true, force: true });
+  await run("npx", ["pnpm", "install", "--no-frozen-lockfile"], { cwd: appDirectory });
+
+  log("Verifying the layout is strict and the framework is really installed");
+  console.log(`  @warlock.js/core → ${assertFrameworkIsReallyInstalled()}`);
+
+  log("POSITIVE — building the app");
+  await run("npx", ["pnpm", "exec", "warlock", "build"], { cwd: appDirectory });
+
+  log("POSITIVE — starting the app and requesting /acceptance");
+  const { body, pid } = await startAndRequest();
+  console.log(`  response: ${body}`);
+
+  log("Verifying teardown reaped the process and released the port");
+  await assertTeardownComplete(pid, acceptancePort);
+  console.log(`  port ${acceptancePort} released; wrapper ${pid} gone (wrapper check is narrow — see assertTeardownComplete)`);
+
+  log("NEGATIVE — an undeclared import must fail the build");
+  await assertUndeclaredImportFailsTheBuild();
+
+  log(`ACCEPTED @warlock.js/core@${version} — built, booted, served, and refused an undeclared import.`);
+}
+
+main().catch((error) => {
+  console.error(`\n✖ ACCEPTANCE FAILED: ${error.message}`);
+  process.exit(1);
+});

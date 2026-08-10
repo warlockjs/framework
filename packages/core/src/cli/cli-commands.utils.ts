@@ -41,6 +41,79 @@ export async function displayStartupBanner({ environment }: StartBannerOptions) 
   console.log();
 }
 
+type ProductionReadyBannerOptions = {
+  bootDurationMs?: number;
+};
+
+/**
+ * Announce that the production server is up — printed on **stdout**, and only
+ * after the child process reported a completed boot.
+ *
+ * Stdout is the channel a supervisor or CI gate greps to decide the service is
+ * healthy, so nothing optimistic may be written to it: this function is the
+ * single place allowed to say "started", and it is called from exactly one
+ * place, the `warlock:ready` handler in the `start` command.
+ */
+export async function displayProductionReadyBanner({
+  bootDurationMs,
+}: ProductionReadyBannerOptions = {}) {
+  const version = await getWarlockVersion();
+  const duration = bootDurationMs ? colors.dim(` in ${bootDurationMs}ms`) : "";
+
+  console.log(
+    `  ⚡ ${colors.bold(colors.greenBright("Warlock.js"))} ${colors.dim(`v${version}`)} ${colors.green("✔")} production server started${duration}`,
+  );
+  console.log();
+}
+
+/**
+ * Report that the production server died before it ever served anything.
+ *
+ * Written to **both** streams on purpose. Stderr is where a human and a log
+ * collector look; stdout is where a supervisor that greps for the success
+ * banner looks, and it must find a failure there rather than silence — silence
+ * on stdout is what let a boot failure be recorded as a healthy start.
+ */
+export function displayProductionStartFailure(exitCode: number) {
+  const lines = [
+    "",
+    `  ${colors.red("✖")} ${colors.bold("warlock start")} failed — the server never finished booting`,
+    `  ${colors.dim(`the application process exited with code ${exitCode}`)}`,
+    `  ${colors.dim("the cause is printed above, in the application's own output")}`,
+    "",
+  ];
+
+  for (const line of lines) {
+    console.error(line);
+    console.log(line);
+  }
+}
+
+/**
+ * Note that a running child has not reported readiness yet.
+ *
+ * Emitted on **stderr** only. The process may be perfectly healthy — an older
+ * bundle has no readiness signal at all — so saying anything on stdout would be
+ * the very false-green this channel exists to prevent.
+ *
+ * The wording offers the likely causes rather than asserting one. It cannot
+ * distinguish an old bundle from a slow boot from a boot that is about to fail,
+ * and an earlier version claimed "the bundle predates readiness reporting" —
+ * which was simply wrong when a current bundle was mid-crash, and sent the
+ * reader after the wrong thing.
+ */
+export function displayMissingReadinessNotice(waitedMs: number) {
+  console.error();
+  console.error(
+    `  ${colors.yellow("!")} still running after ${Math.round(waitedMs / 1000)}s with no readiness signal`,
+  );
+  console.error(`  ${colors.dim("either the boot is still in progress, or this bundle was built")}`);
+  console.error(
+    `  ${colors.dim("before readiness reporting — re-run")} ${colors.cyan("warlock build")} ${colors.dim("if the banner never appears")}`,
+  );
+  console.error();
+}
+
 /**
  * Display command execution header
  */

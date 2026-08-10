@@ -4,6 +4,51 @@ All notable changes to `@warlock.js/core` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.11.0
+
+### Added
+
+- `startHttpTestServer({ port })` — run an integration suite on an explicit port, honoured over `HTTP_PORT` in `.env`, which the internal bootstrap re-reads and no caller could previously override
+- the test server preflights its port and fails with "stop the dev server" naming the port, instead of a raw `EADDRINUSE` from inside Fastify
+- `Application.setServedPort()` and a `port` field on the readiness signal, so a supervisor learns the bound http port from the app rather than re-deriving it from config it may not be able to read
+- `setConfig(name, value)` — the write side of the config store, exported separately from the read-only `config` accessor so registering configuration stays a deliberate boot-time act
+
+### Changed
+
+- `@mongez/dotenv` is now required at `^1.3.1` (was `^1.2.4`). Under the old range a fresh install resolved to 1.3.x while an existing lockfile could stay on 1.2.x, so we could not say which behaviour a given consumer actually had. 1.3.x only changes cases that were previously wrong: `env()` now consults `process.env` instead of returning a default for a key the environment defines, `${VAR}` interpolation throws naming the key instead of baking the string `"undefined"` into a value, and numeric coercion no longer corrupts values like `0123456789` or IDs beyond 2^53. Precedence between `.env` files and injected variables is unchanged
+
+  Core keeps its own guard for a missing `.env` regardless of which version resolves — an application can pin its own transitive dependencies, so the installed version is never something core can assume
+
+### Deprecated
+
+- the `env` preloader flag on a CLI command is no longer read — env is loaded for every command that declares a preload block. Setting it is harmless and does nothing; remove it. Dropped at 5.0
+
+### Fixed
+
+- **A production bundle no longer imports a package your app does not declare.** `warlock build`'s generated config loader emitted `import config from "@mongez/config"` — one of *core's* dependencies, never the app's. npm and yarn hoist flat so it resolved by accident; under pnpm's strict layout the shipped bundle died at boot with `ERR_MODULE_NOT_FOUND` for a package the app had no reason to install. The generator now emits `setConfig` from `@warlock.js/core`, which the app does declare, and Node resolves `@mongez/config` from core's own install — correct under pnpm, and portable, unlike baking absolute paths into an artifact meant to be copied between machines
+
+  **The rule is now enforced, not just followed.** `warlock build` fails if any specifier written into generated code is missing from the app's `dependencies`, listing every violation at once. Rewriting the one bad import fixes today's bundle; the check is what stops the next change to the generator from reintroducing it invisibly — under npm and yarn the mistake never surfaces
+
+  Two scaffolding sites had the same defect and are fixed with it: `warlock generate.module` emitted `groupedTranslations` from `@mongez/localization`, and the communicators config stub emitted `env` from `@mongez/dotenv`. Both now come from `@warlock.js/core`, which already re-exports them
+
+- **`env()` inside `warlock.config.ts` no longer always returns its default.** The config module was evaluated *before* any `.env` file was read, so a project following the documented `build: { outdir: env("BUILD_OUT", "dist") }` recipe silently got `dist` no matter what the environment said — under every command, `dev` included, and under `build` and `start` env was never loaded at all. Env files are now loaded before `warlock.config.ts` is evaluated, for every command
+
+  Loading is guarded: a project with no `.env` is legitimate and must not start failing `warlock build` now that env loads everywhere. `NODE_ENV` remains authoritative for which file is chosen — no command forces the environment, so a deliberate `NODE_ENV=staging` build still reads `.env.staging`. With `NODE_ENV` unset, plain `.env` is read
+
+- **An application without `src/config/storage.ts` can boot again.** The storage connector starts unconditionally, on the documented grounds that `storage.init()` falls back to a built-in `local` driver so file storage works out of the box. That fallback was never implemented: `init()` resolved the default driver *name* and then found nothing registered under it, so any app without a storage config died at boot with `Storage driver "local" is not configured`. A built-in `local` driver rooted at `uploadsPath()` is now registered before configured drivers — so an app defining its own `local` still overrides it, and naming a driver that genuinely does not exist still fails loudly
+
+  Only scaffolded apps hid this, because `create-warlock` always ships a storage config
+
+- `startHttpTestServer` no longer breaks a suite that configures `http.port: 0`. `0` is the OS's "pick a free port for me" idiom, but the guard only checked `typeof port !== "number"`, so `0` fell through: the preflight bound an unrelated ephemeral port and passed without proving anything, and `0` was then published as the bound port, pointing every request in the suite at `http://host:0`. An explicit `0` now takes the same path as no configured port — no preflight, nothing published, Fastify picks the port
+
+- **`warlock start` no longer claims success before the app has booted.** The startup banner printed in `preAction` — before the child process was even spawned — and the failure that followed went only to stderr. Any CI gate or process supervisor that watches stdout for the banner read a 🔴 boot failure as a healthy start, which is how a production app that never booted was recorded as running. The banner now prints only when the application reports a completed boot, and a child that dies before reporting is a failed start: the message goes to **both** stdout and stderr, and the exit code is forced non-zero even when the process itself exited `0`
+
+  Readiness is signalled, never assumed. `Application.markBooted()` sends a versioned `warlock:ready` message — `{ type, version, pid, at, environment, runtimeStrategy, bootDurationMs?, port? }` — over the IPC channel `warlock start` opens, and closes that channel immediately so an open handle can't keep a wedged process looking alive. The signal is gated on a `WARLOCK_BOOT_SIGNAL` handshake the CLI sets on the child it spawns, so an app running under pm2 or any other supervisor never writes into a channel it does not own
+
+  A bundle built by an older Warlock has no readiness signal. It still starts normally and draws a note on **stderr only** telling you to re-run `warlock build` — an absent signal is never an error, never fails a run, and never kills a slow boot
+
+  **Upgrading:** re-run `warlock build` so the bundle can report readiness; until you do, `warlock start` runs your app but prints no started banner. Anything parsing `warlock start` output should note that progress lines now go to stderr — stdout carries the started banner and start failures, nothing else
+
 ## 4.10.0
 
 ### Changed

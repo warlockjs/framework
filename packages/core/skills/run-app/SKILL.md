@@ -219,6 +219,57 @@ Just `warlockConfig: true` — same as `build`. The actual app bootstrap happens
 
 Means `docker stop` / `kubectl delete pod` works as expected: SIGTERM reaches the bundle, your graceful-shutdown hooks fire, then the parent exits.
 
+### pnpm needs esbuild's install script allowed
+
+pnpm 10+ will not run a dependency's install script unless the app names it. esbuild's script links its platform-native binary, and `warlock build` shells out to that binary — so the app installs cleanly and then cannot build:
+
+```
+[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: esbuild@0.27.7
+```
+
+Fix it once in the app's `pnpm-workspace.yaml`:
+
+```yaml
+allowBuilds:
+  esbuild: true
+```
+
+Note pnpm reads this from `pnpm-workspace.yaml`, **not** from `package.json`'s `pnpm` field — pnpm 11 warns that the field is ignored and then carries on, so settings left there fail silently.
+
+Nothing else is needed for pnpm. Warlock never requires an app to declare a package it does not import: generated code is checked at build time against the app's own `dependencies`, so `warlock build` failing over an unfamiliar package name is a framework bug, not a missing dependency.
+
+### Output streams — what a supervisor may trust
+
+**A success line on stdout means the app is serving requests.** That is a contract, not a convention, and you can build a CI gate or a health probe on it.
+
+| Stream     | Carries                                                        |
+| ---------- | -------------------------------------------------------------- |
+| **stdout** | the started banner, and start failures. Nothing else.           |
+| **stderr** | progress (`🚀 Starting production server...`), diagnostics, the application's own logs |
+
+The started banner prints **only** when the running application reports a completed boot — not when the command starts, not when the child is spawned. A child that dies before reporting is a failed start: the failure is written to **both** streams (stderr for humans and log collectors, stdout so a supervisor greping for the banner finds a failure rather than silence), and `warlock start` exits non-zero **even when the child itself exited `0`**.
+
+```bash
+# a CI gate can be this blunt, and it is now correct
+yarn warlock start | grep -q "production server started"
+```
+
+### How readiness is reported
+
+`warlock start` spawns the bundle with an IPC channel and sets `WARLOCK_BOOT_SIGNAL=1` on it. `Application.markBooted()` — which the production entry calls after the late-phase connectors (http, socket) are up — sends one versioned message and closes the channel:
+
+```ts
+{ type: "warlock:ready", version: 1, pid, at, environment, runtimeStrategy, bootDurationMs?, port? }
+```
+
+Three consequences worth knowing:
+
+1. **A queue worker with no http connector still reports.** Readiness hangs on a completed boot, not on a bound port. `port` is simply absent.
+2. **Running the bundle any other way changes nothing.** `node dist/app.js`, a Docker `CMD`, or pm2 — the signal is a strict no-op without both the IPC channel and the handshake flag, so Warlock never writes into a channel that belongs to another supervisor.
+3. **A bundle built before 4.11.0 has no signal.** It starts and runs normally, and after ten seconds prints a note on **stderr only** telling you to re-run `warlock build`. An absent signal is never an error, never fails the run, and never kills a slow boot.
+
+If you need the same fact inside the app, use `Application.onceBooted()` / `Application.whenBooted()` — the signal and your listeners fire from the same latch.
+
 ## Picking which mode you're in
 
 `Application.environment` and `Application.runtimeStrategy` are separate axes:
@@ -285,6 +336,18 @@ export default defineConfig({
 ```
 
 CI sets `BUILD_OUT=build/<sha>` per pipeline. `warlock start` reads the same config and finds the bundle without any hardcoded paths.
+
+**This recipe only started working in 4.11.0.** Before that, `warlock.config.ts` was evaluated *before* any `.env` file was read, so every `env()` call in it returned its default — silently, under every command. If you copied this recipe earlier and concluded that `BUILD_OUT` was ignored, it was.
+
+**Which file the value comes from is decided by `NODE_ENV`, and no Warlock command sets it.** `env()` reads `.env.<NODE_ENV>` when that file exists and falls back to plain `.env`. So:
+
+```bash
+warlock build                       # NODE_ENV unset → reads .env
+NODE_ENV=production warlock build   # → reads .env.production
+NODE_ENV=staging warlock build      # → reads .env.staging
+```
+
+That is deliberate: `build` and `start` do **not** force `production`. Forcing it would silently change which file an existing `NODE_ENV=staging` pipeline reads, and would have the framework overriding an operator's explicit choice at the moment of deployment. Set `NODE_ENV` in your Dockerfile, CI job, or process manager — the same place you already set it for `Application.environment`.
 
 ### Skip type-gen on machines without write access
 

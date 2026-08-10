@@ -1,7 +1,6 @@
-import { spawn } from "child_process";
+import { superviseProductionProcess } from "../../production/production-supervisor";
 import { resolveBuildConfig } from "../../production/resolve-build-config";
 import { command } from "../cli-command";
-import { displayStartupBanner } from "../cli-commands.utils";
 
 export const startProductionCommand = command({
   name: "start",
@@ -9,9 +8,6 @@ export const startProductionCommand = command({
   persistent: true,
   preload: {
     warlockConfig: true,
-  },
-  preAction: async () => {
-    displayStartupBanner({ environment: "production" });
   },
   action: async () => {
     const { entryPath, sourcemap } = resolveBuildConfig();
@@ -35,48 +31,14 @@ export const startProductionCommand = command({
       nodeArgs.push(...extraArgs);
     }
 
-    console.log(`🚀 Starting production server...\n`);
+    // Progress goes to stderr, never stdout. Stdout carries exactly one claim —
+    // "started" — so that whatever greps it cannot mistake an intention for an
+    // outcome. The banner that used to print here, in `preAction`, printed
+    // before the child had even been spawned.
+    console.error(`🚀 Starting production server...\n`);
 
-    // Spawn child process
-    // On Windows, we need to be careful with signals - the console sends Ctrl+C
-    // to all processes in the group, so we just need to not interfere
-    // `process.execPath`, not "node": the bare name needs `node` on PATH, which
-    // a systemd unit, a cron job, or a slim container may not provide — and a
-    // PATH `node` that *is* present can be a different version than the one
-    // running this CLI. execPath is the binary already executing us.
-    const child = spawn(process.execPath, nodeArgs, {
-      stdio: "inherit",
-      cwd: process.cwd(),
-      env: process.env,
-      // Important: keep child in same process group for proper signal handling
-      detached: false,
-    });
+    const { exitCode } = await superviseProductionProcess({ nodeArgs });
 
-    // Track if we're shutting down to prevent double-exit
-    let isShuttingDown = false;
-
-    // Forward signals to child (needed for SIGTERM, helpful for explicit forwarding)
-    const forwardSignal = (signal: NodeJS.Signals) => {
-      if (isShuttingDown) return;
-      isShuttingDown = true;
-
-      // Send signal to child
-      child.kill(signal);
-    };
-
-    // On SIGTERM, forward it (SIGTERM doesn't auto-propagate like SIGINT on Windows)
-    process.on("SIGTERM", () => forwardSignal("SIGTERM"));
-
-    // On SIGINT (Ctrl+C), mark as shutting down but let child handle it naturally
-    // On Windows, Ctrl+C is sent to both processes, so child already gets it
-    process.on("SIGINT", () => {
-      isShuttingDown = true;
-      // Give child a chance to exit gracefully before we do anything
-    });
-
-    // Exit with child's exit code
-    child.on("exit", (code) => {
-      process.exit(code ?? 0);
-    });
+    process.exit(exitCode);
   },
 });
