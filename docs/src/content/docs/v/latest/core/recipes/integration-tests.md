@@ -78,6 +78,28 @@ export default defineConfig({
 
 The split matters: `globalSetup` runs ONCE in the main vitest process (boots the HTTP server); `setupFiles` runs in each worker thread (gives each worker its own DB connection for direct calls).
 
+### Running on a port of your own
+
+`startHttpTestServer()` binds `http.port` — the same port `warlock dev` uses. Pass one explicitly to run the suite alongside a live dev server, or to run two suites at once:
+
+```ts title="src/test-global-setup.ts"
+export async function setup() {
+  await startHttpTestServer({ port: 3999 });
+}
+```
+
+The explicit port wins over `HTTP_PORT` in `.env`. It has to be passed here — `startHttpTestServer()` bootstraps the app itself and that bootstrap re-reads `.env`, so setting `process.env.HTTP_PORT` before the call has no effect.
+
+`testGet` and friends follow automatically — the bound port is published to the test workers, so `getTestServerUrl()` targets the server that is actually listening.
+
+Either way the port is checked before the server binds, so a collision reads as an instruction rather than a stack trace:
+
+```
+Port 2031 is already in use on localhost. Stop the dev server (or whatever else is
+listening on port 2031) and run again, or start on a free port — e.g.
+startHttpTestServer({ port: 2032 }).
+```
+
 ## Step 3 — Write the first test
 
 Drop a file under `src/app/products/tests/`:
@@ -285,7 +307,7 @@ Either works. The first is easier to find when you're fixing a specific endpoint
 ## Common pitfalls
 
 - **`globalSetup` failed silently → all tests get `fetch failed`.** Check that `src/test-global-setup.ts` exports `setup` and `teardown` (not default exports). A typo in the export name = no error at compile time, just every HTTP test failing.
-- **Port conflict with running dev server.** If `yarn start` is running on `:2031`, the test server can't bind. Stop the dev server or set a test-only port: `http: { port: 3999 }` in your config when `Application.environment === "test"`.
+- **Port conflict with running dev server.** If `yarn start` is running on `:2031`, the preflight stops the run with `Port 2031 is already in use` before anything binds. Stop the dev server, or start the suite on a free port: `startHttpTestServer({ port: 3999 })`.
 - **JWT signed against a different secret.** Make sure `JWT_SECRET` (or whatever your auth config reads) is in `.env`. The test server reads the same env as the dev server — no `.env.test` overlay by default.
 - **`User.create(...)` for fixtures hits the `useHashedPassword()` transformer.** Pass the plain password; the model hashes it on save. Tokens generated via `authService` use the hashed password from the DB, so the round-trip is consistent.
 - **Don't `await testPost(...)` once and reuse `response`.** `Response.json()` consumes the body stream — call `expectJson` (or `parseJsonResponse`) at most once per response.

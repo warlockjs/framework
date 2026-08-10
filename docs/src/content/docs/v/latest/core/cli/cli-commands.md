@@ -151,6 +151,8 @@ warlock start
 
 Persistent. Reads `warlock.config.ts` to resolve the entry path and source-map flag, then `spawn`s `node` with the right arguments. Forwards `SIGTERM` / `SIGINT` to the child cleanly — Ctrl+C does what you expect.
 
+The started banner goes to stdout **only after the running app reports a completed boot**; progress goes to stderr. A boot that fails prints to both streams and exits non-zero, even if the child process exited `0` — so `warlock start | grep -q "production server started"` is a sound health gate. See [Deployment](../digging-deeper/deployment) for the readiness contract.
+
 Build first, then start:
 
 ```bash

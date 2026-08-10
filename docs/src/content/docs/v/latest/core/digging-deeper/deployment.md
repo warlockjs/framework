@@ -116,11 +116,57 @@ Specifically:
 
 - `--enable-source-maps` is added **unless** `build.sourcemap` is `false`, so production stack traces map back to your TypeScript.
 - Anything you type after `start` is passed through to the Node process — e.g. `warlock start --inspect` forwards `--inspect`.
-- The command runs the child with `stdio: "inherit"` and the parent's `env`, in the same working directory.
+- The command inherits stdio and the parent's `env`, in the same working directory, and adds one IPC channel the bundle reports readiness on.
 
-`start` exits with the child's exit code. It forwards `SIGTERM` to the child explicitly and lets `SIGINT` (Ctrl+C) reach the child naturally; the actual graceful shutdown is handled *inside* the bundle by the connectors manager (next section).
+`start` exits with the child's exit code, except that a child which never finished booting always exits non-zero. It forwards `SIGTERM` to the child explicitly and lets `SIGINT` (Ctrl+C) reach the child naturally; the actual graceful shutdown is handled *inside* the bundle by the connectors manager (next section).
 
 > The build must exist before you call `start`. `start` does not build for you — run `warlock build` first (typically as a deploy step), then `warlock start` on the server.
+
+### Installing with pnpm
+
+Two things pnpm 10+ needs that npm and yarn do not. Both bite at deploy time, and neither error mentions Warlock, so they are worth setting once in your app's `pnpm-workspace.yaml`:
+
+```yaml
+# esbuild's install script links its platform-native binary. `warlock build`
+# shells out to that binary, so without this the app installs cleanly and then
+# cannot build.
+allowBuilds:
+  esbuild: true
+```
+
+```
+[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: esbuild@0.27.7
+Run "pnpm approve-builds" to pick which dependencies should be allowed to run scripts.
+```
+
+That is the error you get without it — at install time, before you ever run `warlock build`.
+
+The second is a non-issue by design, but worth knowing why: **Warlock never asks you to declare a dependency you do not import.** Under npm and yarn's flat hoisting a framework-internal package can be reached from your app by accident; under pnpm's strict layout it cannot, and code the builder generates into your app is checked at build time to make sure it only imports packages your own `package.json` declares. If `warlock build` ever fails naming a package you have never heard of, that is a framework bug — report it rather than adding the dependency.
+
+### Knowing the app actually started
+
+**A success line on stdout means the app is serving requests.** Deployment tooling can depend on that:
+
+| Stream     | Carries                                                            |
+| ---------- | ------------------------------------------------------------------ |
+| **stdout** | the started banner, and start failures. Nothing else.               |
+| **stderr** | progress, diagnostics, and the application's own logs               |
+
+The banner prints only when the *running application* reports a completed boot — after the late-phase connectors (http, socket) are up. It is not printed when the command starts or when the child is spawned, so a health gate cannot mistake an intention for an outcome:
+
+```bash
+warlock start | grep -q "production server started"
+```
+
+A child that dies before reporting readiness is a failed start. The failure is written to **both** streams — stderr for humans and log collectors, stdout so a supervisor watching for the banner finds a failure instead of silence — and the command exits non-zero even if the child itself exited `0`.
+
+Readiness travels as one versioned IPC message, `{ type: "warlock:ready", version, pid, at, environment, runtimeStrategy, bootDurationMs?, port? }`, sent by `Application.markBooted()` and immediately followed by closing the channel. Three things follow from that:
+
+- **A worker app with no http connector still reports.** Readiness means a completed boot, not a bound port; `port` is simply absent.
+- **Running the bundle any other way is unaffected.** Under `node dist/app.js`, a Docker `CMD`, or pm2, the signal is a no-op — Warlock only writes to a channel opened by `warlock start` itself, so it never interferes with another supervisor's protocol.
+- **A bundle built before 4.11.0 has no signal.** It runs normally and prints a note on stderr only, asking you to re-run `warlock build`. A missing signal never fails a run and never interrupts a slow boot.
+
+Inside the app, `Application.onceBooted()` and `Application.whenBooted()` fire from the same latch.
 
 ## Environment selection
 
@@ -142,6 +188,10 @@ By default `loadEnv` overrides — values in the loaded file win over whatever i
 ```bash title="Production launch"
 NODE_ENV=production warlock start
 ```
+
+**`NODE_ENV` is authoritative — no Warlock command overrides it.** Neither `build` nor `start` forces `production`, deliberately: doing so would silently change which `.env` file an existing `NODE_ENV=staging` pipeline reads, and would have the framework overriding what the operator explicitly asked for at the moment of deployment. If `NODE_ENV` is unset, `warlock build` reads plain `.env` — set it in your Dockerfile, CI job, or process manager.
+
+**Env files are read before `warlock.config.ts` is evaluated (4.11.0+).** That ordering is what makes `env()` usable in the config file at all. Before 4.11.0 the config module ran against an empty store, so every `env("KEY", "default")` in `warlock.config.ts` returned its default under every command — including `dev`, and including `build` and `start`, which never loaded env at all. A project with no `.env` file is still fine: loading is guarded, so a missing file is a non-event rather than a failed build.
 
 ```ini title=".env.production"
 # Whatever your src/config/* files read via env(...)
