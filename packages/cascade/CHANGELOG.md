@@ -4,6 +4,20 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.12.0
+
+### Added
+
+- **`listPendingMigrations()`** — the registered migrations that have not executed, **in the order they will execute**, mirroring `listExecutedMigrations()`. The set was already computed inside the runner on every migrate run; `getPendingMigrations()` was `private` and had no read-only exit, so nothing outside could ask "what will run next?" without running it
+
+  Returns `PendingMigration { name, createdAt? }` rather than the migration classes: `MigrationClass` is module-local, so a public API returning it would hand consumers a type they cannot name. It deliberately omits `table`, which `status()` obtains by constructing each migration — instantiating user classes to decorate a listing lets a constructor throw inside the very call meant to report on a broken tree
+
+  `getPendingMigrations()` is now public alongside it. **Both document the trap in their own JSDoc:** only *registered* migrations can be pending, so a caller that has not registered anything receives `[]` — indistinguishable from a database with nothing pending, and the reason `@warlock.js/core`'s CLI loads before it reports
+
+### Changed
+
+- Declares its own test runner and pins it to an exact version (`vitest@4.1.10`). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to
+
 ## 4.9.2
 
 ### Fixed

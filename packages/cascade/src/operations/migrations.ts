@@ -96,3 +96,38 @@ export async function exportMigrationsSQL(
 export async function listExecutedMigrations(): Promise<MigrationRecord[]> {
   return migrationRunner.getExecutedMigrations();
 }
+
+/**
+ * A registered migration that has not yet been executed against the configured
+ * data source.
+ */
+export type PendingMigration = {
+  /** Migration name/identifier, as it will be recorded once executed. */
+  readonly name: string;
+  /** Creation timestamp, when the migration carries one. */
+  readonly createdAt?: string;
+};
+
+/**
+ * Return the registered migrations that have NOT been executed, **in the order
+ * they will execute**. The order is the point: it makes the result a dry run
+ * rather than a set.
+ *
+ * ⚠️ Only registered migrations can be pending. Register them first — via
+ * `migrationRunner.register()` / `registerMany()`, or whatever the host
+ * framework's loader does — or this returns `[]`, which reads as "nothing
+ * pending" and is not the same thing.
+ *
+ * @example
+ * migrationRunner.registerMany([CreateUsersTable, AddEmailIndex]);
+ * const pending = await listPendingMigrations();
+ * console.log(pending.map((migration) => migration.name));
+ */
+export async function listPendingMigrations(): Promise<PendingMigration[]> {
+  const pending = await migrationRunner.getPendingMigrations();
+
+  return pending.map((MigrationClass) => ({
+    name: MigrationClass.migrationName,
+    createdAt: MigrationClass.createdAt,
+  }));
+}

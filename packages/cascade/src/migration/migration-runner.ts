@@ -923,9 +923,18 @@ export class MigrationRunner {
   }
 
   /**
-   * Get pending (not executed) registered migrations.
+   * Get pending (not executed) registered migrations, in the order they would
+   * execute.
+   *
+   * ⚠️ "Registered" is load-bearing. This filters `this.migrations`, which is
+   * populated only by `register()` / `registerMany()`. A caller that has not
+   * registered anything gets `[]` — indistinguishable from a database with
+   * nothing pending. Anything reporting this set to a human MUST register
+   * migrations first, or it will print a confident all-clear over an unknown.
+   *
+   * @see listPendingMigrations
    */
-  private async getPendingMigrations(): Promise<MigrationClass[]> {
+  public async getPendingMigrations(): Promise<MigrationClass[]> {
     const executed = await this.getExecutedMigrations();
     const executedNames = new Set(executed.map((r) => r.name));
     const migrations = this.migrations.filter((m) => !executedNames.has(m.migrationName));
