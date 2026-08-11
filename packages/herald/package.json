@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/herald",
-  "version": "4.11.0",
+  "version": "4.12.0",
   "type": "module",
   "description": "Message bus/brokers for RabbitMQ, Kafka, and more",
   "main": "./cjs/index.js",
@@ -45,5 +45,9 @@
   "author": "hassanzohdy",
   "license": "MIT",
   "module": "./esm/index.js",
-  "typings": "./cjs/index.d.ts"
+  "typings": "./cjs/index.d.ts",
+  "devDependencies": {
+    "@vitest/coverage-v8": "4.1.10",
+    "vitest": "4.1.10"
+  }
 }
