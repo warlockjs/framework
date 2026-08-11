@@ -62,10 +62,12 @@ export const generateCommand = command({
     {
       text: "--force, -f",
       description: "Overwrite existing files",
+      type: "boolean",
     },
     {
       text: "--dry-run",
       description: "Preview the files that would be generated without writing anything",
+      type: "boolean",
     },
   ],
 });
@@ -81,14 +83,17 @@ export const generateModuleCommand = command({
       text: "--minimal, -m",
       description:
         "Generate a minimal skeleton (routes, main, locales, empty subfolders) instead of the full CRUD scaffold",
+      type: "boolean",
     },
     {
       text: "--force, -f",
       description: "Overwrite existing files",
+      type: "boolean",
     },
     {
       text: "--dry-run",
       description: "Preview the files that would be generated without writing anything",
+      type: "boolean",
     },
   ],
 });
@@ -102,14 +107,17 @@ export const generateControllerCommand = command({
     {
       text: "--with-validation, -v",
       description: "Generate a validation schema and bind it to the controller",
+      type: "boolean",
     },
     {
       text: "--force, -f",
       description: "Overwrite existing files",
+      type: "boolean",
     },
     {
       text: "--dry-run",
       description: "Preview the files that would be generated without writing anything",
+      type: "boolean",
     },
   ],
 });
@@ -123,10 +131,12 @@ export const generateServiceCommand = command({
     {
       text: "--force, -f",
       description: "Overwrite existing files",
+      type: "boolean",
     },
     {
       text: "--dry-run",
       description: "Preview the files that would be generated without writing anything",
+      type: "boolean",
     },
   ],
 });
@@ -140,6 +150,7 @@ export const generateModelCommand = command({
     {
       text: "--with-resource, -rs",
       description: "Generate resource",
+      type: "boolean",
     },
     {
       text: "--table <name>",
@@ -148,14 +159,17 @@ export const generateModelCommand = command({
     {
       text: "--force, -f",
       description: "Overwrite existing files",
+      type: "boolean",
     },
     {
       text: "--dry-run",
       description: "Preview the files that would be generated without writing anything",
+      type: "boolean",
     },
     {
       text: "--timestamps [bool]",
       description: "Include timestamps in migration (default: true)",
+      type: "boolean",
     },
   ],
 });
@@ -169,10 +183,12 @@ export const generateRepositoryCommand = command({
     {
       text: "--force, -f",
       description: "Overwrite existing files",
+      type: "boolean",
     },
     {
       text: "--dry-run",
       description: "Preview the files that would be generated without writing anything",
+      type: "boolean",
     },
   ],
 });
@@ -186,10 +202,12 @@ export const generateResourceCommand = command({
     {
       text: "--force, -f",
       description: "Overwrite existing files",
+      type: "boolean",
     },
     {
       text: "--dry-run",
       description: "Preview the files that would be generated without writing anything",
+      type: "boolean",
     },
   ],
 });
@@ -203,10 +221,12 @@ export const generateMigrationCommand = command({
     {
       text: "--force, -f",
       description: "Overwrite existing files",
+      type: "boolean",
     },
     {
       text: "--dry-run",
       description: "Preview the files that would be generated without writing anything",
+      type: "boolean",
     },
     {
       text: "--add <columns>",
@@ -223,6 +243,7 @@ export const generateMigrationCommand = command({
     {
       text: "--timestamps [bool]",
       description: "Include timestamps (default: true)",
+      type: "boolean",
     },
   ],
 });

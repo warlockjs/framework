@@ -156,11 +156,29 @@ The framework ships a fixed set of commands you call but don't author. Knowing t
 
 | Command  | Flags / args                                    | Preloads                       |
 | -------- | ----------------------------------------------- | ------------------------------ |
-| `warlock migrate` | `--list` (just list pending), `--fresh` / `-f` (drop tables first) | database, logger          |
+| `warlock migrate` | `--list` / `-l` (executed **and** pending), `--pending` (pending only, sets an exit code), `--fresh` / `-f` (drop tables first) | database, logger          |
 | `warlock seed` | `--name <pattern>` (run seeds matching the pattern) | full bootstrap (env, configs, app modules) |
 | `warlock create-database <name>` | bare positional `<name>`        | database                       |
 | `warlock drop.tables` | `--force, -f` (skip confirmation prompt) | database, logger          |
 | `warlock db.indexes` | builds DB indexes for every registered model    | database                  |
+
+**Asking what will run next.** `warlock migrate --list` prints executed migrations and then the pending ones **in execution order**. Do not derive the pending set by differencing `--all` against `--list`: `--all` globs `src/app` only, while `--list` reads the migrations table, which also holds migrations that packages register through `database.migrations` (`@warlock.js/auth` contributes two). The difference under-counts pending, in the direction that says "safe to proceed".
+
+`--list` is a report and always exits `0`. `--pending` is a gate, and its exit code is its whole API:
+
+| Exit | Meaning |
+| ---- | ------- |
+| `0`  | computed, nothing pending |
+| `1`  | computed, N pending |
+| `2`  | **could not be computed** |
+
+```bash
+warlock migrate --pending && ./deploy.sh
+```
+
+`2` is separate from `1` on purpose — a script must be able to tell a backlog from an unknown, because one means *run them* and the other means *stop*. When the migration files cannot be loaded, both commands print `Pending: unavailable — <reason>` beneath a complete executed listing rather than reporting `0`.
+
+**If you are writing a command that reports on pending migrations:** register migrations first. `listPendingMigrations()` filters the runner's registry, so a caller that has not loaded anything gets `[]` — which reads as "nothing pending" and is not the same claim.
 
 ### Scaffolding
 

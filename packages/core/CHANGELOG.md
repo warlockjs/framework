@@ -4,6 +4,90 @@ All notable changes to `@warlock.js/core` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.12.0
+
+### Added
+
+- **`warlock migrate --pending` — what will run next, in the order it will run.** `migrate` could report what had already run (`--list`) and what files existed on disk (`--all`), but not the one thing an operator asks before a schema change against a live database. The pending set was already computed on every migrate run; it simply had no read-only exit
+
+  The gap forced a workaround that is **unsound in the dangerous direction**. `--all` globs `src/app` only, so it cannot see migrations a *package* registers through `database.migrations` — `@warlock.js/auth` alone contributes two. `--list` reads the migrations table, which does contain them. Differencing the two counts subtracts populations that do not overlap, and it under-counts pending by roughly the number of package migrations installed — reporting "nothing else is pending" when something is
+
+  **`migrate --list` now prints both sections**, executed and pending, so the question can be answered without knowing a second flag exists. The executed section prints **first and unconditionally**: it is a table read that cannot fail because of a broken file on disk, and `--list` is the command reached for while something is already wrong. `--list` always exits `0` — it is a report
+
+  **`--pending` is the gate**, and its exit code is its entire API: **`0`** computed and nothing pending, **`1`** computed and N pending, **`2`** could not be computed. Two codes would fold "three migrations are waiting" into "I could not work out what is waiting", and those demand opposite responses — the first is *run them*, the second is *stop*. `migrate --pending && deploy` behaves correctly under all three
+
+  **A failure to read the migrations never reports `0`.** Computing pending requires loading project code, and a single migration file missing its default export throws. That degrades to an explicit `Pending: unavailable — <reason>` line with the executed listing intact above it, and `--pending` exits `2`. An empty pending set means *nothing is pending*, and nothing else
+
+  `--all` deliberately does **not** gain a migration name beside each path. The only identifier available without loading is the one derived from the filename, and that derivation is a *fallback* used when a migration does not set `migrationName` — so any migration that names itself (`auth`'s do) would be listed under a name that does not exist. A wrong identifier in a listing whose purpose is cross-referencing is worse than no identifier, and `--list`'s two sections answer the comparison directly
+
+  Proven against a real Postgres: an executed package migration and a pending local one land in the correct sections, a fully-migrated database reports an empty pending list rather than an absent one, and the reporter's `files − executed` arithmetic is pinned as a test that fails if it is ever reintroduced
+
+### Changed
+
+- `migrate`'s preload block no longer declares `env: true`. The flag has done nothing since env began loading for every command that declares a preload block; it was decoration, and the test suite now asserts its **absence** so it is not re-added by someone reading the still-deprecated type
+
+- **The package now declares its own test runner and a `test` script.** `@warlock.js/core` shipped a maintained `vitest.config.ts` — aliasing eight sibling packages to their sources — with **no `devDependencies` key at all** and no way to invoke it. Its suite was reachable only by knowing to type `npx vitest`, which resolves whatever happens to exist in the tree rather than anything the manifest asked for. The runner is pinned to an **exact** version, not a range: it moved from 4.1.8 to 4.1.10 mid-development on an unrelated install, silently, and a suite whose runner can change underneath it proves less than it appears to
+
+### Fixed
+
+- **A build artifact that names an entry point it does not contain is now refused before it can be packed.** An interrupted build leaves a directory that looks finished — `package.json`, `README`, `CHANGELOG`, `bin/`, `skills/` — and holds no compiled code at all. Nineteen existed in this tree at once, and nothing in the release path noticed: the only related guard compares **modification times**, so a hollow directory with a freshly written manifest is *newer than source* and passes, and it runs solely on the artifact-reuse path, which is not how the hollow directories were produced
+
+  Each artifact is now verified immediately before `npm pack`, on the normal build path and the reuse path alike. **The manifest is the specification:** `main`, `module` and the typings field name the exact files the package promises to ship, so they are resolved against the artifact and must exist. Fields a manifest does not declare are skipped — `core` and `auth` point `main` at `esm/` while `cascade`, `ai` and `seal` point it at `cjs/`, and any check that assumed one build shape would have raised a false failure on packages that are entirely correct. A manifest declaring no entry point at all is also a failure: a published package nothing can import is not a package
+
+- **The production acceptance gate no longer inherits the environment it is supposed to be testing.** `run-pnpm-acceptance.mjs` spawned every child with `env: { ...process.env }` and set no `NODE_ENV`. It exercised the production path only because the shell it was written in happened to carry `NODE_ENV=production`; on a clean checkout, a new contributor's machine, or CI, the same gate boots the app in **development** — and does not fail, it passes while testing something other than the thing it is named after. That is the worst outcome available to a gate, and it sat underneath the proof for 4.11.0's headline fix
+
+  `NODE_ENV=production` is now set explicitly on every spawn, and — more importantly — **asserted from inside the running app**: `/acceptance` reports the environment it actually booted in, and the run fails if it is anything else. Setting a variable and never checking it arrived is how the original defect survived. The remaining `{ ...process.env }` is documented as a deliberate inheritance of `PATH` and the package-manager store paths, with everything the *verdict* depends on set after it
+
+  Consequence for the roadmap, recorded because the ordering matters: **CI wiring for this gate is now blocked on this fix, not parallel to it.** Wiring it up first would have produced a green from CI — which carries more weight than a local one — for a run that never touched the production path
+
+- **`warlock migrate --rollback=false` no longer drops every table.** CLI options were parsed as raw strings and nothing ever coerced them: `--rollback=false` reached the action as the string `"false"`, `if (rollback)` saw a truthy value, and the run rolled back *everything*. The declared `type: "boolean"` on the option was decorative — used only to render help. The same shape existed on every boolean option, including `warlock drop.tables --force=false`, where it turned a confirmation prompt into an unattended drop
+
+  Its twin was worse. A bare `--flag` swallowed the following token as its value, so `warlock migrate --rollback 2024_users.ts` produced `rollback: "2024_users.ts"` — the filename was never read as a path, and every table went down while the operator believed they had named one file. **A declared boolean now never consumes the next positional**: `--rollback 2024_users.ts` is `rollback: true` plus the positional `2024_users.ts`
+
+  Coercion is **type-aware, driven by the command's own declared options**, not a blanket rule in the parser: `--flag` → `true`, `--flag=true|1|yes` → `true`, `--flag=false|0|no` → `false` (case-insensitive), and short aliases (`-r=false`) behave identically. A string-typed option whose value is genuinely the word `false` — `--name=false` — still arrives as the string `"false"`. Options a command does not declare are untouched
+
+  **An unreadable value is an error, not a guess.** `--rollback=maybe` prints what was invalid and what is accepted, and exits 1. Guessing is what produced this defect; a flag that gates a destructive action must refuse input it cannot read rather than pick a side
+
+  `parseCliArgs` now takes an optional schema and runs twice: once bare to discover the command name (behaviour unchanged — there is no command to consult yet), then again against the resolved command's options. Re-reading argv is what makes the swallowed positional recoverable; by the time the first pass returns, a swallowed argument is indistinguishable from a value
+
+- **`warlock generate.module users --force=false` no longer overwrites your files.** The coercion above is opt-in by design — it applies only to options a command declares `type: "boolean"`, so a string option whose value is genuinely the word `false` survives. The generate family and `add` never carried that declaration, so the fix reached none of them and both faces of the defect stayed live on the commands most likely to be run against existing source
+
+  `--force=false` arrived at every generator as the truthy string `"false"` and the overwrite guard (`if (exists && !force)`) let it through — a flag written to *prevent* clobbering did the clobbering. Its twin ate the target: `warlock generate.module --force users` parsed `users` as the value of `--force`, so the module name was lost entirely and the generator ran with no name
+
+  Twenty-three option declarations are now typed: `--force, -f` and `--dry-run` on all eight `generate.*` commands, plus `--minimal, -m`, `--with-validation, -v`, `--with-resource, -rs`, and both `--timestamps [bool]` declarations, and `--list, -l` / `--no-install` on `add`. Options that carry real data are deliberately untouched and still take a value — `--table`, `--add`, `--drop`, `--rename` on the generators, `--package-manager` on `add`, and `seed --drop="Seed Name"`, whose value scopes which seeder is undone
+
+  `add --no-install` no longer has to be passed last. That instruction was in its help text only because the bare flag used to swallow the feature that followed it; `warlock add --no-install auth` now records `auth` as the feature and skips the install, and the wording is gone
+
+  The guard drives the real command objects through the manager's own resolution path (`tests/unit/cli/generate-flag-options.test.ts`) and asserts what the action is handed. Asserting the declaration object instead would pass against a fixture while the CLI stayed broken
+
+- **`new Image(...)` no longer fails depending on how soon you call it.** The `Image` module fired `import("sharp")` at load time without awaiting it, and the constructor only checked whether that import had *failed* — never whether it was still in flight. Constructing an image in the first tick after importing the package therefore ran with an undefined sharp function and died with `TypeError: sharpFn is not a function`; the exact same code passed if something had awaited a timer first. Anything that builds an image during boot — a startup thumbnail job, a module-level warm-up — hit it, and it presented as a mysterious "works locally, breaks in prod" timing bug rather than as a missing dependency
+
+  Sharp is now resolved **synchronously on the first construction that needs it**, via `createRequire`, and the outcome is cached for the process. There is no longer a window in which the constructor can proceed without a real sharp function: it either has the module or throws. A missing sharp still throws the same install-hint error, at the same point (construction), with the same wording
+
+  Resolution stays **lazy** — importing `@warlock.js/core` still does not load sharp's native binary, so apps that never touch images pay nothing — and constructing an `Image` from an existing sharp instance short-circuits before any module load
+
+  The guard for this is a spawned fresh Node process that imports and constructs with nothing in between (`tests/unit/image/image-sharp-resolution.test.ts`). A same-process test cannot catch it: importing at collection time and constructing later *is* the delay that hides the bug
+
+- **A sharp that is installed but will not load no longer reports itself as "not installed".** The resolution above swallowed every failure into a single outcome, so the most common real-world sharp problem — the package present but its native binary built for another platform — arrived as `sharp is not installed.` plus instructions to run `npm install sharp`, which cannot fix it. sharp throws its own long, actionable error naming the runtime, the failing `.node` file and the exact install flags to use; that text was discarded and replaced with a different, wrong cause
+
+  Only **genuine absence** now produces the install hint: a `MODULE_NOT_FOUND` whose message names the specifier `'sharp'` exactly. Matching on the code alone is not sufficient — a dependency missing *inside* sharp raises the very same code (`Cannot find module 'color'`), and would have been reported as sharp itself being absent. Any other failure surfaces sharp's own message, inlined as `Failed to load "sharp": …` **and** chained as `cause`, so a terminal that never prints `cause` still shows the text that helps. The absent-sharp path is unchanged, wording included
+
+  **The failure reason is cached, not just the fact of failure.** The resolution attempt runs once per process; a second `new Image(...)` skips the load entirely, so caching only "there is no sharp function" would have re-told the same lie one call later. The guard therefore constructs **twice** in each spawned process and asserts the second error matches the first (`tests/unit/image/image-sharp-load-failure.test.ts`) — a one-shot test passes even with that bug present
+
+  The `MODULE_NOT_FOUND` shapes the guard feeds in are produced by asking Node for a module that genuinely is not installed, rather than hand-written, so the matcher is tested against Node's real message text
+
+- **`renderReact()` no longer renders against modules that have not loaded yet.** The same defect as the two above, in a second module, found by looking for the pattern rather than by a bug report. `react/index.ts` fired `import("react")` and `import("react-dom/server")` at load time without awaiting either, and tracked them with a three-state flag that the guard only tested for one state: `if (moduleExists === false)`. While the imports were in flight the flag was `null`, which is not `false`, so the guard passed and the synchronous `renderReact` read `createElement` off `undefined`. With two sequential dynamic imports the window is wider than the image module's, and it is open during exactly the work a server does at boot — rendering a page or an email template from a module-level warm-up
+
+  The window swallowed the diagnostics as well as the render. A genuinely missing react did **not** produce the install hint during that window: it produced `TypeError: Cannot read properties of undefined (reading 'createElement')`, because the flag was still `null` rather than `false`. The install instructions only appeared for callers late enough to have missed the race — the callers who least needed telling
+
+  Both modules are now resolved **synchronously on the first `renderReact()` that needs them**, via `createRequire`, with the outcome cached for the process. Resolution stays **lazy**: importing `@warlock.js/core` still does not pull react into apps that never render. A genuinely absent react throws the same `react is not installed.` message with the same instructions, unchanged
+
+- **A broken `react-dom/server` no longer reports itself as `react is not installed`.** The two packages were loaded in one `try` and collapsed into one flag, so any failure of either was attributed to react. The specifiers are now resolved and reported **separately**, and the message names the one that actually failed — `Failed to load "react-dom/server": …` — because sending an operator to reinstall react when react is fine costs them the debugging session. Absence is distinguished from breakage the same way as for sharp: `MODULE_NOT_FOUND` **and** a message naming the specifier exactly, quoted, which is also what stops `'react-dom'` from satisfying a check for `'react'`. Everything else surfaces the original error, inlined and chained as `cause`. A `react-dom` whose `./server` subpath is missing from `exports` raises `ERR_PACKAGE_PATH_NOT_EXPORTED`, so it correctly reports as an incompatible install rather than an absent one
+
+  As with sharp, the failure **reason** is cached rather than only the fact of failure, so the second call cannot fall through to the "not installed" branch and re-tell a lie the first call got right
+
+  The guard is a spawned fresh Node process (`tests/unit/react/react-module-resolution.test.ts`); a same-process test cannot catch this, which is why the pre-existing suite was green against it. Against the live bug all five cases failed, and — the detail that shows how much the race hid — all five failed with the *same* `Cannot read properties of undefined` symptom, including the case that only asserts the install message. The present-but-broken states are staged by copying the module source next to a fixture `node_modules`, since resolution anchors to the importing file; the real workspace is not mutated
+
 ## 4.11.0
 
 ### Added

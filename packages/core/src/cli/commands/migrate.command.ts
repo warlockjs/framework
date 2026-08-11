@@ -7,7 +7,6 @@ export const migrateCommand = command({
   description: "Run database migrations",
   preload: {
     config: ["database", "log"],
-    env: true,
     connectors: ["database", "logger"],
   },
   options: [
@@ -28,7 +27,13 @@ export const migrateCommand = command({
     },
     {
       text: "--list, -l",
-      description: "List all executed migrations",
+      description: "Show migration state: executed migrations, then what will run next",
+      type: "boolean",
+    },
+    {
+      text: "--pending",
+      description:
+        "List only what will run next, in execution order. Exits 0 if nothing is pending, 1 if something is, 2 if it could not be determined",
       type: "boolean",
     },
     {

@@ -71,6 +71,22 @@ const targetVersion = JSON.parse(
 const acceptancePort = 3711;
 const acceptanceUrl = `http://localhost:${acceptancePort}/acceptance`;
 
+/**
+ * The environment this gate exists to exercise, set explicitly on every child.
+ *
+ * It used to be inherited. `env: { ...process.env }` reads as neutral and is
+ * not: the shell this harness was written in happened to carry
+ * `NODE_ENV=production`, so the gate ran the production path by accident of the
+ * operator's environment. On a clean checkout — a new contributor, or CI — the
+ * same run boots the app in DEVELOPMENT and passes while testing something
+ * other than the thing it is named after.
+ *
+ * Setting it is half the fix. The run also reads the value back out of the
+ * booted app (`assertBootedInProduction`), because a variable that is set and
+ * never checked is exactly how this survived in the first place.
+ */
+const ACCEPTANCE_ENV = { NODE_ENV: "production" };
+
 const log = (message) => console.log(`\n▸ ${message}`);
 
 /** Run a command to completion, rejecting on a non-zero exit. */
@@ -78,7 +94,17 @@ function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: options.cwd ?? process.cwd(),
-      env: { ...process.env, ...options.env },
+      // process.env is inherited deliberately — PATH, the npm/pnpm store paths
+      // and the platform's temp directory all have to survive. Every value the
+      // VERDICT depends on is set after it, never taken from the caller.
+      //
+      // `options.env` last is intentional: a caller CAN override NODE_ENV, and
+      // that override is CAUGHT rather than PREVENTED — `assertBootedInProduction`
+      // reads the value back out of the running app. Keeping the door open is
+      // what makes a deliberate negative test possible. Do not tighten this
+      // spread to "fix" it; doing so removes the only way to exercise the
+      // failure path and buys nothing the assertion doesn't already give.
+      env: { ...process.env, ...ACCEPTANCE_ENV, ...options.env },
       stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit",
       shell: process.platform === "win32",
     });
@@ -145,6 +171,70 @@ function latestCoreVersion() {
  * straight back into the monorepo, which restores the accidental resolution
  * this whole run exists to detect.
  */
+/**
+ * Assert a built artifact contains the entry points its own manifest declares.
+ *
+ * A build that is interrupted leaves a directory that looks finished — manifest,
+ * README, CHANGELOG, `bin/`, `skills/` — and contains no compiled code at all.
+ * Nineteen of them existed in this tree at once, and nothing we owned noticed:
+ * the staleness check compares mtimes (a hollow directory with a freshly
+ * written `package.json` is *newer* than source and passes), and it only runs
+ * on the reuse path anyway.
+ *
+ * The manifest is the specification. `main`, `module` and the typings field
+ * name exactly the files the package promises to ship, so resolving them
+ * against the artifact needs no per-package knowledge of build shape — `core`
+ * is ESM-only, `cascade` is dual-format, and both are checked correctly by the
+ * same rule. Fields a manifest does NOT declare are skipped: asserting a `cjs`
+ * entry on a package that legitimately ships ESM only would be a false red, and
+ * a gate that cries wolf is a gate people learn to skip.
+ *
+ * @param artifactDirectory built package directory, containing its package.json
+ * @param name package name, for the failure message
+ */
+function assertArtifactContainsItsEntryPoints(artifactDirectory, name) {
+  const manifestPath = path.join(artifactDirectory, "package.json");
+
+  if (!existsSync(manifestPath)) {
+    throw new Error(`${name}: no package.json in ${artifactDirectory} — nothing was built.`);
+  }
+
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+
+  const declaredEntries = [
+    ["main", manifest.main],
+    ["module", manifest.module],
+    ["types", manifest.types ?? manifest.typings],
+  ].filter(([, target]) => typeof target === "string" && target.length > 0);
+
+  if (declaredEntries.length === 0) {
+    throw new Error(
+      `${name}: its package.json declares no main, module or types, so there is nothing to verify. ` +
+        `A published package that names no entry point cannot be imported.`,
+    );
+  }
+
+  const missing = declaredEntries.filter(([, target]) => {
+    return !existsSync(path.join(artifactDirectory, target));
+  });
+
+  if (missing.length > 0) {
+    throw new Error(
+      [
+        `${name}: the built artifact names entry points it does not contain.`,
+        "",
+        ...missing.map(([field, target]) => `  ${field}: ${target}  → MISSING`),
+        "",
+        `  in ${artifactDirectory}`,
+        "",
+        "This is what an interrupted build leaves behind: a directory carrying a",
+        "manifest, docs and bin/ with no compiled output. It looks built. Packing",
+        "and shipping it produces a package that cannot be imported at all.",
+      ].join("\n"),
+    );
+  }
+}
+
 async function packFramework() {
   const version = latestCoreVersion();
   const scopeDirectory = path.dirname(coreBuildsDirectory);
@@ -160,6 +250,13 @@ async function packFramework() {
   });
 
   for (const name of packages) {
+    // Every artifact is checked before it is packed, on the normal build path
+    // and the reuse path alike. The hollow directories this catches were
+    // produced by an ordinary build that was interrupted — not by anyone
+    // reusing an old artifact — so a check living only behind the reuse flag
+    // would have missed the only case that has ever actually occurred.
+    assertArtifactContainsItsEntryPoints(path.join(scopeDirectory, name, version), name);
+
     await run("npm", [
       "pack",
       path.join(scopeDirectory, name, version),
@@ -368,6 +465,9 @@ function startAndRequest() {
   return new Promise((resolve, reject) => {
     const child = spawn("npx", ["pnpm", "exec", "warlock", "start"], {
       cwd: appDirectory,
+      // The app under test. Same rule as `run()`: the environment the verdict
+      // depends on is set here, not inherited from the operator.
+      env: { ...process.env, ...ACCEPTANCE_ENV },
       // stdin is closed, never inherited: `pnpm approve-builds` and friends are
       // interactive, and a child waiting on a tty that will never answer blocks
       // forever without printing why.
@@ -536,6 +636,44 @@ async function requestAcceptanceEndpoint() {
   return response.text();
 }
 
+/**
+ * Assert the app answered from PRODUCTION mode.
+ *
+ * Setting `NODE_ENV` on the spawn is not evidence it arrived: a wrapper can
+ * drop it, a shell can override it, and a future refactor can move the spawn
+ * out from under `ACCEPTANCE_ENV` without anything failing. This reads the
+ * value back out of the process that served the request, so the claim comes
+ * from the app rather than from the runner's intentions.
+ *
+ * @param body raw response text from `/acceptance`
+ */
+function assertBootedInProduction(body) {
+  let payload;
+
+  try {
+    payload = JSON.parse(body);
+  } catch {
+    throw new Error(
+      `/acceptance did not return JSON, so the booted environment could not be read. Body: ${body}`,
+    );
+  }
+
+  if (payload.environment !== "production") {
+    throw new Error(
+      [
+        `The app served the request from "${payload.environment}", not "production".`,
+        "",
+        "This gate exists to exercise the PRODUCTION bundle. Running it in any other",
+        "mode does not fail — it passes while testing something else, which is worse.",
+        "",
+        `Expected NODE_ENV=production to reach the app (ACCEPTANCE_ENV), got "${payload.environment}".`,
+      ].join("\n"),
+    );
+  }
+
+  console.log(`  app booted in ${payload.environment} — asserted, not assumed`);
+}
+
 /** The line the fixed generator emits into the app's config loader. */
 const GENERATED_IMPORT = 'import { setConfig, configSpecialHandlers } from "@warlock.js/core";';
 
@@ -700,7 +838,22 @@ async function main() {
 
   log("Installing with pnpm (strict layout, no hoisting)");
   rmSync(path.join(appDirectory, "node_modules"), { recursive: true, force: true });
-  await run("npx", ["pnpm", "install", "--no-frozen-lockfile"], { cwd: appDirectory });
+  // The INSTALL is deliberately not run in production mode.
+  //
+  // Package managers read NODE_ENV: under `production` both yarn 1 and pnpm
+  // skip devDependencies entirely — silently, exit 0, no warning. Installing
+  // the app under `production` would therefore resolve a different tree than a
+  // developer gets, and the gate would build against dependencies nobody has.
+  //
+  // The fixture happens to declare no devDependencies today, so nothing is
+  // dropped; that is luck, not a guarantee, and the first devDependency added
+  // to it would break this quietly. Everything AFTER the install — the build
+  // and the boot, which are what the gate is actually about — still runs in
+  // production, and the app reports back which mode it booted in.
+  await run("npx", ["pnpm", "install", "--no-frozen-lockfile"], {
+    cwd: appDirectory,
+    env: { NODE_ENV: "development" },
+  });
 
   log("Verifying the layout is strict and the framework is really installed");
   console.log(`  @warlock.js/core → ${assertFrameworkIsReallyInstalled()}`);
@@ -711,6 +864,7 @@ async function main() {
   log("POSITIVE — starting the app and requesting /acceptance");
   const { body, pid } = await startAndRequest();
   console.log(`  response: ${body}`);
+  assertBootedInProduction(body);
 
   log("Verifying teardown reaped the process and released the port");
   await assertTeardownComplete(pid, acceptancePort);

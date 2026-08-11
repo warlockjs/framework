@@ -112,6 +112,11 @@ async function getSesMailer(config: SESConfigurations): Promise<Transporter> {
     },
   });
 
+  // PRECONDITION: callers must already have awaited `nodemailerLoadPromise` — `getMailer` does, at
+  // its own guard above, before it dispatches here. This function reads `nodemailerModule` WITHOUT
+  // resolving it, and is safe only because it is unexported with a single call site. Exporting it,
+  // or adding a caller outside `getMailer`, reintroduces defect #20: a synchronous read of a module
+  // whose load was started and never awaited. Tracked as #29.
   const transporter = nodemailerModule.createTransport({
     SES: { sesClient: ses, SendEmailCommand: sesModule.SendEmailCommand },
   });

@@ -1,6 +1,6 @@
 # React
 
-React server-side rendering support. Provides `renderReact()` which converts React components/elements to HTML strings. Eagerly loads `react` and `react-dom/server` at import time; throws a clear error with install instructions if packages are missing.
+React server-side rendering support. Provides `renderReact()` which converts React components/elements to HTML strings. Resolves `react` and `react-dom/server` lazily and **synchronously** on the first call that needs them, so importing the package never loads React into apps that do not render, and `renderReact()` either has both modules or throws. Missing packages throw a clear error with install instructions; a package that is present but fails to load surfaces its own error instead, naming the specifier that actually failed.
 
 ## Key Files
 
@@ -20,8 +20,9 @@ React server-side rendering support. Provides `renderReact()` which converts Rea
 
 ### External
 
-- `react` — optional peer dependency
-- `react-dom/server` — optional peer dependency (`renderToString`)
+- `node:module` — `createRequire`, for synchronous resolution from an ESM module
+- `react` — optional peer dependency, resolved on first render
+- `react-dom/server` — optional peer dependency (`renderToString`), resolved on first render as a separate specifier so its failures are reported as its own
 
 ## Used By
 

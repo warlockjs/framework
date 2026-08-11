@@ -1,9 +1,10 @@
 import { http } from "@mongez/http";
+import { createRequire } from "node:module";
 import type sharp from "sharp";
 import type { FormatEnum } from "sharp";
 
 // ============================================================
-// Eager-loaded Sharp Module
+// Lazily Resolved Sharp Module
 // ============================================================
 
 /**
@@ -23,30 +24,106 @@ Or manually:
 `.trim();
 
 /**
- * Module availability flag
+ * Cached sharp function, populated by the first `resolveSharp()` call
  */
-let moduleExists: boolean | null = null;
+let sharpFn: typeof sharp | null = null;
 
 /**
- * Cached sharp function (loaded at import time)
+ * Whether the resolution attempt already ran (success or failure)
  */
-let sharpFn: typeof sharp;
+let sharpResolved = false;
 
 /**
- * Eagerly load sharp module at import time
+ * Why the resolution failed, when it failed for a reason other than absence.
+ *
+ * Cached and re-thrown on every later call: the resolution attempt runs exactly
+ * once, so without this the second construction would fall through to the
+ * "not installed" branch and report a different, wrong cause.
  */
-async function loadSharpModule() {
-  try {
-    const module = await import("sharp");
-    sharpFn = module.default;
-    moduleExists = true;
-  } catch {
-    moduleExists = false;
-  }
+let sharpLoadError: Error | null = null;
+
+/**
+ * `new Error(message, { cause })` is ES2022, and this package still compiles
+ * against the ES2020 lib (see #16), where `Error` is typed as taking a message
+ * only. Node has supported the option since v16, so this is the type layer
+ * catching up with the runtime, not a change in what the code does.
+ */
+type ErrorWithCauseConstructor = new (message: string, options: { cause: unknown }) => Error;
+
+const ErrorWithCause = Error as ErrorWithCauseConstructor;
+
+/**
+ * Whether `error` says sharp itself is absent, as opposed to present but broken.
+ *
+ * Both halves are load-bearing. `MODULE_NOT_FOUND` alone is not enough: a
+ * dependency missing *inside* sharp raises the very same code (`Cannot find
+ * module 'color'`), and treating that as absence would tell the operator to
+ * install a package they already have. So the message has to name the specifier
+ * `'sharp'` exactly — quoted, which is also what keeps `'sharp-cli'` and friends
+ * from matching.
+ */
+function isSharpMissing(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+
+  return (
+    (error as NodeJS.ErrnoException).code === "MODULE_NOT_FOUND" &&
+    error.message.includes("Cannot find module 'sharp'")
+  );
 }
 
-// Kick off eager loading immediately
-loadSharpModule();
+/**
+ * Resolve sharp synchronously, on first use.
+ *
+ * Resolution is deliberately *lazy* and *synchronous*:
+ *
+ * - Lazy, because a top-level require would drag sharp's native binary into
+ *   every `import "@warlock.js/core"`, including apps that never touch images.
+ * - Synchronous, because the `Image` constructor is synchronous. An async
+ *   import kicked off at module load leaves a window in which the module is
+ *   neither loaded nor known to be missing, and a constructor running inside
+ *   that window has no correct answer to give.
+ *
+ * `createRequire` gives an ESM-safe `require`, and the outcome — module, absence
+ * or load failure — is cached, so the resolution runs exactly once per process.
+ * The failure *reason* is cached too, not just the fact of it: every call after
+ * a failed load has to report the same cause as the first one.
+ *
+ * @throws when sharp is not installed, or is installed but cannot be loaded
+ */
+function resolveSharp(): typeof sharp {
+  if (!sharpResolved) {
+    sharpResolved = true;
+
+    try {
+      const require = createRequire(import.meta.url);
+      const module = require("sharp");
+      sharpFn = (module.default ?? module) as typeof sharp;
+    } catch (error) {
+      sharpFn = null;
+
+      if (!isSharpMissing(error)) {
+        // sharp is there, it just would not load — almost always a binary built
+        // for another platform. Its own error names the runtime and the fix, so
+        // it is inlined *and* chained: a terminal that never prints `cause`
+        // must still show the text that actually helps.
+        sharpLoadError = new ErrorWithCause(
+          `Failed to load "sharp": ${(error as Error).message}`,
+          { cause: error },
+        );
+      }
+    }
+  }
+
+  if (sharpLoadError) {
+    throw sharpLoadError;
+  }
+
+  if (!sharpFn) {
+    throw new Error(`sharp is not installed.\n\n${SHARP_INSTALL_INSTRUCTIONS}`);
+  }
+
+  return sharpFn;
+}
 
 // ============================================================
 // Types
@@ -185,8 +262,9 @@ type InternalOptions = {
  * **Important:** This class requires the `sharp` package to be installed.
  * Install it with: `warlock add image` or `npm install sharp`
  *
- * Sharp is lazy-loaded on the first async operation (save, toBuffer, etc.),
- * so the constructor and all chainable methods remain synchronous.
+ * Sharp is resolved synchronously on the first construction that needs it, so
+ * the constructor and all chainable methods remain synchronous, and a missing
+ * sharp throws at construction rather than at some later await.
  *
  * All operations are synchronous and stored as descriptors.
  * The pipeline is executed only when calling output methods:
@@ -240,15 +318,12 @@ export class Image {
    * Constructor
    */
   public constructor(image: ImageInput | sharp.Sharp) {
-    if (moduleExists === false) {
-      throw new Error(`sharp is not installed.\n\n${SHARP_INSTALL_INSTRUCTIONS}`);
-    }
-
-    // Check if it's already a sharp instance
+    // An existing sharp instance carries its own module — short-circuit before
+    // resolving sharp, so cloning never pays for (or fails on) a module load.
     if (image instanceof Object && "clone" in image && typeof image.clone === "function") {
       this.image = image as sharp.Sharp;
     } else {
-      this.image = sharpFn(image as ImageInput);
+      this.image = resolveSharp()(image as ImageInput);
     }
   }
 
@@ -608,7 +683,7 @@ export class Image {
     }
 
     // For other inputs (path, buffer, etc.), create temp sharp instance
-    const tempImage = sharpFn(input);
+    const tempImage = resolveSharp()(input);
 
     return tempImage.toBuffer();
   }

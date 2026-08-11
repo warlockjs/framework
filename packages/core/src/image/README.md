@@ -21,7 +21,12 @@ Image processing utilities. Provides an `Image` class for resizing, converting, 
 
 ### External
 
-- `sharp` — underlying image processing library
+- `sharp` — underlying image processing library. Optional, and resolved lazily: the
+  first `Image` construction that needs it requires it synchronously via
+  `createRequire`, and throws the install hint if it is absent. Importing this
+  module — or `@warlock.js/core` — never loads sharp's native binary on its own,
+  and constructing an `Image` from an existing sharp instance skips resolution
+  entirely
 
 ## Used By
 

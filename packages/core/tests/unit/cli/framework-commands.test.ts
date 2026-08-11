@@ -21,9 +21,23 @@ describe("migrateCommand definition", () => {
     expect(migrateCommand.name).toBe("migrate");
     expect(migrateCommand.commandPreload).toEqual({
       config: ["database", "log"],
-      env: true,
       connectors: ["database", "logger"],
     });
+  });
+
+  // `env: true` was removed from the declaration, not defaulted to false: env
+  // is loaded for every command that declares a preload block, so the flag was
+  // decoration. Asserting its ABSENCE keeps it from being re-added by someone
+  // who reads the deprecated type field and assumes it still does something.
+  it("no longer declares the dead env preload flag", () => {
+    expect(migrateCommand.commandPreload).not.toHaveProperty("env");
+  });
+
+  it("declares --pending as a boolean so it cannot swallow a positional", () => {
+    const pending = migrateCommand.commandOptions.find((option) => option.name === "pending");
+
+    expect(pending).toBeDefined();
+    expect(pending?.type).toBe("boolean");
   });
 
   it("parses every option into a name with the expected alias", () => {

@@ -16,8 +16,32 @@ import { Path } from "../dev-server/path";
 import { getFilesFromDirectory } from "../dev-server/utils";
 import { srcPath } from "../utils";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
+import { exitCodeFor, PENDING_EXIT_CODE } from "./pending-exit-code";
+import {
+  resolvePendingMigrations,
+  type PendingMigrationsResult,
+} from "./resolve-pending-migrations";
 
+/**
+ * `--list` — print the migration state: what has run, then what will run next.
+ *
+ * The executed section is printed FIRST and unconditionally, before anything
+ * touches disk or config. That ordering is the contract: reading migrations
+ * from the table cannot fail because of a broken migration file, and `--list`
+ * is the command an operator reaches for *during* an incident. The pending
+ * section is best-effort on top of an answer that is already on screen.
+ *
+ * Always exits 0. It is a report; `--pending` is the gate.
+ */
 async function listMigrationsAction() {
+  await printExecutedMigrations();
+
+  const pending = await resolvePendingMigrations(loadAllMigrations);
+
+  printPendingMigrations(pending);
+}
+
+async function printExecutedMigrations() {
   const createdMigrations = await listExecutedMigrations();
 
   console.log(`\nTotal Executed Migrations: ${colors.green(createdMigrations.length)}\n`);
@@ -49,6 +73,60 @@ async function listMigrationsAction() {
   }
 }
 
+/**
+ * Print the pending section shared by `--list` and `--pending`.
+ *
+ * An unavailable result prints an explicit line and NEVER a count. "0 pending"
+ * over a tree we failed to read is the one output this whole feature exists to
+ * prevent.
+ */
+function printPendingMigrations(result: PendingMigrationsResult) {
+  if (result.type === "unavailable") {
+    console.log(
+      `${colors.yellowBright("Pending: unavailable")} — ${result.reason}\n` +
+        colors.gray("  The executed list above is still accurate.\n"),
+    );
+    return;
+  }
+
+  const { migrations } = result;
+
+  console.log(`Total Pending Migrations: ${colors.green(migrations.length)}\n`);
+
+  if (migrations.length === 0) {
+    console.log(colors.gray("  Nothing pending — the database is up to date.\n"));
+    return;
+  }
+
+  // Numbered because the ORDER is the answer: this is what the next
+  // `warlock migrate` will do, in the sequence it will do it.
+  migrations.forEach((migration, index) => {
+    console.log(`  ${colors.gray(`${index + 1}.`)} ${colors.cyanBright(migration.name)}`);
+  });
+
+  console.log("");
+}
+
+/**
+ * `--pending` — the scriptable half. Same computation as `--list`'s pending
+ * section, different exit contract: see {@link PENDING_EXIT_CODE}.
+ */
+async function pendingMigrationsAction() {
+  const result = await resolvePendingMigrations(loadAllMigrations);
+
+  printPendingMigrations(result);
+
+  const exitCode = exitCodeFor(result);
+
+  if (exitCode === PENDING_EXIT_CODE.unavailable) {
+    console.error(
+      colors.redBright("Could not determine the pending set — exiting 2 rather than reporting 0."),
+    );
+  }
+
+  process.exit(exitCode);
+}
+
 async function allMigrationsFilesAction() {
   // get all available migration files in the project
   const files = (await migrationFiles()).map((path) => Path.toRelative(path));
@@ -65,10 +143,14 @@ async function allMigrationsFilesAction() {
  * If rollback is provided, then run the migration runner against all files in reverse order
  */
 export async function migrateAction(options: CommandActionData) {
-  const { fresh, path, rollback, all, list, sql, pendingOnly, compact } = options.options;
+  const { fresh, path, rollback, all, list, pending, sql, pendingOnly, compact } = options.options;
 
   if (list) {
     return await listMigrationsAction();
+  }
+
+  if (pending) {
+    return await pendingMigrationsAction();
   }
 
   if (all) {

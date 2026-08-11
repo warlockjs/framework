@@ -27,7 +27,7 @@ import {
 } from "./cli-commands.utils";
 import { cliCommandsLoader } from "./commands-loader";
 import { frameworkCommands } from "./framework-cli-commands";
-import { parseCliArgs } from "./parse-cli-args";
+import { CliOptionValueError, ParsedCliArgs, parseCliArgs } from "./parse-cli-args";
 import { findSimilar } from "./string-similarity";
 import { CommandActionData, ResolvedCLICommandOption } from "./types";
 
@@ -129,7 +129,10 @@ export class CLICommandsManager {
    * Start the cli manager
    */
   public async start() {
-    const { name, options, args } = parseCliArgs(process.argv);
+    // Schema-less first pass: it exists to discover the command name and the
+    // command-independent flags (--help, --version, --no-cache). Values here are
+    // raw strings; the typed pass below is the one whose options reach a command.
+    const { name, options } = parseCliArgs(process.argv);
 
     if (options.noCache) {
       manifestManager.clearCommandsCache();
@@ -200,10 +203,39 @@ export class CLICommandsManager {
       process.exit(0);
     }
 
+    // The first parse above had no command to consult, so every value in it is
+    // a raw string. Now that the command is resolved, re-read argv against its
+    // declared options so a `type: "boolean"` option arrives as a boolean.
+    const resolved = this.resolveCommandArgs(command);
+
     await this.execute(command, {
-      options,
-      args,
+      options: resolved.options,
+      args: resolved.args,
     });
+  }
+
+  /**
+   * Re-parse argv against the resolved command's declared options.
+   *
+   * parseCliArgs runs twice on purpose. The first run produces the command
+   * name, and there is no schema to consult yet; the second one, here, can be
+   * type-aware. Re-reading argv (rather than post-processing the first result)
+   * is what makes `--rollback users.ts` recoverable: by the time the first pass
+   * returns, the swallowed positional is indistinguishable from a value.
+   */
+  protected resolveCommandArgs(command: CLICommand, argv: string[] = process.argv): ParsedCliArgs {
+    try {
+      return parseCliArgs(argv, command.commandOptions);
+    } catch (error) {
+      if (error instanceof CliOptionValueError) {
+        console.log();
+        console.log(`  ${colors.redBright("Error:")} ${error.message}`);
+        console.log();
+        process.exit(1);
+      }
+
+      throw error;
+    }
   }
 
   /**
@@ -394,7 +426,14 @@ export class CLICommandsManager {
         }
       }
 
-      if (opt.alias !== undefined && result[opt.alias] && result[opt.name] === undefined) {
+      // `!== undefined`, not truthiness: `-r=false` now resolves to the boolean
+      // `false`, and a truthiness test would drop it before it ever reached the
+      // canonical name — leaving `rollback` undefined instead of explicitly off.
+      if (
+        opt.alias !== undefined &&
+        result[opt.alias] !== undefined &&
+        result[opt.name] === undefined
+      ) {
         result[opt.name] = result[opt.alias];
       }
     });

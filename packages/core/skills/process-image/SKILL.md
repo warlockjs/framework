@@ -22,7 +22,9 @@ await new Image("./photo.jpg")
   .save("./output.webp");
 ```
 
-That's the full contract. The chain doesn't touch sharp until the output method fires.
+That's the full contract. The chain doesn't run sharp until the output method fires; the
+constructor resolves the sharp module itself, so a missing sharp throws there rather than at the
+final await.
 
 ## Installation
 
