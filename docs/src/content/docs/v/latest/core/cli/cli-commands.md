@@ -171,7 +171,8 @@ Run database migrations. Without flags, runs all pending migrations.
 warlock migrate
 warlock migrate --fresh                  # drop all tables, run from scratch
 warlock migrate --rollback               # roll everything back
-warlock migrate --list                   # show executed migrations only
+warlock migrate --list                   # migration state: executed, then what's next
+warlock migrate --pending                # only what will run next, in execution order
 warlock migrate --all                    # show all migration files in the app
 warlock migrate --sql --pending-only     # export pending migrations as SQL files
 warlock migrate --sql --compact          # ...minus comments and blank lines
@@ -183,13 +184,67 @@ warlock migrate --path src/app/orders/models/order/migrations
 | `--fresh, -f`       | boolean | Drop all tables and re-run migrations from scratch.                                                      |
 | `--rollback, -r`    | boolean | Roll back migrations, dropping all tables.                                                               |
 | `--path, -p`        | string  | Path to a specific migration file or folder. Defaults to running all.                                    |
-| `--list, -l`        | boolean | List all *executed* migrations.                                                                          |
+| `--list, -l`        | boolean | Migration state: executed migrations, then what will run next.                                           |
+| `--pending`         | boolean | Only what will run next, in execution order. Sets an exit code — see below.                              |
 | `--all, -a`         | boolean | List *every* migration file in the app, executed or not.                                                 |
 | `--sql, -s`         | boolean | Export migrations as phase-ordered SQL files instead of executing them.                                  |
 | `--pending-only`    | boolean | With `--sql`, export only pending migrations. Otherwise exports all.                                     |
 | `--compact, -c`     | boolean | With `--sql`, strips generated comments and blank lines.                                                 |
 
 The minimal preload — only `database` and `logger` connectors — keeps migrations fast.
+
+#### Checking what will run next
+
+Before applying a schema change to a database other people are using, the question is *what is about to run* — not what already has.
+
+```bash
+warlock migrate --list
+```
+
+```
+Total Executed Migrations: 22
+
+  ✔ accessToken
+    Executed: 03-08-2026 11:04:19 PM
+  …
+
+Total Pending Migrations: 1
+
+  1. 08-10-2026_create_media
+```
+
+The pending block is printed **in execution order**, so it reads as a dry run rather than a set.
+
+:::caution[Don't derive the pending set by hand]
+Differencing `--all` against `--list` gives the wrong answer, and it errs towards *"safe to proceed"*.
+
+`--all` lists files under `src/app`. `--list` reads the migrations table, which **also** contains migrations registered by packages through `database.migrations` — `@warlock.js/auth` contributes two. The two outputs are drawn from different populations, so the difference under-counts what is pending. Use `--list` or `--pending`; neither has that problem.
+:::
+
+#### Gating a deploy on `--pending`
+
+`--list` is a report and always exits `0`. `--pending` is a gate:
+
+| Exit code | Meaning                                     |
+| --------- | ------------------------------------------- |
+| `0`       | Computed, and **nothing** is pending.       |
+| `1`       | Computed, and at least one migration is pending. |
+| `2`       | **Could not be computed.**                  |
+
+```bash
+warlock migrate --pending && ./deploy.sh   # deploys only when nothing is outstanding
+```
+
+`2` exists because "three migrations are waiting" and "I could not work out what is waiting" need opposite responses — run them, versus stop and look. A single non-zero code would make them indistinguishable to a script.
+
+Computing the pending set means loading your migration files, and a file missing its default export throws. When that happens the executed listing is still printed in full, followed by an explicit line:
+
+```
+Pending: unavailable — src/app/media/migrations/broken.ts must have a default export
+  The executed list above is still accurate.
+```
+
+It never reports `0` pending in that case. An empty pending list means *nothing is pending*, and nothing else.
 
 ### `seed`
 

@@ -74,6 +74,10 @@
       "slug": "cascade"
     },
     {
+      "name": "@warlock.js/context",
+      "slug": "context"
+    },
+    {
       "name": "@warlock.js/core",
       "slug": "core"
     },
@@ -107,6 +111,574 @@
     }
   ],
   "releases": [
+    {
+      "version": "4.12.0",
+      "id": "v4-12-0",
+      "date": "August 11, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong><code>@warlock.js/core</code></strong> adds <code>warlock migrate --pending</code> — what will run next, in execution order, with exit codes you can gate a deploy on — and stops two CLI flags doing the opposite of what they say: <code>migrate --rollback=false</code> dropped every table, and <code>generate.module --force=false</code> overwrote your files, because boolean options were parsed as raw strings and <code>\"false\"</code> is truthy. <strong><code>@warlock.js/auth</code></strong> closes a token-expiry hole: an unparseable <code>expiresIn</code> minted a JWT with no <code>exp</code> claim, such a token was then accepted forever, and the rows were never purged — tokens are now rejected at issue and at verification, and <code>auth:purge-never-expiring</code> finds and revokes the ones already in your database. <strong><code>@warlock.js/core</code></strong> also fixes <code>Image</code> and <code>renderReact</code> racing their own optional-dependency imports, where a constructor could run before <code>sharp</code> or <code>react</code> had loaded and fail with <code>not a function</code>.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 11,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 8
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>warlock migrate --pending</code> — what will run next, in the order it will run.</strong> <code>migrate</code> could report what had already run (<code>--list</code>) and what files existed on disk (<code>--all</code>), but not the one thing an operator asks before a schema change against a live database. The pending set was already computed on every migrate run; it simply had no read-only exit"
+            },
+            {
+              "type": "Changed",
+              "html": "<code>migrate</code>'s preload block no longer declares <code>env: true</code>. The flag has done nothing since env began loading for every command that declares a preload block; it was decoration, and the test suite now asserts its <strong>absence</strong> so it is not re-added by someone reading the still-deprecated type"
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>The package now declares its own test runner and a <code>test</code> script.</strong> <code>@warlock.js/core</code> shipped a maintained <code>vitest.config.ts</code> — aliasing eight sibling packages to their sources — with <strong>no <code>devDependencies</code> key at all</strong> and no way to invoke it. Its suite was reachable only by knowing to type <code>npx vitest</code>, which resolves whatever happens to exist in the tree rather than anything the manifest asked for. The runner is pinned to an <strong>exact</strong> version, not a range: it moved from 4.1.8 to 4.1.10 mid-development on an unrelated install, silently, and a suite whose runner can change underneath it proves less than it appears to"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>A build artifact that names an entry point it does not contain is now refused before it can be packed.</strong> An interrupted build leaves a directory that looks finished — <code>package.json</code>, <code>README</code>, <code>CHANGELOG</code>, <code>bin/</code>, <code>skills/</code> — and holds no compiled code at all. Nineteen existed in this tree at once, and nothing in the release path noticed: the only related guard compares <strong>modification times</strong>, so a hollow directory with a freshly written manifest is *newer than source* and passes, and it runs solely on the artifact-reuse path, which is not how the hollow directories were produced"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>The production acceptance gate no longer inherits the environment it is supposed to be testing.</strong> <code>run-pnpm-acceptance.mjs</code> spawned every child with <code>env: { ...process.env }</code> and set no <code>NODE_ENV</code>. It exercised the production path only because the shell it was written in happened to carry <code>NODE_ENV=production</code>; on a clean checkout, a new contributor's machine, or CI, the same gate boots the app in <strong>development</strong> — and does not fail, it passes while testing something other than the thing it is named after. That is the worst outcome available to a gate, and it sat underneath the proof for 4.11.0's headline fix"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>warlock migrate --rollback=false</code> no longer drops every table.</strong> CLI options were parsed as raw strings and nothing ever coerced them: <code>--rollback=false</code> reached the action as the string <code>\"false\"</code>, <code>if (rollback)</code> saw a truthy value, and the run rolled back *everything*. The declared <code>type: \"boolean\"</code> on the option was decorative — used only to render help. The same shape existed on every boolean option, including <code>warlock drop.tables --force=false</code>, where it turned a confirmation prompt into an unattended drop"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>warlock generate.module users --force=false</code> no longer overwrites your files.</strong> The coercion above is opt-in by design — it applies only to options a command declares <code>type: \"boolean\"</code>, so a string option whose value is genuinely the word <code>false</code> survives. The generate family and <code>add</code> never carried that declaration, so the fix reached none of them and both faces of the defect stayed live on the commands most likely to be run against existing source"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>new Image(...)</code> no longer fails depending on how soon you call it.</strong> The <code>Image</code> module fired <code>import(\"sharp\")</code> at load time without awaiting it, and the constructor only checked whether that import had *failed* — never whether it was still in flight. Constructing an image in the first tick after importing the package therefore ran with an undefined sharp function and died with <code>TypeError: sharpFn is not a function</code>; the exact same code passed if something had awaited a timer first. Anything that builds an image during boot — a startup thumbnail job, a module-level warm-up — hit it, and it presented as a mysterious \"works locally, breaks in prod\" timing bug rather than as a missing dependency"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>A sharp that is installed but will not load no longer reports itself as \"not installed\".</strong> The resolution above swallowed every failure into a single outcome, so the most common real-world sharp problem — the package present but its native binary built for another platform — arrived as <code>sharp is not installed.</code> plus instructions to run <code>npm install sharp</code>, which cannot fix it. sharp throws its own long, actionable error naming the runtime, the failing <code>.node</code> file and the exact install flags to use; that text was discarded and replaced with a different, wrong cause"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>renderReact()</code> no longer renders against modules that have not loaded yet.</strong> The same defect as the two above, in a second module, found by looking for the pattern rather than by a bug report. <code>react/index.ts</code> fired <code>import(\"react\")</code> and <code>import(\"react-dom/server\")</code> at load time without awaiting either, and tracked them with a three-state flag that the guard only tested for one state: <code>if (moduleExists === false)</code>. While the imports were in flight the flag was <code>null</code>, which is not <code>false</code>, so the guard passed and the synchronous <code>renderReact</code> read <code>createElement</code> off <code>undefined</code>. With two sequential dynamic imports the window is wider than the image module's, and it is open during exactly the work a server does at boot — rendering a page or an email template from a module-level warm-up"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>A broken <code>react-dom/server</code> no longer reports itself as <code>react is not installed</code>.</strong> The two packages were loaded in one <code>try</code> and collapsed into one flag, so any failure of either was attributed to react. The specifiers are now resolved and reported <strong>separately</strong>, and the message names the one that actually failed — <code>Failed to load \"react-dom/server\": …</code> — because sending an operator to reinstall react when react is fine costs them the debugging session. Absence is distinguished from breakage the same way as for sharp: <code>MODULE_NOT_FOUND</code> <strong>and</strong> a message naming the specifier exactly, quoted, which is also what stops <code>'react-dom'</code> from satisfying a check for <code>'react'</code>. Everything else surfaces the original error, inlined and chained as <code>cause</code>. A <code>react-dom</code> whose <code>./server</code> subpath is missing from <code>exports</code> raises <code>ERR_PACKAGE_PATH_NOT_EXPORTED</code>, so it correctly reports as an incompatible install rather than an absent one"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 12,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 6
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            },
+            {
+              "type": "Security",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>warlock auth.purge-never-expiring</code></strong> — remediation for rows written by the <code>expiresIn</code> defect below. Finds every access- and refresh-token row that can never retire itself, on two independent signals: an <code>expires_at</code> that is missing or unparseable, and a persisted token carrying no <code>exp</code> claim. Reports <code>id</code>, <code>user_id</code>, <code>user_type</code> and <code>expires_at</code> per row (never the token string — it is a live credential until the command removes it), then deletes them. Pass <code>--dry-run</code> to report without deleting."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Potentially breaking:</strong> a JWT with no <code>exp</code> claim is rejected by <code>jwt.verify</code> / <code>jwt.verifyRefreshToken</code>. No supported configuration produces one: an app that wants a token that effectively never expires sets <code>expiresIn: NO_EXPIRATION</code> (<code>\"100y\"</code>), which mints a <strong>real</strong> <code>exp</code> about a century out (<code>ms(\"100y\")</code> ⇒ <code>3155760000000</code>; <code>exp - iat</code> ⇒ <code>3155760000</code> seconds). \"No deadline\" and \"a distant deadline\" are different things, and only the second was ever asked for. If you sign tokens with your own signer and feed them to this package's verifier, they must carry <code>exp</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Potentially breaking:</strong> <code>RefreshToken.isExpired</code> now answers <code>true</code> for a missing or unparseable <code>expires_at</code>; it previously answered <code>false</code> (\"no expiry recorded ⇒ never expires\"). That reading handed an unlimited life to precisely the malformed rows. <code>expires_at</code> is <code>required</code> in the schema — a row that cannot say when it dies is malformed, not immortal. <code>AccessToken.isExpired</code> is new and fails closed the same way."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Potentially breaking:</strong> an invalid <code>accessToken.expiresIn</code> / <code>refreshToken.expiresIn</code> now throws on token issue instead of producing a token with a wrong or absent expiry. Valid configuration is unaffected — <code>\"1h\"</code>, <code>\"7d\"</code>, <code>\"30 days\"</code>, <code>NO_EXPIRATION</code> (<code>\"100y\"</code>), the <code>1h</code> access default when the key is absent, and the <code>7d</code> refresh default all behave exactly as before. An <strong>empty string</strong> (e.g. <code>env(\"JWT_TTL\")</code> with the variable unset) now throws rather than falling back; give the env read an explicit default."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>authConfig.accessToken.expiresInMs()</code> / <code>authConfig.refreshToken.expiresInMs()</code> are the validated accessors token issuers must use; the raw <code>expiresIn()</code> accessors are unchanged."
+            },
+            {
+              "type": "Changed",
+              "html": "Removed the <code>as ms.StringValue</code> casts on both call sites. They were what let arbitrary config text compile against <code>ms</code>'s template-literal type and reach the signer as <code>undefined</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>An <code>expiresIn</code> the <code>ms</code> package cannot parse no longer mints a credential that never expires.</strong> <code>accessToken.expiresIn: \"30dayz\"</code> (or <code>\"thirty days\"</code>, or any truthy-but-unparseable value) made <code>ms()</code> return <code>undefined</code>, which the signer emitted as a JWT with <strong>no <code>exp</code> claim</strong>, alongside a token row whose <code>expires_at</code> was <code>Invalid Date</code>. The old guard tested the raw config string for truthiness, so the <code>1h</code> fallback was unreachable in exactly the case it existed for. <code>refreshToken.expiresIn</code> had no fallback at all."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>expiresIn: \"0d\"</code> (and any non-positive duration) is rejected too.</strong> It is truthy and parses cleanly to <code>0</code>, so it survived any guard that only rejects <code>undefined</code> — and <code>fast-jwt</code> skips its own validation for <code>0</code>, emitting a token with <strong>no <code>exp</code> claim</strong> while the persisted row claims it expired immediately."
+            },
+            {
+              "type": "Fixed",
+              "html": "A bare number (<code>expiresIn: 2592000</code>) is now rejected instead of silently corrupting the expiry. <code>ms</code> *formats* numbers rather than parsing them (<code>2592000</code> ⇒ <code>\"43m\"</code>), which then poisoned <code>Date.now() + expiresIn</code> into <code>Invalid Date</code>. Write <code>\"30d\"</code>."
+            },
+            {
+              "type": "Security",
+              "html": "<strong>A token with no <code>exp</code> claim is now rejected instead of being accepted forever.</strong> <code>fast-jwt</code> has no deadline to check on such a token, so verification simply succeeds — measured against <code>fast-jwt@6.2.4</code>, a token with no <code>exp</code> verifies unchanged at <code>clockTimestamp</code> + 100 years. Both <code>jwt.verify</code> and <code>jwt.verifyRefreshToken</code> now require an <code>exp</code> claim."
+            },
+            {
+              "type": "Security",
+              "html": "<strong>The persisted <code>expires_at</code> is now enforced on every request.</strong> <code>authMiddleware</code> previously checked only that the access-token row *existed*; a row whose own expiry had passed still opened the gate, because nothing ever asked. The row is now checked against the clock and deleted on rejection."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>listPendingMigrations()</code></strong> — the registered migrations that have not executed, <strong>in the order they will execute</strong>, mirroring <code>listExecutedMigrations()</code>. The set was already computed inside the runner on every migrate run; <code>getPendingMigrations()</code> was <code>private</code> and had no read-only exit, so nothing outside could ask \"what will run next?\" without running it"
+            },
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            },
+            {
+              "type": "Changed",
+              "html": "Adds a <code>test</code> script. The package shipped a <code>tests/</code> directory with no way to run it, so the suite was reachable only by knowing to type <code>npx vitest</code> — which resolves whatever happens to exist in the tree rather than anything the manifest asked for"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Declares its own test runner and pins it to an exact version (<code>vitest@4.1.10</code>). The package is its own repository, so a runner resolved from a workspace root it may not be cloned with is a runner it cannot rely on. The pin is exact rather than a range because the version moved underneath the suite mid-development on an unrelated install — a suite whose runner can change without anyone choosing it proves less than it appears to"
+            }
+          ]
+        }
+      ]
+    },
     {
       "version": "4.11.0",
       "id": "v4-11-0",
