@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/logger",
-  "version": "4.11.0",
+  "version": "4.12.0",
   "type": "module",
   "description": "A powerful logging system  for messages and errors in nodejs.",
   "scripts": {
@@ -16,9 +16,9 @@
     "safe-stable-stringify": "^2.5.0"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^4.0.16",
+    "@vitest/coverage-v8": "4.1.10",
     "typescript": "^5.0.2",
-    "vitest": "^4.0.16"
+    "vitest": "4.1.10"
   },
   "peerDependencies": {
     "@sentry/node": "^8.0.0 || ^9.0.0 || ^10.0.0"
