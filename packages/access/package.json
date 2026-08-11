@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/access",
-  "version": "4.11.0",
+  "version": "4.12.0",
   "type": "module",
   "description": "Authorization (RBAC + ABAC) for Warlock.js applications",
   "main": "./esm/index.js",
@@ -31,5 +31,8 @@
   "author": "hassanzohdy",
   "license": "MIT",
   "module": "./esm/index.js",
-  "typings": "./esm/index.d.ts"
+  "typings": "./esm/index.d.ts",
+  "devDependencies": {
+    "vitest": "4.1.10"
+  }
 }
