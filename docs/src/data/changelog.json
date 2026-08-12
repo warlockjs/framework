@@ -112,6 +112,69 @@
   ],
   "releases": [
     {
+      "version": "4.13.0",
+      "id": "v4-13-0",
+      "date": null,
+      "isUnreleased": false,
+      "summaryHtml": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 9,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 8
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>build.singleBundle</code> — one file you can run with <code>node dist/app.js</code>.</strong> The default build keeps dependencies as real <code>import</code> specifiers resolved from <code>node_modules</code>, which is right when you deploy the folder. Producing a single self-contained file previously meant knowing to set <code>packages: \"bundle\"</code> <strong>and</strong> <code>splitting: false</code>, and it still did not work"
+            },
+            {
+              "type": "Fixed",
+              "html": "⚠ <strong>BREAKING — the package entry no longer re-exports the CLI, the dev server, the test helpers or the Vite integration.</strong> Five <code>export *</code> lines are gone from <code>@warlock.js/core</code>'s root: <code>./cli</code>, <code>./dev-server/files-orchestrator</code>, <code>./dev-server/health-checker</code>, <code>./tests</code> and <code>./vite</code>"
+            },
+            {
+              "type": "Fixed",
+              "html": "⚠ <strong>BREAKING — the CORS allow-list in <code>http.cors</code> now actually applies.</strong> The framework's defaults were spread <strong>after</strong> your configuration, so <code>{ origin: \"*\", methods: \"*\" }</code> overwrote whatever you set. <strong><code>http.cors</code> has never had any effect</strong>, in any release up to 4.12.0 — an app that configured an allow-list still answered every origin. Your configuration now wins"
+            },
+            {
+              "type": "Fixed",
+              "html": "⚠ <strong>BREAKING — <code>http.bodyLimit</code> no longer defaults to 200 GB.</strong> An app that configures nothing now gets <strong>Fastify's own 1 MB limit</strong>. The previous default did not merely allow large bodies, it <strong>replaced a protection Fastify provides</strong>: an unauthenticated endpoint accepted a 5 MB body and ran application logic on it where bare Fastify would have answered <code>413</code>"
+            },
+            {
+              "type": "Fixed",
+              "html": "⚠ <strong>BREAKING — <code>http.trustProxy</code> now defaults to <code>false</code>.</strong> <code>request.ip</code> was derived from the client-supplied <code>X-Forwarded-For</code> header by default, and <code>@fastify/rate-limit</code> keys its buckets on <code>request.ip</code> — so <strong>a client sending a different <code>X-Forwarded-For</code> on each request got a fresh rate-limit bucket every time.</strong> Any deployment not behind a proxy that strips the header had bypassable rate limiting, and the same applied to per-IP lockouts and audit logs"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Per-route <code>serverOptions</code> are no longer discarded by the dev server.</strong> <code>scanDevServer</code> registers wildcard routes and dispatches per request, so it had no per-route registration slot and dropped <code>serverOptions</code> entirely. A route declaring <code>serverOptions.onRequest</code> — the documented way to run <strong>before body parsing</strong> — worked in production and <strong>silently never ran in dev</strong>, which is the only mode most teams run. <code>route.rateLimit</code> was dropped the same way, since it rides in the same options object"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>The dev server no longer rebuilds its entire route registry on every request.</strong> A comment claimed the registry was initialised \"once\" and pointed at a <code>rebuildRouteRegistry</code> function that <strong>does not exist</strong>; the code sat inside the per-request handler, re-registering every route on every hit — and <code>router.any()</code> routes expand into seven registrations each. It is now built once and rebuilt when the route table changes"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>The dev dispatcher logs through the framework logger instead of <code>console.log(error)</code>,</strong> with the request method and url attached"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>A bundled production build no longer succeeds and then dies at startup.</strong> Setting <code>packages: \"bundle\"</code> produced a clean build whose process failed immediately with <code>Error: Dynamic require of \"node:assert\" is not supported</code>. Warlock's output is an ES module; bundled CommonJS dependencies call <code>require(...)</code> and read <code>__dirname</code> to locate their own assets, and neither exists in an ES module, so the bundler substituted a stub that throws. The only fix available to an application author was to hand-write an esbuild <code>banner</code> recreating <code>require</code> via <code>createRequire(import.meta.url)</code> — esbuild internals no app should need to know"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "4.12.0",
       "id": "v4-12-0",
       "date": "August 11, 2026",

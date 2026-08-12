@@ -120,7 +120,7 @@ Each rejection carries a stable `HttpErrorCodes` value so clients can branch on 
 A few facts worth internalizing before you lean on these:
 
 - **`rateLimit` and `concurrencyLimit` counters are process-local.** With `N` replicas the effective cap is `N × max`. For a genuinely shared rate limit, configure `@fastify/rate-limit`'s Redis store via `http.rateLimit` instead; for shared concurrency, reach for a `@warlock.js/cache` lock.
-- **`ipFilter` reads the IP via `request.detectIp()`,** which honors `X-Real-IP` / `X-Forwarded-For` because Fastify runs with `trustProxy: true`. Those headers are client-settable — only trust them behind a proxy you control.
+- **`ipFilter` reads the IP via `request.detectIp()`.** **Since 4.13.0 `http.trustProxy` defaults to `false`**, so that is the socket address and `X-Real-IP` / `X-Forwarded-For` are ignored. Earlier versions defaulted to `true` — client-settable headers were believed, which made per-IP rate limits and IP allow-lists bypassable. **Turn it on only behind a proxy you control that overwrites those headers.**
 - **`maxBodySize` is a per-route layer, not pre-read protection.** It short-circuits the application stack on `Content-Length`, but the server still reads the body off the wire. For true pre-read protection, lower `http.bodyLimit` at the Fastify level too.
 - **`idempotency` must run after `authMiddleware`** — its cache key is scoped per-user so user A can't replay user B's key. Anonymous requests fall back to IP scope.
 - **`maintenance` is toggled by config and needs a restart** to flip — there's no runtime hot-flip. Its allowlist defaults to `["/health"]` so health checks survive planned downtime.
@@ -157,7 +157,7 @@ export default {
 
 CORS comes from `@fastify/cors`, configured via `http.cors` (a `FastifyCorsOptions`).
 
-> **Gotcha — the framework's permissive default wins.** The plugin is registered as `{ ...config.get("http.cors", {}), ...defaultCorsOptions }`, and `defaultCorsOptions` is `{ origin: "*", methods: "*" }`. Because the default is spread **last**, it overrides your `origin` / `methods` — today `http.cors` cannot tighten those two fields through config. If you need a locked-down origin, that's a known limitation to confirm against the current `src/http/plugins.ts` before relying on it.
+> ⚠ **Fixed in 4.13.0 — and breaking if you were relying on the old behaviour.** Up to and including 4.12.0 the framework's defaults (`{ origin: "*", methods: "*" }`) were spread **after** your configuration, so `http.cors` **had no effect on `origin` / `methods` in any release** — an app that carefully configured an allow-list still answered every origin. Your configuration now wins. **If your app has been running open CORS without knowing it, upgrading will start rejecting origins you never allow-listed.**
 
 ### Cookies
 
@@ -205,9 +205,9 @@ Concrete, verified-against-the-code steps. Only knobs that actually exist are li
 - **Set `APP_ENCRYPTION_KEY` (and ideally a separate `APP_HMAC_KEY`).** A missing key throws on the first `encrypt()` call at runtime, not at boot — catch it in a startup pre-flight. Use a fresh 32-byte key (`crypto.randomBytes(32).toString("hex")`).
 - **Hash passwords with `hashPassword`, never `encrypt` or `hmacHash`.** bcrypt only, on signup / login / password-change — never on the per-request hot path.
 - **Encrypt recoverable secrets, fingerprint them with `hmacHash` for lookup.** Look up by fingerprint; decrypt only at the moment of use. Never log a decrypted value.
-- **Lock down CORS** via `http.cors` — but verify the permissive-default gotcha above against `src/http/plugins.ts` first; `origin` / `methods` may not be overridable through config yet.
+- **Lock down CORS** via `http.cors`. **Since 4.13.0 your configuration wins** — in 4.12.0 and earlier it was silently overridden by the permissive default.
 - **Sign cookies** by setting `http.cookies.secret` whenever a cookie value must not be client-forgeable.
-- **Lower `http.bodyLimit`** from the historical default for production, and add `middleware.maxBodySize()` on routes that accept user payloads.
+- **Check `http.bodyLimit`** — **since 4.13.0 it defaults to Fastify's own 1 MB** rather than the previous 200 GB — and add `middleware.maxBodySize()` on routes that accept user payloads.
 - **Add `middleware.rateLimit()`** to login, OTP, password-reset, and other abuse-prone endpoints — tighter than the global `http.rateLimit` backstop. Use a Redis store via `http.rateLimit` if you run multiple replicas and need a shared cap.
 - **Add `middleware.concurrencyLimit()`** to unbounded-cost endpoints (report generation, AI completions, image processing).
 - **Gate admin / webhook routes with `middleware.ipFilter()`** — and only trust `X-Forwarded-For` behind a proxy you control.

@@ -18,14 +18,14 @@ Work top to bottom — the order roughly follows boot: secrets first, then the t
 
 ## Request surface (body limits & input)
 
-- [ ] **Lower `http.bodyLimit`** from the historical default for production, and add `middleware.maxBodySize()` on routes that accept user payloads. An unbounded body is a denial-of-service vector. See [Security → hardening checklist](./security.md).
+- [ ] **Check `http.bodyLimit`, and add `middleware.maxBodySize()`** on routes that accept user payloads. **Since 4.13.0 the default is Fastify's own 1 MB** — before that it was 200 GB, which *replaced* Fastify's protection, so an app configuring nothing had effectively no cap. **If you are upgrading from ≤ 4.12.0 and relied on large bodies being accepted, set `bodyLimit` explicitly.** See [Security → hardening checklist](./security.md).
 - [ ] **Attach a validation schema to every controller that takes input.** Constrain enums, lengths, and required fields so malformed input is rejected before the handler runs. See [Validation](../the-basics/validation.md).
 - [ ] **Sanitize storage keys and locations derived from request input.** Never pass a raw filename / `:id` / `?path=` into `storage.get/put/path`. The local driver rejects paths that escape the storage root, but you should still restrict keys to a known per-tenant prefix and strip `..` segments — and cloud drivers have no filesystem root to contain you, so sanitization is entirely on you there. See [Storage → gotchas](./storage.md).
 
 ## Trusted proxy & transport
 
-- [ ] **Decide who you trust for `X-Forwarded-For`.** Fastify runs with `trustProxy: true`, so `request.detectIp()`, `middleware.ipFilter()`, and IP-scoped rate limiting honor client-settable forwarding headers. Only deploy behind a proxy you control that overwrites those headers — otherwise the client IP can be spoofed. See [Known Limitations → transport & proxy trust](./known-limitations.md).
-- [ ] **Lock down CORS** via `http.cors` — but verify the permissive-default gotcha first (`origin` / `methods` may not be overridable through config yet; confirm against `src/http/plugins.ts`). See [Security → CORS](./security.md).
+- [ ] **Decide who you trust for `X-Forwarded-For`.** **Since 4.13.0 `http.trustProxy` defaults to `false`**, so `request.detectIp()`, `middleware.ipFilter()` and IP-scoped rate limiting use the socket address. **Set it to `true` only if you are behind a proxy you control that overwrites those headers** — turning it on without one lets any client choose its own IP, and per-IP rate limits become bypassable. See [Known Limitations → transport & proxy trust](./known-limitations.md).
+- [ ] **Lock down CORS** via `http.cors`. **Since 4.13.0 your configuration wins** — in 4.12.0 and earlier the permissive defaults were spread last and `http.cors` had no effect at all. See [Security → CORS](./security.md).
 - [ ] **Sign cookies** by setting `http.cookies.secret` whenever a cookie value must not be client-forgeable. See [Security](./security.md).
 - [ ] **Keep `http.requestId` enabled** so every request is traceable end-to-end; inherited ids are already validated against log-injection. See [Security](./security.md).
 

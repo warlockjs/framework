@@ -23,8 +23,8 @@ These features are correct on one node and degrade silently when you scale horiz
 
 ## Transport & proxy trust
 
-- **The CORS default is permissive and currently wins over config.** The plugin is registered as `{ ...config.get("http.cors"), ...defaultCorsOptions }` with `defaultCorsOptions = { origin: "*", methods: "*" }` spread **last** — so today `http.cors` cannot tighten `origin` / `methods` through config alone. If you need a locked-down origin, confirm the current behavior against `src/http/plugins.ts` before relying on config. See [Security → CORS](./security.md).
-- **`X-Forwarded-For` / `X-Real-IP` are trusted because Fastify runs with `trustProxy: true`.** Those headers are client-settable. `request.detectIp()`, `middleware.ipFilter()`, and IP-scoped rate limiting all read them — so they're only trustworthy **behind a proxy you control** that overwrites the header. A directly internet-exposed instance can be spoofed. See [Security](./security.md).
+- **Fixed in 4.13.0 — `http.cors` now applies.** Up to and including 4.12.0 the framework's defaults (`{ origin: "*", methods: "*" }`) were spread **after** your configuration, so `http.cors` **could not tighten `origin` / `methods` at all** — an app that configured an allow-list still answered every origin. Your configuration now wins. **If you are upgrading and were unknowingly running open CORS, this will start rejecting origins.** See [Security → CORS](./security.md).
+- **Fixed in 4.13.0 — `X-Forwarded-For` / `X-Real-IP` are no longer trusted by default.** `http.trustProxy` now defaults to **`false`**, so `request.detectIp()`, `middleware.ipFilter()` and IP-scoped rate limiting read the socket address. Previously the default was `true`, which meant **a client could send its own forwarding header and be believed** — and because `@fastify/rate-limit` keys its buckets on `request.ip`, a different header per request produced a fresh bucket each time. **Set `http.trustProxy: true` only when you are genuinely behind a proxy that overwrites those headers.** See [Security](./security.md).
 
 ## API surface
 

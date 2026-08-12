@@ -98,10 +98,45 @@ build: {
 | `outFile`       | `"app.js"`               | The name of the bundled file                                            |
 | `minify`        | `true`                   | Whether the production bundle is minified                               |
 | `sourcemap`     | `true`                   | Sourcemap mode — `true`, `false`, `"inline"`, or `"linked"`             |
+| `singleBundle`  | `false`                  | Inline dependencies into one runnable file — see below                  |
+| `esmShim`       | `true`                   | Recreate `require` / `__filename` / `__dirname` for bundled CommonJS    |
 
 `outDirectory` is accepted as an alias for `outdir`. Earlier docs used that name while the code only ever read `outdir`, so configs written from them were silently ignored — both work now, and `outdir` wins if you set both.
 
 `sourcemap: true` produces a `.js.map` next to the bundle (linked). `"inline"` embeds the sourcemap into the bundle (larger but no separate file). Set it to `false` only if you're shipping to an environment where source maps would leak source code via debuggers.
+
+#### `singleBundle` — one file you can just run
+
+By default the bundle keeps your dependencies as real `import` specifiers and resolves them from `node_modules` at runtime. That's what you want when you deploy the folder. When you'd rather ship **one file**, set:
+
+```ts
+build: {
+  singleBundle: true,
+}
+```
+
+```bash
+warlock build
+node dist/app.js        # no node_modules, no launcher
+```
+
+It sets `packages: "bundle"` and `splitting: false` **as defaults you can still override** — write `splitting: true` yourself and yours wins.
+
+:::caution[Not literally a single file]
+Native `.node` addons cannot be inlined by any bundler and are still emitted next to `dist/app.js`. If your dependencies include one (`sharp`, for example), ship the folder — "single bundle" means one JavaScript file plus any native addons.
+:::
+
+#### `esmShim` — why a bundled build used to crash at runtime
+
+Warlock's production output is an ES module. Bundled CommonJS dependencies call `require(...)` and read `__dirname` to find their own assets, and **neither exists in an ES module** — so the bundler replaces them with a stub that throws:
+
+```
+Error: Dynamic require of "node:assert" is not supported
+```
+
+The build reported success; the process died on start. Warlock now injects a small prelude that recreates `require`, `__filename` and `__dirname` via `createRequire(import.meta.url)`.
+
+**This applies to any ESM build, not just `singleBundle`** — so setting `packages: "bundle"` by hand works too. It's on by default; set `esmShim: false` only if you're certain nothing in your dependency graph is CommonJS. If you already hand-wrote a `banner` to do this, keep it: your banner is merged after the shim rather than replacing it.
 
 ### `cli` — custom commands
 
