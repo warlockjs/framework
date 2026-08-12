@@ -1,4 +1,4 @@
-import { Path } from "../dev-server/path";
+import { Path } from "../utils/normalized-path";
 import { ConnectorLifecyclePhase } from "./types";
 import type { Connector, ConnectorName } from "./types";
 

@@ -1,6 +1,6 @@
 import { colors } from "@mongez/copper";
 import dayjs from "dayjs";
-import { Path } from "./path";
+import { Path } from "../utils/normalized-path";
 
 /**
  * Dev server logger — Vite-style formatting helpers.

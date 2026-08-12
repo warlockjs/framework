@@ -2,7 +2,6 @@ import config from "@mongez/config";
 import { colors } from "@mongez/copper";
 import { log } from "@warlock.js/logger";
 import { Application } from "../application";
-import { devLogError } from "../dev-server/dev-logger";
 import { health } from "../http/health";
 import { registerHttpPlugins } from "../http/plugins";
 import { closeServerWithTimeout, FastifyInstance, getHttpServer, startHttpServer } from "../http/server";
@@ -156,12 +155,9 @@ export class HttpConnector extends BaseConnector {
 
       log.success(`http`, "connection", `Server ready at ${baseUrl}`);
     } catch (error) {
-      devLogError("Error while starting http server", error);
-
       // A failed listen()/port-bind at boot means the app can't serve — fatal.
-      // devLogError above is the dev-server console UI and bypasses the logger
-      // pipeline, so also route it through `log.fatal` to reach Sentry/file,
-      // then `await log.flush()` to drain buffered/async channels before exit.
+      // `log.fatal` reaches Sentry/file; `await log.flush()` drains buffered and
+      // async channels before the process exits.
       await log.fatal("http", "connection", error);
       await log.flush();
 

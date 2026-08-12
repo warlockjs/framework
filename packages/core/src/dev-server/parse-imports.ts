@@ -1,7 +1,7 @@
 import { fileExistsAsync, directoryExistsAsync } from "@warlock.js/fs";
 import { ImportSpecifier, parse } from "es-module-lexer";
 import path from "node:path";
-import { Path } from "./path";
+import { Path } from "../utils/normalized-path";
 import { tsconfigManager } from "./tsconfig-manager";
 
 /**

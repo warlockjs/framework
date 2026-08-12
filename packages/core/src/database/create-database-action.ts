@@ -1,7 +1,7 @@
 import { colors } from "@mongez/copper";
 import { createDatabase } from "@warlock.js/cascade";
 import { log } from "@warlock.js/logger";
-import { CommandActionData } from "../cli/types";
+import { CommandActionData } from "../commands/types";
 import { config } from "../config";
 
 export async function createDatabaseAction(command: CommandActionData) {

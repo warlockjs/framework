@@ -1,13 +1,8 @@
-import type { FastifyCorsOptions } from "@fastify/cors";
 import fastifyMultipart from "@fastify/multipart";
 import config from "@mongez/config";
 import { rootPath } from "../utils";
+import { buildCorsOptions } from "./build-cors-options";
 import type { FastifyInstance } from "./server";
-
-const defaultCorsOptions: FastifyCorsOptions = {
-  origin: "*",
-  methods: "*",
-};
 
 export async function registerHttpPlugins(server: FastifyInstance) {
   // 👇🏻 register rate-limit plugin
@@ -19,12 +14,7 @@ export async function registerHttpPlugins(server: FastifyInstance) {
   });
 
   // 👇🏻 register cors plugin
-  const corsOptions: FastifyCorsOptions | undefined = {
-    ...config.get("http.cors", {}),
-    ...defaultCorsOptions,
-  };
-
-  server.register(import("@fastify/cors"), corsOptions);
+  server.register(import("@fastify/cors"), buildCorsOptions());
 
   // 👇🏻 import multipart plugin
   server.register(fastifyMultipart, {

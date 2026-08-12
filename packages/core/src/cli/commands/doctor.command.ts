@@ -1,4 +1,4 @@
-import { command } from "../cli-command";
+import { command } from "../../commands/cli-command";
 import { doctorCommandAction } from "./doctor/doctor-command.action";
 
 /**

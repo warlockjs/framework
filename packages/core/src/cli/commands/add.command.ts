@@ -1,5 +1,5 @@
 import { addCommandAction } from "../../generations/add-command.action";
-import { command } from "../cli-command";
+import { command } from "../../commands/cli-command";
 
 export const addCommand = command({
   name: "add <features...>",

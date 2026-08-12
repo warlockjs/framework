@@ -3,7 +3,7 @@ import { Random } from "@mongez/reinforcements";
 import chokidar from "chokidar";
 import { rootPath, srcPath } from "../utils";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
-import { Path } from "./path";
+import { Path } from "../utils/normalized-path";
 
 type FileWatcherEvent = "change" | "delete" | "add" | "error" | "addDir" | "unlinkDir";
 

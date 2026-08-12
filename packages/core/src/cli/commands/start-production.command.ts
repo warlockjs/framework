@@ -1,6 +1,6 @@
 import { superviseProductionProcess } from "../../production/production-supervisor";
 import { resolveBuildConfig } from "../../production/resolve-build-config";
-import { command } from "../cli-command";
+import { command } from "../../commands/cli-command";
 
 export const startProductionCommand = command({
   name: "start",

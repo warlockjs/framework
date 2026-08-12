@@ -26,16 +26,48 @@ export function getTestServerUrl(): string {
  * Uses native fetch - lightweight, no extra dependencies
  */
 export async function testRequest(path: string, options: RequestInit = {}): Promise<Response> {
+  return sendRequest(path, options, false);
+}
+
+/**
+ * The single place a request is actually built.
+ *
+ * `serializedJson` says whether THIS module turned the caller's value into a
+ * JSON string. It is the only thing that justifies setting a JSON content type:
+ * a `FormData` body carries a multipart boundary the runtime generates, and
+ * labelling it `application/json` produces a request no server can parse.
+ */
+async function sendRequest(
+  path: string,
+  options: RequestInit,
+  serializedJson: boolean,
+): Promise<Response> {
   const baseUrl = getTestServerUrl();
   const url = path.startsWith("/") ? `${baseUrl}${path}` : `${baseUrl}/${path}`;
 
-  return fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
+  // Normalised through `Headers` rather than object-spread: `RequestInit.headers`
+  // may be a record, a `Headers` instance, or a list of `[name, value]` tuples,
+  // and spreading the last two silently produces an object with numeric keys —
+  // the header is simply lost, with no error anywhere.
+  const headers = new Headers(options.headers);
+
+  if (serializedJson && !headers.has("content-type")) {
+    headers.set("content-type", "application/json");
+  }
+
+  return fetch(url, { ...options, headers });
+}
+
+/**
+ * Serialize a body for a JSON request.
+ *
+ * `undefined` means the caller omitted the argument; every other value —
+ * including `false`, `0`, `""` and `null` — is a legal JSON document and must
+ * be sent. The old check was `body ? JSON.stringify(body) : undefined`, which
+ * dropped all four.
+ */
+function jsonBody(body: unknown): string | undefined {
+  return body === undefined ? undefined : JSON.stringify(body);
 }
 
 /**
@@ -53,11 +85,7 @@ export async function testPost(
   body?: unknown,
   options: RequestInit = {},
 ): Promise<Response> {
-  return testRequest(path, {
-    ...options,
-    method: "POST",
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  return sendRequest(path, { ...options, method: "POST", body: jsonBody(body) }, body !== undefined);
 }
 
 /**
@@ -68,11 +96,7 @@ export async function testPut(
   body?: unknown,
   options: RequestInit = {},
 ): Promise<Response> {
-  return testRequest(path, {
-    ...options,
-    method: "PUT",
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  return sendRequest(path, { ...options, method: "PUT", body: jsonBody(body) }, body !== undefined);
 }
 
 /**
@@ -90,11 +114,7 @@ export async function testPatch(
   body?: unknown,
   options: RequestInit = {},
 ): Promise<Response> {
-  return testRequest(path, {
-    ...options,
-    method: "PATCH",
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  return sendRequest(path, { ...options, method: "PATCH", body: jsonBody(body) }, body !== undefined);
 }
 
 /**

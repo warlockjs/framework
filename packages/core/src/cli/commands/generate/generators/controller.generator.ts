@@ -1,5 +1,5 @@
 import { colors } from "@mongez/copper";
-import type { CommandActionData } from "../../../types";
+import type { CommandActionData } from "../../../../commands/types";
 import { controllerStub, schemaStub } from "../templates/stubs";
 import { parseModulePath, parseName } from "../utils/name-parser";
 import {

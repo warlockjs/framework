@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { CLICommand } from "../../../src/cli/cli-command";
+import { CLICommand } from "../../../src/commands/cli-command";
 import { CLICommandsManager } from "../../../src/cli/cli-commands.manager";
 import { CliOptionValueError, parseCliArgs } from "../../../src/cli/parse-cli-args";
-import type { ResolvedCLICommandOption } from "../../../src/cli/types";
+import type { ResolvedCLICommandOption } from "../../../src/commands/types";
 
 /**
  * Type-aware option resolution (#21).

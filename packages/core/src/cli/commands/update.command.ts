@@ -1,6 +1,6 @@
 import { colors } from "@mongez/copper";
 import { updateWarlockPackages } from "../../updater/update-warlock-packages";
-import { command } from "../cli-command";
+import { command } from "../../commands/cli-command";
 
 export const updateCommand = command({
   name: "update",

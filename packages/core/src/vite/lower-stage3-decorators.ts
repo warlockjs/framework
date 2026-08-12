@@ -38,7 +38,7 @@ export interface DecoratorLoweringPlugin {
  * @example
  * ```ts
  * // vite.config.ts / vitest.config.ts
- * import { lowerStage3Decorators } from "@warlock.js/core";
+ * import { lowerStage3Decorators } from "@warlock.js/core/vite";
  * import { defineConfig } from "vitest/config";
  *
  * export default defineConfig({

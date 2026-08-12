@@ -30,7 +30,7 @@ const load = vi.fn();
 vi.mock("../../../../src/dev-server/files-orchestrator", () => ({
   filesOrchestrator: { load: (...args: unknown[]) => load(...args) },
 }));
-vi.mock("../../../../src/dev-server/path", () => ({
+vi.mock("../../../../src/utils/normalized-path", () => ({
   Path: { toAbsolute: (p: string) => p, toRelative: (p: string) => p },
 }));
 vi.mock("../../../../src/dev-server/utils", () => ({

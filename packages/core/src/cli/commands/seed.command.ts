@@ -1,5 +1,5 @@
 import { seedCommandAction } from "../../database/seed-command-action";
-import { command } from "../cli-command";
+import { command } from "../../commands/cli-command";
 
 export const seedCommand = command({
   action: seedCommandAction,

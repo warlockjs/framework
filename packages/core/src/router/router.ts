@@ -24,11 +24,91 @@ import type {
   RouterStacks,
 } from "./types";
 
+/**
+ * A Fastify lifecycle hook as it may be declared in a route's `serverOptions`.
+ * Fastify accepts a single hook or an array in either position.
+ */
+type RouteLifecycleHook = (
+  request: FastifyRequest,
+  reply: FastifyReply,
+) => unknown | Promise<unknown>;
+
+/**
+ * The pre-handler phases the dev server forwards from a route's `serverOptions`.
+ *
+ * These are the admission-control phases and they share the `(request, reply)`
+ * signature. `preParsing` is deliberately absent — it must return the payload
+ * stream, so forwarding it generically would corrupt the body rather than
+ * guard it. `bodyLimit` cannot be forwarded at all; Fastify reads it at
+ * registration time and no hook can bound a body already being parsed.
+ */
+const FORWARDED_ROUTE_PHASES = ["onRequest", "preValidation", "preHandler"] as const;
+
+type ForwardedRoutePhase = (typeof FORWARDED_ROUTE_PHASES)[number];
+
+/**
+ * The route the dev dispatcher matched, stashed on the request so the hooks and
+ * the wildcard handler all act on one match rather than each matching again.
+ */
+type DevMatchedRoute = { route: Route; params: Record<string, string> };
+
+type DevDispatchRequest = FastifyRequest & {
+  matchedDevRoute?: DevMatchedRoute;
+};
+
+function toHookList(
+  hook: RouteLifecycleHook | RouteLifecycleHook[] | undefined,
+): RouteLifecycleHook[] {
+  if (!hook) {
+    return [];
+  }
+
+  return Array.isArray(hook) ? hook : [hook];
+}
+
+/**
+ * Run a matched route's hooks for one phase.
+ *
+ * Returning the reply is how an async Fastify hook signals that it has answered
+ * the request; the chain must stop there, so the value is propagated rather
+ * than discarded.
+ */
+async function runRouteHooks(
+  route: Route,
+  phase: ForwardedRoutePhase,
+  request: FastifyRequest,
+  reply: FastifyReply,
+) {
+  const hooks = toHookList(
+    route.serverOptions?.[phase] as RouteLifecycleHook | RouteLifecycleHook[] | undefined,
+  );
+
+  for (const hook of hooks) {
+    const outcome = await hook(request, reply);
+
+    if (outcome === reply) {
+      return reply;
+    }
+  }
+
+  return undefined;
+}
+
 export class Router {
   /**
    * Routes list
    */
   private routes: Route[] = [];
+
+  /**
+   * Bumped on every mutation of {@link routes}.
+   *
+   * The dev dispatcher caches a route registry and needs to know when it is
+   * stale. Comparing `routes.length` would miss an HMR reload that replaces a
+   * route without changing the count — the registry would then keep matching
+   * paths that no longer exist. A version counter cannot miss that.
+   */
+  private routesVersion = 0;
 
   /**
    * Router Instance
@@ -259,6 +339,8 @@ export class Router {
     }
 
     this.routes.push(routeData);
+
+    this.routesVersion++;
 
     return this;
   }
@@ -570,6 +652,8 @@ export class Router {
    */
   public removeRoutesBySourceFile(sourceFile: string): void {
     this.routes = this.routes.filter((route) => route.sourceFile !== sourceFile);
+
+    this.routesVersion++;
   }
 
   /**
@@ -713,14 +797,64 @@ export class Router {
   public scanDevServer(server: FastifyInstance) {
     this.eventListeners.beforeScan?.forEach((callback) => callback(this, server));
 
-    // Shared handler for wildcard routing
-    const wildcardHandler = async (fastifyRequest: FastifyRequest, fastifyReply: FastifyReply) => {
-      // Initialize route registry once (will be rebuilt on HMR via rebuildRouteRegistry)
-      const routeRegistry = new RouteRegistry();
+    let routeRegistry: RouteRegistry | undefined;
+    let registryVersion = -1;
+
+    // Rebuilt when the route table changes rather than per request. Building it
+    // inside the handler re-registered every route on every hit — and `all`
+    // routes expand into seven registrations each. Keyed on `routesVersion`
+    // rather than on the route count, so an HMR reload that swaps a route
+    // without changing the count still invalidates.
+    const resolveRouteRegistry = () => {
+      if (routeRegistry && registryVersion === this.routesVersion) {
+        return routeRegistry;
+      }
+
+      routeRegistry = new RouteRegistry();
 
       routeRegistry.register(this.routes);
-      // Find matching route using find-my-way
-      const match = routeRegistry.find(fastifyRequest.method, fastifyRequest.url);
+
+      registryVersion = this.routesVersion;
+
+      return routeRegistry;
+    };
+
+    // Matching happens here, in Fastify's own onRequest phase, so a route's
+    // `serverOptions.onRequest` still runs BEFORE body parsing. Production
+    // `scan()` gets that from per-route registration; the wildcard dispatcher
+    // has no per-route slot, so without this the hook silently never runs.
+    server.addHook(
+      "onRequest",
+      async (fastifyRequest: FastifyRequest, fastifyReply: FastifyReply) => {
+        const match = resolveRouteRegistry().find(fastifyRequest.method, fastifyRequest.url);
+
+        if (!match) {
+          return undefined;
+        }
+
+        (fastifyRequest as DevDispatchRequest).matchedDevRoute = match;
+
+        fastifyRequest.params = match.params;
+
+        return runRouteHooks(match.route, "onRequest", fastifyRequest, fastifyReply);
+      },
+    );
+
+    for (const phase of FORWARDED_ROUTE_PHASES.filter((name) => name !== "onRequest")) {
+      server.addHook(phase, async (fastifyRequest: FastifyRequest, fastifyReply: FastifyReply) => {
+        const match = (fastifyRequest as DevDispatchRequest).matchedDevRoute;
+
+        if (!match) {
+          return undefined;
+        }
+
+        return runRouteHooks(match.route, phase, fastifyRequest, fastifyReply);
+      });
+    }
+
+    // Shared handler for wildcard routing
+    const wildcardHandler = async (fastifyRequest: FastifyRequest, fastifyReply: FastifyReply) => {
+      const match = (fastifyRequest as DevDispatchRequest).matchedDevRoute;
 
       // No match found - return 404
       if (!match) {
@@ -731,9 +865,6 @@ export class Router {
         });
       }
 
-      // Inject extracted params into the request
-      fastifyRequest.params = match.params;
-
       try {
         // Call the matched route handler
         const { output, response } = await this.handleRoute(match.route)(
@@ -743,7 +874,11 @@ export class Router {
 
         return output || response.baseResponse;
       } catch (error) {
-        console.log(error);
+        log.error("router", "dev-dispatch", error as Error, {
+          method: fastifyRequest.method,
+          url: fastifyRequest.url,
+        });
+
         throw error;
       }
     };

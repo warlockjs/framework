@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { CLICommand, command } from "../../../src/cli/cli-command";
+import { CLICommand, command } from "../../../src/commands/cli-command";
 
 /**
  * Unit coverage for `CLICommand` and its `command()` factory. Focus areas:

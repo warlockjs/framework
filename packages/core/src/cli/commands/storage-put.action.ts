@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { config } from "../../config";
 import { storage } from "../../storage";
-import type { CommandActionData } from "../types";
+import type { CommandActionData } from "../../commands/types";
 
 /**
  * Action for `warlock storage.put <localPath> [destination] [--driver <name>] [--concurrency <n>]`

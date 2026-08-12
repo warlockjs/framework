@@ -7,7 +7,7 @@ import type { FileOperations } from "./file-operations";
 import { FILE_PROCESSING_BATCH_SIZE } from "./flags";
 import type { ManifestManager } from "./manifest-manager";
 import { clearFileExistsCache } from "./parse-imports";
-import { Path } from "./path";
+import { Path } from "../utils/normalized-path";
 
 /**
  * Receives raw watcher events and processes them in a single debounced batch.

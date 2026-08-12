@@ -4,7 +4,7 @@ import crypto from "crypto";
 import { DEV_SERVER_EVENTS } from "./events";
 import { type FileOperations } from "./file-operations";
 import { isTypeOnlyFile, parseImports } from "./parse-imports";
-import { Path } from "./path";
+import { Path } from "../utils/normalized-path";
 import type { FileManifest, FileState, FileType } from "./types";
 
 export type CleanupFunction = () => void;

@@ -1,7 +1,7 @@
 import { checkForFrameworkUpdate } from "../../dev-server/check-for-updates";
 import { startDevelopmentServer } from "../../dev-server/start-development-server";
 import { isDevWorker, superviseDevServer } from "../../dev-server/supervisor";
-import { command } from "../cli-command";
+import { command } from "../../commands/cli-command";
 import { displayStartupBanner } from "../cli-commands.utils";
 
 export const devServerCommand = command({

@@ -1,5 +1,5 @@
 import { router } from "../../../router/router";
-import type { CommandActionData } from "../../types";
+import type { CommandActionData } from "../../../commands/types";
 import { printRoutesTable } from "./format-routes-table";
 import { filterRouteRows, sortRouteRows, toRouteRow } from "./route-row";
 

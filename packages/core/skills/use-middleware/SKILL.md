@@ -81,6 +81,8 @@ Server errors (5xx) are not cached — clients can retry past a 5xx. 4xx respons
 
 `http.bodyLimit` in config is read by Fastify at server-start and applies to every body. `middleware.maxBodySize()` is a per-route middleware on top — it checks `Content-Length` after route match and rejects with 413 before body parsing runs. Use both: global as a safety net, per-route for tight caps on small-payload endpoints.
 
+⚠ **Since 4.13.0, configuring nothing gives you Fastify's own 1 MB limit.** Earlier versions defaulted to 200 GB, which **replaced** Fastify's protection rather than adding to it — so an app that set nothing had effectively no cap. **Set `bodyLimit` explicitly if you need more than 1 MB.**
+
 ```ts
 // src/config/http.ts
 export default { bodyLimit: 10 * 1024 * 1024 }; // 10MB globally
@@ -111,7 +113,9 @@ export default {
 
 ## `ipFilter` — fail-closed
 
-`deny` wins over `allow`. If the IP can't be read (empty / unparseable), the request is rejected with 403. Reads via `request.detectIp()` which honors `X-Real-IP` and `X-Forwarded-For` (Fastify starts with `trustProxy: true`).
+`deny` wins over `allow`. If the IP can't be read (empty / unparseable), the request is rejected with 403. Reads via `request.detectIp()`.
+
+⚠ **Since 4.13.0 `http.trustProxy` defaults to `false`**, so `request.detectIp()` returns the socket address and **`X-Real-IP` / `X-Forwarded-For` are ignored unless you opt in.** Set `trustProxy: true` **only when you are genuinely behind a proxy that overwrites those headers** — before 4.13.0 the default was `true`, which meant any client could set its own forwarding header and be believed.
 
 ```ts
 import { middleware } from "@warlock.js/core";

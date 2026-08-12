@@ -4,9 +4,9 @@ import {
   dataSourceRegistry,
   transaction as runInTransaction,
 } from "@warlock.js/cascade";
-import { CommandActionData } from "../cli/types";
+import { CommandActionData } from "../commands/types";
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
-import { Path } from "../dev-server/path";
+import { Path } from "../utils/normalized-path";
 import { getFilesFromDirectory } from "../dev-server/utils";
 import { srcPath } from "../utils";
 import { Seeder } from "./seeds/seeder";

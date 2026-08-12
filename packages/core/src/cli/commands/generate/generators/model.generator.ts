@@ -1,6 +1,6 @@
 import { colors } from "@mongez/copper";
 import path from "node:path";
-import type { CommandActionData } from "../../../types";
+import type { CommandActionData } from "../../../../commands/types";
 import { migrationStub, modelStub } from "../templates/stubs";
 import { parseModulePath, singularName } from "../utils/name-parser";
 import { componentExists, moduleExists, resolveModulePath } from "../utils/path-resolver";

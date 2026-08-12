@@ -1,7 +1,7 @@
 import { ensureDirectoryAsync } from "@warlock.js/fs";
 import glob from "fast-glob";
 import { srcPath, warlockPath } from "../utils";
-import { Path } from "./path";
+import { Path } from "../utils/normalized-path";
 
 /**
  * Ensure the .warlock/ directory exists. Used by the loader-hook

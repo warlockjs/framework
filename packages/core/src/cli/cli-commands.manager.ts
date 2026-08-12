@@ -10,7 +10,7 @@ import { manifestManager } from "../manifest/manifest-manager";
 import { appPath } from "../utils";
 import { loadEnvironmentFiles } from "../utils/load-environment";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
-import { CLICommand } from "./cli-command";
+import { CLICommand } from "../commands/cli-command";
 import {
   displayBootError,
   displayCommandError,
@@ -29,7 +29,7 @@ import { cliCommandsLoader } from "./commands-loader";
 import { frameworkCommands } from "./framework-cli-commands";
 import { CliOptionValueError, ParsedCliArgs, parseCliArgs } from "./parse-cli-args";
 import { findSimilar } from "./string-similarity";
-import { CommandActionData, ResolvedCLICommandOption } from "./types";
+import { CommandActionData, ResolvedCLICommandOption } from "../commands/types";
 
 export class CLICommandsManager {
   /**

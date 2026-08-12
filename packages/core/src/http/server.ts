@@ -3,23 +3,26 @@ import Fastify, { FastifyServerOptions } from "fastify";
 
 export type FastifyInstance = ReturnType<typeof Fastify>;
 
-/**
- * Default Fastify body limit. Kept at the historical 200GB so existing apps
- * don't regress on upgrade. Override via `http.bodyLimit` in config; for
- * per-route caps use the `maxBodySize()` middleware.
- */
-const DEFAULT_BODY_LIMIT = 200 * 1024 * 1024 * 1024;
-
 // Instantiate Fastify server
 let server: FastifyInstance | undefined = undefined;
 
 export function startHttpServer(options?: FastifyServerOptions): FastifyInstance {
+  // `config.set(key, undefined)` stores null rather than unsetting, so an app
+  // that clears a key would otherwise hand Fastify `null` and crash the boot.
+  const bodyLimit = config.get("http.bodyLimit") ?? undefined;
+
   return (server = Fastify({
-    // Configurable so deployments NOT behind a trusted proxy can disable
-    // `X-Forwarded-For` resolution (it's client-settable and spoofable).
-    // Defaults to `true` to preserve historical behavior for proxied apps.
-    trustProxy: config.get("http.trustProxy", true),
-    bodyLimit: config.get("http.bodyLimit", DEFAULT_BODY_LIMIT),
+    // `X-Forwarded-For` is client-settable and spoofable, and `request.ip` is
+    // what @fastify/rate-limit keys its buckets on — so trusting it by default
+    // makes rate limiting bypassable on any deployment NOT behind a proxy that
+    // strips the header. Apps behind such a proxy opt in explicitly.
+    trustProxy: config.get("http.trustProxy", false),
+    // No default: an app that configures nothing keeps Fastify's own 1MB limit
+    // rather than the historical 200GB, which silently removed the protection
+    // Fastify provides. Per-route caps go through `serverOptions.bodyLimit`;
+    // the `maxBodySize()` middleware runs AFTER parsing and cannot reject
+    // before the bytes are resident.
+    ...(bodyLimit !== undefined && { bodyLimit }),
     // Close idle keep-alive connections on shutdown while letting in-flight
     // requests finish — the basis for graceful draining. Override via
     // `http.gracefulShutdown.forceCloseConnections`.

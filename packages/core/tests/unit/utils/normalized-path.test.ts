@@ -1,10 +1,14 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { Path } from "../../../src/dev-server/path";
+import { Path } from "../../../src/utils/normalized-path";
 
 /**
  * `Path` is a thin wrapper over node:path that forces forward slashes so the
- * dev server holds one canonical separator on every platform.
+ * framework holds one canonical separator on every platform.
+ *
+ * It lived under `dev-server/` and was moved to `utils/` once measurement
+ * showed production modules importing it from there — which put the whole
+ * dev-server directory into every consumer's module graph.
  */
 describe("Path.normalize", () => {
   it("converts backslashes to forward slashes", () => {

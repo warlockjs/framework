@@ -8,7 +8,7 @@ import ts from "typescript";
 import { warlockPath } from "../utils";
 import { devLogError, devLogInfo, devLogSuccess, devServeLog } from "./dev-logger";
 import { filesOrchestrator } from "./files-orchestrator";
-import { Path } from "./path";
+import { Path } from "../utils/normalized-path";
 
 /**
  * Typings manifest structure for tracking file hashes

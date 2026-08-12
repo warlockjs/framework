@@ -18,7 +18,7 @@ import { registerLoader } from "./loader/register-loader.js";
 import { ManifestManager } from "./manifest-manager";
 import { ModuleLoader } from "./module-loader";
 import { packageJsonManager } from "./package-json-manager";
-import { Path } from "./path";
+import { Path } from "../utils/normalized-path";
 import { SpecialFilesCollector } from "./special-files-collector";
 import { tsconfigManager } from "./tsconfig-manager";
 import { ensureWarlockDirectory, getFilesFromDirectory } from "./utils";
@@ -202,6 +202,7 @@ export class FilesOrchestrator {
 
   public async startCheckingHealth(healthCheckers?: FileHealthCheckerContract[]): Promise<void> {
     devLogDim("Started File Health Checks in the background.");
+
     const checkers = healthCheckers ?? [new TypescriptHealthChecker(), new EslintHealthChecker()];
     await this.healthCheckerManager.setHealthCheckers(checkers).initialize();
     await this.healthCheckerManager.validateAllFiles();

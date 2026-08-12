@@ -2,6 +2,7 @@ export * from "./app-log";
 export * from "./database-log";
 export * from "./environment";
 export * from "./get-localized";
+export * from "./normalized-path";
 export * from "./npm-registry";
 export * from "./paths";
 export * from "./promise-all-object";

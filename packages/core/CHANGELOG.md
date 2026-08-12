@@ -4,6 +4,122 @@ All notable changes to `@warlock.js/core` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+> ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
+
+## 4.13.0
+
+### ⚠ Upgrading from 4.12.0 — read this first
+
+**Four breaking changes. Every one of them fails visibly, and every one is fixed by a single line or a single config key.** Three are security defaults that were wrong; the fourth is an import path.
+
+| What breaks | How you'll see it | The fix |
+|---|---|---|
+| **`http.cors` now actually applies** — it never had any effect in any release through 4.12.0 | requests from origins you never allow-listed start being rejected | check `http.cors` before upgrading; it now means what it says |
+| **`http.bodyLimit` defaults to Fastify's 1 MB**, not 200 GB | large uploads that used to be accepted answer `413` | set `http.bodyLimit` explicitly if you need more |
+| **`http.trustProxy` defaults to `false`** | `request.ip` becomes the socket address instead of `X-Forwarded-For` | set `http.trustProxy: true` **only if** you are genuinely behind a proxy that strips the header |
+| **The package entry no longer re-exports the CLI, dev server, test helpers or Vite integration** | build fails with `has no exported member` | test helpers move to `@warlock.js/core/tests`, `lowerStage3Decorators` to `@warlock.js/core/vite` — **one line per import.** The CLI and dev-server internals are **not** public and have no replacement specifier |
+
+**If your app configures none of the three HTTP keys, the first three changes make it strictly safer with no action from you.** The `trustProxy` default in particular meant per-IP rate limiting was bypassable by anyone sending their own `X-Forwarded-For`.
+
+Details for each are in the entries below.
+
+### Added
+
+- **`build.singleBundle` — one file you can run with `node dist/app.js`.** The default build keeps dependencies as real `import` specifiers resolved from `node_modules`, which is right when you deploy the folder. Producing a single self-contained file previously meant knowing to set `packages: "bundle"` **and** `splitting: false`, and it still did not work
+
+  It sets both as **defaults you can override** — an explicit `splitting: true` in your config still wins. Phase ordering is unaffected: it comes from the generated entry using dynamic `await import(...)`, which the bundler defers to the call site whether or not splitting is on. A comment in the builder claiming ordering "requires `splitting: true`" was wrong and has been corrected
+
+  ⚠ Native `.node` addons cannot be inlined by any bundler and are still emitted alongside the file, so "single bundle" means one JavaScript file plus any native addons — the flag does not promise otherwise
+
+  **Verified end to end on a real application**, not in isolation: the build emits exactly one file, the interop prelude is present, and the result boots and serves a request. This only became possible once dev-only tooling left the production module graph — see the entry below, which is what made `singleBundle` build a real application rather than only a synthetic one
+
+- **`@warlock.js/core/tests` and `@warlock.js/core/vite` are real subpaths**, with their own build entries and `exports` keys — the first version in which those helpers are addressable at all. `/tests` carries the 13 documented test helpers; `/vite` carries `lowerStage3Decorators`
+
+  **The test server's port channel — `publishTestServerPort`, `withdrawTestServerPort`, `TEST_SERVER_PORT_ENV_KEY` — is deliberately NOT part of that surface.** It is how `startHttpTestServer` hands the resolved port to the worker processes that later call `testGet`; it is plumbing, and nothing outside the framework needs it. **Decided before the subpath shipped rather than after, because removing an export once people depend on it is a breaking change**
+
+### Fixed
+
+- **`setupTest()` no longer crashes in a project that has no `src/config/tests.ts`.** `config.get("tests")` resolves an absent key to `null`, and the result was dereferenced — so the very path `warlock add test` generates threw `Cannot read properties of null (reading 'connectors')` before running a single test. **`setupTest()` with no arguments at all** threw one step earlier still, on a destructured parameter with no default
+
+  **`connectors: false` now starts no connectors, as its type and the skill have always said.** The selection read `testConfig.connectors || connectors`, so a configured `false` was discarded, and every non-array value then took the "start all but http" branch — **`false` started everything except http, from config and from the caller alike.** It is now `??` with an explicit `false` check
+
+  ⚠ **Config still beats the parameter:** if `tests.connectors` is set, `setupTest({ connectors })` cannot override it. That is the existing contract and this release does not change it — one line of `skills/test-service` claimed otherwise and has been corrected. **A per-call override is a contract decision for a later release**
+
+- **The request helpers send falsy JSON bodies.** `testPost`, `testPut` and `testPatch` used `body ? JSON.stringify(body) : undefined`, so **`false`, `0`, `""` and `null` — all legal JSON documents — were sent as no body at all.** Only an omitted argument now means "no body"
+
+  **Headers are accepted in every shape `RequestInit` allows.** They were merged by object spread, which is correct only for a plain record — a `Headers` instance or a `[name, value]` tuple list was silently turned into an object with numeric keys and the header was lost with no error. They are now normalised through `new Headers(...)`
+
+  **`Content-Type: application/json` is set only when the helper serialized the body**, and never over a content type the caller set. It was previously forced onto every request, including `FormData` — replacing the multipart boundary the runtime generates and producing a request no server can parse
+
+- **Shutdown survives a throwing log channel.** A connector whose `shutdown()` failed was reported through `log.error(...)` **from inside the catch block** — and `Logger.log()` hands each entry to `channel.log()` with no isolation, so a channel that throws synchronously (a misconfigured transport, an unserialisable payload) made that report reject. The rejection escaped `shutdown()` entirely, and the consequences went well past a missing log line: **`log.flush()` never ran, so every buffered entry from the whole run was lost; the remaining connectors were never torn down; and `process.exit(0)` — the line `gracefulShutdown` runs once `shutdown()` resolves — was never reached, leaving the process alive on the handles those connectors still held**
+
+  ⚠ **This hardens the shutdown path, not the logger.** `Logger.log()` still aborts its fan-out on the first throwing channel, so the other channels never receive that entry, and an *asynchronously* rejecting channel is not covered at all — `channel.log()` is never awaited. **Logger-wide isolation is a separate fix in a later release**
+
+- **A test server that fails to start no longer leaves half of itself running.** `startHttpTestServer()` publishes the resolved port before the late connector phase and sets `isServerRunning` only on its last line, so a failure in between left **live early-phase connectors and a published port pointing at a server that never came up** — while `stopHttpTestServer()` in `globalTeardown` reported *"No server to stop"* and walked away from them. Startup now unwinds what it started, always withdraws the port and resets its state. ⚠ **The error you get back is unchanged — it always was.** Startup had no `catch` at all, so the original failure already propagated correctly; what was missing was the cleanup, and the new `catch` exists only to run it. A failure *during* that cleanup is reported and never substituted for the cause, which is the one propagation guarantee the wrapper had to be careful not to break
+
+  **`stopHttpTestServer()` withdraws the port and resets state in a `finally`.** They previously ran after the `await`, so a shutdown that threw left the published port behind and the next run in the same process inherited it
+
+- **`startHttpTestServer({ port: 0 })` is refused with an instruction instead of half-working.** `0` is the OS's "pick a free one" idiom, and the test server cannot honour it: the preflight would bind some unrelated ephemeral port and pass without proving anything, and nothing publishable exists afterwards — `HttpConnector.start()` records the port it **asked for**, not the one Fastify bound. Accepting it silently meant `getTestServerUrl()` resolved `0` through its own config fallback and **every worker request went to `http://host:0`**, where nothing listens. The error names the fix: pass an explicit port, or set `http.port`
+
+- ⚠ **BREAKING — the package entry no longer re-exports the CLI, the dev server, the test helpers or the Vite integration.** Five `export *` lines are gone from `@warlock.js/core`'s root: `./cli`, `./dev-server/files-orchestrator`, `./dev-server/health-checker`, `./tests` and `./vite`
+
+  **Why it had to change:** those five put dev-only tooling into the **static module graph of every application that imports the framework** — 39 files, reaching ESLint and, through it, ESLint's optional `jiti` import. It cost nothing while the builder kept `packages: "external"`, because esbuild never walked into the framework. **Anything that bundles walks it, and the build fails.** That is why `singleBundle` could not build a single real application
+
+  ⚠ **Making those imports lazy does not help and should not be attempted.** esbuild resolves `import()` at build time; a dynamic import defers *evaluation*, not resolution. Measured: `await import("jiti")` in an otherwise empty file still fails with `Could not resolve "jiti"`. **Only unreachability from the entry removes a module from the graph**
+
+  **The two public halves are now reachable from a subpath — and in 4.12.0 and earlier they were reachable from nowhere at all.** `./tests` and `./vite` are **real build entries with their own emitted files and `exports` entries**, not reachable from the root barrel, which is the entire point:
+
+  ```ts
+  // before                                        // after
+  import { setupTest } from "@warlock.js/core";     import { setupTest } from "@warlock.js/core/tests";
+  import { startHttpTestServer } from "@warlock.js/core";
+                                                    import { startHttpTestServer } from "@warlock.js/core/tests";
+  import { lowerStage3Decorators } from "@warlock.js/core";
+                                                    import { lowerStage3Decorators } from "@warlock.js/core/vite";
+  ```
+
+  **The CLI and dev-server internals are different — they were never a public API and have no replacement specifier.** If you were importing from those, you were reaching into framework internals; open an issue describing what you needed.
+
+  ⚠ **If you were importing these symbols in 4.12.0, they were already not in the published package.** `esm/tests/` and `esm/vite/` did not exist in the 4.12.0 artifact, and none of those symbols appear in `esm/index.d.mts` — **the root barrel re-exported source the build never emitted.** So this is the release that makes them installable, not the one that removed them.
+
+  `Path` is unaffected — it moved to a genuine utility module and remains exported
+
+  **Removing the five lines was necessary but not sufficient.** Three production modules — `connectors/http-connector`, `connectors/connectors-manager` and `warlock-config/warlock-config.manager` — imported the dev server's console formatter directly. In `http-connector` the dev-console call was simply **deleted**: the same error was already routed through `log.fatal` on the following line. `connectors-manager` now logs a connector's shutdown failure through `@warlock.js/logger`, **awaited and then flushed** — `process.exit(0)` follows immediately, so an un-awaited log is a log that never happens. `warlock-config.manager`'s *"`warlock.config.ts` is missing"* warning writes **straight to the console instead**: it runs during CLI bootstrap, before the logger has a single channel configured, so routing it through the logger would drop it in every application
+
+  `tests/unit/meta/production-entry-graph.test.ts` enforces this from now on. It keys on **our own directory names** rather than a denylist of third-party packages, because a denylist rots the moment a dependency changes its imports and can only catch names someone thought of
+
+- ⚠ **BREAKING — the CORS allow-list in `http.cors` now actually applies.** The framework's defaults were spread **after** your configuration, so `{ origin: "*", methods: "*" }` overwrote whatever you set. **`http.cors` has never had any effect**, in any release up to 4.12.0 — an app that configured an allow-list still answered every origin. Your configuration now wins
+
+  **This is breaking in the direction you want, but it is breaking:** an app that has been relying on the accidental `origin: "*"` while believing it was restricted will now restrict. Check your `http.cors` before upgrading
+
+  Worth knowing why the old behaviour was also broken for the legitimate case: `Access-Control-Allow-Origin: *` together with `Access-Control-Allow-Credentials: true` is a pair **browsers reject**, so a cross-origin `fetch(…, { credentials: "include" })` failed outright. The default was simultaneously too open for unauthenticated reads and unusable for authenticated ones
+
+- ⚠ **BREAKING — `http.bodyLimit` no longer defaults to 200 GB.** An app that configures nothing now gets **Fastify's own 1 MB limit**. The previous default did not merely allow large bodies, it **replaced a protection Fastify provides**: an unauthenticated endpoint accepted a 5 MB body and ran application logic on it where bare Fastify would have answered `413`
+
+  **If you accept uploads, set `http.bodyLimit` before upgrading** — otherwise those requests start failing with `413`. The failure is immediate and one config key fixes it
+
+  The old comment recommended `middleware.maxBodySize()` for per-route caps. **That middleware cannot do this job** and its documentation has been corrected: framework middleware runs inside the route handler, after `@fastify/multipart` has already parsed the body, so it can report `Content-Length` but cannot refuse the read. For a real per-route cap use `serverOptions.bodyLimit`, which Fastify enforces while reading
+
+- ⚠ **BREAKING — `http.trustProxy` now defaults to `false`.** `request.ip` was derived from the client-supplied `X-Forwarded-For` header by default, and `@fastify/rate-limit` keys its buckets on `request.ip` — so **a client sending a different `X-Forwarded-For` on each request got a fresh rate-limit bucket every time.** Any deployment not behind a proxy that strips the header had bypassable rate limiting, and the same applied to per-IP lockouts and audit logs
+
+  **If your app is behind a proxy, set `http.trustProxy = true`.** Until you do, `request.ip` reports the proxy's address rather than the client's — a visible, diagnosable change, unlike the previous default, which could not be detected from inside the application
+
+- **Per-route `serverOptions` are no longer discarded by the dev server.** `scanDevServer` registers wildcard routes and dispatches per request, so it had no per-route registration slot and dropped `serverOptions` entirely. A route declaring `serverOptions.onRequest` — the documented way to run **before body parsing** — worked in production and **silently never ran in dev**, which is the only mode most teams run. `route.rateLimit` was dropped the same way, since it rides in the same options object
+
+  Matching now happens in Fastify's own `onRequest` phase and the matched route's hooks run there, so `onRequest`, `preValidation` and `preHandler` are forwarded with their pre-parse ordering intact
+
+  ⚠ **Two options still cannot be forwarded in dev, and `serverOptions`' documentation now says so rather than implying otherwise:** `bodyLimit`, because Fastify reads it at registration time and no hook can bound a body already being parsed; and `preParsing`, because it must return the payload stream. For a pre-parse guarantee that holds in both modes, register a server-level hook via `router.beforeScanning` — it must be idempotent per request, since a connector restart builds a new server and runs the callback again
+
+- **The dev server no longer rebuilds its entire route registry on every request.** A comment claimed the registry was initialised "once" and pointed at a `rebuildRouteRegistry` function that **does not exist**; the code sat inside the per-request handler, re-registering every route on every hit — and `router.any()` routes expand into seven registrations each. It is now built once and rebuilt when the route table changes
+
+- **The dev dispatcher logs through the framework logger instead of `console.log(error)`,** with the request method and url attached
+
+- **A bundled production build no longer succeeds and then dies at startup.** Setting `packages: "bundle"` produced a clean build whose process failed immediately with `Error: Dynamic require of "node:assert" is not supported`. Warlock's output is an ES module; bundled CommonJS dependencies call `require(...)` and read `__dirname` to locate their own assets, and neither exists in an ES module, so the bundler substituted a stub that throws. The only fix available to an application author was to hand-write an esbuild `banner` recreating `require` via `createRequire(import.meta.url)` — esbuild internals no app should need to know
+
+  The interop prelude is now injected automatically for **any** ESM build (`build.esmShim`, default `true`), not only under `singleBundle` — so a hand-written `packages: "bundle"` works too. It defines `__filename` and `__dirname` as well as `require`: a dependency resolving an asset path with a missing `__dirname` gets `undefined` and fails later, further from the cause
+
+  **An existing hand-written `banner` is preserved.** esbuild's `banner` is an object and every merge on the way to it replaces rather than merges, so previously whichever was applied second silently deleted the other. The shim is prepended to your banner instead
+
 ## 4.12.0
 
 ### Added

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CLICommand } from "../../../../src/cli/cli-command";
+import { CLICommand } from "../../../../src/commands/cli-command";
 import { doctorCommand } from "../../../../src/cli/commands/doctor.command";
 import { defaultDoctorChecks } from "../../../../src/cli/commands/doctor/checks";
 import { frameworkCommands } from "../../../../src/cli/framework-cli-commands";

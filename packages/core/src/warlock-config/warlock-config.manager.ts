@@ -2,7 +2,6 @@ import { fileExistsAsync } from "@warlock.js/fs";
 import { get } from "@mongez/reinforcements";
 import { readFile, unlink, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "url";
-import { devLogWarn } from "../dev-server/dev-logger";
 import { rootPath } from "../utils";
 import { WarlockConfig } from "./types";
 
@@ -72,9 +71,12 @@ export class WarlockConfigManager {
     const configPath = rootPath("warlock.config.ts");
 
     if (!(await fileExistsAsync(configPath))) {
-      devLogWarn(
-        "warlock.config.ts is missing, it's highly recommended to create it, run warlock init to create it",
-      );
+      // Written straight to the console, NOT through `@warlock.js/logger`.
+      // This runs during CLI bootstrap, before `LoggerConnector.start()` has
+      // configured a single channel, so a logger call here reaches nobody in
+      // any application — the warning would be silently dropped exactly when
+      // the user most needs it.
+      console.warn("warlock.config.ts is missing — run `warlock init` to create it");
       return;
     }
 

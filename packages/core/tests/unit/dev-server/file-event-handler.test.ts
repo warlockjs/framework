@@ -4,7 +4,7 @@ import { FileEventHandler } from "../../../src/dev-server/file-event-handler";
 
 // Identity Path so the test controls the exact relative paths the handler sees
 // (toRelative would otherwise strip the real project root).
-vi.mock("../../../src/dev-server/path", () => ({
+vi.mock("../../../src/utils/normalized-path", () => ({
   Path: {
     toRelative: (path: string) => path,
     toAbsolute: (path: string) => path,

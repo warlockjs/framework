@@ -18,6 +18,57 @@ import { resolveBuildConfig, type ResolvedBuildConfig } from "./resolve-build-co
 import { toCamelCase, toKebabCase } from "@mongez/reinforcements";
 
 /**
+ * Recreates `require`, `__filename` and `__dirname` at the top of an ESM bundle.
+ *
+ * Bundled CommonJS dependencies call `require("node:assert")` and read
+ * `__dirname` to locate their own assets. Neither exists in an ES module, so
+ * esbuild substitutes a stub that throws — **after the build has reported
+ * success**. `Dynamic require of "node:assert" is not supported` is that stub
+ * firing, and it is the defect this shim removes.
+ *
+ * `__dirname` matters as much as `require`: without it a dependency resolving
+ * an asset path silently gets `undefined` and fails later, further from the
+ * cause.
+ *
+ * Written as one line because esbuild inserts a banner verbatim above the
+ * bundle and a multi-line string here would shift every mapped line.
+ */
+const ESM_INTEROP_SHIM =
+  "import{createRequire as __wlCreateRequire}from'node:module';" +
+  "import{fileURLToPath as __wlFileURLToPath}from'node:url';" +
+  "import{dirname as __wlDirname}from'node:path';" +
+  "const require=__wlCreateRequire(import.meta.url);" +
+  "const __filename=__wlFileURLToPath(import.meta.url);" +
+  "const __dirname=__wlDirname(__filename);";
+
+/**
+ * Combine the framework's banner with the user's, keeping both.
+ *
+ * esbuild's `banner` is an object keyed by output type, and every merge in the
+ * path to it — the config merge and the options spread — REPLACES that object
+ * rather than merging it. So whichever is applied second silently deletes the
+ * other. This is the only place the two can coexist.
+ *
+ * The shim goes first: it defines `require`, which a user banner may use.
+ *
+ * @param userBanner banner from `warlock.config.ts`, if any
+ * @param shim the interop shim, or undefined when it does not apply
+ */
+function mergeBanner(
+  userBanner: Record<string, string> | undefined,
+  shim: string | undefined,
+): Record<string, string> | undefined {
+  if (!shim) return userBanner;
+
+  const userJs = userBanner?.js;
+
+  return {
+    ...userBanner,
+    js: userJs ? `${shim}${userJs}` : shim,
+  };
+}
+
+/**
  * Production Builder
  * Generates production-ready files and bundles them for deployment
  * Build options are loaded from warlock.config.ts
@@ -312,7 +363,13 @@ bootstrap();
     // effects fire at THIS point in execution. Static imports would be
     // hoisted to module-instantiation time (before the early-phase await
     // resolves), which is exactly the bug this split is meant to fix.
-    // Requires `splitting: true` in esbuild (set below in bundle()).
+    //
+    // The guarantee comes from the imports being DYNAMIC — esbuild wraps a
+    // dynamically-imported module in its `__esm(() => {…})` helper and runs
+    // it at the await, not at instantiation. It does NOT come from
+    // `splitting: true`, which only decides one-file-vs-chunks. This
+    // previously said splitting was required; it is not, and `singleBundle`
+    // (splitting: false) preserves the ordering.
     imports.push("", "// 4. Load app code (events, locales, main, routes)");
 
     if (this.generatedFiles.events) {
@@ -356,12 +413,39 @@ bootstrap();
     // Strip extension so entryNames produces "<base>.js" via esbuild
     const entryName = path.basename(outFileName, path.extname(outFileName));
 
+    // `singleBundle` and `esmShim` are ours, not esbuild's — it throws on
+    // unknown keys, and the user options are spread into its call verbatim.
+    const singleBundle = this.options.singleBundle === true;
+    const esmShim = this.options.esmShim !== false;
+    // Read before deleting: the merged banner is applied AFTER the user
+    // spread, so a user banner must not be lost to it or clobber the shim.
+    const userBanner = this.options.banner;
+
     delete this.options.outFile;
     delete this.options.entryPath;
+    delete this.options.singleBundle;
+    delete this.options.esmShim;
+    delete this.options.banner;
 
     await ensureDirectoryAsync(outDir);
 
     const alias = this.buildAliasMapFromTsconfig();
+
+    // The user can override `format`, so gate the shim on the EFFECTIVE
+    // format rather than on the default below. A CJS build already has
+    // `require` and friends; injecting them there would be a redefinition.
+    const isEsm = (this.options.format ?? "esm") === "esm";
+    const banner = mergeBanner(userBanner, esmShim && isEsm ? ESM_INTEROP_SHIM : undefined);
+
+    if (singleBundle) {
+      console.log(
+        colors.magenta(
+          "   Single-bundle mode — one JS file" +
+            (esmShim && isEsm ? " with the ESM interop shim" : "") +
+            ". Native .node addons are still emitted alongside it.",
+        ),
+      );
+    }
 
 
     try {
@@ -370,12 +454,16 @@ bootstrap();
       platform: "node",
       entryPoints: [entryPoint],
       bundle: true,
-      // Required so dynamic `await import("./main")` in the generated
-      // app.ts produces separate chunks loaded at the runtime call site,
-      // instead of inlining the modules at instantiation time (which
-      // would defeat the early/late phase split).
-      splitting: true,
-      packages: "external",
+      // Both are DEFAULTS the user can override — they sit before the
+      // `...this.options` spread deliberately. `singleBundle` moves them,
+      // an explicit `splitting`/`packages` in warlock.config.ts beats both.
+      //
+      // Phase ordering does not depend on `splitting`: it comes from the
+      // generated app.ts using dynamic `await import(...)` (see
+      // generateAppEntry above), which esbuild defers to the call site in
+      // either mode. Splitting only decides one file vs chunks.
+      splitting: !singleBundle,
+      packages: singleBundle ? "bundle" : "external",
       minify: this.options!.minify,
       sourcemap: this.options!.sourcemap === true ? "linked" : this.options!.sourcemap,
       format: "esm",
@@ -388,6 +476,12 @@ bootstrap();
       alias,
       plugins: [nativeNodeModulesPlugin],
       ...(this.options as any),
+      // AFTER the spread, and intentionally so: `banner` is an object, and
+      // both the config merge and this spread REPLACE it wholesale rather
+      // than merging. Left as a default above, any user banner would delete
+      // the shim; left to the spread, the shim would delete theirs. The
+      // merge is the only form that keeps both.
+      ...(banner ? { banner } : {}),
     });
     } catch (e) {
       console.log(e);

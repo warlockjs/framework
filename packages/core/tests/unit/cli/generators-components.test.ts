@@ -7,7 +7,7 @@ import { generateModel } from "../../../src/cli/commands/generate/generators/mod
 import { generateRepository } from "../../../src/cli/commands/generate/generators/repository.generator";
 import { generateResource } from "../../../src/cli/commands/generate/generators/resource.generator";
 import { setDryRun } from "../../../src/cli/commands/generate/utils/writer";
-import type { CommandActionData } from "../../../src/cli/types";
+import type { CommandActionData } from "../../../src/commands/types";
 
 /**
  * End-to-end OUTPUT tests for the module-gated component generators that the

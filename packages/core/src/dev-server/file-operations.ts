@@ -4,7 +4,7 @@ import { DEV_SERVER_EVENTS } from "./events";
 import { FileManager } from "./file-manager";
 import type { ManifestManager } from "./manifest-manager";
 import { parseImports } from "./parse-imports";
-import { Path } from "./path";
+import { Path } from "../utils/normalized-path";
 import type { SpecialFilesCollector } from "./special-files-collector";
 import { areSetsEqual } from "./utils";
 

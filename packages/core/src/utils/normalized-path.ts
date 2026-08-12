@@ -1,5 +1,18 @@
 import path from "node:path";
 
+/**
+ * Path helpers that always hand back forward slashes.
+ *
+ * Node's `path` returns `\` on Windows, and these values are compared against
+ * module specifiers, glob results and map keys — all of which use `/`. A raw
+ * `path.relative()` therefore produces a string that looks right in a log and
+ * fails every lookup it is used for.
+ *
+ * This lived under `dev-server/` and was imported from there by production
+ * modules (`connectors`, `database`, `config`), which put the whole dev-server
+ * directory into the production module graph. The code was never dev-only —
+ * only its location was.
+ */
 export class Path {
   /**
    * Convert the given absolute path to a relative path

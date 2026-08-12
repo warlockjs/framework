@@ -1,6 +1,6 @@
 import { colors } from "@mongez/copper";
-import { command } from "../../cli-command";
-import type { CommandActionData } from "../../types";
+import { command } from "../../../commands/cli-command";
+import type { CommandActionData } from "../../../commands/types";
 import { generateController } from "./generators/controller.generator";
 import { generateMigration } from "./generators/migration.generator";
 import { generateModel } from "./generators/model.generator";

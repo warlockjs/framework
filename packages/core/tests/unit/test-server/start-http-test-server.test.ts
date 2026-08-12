@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { PortInUseError } from "../../../src/http/port-preflight";
 import {
+  isTestServerRunning,
   startHttpTestServer,
   stopHttpTestServer,
 } from "../../../src/tests/start-http-development-server";
@@ -18,6 +19,10 @@ const host = "127.0.0.1";
 const fixture = vi.hoisted(() => ({
   envDir: "",
   portAtLatePhase: undefined as unknown,
+  /** Fails the late connector phase, i.e. after the port has been published. */
+  failLatePhase: false,
+  /** Fails teardown, including the best-effort unwind of a failed startup. */
+  failShutdown: false,
 }));
 
 vi.mock("../../../src/warlock-config/warlock-config.manager", () => ({
@@ -64,11 +69,19 @@ vi.mock("../../../src/connectors/connectors-manager", async () => {
   return {
     connectorsManager: {
       startPhase: vi.fn(async (phase: string) => {
-        if (phase === "late") {
-          fixture.portAtLatePhase = appConfig.get("http.port");
+        if (phase !== "late") return;
+
+        if (fixture.failLatePhase) {
+          throw new Error("late phase exploded");
+        }
+
+        fixture.portAtLatePhase = appConfig.get("http.port");
+      }),
+      shutdown: vi.fn(async () => {
+        if (fixture.failShutdown) {
+          throw new Error("shutdown exploded");
         }
       }),
-      shutdown: vi.fn(async () => undefined),
     },
   };
 });
@@ -116,6 +129,11 @@ describe("startHttpTestServer", () => {
   });
 
   afterEach(async () => {
+    // Cleared before the teardown call so a spec that made shutdown fail cannot
+    // fail the suite's own cleanup too.
+    fixture.failLatePhase = false;
+    fixture.failShutdown = false;
+
     await stopHttpTestServer();
 
     if (holder) {
@@ -199,22 +217,115 @@ describe("startHttpTestServer", () => {
     expect(process.env[TEST_SERVER_PORT_ENV_KEY]).toBeUndefined();
   });
 
-  it("treats port 0 as 'the OS picks one' — no preflight, and nothing published", async () => {
-    // `0` is a number, so a `typeof` guard alone lets it through: the preflight
-    // then binds an unrelated ephemeral port and passes vacuously, and the
-    // published `0` sends every worker request to a port nothing listens on.
-    await startHttpTestServer({ port: 0 });
+  it("rejects port 0 with an actionable message instead of half-supporting it", async () => {
+    // Port `0` used to be accepted and deliberately not published, on the
+    // grounds that the OS picks the port. That left the trap this test now
+    // closes: `getTestServerUrl()` resolves `0` through its own
+    // `config.key("http.port", 2031)` fallback — `0` is a defined value and
+    // never reaches that default — so every worker request went to
+    // `http://host:0`, where nothing listens. Publishing the real port instead
+    // is not available: `HttpConnector.start()` records the port it ASKED for,
+    // not the one Fastify bound.
+    // Cast the awaited result, not the caught value: the call resolves to
+    // `void` on success, so `.catch(x => x as Error)` types as `void | Error`
+    // and `.message` never narrows.
+    const error = (await startHttpTestServer({ port: 0 }).catch(
+      (thrown: unknown) => thrown,
+    )) as Error;
 
-    // the HTTP connector still binds — Fastify hands the choice to the OS
-    expect(fixture.portAtLatePhase).toBe(0);
-    // the channel must stay silent rather than advertise port 0 — publishing it
-    // is what used to pin `getTestServerUrl()` to `http://host:0`
-    //
-    // NOTE: `getTestServerUrl()` can still resolve to `:0` through its own
-    // `config.key("http.port", 2031)` fallback, since `0` is a defined value and
-    // never reaches that default. Closing that needs the actually-bound port to
-    // be read back from the HTTP connector and published — tracked separately.
+    expect(error).toBeInstanceOf(Error);
+    // says what to do, not only what failed — the standard `PortInUseError` sets
+    expect(error.message).toContain("cannot run on port 0");
+    expect(error.message).toContain("startHttpTestServer({ port: 3999 })");
+
+    // rejected before anything bound
+    expect(fixture.portAtLatePhase).toBeUndefined();
     expect(process.env[TEST_SERVER_PORT_ENV_KEY]).toBeUndefined();
+  });
+
+  /**
+   * Canon `1dbe51b1` — `startHttpTestServer` owns the connectors it starts; a
+   * partial failure unwinds, always withdraws the port and resets state, and
+   * rethrows the ORIGINAL error. `stopHttpTestServer` withdraws and resets in a
+   * `finally` while still surfacing the failure.
+   */
+  describe("failure atomicity", () => {
+    it("withdraws the published port when the late phase fails after publishing it", async () => {
+      const explicitPort = await reserveFreePort();
+
+      fixture.failLatePhase = true;
+
+      const error = (await startHttpTestServer({ port: explicitPort }).catch(
+        (thrown: unknown) => thrown,
+      )) as Error;
+
+      // Asserted before `.message` is read: the cast above is unconditional, so
+      // without this a startup that stopped throwing would fail as a confusing
+      // "cannot read properties of undefined" instead of "it did not reject".
+      expect(error).toBeInstanceOf(Error);
+      // the original startup failure, not a cleanup error standing in for it
+      expect(error.message).toBe("late phase exploded");
+      // the port was published BEFORE the phase that failed — it must not
+      // outlive the server it points at
+      expect(process.env[TEST_SERVER_PORT_ENV_KEY]).toBeUndefined();
+      // `isServerRunning` is set on the last line, so before this fix a failed
+      // start left teardown reporting "No server to stop" over live connectors
+      expect(isTestServerRunning()).toBe(false);
+    });
+
+    it("tears down the connectors it already started when startup fails", async () => {
+      const explicitPort = await reserveFreePort();
+      const { connectorsManager } = await import("../../../src/connectors/connectors-manager");
+
+      vi.mocked(connectorsManager.shutdown).mockClear();
+
+      fixture.failLatePhase = true;
+
+      await startHttpTestServer({ port: explicitPort }).catch(() => undefined);
+
+      expect(connectorsManager.shutdown).toHaveBeenCalled();
+    });
+
+    it("rethrows the startup error even when the cleanup shutdown also fails", async () => {
+      const explicitPort = await reserveFreePort();
+
+      fixture.failLatePhase = true;
+      fixture.failShutdown = true;
+
+      const error = (await startHttpTestServer({ port: explicitPort }).catch(
+        (thrown: unknown) => thrown,
+      )) as Error;
+
+      expect(error).toBeInstanceOf(Error);
+      // a cleanup failure is secondary: it must not replace the cause
+      expect(error.message).toBe("late phase exploded");
+      expect(error.message).not.toBe("shutdown exploded");
+      // and cleanup still completed everything it could
+      expect(process.env[TEST_SERVER_PORT_ENV_KEY]).toBeUndefined();
+      expect(isTestServerRunning()).toBe(false);
+    });
+
+    it("withdraws the port and resets state when stopHttpTestServer's shutdown throws", async () => {
+      const explicitPort = await reserveFreePort();
+
+      await startHttpTestServer({ port: explicitPort });
+
+      expect(process.env[TEST_SERVER_PORT_ENV_KEY]).toBe(String(explicitPort));
+
+      fixture.failShutdown = true;
+
+      const error = (await stopHttpTestServer().catch(
+        (thrown: unknown) => thrown,
+      )) as Error;
+
+      expect(error).toBeInstanceOf(Error);
+      // the failure is surfaced — cleaning up is not the same as succeeding
+      expect(error.message).toBe("shutdown exploded");
+      // …and the cleanup still ran, so the next run in this process cannot
+      // inherit a port pointing at a server that is gone
+      expect(process.env[TEST_SERVER_PORT_ENV_KEY]).toBeUndefined();
+      expect(isTestServerRunning()).toBe(false);
+    });
   });
 
   it("keeps stopHttpTestServer working, and a stopped server can start again", async () => {

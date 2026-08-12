@@ -62,13 +62,32 @@ async function applyTestServerPort(port?: number): Promise<void> {
 
   const resolvedPort = config.get("http.port");
 
-  // No configured port — or an explicit `0`, which is the OS's "pick a free one
-  // for me" idiom — means Fastify chooses the port, so there is nothing to
-  // preflight and nothing to publish: preflighting 0 would bind some unrelated
-  // ephemeral port and pass without proving anything, and publishing 0 would
-  // point every worker request at `http://host:0`.
-  if (typeof resolvedPort !== "number" || resolvedPort <= 0) {
+  // No configured port at all is fine: Fastify falls back to its own default and
+  // the workers resolve the same one from their own config, so both ends agree
+  // without the channel.
+  //
+  // ⚠ A non-numeric port also lands here, and that is NOT fine — it is just not
+  // this function's bug to fix. `env()` coerces a value only when it round-trips
+  // exactly (`String(Number(v)) === v`), so `HTTP_PORT=3999` and `HTTP_PORT=0`
+  // arrive as numbers, but `03999`, `+3999`, `1e3` and anything with stray
+  // whitespace stay strings. Those skip the preflight and the publish here, and
+  // reach `HttpConnector.start()`'s `listen({ port })` unchanged — a production
+  // path, not a test one. Tracked separately rather than widened into this fix.
+  if (typeof resolvedPort !== "number") {
     return;
+  }
+
+  // `0` is the OS's "pick a free one for me" idiom, and the test server cannot
+  // support it. Preflighting 0 would bind some unrelated ephemeral port and pass
+  // without proving anything, and there is nothing meaningful to publish: the
+  // port Fastify ends up binding is never recorded — `HttpConnector.start()`
+  // stores the port it ASKED for, not the one it got. Accepting 0 silently is
+  // what left `getTestServerUrl()` resolving to `http://host:0` through its own
+  // config fallback, so every worker request went to a port nothing listens on.
+  if (resolvedPort <= 0) {
+    throw new Error(
+      `startHttpTestServer() cannot run on port ${resolvedPort}. Pass an explicit port — e.g. startHttpTestServer({ port: 3999 }) — or set \`http.port\` in your config. Test workers are separate processes that resolve the server's URL from the port published at startup, and an OS-assigned port is not knowable to them.`,
+    );
   }
 
   await assertPortIsAvailable(resolvedPort, config.get("http.host") || "localhost");
@@ -94,38 +113,71 @@ export async function startHttpTestServer(
 
   console.log("[test-server] Starting HTTP test server...");
 
-  // Set environment
-  Application.setRuntimeStrategy("development");
-  Application.setEnvironment("test");
+  try {
+    // Set environment
+    Application.setRuntimeStrategy("development");
+    Application.setEnvironment("test");
 
-  // Bootstrap (env, etc.)
-  await warlockConfigManager.load();
-  await bootstrap();
+    // Bootstrap (env, etc.)
+    await warlockConfigManager.load();
+    await bootstrap();
 
-  // Initialize file orchestrator (but don't watch)
-  await filesOrchestrator.init();
-  await filesOrchestrator.initializeAll();
+    // Initialize file orchestrator (but don't watch)
+    await filesOrchestrator.init();
+    await filesOrchestrator.initializeAll();
 
-  // Load config files
-  await loadConfigFiles(true);
+    // Load config files
+    await loadConfigFiles(true);
 
-  // Early-phase connectors (database, cache, logger, storage, mailer,
-  // herald) must start BEFORE app modules load: a module's `main.ts` boot
-  // side-effect can query the DB at import time, so the data source has to
-  // be registered first. This mirrors the dev/prod boot order (see
-  // `cli-commands.manager`, `production-builder`, and `DevelopmentServer`).
-  await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);
+    // Early-phase connectors (database, cache, logger, storage, mailer,
+    // herald) must start BEFORE app modules load: a module's `main.ts` boot
+    // side-effect can query the DB at import time, so the data source has to
+    // be registered first. This mirrors the dev/prod boot order (see
+    // `cli-commands.manager`, `production-builder`, and `DevelopmentServer`).
+    await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);
 
-  // Load application modules (their boot side-effects now see a live DB).
-  await filesOrchestrator.moduleLoader.loadAll();
+    // Load application modules (their boot side-effects now see a live DB).
+    await filesOrchestrator.moduleLoader.loadAll();
 
-  await applyTestServerPort(options.port);
+    await applyTestServerPort(options.port);
 
-  // Late-phase connectors (http, socket) bind after app code has
-  // registered its routes and listeners.
-  await connectorsManager.startPhase(ConnectorLifecyclePhase.Late);
+    // Late-phase connectors (http, socket) bind after app code has
+    // registered its routes and listeners.
+    await connectorsManager.startPhase(ConnectorLifecyclePhase.Late);
 
-  isServerRunning = true;
+    isServerRunning = true;
+  } catch (error) {
+    // This function owns the connectors it starts, so a failure part-way
+    // through has to leave nothing behind. Without this, `isServerRunning` was
+    // still `false` — it is only set on the last line — so `globalTeardown`'s
+    // `stopHttpTestServer()` reported "No server to stop" and walked away from
+    // live early-phase connectors and a published port that outlived them.
+    await unwindPartialStartup();
+
+    // Rethrown unchanged: the startup failure is the one the caller needs to
+    // read. A cleanup failure that replaced it would hide the actual cause.
+    throw error;
+  }
+}
+
+/**
+ * Best-effort teardown of whatever a failed {@link startHttpTestServer} managed
+ * to start.
+ *
+ * Every step is independent and none may throw: this runs while an error is
+ * already in flight, and the caller is about to rethrow it.
+ */
+async function unwindPartialStartup(): Promise<void> {
+  try {
+    await connectorsManager.shutdown();
+  } catch (shutdownError) {
+    // Reported, not thrown — it is secondary to the startup error being
+    // rethrown, and losing that one to this would be the worse outcome.
+    console.error("[test-server] Cleanup after a failed start did not complete:", shutdownError);
+  }
+
+  withdrawTestServerPort();
+  isServerRunning = false;
 }
 
 /**
@@ -140,12 +192,21 @@ export async function stopHttpTestServer(): Promise<void> {
 
   try {
     await connectorsManager.shutdown();
-    withdrawTestServerPort();
-    isServerRunning = false;
+
     console.log("[test-server] HTTP test server stopped");
   } catch (error) {
+    // Surfaced, never swallowed — cleaning up is not the same as the shutdown
+    // having succeeded, and a suite whose teardown failed should say so.
     console.error("[test-server] Error stopping HTTP server:", error);
+
     throw error;
+  } finally {
+    // In a `finally` rather than after the `await`: when `shutdown()` threw,
+    // the published port survived the server it pointed at, so the next run in
+    // the same process inherited a stale one and sent every request to it.
+    withdrawTestServerPort();
+
+    isServerRunning = false;
   }
 }
 

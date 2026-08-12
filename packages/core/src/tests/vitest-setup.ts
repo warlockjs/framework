@@ -24,7 +24,7 @@ type TestSetup = {
 /**
  * Setup function that runs once per worker thread
  */
-export async function setupTest({ connectors = true }: TestSetup) {
+export async function setupTest({ connectors = true }: TestSetup = {}) {
   // Skip if already set up in this worker
   if (isSetupComplete) {
     return;
@@ -40,20 +40,35 @@ export async function setupTest({ connectors = true }: TestSetup) {
     await filesOrchestrator.init();
     await loadConfigFiles(true);
 
-    // 2. Load test configuration
-    const testConfig = config.get<GenericObject>("tests");
+    // 2. Load test configuration.
+    //
+    // The default matters: `config.get` resolves an absent key to its default,
+    // and ITS default is `null` — not `{}`. `warlock add test` does not generate
+    // `src/config/tests.ts`, so reading `.connectors` off the result threw
+    // "Cannot read properties of null" on the generated default path.
+    const testConfig = config.get<GenericObject>("tests", {});
 
-    // 3. Start connectors (database, cache, etc.)
-    const connectorsToStart = testConfig.connectors || connectors;
+    // 3. Choose the connectors.
+    //
+    // `??`, not `||`: `false` is a meaningful configured value ("start none")
+    // and `||` discarded it, falling through to the branch that starts
+    // everything. The type and the skill both document `false` as "start none",
+    // so the old behaviour was the exact opposite of the promise.
+    const connectorsToStart = testConfig?.connectors ?? connectors;
 
-    // force not starting http since it will be used globally over all
-    // tests files
-    if (Array.isArray(connectorsToStart)) {
-      await connectorsManager.start(connectorsToStart);
-    } else {
-      await connectorsManager.startWithout(["http"]);
+    // `false` means none at all. Everything else starts something: an array
+    // starts exactly those, and `true` starts all but http — http is the global
+    // setup's job, shared across every worker.
+    if (connectorsToStart !== false) {
+      if (Array.isArray(connectorsToStart)) {
+        await connectorsManager.start(connectorsToStart);
+      } else {
+        await connectorsManager.startWithout(["http"]);
+      }
     }
 
+    // Set even when no connectors were started: setup DID complete, and a second
+    // call in the same worker must stay a no-op either way.
     isSetupComplete = true;
   } catch (error) {
     console.error("[vitest-setup] Failed to setup test environment:", error);

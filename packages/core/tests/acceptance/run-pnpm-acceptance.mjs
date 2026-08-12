@@ -17,6 +17,7 @@
  *
  * Usage:
  *   node core/tests/acceptance/run-pnpm-acceptance.mjs
+ *   node core/tests/acceptance/run-pnpm-acceptance.mjs --baseline-only
  *   node core/tests/acceptance/run-pnpm-acceptance.mjs --reuse-stale-artifact-i-know-this-proves-nothing
  *
  * The long flag is deliberate. It reuses whatever artifact happens to be in the
@@ -55,6 +56,22 @@ const coreBuildsDirectory = path.join(builderDirectory, "builds", "@warlock.js",
 const skipFrameworkBuild = process.argv.includes(
   "--reuse-stale-artifact-i-know-this-proves-nothing",
 );
+
+/**
+ * Run the baseline only — build, boot, serve, and the negative case — and skip
+ * the `singleBundle` case.
+ *
+ * This exists to keep one variable moving at a time. When the harness itself
+ * changes (the launcher, the environment, the teardown), a run that also
+ * exercises a new feature proves neither: a red result has two candidate causes
+ * and a green one is indistinguishable from luck. Land the harness change,
+ * confirm the baseline still passes, and only then let the feature case run.
+ *
+ * The final line says out loud that the feature was skipped, because a
+ * shortened run that reports the same "ACCEPTED" as a full one is exactly how a
+ * partial verification gets quoted as a complete one.
+ */
+const baselineOnly = process.argv.includes("--baseline-only");
 /**
  * The version the family is built at — read from core's own `package.json`.
  *
@@ -89,6 +106,56 @@ const ACCEPTANCE_ENV = { NODE_ENV: "production" };
 
 const log = (message) => console.log(`\n▸ ${message}`);
 
+/**
+ * Absolute path to the `warlock` CLI as the fixture actually installed it.
+ *
+ * Every invocation used to go through `npx pnpm exec warlock`, which cost a
+ * measured ~20s of package-manager resolution per launch. Against the 60s
+ * readiness budget below that left ~11s of headroom, so the gate spent a third
+ * of its own timeout on the launcher and went red after a cold-cache install
+ * while the framework was fine. Three warm runs each, same fixture:
+ *
+ *   npx pnpm exec warlock start   banner at 49.1 / 49.1 / 49.5s
+ *   node <this path> start        banner at 31.1 / 26.9 / 28.3s
+ *
+ * The measurement is the point, not the speed: two thirds of that budget was
+ * not ours, so a change that DOUBLED the framework's own boot time would still
+ * have passed. Widening the timeout keeps that dishonesty; resolving the binary
+ * is the fix.
+ *
+ * `realpathSync` matters — pnpm's strict layout reaches the package through a
+ * symlink, and spawning the link leaves `import.meta.url` pointing somewhere the
+ * package's own relative requires do not resolve from.
+ */
+function resolveWarlockBinary() {
+  const binaryPath = path.join(
+    appDirectory,
+    "node_modules",
+    "@warlock.js",
+    "core",
+    "bin",
+    "warlock.js",
+  );
+
+  if (!existsSync(binaryPath)) {
+    throw new Error(
+      [
+        `The warlock CLI is not installed at ${binaryPath}.`,
+        "",
+        "This resolves inside the fixture on purpose: the gate must launch the",
+        "binary the app installed, not one hoisted from the workspace root.",
+      ].join("\n"),
+    );
+  }
+
+  return realpathSync(binaryPath);
+}
+
+/** Launch the fixture's own `warlock` CLI directly — never through a package manager. */
+function warlockCommand(...args) {
+  return [process.execPath, [resolveWarlockBinary(), ...args]];
+}
+
 /** Run a command to completion, rejecting on a non-zero exit. */
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
@@ -106,7 +173,13 @@ function run(command, args, options = {}) {
       // failure path and buys nothing the assertion doesn't already give.
       env: { ...process.env, ...ACCEPTANCE_ENV, ...options.env },
       stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit",
-      shell: process.platform === "win32",
+      // Windows needs a shell to find `npx`/`pnpm`, which are `.CMD` shims.
+      // A caller launching an absolute executable must pass `shell: false`:
+      // with a shell, Node concatenates the arguments instead of escaping
+      // them, and `process.execPath` on a default install is
+      // `C:\Program Files\nodejs\node.exe` — the space alone breaks the
+      // command, and it breaks it into something that still LOOKS launchable.
+      shell: options.shell ?? process.platform === "win32",
     });
 
     let output = "";
@@ -288,9 +361,9 @@ async function packFramework() {
 /**
  * Kill a process and everything it spawned.
  *
- * `child.kill()` signals only the direct child, and here that child is
- * `pnpm exec warlock start` — two levels above the application process that
- * actually holds the port. Signalling it leaves the app running, so the NEXT
+ * `child.kill()` signals only the direct child, and here that child is the
+ * `warlock start` CLI — the supervisor it spawns is what actually holds the
+ * port. Signalling it leaves the app running, so the NEXT
  * run dies with `EADDRINUSE` on a port nothing visible is using. That happened,
  * and on a CI agent it would make every run after the first fail for a reason
  * that has nothing to do with the code under test.
@@ -372,17 +445,18 @@ function isProcessAlive(pid) {
  * Two checks with deliberately unequal weight, and the asymmetry matters:
  *
  * 1. **The port is released.** This is the check that catches the real leak.
- *    The process that leaks is a *grandchild* — the application, two levels
- *    below what this script spawns — and the port is the only handle we have on
- *    it. A run where teardown failed left the app listening while the wrapper
- *    had exited perfectly.
- * 2. **The spawned wrapper is gone.** NARROW BY CONSTRUCTION: it observes the
- *    `pnpm exec` process only, never the application. The wrapper essentially
- *    always exits, so this check is essentially always green — it is here to
- *    catch a *hung wrapper* leaking on a CI agent, and for nothing else. It
- *    must never be read as evidence that the process tree was reaped; that is
- *    what check 1 is for. Its failure message says so, because a permanently
- *    green check that reads as coverage is worse than no check at all.
+ *    The process that leaks is a *descendant* — the application the CLI
+ *    supervises, below what this script spawns — and the port is the only handle
+ *    we have on it. A run where teardown failed left the app listening while the
+ *    spawned CLI had exited perfectly.
+ * 2. **The spawned CLI is gone.** NARROW BY CONSTRUCTION: it observes the
+ *    `warlock start` process only, never the application it supervises. That
+ *    process essentially always exits, so this check is essentially always
+ *    green — it is here to catch a *hung launcher* leaking on a CI agent, and
+ *    for nothing else. It must never be read as evidence that the process tree
+ *    was reaped; that is what check 1 is for. Its failure message says so,
+ *    because a permanently green check that reads as coverage is worse than no
+ *    check at all.
  *
  * Residual gap, stated rather than papered over: a tree member that holds
  * neither the port nor the spawned pid escapes both checks.
@@ -408,12 +482,12 @@ async function assertTeardownComplete(pid, port, timeoutMs = 10_000) {
   if (isProcessAlive(pid)) {
     throw new Error(
       [
-        `The spawned wrapper (pid ${pid}) was still alive ${timeoutMs}ms after teardown.`,
+        `The spawned launcher (pid ${pid}) was still alive ${timeoutMs}ms after teardown.`,
         "",
-        "Scope: this observes the `pnpm exec` process ONLY — never the application,",
-        "which runs two levels below it. The port check above is what proves the",
-        "application was reaped. A hung wrapper leaks a process on a CI agent, which",
-        "is the only thing this check exists to catch.",
+        "Scope: this observes the `warlock start` process ONLY — never the application",
+        "it supervises. The port check above is what proves the application was",
+        "reaped. A hung launcher leaks a process on a CI agent, which is the only",
+        "thing this check exists to catch.",
       ].join("\n"),
     );
   }
@@ -461,9 +535,33 @@ async function assertPortReleased(port, timeoutMs = 10_000) {
 }
 
 /** Start the app and resolve once it answers, or reject with why it didn't. */
-function startAndRequest() {
+/**
+ * Readiness has TWO budgets on purpose, because "does it boot and serve" and
+ * "how long did that take" are different claims and only one of them should
+ * ever fail a release.
+ *
+ * CEILING — the correctness assertion. Exceeding it means the app never served,
+ * which is a genuine hang and must fail the gate.
+ *
+ * SOFT BUDGET — an observation. Exceeding it prints a warning and nothing more.
+ * A wall-clock figure on a shared developer machine measures the machine as
+ * much as the framework: this gate has failed at 64.3s against a 60s budget
+ * purely because two unrelated `warlock dev` servers were running. Failing a
+ * release on that teaches people to ignore the gate, and an ignored gate is
+ * worse than a slow one. We cannot assert a duration until there is a stable
+ * baseline to assert against.
+ */
+const READINESS_CEILING_MS = 180_000;
+
+const READINESS_SOFT_BUDGET_MS = 60_000;
+
+function startAndRequest({ command, args, readiness = "banner" } = {}) {
+  const [defaultCommand, defaultArgs] = warlockCommand("start");
+  const launchCommand = command ?? defaultCommand;
+  const launchArgs = args ?? defaultArgs;
+
   return new Promise((resolve, reject) => {
-    const child = spawn("npx", ["pnpm", "exec", "warlock", "start"], {
+    const child = spawn(launchCommand, launchArgs, {
       cwd: appDirectory,
       // The app under test. Same rule as `run()`: the environment the verdict
       // depends on is set here, not inherited from the operator.
@@ -472,10 +570,16 @@ function startAndRequest() {
       // interactive, and a child waiting on a tty that will never answer blocks
       // forever without printing why.
       stdio: ["ignore", "pipe", "pipe"],
-      shell: process.platform === "win32",
+      // No shell. Both launch paths are now `node <absolute script>`, which needs
+      // none, and a `cmd.exe` wrapper only adds a layer between this process and
+      // the one holding the port — the exact gap that let an app survive its
+      // parent being killed and take the next run down with EADDRINUSE.
+      shell: false,
       // Own process group on POSIX so `killTree` can signal the whole thing.
       detached: process.platform !== "win32",
     });
+
+    const launchedAt = Date.now();
 
     let stdout = "";
     let stderr = "";
@@ -487,6 +591,19 @@ function startAndRequest() {
       }
 
       settled = true;
+
+      if (!error) {
+        const readyMs = Date.now() - launchedAt;
+
+        console.log(`TIME_TO_READY_MS=${readyMs}`);
+
+        if (readyMs > READINESS_SOFT_BUDGET_MS) {
+          console.warn(
+            `WARN  readiness took ${readyMs}ms, over the ${READINESS_SOFT_BUDGET_MS}ms soft budget. ` +
+              `Recorded, not failed — check what else is running before reading it as a regression.`,
+          );
+        }
+      }
 
       // Settle only once the kill has actually run, so the teardown assertion
       // downstream is not racing it.
@@ -507,29 +624,70 @@ function startAndRequest() {
 
       // The started banner is the contract: it appears on stdout only after the
       // app reported a completed boot, so it is safe to request the endpoint.
-      if (stdout.includes("production server started")) {
+      //
+      // ONLY `warlock start` prints it — it comes from the supervisor
+      // (`production-supervisor.ts`), not from the app. A bundle executed
+      // directly never emits it, so that path polls the port instead; waiting
+      // for the banner there would hang for the full timeout and look like a
+      // boot failure.
+      if (readiness === "banner" && stdout.includes("production server started")) {
         void requestAcceptanceEndpoint()
           .then((body) => finish(undefined, { stdout, stderr, body, pid: child.pid }))
           .catch((error) => finish(error));
       }
     });
 
+    if (readiness === "poll") {
+      // Poll the endpoint itself rather than any log line. Stronger than the
+      // banner — it proves the app is SERVING, where the banner proves only
+      // that it said so — and it is the only signal available without a
+      // supervisor.
+      const deadline = Date.now() + READINESS_CEILING_MS;
+
+      const poll = () => {
+        if (settled) return;
+
+        requestAcceptanceEndpoint()
+          .then((body) => finish(undefined, { stdout, stderr, body, pid: child.pid }))
+          .catch(() => {
+            if (Date.now() > deadline) {
+              finish(
+                new Error(
+                  `\`${[command, ...args].join(" ")}\` never served within ${READINESS_CEILING_MS}ms`,
+                ),
+              );
+
+              return;
+            }
+
+            setTimeout(poll, 500).unref();
+          });
+      };
+
+      setTimeout(poll, 500).unref();
+    }
+
     child.stderr.on("data", (chunk) => {
       stderr += chunk;
       process.stderr.write(chunk);
     });
 
+    // The command is named in both messages because this now launches the app
+    // two ways — through `warlock start` and directly as a single bundle — and
+    // "it exited before serving" is useless if you cannot tell which one did.
+    const launched = [launchCommand, ...launchArgs].join(" ");
+
     child.on("exit", (code) => {
       finish(
-        new Error(
-          `warlock start exited with ${code} before serving. It never printed the started banner.`,
-        ),
+        new Error(`\`${launched}\` exited with ${code} before serving. It never became ready.`),
       );
     });
 
     setTimeout(() => {
-      finish(new Error("warlock start never reported readiness within 60s"));
-    }, 60_000).unref();
+      finish(
+        new Error(`\`${launched}\` never reported readiness within ${READINESS_CEILING_MS}ms`),
+      );
+    }, READINESS_CEILING_MS).unref();
   });
 }
 
@@ -724,8 +882,9 @@ async function assertUndeclaredImportFailsTheBuild() {
   writeFileSync(builderPath, original.replace(needle, asLiteral(REINTRODUCED_IMPORT)));
 
   try {
-    const { code, output } = await run("npx", ["pnpm", "exec", "warlock", "build"], {
+    const { code, output } = await run(...warlockCommand("build"), {
       cwd: appDirectory,
+      shell: false,
       capture: true,
       allowFailure: true,
     });
@@ -800,6 +959,89 @@ function assertArtifactIsNotStale(version) {
   }
 }
 
+/**
+ * Build the fixture with `singleBundle: true` and RUN the result.
+ *
+ * The defect this covers is specifically a build that SUCCEEDS and a process
+ * that then dies: a consumer set `packages: "bundle"`, got a clean build, and
+ * hit `Dynamic require of "node:assert" is not supported` at runtime. So a
+ * green `warlock build` proves nothing here — the bundle has to be executed.
+ *
+ * It is executed with `node dist/app.js` directly rather than through
+ * `warlock start`, because the point of a single bundle is that it runs
+ * WITHOUT the framework's launcher. Booting it through `start` would test the
+ * launcher and leave the actual claim unverified.
+ *
+ * A successful boot is proven by the app answering on its port, not by the
+ * process staying alive — a process can survive while failing to serve.
+ */
+async function assertSingleBundleRuns() {
+  const configPath = path.join(appDirectory, "warlock.config.ts");
+  const originalConfig = readFileSync(configPath, "utf-8");
+
+  if (!originalConfig.includes("build:")) {
+    throw new Error(
+      `${configPath} has no \`build\` block, so this check cannot enable singleBundle. ` +
+        `The fixture changed shape — fix this assertion rather than skipping it.`,
+    );
+  }
+
+  const outputDirectory = path.join(appDirectory, "dist");
+
+  try {
+    writeFileSync(
+      configPath,
+      originalConfig.replace(/build:\s*\{/, "build: {\n    singleBundle: true,"),
+    );
+
+    // Emptied first, and this is load-bearing rather than tidiness. `warlock
+    // build` does NOT clean its output directory, and the positive case above
+    // already ran a DEFAULT build that left its `routes-*.js` chunks here. A
+    // count taken over a dirty directory therefore fails a correct build: this
+    // check was written that way and would have reported "emitted 4, expected
+    // exactly one" against a bundle that was in fact single. Worse, it can also
+    // pass wrongly — a stale `app.js` from an earlier build satisfies the
+    // existence check when the new build produced nothing at all.
+    rmSync(outputDirectory, { recursive: true, force: true });
+
+    await run(...warlockCommand("build"), { cwd: appDirectory, shell: false });
+
+    const bundlePath = path.join(outputDirectory, "app.js");
+
+    if (!existsSync(bundlePath)) {
+      throw new Error(`singleBundle build produced no ${bundlePath}`);
+    }
+
+    // No chunk files beside it — that is what "single" means, and a build
+    // that quietly kept splitting on would still boot, so nothing else
+    // would notice.
+    const emitted = readdirSync(outputDirectory).filter((file) => file.endsWith(".js"));
+
+    if (emitted.length !== 1) {
+      throw new Error(
+        `singleBundle emitted ${emitted.length} .js files (${emitted.join(", ")}), expected exactly one.`,
+      );
+    }
+
+    const { body, pid } = await startAndRequest({
+      command: process.execPath,
+      args: [bundlePath],
+      // No supervisor here, so no started banner — poll the endpoint.
+      readiness: "poll",
+    });
+
+    console.log(`  response: ${body}`);
+    assertBootedInProduction(body);
+    console.log(`  ran with \`node dist/app.js\` — no launcher, no chunks`);
+
+    await assertTeardownComplete(pid, acceptancePort);
+  } finally {
+    // Always restore: a fixture left with singleBundle on would silently
+    // change what every later run is testing.
+    writeFileSync(configPath, originalConfig);
+  }
+}
+
 async function main() {
   if (skipFrameworkBuild) {
     console.error("");
@@ -859,7 +1101,7 @@ async function main() {
   console.log(`  @warlock.js/core → ${assertFrameworkIsReallyInstalled()}`);
 
   log("POSITIVE — building the app");
-  await run("npx", ["pnpm", "exec", "warlock", "build"], { cwd: appDirectory });
+  await run(...warlockCommand("build"), { cwd: appDirectory, shell: false });
 
   log("POSITIVE — starting the app and requesting /acceptance");
   const { body, pid } = await startAndRequest();
@@ -870,10 +1112,26 @@ async function main() {
   await assertTeardownComplete(pid, acceptancePort);
   console.log(`  port ${acceptancePort} released; wrapper ${pid} gone (wrapper check is narrow — see assertTeardownComplete)`);
 
+  if (baselineOnly) {
+    log("NEGATIVE — an undeclared import must fail the build");
+    await assertUndeclaredImportFailsTheBuild();
+
+    log(
+      `BASELINE ACCEPTED @warlock.js/core@${version} — built, booted, served, and refused an undeclared import. The singleBundle case was SKIPPED; this run does not gate that feature.`,
+    );
+
+    return;
+  }
+
+  log("SINGLE BUNDLE — one self-contained file must build AND run");
+  await assertSingleBundleRuns();
+
   log("NEGATIVE — an undeclared import must fail the build");
   await assertUndeclaredImportFailsTheBuild();
 
-  log(`ACCEPTED @warlock.js/core@${version} — built, booted, served, and refused an undeclared import.`);
+  log(
+    `ACCEPTED @warlock.js/core@${version} — built, booted, served, produced a runnable single bundle, and refused an undeclared import.`,
+  );
 }
 
 main().catch((error) => {

@@ -165,6 +165,8 @@ export default defineConfig({
     outFile: "app.js",            // default — bundle filename
     minify: true,                 // default — esbuild minify
     sourcemap: true,              // default — true | false | "inline" | "linked"
+    singleBundle: false,          // default — one runnable file, deps inlined
+    esmShim: true,                // default — require/__filename/__dirname for bundled CJS
   },
 });
 ```
@@ -176,6 +178,10 @@ Defaults are sensible for the typical "Node service" deployment. Knobs to actual
 - **`minify: false`** — flip to debug a production-only bug. Larger bundle, readable stack traces.
 - **`sourcemap: "inline"`** — embed the source map in the bundle. Useful when your error reporter only captures the bundle and can't fetch a `.map` sidecar.
 - **`sourcemap: false`** — skip source maps entirely. Smaller artifact, but stack traces in production logs lose their file:line precision (and `warlock start` will not enable `--enable-source-maps` since there's nothing to map).
+- **`singleBundle: true`** — inline dependencies so `node dist/app.js` runs with no `node_modules` and no launcher. Sets `packages: "bundle"` + `splitting: false` as **defaults you can override**. ⚠ Native `.node` addons are still emitted alongside — "single bundle" is one JS file *plus* any native addons. Do NOT reach for it as the default: keeping deps external is right when you deploy the folder.
+- **`esmShim: false`** — only if you are certain nothing in the graph is CommonJS. Leave it on.
+
+⚠ **The trap this replaced.** Setting `packages: "bundle"` by hand used to produce a clean build whose process died on start with `Error: Dynamic require of "node:assert" is not supported`. The output is ESM; bundled CJS deps call `require(...)` and read `__dirname`, and neither exists in an ES module, so the bundler substitutes a throwing stub. **A green `warlock build` was not evidence the bundle ran.** `esmShim` now injects `createRequire(import.meta.url)` and friends automatically for any ESM build, so both `singleBundle` and a hand-written `packages: "bundle"` work. An existing hand-written `banner` is preserved — the shim is prepended, not substituted.
 
 ### What it preloads
 

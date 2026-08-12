@@ -1,5 +1,5 @@
 import { createDatabaseAction } from "../../database/create-database-action";
-import { command } from "../cli-command";
+import { command } from "../../commands/cli-command";
 
 export const createDatabaseCommand = command({
   name: "create-database <name>",

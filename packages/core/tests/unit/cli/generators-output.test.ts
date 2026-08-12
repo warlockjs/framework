@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { generateMigration } from "../../../src/cli/commands/generate/generators/migration.generator";
 import { generateModule } from "../../../src/cli/commands/generate/generators/module.generator";
 import { setDryRun } from "../../../src/cli/commands/generate/utils/writer";
-import type { CommandActionData } from "../../../src/cli/types";
+import type { CommandActionData } from "../../../src/commands/types";
 
 /**
  * End-to-end generator OUTPUT tests. The generators write under

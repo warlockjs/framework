@@ -31,7 +31,7 @@ vi.mock("@warlock.js/cascade", () => {
 vi.mock("../../../../src/dev-server/files-orchestrator", () => ({
   filesOrchestrator: { load: vi.fn() },
 }));
-vi.mock("../../../../src/dev-server/path", () => ({
+vi.mock("../../../../src/utils/normalized-path", () => ({
   Path: { toAbsolute: vi.fn(), toRelative: vi.fn() },
 }));
 vi.mock("../../../../src/dev-server/utils", () => ({

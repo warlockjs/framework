@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { generateController } from "../../../src/cli/commands/generate/generators/controller.generator";
 import { generateService } from "../../../src/cli/commands/generate/generators/service.generator";
 import { setDryRun } from "../../../src/cli/commands/generate/utils/writer";
-import type { CommandActionData } from "../../../src/cli/types";
+import type { CommandActionData } from "../../../src/commands/types";
 
 /**
  * Behavior for the module-gated generators (controller / service / model /

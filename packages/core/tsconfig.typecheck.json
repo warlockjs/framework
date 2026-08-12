@@ -1,0 +1,46 @@
+{
+  // Typecheck-only configuration. `tsconfig.json` is left untouched because the
+  // release tooling may consume it; nothing here changes what is built or
+  // published.
+  //
+  // The point of this file is that the headline error count was measuring the
+  // wrong thing. Three settings in the base config made most of it meaningless:
+  //
+  //   1. Sibling `@warlock.js/*` packages resolve through workspace symlinks to
+  //      source folders with no compiled output, so `tsc` reported 87 "cannot
+  //      find module" errors — and every class extending an unresolvable base
+  //      then reported all of its own members missing. The `paths` mapping below
+  //      points them at source instead.
+  //   2. `"module": "CommonJS"` while `package.json` declares `"type": "module"`
+  //      and we ship ESM. That mismatch alone produced every top-level-await
+  //      error. `ESNext` + `Bundler` resolution is what esbuild actually does to
+  //      this code, including extensionless relative imports.
+  //   3. `tsc` follows imports outward, so errors in `../ai/src/...` — a
+  //      different package — were being counted as ours.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2022",
+    "noEmit": true,
+    // `rootDir` only constrains emit, and this config emits nothing. Inheriting
+    // `src` would reject every file under `tests/`, and sibling sources resolved
+    // through `paths` live above this package — so the program root is the
+    // workspace folder.
+    "rootDir": "..",
+    "baseUrl": ".",
+    "paths": {
+      "@warlock.js/cascade": ["../cascade/src/index.ts"],
+      "@warlock.js/seal": ["../seal/src/index.ts"],
+      "@warlock.js/cache": ["../cache/src/index.ts"],
+      "@warlock.js/context": ["../context/src/index.ts"],
+      "@warlock.js/herald": ["../herald/src/index.ts"],
+      "@warlock.js/access": ["../access/src/index.ts"],
+      "@warlock.js/auth": ["../auth/src/index.ts"],
+      "@warlock.js/notifications": ["../notifications/src/index.ts"],
+      "@warlock.js/core": ["./src/index.ts"]
+    }
+  },
+  "include": ["src/**/*", "tests/**/*"],
+  "exclude": ["node_modules", "dist", "tests/acceptance/pnpm-production-app"]
+}

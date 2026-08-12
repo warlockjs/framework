@@ -110,7 +110,30 @@ export interface RouteOptions {
    */
   description?: string;
   /**
-   * Request server options
+   * Fastify route options, forwarded to the route's registration.
+   *
+   * **Dev server caveat.** The dev server registers wildcard routes and
+   * dispatches per request, so it has no per-route registration slot. It
+   * forwards the pre-handler hook phases — `onRequest`, `preValidation` and
+   * `preHandler` — by matching in Fastify's own `onRequest` phase and running
+   * the matched route's hooks there, which keeps `onRequest` running before the
+   * body is parsed, as it does in production.
+   *
+   * **Two things are NOT forwarded in dev, and cannot be:**
+   * - `bodyLimit` — Fastify reads it at registration time; no hook can bound a
+   *   body that is already being parsed.
+   * - `preParsing` — it must return the payload stream, so forwarding it
+   *   generically would corrupt the body rather than guard it.
+   *
+   * A route that relies on either of those behaves differently in dev than in
+   * production. For a pre-parse guarantee that holds in both modes, register a
+   * server-level hook through `router.beforeScanning((_router, server) =>
+   * server.addHook("onRequest", ...))` — it lands on the Fastify instance
+   * rather than in per-route options. That hook fires for **every** request, so
+   * it must discriminate on `request.method` and `request.url` itself, and it
+   * must be **idempotent per request**: `beforeScanning` runs once per scan and
+   * restarting the HTTP connector builds a new server, so the callback can run
+   * more than once against different instances.
    */
   serverOptions?: RouteShorthandOptions;
   /**

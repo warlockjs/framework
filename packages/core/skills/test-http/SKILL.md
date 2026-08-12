@@ -1,19 +1,21 @@
 ---
 name: test-http
-description: 'Integration tests against a real HTTP server — `startHttpTestServer()` boots one shared server in globalSetup, then `testGet` / `testPost` / `expectJson` make typed requests against it. Triggers: `startHttpTestServer`, `startHttpTestServer({ port })`, `stopHttpTestServer`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`, `PortInUseError`, `assertPortIsAvailable`, `isPortAvailable`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape", "test server port already in use", "EADDRINUSE while running tests", "run tests while the dev server is up"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core"`. Skip: pure unit tests — `@warlock.js/core/test-service/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing libs `supertest`, `light-my-request`, `nock`.'
+description: 'Integration tests against a real HTTP server — `startHttpTestServer()` boots one shared server in globalSetup, then `testGet` / `testPost` / `expectJson` make typed requests against it. Triggers: `startHttpTestServer`, `startHttpTestServer({ port })`, `stopHttpTestServer`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`, `PortInUseError`, `assertPortIsAvailable`, `isPortAvailable`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape", "test server port already in use", "EADDRINUSE while running tests", "run tests while the dev server is up"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core/tests"`. Skip: pure unit tests — `@warlock.js/core/test-service/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing libs `supertest`, `light-my-request`, `nock`.'
 ---
 
 # Warlock — HTTP integration tests
 
 Some tests need the full stack: route matching, middleware chain, validation, controller, response serialization. For those, you boot the real HTTP server once per test run and make real `fetch` calls against it.
 
-`startHttpTestServer()` is the bootstrap. `testGet` / `testPost` / `expectJson` are the call helpers. Both ship in `@warlock.js/core`.
+`startHttpTestServer()` is the bootstrap. `testGet` / `testPost` / `expectJson` are the call helpers. Both ship in `@warlock.js/core/tests`.
+
+⚠ **Changed in 4.13.0 — the import is a subpath now.** These helpers used to be re-exported from the package root; they are not any more, because that put the test helpers into every application's production module graph. `import { testGet } from "@warlock.js/core"` now fails with *"has no exported member"* — **add `/tests` to the specifier and nothing else changes.**
 
 ## The shape
 
 ```ts title="src/app/users/tests/users.controller.test.ts"
 import { describe, expect, it } from "vitest";
-import { expectJson, testGet, testPost } from "@warlock.js/core";
+import { expectJson, testGet, testPost } from "@warlock.js/core/tests";
 
 describe("Users API", () => {
   it("GET /users returns the list", async () => {
@@ -39,7 +41,7 @@ No `beforeAll`, no manual server start — the project's `src/test-global-setup.
 ## The bootstrap — `startHttpTestServer` / `stopHttpTestServer`
 
 ```ts
-import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core";
+import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core/tests";
 ```
 
 `startHttpTestServer()` boots a **minimal but real** HTTP server:
@@ -80,6 +82,23 @@ startHttpTestServer({ port: 2032 }).
 
 This runs whether or not you passed a port, so a collision never reaches you as a bare `EADDRINUSE` from inside Fastify. The failure is a `PortInUseError` carrying `port` and `host`. The same check is available on its own — `assertPortIsAvailable(port, host)` throws it, `isPortAvailable(port, host)` returns a boolean.
 
+### Port `0` is refused
+
+`port: 0` — "let the OS pick one" — is not supported, and says so rather than half-working:
+
+```
+startHttpTestServer() cannot run on port 0. Pass an explicit port — e.g.
+startHttpTestServer({ port: 3999 }) — or set `http.port` in your config. Test workers
+are separate processes that resolve the server's URL from the port published at
+startup, and an OS-assigned port is not knowable to them.
+```
+
+The reason is the worker handoff described above: the port the OS assigns is never recorded anywhere the workers can read, so `getTestServerUrl()` would resolve `0` and send every request to `http://host:0`.
+
+### If startup fails, nothing is left behind
+
+`startHttpTestServer()` owns the connectors it starts. A failure part-way through — a bad config, a connector that won't boot — tears down whatever came up, withdraws the published port, and **rethrows the original error**; a failure during that cleanup is logged but never replaces the cause. `stopHttpTestServer()` withdraws the port and resets its state even when the shutdown itself throws, and still surfaces that failure.
+
 ## Project wiring — `src/test-global-setup.ts` + `vite.config.ts`
 
 ```ts title="src/test-global-setup.ts"
@@ -87,7 +106,7 @@ This runs whether or not you passed a port, so a collision never reaches you as 
  * Global Test Setup
  * Runs ONCE in the main process before all test workers start.
  */
-import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core";
+import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core/tests";
 
 export async function setup() {
   await startHttpTestServer();
@@ -99,7 +118,7 @@ export async function teardown() {
 ```
 
 ```ts title="vite.config.ts"
-import { lowerStage3Decorators } from "@warlock.js/core";
+import { lowerStage3Decorators } from "@warlock.js/core/vite";
 import mongezVite from "@mongez/vite";
 import { defineConfig } from "vitest/config";
 
@@ -124,7 +143,7 @@ Everything is built on native `fetch` — no extra dependency, no special wire f
 ### URL resolution
 
 ```ts
-import { getTestServerUrl } from "@warlock.js/core";
+import { getTestServerUrl } from "@warlock.js/core/tests";
 
 const url = getTestServerUrl();  // → "http://localhost:2031" (defaults)
 ```
@@ -141,7 +160,7 @@ import {
   testPut,
   testPatch,
   testDelete,
-} from "@warlock.js/core";
+} from "@warlock.js/core/tests";
 
 await testGet("/products");
 await testGet("/products?published=true", { headers: { "X-Tenant": "abc" } });
@@ -158,7 +177,7 @@ All accept a relative path (leading `/` optional) and a standard `RequestInit`. 
 ### Parsing + asserting — `expectJson<T>`
 
 ```ts
-import { expectJson, parseJsonResponse } from "@warlock.js/core";
+import { expectJson, parseJsonResponse } from "@warlock.js/core/tests";
 
 // Parse-only
 const body = await parseJsonResponse<MyShape>(response);
@@ -177,7 +196,7 @@ const body = await expectJson<MyShape>(response, 404);     // expects 404 (testi
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { expectJson, testGet, testPost } from "@warlock.js/core";
+import { expectJson, testGet, testPost } from "@warlock.js/core/tests";
 
 describe("Products API — happy path", () => {
   it("creates and reads back a product", async () => {

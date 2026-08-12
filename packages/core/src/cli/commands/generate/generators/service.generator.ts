@@ -1,5 +1,5 @@
 import { colors } from "@mongez/copper";
-import type { CommandActionData } from "../../../types";
+import type { CommandActionData } from "../../../../commands/types";
 import { serviceStub } from "../templates/stubs";
 import { putFileAsync, setDryRun } from "../utils/writer";
 import { parseModulePath, parseName } from "../utils/name-parser";

@@ -1,4 +1,4 @@
-import { command } from "../cli-command";
+import { command } from "../../commands/cli-command";
 import { routesCommandAction } from "./routes/routes-command.action";
 
 /**

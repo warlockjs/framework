@@ -50,7 +50,7 @@ vi.mock("@warlock.js/fs", () => ({
   fileExistsAsync: vi.fn(async () => false),
 }));
 
-const { CLICommand } = await import("../../../src/cli/cli-command");
+const { CLICommand } = await import("../../../src/commands/cli-command");
 const { CLICommandsManager } = await import("../../../src/cli/cli-commands.manager");
 const { Application } = await import("../../../src/application");
 

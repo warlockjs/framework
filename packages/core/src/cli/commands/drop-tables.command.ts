@@ -1,5 +1,5 @@
 import { dropTablesAction } from "../../database/drop-tables-action";
-import { command } from "../cli-command";
+import { command } from "../../commands/cli-command";
 
 export const dropTablesCommand = command({
   name: "drop.tables",

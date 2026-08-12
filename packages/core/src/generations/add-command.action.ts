@@ -8,7 +8,7 @@ import {
   putJsonFileAsync,
 } from "@warlock.js/fs";
 import { execSync } from "node:child_process";
-import { CommandActionData } from "../cli/types";
+import { CommandActionData } from "../commands/types";
 import {
   detectPackageManager,
   getAddCommand,
@@ -34,6 +34,23 @@ import {
   notificationsConfigStub,
   socketConfigStub,
 } from "./stubs";
+
+/**
+ * The parts of a project `package.json` this action reads or writes. Deliberately
+ * partial — it describes what we touch, not the whole manifest.
+ */
+type ProjectPackageJson = {
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  scripts?: Record<string, string>;
+};
+
+/**
+ * The part of a project `tsconfig.json` this action patches.
+ */
+type ProjectTsConfig = {
+  include?: string[];
+};
 
 /**
  * Build a migration filename timestamp prefix in the framework's
@@ -66,7 +83,7 @@ async function completeTestInstallation(options: CommandActionData) {
  * Runs ONCE before all test workers.
  * Starts the HTTP server for integration tests.
  */
-import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core";
+import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core/tests";
 
 export async function setup() {
   await startHttpTestServer();
@@ -93,7 +110,7 @@ export async function teardown() {
  * Runs in EACH Vitest worker thread before tests execute.
  * Sets up per-worker database and cache connections.
  */
-import { setupTest } from "@warlock.js/core";
+import { setupTest } from "@warlock.js/core/tests";
 
 await setupTest({ connectors: true });
 `,
@@ -108,7 +125,7 @@ await setupTest({ connectors: true });
   if (!viteConfigExists) {
     await putFileAsync(
       viteConfigPath,
-      `import { lowerStage3Decorators } from "@warlock.js/core";
+      `import { lowerStage3Decorators } from "@warlock.js/core/vite";
 import mongezVite from "@mongez/vite";
 import { defineConfig } from "vitest/config";
 
@@ -177,7 +194,7 @@ export default function WelcomeEmail({ name }: WelcomeEmailProps) {
 
   // 2. Patch tsconfig.json â€” add "emails" to include if missing
   const tsconfigPath = rootPath("tsconfig.json");
-  const tsconfig = await getJsonFileAsync(tsconfigPath);
+  const tsconfig = await getJsonFileAsync<ProjectTsConfig>(tsconfigPath);
 
   if (!tsconfig.include) {
     tsconfig.include = [];
@@ -720,7 +737,7 @@ export async function addCommandAction(options: CommandActionData) {
     }
   }
 
-  const currentPackageJson = await getJsonFileAsync(rootPath("package.json"));
+  const currentPackageJson = await getJsonFileAsync<ProjectPackageJson>(rootPath("package.json"));
 
   // Fresh templates may omit one of the maps — guard before reading.
   currentPackageJson.dependencies = currentPackageJson.dependencies ?? {};
@@ -771,7 +788,7 @@ export async function addCommandAction(options: CommandActionData) {
   if (Object.keys(scripts).length > 0) {
     console.log(`Adding scripts ${colors.magenta(Object.keys(scripts).join(", "))}`);
     const packageJsonPath = rootPath("package.json");
-    const packageJson = await getJsonFileAsync(packageJsonPath);
+    const packageJson = await getJsonFileAsync<ProjectPackageJson>(packageJsonPath);
     packageJson.scripts = { ...(packageJson.scripts ?? {}), ...scripts };
     await putJsonFileAsync(packageJsonPath, packageJson);
 
@@ -834,7 +851,7 @@ async function recordDependencies(
   }
 
   const packageJsonPath = rootPath("package.json");
-  const packageJson = await getJsonFileAsync(packageJsonPath);
+  const packageJson = await getJsonFileAsync<ProjectPackageJson>(packageJsonPath);
 
   packageJson.dependencies = packageJson.dependencies ?? {};
   packageJson.devDependencies = packageJson.devDependencies ?? {};

@@ -2,7 +2,7 @@ import { colors } from "@mongez/copper";
 import { dataSourceRegistry, dropAllTables } from "@warlock.js/cascade";
 import { log } from "@warlock.js/logger";
 import { confirm } from "../cli/commands/generate/utils/prompt";
-import { CommandActionData } from "../cli/types";
+import { CommandActionData } from "../commands/types";
 
 export async function dropTablesAction(command: CommandActionData) {
   const { force } = command.options;

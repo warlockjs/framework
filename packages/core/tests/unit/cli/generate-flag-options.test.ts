@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CLICommand } from "../../../src/cli/cli-command";
+import { CLICommand } from "../../../src/commands/cli-command";
 import { CLICommandsManager } from "../../../src/cli/cli-commands.manager";
 import { addCommand } from "../../../src/cli/commands/add.command";
 import {
@@ -13,7 +13,7 @@ import {
   generateServiceCommand,
 } from "../../../src/cli/commands/generate/generate.command";
 import { seedCommand } from "../../../src/cli/commands/seed.command";
-import type { CommandActionData } from "../../../src/cli/types";
+import type { CommandActionData } from "../../../src/commands/types";
 
 /**
  * #23 — the #21 engine fix only reaches options that DECLARE `type: "boolean"`.

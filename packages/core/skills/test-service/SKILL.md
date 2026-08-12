@@ -1,6 +1,6 @@
 ---
 name: test-service
-description: 'Pure unit tests against services, repositories, models, and use-cases — `setupTest({ connectors })` bootstraps each Vitest worker with its own DB/cache connections so you can call your code directly. Triggers: `setupTest`, `src/test-setup.ts`, `tests.connectors`, `Application.setEnvironment`; "unit-test a service", "test a repository query", "vitest setupFiles", "skip connectors for pure-logic tests"; typical import `import { setupTest } from "@warlock.js/core"`. Skip: HTTP integration — `@warlock.js/core/test-http/SKILL.md`; warlock add test scaffold — `@warlock.js/core/write-cli-command/SKILL.md`; competing tooling: jest direct, `supertest`, `nock`.'
+description: 'Pure unit tests against services, repositories, models, and use-cases — `setupTest({ connectors })` bootstraps each Vitest worker with its own DB/cache connections so you can call your code directly. Triggers: `setupTest`, `src/test-setup.ts`, `tests.connectors`, `Application.setEnvironment`; "unit-test a service", "test a repository query", "vitest setupFiles", "skip connectors for pure-logic tests"; typical import `import { setupTest } from "@warlock.js/core/tests"`. Skip: HTTP integration — `@warlock.js/core/test-http/SKILL.md`; warlock add test scaffold — `@warlock.js/core/write-cli-command/SKILL.md`; competing tooling: jest direct, `supertest`, `nock`.'
 ---
 
 # Warlock — test a service
@@ -8,6 +8,8 @@ description: 'Pure unit tests against services, repositories, models, and use-ca
 For unit tests, you import the thing under test and call it directly. No HTTP, no fetch, no controllers. Framework testing in Warlock is about getting your **service layer** under test efficiently — and that means each Vitest worker needs its own bootstrapped framework with a DB connection.
 
 `setupTest()` is the one-call bootstrap that gives each worker that environment.
+
+⚠ **Changed in 4.13.0 — the import is a subpath now.** `setupTest` used to be re-exported from the package root; it is not any more, because that put the test helpers into every application's production module graph. `import { setupTest } from "@warlock.js/core"` now fails with *"has no exported member"* — **add `/tests` to the specifier and nothing else changes.**
 
 ## The shape
 
@@ -37,7 +39,7 @@ No `beforeAll(setupTest)` in this file — the project's `src/test-setup.ts` (re
 ## `setupTest({ connectors })` — the worker bootstrap
 
 ```ts
-import { setupTest } from "@warlock.js/core";
+import { setupTest } from "@warlock.js/core/tests";
 
 await setupTest({ connectors: true });
 ```
@@ -85,13 +87,13 @@ The `warlock add test` feature creates both files. The standard wiring:
  * Per-Worker Test Setup
  * Runs in EACH Vitest worker thread before tests execute.
  */
-import { setupTest } from "@warlock.js/core";
+import { setupTest } from "@warlock.js/core/tests";
 
 await setupTest({ connectors: true });
 ```
 
 ```ts title="vite.config.ts"
-import { lowerStage3Decorators } from "@warlock.js/core";
+import { lowerStage3Decorators } from "@warlock.js/core/vite";
 import mongezVite from "@mongez/vite";
 import { defineConfig } from "vitest/config";
 
@@ -210,11 +212,11 @@ Vitest runs tests in a single worker file sequentially, so an `afterEach` trunca
 
 ```ts title="src/app/utils/tests/slugify.test.ts"
 import { beforeAll, describe, expect, it } from "vitest";
-import { setupTest } from "@warlock.js/core";
+import { setupTest } from "@warlock.js/core/tests";
 import { slugify } from "../utils/slugify";
 
 beforeAll(async () => {
-  await setupTest({ connectors: false });  // override the project default
+  await setupTest({ connectors: false });  // starts no connectors at all
 });
 
 describe("slugify", () => {
@@ -224,7 +226,9 @@ describe("slugify", () => {
 });
 ```
 
-`setupTest` is idempotent per worker (`isSetupComplete` flag) — calling it again with different options after `src/test-setup.ts` already ran is a no-op. To genuinely skip connectors, either set `tests.connectors: false` in config (project-wide) or rely on the default in `src/test-setup.ts` being what you want most of the time.
+`setupTest` is idempotent per worker (`isSetupComplete` flag) — calling it again with different options after `src/test-setup.ts` already ran is a no-op. **That includes a `connectors: false` call: if `src/test-setup.ts` already ran `setupTest()` in this worker, the example above changes nothing.** To genuinely skip connectors, either set `tests.connectors: false` in config (project-wide) or rely on the default in `src/test-setup.ts` being what you want most of the time.
+
+⚠ **Config beats the parameter.** If `tests.connectors` is set at all, `setupTest({ connectors })` cannot override it — the config value wins. That is the current contract, not an accident; a per-call override is under discussion for a later release.
 
 ## Gotchas
 
@@ -232,7 +236,7 @@ describe("slugify", () => {
 - **Per-worker connections are separate from the HTTP server's connections.** A row inserted by a service-level test is on the worker's connection; the HTTP test server has its own. They don't see each other unless they're both pointing at the same physical DB and the inserting test has already committed.
 - **`NODE_ENV` is set to `"test"`** by `setupTest`. Code that branches on `Application.isProduction` / `Application.isDevelopment` sees `false` for both. If your tests need production-like config (cookies, CORS), set those values in `src/config/*.ts` explicitly under the test branch — don't rely on the env flag.
 - **No HTTP from this layer.** `setupTest({ connectors: true })` never starts the HTTP connector by design. Don't try to `request.app.http` your way to a fetch test — use the `test-http` skill instead.
-- **Don't import `vitest-setup` from `@warlock.js/core/src/...`.** The public surface is `import { setupTest } from "@warlock.js/core"`. Reaching into source paths breaks when the package layout shifts.
+- **Don't import `vitest-setup` from `@warlock.js/core/src/...`.** The public surface is `import { setupTest } from "@warlock.js/core/tests"`. Reaching into source paths breaks when the package layout shifts.
 - **Test files need the `.test.ts` suffix.** `include: ["src/app/**/*.test.ts"]` is what vitest scans. A file named `service.tests.ts` (plural) silently doesn't run.
 
 ## See also

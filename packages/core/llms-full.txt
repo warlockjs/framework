@@ -2439,7 +2439,7 @@ For an even smoother handoff, give the load balancer time to observe the 503 bef
 
 ---
 name: lower-stage3-decorators
-description: 'Vite/Vitest plugin `lowerStage3Decorators()` that lowers TC39 Stage-3 (native) decorators with esbuild before oxc / the SSR rewrite mangles them — so `@RegisterModel`-decorated Cascade models load under Vitest 4 / Vite 8. Triggers: `lowerStage3Decorators`, "SyntaxError: Invalid or unexpected token" on a decorated class, "@(0, __vite_ssr_import__.X)()", "decorator crashes vitest", "models won''t load in tests", "Vite 8 oxc decorators"; typical import `import { lowerStage3Decorators } from "@warlock.js/core"` in `vite.config.ts` / `vitest.config.ts`. Skip: writing the tests themselves — `@warlock.js/core/test-service/SKILL.md` / `@warlock.js/core/test-http/SKILL.md`; runtime migrations — `@warlock.js/cascade/write-migration/SKILL.md`.'
+description: 'Vite/Vitest plugin `lowerStage3Decorators()` that lowers TC39 Stage-3 (native) decorators with esbuild before oxc / the SSR rewrite mangles them — so `@RegisterModel`-decorated Cascade models load under Vitest 4 / Vite 8. Triggers: `lowerStage3Decorators`, "SyntaxError: Invalid or unexpected token" on a decorated class, "@(0, __vite_ssr_import__.X)()", "decorator crashes vitest", "models won''t load in tests", "Vite 8 oxc decorators"; typical import `import { lowerStage3Decorators } from "@warlock.js/core/vite"` in `vite.config.ts` / `vitest.config.ts`. Skip: writing the tests themselves — `@warlock.js/core/test-service/SKILL.md` / `@warlock.js/core/test-http/SKILL.md`; runtime migrations — `@warlock.js/cascade/write-migration/SKILL.md`.'
 ---
 
 # Lower Stage-3 decorators for Vite/Vitest
@@ -2454,12 +2454,14 @@ The cause is two transforms that don't understand each other. Vite 8 transpiles 
 
 `lowerStage3Decorators()` fixes it by getting **esbuild** to lower the decorators *first*.
 
+⚠ **Changed in 4.13.0 — the import is a subpath now.** The plugin used to be re-exported from the package root; it is not any more, because that put the Vite integration into every application's production module graph. `import { lowerStage3Decorators } from "@warlock.js/core"` now fails with *"has no exported member"* — **add `/vite` to the specifier and nothing else changes.**
+
 ## Use it
 
 Drop it **first** in your `plugins` array:
 
 ```ts title="vite.config.ts"
-import { lowerStage3Decorators } from "@warlock.js/core";
+import { lowerStage3Decorators } from "@warlock.js/core/vite";
 import mongezVite from "@mongez/vite";
 import { defineConfig } from "vitest/config";
 
@@ -2519,7 +2521,9 @@ await new Image("./photo.jpg")
   .save("./output.webp");
 ```
 
-That's the full contract. The chain doesn't touch sharp until the output method fires.
+That's the full contract. The chain doesn't run sharp until the output method fires; the
+constructor resolves the sharp module itself, so a missing sharp throws there rather than at the
+final await.
 
 ## Installation
 
@@ -3285,6 +3289,8 @@ export default defineConfig({
     outFile: "app.js",            // default — bundle filename
     minify: true,                 // default — esbuild minify
     sourcemap: true,              // default — true | false | "inline" | "linked"
+    singleBundle: false,          // default — one runnable file, deps inlined
+    esmShim: true,                // default — require/__filename/__dirname for bundled CJS
   },
 });
 ```
@@ -3296,6 +3302,10 @@ Defaults are sensible for the typical "Node service" deployment. Knobs to actual
 - **`minify: false`** — flip to debug a production-only bug. Larger bundle, readable stack traces.
 - **`sourcemap: "inline"`** — embed the source map in the bundle. Useful when your error reporter only captures the bundle and can't fetch a `.map` sidecar.
 - **`sourcemap: false`** — skip source maps entirely. Smaller artifact, but stack traces in production logs lose their file:line precision (and `warlock start` will not enable `--enable-source-maps` since there's nothing to map).
+- **`singleBundle: true`** — inline dependencies so `node dist/app.js` runs with no `node_modules` and no launcher. Sets `packages: "bundle"` + `splitting: false` as **defaults you can override**. ⚠ Native `.node` addons are still emitted alongside — "single bundle" is one JS file *plus* any native addons. Do NOT reach for it as the default: keeping deps external is right when you deploy the folder.
+- **`esmShim: false`** — only if you are certain nothing in the graph is CommonJS. Leave it on.
+
+⚠ **The trap this replaced.** Setting `packages: "bundle"` by hand used to produce a clean build whose process died on start with `Error: Dynamic require of "node:assert" is not supported`. The output is ESM; bundled CJS deps call `require(...)` and read `__dirname`, and neither exists in an ES module, so the bundler substitutes a throwing stub. **A green `warlock build` was not evidence the bundle ran.** `esmShim` now injects `createRequire(import.meta.url)` and friends automatically for any ESM build, so both `singleBundle` and a hand-written `packages: "bundle"` work. An existing hand-written `banner` is preserved — the shim is prepended, not substituted.
 
 ### What it preloads
 
@@ -4556,20 +4566,22 @@ Client `PUT`s the bytes straight to R2 — your server never sees them.
 
 ---
 name: test-http
-description: 'Integration tests against a real HTTP server — `startHttpTestServer()` boots one shared server in globalSetup, then `testGet` / `testPost` / `expectJson` make typed requests against it. Triggers: `startHttpTestServer`, `startHttpTestServer({ port })`, `stopHttpTestServer`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`, `PortInUseError`, `assertPortIsAvailable`, `isPortAvailable`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape", "test server port already in use", "EADDRINUSE while running tests", "run tests while the dev server is up"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core"`. Skip: pure unit tests — `@warlock.js/core/test-service/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing libs `supertest`, `light-my-request`, `nock`.'
+description: 'Integration tests against a real HTTP server — `startHttpTestServer()` boots one shared server in globalSetup, then `testGet` / `testPost` / `expectJson` make typed requests against it. Triggers: `startHttpTestServer`, `startHttpTestServer({ port })`, `stopHttpTestServer`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`, `PortInUseError`, `assertPortIsAvailable`, `isPortAvailable`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape", "test server port already in use", "EADDRINUSE while running tests", "run tests while the dev server is up"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core/tests"`. Skip: pure unit tests — `@warlock.js/core/test-service/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing libs `supertest`, `light-my-request`, `nock`.'
 ---
 
 # Warlock — HTTP integration tests
 
 Some tests need the full stack: route matching, middleware chain, validation, controller, response serialization. For those, you boot the real HTTP server once per test run and make real `fetch` calls against it.
 
-`startHttpTestServer()` is the bootstrap. `testGet` / `testPost` / `expectJson` are the call helpers. Both ship in `@warlock.js/core`.
+`startHttpTestServer()` is the bootstrap. `testGet` / `testPost` / `expectJson` are the call helpers. Both ship in `@warlock.js/core/tests`.
+
+⚠ **Changed in 4.13.0 — the import is a subpath now.** These helpers used to be re-exported from the package root; they are not any more, because that put the test helpers into every application's production module graph. `import { testGet } from "@warlock.js/core"` now fails with *"has no exported member"* — **add `/tests` to the specifier and nothing else changes.**
 
 ## The shape
 
 ```ts title="src/app/users/tests/users.controller.test.ts"
 import { describe, expect, it } from "vitest";
-import { expectJson, testGet, testPost } from "@warlock.js/core";
+import { expectJson, testGet, testPost } from "@warlock.js/core/tests";
 
 describe("Users API", () => {
   it("GET /users returns the list", async () => {
@@ -4595,7 +4607,7 @@ No `beforeAll`, no manual server start — the project's `src/test-global-setup.
 ## The bootstrap — `startHttpTestServer` / `stopHttpTestServer`
 
 ```ts
-import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core";
+import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core/tests";
 ```
 
 `startHttpTestServer()` boots a **minimal but real** HTTP server:
@@ -4636,6 +4648,23 @@ startHttpTestServer({ port: 2032 }).
 
 This runs whether or not you passed a port, so a collision never reaches you as a bare `EADDRINUSE` from inside Fastify. The failure is a `PortInUseError` carrying `port` and `host`. The same check is available on its own — `assertPortIsAvailable(port, host)` throws it, `isPortAvailable(port, host)` returns a boolean.
 
+### Port `0` is refused
+
+`port: 0` — "let the OS pick one" — is not supported, and says so rather than half-working:
+
+```
+startHttpTestServer() cannot run on port 0. Pass an explicit port — e.g.
+startHttpTestServer({ port: 3999 }) — or set `http.port` in your config. Test workers
+are separate processes that resolve the server's URL from the port published at
+startup, and an OS-assigned port is not knowable to them.
+```
+
+The reason is the worker handoff described above: the port the OS assigns is never recorded anywhere the workers can read, so `getTestServerUrl()` would resolve `0` and send every request to `http://host:0`.
+
+### If startup fails, nothing is left behind
+
+`startHttpTestServer()` owns the connectors it starts. A failure part-way through — a bad config, a connector that won't boot — tears down whatever came up, withdraws the published port, and **rethrows the original error**; a failure during that cleanup is logged but never replaces the cause. `stopHttpTestServer()` withdraws the port and resets its state even when the shutdown itself throws, and still surfaces that failure.
+
 ## Project wiring — `src/test-global-setup.ts` + `vite.config.ts`
 
 ```ts title="src/test-global-setup.ts"
@@ -4643,7 +4672,7 @@ This runs whether or not you passed a port, so a collision never reaches you as 
  * Global Test Setup
  * Runs ONCE in the main process before all test workers start.
  */
-import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core";
+import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core/tests";
 
 export async function setup() {
   await startHttpTestServer();
@@ -4655,7 +4684,7 @@ export async function teardown() {
 ```
 
 ```ts title="vite.config.ts"
-import { lowerStage3Decorators } from "@warlock.js/core";
+import { lowerStage3Decorators } from "@warlock.js/core/vite";
 import mongezVite from "@mongez/vite";
 import { defineConfig } from "vitest/config";
 
@@ -4680,7 +4709,7 @@ Everything is built on native `fetch` — no extra dependency, no special wire f
 ### URL resolution
 
 ```ts
-import { getTestServerUrl } from "@warlock.js/core";
+import { getTestServerUrl } from "@warlock.js/core/tests";
 
 const url = getTestServerUrl();  // → "http://localhost:2031" (defaults)
 ```
@@ -4697,7 +4726,7 @@ import {
   testPut,
   testPatch,
   testDelete,
-} from "@warlock.js/core";
+} from "@warlock.js/core/tests";
 
 await testGet("/products");
 await testGet("/products?published=true", { headers: { "X-Tenant": "abc" } });
@@ -4714,7 +4743,7 @@ All accept a relative path (leading `/` optional) and a standard `RequestInit`. 
 ### Parsing + asserting — `expectJson<T>`
 
 ```ts
-import { expectJson, parseJsonResponse } from "@warlock.js/core";
+import { expectJson, parseJsonResponse } from "@warlock.js/core/tests";
 
 // Parse-only
 const body = await parseJsonResponse<MyShape>(response);
@@ -4733,7 +4762,7 @@ const body = await expectJson<MyShape>(response, 404);     // expects 404 (testi
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { expectJson, testGet, testPost } from "@warlock.js/core";
+import { expectJson, testGet, testPost } from "@warlock.js/core/tests";
 
 describe("Products API — happy path", () => {
   it("creates and reads back a product", async () => {
@@ -4872,7 +4901,7 @@ This is fine for normal test flow. It bites when you're inside a transaction the
 
 ---
 name: test-service
-description: 'Pure unit tests against services, repositories, models, and use-cases — `setupTest({ connectors })` bootstraps each Vitest worker with its own DB/cache connections so you can call your code directly. Triggers: `setupTest`, `src/test-setup.ts`, `tests.connectors`, `Application.setEnvironment`; "unit-test a service", "test a repository query", "vitest setupFiles", "skip connectors for pure-logic tests"; typical import `import { setupTest } from "@warlock.js/core"`. Skip: HTTP integration — `@warlock.js/core/test-http/SKILL.md`; warlock add test scaffold — `@warlock.js/core/write-cli-command/SKILL.md`; competing tooling: jest direct, `supertest`, `nock`.'
+description: 'Pure unit tests against services, repositories, models, and use-cases — `setupTest({ connectors })` bootstraps each Vitest worker with its own DB/cache connections so you can call your code directly. Triggers: `setupTest`, `src/test-setup.ts`, `tests.connectors`, `Application.setEnvironment`; "unit-test a service", "test a repository query", "vitest setupFiles", "skip connectors for pure-logic tests"; typical import `import { setupTest } from "@warlock.js/core/tests"`. Skip: HTTP integration — `@warlock.js/core/test-http/SKILL.md`; warlock add test scaffold — `@warlock.js/core/write-cli-command/SKILL.md`; competing tooling: jest direct, `supertest`, `nock`.'
 ---
 
 # Warlock — test a service
@@ -4880,6 +4909,8 @@ description: 'Pure unit tests against services, repositories, models, and use-ca
 For unit tests, you import the thing under test and call it directly. No HTTP, no fetch, no controllers. Framework testing in Warlock is about getting your **service layer** under test efficiently — and that means each Vitest worker needs its own bootstrapped framework with a DB connection.
 
 `setupTest()` is the one-call bootstrap that gives each worker that environment.
+
+⚠ **Changed in 4.13.0 — the import is a subpath now.** `setupTest` used to be re-exported from the package root; it is not any more, because that put the test helpers into every application's production module graph. `import { setupTest } from "@warlock.js/core"` now fails with *"has no exported member"* — **add `/tests` to the specifier and nothing else changes.**
 
 ## The shape
 
@@ -4909,7 +4940,7 @@ No `beforeAll(setupTest)` in this file — the project's `src/test-setup.ts` (re
 ## `setupTest({ connectors })` — the worker bootstrap
 
 ```ts
-import { setupTest } from "@warlock.js/core";
+import { setupTest } from "@warlock.js/core/tests";
 
 await setupTest({ connectors: true });
 ```
@@ -4957,13 +4988,13 @@ The `warlock add test` feature creates both files. The standard wiring:
  * Per-Worker Test Setup
  * Runs in EACH Vitest worker thread before tests execute.
  */
-import { setupTest } from "@warlock.js/core";
+import { setupTest } from "@warlock.js/core/tests";
 
 await setupTest({ connectors: true });
 ```
 
 ```ts title="vite.config.ts"
-import { lowerStage3Decorators } from "@warlock.js/core";
+import { lowerStage3Decorators } from "@warlock.js/core/vite";
 import mongezVite from "@mongez/vite";
 import { defineConfig } from "vitest/config";
 
@@ -5082,11 +5113,11 @@ Vitest runs tests in a single worker file sequentially, so an `afterEach` trunca
 
 ```ts title="src/app/utils/tests/slugify.test.ts"
 import { beforeAll, describe, expect, it } from "vitest";
-import { setupTest } from "@warlock.js/core";
+import { setupTest } from "@warlock.js/core/tests";
 import { slugify } from "../utils/slugify";
 
 beforeAll(async () => {
-  await setupTest({ connectors: false });  // override the project default
+  await setupTest({ connectors: false });  // starts no connectors at all
 });
 
 describe("slugify", () => {
@@ -5096,7 +5127,9 @@ describe("slugify", () => {
 });
 ```
 
-`setupTest` is idempotent per worker (`isSetupComplete` flag) — calling it again with different options after `src/test-setup.ts` already ran is a no-op. To genuinely skip connectors, either set `tests.connectors: false` in config (project-wide) or rely on the default in `src/test-setup.ts` being what you want most of the time.
+`setupTest` is idempotent per worker (`isSetupComplete` flag) — calling it again with different options after `src/test-setup.ts` already ran is a no-op. **That includes a `connectors: false` call: if `src/test-setup.ts` already ran `setupTest()` in this worker, the example above changes nothing.** To genuinely skip connectors, either set `tests.connectors: false` in config (project-wide) or rely on the default in `src/test-setup.ts` being what you want most of the time.
+
+⚠ **Config beats the parameter.** If `tests.connectors` is set at all, `setupTest({ connectors })` cannot override it — the config value wins. That is the current contract, not an accident; a per-call override is under discussion for a later release.
 
 ## Gotchas
 
@@ -5104,7 +5137,7 @@ describe("slugify", () => {
 - **Per-worker connections are separate from the HTTP server's connections.** A row inserted by a service-level test is on the worker's connection; the HTTP test server has its own. They don't see each other unless they're both pointing at the same physical DB and the inserting test has already committed.
 - **`NODE_ENV` is set to `"test"`** by `setupTest`. Code that branches on `Application.isProduction` / `Application.isDevelopment` sees `false` for both. If your tests need production-like config (cookies, CORS), set those values in `src/config/*.ts` explicitly under the test branch — don't rely on the env flag.
 - **No HTTP from this layer.** `setupTest({ connectors: true })` never starts the HTTP connector by design. Don't try to `request.app.http` your way to a fetch test — use the `test-http` skill instead.
-- **Don't import `vitest-setup` from `@warlock.js/core/src/...`.** The public surface is `import { setupTest } from "@warlock.js/core"`. Reaching into source paths breaks when the package layout shifts.
+- **Don't import `vitest-setup` from `@warlock.js/core/src/...`.** The public surface is `import { setupTest } from "@warlock.js/core/tests"`. Reaching into source paths breaks when the package layout shifts.
 - **Test files need the `.test.ts` suffix.** `include: ["src/app/**/*.test.ts"]` is what vitest scans. A file named `service.tests.ts` (plural) silently doesn't run.
 
 ## See also
@@ -6241,6 +6274,8 @@ Server errors (5xx) are not cached — clients can retry past a 5xx. 4xx respons
 
 `http.bodyLimit` in config is read by Fastify at server-start and applies to every body. `middleware.maxBodySize()` is a per-route middleware on top — it checks `Content-Length` after route match and rejects with 413 before body parsing runs. Use both: global as a safety net, per-route for tight caps on small-payload endpoints.
 
+⚠ **Since 4.13.0, configuring nothing gives you Fastify's own 1 MB limit.** Earlier versions defaulted to 200 GB, which **replaced** Fastify's protection rather than adding to it — so an app that set nothing had effectively no cap. **Set `bodyLimit` explicitly if you need more than 1 MB.**
+
 ```ts
 // src/config/http.ts
 export default { bodyLimit: 10 * 1024 * 1024 }; // 10MB globally
@@ -6271,7 +6306,9 @@ export default {
 
 ## `ipFilter` — fail-closed
 
-`deny` wins over `allow`. If the IP can't be read (empty / unparseable), the request is rejected with 403. Reads via `request.detectIp()` which honors `X-Real-IP` and `X-Forwarded-For` (Fastify starts with `trustProxy: true`).
+`deny` wins over `allow`. If the IP can't be read (empty / unparseable), the request is rejected with 403. Reads via `request.detectIp()`.
+
+⚠ **Since 4.13.0 `http.trustProxy` defaults to `false`**, so `request.detectIp()` returns the socket address and **`X-Real-IP` / `X-Forwarded-For` are ignored unless you opt in.** Set `trustProxy: true` **only when you are genuinely behind a proxy that overwrites those headers** — before 4.13.0 the default was `true`, which meant any client could set its own forwarding header and be believed.
 
 ```ts
 import { middleware } from "@warlock.js/core";
@@ -8151,11 +8188,29 @@ The framework ships a fixed set of commands you call but don't author. Knowing t
 
 | Command  | Flags / args                                    | Preloads                       |
 | -------- | ----------------------------------------------- | ------------------------------ |
-| `warlock migrate` | `--list` (just list pending), `--fresh` / `-f` (drop tables first) | database, logger          |
+| `warlock migrate` | `--list` / `-l` (executed **and** pending), `--pending` (pending only, sets an exit code), `--fresh` / `-f` (drop tables first) | database, logger          |
 | `warlock seed` | `--name <pattern>` (run seeds matching the pattern) | full bootstrap (env, configs, app modules) |
 | `warlock create-database <name>` | bare positional `<name>`        | database                       |
 | `warlock drop.tables` | `--force, -f` (skip confirmation prompt) | database, logger          |
 | `warlock db.indexes` | builds DB indexes for every registered model    | database                  |
+
+**Asking what will run next.** `warlock migrate --list` prints executed migrations and then the pending ones **in execution order**. Do not derive the pending set by differencing `--all` against `--list`: `--all` globs `src/app` only, while `--list` reads the migrations table, which also holds migrations that packages register through `database.migrations` (`@warlock.js/auth` contributes two). The difference under-counts pending, in the direction that says "safe to proceed".
+
+`--list` is a report and always exits `0`. `--pending` is a gate, and its exit code is its whole API:
+
+| Exit | Meaning |
+| ---- | ------- |
+| `0`  | computed, nothing pending |
+| `1`  | computed, N pending |
+| `2`  | **could not be computed** |
+
+```bash
+warlock migrate --pending && ./deploy.sh
+```
+
+`2` is separate from `1` on purpose — a script must be able to tell a backlog from an unknown, because one means *run them* and the other means *stop*. When the migration files cannot be loaded, both commands print `Pending: unavailable — <reason>` beneath a complete executed listing rather than reporting `0`.
+
+**If you are writing a command that reports on pending migrations:** register migrations first. `listPendingMigrations()` filters the runner's registry, so a caller that has not loaded anything gets `[]` — which reads as "nothing pending" and is not the same claim.
 
 ### Scaffolding
 

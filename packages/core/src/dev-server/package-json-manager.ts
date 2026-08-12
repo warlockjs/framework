@@ -1,5 +1,5 @@
 import { getJsonFileAsync } from "@warlock.js/fs";
-import { Path } from "./path";
+import { Path } from "../utils/normalized-path";
 
 export class PackageJsonManager {
   /**

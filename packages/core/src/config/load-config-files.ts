@@ -1,5 +1,5 @@
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
-import { Path } from "../dev-server/path";
+import { Path } from "../utils/normalized-path";
 import { getCertainFilesFromDirectory, getFilesFromDirectory } from "../dev-server/utils";
 import { srcPath } from "../utils";
 import { configManager } from "./config-manager";

@@ -1,5 +1,5 @@
 import { migrateAction } from "../../database/migrate-action";
-import { command } from "../cli-command";
+import { command } from "../../commands/cli-command";
 
 export const migrateCommand = command({
   action: migrateAction,

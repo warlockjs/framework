@@ -1,6 +1,5 @@
-import { colors } from "@mongez/copper";
 import { Application } from "../application";
-import { devServeLog } from "../dev-server/dev-logger";
+import { log } from "@warlock.js/logger";
 import { AccessConnector } from "./access-connector";
 import { AiConnector } from "./ai-connector";
 import { CacheConnector } from "./cache-connector";
@@ -120,9 +119,33 @@ export class ConnectorsManager {
       try {
         await connector.shutdown();
       } catch (error) {
-        devServeLog(colors.redBright(`❌ Failed to shutdown ${connector.name}: ${error}`));
+        try {
+          // Awaited deliberately: the caller (`shutdownOnProcessKill`) calls
+          // `process.exit(0)` as soon as this resolves, so an un-awaited log is
+          // a log that never happens.
+          await log.error("connectors", "shutdown", error as Error, { connector: connector.name });
+        } catch {
+          // Reporting a failure must never become a worse failure than the one
+          // being reported. `Logger.log()` fans out to channels without
+          // isolating them, so a channel that throws synchronously rejects this
+          // call — and this call sits INSIDE the catch, so that rejection
+          // escapes `shutdown()` entirely: the remaining connectors are never
+          // torn down and `process.exit(0)` never runs, leaving the process
+          // alive on the handles they still hold.
+          //
+          // Swallowed rather than re-reported: the only channel we could report
+          // it through is the one that just threw.
+        }
       }
     }
+
+    // `Logger.log()` hands each entry to `channel.log()` without awaiting it, so
+    // awaiting the calls above is not enough on its own — a buffered or async
+    // channel (file, Sentry) still loses the entry when the process exits.
+    // Drained once here rather than per failure: shutdown is exactly when
+    // buffered logs must reach their destination, and re-draining every channel
+    // once per failed connector buys nothing.
+    await log.flush();
   }
 
   /**

@@ -1,6 +1,6 @@
 import path from "node:path";
 import ts from "typescript";
-import { Path } from "./path";
+import { Path } from "../utils/normalized-path";
 
 export class TSConfigManager {
   /**

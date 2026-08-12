@@ -1,5 +1,5 @@
 import type { MigrationConstructor } from "@warlock.js/cascade";
-import type { CLICommand } from "../cli/cli-command";
+import type { CLICommand } from "../commands/cli-command";
 import type { FileHealthCheckerContract } from "../dev-server/health-checker/file-health-checker.contract";
 import { BuildOptions } from "esbuild";
 
@@ -45,6 +45,39 @@ export type WarlockConfig = {
      * @default app.js
      */
     outFile?: string;
+    /**
+     * Produce ONE self-contained file you can run with `node dist/app.js`.
+     *
+     * Sets `packages: "bundle"` and `splitting: false` as defaults — write
+     * either of them yourself and yours wins.
+     *
+     * ⚠ Not literally one file: native `.node` addons cannot be inlined by
+     * any bundler and are still emitted alongside it. "Single bundle" means
+     * one JavaScript file plus any native addons your dependencies carry.
+     *
+     * Without this flag the build stays the default: dependencies remain real
+     * `import` specifiers resolved from `node_modules` at runtime, which is
+     * what you want when you deploy the folder rather than the file.
+     *
+     * @default false
+     */
+    singleBundle?: boolean;
+    /**
+     * Inject the ESM interop shim — `require`, `__filename`, `__dirname`.
+     *
+     * Bundled CommonJS dependencies call `require(...)` and read `__dirname`
+     * to find their own assets. In an ES module none of those exist, so
+     * esbuild replaces them with a stub that **throws at runtime** — after a
+     * build that reported success. This recreates them via
+     * `createRequire(import.meta.url)`.
+     *
+     * Deliberately NOT owned by {@link singleBundle}: it applies to any ESM
+     * build, so setting `packages: "bundle"` by hand works too. Turn it off
+     * only if you are certain nothing in your graph is CommonJS.
+     *
+     * @default true
+     */
+    esmShim?: boolean;
     /**
      * Minify output
      *

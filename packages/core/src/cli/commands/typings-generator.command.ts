@@ -1,9 +1,9 @@
 import { filesOrchestrator } from "../../dev-server/files-orchestrator";
-import { Path } from "../../dev-server/path";
+import { Path } from "../../utils/normalized-path";
 import { typeGenerator } from "../../dev-server/type-generator";
 import { getFilesFromDirectory } from "../../dev-server/utils";
 import { srcPath } from "../../utils";
-import { command } from "../cli-command";
+import { command } from "../../commands/cli-command";
 
 export const typingsGeneratorCommand = command({
   name: "generate.typings",

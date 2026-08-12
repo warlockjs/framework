@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CLICommand } from "../../../src/cli/cli-command";
+import { CLICommand } from "../../../src/commands/cli-command";
 import { CLICommandsManager } from "../../../src/cli/cli-commands.manager";
 import { displayBootError, isMatchingCommandName } from "../../../src/cli/cli-commands.utils";
-import type { CommandActionData, ResolvedCLICommandOption } from "../../../src/cli/types";
+import type { CommandActionData, ResolvedCLICommandOption } from "../../../src/commands/types";
 
 /**
  * Exposes the protected validation/default-application helpers so they can be

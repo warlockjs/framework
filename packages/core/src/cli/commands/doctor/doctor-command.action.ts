@@ -1,4 +1,4 @@
-import type { CommandActionData } from "../../types";
+import type { CommandActionData } from "../../../commands/types";
 import { defaultDoctorChecks } from "./checks";
 import { printReport } from "./format-report";
 import { runChecks } from "./run-checks";
