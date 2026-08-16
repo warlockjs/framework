@@ -42,12 +42,16 @@ describe("GoogleImageModel — construction", () => {
     expect(model.name).toBe("gemini-3.1-flash-lite-image");
   });
 
-  it("accepts a non-imagen model id through the SDK factory too", () => {
+  // A `gemini-` id now routes to `GeminiImageModel` instead (see
+  // `gemini-image.spec.ts`); an id that matches neither family still
+  // lands here, unrejected.
+  it("accepts an unrecognized model id through the SDK factory too", () => {
     const sdk = new GoogleSDK({ apiKey: "test" });
 
-    const model = sdk.image({ name: "gemini-3.1-flash-lite-image" });
+    const model = sdk.image({ name: "some-unlisted-image-model" });
 
-    expect(model.name).toBe("gemini-3.1-flash-lite-image");
+    expect(model).toBeInstanceOf(GoogleImageModel);
+    expect(model.name).toBe("some-unlisted-image-model");
   });
 });
 

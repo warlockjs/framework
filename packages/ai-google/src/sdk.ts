@@ -14,8 +14,40 @@ import type {
   GoogleSDKConfig,
 } from "./config.type";
 import { GoogleEmbedder } from "./embedder";
+import { GeminiImageModel } from "./gemini-image";
 import { GoogleImageModel } from "./image";
 import { GoogleModel } from "./model";
+
+/**
+ * Pick the transport for an image model id.
+ *
+ * `ai.models.generateImages` calls `{model}:predict`, and a `gemini-`
+ * id sent there comes back `404 … is not supported for predict`
+ * (observed verbatim from Google). `generateContent` is what the SDK
+ * itself points `generateImages` users at — its deprecation notice
+ * reads "Please use the generateContent method with image models
+ * instead" — so the id has to choose the transport.
+ *
+ * Runs in this package establish where a `gemini-` id is ACCEPTED, not
+ * what it returns: on this transport such an id got as far as a quota
+ * error (HTTP 429) instead of the 404. That an image
+ * comes back end-to-end once billing is enabled is reported by the
+ * maintainer from a locally linked build, not measured here. Whether
+ * these models report token usage is still unknown.
+ *
+ * This is ROUTING, not validation — no id is refused here. An id this
+ * function does not recognize takes the `generateImages` route, the
+ * only route that existed before Gemini image support landed, so every
+ * id that reached Google before still reaches Google the same way and
+ * still fails (or succeeds) at the provider.
+ *
+ * A leading `models/` resource prefix is tolerated, matching the id
+ * shapes `inferVisionCapability` already accepts
+ * (`models/gemini-1.5-flash-001`).
+ */
+function usesGeminiImageTransport(name: string): boolean {
+  return name.toLowerCase().replace(/^models\//, "").startsWith("gemini-");
+}
 
 /**
  * Google Gemini-backed implementation of `SDKAdapterContract`.
@@ -93,24 +125,36 @@ export class GoogleSDK implements SDKAdapterContract {
   }
 
   /**
-   * Build a `GoogleImageModel` (Imagen) bound to this SDK's client for
-   * use with `ai.image({ model, prompt })`. `config.name` is passed
-   * through to `ai.models.generateImages` as given — no id is rejected
-   * locally, so an unsupported model fails at Google, not here.
+   * Build an image model bound to this SDK's client for use with
+   * `ai.image({ model, prompt })`. `config.name` decides the transport
+   * (see {@link usesGeminiImageTransport}) — a `gemini-` id gets the
+   * `generateContent` implementation, everything else the Imagen
+   * `generateImages` one. No id is rejected locally either way, so an
+   * unsupported model fails at Google, not here.
+   *
+   * The two differ in what usage they can report, which is what the
+   * caller must price for: the Imagen path always returns a zero token
+   * `Usage` (Imagen reports none — price with `{ perImage }`), while the
+   * Gemini path passes through whatever `usageMetadata` Google attaches
+   * (price with `{ input, output }` when tokens come back).
    *
    * Pricing resolution mirrors `model()`: per-model `config.pricing`
    * wins, otherwise the SDK-level registry entry keyed by `config.name`,
-   * otherwise `undefined`. Imagen is per-image-metered, so the registry
-   * entry typically carries `{ perImage }`.
+   * otherwise `undefined`.
    *
    * @example
-   * const model = google.image({ name: "imagen-4.0-generate-001" });
-   * const { data } = await ai.image({ model, prompt: "a watercolor lighthouse" });
+   * const imagen = google.image({ name: "imagen-4.0-generate-001" });
+   * const gemini = google.image({ name: "gemini-3.1-flash-lite-image" });
+   * const { data } = await ai.image({ model: gemini, prompt: "a red bicycle" });
    */
   public image(config: GoogleImageConfig): ImageModelContract {
     const resolvedPricing = config.pricing ?? this.pricing?.[config.name];
     const resolvedConfig: GoogleImageConfig =
       resolvedPricing === config.pricing ? config : { ...config, pricing: resolvedPricing };
+
+    if (usesGeminiImageTransport(config.name)) {
+      return new GeminiImageModel(this.ai, resolvedConfig, this.provider);
+    }
 
     return new GoogleImageModel(this.ai, resolvedConfig, this.provider);
   }

@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/ai-google",
-  "version": "4.14.0",
+  "version": "4.15.0",
   "type": "module",
   "description": "Google Gemini adapter for @warlock.js/ai",
   "main": "./src/index.ts",
@@ -33,7 +33,7 @@
     "@warlock.js/ai": "*"
   },
   "dependencies": {
-    "@google/genai": "^2.4.0",
+    "@google/genai": "^2.17.1",
     "@warlock.js/logger": "*"
   }
 }

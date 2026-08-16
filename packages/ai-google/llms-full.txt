@@ -8,7 +8,7 @@
 
 ---
 name: setup-google
-description: 'Wire @warlock.js/ai-google — new GoogleSDK({apiKey} | {vertexai, project, location}) for Gemini API + Vertex AI. generateContent / embedContent + thoughtSignature round-trip for thinking models, batched embeddings. .model({name, vision?, reasoning?, audio?, pdf?}) with cost-truth capabilities (PDF + audio input map to Gemini inlineData), .image({name, pricing?}) for Imagen (imagen-*) image generation via ai.image, extended thinking via options.reasoning → thinkingConfig.thinkingBudget, usage reasoningTokens (thoughtsTokenCount) / cachedTokens (cachedContentTokenCount). Triggers: `GoogleSDK`, `google.model`, `google.embedder`, `google.image`, `imagen`, `generateImages`, `ai.image`, `inlineData`, `pdf input`, `audio input`, `thoughtSignature`, `responseJsonSchema`, `vertexai`, `reasoning`, `thinkingConfig`, `thinkingBudget`, `thoughtsTokenCount`, `reasoningTokens`, `cachedTokens`, `promptCaching`, `cacheControl`; "use gemini", "wire Vertex AI", "gemini embeddings", "gemini thinking tool calls", "gemini 2.5 thinking budget", "gemini cached content cost", "generate images with imagen", "send a pdf / audio to gemini"; import `import { GoogleSDK } from "@warlock.js/ai-google"`. Skip: the ai.image verb surface — `@warlock.js/ai/generate-images/SKILL.md`; agent loop `@warlock.js/ai/run-ai-agent/SKILL.md`; provider picking `@warlock.js/ai/pick-ai-provider/SKILL.md`; embedder usage `@warlock.js/ai/embed-text/SKILL.md`; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-ollama`; raw `@google/genai`, `@google-cloud/vertexai`, Vercel `@ai-sdk/google`.'
+description: 'Wire @warlock.js/ai-google — new GoogleSDK({apiKey} | {vertexai, project, location}) for Gemini API + Vertex AI. generateContent / embedContent + thoughtSignature round-trip for thinking models, batched embeddings. .model({name, vision?, reasoning?, audio?, pdf?}) with cost-truth capabilities (PDF + audio input map to Gemini inlineData), .image({name, pricing?}) for image generation via ai.image — the id picks the transport: gemini-* → generateContent + responseModalities IMAGE (usage passed through; generateImages is deprecated by Google), everything else → generateImages (Imagen, per-image, zero usage) — extended thinking via options.reasoning → thinkingConfig.thinkingBudget, usage reasoningTokens (thoughtsTokenCount) / cachedTokens (cachedContentTokenCount). Triggers: `GoogleSDK`, `google.model`, `google.embedder`, `google.image`, `imagen`, `generateImages`, `gemini image`, `nano banana`, `responseModalities`, `imageConfig`, `ai.image`, `inlineData`, `pdf input`, `audio input`, `thoughtSignature`, `responseJsonSchema`, `vertexai`, `reasoning`, `thinkingConfig`, `thinkingBudget`, `thoughtsTokenCount`, `reasoningTokens`, `cachedTokens`, `promptCaching`, `cacheControl`; "use gemini", "wire Vertex AI", "gemini embeddings", "gemini thinking tool calls", "gemini 2.5 thinking budget", "gemini cached content cost", "generate images with imagen", "generate an image with gemini", "gemini image model 404 not supported for predict", "send a pdf / audio to gemini"; import `import { GoogleSDK } from "@warlock.js/ai-google"`. Skip: the ai.image verb surface — `@warlock.js/ai/generate-images/SKILL.md`; agent loop `@warlock.js/ai/run-ai-agent/SKILL.md`; provider picking `@warlock.js/ai/pick-ai-provider/SKILL.md`; embedder usage `@warlock.js/ai/embed-text/SKILL.md`; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-ollama`; raw `@google/genai`, `@google-cloud/vertexai`, Vercel `@ai-sdk/google`.'
 ---
 
 # `@warlock.js/ai-google`
@@ -87,9 +87,47 @@ Gemini's multimodal input is **media-agnostic** — every binary modality maps t
 
 PDF and audio reach the wire only when the model declares the matching capability (inferred for the multimodal Gemini families above) — so capability ≡ behavior.
 
-## Image generation (Imagen)
+## Image generation — two transports
 
-`google.image({ name })` returns an `ImageModelContract` (Imagen, via `ai.models.generateImages`) for the `ai.image()` verb:
+`google.image({ name })` returns an `ImageModelContract` for the `ai.image()` verb. **The model id picks the transport:**
+
+| Model id | Transport | Usage it can report |
+| --- | --- | --- |
+| `gemini-*` (e.g. `gemini-3.1-flash-lite-image`) | `ai.models.generateContent` with `responseModalities` including `"IMAGE"` | whatever `usageMetadata` Google attaches — price with `{ input, output }` |
+| anything else (`imagen-*`, unknown ids) | `ai.models.generateImages` (Imagen) | none, always zero — price with `{ perImage }` |
+
+A `gemini-` id sent to `generateImages` comes back `404 … is not supported for predict` (observed verbatim from Google) — `generateImages` routes to `{model}:predict`. `generateContent` is the SDK's own named replacement: its runtime deprecation notice for `generateImages` says *"Please use the generateContent method with image models instead"*. Routing on the id is what lets both families go through one factory. A leading `models/` resource prefix is tolerated.
+
+This is **routing, not validation** — no id is refused locally. An id matching neither family takes the `generateImages` route (the pre-existing one) and fails at Google as a typed provider error, not with a local throw.
+
+> ⚠ **No automated test here calls Google**, so the evidence is two-tier. **Measured in this repo:** a `gemini-*` image id that 404s on `predict` reached the model on `generateContent` and returned a **quota error (HTTP 429)** — the endpoint accepts the id. **Reported by the maintainer:** once billing was enabled on the project, an image came back end-to-end through a locally linked build. What remains unknown is **token reporting** — no `usageMetadata` from a successful image call has been seen yet.
+
+### Gemini (`generateContent`)
+
+```ts
+const gemini = google.image({
+  name: "gemini-3.1-flash-lite-image",
+  pricing: { input: 0.3, output: 30 },     // token-metered
+});
+
+const { data, error, usage } = await ai.image({
+  model: gemini,
+  prompt: "a red bicycle on a white background",
+  aspectRatio: "16:9",                     // → config.imageConfig.aspectRatio
+  options: { imageSize: "2K", personGeneration: "ALLOW_ADULT" }, // → imageConfig passthroughs
+});
+```
+
+- Requests `responseModalities: ["TEXT", "IMAGE"]` by default; pass `options.responseModalities` to replace the list verbatim. Which pairing a given model requires is not established here.
+- Inline image parts that **do** come back (`inlineData.data` + `mimeType`) map to the **same** `GeneratedImage` shape Imagen produces — `{ type: "base64", base64, mediaType }`, defaulting to `image/png` when the part declares no mime type. Callers see one shape regardless of transport.
+- **Token usage is passed through, not zeroed.** Any `usageMetadata` Google attaches is mapped by the same rules as `model.complete()` (`promptTokenCount` → `input`, `candidatesTokenCount` → `output`, `cachedContentTokenCount` → `cachedTokens`, `thoughtsTokenCount` → `reasoningTokens`); an absent block collapses to `{ 0, 0, 0 }`. That is the difference from Imagen, which is always zero. Whether these models in fact report tokens is unconfirmed — price with `{ input, output }` and check the first live `usage`.
+- **A response with no image part is never a silent empty success:**
+  - `promptFeedback.blockReason`, or a safety/policy `finishReason` (`SAFETY`, `IMAGE_SAFETY`, `PROHIBITED_CONTENT`, `IMAGE_PROHIBITED_CONTENT`, `RECITATION`, `IMAGE_RECITATION`, `BLOCKLIST`, `SPII`) → `ContentFilterError` carrying the reason.
+  - text only (the model answered instead of drawing) → `ProviderError` **quoting the text** it returned.
+  - nothing usable → `ProviderError` naming the part count and finish reason (e.g. `NO_IMAGE`).
+- `count`, `negativePrompt`, and `format` are **not** forwarded on this path — `GenerateContentConfig` / `ImageConfig` expose no equivalent (`ImageConfig.outputMimeType` is documented "not supported in Gemini API"). Fold those intentions into the prompt. Every inline image part the model does return is mapped, so a multi-image answer still comes back whole.
+
+### Imagen (`generateImages`)
 
 ```ts
 const imagen = google.image({ name: "imagen-4.0-generate-001", pricing: { perImage: 0.04 } });
@@ -103,9 +141,15 @@ const { data, error } = await ai.image({
 });
 ```
 
-- Imagen is **per-image-metered** (price with `{ perImage }`) and returns base64 bytes — no hosted URL, no token usage.
-- When every candidate is safety-filtered, the run surfaces a typed `ContentFilterError` on `result.error`.
-- The model id is **not validated locally** — `google.image({ name })` passes it straight to `ai.models.generateImages`, so an id Google does not serve fails at the provider (wrapped into the typed `AIError` hierarchy), not at construction. The verb surface lives in [`@warlock.js/ai/generate-images/SKILL.md`](@warlock.js/ai/generate-images/SKILL.md).
+- Imagen is **per-image-metered** (price with `{ perImage }`) and returns base64 bytes — no hosted URL, and `usage` is an honest `{ input: 0, output: 0, total: 0 }`.
+- When every candidate is safety-filtered (`raiFilteredReason`), the run surfaces a typed `ContentFilterError` on `result.error`.
+- ⏳ **This path is on a clock.** `@google/genai` warns at runtime: *"The generateImages method is deprecated and will be removed in the next major release (not before Jan. 1 2027). Please use the generateContent method with image models instead."* This package depends on `@google/genai` `^2.17.1`, which does emit that warning. Nothing breaks today, but new work should prefer a `gemini-*` id.
+
+### Not implemented: the `interactions` API
+
+`@google/genai` ≥ 2.17 adds `ai.interactions.create({ model, input, response_format: { type: "image", … } })`, whose images arrive as `interaction.output_image.data` and whose usage is a different snake_case shape (`total_input_tokens` …). It is reachable from the `^2.17.1` this package depends on, but the adapter does **not** use it: it would need its own usage mapper and error surface, and its request type already marks `response_modalities` / `response_mime_type` deprecated. If it is added later it will be an **opt-in config flag**, never id routing.
+
+The verb surface lives in [`@warlock.js/ai/generate-images/SKILL.md`](@warlock.js/ai/generate-images/SKILL.md).
 
 ## Streaming
 

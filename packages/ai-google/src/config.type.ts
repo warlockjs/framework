@@ -111,13 +111,19 @@ export type GoogleEmbedderConfig = EmbedderConfig;
 
 /**
  * Per-model configuration for `GoogleSDK.image()`. Mirrors the neutral
- * {@link ImageModelConfig} — `name` is the image model id, passed
- * through to `ai.models.generateImages` as given (typically an
- * `imagen-*` id, never validated locally), and `pricing` is the
- * optional per-model `perImage` USD override.
+ * {@link ImageModelConfig} — `name` is the image model id, never
+ * validated locally, and `pricing` is the optional per-model USD
+ * override.
+ *
+ * `name` also selects the transport: a `gemini-` id routes to
+ * `ai.models.generateContent`, anything else to
+ * `ai.models.generateImages` (Imagen). Price for what each can report:
+ * the Imagen path never returns tokens (`{ perImage }`), the Gemini
+ * path passes through whatever token usage Google attaches
+ * (`{ input, output }`).
  *
  * @example
- * google.image({ name: "imagen-4.0-generate-001" });
  * google.image({ name: "imagen-4.0-generate-001", pricing: { perImage: 0.04 } });
+ * google.image({ name: "gemini-3.1-flash-lite-image", pricing: { input: 0.3, output: 30 } });
  */
 export type GoogleImageConfig = ImageModelConfig;

@@ -19,7 +19,13 @@ import type {
 } from "@google/genai";
 import type { GoogleModelConfig } from "./config.type";
 import { inferVisionCapability } from "./known-vision-models";
-import { mapFinishReason, toGoogleContents, toGoogleTools, wrapGoogleError } from "./utils";
+import {
+  applyGoogleUsage,
+  mapFinishReason,
+  toGoogleContents,
+  toGoogleTools,
+  wrapGoogleError,
+} from "./utils";
 
 const LOG_MODULE = "ai.google";
 
@@ -221,7 +227,7 @@ export class GoogleModel implements ModelContract {
         }
 
         if (chunk.usageMetadata) {
-          this.applyUsage(usage, chunk.usageMetadata);
+          applyGoogleUsage(usage, chunk.usageMetadata);
         }
       }
     } catch (thrown) {
@@ -388,50 +394,19 @@ export class GoogleModel implements ModelContract {
   }
 
   /**
-   * Normalize Gemini's `usageMetadata` into the neutral `Usage` shape.
-   * Cache-read tokens are surfaced as `cachedTokens` only when
-   * non-zero. Absent usage collapses to zeros.
+   * Normalize Gemini's `usageMetadata` into the neutral `Usage` shape
+   * via the shared {@link applyGoogleUsage} mapper (the same one the
+   * streaming loop and the Gemini image model use). Absent usage
+   * collapses to zeros.
    */
   private extractUsage(response: GenerateContentResponse): Usage {
     const usage: Usage = { input: 0, output: 0, total: 0 };
 
     if (response.usageMetadata) {
-      this.applyUsage(usage, response.usageMetadata);
+      applyGoogleUsage(usage, response.usageMetadata);
     }
 
     return usage;
-  }
-
-  /**
-   * Fold a Gemini `usageMetadata` block into the running neutral
-   * `Usage` accumulator. Shared by `complete()` and the streaming
-   * loop (where the final chunk carries cumulative totals).
-   *
-   * Cache-read hits (`cachedContentTokenCount`, implicit or explicit
-   * context caching) surface as `cachedTokens`; the thinking-phase
-   * tokens of a reasoning model (`thoughtsTokenCount`) surface as
-   * `reasoningTokens`. Both are emitted only when reported `> 0` so an
-   * absent channel leaves the field undefined.
-   */
-  private applyUsage(
-    usage: Usage,
-    raw: NonNullable<GenerateContentResponse["usageMetadata"]>,
-  ): void {
-    usage.input = raw.promptTokenCount ?? usage.input;
-    usage.output = raw.candidatesTokenCount ?? usage.output;
-    usage.total = raw.totalTokenCount ?? usage.input + usage.output;
-
-    const cached = raw.cachedContentTokenCount;
-
-    if (cached && cached > 0) {
-      usage.cachedTokens = cached;
-    }
-
-    const reasoning = raw.thoughtsTokenCount;
-
-    if (reasoning && reasoning > 0) {
-      usage.reasoningTokens = reasoning;
-    }
   }
 
   /**
