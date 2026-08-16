@@ -1,6 +1,5 @@
 import {
   ContentFilterError,
-  InvalidRequestError,
   ProviderError,
   type GeneratedImage,
   type ImageGenerationOptions,
@@ -11,7 +10,6 @@ import {
 import { log, type Logger } from "@warlock.js/logger";
 import type { GenerateImagesConfig, GoogleGenAI } from "@google/genai";
 import type { GoogleImageConfig } from "./config.type";
-import { isGoogleImageModel } from "./known-image-models";
 import { wrapGoogleError } from "./utils";
 
 const LOG_MODULE = "ai.google";
@@ -36,10 +34,13 @@ function mediaTypeFor(format: string | undefined): string | undefined {
  * `ai.models.generateImages`. Imagen is per-image-metered and returns
  * base64 image bytes (no hosted URL, no token usage).
  *
- * **Capability guard.** The constructor rejects a non-Imagen model id
- * up front — `google.image({ name: "gemini-2.5-flash" })` throws a
- * typed `InvalidRequestError` instead of a downstream 400 (Gemini's
- * native image output is a different API and not routed here).
+ * **No model-id validation.** `config.name` is passed through to
+ * `ai.models.generateImages` exactly as given — the constructor never
+ * inspects it. Google adds and retires image model ids on its own
+ * schedule, so an id this adapter does not recognize is not the
+ * adapter's call to refuse; an unsupported id surfaces as a provider
+ * error from Google (wrapped into the typed `AIError` hierarchy by
+ * `generate()`), not as a local one.
  *
  * **Safety filtering.** When Imagen filters every candidate for safety
  * (`raiFilteredReason`), this surfaces a typed `ContentFilterError`
@@ -58,13 +59,6 @@ export class GoogleImageModel implements ImageModelContract {
   private readonly logger: Logger = log;
 
   public constructor(ai: GoogleGenAI, config: GoogleImageConfig, provider: string = "google") {
-    if (!isGoogleImageModel(config.name)) {
-      throw new InvalidRequestError(
-        `"${config.name}" is not a known Google Imagen model. ` +
-          "Use an `imagen-*` model with google.image({ name }).",
-      );
-    }
-
     this.ai = ai;
     this.name = config.name;
     this.provider = provider;

@@ -105,7 +105,7 @@ const { data, error } = await ai.image({
 
 - Imagen is **per-image-metered** (price with `{ perImage }`) and returns base64 bytes — no hosted URL, no token usage.
 - When every candidate is safety-filtered, the run surfaces a typed `ContentFilterError` on `result.error`.
-- A non-Imagen model id (`google.image({ name: "gemini-2.5-flash" })`) throws `InvalidRequestError` at construction — Gemini's *native* image output (`gemini-*-image` via `generateContent`) is a separate surface, not routed here. The verb surface lives in [`@warlock.js/ai/generate-images/SKILL.md`](@warlock.js/ai/generate-images/SKILL.md).
+- The model id is **not validated locally** — `google.image({ name })` passes it straight to `ai.models.generateImages`, so an id Google does not serve fails at the provider (wrapped into the typed `AIError` hierarchy), not at construction. The verb surface lives in [`@warlock.js/ai/generate-images/SKILL.md`](@warlock.js/ai/generate-images/SKILL.md).
 
 ## Streaming
 

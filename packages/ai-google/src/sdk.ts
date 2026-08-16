@@ -94,8 +94,9 @@ export class GoogleSDK implements SDKAdapterContract {
 
   /**
    * Build a `GoogleImageModel` (Imagen) bound to this SDK's client for
-   * use with `ai.image({ model, prompt })`. Accepts the `imagen-*`
-   * family; a non-Imagen model id is rejected at construction.
+   * use with `ai.image({ model, prompt })`. `config.name` is passed
+   * through to `ai.models.generateImages` as given — no id is rejected
+   * locally, so an unsupported model fails at Google, not here.
    *
    * Pricing resolution mirrors `model()`: per-model `config.pricing`
    * wins, otherwise the SDK-level registry entry keyed by `config.name`,

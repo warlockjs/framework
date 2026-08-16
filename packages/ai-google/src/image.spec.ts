@@ -1,6 +1,5 @@
 import {
   ContentFilterError,
-  InvalidRequestError,
   ProviderError,
   ProviderRateLimitError,
 } from "@warlock.js/ai";
@@ -11,7 +10,6 @@ import type {
 } from "@google/genai";
 import { describe, expect, it } from "vitest";
 import { GoogleImageModel } from "./image";
-import { isGoogleImageModel } from "./known-image-models";
 import { GoogleSDK } from "./sdk";
 
 type GenerateCall = { params: GenerateImagesParameters };
@@ -35,25 +33,21 @@ function makeFakeClient(options: { response?: Partial<GenerateImagesResponse>; e
   return { client, calls };
 }
 
-describe("isGoogleImageModel", () => {
-  it("recognizes the imagen family, rejects gemini chat models", () => {
-    expect(isGoogleImageModel("imagen-4.0-generate-001")).toBe(true);
-    expect(isGoogleImageModel("imagen-3.0-fast-generate-001")).toBe(true);
-    expect(isGoogleImageModel("gemini-2.5-flash")).toBe(false);
-  });
-});
-
-describe("GoogleImageModel — construction guard", () => {
-  it("throws InvalidRequestError for a non-Imagen model id", () => {
+describe("GoogleImageModel — construction", () => {
+  it("accepts a non-imagen model id as given", () => {
     const { client } = makeFakeClient({ response: { generatedImages: [] } });
-    expect(() => new GoogleImageModel(client, { name: "gemini-2.5-flash" })).toThrow(
-      InvalidRequestError,
-    );
+
+    const model = new GoogleImageModel(client, { name: "gemini-3.1-flash-lite-image" });
+
+    expect(model.name).toBe("gemini-3.1-flash-lite-image");
   });
 
-  it("rejects a chat model through the SDK factory too", () => {
+  it("accepts a non-imagen model id through the SDK factory too", () => {
     const sdk = new GoogleSDK({ apiKey: "test" });
-    expect(() => sdk.image({ name: "gemini-2.5-flash" })).toThrow(InvalidRequestError);
+
+    const model = sdk.image({ name: "gemini-3.1-flash-lite-image" });
+
+    expect(model.name).toBe("gemini-3.1-flash-lite-image");
   });
 });
 

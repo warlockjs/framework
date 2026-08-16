@@ -111,8 +111,10 @@ export type GoogleEmbedderConfig = EmbedderConfig;
 
 /**
  * Per-model configuration for `GoogleSDK.image()`. Mirrors the neutral
- * {@link ImageModelConfig} — `name` is an `imagen-*` model id and
- * `pricing` is the optional per-model `perImage` USD override.
+ * {@link ImageModelConfig} — `name` is the image model id, passed
+ * through to `ai.models.generateImages` as given (typically an
+ * `imagen-*` id, never validated locally), and `pricing` is the
+ * optional per-model `perImage` USD override.
  *
  * @example
  * google.image({ name: "imagen-4.0-generate-001" });
