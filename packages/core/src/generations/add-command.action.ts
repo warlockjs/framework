@@ -97,7 +97,7 @@ export async function teardown() {
     console.log(`${colors.green("âœ“")} Created src/test-global-setup.ts`);
   }
 
-  // Create test-setup.ts (runs per worker thread)
+  // Create test-setup.ts (runs before EVERY test file)
   const testSetupPath = srcPath("test-setup.ts");
   const testSetupExists = await fileExistsAsync(testSetupPath);
 
@@ -105,14 +105,26 @@ export async function teardown() {
     await putFileAsync(
       testSetupPath,
       `/**
- * Per-Worker Test Setup
+ * Test Setup - runs before EVERY test file
  *
- * Runs in EACH Vitest worker thread before tests execute.
- * Sets up per-worker database and cache connections.
+ * Vitest runs setupFiles before each test file and rebuilds the module
+ * registry with it, so this pair boots and closes the test runtime once per
+ * test file.
+ *
+ * setupTest() is called with no options on purpose: an explicit connectors
+ * value outranks tests.connectors from src/config/tests.ts, so passing one
+ * here would erase your project config. Omitting it leaves the config in
+ * charge.
+ *
+ * afterAll(teardownTest) is the other half of the pair: whoever calls
+ * setupTest() owns closing it in the same runtime context.
  */
-import { setupTest } from "@warlock.js/core/tests";
+import { setupTest, teardownTest } from "@warlock.js/core/tests";
+import { afterAll } from "vitest";
 
-await setupTest({ connectors: true });
+await setupTest();
+
+afterAll(teardownTest);
 `,
     );
     console.log(`${colors.green("âœ“")} Created src/test-setup.ts`);
@@ -136,7 +148,7 @@ export default defineConfig({
   plugins: [lowerStage3Decorators(), mongezVite()],
   test: {
     globalSetup: "./src/test-global-setup.ts", // HTTP server - runs once
-    setupFiles: ["./src/test-setup.ts"],       // DB/cache - runs per worker
+    setupFiles: ["./src/test-setup.ts"],       // DB/cache - runs per test file
     environment: "node",
     globals: false,
     include: ["src/app/**/*.test.ts"],

@@ -6,6 +6,104 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 4.14.0
+
+### ⚠ Upgrading from 4.13.0 — read this first
+
+**Three behaviour changes and one documentation correction. All four touch the test lifecycle; none touch application runtime.**
+
+⛔ **Every existing project must replace its `src/test-setup.ts`.** Three things are wrong with the file 4.13.0 generated:
+
+```ts
+/**
+ * Test Setup
+ * Runs before EACH test file — not once per worker.
+ */
+import { afterAll } from "vitest";
+import { setupTest, teardownTest } from "@warlock.js/core/tests";
+
+await setupTest();          // ← was setupTest({ connectors: true })
+afterAll(teardownTest);     // ← is new
+```
+
+1. **`{ connectors: true }` must become a bare `setupTest()`.** Under the new precedence it is an **explicit** value, so it now overrides your `src/config/tests.ts` where it previously deferred to it.
+2. **`afterAll(teardownTest)` is new and is not optional** — without it nothing ever closes the framework your tests started.
+3. **The `Per-Worker Test Setup` comment is false.** It always was.
+
+**This is the migration step nobody can skip.** `warlock add test` emits the corrected file for new projects.
+
+| What changes | How you'll see it | What to do |
+|---|---|---|
+| **`setupTest({ connectors })` now beats `tests.connectors` config** — the precedence flipped | a test file that passes `connectors` explicitly starts a **different connector set** than it did in 4.13.0 | grep for `setupTest({` — a call passing `connectors` was previously **ignored** and is now honoured. **Including the one in your generated setup file** |
+| **A second `setupTest` call with different options now REJECTS** | an error naming the active and the requested selection, where 4.13.0 silently did nothing | call `teardownTest()` first, or don't call `setupTest` again at all |
+| **The generated setup file now registers `afterAll(teardownTest)`** | your test files tear the framework down when they finish, instead of leaving it running | **add it to your existing `src/test-setup.ts`** — see below |
+| **Docs corrected: `setupTest` is called per TEST FILE, not per worker** | no runtime effect on its own — the *invocation* always worked this way | fix the comment in `src/test-setup.ts` as above |
+
+### Added
+
+- **`teardownTest()` — the other half of the pair.** `setupTest` has shipped without a counterpart since it was introduced: there was no supported way to close the framework a test file brought up, and the only "reset" available was a module flag that proved nothing about whether ports, sockets, pools or timers had actually closed
+
+  `teardownTest()` is idempotent when idle, shares one shutdown between concurrent callers, waits for an in-flight setup to settle before closing, and **always clears local state in a `finally`** so a failed shutdown cannot leave the lifecycle claiming to be ready
+
+  ⚠ **A shutdown failure poisons the lifecycle rather than pretending to recover.** If the shutdown layer reports a rejection, later `setupTest` calls refuse until the Vitest worker is recycled or a retried teardown fully succeeds. **We cannot promise a clean restart after a reported close failure, so we don't.** ⚠ **What it cannot see:** `connectorsManager.shutdown()` catches and logs individual connector failures internally — those never reach this lifecycle and never poison it. Manager-wide error policy is a separate piece of work
+
+### Changed
+
+- **BREAKING — an explicit `setupTest({ connectors })` now wins over `tests.connectors` config.** The order was `config > parameter > true`; it is now **`explicit parameter > config > true`**
+
+  4.13.0's changelog said this question was open, not settled: *"a per-call override is a contract decision for a later release."* This is that decision. **Call-site intent should beat a project default** — a caller who names a connector set is being specific on purpose, and silently overruling them was the wrong behaviour
+
+  **"Explicit" means a non-`undefined` value.** `setupTest()`, `setupTest({})` and `setupTest({ connectors: undefined })` **all fall through to config, then to `true`.** The `undefined` rule is deliberate: an optional variable that happens to be `undefined` must not silently erase project config
+
+  ⚠ **The generated `src/test-setup.ts` now calls `setupTest()` with no argument**, where it previously passed `{ connectors: true }`. Under the new order, passing `true` explicitly would erase the `tests.connectors` layer for the entire project. **If you edit your setup file, leave the call bare**
+
+  ⚠ **This is user-visible and it is why the change is marked BREAKING:** an application that sets `tests.connectors` *and* passes `connectors` from any test file will start a different connector set after upgrading
+
+- **BREAKING — a conflicting `setupTest` call rejects instead of being ignored.** While a setup is starting or ready, a call with *different* effective options now rejects with an error naming both the active and the requested selection. The same options remain a no-op, and concurrent identical calls share one startup
+
+  Through 4.13.0 this was a silent early-return on an `isSetupComplete` flag — so `setupTest({ connectors: false })` in a file whose `src/test-setup.ts` had already run **did nothing at all, reported nothing, and started every connector anyway.** Connector arrays are compared as **sets** after deduplication, so caller order never counts as a conflict
+
+- **Lifecycle state is now scoped to the worker runtime instead of the module.** `isSetupComplete` was a module-level variable, and **Vitest rebuilds the setup module's registry between test files while the worker process or thread keeps running** — so the flag reset in exactly the situation where live DB connections, pools and timers survive
+
+  Scope is per **process** under `pool: "forks"` and per **thread** under `pool: "threads"`; it deliberately does not cross thread workers, because `globalThis` is per realm and the resources are per worker too. **The guard's scope now matches the leak's scope in all four `pool` × `isolate` combinations**
+
+### Fixed
+
+- **A stranded setup no longer exhausts the heap.** A lifecycle left in the `starting` state sent `teardownTest`'s wait-then-re-enter path into unbounded recursion — **`FATAL ERROR: JavaScript heap out of memory` at 4 GB, killing the worker with 26 tests in that run never executed.** It was found while proving the state machine, not reported by a user, and it would have shipped
+
+  The setup attempt is now bounded by **`tests.setupTimeout`, defaulting to `120000` ms**, and expiry **poisons** the lifecycle rather than returning it to `idle` — the attempt may have started connectors nobody can now account for. The message names the state, the bound and the remedy:
+
+  ```
+  setupTest() did not finish within 120000ms and is stuck in the "starting" state. The
+  lifecycle is now poisoned: whatever that attempt had already started is not known to be
+  closed, so later setupTest() calls refuse until the Vitest worker is recycled. If your
+  cold start is legitimately slower than this, raise the bound with `tests.setupTimeout`
+  in `src/config/tests.ts` — milliseconds, default 120000.
+  ```
+
+  **It bounds the setup attempt, not teardown separately** — `teardownTest()` awaits the same attempt and inherits the bound. **A second teardown-side deadline was tried and rejected during implementation**: it expired instead of the setup's, was swallowed on settle, re-entered and armed a third, and left the stuck setup unbounded after all — reproducing the exact recursion the guard exists to remove
+
+  ⚠ **An invalid `tests.setupTimeout` throws, naming the value.** Zero, negative and non-numeric fail loudly instead of falling back to the default; a silent fallback hides a typo behind a working suite
+
+  ⚠ **A stranded lifecycle must fail with a message, not a dead process** — a crash mid-file is indistinguishable from an infrastructure flake, which is the worst way for a framework to report its own bug
+
+  ⚠ **Scope of the proof, stated because a green here is easy to over-read:** all nine guards were seen to fail under their own mutation, **but every spec injects its scheduler** — the default *value* is tested while the production timer, and whether its `unref` releases the worker, is not. **No spec observes a real hang**; the stuck attempt is a mock gate, not a socket that never returns
+
+### Documentation
+
+- **Corrected: `setupTest` is CALLED once per TEST FILE, not once per worker.** Every version of the `test-service` and `test-http` skills, both generated LLM projections, the generator's comments and `setupTest`'s own JSDoc described a per-worker lifetime. **Vitest runs `setupFiles` before each test file and their exports are ignored** — measured across all four `pool` × `isolate` combinations, not inferred
+
+  ⛔ **If your project was generated before 4.14.0, replace the whole file** — see the migration block above. It is not a comment-only change
+
+  **The lifetime this release commits to is FILE-SCOPED:** the setup file bootstraps the framework and its `afterAll(teardownTest)` closes it, once per test file. **One owner, one pairing, correct under every pool, every isolation setting, and watch mode**
+
+  ⚠ **This deliberately declines a faster option.** Holding lifecycle state in the worker runtime makes a worker-scoped lifetime *possible* — bootstrap once, reuse across every file in that worker — and an earlier draft of this release simply left the framework running to get it. **We are not shipping that**, for two reasons neither of which is performance:
+
+  1. **Under `pool: "threads"` we cannot honestly claim the runner cleans up.** Vitest tears the thread down while the process lives, and whether Node reclaims that thread's sockets and pools is **unmeasured** — so "the runner owns cleanup by termination" would be a promise we cannot observe being kept
+  2. **In watch mode Vitest reuses workers between reruns**, so there is no recycle and therefore **no cleanup owner at all** between reruns. Declaring watch mode unsupported was the alternative, and a test framework whose lifecycle is undefined in the mode people use all day does not have a lifecycle
+
+  **The cost is a framework bootstrap per test file — which is exactly what 4.13.0 already paid**, since its module-level flag died with the module registry between files. **Nothing gets slower; an unearned speed-up is simply not being claimed.** A worker-scoped lifetime remains open, and gets taken when the real per-file cost has been measured on a real application and the runner integration is chosen deliberately rather than inherited from whatever the wiring happened to do
+
 ## 4.13.0
 
 ### ⚠ Upgrading from 4.12.0 — read this first

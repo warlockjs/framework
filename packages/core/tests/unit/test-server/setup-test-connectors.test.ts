@@ -1,21 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { TEST_LIFECYCLE_REGISTRY_KEY } from "../../../src/tests/test-lifecycle-state";
 
 /**
- * `setupTest`'s connector selection — the five cases the public contract names.
+ * `setupTest`'s connector selection — the cases the public contract names.
  *
  * SCOPE: this file asserts ONLY which connectors `setupTest` asks the manager to
  * start. Everything `setupTest` does before that decision — env, bootstrap, the
  * files orchestrator, config loading — is mocked away, because none of it is the
- * subject and all of it is slow.
+ * subject and all of it is slow. The lifecycle state machine around the decision
+ * is `setup-test-lifecycle.test.ts`.
  *
- * The subject is four lines:
- *
- *   const selected = testConfig?.connectors ?? connectors;
- *   if (selected === false) return;                       // start NOTHING
- *   if (Array.isArray(selected)) start(selected);         // start EXACTLY these
- *   else startWithout(["http"]);                          // start all but http
- *
- * Two defects live there, both reported by @Fig on 2026-08-12:
+ * Two defects live in this decision, both reported by @Fig on 2026-08-12:
  *
  *   1. `config.get("tests")` returns `null` for an absent key (it defaults to
  *      `null`, not `{}`), and the old code dereferenced it — so an app with no
@@ -27,16 +22,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  *      `startWithout(["http"])` — so `connectors: false` started EVERYTHING but
  *      http, from config and from the caller alike. The type and three places in
  *      `skills/test-service/SKILL.md` promise it starts none.
+ *
+ * ⚠ A third change lands here: 4.13 let config win over the parameter, and
+ * `contracts/2026-08-12-test-worker-lifecycle.md` flips that to
+ * `explicit non-undefined call > tests.connectors config > true`. The last case
+ * below is the one that changed direction.
  */
 
-const startMock = vi.fn();
-const startWithoutMock = vi.fn();
+const startMock = vi.fn(async () => undefined);
+const startWithoutMock = vi.fn(async () => undefined);
+const shutdownMock = vi.fn(async () => undefined);
 const configGetMock = vi.fn();
 
 vi.mock("../../../src/connectors", () => ({
   connectorsManager: {
-    start: (...args: unknown[]) => startMock(...args),
-    startWithout: (...args: unknown[]) => startWithoutMock(...args),
+    start: (...args: unknown[]) => startMock(...(args as [])),
+    startWithout: (...args: unknown[]) => startWithoutMock(...(args as [])),
+    shutdown: (...args: unknown[]) => shutdownMock(...(args as [])),
   },
 }));
 
@@ -49,27 +51,25 @@ vi.mock("../../../src/config", () => ({
 }));
 
 vi.mock("../../../src/application/application", () => ({
-  Application: { setEnvironment: vi.fn() },
+  Application: { setEnvironment: vi.fn(), runShutdownHooks: vi.fn(async () => undefined) },
 }));
 
-vi.mock("../../../src/bootstrap", () => ({ bootstrap: vi.fn() }));
+vi.mock("../../../src/bootstrap", () => ({ bootstrap: vi.fn(async () => undefined) }));
 
-vi.mock("../../../src/config/load-config-files", () => ({ loadConfigFiles: vi.fn() }));
+vi.mock("../../../src/config/load-config-files", () => ({
+  loadConfigFiles: vi.fn(async () => undefined),
+}));
 
 vi.mock("../../../src/dev-server/files-orchestrator", () => ({
-  filesOrchestrator: { init: vi.fn() },
+  filesOrchestrator: { init: vi.fn(async () => undefined) },
 }));
 
 vi.mock("../../../src/warlock-config/warlock-config.manager", () => ({
-  warlockConfigManager: { load: vi.fn() },
+  warlockConfigManager: { load: vi.fn(async () => undefined) },
 }));
 
 /**
  * Import a fresh copy of the module.
- *
- * `setupTest` guards on a module-level `isSetupComplete` flag, so a second call
- * in the same module instance is a no-op — without resetting, every case after
- * the first would silently assert nothing.
  */
 async function freshSetupTest() {
   vi.resetModules();
@@ -79,20 +79,36 @@ async function freshSetupTest() {
   return module.setupTest;
 }
 
+/**
+ * Drop the runtime context's lifecycle registry.
+ *
+ * ⚠ `vi.resetModules()` is NOT enough on its own any more, and that is the
+ * point: lifecycle state lives on `globalThis` so it survives the module
+ * registry rebuild Vitest performs before every test file. Without this reset,
+ * every case after the first would hit a "ready" runtime and reject.
+ */
+function resetLifecycleRegistry(): void {
+  delete (globalThis as Record<symbol, unknown>)[TEST_LIFECYCLE_REGISTRY_KEY];
+}
+
 describe("setupTest — connector selection", () => {
   beforeEach(() => {
-    startMock.mockReset();
-    startWithoutMock.mockReset();
+    resetLifecycleRegistry();
+
+    startMock.mockReset().mockResolvedValue(undefined);
+    startWithoutMock.mockReset().mockResolvedValue(undefined);
+    shutdownMock.mockReset().mockResolvedValue(undefined);
     configGetMock.mockReset();
   });
 
   afterEach(() => {
+    resetLifecycleRegistry();
     vi.restoreAllMocks();
   });
 
   it("can be called with no arguments at all", async () => {
-    // Found by @Nova: the signature destructures a REQUIRED parameter, so
-    // `setupTest()` throws "Cannot destructure property 'connectors' of
+    // Found by @Nova: the signature destructured a REQUIRED parameter, so
+    // `setupTest()` threw "Cannot destructure property 'connectors' of
     // 'undefined'" before reaching any of the logic below — and calling it with
     // no arguments is the most likely thing a new user types.
     configGetMock.mockReturnValue(null);
@@ -151,22 +167,23 @@ describe("setupTest — connector selection", () => {
 
     const setupTest = await freshSetupTest();
 
-    await setupTest({ connectors: ["database", "logger"] as never });
+    await setupTest({ connectors: ["database", "logger"] });
 
     expect(startMock).toHaveBeenCalledWith(["database", "logger"]);
     expect(startWithoutMock).not.toHaveBeenCalled();
   });
 
-  it("lets the config override the caller, including `false` over `true`", async () => {
-    // Documented in skills/test-service/SKILL.md: `tests.connectors` wins over
-    // the parameter. `false` beating `true` is the case the old `||` inverted.
+  it("lets the caller override the config, including `true` over `false`", async () => {
+    // 4.13 documented the opposite — `tests.connectors` beat the parameter, so
+    // this call started nothing. The ratified precedence puts an explicit
+    // call-site value first, because a value the caller typed is intent and a
+    // project default is not.
     configGetMock.mockReturnValue({ connectors: false });
 
     const setupTest = await freshSetupTest();
 
     await setupTest({ connectors: true });
 
-    expect(startMock).not.toHaveBeenCalled();
-    expect(startWithoutMock).not.toHaveBeenCalled();
+    expect(startWithoutMock).toHaveBeenCalledWith(["http"]);
   });
 });

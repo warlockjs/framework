@@ -126,7 +126,7 @@ export default defineConfig({
   plugins: [lowerStage3Decorators(), mongezVite()],
   test: {
     globalSetup: "./src/test-global-setup.ts",  // ← starts the HTTP server
-    setupFiles: ["./src/test-setup.ts"],         // ← per-worker setupTest (see test-service skill)
+    setupFiles: ["./src/test-setup.ts"],         // ← setupTest + afterAll(teardownTest), per test file
     environment: "node",
     globals: false,
     include: ["src/app/**/*.test.ts"],
@@ -134,7 +134,13 @@ export default defineConfig({
 });
 ```
 
-Both files (and this config, with `lowerStage3Decorators()` first so decorated models load) are created by `warlock add test`. The split is intentional: `globalSetup` runs ONCE in the main vitest process; `setupFiles` runs per worker thread.
+Both files (and this config, with `lowerStage3Decorators()` first so decorated models load) are created by `warlock add test`. The split is intentional: `globalSetup` runs **ONCE** in the main vitest process; `setupFiles` runs **before every test file**.
+
+⚠ **Corrected in 4.14.0.** This line previously said `setupFiles` runs "per worker thread". **It does not** — Vitest runs it before each test file, and the setup module's registry is rebuilt every time. Measured across all four `pool` × `isolate` combinations.
+
+**So the service-layer framework is file-scoped: bootstrapped by `setupTest` and closed by the `afterAll(teardownTest)` the setup file registers, once per test file.** ⚠ **`setupTest` alone is not the whole wiring — the paired teardown is mandatory from 4.14.0**; see the `test-service` skill.
+
+**HTTP is the exception and stays in `globalSetup`**, which genuinely does run once in the main vitest process and owns a real port. **That split is the point:** one server for the whole run, one framework per test file.
 
 ## HTTP request helpers
 
