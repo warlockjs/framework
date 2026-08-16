@@ -42,7 +42,7 @@ if (error) {
 `ImageModelContract` is a peer primitive on the SDK adapter, produced by the optional `image?()` factory — the same shape as `EmbedderContract`. An adapter without an image API simply doesn't define `image()`, so calling it on an unsupported adapter is a **compile-time** error, not a silent runtime failure.
 
 :::tip
-A non-image model id (`openai.image({ name: "gpt-4o" })`) throws `InvalidRequestError` **at construction** — you fail fast, before any request goes out.
+No adapter validates the model id locally. `openai.image({ name })` (and every other provider's `image()`) forwards the id to the provider exactly as given, so an id the provider does not serve fails as a typed provider error on `result.error` — never as a local throw at construction.
 :::
 
 ## The result envelope
@@ -100,15 +100,23 @@ const gpt = openai.image({ name: "gpt-image-1", pricing: { input: 5, output: 40 
 const dalle = openai.image({ name: "dall-e-3", pricing: { perImage: 0.04 } });
 ```
 
-## Google — Imagen (per-image)
+## Google — Imagen (per-image) and Gemini (per-token)
 
 ```ts
 import { GoogleSDK } from "@warlock.js/ai-google";
 
 const google = new GoogleSDK({ apiKey: process.env.GEMINI_API_KEY! });
+
+// Imagen — routes to ai.models.generateImages; reports no tokens.
 const imagen = google.image({
   name: "imagen-4.0-generate-001",
   pricing: { perImage: 0.04 },
+});
+
+// Gemini image model — routes to ai.models.generateContent; usage passed through.
+const gemini = google.image({
+  name: "gemini-3.1-flash-lite-image",
+  pricing: { input: 0.3, output: 30 },
 });
 
 const { data } = await ai.image({
@@ -118,7 +126,17 @@ const { data } = await ai.image({
 });
 ```
 
-Imagen returns base64 bytes (no hosted URL). When every candidate is safety-filtered, `ai.image` surfaces a typed `ContentFilterError` on `result.error` — no exception to catch.
+The **id picks the transport**: a `gemini-` id goes to `generateContent` with `responseModalities` including `"IMAGE"`, anything else to `generateImages`. Both surface images in the same `GeneratedImage` shape (base64 bytes, no hosted URL). They differ in usage: Imagen always reports `{ input: 0, output: 0, total: 0 }`, while the Gemini path passes through whatever `usageMetadata` Google attaches — so price the first with `{ perImage }` and the second with `{ input, output }`.
+
+When Google filters the request, `ai.image` surfaces a typed `ContentFilterError` on `result.error` — no exception to catch. On the Gemini path, a response that came back as text instead of an image surfaces a `ProviderError` quoting that text, never a silent empty success.
+
+Like every adapter, Google does **not** guard the model id: the id selects a route, it is never refused locally, so an id Google does not serve fails as a typed provider error on `result.error` — not with a local throw at construction. See the [Google provider page](/v/latest/ai/providers/google/).
+
+:::caution[The Gemini image path: what is measured vs what is reported]
+No test calls the live API, so the evidence comes in two tiers. **Measured here:** a `gemini-*` image id that returns `404 … is not supported for predict` on the Imagen transport reached the model on `generateContent` and came back with a quota error (HTTP 429) — the endpoint accepts the id. **Reported by the maintainer:** with billing enabled on the project, an image came back end-to-end from an application running a locally linked build. **Still unknown:** whether these models report token usage — no `usageMetadata` from a successful image call has been seen, so verify `usage` against your own model before relying on `{ input, output }` pricing.
+:::
+
+Google has **deprecated `generateImages`**, the transport behind the `imagen-*` path: *"The generateImages method is deprecated and will be removed in the next major release (not before Jan. 1 2027). Please use the generateContent method with image models instead."* Nothing breaks today, but prefer a `gemini-` id for new work.
 
 ## Cost-truth — one rollup, two metering models
 

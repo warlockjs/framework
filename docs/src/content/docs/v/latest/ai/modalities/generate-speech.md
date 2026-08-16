@@ -37,8 +37,8 @@ if (error) {
 
 `SpeechModelContract` is a peer primitive produced by the adapter's optional `speech?()` factory — the same shape as `EmbedderContract` and `ImageModelContract`. An adapter without a TTS API simply doesn't define `speech()`, so calling it there is a **compile-time** error, not a silent runtime failure.
 
-:::tip
-A non-TTS model id (`openai.speech({ name: "gpt-4o" })`) throws `InvalidRequestError` **at construction** — you fail fast, before any request goes out.
+:::note
+No adapter validates the model id locally. `openai.speech({ name })` forwards the id to the provider exactly as given, so a non-TTS id (`openai.speech({ name: "gpt-4o" })`) constructs fine and fails at the provider — as a typed provider error on `result.error`, never as a local throw at construction.
 :::
 
 ## The result envelope

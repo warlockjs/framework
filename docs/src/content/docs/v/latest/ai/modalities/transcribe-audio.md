@@ -36,8 +36,8 @@ else console.log(data.text);         // the transcript
 
 The two-line shape above is the whole flow: `ai.audioFromFile` (utility) packages the bytes, `ai.transcribe` (the AI verb) does the work. `TranscriptionModelContract` is a peer primitive produced by the adapter's optional `transcribe?()` factory — the same shape as `SpeechModelContract`.
 
-:::tip
-A non-STT model id (`openai.transcribe({ name: "gpt-4o" })`) throws `InvalidRequestError` **at construction** — you fail fast, before any request goes out.
+:::note
+No adapter validates the model id locally. `openai.transcribe({ name })` forwards the id to the provider exactly as given, so a non-STT id (`openai.transcribe({ name: "gpt-4o" })`) constructs fine and fails at the provider — as a typed provider error on `result.error`, never as a local throw at construction.
 :::
 
 ## The `AudioInput` shape + the two builders

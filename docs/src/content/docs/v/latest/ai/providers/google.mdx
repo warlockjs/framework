@@ -162,12 +162,37 @@ PDF and audio reach the wire only when the model declares the matching
 capability (inferred for the multimodal Gemini families) — so capability ≡
 behavior.
 
-## Image generation (Imagen)
+## Image generation (Imagen and Gemini)
 
-`google.image({ name })` returns an `ImageModelContract` (Imagen, via
-`ai.models.generateImages`) for the [`ai.image()`](/v/latest/ai/) output
-verb — prompt in, images out, in the same never-throws
-`{ data, error, usage, report }` envelope every executable returns.
+`google.image({ name })` returns an `ImageModelContract` for the
+[`ai.image()`](/v/latest/ai/) output verb — prompt in, images out, in the same
+never-throws `{ data, error, usage, report }` envelope every executable
+returns.
+
+**The model id picks the transport:**
+
+| Model id | Transport | Usage it can report |
+| --- | --- | --- |
+| `gemini-*` (e.g. `gemini-3.1-flash-lite-image`) | `ai.models.generateContent`, `responseModalities` including `"IMAGE"` | whatever Google attaches — `{ input, output }` |
+| anything else (`imagen-*`, unknown ids) | `ai.models.generateImages` | none, always zero — `{ perImage }` |
+
+A `gemini-` id sent to `generateImages` comes back
+`404 … is not supported for predict` — that call routes to `{model}:predict`.
+`generateContent` is the SDK's own named replacement: its runtime deprecation
+notice for `generateImages` reads *"Please use the generateContent method with
+image models instead."* Routing on the id is what makes both families work
+through one factory.
+
+:::caution[What is measured here vs what is reported]
+No test in this package calls the live API, so the evidence comes in two tiers.
+**Measured here:** a `gemini-*` image id that 404s on the Imagen transport
+reached the model on `generateContent` and came back with a quota error
+(HTTP 429) — the endpoint accepts the id. **Reported by the maintainer:** once
+billing was enabled on the project, an image came back end-to-end from an
+application running a locally linked build. **Still unknown:** whether these
+models report token usage — no `usageMetadata` from a successful image call has
+been seen, so check your first live `usage` before relying on token pricing.
+:::
 
 ```ts
 import { ai } from "@warlock.js/ai";
@@ -193,15 +218,46 @@ if (error) {
 }
 ```
 
+```ts
+// Gemini-native — same envelope, same GeneratedImage shape, usage passed through:
+const gemini = google.image({
+  name: "gemini-3.1-flash-lite-image",
+  pricing: { input: 0.3, output: 30 },       // token-metered, not per-image
+});
+
+const { data, usage } = await ai.image({
+  model: gemini,
+  prompt: "a red bicycle on a white background",
+  aspectRatio: "16:9",                       // → config.imageConfig.aspectRatio
+});
+```
+
 - Imagen is **per-image-metered** — price it with `{ perImage }`. It returns
   base64 bytes (no hosted URL, no token usage), and the spend folds into the
   same `Usage.cost` rollup as text.
-- When every candidate is safety-filtered, the run surfaces a typed
-  `ContentFilterError` on `result.error`.
-- A non-Imagen model id (`google.image({ name: "gemini-2.5-flash" })`) throws
-  `InvalidRequestError` **at construction** — Gemini's *native* image output
-  (`gemini-*-image` via `generateContent`) is a separate surface, not routed
-  here.
+- The Gemini path **passes token usage through** rather than zeroing it: any
+  `usageMetadata` Google attaches becomes `usage.input` / `output` / `total`
+  (plus `cachedTokens` / `reasoningTokens`), and only an absent block collapses
+  to zeros — so price it with `{ input, output }` and check your first live
+  `usage`. It requests `responseModalities: ["TEXT", "IMAGE"]` by default
+  (override verbatim with `options.responseModalities`) and maps `aspectRatio` /
+  `imageSize` / `personGeneration` onto `config.imageConfig`. `count`,
+  `negativePrompt`, and `format` have no equivalent on this endpoint and are not
+  forwarded.
+- **`generateImages` is deprecated by Google**, so the `imagen-*` path is on a
+  clock: *"The generateImages method is deprecated and will be removed in the
+  next major release (not before Jan. 1 2027). Please use the generateContent
+  method with image models instead."* Nothing breaks today; prefer a `gemini-`
+  id for new work.
+- When Google filters the request, the run surfaces a typed
+  `ContentFilterError` on `result.error`. On the Gemini path, a response that
+  came back as text instead of an image surfaces a `ProviderError` quoting that
+  text — never a silent empty success.
+- The model id is **not validated locally**. It selects a route; it is never
+  refused. An id Google does not serve fails as a typed provider error on
+  `result.error` — not with a local throw at construction. Google adds and
+  retires image models on its own schedule; you pick the model, the API rules
+  on it.
 
 See [`ai.image`](/v/latest/ai/) for the full verb surface (options,
 cost-truth, `GeneratedImage`).

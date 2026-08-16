@@ -161,9 +161,13 @@ if (error) {
 - `dall-e-*` is **per-image** — price it with `{ perImage }` (or
   `perImageBySize`). It defaults to base64; opt into a hosted URL with
   `options: { responseFormat: "url" }`.
-- A non-image model id (`openai.image({ name: "gpt-4o" })`) throws
-  `InvalidRequestError` **at construction** — fail fast, like the embedder
-  guard.
+- The model id is **not validated locally**. `openai.image({ name })` passes it
+  straight to `client.images.generate` — the same goes for `openai.speech()`
+  and `openai.transcribe()` — so an id OpenAI does not serve fails at the
+  provider (as a typed `AIError`), not at construction. There are no model-id
+  helpers to consult — `isOpenAIImageModel()`, `OPENAI_IMAGE_MODEL_PREFIXES`,
+  `isOpenAISpeechModel()` and `isOpenAITranscriptionModel()` were all removed in
+  4.13.0. Branch on your own id list if you need one.
 
 The image spend folds into the same `Usage.cost` rollup as text — no second
 accounting path. See [`ai.image`](/v/latest/ai/) for the full verb surface
@@ -270,6 +274,6 @@ over inference.
 
 - [`ai.image` / `ai.speech` / `ai.transcribe`](/v/latest/ai/) — the modality
   verb surfaces these factories feed.
-- [Google provider](/v/latest/ai/providers/google/) — Imagen image
-  generation and Gemini `inlineData` multimodal input.
+- [Google provider](/v/latest/ai/providers/google/) — Gemini and Imagen image
+  generation, and Gemini `inlineData` multimodal input.
 - [API reference](/v/latest/ai/reference/api/) — every public export.

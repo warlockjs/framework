@@ -112,6 +112,289 @@
   ],
   "releases": [
     {
+      "version": "4.15.0",
+      "id": "v4-15-0",
+      "date": null,
+      "isUnreleased": false,
+      "summaryHtml": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 9,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 6
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<strong><code>MockModelResponse.usage</code> is a new <code>MockUsage</code> type rather than the emitted <code>Usage</code>.</strong> The script is an input, not a result: <code>MockModel.buildResponse</code> honours only <code>input</code> / <code>output</code> / <code>cachedTokens</code>, so a fixture declaring <code>cost</code> or <code>reasoningTokens</code> was silently discarded while the type promised otherwise. <code>total</code> is optional and documented as derived, because the mock recomputes it as <code>input + output</code> — an existing spec deliberately asserts that a mismatched scripted <code>total</code> is overridden"
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>The mock honours <code>deltas</code>.</strong> Fixtures already declared the field; the mock ignored it"
+            },
+            {
+              "type": "Changed",
+              "html": "<code>MockSDK.model()</code> declares its <code>MockModel</code> return type — it always returned one, so <code>callHistory</code> is now reachable without a cast. <code>MockUsage</code> is exported from the barrel"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>ctx.run(agent, payload)</code> now stringifies a non-string payload, as it always claimed to.</strong> <code>coerceInlineInput</code> in <code>src/supervisor/execution.ts</code> gated on <code>!(\"signature\" in executable)</code> to decide whether the target was an agent — but every member of <code>SupervisableExecutable</code> (<code>AgentContract</code>, <code>WorkflowInstance</code>, <code>SupervisorContract</code>) declares <code>signature</code>, so the condition was <strong>permanently false and the coercion never ran</strong>. A supervisor intent calling <code>ctx.run(someAgent, { question: \"why\", attempt: 2 })</code> handed the raw object to <code>agent.execute()</code>, where it landed as the user message <code>content</code> — <code>[object Object]</code> in the prompt, or a provider-side payload rejection, depending on the adapter. The check now discriminates on <code>isAnonymous</code>, the one member unique to <code>AgentContract</code>. A regression test covers it; the old guard fails it with <code>Expected: \"string\" / Received: \"object\"</code>. The unreferenced <code>isSupervisor()</code> duck-type helper — whose own JSDoc admitted it could not tell a supervisor from a workflow — is removed"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>ToolMeta</code> no longer forces <code>label</code> and <code>actionLabel</code> on every tool that supplies <code>meta</code>.</strong> It was declared as <code>Record&lt;\"label\" | \"actionLabel\" | (string &amp; {}), unknown&gt;</code>, which makes both keys <strong>required</strong>, not optional — so any tool author who set one metadata field was made to set all of them. Now an optional-key shape with an index signature"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>ToolConfig.action</code> is checked bivariantly</strong>, via a <code>ToolActionResolver&lt;T&gt;</code> method-in-wrapper. The strictly contravariant parameter position rejected heterogeneous tool arrays that work correctly at runtime"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>new Error(msg, { cause })</code> compiles.</strong> <code>tsconfig.json</code> declared no <code>lib</code>, so it inherited the <code>target</code> default of ES2020, where <code>ErrorOptions</code> does not exist. <code>lib</code> is now <code>[\"ES2022\"]</code>; this also resolves the <code>Array.at</code> and <code>String.replaceAll</code> errors. Emit is unchanged — <code>target</code> is still ES2020. Note <code>src/skills/sources/url-source.ts:122</code> was <strong>not</strong> a defect: the <code>cause</code> was always passed at runtime, the compiler simply had no type for it"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>TeamMemberValue</code> accepts the callback member form</strong> (<code>IntentCallback</code>), which has always worked at runtime and was only rejected by the type"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>PlanSchema</code> no longer erases <code>~standard.jsonSchema</code></strong> from its return type"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            },
+            {
+              "type": "Deprecated",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>GeminiImageModel</code> — a Gemini-native image path over <code>ai.models.generateContent</code></strong> (new <code>src/gemini-image.ts</code>, exported as <code>GeminiImageModel</code>). Requests <code>responseModalities: [\"TEXT\", \"IMAGE\"]</code> (override the list verbatim with <code>options.responseModalities</code>), maps <code>aspectRatio</code> / <code>imageSize</code> / <code>personGeneration</code> onto Gemini's <code>config.imageConfig</code>, and reshapes inline image parts that come back into the <strong>same</strong> <code>GeneratedImage[]</code> (<code>{ type: \"base64\", base64, mediaType }</code>, <code>image/png</code> fallback) the Imagen path emits — so <code>ai.image()</code>'s envelope is unchanged for callers"
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Token usage is passed through on the Gemini image path instead of hard-zeroed.</strong> Whatever <code>usageMetadata</code> Google attaches becomes <code>usage.input</code> / <code>output</code> / <code>total</code> (plus <code>cachedTokens</code> / <code>reasoningTokens</code> when reported <code>&gt; 0</code>); only an absent block collapses to zeros. The Imagen path stays a flat zero because Imagen reports no tokens at all. Price these models with <code>{ input, output }</code> rather than <code>{ perImage }</code>, and check the first live <code>usage</code> — whether these models report tokens is not confirmed here. The mapping is now a shared <code>applyGoogleUsage</code> util used by both the chat model and the image model, so one rule decides what a Gemini token report means package-wide"
+            },
+            {
+              "type": "Added",
+              "html": "A response with <strong>no image part is never a silent empty success</strong>: a blocked prompt (<code>promptFeedback.blockReason</code>) or a safety/policy <code>finishReason</code> (<code>SAFETY</code>, <code>IMAGE_SAFETY</code>, <code>PROHIBITED_CONTENT</code>, <code>IMAGE_PROHIBITED_CONTENT</code>, <code>RECITATION</code>, <code>IMAGE_RECITATION</code>, <code>BLOCKLIST</code>, <code>SPII</code>) throws <code>ContentFilterError</code> carrying the reason; a text-only answer throws <code>ProviderError</code> <strong>quoting the text the model returned</strong>; anything else throws <code>ProviderError</code> naming the part count and finish reason"
+            },
+            {
+              "type": "Changed",
+              "html": "<strong><code>@google/genai</code> moves from <code>^2.4.0</code> to <code>^2.17.1</code></strong> (2.17.1 is what installs today). The Gemini image path does not depend on the bump — <code>models.generateContent</code> exists in both — but the older range predates the deprecation notice above and predates <code>ai.interactions</code>, so staying on it meant documenting an SDK surface the package could not reach. The 11 suites / 149 specs in this package pass unchanged on 2.17.1. Note this re-resolved the whole workspace lockfile, not just this package's dependency"
+            },
+            {
+              "type": "Changed",
+              "html": "<code>GoogleSDK.image()</code> returns <code>GeminiImageModel</code> for a <code>gemini-</code> id. This is <strong>routing, not validation</strong> — no id is rejected locally: an id matching neither family takes the <code>generateImages</code> route, the only route that existed before, so every id that reached Google before still reaches Google the same way and still fails (or succeeds) at the provider"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>google.image({ name: \"gemini-…\" })</code> no longer hits the endpoint that 404s it.</strong> <code>ai.models.generateImages</code> routes to <code>{model}:predict</code> (<code>generateImages</code> → <code>generateImagesInternal</code> → <code>formatMap('{model}:predict', …)</code> in <code>@google/genai</code>'s bundle), which does not serve the Gemini image models — the call came back <code>404 models/… is not found for API version v1beta, or is not supported for predict</code>. <code>GoogleSDK.image()</code> now picks the transport from the id: a <code>gemini-</code> id (with an optional <code>models/</code> resource prefix) gets the new <code>generateContent</code> implementation, everything else keeps <code>GoogleImageModel</code> / <code>generateImages</code>. <strong>Scope of the proof:</strong> two levels. Measured here — on the new transport such an id got as far as a quota error (HTTP 429) instead of the 404, which establishes that the endpoint accepts the id. Reported by the maintainer — once billing was enabled on the project, the path returned an image end-to-end from an application running a locally linked build of this package. No test in this package calls Google; the suite proves the request shape and the error mapping, not the round trip"
+            },
+            {
+              "type": "Deprecated",
+              "html": "**Google has deprecated <code>generateImages</code>, the transport the <code>imagen-*</code> path still uses.** Verbatim from the <code>@google/genai</code> runtime warning: *\"The generateImages method is deprecated and will be removed in the next major release (not before Jan. 1 2027). Please use the generateContent method with image models instead. See https://ai.google.dev/gemini-api/docs/deprecations#imagen-models and https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/capabilities/image-generation#generate-images\"* (<code>editImage</code> carries the same notice.) Nothing breaks today and the Imagen path is unchanged, but it is on a clock: new image work should prefer a <code>gemini-</code> id. The warning is emitted by <code>@google/genai</code> ≥ 2.17; with the bump below, this package now prints it whenever the <code>imagen-*</code> path is used"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<strong><code>openai</code> moves from <code>^6.34.0</code> to <code>^7.4.0</code>.</strong> The runtime was unaffected: the full suite — 13 files / 208 tests — passed on 7.4.0 *before* any of the type fixes below were made, so nothing about the wire shape this adapter sends or the responses it reads changed across the major. Every fix in this release is a compile-time one."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong><code>OpenAI.Images.ImageGenerateParamsBase</code> is no longer reachable upstream</strong> — openai 7 split image generation into <code>ImageGenerateParamsNonStreaming</code> / <code>ImageGenerateParamsStreaming</code> and stopped re-exporting the shared <code>Base</code> interface from the <code>Images</code> namespace. <code>image.ts</code> now sources its <code>quality</code> / <code>output_format</code> / <code>background</code> value types from <code>ImageGenerateParamsNonStreaming</code>, which is what the request body was already typed as and what the non-streaming <code>images.generate</code> overload accepts. The three fields are inherited from <code>Base</code> unchanged, so the accepted values are identical."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong><code>ChatCompletionTool</code> became a union</strong> (<code>ChatCompletionFunctionTool | ChatCompletionCustomTool</code>) now that Chat Completions carries custom tools. <code>.function</code> is no longer reachable without the <code>type</code> discriminant, so the tool-conversion specs narrow on <code>type === \"function\"</code> and throw on anything else — a custom-tool regression fails loudly rather than silently skipping the assertion it used to make."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>OpenAISDKConfig.provider</code> is a usable <code>string</code> again.</strong> openai 7 added its own <code>provider?: Provider</code> key to <code>ClientOptions</code> — an opaque branded object minted by <code>createProvider()</code> — and our intersection collapsed the field to <code>Provider &amp; string</code>, a type no string literal can inhabit. The config now omits the upstream key (<code>Omit&lt;ClientOptions, \"provider\"&gt;</code>) before declaring its own label. No behavior change: the constructor already peeled <code>provider</code> off and never forwarded it to the OpenAI client."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<strong>The RabbitMQ driver's lazy <code>amqplib</code> loader was not idempotent under concurrent callers.</strong> It cached the resolved module in a module-level binding but nothing guarded the load itself, so two loads could be in flight at the same time and the last one to settle won the binding. The eager, unawaited <code>loadAmqplibModule()</code> call at module scope was one of those callers by construction — it started a load nobody was waiting on, which then raced the awaited call from <code>connect()</code>. That eager call has been removed: <code>connect()</code> already awaits the loader, so it bought nothing but the race. The loader now memoizes the in-flight promise itself, so the first caller starts the <code>import()</code> and every later caller awaits that same one"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>No user-visible misbehaviour is known in production</strong> — both racing paths resolve the same real <code>amqplib</code>, so whichever won, callers got the module they expected. The observable damage was in test isolation: when a test was aborted mid-<code>await import(...)</code>, the racing loads could leave the binding holding the real <code>amqplib</code> while the test file's <code>vi.mock(\"amqplib\")</code> was still active, so every later test in that file silently bypassed the mock and opened a real socket. Proven by instrumentation — the driver held a live <code>ChannelModel</code> on <code>::1:5672</code> while <code>import(\"amqplib\")</code> inside the same test still returned the mock, which is how a green test could be green for the wrong reason"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Verified by a timeout sweep, not by a passing suite.</strong> The full suite passed both before and after (13 files / 137 tests), because the fault only surfaces when the first test is starved of time. Running <code>tests/connect-to-broker.test.ts</code> at <code>--testTimeout=3000</code> and <code>4000</code> previously timed out the first test *and* took <code>wraps a connection failure with the driver name</code> down with it, failing in ~50 ms with <code>promise resolved \"Broker{…}\" instead of rejecting</code> — the mock was gone. With the loader fixed, that test passes at every timeout even while the first test still times out: starving one test can no longer poison the next"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>The first test also paid a cold-transform cost inside its own timed body</strong>, since <code>connectToBroker</code> dynamically imports the driver, which pulls in <code>@warlock.js/seal</code> and <code>@warlock.js/logger</code> as raw TS source. That work moved to a <code>beforeAll</code> warm-up. This is a test-timing change only and carries none of the correctness weight above — the loader fix stands on its own without it"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "4.14.0",
+      "id": "v4-14-0",
+      "date": null,
+      "isUnreleased": false,
+      "summaryHtml": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>teardownTest()</code> — the other half of the pair.</strong> <code>setupTest</code> has shipped without a counterpart since it was introduced: there was no supported way to close the framework a test file brought up, and the only \"reset\" available was a module flag that proved nothing about whether ports, sockets, pools or timers had actually closed"
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING — an explicit <code>setupTest({ connectors })</code> now wins over <code>tests.connectors</code> config.</strong> The order was <code>config &gt; parameter &gt; true</code>; it is now <strong><code>explicit parameter &gt; config &gt; true</code></strong>"
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING — a conflicting <code>setupTest</code> call rejects instead of being ignored.</strong> While a setup is starting or ready, a call with *different* effective options now rejects with an error naming both the active and the requested selection. The same options remain a no-op, and concurrent identical calls share one startup"
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Lifecycle state is now scoped to the worker runtime instead of the module.</strong> <code>isSetupComplete</code> was a module-level variable, and <strong>Vitest rebuilds the setup module's registry between test files while the worker process or thread keeps running</strong> — so the flag reset in exactly the situation where live DB connections, pools and timers survive"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>A stranded setup no longer exhausts the heap.</strong> A lifecycle left in the <code>starting</code> state sent <code>teardownTest</code>'s wait-then-re-enter path into unbounded recursion — <strong><code>FATAL ERROR: JavaScript heap out of memory</code> at 4 GB, killing the worker with 26 tests in that run never executed.</strong> It was found while proving the state machine, not reported by a user, and it would have shipped"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Removed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<code>openai.image({ name })</code>, <code>openai.speech({ name })</code> and <code>openai.transcribe({ name })</code> no longer reject an unknown model id at construction — the id is forwarded to OpenAI as given, so an id OpenAI does not serve now fails as a typed provider error instead of a local <code>InvalidRequestError</code>."
+            },
+            {
+              "type": "Removed",
+              "html": "<strong>BREAKING</strong> — <code>isOpenAIImageModel()</code> and <code>OPENAI_IMAGE_MODEL_PREFIXES</code> are no longer exported; the <code>known-image-models</code> module is deleted. Nothing in the adapter read them once the construction-time gate went away, so they were a public list of model ids that enforced nothing and went stale on OpenAI's release schedule, not this package's. Import them from nowhere — branch on your own id list if you need one."
+            },
+            {
+              "type": "Removed",
+              "html": "<strong>BREAKING</strong> — <code>isOpenAISpeechModel()</code> and <code>isOpenAITranscriptionModel()</code> are no longer exported either, for the same reason. Once their construction-time gates went away nothing in the adapter read them, leaving two more public model-id lists that enforced nothing. No <code>@warlock.js/ai-*</code> adapter validates a model id locally, so the package no longer ships a helper that implies otherwise — branch on your own id list if you need one."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Removed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<code>google.image({ name })</code> no longer rejects a non-<code>imagen-*</code> model id at construction — the id is passed through to <code>ai.models.generateImages</code> as given, so an id Google does not serve now fails as a typed provider error instead of a local <code>InvalidRequestError</code>"
+            },
+            {
+              "type": "Removed",
+              "html": "<strong>BREAKING — <code>isGoogleImageModel()</code> and <code>GOOGLE_IMAGE_MODEL_PREFIXES</code> are gone from the public API.</strong> Both were dropped from the package entrypoint and the module deleted; importing either from <code>@warlock.js/ai-google</code> is now a compile error. With the construction-time guard gone (below) they enforced nothing and only invited callers to re-implement a model allow-list the framework does not own — a model id is the provider's to rule on, so there is nothing left for a local list to say. Callers that branched on the Imagen family should match on the id themselves (<code>name.startsWith(\"imagen-\")</code>) or, better, stop branching and let the provider answer"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "4.13.0",
       "id": "v4-13-0",
       "date": null,
@@ -122,21 +405,45 @@
         {
           "name": "@warlock.js/core",
           "slug": "core",
-          "total": 9,
+          "total": 15,
           "counts": [
             {
               "type": "Added",
-              "n": 1
+              "n": 2
             },
             {
               "type": "Fixed",
-              "n": 8
+              "n": 13
             }
           ],
           "items": [
             {
               "type": "Added",
               "html": "<strong><code>build.singleBundle</code> — one file you can run with <code>node dist/app.js</code>.</strong> The default build keeps dependencies as real <code>import</code> specifiers resolved from <code>node_modules</code>, which is right when you deploy the folder. Producing a single self-contained file previously meant knowing to set <code>packages: \"bundle\"</code> <strong>and</strong> <code>splitting: false</code>, and it still did not work"
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>@warlock.js/core/tests</code> and <code>@warlock.js/core/vite</code> are real subpaths</strong>, with their own build entries and <code>exports</code> keys — the first version in which those helpers are addressable at all. <code>/tests</code> carries the 13 documented test helpers; <code>/vite</code> carries <code>lowerStage3Decorators</code>"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>setupTest()</code> no longer crashes in a project that has no <code>src/config/tests.ts</code>.</strong> <code>config.get(\"tests\")</code> resolves an absent key to <code>null</code>, and the result was dereferenced — so the very path <code>warlock add test</code> generates threw <code>Cannot read properties of null (reading 'connectors')</code> before running a single test. <strong><code>setupTest()</code> with no arguments at all</strong> threw one step earlier still, on a destructured parameter with no default"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>The request helpers send falsy JSON bodies.</strong> <code>testPost</code>, <code>testPut</code> and <code>testPatch</code> used <code>body ? JSON.stringify(body) : undefined</code>, so <strong><code>false</code>, <code>0</code>, <code>\"\"</code> and <code>null</code> — all legal JSON documents — were sent as no body at all.</strong> Only an omitted argument now means \"no body\""
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Shutdown survives a throwing log channel.</strong> A connector whose <code>shutdown()</code> failed was reported through <code>log.error(...)</code> <strong>from inside the catch block</strong> — and <code>Logger.log()</code> hands each entry to <code>channel.log()</code> with no isolation, so a channel that throws synchronously (a misconfigured transport, an unserialisable payload) made that report reject. The rejection escaped <code>shutdown()</code> entirely, and the consequences went well past a missing log line: <strong><code>log.flush()</code> never ran, so every buffered entry from the whole run was lost; the remaining connectors were never torn down; and <code>process.exit(0)</code> — the line <code>gracefulShutdown</code> runs once <code>shutdown()</code> resolves — was never reached, leaving the process alive on the handles those connectors still held</strong>"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>A test server that fails to start no longer leaves half of itself running.</strong> <code>startHttpTestServer()</code> publishes the resolved port before the late connector phase and sets <code>isServerRunning</code> only on its last line, so a failure in between left <strong>live early-phase connectors and a published port pointing at a server that never came up</strong> — while <code>stopHttpTestServer()</code> in <code>globalTeardown</code> reported *\"No server to stop\"* and walked away from them. Startup now unwinds what it started, always withdraws the port and resets its state. ⚠ <strong>The error you get back is unchanged — it always was.</strong> Startup had no <code>catch</code> at all, so the original failure already propagated correctly; what was missing was the cleanup, and the new <code>catch</code> exists only to run it. A failure *during* that cleanup is reported and never substituted for the cause, which is the one propagation guarantee the wrapper had to be careful not to break"
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>startHttpTestServer({ port: 0 })</code> is refused with an instruction instead of half-working.</strong> <code>0</code> is the OS's \"pick a free one\" idiom, and the test server cannot honour it: the preflight would bind some unrelated ephemeral port and pass without proving anything, and nothing publishable exists afterwards — <code>HttpConnector.start()</code> records the port it <strong>asked for</strong>, not the one Fastify bound. Accepting it silently meant <code>getTestServerUrl()</code> resolved <code>0</code> through its own config fallback and <strong>every worker request went to <code>http://host:0</code></strong>, where nothing listens. The error names the fix: pass an explicit port, or set <code>http.port</code>"
             },
             {
               "type": "Fixed",

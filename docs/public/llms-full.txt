@@ -2448,7 +2448,7 @@ For an even smoother handoff, give the load balancer time to observe the 503 bef
 
 ---
 name: lower-stage3-decorators
-description: 'Vite/Vitest plugin `lowerStage3Decorators()` that lowers TC39 Stage-3 (native) decorators with esbuild before oxc / the SSR rewrite mangles them — so `@RegisterModel`-decorated Cascade models load under Vitest 4 / Vite 8. Triggers: `lowerStage3Decorators`, "SyntaxError: Invalid or unexpected token" on a decorated class, "@(0, __vite_ssr_import__.X)()", "decorator crashes vitest", "models won''t load in tests", "Vite 8 oxc decorators"; typical import `import { lowerStage3Decorators } from "@warlock.js/core"` in `vite.config.ts` / `vitest.config.ts`. Skip: writing the tests themselves — `@warlock.js/core/test-service/SKILL.md` / `@warlock.js/core/test-http/SKILL.md`; runtime migrations — `@warlock.js/cascade/write-migration/SKILL.md`.'
+description: 'Vite/Vitest plugin `lowerStage3Decorators()` that lowers TC39 Stage-3 (native) decorators with esbuild before oxc / the SSR rewrite mangles them — so `@RegisterModel`-decorated Cascade models load under Vitest 4 / Vite 8. Triggers: `lowerStage3Decorators`, "SyntaxError: Invalid or unexpected token" on a decorated class, "@(0, __vite_ssr_import__.X)()", "decorator crashes vitest", "models won''t load in tests", "Vite 8 oxc decorators"; typical import `import { lowerStage3Decorators } from "@warlock.js/core/vite"` in `vite.config.ts` / `vitest.config.ts`. Skip: writing the tests themselves — `@warlock.js/core/test-service/SKILL.md` / `@warlock.js/core/test-http/SKILL.md`; runtime migrations — `@warlock.js/cascade/write-migration/SKILL.md`.'
 ---
 
 # Lower Stage-3 decorators for Vite/Vitest
@@ -2463,12 +2463,14 @@ The cause is two transforms that don't understand each other. Vite 8 transpiles 
 
 `lowerStage3Decorators()` fixes it by getting **esbuild** to lower the decorators *first*.
 
+⚠ **Changed in 4.13.0 — the import is a subpath now.** The plugin used to be re-exported from the package root; it is not any more, because that put the Vite integration into every application's production module graph. `import { lowerStage3Decorators } from "@warlock.js/core"` now fails with *"has no exported member"* — **add `/vite` to the specifier and nothing else changes.**
+
 ## Use it
 
 Drop it **first** in your `plugins` array:
 
 ```ts title="vite.config.ts"
-import { lowerStage3Decorators } from "@warlock.js/core";
+import { lowerStage3Decorators } from "@warlock.js/core/vite";
 import mongezVite from "@mongez/vite";
 import { defineConfig } from "vitest/config";
 
@@ -2528,7 +2530,9 @@ await new Image("./photo.jpg")
   .save("./output.webp");
 ```
 
-That's the full contract. The chain doesn't touch sharp until the output method fires.
+That's the full contract. The chain doesn't run sharp until the output method fires; the
+constructor resolves the sharp module itself, so a missing sharp throws there rather than at the
+final await.
 
 ## Installation
 
@@ -3294,6 +3298,8 @@ export default defineConfig({
     outFile: "app.js",            // default — bundle filename
     minify: true,                 // default — esbuild minify
     sourcemap: true,              // default — true | false | "inline" | "linked"
+    singleBundle: false,          // default — one runnable file, deps inlined
+    esmShim: true,                // default — require/__filename/__dirname for bundled CJS
   },
 });
 ```
@@ -3305,6 +3311,10 @@ Defaults are sensible for the typical "Node service" deployment. Knobs to actual
 - **`minify: false`** — flip to debug a production-only bug. Larger bundle, readable stack traces.
 - **`sourcemap: "inline"`** — embed the source map in the bundle. Useful when your error reporter only captures the bundle and can't fetch a `.map` sidecar.
 - **`sourcemap: false`** — skip source maps entirely. Smaller artifact, but stack traces in production logs lose their file:line precision (and `warlock start` will not enable `--enable-source-maps` since there's nothing to map).
+- **`singleBundle: true`** — inline dependencies so `node dist/app.js` runs with no `node_modules` and no launcher. Sets `packages: "bundle"` + `splitting: false` as **defaults you can override**. ⚠ Native `.node` addons are still emitted alongside — "single bundle" is one JS file *plus* any native addons. Do NOT reach for it as the default: keeping deps external is right when you deploy the folder.
+- **`esmShim: false`** — only if you are certain nothing in the graph is CommonJS. Leave it on.
+
+⚠ **The trap this replaced.** Setting `packages: "bundle"` by hand used to produce a clean build whose process died on start with `Error: Dynamic require of "node:assert" is not supported`. The output is ESM; bundled CJS deps call `require(...)` and read `__dirname`, and neither exists in an ES module, so the bundler substitutes a throwing stub. **A green `warlock build` was not evidence the bundle ran.** `esmShim` now injects `createRequire(import.meta.url)` and friends automatically for any ESM build, so both `singleBundle` and a hand-written `packages: "bundle"` work. An existing hand-written `banner` is preserved — the shim is prepended, not substituted.
 
 ### What it preloads
 
@@ -3347,6 +3357,57 @@ Just `warlockConfig: true` — same as `build`. The actual app bootstrap happens
 - `SIGTERM` — explicitly forwarded to the child by the parent (Windows doesn't auto-propagate this one).
 
 Means `docker stop` / `kubectl delete pod` works as expected: SIGTERM reaches the bundle, your graceful-shutdown hooks fire, then the parent exits.
+
+### pnpm needs esbuild's install script allowed
+
+pnpm 10+ will not run a dependency's install script unless the app names it. esbuild's script links its platform-native binary, and `warlock build` shells out to that binary — so the app installs cleanly and then cannot build:
+
+```
+[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: esbuild@0.27.7
+```
+
+Fix it once in the app's `pnpm-workspace.yaml`:
+
+```yaml
+allowBuilds:
+  esbuild: true
+```
+
+Note pnpm reads this from `pnpm-workspace.yaml`, **not** from `package.json`'s `pnpm` field — pnpm 11 warns that the field is ignored and then carries on, so settings left there fail silently.
+
+Nothing else is needed for pnpm. Warlock never requires an app to declare a package it does not import: generated code is checked at build time against the app's own `dependencies`, so `warlock build` failing over an unfamiliar package name is a framework bug, not a missing dependency.
+
+### Output streams — what a supervisor may trust
+
+**A success line on stdout means the app is serving requests.** That is a contract, not a convention, and you can build a CI gate or a health probe on it.
+
+| Stream     | Carries                                                        |
+| ---------- | -------------------------------------------------------------- |
+| **stdout** | the started banner, and start failures. Nothing else.           |
+| **stderr** | progress (`🚀 Starting production server...`), diagnostics, the application's own logs |
+
+The started banner prints **only** when the running application reports a completed boot — not when the command starts, not when the child is spawned. A child that dies before reporting is a failed start: the failure is written to **both** streams (stderr for humans and log collectors, stdout so a supervisor greping for the banner finds a failure rather than silence), and `warlock start` exits non-zero **even when the child itself exited `0`**.
+
+```bash
+# a CI gate can be this blunt, and it is now correct
+yarn warlock start | grep -q "production server started"
+```
+
+### How readiness is reported
+
+`warlock start` spawns the bundle with an IPC channel and sets `WARLOCK_BOOT_SIGNAL=1` on it. `Application.markBooted()` — which the production entry calls after the late-phase connectors (http, socket) are up — sends one versioned message and closes the channel:
+
+```ts
+{ type: "warlock:ready", version: 1, pid, at, environment, runtimeStrategy, bootDurationMs?, port? }
+```
+
+Three consequences worth knowing:
+
+1. **A queue worker with no http connector still reports.** Readiness hangs on a completed boot, not on a bound port. `port` is simply absent.
+2. **Running the bundle any other way changes nothing.** `node dist/app.js`, a Docker `CMD`, or pm2 — the signal is a strict no-op without both the IPC channel and the handshake flag, so Warlock never writes into a channel that belongs to another supervisor.
+3. **A bundle built before 4.11.0 has no signal.** It starts and runs normally, and after ten seconds prints a note on **stderr only** telling you to re-run `warlock build`. An absent signal is never an error, never fails the run, and never kills a slow boot.
+
+If you need the same fact inside the app, use `Application.onceBooted()` / `Application.whenBooted()` — the signal and your listeners fire from the same latch.
 
 ## Picking which mode you're in
 
@@ -3414,6 +3475,18 @@ export default defineConfig({
 ```
 
 CI sets `BUILD_OUT=build/<sha>` per pipeline. `warlock start` reads the same config and finds the bundle without any hardcoded paths.
+
+**This recipe only started working in 4.11.0.** Before that, `warlock.config.ts` was evaluated *before* any `.env` file was read, so every `env()` call in it returned its default — silently, under every command. If you copied this recipe earlier and concluded that `BUILD_OUT` was ignored, it was.
+
+**Which file the value comes from is decided by `NODE_ENV`, and no Warlock command sets it.** `env()` reads `.env.<NODE_ENV>` when that file exists and falls back to plain `.env`. So:
+
+```bash
+warlock build                       # NODE_ENV unset → reads .env
+NODE_ENV=production warlock build   # → reads .env.production
+NODE_ENV=staging warlock build      # → reads .env.staging
+```
+
+That is deliberate: `build` and `start` do **not** force `production`. Forcing it would silently change which file an existing `NODE_ENV=staging` pipeline reads, and would have the framework overriding an operator's explicit choice at the moment of deployment. Set `NODE_ENV` in your Dockerfile, CI job, or process manager — the same place you already set it for `Application.environment`.
 
 ### Skip type-gen on machines without write access
 
@@ -4502,20 +4575,22 @@ Client `PUT`s the bytes straight to R2 — your server never sees them.
 
 ---
 name: test-http
-description: 'Integration tests against a real HTTP server — `startHttpTestServer()` boots one shared server in globalSetup, then `testGet` / `testPost` / `expectJson` make typed requests against it. Triggers: `startHttpTestServer`, `stopHttpTestServer`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core"`. Skip: pure unit tests — `@warlock.js/core/test-service/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing libs `supertest`, `light-my-request`, `nock`.'
+description: 'Integration tests against a real HTTP server — `startHttpTestServer()` boots one shared server in globalSetup, then `testGet` / `testPost` / `expectJson` make typed requests against it. Triggers: `startHttpTestServer`, `startHttpTestServer({ port })`, `stopHttpTestServer`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`, `PortInUseError`, `assertPortIsAvailable`, `isPortAvailable`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape", "test server port already in use", "EADDRINUSE while running tests", "run tests while the dev server is up"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core/tests"`. Skip: pure unit tests — `@warlock.js/core/test-service/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing libs `supertest`, `light-my-request`, `nock`.'
 ---
 
 # Warlock — HTTP integration tests
 
 Some tests need the full stack: route matching, middleware chain, validation, controller, response serialization. For those, you boot the real HTTP server once per test run and make real `fetch` calls against it.
 
-`startHttpTestServer()` is the bootstrap. `testGet` / `testPost` / `expectJson` are the call helpers. Both ship in `@warlock.js/core`.
+`startHttpTestServer()` is the bootstrap. `testGet` / `testPost` / `expectJson` are the call helpers. Both ship in `@warlock.js/core/tests`.
+
+⚠ **Changed in 4.13.0 — the import is a subpath now.** These helpers used to be re-exported from the package root; they are not any more, because that put the test helpers into every application's production module graph. `import { testGet } from "@warlock.js/core"` now fails with *"has no exported member"* — **add `/tests` to the specifier and nothing else changes.**
 
 ## The shape
 
 ```ts title="src/app/users/tests/users.controller.test.ts"
 import { describe, expect, it } from "vitest";
-import { expectJson, testGet, testPost } from "@warlock.js/core";
+import { expectJson, testGet, testPost } from "@warlock.js/core/tests";
 
 describe("Users API", () => {
   it("GET /users returns the list", async () => {
@@ -4541,7 +4616,7 @@ No `beforeAll`, no manual server start — the project's `src/test-global-setup.
 ## The bootstrap — `startHttpTestServer` / `stopHttpTestServer`
 
 ```ts
-import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core";
+import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core/tests";
 ```
 
 `startHttpTestServer()` boots a **minimal but real** HTTP server:
@@ -4558,6 +4633,47 @@ Unlike the dev server, it doesn't watch files, doesn't do HMR, doesn't run healt
 
 Both are idempotent. A second `start` returns early; `stop` on a non-running server logs and returns.
 
+### Choosing the port — `startHttpTestServer({ port })`
+
+```ts
+await startHttpTestServer({ port: 3999 });
+```
+
+The explicit port wins over `http.port` — including over `HTTP_PORT` in `.env`. Use it to run a suite while the dev server holds the configured port, or to run two suites side by side.
+
+**Nothing else can move the server.** `startHttpTestServer()` bootstraps the app itself, and that bootstrap re-reads `.env` (dotenv overrides by default), so any value you set before calling it is gone before the port is read. Assigning `process.env.HTTP_PORT` does not work either: `env()` reads dotenv's own store and never falls back to `process.env`. The option is applied after the bootstrap, immediately before the connector binds — that is why it is the only channel that survives.
+
+The request helpers follow with no extra wiring: the bound port is published as `WARLOCK_TEST_SERVER_PORT`, which the workers inherit, and `getTestServerUrl()` prefers it over their own `.env`-resolved `http.port`. `stopHttpTestServer()` withdraws it.
+
+### The port is preflighted
+
+Before binding, the test server checks the resolved port is free and fails with an instruction if it isn't:
+
+```
+Port 2031 is already in use on localhost. Stop the dev server (or whatever else is
+listening on port 2031) and run again, or start on a free port — e.g.
+startHttpTestServer({ port: 2032 }).
+```
+
+This runs whether or not you passed a port, so a collision never reaches you as a bare `EADDRINUSE` from inside Fastify. The failure is a `PortInUseError` carrying `port` and `host`. The same check is available on its own — `assertPortIsAvailable(port, host)` throws it, `isPortAvailable(port, host)` returns a boolean.
+
+### Port `0` is refused
+
+`port: 0` — "let the OS pick one" — is not supported, and says so rather than half-working:
+
+```
+startHttpTestServer() cannot run on port 0. Pass an explicit port — e.g.
+startHttpTestServer({ port: 3999 }) — or set `http.port` in your config. Test workers
+are separate processes that resolve the server's URL from the port published at
+startup, and an OS-assigned port is not knowable to them.
+```
+
+The reason is the worker handoff described above: the port the OS assigns is never recorded anywhere the workers can read, so `getTestServerUrl()` would resolve `0` and send every request to `http://host:0`.
+
+### If startup fails, nothing is left behind
+
+`startHttpTestServer()` owns the connectors it starts. A failure part-way through — a bad config, a connector that won't boot — tears down whatever came up, withdraws the published port, and **rethrows the original error**; a failure during that cleanup is logged but never replaces the cause. `stopHttpTestServer()` withdraws the port and resets its state even when the shutdown itself throws, and still surfaces that failure.
+
 ## Project wiring — `src/test-global-setup.ts` + `vite.config.ts`
 
 ```ts title="src/test-global-setup.ts"
@@ -4565,7 +4681,7 @@ Both are idempotent. A second `start` returns early; `stop` on a non-running ser
  * Global Test Setup
  * Runs ONCE in the main process before all test workers start.
  */
-import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core";
+import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core/tests";
 
 export async function setup() {
   await startHttpTestServer();
@@ -4577,7 +4693,7 @@ export async function teardown() {
 ```
 
 ```ts title="vite.config.ts"
-import { lowerStage3Decorators } from "@warlock.js/core";
+import { lowerStage3Decorators } from "@warlock.js/core/vite";
 import mongezVite from "@mongez/vite";
 import { defineConfig } from "vitest/config";
 
@@ -4602,12 +4718,12 @@ Everything is built on native `fetch` — no extra dependency, no special wire f
 ### URL resolution
 
 ```ts
-import { getTestServerUrl } from "@warlock.js/core";
+import { getTestServerUrl } from "@warlock.js/core/tests";
 
 const url = getTestServerUrl();  // → "http://localhost:2031" (defaults)
 ```
 
-Reads `http.host` (default `"localhost"`) and `http.port` (default `2031`) from config. If you change the HTTP config, helpers follow automatically.
+Reads `http.host` (default `"localhost"`) and `http.port` (default `2031`) from config — unless `startHttpTestServer` published a port, which wins, since a worker's own config never sees the `{ port }` option passed in `globalSetup`. If you change the HTTP config, helpers follow automatically.
 
 ### Verb helpers
 
@@ -4619,7 +4735,7 @@ import {
   testPut,
   testPatch,
   testDelete,
-} from "@warlock.js/core";
+} from "@warlock.js/core/tests";
 
 await testGet("/products");
 await testGet("/products?published=true", { headers: { "X-Tenant": "abc" } });
@@ -4636,7 +4752,7 @@ All accept a relative path (leading `/` optional) and a standard `RequestInit`. 
 ### Parsing + asserting — `expectJson<T>`
 
 ```ts
-import { expectJson, parseJsonResponse } from "@warlock.js/core";
+import { expectJson, parseJsonResponse } from "@warlock.js/core/tests";
 
 // Parse-only
 const body = await parseJsonResponse<MyShape>(response);
@@ -4655,7 +4771,7 @@ const body = await expectJson<MyShape>(response, 404);     // expects 404 (testi
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { expectJson, testGet, testPost } from "@warlock.js/core";
+import { expectJson, testGet, testPost } from "@warlock.js/core/tests";
 
 describe("Products API — happy path", () => {
   it("creates and reads back a product", async () => {
@@ -4776,7 +4892,7 @@ This is fine for normal test flow. It bites when you're inside a transaction the
 ## Gotchas
 
 - **`globalSetup` must export `setup` and `teardown`.** Vitest reads them by name. A typo in the export gets you a confusing "server not running" error on the first `testGet` call.
-- **Port conflicts.** If `http.port` matches your running dev server, `startHttpTestServer()` fails to bind. Either stop the dev server or set a test-only port: `http: { port: 3999 }` in a test-config branch.
+- **Port conflicts.** If `http.port` matches your running dev server, the preflight fails with a `PortInUseError` naming the port. Either stop the dev server or pass a free one: `startHttpTestServer({ port: 3999 })`.
 - **Auth tokens need a real user.** Generating a JWT with a non-existent `user_id` works — but the auth middleware's user-loading step will reject the request with 401 because it can't find the user in the DB.
 - **`expectJson` parses the body once.** If you call it twice on the same response, the second call gets an already-consumed stream error. Capture the result.
 - **The HTTP server's connection is NOT torn down between test files.** Data persists across files within a single `vitest` run. Either truncate in `afterEach` / `afterAll`, or design your tests to be order-independent.
@@ -4794,7 +4910,7 @@ This is fine for normal test flow. It bites when you're inside a transaction the
 
 ---
 name: test-service
-description: 'Pure unit tests against services, repositories, models, and use-cases — `setupTest({ connectors })` bootstraps each Vitest worker with its own DB/cache connections so you can call your code directly. Triggers: `setupTest`, `src/test-setup.ts`, `tests.connectors`, `Application.setEnvironment`; "unit-test a service", "test a repository query", "vitest setupFiles", "skip connectors for pure-logic tests"; typical import `import { setupTest } from "@warlock.js/core"`. Skip: HTTP integration — `@warlock.js/core/test-http/SKILL.md`; warlock add test scaffold — `@warlock.js/core/write-cli-command/SKILL.md`; competing tooling: jest direct, `supertest`, `nock`.'
+description: 'Pure unit tests against services, repositories, models, and use-cases — `setupTest({ connectors })` bootstraps each Vitest worker with its own DB/cache connections so you can call your code directly. Triggers: `setupTest`, `src/test-setup.ts`, `tests.connectors`, `Application.setEnvironment`; "unit-test a service", "test a repository query", "vitest setupFiles", "skip connectors for pure-logic tests"; typical import `import { setupTest } from "@warlock.js/core/tests"`. Skip: HTTP integration — `@warlock.js/core/test-http/SKILL.md`; warlock add test scaffold — `@warlock.js/core/write-cli-command/SKILL.md`; competing tooling: jest direct, `supertest`, `nock`.'
 ---
 
 # Warlock — test a service
@@ -4802,6 +4918,8 @@ description: 'Pure unit tests against services, repositories, models, and use-ca
 For unit tests, you import the thing under test and call it directly. No HTTP, no fetch, no controllers. Framework testing in Warlock is about getting your **service layer** under test efficiently — and that means each Vitest worker needs its own bootstrapped framework with a DB connection.
 
 `setupTest()` is the one-call bootstrap that gives each worker that environment.
+
+⚠ **Changed in 4.13.0 — the import is a subpath now.** `setupTest` used to be re-exported from the package root; it is not any more, because that put the test helpers into every application's production module graph. `import { setupTest } from "@warlock.js/core"` now fails with *"has no exported member"* — **add `/tests` to the specifier and nothing else changes.**
 
 ## The shape
 
@@ -4831,7 +4949,7 @@ No `beforeAll(setupTest)` in this file — the project's `src/test-setup.ts` (re
 ## `setupTest({ connectors })` — the worker bootstrap
 
 ```ts
-import { setupTest } from "@warlock.js/core";
+import { setupTest } from "@warlock.js/core/tests";
 
 await setupTest({ connectors: true });
 ```
@@ -4879,13 +4997,13 @@ The `warlock add test` feature creates both files. The standard wiring:
  * Per-Worker Test Setup
  * Runs in EACH Vitest worker thread before tests execute.
  */
-import { setupTest } from "@warlock.js/core";
+import { setupTest } from "@warlock.js/core/tests";
 
 await setupTest({ connectors: true });
 ```
 
 ```ts title="vite.config.ts"
-import { lowerStage3Decorators } from "@warlock.js/core";
+import { lowerStage3Decorators } from "@warlock.js/core/vite";
 import mongezVite from "@mongez/vite";
 import { defineConfig } from "vitest/config";
 
@@ -5004,11 +5122,11 @@ Vitest runs tests in a single worker file sequentially, so an `afterEach` trunca
 
 ```ts title="src/app/utils/tests/slugify.test.ts"
 import { beforeAll, describe, expect, it } from "vitest";
-import { setupTest } from "@warlock.js/core";
+import { setupTest } from "@warlock.js/core/tests";
 import { slugify } from "../utils/slugify";
 
 beforeAll(async () => {
-  await setupTest({ connectors: false });  // override the project default
+  await setupTest({ connectors: false });  // starts no connectors at all
 });
 
 describe("slugify", () => {
@@ -5018,7 +5136,9 @@ describe("slugify", () => {
 });
 ```
 
-`setupTest` is idempotent per worker (`isSetupComplete` flag) — calling it again with different options after `src/test-setup.ts` already ran is a no-op. To genuinely skip connectors, either set `tests.connectors: false` in config (project-wide) or rely on the default in `src/test-setup.ts` being what you want most of the time.
+`setupTest` is idempotent per worker (`isSetupComplete` flag) — calling it again with different options after `src/test-setup.ts` already ran is a no-op. **That includes a `connectors: false` call: if `src/test-setup.ts` already ran `setupTest()` in this worker, the example above changes nothing.** To genuinely skip connectors, either set `tests.connectors: false` in config (project-wide) or rely on the default in `src/test-setup.ts` being what you want most of the time.
+
+⚠ **Config beats the parameter.** If `tests.connectors` is set at all, `setupTest({ connectors })` cannot override it — the config value wins. That is the current contract, not an accident; a per-call override is under discussion for a later release.
 
 ## Gotchas
 
@@ -5026,7 +5146,7 @@ describe("slugify", () => {
 - **Per-worker connections are separate from the HTTP server's connections.** A row inserted by a service-level test is on the worker's connection; the HTTP test server has its own. They don't see each other unless they're both pointing at the same physical DB and the inserting test has already committed.
 - **`NODE_ENV` is set to `"test"`** by `setupTest`. Code that branches on `Application.isProduction` / `Application.isDevelopment` sees `false` for both. If your tests need production-like config (cookies, CORS), set those values in `src/config/*.ts` explicitly under the test branch — don't rely on the env flag.
 - **No HTTP from this layer.** `setupTest({ connectors: true })` never starts the HTTP connector by design. Don't try to `request.app.http` your way to a fetch test — use the `test-http` skill instead.
-- **Don't import `vitest-setup` from `@warlock.js/core/src/...`.** The public surface is `import { setupTest } from "@warlock.js/core"`. Reaching into source paths breaks when the package layout shifts.
+- **Don't import `vitest-setup` from `@warlock.js/core/src/...`.** The public surface is `import { setupTest } from "@warlock.js/core/tests"`. Reaching into source paths breaks when the package layout shifts.
 - **Test files need the `.test.ts` suffix.** `include: ["src/app/**/*.test.ts"]` is what vitest scans. A file named `service.tests.ts` (plural) silently doesn't run.
 
 ## See also
@@ -6163,6 +6283,8 @@ Server errors (5xx) are not cached — clients can retry past a 5xx. 4xx respons
 
 `http.bodyLimit` in config is read by Fastify at server-start and applies to every body. `middleware.maxBodySize()` is a per-route middleware on top — it checks `Content-Length` after route match and rejects with 413 before body parsing runs. Use both: global as a safety net, per-route for tight caps on small-payload endpoints.
 
+⚠ **Since 4.13.0, configuring nothing gives you Fastify's own 1 MB limit.** Earlier versions defaulted to 200 GB, which **replaced** Fastify's protection rather than adding to it — so an app that set nothing had effectively no cap. **Set `bodyLimit` explicitly if you need more than 1 MB.**
+
 ```ts
 // src/config/http.ts
 export default { bodyLimit: 10 * 1024 * 1024 }; // 10MB globally
@@ -6193,7 +6315,9 @@ export default {
 
 ## `ipFilter` — fail-closed
 
-`deny` wins over `allow`. If the IP can't be read (empty / unparseable), the request is rejected with 403. Reads via `request.detectIp()` which honors `X-Real-IP` and `X-Forwarded-For` (Fastify starts with `trustProxy: true`).
+`deny` wins over `allow`. If the IP can't be read (empty / unparseable), the request is rejected with 403. Reads via `request.detectIp()`.
+
+⚠ **Since 4.13.0 `http.trustProxy` defaults to `false`**, so `request.detectIp()` returns the socket address and **`X-Real-IP` / `X-Forwarded-For` are ignored unless you opt in.** Set `trustProxy: true` **only when you are genuinely behind a proxy that overwrites those headers** — before 4.13.0 the default was `true`, which meant any client could set its own forwarding header and be believed.
 
 ```ts
 import { middleware } from "@warlock.js/core";
@@ -8073,11 +8197,29 @@ The framework ships a fixed set of commands you call but don't author. Knowing t
 
 | Command  | Flags / args                                    | Preloads                       |
 | -------- | ----------------------------------------------- | ------------------------------ |
-| `warlock migrate` | `--list` (just list pending), `--fresh` / `-f` (drop tables first) | database, logger          |
+| `warlock migrate` | `--list` / `-l` (executed **and** pending), `--pending` (pending only, sets an exit code), `--fresh` / `-f` (drop tables first) | database, logger          |
 | `warlock seed` | `--name <pattern>` (run seeds matching the pattern) | full bootstrap (env, configs, app modules) |
 | `warlock create-database <name>` | bare positional `<name>`        | database                       |
 | `warlock drop.tables` | `--force, -f` (skip confirmation prompt) | database, logger          |
 | `warlock db.indexes` | builds DB indexes for every registered model    | database                  |
+
+**Asking what will run next.** `warlock migrate --list` prints executed migrations and then the pending ones **in execution order**. Do not derive the pending set by differencing `--all` against `--list`: `--all` globs `src/app` only, while `--list` reads the migrations table, which also holds migrations that packages register through `database.migrations` (`@warlock.js/auth` contributes two). The difference under-counts pending, in the direction that says "safe to proceed".
+
+`--list` is a report and always exits `0`. `--pending` is a gate, and its exit code is its whole API:
+
+| Exit | Meaning |
+| ---- | ------- |
+| `0`  | computed, nothing pending |
+| `1`  | computed, N pending |
+| `2`  | **could not be computed** |
+
+```bash
+warlock migrate --pending && ./deploy.sh
+```
+
+`2` is separate from `1` on purpose — a script must be able to tell a backlog from an unknown, because one means *run them* and the other means *stop*. When the migration files cannot be loaded, both commands print `Pending: unavailable — <reason>` beneath a complete executed listing rather than reporting `0`.
+
+**If you are writing a command that reports on pending migrations:** register migrations first. `listPendingMigrations()` filters the runner's registry, so a caller that has not loaded anything gets `[]` — which reads as "nothing pending" and is not the same claim.
 
 ### Scaffolding
 
@@ -19346,6 +19488,21 @@ export default {
 };
 ```
 
+### Token lifetimes are validated — a bad one throws
+
+`expiresIn` (both blocks) must be a duration string the [`ms`](https://github.com/vercel/ms) package parses to a **positive** number: `"1h"`, `"30m"`, `"7d"`, `"30 days"`, or `NO_EXPIRATION` (`"100y"`). Anything else throws on the first token issue, naming the key:
+
+```
+auth.accessToken.expiresIn: "30dayz" is not a valid ms duration — use a positive duration string such as "1h", "7d", or NO_EXPIRATION.
+```
+
+That is deliberate. `ms` answers `undefined` for a string it can't parse (`"30dayz"`, `"thirty days"`) and `0` for `"0d"`, and a signer given either emits a JWT with **no `exp` claim** — a credential that never expires. A typo must not be able to produce that quietly, so it fails loudly instead of falling back to a default nobody asked for. Defaults still apply when the key is **absent**: `1h` for access, `7d` for refresh.
+
+Two values that look right and are not:
+
+- `expiresIn: 2592000` — a bare number. `ms` *formats* numbers instead of parsing them, so this is rejected; write `"30d"`.
+- `expiresIn: env("JWT_TTL")` where the variable is unset — resolves to `""` and is rejected. Give the env read a default: `env("JWT_TTL") || "1h"`.
+
 ## Pick a skill
 
 | If the task is about… | Load |
@@ -19464,8 +19621,18 @@ Your subclass inherits and may override these statics — the service calls them
 | `revokeAllFor(user)` / `revokeFamily(id)` | revoke a set, returning the revoked rows |
 | `enforceMax(user, max)` | cap concurrent refresh tokens |
 | `purgeExpired()` | delete expired rows (CLI cleanup) |
+| `findNeverExpiring()` / `purgeNeverExpiring()` | find/delete rows that can never expire (CLI remediation) |
 
-If you rename a column, override the statics that reference it so they map to your name — the service depends on the method, not the column.
+Plus two instance getters, both of which the route gate consults on every request:
+
+| Getter | Role |
+| --- | --- |
+| `isExpired` | whether the row's persisted expiry has passed — **the middleware rejects the request when this is `true`** |
+| `neverExpires` | whether nothing can ever retire the row (unusable `expires_at`, or a token with no `exp` claim) |
+
+If you rename a column, override the statics **and these getters** so they map to your name — the service depends on the method, not the column.
+
+⚠️ **Do not drop `isExpired`.** The middleware treats a row that cannot answer as **expired** and rejects the request, so removing the getter locks every user out rather than letting them through. That direction is deliberate: the fail-open reading is what let expired sessions stay usable before 4.12.0.
 
 ## Things NOT to do
 
@@ -19941,12 +20108,20 @@ For low-level JWT signing/verification (outside the authService flow):
 ```ts
 import { jwt } from "@warlock.js/auth";
 
-const token = await jwt.generate(payload, { expiresIn: "1h" }); // string or ms; a bare number is milliseconds
+const token = await jwt.generate(payload, { expiresIn: 3_600_000 }); // milliseconds
 const decoded = await jwt.verify(token);
 
 const refreshToken = await jwt.generateRefreshToken(payload, { expiresIn });
 const decodedRefresh = await jwt.verifyRefreshToken(refreshToken);
 ```
+
+⚠️ **`jwt.generate` / `jwt.generateRefreshToken` are the low-level escape hatch — `expiresIn` goes straight to `fast-jwt`.** It takes a number of milliseconds or an `ms`-style string, and rejects an unparseable string. What it does **not** reject is `undefined` or `0`: both skip the check and emit a token with **no `exp` claim**. Pass a positive value, and never pass the result of parsing a config string without checking it first.
+
+**`jwt.verify` / `jwt.verifyRefreshToken` require an `exp` claim** (since 4.12.0) and reject a token without one. There is no deadline to check on such a token, so verification would otherwise succeed indefinitely. `requiredClaims` is additive — `jwt.verify(token, { requiredClaims: ["iat"] })` requires `iat` **and** `exp`; you cannot opt out of `exp`. If you want a token that effectively never expires, use `expiresIn: NO_EXPIRATION` (`"100y"`), which stamps a real `exp` about a century out.
+
+If tokens minted before 4.12.0 may lack an `exp`, see `warlock auth.purge-never-expiring` in [`@warlock.js/auth/run-auth-commands/SKILL.md`](@warlock.js/auth/run-auth-commands/SKILL.md) — they are still in your token tables and no date-based cleanup can reach them.
+
+`authService.generateAccessToken` / `createRefreshToken` read `config.auth.accessToken.expiresIn` / `config.auth.refreshToken.expiresIn`, validate them, and throw naming the key if the value is not a positive `ms` duration — before anything is signed, persisted, or capped.
 
 The package signs access and refresh tokens with independent secrets — `config.auth.accessToken.secret` and `config.auth.refreshToken.secret`. Setting a distinct `refresh.secret` is recommended: it prevents an access-token compromise from forging refresh tokens (and vice versa). The refresh secret is **optional** — when `config.auth.refreshToken.secret` is unset, refresh tokens fall back to the main `config.auth.accessToken.secret`, so refresh works out of the box without a second secret.
 
@@ -20088,12 +20263,18 @@ request.decodedAccessToken = <decoded JWT payload>;
 
 The user is loaded via `Model.find(decodedToken.id)` against the `config.auth.userType[userType]` class. If the user no longer exists (deleted), the access token row is destroyed and the request gets 401.
 
+A token passes three separate checks, in order — a token can fail any one of them while satisfying the other two:
+
+1. **The JWT verifies** — signature, algorithm, `tokenType`, and (since 4.12.0) the presence of an `exp` claim that has not passed. A token with *no* `exp` is rejected: there is no deadline to check, so it would otherwise verify indefinitely.
+2. **The access-token row still exists** — deleting it (logout) invalidates the token immediately, before its JWT expiry.
+3. **The row's own `expires_at` has not passed** (since 4.12.0). The database is the authority on the session: a row whose expiry has elapsed is rejected and deleted, even if the JWT itself is still within its lifetime. A row with a missing or unparseable `expires_at` is treated as expired, not as never-expiring.
+
 On failure, the middleware returns one of these 401 responses:
 
 | Error code | When |
 | --- | --- |
 | `MissingAccessToken` | No `Authorization` header |
-| `InvalidAccessToken` | Token doesn't verify (signature, expired, doesn't match DB) |
+| `InvalidAccessToken` | Token doesn't verify (signature, missing/passed `exp`, wrong token type), has no DB row, or the row's `expires_at` has passed |
 | `Unauthorized` | Token valid but user-type isn't in the allowed list |
 
 ## Reading the user in a controller
@@ -20330,18 +20511,19 @@ Cleaner alternative: emit your own `user.registered` event from the controller a
 
 ---
 name: run-auth-commands
-description: 'Two bundled CLI commands — warlock jwt.generate (creates strong JWT secret + writes to .env) and warlock auth.cleanup (removes expired refresh tokens). Register via registerJWTSecretGeneratorCommand() and registerAuthCleanupCommand(). Triggers: `registerJWTSecretGeneratorCommand`, `registerAuthCleanupCommand`, `warlock jwt.generate`, `warlock auth.cleanup`, `cleanupExpiredTokens`, `command`; "generate JWT secret", "bootstrap .env JWT_SECRET", "cron job for expired tokens", "schedule auth cleanup"; typical import `import { registerJWTSecretGeneratorCommand, registerAuthCleanupCommand } from "@warlock.js/auth"`. Skip: programmatic cleanup — `@warlock.js/auth/manage-tokens/SKILL.md`; in-process scheduling — `@warlock.js/scheduler/scheduler-basics/SKILL.md`; competing tools `dotenv-cli`, `node-cron`.'
+description: 'Three bundled CLI commands — warlock jwt.generate (creates strong JWT secret + writes to .env), warlock auth.cleanup (removes expired refresh tokens), and warlock auth.purge-never-expiring (finds and revokes token rows that can never expire). Register via registerJWTSecretGeneratorCommand(), registerAuthCleanupCommand() and registerAuthPurgeNeverExpiringCommand(). Triggers: `registerJWTSecretGeneratorCommand`, `registerAuthCleanupCommand`, `registerAuthPurgeNeverExpiringCommand`, `warlock jwt.generate`, `warlock auth.cleanup`, `warlock auth.purge-never-expiring`, `cleanupExpiredTokens`, `purgeNeverExpiringTokens`, `command`; "token never expires", "no exp claim", "Invalid Date expires_at"; "generate JWT secret", "bootstrap .env JWT_SECRET", "cron job for expired tokens", "schedule auth cleanup"; typical import `import { registerJWTSecretGeneratorCommand, registerAuthCleanupCommand, registerAuthPurgeNeverExpiringCommand } from "@warlock.js/auth"`. Skip: programmatic cleanup — `@warlock.js/auth/manage-tokens/SKILL.md`; in-process scheduling — `@warlock.js/scheduler/scheduler-basics/SKILL.md`; competing tools `dotenv-cli`, `node-cron`.'
 ---
 
 # Run auth commands
 
-The package ships two CLI commands. Register them in `warlock.config.ts`; the framework picks them up.
+The package ships three CLI commands. Register them in `warlock.config.ts`; the framework picks them up.
 
 ## Register
 
 ```ts title="warlock.config.ts"
 import {
   registerAuthCleanupCommand,
+  registerAuthPurgeNeverExpiringCommand,
   registerJWTSecretGeneratorCommand,
 } from "@warlock.js/auth";
 import { defineConfig } from "@warlock.js/core";
@@ -20351,6 +20533,7 @@ export default defineConfig({
     commands: [
       registerJWTSecretGeneratorCommand(),
       registerAuthCleanupCommand(),
+      registerAuthPurgeNeverExpiringCommand(),
     ],
   },
 });
@@ -20409,6 +20592,23 @@ Out-of-process — works when you don't want the scheduler subsystem running in 
 Once a day is usually enough. The check is cheap (single indexed DELETE on `expires_at < now()`), and refresh tokens that have already expired don't grant access — cleanup is housekeeping, not security.
 
 If you have very-short-lived refresh tokens (1h expiry) and a million-user scale where the table grows fast, cleanup more often (hourly).
+
+## `warlock auth.purge-never-expiring` — one-off remediation
+
+```bash
+yarn warlock auth.purge-never-expiring --dry-run   # report only
+yarn warlock auth.purge-never-expiring             # report, then revoke
+```
+
+Register with `registerAuthPurgeNeverExpiringCommand()`.
+
+Finds every token row that **can never retire itself**, on two independent signals: an `expires_at` that is missing or unparseable, and a stored token carrying no `exp` claim. It reports `id` / `user_id` / `user_type` / `expires_at` per row — never the token string, which is a live credential until the row is deleted — and then deletes them. Affected users must log in again.
+
+**This is not a substitute for `auth.cleanup`, and `auth.cleanup` is not a substitute for it.** Cleanup selects `expires_at < now`; an `Invalid Date` compares `false` against *every* date, so such a row satisfies neither `< now` nor `> now` and no date predicate can ever reach it. The "no `exp` claim" signal is not in a column at all — it is inside the JWT.
+
+Run it once after upgrading to 4.12.0 **if any deployment ever ran an `expiresIn` that `ms` could not parse** (`"30dayz"`, `"0d"`, `""`, a bare number). Those configurations minted tokens that verify forever. It is safe to run when unaffected — it reports nothing and deletes nothing.
+
+Unlike `auth.cleanup`, do **not** schedule it: it is a full table scan (it must read rows to judge them, since neither signal is expressible as a `where`), and once the poisoned rows are gone, 4.12.0 cannot create more.
 
 ## Custom commands
 
@@ -24117,7 +24317,7 @@ if (report.regression && !report.regression.passed) process.exit(1);
 
 ---
 name: generate-images
-description: 'Text-to-image via ai.image({ model: sdk.image({ name }), prompt }) — the image-OUTPUT verb (Theme I), returning the uniform never-throws { data, error, usage, report } envelope with cost-truth + panoptic observation. Models come from an adapter''s image() factory: OpenAI gpt-image-* (token-metered) / dall-e-* (per-image), Google imagen-* (per-image). Result images are a discriminated GeneratedImage = { type: "base64" } | { type: "url" }. Triggers: `ai.image`, `sdk.image`, `openai.image`, `google.image`, `ImageModelContract`, `GeneratedImage`, `ImageModelPricing`; ''generate an image'', ''text to image'', ''gpt-image'', ''dall-e'', ''imagen'', ''product thumbnail'', ''image output''; typical import `import { ai } from "@warlock.js/ai"` + `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: image INPUT / vision attachments to a chat agent — `@warlock.js/ai/run-ai-agent/SKILL.md`; embeddings — `@warlock.js/ai/embed-text/SKILL.md`; competing libs raw `openai.images.generate`, `langchain` image tools.'
+description: 'Text-to-image via ai.image({ model: sdk.image({ name }), prompt }) — the image-OUTPUT verb (Theme I), returning the uniform never-throws { data, error, usage, report } envelope with cost-truth + panoptic observation. Models come from an adapter''s image() factory: OpenAI gpt-image-* (token-metered) / dall-e-* (per-image), Google gemini-* (generateContent + responseModalities IMAGE, usage passed through) / imagen-* and every other id (per-image, generateImages — deprecated by Google); the id picks the transport and is never validated locally. Result images are a discriminated GeneratedImage = { type: "base64" } | { type: "url" }. Triggers: `ai.image`, `sdk.image`, `openai.image`, `google.image`, `ImageModelContract`, `GeneratedImage`, `ImageModelPricing`; ''generate an image'', ''text to image'', ''gpt-image'', ''dall-e'', ''imagen'', ''product thumbnail'', ''image output''; typical import `import { ai } from "@warlock.js/ai"` + `import { OpenAISDK } from "@warlock.js/ai-openai"`. Skip: image INPUT / vision attachments to a chat agent — `@warlock.js/ai/run-ai-agent/SKILL.md`; embeddings — `@warlock.js/ai/embed-text/SKILL.md`; competing libs raw `openai.images.generate`, `langchain` image tools.'
 ---
 
 # Generate images — the image-output verb (`ai.image`)
@@ -24198,20 +24398,29 @@ const gpt = openai.image({ name: "gpt-image-1", pricing: { input: 5, output: 40 
 const dalle = openai.image({ name: "dall-e-3", pricing: { perImage: 0.04 } });
 ```
 
-A non-image model id (`openai.image({ name: "gpt-4o" })`) throws `InvalidRequestError` **at construction** — fail fast, like the embedder/vision guards.
+The model id is **not validated locally**. `openai.image({ name })` forwards the id to `client.images.generate` exactly as given, so a non-image id (`openai.image({ name: "gpt-4o" })`) constructs fine and fails at OpenAI — as a typed provider error on `result.error`, never as a local throw at construction.
 
-## Google — Imagen (per-image)
+## Google — Imagen (per-image) and Gemini (per-token)
 
 ```ts
 import { GoogleSDK } from "@warlock.js/ai-google";
 
 const google = new GoogleSDK({ apiKey: process.env.GEMINI_API_KEY! });
+
+// Imagen — per-image-metered, via ai.models.generateImages:
 const imagen = google.image({ name: "imagen-4.0-generate-001", pricing: { perImage: 0.04 } });
+
+// Gemini image model — token-metered, via ai.models.generateContent:
+const gemini = google.image({ name: "gemini-3.1-flash-lite-image", pricing: { input: 0.3, output: 30 } });
 
 const { data } = await ai.image({ model: imagen, prompt: "a watercolor lighthouse at dawn", aspectRatio: "3:4" });
 ```
 
-Imagen returns base64 bytes (no hosted URL). When every candidate is safety-filtered, `ai.image` surfaces a typed `ContentFilterError` on `result.error`.
+The **id picks the transport**: a `gemini-` id goes to `generateContent` (token `usage` is passed through as Google reports it — price with `{ input, output }`), anything else to `generateImages` (Imagen — always zero usage, price with `{ perImage }`). Both surface images in the same `GeneratedImage` shape (base64 bytes, no hosted URL). When Google filters the request, `ai.image` surfaces a typed `ContentFilterError` on `result.error`; a Gemini response that answered with text instead of an image surfaces a `ProviderError` quoting that text.
+
+⚠ **No test calls the live API**, so the Gemini path rests on two tiers of evidence. Measured here: a `gemini-*` id reached `generateContent` and returned a quota error (429) where `generateImages` returned 404 — the endpoint accepts the id. Reported by the maintainer: with billing enabled, an image comes back end-to-end. Still unknown is whether these models report token usage — no `usageMetadata` from a successful image call has been seen. Google has also **deprecated `generateImages`** ("will be removed in the next major release (not before Jan. 1 2027)"), so the Imagen path is on a clock.
+
+Like every adapter, Google does **not** guard the model id — the id selects a route, it is never refused locally, so an id Google does not serve fails as a typed provider error on `result.error`, not with a local throw at construction.
 
 ## Cost-truth — one rollup, two metering models
 
@@ -24285,7 +24494,7 @@ if (error) {
 }
 ```
 
-`SpeechModelContract` mirrors `EmbedderContract` / `ImageModelContract` — a peer primitive produced by the adapter's optional `speech?()` factory. An adapter without a TTS API simply doesn't define `speech()`, so calling it is a **compile-time** error, not a silent runtime failure. A non-TTS model id (`openai.speech({ name: "gpt-4o" })`) throws `InvalidRequestError` **at construction** — fail fast, like the embedder/image guards.
+`SpeechModelContract` mirrors `EmbedderContract` / `ImageModelContract` — a peer primitive produced by the adapter's optional `speech?()` factory. An adapter without a TTS API simply doesn't define `speech()`, so calling it is a **compile-time** error, not a silent runtime failure. The model id itself is **not validated locally** — a non-TTS id (`openai.speech({ name: "gpt-4o" })`) constructs fine and is forwarded to the provider as given, so it fails as a typed provider error on `result.error`, never as a local throw at construction.
 
 ## The result envelope
 
@@ -27722,7 +27931,7 @@ if (error) console.warn(error.code); // typed AIError
 else console.log(data.text);         // the transcript
 ```
 
-`TranscriptionModelContract` mirrors `SpeechModelContract` — a peer primitive produced by the adapter's optional `transcribe?()` factory. A non-STT model id (`openai.transcribe({ name: "gpt-4o" })`) throws `InvalidRequestError` **at construction** — fail fast, like the speech/embedder guards.
+`TranscriptionModelContract` mirrors `SpeechModelContract` — a peer primitive produced by the adapter's optional `transcribe?()` factory. The model id is **not validated locally** — a non-STT id (`openai.transcribe({ name: "gpt-4o" })`) constructs fine and is forwarded to the provider as given, so it fails as a typed provider error on `result.error`, never as a local throw at construction.
 
 ## The `AudioInput` shape + the two builders
 
@@ -28363,7 +28572,7 @@ const { data } = await ai.image({ model: gpt, prompt: "a red bicycle", size: "10
 
 - `gpt-image-*` is token-metered (price with `{ input, output }`) and always returns base64 bytes — the adapter never sends `response_format` (the API rejects it).
 - `dall-e-*` is per-image (price with `{ perImage }` / `perImageBySize`); defaults to base64, opt into a hosted URL with `options: { responseFormat: "url" }`.
-- A non-image model id (`openai.image({ name: "gpt-4o" })`) throws `InvalidRequestError` at construction. The verb surface (envelope, options, cost-truth) lives in [`@warlock.js/ai/generate-images/SKILL.md`](@warlock.js/ai/generate-images/SKILL.md).
+- The model id is **not validated locally** — `openai.image({ name })` passes it straight to `client.images.generate`, so an id OpenAI does not serve fails at the provider (wrapped into the typed `AIError` hierarchy), not at construction. Same for `openai.speech({ name })` and `openai.transcribe({ name })`. There are no model-id helpers to consult: `isOpenAIImageModel()`, `OPENAI_IMAGE_MODEL_PREFIXES`, `isOpenAISpeechModel()` and `isOpenAITranscriptionModel()` were all removed in 4.13.0 — branch on your own id list if you need one. The verb surface (envelope, options, cost-truth) lives in [`@warlock.js/ai/generate-images/SKILL.md`](@warlock.js/ai/generate-images/SKILL.md).
 
 ## Streaming
 
@@ -28687,7 +28896,7 @@ Anthropic ships no first-party embeddings API, so `AnthropicSDK` intentionally d
 
 ---
 name: setup-google
-description: 'Wire @warlock.js/ai-google — new GoogleSDK({apiKey} | {vertexai, project, location}) for Gemini API + Vertex AI. generateContent / embedContent + thoughtSignature round-trip for thinking models, batched embeddings. .model({name, vision?, reasoning?, audio?, pdf?}) with cost-truth capabilities (PDF + audio input map to Gemini inlineData), .image({name, pricing?}) for Imagen (imagen-*) image generation via ai.image, extended thinking via options.reasoning → thinkingConfig.thinkingBudget, usage reasoningTokens (thoughtsTokenCount) / cachedTokens (cachedContentTokenCount). Triggers: `GoogleSDK`, `google.model`, `google.embedder`, `google.image`, `imagen`, `generateImages`, `ai.image`, `inlineData`, `pdf input`, `audio input`, `thoughtSignature`, `responseJsonSchema`, `vertexai`, `reasoning`, `thinkingConfig`, `thinkingBudget`, `thoughtsTokenCount`, `reasoningTokens`, `cachedTokens`, `promptCaching`, `cacheControl`; "use gemini", "wire Vertex AI", "gemini embeddings", "gemini thinking tool calls", "gemini 2.5 thinking budget", "gemini cached content cost", "generate images with imagen", "send a pdf / audio to gemini"; import `import { GoogleSDK } from "@warlock.js/ai-google"`. Skip: the ai.image verb surface — `@warlock.js/ai/generate-images/SKILL.md`; agent loop `@warlock.js/ai/run-ai-agent/SKILL.md`; provider picking `@warlock.js/ai/pick-ai-provider/SKILL.md`; embedder usage `@warlock.js/ai/embed-text/SKILL.md`; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-ollama`; raw `@google/genai`, `@google-cloud/vertexai`, Vercel `@ai-sdk/google`.'
+description: 'Wire @warlock.js/ai-google — new GoogleSDK({apiKey} | {vertexai, project, location}) for Gemini API + Vertex AI. generateContent / embedContent + thoughtSignature round-trip for thinking models, batched embeddings. .model({name, vision?, reasoning?, audio?, pdf?}) with cost-truth capabilities (PDF + audio input map to Gemini inlineData), .image({name, pricing?}) for image generation via ai.image — the id picks the transport: gemini-* → generateContent + responseModalities IMAGE (usage passed through; generateImages is deprecated by Google), everything else → generateImages (Imagen, per-image, zero usage) — extended thinking via options.reasoning → thinkingConfig.thinkingBudget, usage reasoningTokens (thoughtsTokenCount) / cachedTokens (cachedContentTokenCount). Triggers: `GoogleSDK`, `google.model`, `google.embedder`, `google.image`, `imagen`, `generateImages`, `gemini image`, `nano banana`, `responseModalities`, `imageConfig`, `ai.image`, `inlineData`, `pdf input`, `audio input`, `thoughtSignature`, `responseJsonSchema`, `vertexai`, `reasoning`, `thinkingConfig`, `thinkingBudget`, `thoughtsTokenCount`, `reasoningTokens`, `cachedTokens`, `promptCaching`, `cacheControl`; "use gemini", "wire Vertex AI", "gemini embeddings", "gemini thinking tool calls", "gemini 2.5 thinking budget", "gemini cached content cost", "generate images with imagen", "generate an image with gemini", "gemini image model 404 not supported for predict", "send a pdf / audio to gemini"; import `import { GoogleSDK } from "@warlock.js/ai-google"`. Skip: the ai.image verb surface — `@warlock.js/ai/generate-images/SKILL.md`; agent loop `@warlock.js/ai/run-ai-agent/SKILL.md`; provider picking `@warlock.js/ai/pick-ai-provider/SKILL.md`; embedder usage `@warlock.js/ai/embed-text/SKILL.md`; siblings `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-ollama`; raw `@google/genai`, `@google-cloud/vertexai`, Vercel `@ai-sdk/google`.'
 ---
 
 # `@warlock.js/ai-google`
@@ -28766,9 +28975,47 @@ Gemini's multimodal input is **media-agnostic** — every binary modality maps t
 
 PDF and audio reach the wire only when the model declares the matching capability (inferred for the multimodal Gemini families above) — so capability ≡ behavior.
 
-## Image generation (Imagen)
+## Image generation — two transports
 
-`google.image({ name })` returns an `ImageModelContract` (Imagen, via `ai.models.generateImages`) for the `ai.image()` verb:
+`google.image({ name })` returns an `ImageModelContract` for the `ai.image()` verb. **The model id picks the transport:**
+
+| Model id | Transport | Usage it can report |
+| --- | --- | --- |
+| `gemini-*` (e.g. `gemini-3.1-flash-lite-image`) | `ai.models.generateContent` with `responseModalities` including `"IMAGE"` | whatever `usageMetadata` Google attaches — price with `{ input, output }` |
+| anything else (`imagen-*`, unknown ids) | `ai.models.generateImages` (Imagen) | none, always zero — price with `{ perImage }` |
+
+A `gemini-` id sent to `generateImages` comes back `404 … is not supported for predict` (observed verbatim from Google) — `generateImages` routes to `{model}:predict`. `generateContent` is the SDK's own named replacement: its runtime deprecation notice for `generateImages` says *"Please use the generateContent method with image models instead"*. Routing on the id is what lets both families go through one factory. A leading `models/` resource prefix is tolerated.
+
+This is **routing, not validation** — no id is refused locally. An id matching neither family takes the `generateImages` route (the pre-existing one) and fails at Google as a typed provider error, not with a local throw.
+
+> ⚠ **No automated test here calls Google**, so the evidence is two-tier. **Measured in this repo:** a `gemini-*` image id that 404s on `predict` reached the model on `generateContent` and returned a **quota error (HTTP 429)** — the endpoint accepts the id. **Reported by the maintainer:** once billing was enabled on the project, an image came back end-to-end through a locally linked build. What remains unknown is **token reporting** — no `usageMetadata` from a successful image call has been seen yet.
+
+### Gemini (`generateContent`)
+
+```ts
+const gemini = google.image({
+  name: "gemini-3.1-flash-lite-image",
+  pricing: { input: 0.3, output: 30 },     // token-metered
+});
+
+const { data, error, usage } = await ai.image({
+  model: gemini,
+  prompt: "a red bicycle on a white background",
+  aspectRatio: "16:9",                     // → config.imageConfig.aspectRatio
+  options: { imageSize: "2K", personGeneration: "ALLOW_ADULT" }, // → imageConfig passthroughs
+});
+```
+
+- Requests `responseModalities: ["TEXT", "IMAGE"]` by default; pass `options.responseModalities` to replace the list verbatim. Which pairing a given model requires is not established here.
+- Inline image parts that **do** come back (`inlineData.data` + `mimeType`) map to the **same** `GeneratedImage` shape Imagen produces — `{ type: "base64", base64, mediaType }`, defaulting to `image/png` when the part declares no mime type. Callers see one shape regardless of transport.
+- **Token usage is passed through, not zeroed.** Any `usageMetadata` Google attaches is mapped by the same rules as `model.complete()` (`promptTokenCount` → `input`, `candidatesTokenCount` → `output`, `cachedContentTokenCount` → `cachedTokens`, `thoughtsTokenCount` → `reasoningTokens`); an absent block collapses to `{ 0, 0, 0 }`. That is the difference from Imagen, which is always zero. Whether these models in fact report tokens is unconfirmed — price with `{ input, output }` and check the first live `usage`.
+- **A response with no image part is never a silent empty success:**
+  - `promptFeedback.blockReason`, or a safety/policy `finishReason` (`SAFETY`, `IMAGE_SAFETY`, `PROHIBITED_CONTENT`, `IMAGE_PROHIBITED_CONTENT`, `RECITATION`, `IMAGE_RECITATION`, `BLOCKLIST`, `SPII`) → `ContentFilterError` carrying the reason.
+  - text only (the model answered instead of drawing) → `ProviderError` **quoting the text** it returned.
+  - nothing usable → `ProviderError` naming the part count and finish reason (e.g. `NO_IMAGE`).
+- `count`, `negativePrompt`, and `format` are **not** forwarded on this path — `GenerateContentConfig` / `ImageConfig` expose no equivalent (`ImageConfig.outputMimeType` is documented "not supported in Gemini API"). Fold those intentions into the prompt. Every inline image part the model does return is mapped, so a multi-image answer still comes back whole.
+
+### Imagen (`generateImages`)
 
 ```ts
 const imagen = google.image({ name: "imagen-4.0-generate-001", pricing: { perImage: 0.04 } });
@@ -28782,9 +29029,15 @@ const { data, error } = await ai.image({
 });
 ```
 
-- Imagen is **per-image-metered** (price with `{ perImage }`) and returns base64 bytes — no hosted URL, no token usage.
-- When every candidate is safety-filtered, the run surfaces a typed `ContentFilterError` on `result.error`.
-- A non-Imagen model id (`google.image({ name: "gemini-2.5-flash" })`) throws `InvalidRequestError` at construction — Gemini's *native* image output (`gemini-*-image` via `generateContent`) is a separate surface, not routed here. The verb surface lives in [`@warlock.js/ai/generate-images/SKILL.md`](@warlock.js/ai/generate-images/SKILL.md).
+- Imagen is **per-image-metered** (price with `{ perImage }`) and returns base64 bytes — no hosted URL, and `usage` is an honest `{ input: 0, output: 0, total: 0 }`.
+- When every candidate is safety-filtered (`raiFilteredReason`), the run surfaces a typed `ContentFilterError` on `result.error`.
+- ⏳ **This path is on a clock.** `@google/genai` warns at runtime: *"The generateImages method is deprecated and will be removed in the next major release (not before Jan. 1 2027). Please use the generateContent method with image models instead."* This package depends on `@google/genai` `^2.17.1`, which does emit that warning. Nothing breaks today, but new work should prefer a `gemini-*` id.
+
+### Not implemented: the `interactions` API
+
+`@google/genai` ≥ 2.17 adds `ai.interactions.create({ model, input, response_format: { type: "image", … } })`, whose images arrive as `interaction.output_image.data` and whose usage is a different snake_case shape (`total_input_tokens` …). It is reachable from the `^2.17.1` this package depends on, but the adapter does **not** use it: it would need its own usage mapper and error surface, and its request type already marks `response_modalities` / `response_mime_type` deprecated. If it is added later it will be an **opt-in config flag**, never id routing.
+
+The verb surface lives in [`@warlock.js/ai/generate-images/SKILL.md`](@warlock.js/ai/generate-images/SKILL.md).
 
 ## Streaming
 
