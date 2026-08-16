@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BrokerDriverContract } from "../src/contracts";
 import { EventMessage } from "../src/message-managers/event-message";
 import type { EventConsumerClass } from "../src/message-managers/types";
@@ -27,6 +27,14 @@ const { brokerRegistry } = await import("../src/communicators");
 
 describe("connectToBroker", () => {
   let connection: FakeConnection;
+
+  // `connectToBroker` dynamically imports the rabbitmq driver on first use,
+  // which drags in `@warlock.js/seal` and `@warlock.js/logger` as raw TS source
+  // (see vitest.config.ts aliases). Pay that transform cost here instead of
+  // inside the first timed test body.
+  beforeAll(async () => {
+    await import("../src/drivers/rabbitmq/rabbitmq-driver");
+  });
 
   beforeEach(() => {
     connection = new FakeConnection();

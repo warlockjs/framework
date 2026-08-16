@@ -18,14 +18,21 @@ import { RabbitMQChannel } from "./rabbitmq-channel";
 // ============================================================
 
 /**
- * Cached amqplib module (loaded once, reused)
+ * Shape of the lazily-imported amqplib module
  */
-let amqplibModule: typeof import("amqplib");
+type AmqplibModule = typeof import("amqplib");
 
 /**
- * Module availability flag
+ * The single amqplib load, shared by every caller.
+ *
+ * Memoized as a promise rather than as a resolved value so the loader stays
+ * idempotent: without it, two callers arriving before the first `import()`
+ * settles would each start their own load and the last writer would win, so a
+ * caller could end up observing a module instance it never awaited.
+ *
+ * Resolves to `undefined` when amqplib is not installed.
  */
-let isModuleExists: boolean | null = null;
+let amqplibModulePromise: Promise<AmqplibModule | undefined> | undefined;
 
 /**
  * Installation instructions for amqplib
@@ -44,19 +51,17 @@ Or manually:
 `.trim();
 
 /**
- * Load amqplib module
+ * Load amqplib, reusing the single shared load for every caller.
+ *
+ * @returns The amqplib module, or `undefined` when it is not installed.
  */
-async function loadAmqplibModule() {
-  try {
-    amqplibModule = await import("amqplib");
-    isModuleExists = true;
-  } catch {
-    isModuleExists = false;
+function loadAmqplibModule(): Promise<AmqplibModule | undefined> {
+  if (!amqplibModulePromise) {
+    amqplibModulePromise = import("amqplib").catch(() => undefined);
   }
-}
 
-// Kick off eager loading immediately
-loadAmqplibModule();
+  return amqplibModulePromise;
+}
 
 // ============================================================
 // RabbitMQ Driver
@@ -167,17 +172,10 @@ export class RabbitMQDriver implements BrokerDriverContract {
    * Connect to RabbitMQ
    */
   public async connect(): Promise<void> {
-    // Check if amqplib is installed
-    if (isModuleExists === false) {
-      throw new Error(`amqplib is not installed.\n\n${AMQPLIB_INSTALL_INSTRUCTIONS}`);
-    }
+    const amqplib = await loadAmqplibModule();
 
-    // Wait for module to load if still loading
-    if (isModuleExists === null) {
-      await loadAmqplibModule();
-      if (!isModuleExists) {
-        throw new Error(`amqplib is not installed.\n\n${AMQPLIB_INSTALL_INSTRUCTIONS}`);
-      }
+    if (!amqplib) {
+      throw new Error(`amqplib is not installed.\n\n${AMQPLIB_INSTALL_INSTRUCTIONS}`);
     }
 
     try {
@@ -193,7 +191,7 @@ export class RabbitMQDriver implements BrokerDriverContract {
       };
 
       // Connect using cached module
-      this.connection = await amqplibModule.connect(url, connectOptions);
+      this.connection = await amqplib.connect(url, connectOptions);
 
       // Create channel
       this.amqpChannel = await this.connection.createChannel();
