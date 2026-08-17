@@ -30,8 +30,9 @@ export type IpFilterOptions = {
  * the request is rejected with 403.
  *
  * Reads the client IP via `request.detectIp()`, which honors `X-Real-IP` and
- * `X-Forwarded-For` (Fastify is started with `trustProxy: true`). Make sure
- * your upstream proxy is trustworthy — `X-Forwarded-For` is client-settable.
+ * `X-Forwarded-For` only when `http.trustProxy` is set — otherwise the socket
+ * peer address is used, since both headers are client-settable. When opting
+ * in, make sure your upstream proxy overwrites the forwarding headers.
  *
  * @example
  * import { middleware } from "@warlock.js/core";

@@ -1,5 +1,6 @@
+import config from "@mongez/config";
 import type { FastifyRequest } from "fastify";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { Request } from "../../../src/http/request";
 import {
   buildIdempotencyCacheKey,
@@ -109,12 +110,31 @@ describe("buildIdempotencyCacheKey", () => {
     expect(buildIdempotencyCacheKey(request, "KEY")).toBe("idem:anonymous:203.0.113.9:KEY");
   });
 
-  it("prefers X-Forwarded-For over the peer IP for the anonymous scope", () => {
+  it("ignores X-Forwarded-For for the anonymous scope unless http.trustProxy is set", () => {
     const request = makeRequest({
       headers: { "x-forwarded-for": "198.51.100.7" },
       ip: "10.0.0.1",
     });
 
-    expect(buildIdempotencyCacheKey(request, "KEY")).toBe("idem:anonymous:198.51.100.7:KEY");
+    expect(buildIdempotencyCacheKey(request, "KEY")).toBe("idem:anonymous:10.0.0.1:KEY");
+  });
+
+  describe("with http.trustProxy enabled", () => {
+    afterEach(() => {
+      // `config.set(key, undefined)` stores `null` rather than unsetting, so
+      // reset by deleting the key.
+      delete config.list()?.http?.trustProxy;
+    });
+
+    it("prefers X-Forwarded-For over the peer IP for the anonymous scope", () => {
+      config.set("http.trustProxy", true);
+
+      const request = makeRequest({
+        headers: { "x-forwarded-for": "198.51.100.7" },
+        ip: "10.0.0.1",
+      });
+
+      expect(buildIdempotencyCacheKey(request, "KEY")).toBe("idem:anonymous:198.51.100.7:KEY");
+    });
   });
 });

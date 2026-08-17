@@ -1013,8 +1013,16 @@ export class Request<RequestValidation = any> {
   }
 
   /**
-   * Best-effort real client IP — checks `X-Real-IP` and `X-Forwarded-For`
-   * headers first, falls back to `baseRequest.ip` when neither is present.
+   * Best-effort real client IP — behind a trusted proxy, checks `X-Real-IP`
+   * and `X-Forwarded-For` headers first, falls back to `baseRequest.ip` when
+   * neither is present.
+   *
+   * The forwarding headers are honoured ONLY when `http.trustProxy` is set:
+   * both are client-settable, so on a deployment without a trusted edge that
+   * overwrites them, any client could spoof its IP and bypass everything
+   * keyed on it (ip-filter allowlists, rate-limit buckets, idempotency
+   * scoping). Without the opt-in, this returns `baseRequest.ip` — the socket
+   * peer address — which cannot be forged.
    *
    * For a multi-hop `X-Forwarded-For` (`client, proxy1, proxy2`) only the
    * FIRST entry is returned (the original client), comma-split and trimmed.
@@ -1022,17 +1030,16 @@ export class Request<RequestValidation = any> {
    * would key off the whole header string and break behind chained proxies.
    *
    * **Prefer this over `request.ip` for any caller behind a proxy** (load
-   * balancer, CDN, reverse proxy, k8s ingress). Only trust the result as
-   * far as you trust the upstream proxy chain — `X-Forwarded-For` is
-   * client-settable, so the leftmost entry is spoofable by the immediate
-   * client when the request did NOT pass through a trusted edge that
-   * appends/overwrites the header. Verify the request came through your
-   * trusted edge before treating the value as authoritative.
+   * balancer, CDN, reverse proxy, k8s ingress) — and make sure that proxy
+   * appends/overwrites the forwarding headers, since `http.trustProxy`
+   * trusts them wholesale.
    */
   public detectIp() {
-    // as the server maybe used behind a proxy
-    // then we need to check first if there is a forwarded ip
-    // check for the real-ip header
+    // Forwarding headers are attacker-controlled unless a trusted edge
+    // overwrites them — same opt-in Fastify's own `trustProxy` gates on.
+    if (!config.get("http.trustProxy", false)) {
+      return this.baseRequest.ip;
+    }
 
     const realIp = this.header("x-real-ip");
 

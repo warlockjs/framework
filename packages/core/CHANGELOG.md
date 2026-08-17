@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 4.15.0
+
+### Security
+
+- **`request.detectIp()` no longer trusts `X-Real-IP` / `X-Forwarded-For` unless `http.trustProxy` is set.** Both headers are client-settable, and `detectIp()` honoured them unconditionally — bypassing the `trustProxy` opt-in the Fastify server itself is configured with. Any client could therefore spoof its IP to everything keyed on `detectIp()`: `ipFilter` allowlists/denylists, the default rate-limit bucket key, and anonymous idempotency scoping. Without the opt-in, `detectIp()` (and its `realIp` alias) now returns `baseRequest.ip` — the socket peer address, which cannot be forged
+
+  ⚠ **If your app runs behind a proxy and relied on `detectIp()` reading the forwarding headers without setting `http.trustProxy`, set `http.trustProxy: true`** (or a Fastify `trustProxy` value matching your edge). With the flag set, behaviour is unchanged: `X-Real-IP` first, then the leftmost `X-Forwarded-For` hop, then the peer address. Only enable it when your edge overwrites those headers — the flag trusts them wholesale
+
 ## 4.14.0
 
 ### ⚠ Upgrading from 4.13.0 — read this first
