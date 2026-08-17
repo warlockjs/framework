@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { realpath } from "node:fs/promises";
 import { platform } from "node:process";
 import { fs } from "@warlock.js/fs";
+import { tokenizeCommand } from "../policy/tokenize-command";
 import type {
   WorkspaceBackend,
   WorkspaceBackendExecOptions,
@@ -43,11 +44,11 @@ function pushCapped(chunks: Buffer[], total: number, chunk: Buffer): number {
 /**
  * Force-kill a spawned command and its entire process tree.
  *
- * With `shell: true` the command runs under an intermediary shell
- * (`cmd.exe` on Windows, `/bin/sh` elsewhere), so signalling the direct
- * child only reaps the shell — a long-running grandchild (e.g. `node`)
- * would survive, leaving the `exec` promise unsettled. We therefore kill
- * the whole group:
+ * The direct child may have grandchildren (on Windows it is the `cmd.exe`
+ * wrapper around a batch shim; anywhere, an allowed `npm`/`node` can spawn
+ * further processes), so signalling the direct child alone could leave a
+ * long-running grandchild alive and the `exec` promise unsettled. We
+ * therefore kill the whole group:
  *   - **Windows** — `taskkill /T /F` walks and terminates the PID's tree.
  *   - **POSIX** — the child is spawned `detached`, becoming its own process
  *     group leader, so `process.kill(-pid)` SIGKILLs the group.
@@ -71,6 +72,42 @@ function killTree(pid: number | undefined, child: { kill(signal: NodeJS.Signals)
     // The group may already be gone; fall back to the direct child.
     child.kill("SIGKILL");
   }
+}
+
+/**
+ * Argument bytes `cmd.exe` cannot carry safely even inside double quotes:
+ * an embedded quote breaks out of the quoted span, `%` triggers variable
+ * expansion regardless of quoting, and newlines end the command line. An
+ * argv containing any of these is refused rather than risked (the
+ * BatBadBut / CVE-2024-24576 class of `cmd.exe` argument smuggling).
+ */
+const WIN32_UNSAFE_ARGUMENT = /["%\r\n]/;
+
+/**
+ * Build the `cmd.exe` invocation that runs an argv on Windows. Batch shims
+ * (`npm.cmd`, `npx.cmd`, …) cannot be spawned directly without a shell
+ * (Node rejects them since CVE-2024-27980), so the argv is run through
+ * `cmd.exe /d /s /c` with every element individually double-quoted —
+ * quoted spans are literal to cmd's parser, so pipes/ampersands inside an
+ * argument stay argument data. Returns `null` when an element contains a
+ * byte cmd cannot quote safely (see {@link WIN32_UNSAFE_ARGUMENT}).
+ *
+ * The caller must spawn with `windowsVerbatimArguments: true` so Node does
+ * not re-quote the already-quoted command line.
+ */
+function toWin32CmdInvocation(
+  argv: string[],
+): { file: string; args: string[] } | null {
+  if (argv.some((element) => WIN32_UNSAFE_ARGUMENT.test(element))) {
+    return null;
+  }
+
+  const commandLine = argv.map((element) => `"${element}"`).join(" ");
+
+  return {
+    file: process.env.ComSpec ?? "cmd.exe",
+    args: ["/d", "/s", "/c", `"${commandLine}"`],
+  };
 }
 
 /**
@@ -152,30 +189,75 @@ class LocalBackend implements WorkspaceBackend {
   }
 
   /**
-   * Run a command and capture its outcome. The command line is executed
-   * through the platform shell (`shell: true`) so pipes/operators behave as a
-   * caller would expect; `cwd`, `env`, and the timeout are taken verbatim from
-   * the ops layer (the environment is NOT merged with `process.env`). On
-   * timeout the process is SIGKILLed and `timedOut` is set. `stdout`/`stderr`
-   * are captured and byte-capped per {@link MAX_STREAM_BYTES}.
+   * Run a command and capture its outcome. The command line is tokenized
+   * into an argv (quotes respected, NO shell semantics — see
+   * `tokenizeCommand`) and spawned **without a shell**, so metacharacters
+   * like `;`, `&&`, `|`, backticks, and `$()` can never chain extra
+   * commands past the ops layer's allowlist; a command they appear
+   * unquoted in is refused with exit code 127. On Windows the argv runs
+   * through a `cmd.exe /d /s /c` wrapper (batch shims like `npm.cmd`
+   * cannot be spawned shell-less) with every element individually quoted.
+   * `cwd`, `env`, and the timeout are taken verbatim from the ops layer
+   * (the environment is NOT merged with `process.env`). On timeout the
+   * process is SIGKILLed and `timedOut` is set. `stdout`/`stderr` are
+   * captured and byte-capped per {@link MAX_STREAM_BYTES}.
    *
-   * Never rejects for a non-zero exit, a missing executable, or a timeout —
-   * those are reported through the resolved {@link WorkspaceBackendExecResult}
-   * so the ops layer can surface them as tool-error data.
+   * Never rejects for a non-zero exit, a missing executable, a refused
+   * command line, or a timeout — those are reported through the resolved
+   * {@link WorkspaceBackendExecResult} so the ops layer can surface them
+   * as tool-error data.
    */
   public exec(
     command: string,
     opts: WorkspaceBackendExecOptions = {},
   ): Promise<WorkspaceBackendExecResult> {
     return new Promise<WorkspaceBackendExecResult>((resolve) => {
-      const child = spawn(command, {
+      const refuse = (stderr: string): void =>
+        resolve({ exitCode: 127, stdout: "", stderr, timedOut: false });
+
+      const argv = tokenizeCommand(command);
+
+      if (argv === null) {
+        refuse(
+          "Command was not executed: it is empty, has unbalanced quotes, or " +
+            "contains unquoted shell metacharacters (;, &, |, `, $, <, >, " +
+            "parentheses). Commands run without a shell — pass metacharacters " +
+            "inside quotes as literal arguments, or run one command at a time.",
+        );
+
+        return;
+      }
+
+      let file = argv[0];
+      let args = argv.slice(1);
+      let windowsVerbatimArguments = false;
+
+      if (platform === "win32") {
+        const invocation = toWin32CmdInvocation(argv);
+
+        if (invocation === null) {
+          refuse(
+            'Command was not executed: on Windows, arguments containing ", %, ' +
+              "or newlines cannot be passed to cmd.exe safely.",
+          );
+
+          return;
+        }
+
+        file = invocation.file;
+        args = invocation.args;
+        windowsVerbatimArguments = true;
+      }
+
+      const child = spawn(file, args, {
         cwd: opts.cwd,
         env: opts.env,
-        shell: true,
+        shell: false,
         windowsHide: true,
+        windowsVerbatimArguments,
         // POSIX: own process group so a timeout SIGKILL reaps the whole
-        // shell tree, not just the shell. Harmless on Windows (ignored;
-        // there we tree-kill via taskkill instead).
+        // process tree, not just the direct child. Harmless on Windows
+        // (ignored; there we tree-kill via taskkill instead).
         detached: platform !== "win32",
       });
 
@@ -221,8 +303,8 @@ class LocalBackend implements WorkspaceBackend {
         stderrBytes = pushCapped(stderrChunks, stderrBytes, chunk);
       });
 
-      // A spawn failure (e.g. the shell itself is missing) surfaces as an
-      // error event with no exit; report it as a conventional shell
+      // A spawn failure (e.g. the executable cannot be found) surfaces as
+      // an error event with no exit; report it as a conventional
       // "command not found" exit code rather than rejecting.
       child.on("error", () => {
         settle(127);

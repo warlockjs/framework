@@ -187,4 +187,53 @@ describe("createLocalBackend", () => {
     // otherwise make a raw string compare flaky.
     expect(await backend.realpath(result.stdout)).toBe(await backend.realpath(sub));
   });
+
+  it("should refuse to exec a command chaining a second command with `;` — nothing runs", async () => {
+    const backend = createLocalBackend();
+    const marker = join(root, "injected.txt").replace(/\\/g, "/");
+
+    const result = await backend.exec(
+      `node -e "process.stdout.write('safe')" ; node -e "require('fs').writeFileSync('${marker}', 'pwned')"`,
+      { cwd: root, env: execEnv },
+    );
+
+    // Refused outright: neither the allowed-looking prefix nor the
+    // injected suffix executed, and no shell ever saw the string.
+    expect(result.exitCode).toBe(127);
+    expect(result.stdout).toBe("");
+    expect(result.timedOut).toBe(false);
+    expect(await backend.exists(join(root, "injected.txt"))).toBe(false);
+  });
+
+  it("should refuse every unquoted shell metacharacter (&&, |, backtick, $(), >)", async () => {
+    const backend = createLocalBackend();
+    const payloads = [
+      "node -v && node -v",
+      "node -v | node -v",
+      "node -v `node -v`",
+      "node -v $(node -v)",
+      `node -v > ${join(root, "redirected.txt").replace(/\\/g, "/")}`,
+    ];
+
+    for (const command of payloads) {
+      const result = await backend.exec(command, { cwd: root, env: execEnv });
+
+      expect(result.exitCode).toBe(127);
+      expect(result.stdout).toBe("");
+    }
+
+    expect(await backend.exists(join(root, "redirected.txt"))).toBe(false);
+  });
+
+  it("should pass quoted metacharacters through as literal argument data, not shell syntax", async () => {
+    const backend = createLocalBackend();
+
+    const result = await backend.exec(
+      'node -e "process.stdout.write(process.argv[1])" "a;b|c"',
+      { cwd: root, env: execEnv },
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe("a;b|c");
+  });
 });

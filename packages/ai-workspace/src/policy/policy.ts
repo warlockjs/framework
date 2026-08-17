@@ -1,6 +1,7 @@
 import path from "node:path";
 import { realpath } from "node:fs/promises";
 import { WorkspacePolicyError } from "../errors";
+import { tokenizeCommand } from "./tokenize-command";
 import type { WorkspacePolicy } from "../contracts";
 
 /**
@@ -209,14 +210,12 @@ export async function resolveInJail(
 }
 
 /**
- * Extract the leading executable basename from a command line — the
- * token the shell allow/deny policy is keyed on. `"npm run build"` →
- * `"npm"`; `"/usr/bin/node app.js"` → `"node"`; `"node.exe app"` →
- * `"node"` (the `.exe`/`.cmd`/`.bat` Windows extension is stripped).
+ * Reduce an argv's first element to the basename the allow/deny policy is
+ * keyed on. `"npm"` → `"npm"`; `"/usr/bin/node"` → `"node"`; `"node.exe"`
+ * → `"node"` (the `.exe`/`.cmd`/`.bat`/`.com` Windows extension is
+ * stripped).
  */
-function leadingExecutable(command: string): string {
-  const trimmed = command.trim();
-  const firstToken = trimmed.split(/\s+/)[0] ?? "";
+function executableBasename(firstToken: string): string {
   const base = path.basename(firstToken);
 
   return base.replace(/\.(exe|cmd|bat|com)$/i, "");
@@ -225,8 +224,14 @@ function leadingExecutable(command: string): string {
 /**
  * Whether a shell command is permitted by the policy's `shell` sub-policy.
  *
- * The command's leading executable basename is matched against
- * `shell.deny` then `shell.allow`. **Deny always wins.** When
+ * The command is first tokenized via {@link tokenizeCommand} — a command
+ * that cannot be represented as a single argv (unbalanced quotes, or
+ * unquoted shell metacharacters such as `;`, `&&`, `|`, backticks, `$`,
+ * redirection) is denied outright. The backend spawns the argv directly
+ * with no shell, so such a command has no meaning here — and unquoted
+ * metacharacters were exactly how an injected command chain used to ride
+ * past the allowlist. The resolved `argv[0]` basename is then matched
+ * against `shell.deny` then `shell.allow`. **Deny always wins.** When
  * `shell.allow` is set, the executable MUST appear in it (fail-closed
  * allowlist); when `allow` is absent/empty, any non-denied command is
  * permitted. An absent `shell` block means no command may run at all.
@@ -238,6 +243,7 @@ function leadingExecutable(command: string): string {
  * @example
  * isCommandAllowed({ cwd, shell: { allow: ["npm"] } }, "npm test"); // true
  * isCommandAllowed({ cwd, shell: { allow: ["npm"] } }, "rm -rf /"); // false
+ * isCommandAllowed({ cwd, shell: { allow: ["npm"] } }, "npm test; rm -rf /"); // false
  */
 export function isCommandAllowed(
   policy: WorkspacePolicy,
@@ -250,7 +256,13 @@ export function isCommandAllowed(
     return false;
   }
 
-  const executable = leadingExecutable(command);
+  const argv = tokenizeCommand(command);
+
+  if (argv === null) {
+    return false;
+  }
+
+  const executable = executableBasename(argv[0]);
 
   if (executable === "") {
     return false;

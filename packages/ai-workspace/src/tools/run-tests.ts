@@ -14,7 +14,10 @@ const DEFAULT_TEST_COMMAND = "npm test";
 
 /**
  * Hand-rolled Standard Schema for {@link RunTestsInput}. `pattern` is the
- * only field and is optional; when present it must be a string. Validation
+ * only field and is optional; when present it must be a string without
+ * double quotes or newlines — the pattern is forwarded to the runner as a
+ * single double-quoted argument, and those characters would break out of
+ * the quoting (i.e. inject extra arguments or commands). Validation
  * happens without a runtime schema dependency, mirroring the wider tool
  * layer.
  */
@@ -39,6 +42,17 @@ const runTestsInputSchema: StandardSchemaV1<RunTestsInput> = {
         return { issues: [{ message: "pattern must be a string", path: ["pattern"] }] };
       }
 
+      if (typeof candidate.pattern === "string" && /["\r\n]/.test(candidate.pattern)) {
+        return {
+          issues: [
+            {
+              message: "pattern must not contain double quotes or newlines",
+              path: ["pattern"],
+            },
+          ],
+        };
+      }
+
       const result: RunTestsInput = {};
 
       if (candidate.pattern !== undefined) {
@@ -56,7 +70,8 @@ export interface MakeRunTestsToolOptions {
   name?: string;
   /**
    * The base test command to run (default `"npm test"`). When the model
-   * supplies a `pattern`, it is appended to this command.
+   * supplies a `pattern`, it is appended to this command as a single
+   * quoted argument.
    */
   command?: string;
 }
@@ -68,8 +83,10 @@ export interface MakeRunTestsToolOptions {
  *
  * The base command defaults to `"npm test"` and can be overridden via
  * `options.command`. When the model passes a `pattern`, it is appended to
- * the command as a path/suite filter forwarded to the runner (e.g.
- * `"npm test src/cart"`). Like `run_shell`, the resolved command's
+ * the command as a **single quoted argument** — a path/suite filter the
+ * tokenizer hands to the runner as one argv element (e.g.
+ * `npm test "src/cart"`), so shell metacharacters inside it are literal
+ * data, never a second command. Like `run_shell`, the resolved command's
  * executable is gated by the shell policy — a denial surfaces in the
  * result's `error` field — and a non-zero exit (failing tests) comes back
  * as `data` for the agent to read and fix.
@@ -98,7 +115,10 @@ export function makeRunTestsTool(
       input.pattern ? `Running tests matching "${input.pattern}"` : "Running tests",
     input: runTestsInputSchema,
     execute: (input) => {
-      const command = input.pattern ? `${baseCommand} ${input.pattern}` : baseCommand;
+      // The pattern rides as ONE double-quoted token (quotes/newlines are
+      // rejected by the schema), so it reaches the runner as a single argv
+      // element and can never smuggle in additional commands or arguments.
+      const command = input.pattern ? `${baseCommand} "${input.pattern}"` : baseCommand;
 
       return ops.exec(command);
     },
