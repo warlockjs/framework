@@ -1,4 +1,9 @@
-import { type ToolContract, tool } from "@warlock.js/ai";
+import {
+  guardedFetch,
+  OutboundPolicyError,
+  tool,
+  type ToolContract,
+} from "@warlock.js/ai";
 import type {
   HttpMethod,
   HttpRequestInput,
@@ -159,8 +164,16 @@ function isJsonContentType(contentType: string | undefined): boolean {
  * - **Method allowlist** — `allowMethods` (default `["GET"]`). A method
  *   outside the list is rejected with a typed
  *   {@link HttpPolicyError} (`type: "method-not-allowed"`).
+ * - **Private-network deny (default).** The request — and every redirect
+ *   hop — goes through the framework's `guardedFetch` outbound policy,
+ *   which refuses private / loopback / link-local / cloud-metadata
+ *   addresses (and hostnames resolving to them) unless
+ *   `allowPrivateNetwork: true` is set. This applies even when
+ *   `allowHosts` is not configured, so a bare `ai.tools.http()` is not
+ *   an SSRF primitive (`type: "host-not-allowed"`).
  * - **Host allowlist** — when `allowHosts` is set, any other host is
- *   rejected (`type: "host-not-allowed"`), an SSRF guardrail.
+ *   rejected (`type: "host-not-allowed"`), an SSRF guardrail; redirect
+ *   targets are held to the same allowlist.
  * - **`baseUrl` join** — when configured, the model passes a path that
  *   is resolved against `baseUrl`; otherwise it must pass an absolute
  *   `http(s)` URL. An unresolvable URL is rejected
@@ -204,6 +217,7 @@ export function httpRequestTool(
   const allowMethods = options.allowMethods ?? ["GET"];
   const allowedMethodSet = new Set<HttpMethod>(allowMethods);
   const allowHostSet = options.allowHosts ? new Set(options.allowHosts) : undefined;
+  const allowPrivateNetwork = options.allowPrivateNetwork ?? false;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
   const staticHeaders = options.headers;
@@ -268,27 +282,32 @@ export function httpRequestTool(
         }
       }
 
-      // 6. Bound the call by timeout, chained to the caller's signal.
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-      const onAbort = () => controller.abort();
-
-      if (ctx?.signal) {
-        if (ctx.signal.aborted) {
-          controller.abort();
-        } else {
-          ctx.signal.addEventListener("abort", onAbort, { once: true });
-        }
-      }
-
+      // 6. Issue the request through the shared hardened outbound path:
+      //    private-IP deny by default, per-hop redirect re-validation,
+      //    timeout, and the caller's signal — never a raw fetch.
       let response: Response;
 
       try {
-        response = await fetch(url, { method, headers, body, signal: controller.signal });
-      } finally {
-        clearTimeout(timer);
-        ctx?.signal?.removeEventListener("abort", onAbort);
+        response = await guardedFetch(
+          url.toString(),
+          {
+            allowedSchemes: ["http", "https"],
+            hostAllowlist: options.allowHosts,
+            denyPrivateIPsAfterDNS: !allowPrivateNetwork,
+            timeoutMs,
+            signal: ctx?.signal,
+          },
+          { method, headers, body },
+        );
+      } catch (cause) {
+        if (cause instanceof OutboundPolicyError) {
+          throw new HttpPolicyError(`http_request blocked: ${cause.message}`, {
+            type: "host-not-allowed",
+            cause,
+          });
+        }
+
+        throw cause;
       }
 
       // 7. Collect response headers with lower-cased keys.

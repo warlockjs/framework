@@ -171,8 +171,11 @@ export class McpTransportError extends AIError {
  *   `npm install` string for the developer.
  * - `"missing-key"` — no API key was supplied via options or the
  *   provider's environment variable.
- * - `"denied-host"` — the requested URL's host is not in the configured
- *   `allowHosts` allowlist (an SSRF guardrail), rejected before any fetch.
+ * - `"denied-host"` — the requested URL (or a redirect target) was
+ *   refused by the outbound policy: a host outside the configured
+ *   `allowHosts` allowlist, or a private / loopback / link-local /
+ *   cloud-metadata address blocked by the default private-network deny
+ *   (an SSRF guardrail).
  * - `"invalid-url"` — the supplied URL could not be parsed, or used a
  *   non-`http(s)` scheme.
  * - `"request-failed"` — the network call itself failed (DNS, connection
@@ -231,8 +234,11 @@ export class WebToolError extends AIError {
  *
  * - `"method-not-allowed"` — the model requested an HTTP method that is
  *   not on the tool's `allowMethods` allowlist (defaults to `["GET"]`).
- * - `"host-not-allowed"` — the resolved request host is not on the
- *   tool's `allowHosts` allowlist (an SSRF guardrail).
+ * - `"host-not-allowed"` — the resolved request host (or a redirect
+ *   target) was refused by the outbound policy: not on the tool's
+ *   `allowHosts` allowlist, or a private / loopback / link-local /
+ *   cloud-metadata address blocked by the default private-network deny
+ *   (an SSRF guardrail).
  * - `"invalid-url"` — the supplied URL (or its join with `baseUrl`)
  *   could not be parsed into an absolute `http(s)` URL.
  */

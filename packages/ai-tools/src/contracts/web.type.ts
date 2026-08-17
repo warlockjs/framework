@@ -113,9 +113,21 @@ export interface FetchUrlOptions {
   extract?: FetchUrlExtract;
   /**
    * Host allowlist. When set, any request to a host not in this list is
-   * rejected before the network call (an SSRF guardrail).
+   * rejected before the network call (an SSRF guardrail). Redirect
+   * targets are held to the same allowlist.
    */
   allowHosts?: string[];
+  /**
+   * Permit requests to private / loopback / link-local / cloud-metadata
+   * addresses. Off by default: the tool refuses internal targets (and
+   * hostnames that resolve to them) even when `allowHosts` is unset, so
+   * a prompt-injected URL cannot reach `169.254.169.254` or
+   * `localhost`. Enable only for a tool that is meant to call an
+   * internal service.
+   *
+   * @default false
+   */
+  allowPrivateNetwork?: boolean;
 }
 
 /**

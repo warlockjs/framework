@@ -36,9 +36,21 @@ export interface HttpRequestOptions {
   allowMethods?: HttpMethod[];
   /**
    * Host allowlist, enforced before the request (an SSRF guardrail).
-   * When set, any other host is rejected.
+   * When set, any other host is rejected. Redirect targets are held to
+   * the same allowlist.
    */
   allowHosts?: string[];
+  /**
+   * Permit requests to private / loopback / link-local / cloud-metadata
+   * addresses. Off by default: the tool refuses internal targets (and
+   * hostnames that resolve to them) even when `allowHosts` is unset, so
+   * a prompt-injected URL cannot reach `169.254.169.254` or
+   * `localhost`. Enable only for a tool that is meant to call an
+   * internal service.
+   *
+   * @default false
+   */
+  allowPrivateNetwork?: boolean;
   /** Static headers merged into every call (e.g. an API key). */
   headers?: Record<string, string>;
   /**

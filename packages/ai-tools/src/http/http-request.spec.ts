@@ -3,6 +3,16 @@ import { HttpPolicyError } from "../errors";
 import { causeOf } from "../test-support";
 import { httpRequestTool } from "./http-request";
 
+// The default private-network deny resolves hostnames through DNS; mock
+// the resolver so specs never touch the real network, with one host that
+// deliberately resolves inward.
+vi.mock("node:dns/promises", () => ({
+  lookup: async (host: string) =>
+    host === "internal.test"
+      ? [{ address: "10.0.0.8", family: 4 }]
+      : [{ address: "93.184.216.34", family: 4 }],
+}));
+
 /** The shape of a single recorded `fetch` invocation. */
 interface FetchCall {
   url: string;
@@ -366,5 +376,71 @@ describe("httpRequestTool", () => {
     expect(data).toBeUndefined();
     expect(error).toBeDefined();
     expect(error?.name).toBe("ToolExecutionError");
+  });
+});
+
+describe("httpRequestTool — private-network deny (SSRF defaults)", () => {
+  it("blocks metadata / loopback / private IP targets by default, before any fetch", async () => {
+    const calls = stubFetch(() => textResponse("unreachable"));
+    const tool = httpRequestTool();
+
+    for (const url of [
+      "http://169.254.169.254/latest/meta-data/",
+      "http://127.0.0.1:6379/",
+      "https://10.1.2.3/admin",
+    ]) {
+      const { data, error } = await tool.invoke({ url });
+
+      expect(data, url).toBeUndefined();
+      expect(causeOf(error), url).toBeInstanceOf(HttpPolicyError);
+      expect((causeOf(error) as HttpPolicyError).type, url).toBe("host-not-allowed");
+    }
+
+    expect(calls).toHaveLength(0);
+  });
+
+  it("blocks a hostname that resolves to a private address", async () => {
+    const calls = stubFetch(() => textResponse("unreachable"));
+
+    const { data, error } = await httpRequestTool().invoke({
+      url: "https://internal.test/admin",
+    });
+
+    expect(data).toBeUndefined();
+    expect(calls).toHaveLength(0);
+    expect(causeOf(error)).toBeInstanceOf(HttpPolicyError);
+    expect((causeOf(error) as HttpPolicyError).type).toBe("host-not-allowed");
+  });
+
+  it("blocks a redirect from an allowed host into the metadata endpoint", async () => {
+    const calls = stubFetch(
+      () =>
+        new Response(null, {
+          status: 302,
+          headers: { location: "https://169.254.169.254/latest/meta-data/" },
+        }),
+    );
+
+    const { data, error } = await httpRequestTool({ allowHosts: ["api.test"] }).invoke({
+      url: "https://api.test/redirect",
+    });
+
+    expect(data).toBeUndefined();
+    // The first hop is fetched; the metadata endpoint never is.
+    expect(calls).toHaveLength(1);
+    expect(causeOf(error)).toBeInstanceOf(HttpPolicyError);
+    expect((causeOf(error) as HttpPolicyError).type).toBe("host-not-allowed");
+  });
+
+  it("permits an internal target when allowPrivateNetwork is explicitly enabled", async () => {
+    const calls = stubFetch(() => jsonResponse({ ok: true }));
+
+    const { data, error } = await httpRequestTool({ allowPrivateNetwork: true }).invoke({
+      url: "http://127.0.0.1:3000/health",
+    });
+
+    expect(error).toBeUndefined();
+    expect(calls).toHaveLength(1);
+    expect(data?.body).toEqual({ ok: true });
   });
 });

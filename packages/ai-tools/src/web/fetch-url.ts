@@ -1,4 +1,9 @@
-import { tool, type ToolContract } from "@warlock.js/ai";
+import {
+  guardedFetch,
+  OutboundPolicyError,
+  tool,
+  type ToolContract,
+} from "@warlock.js/ai";
 import type {
   FetchUrlExtract,
   FetchUrlInput,
@@ -273,8 +278,16 @@ function stripTags(html: string): string {
  * `fetch` (Node 18+) and hand the model back rendered `content`.
  *
  * Guardrails, applied in order before/around the network call:
+ * - **Private-network deny (default).** Every request — and every
+ *   redirect hop — goes through the framework's `guardedFetch` outbound
+ *   policy, which refuses private / loopback / link-local /
+ *   cloud-metadata addresses (and hostnames resolving to them) unless
+ *   `allowPrivateNetwork: true` is set. This applies even when
+ *   `allowHosts` is not configured, so a bare `ai.tools.fetchUrl()` is
+ *   not an SSRF primitive.
  * - **`allowHosts`** — when set, a request to any host not in the list is
- *   rejected before the fetch (an SSRF guardrail).
+ *   rejected before the fetch, and redirect targets are held to the same
+ *   allowlist.
  * - **`timeoutMs`** — the request is aborted via `AbortSignal.timeout`
  *   (default {@link DEFAULT_TIMEOUT_MS}).
  * - **`maxBytes`** — the response body is read up to this cap and the
@@ -306,6 +319,7 @@ export function fetchUrlTool(
   const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const extract = options?.extract ?? DEFAULT_EXTRACT;
   const allowHosts = options?.allowHosts;
+  const allowPrivateNetwork = options?.allowPrivateNetwork ?? false;
 
   // Warm the readability peers non-blockingly when the configured mode
   // needs them, so the curated install string is ready (and logged at
@@ -328,8 +342,22 @@ export function fetchUrlTool(
       let response: Response;
 
       try {
-        response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+        // The shared hardened outbound path: private-IP deny by default,
+        // per-hop redirect re-validation, timeout — never a raw fetch.
+        response = await guardedFetch(url.toString(), {
+          allowedSchemes: ["http", "https"],
+          hostAllowlist: allowHosts,
+          denyPrivateIPsAfterDNS: !allowPrivateNetwork,
+          timeoutMs,
+        });
       } catch (cause) {
+        if (cause instanceof OutboundPolicyError) {
+          throw new WebToolError(`fetch_url blocked: ${cause.message}`, {
+            type: "denied-host",
+            cause,
+          });
+        }
+
         const message = cause instanceof Error ? cause.message : String(cause);
 
         throw new WebToolError(`fetch_url request failed: ${message}`, {
