@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-panoptic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## Unreleased
+
+### Security
+
+- **Dashboard stored XSS via `javascript:` markdown links — fixed.** The dashboard's markdown link renderer (`mdInline` in `ui.html.ts`) rewrote `[text](url)` into a live `<a href>` without validating the URL scheme, so a `javascript:` URL embedded in captured trace content (`span.input` / `span.output` under `captureContent` — i.e. prompt-injected model output or attacker-controlled tool results) became a stored XSS that fired when an operator clicked the link; the page's CSP (`script-src 'unsafe-inline'`) permits `javascript:` URI execution and does not restrict top-level navigation, putting the in-page bearer token in reach. Link URLs are now checked against a scheme allowlist (`http:`, `https:`, `mailto:`, plus relative/anchor URLs) after normalizing the URL the way a browser will — attribute-entity decode, strip of ignored control chars/whitespace (`java\tscript:`), lowercase — and scheme-relative `//host` links are rejected too; a rejected URL renders its label as plain text with no `href` at all. Regression-tested by executing the actual inlined client renderer against `javascript:`/`data:`/`vbscript:` payloads and their case/whitespace/entity obfuscations (`ui.html.md-links.spec.ts`)
+
 ## 4.12.0
 
 ### Changed

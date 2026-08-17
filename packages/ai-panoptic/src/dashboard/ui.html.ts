@@ -624,11 +624,34 @@ export function dashboardHtml(
     return out;
   }
 
+  // (S5) Markdown link URLs come from captured prompt/tool text — attacker-
+  // influenced content — so only http:, https:, mailto: and relative/anchor
+  // URLs may become an href; javascript:, data:, vbscript:, etc. must not.
+  // The check runs on the URL as the browser will act on it: undo the
+  // entities esc() introduced (the HTML parser decodes them exactly once in
+  // the attribute), strip the control chars / whitespace browsers ignore
+  // when parsing a scheme (java\\tscript:), and lowercase. Returns the
+  // original (still-escaped) URL when safe, or null to drop the link.
+  function sanitizeHref(url) {
+    var probe = url.replace(/&(amp|lt|gt|quot|#39);/g, function (m, name) {
+      return { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'" }[name];
+    });
+    probe = probe.replace(/[\\u0000-\\u0020\\u007f]+/g, "").toLowerCase();
+    if (/^[a-z][a-z0-9+.-]*:/.test(probe)) {
+      return /^(https?|mailto):/.test(probe) ? url : null;
+    }
+    if (/^[\\/\\\\]{2}/.test(probe)) return null; // scheme-relative smuggles a foreign host
+    return url;
+  }
   function mdInline(s) {
     s = s.replace(/\\*\\*([^*]+)\\*\\*/g, "<strong>$1</strong>");
     var codeRe = new RegExp(BT + "([^" + BT + "]+)" + BT, "g");
     s = s.replace(codeRe, "<code>$1</code>");
-    s = s.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    s = s.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, function (m, label, url) {
+      var href = sanitizeHref(url);
+      if (href === null) return label; // unsafe scheme: label as plain text, no <a>
+      return '<a href="' + href + '" target="_blank" rel="noopener">' + label + "</a>";
+    });
     return s;
   }
   function mdToHtml(raw) {
