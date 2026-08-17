@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BaseNotificationsRepository } from "../../../src";
+import { BaseNotificationsRepository, type DatabasePayload } from "../../../src";
 
 /**
  * Stub model carrying a `columnMap` static. Only `events()` is otherwise
@@ -155,6 +155,95 @@ describe("BaseNotificationsRepository — read_at-only (default columnMap)", () 
     await h.repo.markUnread("u42");
 
     expect(h.updateMany).toHaveBeenCalledWith({ user_id: "u42" }, { read_at: null });
+  });
+});
+
+describe("BaseNotificationsRepository — server-owned keys cannot be mass-assigned", () => {
+  const Both = stubModel({ tenant: "organization_id", isRead: "is_read", readAt: "read_at" });
+  let h: ReturnType<typeof makeRepo>;
+
+  beforeEach(() => {
+    h = makeRepo(Both);
+  });
+
+  it("createFor ignores a recipientId smuggled into the payload — the trusted argument wins", async () => {
+    await h.repo.createFor("u42", {
+      type: "order.shipped",
+      title: "Hi",
+      recipientId: "victim-1",
+    } as DatabasePayload);
+
+    const row = h.create.mock.calls[0][0];
+    expect(row.user_id).toBe("u42");
+    expect(row).not.toHaveProperty("recipientId");
+  });
+
+  it("createFor ignores the PHYSICAL recipient column smuggled into the payload", async () => {
+    await h.repo.createFor("u42", {
+      type: "x",
+      title: "Hi",
+      user_id: "victim-1",
+    } as DatabasePayload);
+
+    expect(h.create.mock.calls[0][0].user_id).toBe("u42");
+  });
+
+  it("createFor ignores smuggled id / tenant / read-state keys — trusted values win", async () => {
+    await h.repo.createFor(
+      "u42",
+      {
+        type: "x",
+        title: "Hi",
+        id: "n999",
+        tenant: "evil-org",
+        organization_id: "evil-org",
+        isRead: true,
+        is_read: true,
+        readAt: new Date(),
+        read_at: new Date(),
+      } as DatabasePayload,
+      "org_7",
+    );
+
+    const row = h.create.mock.calls[0][0];
+    expect(row).not.toHaveProperty("id");
+    expect(row.organization_id).toBe("org_7");
+    expect(row.is_read).toBe(false);
+    expect(row).not.toHaveProperty("read_at");
+  });
+
+  it("createFor still passes legitimate payload fields through alongside hostile keys", async () => {
+    await h.repo.createFor("u42", {
+      type: "order.shipped",
+      title: "Hi",
+      body: "b",
+      payload: { orderId: 7 },
+      idempotencyKey: "k1",
+      recipientId: "victim-1",
+    } as DatabasePayload);
+
+    expect(h.create.mock.calls[0][0]).toMatchObject({
+      user_id: "u42",
+      type: "order.shipped",
+      title: "Hi",
+      body: "b",
+      payload: { orderId: 7 },
+      idempotency_key: "k1",
+    });
+  });
+
+  it("createFor strips the RENAMED physical recipient column too", async () => {
+    const Renamed = stubModel({ recipient: "audience_id" });
+    const renamed = makeRepo(Renamed);
+
+    await renamed.repo.createFor("a1", {
+      type: "x",
+      title: "Hi",
+      recipientId: "victim-1",
+      audience_id: "victim-1",
+    } as DatabasePayload);
+
+    expect(renamed.create.mock.calls[0][0].audience_id).toBe("a1");
   });
 });
 

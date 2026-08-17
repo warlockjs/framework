@@ -140,9 +140,47 @@ export class BaseNotificationsRepository<
   }
 
   /**
+   * Runtime backstop for the compile-time `DatabasePayload` `Omit`: untyped
+   * callers (`notify.channel(name).send`, payloads assembled from request
+   * JSON) can smuggle server-owned keys past the type system, and spreading
+   * them into the row would let a payload redirect the notification into
+   * another recipient's inbox (recipient spoofing), cross tenants, pre-set
+   * read-state, or clobber the primary key. Drops BOTH the logical names and
+   * the model's resolved physical columns — `toRow` passes unmapped keys
+   * through verbatim, so a payload carrying `user_id` would otherwise reach
+   * the recipient column directly.
+   */
+  private stripServerOwnedKeys(input: DatabasePayload): Record<string, unknown> {
+    const { recipient, tenant, readAt, isRead } = this.columns;
+    const serverOwned = new Set<string | undefined>([
+      "id",
+      "recipientId",
+      "tenant",
+      "readAt",
+      "isRead",
+      recipient,
+      tenant,
+      readAt,
+      isRead,
+    ]);
+
+    const safe: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(input)) {
+      if (!serverOwned.has(key)) {
+        safe[key] = value;
+      }
+    }
+
+    return safe;
+  }
+
+  /**
    * Create one row for the recipient. New rows start unread; the tenant column
    * (when the model declares one) is written from `tenantId`, which the
-   * database channel reads off the recipient.
+   * database channel reads off the recipient. `recipientId` and the other
+   * server-owned keys always come from the trusted arguments — matching keys
+   * in `input` are stripped, never merged.
    *
    * Idempotency: when `input.idempotencyKey` is set, find-or-create — return
    * the existing row instead of inserting a duplicate. A unique index on the
@@ -162,7 +200,7 @@ export class BaseNotificationsRepository<
       }
     }
 
-    const row: Record<string, unknown> = { recipientId, ...input };
+    const row: Record<string, unknown> = { ...this.stripServerOwnedKeys(input), recipientId };
 
     if (this.columns.isRead) {
       row.isRead = false;
