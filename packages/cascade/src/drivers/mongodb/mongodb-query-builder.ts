@@ -22,6 +22,7 @@ import { type DataSource } from "../../data-source/data-source";
 import { dataSourceRegistry } from "../../data-source/data-source-registry";
 import { QueryBuilder } from "../../query-builder/query-builder";
 import { RelationLoader } from "../../relations/relation-loader";
+import { sanitizeFilter, sanitizeFilterValue } from "../../utils/sanitize-filter";
 import { type MongoDbDriver } from "./mongodb-driver";
 import { MongoQueryOperations } from "./mongodb-query-operations";
 import { MongoQueryParser } from "./mongodb-query-parser";
@@ -912,15 +913,16 @@ export class MongoQueryBuilder<T = unknown>
         // Callback-based where
         this.operationsHelper.addMatchOperation(`${prefix}:callback`, args[0]);
       } else {
-        // Object-based where
-        this.operationsHelper.addMatchOperation(`${prefix}:object`, args[0]);
+        // Object-based where — the object becomes the $match filter verbatim,
+        // so reject smuggled "$"-prefixed operator keys before recording it.
+        this.operationsHelper.addMatchOperation(`${prefix}:object`, sanitizeFilter(args[0]));
       }
     } else if (args.length === 2) {
       // Simple equality: where(field, value)
       this.operationsHelper.addMatchOperation(prefix, {
         field: args[0],
         operator: "=",
-        value: args[1],
+        value: sanitizeFilterValue(args[1], String(args[0])),
       });
     } else if (args.length === 3) {
       // With operator: where(field, operator, value)

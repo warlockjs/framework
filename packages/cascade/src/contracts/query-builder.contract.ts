@@ -416,9 +416,13 @@ export interface QueryBuilderContract<T = unknown> {
   /**
    * Add a raw where clause expressed in the native query language.
    *
+   * String expressions are SQL-only ("age > ?" with bindings). The MongoDB
+   * driver rejects string expressions — they would compile to a `$where`
+   * server-side JavaScript filter — and requires the object form.
+   *
    * @example
-   * query.whereRaw({ $expr: { $gt: ["$stock", "$reserved"] } })
-   * query.whereRaw("this.age > ?", [30])
+   * query.whereRaw({ $expr: { $gt: ["$stock", "$reserved"] } }) // MongoDB
+   * query.whereRaw("age > ?", [30])                             // SQL
    */
   whereRaw(expression: RawExpression, bindings?: unknown[]): this;
 
@@ -426,7 +430,7 @@ export interface QueryBuilderContract<T = unknown> {
    * Add a raw OR where clause expressed in the native query language.
    *
    * @example
-   * query.orWhereRaw({ $where: "this.isAdmin === true" })
+   * query.orWhereRaw({ $expr: { $eq: ["$isAdmin", true] } })
    */
   orWhereRaw(expression: RawExpression, bindings?: unknown[]): this;
 

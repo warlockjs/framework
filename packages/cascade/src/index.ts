@@ -19,6 +19,8 @@ export * from "./data-source/data-source-registry";
 // Errors
 export * from "./errors/missing-data-source.error";
 export * from "./errors/transaction-rollback.error";
+export * from "./errors/unsafe-filter.error";
+export * from "./errors/unsafe-raw-expression.error";
 
 // Core Services
 export * from "./database-dirty-tracker";
@@ -68,6 +70,7 @@ export type {
 
 // Utilities
 export * from "./utils/connect-to-database";
+export * from "./utils/sanitize-filter";
 export * from "./utils/database-writer.utils";
 export * from "./utils/define-model";
 export * from "./utils/once-connected";

@@ -1,6 +1,7 @@
 import { colors } from "@mongez/copper";
 import type { Collection } from "mongodb";
 import type { GroupByInput, RawExpression, WhereOperator } from "../../contracts";
+import { UnsafeRawExpressionError } from "../../errors/unsafe-raw-expression.error";
 import {
   isAggregateExpression,
   type AggregateExpression,
@@ -956,10 +957,16 @@ export class MongoQueryParser {
     return map[operator] || "$eq";
   }
 
-  private resolveRawExpression(expression: RawExpression, bindings?: unknown[]): any {
+  private resolveRawExpression(expression: RawExpression, _bindings?: unknown[]): any {
     if (typeof expression === "string") {
-      const bound = this.bindRawString(expression, bindings);
-      return { $where: bound };
+      // String expressions used to compile to { $where: "<js>" } — a
+      // server-side JavaScript execution sink inside mongod (and an unindexed
+      // full-scan even when trusted). Refuse them outright.
+      throw new UnsafeRawExpressionError(
+        `whereRaw()/orWhereRaw() string expressions are not supported on the MongoDB driver: ` +
+          `they would compile to a {$where: "<js>"} filter, which executes JavaScript on the database server. ` +
+          `Use the object form instead, e.g. whereRaw({ $expr: { $gt: ["$stock", "$reserved"] } }).`,
+      );
     }
 
     if (typeof expression === "object" && expression !== null) {

@@ -38,6 +38,7 @@ import type {
   WhereObject,
   WhereOperator,
 } from "../contracts/query-builder.contract";
+import { sanitizeFilter, sanitizeFilterValue } from "../utils/sanitize-filter";
 
 // ============================================================================
 // TYPES
@@ -285,11 +286,15 @@ export class QueryBuilder<T = unknown> {
       (args[0] as (q: QueryBuilder) => void)(sub);
       this.addOperation("where", { nested: sub.operations });
     } else if (args.length === 1 && typeof args[0] === "object" && args[0] !== null) {
-      for (const [key, value] of Object.entries(args[0] as WhereObject)) {
+      for (const [key, value] of Object.entries(sanitizeFilter(args[0] as WhereObject))) {
         this.addOperation("where", { field: key, operator: "=", value });
       }
     } else if (args.length === 2) {
-      this.addOperation("where", { field: args[0], operator: "=", value: args[1] });
+      this.addOperation("where", {
+        field: args[0],
+        operator: "=",
+        value: sanitizeFilterValue(args[1], String(args[0])),
+      });
     } else {
       this.addOperation("where", { field: args[0], operator: args[1], value: args[2] });
     }
@@ -312,11 +317,15 @@ export class QueryBuilder<T = unknown> {
       (args[0] as (q: QueryBuilder) => void)(sub);
       this.addOperation("orWhere", { nested: sub.operations });
     } else if (args.length === 1 && typeof args[0] === "object" && args[0] !== null) {
-      for (const [key, value] of Object.entries(args[0] as WhereObject)) {
+      for (const [key, value] of Object.entries(sanitizeFilter(args[0] as WhereObject))) {
         this.addOperation("orWhere", { field: key, operator: "=", value });
       }
     } else if (args.length === 2) {
-      this.addOperation("orWhere", { field: args[0], operator: "=", value: args[1] });
+      this.addOperation("orWhere", {
+        field: args[0],
+        operator: "=",
+        value: sanitizeFilterValue(args[1], String(args[0])),
+      });
     } else {
       this.addOperation("orWhere", { field: args[0], operator: args[1], value: args[2] });
     }

@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.15.0
+
+### Security
+
+- **NoSQL operator injection via equality filters is now rejected.** `where({ field: value })`, `where(field, value)` and the filter-accepting model statics (`first`, `findFirst`, `findAll`, `count`, `paginate`, `deleteMany`, `deleteOne`, …) treated the value verbatim, so a request-controlled payload such as `{ password: { $ne: null } }` compiled into a MongoDB *operator* query instead of an equality match — the textbook auth-bypass primitive (`User.first({ email, password })` matched any user). Equality-position values (and top-level object-form keys) containing `$`-prefixed keys now throw `UnsafeFilterError`. Explicit operator APIs are unaffected: `where(field, operator, value)`, `whereIn`/`whereNull`/`whereBetween`/…, and the object form of `whereRaw`. Dotted paths (`"profile.name"`) and plain sub-document equality values remain valid. A `sanitizeFilter` / `sanitizeFilterValue` helper pair is exported for callers who forward request objects to other driver-level APIs
+- **String-mode `whereRaw()` / `orWhereRaw()` no longer compiles to `$where` on the MongoDB driver.** Any string expression was wrapped as `{ $where: "<js>" }` — JavaScript executed *inside* `mongod` for every scanned document (an injection sink whenever any part of the string was request-influenced, and an unindexed full-scan DoS even when trusted), with `?`-bindings substituted by string concatenation rather than real parameterization. The MongoDB parser now throws `UnsafeRawExpressionError` for string expressions and directs callers to the object form (`whereRaw({ $expr: … })`), which keeps working. SQL drivers keep string mode with real bindings
+
 ## 4.12.0
 
 ### Added
