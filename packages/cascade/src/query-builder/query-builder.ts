@@ -296,7 +296,12 @@ export class QueryBuilder<T = unknown> {
         value: sanitizeFilterValue(args[1], String(args[0])),
       });
     } else {
-      this.addOperation("where", { field: args[0], operator: args[1], value: args[2] });
+      // "=" is still an equality position — sanitize like the 2-arg form.
+      this.addOperation("where", {
+        field: args[0],
+        operator: args[1],
+        value: args[1] === "=" ? sanitizeFilterValue(args[2], String(args[0])) : args[2],
+      });
     }
     return this;
   }
@@ -327,7 +332,12 @@ export class QueryBuilder<T = unknown> {
         value: sanitizeFilterValue(args[1], String(args[0])),
       });
     } else {
-      this.addOperation("orWhere", { field: args[0], operator: args[1], value: args[2] });
+      // "=" is still an equality position — sanitize like the 2-arg form.
+      this.addOperation("orWhere", {
+        field: args[0],
+        operator: args[1],
+        value: args[1] === "=" ? sanitizeFilterValue(args[2], String(args[0])) : args[2],
+      });
     }
     return this;
   }

@@ -970,10 +970,40 @@ export class MongoQueryParser {
     }
 
     if (typeof expression === "object" && expression !== null) {
+      this.assertNoJsExecutionOperators(expression);
       return expression;
     }
 
     return null;
+  }
+
+  /**
+   * The object form of whereRaw() is forwarded to MongoDB verbatim, so it must
+   * not smuggle in the operators that execute JavaScript inside mongod
+   * ($where, and $function/$accumulator which can nest under $expr).
+   * Aggregation operators like $expr/$gt remain valid — that is the object
+   * form's purpose.
+   */
+  private assertNoJsExecutionOperators(value: unknown): void {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        this.assertNoJsExecutionOperators(item);
+      }
+      return;
+    }
+
+    if (typeof value !== "object" || value === null) return;
+
+    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+      if (key === "$where" || key === "$function" || key === "$accumulator") {
+        throw new UnsafeRawExpressionError(
+          `whereRaw()/orWhereRaw() expressions must not contain "${key}": ` +
+            `it executes JavaScript on the database server. ` +
+            `Express the condition with query operators instead, e.g. whereRaw({ $expr: { $gt: ["$stock", "$reserved"] } }).`,
+        );
+      }
+      this.assertNoJsExecutionOperators(nested);
+    }
   }
 
   private bindRawString(expression: string, bindings?: unknown[]): string {

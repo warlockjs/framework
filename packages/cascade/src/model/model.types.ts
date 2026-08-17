@@ -61,6 +61,7 @@ export type ChildModel<TModel extends Model> = (new (...args: any[]) => TModel) 
     | "resource"
     | "resourceColumns"
     | "toJsonColumns"
+    | "hidden"
     | "randomIncrement"
     | "getDataSource"
     | "getDriver"

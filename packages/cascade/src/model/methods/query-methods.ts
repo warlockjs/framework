@@ -6,7 +6,9 @@ import type {
 } from "../../contracts";
 import type { DataSource } from "../../data-source/data-source";
 import { dataSourceRegistry } from "../../data-source/data-source-registry";
+import { sanitizeFilter } from "../../utils/sanitize-filter";
 import type { ChildModel, GlobalScopeDefinition, Model } from "../model";
+import { warnUndeclaredSensitiveFields } from "./serialization-methods";
 
 export function buildQuery<TModel extends Model>(
   ModelClass: ChildModel<TModel>,
@@ -160,12 +162,20 @@ export function decreaseField<TModel extends Model>(
   return query.decrement(field, amount);
 }
 
+// The atomic/find-and-modify statics below forward their filter straight to
+// the driver — they never pass through where(), so they must run the same
+// operator-injection check themselves. Only the FILTER is sanitized; update
+// operators ($set/$inc/…) are the point of these APIs and stay untouched.
 export async function performAtomic<TModel extends Model>(
   ModelClass: ChildModel<TModel>,
   filter: Record<string, unknown>,
   operations: UpdateOperations,
 ): Promise<number> {
-  const result = await ModelClass.getDriver().atomic(ModelClass.table, filter, operations);
+  const result = await ModelClass.getDriver().atomic(
+    ModelClass.table,
+    sanitizeFilter(filter),
+    operations,
+  );
   return result.modifiedCount;
 }
 
@@ -192,7 +202,11 @@ export async function findOneAndUpdateRecord<TModel extends Model>(
   filter: Record<string, unknown>,
   update: UpdateOperations,
 ): Promise<TModel | null> {
-  const result = await ModelClass.getDriver().findOneAndUpdate(ModelClass.table, filter, update);
+  const result = await ModelClass.getDriver().findOneAndUpdate(
+    ModelClass.table,
+    sanitizeFilter(filter),
+    update,
+  );
   if (!result) return null;
   const ctor = ModelClass as any;
   return new ctor(result);
@@ -203,7 +217,11 @@ export async function findAndReplaceRecord<TModel extends Model>(
   filter: Record<string, unknown>,
   document: Record<string, unknown>,
 ): Promise<TModel | null> {
-  const result = await ModelClass.getDriver().replace(ModelClass.table, filter, document);
+  const result = await ModelClass.getDriver().replace(
+    ModelClass.table,
+    sanitizeFilter(filter),
+    document,
+  );
   if (!result) return null;
   const ctor = ModelClass as any;
   return new ctor(result);
@@ -215,7 +233,7 @@ export async function findOneAndDeleteRecord<TModel extends Model>(
   options?: Record<string, unknown>,
 ): Promise<TModel | null> {
   const driver = ModelClass.getDriver();
-  const result = await driver.findOneAndDelete(ModelClass.table, filter, options);
+  const result = await driver.findOneAndDelete(ModelClass.table, sanitizeFilter(filter), options);
 
   if (!result) {
     return null;
@@ -255,6 +273,11 @@ export function resolveDataSource<TModel extends Model>(
 
     (ModelClass as any)._defaultsApplied = true;
   }
+
+  // First data-source resolution is the earliest per-class hook every model
+  // passes through — warn here (once) if the schema carries credential-shaped
+  // fields that toJSON() would expose.
+  warnUndeclaredSensitiveFields(ModelClass);
 
   return dataSource;
 }

@@ -209,6 +209,26 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   public static toJsonColumns?: string[];
 
   /**
+   * Top-level fields that are ALWAYS stripped from `toJSON()` output —
+   * regardless of `resource`, `resourceColumns` or `toJsonColumns`.
+   *
+   * `toJSON()` is invoked implicitly by `JSON.stringify(model)` (e.g.
+   * `res.json(user)`), and with no `resource`/`toJsonColumns` configured it
+   * returns the entire raw document. Declare credential/PII columns here so
+   * they can never leak through serialization, whatever else is configured.
+   *
+   * @default []
+   *
+   * @example
+   * ```typescript
+   * class User extends Model {
+   *   public static hidden = ["password", "resetToken"];
+   * }
+   * ```
+   */
+  public static hidden: string[] = [];
+
+  /**
    * Data source reference for this model.
    *
    * Can be:

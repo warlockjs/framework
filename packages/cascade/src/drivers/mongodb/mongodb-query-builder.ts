@@ -925,11 +925,12 @@ export class MongoQueryBuilder<T = unknown>
         value: sanitizeFilterValue(args[1], String(args[0])),
       });
     } else if (args.length === 3) {
-      // With operator: where(field, operator, value)
+      // With operator: where(field, operator, value).
+      // "=" is still an equality position — sanitize like the 2-arg form.
       this.operationsHelper.addMatchOperation(prefix, {
         field: args[0],
         operator: args[1],
-        value: args[2],
+        value: args[1] === "=" ? sanitizeFilterValue(args[2], String(args[0])) : args[2],
       });
     }
   }

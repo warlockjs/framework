@@ -5,6 +5,12 @@ import { MongoQueryBuilder } from "../../../../src/drivers/mongodb/mongodb-query
 import { UnsafeFilterError } from "../../../../src/errors/unsafe-filter.error";
 import { UnsafeRawExpressionError } from "../../../../src/errors/unsafe-raw-expression.error";
 import { deleteRecords } from "../../../../src/model/methods/delete-methods";
+import {
+  findAndReplaceRecord,
+  findOneAndDeleteRecord,
+  findOneAndUpdateRecord,
+  performAtomic,
+} from "../../../../src/model/methods/query-methods";
 import { QueryBuilder } from "../../../../src/query-builder/query-builder";
 import { createMockDriver } from "../../../helpers/mock-driver";
 
@@ -61,6 +67,10 @@ describe("MongoQueryBuilder — filter security", () => {
 
     it("rejects a $-operator smuggled into a two-argument equality value", () => {
       expect(() => builder().where("password", { $ne: null })).toThrow(UnsafeFilterError);
+    });
+
+    it("rejects a $-operator smuggled into a three-argument '=' equality value", () => {
+      expect(() => builder().where("password", "=", { $ne: null })).toThrow(UnsafeFilterError);
     });
 
     it("rejects a top-level $where key in an object-form filter", () => {
@@ -151,6 +161,22 @@ describe("MongoQueryBuilder — filter security", () => {
 
       expect(pipeline).toEqual([{ $match: expression }]);
     });
+
+    it("rejects $where in the object form of whereRaw", () => {
+      expect(() => builder().whereRaw({ $where: "this.isAdmin === true" }).parse()).toThrow(
+        UnsafeRawExpressionError,
+      );
+    });
+
+    it("rejects $function nested inside an object-form raw expression", () => {
+      expect(() =>
+        builder()
+          .whereRaw({
+            $expr: { $function: { body: "function() { return true; }", args: [], lang: "js" } },
+          })
+          .parse(),
+      ).toThrow(UnsafeRawExpressionError);
+    });
   });
 
   describe("delete statics filter sanitization", () => {
@@ -177,6 +203,81 @@ describe("MongoQueryBuilder — filter security", () => {
       expect(deleteMany).toHaveBeenCalledWith("users", { role: "member" });
     });
   });
+
+  describe("atomic/find-and-modify statics filter sanitization", () => {
+    function fakeModelClass(driver: Record<string, ReturnType<typeof vi.fn>>) {
+      return {
+        table: "users",
+        getDriver: () => driver,
+      } as never;
+    }
+
+    it("rejects operator keys in an atomic() filter", async () => {
+      const atomic = vi.fn().mockResolvedValue({ modifiedCount: 0 });
+
+      await expect(
+        performAtomic(fakeModelClass({ atomic }), { role: { $ne: "admin" } }, { $inc: { age: 1 } }),
+      ).rejects.toThrow(UnsafeFilterError);
+      expect(atomic).not.toHaveBeenCalled();
+    });
+
+    it("forwards plain atomic() filters with the update operators untouched", async () => {
+      const atomic = vi.fn().mockResolvedValue({ modifiedCount: 2 });
+
+      await expect(
+        performAtomic(fakeModelClass({ atomic }), { role: "member" }, { $inc: { age: 1 } }),
+      ).resolves.toBe(2);
+      expect(atomic).toHaveBeenCalledWith("users", { role: "member" }, { $inc: { age: 1 } });
+    });
+
+    it("rejects operator keys in a findOneAndUpdate() filter", async () => {
+      const findOneAndUpdate = vi.fn().mockResolvedValue(null);
+
+      await expect(
+        findOneAndUpdateRecord(
+          fakeModelClass({ findOneAndUpdate }),
+          { password: { $ne: null } },
+          { $set: { visited: true } },
+        ),
+      ).rejects.toThrow(UnsafeFilterError);
+      expect(findOneAndUpdate).not.toHaveBeenCalled();
+    });
+
+    it("forwards plain findOneAndUpdate() filters with the update operators untouched", async () => {
+      const findOneAndUpdate = vi.fn().mockResolvedValue(null);
+
+      await expect(
+        findOneAndUpdateRecord(
+          fakeModelClass({ findOneAndUpdate }),
+          { email: "a@b.c" },
+          { $set: { visited: true } },
+        ),
+      ).resolves.toBeNull();
+      expect(findOneAndUpdate).toHaveBeenCalledWith(
+        "users",
+        { email: "a@b.c" },
+        { $set: { visited: true } },
+      );
+    });
+
+    it("rejects operator keys in a findAndReplace() filter", async () => {
+      const replace = vi.fn().mockResolvedValue(null);
+
+      await expect(
+        findAndReplaceRecord(fakeModelClass({ replace }), { role: { $gt: "" } }, { name: "x" }),
+      ).rejects.toThrow(UnsafeFilterError);
+      expect(replace).not.toHaveBeenCalled();
+    });
+
+    it("rejects operator keys in a findOneAndDelete() filter", async () => {
+      const findOneAndDelete = vi.fn().mockResolvedValue(null);
+
+      await expect(
+        findOneAndDeleteRecord(fakeModelClass({ findOneAndDelete }), { token: { $ne: null } }),
+      ).rejects.toThrow(UnsafeFilterError);
+      expect(findOneAndDelete).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("QueryBuilder (base) — filter security", () => {
@@ -186,6 +287,18 @@ describe("QueryBuilder (base) — filter security", () => {
 
   it("rejects operator keys in two-argument equality where()", () => {
     expect(() => new QueryBuilder().where("password", { $gt: "" })).toThrow(UnsafeFilterError);
+  });
+
+  it("rejects operator keys in three-argument '=' equality where()", () => {
+    expect(() => new QueryBuilder().where("password", "=", { $ne: null })).toThrow(
+      UnsafeFilterError,
+    );
+  });
+
+  it("rejects operator keys in three-argument '=' equality orWhere()", () => {
+    expect(() => new QueryBuilder().where("a", 1).orWhere("password", "=", { $ne: null })).toThrow(
+      UnsafeFilterError,
+    );
   });
 
   it("still records plain object-form equality operations", () => {
