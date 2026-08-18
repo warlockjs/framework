@@ -12,6 +12,7 @@ import {
   performAtomic,
 } from "../../../../src/model/methods/query-methods";
 import { QueryBuilder } from "../../../../src/query-builder/query-builder";
+import { escapeRegex, likePatternToRegexSource } from "../../../../src/utils/escape-regex";
 import { createMockDriver } from "../../../helpers/mock-driver";
 
 /**
@@ -25,6 +26,11 @@ import { createMockDriver } from "../../../helpers/mock-driver";
  * (b) `$where` sink: string-mode `whereRaw()` used to compile to
  *     `{ $where: "<js>" }` (server-side JS execution). It must now throw;
  *     the object form (`{ $expr: … }`) must keep working.
+ * (c) `$regex` injection / ReDoS: `whereLike` / `whereStartsWith` /
+ *     `whereEndsWith` / `whereSearch` compiled their argument into `$regex`
+ *     unescaped, handing a search box control of the regex engine inside
+ *     `mongod`. String arguments must now be literals; only an explicit
+ *     `RegExp` stays a pattern.
  */
 describe("MongoQueryBuilder — filter security", () => {
   let dataSource: DataSource;
@@ -179,6 +185,125 @@ describe("MongoQueryBuilder — filter security", () => {
     });
   });
 
+  describe("regex injection via pattern matching helpers", () => {
+    /** The `$regex` source the first `$match` stage compiled for `field`. */
+    function regexSourceOf(pipeline: any[], field = "name"): string {
+      const condition = pipeline[0].$match[field];
+      return (condition.$not ?? condition).$regex;
+    }
+
+    it("treats whereLike metacharacters as literals", () => {
+      const pipeline = builder().whereLike("name", "a.b*c").parse().pipeline;
+
+      expect(regexSourceOf(pipeline)).toBe("a\\.b\\*c");
+    });
+
+    it("does not compile a catastrophically backtracking pattern from a string", () => {
+      const pipeline = builder().whereLike("name", "(a+)+$").parse().pipeline;
+      const source = regexSourceOf(pipeline);
+
+      expect(source).toBe("\\(a\\+\\)\\+\\$");
+
+      // Nothing the caller typed is left acting as a quantifier or a group:
+      // the compiled regex matches its own text and nothing else.
+      const compiled = new RegExp(source);
+
+      expect(compiled.test("(a+)+$")).toBe(true);
+      expect(compiled.test("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")).toBe(false);
+    });
+
+    it("neutralizes an anchored match-everything injection", () => {
+      const pipeline = builder().whereLike("name", "^.*$").parse().pipeline;
+      const compiled = new RegExp(regexSourceOf(pipeline));
+
+      expect(compiled.test("Alice")).toBe(false);
+      expect(compiled.test("^.*$")).toBe(true);
+    });
+
+    it("neutralizes an alternation injection", () => {
+      const pipeline = builder().whereLike("name", "admin|root").parse().pipeline;
+      const compiled = new RegExp(regexSourceOf(pipeline));
+
+      expect(compiled.test("root")).toBe(false);
+      expect(compiled.test("admin|root")).toBe(true);
+    });
+
+    it("keeps the documented % wildcard working", () => {
+      const pipeline = builder().whereLike("email", "%@gmail.com").parse().pipeline;
+      const source = regexSourceOf(pipeline, "email");
+
+      expect(source).toBe(".*@gmail\\.com");
+      expect(new RegExp(source).test("alice@gmail.com")).toBe(true);
+      expect(new RegExp(source).test("alice@gmail-com")).toBe(false);
+    });
+
+    it("collapses a run of % into a single wildcard", () => {
+      const pipeline = builder().whereLike("name", "%%%%%%%%%%a%%%%%%%%%%").parse().pipeline;
+
+      expect(regexSourceOf(pipeline)).toBe(".*a.*");
+    });
+
+    it("keeps plain substring matching unchanged", () => {
+      const pipeline = builder().whereLike("name", "ar").parse().pipeline;
+
+      expect(pipeline).toEqual([{ $match: { name: { $regex: "ar", $options: "i" } } }]);
+    });
+
+    it("still honors an explicit RegExp as a pattern", () => {
+      const pipeline = builder().whereLike("name", /^ali.e$/i).parse().pipeline;
+
+      expect(regexSourceOf(pipeline)).toBe("^ali.e$");
+    });
+
+    it("escapes whereNotLike patterns too", () => {
+      const pipeline = builder().whereNotLike("name", "a+b").parse().pipeline;
+
+      expect(pipeline).toEqual([
+        { $match: { name: { $not: { $regex: "a\\+b", $options: "i" } } } },
+      ]);
+    });
+
+    it("escapes whereStartsWith while keeping the ^ anchor", () => {
+      const pipeline = builder().whereStartsWith("name", ".*").parse().pipeline;
+
+      expect(regexSourceOf(pipeline)).toBe("^\\.\\*");
+    });
+
+    it("escapes whereEndsWith while keeping the $ anchor", () => {
+      const pipeline = builder().whereEndsWith("email", "ob@example.com").parse().pipeline;
+
+      expect(regexSourceOf(pipeline, "email")).toBe("ob@example\\.com$");
+    });
+
+    it("escapes whereNotStartsWith and whereNotEndsWith", () => {
+      const starts = builder().whereNotStartsWith("name", "(a+)+").parse().pipeline;
+      const ends = builder().whereNotEndsWith("name", "(a+)+").parse().pipeline;
+
+      expect(regexSourceOf(starts)).toBe("^\\(a\\+\\)\\+");
+      expect(regexSourceOf(ends)).toBe("\\(a\\+\\)\\+$");
+    });
+
+    it("escapes a regex-mode whereSearch operation", () => {
+      // `whereSearch()` compiles to $text on this builder; the $regex form of
+      // the operation is still reachable through the parser, so it is pinned
+      // here directly.
+      const query = builder();
+
+      query.operations.push({
+        stage: "$match",
+        mergeable: true,
+        type: "whereSearch",
+        data: { field: "name", query: "(a+)+$" },
+      } as never);
+
+      const pipeline = query.parse().pipeline;
+
+      expect(pipeline).toEqual([
+        { $match: { name: { $regex: "\\(a\\+\\)\\+\\$", $options: "i" } } },
+      ]);
+    });
+  });
+
   describe("delete statics filter sanitization", () => {
     function fakeModelClass(deleteMany: ReturnType<typeof vi.fn>) {
       return {
@@ -315,5 +440,52 @@ describe("QueryBuilder (base) — filter security", () => {
     expect(qb.operations).toEqual([
       { type: "where", data: { field: "age", operator: ">", value: 18 } },
     ]);
+  });
+
+  it("records a string LIKE pattern without flagging it as a regex", () => {
+    const qb = new QueryBuilder().whereLike("name", "(a+)+");
+
+    expect(qb.operations).toEqual([
+      { type: "whereLike", data: { field: "name", pattern: "(a+)+" } },
+    ]);
+  });
+
+  it("flags an explicit RegExp so drivers keep pattern semantics", () => {
+    const qb = new QueryBuilder().whereLike("name", /^ali.e$/i);
+
+    expect(qb.operations).toEqual([
+      { type: "whereLike", data: { field: "name", pattern: "^ali.e$", isRegExp: true } },
+    ]);
+  });
+
+  it("routes whereStartsWith through the escaped LIKE path", () => {
+    const qb = new QueryBuilder().whereStartsWith("name", "a.b");
+
+    expect(qb.operations).toEqual([
+      { type: "whereLike", data: { field: "name", pattern: "a.b%" } },
+    ]);
+  });
+});
+
+describe("escapeRegex / likePatternToRegexSource", () => {
+  it("escapes every regex metacharacter", () => {
+    expect(escapeRegex(".*+?^${}()|[]\\")).toBe(
+      "\\.\\*\\+\\?\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\",
+    );
+  });
+
+  it("leaves ordinary text alone", () => {
+    expect(escapeRegex("alice smith")).toBe("alice smith");
+  });
+
+  it("makes an escaped pattern match only its own text", () => {
+    const compiled = new RegExp(`^${escapeRegex("a.b")}$`);
+
+    expect(compiled.test("a.b")).toBe(true);
+    expect(compiled.test("axb")).toBe(false);
+  });
+
+  it("translates % to a wildcard and escapes the rest", () => {
+    expect(likePatternToRegexSource("%a.b%")).toBe(".*a\\.b.*");
   });
 });

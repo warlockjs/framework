@@ -445,19 +445,37 @@ export class QueryBuilder<T = unknown> {
 
   /**
    * LIKE pattern match (AND).
+   *
+   * A string is a LIKE pattern (`%` wildcard) and is matched literally
+   * otherwise — regex metacharacters in it are escaped by the driver, so
+   * search input cannot alter the query. Pass an explicit `RegExp` to opt into
+   * raw pattern semantics; never build that `RegExp` from user input.
+   *
    * @example q.whereLike("email", "%@gmail.com")
    */
   public whereLike(field: string, pattern: RegExp | string): this {
-    const patternStr = pattern instanceof RegExp ? pattern.source : pattern;
-    this.addOperation("whereLike", { field, pattern: patternStr });
+    this.addOperation("whereLike", { field, ...this.likePatternData(pattern) });
     return this;
   }
 
-  /** NOT LIKE pattern match. */
+  /** NOT LIKE pattern match. @see whereLike for the escaping rules. */
   public whereNotLike(field: string, pattern: RegExp | string): this {
-    const patternStr = pattern instanceof RegExp ? pattern.source : pattern;
-    this.addOperation("whereNotLike", { field, pattern: patternStr });
+    this.addOperation("whereNotLike", { field, ...this.likePatternData(pattern) });
     return this;
+  }
+
+  /**
+   * Flatten a LIKE argument into operation data, keeping the distinction the
+   * drivers need: an explicit `RegExp` (developer-authored) stays a pattern,
+   * a string (potentially request input) is a literal.
+   */
+  private likePatternData(pattern: RegExp | string): {
+    pattern: string;
+    isRegExp?: true;
+  } {
+    return pattern instanceof RegExp
+      ? { pattern: pattern.source, isRegExp: true }
+      : { pattern };
   }
 
   /** Starts with a prefix. */

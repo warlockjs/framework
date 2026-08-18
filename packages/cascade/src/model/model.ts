@@ -528,6 +528,19 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    */
   public static relations: Readonly<Record<string, RelationDefinition>> = {};
 
+  /** Backing field for {@link isNew}. */
+  private newRecord = true;
+
+  /**
+   * The primary key value captured at the moment this instance became a
+   * persisted record — the ONLY value an UPDATE/REPLACE filter may be built
+   * from. See {@link trustedPrimaryKey}.
+   */
+  private capturedPrimaryKey: unknown = undefined;
+
+  /** Whether {@link capturedPrimaryKey} holds a captured value. */
+  private primaryKeyCaptured = false;
+
   /**
    * Flag indicating whether this model instance represents a new (unsaved) record.
    *
@@ -535,8 +548,45 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * - `false`: The model represents an existing database record
    *
    * This flag is used by the writer to determine whether to perform an insert or update.
+   *
+   * Setting it to `false` (hydration from the database, or the writer marking a
+   * freshly inserted row as persisted) is also the moment the instance captures
+   * its trusted primary key — see {@link trustedPrimaryKey}.
    */
-  public isNew = true;
+  public get isNew(): boolean {
+    return this.newRecord;
+  }
+
+  public set isNew(value: boolean) {
+    this.newRecord = value;
+
+    if (value) {
+      // Back to "unsaved": there is no persisted row to be pinned to anymore.
+      this.capturedPrimaryKey = undefined;
+      this.primaryKeyCaptured = false;
+      return;
+    }
+
+    this.capturedPrimaryKey = this.get(this.self().primaryKey);
+    this.primaryKeyCaptured = true;
+  }
+
+  /**
+   * The primary key value an UPDATE/REPLACE filter must be built from.
+   *
+   * For a persisted record this is the value the row was loaded with, captured
+   * when `isNew` flipped to `false` — NOT the current value in `data`. Deriving
+   * the filter from post-`merge()` state let a request body carrying
+   * `{ id: "<victim-id>" }` redirect the write to a different document
+   * (`model.merge(req.body); await model.save()`), so the two must never be the
+   * same read. For a model that was never persisted it falls back to the
+   * current value, which is what an insert would use anyway.
+   */
+  public get trustedPrimaryKey(): any {
+    return this.primaryKeyCaptured
+      ? this.capturedPrimaryKey
+      : this.get(this.self().primaryKey);
+  }
 
   /**
    * The raw mutable data backing this model instance.

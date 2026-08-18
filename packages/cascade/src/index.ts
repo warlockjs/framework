@@ -70,6 +70,7 @@ export type {
 
 // Utilities
 export * from "./utils/connect-to-database";
+export * from "./utils/escape-regex";
 export * from "./utils/sanitize-filter";
 export * from "./utils/database-writer.utils";
 export * from "./utils/define-model";

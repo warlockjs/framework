@@ -95,7 +95,10 @@ export class DatabaseRemover implements RemoverContract {
       );
     }
 
-    const primaryKeyValue = this.model.get(this.primaryKey);
+    // The value captured when the model became persisted, never the current
+    // (mass-assignable) one — a delete must not be retargetable by a payload
+    // carrying `{ id: "<victim-id>" }`. Same rule as the writer's update filter.
+    const primaryKeyValue = this.model.trustedPrimaryKey;
     if (!primaryKeyValue) {
       throw new Error(
         `Cannot destroy ${this.ctor.name} instance: primary key (${this.primaryKey}) is missing.`,

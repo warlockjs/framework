@@ -12,6 +12,7 @@ import type {
   WriterOptions,
   WriterResult,
 } from "../contracts/database-writer.contract";
+import { mergeDriverFields } from "../model/methods/accessor-methods";
 import type { ChildModel, Model } from "../model/model";
 import { getModelUpdatedEvent } from "../sync/model-events";
 import type { StrictMode } from "../types";
@@ -308,7 +309,7 @@ export class DatabaseWriter implements WriterContract {
     // Merge returned data (e.g., generated _id, timestamps)
     // Note: We use merge here because the result might not include all fields
     // (e.g., our generated 'id' field), and we don't want to lose them
-    this.model.merge(result.document as Record<string, unknown>);
+    mergeDriverFields(this.model, result.document as Record<string, unknown>);
 
     // Reset dirty tracker immediately after merge to prevent
     // database-generated fields (like _id) from being marked as dirty
@@ -339,9 +340,7 @@ export class DatabaseWriter implements WriterContract {
     if (options.replace) {
       const document = await this.driver.replace(
         this.table,
-        {
-          [this.primaryKey]: this.model.get(this.primaryKey),
-        },
+        this.buildPrimaryKeyFilter(),
         this.model.data,
       );
 
@@ -355,11 +354,33 @@ export class DatabaseWriter implements WriterContract {
     // Build operations from dirty tracker
     const operations = this.buildUpdateOperations();
 
-    // Build filter using primary key
-    const filter = { [this.primaryKey]: this.model.get(this.primaryKey) };
+    // Nothing left to write once identity columns are excluded — don't hand the
+    // driver an empty update document (MongoDB rejects one).
+    if (Object.keys(operations).length === 0) {
+      return { modifiedCount: 0 };
+    }
 
     // Execute update with operations
-    return await this.driver.update(this.table, filter, operations);
+    return await this.driver.update(
+      this.table,
+      this.buildPrimaryKeyFilter(),
+      operations,
+    );
+  }
+
+  /**
+   * Build the filter that pins a write to the row this model was loaded from.
+   *
+   * It reads `model.trustedPrimaryKey` — the value captured when the instance
+   * became persisted — NOT the current value in `model.data`. The current value
+   * is reachable by mass assignment (`model.merge(req.body)`), so deriving the
+   * filter from it let a request body redirect the UPDATE to another document.
+   *
+   * @returns Filter matching the originally loaded record
+   * @private
+   */
+  private buildPrimaryKeyFilter(): Record<string, unknown> {
+    return { [this.primaryKey]: this.model.trustedPrimaryKey };
   }
 
   /**
@@ -415,8 +436,17 @@ export class DatabaseWriter implements WriterContract {
   private buildUpdateOperations(): UpdateOperations {
     const operations: UpdateOperations = {};
 
+    // Identity columns are never written by an update. The filter pins the row
+    // by its captured primary key, so a dirty `id`/`_id` can only come from
+    // mass assignment or an explicit set() — either way, rewriting the key of
+    // an existing row corrupts identity (and `_id` is immutable in MongoDB).
+    // Changing a primary key is a deliberate operation: use the atomic/raw APIs.
+    const identityColumns = new Set([this.primaryKey, "id", "_id"]);
+
     // Get dirty columns (modified fields)
-    const dirtyColumns = this.model.getDirtyColumns();
+    const dirtyColumns = this.model
+      .getDirtyColumns()
+      .filter(column => !identityColumns.has(column));
 
     if (dirtyColumns.length > 0) {
       operations.$set = {};
@@ -429,7 +459,10 @@ export class DatabaseWriter implements WriterContract {
     }
 
     // Get removed columns
-    const removedColumns = this.model.getRemovedColumns();
+    const removedColumns = this.model
+      .getRemovedColumns()
+      .filter(column => !identityColumns.has(column));
+
     if (removedColumns.length > 0) {
       operations.$unset = {};
       for (const column of removedColumns) {

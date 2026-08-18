@@ -45,7 +45,53 @@ export function unsetFields(model: Model, ...fields: string[]): Model {
   return model;
 }
 
+/**
+ * Identity columns that a mass-assignment payload may never carry into an
+ * already-persisted model. `merge()` is the method request bodies reach
+ * (`model.merge(req.body)` / `save({ merge })`), and the primary key is what
+ * the UPDATE filter is built from — letting it through means a payload of
+ * `{ id: "<victim-id>" }` rewrites which document the save targets. Both the
+ * configured primary key and the two framework identity columns are dropped,
+ * because `id` and `_id` are managed by the writer/driver either way.
+ *
+ * A NEW model is untouched: creating with an explicit id is a legitimate flow,
+ * and the writer itself merges the driver-returned document (`_id`, defaults)
+ * back onto the instance before it is marked persisted.
+ */
+function stripIdentityColumns(
+  model: Model,
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  if (model.isNew) return values;
+
+  const identityColumns = new Set([model.getPrimaryKey(), "id", "_id"]);
+  const blockedKeys = Object.keys(values).filter(key => identityColumns.has(key));
+
+  if (blockedKeys.length === 0) return values;
+
+  // Copy — the caller's object (often the request body itself) is not ours to mutate.
+  const safeValues = { ...values };
+  for (const key of blockedKeys) {
+    delete safeValues[key];
+  }
+
+  return safeValues;
+}
+
 export function mergeFields(model: Model, values: Record<string, unknown>): Model {
+  return mergeDriverFields(model, stripIdentityColumns(model, values));
+}
+
+/**
+ * Merge a document the DRIVER produced (generated `_id`, `RETURNING *`, DB
+ * defaults) back onto the model, identity columns included.
+ *
+ * Framework-internal counterpart of {@link mergeFields}: the write pipeline is
+ * the one caller allowed to set identity columns on an already-persisted
+ * instance, because the values come from the database rather than from a
+ * request. Never route caller-supplied data through this.
+ */
+export function mergeDriverFields(model: Model, values: Record<string, unknown>): Model {
   model.data = merge(model.data, values) as any;
   model.dirtyTracker.mergeChanges(values);
   return model;

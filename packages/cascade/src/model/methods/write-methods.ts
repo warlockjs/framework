@@ -1,6 +1,7 @@
 import { DatabaseWriter } from "../../writer/database-writer";
 import type { InsertResult, WriterOptions } from "../../contracts";
 import type { ChildModel, Model, ModelSchema } from "../model";
+import { mergeDriverFields } from "./accessor-methods";
 import { emitModelEvent } from "./instance-event-methods";
 
 /**
@@ -298,7 +299,10 @@ async function createManyBulk<
               ? (result as InsertResult).document
               : result;
 
-          model.merge(returnedDocument as Record<string, unknown>);
+          // Driver-returned identity (generated _id / RETURNING *) — merged
+          // through the framework-internal path so it is not treated as mass
+          // assignment on a model the writer has already marked persisted.
+          mergeDriverFields(model, returnedDocument as Record<string, unknown>);
         }
 
         model.dirtyTracker.reset();

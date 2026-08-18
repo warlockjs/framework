@@ -7,6 +7,7 @@ import {
   type AggregateExpression,
 } from "../../expressions/aggregate-expressions";
 import type { ColumnExpression } from "../../expressions/column-expressions";
+import { escapeRegex, resolveLikePattern } from "../../utils/escape-regex";
 import type { MongoQueryBuilder } from "./mongodb-query-builder";
 import type { Operation, PipelineStage } from "./types";
 
@@ -749,32 +750,40 @@ export class MongoQueryParser {
           },
         };
 
-      case "whereLike": {
-        const pattern =
-          typeof op.data.pattern === "string" ? op.data.pattern : op.data.pattern.source;
-        return { [field]: { $regex: pattern, $options: "i" } };
-      }
+      case "whereLike":
+        return {
+          [field]: { $regex: this.buildLikeRegexSource(op.data), $options: "i" },
+        };
 
-      case "whereNotLike": {
-        const notPattern =
-          typeof op.data.pattern === "string" ? op.data.pattern : op.data.pattern.source;
-        return { [field]: { $not: { $regex: notPattern, $options: "i" } } };
-      }
+      case "whereNotLike":
+        return {
+          [field]: {
+            $not: { $regex: this.buildLikeRegexSource(op.data), $options: "i" },
+          },
+        };
 
       case "whereStartsWith":
-        return { [field]: { $regex: `^${op.data.value}`, $options: "i" } };
+        return {
+          [field]: { $regex: `^${escapeRegex(String(op.data.value))}`, $options: "i" },
+        };
 
       case "whereNotStartsWith":
         return {
-          [field]: { $not: { $regex: `^${op.data.value}`, $options: "i" } },
+          [field]: {
+            $not: { $regex: `^${escapeRegex(String(op.data.value))}`, $options: "i" },
+          },
         };
 
       case "whereEndsWith":
-        return { [field]: { $regex: `${op.data.value}$`, $options: "i" } };
+        return {
+          [field]: { $regex: `${escapeRegex(String(op.data.value))}$`, $options: "i" },
+        };
 
       case "whereNotEndsWith":
         return {
-          [field]: { $not: { $regex: `${op.data.value}$`, $options: "i" } },
+          [field]: {
+            $not: { $regex: `${escapeRegex(String(op.data.value))}$`, $options: "i" },
+          },
         };
 
       case "whereExists":
@@ -877,7 +886,9 @@ export class MongoQueryParser {
       case "whereSearch":
         return {
           [op.data.field]: {
-            $regex: op.data.query,
+            // Search text is the most user-facing input in the whole API —
+            // always a literal, never a pattern.
+            $regex: escapeRegex(String(op.data.query)),
             $options: "i",
           },
         };
@@ -910,6 +921,26 @@ export class MongoQueryParser {
       default:
         return null;
     }
+  }
+
+  /**
+   * Resolve the `$regex` source for a whereLike/whereNotLike operation.
+   *
+   * A `RegExp` argument is developer-authored and used verbatim; a string is
+   * treated as a literal LIKE pattern (`%` aside) so that search input cannot
+   * inject regex operators or a catastrophically backtracking pattern. The base
+   * (driver-agnostic) query builder flattens a `RegExp` to its source string and
+   * flags it with `isRegExp`, which is honored here for the same reason.
+   *
+   * @param data - The operation data (`{ pattern, isRegExp? }`)
+   * @returns Regex source for `$regex`
+   */
+  private buildLikeRegexSource(data: any): string {
+    if (data.isRegExp === true && typeof data.pattern === "string") {
+      return data.pattern;
+    }
+
+    return resolveLikePattern(data.pattern);
   }
 
   /**
