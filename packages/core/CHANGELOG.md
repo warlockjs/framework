@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
-## 4.15.0
+## 4.16.0 - 2026-08-18
 
 ### Security
 
@@ -34,7 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - ⚠ **`@mongez/reinforcements` 4.0.1 is a major bump: `Random` is now CSPRNG-backed (WebCrypto) and `Random.seed()` was removed** — seeded/reproducible `Random.string/nanoid/id/token/uuid` calls now throw. Audited `core`'s `Random.string(...)` call sites (`use-case.ts`, `http/request.ts`, `dev-server/files-watcher.ts`, `http/uploaded-file.ts`) and its test suite: none rely on seeding or reproducible output, so no code changes were required
 - `@mongez/encryption` 2.0.1 (async `encrypt`/`decrypt`, throws on failure) does not apply to this package — `core` is not a consumer; `src/encryption/encrypt.ts` uses Node's built-in `crypto` module directly and is unaffected
 
-## 4.14.0
+## 4.14.0 - 2026-08-16
 
 ### ⚠ Upgrading from 4.13.0 — read this first
 
@@ -132,7 +132,7 @@ afterAll(teardownTest);     // ← is new
 
   **The cost is a framework bootstrap per test file — which is exactly what 4.13.0 already paid**, since its module-level flag died with the module registry between files. **Nothing gets slower; an unearned speed-up is simply not being claimed.** A worker-scoped lifetime remains open, and gets taken when the real per-file cost has been measured on a real application and the runner integration is chosen deliberately rather than inherited from whatever the wiring happened to do
 
-## 4.13.0
+## 4.13.0 - 2026-08-12
 
 ### ⚠ Upgrading from 4.12.0 — read this first
 
