@@ -24,6 +24,7 @@ yarn add @warlock.js/herald amqplib   # amqplib for RabbitMQ
 5. **`@warlock.js/seal` schemas validate on publish + receive.** Pass `{ schema }` to `.channel(name, { schema })`.
 6. **Subscribers control message flow** via `ctx.ack()` / `ctx.nack()` / `ctx.reject()` / `ctx.retry(ms)`.
 7. **Smart auto-ack is the default** (`autoAck` unset/`false`). The consumer runs with manual-ack enabled, but herald acks for you when the handler returns cleanly and nacks-with-requeue when it throws — so a crash mid-handling re-delivers, and a clean handler that forgot `ctx.ack()` is still acked. Call `ctx` methods explicitly only when you need a non-default outcome (reject, DLQ, delayed retry). `autoAck: true` is the dangerous mode: the broker acks on delivery, so a crash loses the message.
+8. **`username`/`password` never leak into thrown or logged errors.** They're URI-encoded when building the internal `amqp://` connection URL, and any connect failure — including one built from a caller-supplied `uri` — has `user:pass@` redacted before it's re-thrown/logged. Safe to log a connection error as-is; it will never contain a plaintext broker credential.
 
 ## Minimal example
 
