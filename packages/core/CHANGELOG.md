@@ -14,6 +14,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
   ⚠ **If your app runs behind a proxy and relied on `detectIp()` reading the forwarding headers without setting `http.trustProxy`, set `http.trustProxy: true`** (or a Fastify `trustProxy` value matching your edge). With the flag set, behaviour is unchanged: `X-Real-IP` first, then the leftmost `X-Forwarded-For` hop, then the peer address. Only enable it when your edge overwrites those headers — the flag trusts them wholesale
 
+### Dependencies
+
+- Bumped `@mongez/*` deps to their 2026-08-17 security release specs: `concat-route` ^1.2.0, `config` ^1.2.1, `dotenv` ^1.3.2, `events` ^2.2.7, `http` ^3.5.0, `localization` ^3.4.7, `reinforcements` ^4.0.1, `supportive-is` ^2.1.4
+- ⚠ **`@mongez/reinforcements` 4.0.1 is a major bump: `Random` is now CSPRNG-backed (WebCrypto) and `Random.seed()` was removed** — seeded/reproducible `Random.string/nanoid/id/token/uuid` calls now throw. Audited `core`'s `Random.string(...)` call sites (`use-case.ts`, `http/request.ts`, `dev-server/files-watcher.ts`, `http/uploaded-file.ts`) and its test suite: none rely on seeding or reproducible output, so no code changes were required
+- `@mongez/encryption` 2.0.1 (async `encrypt`/`decrypt`, throws on failure) does not apply to this package — `core` is not a consumer; `src/encryption/encrypt.ts` uses Node's built-in `crypto` module directly and is unaffected
+
 ## 4.14.0
 
 ### ⚠ Upgrading from 4.13.0 — read this first
