@@ -54,8 +54,13 @@ type AccessConfigurations = {
   cache?: {
     ttl?: string | number; //           resolved-set TTL, default "10m"
   };
+  strictPolicies?: boolean; //          default false — see below
 };
 ```
+
+### `strictPolicies`
+
+An instance check (`{ resource }`) for a permission with no registered ABAC policy normally **warns once per permission** (`log.warn`) and falls back to the RBAC grant alone. Set `strictPolicies: true` to turn that gap into a thrown `AccessConfigError` instead — for apps that want a missing policy to fail the request/boot loudly rather than just log. See [`define-policies`](@warlock.js/access/define-policies/SKILL.md) for the full decision table.
 
 A missing resolver throws `AccessConfigError` **at boot** — the framework's access connector wires `src/config/access.ts` (the same way the notifications connector wires `config/notifications.ts`), so a misconfig fails at startup, never a silent deny.
 
