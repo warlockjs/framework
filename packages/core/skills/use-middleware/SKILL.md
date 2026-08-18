@@ -115,7 +115,18 @@ export default {
 
 `deny` wins over `allow`. If the IP can't be read (empty / unparseable), the request is rejected with 403. Reads via `request.detectIp()`.
 
-⚠ **Since 4.13.0 `http.trustProxy` defaults to `false`**, so `request.detectIp()` returns the socket address and **`X-Real-IP` / `X-Forwarded-For` are ignored unless you opt in.** Set `trustProxy: true` **only when you are genuinely behind a proxy that overwrites those headers** — before 4.13.0 the default was `true`, which meant any client could set its own forwarding header and be believed.
+⚠ **Since 4.13.0 `http.trustProxy` defaults to `false`**, so `request.detectIp()` returns the socket address and **`X-Real-IP` / `X-Forwarded-For` are ignored unless you opt in.** Before 4.13.0 the default was `true`, which meant any client could set its own forwarding header and be believed.
+
+⚠ **Opt in with the narrowest shape your topology allows, not with `true`.** Since 4.15.0 `http.trustProxy` takes a hop count or a trusted-proxy list, and `detectIp()` resolves the chain the same way Fastify's `request.ip` does:
+
+| `http.trustProxy` | Client IP |
+| --- | --- |
+| `false` *(default)* | Socket peer address |
+| `2` | Walks past the 2 rightmost `X-Forwarded-For` hops — for an edge that **appends** (the usual case: nginx, ALB, most CDNs) |
+| `"10.0.0.0/8"` / `["10.0.0.0/8", "192.168.0.0/16"]` | Walks left while each hop is a listed proxy |
+| `true` | Trusts the whole chain — the leftmost hop, i.e. **whatever the client put there** if your edge appends rather than overwrites |
+
+With `true`, any client that can reach the process directly picks its own IP and this allowlist is decorative. `X-Real-IP` is honoured only under `true` — it carries no chain to check a hop count or proxy list against — so if your edge sets only that header, have it set `X-Forwarded-For` too.
 
 ```ts
 import { middleware } from "@warlock.js/core";

@@ -12,7 +12,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **`request.detectIp()` no longer trusts `X-Real-IP` / `X-Forwarded-For` unless `http.trustProxy` is set.** Both headers are client-settable, and `detectIp()` honoured them unconditionally — bypassing the `trustProxy` opt-in the Fastify server itself is configured with. Any client could therefore spoof its IP to everything keyed on `detectIp()`: `ipFilter` allowlists/denylists, the default rate-limit bucket key, and anonymous idempotency scoping. Without the opt-in, `detectIp()` (and its `realIp` alias) now returns `baseRequest.ip` — the socket peer address, which cannot be forged
 
-  ⚠ **If your app runs behind a proxy and relied on `detectIp()` reading the forwarding headers without setting `http.trustProxy`, set `http.trustProxy: true`** (or a Fastify `trustProxy` value matching your edge). With the flag set, behaviour is unchanged: `X-Real-IP` first, then the leftmost `X-Forwarded-For` hop, then the peer address. Only enable it when your edge overwrites those headers — the flag trusts them wholesale
+  ⚠ **If your app runs behind a proxy and relied on `detectIp()` reading the forwarding headers without setting `http.trustProxy`, set `http.trustProxy: true`** (or a Fastify `trustProxy` value matching your edge). With `true` set, behaviour is unchanged: `X-Real-IP` first, then the leftmost `X-Forwarded-For` hop, then the peer address. Only enable `true` when your edge overwrites those headers — it trusts them wholesale
+
+- **`http.trustProxy` now accepts a hop count or a trusted-proxy list, and `detectIp()` honours them.** `true` is the wrong shape for the common topology: an edge that *appends* to `X-Forwarded-For` leaves whatever the client prepended as the leftmost entry, so "trust the leftmost hop" hands the client its own IP back. The config value is passed to Fastify untouched, and `detectIp()` now reads the resolved client off `request.ip` instead of re-parsing the header — so both agree, and every Fastify shape works:
+
+  | `http.trustProxy` | Client IP |
+  | --- | --- |
+  | `false` *(default)* | Socket peer address; forwarding headers ignored |
+  | `true` | Leftmost `X-Forwarded-For` entry (whole chain trusted) |
+  | `2` | Walks past the 2 rightmost hops — for an edge that appends |
+  | `"10.0.0.0/8"`, `"loopback, 10.0.0.0/8"`, `["10.0.0.0/8", "192.168.0.0/16"]` | Walks left while each hop is a listed proxy, stops at the first that isn't |
+  | `(address, hop) => boolean` | Your predicate |
+
+  Prefer the narrowest shape your topology allows: with `true`, any client that can reach the process directly picks its own IP, and an `ipFilter` allowlist in front of it is decorative
+
+  ⚠ **`X-Real-IP` is now honoured only under `trustProxy: true`.** It carries no chain, so there is nothing to check a hop count or proxy list against, and a trusted edge that forwards the client's own `X-Real-IP` verbatim would otherwise let any client escape the bound. Under a bounded `trustProxy` the value comes from the `X-Forwarded-For` chain instead — if your edge sets only `X-Real-IP`, have it set `X-Forwarded-For` as well
 
 ### Dependencies
 

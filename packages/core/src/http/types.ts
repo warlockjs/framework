@@ -157,6 +157,28 @@ export interface HttpConfigurations {
    * @default 200 * 1024 * 1024 * 1024  // 200GB — historical default; consider lowering for production.
    */
   bodyLimit?: number;
+  /**
+   * Which upstream hops may be trusted to report the real client address via
+   * `X-Forwarded-For`. Passed straight to Fastify, so every shape Fastify
+   * supports works here, and `request.ip` / `request.detectIp()` resolve the
+   * client identically:
+   *
+   * - `false` (default) — trust nothing; the socket peer address is the client.
+   * - `true` — trust the whole chain; the leftmost `X-Forwarded-For` entry wins.
+   * - `number` — trust that many rightmost hops (an edge that APPENDS to
+   *   `X-Forwarded-For`; `2` = "my CDN plus my load balancer").
+   * - `string` / `string[]` — trust only these proxy addresses: exact IPs,
+   *   CIDR blocks (`"10.0.0.0/8"`), the named ranges `"loopback"`,
+   *   `"linklocal"`, `"uniquelocal"`, or a comma-separated string of those.
+   * - `(address, hop) => boolean` — custom predicate.
+   *
+   * Anything but `false` is a trust boundary: every hop you trust can forge the
+   * addresses to its left. Prefer the narrowest shape your topology allows —
+   * `true` is only safe when nothing but your edge can reach the process.
+   *
+   * @default false
+   */
+  trustProxy?: boolean | number | string | string[] | ((address: string, hop: number) => boolean);
   cookies?: {
     /**
      * Secret key for signed cookies

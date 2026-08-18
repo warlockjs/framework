@@ -1,22 +1,29 @@
 import config from "@mongez/config";
 import type { FastifyRequest } from "fastify";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Request } from "../../../src/http/request";
+import { startHttpServer } from "../../../src/http/server";
+
+// The first Fastify boot in the process costs far more than the 10s default on
+// a cold transform cache; the assertions themselves resolve instantly.
+vi.setConfig({ testTimeout: 120_000 });
 
 /**
- * Unit coverage for `Request.detectIp()` — the real-client-IP resolver used by
+ * Coverage for `Request.detectIp()` — the real-client-IP resolver used by
  * ip-filter / rate-limit / idempotency scoping.
  *
  * The security-critical property: `X-Real-IP` / `X-Forwarded-For` are
- * client-settable, so they are honoured ONLY when `http.trustProxy` is set.
- * Without the opt-in, a spoofed header must be ignored and the socket peer
- * address returned — otherwise any client could bypass ip-filter allowlists,
- * rate-limit buckets, and idempotency scoping by forging a header.
+ * client-settable, so they are honoured ONLY as far as `http.trustProxy`
+ * allows. Without the opt-in, a spoofed header must be ignored and the socket
+ * peer address returned — otherwise any client could bypass ip-filter
+ * allowlists, rate-limit buckets, and idempotency scoping by forging a header.
  *
- * With trustProxy on, the interesting case is a multi-hop `X-Forwarded-For`
- * ("client, proxy1, proxy2"): only the leftmost entry (the original client)
- * should be returned, comma-split and trimmed.
- * We seed `baseRequest` directly so no Fastify server is needed.
+ * `X-Forwarded-For` resolution is delegated to Fastify (`request.ip`), so the
+ * chain tests below run against a live Fastify booted through the framework's
+ * own `startHttpServer()` with a real socket peer address — asserting the
+ * config value shapes end to end (`true`, hop count, CIDR list) rather than a
+ * re-implementation of the chain walk. `X-Real-IP` is not part of Fastify's
+ * resolution and is asserted against a seeded `baseRequest`.
  */
 function makeRequest(seed: {
   headers?: Record<string, string>;
@@ -41,6 +48,45 @@ function unsetTrustProxy() {
   delete config.list()?.http?.trustProxy;
 }
 
+/**
+ * Boot the framework's Fastify with the given `http.trustProxy`, inject one
+ * request from `remoteAddress`, and report what `detectIp()` resolved. This is
+ * the production wiring: Fastify applies `trustProxy` to `request.ip`, and
+ * `detectIp()` reads it back off the same request object.
+ */
+async function detectIpThroughServer(seed: {
+  trustProxy?: unknown;
+  headers?: Record<string, string>;
+  remoteAddress?: string;
+}): Promise<string> {
+  if (seed.trustProxy !== undefined) {
+    config.set("http.trustProxy", seed.trustProxy);
+  }
+
+  const server = startHttpServer();
+
+  let detected = "";
+
+  server.get("/whoami", async (baseRequest: FastifyRequest) => {
+    detected = new Request().setRequest(baseRequest).detectIp();
+
+    return { ok: true };
+  });
+
+  try {
+    await server.inject({
+      method: "GET",
+      url: "/whoami",
+      headers: seed.headers ?? {},
+      remoteAddress: seed.remoteAddress ?? "127.0.0.1",
+    });
+  } finally {
+    await server.close();
+  }
+
+  return detected;
+}
+
 describe("Request.detectIp", () => {
   afterEach(() => {
     unsetTrustProxy();
@@ -56,13 +102,13 @@ describe("Request.detectIp", () => {
       expect(request.detectIp()).toBe("10.0.0.1");
     });
 
-    it("ignores a spoofed x-forwarded-for and returns the peer ip", () => {
-      const request = makeRequest({
-        headers: { "x-forwarded-for": "203.0.113.9, 70.41.3.18" },
-        ip: "10.0.0.1",
-      });
-
-      expect(request.detectIp()).toBe("10.0.0.1");
+    it("ignores a spoofed x-forwarded-for and returns the peer ip", async () => {
+      expect(
+        await detectIpThroughServer({
+          headers: { "x-forwarded-for": "203.0.113.9, 70.41.3.18" },
+          remoteAddress: "10.0.0.1",
+        }),
+      ).toBe("10.0.0.1");
     });
 
     it("returns the peer ip when no forwarding headers exist", () => {
@@ -72,7 +118,7 @@ describe("Request.detectIp", () => {
     });
   });
 
-  describe("with http.trustProxy enabled", () => {
+  describe("with http.trustProxy: true (whole chain trusted)", () => {
     it("returns x-real-ip when present (highest priority)", () => {
       config.set("http.trustProxy", true);
 
@@ -84,56 +130,182 @@ describe("Request.detectIp", () => {
       expect(request.detectIp()).toBe("198.51.100.5");
     });
 
-    it("returns a single-hop x-forwarded-for verbatim", () => {
-      config.set("http.trustProxy", true);
-
-      const request = makeRequest({
-        headers: { "x-forwarded-for": "198.51.100.7" },
-        ip: "10.0.0.1",
-      });
-
-      expect(request.detectIp()).toBe("198.51.100.7");
+    it("returns a single-hop x-forwarded-for verbatim", async () => {
+      expect(
+        await detectIpThroughServer({
+          trustProxy: true,
+          headers: { "x-forwarded-for": "198.51.100.7" },
+          remoteAddress: "10.0.0.1",
+        }),
+      ).toBe("198.51.100.7");
     });
 
-    it("takes only the FIRST entry of a multi-hop x-forwarded-for", () => {
-      config.set("http.trustProxy", true);
-
-      const request = makeRequest({
-        headers: { "x-forwarded-for": "203.0.113.9, 70.41.3.18, 150.172.238.178" },
-        ip: "10.0.0.1",
-      });
-
-      expect(request.detectIp()).toBe("203.0.113.9");
+    it("takes the leftmost entry of a multi-hop x-forwarded-for", async () => {
+      expect(
+        await detectIpThroughServer({
+          trustProxy: true,
+          headers: { "x-forwarded-for": "203.0.113.9, 70.41.3.18, 150.172.238.178" },
+          remoteAddress: "10.0.0.1",
+        }),
+      ).toBe("203.0.113.9");
     });
 
-    it("trims whitespace around the first hop", () => {
-      config.set("http.trustProxy", true);
-
-      const request = makeRequest({
-        headers: { "x-forwarded-for": "  203.0.113.9 , 70.41.3.18" },
-        ip: "10.0.0.1",
-      });
-
-      expect(request.detectIp()).toBe("203.0.113.9");
+    it("trims whitespace around the resolved hop", async () => {
+      expect(
+        await detectIpThroughServer({
+          trustProxy: true,
+          headers: { "x-forwarded-for": "  203.0.113.9 , 70.41.3.18" },
+          remoteAddress: "10.0.0.1",
+        }),
+      ).toBe("203.0.113.9");
     });
 
-    it("falls back to the peer ip when no forwarding headers exist", () => {
-      config.set("http.trustProxy", true);
-
-      const request = makeRequest({ ip: "172.16.0.4" });
-
-      expect(request.detectIp()).toBe("172.16.0.4");
+    it("falls back to the peer ip when no forwarding headers exist", async () => {
+      expect(
+        await detectIpThroughServer({
+          trustProxy: true,
+          remoteAddress: "172.16.0.4",
+        }),
+      ).toBe("172.16.0.4");
     });
 
-    it("falls back to the peer ip when x-forwarded-for is blank/comma-only", () => {
-      config.set("http.trustProxy", true);
+    it("falls back to the peer ip when x-forwarded-for is blank/comma-only", async () => {
+      expect(
+        await detectIpThroughServer({
+          trustProxy: true,
+          headers: { "x-forwarded-for": " , " },
+          remoteAddress: "172.16.0.4",
+        }),
+      ).toBe("172.16.0.4");
+    });
+  });
 
-      const request = makeRequest({
-        headers: { "x-forwarded-for": " , " },
-        ip: "172.16.0.4",
-      });
+  describe("with a numeric http.trustProxy (hop count)", () => {
+    /**
+     * The shape for an edge that APPENDS to `X-Forwarded-For`: whatever the
+     * client sent stays to the LEFT of what the edge appended, so trusting one
+     * hop must land on the entry the edge wrote, not the forged prefix.
+     */
+    it("trusts one hop: the entry the edge appended wins over a forged prefix", async () => {
+      expect(
+        await detectIpThroughServer({
+          trustProxy: 1,
+          headers: { "x-forwarded-for": "203.0.113.9, 198.51.100.7" },
+          remoteAddress: "10.0.0.1",
+        }),
+      ).toBe("198.51.100.7");
+    });
 
-      expect(request.detectIp()).toBe("172.16.0.4");
+    it("trusts two hops: walks one entry further left through a two-proxy chain", async () => {
+      expect(
+        await detectIpThroughServer({
+          trustProxy: 2,
+          headers: { "x-forwarded-for": "203.0.113.9, 198.51.100.7" },
+          remoteAddress: "10.0.0.1",
+        }),
+      ).toBe("203.0.113.9");
+    });
+
+    it("never walks past the chain even when the hop count exceeds it", async () => {
+      expect(
+        await detectIpThroughServer({
+          trustProxy: 5,
+          headers: { "x-forwarded-for": "203.0.113.9" },
+          remoteAddress: "10.0.0.1",
+        }),
+      ).toBe("203.0.113.9");
+    });
+
+    it("ignores x-real-ip under a bounded hop count", async () => {
+      expect(
+        await detectIpThroughServer({
+          trustProxy: 1,
+          headers: { "x-real-ip": "203.0.113.9" },
+          remoteAddress: "10.0.0.1",
+        }),
+      ).toBe("10.0.0.1");
+    });
+
+    it("trusts nothing when the hop count is 0", async () => {
+      expect(
+        await detectIpThroughServer({
+          trustProxy: 0,
+          headers: { "x-forwarded-for": "203.0.113.9" },
+          remoteAddress: "10.0.0.1",
+        }),
+      ).toBe("10.0.0.1");
+    });
+  });
+
+  describe("with a CIDR / IP list http.trustProxy", () => {
+    it("walks the chain past hops inside the trusted CIDR", async () => {
+      expect(
+        await detectIpThroughServer({
+          trustProxy: "10.0.0.0/8",
+          headers: { "x-forwarded-for": "203.0.113.9, 10.0.0.2" },
+          remoteAddress: "10.0.0.1",
+        }),
+      ).toBe("203.0.113.9");
+    });
+
+    it("stops at the first hop outside the trusted CIDR", async () => {
+      expect(
+        await detectIpThroughServer({
+          trustProxy: "10.0.0.0/8",
+          headers: { "x-forwarded-for": "203.0.113.9, 198.51.100.7" },
+          remoteAddress: "10.0.0.1",
+        }),
+      ).toBe("198.51.100.7");
+    });
+
+    it("ignores a forged chain when the peer itself is not a trusted proxy", async () => {
+      expect(
+        await detectIpThroughServer({
+          trustProxy: "10.0.0.0/8",
+          headers: { "x-forwarded-for": "203.0.113.9" },
+          remoteAddress: "198.51.100.1",
+        }),
+      ).toBe("198.51.100.1");
+    });
+
+    it("accepts an array of CIDR blocks", async () => {
+      expect(
+        await detectIpThroughServer({
+          trustProxy: ["10.0.0.0/8", "192.168.0.0/16"],
+          headers: { "x-forwarded-for": "203.0.113.9, 192.168.1.7" },
+          remoteAddress: "10.0.0.1",
+        }),
+      ).toBe("203.0.113.9");
+    });
+
+    it("accepts a comma-separated list in a single string", async () => {
+      expect(
+        await detectIpThroughServer({
+          trustProxy: "10.0.0.0/8, 192.168.0.0/16",
+          headers: { "x-forwarded-for": "203.0.113.9, 192.168.1.7" },
+          remoteAddress: "10.0.0.1",
+        }),
+      ).toBe("203.0.113.9");
+    });
+
+    it("accepts an exact proxy address", async () => {
+      expect(
+        await detectIpThroughServer({
+          trustProxy: "10.0.0.1",
+          headers: { "x-forwarded-for": "203.0.113.9" },
+          remoteAddress: "10.0.0.1",
+        }),
+      ).toBe("203.0.113.9");
+    });
+
+    it("ignores x-real-ip under a CIDR list", async () => {
+      expect(
+        await detectIpThroughServer({
+          trustProxy: "10.0.0.0/8",
+          headers: { "x-real-ip": "203.0.113.9" },
+          remoteAddress: "10.0.0.1",
+        }),
+      ).toBe("10.0.0.1");
     });
   });
 });

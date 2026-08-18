@@ -1013,49 +1013,56 @@ export class Request<RequestValidation = any> {
   }
 
   /**
-   * Best-effort real client IP — behind a trusted proxy, checks `X-Real-IP`
-   * and `X-Forwarded-For` headers first, falls back to `baseRequest.ip` when
-   * neither is present.
+   * Best-effort real client IP — the value everything IP-scoped keys on
+   * (ip-filter allowlists, rate-limit buckets, idempotency scoping).
    *
-   * The forwarding headers are honoured ONLY when `http.trustProxy` is set:
-   * both are client-settable, so on a deployment without a trusted edge that
-   * overwrites them, any client could spoof its IP and bypass everything
-   * keyed on it (ip-filter allowlists, rate-limit buckets, idempotency
-   * scoping). Without the opt-in, this returns `baseRequest.ip` — the socket
-   * peer address — which cannot be forged.
+   * `X-Forwarded-For` resolution is **delegated to Fastify**: `baseRequest.ip`
+   * is already the client address Fastify's `trustProxy` machinery picked out
+   * of the chain, so every shape `http.trustProxy` accepts is honoured here
+   * with exactly the semantics Fastify documents:
    *
-   * For a multi-hop `X-Forwarded-For` (`client, proxy1, proxy2`) only the
-   * FIRST entry is returned (the original client), comma-split and trimmed.
-   * Without this, downstream scoping (ip-filter, rate-limit, idempotency)
-   * would key off the whole header string and break behind chained proxies.
+   * - `false` (default) — no header is trusted; the socket peer address wins.
+   *   Both forwarding headers are client-settable, so without a trusted edge
+   *   that rewrites them any client could otherwise forge its own IP.
+   * - `true` — the whole chain is trusted; the leftmost hop (original client)
+   *   wins.
+   * - `number` — that many rightmost hops are trusted, so an edge that
+   *   APPENDS to `X-Forwarded-For` yields the real client rather than whatever
+   *   the client prepended.
+   * - CIDR / IP list (string, comma-separated string, or array) or a custom
+   *   predicate — the chain is walked right-to-left and stops at the first hop
+   *   that isn't a trusted proxy.
+   *
+   * `X-Real-IP` is NOT part of that resolution — Fastify never looks at it,
+   * and unlike `X-Forwarded-For` it carries no chain, so there is nothing to
+   * validate a hop count or proxy allowlist against. It is therefore honoured
+   * only under `trustProxy: true` ("everything upstream is mine"), where it is
+   * no weaker than the trust already granted. Under a bounded `trustProxy`
+   * (hop count / CIDR list) it is ignored: a trusted-but-passthrough edge that
+   * forwards the client's own `X-Real-IP` verbatim would otherwise hand any
+   * client a way around the bound.
    *
    * **Prefer this over `request.ip` for any caller behind a proxy** (load
-   * balancer, CDN, reverse proxy, k8s ingress) — and make sure that proxy
-   * appends/overwrites the forwarding headers, since `http.trustProxy`
-   * trusts them wholesale.
+   * balancer, CDN, reverse proxy, k8s ingress).
    */
   public detectIp() {
-    // Forwarding headers are attacker-controlled unless a trusted edge
-    // overwrites them — same opt-in Fastify's own `trustProxy` gates on.
-    if (!config.get("http.trustProxy", false)) {
-      return this.baseRequest.ip;
+    // Trusting `X-Real-IP` is only sound when the config trusts the entire
+    // upstream chain; bounded shapes get chain-aware resolution instead.
+    if (config.get("http.trustProxy", false) === true) {
+      const realIp = this.header("x-real-ip");
+
+      if (realIp) {
+        const address = String(realIp).split(",")[0].trim();
+
+        if (address) return address;
+      }
     }
 
-    const realIp = this.header("x-real-ip");
-
-    if (realIp) return realIp;
-
-    const forwardedIp = this.header("x-forwarded-for");
-
-    if (forwardedIp) {
-      // `X-Forwarded-For` may carry the full proxy chain ("client, proxy1, ...").
-      // The original client is the leftmost entry; split + trim so multi-hop
-      // values don't leak the whole header string into IP-scoped logic.
-      const firstHop = String(forwardedIp).split(",")[0].trim();
-
-      if (firstHop) return firstHop;
-    }
-
+    // Fastify resolved this against the configured `trustProxy` already:
+    // socket peer when trust is off, the correct hop of `X-Forwarded-For`
+    // when it is on. Re-parsing the header here would mean a second, weaker
+    // trust model that could disagree with `request.ip` and with the plugins
+    // (rate limit, proxy) that key on it.
     return this.baseRequest.ip;
   }
 

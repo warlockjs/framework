@@ -29,10 +29,12 @@ export type IpFilterOptions = {
  * Allow / deny requests by client IP. Fail-closed: if the IP can't be read,
  * the request is rejected with 403.
  *
- * Reads the client IP via `request.detectIp()`, which honors `X-Real-IP` and
- * `X-Forwarded-For` only when `http.trustProxy` is set — otherwise the socket
- * peer address is used, since both headers are client-settable. When opting
- * in, make sure your upstream proxy overwrites the forwarding headers.
+ * Reads the client IP via `request.detectIp()`, which honors the forwarding
+ * headers only when `http.trustProxy` is set — otherwise the socket peer
+ * address is used, since both headers are client-settable. When opting in,
+ * prefer a bounded `http.trustProxy` (hop count or CIDR list of your proxies)
+ * over `true`: with `true`, any client that can reach the process directly
+ * picks its own IP and this allowlist is decorative.
  *
  * @example
  * import { middleware } from "@warlock.js/core";

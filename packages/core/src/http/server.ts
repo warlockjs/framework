@@ -16,6 +16,11 @@ export function startHttpServer(options?: FastifyServerOptions): FastifyInstance
     // what @fastify/rate-limit keys its buckets on — so trusting it by default
     // makes rate limiting bypassable on any deployment NOT behind a proxy that
     // strips the header. Apps behind such a proxy opt in explicitly.
+    //
+    // The value is passed through untouched so every shape Fastify supports
+    // works: `true`, a hop count, a CIDR/IP list (string, comma-separated
+    // string or array), or a predicate. `request.detectIp()` reads the client
+    // off `request.ip`, so it resolves the chain exactly the same way.
     trustProxy: config.get("http.trustProxy", false),
     // No default: an app that configures nothing keeps Fastify's own 1MB limit
     // rather than the historical 200GB, which silently removed the protection

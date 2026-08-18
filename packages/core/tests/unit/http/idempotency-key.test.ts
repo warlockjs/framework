@@ -126,11 +126,18 @@ describe("buildIdempotencyCacheKey", () => {
       delete config.list()?.http?.trustProxy;
     });
 
-    it("prefers X-Forwarded-For over the peer IP for the anonymous scope", () => {
+    /**
+     * `X-Forwarded-For` resolution belongs to Fastify (`request.ip`) and is
+     * covered end to end in `detect-ip.test.ts` against a live server, since a
+     * seeded `baseRequest` cannot reproduce the chain walk. `X-Real-IP` is the
+     * one header `detectIp()` reads itself, so it is what this seeded request
+     * can assert the scoping against.
+     */
+    it("prefers X-Real-IP over the peer IP for the anonymous scope", () => {
       config.set("http.trustProxy", true);
 
       const request = makeRequest({
-        headers: { "x-forwarded-for": "198.51.100.7" },
+        headers: { "x-real-ip": "198.51.100.7" },
         ip: "10.0.0.1",
       });
 
