@@ -90,6 +90,71 @@ describe("RabbitMQDriver — connection", () => {
     expect(driver.isConnected).toBe(false);
   });
 
+  it("URI-encodes credentials containing reserved URL characters", async () => {
+    const driver = new RabbitMQDriver({
+      driver: "rabbitmq",
+      host: "rabbit.internal",
+      username: "svc",
+      password: "p@ss:word/1",
+    });
+
+    await driver.connect();
+
+    // An unencoded `@`/`:`/`/` in the password would otherwise produce a
+    // malformed URL (extra `@`/`:`/`/` delimiters) that Node's URL parser
+    // could echo verbatim in an error — encoding closes that off at the
+    // source.
+    expect(connectMock).toHaveBeenCalledWith(
+      "amqp://svc:p%40ss%3Aword%2F1@rabbit.internal:5672/%2F",
+      expect.anything(),
+    );
+  });
+
+  it("redacts embedded credentials from a connection error before throwing", async () => {
+    connectMock.mockRejectedValueOnce(
+      new Error("Invalid URL: amqp://app:s3cr3t-pass@rabbit.internal:5672/%2F"),
+    );
+
+    const driver = new RabbitMQDriver({
+      driver: "rabbitmq",
+      host: "rabbit.internal",
+      username: "app",
+      password: "s3cr3t-pass",
+    });
+
+    let thrown: unknown;
+    try {
+      await driver.connect();
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(String(thrown)).toMatch(
+      /Failed to connect to RabbitMQ: Invalid URL: amqp:\/\/\*\*\*\*:\*\*\*\*@rabbit\.internal/,
+    );
+    expect(String(thrown)).not.toContain("s3cr3t-pass");
+  });
+
+  it("redacts credentials from an explicit uri's connection error too", async () => {
+    connectMock.mockRejectedValueOnce(
+      new Error("connect ECONNREFUSED amqps://user:top-secret@cloud.example.com/prod"),
+    );
+
+    const driver = new RabbitMQDriver({
+      driver: "rabbitmq",
+      uri: "amqps://user:top-secret@cloud.example.com/prod",
+    });
+
+    let thrown: unknown;
+    try {
+      await driver.connect();
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(String(thrown)).not.toContain("top-secret");
+  });
+
   it("emits disconnected on graceful disconnect", async () => {
     const driver = new RabbitMQDriver({ driver: "rabbitmq", host: "localhost", reconnect: false });
     const onDisconnected = vi.fn();

@@ -161,7 +161,11 @@ describe("RabbitMQChannel — subscribe smart ack", () => {
     expect(amqp.nack).toHaveBeenCalledWith(expect.anything(), false, false);
   });
 
-  it("nacks with requeue when the handler throws under maxRetries", async () => {
+  it("republishes with an incremented x-retry-count when the handler throws under maxRetries", async () => {
+    // Regression guard: a bare `nack(msg, false, true)` here would redeliver
+    // the ORIGINAL message untouched, so the counter would never advance and
+    // maxRetries/deadLetter would never be reached — the automatic path must
+    // republish with the incremented header, same as ctx.retry() does.
     await channel.subscribe(
       async () => {
         throw new Error("boom");
@@ -171,10 +175,15 @@ describe("RabbitMQChannel — subscribe smart ack", () => {
 
     await amqp.deliver(amqp.buildDelivery({ orderId: 1 }, { headers: { "x-retry-count": 1 } }));
 
-    expect(amqp.nack).toHaveBeenCalledWith(expect.anything(), false, true);
+    const republish = amqp.sent.find((entry) => entry.queue === "orders");
+
+    expect(republish).toBeDefined();
+    expect((republish!.options.headers as Record<string, unknown>)["x-retry-count"]).toBe(2);
+    expect(amqp.ack).toHaveBeenCalledTimes(1);
+    expect(amqp.nack).not.toHaveBeenCalled();
   });
 
-  it("nacks without requeue at maxRetries when a dead-letter is configured", async () => {
+  it("stops requeuing and dead-letters at maxRetries instead of looping forever", async () => {
     await channel.subscribe(
       async () => {
         throw new Error("boom");
@@ -187,7 +196,38 @@ describe("RabbitMQChannel — subscribe smart ack", () => {
 
     await amqp.deliver(amqp.buildDelivery({ orderId: 1 }, { headers: { "x-retry-count": 3 } }));
 
-    expect(amqp.nack).toHaveBeenCalledWith(expect.anything(), false, false);
+    const deadLettered = amqp.sent.find((entry) => entry.queue === "orders.failed");
+    expect(deadLettered).toBeDefined();
+    expect(JSON.parse(deadLettered!.content.toString()).payload).toEqual({ orderId: 1 });
+    expect(amqp.ack).toHaveBeenCalledTimes(1);
+    expect(amqp.nack).not.toHaveBeenCalled();
+  });
+
+  it("never redelivers the same message past maxRetries even across repeated poison-message deliveries", async () => {
+    // Simulates the poison-message DoS: the same failing message redelivered
+    // over and over must stop being requeued once the cap is hit, instead of
+    // spinning forever.
+    await channel.subscribe(
+      async () => {
+        throw new Error("boom");
+      },
+      { retry: { maxRetries: 2, delay: 0 } },
+    );
+
+    let retryCount = 0;
+    for (let i = 0; i < 5; i++) {
+      await amqp.deliver(amqp.buildDelivery({ orderId: 1 }, { headers: { "x-retry-count": retryCount } }));
+
+      const republish = amqp.sent.pop();
+      if (republish) {
+        retryCount = (republish.options.headers as Record<string, unknown>)["x-retry-count"] as number;
+      }
+    }
+
+    // Exactly maxRetries republishes happened (x-retry-count 1, 2) — the 3rd
+    // and later deliveries were rejected, not requeued again.
+    expect(retryCount).toBe(2);
+    expect(amqp.reject).toHaveBeenCalled();
   });
 
   it("rejects invalid messages on the consume side without running the handler", async () => {

@@ -1,3 +1,4 @@
+import { log } from "@warlock.js/logger";
 import { v } from "@warlock.js/seal";
 import { randomUUID } from "node:crypto";
 import type { ChannelContract } from "../../contracts";
@@ -160,6 +161,11 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
         // Track if acknowledgment was handled explicitly
         let ackHandled = isFireAndForget;
 
+        // Populated once the message is successfully parsed, so the catch
+        // block below can dead-letter with the full envelope. Stays
+        // `undefined` when `JSON.parse` itself is what threw.
+        let parsedMessage: Message<TPayload> | undefined;
+
         try {
           const content = JSON.parse(msg.content.toString());
           let payload = content.payload as TPayload;
@@ -195,6 +201,8 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
             payload,
             raw: msg,
           };
+
+          parsedMessage = message;
 
           const context: MessageContext = {
             ack: async () => {
@@ -235,31 +243,7 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
               if (ackHandled) return;
               ackHandled = true;
 
-              const retryCount = (metadata.retryCount || 0) + 1;
-              const maxRetries = options?.retry?.maxRetries ?? 3;
-
-              if (retryCount > maxRetries) {
-                // Send to dead-letter if configured
-                if (options?.deadLetter) {
-                  await this.sendToDeadLetter(message, options.deadLetter.channel);
-                }
-                this.amqpChannel.ack(msg);
-                return;
-              }
-
-              // Republish with retry count
-              const headers = {
-                ...msg.properties.headers,
-                "x-retry-count": retryCount,
-              };
-
-              if (delay) {
-                headers["x-delay"] = delay;
-              }
-
-              this.amqpChannel.sendToQueue(this.name, msg.content, { ...msg.properties, headers });
-
-              this.amqpChannel.ack(msg);
+              await this.retryOrGiveUp(msg, metadata.retryCount || 0, options, message, delay);
             },
           };
 
@@ -274,20 +258,19 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
           // Smart auto-nack: if handler threw and didn't explicitly handle ack
           if (ackHandled) return;
 
-          // Handle errors - nack and potentially retry
           if (options?.retry) {
-            const retryCount = msg.properties.headers?.["x-retry-count"] || 0;
-            if (retryCount < options.retry.maxRetries) {
-              // Requeue for retry
-              this.amqpChannel.nack(msg, false, true);
-            } else if (options.deadLetter) {
-              // Send to dead-letter
-              this.amqpChannel.nack(msg, false, false);
-            } else {
-              this.amqpChannel.reject(msg, false);
-            }
+            // A bare `nack(msg, false, true)` redelivers the ORIGINAL message
+            // untouched — amqplib/RabbitMQ do not add an `x-retry-count`
+            // header on requeue, so a plain requeue here never advances the
+            // counter and `maxRetries`/`deadLetter` are silently never
+            // reached. Route through the same bounded-retry path `ctx.retry()`
+            // uses, so the counter increments (and the cap/dead-letter fires)
+            // on this automatic path too.
+            const currentRetryCount = msg.properties.headers?.["x-retry-count"] || 0;
+            await this.retryOrGiveUp(msg, currentRetryCount, options, parsedMessage);
           } else {
-            // No retry configured - reject without requeue
+            // No retry configured - reject without requeue (already bounded:
+            // a single attempt, no requeue loop possible).
             this.amqpChannel.nack(msg, false, false);
           }
         }
@@ -345,6 +328,81 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
     });
 
     this.amqpChannel.sendToQueue(deadLetterChannel, Buffer.from(content), { persistent: true });
+  }
+
+  /**
+   * Dead-letter a message whose body couldn't be parsed into a {@link Message}
+   * (e.g. `JSON.parse` itself threw before an envelope existed). Forwards the
+   * raw AMQP bytes/properties as-is rather than re-deriving a payload, so a
+   * malformed message isn't lost.
+   */
+  private sendToDeadLetterRaw(msg: any, deadLetterChannel: string): void {
+    this.amqpChannel.sendToQueue(deadLetterChannel, msg.content, {
+      ...msg.properties,
+      persistent: true,
+    });
+  }
+
+  /**
+   * Bounded retry shared by the explicit `ctx.retry()` call and the automatic
+   * catch when a handler throws without calling it itself — so both paths
+   * honor the same cap instead of the automatic path silently requeueing
+   * forever (see `subscribe()`'s catch block).
+   *
+   * Under the cap: republishes with an incremented `x-retry-count` header —
+   * NOT a plain `nack(msg, false, true)`, which redelivers the original
+   * message untouched and never advances the counter.
+   *
+   * At/over the cap: dead-letters if configured, otherwise drops the message
+   * with a loud `log.error` (never a silent drop) so an operator can see a
+   * poison message was discarded instead of it vanishing without a trace.
+   */
+  private async retryOrGiveUp(
+    msg: any,
+    currentRetryCount: number,
+    options: SubscribeOptions | undefined,
+    parsedMessage: Message<TPayload> | undefined,
+    delay?: number,
+  ): Promise<void> {
+    const retryCount = currentRetryCount + 1;
+    const maxRetries = options?.retry?.maxRetries ?? 3;
+
+    if (retryCount > maxRetries) {
+      if (options?.deadLetter) {
+        if (parsedMessage) {
+          await this.sendToDeadLetter(parsedMessage, options.deadLetter.channel);
+        } else {
+          this.sendToDeadLetterRaw(msg, options.deadLetter.channel);
+        }
+      } else {
+        log.error(
+          "herald",
+          "poison-message",
+          `Dropping message on channel "${this.name}" after ${retryCount - 1} failed ` +
+            `${retryCount - 1 === 1 ? "retry" : "retries"} (maxRetries: ${maxRetries}) with no ` +
+            `dead-letter channel configured.`,
+          { channel: this.name, retryCount: retryCount - 1, maxRetries },
+        );
+        this.amqpChannel.reject(msg, false);
+        return;
+      }
+
+      this.amqpChannel.ack(msg);
+      return;
+    }
+
+    const headers: Record<string, unknown> = {
+      ...msg.properties.headers,
+      "x-retry-count": retryCount,
+    };
+
+    if (delay) {
+      headers["x-delay"] = delay;
+    }
+
+    this.amqpChannel.sendToQueue(this.name, msg.content, { ...msg.properties, headers });
+
+    this.amqpChannel.ack(msg);
   }
 
   /**

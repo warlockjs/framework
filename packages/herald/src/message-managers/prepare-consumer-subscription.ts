@@ -39,7 +39,12 @@ export function prepareConsumerSubscription(
       });
       ctx.ack(); // Auto-ack on success?
     } catch (error) {
-      ctx.nack(true); // Requeue on failure
+      // Bounded retry instead of an unconditional requeue: a message that
+      // reliably throws (bad payload, a handler bug, a downstream outage)
+      // would otherwise be nack+requeued forever, pinning the consumer in a
+      // hot loop. `ctx.retry()` caps redelivery and dead-letters/drops (with
+      // a loud log) once the cap is hit.
+      await ctx.retry();
       if (onError) {
         onError(error, Consumer.eventName);
       }

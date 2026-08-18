@@ -51,6 +51,19 @@ Or manually:
 `.trim();
 
 /**
+ * Strip `user:password@` credentials from any `amqp(s)://` URL embedded in a
+ * string. The connection URL carries plaintext broker credentials, and
+ * amqplib/Node's URL parser commonly echoes the offending URL verbatim in a
+ * malformed-URL error (e.g. an unencoded `@`/`:` in the password) — applied
+ * to every error `connect()` surfaces so a credential never reaches whatever
+ * the host app does with a thrown connection error (console.error,
+ * structured logging, an error tracker).
+ */
+function redactAmqpCredentials(message: string): string {
+  return message.replace(/(amqps?:\/\/)[^/@\s]+@/gi, "$1****:****@");
+}
+
+/**
  * Load amqplib, reusing the single shared load for every caller.
  *
  * @returns The amqplib module, or `undefined` when it is not installed.
@@ -226,9 +239,8 @@ export class RabbitMQDriver implements BrokerDriverContract {
       });
     } catch (error) {
       this._isConnected = false;
-      throw new Error(
-        `Failed to connect to RabbitMQ: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to connect to RabbitMQ: ${redactAmqpCredentials(message)}`);
     }
   }
 
@@ -244,8 +256,11 @@ export class RabbitMQDriver implements BrokerDriverContract {
     const host = this.options.host ?? "localhost";
     const port = this.options.port ?? 5672;
     const vhost = this.options.vhost ?? "/";
-    const username = this.options.username ?? "guest";
-    const password = this.options.password ?? "guest";
+    // URI-encoded so a credential containing a reserved URL character
+    // (`@`, `:`, `/`, whitespace — common in generated secrets) can't produce
+    // a malformed URL whose parser error echoes the raw credential back.
+    const username = encodeURIComponent(this.options.username ?? "guest");
+    const password = encodeURIComponent(this.options.password ?? "guest");
 
     const encodedVhost = encodeURIComponent(vhost);
 

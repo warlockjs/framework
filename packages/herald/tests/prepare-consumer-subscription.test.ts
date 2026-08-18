@@ -138,7 +138,7 @@ describe("prepareConsumerSubscription", () => {
     expect(received).toEqual({ value: 42 });
   });
 
-  it("requeues via nack(true) and reports the error when the handler throws", async () => {
+  it("retries (bounded) instead of an unconditional requeue and reports the error", async () => {
     const onError = vi.fn();
     const failure = new Error("handler boom");
 
@@ -158,7 +158,29 @@ describe("prepareConsumerSubscription", () => {
 
     await callback(createMessage({ payload: { value: 1 } }), context);
 
-    expect(context.nack).toHaveBeenCalledWith(true);
+    expect(context.retry).toHaveBeenCalledTimes(1);
+    expect(context.nack).not.toHaveBeenCalled();
     expect(onError).toHaveBeenCalledWith(failure, "demo.failing");
+  });
+
+  it("never requeues unconditionally via a bare nack when the handler throws repeatedly", async () => {
+    // Regression guard for the poison-message infinite loop: whatever the
+    // dispatcher does on failure, it must not be a plain `ctx.nack(true)` —
+    // that path has no retry cap and would requeue forever.
+    class FailingConsumer extends EventConsumer<Payload> {
+      public static eventName = "demo.failing";
+
+      public async handle() {
+        throw new Error("handler boom");
+      }
+    }
+
+    const callback = prepareConsumerSubscription(FailingConsumer as unknown as EventConsumerClass);
+
+    for (let i = 0; i < 5; i++) {
+      const context = createContext();
+      await callback(createMessage({ payload: { value: 1 } }), context);
+      expect(context.nack).not.toHaveBeenCalledWith(true);
+    }
   });
 });

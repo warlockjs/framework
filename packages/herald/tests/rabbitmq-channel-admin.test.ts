@@ -339,7 +339,7 @@ describe("RabbitMQChannel — throw-path retry routing", () => {
     channel = new RabbitMQChannel<OrderPayload>("orders", amqp);
   });
 
-  it("nacks without requeue at the retry ceiling when a dead-letter is configured", async () => {
+  it("dead-letters and acks at the retry ceiling when a dead-letter is configured", async () => {
     await channel.subscribe(
       async () => {
         throw new Error("boom");
@@ -352,8 +352,14 @@ describe("RabbitMQChannel — throw-path retry routing", () => {
 
     await amqp.deliver(amqp.buildDelivery({ orderId: 1 }, { headers: { "x-retry-count": 2 } }));
 
-    // At the ceiling with a DLQ configured the consume-side path nacks without requeue.
-    expect(amqp.nack).toHaveBeenCalledWith(expect.anything(), false, false);
+    // At the ceiling with a DLQ configured the consume-side path routes to the
+    // dead-letter queue and acks the original — never a bare nack, which
+    // would just requeue the same message with a stuck counter.
+    const deadLettered = amqp.sent.find((entry) => entry.queue === "orders.dlq");
+    expect(deadLettered).toBeDefined();
+    expect(JSON.parse(deadLettered!.content.toString()).payload).toEqual({ orderId: 1 });
+    expect(amqp.ack).toHaveBeenCalledTimes(1);
+    expect(amqp.nack).not.toHaveBeenCalled();
   });
 
   it("rejects at the retry ceiling when no dead-letter is configured", async () => {
