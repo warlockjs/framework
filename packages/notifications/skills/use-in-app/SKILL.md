@@ -85,6 +85,10 @@ class BaseNotificationsRepository extends RepositoryManager {
 }
 ```
 
+### `createFor` write side — no IDOR either (since 4.15.0)
+
+`recipientId` is always the trusted argument, applied **after** the payload — `createFor`/`createManyFor` strip server-owned keys (`id`, `recipientId`, `tenant`, `readAt`, `isRead`, and their resolved `columnMap` physical column names) off `input` before merging. Before this, a caller passing an untyped payload straight through (request JSON, a channel's `send` args) could smuggle its own `recipientId` — or the raw physical column name — and write the notification into someone else's inbox. `type` / `title` / `body` / `payload` / `idempotencyKey` are untouched; you don't need to sanitize `input` yourself.
+
 ### `columnMap` — map logical roles → your columns
 
 ```ts

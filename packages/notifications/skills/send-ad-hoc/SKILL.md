@@ -46,7 +46,7 @@ const channelName = await chooseChannelForUser(user);
 await notify.channel(channelName).send(user, payload);
 ```
 
-This is the only path with `unknown`-typed payloads — prefer the literal `notify.<channel>` when you can.
+This is the only path with `unknown`-typed payloads — prefer the literal `notify.<channel>` when you can. `to` is still what decides the recipient: even for the `database` channel, a `recipientId`-shaped key on `payload` (or the model's physical recipient column name) is stripped before the row is built, so an untyped payload assembled from request JSON can't redirect the write to another recipient — see [`use-in-app/SKILL.md`](../use-in-app/SKILL.md#createfor-write-side--no-idor-either-since-4150).
 
 ## Opt into preference/rate-limit gating
 

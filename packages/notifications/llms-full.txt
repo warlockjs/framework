@@ -697,7 +697,7 @@ const channelName = await chooseChannelForUser(user);
 await notify.channel(channelName).send(user, payload);
 ```
 
-This is the only path with `unknown`-typed payloads — prefer the literal `notify.<channel>` when you can.
+This is the only path with `unknown`-typed payloads — prefer the literal `notify.<channel>` when you can. `to` is still what decides the recipient: even for the `database` channel, a `recipientId`-shaped key on `payload` (or the model's physical recipient column name) is stripped before the row is built, so an untyped payload assembled from request JSON can't redirect the write to another recipient — see [`use-in-app/SKILL.md`](../use-in-app/SKILL.md#createfor-write-side--no-idor-either-since-4150).
 
 ## Opt into preference/rate-limit gating
 
@@ -834,6 +834,10 @@ class BaseNotificationsRepository extends RepositoryManager {
   public createFor(recipientId, input, tenantId?)   { /* one insert, starts unread */ }
 }
 ```
+
+### `createFor` write side — no IDOR either (since 4.15.0)
+
+`recipientId` is always the trusted argument, applied **after** the payload — `createFor`/`createManyFor` strip server-owned keys (`id`, `recipientId`, `tenant`, `readAt`, `isRead`, and their resolved `columnMap` physical column names) off `input` before merging. Before this, a caller passing an untyped payload straight through (request JSON, a channel's `send` args) could smuggle its own `recipientId` — or the raw physical column name — and write the notification into someone else's inbox. `type` / `title` / `body` / `payload` / `idempotencyKey` are untouched; you don't need to sanitize `input` yourself.
 
 ### `columnMap` — map logical roles → your columns
 
