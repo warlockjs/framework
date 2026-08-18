@@ -1,13 +1,47 @@
 ---
 name: redact-sensitive-log-fields
-description: 'Strip secrets from log output — two-layer additive redaction via log.configure({redact: {paths}}) (logger floor) + per-channel redact (more paths on top). Dotted glob paths (*, **). Triggers: `redact`, `paths`, `censor`, `log.setRedact`, `applyRedact`; "redact passwords in logs", "strip tokens from log output", "hide authorization headers", "scrub PII before logging"; typical import `import { log } from "@warlock.js/logger"`. Skip: filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; custom sinks — `@warlock.js/logger/write-custom-log-channel/SKILL.md`; competing libs `pino.redact`, `fast-redact`.'
+description: 'Strip secrets from log output — a built-in secret-key denylist on by default (DEFAULT_REDACT_KEYS), plus two-layer additive redaction via log.configure({redact: {paths, keys}}) (logger floor) + per-channel redact (more on top). Dotted glob paths (*, **). Triggers: `redact`, `paths`, `keys`, `defaultKeys`, `censor`, `log.setRedact`, `applyRedact`; "redact passwords in logs", "strip tokens from log output", "hide authorization headers", "scrub PII before logging", "turn off default redaction"; typical import `import { log } from "@warlock.js/logger"`. Skip: filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; custom sinks — `@warlock.js/logger/write-custom-log-channel/SKILL.md`; competing libs `pino.redact`, `fast-redact`.'
 ---
 
 # Redaction — keeping secrets out of logs
 
-Two layers, both opt-in. Configured at the logger and/or per channel.
+Three layers: a **built-in key denylist that is on by default**, plus opt-in path globs configured at the logger and/or per channel.
 
-## The model in one line
+## Layer 0 — the default denylist (since 4.15.0, no configuration needed)
+
+Common secret **key names** are censored at any depth of `context`, `message`, and an `Error`'s own enumerable properties — before any of your config runs:
+
+```ts
+log.error("auth", "login", "failed", { headers: req.headers, body: req.body });
+// context.headers.authorization → "[REDACTED]"
+// context.body.password         → "[REDACTED]"
+// context.body.email            → untouched
+```
+
+Keys are matched **exactly**, on a normalized form (lower-cased, separators stripped) — so one entry covers `apiKey` / `api_key` / `API-KEY` / `x-api-key`. It is not substring matching: `tokenCount` and `passwordUpdatedAt` survive. Read the exact set from `DEFAULT_REDACT_KEYS`.
+
+```ts
+import { DEFAULT_REDACT_KEYS } from "@warlock.js/logger";
+
+log.configure({
+  redact: {
+    keys: ["internalRef"],   // union with the built-in set
+    defaultKeys: false,      // opt out of the built-in set entirely
+  },
+});
+```
+
+`defaultKeys: false` is an escape hatch, not a tuning knob — it restores the pre-4.15.0 behavior where a `password` in `context` reaches every sink in cleartext. Prefer adding a function `censor` if you only need to keep a prefix.
+
+**A channel cannot turn the default set off** (it can only add keys, or turn it back *on* if the logger-wide config disabled it) — same additive-only contract as paths, below. And `log.setRedact(undefined)` clears *your* paths, not the default denylist.
+
+Not reachable by any layer: secrets interpolated into a `message` string (`` `token=${t}` ``), `Map`/`Set`/`Buffer` contents, and getter-backed or non-enumerable properties.
+
+## Layers 1 & 2 — path globs, opt-in
+
+For anything the denylist can't name by key — a secret under an app-specific key, or a value you want partially masked rather than blanked.
+
+The model in one line:
 
 > Logger-wide redaction is the security floor. Per-channel redaction adds more paths. **No channel can ever undo a logger-wide redaction.**
 
@@ -31,7 +65,7 @@ log.configure({
 
 // runtime equivalent:
 log.setRedact({ paths: ["context.password"] });
-log.setRedact(undefined);  // clear
+log.setRedact(undefined);  // clear your paths (the default denylist stays on)
 ```
 
 Every channel sees the redacted entry. Cheap: applied **once** before fan-out; channels share the redacted clone unless they add their own paths.

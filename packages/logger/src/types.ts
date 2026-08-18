@@ -39,24 +39,36 @@ export type RedactCensor =
 /**
  * Strip sensitive fields from log entries before they reach a channel.
  *
- * Paths are dotted glob patterns evaluated against the `LoggingData` itself —
- * use `context.password`, `message.token`, etc. Wildcards:
+ * Two independent matchers, both applied at the same choke point (so every
+ * channel inherits them):
  *
- * - `*`  — matches a single segment (any one key)
- * - `**` — matches zero or more segments (any depth, any key)
+ * 1. **Key denylist** (`keys` + the built-in `DEFAULT_REDACT_KEYS`) — matches
+ *    by *key name* at any depth, case- and separator-insensitively. **On by
+ *    default**, with no configuration: `password`, `authorization`, `apiKey`,
+ *    `token`, `cookie`, … are censored out of the box.
+ * 2. **Path globs** (`paths`) — opt-in, dotted patterns evaluated against the
+ *    `LoggingData` itself (`context.password`, `message.token`). Wildcards:
+ *    - `*`  — matches a single segment (any one key)
+ *    - `**` — matches zero or more segments (any depth, any key)
  *
  * Configurable in two places:
  *
  * 1. **Logger-wide** via `Logger.configure({ redact })` — applied once before
  *    fan-out. This is the security floor; no channel can undo it.
- * 2. **Per channel** via the channel's options. Channel paths are *additive*:
- *    they extend (never replace) the logger-wide list, so a channel can only
- *    redact more, never less.
+ * 2. **Per channel** via the channel's options. Channel paths/keys are
+ *    *additive*: they extend (never replace) the logger-wide list, so a
+ *    channel can only redact more, never less.
+ *
+ * @example
+ * // Nothing to configure for the common secrets — this is the default:
+ * log.info("auth", "login", "ok", { password: "hunter2" });
+ * // channel sees { password: "[REDACTED]" }
  *
  * @example
  * logger.configure({
  *   redact: {
- *     paths: ["context.password", "context.*.token", "context.headers.authorization"],
+ *     keys: ["internalRef"], // extends the built-in denylist
+ *     paths: ["context.*.token", "context.headers.authorization"],
  *     censor: "[REDACTED]",
  *   },
  * });
@@ -66,10 +78,34 @@ export type RedactConfig = {
    * Glob path patterns to redact. Paths are evaluated against the full
    * `LoggingData` object — so prefix with `context.` or `message.` to scope
    * to either field.
+   *
+   * Optional: omit it to rely on key-based redaction alone.
    */
-  paths: string[];
+  paths?: string[];
   /**
-   * Replacement applied at each matched path.
+   * Extra key names to censor anywhere they appear, in addition to the
+   * built-in {@link DEFAULT_REDACT_KEYS}. Matched case- and
+   * separator-insensitively on the normalized key, so `"internal_ref"`,
+   * `"internalRef"` and `"INTERNAL-REF"` are one entry.
+   */
+  keys?: string[];
+  /**
+   * Set to `false` to drop the built-in secret-key denylist and rely solely
+   * on `paths`/`keys`.
+   *
+   * This is an escape hatch, not a tuning knob — turning it off restores the
+   * pre-4.15.0 behavior where a `password` in `context` reaches every sink in
+   * cleartext. Prefer narrowing with a function `censor` over disabling.
+   *
+   * A *channel* may set this to `true` to re-enable defaults the logger-wide
+   * config turned off (channels can only redact more, never less); a channel
+   * setting it to `false` cannot disable a logger-wide default.
+   *
+   * @default true
+   */
+  defaultKeys?: boolean;
+  /**
+   * Replacement applied at each matched path or key.
    *
    * @default "[REDACTED]"
    */
@@ -100,8 +136,9 @@ export type BasicLogConfigurations = {
   context?: (data: LoggingData) => Promise<Record<string, any>>;
   /**
    * Channel-specific redaction. Additive on top of the logger-wide config —
-   * the channel's paths extend (never replace) the logger floor. The
-   * `censor` here, when omitted, falls back to the logger-wide censor.
+   * the channel's paths/keys extend (never replace) the logger floor. The
+   * `censor` here, when omitted, falls back to the logger-wide censor. The
+   * built-in key denylist applies to every channel whether or not this is set.
    */
   redact?: RedactConfig;
 };

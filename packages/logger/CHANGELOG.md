@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 4.15.0
 
+### Security
+
+- **Secrets are now redacted by default. This is a behavior change — logs that previously showed these values in cleartext will now show `[REDACTED]`.** Redaction used to be a *tool* (`redact.paths`, entirely opt-in): unless an application configured it, a `password` in `context`, an `authorization` header, or an `apiKey` on a logged `Error` reached every sink — console, log file, JSON log file, Sentry — verbatim. Protection existed only where every call site had been configured correctly, with no signal when one hadn't. It is now a *default*.
+
+  A built-in denylist (`DEFAULT_REDACT_KEYS`) censors matching keys at any depth of `context`, `message`, and an `Error`'s own enumerable properties, applied at the same logger-wide choke point as `redact.paths` — so every channel inherits it, including custom ones. The set covers passwords, shared secrets, tokens (access/refresh/id/CSRF/session), API and private keys, HTTP credential headers (`authorization`, `x-api-key`, `cookie`, `set-cookie`), session IDs, connection strings, and high-sensitivity financial PII (card numbers, CVV, SSN, IBAN).
+
+  Keys are matched **exactly**, after normalizing to lower-case with separators stripped — so one entry covers `apiKey` / `api_key` / `API-KEY` / `x-api-key`. Matching is deliberately not substring-based: `*token*` would also blank `tokenCount` and `passwordUpdatedAt`, which is silent data loss in the one place engineers look when something is broken. The trade is that unusual spellings are missed, which is what `redact.keys` is for.
+
+  Two new knobs on `RedactConfig`, both usable logger-wide or per channel:
+
+  - `keys: string[]` — extra key names, unioned with the built-in set.
+  - `defaultKeys: false` — opt out of the built-in set entirely (restores the pre-4.15.0 behavior). An escape hatch, not a tuning knob; prefer a function `censor` if you need to keep a prefix.
+
+  Existing `redact.paths` config is untouched and keeps working — paths and keys are independent matchers, and both apply. `paths` is now optional, so `redact: { keys: [...] }` alone is valid. The additive-only contract still holds in both directions: a channel can add keys or re-enable defaults, but **cannot** switch off a default the logger-wide config left on; conversely, a logger-wide `defaultKeys: false` is inherited rather than silently re-enabled by any channel that happens to set a `redact` option.
+
+  Paths are evaluated before keys, so a function `censor` on an explicit path still receives the original value rather than a mask, and that leaf is not censored twice.
+
+  Known residual gaps, unchanged by this release and documented on `applyRedact`: secrets interpolated into a `message` *string* (`` `token=${t}` ``) cannot be reached by either matcher; `Map` / `Set` / `Buffer` contents are not traversed; and properties exposed only via getters or non-enumerable descriptors are not walked, so an HTTP client that hides its request config behind a getter can still slip through. Enumerable ones — axios's `.config` / `.response`, which carry the outgoing `Authorization` header — *are* now covered.
+
+### Fixed
+
+- Cloning a log entry for redaction no longer discards an `Error`'s own enumerable properties. Previously, configuring `redact` at all silently reduced every logged `Error` to `message` / `stack` / `name` — dropping `.code` and friends as an unadvertised side effect, and putting `.config.headers.authorization` permanently out of reach of any path pattern. Those properties are now carried through the clone (and censored by the key denylist above). An `Error` subclass whose constructor takes a non-string argument also keeps its `message` instead of being rebuilt as an empty one.
+- The redaction clone no longer expands buffers, typed arrays, `Map`, `Set`, `Promise`, or `RegExp` into plain objects — matching what the code already documented. A `Buffer` in `context` had been rebuilt as a multi-thousand-key index map.
+
 ### Dependencies
 
 - Bumped `@mongez/reinforcements` to `^4.0.1`. The major makes `Random.string/nanoid/id/token/uuid` CSPRNG-backed (WebCrypto) and removes `Random.seed()` support. This package uses `Random.string(32)` only for the non-security `logger-<id>` instance identifier; audited for `Random.seed(` with no hits, so no code changes were needed.

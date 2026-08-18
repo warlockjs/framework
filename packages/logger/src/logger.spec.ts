@@ -782,16 +782,29 @@ describe("Logger — redact", () => {
     expect(channel.received[0]!.context!.password).toBe("[REDACTED]");
   });
 
-  it("clears the floor when set to undefined", async () => {
+  it("clears the path floor when set to undefined", async () => {
     const instance = new Logger();
     const channel = new CapturingChannel();
     instance.addChannel(channel);
-    instance.setRedact({ paths: ["context.password"] });
+    instance.setRedact({ paths: ["context.nickname"] });
+    instance.setRedact(undefined);
+
+    await instance.info("m", "a", "x", { nickname: "ally" });
+
+    expect(channel.received[0]!.context!.nickname).toBe("ally");
+  });
+
+  it("clearing the floor does NOT clear the built-in key denylist", async () => {
+    // `setRedact(undefined)` drops the app's own paths; the default secret
+    // denylist is not an app path and stays on. Opting out is explicit.
+    const instance = new Logger();
+    const channel = new CapturingChannel();
+    instance.addChannel(channel);
     instance.setRedact(undefined);
 
     await instance.info("m", "a", "x", { password: "secret" });
 
-    expect(channel.received[0]!.context!.password).toBe("secret");
+    expect(channel.received[0]!.context!.password).toBe("[REDACTED]");
   });
 
   describe("per-channel additive redaction", () => {
@@ -891,6 +904,150 @@ describe("Logger — redact", () => {
       expect(channel.received[0]!.context!.password).toBe("[FLOOR]");
       expect(channel.received[0]!.context!.email).toBe("[FLOOR]");
     });
+  });
+});
+
+describe("Logger — default secret redaction", () => {
+  class ConfiguredChannel extends LogChannel {
+    public name = "configured";
+    public terminal = false;
+    public received: LoggingData[] = [];
+
+    public constructor(redact?: any) {
+      super({ redact });
+    }
+
+    public log(data: LoggingData) {
+      this.received.push(data);
+    }
+  }
+
+  it("censors common secrets with no configuration whatsoever", async () => {
+    const instance = new Logger();
+    const channel = new CapturingChannel();
+    instance.addChannel(channel);
+
+    await instance.error("auth", "login", "failed login", {
+      headers: { authorization: "Bearer live-token" },
+      body: { email: "a@b.com", password: "hunter2" },
+    });
+
+    const context = channel.received[0]!.context as any;
+
+    expect(context.headers.authorization).toBe("[REDACTED]");
+    expect(context.body.password).toBe("[REDACTED]");
+    // Everything not on the denylist still reaches the sink.
+    expect(context.body.email).toBe("a@b.com");
+  });
+
+  it("applies to every channel, configured or not", async () => {
+    const instance = new Logger();
+    const plain = new CapturingChannel();
+    const configured = new ConfiguredChannel({ paths: ["context.email"] });
+    instance.setChannels([plain, configured]);
+
+    await instance.info("m", "a", "x", { apiKey: "sk_live_x", email: "a@b.com" });
+
+    expect(plain.received[0]!.context!.apiKey).toBe("[REDACTED]");
+    expect(configured.received[0]!.context!.apiKey).toBe("[REDACTED]");
+    expect(configured.received[0]!.context!.email).toBe("[REDACTED]");
+  });
+
+  it("a channel opting out cannot undo the logger-wide default", async () => {
+    const instance = new Logger();
+    const channel = new ConfiguredChannel({ defaultKeys: false });
+    instance.addChannel(channel);
+
+    await instance.info("m", "a", "x", { password: "secret" });
+
+    expect(channel.received[0]!.context!.password).toBe("[REDACTED]");
+  });
+
+  it("opts out logger-wide via redact.defaultKeys = false", async () => {
+    const instance = new Logger();
+    const channel = new CapturingChannel();
+    instance.configure({
+      channels: [channel],
+      redact: { defaultKeys: false },
+    });
+
+    await instance.info("m", "a", "x", { password: "secret" });
+
+    expect(channel.received[0]!.context!.password).toBe("secret");
+  });
+
+  it("a logger-wide opt-out is not resurrected by a channel's own redact config", async () => {
+    const instance = new Logger();
+    const channel = new ConfiguredChannel({ paths: ["context.email"] });
+    instance.setChannels([channel]);
+    instance.setRedact({ defaultKeys: false });
+
+    await instance.info("m", "a", "x", { password: "secret", email: "a@b.com" });
+
+    expect(channel.received[0]!.context!.password).toBe("secret");
+    expect(channel.received[0]!.context!.email).toBe("[REDACTED]");
+  });
+
+  it("extends the default set with app-specific keys", async () => {
+    const instance = new Logger();
+    const channel = new CapturingChannel();
+    instance.configure({
+      channels: [channel],
+      redact: { keys: ["internalRef"] },
+    });
+
+    await instance.info("m", "a", "x", {
+      password: "secret",
+      internal_ref: "IR-1",
+      role: "admin",
+    });
+
+    expect(channel.received[0]!.context!.password).toBe("[REDACTED]");
+    expect(channel.received[0]!.context!.internal_ref).toBe("[REDACTED]");
+    expect(channel.received[0]!.context!.role).toBe("admin");
+  });
+
+  it("a channel can add keys on top of the logger-wide set", async () => {
+    const instance = new Logger();
+    const channel = new ConfiguredChannel({ keys: ["channelOnly"] });
+    instance.setChannels([channel]);
+    instance.setRedact({ keys: ["loggerWide"] });
+
+    await instance.info("m", "a", "x", {
+      password: "p",
+      loggerWide: "l",
+      channelOnly: "c",
+    });
+
+    expect(channel.received[0]!.context!.password).toBe("[REDACTED]");
+    expect(channel.received[0]!.context!.loggerWide).toBe("[REDACTED]");
+    expect(channel.received[0]!.context!.channelOnly).toBe("[REDACTED]");
+  });
+
+  it("censors a secret riding on a logged Error", async () => {
+    const instance = new Logger();
+    const channel = new CapturingChannel();
+    instance.addChannel(channel);
+
+    const error = new Error("401");
+    (error as any).config = { headers: { Authorization: "Bearer sk_live_x" } };
+
+    await instance.error("payments", "charge", error);
+
+    expect((channel.received[0]!.message as any).config.headers.Authorization).toBe(
+      "[REDACTED]",
+    );
+  });
+
+  it("does not mutate the caller's context", async () => {
+    const instance = new Logger();
+    const channel = new CapturingChannel();
+    instance.addChannel(channel);
+
+    const context = { password: "secret" };
+    await instance.info("m", "a", "x", context);
+
+    expect(context.password).toBe("secret");
   });
 });
 
