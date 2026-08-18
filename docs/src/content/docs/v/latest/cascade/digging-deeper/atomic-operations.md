@@ -166,6 +166,10 @@ The query-builder atomic story extends to other shapes too:
 
 Atomicity composes: a transaction wrapping several query-builder increments is **race-safe and event-firing** (events still fire for any `Model.create` / `instance.save()` inside; the bare `.increment()` calls remain event-free regardless of transaction wrapping).
 
+:::caution[`Model.atomic()` / find-and-modify statics sanitize their filter]
+`Model.atomic(filter, ops)`, `Model.findAndUpdate(filter, ops)`, `Model.findOneAndUpdate(filter, ops)`, `Model.findAndReplace(filter, data)` and `Model.findOneAndDelete(filter)` run their `filter` argument through the same `$`-prefixed-key check `where()` uses (see [`where(...)`](../reference/query-builder-api.md#where) in the API reference), throwing `UnsafeFilterError` on a key like `$ne`. These statics forward `filter` straight to the driver, bypassing `where()` — so before this, a filter taken directly from a request body (`User.atomic(req.body.filter, { $set: { role: "admin" } })`) could still smuggle an operator query through even on a codebase that only ever used `where()` for reads. Only the filter is checked — the update-operator object (`$set`/`$inc`/`$unset`/…) is untouched, since operators belong there. If you need operator conditions in the filter itself, express them through `Model.query().where(...)` instead of passing a raw filter object to these statics.
+:::
+
 ## Going further
 
 - **Lifecycle events** that fire (or don't) per API: [Events and hooks guide](../architecture-concepts/events-and-hooks.md)

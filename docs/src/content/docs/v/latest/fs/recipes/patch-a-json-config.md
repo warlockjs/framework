@@ -50,6 +50,10 @@ would overwrite the *entire* `features` object with just
 `{ deep: true }` whenever your patch is more than one level down.
 :::
 
+:::note[Safe against prototype pollution]
+`mergeJson` drops `__proto__` / `constructor` / `prototype` keys from both sides of the merge, at every depth, instead of merging them — so patching straight from a request body (`mergeJson(configPath, req.body)`, a natural shape for a "PATCH this config" endpoint) can't poison the merged object or the file written back to disk. The rest of the payload merges as normal.
+:::
+
 ## Computed update
 
 When the new value depends on the old one — increment a version, append to a

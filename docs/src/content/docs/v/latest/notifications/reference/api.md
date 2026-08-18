@@ -50,6 +50,8 @@ Abstract base model implementing `NotificationContract` (`recipientId` / `type` 
 
 Concrete repo. Resolves the model's `columnMap` in its constructor and derives BOTH the read filter (`filterBy`) and the write/update/delete mapping from it — one source, reads and writes can't disagree. Methods: `createFor(recipientId, input, tenantId?)`, `createManyFor`, `markRead`, `markUnread`, `findFor`, `deleteFor`. Subclass only for EXTRA query methods; column names come from the model's `columnMap`.
 
+`createFor` / `createManyFor` (since 4.15.0) strip server-owned keys — `id`, `recipientId`, `tenant`, `readAt`, `isRead`, and their resolved `columnMap` physical column names — off `input` before merging in the trusted `recipientId` argument, so an untyped `input` can't redirect the write to another recipient.
+
 ## Migration
 
 `notificationColumns(model?): ColumnMap` — table columns named from the model's `columnMap` (recipient / tenant / read-state); `type` / `title` / `body` / `payload` / `idempotency_key` are fixed, with a unique `idempotency_key`. Use with `Migration.create`.

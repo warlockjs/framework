@@ -56,6 +56,8 @@ await connectToBroker({
 
 When `uri` is set, the other connection fields are ignored — herald passes the URI straight to amqplib. Useful when the provider gives you exotic TLS or auth setups.
 
+**Credentials never leak into a connection error.** Whether you pass `username`/`password` or a full `uri`, a failed connect has `user:pass@` redacted before the error is thrown — safe to log or forward to an error tracker as-is. (`username`/`password` are also URI-encoded when herald builds the internal `amqp://` URL, so a reserved character in a generated secret can't produce a malformed URL that echoes the raw credential back.)
+
 ## TLS
 
 For `amqps://`, either pass the URI directly (as above) or thread certs through `clientOptions.socket`:

@@ -53,6 +53,10 @@ await user.merge({ name: "Augusta Ada King", status: "active" }).save();
 
 `.merge()` copies each key from the object into the instance's pending state (only the keys present), then `.save()` persists. Existing fields not in the object are untouched. A typical update service in your codebase looks exactly like that one line.
 
+:::note[Safe by design against id-spoofing]
+`user.merge(req.body); await user.save();` is exactly this idiom, and `req.body` is attacker-controlled — so on an **already-persisted** instance, `.merge()` drops identity columns (`id`, `_id`, whatever `static primaryKey` names) instead of applying them. A body carrying `{ id: "<victim-id>", role: "admin" }` can't redirect the write onto someone else's row: `update()`/`replace()`/`destroy()` build their filter from `model.trustedPrimaryKey`, the id captured when the instance became persisted (hydration, or right after an insert) — never the current in-memory value, so a post-merge mutation of `id` can't change what gets written. Identity columns are also excluded from the generated `$set`/`$unset`, so an explicit `user.set("id", ...)` on a loaded record doesn't rewrite the key of the row it's pinned to either. This only guards an *existing* record — `User.create({ id, ... })` with an explicit id is unchanged, since there's no row to retarget yet. To deliberately change a primary key, go through the [atomic/raw APIs](../digging-deeper/atomic-operations.md) instead of `merge()`.
+:::
+
 **Nested values follow one rule:** plain objects are merged key-by-key, so siblings survive; everything else — primitives, arrays, and class instances such as `Date`, `Map`, `Set`, `RegExp` — replaces the old value outright.
 
 ```ts

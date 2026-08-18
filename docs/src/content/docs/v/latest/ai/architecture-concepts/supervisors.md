@@ -79,7 +79,7 @@ Each branch's output strip-merges into `state` per its declared schema. Last-wri
 3. `evaluate` (if provided) inspects `state` and `result`. Returns `{ satisfied: true }` to end, `undefined` to loop.
 4. If satisfied or `END` → terminate. Otherwise → loop.
 
-`maxIterations` (default 10) is the hard cap. Hitting it surfaces `MaxIterationsError`.
+`maxIterations` (default 10) bounds how deep a run goes; `maxFanOut` (default `10`) bounds how wide a single dispatch goes — an over-wide deduped `next` array (e.g. one grown by a router prompt-injected via `state` or a prior branch's output) is rejected as `SupervisorRoutingError` rather than dispatched. See [Run supervisor](/v/latest/ai/orchestration/run-supervisor/) for the full detail. Hitting `maxIterations` surfaces `MaxIterationsError`.
 
 ## Per-intent `next` — skip the router
 

@@ -7,7 +7,7 @@ sidebar:
 
 Every Cascade model has a `toJSON()` method, and `JSON.stringify(user)` calls it. By default that returns the model's raw `data` object — every column, including the ones you didn't mean to expose. For HTTP responses that's usually wrong.
 
-This guide covers the two ways Cascade lets you shape what flows *out*: the `static toJsonColumns` allow-list and the `static resource` class. Both are Cascade-native — no framework helpers required.
+This guide covers the ways Cascade lets you shape what flows *out*: the `static toJsonColumns` allow-list, the `static resource` class, and `static hidden` — a guaranteed exclusion that wins over both. All three are Cascade-native — no framework helpers required.
 
 ## `toJSON()` is the entry point
 
@@ -186,7 +186,33 @@ When to reach for it: you want defence-in-depth so that a freshly-added sensitiv
 
 If both `resource` and `toJsonColumns` are set, `resource` wins — `toJsonColumns` is only consulted when there's no resource.
 
-## Choosing between the two patterns
+## Pattern 3 — `static hidden`, the guaranteed exclusion
+
+`toJsonColumns` and `resource` are both allow-lists (or shaping code) you maintain by hand. That's fine until someone refactors the resource, or a new column shows up and nobody remembers to keep it out. `static hidden: string[]` is a separate, always-on backstop:
+
+```ts
+@RegisterModel()
+export class User extends Model<UserSchema> {
+  public static table = "users";
+  public static schema = userSchema;
+  public static hidden = ["password", "resetToken"];
+}
+```
+
+**What it does:** every field named in `hidden` is stripped from `toJSON()` output, unconditionally — with the raw-`data` default (no `toJsonColumns`/`resource` set), with `toJsonColumns` (hidden wins even if the field is in the allow-list), and from the data object handed to a `resource` class's constructor (so the resource never even sees it, let alone can accidentally return it).
+
+**Default is `[]`.** Declaring `hidden` is opt-in — nothing changes on an existing model until you add fields to the array. But because that default fails open (a model with no `hidden`, no `resource`, no `toJsonColumns` still serializes everything), Cascade logs a **one-time `console.warn` per model** whose schema declares a credential-shaped column — `password`, `passwordHash`, `secret`, `token`, `apiKey`/`api_key`, matched case-insensitively — that isn't covered by `hidden`, `resource`, or `toJsonColumns`. That warning is meant to be acted on: add the field to `hidden` (or confirm your `resource`/`toJsonColumns` already excludes it, which the warning doesn't currently detect for resource-shaped output beyond the raw schema check).
+
+**Reach for `hidden` whenever a field must never reach an API response**, even if you also use `resource` or `toJsonColumns` for everything else — it's the one path that survives a resource refactor, an `AdminUserResource` subclass that forgets to re-exclude it, or a future teammate adding a second resource for a new endpoint.
+
+```ts
+// hidden wins regardless of the other two:
+public static hidden = ["password"];
+public static toJsonColumns = ["id", "name", "password"]; // "password" still dropped
+public static resource = UserResource;                     // resource's `this.data.password` is already gone
+```
+
+## Choosing between the patterns
 
 | Situation                                | Reach for                                  |
 | ---------------------------------------- | ------------------------------------------ |
@@ -196,6 +222,7 @@ If both `resource` and `toJsonColumns` are set, `resource` wins — `toJsonColum
 | Conditionally include a field            | `resource`                                 |
 | Include loaded relations in output       | `resource` (automatic composition)         |
 | Different shape for different consumers  | Multiple resources, explicit constructor   |
+| A field must NEVER serialize, whichever of the above is set | `hidden` |
 
 ## Multiple shapes — admin view, list view, etc.
 

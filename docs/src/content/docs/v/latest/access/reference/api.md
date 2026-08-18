@@ -67,7 +67,7 @@ Stack these after `authMiddleware` (they read `request.user`).
 | --- | --- |
 | `AccessErrorCodes` | `Forbidden = "EC100"` |
 | `AccessConfigError` | thrown loudly on misconfig (e.g. no resolver) — not a silent deny |
-| `AccessConfigurations` | `config.access.*` shape — `{ resolver, cache?: { ttl } }` |
+| `AccessConfigurations` | `config.access.*` shape — `{ resolver, cache?: { ttl }, strictPolicies?: boolean }` |
 | `AccessContext` | check context — reserved `resource` / `tenant` + free-form |
 | `PolicyContext` | what a policy receives — `tenant`, `hasRole`, `hasPermission`, free-form |
 | `PolicyFn` | `(user, resource, ctx) => boolean \| Promise<boolean>` |
@@ -75,7 +75,7 @@ Stack these after `authMiddleware` (they read `request.user`).
 
 ## Decision semantics
 
-- `can` / `authorize` = **grant AND (no policy OR policy passes)**. A policy runs only when `ctx.resource` is supplied.
+- `can` / `authorize` = **grant AND (no policy OR policy passes)**. A policy runs only when `ctx.resource` is supplied. An instance check with a grant but no registered policy is allowed and logs a one-time `log.warn` per permission — set `strictPolicies: true` to throw `AccessConfigError` instead.
 - Wildcards: `*` (super-grant), `orders.*` (prefix, nested-aware — but **not** the bare `orders`), exact.
 - **Fails closed** — any error resolving a decision denies and logs.
 - The cache is **best-effort** — a cache failure degrades to the resolver, never denies.

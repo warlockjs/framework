@@ -2,7 +2,7 @@
 title: "Best Practices — Memory"
 sidebar:
   label: "Memory"
-description: How to give an agent durable memory without poisoning the prompt — separate working scratch from semantic recall, store facts not transcripts, tune k and threshold for signal, and namespace per user so a shared store never leaks.
+description: How to give an agent durable memory without poisoning the prompt — separate working scratch from semantic recall, store facts not transcripts, tune k and threshold for signal, and scope per user/tenant so a shared store never leaks.
 ---
 
 The pillar this page answers: **what should an agent remember, and how do you put it back in front of the model without drowning the prompt in noise?**
@@ -122,11 +122,22 @@ const prefs = await mem.recall("dietary preferences", { tier: "semantic", k: 3 }
 
 > Treat the threshold as a per-domain dial, not a global constant. Tightly-worded facts (a plan name, a unit preference) tolerate a higher floor; fuzzy, conversational recall needs a lower one. Start at the `0.7` default, then watch what actually gets injected and move it.
 
-## Namespace per user or tenant — a shared store must never leak
+## Isolate per user or tenant — a shared store must never leak
 
-This is the one that becomes a security incident if you skip it. The semantic tier writes to a `@warlock.js/cache` driver, and **one store can hold many users' memories**. If every user's memory writes to the same namespace, a recall for User A can surface User B's allergies, plan, or private project name. The `namespace` prefix is how you keep them apart.
+This is the one that becomes a security incident if you skip it. `ai.memory()` is normally built **once** at boot and shared by every end user (the pattern `ai.orchestrator({ memory })` documents), and every tier — including `working` — enforces isolation the same way, not just `semantic`. If nothing isolates recall, a query for User A can surface User B's allergies, plan, or private project name.
 
-**Do this — derive the namespace from the user or tenant identity.** Build a per-identity memory so reads and writes are physically partitioned in the store.
+**Do this first — `scope` (4.15.0), the built-in isolation key.** Every `remember()` / `recall()` call takes a `scope`, enforced by exact-equality match **inside** every tier before hits are scored, merged, or sliced — so one shared instance is safe by construction, no per-user `ai.memory()` object required:
+
+```ts
+await mem.remember({ text: "Allergic to shellfish.", tier: "semantic", scope: `user:${userId}` });
+
+// Bob's recall can never see Alice's facts — the tier checks scope equality, not just the key.
+const hits = await mem.recall("any dietary restrictions?", { scope: `user:${bobId}` });
+```
+
+Omitting `scope` is **not** a wildcard — an unscoped recall only ever sees unscoped entries, never a scoped one. `ai.orchestrator({ memory })` derives this automatically from the turn's `sessionId` (`memory.scope`, default `"session"` — see [Architecture — Memory](/v/latest/ai/architecture-concepts/memory/)), so wiring memory into an orchestrator is isolated out of the box; reach for `scope` explicitly only when you call `remember` / `recall` directly, outside an orchestrator turn.
+
+**`namespace` is a complementary, coarser tool** — it physically partitions keys in the underlying `@warlock.js/cache` driver, which is useful for routing different users/tenants to different stores or purging one tenant's data independently of the rest. `scope` is the finer, per-call boundary and the one that keeps one *shared* store's reads honest; use `namespace` on top of it, not instead of it, when you need physical separation:
 
 ```ts
 function memoryForUser(userId: string) {
@@ -147,20 +158,23 @@ const bobMemory = memoryForUser("bob");
 const hits = await bobMemory.recall("any dietary restrictions?");
 ```
 
-**Avoid this — one namespace for all users.** A single shared default namespace means recall is a cross-user query waiting to leak.
+**Avoid this — no `scope` and no `namespace`.** One shared instance with neither means recall is a cross-user query waiting to leak.
 
 ```ts
-// Anti-pattern: every user's memory lands in the same key space.
+// Anti-pattern: every caller's memory lands in the same, unscoped key space.
 const sharedMemory = ai.memory({
   semantic: {
     embedder: openai.embedder({ name: "text-embedding-3-small" }),
     store,
-    // no namespace → all users collide under the default "ai.memory" prefix
+    // no namespace → all callers collide under the default "ai.memory" prefix
   },
 });
+
+await sharedMemory.remember({ text: "Allergic to shellfish.", tier: "semantic" }); // no scope
+const hits = await sharedMemory.recall("any dietary restrictions?"); // sees EVERY caller's unscoped facts
 ```
 
-> The same isolation argument applies to **tenants**. In a B2B app, key on `tenant:${tenantId}` (or `tenant:${tenantId}:user:${userId}` when you need both axes). Whatever the boundary your product promises — that's the namespace boundary.
+> The same isolation argument applies to **tenants**. In a B2B app, scope on `tenant:${tenantId}` (or `tenant:${tenantId}:user:${userId}` when you need both axes). Whatever the boundary your product promises — that's the `scope` (and, if you also want physical partitioning, the `namespace`) boundary.
 
 ## Don't treat memory as a dumping ground
 
@@ -175,7 +189,7 @@ await mem.clear("working");
 
 `clear(tier?)` with no argument wipes every tier; with a `tier` it scopes to one — `clear("working")` is the routine session-teardown call, leaving semantic recall intact.
 
-**Avoid this — letting the store grow unbounded.** Because **decay / forgetting is deferred to 4.4**, nothing evicts a stale semantic memory for you today. A fact you stored a year ago still embeds, still matches, still costs tokens when it surfaces. Until 4.4 ships decay, *you* own retention: store fewer, higher-signal facts; overwrite a changing fact in place via a stable `id` rather than appending a new contradictory one; and periodically prune what no longer holds.
+**Avoid this — letting the durable tiers grow unbounded.** Because **decay / forgetting is still deferred**, nothing evicts a stale semantic (or episodic/procedural) memory for you today. A fact you stored a year ago still embeds, still matches, still costs tokens when it surfaces. Until decay ships, *you* own retention on the durable tiers: store fewer, higher-signal facts; overwrite a changing fact in place via a stable `id` rather than appending a new contradictory one; and periodically prune what no longer holds. The **working** tier is the one exception — it's size-bounded (`working: { maxItems }`, default `1000`, FIFO eviction) precisely because it has no durable backing store and no cap was a memory-exhaustion path for a long-lived shared process; see [Architecture — Memory](/v/latest/ai/architecture-concepts/memory/) for the eviction policy.
 
 > **On the deferred tiers.** `MemoryTier` is intentionally closed to `"working" | "semantic"` in v1 — episodic ("what happened in past runs"), procedural ("how to do a recurring task"), and decay land in **4.4** as a non-breaking widening. Don't simulate episodic memory by dumping transcripts into semantic; that recreates exactly the noise this page warns against. Wait for the real tier.
 

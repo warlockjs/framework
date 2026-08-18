@@ -179,6 +179,8 @@ userContext.clear();                              // wipe the store
 
 `set` is sugar for `update({ key: value })`. Both call `Object.assign(currentStore, partial)` — top-level merge, no deep copy. Both should be called inside an active context; outside, `update` silently `enter()`s a new context with the partial, which is rarely what you want.
 
+Both drop `__proto__` / `constructor` / `prototype` keys instead of merging them — otherwise a caller-shaped payload (e.g. `userContext.update(req.body)`) could pollute `Object.prototype` for the whole process, since the store is shared. The rest of the payload still merges as normal; this closes the prototype vector only — validate untrusted input before merging it into a context.
+
 `clear()` replaces the store with `{}` cast to `TStore`. It does not exit the context — `hasContext()` still returns true after `clear()`. Rare in app code; the cleanup at the end of `run()` is the normal path.
 
 ## Multiple context instances of the same class

@@ -86,6 +86,8 @@ By default (`dag` off) the planner runs the classic loop:
 - Earlier steps' outputs are threaded into later steps' prompt context, so a downstream capability builds on what ran before it.
 - `maxSteps` (default 10, must be ≥ 1) caps execution; a longer generated plan is truncated and the dropped tail recorded as `skipped`.
 
+**`maxSteps` also gates parsing, not just execution (4.15.0).** The strict-mode JSON Schema handed to the planning model can't express `maxItems`, so nothing on the wire stopped a provider or proxy that ignores the requested step budget from returning an arbitrarily long `steps[]` array — the truncate-to-`skipped` behavior above only ran *after* that whole array was already parsed. Plan validation now enforces a hard **parse-time** ceiling of `maxSteps * 4` (or `100` when the schema is built without a `maxSteps`) and **rejects** a plan past it with `PlannerPlanInvalidError`, rather than parsing it and truncating. The 4× slack keeps the everyday case — a model overshooting "at most N steps" by a little — truncating to `skipped` exactly as before; only a plan several times over budget is treated as a malfunction worth surfacing.
+
 The three sections below — DAG execution, adaptive re-planning, and the plan-only/approval gate — are all **additive and off by default**. Leave them unset and the planner behaves exactly as the sequential loop above, byte-for-byte.
 
 ## DAG execution — `dag` and `maxConcurrency`

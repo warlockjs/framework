@@ -511,7 +511,7 @@ Info + housekeeping: `exists`, `isEmpty`, `size`, `stats` (→ `{ path, name, si
 ### The JSON family — pick the right one
 - `getJson` — read (+ optional `schema` validation, + `default` when missing).
 - `putJson` — overwrite the whole document.
-- `mergeJson(path, partial, { deep? })` — **patch an object** (shallow spread; `deep:true` recurses).
+- `mergeJson(path, partial, { deep? })` — **patch an object** (shallow spread; `deep:true` recurses). `__proto__`/`constructor`/`prototype` keys are dropped from both sides at every depth (not merged) — so a caller-supplied `partial` (e.g. a PATCH request body) can't prototype-pollute the merged object or the file written back to disk. The rest of the payload merges as normal.
 - `editJson(path, fn)` — arbitrary transform, e.g. push into an array `(arr) => [...arr, x]`.
 - `ensureJson(path, fallback)` — return the parsed doc, or create it with `fallback`.
 - `appendJsonLine(path, value)` — **NDJSON**: one JSON record per line (a log/journal), NOT one JSON document; never parses or merges.

@@ -26,12 +26,12 @@ npx create-warlock my-app --yes \
   --git --jwt
 ```
 
-The first positional argument (or `--name`) is the project name. Value flags accept either `--db=postgres` or `--db postgres`. Unknown `--db`, `--features`, or `--ai` keys fail fast — before anything is written to disk — so a typo never leaves you with a half-scaffolded project.
+The first positional argument (or `--name`) is the project name. Value flags accept either `--db=postgres` or `--db postgres`. Unknown `--db`, `--features`, `--ai`, or `--pm` keys fail fast — before anything is written to disk — so a typo (or a hostile value) never leaves you with a half-scaffolded project.
 
 | Flag | Default | Purpose |
 | --- | --- | --- |
 | `--db` | `mongodb` | Database driver — `mongodb`, `postgres`, or `none` |
-| `--pm` | auto-detected | Package manager (`npm` / `yarn` / `pnpm`) |
+| `--pm` | auto-detected | Package manager — must be `npm` / `yarn` / `pnpm` / `bun`; any other value is rejected before scaffolding starts |
 | `--features` | none | Comma-separated optional feature keys |
 | `--ai` | none | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`) |
 | `--git` / `--no-git` | off | Initialize a Git repository |

@@ -27,6 +27,10 @@ await inApp.dismiss(user);                           // clear all for this user
 
 Every method forces the recipient id into the query. `markAsRead(user, id)` with an `id` belonging to a *different* user matches zero rows — **IDOR-safe by construction**, not by a guard you might forget. All methods accept a cascade model or a raw id.
 
+### The write side is IDOR-safe too (since 4.15.0)
+
+`createFor(recipientId, input, tenantId?)` treats `recipientId` as the trusted argument and applies it **after** `input` — server-owned keys (`id`, `recipientId`, `tenant`, `readAt`, `isRead`, and their resolved `columnMap` physical column names) are stripped from `input` before the row is built. Before this fix, an `input` payload assembled from untyped data (request JSON, a channel's `send` args) that happened to carry a `recipientId` key — or the model's physical recipient column name — could redirect the write into another recipient's inbox. `createManyFor` inherits the same protection. `type` / `title` / `body` / `payload` / `idempotencyKey` pass through unchanged — you don't need to sanitize `input` yourself.
+
 ## The model
 
 Extend the shipped base and declare your physical columns once via `columnMap` — the accessors are the stable contract, the column names are yours. The `schema` mirrors the migration columns; cascade validates + casts every write against it:

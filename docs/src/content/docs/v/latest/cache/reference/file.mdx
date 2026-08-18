@@ -140,6 +140,10 @@ The file driver creates a directory structure like this:
 
 Each cache entry is stored in its own directory with a JSON file containing the data and metadata.
 
+## Key Safety
+
+Cache keys can carry untrusted input (a `cached()` auto-key derived from a request param, for example), so the file driver never lets a key choose its own path. `%`, `/`, and `\` in a key are percent-encoded before the on-disk directory is built — a key like `../../etc` becomes an inert directory name, not a path traversal — and the resolved path is additionally asserted to stay inside the configured `directory` (the cache root), throwing `CacheError` otherwise. `removeNamespace(ns)` also clears dotted sibling keys (`ns.a`, `ns.b`, …), not just a directory literally named `ns`.
+
 ## Expired Cache
 - Expired cache is only removed when accessed.
 - For automatic cleanup, consider a background job or use Redis.

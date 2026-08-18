@@ -83,6 +83,10 @@ await User.where("age", ">", 18).get();
 await User.where({ status: "active", role: "admin" }).get();
 ```
 
+:::caution[Equality values reject `$`-prefixed keys]
+The equality forms — `where(field, value)`, `where(field, "=", value)`, and the object form — run the value (and, for the object form, each top-level key) through a check that rejects `$`-prefixed keys, throwing `UnsafeFilterError`. This closes the classic NoSQL operator-injection hole where a request body forwarded straight into a filter — `User.first({ email, password })` with `password: { $ne: null }` — compiled into a live MongoDB operator query instead of an equality match. The same check runs on every filter-accepting model static (`first`, `findFirst`, `findAll`, `count`, `paginate`, `all`, `delete`/`deleteMany`, `deleteOne`, `atomic`, `findAndUpdate`, `findOneAndUpdate`, `findAndReplace`, `findOneAndDelete`). It does **not** apply to explicit operator APIs — `where(field, operator, value)` for non-`=` operators, `whereIn`/`whereNull`/`whereBetween`/…, and the object form of `whereRaw()` — those already express an operator on purpose. Dotted paths (`"profile.name"`) and plain nested-object equality values remain valid. Two helpers, `sanitizeFilter(filter)` and `sanitizeFilterValue(value, field)`, are exported for callers who forward a filter to a driver-level API directly.
+:::
+
 **See also:** [Querying essentials](../the-basics/02-querying.md)
 
 ### `orWhere(...)`
@@ -156,6 +160,21 @@ whereNotEndsWith(field: string, value: string | number): this
 await User.whereLike("name", "%john%").get();
 await User.whereStartsWith("email", "admin@").get();
 ```
+
+:::caution[A `string` pattern is matched LITERALLY]
+`whereLike`, `whereNotLike`, `whereStartsWith`/`whereNotStartsWith`, `whereEndsWith`/`whereNotEndsWith` — and the `$regex` form of `whereSearch` below — escape a `string` argument before matching, so it behaves as a literal substring, not a regex. The one wildcard that still expands is the SQL `LIKE` `%` (runs of `%` collapse into one `.*`); every other regex metacharacter (`.`, `*`, `+`, `^`, `$`, `(`, `)`, …) in the string matches itself. This is what makes it safe to wire `whereSearch("name", req.query.q)` straight to a search box — before this, a raw string compiled directly into a MongoDB `$regex`, so a value like `^.*$` matched everything, `^a`/`^b`/… probed a field back one character at a time, and a pattern with nested quantifiers (`(a+)+$`) triggered catastrophic backtracking (ReDoS) against every scanned document.
+
+An explicit **`RegExp`** argument is still used as a real pattern, unescaped — but a `RegExp` can't arrive as JSON, so it only reaches these calls from developer-authored code. **Never construct that `RegExp` from user input.** For a pattern built partly from dynamic data, escape the dynamic parts yourself:
+
+```ts
+import { escapeRegex, likePatternToRegexSource } from "@warlock.js/cascade";
+
+escapeRegex("(a+)+$");                  // "\\(a\\+\\)\\+\\$" — literal text
+likePatternToRegexSource("%o'brien%");  // ".*o'brien.*"      — % still a wildcard
+```
+
+The Postgres driver was already parameterized (`ILIKE $1`) and is unaffected either way.
+:::
 
 ### `whereDate` / `whereDateEquals` / `whereDateBefore` / `whereDateAfter` / `whereDateBetween` / `whereDateNotBetween`
 
@@ -286,8 +305,15 @@ orWhereRaw(expression: RawExpression, bindings?: unknown[]): this
 **What it does:** drop into the driver's native query language for a where clause Cascade can't express.
 
 ```ts
-await User.whereRaw("this.age > ?", [30]).get();
+await User.whereRaw({ $expr: { $gt: ["$stock", "$reserved"] } }).get(); // MongoDB — object form
+await User.whereRaw("age > ?", [30]).get();                            // SQL — string form, real bindings
 ```
+
+:::caution[String form throws on MongoDB — use the object form]
+On the MongoDB driver, a **string** expression used to compile to `{ $where: "<js>" }` — arbitrary JavaScript executed inside `mongod` for every scanned document, with `?` bindings substituted by string concatenation rather than real parameterization. That's an injection sink whenever any part of the string is request-influenced, and an unindexed full-scan DoS even when fully trusted. `whereRaw()`/`orWhereRaw()` string expressions now throw `UnsafeRawExpressionError` on MongoDB — switch to the **object form** (`whereRaw({ $expr: … })`), which keeps working and is the form shown above. SQL drivers are unaffected and keep string mode with real bindings.
+
+The **object form** is also checked: it rejects the server-side-JavaScript operators `$where`, `$function` and `$accumulator` anywhere in the expression (throws `UnsafeRawExpressionError`), while `$expr` and the rest of the aggregation operators keep working.
+:::
 
 ---
 

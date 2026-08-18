@@ -132,7 +132,8 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | `OrchestratorExecuteOptions<TState>` | Per-call options — `sessionId` (required), `history` (required), `state?`, `context?`, `signal?`, `on?`, `force?`. |
 | `OrchestratorResumeOptions` | Options for `resume()` — `context?`, `signal?`, `on?`, `force?`. |
 | `OrchestratorCommands` | Typed command map for `command()`; ships `compact`, open for module augmentation. |
-| `OrchestratorAsToolOptions<TToolInput>` | `asTool()` options — adds `sessionScope: "fresh" | "shared"`. |
+| `OrchestratorAsToolOptions<TToolInput>` | `asTool()` options — `sessionScope: "fresh" \| "shared"` plus (4.15.0) `session`, **required** for `"shared"`: a literal session id, or a `(ctx) => sessionId` resolver reading the tool's out-of-band `ToolContext` (never the model-visible payload). `unsafeAllowModelSessionId` restores the pre-4.15.0 payload-driven behavior. |
+| `OrchestratorToolSession` / `OrchestratorToolSessionBinding` | The `session` binding shape — `string \| (ctx) => string \| { sessionId, history? } \| undefined`. |
 | `OrchestratorEvent` / `OrchestratorEventMap` / `OrchestratorEventHandlers` | The `orchestrator.*` event surface (3-tier). |
 | `CompactionResult` | `{ summary, replacesFromIndex, replacesToIndex }`. |
 | `SummarizeConfig` / `SummarizeCallback` | `summarize` policy shapes. |
@@ -159,12 +160,12 @@ import { ai, /* types, errors */ } from "@warlock.js/ai";
 | Export | What it is |
 | --- | --- |
 | `MemoryContract` | Returned by `ai.memory`. `.remember()`, `.recall()`, `.clear()`, `.name`. |
-| `MemoryConfig` | Config — `working?`, `semantic?`, `defaultTier?`, `k?`, `threshold?`. |
+| `MemoryConfig` | Config — `working?` (`boolean \| { maxItems? }`, default `true` → `maxItems: 1000`, 4.15.0), `semantic?`, `defaultTier?`, `k?`, `threshold?`. |
 | `SemanticMemoryConfig` | `{ embedder, store?, namespace? }`. |
-| `MemoryItem` | `{ text, tier?, id?, metadata? }`. |
+| `MemoryItem` | `{ text, tier?, id?, scope?, metadata? }` — `scope` (4.15.0) is the isolation key, enforced by exact-equality inside every tier. |
 | `MemoryTier` | `"working" | "semantic" | "episodic" | "procedural"` — all four tiers shipped in 4.3.0. |
 | `RecalledMemory` | `{ id, text, tier, score, metadata? }`. |
-| `RecallOptions` | `{ k?, tier?, threshold? }`. |
+| `RecallOptions` | `{ k?, tier?, threshold?, scope? }` — `scope` (4.15.0) restricts recall to entries remembered under the exact same key; omitting it is not a wildcard. |
 
 ## Skills
 
@@ -472,6 +473,7 @@ All extend `AIError`. Stable `code` strings listed in [Handle errors](/v/latest/
 | `BudgetExceededError` | `BUDGET_EXCEEDED` | `budget` |
 | `GuardrailViolationError` | `GUARDRAIL_VIOLATION` | `guardrail` |
 | `SupervisorDriftError` | `SUPERVISOR_DRIFT` | `drift` |
+| `SupervisorRoutingError` | `SUPERVISOR_INVALID_ROUTE` | `routing` |
 | `MaxIterationsError` | `SUPERVISOR_MAX_ITERATIONS` | `max-iterations` |
 | `OrchestratorFailedError` | `ORCHESTRATOR_FAILED` | varies |
 | `OrchestratorDriftError` | `ORCHESTRATOR_DRIFT` | `drift` |
@@ -501,10 +503,10 @@ A shared trust-boundary foundation used by every server-side outbound request (a
 
 | Export | What it is |
 | --- | --- |
-| `OutboundPolicy` / `ResolvedOutboundPolicy` | Outbound-request controls — `allowedSchemes?` (default `["https"]`), `hostAllowlist?`, `denyPrivateIPsAfterDNS?` (default `true`), `maxBytes?` (5 MiB), `timeoutMs?` (10s), `signal?`, `fetch?`. The resolved form has every default filled. |
+| `OutboundPolicy` / `ResolvedOutboundPolicy` | Outbound-request controls — `allowedSchemes?` (default `["https"]`), `hostAllowlist?`, `denyPrivateIPsAfterDNS?` (default `true`), `maxBytes?` (5 MiB), `timeoutMs?` (10s), `maxRedirects?` (default `5`, 4.15.0), `signal?`, `fetch?`. The resolved form has every default filled. |
 | `resolveOutboundPolicy(policy?)` | Fill a partial policy with the strict defaults (idempotent). |
 | `assertUrlAllowed(url, policy)` | Validate scheme + host allowlist + post-DNS private-IP guard before any fetch. Returns the parsed `URL`; throws `OutboundPolicyError`. |
-| `guardedFetch(url, policy, init?)` | `assertUrlAllowed` + timeout-merged `fetch` → raw `Response`. Read it with `readTextCapped`. |
+| `guardedFetch(url, policy, init?)` | `assertUrlAllowed` + timeout-merged `fetch` → raw `Response`. Every redirect hop is issued `redirect: "manual"` and re-validated via `assertUrlAllowed` before being followed, capped at `maxRedirects`, with `authorization` / `cookie` / `proxy-authorization` stripped on a cross-origin hop (4.15.0). Read the response with `readTextCapped`. |
 | `fetchTextWithPolicy(url, policy, init?)` | `guardedFetch` + `readTextCapped` → `{ ok, status, statusText, text }`. |
 | `readTextCapped(response, maxBytes)` | Read a body as UTF-8 with a hard byte cap. |
 | `isPrivateOrReservedIp(ip)` | `true` for private / loopback / link-local / unique-local / cloud-metadata addresses — the post-DNS SSRF predicate. |

@@ -1,6 +1,6 @@
 ---
 title: "Outbound policy (SSRF guard)"
-description: OutboundPolicy is the shared SSRF and resource-exhaustion guard for every server-side fetch the framework makes on a user's behalf — https-only, post-DNS private-IP deny, byte cap, timeout. resolveOutboundPolicy fills the strict defaults; guardedFetch / fetchTextWithPolicy enforce them.
+description: OutboundPolicy is the shared SSRF and resource-exhaustion guard for every server-side fetch the framework makes on a user's behalf — https-only, post-DNS private-IP deny, byte cap, timeout, and per-hop redirect revalidation. resolveOutboundPolicy fills the strict defaults; guardedFetch / fetchTextWithPolicy enforce them.
 sidebar:
   order: 7
   label: "Outbound policy (SSRF guard)"
@@ -8,7 +8,7 @@ sidebar:
 
 Some agent surfaces fetch remote content on the user's behalf — a remote-text attachment, a URL skill source, a future RAG document loader. Those URLs are frequently user-controlled, so an unguarded `fetch()` is an [SSRF](https://owasp.org/www-community/attacks/Server_Side_Request_Forgery) hole (point it at `http://169.254.169.254/` and read cloud metadata) and a resource-exhaustion hole (point it at a multi-gigabyte body).
 
-`OutboundPolicy` is the one audited guard those surfaces share, instead of six ad-hoc `fetch()` call sites. It is `https`-only, denies any host that *resolves to* a private / reserved address, caps the response body, and enforces a timeout — all on by default. A policy violation throws an `OutboundPolicyError`.
+`OutboundPolicy` is the one audited guard those surfaces share, instead of six ad-hoc `fetch()` call sites. It is `https`-only, denies any host that *resolves to* a private / reserved address, caps the response body, enforces a timeout, and — critically — re-validates every redirect hop instead of letting the platform follow one blindly. A policy violation throws an `OutboundPolicyError`.
 
 ## When you touch it
 
@@ -42,6 +42,7 @@ const policy: OutboundPolicy = {
 | `denyPrivateIPsAfterDNS` | `boolean` | `true` | Resolve the host through DNS and reject when it maps to a private / loopback / link-local / unique-local / cloud-metadata (`169.254.169.254`) address. The core SSRF guard — catches a public hostname that resolves inward. |
 | `maxBytes` | `number` | `5_242_880` (5 MiB) | Max response body in bytes. A declared `content-length` over this fails fast; otherwise the body is read with a running cap and aborted on overflow. |
 | `timeoutMs` | `number` | `10_000` | Per-request timeout in milliseconds. |
+| `maxRedirects` | `number` | `5` | Maximum redirect hops `guardedFetch` will follow. Every hop's `Location` is re-run through the same scheme / host-allowlist / private-IP checks before being followed — see [Redirects are revalidated per hop](#redirects-are-revalidated-per-hop-not-delegated-to-fetch) below. |
 | `signal` | `AbortSignal` | _(none)_ | Caller signal, merged with the internal timeout — whichever fires first aborts the request. |
 | `fetch` | `typeof fetch` | `globalThis.fetch` | Injected `fetch` implementation (for tests, proxies, or a wrapper that already enforces app-level rules). |
 
@@ -111,6 +112,27 @@ const body = await readTextCapped(response, policy.maxBytes);
 :::caution
 `guardedFetch` returns the body **unread**. The byte cap is only enforced when you read it through `readTextCapped` — reading the `Response` any other way (`response.text()`, `response.arrayBuffer()`) bypasses `maxBytes`.
 :::
+
+### Redirects are revalidated per hop, not delegated to `fetch`
+
+Validating only the *initial* URL and then letting the platform's `fetch` follow redirects automatically leaves a gap: a URL that passes every check can still `3xx` into `http://169.254.169.254/` or an internal host, and the platform would follow it with no re-check. `guardedFetch` closes that gap — it never sets `redirect: "follow"` on the underlying request. Every hop is issued with `redirect: "manual"`, and when the response is a redirect, its `Location` header is resolved and re-run through the exact same `assertUrlAllowed` (scheme, host allowlist, post-DNS private-IP deny) **before** it is followed:
+
+- Capped at `policy.maxRedirects` (default `5`) — one hop past the cap throws `OutboundPolicyError`.
+- **Credential headers are stripped on a cross-origin hop.** `authorization`, `cookie`, and `proxy-authorization` are dropped the moment a redirect's target origin differs from the current one, so a redirect can't carry credentials meant for the original host to somewhere else.
+- **Method/body semantics match `fetch`'s own redirect handling.** A `303` — and the legacy convention of a `301`/`302` on a non-`GET`/`HEAD` request — re-issues the next hop as a bodyless `GET`.
+- The net guarantee: a redirect can never land `guardedFetch` on a URL the original request could not have reached directly.
+
+Pass `init.redirect` to opt out of following:
+
+```ts
+// Inspect the raw 3xx yourself — no follow, no throw:
+const response = await guardedFetch(url, policy, { redirect: "manual" });
+
+// Reject outright the moment any redirect is returned:
+await guardedFetch(url, policy, { redirect: "error" }); // throws OutboundPolicyError on a 3xx
+```
+
+`fetchTextWithPolicy` follows redirects (the default) and applies the same revalidation, since it calls `guardedFetch` internally.
 
 ### `readTextCapped(response, maxBytes)`
 

@@ -920,7 +920,7 @@ See [`@warlock.js/cascade/subscribe-to-model-events/SKILL.md`](@warlock.js/casca
 
 ---
 name: define-model
-description: 'Define a Cascade model — `@RegisterModel()`, class extends `Model<TSchema>`, `static table`, `static schema`, three update idioms (`.set` / `.merge` / `.save`), `.unset`, `.destroy`, `static toJsonColumns` / `resource` for output shaping. Triggers: `Model`, `RegisterModel`, `static schema`, `.set`, `.merge`, `.save`, `.unset`, `.destroy`, `toJsonColumns`, `resource`; "how do I define a model", "shape the JSON output", "remove a field"; typical import `import { Model, RegisterModel } from "@warlock.js/cascade"`. Skip: querying — `@warlock.js/cascade/query-data/SKILL.md`; relations — `@warlock.js/cascade/define-relations/SKILL.md`; competing libs `mongoose`, `prisma`, `typeorm` `@Entity`.'
+description: 'Define a Cascade model — `@RegisterModel()`, class extends `Model<TSchema>`, `static table`, `static schema`, three update idioms (`.set` / `.merge` / `.save`), `.unset`, `.destroy`, `static toJsonColumns` / `resource` / `static hidden` for output shaping. Covers write safety: `static hidden` fields are ALWAYS stripped from `toJSON()` regardless of `resource`/`toJsonColumns`, cascade warns once per model on an unhidden credential-shaped field, and `merge()` on a persisted model drops identity columns so request data can never retarget an `update()`/`destroy()` at another row. Triggers: `Model`, `RegisterModel`, `static schema`, `.set`, `.merge`, `.save`, `.unset`, `.destroy`, `toJsonColumns`, `resource`, `hidden`, `trustedPrimaryKey`; "how do I define a model", "shape the JSON output", "remove a field", "hide password from response", "prevent id in request body overwriting another row"; typical import `import { Model, RegisterModel } from "@warlock.js/cascade"`. Skip: querying — `@warlock.js/cascade/query-data/SKILL.md`; relations — `@warlock.js/cascade/define-relations/SKILL.md`; competing libs `mongoose`, `prisma`, `typeorm` `@Entity`.'
 ---
 
 # Define a model
@@ -1014,6 +1014,8 @@ await user.merge({ name: "Augusta Ada King", status: "active" }).save();
 
 The everyday case. Service takes `Partial<UserSchema>` from a request body, merges it into the instance, saves. Existing fields not in the object are untouched.
 
+**Safe against id-retargeting by design.** `model.merge(req.body); await model.save();` is the canonical update-my-profile shape — and `req.body` is attacker-controlled. On an already-persisted model, `merge()` drops identity columns (`id`, `_id`, the configured primary key) instead of applying them, so a body carrying `{ id: "<victim-id>", role: "admin" }` cannot redirect the write onto someone else's row: `update()`/`replace()`/`destroy()` build their filter from `model.trustedPrimaryKey` — the id captured when the instance became persisted (hydration, or right after an insert), never the current in-memory value. Identity columns are also excluded from the `$set`/`$unset` payload, so an explicit `.set("id", …)` on a loaded record doesn't rewrite the key of the row it's pinned to either. This only applies to an *existing* record — `User.create({ id, ... })` with an explicit id is unchanged, since there's no row to retarget yet. If you deliberately need to change a primary key, do it through the atomic/raw APIs (see [`perform-atomic-ops`](@warlock.js/cascade/perform-atomic-ops/SKILL.md)), not `merge()`.
+
 ### `.save()` after manual mutation — when changes are spread
 
 ```ts
@@ -1093,11 +1095,25 @@ export class User extends Model<UserSchema> {
 
 Plain TypeScript class. No framework dependencies. `static resourceColumns` narrows which columns reach the resource; pair the two for strongly-typed public output.
 
+### Fields that must never serialize — `static hidden`
+
+```ts
+@RegisterModel()
+export class User extends Model<UserSchema> {
+  public static table = "users";
+  public static schema = userSchema;
+  public static hidden = ["password", "resetToken"];
+}
+```
+
+`static hidden: string[]` names top-level fields `toJSON()` (and therefore `JSON.stringify(user)` / `res.json(user)`) can **never** emit — stripped whether the model falls back to the raw-document default, uses `toJsonColumns`, or goes through `resource` (hidden wins over all three). Defaults to `[]`, so declaring it is opt-in and nothing changes on an existing model until you add fields — but because that default fails open, cascade logs a one-time `console.warn` per model whose schema declares a credential-shaped column (`password`, `passwordHash`, `secret`, `token`, `apiKey`/`api_key`, case-insensitive) that isn't covered by `hidden`, `resource`, or `toJsonColumns`. Treat that warning as "add this field to `hidden`," not noise to suppress. Prefer `hidden` over remembering to exclude the field from every `toJsonColumns` list by hand — it's enforced regardless of which shaping strategy a given model (or a future refactor) picks.
+
 ## Things NOT to do
 
 - Don't `new User()` to create a record — `User.create({...})` validates, persists, fires events.
 - Don't `.set("relation_name", instance)` for a relation slot. Use `setRelation("name", instance)`.
 - Don't return the raw model from an HTTP route without shaping output. Add `toJsonColumns` or `resource`.
+- Don't rely on `toJsonColumns`/`resource` alone to keep a password or token out of responses — declare it in `static hidden` too; that's the one path enforced no matter which shaping strategy is used, and the only one that survives someone adding a second `resource` later.
 - Don't `await user.save()` and forget the `await` — your changes live only on the instance and never reach the DB.
 - Don't expect schema defaults to apply on `.merge()` — defaults fire on `.create()` only.
 
@@ -1753,7 +1769,7 @@ The total count requires an extra query. On very large filtered tables, this can
 
 ---
 name: perform-atomic-ops
-description: 'Avoid races on concurrent writes — `Model.increase(filter, field, n)` / `Model.decrease` for atomic counters, `Model.atomic(filter, ops)` for arbitrary mutations (`$set` / `$inc` / `$push` / `$pull`), `Model.createMany` / `Model.findAndUpdate` / `Model.delete` for bulk. Triggers: `Model.increase`, `Model.decrease`, `Model.atomic`, `Model.createMany`, `createMany bulk`, `batchSize`, `Model.findAndUpdate`, `Model.delete`, `$inc`, `$set`; "increment counter under concurrency", "bulk insert without N+1", "fast bulk insert", "insert thousands of rows", "atomic update without loading"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: multi-row atomicity — `@warlock.js/cascade/manage-transactions/SKILL.md`; competing patterns `mongoose findOneAndUpdate`, `pg` `UPDATE ... SET x = x + 1`.'
+description: 'Avoid races on concurrent writes — `Model.increase(filter, field, n)` / `Model.decrease` for atomic counters, `Model.atomic(filter, ops)` for arbitrary mutations (`$set` / `$inc` / `$push` / `$pull`), `Model.createMany` / `Model.findAndUpdate` / `Model.delete` for bulk. `atomic()` / `findAndUpdate()` / `findOneAndUpdate()` / `findAndReplace()` / `findOneAndDelete()` sanitize their `filter` argument — `$`-prefixed keys throw `UnsafeFilterError`, same check as `where()`. Triggers: `Model.increase`, `Model.decrease`, `Model.atomic`, `Model.createMany`, `createMany bulk`, `batchSize`, `Model.findAndUpdate`, `Model.findOneAndUpdate`, `Model.findAndReplace`, `Model.findOneAndDelete`, `Model.delete`, `$inc`, `$set`, `UnsafeFilterError`; "increment counter under concurrency", "bulk insert without N+1", "fast bulk insert", "insert thousands of rows", "atomic update without loading", "is atomic() safe with a request body filter"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: multi-row atomicity — `@warlock.js/cascade/manage-transactions/SKILL.md`; competing patterns `mongoose findOneAndUpdate`, `pg` `UPDATE ... SET x = x + 1`.'
 ---
 
 # Use atomic operations
@@ -1779,6 +1795,8 @@ await User.atomic({ id: userId }, {
 ```
 
 `Model.atomic(filter, operations)` → `Promise<number>`. Driver-flavored atomic mutation — MongoDB has `$set` / `$inc` / `$push` / `$pull`; the Postgres driver translates the equivalents. Use when you need to combine multiple field changes atomically without loading the model first.
+
+**`filter` is sanitized like `where()`.** `atomic()`, `findAndUpdate()`, `findOneAndUpdate()`, `findAndReplace()` and `findOneAndDelete()` all run their `filter` argument through the same `$`-prefixed-key check as `Model.where()` (see [`query-data`](@warlock.js/cascade/query-data/SKILL.md)) and throw `UnsafeFilterError` on a key like `$ne`. Before this, these five bypassed `where()` entirely, so a filter forwarded straight from a request body — `User.atomic(req.body.filter, { $set: { role: "admin" } })` — could still smuggle an operator like `{ role: { $ne: "admin" } }` through as a live query even though `where()` itself was already guarded. Only the FILTER is checked — the update-operator object (`$set`/`$inc`/`$unset`/…) is untouched, since that's meant to carry `$` keys. If you legitimately need operator conditions in the filter, express them through `Model.query().where(...)` instead of the raw filter argument.
 
 ## Bulk insert — `Model.createMany`
 
@@ -1864,6 +1882,7 @@ for (const user of targets) {
 - Don't expect `findAndUpdate` / `delete` to fire per-row `saved` / `deleted` events or honor the delete strategy. They don't. Iterate if you need that.
 - Don't hand-roll chunking around `createMany` — it already chunks by `batchSize` (default 500). Tune `batchSize` instead of slicing the array yourself.
 - Don't assume `bulk: true` fires per-row `saving` / `created` / `saved` events or runs instance hooks — it doesn't. Casts/timestamps/defaults/ids still apply, but if you need the lifecycle, use the default path (or iterate with `.save()`).
+- Don't forward a raw request-body object as the `filter` to `atomic()`/`findAndUpdate()`/`findOneAndUpdate()`/`findAndReplace()`/`findOneAndDelete()` expecting it to be un-sanitized — it isn't, `$`-prefixed keys throw `UnsafeFilterError` — but don't rely on that as your only authorization check either; it blocks operator injection, not "does this caller own this row."
 
 ## See also
 
@@ -1875,7 +1894,7 @@ for (const user of targets) {
 
 ---
 name: query-data
-description: 'Query records via the model — `.where(field, value)` / `.where(field, op, value)`, `.find(id)` / `.first` / `.all`, `.orderBy`, `.count` / `.exists`, plus `.whereIn` / `.whereBetween` / `.whereLike` / `.pluck` / `.firstOrFail` / scopes via `addScope`. Triggers: `.where`, `.find`, `.first`, `.firstOrFail`, `.all`, `.get`, `.orderBy`, `.exists`, `.whereIn`, `.whereBetween`, `addScope`; "filter by status", "find by id", "fetch active users", "check existence"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: pagination — `@warlock.js/cascade/paginate-results/SKILL.md`; aggregates — `@warlock.js/cascade/aggregate-data/SKILL.md`.'
+description: 'Query records via the model — `.where(field, value)` / `.where(field, op, value)`, `.find(id)` / `.first` / `.all`, `.orderBy`, `.count` / `.exists`, plus `.whereIn` / `.whereBetween` / `.whereLike` / `.pluck` / `.firstOrFail` / scopes via `addScope`. Covers filter safety: `where()` rejects `$`-prefixed keys (`UnsafeFilterError`), `whereRaw()` string form rejects `$where`/`$function`/`$accumulator` (`UnsafeRawExpressionError`), and `whereLike`/`whereStartsWith`/`whereEndsWith`/`whereSearch` match string arguments literally (pass a `RegExp` for pattern semantics). Triggers: `.where`, `.find`, `.first`, `.firstOrFail`, `.all`, `.get`, `.orderBy`, `.exists`, `.whereIn`, `.whereBetween`, `.whereLike`, `.whereRaw`, `addScope`, `escapeRegex`, `likePatternToRegexSource`, `UnsafeFilterError`, `UnsafeRawExpressionError`; "filter by status", "find by id", "fetch active users", "check existence", "search box query", "is where() safe from injection"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: pagination — `@warlock.js/cascade/paginate-results/SKILL.md`; aggregates — `@warlock.js/cascade/aggregate-data/SKILL.md`.'
 ---
 
 # Query data
@@ -1920,6 +1939,23 @@ const targets = await User.where({ status: "active", role: "admin" }).get();
 ```
 
 Equivalent to chained equalities. Useful when the filter comes from a dynamic source. **Object form only supports equality** — use chained `.where()` for operators.
+
+### Filters are safe to build from request data — but only through this API
+
+`where(field, value)`, `where(field, "=", value)` and the object form all run the value through a `$`-prefixed-key check before it reaches the driver, so `User.first({ email: req.body.email, password: req.body.password })` throws `UnsafeFilterError` instead of compiling `{ password: { $ne: null } }` into a live MongoDB operator query (the classic NoSQL auth-bypass). This applies to every filter-accepting model static too — `first`, `findFirst`, `findAll`, `count`, `paginate`, `all`, `deleteMany`/`delete`, `deleteOne`, and the atomic/find-and-modify statics in [`perform-atomic-ops`](@warlock.js/cascade/perform-atomic-ops/SKILL.md). Explicit operator APIs (`where(field, operator, value)` for operators other than `=`, `whereIn`/`whereNull`/`whereBetween`/…, object-form `whereRaw({ ... })`) are intentionally not routed through this check — they already express an operator on purpose. Dotted paths (`"profile.name"`) and plain nested-object equality values remain valid; only literal `$`-prefixed keys are rejected. `sanitizeFilter` / `sanitizeFilterValue` are exported if you need the same check on a filter you forward to a driver-level API directly.
+
+```ts
+await User.first({ email, password }); // throws UnsafeFilterError if password is `{ $ne: null }`
+```
+
+## Raw expressions — `.whereRaw()` / `.orWhereRaw()`
+
+```ts
+query.whereRaw({ $expr: { $gt: ["$stock", "$reserved"] } }); // object form — MongoDB
+query.whereRaw("age > ?", [30]);                             // string form — SQL, real bindings
+```
+
+The **object form** is checked like any other filter value, plus it rejects the server-side-JavaScript operators `$where`, `$function` and `$accumulator` anywhere in the expression (throws `UnsafeRawExpressionError`); `$expr` and the other aggregation operators keep working. The **string form on the MongoDB driver throws `UnsafeRawExpressionError`** — a string used to compile to `{ $where: "<js>" }`, executing arbitrary JavaScript inside `mongod` per scanned document; there is no safe way to parameterize that, so it's rejected outright. Use the object form instead. SQL drivers keep string mode with real `?` bindings (unchanged).
 
 ## Get one record
 
@@ -1996,7 +2032,7 @@ Cascade's query builder has around 60 methods. Reach for these as the need arise
 | `.whereNull(field)` / `.whereNotNull(field)` | Nullability checks |
 | `.whereBetween(field, [a, b])` | Inclusive range |
 | `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter` | Date helpers |
-| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` | Pattern matching |
+| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` / `.whereSearch` | Pattern matching — see below for literal-vs-regex semantics |
 | `.whereHas(relation, callback)` | Filter by conditions on a related model |
 | `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)` | Aggregates — [`use-aggregates`](@warlock.js/cascade/aggregate-data/SKILL.md) |
 | `.distinct(field)` / `.pluck(field)` | Single-field reads (distinct values, flat list) |
@@ -2005,6 +2041,23 @@ Cascade's query builder has around 60 methods. Reach for these as the need arise
 | `.similarTo(column, embedding)` | Vector similarity — [`use-vector-search`](@warlock.js/cascade/search-by-vector/SKILL.md) |
 
 Each chains off `User.where(...)` or `User.query()` and ends with the appropriate terminator. (`where`, `with`, `joinWith`, `first`, `count`, `find`, `all`, `paginate` are static shortcuts on the model; the rest live on the query builder, so reach them via `User.query()` or by chaining off a static `where`.)
+
+### `whereLike` / `whereSearch` — string arguments match literally
+
+```ts
+await User.where(...).whereLike("email", "%@gmail.com").get();      // literal, % still wildcards
+await User.query().whereSearch("name", req.query.q).get();          // safe with raw user input
+```
+
+A **string** argument to `whereLike`/`whereNotLike`/`whereStartsWith`/`whereEndsWith` (and their `Not` variants) and the `$regex` form of `whereSearch` is escaped and matched as a **literal substring** — the SQL `LIKE` wildcard `%` still expands (to `.*`, runs of `%` collapse), but every other regex metacharacter (`.`, `*`, `+`, `^`, `$`, …) in the string is neutralized. This is what makes `whereSearch("name", req.query.q)` safe to wire directly to a search box: before this, a user-controlled string compiled straight into a MongoDB `$regex`, so `^.*$` matched everything, `^a`/`^b`/… probed a value back one character at a time, and a nested-quantifier pattern like `(a+)+$` triggered catastrophic backtracking (ReDoS) against every scanned document.
+
+An explicit **`RegExp`** argument is still used as a pattern (verbatim, no escaping) — that's how you get real regex semantics — but a `RegExp` can't arrive as JSON, so it only reaches these calls when a developer constructs it in code. **Never build that `RegExp` from user input**; if you need dynamic pattern matching, escape the dynamic parts yourself with the exported `escapeRegex(value)` / `likePatternToRegexSource(pattern)` helpers.
+
+```ts
+import { escapeRegex, likePatternToRegexSource } from "@warlock.js/cascade";
+```
+
+The Postgres driver was already parameterized (`ILIKE $1`) and is unaffected either way.
 
 ## Scopes — reusable query fragments
 
@@ -2035,6 +2088,8 @@ const activeUsers = await User.query().scope("active").get();
 - Don't `Model.all()` without a filter on a production table — use pagination or chunking.
 - Don't `!` away the null from `.find()` / `.first()` — handle the missing case explicitly or use `.firstOrFail()` when absence is a real error.
 - Don't write the same filter chain across multiple services — promote it to a scope.
+- Don't build a `RegExp` for `whereLike`/`whereSearch` out of user input — a string argument is already safely escaped; a raw `RegExp` bypasses that and reintroduces the injection/ReDoS risk it closes.
+- Don't reach for `whereRaw()` string mode on MongoDB expecting it to still work — it now throws `UnsafeRawExpressionError`; use the object form (`whereRaw({ $expr: … })`).
 
 ## See also
 

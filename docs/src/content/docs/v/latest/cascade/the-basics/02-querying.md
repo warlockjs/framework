@@ -53,6 +53,10 @@ const targets = await User.where({ status: "active", role: "admin" }).get();
 
 Equivalent to chained equalities. Useful when the filter comes from a dynamic source — a request body, a service argument. **Object form only supports equality** — for operators or OR logic, chain `.where()` calls or use callback form.
 
+:::caution[Filters built from request data are checked for injection]
+The equality forms — `where(field, value)`, `where(field, "=", value)`, and the object form — reject `$`-prefixed keys (`UnsafeFilterError`), so `User.first({ email, password })` throws instead of quietly compiling a request-supplied `{ $ne: null }` into a live MongoDB operator query. This is safe to build straight from `req.body` or `req.query`; explicit operator calls (`where(field, ">", value)`, `whereIn`, object-form `whereRaw`, …) are unaffected since they're meant to carry operators. Full detail: [`where(...)` in the API reference](../reference/query-builder-api.md#where).
+:::
+
 ### Quick reference
 
 | Shape | Use when |
@@ -194,7 +198,7 @@ Cascade's query builder is deep — around 60 methods covering shapes you'll nee
 | `.whereNull(field)` / `.whereNotNull(field)` | Nullability checks |
 | `.whereBetween(field, [a, b])` | Inclusive range |
 | `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter` | Date helpers |
-| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` | Pattern matching |
+| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` | Pattern matching — a `string` matches literally (safe on a search box), pass a `RegExp` for real pattern semantics |
 | `.whereHas(relation, callback)` | Filter by conditions on a related model |
 | `.firstOrFail()` | Throw if no match (when you *know* it should exist) |
 | `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)` | Aggregates |
@@ -209,7 +213,7 @@ Each works the same way: chain off `User.where(...)` or `User.query()`, end with
 
 You've fetched the record. Now what does it look like when you serialize it for an HTTP response?
 
-`JSON.stringify(user)` calls `model.toJSON()` under the hood. With no configuration, that returns `model.data` — **every column on the record**. That's fine for internal use; for an API response it's almost always wrong. Cascade gives you two ways to shape what goes out.
+`JSON.stringify(user)` calls `model.toJSON()` under the hood. With no configuration, that returns `model.data` — **every column on the record**. That's fine for internal use; for an API response it's almost always wrong. Cascade gives you two ways to shape what goes out, plus an allow-list-proof way to guarantee a field never leaks regardless of which shaping strategy you pick.
 
 ### The fast escape — `static toJsonColumns`
 
@@ -263,6 +267,21 @@ If you haven't set `toJsonColumns` or `resource`, `JSON.stringify(model)` return
 
 :::
 
+### The guaranteed exclusion — `static hidden`
+
+`toJsonColumns` and `resource` are both allow-lists you maintain by hand — easy to forget a field on, especially when a resource gets refactored later. `static hidden: string[]` is the backstop:
+
+```ts
+@RegisterModel()
+export class User extends Model<UserSchema> {
+  public static table = "users";
+  public static schema = userSchema;
+  public static hidden = ["password", "resetToken"];
+}
+```
+
+Fields listed in `hidden` are **always** stripped from `toJSON()` output — with the raw-document default, with `toJsonColumns`, and from the data handed to a `resource` (hidden wins over all three). It defaults to `[]`, so nothing changes on an existing model until you add fields — but because that default still fails open, Cascade logs a one-time `console.warn` per model whose schema declares a credential-shaped column (`password`, `passwordHash`, `secret`, `token`, `apiKey`/`api_key`, case-insensitive) that isn't covered by `hidden`, `resource`, or `toJsonColumns`. Treat that warning as a to-do, not noise to silence.
+
 The full pattern — strongly-typed resources, composing resources for loaded relations, `resourceColumns` filter, runtime-swappable shapes — lives in the [Resources guide](../the-basics/resources.md).
 
 ## Recap
@@ -274,6 +293,7 @@ The full pattern — strongly-typed resources, composing resources for loaded re
 - **Count** with `.count()`; **existence** with `.exists()` / `.notExists()` (cheaper than `count > 0`)
 - **Reuse filters** as local or global scopes
 - **Shape what gets serialized** via `static toJsonColumns` or `static resource`; default sends every column
+- **Guarantee a field never serializes** with `static hidden` — wins over `toJsonColumns`/`resource`, and Cascade warns once if a credential-shaped column is left uncovered
 
 ## Next
 

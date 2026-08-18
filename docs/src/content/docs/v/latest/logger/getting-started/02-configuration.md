@@ -44,7 +44,7 @@ Accepts an options object. Every field is optional — pass only what you want t
 | `channels` | Replaces the channel list (same as `setChannels`). |
 | `autoFlushOn` | Installs process-level auto-flush handlers — see [Shutdown & flushing](../advanced/03-shutdown-and-flushing/). |
 | `minLevel` | Sets the logger-wide severity floor. Entries below this rank are dropped before fan-out. |
-| `redact` | Sets the logger-wide redaction floor — see [Redaction](../advanced/01-redaction/). |
+| `redact` | Sets the logger-wide redaction floor — see [Redaction](../advanced/01-redaction/). A built-in secret-key denylist applies even if you never set this field. |
 
 ```ts
 import { log, ConsoleLog, FileLog } from "@warlock.js/logger";

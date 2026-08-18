@@ -120,7 +120,7 @@ Each rejection carries a stable `HttpErrorCodes` value so clients can branch on 
 A few facts worth internalizing before you lean on these:
 
 - **`rateLimit` and `concurrencyLimit` counters are process-local.** With `N` replicas the effective cap is `N × max`. For a genuinely shared rate limit, configure `@fastify/rate-limit`'s Redis store via `http.rateLimit` instead; for shared concurrency, reach for a `@warlock.js/cache` lock.
-- **`ipFilter` reads the IP via `request.detectIp()`.** **Since 4.13.0 `http.trustProxy` defaults to `false`**, so that is the socket address and `X-Real-IP` / `X-Forwarded-For` are ignored. Earlier versions defaulted to `true` — client-settable headers were believed, which made per-IP rate limits and IP allow-lists bypassable. **Turn it on only behind a proxy you control that overwrites those headers.**
+- **`ipFilter` reads the IP via `request.detectIp()`.** **Since 4.13.0 `http.trustProxy` defaults to `false`**, so that is the socket address and `X-Real-IP` / `X-Forwarded-For` are ignored. Earlier versions defaulted to `true` — client-settable headers were believed, which made per-IP rate limits and IP allow-lists bypassable. **Turn it on only behind a proxy you control that overwrites those headers**, and prefer the narrowest shape your topology allows over bare `true` — see [`trustProxy` shapes](#trustproxy-shapes) below.
 - **`maxBodySize` is a per-route layer, not pre-read protection.** It short-circuits the application stack on `Content-Length`, but the server still reads the body off the wire. For true pre-read protection, lower `http.bodyLimit` at the Fastify level too.
 - **`idempotency` must run after `authMiddleware`** — its cache key is scoped per-user so user A can't replay user B's key. Anonymous requests fall back to IP scope.
 - **`maintenance` is toggled by config and needs a restart** to flip — there's no runtime hot-flip. Its allowlist defaults to `["/health"]` so health checks survive planned downtime.
@@ -174,6 +174,20 @@ Inherited values are validated before use — non-empty printable ASCII, max 128
 | `header`    | `"X-Request-Id"` | Inbound + outbound header name.                                           |
 | `generator` | random 32-char | Override the id generator.                                                 |
 | `enabled`   | `true`         | Set `false` to stop echoing and inheriting. `request.id` is still generated for internal logging. |
+
+### `trustProxy` shapes
+
+`http.trustProxy` is passed to Fastify untouched, and `request.detectIp()` (and its `realIp` alias) reads the resolved client off `request.ip` — so both agree.
+
+| `http.trustProxy` | Client IP |
+| --- | --- |
+| `false` *(default)* | Socket peer address; forwarding headers ignored — cannot be forged. |
+| `true` | Leftmost `X-Forwarded-For` hop — trusts the **whole chain**, including whatever the client itself prepended if your edge only appends. |
+| `2` (a number) | Walks past the 2 rightmost hops — for an edge that appends to the chain (the common case: nginx, an ALB, most CDNs). |
+| `"10.0.0.0/8"`, `"loopback, 10.0.0.0/8"`, `["10.0.0.0/8", "192.168.0.0/16"]` | Walks left while each hop is a listed proxy, stops at the first that isn't. |
+| `(address, hop) => boolean` | Your own predicate. |
+
+Prefer the narrowest shape your topology allows. With `true`, any client that can reach the process directly can pick its own IP — an `ipFilter` allowlist in front of it becomes decorative. **`X-Real-IP` is honoured only under `trustProxy: true`** — it carries no chain to walk a hop count or proxy list against; under a bounded `trustProxy` the client IP comes from `X-Forwarded-For` instead, so if your edge only sets `X-Real-IP`, have it set `X-Forwarded-For` too.
 
 ## Validation as a boundary
 

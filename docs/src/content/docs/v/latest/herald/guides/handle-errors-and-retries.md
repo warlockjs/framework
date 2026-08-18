@@ -107,6 +107,8 @@ await channel.subscribe(handler, {
 });
 ```
 
+**A plain `throw` counts toward the same cap as `ctx.retry()`.** You don't have to call `ctx.retry()` yourself for `maxRetries`/`deadLetter` to apply — letting the error propagate (the `throw error;` in the patterns above) goes through the same bounded routine: it republishes with an incremented `x-retry-count` header under the cap, then dead-letters (or drops with a logged error) once `maxRetries` is hit. So a handler that just throws is never an unbounded loop as long as `retry` is configured on the subscription.
+
 The type signature accepts either a number or `(attempt) => number`:
 
 ```ts

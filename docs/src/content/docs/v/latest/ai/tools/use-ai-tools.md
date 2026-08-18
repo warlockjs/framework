@@ -70,7 +70,9 @@ ai.tools.fetchUrl({ extract: "text", allowHosts: ["docs.stripe.com"], maxBytes: 
 ```
 
 - `extract`: `"text"` (default — readability-extracted main text), `"html"` (raw body), or `"markdown"`.
-- `allowHosts` (when set) rejects any other host **before the fetch** (an SSRF guardrail) → `WebToolError` of type `"denied-host"`.
+- `allowHosts` (when set) rejects any other host **before the fetch** (an SSRF guardrail) → `WebToolError` of type `"denied-host"`, and redirect targets are held to the same allowlist.
+- **Private-network deny by default.** Every request — and every redirect hop — routes through `@warlock.js/ai`'s hardened `guardedFetch` outbound policy instead of a local host check. It refuses private / loopback / link-local / CGNAT / cloud-metadata addresses (`169.254.169.254`, RFC1918, `localhost`, …) by resolving the hostname via DNS and checking every returned address, failing closed on resolution failure — and re-validates every redirect `Location` (scheme, allowlist, private-IP deny) before following it. This applies even with no `allowHosts` set, so a bare `ai.tools.fetchUrl()` is not an SSRF primitive.
+- `allowPrivateNetwork` (default `false`) — set `true` only for a deliberate internal/dev target (e.g. a local dev server); pair it with `allowHosts` to scope it rather than opening the whole private range.
 - `maxBytes` caps the body and flags `truncated`; `timeoutMs` aborts via `AbortSignal.timeout`.
 
 > **Heavy deps are lazy optional peers.** `"text"` / `"markdown"` lazily import `@mozilla/readability` + `jsdom` only when used — a missing peer surfaces a `WebToolError` of type `"missing-peer"` carrying the exact `npm install @mozilla/readability jsdom` string, never a raw import-time crash. `"html"` needs nothing.
@@ -85,6 +87,7 @@ ai.tools.http({
   headers: { authorization: `Bearer ${process.env.STRIPE_KEY}` },
   timeoutMs: 15_000,
   maxBytes: 1_000_000,
+  // allowPrivateNetwork: true,             // only for a deliberate internal/dev target
 });
 ```
 
@@ -93,6 +96,7 @@ All guardrails are enforced **before the network call** and surface as a typed `
 - a method outside `allowMethods` → `"method-not-allowed"`;
 - a host outside `allowHosts` → `"host-not-allowed"` (SSRF guardrail);
 - an unresolvable URL → `"invalid-url"`.
+- **Private-network deny by default** — like `fetch_url`, every request and redirect hop routes through the hardened `guardedFetch` outbound policy, refusing private/loopback/link-local/CGNAT/cloud-metadata addresses (DNS-resolved and re-checked per redirect hop) even when `allowHosts` isn't set → `"host-not-allowed"`. Set `allowPrivateNetwork: true` (default `false`) to permit a deliberate internal target.
 
 When `baseUrl` is set the model passes a **path** joined against it; otherwise it must pass an absolute `http(s)` URL. Static `headers` merge **under** the per-call headers (per-call wins). An object `body` is JSON-serialized (with a default `content-type: application/json`); a string `body` is sent verbatim; `body` is dropped for `GET`. The response body is JSON-parsed when the `content-type` is JSON, else returned as text.
 

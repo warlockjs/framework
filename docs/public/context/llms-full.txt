@@ -95,6 +95,8 @@ userContext.update({ role: "admin" });
 
 If there's no current store, `update` creates one with the partial (cast to the full type). Use for incremental enrichment as the request flows through layers.
 
+`update()` (and `set()`, which calls it) silently drops `__proto__` / `constructor` / `prototype` keys instead of merging them — merging with `Object.assign` would otherwise let a caller-shaped payload (e.g. `userContext.update(req.body)`) pollute `Object.prototype` for the whole process, since the context store is shared. The rest of the payload still merges normally; this closes only the prototype-pollution vector, not general trust of merged input — validate before you merge caller-supplied data.
+
 ## Reading
 
 ```ts

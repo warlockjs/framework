@@ -41,6 +41,10 @@ v.string().email().min(5)        // when you need more than just the format
 
 The string surface is broad — slug normalization, mask, base64 encode/decode, HTML escape, trim variants, case conversions (`.uppercase()`, `.camelCase()`, `.kebabCase()`). The full method list is in the [API reference](../reference/api.md).
 
+:::caution[`.stripTags()` is not an XSS sanitizer]
+`v.string().stripTags()` strips markup with a naive `<[^>]*>` regex — it's a tag-stripper, not an HTML parser, and malformed/nested markup can defeat it. Don't treat its output as pre-sanitized; encode on output or use a real parser-based sanitizer (DOMPurify, sanitize-html) for untrusted rich text. `.safeHtml()` is a deprecated alias of the same method — its old name implied a safety guarantee it never had.
+:::
+
 ## Numbers — pick by what you accept
 
 Four number validators, differing only in what they accept as input:

@@ -45,7 +45,7 @@ type DashboardOptions = {
   basePath?: string; // default "/" — mount prefix for the UI + every /api route
   open?: boolean;    // default false — open the default browser once listening
   title?: string;    // default "Panoptic" — shown in the page header
-  authToken?: string;      // require `Authorization: Bearer <token>` (or `?token=`) — REQUIRED off-loopback
+  authToken?: string;      // require `Authorization: Bearer <token>` (page route also accepts `?token=`) — REQUIRED off-loopback
   allowedHosts?: string[]; // Host-header allowlist (DNS-rebind guard) — defaults to the loopback names
 };
 ```
@@ -57,7 +57,7 @@ type DashboardOptions = {
 | `basePath` | `"/"` | A non-root value (e.g. `"/panoptic"`) prefixes both the page and every `/api/...` route. Normalized to leading-and-trailing-slash form internally. |
 | `open` | `false` | Best-effort browser launch via the platform opener; a launch failure never rejects the start. |
 | `title` | `"Panoptic"` | Baked into the served page header at start time. |
-| `authToken` | _unset_ | When set, every request must present `Authorization: Bearer <token>` (or a `?token=<token>` query param) or gets `401`. **Required** when `host` is non-loopback — starting off-loopback without one rejects at `dashboard()`. |
+| `authToken` | _unset_ | When set, every request must present `Authorization: Bearer <token>` or gets `401`; `?token=<token>` is accepted **only on the HTML page route** — the JSON API routes are header-only, since the page load is the one request that structurally can't carry a header. The comparison uses `crypto.timingSafeEqual` (constant-time, length-checked first), not `===`, so a network-reachable dashboard can't leak the token to a timing attack. **Required** when `host` is non-loopback — starting off-loopback without one rejects at `dashboard()`. |
 | `allowedHosts` | loopback names | `Host`-header allowlist defending against DNS-rebinding; a request whose `Host` isn't listed gets `403`. Defaults to `localhost` / `127.0.0.1` / `[::1]` for a loopback bind — list your expected host(s) for a non-loopback one. |
 
 ## The low-level `dashboard(store, options)`
@@ -126,13 +126,15 @@ curl 'http://127.0.0.1:4319/api/traces?sessionId=session-42&status=failed&status
 curl 'http://127.0.0.1:4319/api/aggregate?sessionId=session-42'
 ```
 
-Non-`GET` methods get `405`; anything outside these routes (and the page itself) gets `404`. The store shapes are already JSON-safe, so responses are a plain `JSON.stringify` — no serializer and no write surface (these routes are read-only). When `authToken` is set, the same bearer check guards them, and security headers (`nosniff`, a strict CSP, `X-Frame-Options: DENY`) ride on every response.
+Non-`GET` methods get `405`; anything outside these routes (and the page itself) gets `404`. The store shapes are already JSON-safe, so responses are a plain `JSON.stringify` — no serializer and no write surface (these routes are read-only). When `authToken` is set, the same bearer check guards them — but these API routes accept the token **only** via the `Authorization` header, not `?token=` (that fallback exists solely for the page route) — and security headers (`nosniff`, a strict CSP, `X-Frame-Options: DENY`) ride on every response.
 
 ## Security: loopback-only by default
 
 The dashboard surfaces whatever the store holds — including **prompt and tool content** when [content capture](/v/latest/ai/observability/what-panoptic-traces/) is enabled. So it binds to `127.0.0.1` by default: the page and its API are reachable only from the local machine, and it stays a read-only dev tool (no write surface). (Persistence is opt-in via a [cache-backed store](/v/latest/ai/observability/querying-traces/#persisting-traces-across-restarts); when you enable it, your traces — content included — outlive the process, so guard the cache accordingly.)
 
-Going off-loopback is **gated**. Set `host` to a non-loopback value and you **must** also pass an `authToken`, or `dashboard()` rejects at start — it refuses to serve raw prompt content on a public interface unauthenticated. With a token set, every request needs `Authorization: Bearer <token>` (or a `?token=` query param) and its `Host` header is checked against `allowedHosts` (a DNS-rebinding guard); security headers (`X-Content-Type-Options: nosniff`, a strict CSP, `X-Frame-Options: DENY`) ride on every response. Even then, only do this for an isolated container you reach through an SSH tunnel or behind your own authenticating proxy — never expose it to an untrusted network with content capture on.
+Going off-loopback is **gated**. Set `host` to a non-loopback value and you **must** also pass an `authToken`, or `dashboard()` rejects at start — it refuses to serve raw prompt content on a public interface unauthenticated. With a token set, every request needs `Authorization: Bearer <token>` (or, on the page route only, `?token=`) and its `Host` header is checked against `allowedHosts` (a DNS-rebinding guard), compared with `crypto.timingSafeEqual` rather than `===`; security headers (`X-Content-Type-Options: nosniff`, a strict CSP, `X-Frame-Options: DENY`) ride on every response. Even then, only do this for an isolated container you reach through an SSH tunnel or behind your own authenticating proxy — never expose it to an untrusted network with content capture on.
+
+**Captured trace content is untrusted input to the page itself.** With [content capture](/v/latest/ai/observability/what-panoptic-traces/) on, `span.input`/`span.output` can hold model output or attacker-controlled tool results — i.e. prompt-injected content — and the drawer renders it as Markdown. Link URLs are checked against a scheme allowlist (`http:`, `https:`, `mailto:`, plus relative/anchor URLs) after normalizing the way a browser will (entity-decode, strip ignored control chars/whitespace, lowercase), so `javascript:` / `data:` / `vbscript:` payloads — including obfuscated variants and scheme-relative `//host` links — never become a clickable `href`; a rejected link renders as plain text instead. The bearer token itself is also no longer reachable as a page-global from other script in that closure — it's sealed inside its own inner IIFE.
 
 ## Gotchas
 

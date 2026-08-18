@@ -204,6 +204,7 @@ What this gets you:
 - `schema` runs before `handle` — invalid payloads are nacked without your handler ever seeing them.
 - `@Consumable()` registers the class with the broker; if the broker is connected at decoration time, it subscribes immediately. If not, it queues until `connectToBroker` fires. Pass `@Consumable({ broker: "analytics" })` to subscribe to a non-default broker.
 - The class can opt into version filtering via static `minVersion` / `maxVersion` — messages outside that range are acked without processing (silently skipped). Useful for rolling upgrades.
+- `handle` throwing is a **bounded retry**, not an infinite requeue. It goes through the same retry routine as the raw `.subscribe()` throw path — capped at `maxRetries: 3` (there's no per-consumer `retry`/`deadLetter` config yet, so the cap is always the default) — then drops the message with a logged error once exhausted. A message a class-based consumer can't process no longer pins it in a hot ack/nack loop.
 
 There's also a `defineConsumer` factory if you don't want a full class:
 

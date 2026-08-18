@@ -34,7 +34,7 @@ This is least-privilege guardrails for a **trusted** agent — not a sandbox aro
 | `cwd` | **Absolute** jail root. Every path resolves against it and must stay inside. |
 | `allowPaths` | Extra readable roots outside `cwd`. |
 | `denyPaths` | Globs (`*`, `**`, `?`) blocked **even inside `cwd`** — e.g. `[".git/**", ".env*"]`. A bare dir name (`"node_modules"`) also blocks its contents. |
-| `shell.allow` / `shell.deny` | Executable **basenames** matched against the command's leading token. **Deny wins.** An `allow` list is exhaustive (fail-closed); no `shell` block at all ⇒ nothing may run. |
+| `shell.allow` / `shell.deny` | Executable **basenames** matched against the command's leading argv token (after tokenizing — see below). **Deny wins.** An `allow` list is exhaustive (fail-closed); no `shell` block at all ⇒ nothing may run. |
 | `shell.inheritEnv` | Opt-in `process.env` keys to pass through (e.g. `["PATH"]`). **Nothing leaks in otherwise** — a command can't find `node`/`npm` without `PATH`. |
 | `shell.env` | Explicit env vars injected into every spawned process (override inherited on collision). |
 | `shell.timeoutMs` / `shell.maxOutputBytes` | Per-command wall-clock cap (SIGKILL on expiry) and stdout/stderr byte cap. |
@@ -44,6 +44,25 @@ This is least-privilege guardrails for a **trusted** agent — not a sandbox aro
 The effective shell environment is `{ ...pick(process.env, inheritEnv), ...shell.env }` — `process.env` is never inherited wholesale.
 
 > **The most common gotcha:** `run_shell` fails to find `node`/`npm` because the env is empty. Add `shell: { allow: ["npm", "node"], inheritEnv: ["PATH"] }`.
+
+## `run_shell`/`exec` run argv, NOT a shell
+
+Commands are tokenized into an argv and spawned with **no shell semantics** — no pipes, redirection, chaining, backticks, or variable expansion. `npm test && rm -rf /` or `` `curl evil` `` doesn't chain or substitute; it's rejected outright rather than executed piecemeal:
+
+```ts
+await ws.exec("npm test");                    // OK — ["npm", "test"]
+await ws.exec('node -e "console.log(1)"');     // OK — quotes respected, one argv element
+await ws.exec("npm test; curl http://evil");   // rejected — unquoted `;` is a metacharacter
+```
+
+- **Quoting is respected**; **unquoted** shell metacharacters — `;` `&` `|` `<` `>` `` ` `` `$` `(` `)` and newlines — are rejected as a `WorkspacePolicyError` `type: "denied-command"` before anything spawns. The `shell.allow`/`shell.deny` basename check runs against the tokenized argv's first element, not a raw string prefix.
+- **On Windows**, the argv is run through a `cmd.exe /d /s /c` wrapper with every element individually quoted (needed because batch shims like `npm.cmd` can't be spawned shell-less); arguments containing `"`, `%`, or newlines are refused there rather than risked.
+- **`run_tests`'s `pattern`** (model-controlled test-name filter) is forwarded as a **single double-quoted argv token** to the runner rather than concatenated into the command string — a pattern containing double quotes or newlines is rejected at input validation.
+- This is a **behavior change**: shell conveniences your commands may have relied on (pipes, redirection, `&&` chaining, `$(...)` substitution) no longer work in `run_shell`/`exec`. Compose multi-step work as separate `ws.exec()` calls instead of a single shelled pipeline.
+
+## `grep` is ReDoS-bounded
+
+The model supplies `pattern` freely, so `grep` treats it as untrusted input before compiling it into a `RegExp`: patterns over 200 characters and patterns matching a nested-quantifier shape (`(x+)+`, `(x*)*`, `(x+)*`, `(x*)+`-style groups — the classic catastrophic-backtracking shape) are rejected up front as a `WorkspacePolicyError` `type: "unsafe-pattern"`, before any regex is compiled. Any scanned line longer than 2000 characters is skipped (not tested), bounding the worst-case backtracking cost of any single call.
 
 ## Two callers, one jail
 
@@ -106,7 +125,7 @@ try {
 }
 ```
 
-- `WorkspacePolicyError.type`: `"path-escape"` (jail escape / deny glob) | `"denied-command"`.
+- `WorkspacePolicyError.type`: `"path-escape"` (jail escape / deny glob) | `"denied-command"` (not allow-listed, or rejected during tokenizing — unquoted metacharacters, disallowed Windows-wrapper characters) | `"unsafe-pattern"` (`grep` pattern too long or nested-quantifier ReDoS shape).
 - `WorkspaceEditError.type`: `"not-found"` | `"not-unique"` | `"stale-hash"`.
 
 ## Composition — `readonly()` and `scope()`

@@ -126,6 +126,10 @@ await cache.removeNamespace(`orders.${userId}`);
 
 Removing a namespace is more efficient than removing keys individually.
 
+:::note
+Namespace strings are always treated as data, not as glob/path input, even when derived from user-controlled values (a request param used to build `orders.${userId}`). The [file driver](/v/latest/cache/file/#key-safety) percent-encodes and path-contains every key/namespace; the [redis driver](/v/latest/cache/redis/#namespace-removal) escapes glob metacharacters and walks matches with `SCAN` rather than the blocking `KEYS` command.
+:::
+
 ## Real-World Example
 
 ```ts

@@ -171,13 +171,27 @@ An orchestrator wraps as a tool so an outer agent can drive a whole session insi
 const supportTool = supportBot.asTool({
   description: "Handle a customer support conversation turn",
   inputSchema: v.object({ message: v.string() }),
-  sessionScope: "fresh",   // "fresh" (default) — new session per call; "shared" — join the parent's
+  sessionScope: "fresh",   // "fresh" (default) — new session per call
 });
 
 const concierge = ai.agent({ model, tools: [supportTool] });
 ```
 
-`sessionScope: "fresh"` (default) opens a brand-new session per tool call; `"shared"` joins the parent's session via the tool payload — the expert escape hatch for nested conversations.
+`sessionScope: "fresh"` (default) opens a brand-new session per tool call.
+
+`sessionScope: "shared"` joins an **existing** session — but the id is bound by the developer, never by the model. A `sessionId` is bearer-equivalent to full read/write on that session, so before 4.15.0 it was read straight out of the model-visible tool-call payload (a documented pattern), and any prompt injection reaching the outer agent — a summarized document, a poisoned tool result — could say "continue session `<victim-id>`" and splice an attacker-directed turn into a stranger's live conversation. As of 4.15.0 that channel is closed: `"shared"` requires the new `session` option, resolved **out-of-band** of the model-visible schema, either a literal id fixed at construction or a resolver reading the invocation's `ToolContext` (the same out-of-band channel `signal` / `artifacts` already travel on):
+
+```ts
+const supportTool = supportBot.asTool({
+  description: "Continue this customer's support session",
+  inputSchema: v.object({ message: v.string() }),
+  sessionScope: "shared",
+  session: (ctx) => String(ctx?.artifacts?.supportSessionId), // developer-controlled, not model-visible
+  // or a fixed id: session: "sess_42",
+});
+```
+
+Building a `"shared"` tool without `session` throws at construction. `sessionId` / `history` in the tool-call payload are stripped, not honored, so a model can no longer redirect the join target even if it tries. The pre-4.15.0 payload-driven behavior is still reachable behind `unsafeAllowModelSessionId: true` — only for a fully trusted outer context where the caller independently verifies session ownership.
 
 ## Memory
 

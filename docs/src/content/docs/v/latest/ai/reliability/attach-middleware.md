@@ -87,6 +87,7 @@ ai.middleware.semanticCache({
   threshold: 0.95,
   ttlMs: 60 * 60 * 1000,
   namespace: "support-faq",
+  // scope: "session" (default) — see "Session-scoped by default" below
 });
 ```
 
@@ -100,6 +101,25 @@ ai.middleware.semanticCache({
 - **Writes** happen at `trip.after` on miss.
 - **Trip-zero only.** Only first-trip responses get cached. Tool-using loops never cache tool-call responses — would infinite-loop.
 - **Never use memory drivers in production** — they do a linear scan per query.
+
+### Session-scoped by default
+
+A `semanticCache` is normally built once at app boot and shared by every end user, and a hit is returned as the model's answer with **no LLM call in between** — so without isolation, one caller's merely-*similar* prompt can be served another caller's cached answer, personal context included. `SemanticCacheOptions.scope` defaults to `"session"`: every entry is keyed off the run's `AgentExecuteOptions.sessionId` (as `"session:<id>"`), and a lookup re-checks that key as exact equality on the stored entry before serving it — the cache key alone never authorizes a read.
+
+```ts
+// Opt back into one shared pool — e.g. a genuinely public FAQ bot where no
+// response carries a caller's private context:
+ai.middleware.semanticCache({ embedder, threshold: 0.95, scope: "shared" });
+
+// Derive your own isolation boundary, e.g. per tenant:
+ai.middleware.semanticCache({ embedder, threshold: 0.95, scope: (ctx) => tenantIdFrom(ctx) });
+```
+
+- **`"session"`** (default) — isolated per `sessionId`. A run made *without* a `sessionId` shares one unscoped pool — pass `sessionId` on `agent.execute()` to get the isolation (a supervisor / orchestrator forwards its own automatically).
+- **`"shared"`** — one pool for every caller, regardless of session — the pre-4.15.0 behavior.
+- **a resolver function** — `(context) => key | undefined`; `undefined` falls back to the unscoped pool.
+
+Entries written before upgrading to this scoping are unscoped and are only read back by unscoped (or `"shared"`) runs.
 
 ## Writing your own middleware
 

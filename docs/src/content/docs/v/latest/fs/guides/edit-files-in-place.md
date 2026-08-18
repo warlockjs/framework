@@ -114,6 +114,8 @@ rest are untouched. Only opt into `deep` when you genuinely want nested
 objects merged rather than overwritten.
 :::
 
+`__proto__` / `constructor` / `prototype` keys are dropped from both sides of the merge (at every depth) rather than merged — so `mergeJson`ing an untrusted partial (a request body, say) can't prototype-pollute the merged object or the file written back to disk.
+
 ## `ensureJson(path, fallback)` — get-or-create config
 
 Loading a config file that might not exist yet? `ensureJson` returns the

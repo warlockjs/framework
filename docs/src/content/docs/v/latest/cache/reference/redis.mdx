@@ -244,9 +244,14 @@ await redisClient.zAdd("leaderboard", {
 });
 ```
 
+## Namespace Removal
+
+`removeNamespace(ns)` walks matching keys with a non-blocking `SCAN` cursor (`scanIterator`) rather than the blocking `KEYS` command, so clearing a namespace on a large keyspace doesn't stall the single-threaded Redis event loop for other tenants. The namespace string is also glob-escaped (`*`, `?`, `[`, `\`) before it's used to build the match pattern, so untrusted input in the namespace can't widen the match beyond its own prefix.
+
 ## Troubleshooting
 - **Connection errors?** Check your Redis server is running and credentials are correct.
 - **Data not shared between servers?** Make sure all instances use the same Redis server.
 - **Race conditions?** Use atomic operations (`increment()`, `decrement()`, `set(k, v, { onConflict: "create" })`) instead of manual get/set for counters and locks.
+- **Credentials in logs?** Connection/command failures are logged with the raw error message redacted (`scheme://user:pass@…` → `scheme://[REDACTED]@…`) — a failed connect never prints your Redis URL's password.
 
 ❌ **Not supported today.** `cache.set(k, v, { vector })` and `cache.similar(...)` throw `CacheUnsupportedError`. RediSearch-backed similarity is on the [backlog](/v/latest/cache/similarity/#capability-matrix). Use the [`pg` driver](/v/latest/cache/pg/) with `vector` config for production similarity, or a memory driver for development.

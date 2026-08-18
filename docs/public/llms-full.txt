@@ -4701,7 +4701,7 @@ export default defineConfig({
   plugins: [lowerStage3Decorators(), mongezVite()],
   test: {
     globalSetup: "./src/test-global-setup.ts",  // ← starts the HTTP server
-    setupFiles: ["./src/test-setup.ts"],         // ← per-worker setupTest (see test-service skill)
+    setupFiles: ["./src/test-setup.ts"],         // ← setupTest + afterAll(teardownTest), per test file
     environment: "node",
     globals: false,
     include: ["src/app/**/*.test.ts"],
@@ -4709,7 +4709,13 @@ export default defineConfig({
 });
 ```
 
-Both files (and this config, with `lowerStage3Decorators()` first so decorated models load) are created by `warlock add test`. The split is intentional: `globalSetup` runs ONCE in the main vitest process; `setupFiles` runs per worker thread.
+Both files (and this config, with `lowerStage3Decorators()` first so decorated models load) are created by `warlock add test`. The split is intentional: `globalSetup` runs **ONCE** in the main vitest process; `setupFiles` runs **before every test file**.
+
+⚠ **Corrected in 4.14.0.** This line previously said `setupFiles` runs "per worker thread". **It does not** — Vitest runs it before each test file, and the setup module's registry is rebuilt every time. Measured across all four `pool` × `isolate` combinations.
+
+**So the service-layer framework is file-scoped: bootstrapped by `setupTest` and closed by the `afterAll(teardownTest)` the setup file registers, once per test file.** ⚠ **`setupTest` alone is not the whole wiring — the paired teardown is mandatory from 4.14.0**; see the `test-service` skill.
+
+**HTTP is the exception and stays in `globalSetup`**, which genuinely does run once in the main vitest process and owns a real port. **That split is the point:** one server for the whole run, one framework per test file.
 
 ## HTTP request helpers
 
@@ -4910,14 +4916,22 @@ This is fine for normal test flow. It bites when you're inside a transaction the
 
 ---
 name: test-service
-description: 'Pure unit tests against services, repositories, models, and use-cases — `setupTest({ connectors })` bootstraps each Vitest worker with its own DB/cache connections so you can call your code directly. Triggers: `setupTest`, `src/test-setup.ts`, `tests.connectors`, `Application.setEnvironment`; "unit-test a service", "test a repository query", "vitest setupFiles", "skip connectors for pure-logic tests"; typical import `import { setupTest } from "@warlock.js/core/tests"`. Skip: HTTP integration — `@warlock.js/core/test-http/SKILL.md`; warlock add test scaffold — `@warlock.js/core/write-cli-command/SKILL.md`; competing tooling: jest direct, `supertest`, `nock`.'
+description: 'Pure unit tests against services, repositories, models, and use-cases — `setupTest({ connectors })` bootstraps the framework with its own DB/cache connections so you can call your code directly, and `teardownTest()` closes it. Triggers: `setupTest`, `teardownTest`, `src/test-setup.ts`, `tests.connectors`, `tests.setupTimeout`, `Application.setEnvironment`; "unit-test a service", "test a repository query", "vitest setupFiles", "skip connectors for pure-logic tests"; typical import `import { setupTest, teardownTest } from "@warlock.js/core/tests"`. Skip: HTTP integration — `@warlock.js/core/test-http/SKILL.md`; warlock add test scaffold — `@warlock.js/core/write-cli-command/SKILL.md`; competing tooling: jest direct, `supertest`, `nock`.'
 ---
 
 # Warlock — test a service
 
-For unit tests, you import the thing under test and call it directly. No HTTP, no fetch, no controllers. Framework testing in Warlock is about getting your **service layer** under test efficiently — and that means each Vitest worker needs its own bootstrapped framework with a DB connection.
+For unit tests, you import the thing under test and call it directly. No HTTP, no fetch, no controllers. Framework testing in Warlock is about getting your **service layer** under test efficiently — and that means your tests need a bootstrapped framework with a DB connection.
 
-`setupTest()` is the one-call bootstrap that gives each worker that environment.
+`setupTest()` is the one-call bootstrap that provides that environment; `teardownTest()` closes it.
+
+⚠ **Corrected in 4.14.0 — `setupTest` is CALLED once per TEST FILE, not once per worker.** Every version of this skill through 4.13.0 said "per worker", the generated `src/test-setup.ts` carries a `Per-Worker Test Setup` comment saying the same thing, and **both were wrong.** Vitest runs `setupFiles` before **each test file**, and the setup module's registry is rebuilt every time — measured across all four `pool` × `isolate` combinations.
+
+⛔ **If your project was generated before 4.14.0, fix BOTH the comment and the call.** The comment is false, **and** the generated `setupTest({ connectors: true })` is now an *explicit* value that overrides your `src/config/tests.ts`. **Bare `setupTest()` is the correct call.**
+
+**The lifetime is FILE-SCOPED, on purpose.** Your setup file bootstraps the framework and its `afterAll(teardownTest)` closes it, once per test file. **One owner, one pairing — correct under every pool, every isolation setting, and watch mode.**
+
+⚠ **A worker-scoped lifetime is possible and is deliberately not shipped yet.** Lifecycle state now lives in the worker runtime, so leaving the framework running would let every file in a worker share one bootstrap. Two things block claiming it: under `pool: "threads"` we cannot observe whether Node reclaims a torn-down thread's sockets and pools, and **in watch mode Vitest reuses workers between reruns, so there is no recycle and no cleanup owner.** It gets taken when the real cost is measured and the integration is chosen, not inherited. See *Lifecycle and repeated calls* below.
 
 ⚠ **Changed in 4.13.0 — the import is a subpath now.** `setupTest` used to be re-exported from the package root; it is not any more, because that put the test helpers into every application's production module graph. `import { setupTest } from "@warlock.js/core"` now fails with *"has no exported member"* — **add `/tests` to the specifier and nothing else changes.**
 
@@ -4944,9 +4958,9 @@ describe("registerUserService", () => {
 });
 ```
 
-No `beforeAll(setupTest)` in this file — the project's `src/test-setup.ts` (registered as `setupFiles` in `vite.config.ts`) already ran it once per worker before any test executed.
+No `beforeAll(setupTest)` in this file — the project's `src/test-setup.ts` (registered as `setupFiles` in `vite.config.ts`) already ran it **before this file's tests executed**, as it does before every test file.
 
-## `setupTest({ connectors })` — the worker bootstrap
+## `setupTest({ connectors })` — the bootstrap
 
 ```ts
 import { setupTest } from "@warlock.js/core/tests";
@@ -4961,10 +4975,10 @@ What it does (in order):
 3. Runs `bootstrap()` — env, app, prestart hooks.
 4. Initializes the `filesOrchestrator` (module/route/config discovery, no file watching).
 5. Loads all `src/config/*.ts` files.
-6. Reads `tests.connectors` from config (overrides the parameter if set).
+6. Resolves the connector selection — **an explicit parameter wins, then `tests.connectors` from config, then the `true` default.** See *Selecting connectors* below.
 7. Starts the chosen connectors — but **never `http`** when you pass a boolean. HTTP is the global-setup's job.
 
-The result: each worker has its own DB/cache/logger/storage connections. Models save, repositories query, services run. Same code as production, just isolated to the test process.
+The result: DB/cache/logger/storage connections your code can use. Models save, repositories query, services run. Same code as production, just isolated to the test process.
 
 ### The `connectors` parameter
 
@@ -4974,9 +4988,9 @@ The result: each worker has its own DB/cache/logger/storage connections. Models 
 | `false`                | None                                                             | Pure logic tests with no DB / cache touches (parsers, validators, util functions). |
 | `["database", "cache"]` | Just those, in that order                                        | A test that only needs DB but not, say, the storage driver. |
 
-The default `true` is the sane choice. Reach for `false` when the unit you're testing genuinely doesn't talk to any framework subsystem — pulling up a DB connection per worker just to test a string parser is wasted setup time.
+The default `true` is the sane choice. Reach for `false` when the unit you're testing genuinely doesn't talk to any framework subsystem — pulling up a DB connection **for every file** just to test a string parser is wasted setup time.
 
-### Override via config — `src/config/tests.ts`
+### Selecting connectors — `src/config/tests.ts`
 
 ```ts title="src/config/tests.ts"
 const testsConfigurations = {
@@ -4986,7 +5000,33 @@ const testsConfigurations = {
 export default testsConfigurations;
 ```
 
-If `tests.connectors` is set, **it wins over the `setupTest({ connectors })` parameter**. Use this when every test file in the project agrees on the same minimal connector list — saves repeating the explicit array in `test-setup.ts`.
+⚠ **BREAKING in 4.14.0 — the precedence flipped.**
+
+| | Order |
+|---|---|
+| **4.13.0 and earlier** | `tests.connectors` config **>** `setupTest({ connectors })` parameter **>** `true` |
+| **4.14.0 onward** | **explicit `setupTest({ connectors })` parameter** **>** `tests.connectors` config **>** `true` |
+
+**An explicit call-site value now beats project config.** If your project sets `tests.connectors` *and* some test file passes `connectors` explicitly, **that file will start a different connector set after upgrading.** Search for `setupTest({` across your tests before you upgrade — a call passing `connectors` was previously ignored and is now honoured.
+
+**"Explicit" means you supplied a non-`undefined` value.** Both of these fall through to config:
+
+```ts
+await setupTest();                       // → tests.connectors, else true
+await setupTest({});                     // → tests.connectors, else true
+await setupTest({ connectors: undefined }); // → tests.connectors, else true — NOT "start none"
+```
+
+The `undefined` rule is deliberate: an optional variable that happens to be `undefined` must not silently erase your project config.
+
+```ts
+await setupTest({ connectors: false });        // → none, even if config says otherwise
+await setupTest({ connectors: ["database"] }); // → exactly that, even if config differs
+```
+
+⚠ **The generated `src/test-setup.ts` calls `setupTest()` with no argument, on purpose.** If you "helpfully" change it to `setupTest({ connectors: true })`, you have made it explicit and **erased the `tests.connectors` layer for the whole project.**
+
+Use `tests.connectors` when every test file agrees on the same minimal list — it saves repeating the array, and individual files can still override it.
 
 ## Project wiring — `src/test-setup.ts` + `vite.config.ts`
 
@@ -4994,13 +5034,21 @@ The `warlock add test` feature creates both files. The standard wiring:
 
 ```ts title="src/test-setup.ts"
 /**
- * Per-Worker Test Setup
- * Runs in EACH Vitest worker thread before tests execute.
+ * Test Setup
+ * Runs before EACH test file — not once per worker.
  */
-import { setupTest } from "@warlock.js/core/tests";
+import { afterAll } from "vitest";
+import { setupTest, teardownTest } from "@warlock.js/core/tests";
 
-await setupTest({ connectors: true });
+await setupTest();
+afterAll(teardownTest);
 ```
+
+⛔ **Three things changed here in 4.14.0. If you generated this file earlier, replace all three — it is not a comment fix.**
+
+1. **`afterAll(teardownTest)` is new and mandatory.** Nothing else closes the framework your tests started. This is what makes the lifetime file-scoped and owned rather than left running.
+2. **The call is now bare `setupTest()`, not `setupTest({ connectors: true })`.** Under the flipped precedence, passing `true` is an *explicit* value and would override `tests.connectors` for **every file in the project.** Bare means "whatever this project configured, else the default".
+3. **The comment used to say `Per-Worker Test Setup` / "Runs in EACH Vitest worker thread".** False — see the top of this skill.
 
 ```ts title="vite.config.ts"
 import { lowerStage3Decorators } from "@warlock.js/core/vite";
@@ -5011,7 +5059,7 @@ export default defineConfig({
   plugins: [lowerStage3Decorators(), mongezVite()],
   test: {
     globalSetup: "./src/test-global-setup.ts",  // ← HTTP server (see test-http skill)
-    setupFiles: ["./src/test-setup.ts"],         // ← runs setupTest per worker
+    setupFiles: ["./src/test-setup.ts"],         // ← runs setupTest before EACH test file
     environment: "node",
     globals: false,
     include: ["src/app/**/*.test.ts"],
@@ -5116,7 +5164,9 @@ afterEach(async () => {
 });
 ```
 
-Vitest runs tests in a single worker file sequentially, so an `afterEach` truncate gives each test a clean slate. For cross-file isolation, run the suite with `vitest --pool=forks --maxWorkers=N` and rely on the per-worker connection — each file's data stays within its worker until the run ends.
+Vitest runs the tests within one file sequentially, so an `afterEach` truncate gives each test a clean slate.
+
+⚠ **Cross-*file* isolation is not solved by this.** Separate workers get separate **connections**, not separate **rows** — two files pointed at the same database see each other's committed data regardless of pool or worker count. **Truncate what your file wrote; don't assume the worker boundary did it for you.** Real data isolation (DB-per-worker, transaction-per-test) is a separate piece of work and is not in this release.
 
 ### Skipping connectors for pure logic tests
 
@@ -5136,14 +5186,109 @@ describe("slugify", () => {
 });
 ```
 
-`setupTest` is idempotent per worker (`isSetupComplete` flag) — calling it again with different options after `src/test-setup.ts` already ran is a no-op. **That includes a `connectors: false` call: if `src/test-setup.ts` already ran `setupTest()` in this worker, the example above changes nothing.** To genuinely skip connectors, either set `tests.connectors: false` in config (project-wide) or rely on the default in `src/test-setup.ts` being what you want most of the time.
+⛔ **BREAKING in 4.14.0 — the example above now REJECTS if your project has a `src/test-setup.ts`.**
 
-⚠ **Config beats the parameter.** If `tests.connectors` is set at all, `setupTest({ connectors })` cannot override it — the config value wins. That is the current contract, not an accident; a per-call override is under discussion for a later release.
+Through 4.13.0 a second `setupTest` call with different options was a **silent no-op** — you asked for no connectors, got all of them, and nothing told you. In 4.14.0 a conflicting call **rejects with an error naming both the active and the requested selection**, because silently ignoring what you asked for is worse than failing.
+
+**If `src/test-setup.ts` already ran `setupTest()` in this file, use one of these instead:**
+
+```ts
+// 1. Tear down first, then set up differently — and PUT IT BACK when the file ends.
+import { afterAll, beforeAll } from "vitest";
+import { setupTest, teardownTest } from "@warlock.js/core/tests";
+
+beforeAll(async () => {
+  await teardownTest();
+  await setupTest({ connectors: false });
+});
+
+afterAll(async () => {
+  await teardownTest();      // ← REQUIRED, see below
+});
+```
+
+⛔ **The `afterAll` is not optional** — without it you leave a `connectors: false` runtime ready when the file ends.
+
+⚠ **This pattern interacts with the `afterAll(teardownTest)` in your setup file, and the relative ordering of the two has not been verified.** `teardownTest` is idempotent, so whichever runs second finds an idle lifecycle and no-ops — but **do not build anything on a particular order until someone has measured it.** This is the strongest argument for option 2 below.
+
+```ts
+// 2. Or don't call setupTest at all — a pure-logic test needs nothing from it.
+//    The connectors your setup file started are already running; you simply don't use them.
+```
+
+**3. Or set `tests.connectors: false` in `src/config/tests.ts`** if no test file in the project needs connectors.
+
+**Option 2 is usually right, and option 1 is easy to get wrong.** Tearing down and re-bootstrapping costs a full framework startup — twice, once for your file and once for the next — to avoid a DB connection you were never going to use. **Reach for option 1 only when a connector's mere presence breaks the thing you're testing**, not to save setup time.
+
+## Lifecycle and repeated calls
+
+`setupTest` / `teardownTest` are a pair. **The harness that calls one owns calling the other in the same context.**
+
+| Call | Behaviour |
+|---|---|
+| `setupTest(x)` while idle | bootstraps |
+| `setupTest(x)` while already ready with the **same** effective options | no-op |
+| `setupTest(y)` while ready or starting with **different** effective options | ⛔ **rejects**, naming active vs requested |
+| two concurrent `setupTest(x)` calls | share one startup |
+| `setupTest` after a failed setup | allowed — a failed setup unwinds and returns to idle |
+| `teardownTest()` while idle | no-op |
+| two concurrent `teardownTest()` calls | share one shutdown |
+| `setupTest(y)` after a **successful** teardown | allowed, different options fine |
+
+**"Same options" is compared by meaning, not by literal value** — connector arrays are deduplicated and compared as sets, so `["cache", "database"]` and `["database", "cache", "cache"]` are the same selection.
+
+⚠ **A failed shutdown poisons the lifecycle.** If `teardownTest()` rejects because the shutdown layer reported a failure, later `setupTest` calls **refuse until the Vitest worker is recycled** or a retried teardown fully succeeds. This is deliberate: a cleared flag does not prove that ports, sockets, pools or timers actually closed, and pretending otherwise hands you a "clean" run built on a leaked runtime.
+
+⚠ **What it cannot detect:** `connectorsManager.shutdown()` catches and logs individual connector failures internally. Those never reach this lifecycle, so they never poison it. It surfaces what that layer reports — no more.
+
+### `tests.setupTimeout` — the setup attempt is bounded
+
+**New in 4.14.0.** A setup attempt that never settles used to leave the lifecycle stuck in `starting` and take the worker down with an out-of-memory crash. It is now bounded.
+
+```ts title="src/config/tests.ts"
+const testsConfigurations = {
+  connectors: ["database", "logger"],
+  setupTimeout: 120000,   // milliseconds — this is the default
+};
+
+export default testsConfigurations;
+```
+
+**Default: `120000` (two minutes)** — far above a healthy cold start, below the point where you'd stop watching the terminal. When it expires:
+
+```
+setupTest() did not finish within 120000ms and is stuck in the "starting" state. The
+lifecycle is now poisoned: whatever that attempt had already started is not known to be
+closed, so later setupTest() calls refuse until the Vitest worker is recycled. If your
+cold start is legitimately slower than this, raise the bound with `tests.setupTimeout`
+in `src/config/tests.ts` — milliseconds, default 120000.
+```
+
+1. **It bounds the setup ATTEMPT, not teardown separately.** `teardownTest()` awaits the same attempt, so it inherits the bound — **one timer, not two.** A second teardown-side deadline was tried and rejected: it re-introduced the unbounded re-entry this whole guard exists to remove.
+2. **Expiry poisons the lifecycle**, it does not return to `idle`. The attempt may have started connectors nobody can now account for, so pretending the runtime is clean would be worse than refusing.
+3. **⛔ An invalid `setupTimeout` throws, naming the bad value.** Zero, negative and non-numeric all fail loudly rather than falling back to the default — a silent fallback would hide a typo behind a working suite.
+4. **The bound is measured from when the attempt started**, not from when config was read. `tests.setupTimeout` is only readable after `loadConfigFiles()`, which happens *inside* the window being bounded; re-arming naively would give you the default plus your configured value.
+
+⚠ **What is proven and what is not.** The nine guards above were each seen to fail under their own mutation. **But every spec injects its scheduler**, so the default *value* is tested while the production timer — and whether its `unref` actually releases the worker — is not. **And no spec observes a real hang**: the stuck attempt is a mock gate, not a socket that never returns. These prove what the lifecycle *decides*, not what a genuinely wedged connector does.
+
+### State is per worker runtime, not per module
+
+The lifecycle state lives in the worker runtime, not in a module variable. That matters because **Vitest rebuilds the module registry between test files while the worker itself keeps running** — so a module-level flag resets exactly where live DB connections and pools survive. Scope:
+
+- **`pool: "forks"`** — state is per worker **process**.
+- **`pool: "threads"`** — state is per worker **thread**. It does **not** cross threads; `globalThis` is per realm, not per process.
+
+In both cases the guard's scope matches the resource's scope, which is the point.
+
+⚠ **Not guaranteed:** under `threads` with `isolate: true`, Vitest tears the thread down while the process lives on. **Whether Node reclaims that thread's sockets and pools is unmeasured**, and nothing in this lifecycle can observe it.
 
 ## Gotchas
 
-- **`setupTest` is idempotent per worker.** Second + later calls early-return. You can't "swap" the connector set mid-run — the first call wins, including the one in `src/test-setup.ts`. Choose your worker default carefully.
-- **Per-worker connections are separate from the HTTP server's connections.** A row inserted by a service-level test is on the worker's connection; the HTTP test server has its own. They don't see each other unless they're both pointing at the same physical DB and the inserting test has already committed.
+- **`setupTest` runs per test file, not per worker** — every version of this skill through 4.13.0 said otherwise. **You pay one framework bootstrap per test file**, which is what 4.13.0 already cost; the difference is that it is now a chosen lifetime rather than a side effect of a module flag resetting.
+- ⛔ **Never delete the `afterAll(teardownTest)` from your setup file.** Without it nothing closes what `setupTest` opened, and the connectors outlive the file that started them.
+- ⛔ **You can't swap the connector set by calling `setupTest` again — it rejects now.** Through 4.13.0 the second call was silently ignored. Tear down first, or don't call it.
+- **These connections are separate from the HTTP test server's.** A row inserted by a service-level test is on this connection; the HTTP test server has its own. They only see each other if both point at the same physical DB **and** the inserting test has committed.
+- **`setupTest` takes over the process's `connectorsManager` for its lifetime.** Teardown is manager-wide, so **mixing `setupTest` with manually started connectors is unsupported** — teardown may close yours too.
 - **`NODE_ENV` is set to `"test"`** by `setupTest`. Code that branches on `Application.isProduction` / `Application.isDevelopment` sees `false` for both. If your tests need production-like config (cookies, CORS), set those values in `src/config/*.ts` explicitly under the test branch — don't rely on the env flag.
 - **No HTTP from this layer.** `setupTest({ connectors: true })` never starts the HTTP connector by design. Don't try to `request.app.http` your way to a fetch test — use the `test-http` skill instead.
 - **Don't import `vitest-setup` from `@warlock.js/core/src/...`.** The public surface is `import { setupTest } from "@warlock.js/core/tests"`. Reaching into source paths breaks when the package layout shifts.
@@ -6317,7 +6462,18 @@ export default {
 
 `deny` wins over `allow`. If the IP can't be read (empty / unparseable), the request is rejected with 403. Reads via `request.detectIp()`.
 
-⚠ **Since 4.13.0 `http.trustProxy` defaults to `false`**, so `request.detectIp()` returns the socket address and **`X-Real-IP` / `X-Forwarded-For` are ignored unless you opt in.** Set `trustProxy: true` **only when you are genuinely behind a proxy that overwrites those headers** — before 4.13.0 the default was `true`, which meant any client could set its own forwarding header and be believed.
+⚠ **Since 4.13.0 `http.trustProxy` defaults to `false`**, so `request.detectIp()` returns the socket address and **`X-Real-IP` / `X-Forwarded-For` are ignored unless you opt in.** Before 4.13.0 the default was `true`, which meant any client could set its own forwarding header and be believed.
+
+⚠ **Opt in with the narrowest shape your topology allows, not with `true`.** Since 4.15.0 `http.trustProxy` takes a hop count or a trusted-proxy list, and `detectIp()` resolves the chain the same way Fastify's `request.ip` does:
+
+| `http.trustProxy` | Client IP |
+| --- | --- |
+| `false` *(default)* | Socket peer address |
+| `2` | Walks past the 2 rightmost `X-Forwarded-For` hops — for an edge that **appends** (the usual case: nginx, ALB, most CDNs) |
+| `"10.0.0.0/8"` / `["10.0.0.0/8", "192.168.0.0/16"]` | Walks left while each hop is a listed proxy |
+| `true` | Trusts the whole chain — the leftmost hop, i.e. **whatever the client put there** if your edge appends rather than overwrites |
+
+With `true`, any client that can reach the process directly picks its own IP and this allowlist is decorative. `X-Real-IP` is honoured only under `true` — it carries no chain to check a hop count or proxy list against — so if your edge sets only that header, have it set `X-Forwarded-For` too.
 
 ```ts
 import { middleware } from "@warlock.js/core";
@@ -10175,7 +10331,7 @@ See [`@warlock.js/cascade/subscribe-to-model-events/SKILL.md`](@warlock.js/casca
 
 ---
 name: define-model
-description: 'Define a Cascade model — `@RegisterModel()`, class extends `Model<TSchema>`, `static table`, `static schema`, three update idioms (`.set` / `.merge` / `.save`), `.unset`, `.destroy`, `static toJsonColumns` / `resource` for output shaping. Triggers: `Model`, `RegisterModel`, `static schema`, `.set`, `.merge`, `.save`, `.unset`, `.destroy`, `toJsonColumns`, `resource`; "how do I define a model", "shape the JSON output", "remove a field"; typical import `import { Model, RegisterModel } from "@warlock.js/cascade"`. Skip: querying — `@warlock.js/cascade/query-data/SKILL.md`; relations — `@warlock.js/cascade/define-relations/SKILL.md`; competing libs `mongoose`, `prisma`, `typeorm` `@Entity`.'
+description: 'Define a Cascade model — `@RegisterModel()`, class extends `Model<TSchema>`, `static table`, `static schema`, three update idioms (`.set` / `.merge` / `.save`), `.unset`, `.destroy`, `static toJsonColumns` / `resource` / `static hidden` for output shaping. Covers write safety: `static hidden` fields are ALWAYS stripped from `toJSON()` regardless of `resource`/`toJsonColumns`, cascade warns once per model on an unhidden credential-shaped field, and `merge()` on a persisted model drops identity columns so request data can never retarget an `update()`/`destroy()` at another row. Triggers: `Model`, `RegisterModel`, `static schema`, `.set`, `.merge`, `.save`, `.unset`, `.destroy`, `toJsonColumns`, `resource`, `hidden`, `trustedPrimaryKey`; "how do I define a model", "shape the JSON output", "remove a field", "hide password from response", "prevent id in request body overwriting another row"; typical import `import { Model, RegisterModel } from "@warlock.js/cascade"`. Skip: querying — `@warlock.js/cascade/query-data/SKILL.md`; relations — `@warlock.js/cascade/define-relations/SKILL.md`; competing libs `mongoose`, `prisma`, `typeorm` `@Entity`.'
 ---
 
 # Define a model
@@ -10269,6 +10425,8 @@ await user.merge({ name: "Augusta Ada King", status: "active" }).save();
 
 The everyday case. Service takes `Partial<UserSchema>` from a request body, merges it into the instance, saves. Existing fields not in the object are untouched.
 
+**Safe against id-retargeting by design.** `model.merge(req.body); await model.save();` is the canonical update-my-profile shape — and `req.body` is attacker-controlled. On an already-persisted model, `merge()` drops identity columns (`id`, `_id`, the configured primary key) instead of applying them, so a body carrying `{ id: "<victim-id>", role: "admin" }` cannot redirect the write onto someone else's row: `update()`/`replace()`/`destroy()` build their filter from `model.trustedPrimaryKey` — the id captured when the instance became persisted (hydration, or right after an insert), never the current in-memory value. Identity columns are also excluded from the `$set`/`$unset` payload, so an explicit `.set("id", …)` on a loaded record doesn't rewrite the key of the row it's pinned to either. This only applies to an *existing* record — `User.create({ id, ... })` with an explicit id is unchanged, since there's no row to retarget yet. If you deliberately need to change a primary key, do it through the atomic/raw APIs (see [`perform-atomic-ops`](@warlock.js/cascade/perform-atomic-ops/SKILL.md)), not `merge()`.
+
 ### `.save()` after manual mutation — when changes are spread
 
 ```ts
@@ -10348,11 +10506,25 @@ export class User extends Model<UserSchema> {
 
 Plain TypeScript class. No framework dependencies. `static resourceColumns` narrows which columns reach the resource; pair the two for strongly-typed public output.
 
+### Fields that must never serialize — `static hidden`
+
+```ts
+@RegisterModel()
+export class User extends Model<UserSchema> {
+  public static table = "users";
+  public static schema = userSchema;
+  public static hidden = ["password", "resetToken"];
+}
+```
+
+`static hidden: string[]` names top-level fields `toJSON()` (and therefore `JSON.stringify(user)` / `res.json(user)`) can **never** emit — stripped whether the model falls back to the raw-document default, uses `toJsonColumns`, or goes through `resource` (hidden wins over all three). Defaults to `[]`, so declaring it is opt-in and nothing changes on an existing model until you add fields — but because that default fails open, cascade logs a one-time `console.warn` per model whose schema declares a credential-shaped column (`password`, `passwordHash`, `secret`, `token`, `apiKey`/`api_key`, case-insensitive) that isn't covered by `hidden`, `resource`, or `toJsonColumns`. Treat that warning as "add this field to `hidden`," not noise to suppress. Prefer `hidden` over remembering to exclude the field from every `toJsonColumns` list by hand — it's enforced regardless of which shaping strategy a given model (or a future refactor) picks.
+
 ## Things NOT to do
 
 - Don't `new User()` to create a record — `User.create({...})` validates, persists, fires events.
 - Don't `.set("relation_name", instance)` for a relation slot. Use `setRelation("name", instance)`.
 - Don't return the raw model from an HTTP route without shaping output. Add `toJsonColumns` or `resource`.
+- Don't rely on `toJsonColumns`/`resource` alone to keep a password or token out of responses — declare it in `static hidden` too; that's the one path enforced no matter which shaping strategy is used, and the only one that survives someone adding a second `resource` later.
 - Don't `await user.save()` and forget the `await` — your changes live only on the instance and never reach the DB.
 - Don't expect schema defaults to apply on `.merge()` — defaults fire on `.create()` only.
 
@@ -11008,7 +11180,7 @@ The total count requires an extra query. On very large filtered tables, this can
 
 ---
 name: perform-atomic-ops
-description: 'Avoid races on concurrent writes — `Model.increase(filter, field, n)` / `Model.decrease` for atomic counters, `Model.atomic(filter, ops)` for arbitrary mutations (`$set` / `$inc` / `$push` / `$pull`), `Model.createMany` / `Model.findAndUpdate` / `Model.delete` for bulk. Triggers: `Model.increase`, `Model.decrease`, `Model.atomic`, `Model.createMany`, `createMany bulk`, `batchSize`, `Model.findAndUpdate`, `Model.delete`, `$inc`, `$set`; "increment counter under concurrency", "bulk insert without N+1", "fast bulk insert", "insert thousands of rows", "atomic update without loading"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: multi-row atomicity — `@warlock.js/cascade/manage-transactions/SKILL.md`; competing patterns `mongoose findOneAndUpdate`, `pg` `UPDATE ... SET x = x + 1`.'
+description: 'Avoid races on concurrent writes — `Model.increase(filter, field, n)` / `Model.decrease` for atomic counters, `Model.atomic(filter, ops)` for arbitrary mutations (`$set` / `$inc` / `$push` / `$pull`), `Model.createMany` / `Model.findAndUpdate` / `Model.delete` for bulk. `atomic()` / `findAndUpdate()` / `findOneAndUpdate()` / `findAndReplace()` / `findOneAndDelete()` sanitize their `filter` argument — `$`-prefixed keys throw `UnsafeFilterError`, same check as `where()`. Triggers: `Model.increase`, `Model.decrease`, `Model.atomic`, `Model.createMany`, `createMany bulk`, `batchSize`, `Model.findAndUpdate`, `Model.findOneAndUpdate`, `Model.findAndReplace`, `Model.findOneAndDelete`, `Model.delete`, `$inc`, `$set`, `UnsafeFilterError`; "increment counter under concurrency", "bulk insert without N+1", "fast bulk insert", "insert thousands of rows", "atomic update without loading", "is atomic() safe with a request body filter"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: multi-row atomicity — `@warlock.js/cascade/manage-transactions/SKILL.md`; competing patterns `mongoose findOneAndUpdate`, `pg` `UPDATE ... SET x = x + 1`.'
 ---
 
 # Use atomic operations
@@ -11034,6 +11206,8 @@ await User.atomic({ id: userId }, {
 ```
 
 `Model.atomic(filter, operations)` → `Promise<number>`. Driver-flavored atomic mutation — MongoDB has `$set` / `$inc` / `$push` / `$pull`; the Postgres driver translates the equivalents. Use when you need to combine multiple field changes atomically without loading the model first.
+
+**`filter` is sanitized like `where()`.** `atomic()`, `findAndUpdate()`, `findOneAndUpdate()`, `findAndReplace()` and `findOneAndDelete()` all run their `filter` argument through the same `$`-prefixed-key check as `Model.where()` (see [`query-data`](@warlock.js/cascade/query-data/SKILL.md)) and throw `UnsafeFilterError` on a key like `$ne`. Before this, these five bypassed `where()` entirely, so a filter forwarded straight from a request body — `User.atomic(req.body.filter, { $set: { role: "admin" } })` — could still smuggle an operator like `{ role: { $ne: "admin" } }` through as a live query even though `where()` itself was already guarded. Only the FILTER is checked — the update-operator object (`$set`/`$inc`/`$unset`/…) is untouched, since that's meant to carry `$` keys. If you legitimately need operator conditions in the filter, express them through `Model.query().where(...)` instead of the raw filter argument.
 
 ## Bulk insert — `Model.createMany`
 
@@ -11119,6 +11293,7 @@ for (const user of targets) {
 - Don't expect `findAndUpdate` / `delete` to fire per-row `saved` / `deleted` events or honor the delete strategy. They don't. Iterate if you need that.
 - Don't hand-roll chunking around `createMany` — it already chunks by `batchSize` (default 500). Tune `batchSize` instead of slicing the array yourself.
 - Don't assume `bulk: true` fires per-row `saving` / `created` / `saved` events or runs instance hooks — it doesn't. Casts/timestamps/defaults/ids still apply, but if you need the lifecycle, use the default path (or iterate with `.save()`).
+- Don't forward a raw request-body object as the `filter` to `atomic()`/`findAndUpdate()`/`findOneAndUpdate()`/`findAndReplace()`/`findOneAndDelete()` expecting it to be un-sanitized — it isn't, `$`-prefixed keys throw `UnsafeFilterError` — but don't rely on that as your only authorization check either; it blocks operator injection, not "does this caller own this row."
 
 ## See also
 
@@ -11130,7 +11305,7 @@ for (const user of targets) {
 
 ---
 name: query-data
-description: 'Query records via the model — `.where(field, value)` / `.where(field, op, value)`, `.find(id)` / `.first` / `.all`, `.orderBy`, `.count` / `.exists`, plus `.whereIn` / `.whereBetween` / `.whereLike` / `.pluck` / `.firstOrFail` / scopes via `addScope`. Triggers: `.where`, `.find`, `.first`, `.firstOrFail`, `.all`, `.get`, `.orderBy`, `.exists`, `.whereIn`, `.whereBetween`, `addScope`; "filter by status", "find by id", "fetch active users", "check existence"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: pagination — `@warlock.js/cascade/paginate-results/SKILL.md`; aggregates — `@warlock.js/cascade/aggregate-data/SKILL.md`.'
+description: 'Query records via the model — `.where(field, value)` / `.where(field, op, value)`, `.find(id)` / `.first` / `.all`, `.orderBy`, `.count` / `.exists`, plus `.whereIn` / `.whereBetween` / `.whereLike` / `.pluck` / `.firstOrFail` / scopes via `addScope`. Covers filter safety: `where()` rejects `$`-prefixed keys (`UnsafeFilterError`), `whereRaw()` string form rejects `$where`/`$function`/`$accumulator` (`UnsafeRawExpressionError`), and `whereLike`/`whereStartsWith`/`whereEndsWith`/`whereSearch` match string arguments literally (pass a `RegExp` for pattern semantics). Triggers: `.where`, `.find`, `.first`, `.firstOrFail`, `.all`, `.get`, `.orderBy`, `.exists`, `.whereIn`, `.whereBetween`, `.whereLike`, `.whereRaw`, `addScope`, `escapeRegex`, `likePatternToRegexSource`, `UnsafeFilterError`, `UnsafeRawExpressionError`; "filter by status", "find by id", "fetch active users", "check existence", "search box query", "is where() safe from injection"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: pagination — `@warlock.js/cascade/paginate-results/SKILL.md`; aggregates — `@warlock.js/cascade/aggregate-data/SKILL.md`.'
 ---
 
 # Query data
@@ -11175,6 +11350,23 @@ const targets = await User.where({ status: "active", role: "admin" }).get();
 ```
 
 Equivalent to chained equalities. Useful when the filter comes from a dynamic source. **Object form only supports equality** — use chained `.where()` for operators.
+
+### Filters are safe to build from request data — but only through this API
+
+`where(field, value)`, `where(field, "=", value)` and the object form all run the value through a `$`-prefixed-key check before it reaches the driver, so `User.first({ email: req.body.email, password: req.body.password })` throws `UnsafeFilterError` instead of compiling `{ password: { $ne: null } }` into a live MongoDB operator query (the classic NoSQL auth-bypass). This applies to every filter-accepting model static too — `first`, `findFirst`, `findAll`, `count`, `paginate`, `all`, `deleteMany`/`delete`, `deleteOne`, and the atomic/find-and-modify statics in [`perform-atomic-ops`](@warlock.js/cascade/perform-atomic-ops/SKILL.md). Explicit operator APIs (`where(field, operator, value)` for operators other than `=`, `whereIn`/`whereNull`/`whereBetween`/…, object-form `whereRaw({ ... })`) are intentionally not routed through this check — they already express an operator on purpose. Dotted paths (`"profile.name"`) and plain nested-object equality values remain valid; only literal `$`-prefixed keys are rejected. `sanitizeFilter` / `sanitizeFilterValue` are exported if you need the same check on a filter you forward to a driver-level API directly.
+
+```ts
+await User.first({ email, password }); // throws UnsafeFilterError if password is `{ $ne: null }`
+```
+
+## Raw expressions — `.whereRaw()` / `.orWhereRaw()`
+
+```ts
+query.whereRaw({ $expr: { $gt: ["$stock", "$reserved"] } }); // object form — MongoDB
+query.whereRaw("age > ?", [30]);                             // string form — SQL, real bindings
+```
+
+The **object form** is checked like any other filter value, plus it rejects the server-side-JavaScript operators `$where`, `$function` and `$accumulator` anywhere in the expression (throws `UnsafeRawExpressionError`); `$expr` and the other aggregation operators keep working. The **string form on the MongoDB driver throws `UnsafeRawExpressionError`** — a string used to compile to `{ $where: "<js>" }`, executing arbitrary JavaScript inside `mongod` per scanned document; there is no safe way to parameterize that, so it's rejected outright. Use the object form instead. SQL drivers keep string mode with real `?` bindings (unchanged).
 
 ## Get one record
 
@@ -11251,7 +11443,7 @@ Cascade's query builder has around 60 methods. Reach for these as the need arise
 | `.whereNull(field)` / `.whereNotNull(field)` | Nullability checks |
 | `.whereBetween(field, [a, b])` | Inclusive range |
 | `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter` | Date helpers |
-| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` | Pattern matching |
+| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` / `.whereSearch` | Pattern matching — see below for literal-vs-regex semantics |
 | `.whereHas(relation, callback)` | Filter by conditions on a related model |
 | `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)` | Aggregates — [`use-aggregates`](@warlock.js/cascade/aggregate-data/SKILL.md) |
 | `.distinct(field)` / `.pluck(field)` | Single-field reads (distinct values, flat list) |
@@ -11260,6 +11452,23 @@ Cascade's query builder has around 60 methods. Reach for these as the need arise
 | `.similarTo(column, embedding)` | Vector similarity — [`use-vector-search`](@warlock.js/cascade/search-by-vector/SKILL.md) |
 
 Each chains off `User.where(...)` or `User.query()` and ends with the appropriate terminator. (`where`, `with`, `joinWith`, `first`, `count`, `find`, `all`, `paginate` are static shortcuts on the model; the rest live on the query builder, so reach them via `User.query()` or by chaining off a static `where`.)
+
+### `whereLike` / `whereSearch` — string arguments match literally
+
+```ts
+await User.where(...).whereLike("email", "%@gmail.com").get();      // literal, % still wildcards
+await User.query().whereSearch("name", req.query.q).get();          // safe with raw user input
+```
+
+A **string** argument to `whereLike`/`whereNotLike`/`whereStartsWith`/`whereEndsWith` (and their `Not` variants) and the `$regex` form of `whereSearch` is escaped and matched as a **literal substring** — the SQL `LIKE` wildcard `%` still expands (to `.*`, runs of `%` collapse), but every other regex metacharacter (`.`, `*`, `+`, `^`, `$`, …) in the string is neutralized. This is what makes `whereSearch("name", req.query.q)` safe to wire directly to a search box: before this, a user-controlled string compiled straight into a MongoDB `$regex`, so `^.*$` matched everything, `^a`/`^b`/… probed a value back one character at a time, and a nested-quantifier pattern like `(a+)+$` triggered catastrophic backtracking (ReDoS) against every scanned document.
+
+An explicit **`RegExp`** argument is still used as a pattern (verbatim, no escaping) — that's how you get real regex semantics — but a `RegExp` can't arrive as JSON, so it only reaches these calls when a developer constructs it in code. **Never build that `RegExp` from user input**; if you need dynamic pattern matching, escape the dynamic parts yourself with the exported `escapeRegex(value)` / `likePatternToRegexSource(pattern)` helpers.
+
+```ts
+import { escapeRegex, likePatternToRegexSource } from "@warlock.js/cascade";
+```
+
+The Postgres driver was already parameterized (`ILIKE $1`) and is unaffected either way.
 
 ## Scopes — reusable query fragments
 
@@ -11290,6 +11499,8 @@ const activeUsers = await User.query().scope("active").get();
 - Don't `Model.all()` without a filter on a production table — use pagination or chunking.
 - Don't `!` away the null from `.find()` / `.first()` — handle the missing case explicitly or use `.firstOrFail()` when absence is a real error.
 - Don't write the same filter chain across multiple services — promote it to a scope.
+- Don't build a `RegExp` for `whereLike`/`whereSearch` out of user input — a string argument is already safely escaped; a raw `RegExp` bypasses that and reintroduces the injection/ReDoS risk it closes.
+- Don't reach for `whereRaw()` string mode on MongoDB expecting it to still work — it now throws `UnsafeRawExpressionError`; use the object form (`whereRaw({ $expr: … })`).
 
 ## See also
 
@@ -14083,7 +14294,7 @@ JSON Schema: `format: "color"` for `.hexColor()`; the others map to `format: "co
 | `.toAlphanumeric()` | strip non-alphanumerics |
 | `.removeSpecialCharacters()` | keep alphanumerics + whitespace |
 | `.removeNumbers()` | strip digits |
-| `.safeHtml()` | strip HTML tags |
+| `.stripTags()` | strip HTML tags via a naive `<...>` regex — **not** an XSS sanitizer; `.safeHtml()` is a deprecated alias |
 | `.htmlEscape()` | `<` → `&lt;` etc |
 | `.unescapeHtml()` | reverse `htmlEscape()` |
 
@@ -14122,8 +14333,8 @@ v.string().strongPassword(12)
 // URL with strict format
 v.string().url().startsWith("https://")
 
-// Sanitized HTML body
-v.string().safeHtml().min(1)
+// Tag-stripped HTML body (not XSS-safe — sanitize with DOMPurify/sanitize-html before rendering untrusted rich text)
+v.string().stripTags().min(1)
 
 // Masked phone for response
 v.string().pattern(/^\+\d{8,}$/).mask(3, -2)
@@ -14728,6 +14939,7 @@ import {
 | `CacheDriverNotInitializedError` | Any data op called before `cache.init()` / `cache.use()` | Call `cache.init()` at app startup. Tests often forget this — add a `beforeEach`. |
 | `CacheUnsupportedError` | Driver doesn't implement the requested op. Today: `update` / `merge` on the file driver; `set({ vector })` and `similar()` on file / redis / pg-without-`vector`-config. | Switch driver (memory family for dev similarity, `pg` with `vector` config for production), or queue the op. |
 | `CacheConcurrencyError` | Declared for future optimistic-concurrency exhaustion on Redis `update()` | Not thrown today. Reserved for the v2.1 `WATCH`/`MULTI` implementation. |
+| `CacheError` (file driver, path containment) | A key/namespace, after percent-encoding, still resolves outside the cache root — `"Cache key resolves outside the cache directory: ..."`. Last line of defense against path traversal on top of the encoding step; should not happen in normal use. | Treat as a programmer/attacker-input error — don't retry; investigate the key source. See [`@warlock.js/cache/pick-cache-driver/SKILL.md`](@warlock.js/cache/pick-cache-driver/SKILL.md) for the encoding contract. |
 
 ## Special case — `setNX` unsupported
 
@@ -15035,6 +15247,14 @@ options: {
   },
 }
 ```
+
+## Key & namespace safety (file / redis)
+
+Cache keys can carry untrusted input (e.g. a `cached()` auto-key derived from a request param), so every built-in driver treats a key as data, never as a path or a query fragment:
+
+- **`file`** — a key/namespace maps to exactly one on-disk directory component: `%`, `/`, and `\` are percent-encoded before the path is built, so `../../etc` becomes an inert directory name instead of a traversal. The resolved path is also asserted to stay inside the configured cache root (throws `CacheError` otherwise) — a second, encoding-independent check. `removeNamespace` clears both the namespace's own directory and every dotted child (`ns`, `ns.*`), honoring `globalPrefix`.
+- **`redis`** — `removeNamespace` escapes glob metacharacters (`*`, `?`, `[`, `\`) in the namespace before building its match pattern, and walks matches with a `SCAN` cursor (`scanIterator`) instead of the blocking `KEYS` command, so clearing a namespace on a large keyspace doesn't stall the event loop for other tenants.
+- **Errors that echo a connection string** (Redis `connect()` failures, any driver's failed op) are logged through a `safeErrorInfo()` helper that redacts `scheme://user:pass@` credentials to `scheme://[REDACTED]@` and never prints the raw `Error` object — see [`@warlock.js/cache/handle-cache-errors/SKILL.md`](@warlock.js/cache/handle-cache-errors/SKILL.md).
 
 ## Registering a custom driver
 
@@ -15699,7 +15919,7 @@ await cache.set("user:2:profile", otherProfile);
 await cache.removeNamespace("user.1");  // drops both user:1 entries, keeps user:2
 ```
 
-Cheaper than tags (no reverse index to maintain). Every real driver supports it — memory family and `lru` by prefix-scan, `file` by directory, `redis`/`pg` by key/`LIKE` prefix; `null` no-ops. See [`@warlock.js/cache/pick-cache-driver/SKILL.md`](@warlock.js/cache/pick-cache-driver/SKILL.md).
+Cheaper than tags (no reverse index to maintain). Every real driver supports it — memory family and `lru` by prefix-scan, `file` by directory (including dotted sibling keys like `ns.a`), `redis` by non-blocking `SCAN` (not `KEYS`), `pg` by key/`LIKE` prefix; `null` no-ops. Namespace strings are treated as data, not glob/path input — see [`@warlock.js/cache/pick-cache-driver/SKILL.md`](@warlock.js/cache/pick-cache-driver/SKILL.md) for the file-path-containment and redis-glob-escaping details.
 
 ## Multi-tenant scoping at the driver level
 
@@ -16835,7 +17055,7 @@ Info + housekeeping: `exists`, `isEmpty`, `size`, `stats` (→ `{ path, name, si
 ### The JSON family — pick the right one
 - `getJson` — read (+ optional `schema` validation, + `default` when missing).
 - `putJson` — overwrite the whole document.
-- `mergeJson(path, partial, { deep? })` — **patch an object** (shallow spread; `deep:true` recurses).
+- `mergeJson(path, partial, { deep? })` — **patch an object** (shallow spread; `deep:true` recurses). `__proto__`/`constructor`/`prototype` keys are dropped from both sides at every depth (not merged) — so a caller-supplied `partial` (e.g. a PATCH request body) can't prototype-pollute the merged object or the file written back to disk. The rest of the payload merges as normal.
 - `editJson(path, fn)` — arbitrary transform, e.g. push into an array `(arr) => [...arr, x]`.
 - `ensureJson(path, fallback)` — return the parsed doc, or create it with `fallback`.
 - `appendJsonLine(path, value)` — **NDJSON**: one JSON record per line (a log/journal), NOT one JSON document; never parses or merges.
@@ -17823,14 +18043,48 @@ If two channels share a `name`, only one is reachable this way — the search re
 
 ---
 name: redact-sensitive-log-fields
-description: 'Strip secrets from log output — two-layer additive redaction via log.configure({redact: {paths}}) (logger floor) + per-channel redact (more paths on top). Dotted glob paths (*, **). Triggers: `redact`, `paths`, `censor`, `log.setRedact`, `applyRedact`; "redact passwords in logs", "strip tokens from log output", "hide authorization headers", "scrub PII before logging"; typical import `import { log } from "@warlock.js/logger"`. Skip: filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; custom sinks — `@warlock.js/logger/write-custom-log-channel/SKILL.md`; competing libs `pino.redact`, `fast-redact`.'
+description: 'Strip secrets from log output — a built-in secret-key denylist on by default (DEFAULT_REDACT_KEYS), plus two-layer additive redaction via log.configure({redact: {paths, keys}}) (logger floor) + per-channel redact (more on top). Dotted glob paths (*, **). Triggers: `redact`, `paths`, `keys`, `defaultKeys`, `censor`, `log.setRedact`, `applyRedact`; "redact passwords in logs", "strip tokens from log output", "hide authorization headers", "scrub PII before logging", "turn off default redaction"; typical import `import { log } from "@warlock.js/logger"`. Skip: filtering — `@warlock.js/logger/filter-log-entries/SKILL.md`; custom sinks — `@warlock.js/logger/write-custom-log-channel/SKILL.md`; competing libs `pino.redact`, `fast-redact`.'
 ---
 
 # Redaction — keeping secrets out of logs
 
-Two layers, both opt-in. Configured at the logger and/or per channel.
+Three layers: a **built-in key denylist that is on by default**, plus opt-in path globs configured at the logger and/or per channel.
 
-## The model in one line
+## Layer 0 — the default denylist (since 4.15.0, no configuration needed)
+
+Common secret **key names** are censored at any depth of `context`, `message`, and an `Error`'s own enumerable properties — before any of your config runs:
+
+```ts
+log.error("auth", "login", "failed", { headers: req.headers, body: req.body });
+// context.headers.authorization → "[REDACTED]"
+// context.body.password         → "[REDACTED]"
+// context.body.email            → untouched
+```
+
+Keys are matched **exactly**, on a normalized form (lower-cased, separators stripped) — so one entry covers `apiKey` / `api_key` / `API-KEY` / `x-api-key`. It is not substring matching: `tokenCount` and `passwordUpdatedAt` survive. Read the exact set from `DEFAULT_REDACT_KEYS`.
+
+```ts
+import { DEFAULT_REDACT_KEYS } from "@warlock.js/logger";
+
+log.configure({
+  redact: {
+    keys: ["internalRef"],   // union with the built-in set
+    defaultKeys: false,      // opt out of the built-in set entirely
+  },
+});
+```
+
+`defaultKeys: false` is an escape hatch, not a tuning knob — it restores the pre-4.15.0 behavior where a `password` in `context` reaches every sink in cleartext. Prefer adding a function `censor` if you only need to keep a prefix.
+
+**A channel cannot turn the default set off** (it can only add keys, or turn it back *on* if the logger-wide config disabled it) — same additive-only contract as paths, below. And `log.setRedact(undefined)` clears *your* paths, not the default denylist.
+
+Not reachable by any layer: secrets interpolated into a `message` string (`` `token=${t}` ``), `Map`/`Set`/`Buffer` contents, and getter-backed or non-enumerable properties.
+
+## Layers 1 & 2 — path globs, opt-in
+
+For anything the denylist can't name by key — a secret under an app-specific key, or a value you want partially masked rather than blanked.
+
+The model in one line:
 
 > Logger-wide redaction is the security floor. Per-channel redaction adds more paths. **No channel can ever undo a logger-wide redaction.**
 
@@ -17854,7 +18108,7 @@ log.configure({
 
 // runtime equivalent:
 log.setRedact({ paths: ["context.password"] });
-log.setRedact(undefined);  // clear
+log.setRedact(undefined);  // clear your paths (the default denylist stays on)
 ```
 
 Every channel sees the redacted entry. Cheap: applied **once** before fan-out; channels share the redacted clone unless they add their own paths.
@@ -17937,7 +18191,7 @@ If `message` is a plain object, paths under `message.*` work as expected. If `me
 
 ## Performance notes
 
-- **No redact configured** → zero overhead (no clone, no walk).
+- **No redact configured** → the default denylist still runs (since 4.15.0): a cheap presence scan for a denylisted key on every `log()` call, with the deep clone + censor pass skipped entirely when nothing matches. Only `{ defaultKeys: false }` (no `paths`, no extra `keys`) gets back to zero work.
 - **Logger-wide redact only** → one deep clone + one path-walk per `log()` call, shared by every channel.
 - **Channel adds paths** → that channel re-clones from the original input and runs the merged pass once. Other channels still share the cheaper logger-wide clone.
 - Each path is matched independently; cost grows linearly with `paths.length`.
@@ -20876,6 +21130,8 @@ userContext.update({ role: "admin" });
 
 If there's no current store, `update` creates one with the partial (cast to the full type). Use for incremental enrichment as the request flows through layers.
 
+`update()` (and `set()`, which calls it) silently drops `__proto__` / `constructor` / `prototype` keys instead of merging them — merging with `Object.assign` would otherwise let a caller-shaped payload (e.g. `userContext.update(req.body)`) pollute `Object.prototype` for the whole process, since the context store is shared. The rest of the payload still merges normally; this closes only the prototype-pollution vector, not general trust of merged input — validate before you merge caller-supplied data.
+
 ## Reading
 
 ```ts
@@ -21280,7 +21536,7 @@ retry: {
 }
 ```
 
-`maxRetries` is the part that does the work: when a handler **throws**, herald reads the message's `x-retry-count` header and, while it's under `maxRetries`, nacks with requeue so the broker redelivers. Once `x-retry-count` reaches `maxRetries`, it nacks-without-requeue (→ DLQ if configured) or rejects outright.
+`maxRetries` is the part that does the work: when a handler **throws**, herald reads the message's `x-retry-count` header and, while it's under `maxRetries`, republishes with the header incremented so the count actually advances (a plain requeue never advances it — the broker doesn't add that header). Once `x-retry-count` reaches `maxRetries`, it dead-letters (if `deadLetter` is configured) or drops the message with a loud `log.error` — a poison message can no longer ping-pong forever. This is shared by the automatic throw path and the explicit `ctx.retry()` call, so both honor the same cap.
 
 **Caveat on `delay`.** `RetryOptions.delay` (number or `(attempt) => number`) is **not applied on the automatic throw path** — a thrown handler requeues immediately, with no wait. The only place a delay takes effect is the explicit `ctx.retry(delayMs)` call, which republishes the message with an `x-delay` header — and even that needs the RabbitMQ delayed-message-exchange plugin installed, or the delay is ignored. So if you need real backoff, call `ctx.retry(ms)` from inside the handler and install the plugin; don't rely on the channel-level `retry.delay` for timing.
 
@@ -21319,12 +21575,14 @@ export class UserCreatedConsumer extends EventConsumer<{ id: number; email: stri
   // handle(payload, event) — NOT (message, ctx). No ctx.ack() here.
   public async handle(payload: { id: number; email: string }, event: ConsumedEventMessage) {
     await sendWelcomeEmail(payload.email);
-    // return cleanly → herald acks. throw → herald nacks (requeue).
+    // return cleanly → herald acks. throw → herald retries (bounded — see below).
   }
 }
 ```
 
-The handler receives the **already-unwrapped payload** as the first argument and a `ConsumedEventMessage` as the second — `{ messageId, eventName, payload, version?, occurredAt?, metadata?, message }` (where `message` is the raw `Message` if you need `message.metadata.headers`). There is **no `ctx`**: the framework auto-acks when `handle` resolves and auto-nacks-with-requeue when it throws, so you never call `ack`/`nack` yourself in this style.
+The handler receives the **already-unwrapped payload** as the first argument and a `ConsumedEventMessage` as the second — `{ messageId, eventName, payload, version?, occurredAt?, metadata?, message }` (where `message` is the raw `Message` if you need `message.metadata.headers`). There is **no `ctx`**: the framework auto-acks when `handle` resolves, so you never call `ack`/`nack` yourself in this style.
+
+**A throw is a bounded retry, not an infinite requeue.** `handle` throwing routes through the same bounded-retry routine the raw `.subscribe()` throw path uses (below) — republishes with an incremented `x-retry-count`, capped at `maxRetries: 3` (there's no per-consumer `retry`/`deadLetter` config yet, so the cap is always the default). Once the cap is hit, the message is dropped with a loud `log.error` — never a silent, unbounded ack/nack loop.
 
 Wiring: the channel name comes from `static eventName`, and `@Consumable` self-registers the moment the class module is **imported** — if a broker is already connected it subscribes immediately, otherwise it buffers and subscribes once `connectToBroker` fires. So the only wiring you need is to import the consumer file on the boot path (e.g. your module's `main.ts`).
 
@@ -21442,6 +21700,7 @@ yarn add @warlock.js/herald amqplib   # amqplib for RabbitMQ
 5. **`@warlock.js/seal` schemas validate on publish + receive.** Pass `{ schema }` to `.channel(name, { schema })`.
 6. **Subscribers control message flow** via `ctx.ack()` / `ctx.nack()` / `ctx.reject()` / `ctx.retry(ms)`.
 7. **Smart auto-ack is the default** (`autoAck` unset/`false`). The consumer runs with manual-ack enabled, but herald acks for you when the handler returns cleanly and nacks-with-requeue when it throws — so a crash mid-handling re-delivers, and a clean handler that forgot `ctx.ack()` is still acked. Call `ctx` methods explicitly only when you need a non-default outcome (reject, DLQ, delayed retry). `autoAck: true` is the dangerous mode: the broker acks on delivery, so a crash loses the message.
+8. **`username`/`password` never leak into thrown or logged errors.** They're URI-encoded when building the internal `amqp://` connection URL, and any connect failure — including one built from a caller-supplied `uri` — has `user:pass@` redacted before it's re-thrown/logged. Safe to log a connection error as-is; it will never contain a plaintext broker credential.
 
 ## Minimal example
 
@@ -22471,7 +22730,7 @@ const channelName = await chooseChannelForUser(user);
 await notify.channel(channelName).send(user, payload);
 ```
 
-This is the only path with `unknown`-typed payloads — prefer the literal `notify.<channel>` when you can.
+This is the only path with `unknown`-typed payloads — prefer the literal `notify.<channel>` when you can. `to` is still what decides the recipient: even for the `database` channel, a `recipientId`-shaped key on `payload` (or the model's physical recipient column name) is stripped before the row is built, so an untyped payload assembled from request JSON can't redirect the write to another recipient — see [`use-in-app/SKILL.md`](../use-in-app/SKILL.md#createfor-write-side--no-idor-either-since-4150).
 
 ## Opt into preference/rate-limit gating
 
@@ -22608,6 +22867,10 @@ class BaseNotificationsRepository extends RepositoryManager {
   public createFor(recipientId, input, tenantId?)   { /* one insert, starts unread */ }
 }
 ```
+
+### `createFor` write side — no IDOR either (since 4.15.0)
+
+`recipientId` is always the trusted argument, applied **after** the payload — `createFor`/`createManyFor` strip server-owned keys (`id`, `recipientId`, `tenant`, `readAt`, `isRead`, and their resolved `columnMap` physical column names) off `input` before merging. Before this, a caller passing an untyped payload straight through (request JSON, a channel's `send` args) could smuggle its own `recipientId` — or the raw physical column name — and write the notification into someone else's inbox. `type` / `title` / `body` / `payload` / `idempotencyKey` are untouched; you don't need to sanitize `input` yourself.
 
 ### `columnMap` — map logical roles → your columns
 
@@ -23212,7 +23475,7 @@ Only a *handler bug* — a non-sentinel throw from your handler — propagates, 
 
 ---
 name: attach-ai-middleware
-description: 'Wire agent middleware — ai.middleware.budget (token / USD caps + SLO/cost contract w/ maxLatencyMs + onViolation fallback), ai.middleware.guardrail (pre / post content checks), ai.middleware.semanticCache (exact + vector cache), supervisor-level middleware, plus authoring custom hooks (execute / trip / tool). Triggers: `ai.middleware.budget`, `ai.middleware.guardrail`, `ai.middleware.semanticCache`, `ai.middleware.compose`, `ai.middleware.forTool`, `AgentMiddleware`, `BudgetExceededError`, `GuardrailViolationError`, `BudgetContract`, `maxLatencyMs`, `onViolation`, `readBudgetFallbackSignal`, `supervisor middleware`; ''cap token cost'', ''SLO budget'', ''block pii in prompts'', ''semantic cache before LLM'', ''supervisor-level middleware'', ''write custom hook''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent lifecycle — `@warlock.js/ai/run-ai-agent/SKILL.md`; cache drivers — `@warlock.js/ai/persist-ai-data/SKILL.md`; competing libs `langchain` callbacks.'
+description: 'Wire agent middleware — ai.middleware.budget (token / USD caps + SLO/cost contract w/ maxLatencyMs + onViolation fallback), ai.middleware.guardrail (pre / post content checks), ai.middleware.semanticCache (exact + vector cache), supervisor-level middleware, plus authoring custom hooks (execute / trip / tool). Triggers: `ai.middleware.budget`, `ai.middleware.guardrail`, `ai.middleware.semanticCache`, `ai.middleware.compose`, `ai.middleware.forTool`, `AgentMiddleware`, `BudgetExceededError`, `GuardrailViolationError`, `BudgetContract`, `maxLatencyMs`, `onViolation`, `readBudgetFallbackSignal`, `supervisor middleware`, `SemanticCacheOptions`, `SemanticCacheScope`; ''cap token cost'', ''SLO budget'', ''block pii in prompts'', ''semantic cache before LLM'', ''supervisor-level middleware'', ''write custom hook'', ''isolate semantic cache per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent lifecycle — `@warlock.js/ai/run-ai-agent/SKILL.md`; cache drivers — `@warlock.js/ai/persist-ai-data/SKILL.md`; competing libs `langchain` callbacks.'
 ---
 
 # Middleware — agent-level pipeline
@@ -23317,6 +23580,7 @@ ai.middleware.semanticCache({
   threshold: 0.95,
   ttlMs: 60 * 60 * 1000,
   namespace: "support-faq",
+  // scope: "session" (default) — see below
 });
 ```
 
@@ -23329,6 +23593,21 @@ ai.middleware.semanticCache({
 - **Writes** happen at `trip.after` on miss.
 - **Trip-zero only** — only first-trip responses are cached. Tool-using loops never serve cached tool-call responses (would infinite-loop).
 - **Never use memory drivers in production** — linear scan per query.
+
+### Session-scoped by default — `scope` (4.15.0)
+
+A `semanticCache` is normally built once at app boot and shared by every end user, and a hit is returned as the model's answer with **no LLM call in between** — so without isolation, user B's merely-*similar* prompt could be served user A's cached answer, personal context included. `SemanticCacheOptions.scope` (default `"session"`) keys every entry off the run's `AgentExecuteOptions.sessionId` (`"session:<id>"`) and re-checks it as exact equality on read — the key alone never authorizes a hit.
+
+```ts
+ai.middleware.semanticCache({ embedder, threshold: 0.95, scope: "shared" }); // opt back into one shared pool
+ai.middleware.semanticCache({ embedder, threshold: 0.95, scope: (ctx) => tenantIdFrom(ctx) }); // custom boundary
+```
+
+- **`"session"`** (default) — isolated per `sessionId`; a run made *without* a `sessionId` shares one unscoped pool (unchanged behavior for those calls). Thread `sessionId` through `agent.execute()` to get the isolation — composite primitives (supervisor, orchestrator) already forward their own.
+- **`"shared"`** — one pool for every caller, regardless of session — the pre-4.15.0 behavior. The explicit opt-in for genuinely public Q&A (docs bot, FAQ) where cross-user hit rate is the point and no response can carry a caller's private context.
+- **`(context) => key | undefined`** — derive your own boundary, e.g. per tenant. Returning `undefined` falls back to the unscoped pool.
+
+Entries written before the upgrade are unscoped and are only read by unscoped (or `"shared"`) runs. The vector lookup overscans before filtering (mirroring the memory tiers) so a noisy foreign scope can't occupy the top-`k` and mask a caller's own hit.
 
 ## Writing your own middleware
 
@@ -26002,6 +26281,8 @@ await kb.index(await ai.rag.loadWeb("https://docs.example.com/guide", {
 
 HTML responses run through the same tag-strip pass as `loadHtml`; non-HTML text (`text/plain`, markdown) is used verbatim. `metadata.source` is the resolved URL, `metadata.contentType` the server-reported type. A non-OK response, a policy block, a timeout, or an over-cap body throws `OutboundPolicyError`.
 
+**Redirects are re-validated per hop, not delegated to the platform (4.15.0).** A page a crawl reaches can `3xx` — `guardedFetch` re-runs each `Location` through the same scheme/host/private-IP checks before following it, capped at `policy.maxRedirects` (default `5`), and strips `authorization`/`cookie`/`proxy-authorization` on a cross-origin hop. So a redirect can never smuggle `loadWeb` into a private/metadata address the original URL couldn't have reached. Full guard detail (including `assertUrlAllowed`, `fetchTextWithPolicy`, and the other call sites sharing it): [`@warlock.js/ai/secure-outbound-requests/SKILL.md`](@warlock.js/ai/secure-outbound-requests/SKILL.md).
+
 ### `loadPdf` — lazy optional peer, page-precise citations
 
 `pdf-parse` is an **optional** peer, dynamic-imported on the FIRST `loadPdf` call — importing `@warlock.js/ai` never forces it. When it is absent, the curated `PDF_PARSE_INSTALL_INSTRUCTIONS` string is thrown as a plain `Error` (a missing infra peer, not a content problem), never a raw module-resolution stack trace.
@@ -26100,6 +26381,7 @@ The `embedder`'s `dimensions` MUST equal the store's `dimensions` — a mismatch
 
 - [[run-ai-rag]] — the chunk → embed → retrieve → rerank → cite pipeline that **consumes** these loaders and stores (`ai.rag({ embedder, store })`, `index()` / `retrieve()`).
 - [[embed-text]] — the `sdk.embedder` primitive whose `dimensions` must match the store's `vector(N)` width.
+- [[secure-outbound-requests]] — the full `guardedFetch` / `OutboundPolicy` guard `loadWeb` delegates to, including per-hop redirect revalidation and the other consumers sharing it.
 - [`@warlock.js/cache/use-cache-similarity/SKILL.md`](@warlock.js/cache/use-cache-similarity/SKILL.md) — the cache driver `cacheVectorStore` adapts.
 
 
@@ -26525,6 +26807,8 @@ attachments: [
 
 Model must declare `capabilities.vision`. OpenAI adapter auto-infers from name; override with `openai.model({ name, vision: true })`.
 
+A URL *image* attachment is passed to the provider as a URL — the provider fetches it, not the framework, so there's no server-side SSRF surface. A **remote `{ type: "text", source: <url> }` attachment IS fetched server-side** (the adapter needs the raw text inline) and is default-DENY: it throws unless `attachmentPolicy.allowRemoteFetch: true`, and when enabled runs through the shared `guardedFetch` / `OutboundPolicy` guard — see [`@warlock.js/ai/secure-outbound-requests/SKILL.md`](@warlock.js/ai/secure-outbound-requests/SKILL.md).
+
 ## Pattern — streaming
 
 ```ts
@@ -26637,6 +26921,7 @@ The one field a bare agent config doesn't surface ergonomically is `budget` (`Bu
 - [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md) — tool wiring + schema validation
 - [`@warlock.js/ai/write-system-prompt/SKILL.md`](@warlock.js/ai/write-system-prompt/SKILL.md) — persona / instruction builders
 - [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md) — `AIError` hierarchy
+- [`@warlock.js/ai/secure-outbound-requests/SKILL.md`](@warlock.js/ai/secure-outbound-requests/SKILL.md) — the `guardedFetch` / `OutboundPolicy` guard behind a remote text attachment fetch
 
 
 ## run-ai-rag  `@warlock.js/ai/run-ai-rag/SKILL.md`
@@ -27328,10 +27613,13 @@ ai.orchestrator({
     recall: { k: 5, threshold: 0.7, tier: "semantic" },  // k: 0 = write-only memory
     remember: true,                             // false = read-only (recall, never write)
     rememberTier: "semantic",
+    scope: "session",                           // DEFAULT — isolate memories per sessionId
     injectKey: "memories",                      // ctx.context[injectKey] holds RecalledMemory[]
   },
 });
 ```
+
+**Memory is session-scoped by default (4.15.0).** One store instance backs every session of the orchestrator, so `scope` decides what a turn may read: `"session"` (default) keys recall + write-back to the executing `sessionId`, so one user can never recall another's remembered turns. `"shared"` pools every session into one namespace — the pre-4.15.0 behavior, safe only when every session is trusted to see every other's memories. `(sessionId) => key` derives your own boundary (e.g. a tenant id). Memories written before 4.15.0 are unscoped and are only visible under `scope: "shared"`.
 
 Recalled memories land in the per-turn `context` bag under `injectKey` (default `"memories"`) — every route / router / evaluate / dispatch callback reads them at `ctx.context.memories`. Memory never mutates the prompt itself; surfacing it stays explicit. Cancelled / failed turns never remember (they revert), regardless of `remember`. See [`@warlock.js/ai/use-ai-memory/SKILL.md`](@warlock.js/ai/use-ai-memory/SKILL.md).
 
@@ -27350,7 +27638,9 @@ const concierge = ai.agent({ model, tools: [supportTool] });
 
 The tool boundary is **opaque**: the parent's `signal` / `context` / events do NOT auto-forward — anything the wrapped orchestrator needs must ride on the `inputSchema` payload. `sessionScope`:
 - **`"fresh"`** (default) — each invocation gets a generated `sessionId` and empty history; no continuity across calls.
-- **`"shared"`** — the parent threads `sessionId` (and optionally `history`) through the validated payload; the orchestrator participates in that session. A missing/blank `sessionId` throws.
+- **`"shared"`** — the orchestrator joins an existing session named by the DEVELOPER through `session`, never by the model: either a literal id fixed at construction (`session: "sess_42"`) or a resolver reading the out-of-band tool context (`session: (ctx) => String(ctx?.artifacts?.supportSessionId)`). Building a `"shared"` tool without `session` throws at construction, and `sessionId` / `history` in the payload are stripped, not honored.
+
+  A `sessionId` is bearer-equivalent to read/write on that session, so it must not be a model-visible `inputSchema` field: before 4.15.0 it was, and a prompt injection reaching the outer agent could make the nested orchestrator resume, mutate, and echo back a *victim's* conversation. `unsafeAllowModelSessionId: true` restores the old payload path — only for a fully trusted outer context where you verify session ownership yourself.
 
 ## Drift detection
 
@@ -27382,7 +27672,7 @@ await orch.execute(input, { sessionId, history, on: { "orchestrator.drift.checke
 
 ---
 name: run-planner
-description: 'Goal-driven planning with ai.planner({...}) — an LLM GENERATES an ordered execution plan over your registered capabilities (agents / workflows / supervisors / tools), then the planner EXECUTES it, threading each step output into the next, and returns the unified {data, report, usage, error} envelope with report.type "planner". Supports DAG scheduling (dag:true + maxConcurrency off dependsOn), adaptive re-planning (replan:{maxReplans} + the onStep continue/abort/replan directive), and plan-only / approval (mode:"plan-only" → status "awaiting-approval" → approvedPlan). A plan step may delegate via ai.spawnSubAgent({...}) — a GENERAL one-shot-agent helper covered in `@warlock.js/ai/run-ai-agent/SKILL.md`; it is not planner-specific. Triggers: `ai.planner`, `planner.execute`, `spawnSubAgent`, `PlannerConfig`, `PlannerCapability`, `PlannerResult`, `PlannerReport`, `PlannerPlan`, `PlannerStep`, `PlannerStepDirective`, `PlannerPlanInvalidError`, `maxSteps`, `dag`, `maxConcurrency`, `dependsOn`, `replan`, `onStep`, `mode`, `approvedPlan`, `awaiting-approval`, `report.plan`, `report.executedSteps`; ''let the model plan the steps'', ''dynamic plan from a goal'', ''run independent steps in parallel'', ''re-plan when a step fails'', ''generate a plan for approval before running it''; typical import `import { ai } from "@warlock.js/ai"`. Skip: a FIXED known pipeline — `@warlock.js/ai/run-ai-workflow/SKILL.md`; routing one input to a specialist each turn — `@warlock.js/ai/run-supervisor/SKILL.md`; a single model + tools call — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langgraph`, `crewai`.'
+description: 'Goal-driven planning with ai.planner({...}) — an LLM GENERATES an ordered execution plan over your registered capabilities (agents / workflows / supervisors / tools), then the planner EXECUTES it, threading each step output into the next, and returns the unified {data, report, usage, error} envelope with report.type "planner". Supports DAG scheduling (dag:true + maxConcurrency off dependsOn), adaptive re-planning (replan:{maxReplans} + the onStep continue/abort/replan directive), and plan-only / approval (mode:"plan-only" → status "awaiting-approval" → approvedPlan). A plan step may delegate via ai.spawnSubAgent({...}) — a GENERAL one-shot-agent helper covered in `@warlock.js/ai/run-ai-agent/SKILL.md`; it is not planner-specific. Triggers: `ai.planner`, `planner.execute`, `spawnSubAgent`, `PlannerConfig`, `PlannerCapability`, `PlannerResult`, `PlannerReport`, `PlannerPlan`, `PlannerStep`, `PlannerStepDirective`, `PlannerPlanInvalidError`, `maxSteps`, `dag`, `maxConcurrency`, `dependsOn`, `replan`, `onStep`, `mode`, `approvedPlan`, `awaiting-approval`, `report.plan`, `report.executedSteps`, `parsedStepCeiling`; ''let the model plan the steps'', ''dynamic plan from a goal'', ''run independent steps in parallel'', ''re-plan when a step fails'', ''generate a plan for approval before running it''; typical import `import { ai } from "@warlock.js/ai"`. Skip: a FIXED known pipeline — `@warlock.js/ai/run-ai-workflow/SKILL.md`; routing one input to a specialist each turn — `@warlock.js/ai/run-supervisor/SKILL.md`; a single model + tools call — `@warlock.js/ai/run-ai-agent/SKILL.md`; competing libs `langgraph`, `crewai`.'
 ---
 
 # `ai.planner()` — LLM-generated, then executed, plans
@@ -27412,7 +27702,7 @@ const research = ai.planner({
     { name: "summarize", description: "Summarize text into bullet points", executable: summarizer },
     { name: "write", description: "Draft a final report", executable: writerAgent },
   ],
-  maxSteps: 6, // hard cap; steps beyond it are recorded as "skipped"
+  maxSteps: 6, // soft cap; steps beyond it are recorded as "skipped" — see the parse-time ceiling below
 });
 
 const { data, report, usage, error } = await research.execute("Compare React vs Vue in 2026");
@@ -27434,6 +27724,10 @@ for (const step of report.executedSteps) {  // forensic, in execution order
 3. **Finalize** — when `output` is set (factory or per-call), the LAST completed step's structured output is validated into `result.data`. A capability that should feed typed output to the planner's `output` should declare its own `output` schema (the planner reads `data`, falling back to an agent's raw `text`).
 
 `report.type === "planner"`; `report.children[]` carries every dispatched capability report (plus the planning trip), with usage rolled up. `report.executedSteps` is the authoritative per-step record (`PlannerStepSnapshot[]`). Lazy capability loading is **deferred** — every capability is fully constructed up front.
+
+### Parse-time step ceiling (4.15.0)
+
+`maxSteps` can't be expressed in the strict-mode JSON Schema the planning model is given (no `maxItems`), so a provider/proxy that ignores the prompt's step budget could make the planner deserialize an arbitrarily long `steps[]` array before `PlannerRun`'s tail-truncation logic ever ran — `maxSteps` only trimmed *after* the whole array was already parsed and normalized. Plan validation now enforces a hard **parse-time** ceiling of `maxSteps * 4` (or `100` when the schema is built without a `maxSteps`) and **rejects** — rather than truncates — a plan that exceeds it, surfacing `PlannerPlanInvalidError`. The 4× slack keeps the normal case (a model overshooting "at most N steps" slightly) working exactly as before — that overshoot is still truncated to `skipped` steps at execution time, not rejected at parse time. A plan several times its budget is treated as a malfunction worth surfacing, not a prefix worth silently executing.
 
 ## DAG scheduling — `dag: true` + `maxConcurrency`
 
@@ -27501,7 +27795,7 @@ const final = await planner.execute(goal, { approvedPlan: draft.plan! });
 
 `execute()` never throws — failures surface on `result.error`:
 
-- **`PlannerPlanInvalidError`** (`PLANNER_PLAN_INVALID`, category `schema`) — empty plan, a step naming an unknown capability, a DAG cycle, a `dependsOn` naming an unknown step, a stale `approvedPlan`, or a final-output validation failure.
+- **`PlannerPlanInvalidError`** (`PLANNER_PLAN_INVALID`, category `schema`) — empty plan, a step naming an unknown capability, a DAG cycle, a `dependsOn` naming an unknown step, a stale `approvedPlan`, a final-output validation failure, or (4.15.0) a plan exceeding the parse-time step ceiling (`maxSteps * 4`, default `100`).
 - **`PlannerCancelledError`** (`PLANNER_CANCELLED`, category `cancelled`) — the `AbortSignal` fired. `report.status === "cancelled"`, `report.cancelledAt` set; remaining steps are `skipped`.
 - A child capability's own error (agent / tool / provider) flows through unchanged on the failing step's snapshot and as `result.error`. The planner stops at the first failed step and marks the rest `skipped`.
 - **`PlannerFailedError`** is the base for the `PLANNER_*` family.
@@ -27627,6 +27921,16 @@ ai.supervisor({
 
 Each key references the same underlying unit; the description defaults to the unit's. Override the key base with `{ keyPrefix }` and the per-entry text with `{ description }`.
 
+#### `maxFanOut` — width cap (default `10`)
+
+`maxIterations` bounds how DEEP a run goes; `maxFanOut` bounds how WIDE one decision goes. Duplicate intent names in a fan-out array are collapsed silently (branch results are indexed by intent — duplicates only burn tokens); if the DEDUPED list is still longer than the cap, the decision is rejected with `SupervisorRoutingError` (`SUPERVISOR_INVALID_ROUTE`), same as an unknown intent name. Applies to every dispatch source: `router`, `route`, `evaluate.reassignTo`, `intent.next`.
+
+```ts
+ai.supervisor({ intents: { ...ai.fanOut(writer, 20), vote }, maxFanOut: 20, route });
+```
+
+Raise it deliberately when you fan out wider than 10. Why it exists: the router's per-turn prompt embeds supervisor `state` and prior branch outputs, so text injected into a tool result can push an LLM router to emit a very wide `next` array — every element a real agent/workflow run, all inside the allowlist.
+
 ## The `intents` map — five accepted shapes
 
 ```ts
@@ -27674,7 +27978,7 @@ const refundSupervisor = ai.supervisor<RefundOutput>({
 });
 ```
 
-Each branch's output strip-merges into state per its declared `output` schema. Last-write-wins on fan-out conflict (warning logged).
+Each branch's output strip-merges into state per its declared `output` schema. Last-write-wins on fan-out conflict (warning logged). Keys named `__proto__` / `constructor` / `prototype` are dropped from every merged slice (branch output, `ack`, classifier, `refine`, artifacts) and logged as `state.merge.unsafe-key` — a permissive `output` schema would otherwise let a model-supplied key repoint the run state's prototype.
 
 ## Per-intent `next` — skip the router
 
@@ -27894,6 +28198,95 @@ const escalationAgent = ai.agent({ model, tools: [supportTool] });
 - [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md) — tool artifacts side-channel
 
 
+## secure-outbound-requests  `@warlock.js/ai/secure-outbound-requests/SKILL.md`
+
+---
+name: secure-outbound-requests
+description: 'The shared SSRF / resource-exhaustion guard every server-side outbound HTTP request in the framework goes through — `guardedFetch(url, policy, init?)`, `OutboundPolicy`, `assertUrlAllowed`, `fetchTextWithPolicy`, `readTextCapped`. Scheme allowlist (https-only default), host allowlist, post-DNS private/loopback/link-local/metadata-address deny, byte cap, timeout, and (4.15.0) per-hop redirect revalidation with a `maxRedirects` cap and cross-origin credential stripping. Consumed by `ai.rag.loadWeb`, remote text attachments (`prepareAttachmentPart`), and the skills `urlSource` manifest fetch — never a raw `fetch()` on a caller-influenced URL. Triggers: `guardedFetch`, `OutboundPolicy`, `ResolvedOutboundPolicy`, `assertUrlAllowed`, `fetchTextWithPolicy`, `readTextCapped`, `resolveOutboundPolicy`, `OutboundPolicyError`, `maxRedirects`, `denyPrivateIPsAfterDNS`, `hostAllowlist`, `allowedSchemes`, `maxBytes`, `SSRF`, `redirect: "manual"`, `redirect: "error"`; ''SSRF-safe fetch'', ''block a redirect into a private IP'', ''fetch a URL an agent gave me'', ''cap outbound response size'', ''allowlist hosts for outbound requests'', ''strip auth headers on a cross-origin redirect''; typical import `import { guardedFetch, assertUrlAllowed } from "@warlock.js/ai"` (also re-exported per call site). Skip: the RAG loader that wraps this for `loadWeb` — `@warlock.js/ai/rag-loaders-and-stores/SKILL.md`; the skills manifest source that wraps this for `urlSource` — `@warlock.js/ai/use-runtime-skills/SKILL.md`; prompt-injection / content guardrails (a different trust boundary) — `@warlock.js/ai/guard-input-output/SKILL.md` (ai-guard package).'
+---
+
+# Outbound request policy — the SSRF guard
+
+One `OutboundPolicy` + `guardedFetch` backs **every** server-side HTTP request the framework makes on behalf of user/model-controlled input: `ai.rag.loadWeb`, the remote-text branch of `prepareAttachmentPart` (agent `attachments`), and the skills catalog `urlSource` manifest fetch. A single audited guard instead of N ad-hoc `fetch()` call sites.
+
+```ts
+import { guardedFetch, fetchTextWithPolicy, assertUrlAllowed, OutboundPolicyError } from "@warlock.js/ai";
+
+const response = await guardedFetch("https://docs.example.com/page", {
+  hostAllowlist: ["docs.example.com"],
+  maxBytes: 2_000_000,
+  timeoutMs: 5_000,
+});
+```
+
+## Strict-by-default policy
+
+Every field is optional; `resolveOutboundPolicy` fills safe defaults, so an untuned call is already hardened:
+
+| Field | Default | Guards against |
+| --- | --- | --- |
+| `allowedSchemes` | `["https"]` | plaintext / `file:` / `data:` exfil — `http` must be opted in |
+| `hostAllowlist` | unset (any host) | pinning outbound targets to known hosts, e.g. `docs.example.com` allows `a.docs.example.com` |
+| `denyPrivateIPsAfterDNS` | `true` | **the SSRF guard itself** — resolves the host through DNS and rejects loopback / private / link-local / unique-local / cloud-metadata (`169.254.169.254`) addresses; a public hostname that resolves inward is caught |
+| `maxRedirects` | `5` | a redirect chain used to bypass the checks above (4.15.0 — see below) |
+| `maxBytes` | `5_242_880` (5 MiB) | unbounded response bodies |
+| `timeoutMs` | `10_000` | a hung/slow endpoint tying up the request |
+| `signal` | unset | caller-supplied `AbortSignal`, merged with the internal timeout |
+| `fetch` | global `fetch` | inject a stub for tests, or a wrapper enforcing your own app-level rules |
+
+Every violation throws `OutboundPolicyError` with `context` carrying the offending URL/host/address — never a silent fallback.
+
+## Redirects are never delegated to the platform (4.15.0)
+
+Before 4.15.0, `assertUrlAllowed` validated only the *initial* URL, then handed the request to `fetch` with automatic redirect following — so a URL that passed validation could `3xx` into a private/metadata address or an off-allowlist host with no re-check.
+
+`guardedFetch` now issues **every hop** with `redirect: "manual"` and re-runs the `Location` header through the exact same `assertUrlAllowed` (scheme, host allowlist, post-DNS private-IP deny) before following it:
+
+- Capped at `policy.maxRedirects` (default `5`) — the `(maxRedirects + 1)`th hop throws `OutboundPolicyError`.
+- **Credential headers stripped cross-origin.** `authorization`, `cookie`, `proxy-authorization` are dropped the moment a hop's target origin differs from the current one — a redirect can't exfiltrate credentials meant for the original host.
+- **Method/body semantics match platform behavior.** `303` — and the legacy convention of `301`/`302` on a non-`GET`/`HEAD` method — re-issue the next hop as a bodyless `GET`.
+- Pass `init.redirect: "manual"` to get the raw 3xx response back (no following, no throw); `init.redirect: "error"` rejects on any redirect.
+- The net effect: a redirect can never reach a URL the original request could not have reached directly.
+
+```ts
+// A caller that wants to inspect redirects itself, unfollowed:
+const res = await guardedFetch(url, policy, { redirect: "manual" });
+if (res.status >= 300 && res.status < 400) {
+  console.log(res.headers.get("location"));
+}
+```
+
+## Reading the body — `readTextCapped` / `fetchTextWithPolicy`
+
+`guardedFetch` returns the raw `Response`; read its body through `readTextCapped(response, maxBytes)` to enforce the cap (a declared `content-length` over the cap fails fast, otherwise the stream is read chunk-by-chunk and aborted the moment the running total exceeds it). `fetchTextWithPolicy(url, policy, init?)` is the one-call convenience — `guardedFetch` + `readTextCapped`, returning `{ ok, status, statusText, text }` (body only read when `ok`).
+
+```ts
+const { ok, status, text } = await fetchTextWithPolicy(url, { hostAllowlist: ["api.example.com"] });
+if (!ok) throw new Error(`fetch failed: ${status}`);
+```
+
+## Who consumes this
+
+| Call site | Entry point | Notes |
+| --- | --- | --- |
+| RAG web loader | `ai.rag.loadWeb(url, { policy })` | [`@warlock.js/ai/rag-loaders-and-stores/SKILL.md`](@warlock.js/ai/rag-loaders-and-stores/SKILL.md) |
+| Remote text attachment | `prepareAttachmentPart` via `agent.execute({ attachments })` | default-DENY — requires `attachmentPolicy.allowRemoteFetch: true`; policy travels as `attachmentPolicy.outbound`. URL *image* attachments are handed to the provider as a URL and never fetched server-side, so they carry no SSRF surface here |
+| Skills catalog manifest | `ai.skills({ sources: [urlSource(url, { policy })] })` | [`@warlock.js/ai/use-runtime-skills/SKILL.md`](@warlock.js/ai/use-runtime-skills/SKILL.md) — the fetched manifest is also runtime-validated record-by-record before being trusted |
+
+Each call site passes its own `policy` (or `{}` for the strict defaults) — there is no global policy singleton, so tune per source (e.g. `hostAllowlist` for a known-good docs domain vs. an open web crawl).
+
+## Testing
+
+Inject a stubbed `policy.fetch` (`(url, init) => Response`) instead of hitting the network — every consumer above accepts `policy.fetch` all the way through. Regression coverage lives in `src/security/outbound-policy.spec.ts` (redirect-to-metadata/loopback/private block, off-allowlist redirect block, hop cap, credential stripping, clean-redirect follow).
+
+## See also
+
+- [`@warlock.js/ai/rag-loaders-and-stores/SKILL.md`](@warlock.js/ai/rag-loaders-and-stores/SKILL.md) — `loadWeb`, the primary consumer
+- [`@warlock.js/ai/use-runtime-skills/SKILL.md`](@warlock.js/ai/use-runtime-skills/SKILL.md) — `urlSource`'s manifest fetch
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — `attachments`, including the remote-text fetch path
+- [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md) — `OutboundPolicyError`
+
+
 ## transcribe-audio  `@warlock.js/ai/transcribe-audio/SKILL.md`
 
 ---
@@ -28059,14 +28452,14 @@ Scripting `[{ error: new ProviderRateLimitError("slow down") }]` drives the neve
 
 ---
 name: use-ai-memory
-description: 'Agent memory with ai.memory({...}) — a provider-neutral store with FOUR tiers: WORKING (in-run scratch, recalled by recency), SEMANTIC (durable facts by cosine similarity over a @warlock.js/cache vector driver via .similar()), EPISODIC (durable events, similarity blended with recency), and PROCEDURAL (durable how-tos, similarity blended with reinforcement). remember() / recall() / clear(); wire it into ai.orchestrator({ memory }). Triggers: `ai.memory`, `memory.remember`, `memory.recall`, `memory.clear`, `MemoryContract`, `MemoryConfig`, `MemoryItem`, `RecalledMemory`, `MemoryTier`, `SemanticMemoryConfig`, `EpisodicMemoryConfig`, `ProceduralMemoryConfig`, `working`, `semantic`, `episodic`, `procedural`, `defaultTier`, `threshold`, `recencyWeight`, `halfLifeMs`, `reinforcementWeight`, `injectKey`; ''give the agent memory'', ''remember user preferences'', ''semantic recall'', ''per-session working memory'', ''episodic / event memory'', ''procedural / how-to memory'', ''recency-weighted recall'', ''reinforce a procedure''; typical import `import { ai } from "@warlock.js/ai"`. Skip: orchestrator wiring of the memory — `@warlock.js/ai/run-orchestrator/SKILL.md`; the vector cache driver itself — `@warlock.js/cache/cache-basics/SKILL.md`; embeddings primitive — `@warlock.js/ai/embed-text/SKILL.md`; competing libs `mem0`, `langchain` memory.'
+description: 'Agent memory with ai.memory({...}) — a provider-neutral store with FOUR tiers: WORKING (in-run scratch, recalled by recency), SEMANTIC (durable facts by cosine similarity over a @warlock.js/cache vector driver via .similar()), EPISODIC (durable events, similarity blended with recency), and PROCEDURAL (durable how-tos, similarity blended with reinforcement). remember() / recall() / clear(); wire it into ai.orchestrator({ memory }). Triggers: `ai.memory`, `memory.remember`, `memory.recall`, `memory.clear`, `MemoryContract`, `MemoryConfig`, `MemoryItem`, `RecalledMemory`, `MemoryTier`, `SemanticMemoryConfig`, `EpisodicMemoryConfig`, `ProceduralMemoryConfig`, `working`, `semantic`, `episodic`, `procedural`, `defaultTier`, `threshold`, `recencyWeight`, `halfLifeMs`, `reinforcementWeight`, `injectKey`, `maxItems`, `scope`, `RecallOptions.scope`; ''give the agent memory'', ''remember user preferences'', ''semantic recall'', ''per-session working memory'', ''episodic / event memory'', ''procedural / how-to memory'', ''recency-weighted recall'', ''reinforce a procedure'', ''cap working memory size'', ''isolate memory per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: orchestrator wiring of the memory — `@warlock.js/ai/run-orchestrator/SKILL.md`; the vector cache driver itself — `@warlock.js/cache/cache-basics/SKILL.md`; embeddings primitive — `@warlock.js/ai/embed-text/SKILL.md`; competing libs `mem0`, `langchain` memory.'
 ---
 
 # `ai.memory()` — agent memory store
 
 A single provider-neutral store that holds and retrieves what an agent / orchestrator should remember across turns. Four tiers ship in 4.3.0:
 
-- **working** — in-run scratch threaded across turns of one session. Volatile, unscored, recalled in insertion order (recency). On by default.
+- **working** — in-run scratch threaded across turns of one session. Volatile, unscored, recalled in insertion order (recency). On by default, size-bounded (`working: { maxItems }`, default `1000` — see below).
 - **semantic** — durable *facts* stored as embeddings in a `@warlock.js/cache` driver, retrieved by cosine similarity via the driver's native `.similar()` — the same delegation the `semanticCache` middleware uses. Activates only when you pass `semantic` config.
 - **episodic** — durable *events*: a timestamped log retrieved by similarity **blended with recency** (recent episodes rank higher). Embedder-backed like semantic; tune with `recencyWeight` + `halfLifeMs`.
 - **procedural** — durable *how-tos*: learned procedures retrieved by similarity **blended with reinforcement** — re-remembering a procedure increments its use count so well-worn procedures rank higher. Tune with `reinforcementWeight`.
@@ -28136,7 +28529,7 @@ await mem.remember({ text: "User is on the Enterprise plan.", tier: "semantic", 
 await mem.remember([{ text: "a" }, { text: "b", tier: "working" }]);   // batch
 ```
 
-A `MemoryItem` is `{ text, tier?, id?, metadata? }`. `text` is the only required field — it's what gets embedded (semantic) and surfaced back on recall. `tier` defaults to the factory `defaultTier`. Semantic items are embedded + indexed; working items append to the in-run buffer. **Re-remembering an item whose id (explicit or text-derived) already exists overwrites in place rather than duplicating.** `metadata` is an opaque bag round-tripped verbatim onto the recalled memory.
+A `MemoryItem` is `{ text, tier?, id?, scope?, metadata? }`. `text` is the only required field — it's what gets embedded (semantic) and surfaced back on recall. `tier` defaults to the factory `defaultTier`. Semantic items are embedded + indexed; working items append to the in-run buffer. **Re-remembering an item whose id (explicit or text-derived) already exists overwrites in place rather than duplicating.** `metadata` is an opaque bag round-tripped verbatim onto the recalled memory. `scope` is the ISOLATION key — see below.
 
 ### `recall(query, options?)`
 
@@ -28145,6 +28538,7 @@ const hits = await mem.recall("which plan is the user on?", {
   k: 5,              // cap result count (defaults to factory k)
   threshold: 0.75,   // raise the semantic floor for this call
   tier: "semantic",  // restrict to one tier; omit to query every enabled tier
+  scope: "tenant-42", // isolation key — only memories remembered under this exact scope
 });
 
 for (const hit of hits) {
@@ -28155,6 +28549,38 @@ for (const hit of hits) {
 Returns `RecalledMemory[]` scored and ordered by descending relevance. By default queries every enabled tier and merges. `score` is in `[0,1]` for **every** tier — cosine similarity (semantic), a recency proxy (working, most-recent = 1), similarity×recency (episodic), or similarity×reinforcement (procedural) — so a mixed recall set sorts on one field without special-casing the tier. Returns `[]` when nothing clears the threshold — never throws on "no hits".
 
 **Memory never mutates the prompt.** `recall()` hands you scored entries; surfacing the recalled text (system prefix, a synthesized "what you remember" block, …) is YOUR call so the injection point stays explicit.
+
+### Isolation — `scope` (4.15.0)
+
+One store instance is normally shared by many callers (built once at boot, passed into `ai.orchestrator({ memory })`), so `scope` is what keeps one caller's memories out of another's recall:
+
+```ts
+await mem.remember({ text: "User A's account email is a@example.com", scope: "user-a" });
+
+await mem.recall("what is my email?", { scope: "user-b" });   // [] — never sees user A
+await mem.recall("what is my email?", { scope: "user-a" });   // user A's own memories
+await mem.recall("what is my email?");                        // only the UNSCOPED pool
+```
+
+- The match is **exact equality**, enforced inside every tier (`working` / `semantic` / `episodic` / `procedural`) before hits are scored, merged, or sliced — not something the caller filters afterward.
+- Omitting `scope` is **not** a wildcard: an unscoped recall reads only unscoped entries. There is no "all scopes" query.
+- Identical text under two scopes stays two independent entries (including the procedural tier's reinforcement counter).
+- `ai.orchestrator({ memory })` sets this automatically from the turn's `sessionId` — see [`@warlock.js/ai/run-orchestrator/SKILL.md`](@warlock.js/ai/run-orchestrator/SKILL.md).
+- `clear(tier?)` is scope-agnostic: it drops the tier for every scope.
+
+### Working-memory cap — `working: { maxItems }` (4.15.0)
+
+```ts
+const mem = ai.memory({
+  working: { maxItems: 2_000 },   // default 1000; bare `working: true` also works
+});
+```
+
+The working tier holds everything it's told in **process** memory for the lifetime of the `memory()` instance — which `ai.orchestrator({ memory })` resolves once and reuses for every session. Before 4.15.0 it had no cap, so a memory-backed orchestrator on the open internet was a cheap memory-exhaustion path: one permanent entry per request, forever.
+
+The buffer now evicts on overflow, **FIFO over insertion order, not LRU** — recall on this tier is a pure recency proxy (newest `k`, never reordered), so the oldest entries are exactly the ones a bounded recall would never have returned anyway. `maxItems` is validated as an integer `>= 1` at construction; there is no unbounded setting — "no cap" was the vulnerability, not a configuration choice. Raise it deliberately for a long-lived single-tenant process, and put durable recall in the semantic / episodic tiers (which delegate retention to a `CacheDriver`, not process memory).
+
+The bound is **global**, not per-scope — a busy session can push another session's older entries out. That's a recall-quality degradation on a volatile scratch tier, never a disclosure (the `scope` isolation filter above still applies).
 
 ### `clear(tier?)`
 
@@ -28228,7 +28654,7 @@ const lib = ai.skills({
 ### Sources — `SkillSource` (discriminated by `type`, never `kind`)
 
 - `{ type: "directory", path }` — reads `path/<folder>/SKILL.md` off disk (lazy `node:fs/promises`).
-- `{ type: "url", url, headers? }` — `fetch()`es a JSON manifest of skills.
+- `{ type: "url", url, headers?, policy?, cacheTtlMs? }` — `urlSource(url, options)` fetches a JSON manifest of skills through the shared `guardedFetch` / `OutboundPolicy` guard (scheme/host allowlist, post-DNS private-IP deny, byte cap, timeout, per-hop redirect revalidation) — never a raw `fetch()`. A remote skill source is a prompt supply chain (bodies flow straight into model context), so every fetched record is also runtime-validated before it can be served. `policy` tunes the guard (e.g. `hostAllowlist`); see [`@warlock.js/ai/secure-outbound-requests/SKILL.md`](@warlock.js/ai/secure-outbound-requests/SKILL.md). The result is cached for the source's lifetime, or `cacheTtlMs` when set.
 - `{ type: "store", store }` — any `SkillsStoreContract`, e.g. `MockSkillsStore`.
 
 Sources merge in order; a later source wins on a name collision.
@@ -28291,6 +28717,7 @@ The optional `analytics` sink fires `catalogued` / `loaded` / `used` / `saved` /
 - [`@warlock.js/ai/write-system-prompt/SKILL.md`](@warlock.js/ai/write-system-prompt/SKILL.md) — static persona / instruction blocks (vs. dynamic loaded skills)
 - [`@warlock.js/ai/use-ai-memory/SKILL.md`](@warlock.js/ai/use-ai-memory/SKILL.md) — the procedural memory tier `proceduralSkillStore` unifies with
 - [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — the agent the `skills` option attaches to
+- [`@warlock.js/ai/secure-outbound-requests/SKILL.md`](@warlock.js/ai/secure-outbound-requests/SKILL.md) — the `guardedFetch` / `OutboundPolicy` guard the `url` source's manifest fetch runs through
 
 
 ## write-system-prompt  `@warlock.js/ai/write-system-prompt/SKILL.md`
@@ -30158,7 +30585,7 @@ for (const trace of store.query({ sessionId })) {
 
 ---
 name: use-local-dashboard
-description: 'Run the zero-setup local Panoptic dashboard — a loopback `node:http` server over a trace store served from `ai.config({ panoptic: { dashboard } })`, with a two-pane call-tree + metadata UI (light/dark/system theme, search/filter, session + prompt-version grouping, cost heatmap, Gantt timeline, errors filter, hash deep-links) and an optional cache-backed persistent store. Triggers: `dashboard`, `DashboardOptions`, `DashboardHandle`, `ai.config({ panoptic })`, `panoptic.dashboard`, `panoptic.cache`, `port: 4319`, `basePath`, `open`, `/api/traces`, `/api/aggregate`, `/api/traces/:id`, `createRequestHandler`, `dashboardHtml`, `ServeConfig`, `TraceStoreContract`, `createCacheTraceStore`, theme, dark mode, call tree, metadata panel, cost heatmap, timeline / Gantt, errors only, deep-link, group by session, prompt version, group by type, type stats panel, started / ended timestamps, team type; ''open a local AI trace dashboard'', ''view agent traces in the browser'', ''self-hosted panoptic UI'', ''inspect traces without Langfuse'', ''spin up a dev observability server'', ''dark mode dashboard'', ''persist traces across restart'', ''group traces by session / prompt version / type'', ''cost heatmap'', ''timeline / waterfall view'', ''filter failed runs in the dashboard'', ''per-type stats panel''; typical import `import { ai } from "@warlock.js/ai"` + `import "@warlock.js/ai-panoptic"`. Skip: shipping traces to a backend (OTel / Langfuse / file) — `@warlock.js/ai-panoptic/export-traces/SKILL.md`; the queryable store API the dashboard reads — `@warlock.js/ai-panoptic/query-traces/SKILL.md`; wiring the subscriber by hand — `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`.'
+description: 'Run the zero-setup local Panoptic dashboard — a loopback `node:http` server over a trace store served from `ai.config({ panoptic: { dashboard } })`, with a two-pane call-tree + metadata UI (light/dark/system theme, search/filter, session + prompt-version grouping, cost heatmap, Gantt timeline, errors filter, hash deep-links) and an optional cache-backed persistent store. Triggers: `dashboard`, `DashboardOptions`, `DashboardHandle`, `ai.config({ panoptic })`, `panoptic.dashboard`, `panoptic.cache`, `port: 4319`, `basePath`, `open`, `authToken`, `allowedHosts`, `/api/traces`, `/api/aggregate`, `/api/traces/:id`, `createRequestHandler`, `dashboardHtml`, `sanitizeHref`, `ServeConfig`, `TraceStoreContract`, `createCacheTraceStore`, theme, dark mode, call tree, metadata panel, cost heatmap, timeline / Gantt, errors only, deep-link, group by session, prompt version, group by type, type stats panel, started / ended timestamps, team type; ''open a local AI trace dashboard'', ''view agent traces in the browser'', ''self-hosted panoptic UI'', ''inspect traces without Langfuse'', ''spin up a dev observability server'', ''dark mode dashboard'', ''persist traces across restart'', ''group traces by session / prompt version / type'', ''cost heatmap'', ''timeline / waterfall view'', ''filter failed runs in the dashboard'', ''per-type stats panel'', ''is the dashboard bearer token safe'', ''markdown links XSS in trace content''; typical import `import { ai } from "@warlock.js/ai"` + `import "@warlock.js/ai-panoptic"`. Skip: shipping traces to a backend (OTel / Langfuse / file) — `@warlock.js/ai-panoptic/export-traces/SKILL.md`; the queryable store API the dashboard reads — `@warlock.js/ai-panoptic/query-traces/SKILL.md`; wiring the subscriber by hand — `@warlock.js/ai-panoptic/observe-with-panoptic/SKILL.md`.'
 ---
 
 # The local Panoptic dashboard — zero-setup trace viewing
@@ -30309,7 +30736,7 @@ Every field optional, every default safe:
 | `basePath` | `"/"` | Mount-path prefix for both the page and every `/api/...` route, e.g. `"/panoptic"`. Normalized to leading + trailing slash. |
 | `open` | `false` | Open the default browser at the resolved URL once listening. Best-effort and fully swallowed — failing to open a browser never rejects the start. |
 | `title` | `"Panoptic"` | Header title baked into the served page. |
-| `authToken` | _unset_ | Bearer token required on every request (`Authorization: Bearer <token>` or `?token=`); missing/wrong → `401`. **Required** when `host` is non-loopback. |
+| `authToken` | _unset_ | Bearer token required on every request. Compared with `crypto.timingSafeEqual` (constant-time, length-checked first) against both the header and query-string forms — never a plain `===` — so a network-reachable dashboard doesn't leak the token to a byte-at-a-time timing attack. `Authorization: Bearer <token>` is accepted on every route; `?token=` is accepted **only on the HTML page route** (the JSON API routes are header-only), since the page load is the one request that structurally can't carry a header — this narrows the token's footprint in access/proxy logs and browser history. Missing/wrong → `401`. **Required** when `host` is non-loopback. |
 | `allowedHosts` | loopback names | `Host`-header allowlist (DNS-rebind guard); an unlisted `Host` → `403`. Defaults to `localhost` / `127.0.0.1` / `[::1]` for a loopback bind. |
 
 ### `DashboardHandle`
@@ -30364,6 +30791,12 @@ createServer(handler).listen(4319, "127.0.0.1");
 ## Security note
 
 The dashboard surfaces whatever the store holds — including captured prompt/response content when content capture is on (`captureContent`). It binds **loopback-only** by default precisely so that content never leaves the machine. Binding a non-loopback host is gated — it requires an `authToken` (and checks a `Host` allowlist, sending `nosniff` / CSP / `X-Frame-Options: DENY` on every response) — but still prefer loopback for dev, and for production ship to a real backend via an exporter rather than exposing the dashboard. The dashboard has exactly one write-capable route (`evaluate`, off by default) — everything else stays read-only regardless of configuration.
+
+**Trace content is untrusted input to the dashboard's own UI, and is treated that way:**
+- **Markdown links in captured content are sanitized.** `span.input`/`span.output` can contain model output or attacker-controlled tool results — i.e. prompt-injected content — and the drawer renders it as Markdown. Link URLs go through `sanitizeHref` (a scheme allowlist: `http:`, `https:`, `mailto:`, plus relative/anchor URLs) after normalizing the way a browser will — attribute-entity decode, strip of ignored control chars/whitespace, lowercase — so `javascript:`/`data:`/`vbscript:` payloads (including case/whitespace/entity-obfuscated variants, and scheme-relative `//host` links) never become a live `href`; a rejected link renders its label as plain text instead. This closes a stored-XSS path that could otherwise reach the in-page bearer token.
+- **The bearer token is no longer a page-global.** The client script's `TOKEN` is sealed inside its own inner IIFE that exposes only the `fetchAuthed` helper, so other code in the page's closure can't read the raw token by name.
+
+These three findings (link sanitization + the two token-handling items above) came from the same audit; none is independently exploitable today, but each narrowed the blast radius of a future bug in an operator-facing surface that renders untrusted model/tool content.
 
 ## See also
 
@@ -30431,7 +30864,7 @@ Pass `--yes` (or `-y`) to skip every prompt and build from flags with defaults.
 | `<positional>` / `--name`| yes         | — (required)   | Project name + target directory.                                    |
 | `--db`                   | yes         | `mongodb`      | Database driver key (`mongodb`, `postgres`, or `none`).             |
 | `--no-db`                | no          | —              | Opt out of a database — shorthand for `--db=none`.                  |
-| `--pm`                   | yes         | auto-detected  | Package manager (`npm` / `yarn` / `pnpm`).                           |
+| `--pm`                   | yes         | auto-detected  | Package manager — must be one of `npm` / `yarn` / `pnpm` / `bun`; anything else is rejected before scaffolding starts. |
 | `--features`             | yes (CSV)   | none           | Comma-separated optional feature keys.                              |
 | `--ai`                   | yes (CSV)   | none           | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`).     |
 | `--git` / `--no-git`     | no          | off            | Initialize a Git repo (`git init` + `main` branch + initial commit).|

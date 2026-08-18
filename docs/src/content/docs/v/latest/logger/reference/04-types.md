@@ -113,12 +113,18 @@ Signals are flushed then re-raised so Node's default exit runs; `beforeExit` is 
 
 ```ts
 type RedactConfig = {
-  /** Dotted glob path patterns to redact, evaluated against LoggingData. */
-  paths: string[];
+  /** Dotted glob path patterns to redact, evaluated against LoggingData. Optional — omit to rely on key-based redaction alone. */
+  paths?: string[];
+  /** Extra key names to censor anywhere they appear, unioned with the built-in `DEFAULT_REDACT_KEYS`. Matched case- and separator-insensitively. */
+  keys?: string[];
+  /** Set `false` to opt out of the built-in `DEFAULT_REDACT_KEYS` denylist. @default true — since 4.15.0 */
+  defaultKeys?: boolean;
   /** Replacement applied at each match. @default "[REDACTED]" */
   censor?: RedactCensor;
 };
 ```
+
+`paths` matches by *location* (dotted glob against `LoggingData`); `keys`/`defaultKeys` match by *key name* at any depth of `context`, `message`, and an `Error`'s own enumerable properties — independent matchers, both applied at the same logger-wide choke point. `DEFAULT_REDACT_KEYS: readonly string[]` is exported for introspection. See [Redaction](../advanced/01-redaction/).
 
 ## `RedactCensor`
 

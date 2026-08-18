@@ -6,7 +6,7 @@ sidebar:
   label: "Configuration"
 ---
 
-The whole config surface is two keys — one required, one optional:
+The config surface is three keys — one required, two optional:
 
 ```ts title="src/config/access.ts"
 import { type AccessConfigurations } from "@warlock.js/access";
@@ -15,6 +15,7 @@ import { DatabaseAccessResolver } from "app/access/services/access-resolver";
 const access: AccessConfigurations = {
   resolver: new DatabaseAccessResolver(), // REQUIRED — how the engine reads roles + permissions
   cache: { ttl: "10m" }, //                  resolved-set cache TTL (optional)
+  strictPolicies: false, //                  default false — throw instead of warn on a missing ABAC policy (optional)
 };
 
 export default access;
@@ -40,6 +41,16 @@ How long a user's resolved permission/role set is cached (default `"10m"`). The 
 ```ts
 cache: { ttl: "10m" }; // string duration or a number of seconds
 ```
+
+## `strictPolicies`
+
+An instance-level check (`{ resource }`) for a permission that has no registered ABAC policy still passes — it falls back to the RBAC grant alone — but that gap is easy to introduce by accident (a typo'd permission name, a policies module that never got imported). By default that fallback logs a one-time `log.warn` naming the permission. Set `strictPolicies: true` to throw `AccessConfigError` instead, so apps that want the gap to fail the request (or fail boot, if the policy is meant to always exist) get a hard stop rather than a log line:
+
+```ts
+strictPolicies: true; // default false
+```
+
+See [define policies](../guides/define-policies.md) for the full grant/policy decision table.
 
 ## Tenant resolution
 

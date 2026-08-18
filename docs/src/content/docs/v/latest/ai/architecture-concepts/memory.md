@@ -12,7 +12,7 @@ Four tiers ship in 4.3.0:
 
 | Tier | What it holds | Retrieval | Durability |
 | --- | --- | --- | --- |
-| **working** | In-run scratch threaded across turns of one session | Insertion order (recency proxy score) | Volatile |
+| **working** | In-run scratch threaded across turns of one session | Insertion order (recency proxy score) | Volatile, size-bounded (`maxItems`, default `1000`) |
 | **semantic** | Durable *facts* stored as embeddings | Cosine similarity via the cache driver's `.similar()` | Persisted in a `@warlock.js/cache` driver |
 | **episodic** | Durable *events* — a timestamped log | Similarity **blended with recency** (recent episodes rank higher) | Persisted in a `@warlock.js/cache` driver |
 | **procedural** | Durable *how-tos* — learned procedures | Similarity **blended with reinforcement** (well-used procedures rank higher) | Persisted in a `@warlock.js/cache` driver |
@@ -91,7 +91,7 @@ Each vector tier defaults to its own namespace (`ai.memory.semantic` / `ai.memor
 ```ts
 const mem = ai.memory({
   name: "support-mem",         // logs + working-tier scope key
-  working: true,               // default true; set false for semantic-only
+  working: { maxItems: 2_000 },// default true → maxItems: 1000; set false for semantic-only
   semantic: { embedder, store, namespace: "ai.memory" },
   defaultTier: "working",      // where a remember() without `tier` lands
   k: 5,                        // default recall count
@@ -100,6 +100,28 @@ const mem = ai.memory({
 ```
 
 At least one tier must be enabled — enabling neither is a construction-time error (a memory with no tiers can't store or recall). The working tier is on by default; the `semantic`, `episodic`, and `procedural` tiers each activate only when their config is supplied.
+
+### The working tier is size-bounded
+
+`working` holds everything it's told in **process** memory for the lifetime of the `ai.memory()` instance — and `ai.orchestrator({ memory })` resolves that instance once and reuses it for every session, for as long as the process runs. With no cap, a memory-backed orchestrator with `remember` on (the default) is a cheap memory-exhaustion path for anything internet-facing: one permanent entry per request, forever.
+
+`working: { maxItems }` (default `1000`) evicts on overflow, **FIFO over insertion order, not LRU** — deliberately, since recall on this tier already reverses insertion order and slices the newest `k` without ever reordering, so the oldest entries are exactly the ones a bounded recall would never surface anyway. `maxItems` must be an integer `>= 1`; there is no unbounded escape hatch. Raise it for a long-lived single-tenant process, and lean on the semantic / episodic tiers (which delegate retention to a `CacheDriver`, not process memory) for anything that needs durable, large-scale recall. The bound is global rather than per-scope, so a busy scope can push another scope's older entries out of the buffer — a recall-quality trade-off on a volatile tier, never a disclosure (the isolation check below still applies).
+
+## Isolation — `scope`
+
+One `ai.memory()` instance is normally shared by every caller — built once at boot, passed into `ai.orchestrator({ memory })`, serving every end user. Without isolation, `recall()` has no way to keep user A's remembered turns out of user B's semantically-similar query. `MemoryItem.scope` (on `remember()`) and `RecallOptions.scope` (on `recall()`) are opaque isolation keys, enforced by **exact-equality match inside every tier** — `working`, `semantic`, `episodic`, and `procedural` alike — before hits are scored, merged, or sliced:
+
+```ts
+await mem.remember({ text: "User A's account email is a@example.com", scope: "user-a" });
+
+await mem.recall("what is my email?", { scope: "user-b" }); // [] — never sees user A's memory
+await mem.recall("what is my email?", { scope: "user-a" }); // user A's own memories
+await mem.recall("what is my email?");                       // only the UNSCOPED pool — omitting scope is not a wildcard
+```
+
+Identical text remembered under two different scopes stays two independent entries (including the procedural tier's own reinforcement counter). `clear(tier?)` is scope-agnostic — it drops the tier for every scope.
+
+`ai.orchestrator({ memory })` sets this automatically, deriving `"session:<id>"` from the turn's own `sessionId` (see `memory.scope` in the next section). Memories written before adopting scoping are unscoped and stay visible only to unscoped (or explicitly `"shared"`-scoped) recalls.
 
 ## Memory in an orchestrator
 
@@ -114,12 +136,15 @@ ai.orchestrator({
     recall: { k: 4, threshold: 0.75, tier: "semantic" },
     remember: true,            // default; cancelled/failed turns never remember (they revert)
     rememberTier: "semantic",  // durably accumulate turns for cross-session recall
+    scope: "session",          // default — isolate recall/remember to the executing sessionId
     injectKey: "memories",     // ctx.context.memories — a RecalledMemory[]
   },
 });
 ```
 
 Pass a bare `MemoryContract` for recall + remember with defaults, or the object form above for finer control. `recall.k: 0` disables recall (write-only memory); `remember: false` recalls but never writes (read-only). Memory never mutates the prompt — your route / router / evaluate / dispatch callbacks read `ctx.context[injectKey]` and decide what to do with the recalled text.
+
+`OrchestratorMemoryConfig.scope` defaults to `"session"` — every turn's recall and write-back are keyed off that turn's `sessionId`, so one user's session can never recall another's remembered turns. Set `scope: "shared"` to pool every session into one namespace (the pre-4.15.0 behavior — only safe when every session is trusted to see every other's memories), or `scope: (sessionId) => key` to derive your own boundary, e.g. per tenant.
 
 ## Related
 

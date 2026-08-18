@@ -43,6 +43,7 @@ Fires on:
 - Redis driver without `url` or `host`: `driver.setOptions({})`
 - File driver without `directory`: `driver.setOptions({})`
 - Using an unregistered driver name: `cache.use("undeclared-driver")`
+- File driver: a key/namespace resolves outside the configured cache root even after percent-encoding — `"Cache key resolves outside the cache directory: ..."`. Last line of defense against path traversal; shouldn't happen from normal keys. See [File Cache Driver — Key Safety](/v/latest/cache/file/#key-safety).
 
 ```ts
 import { cache, CacheConfigurationError } from "@warlock.js/cache";

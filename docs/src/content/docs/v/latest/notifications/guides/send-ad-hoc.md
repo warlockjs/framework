@@ -33,6 +33,8 @@ const channel = await pickChannel(user);
 await notify.channel(channel).send(user, payload);
 ```
 
+This is the only path with an `unknown`-typed `payload` — prefer the literal `notify.<channel>` when the name is known at compile time. Even here, `user` (the first argument) is what decides the recipient: for the `database` channel, a `recipientId`-shaped key on `payload` is stripped before the row is written, so a `payload` built from request JSON can't redirect the notification to a different recipient. See [the in-app store — write side](../essentials/02-the-in-app-store.md#the-write-side-is-idor-safe-too-since-4150).
+
 ## Opting into gating
 
 Preference/rate-limit gates need a notification *type*. Ad-hoc sends provide it explicitly, or it's auto-detected from a database payload's `type`:
