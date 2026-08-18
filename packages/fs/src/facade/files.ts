@@ -89,7 +89,7 @@ function deepMerge(target: unknown, source: unknown): unknown {
   // non-literal target (a `Date`, say) keeps the old "spread its own props"
   // result, which the strip then leaves alone.
   const output = stripDangerousKeys(
-    isLiteralObject(target) ? target : { ...target },
+    isLiteralObject(target) ? target : { ...(target as Record<string, unknown>) },
   ) as Record<string, unknown>;
 
   for (const [key, value] of Object.entries(source)) {
