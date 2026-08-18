@@ -6,8 +6,8 @@
   "main": "./cjs/index.js",
   "dependencies": {
     "@mongez/copper": "^2.1.2",
-    "@mongez/events": "^2.2.6",
-    "@mongez/reinforcements": "^3.3.0",
+    "@mongez/events": "^2.2.7",
+    "@mongez/reinforcements": "^4.0.1",
     "@warlock.js/logger": "*",
     "@warlock.js/seal": "*"
   },
