@@ -74,9 +74,52 @@ describe("dashboard serve — security (S4)", () => {
     const withHeader = fakeRes();
     handle(fakeReq({ auth: "Bearer s3cr3t" }), withHeader);
     expect(withHeader.captured.status).toBe(200);
+  });
+
+  it("rejects a wrong bearer token (constant-time compare doesn't just approve everything)", () => {
+    const config: ServeConfig = { ...baseConfig, authToken: "s3cr3t" };
+    const handle = createRequestHandler(createInMemoryTraceStore(), config);
+
+    const wrongHeader = fakeRes();
+    handle(fakeReq({ auth: "Bearer nope" }), wrongHeader);
+    expect(wrongHeader.captured.status).toBe(401);
+
+    // A token that shares a long common prefix with the real one — the
+    // case a naive `===`/timing side-channel is most exposed on.
+    const almostRight = fakeRes();
+    handle(fakeReq({ auth: "Bearer s3cr3s" }), almostRight);
+    expect(almostRight.captured.status).toBe(401);
+
+    // Different length than the real token — must still be rejected, not
+    // throw (crypto.timingSafeEqual requires equal-length buffers).
+    const wrongLength = fakeRes();
+    handle(fakeReq({ auth: "Bearer s3cr3t-and-then-some" }), wrongLength);
+    expect(wrongLength.captured.status).toBe(401);
+  });
+
+  it("honors ?token= on the HTML page route (the one request that can't set a header)", () => {
+    const config: ServeConfig = { ...baseConfig, authToken: "s3cr3t" };
+    const handle = createRequestHandler(createInMemoryTraceStore(), config);
+
+    const withQuery = fakeRes();
+    handle(fakeReq({ url: "/?token=s3cr3t" }), withQuery);
+    expect(withQuery.captured.status).toBe(200);
+
+    const wrongQuery = fakeRes();
+    handle(fakeReq({ url: "/?token=nope" }), wrongQuery);
+    expect(wrongQuery.captured.status).toBe(401);
+  });
+
+  it("does NOT honor ?token= on API routes — header auth only, to minimize the token's log/history exposure", () => {
+    const config: ServeConfig = { ...baseConfig, authToken: "s3cr3t" };
+    const handle = createRequestHandler(createInMemoryTraceStore(), config);
 
     const withQuery = fakeRes();
     handle(fakeReq({ url: "/api/traces?token=s3cr3t" }), withQuery);
-    expect(withQuery.captured.status).toBe(200);
+    expect(withQuery.captured.status).toBe(401);
+
+    const withHeader = fakeRes();
+    handle(fakeReq({ url: "/api/traces", auth: "Bearer s3cr3t" }), withHeader);
+    expect(withHeader.captured.status).toBe(200);
   });
 });

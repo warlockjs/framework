@@ -307,16 +307,23 @@ export function dashboardHtml(
   var EVALUATE_DEFAULT_INSTRUCTIONS = ${encodeForInlineScript(evaluateDefaultInstructions)};
 
   // Carry the ?token= the page itself was loaded with onto every
-  // subsequent poll — otherwise the API calls below inherit no auth and
-  // 401 forever once authToken is configured (the initial page load is
-  // the only request the URL's query string naturally reaches).
-  var TOKEN = new URLSearchParams(window.location.search).get("token");
-  function fetchAuthed(url, options) {
-    var opts = options || {};
-    var headers = opts.headers || {};
-    if (TOKEN) headers = Object.assign({}, headers, { Authorization: "Bearer " + TOKEN });
-    return fetch(url, Object.assign({}, opts, { headers: headers }));
-  }
+  // subsequent poll as an Authorization header — otherwise the API calls
+  // below inherit no auth and 401 forever once authToken is configured
+  // (the initial page load is the only request the URL's query string
+  // naturally reaches; the server only honors ?token= on that one route,
+  // see serve.ts). The token itself is kept in its own nested closure,
+  // not a plain var sitting alongside the rest of this file's top-level
+  // state, so it isn't trivially reachable from other code sharing this
+  // script's outer scope; only the fetchAuthed function it returns is.
+  var fetchAuthed = (function () {
+    var TOKEN = new URLSearchParams(window.location.search).get("token");
+    return function fetchAuthed(url, options) {
+      var opts = options || {};
+      var headers = opts.headers || {};
+      if (TOKEN) headers = Object.assign({}, headers, { Authorization: "Bearer " + TOKEN });
+      return fetch(url, Object.assign({}, opts, { headers: headers }));
+    };
+  })();
 
   var state = {
     traces: [], selectedId: null, selectedSpanId: null, collapsed: {}, sig: null,

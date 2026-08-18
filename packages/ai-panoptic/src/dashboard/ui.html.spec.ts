@@ -38,6 +38,21 @@ describe("dashboardHtml", () => {
     expect(html).toContain("renderDetail");
   });
 
+  it("keeps the bearer token out of the outer script scope (not a page-global)", () => {
+    // `TOKEN` must live inside its own nested IIFE — not a bare top-level
+    // `var` in the ~1000-line closure the rest of the client script
+    // shares — so it isn't reachable from unrelated code in that scope.
+    // Only the `fetchAuthed` function the inner IIFE returns is shared.
+    expect(html).toContain(
+      'var fetchAuthed = (function () {\n    var TOKEN = new URLSearchParams(window.location.search).get("token");',
+    );
+    // The token variable itself is referenced only inside that inner
+    // closure (its declaration + the two reads used to attach it to a
+    // request), never again by the rest of the ~1000-line outer script.
+    const tokenMatches = html.match(/\bTOKEN\b/g) ?? [];
+    expect(tokenMatches.length).toBe(3);
+  });
+
   it("wires the search box + filter chips", () => {
     expect(html).toContain('id="search"');
     expect(html).toContain('id="status-chips"');

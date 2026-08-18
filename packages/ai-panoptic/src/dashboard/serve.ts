@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { EvaluateConfig } from "../evaluate/evaluate.type";
 import { evaluateSystemPrompt } from "../evaluate/evaluate-system-prompt";
@@ -59,11 +60,49 @@ function hostHeaderName(hostHeader: string | undefined): string | undefined {
   return colon === -1 ? hostHeader : hostHeader.slice(0, colon);
 }
 
-/** Constant-ish bearer-token check from `Authorization` header or `?token=`. */
-function isAuthorized(req: IncomingMessage, url: URL, token: string): boolean {
+/**
+ * Constant-time string equality (S4) — guards against a timing
+ * side-channel that could otherwise let a network-adjacent attacker
+ * recover the token byte-by-byte via repeated timed guesses. Plain `===`
+ * short-circuits on the first differing byte, so response latency leaks
+ * how many leading bytes matched; `timingSafeEqual` does not. Lengths are
+ * compared first (a length mismatch is not secret and `timingSafeEqual`
+ * requires equal-length buffers anyway).
+ */
+function constantTimeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+
+  if (bufA.length !== bufB.length) return false;
+
+  return timingSafeEqual(bufA, bufB);
+}
+
+/**
+ * Bearer-token check (S4): `Authorization: Bearer <token>` header, or
+ * (only when `allowQueryToken`) a `?token=` query param.
+ *
+ * The query-string form only exists for the one request that structurally
+ * cannot carry a custom header — the initial browser navigation that
+ * loads the HTML shell (a typed/clicked/bookmarked URL). Every other
+ * request the served page makes is same-origin `fetch()`, which can and
+ * does set `Authorization` (see `ui.html.ts`'s `fetchAuthed`), so the API
+ * routes never need to accept a query-string token. Restricting the
+ * fallback to just the page route minimizes the token's exposure in
+ * server access logs, proxy logs, and browser history to a single route
+ * instead of every poll.
+ */
+function isAuthorized(
+  req: IncomingMessage,
+  url: URL,
+  token: string,
+  allowQueryToken: boolean,
+): boolean {
   const header = req.headers.authorization;
-  if (header && header === `Bearer ${token}`) return true;
-  return url.searchParams.get("token") === token;
+  if (header && constantTimeEqual(header, `Bearer ${token}`)) return true;
+  if (!allowQueryToken) return false;
+  const queryToken = url.searchParams.get("token");
+  return queryToken !== null && constantTimeEqual(queryToken, token);
 }
 
 /**
@@ -115,7 +154,9 @@ export function createRequestHandler(
     }
 
     // Bearer-token auth when configured (always required off loopback, S4).
-    if (config.authToken && !isAuthorized(req, url, config.authToken)) {
+    // `?token=` is only honored on the HTML page route — see `isAuthorized`.
+    const isPageRoute = pathname === base || pathname === base.replace(/\/$/, "");
+    if (config.authToken && !isAuthorized(req, url, config.authToken, isPageRoute)) {
       sendJson(res, 401, { error: "unauthorized" });
 
       return;
