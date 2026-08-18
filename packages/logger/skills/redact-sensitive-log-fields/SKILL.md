@@ -148,7 +148,7 @@ If `message` is a plain object, paths under `message.*` work as expected. If `me
 
 ## Performance notes
 
-- **No redact configured** → zero overhead (no clone, no walk).
+- **No redact configured** → the default denylist still runs (since 4.15.0): a cheap presence scan for a denylisted key on every `log()` call, with the deep clone + censor pass skipped entirely when nothing matches. Only `{ defaultKeys: false }` (no `paths`, no extra `keys`) gets back to zero work.
 - **Logger-wide redact only** → one deep clone + one path-walk per `log()` call, shared by every channel.
 - **Channel adds paths** → that channel re-clones from the original input and runs the merged pass once. Other channels still share the cheaper logger-wide clone.
 - Each path is matched independently; cost grows linearly with `paths.length`.
