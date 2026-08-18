@@ -1,5 +1,5 @@
 import { setTimeout as delay } from "node:timers/promises";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { Context } from "../src/base-context";
 
 type UserStore = {
@@ -379,6 +379,108 @@ describe("Context defaults outside any context", () => {
       // The sibling instance owns an independent AsyncLocalStorage.
       expect(second.hasContext()).toBe(false);
       expect(second.get("userId")).toBeUndefined();
+    });
+  });
+});
+
+/**
+ * The store is shared by everything running in an async chain, so a merge that
+ * honours a `__proto__` key does not just corrupt one request's context — it
+ * reparents an object the whole process reads through. These lock the merge
+ * path (`update()`, and `set()` which funnels into it) shut, since apps
+ * naturally reach for `context.update(req.body)` / `context.set(key, value)`
+ * with request-shaped data.
+ *
+ * `JSON.parse` is used deliberately: an object literal's `__proto__` is a
+ * setter invocation, while parsed JSON carries a real own property named
+ * `__proto__` — which is exactly what arrives from a request body.
+ */
+describe("Context prototype-pollution guard", () => {
+  afterEach(() => {
+    delete (Object.prototype as any).polluted;
+    delete (Object.prototype as any).isAdmin;
+  });
+
+  it("drops a __proto__ key from update() instead of reparenting the store", async () => {
+    const userContext = createContext();
+
+    await userContext.run({ userId: "u-1", role: "user" }, async () => {
+      userContext.update(JSON.parse('{"__proto__":{"isAdmin":true}}'));
+
+      expect(({} as any).isAdmin).toBeUndefined();
+      expect((userContext.getStore() as any).isAdmin).toBeUndefined();
+      expect(Object.getPrototypeOf(userContext.getStore() as object)).toBe(Object.prototype);
+    });
+  });
+
+  it("drops __proto__ on the enter() path when no context is active yet", () => {
+    const userContext = createContext();
+
+    userContext.update(JSON.parse('{"__proto__":{"polluted":"yes"},"userId":"u-2"}'));
+
+    expect(({} as any).polluted).toBeUndefined();
+    expect(userContext.get("userId")).toBe("u-2");
+  });
+
+  it("drops a caller-supplied __proto__ key passed through set()", async () => {
+    const userContext = createContext();
+
+    await userContext.run({ userId: "u-1", role: "user" }, async () => {
+      userContext.set("__proto__" as any, JSON.parse('{"polluted":"yes"}'));
+
+      expect(({} as any).polluted).toBeUndefined();
+      expect(Object.getPrototypeOf(userContext.getStore() as object)).toBe(Object.prototype);
+    });
+  });
+
+  it("drops constructor and prototype keys as well", async () => {
+    const userContext = createContext();
+
+    await userContext.run({ userId: "u-1", role: "user" }, async () => {
+      userContext.update({
+        constructor: { prototype: { polluted: "yes" } },
+        prototype: { polluted: "yes" },
+      } as any);
+
+      expect(({} as any).polluted).toBeUndefined();
+      expect(userContext.getStore()?.constructor).toBe(Object);
+    });
+  });
+
+  it("keeps the legitimate keys of a payload that also carries a dangerous one", async () => {
+    const userContext = createContext();
+
+    await userContext.run({ userId: "u-1", role: "user" }, async () => {
+      userContext.update(JSON.parse('{"__proto__":{"isAdmin":true},"userId":"u-9","role":"admin"}'));
+
+      expect(userContext.get("userId")).toBe("u-9");
+      expect(userContext.get("role")).toBe("admin");
+      expect(({} as any).isAdmin).toBeUndefined();
+    });
+  });
+
+  it("preserves symbol keys while sanitizing a dangerous payload", async () => {
+    const userContext = createContext();
+    const marker = Symbol("marker");
+
+    await userContext.run({ userId: "u-1", role: "user" }, async () => {
+      const payload = JSON.parse('{"__proto__":{"isAdmin":true}}');
+      payload[marker] = "kept";
+
+      userContext.update(payload);
+
+      expect((userContext.getStore() as any)[marker]).toBe("kept");
+      expect(({} as any).isAdmin).toBeUndefined();
+    });
+  });
+
+  it("leaves an untouched payload object untouched (no needless copying)", async () => {
+    const userContext = createContext();
+
+    await userContext.run({ userId: "u-1", role: "user" }, async () => {
+      userContext.update({ userId: "u-3" });
+
+      expect(userContext.get("userId")).toBe("u-3");
     });
   });
 });

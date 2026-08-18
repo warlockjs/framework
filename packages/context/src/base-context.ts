@@ -1,6 +1,49 @@
 import { AsyncLocalStorage } from "async_hooks";
 
 /**
+ * Keys that reach `Object.prototype` instead of the store when assigned.
+ *
+ * `Object.assign(store, { __proto__: {...} })` does not create a property — it
+ * invokes the inherited `__proto__` setter and reparents the store, which for a
+ * shared context store means every later property lookup in the process can
+ * resolve through attacker-supplied data. `constructor` / `prototype` are the
+ * neighbouring rungs of the same ladder.
+ */
+const DANGEROUS_KEYS = ["__proto__", "constructor", "prototype"] as const;
+
+/**
+ * Drop prototype-poisoning keys from a merge payload.
+ *
+ * Contexts are frequently fed request-shaped data (`context.update(req.body)`,
+ * `context.set(key, value)` with a caller-supplied key), so the merge path is
+ * treated as an untrusted boundary: dangerous keys are dropped rather than
+ * throwing, since a request that trips this must not be able to take the
+ * process down, and the store simply never carries them.
+ *
+ * The common case allocates nothing — a copy is made only when a dangerous key
+ * is actually present. The copy is built by spread (which defines properties
+ * rather than assigning them, so it cannot trigger the setter itself) and
+ * preserves symbol keys, which `Object.assign` would have copied.
+ */
+function withoutDangerousKeys<T>(updates: T): T {
+  if (!updates || typeof updates !== "object") return updates;
+
+  const hasDangerousKey = DANGEROUS_KEYS.some(key =>
+    Object.prototype.hasOwnProperty.call(updates, key),
+  );
+
+  if (!hasDangerousKey) return updates;
+
+  const safe: Record<string, any> = { ...(updates as Record<string, any>) };
+
+  for (const key of DANGEROUS_KEYS) {
+    delete safe[key];
+  }
+
+  return safe as T;
+}
+
+/**
  * Base class for all AsyncLocalStorage-based contexts
  *
  * Provides a consistent API for managing context across async operations.
@@ -58,15 +101,24 @@ export abstract class Context<TStore extends Record<string, any>> {
    *
    * Merges new data into existing context, or enters new context if none exists.
    *
+   * Keys named `__proto__`, `constructor`, or `prototype` are dropped: the
+   * merge target is a store shared by everything running in this async chain,
+   * so letting those through would let one caller's payload change property
+   * resolution for the whole process. Passing unvalidated input here is still
+   * discouraged — this guard closes the prototype vector, not the "an attacker
+   * chose what your context says" one.
+   *
    * @param updates - Partial context data to merge
    */
   public update(updates: Partial<TStore>): void {
+    const safeUpdates = withoutDangerousKeys(updates);
+
     const current = this.storage.getStore();
 
     if (current) {
-      Object.assign(current, updates);
+      Object.assign(current, safeUpdates);
     } else {
-      this.enter(updates as TStore);
+      this.enter(safeUpdates as TStore);
     }
   }
 
@@ -91,6 +143,9 @@ export abstract class Context<TStore extends Record<string, any>> {
 
   /**
    * Set a specific value in context
+   *
+   * Goes through `update()`, so a caller-supplied `key` of `__proto__` /
+   * `constructor` / `prototype` is dropped rather than reparenting the store.
    *
    * @param key - Key to set
    * @param value - Value to store
