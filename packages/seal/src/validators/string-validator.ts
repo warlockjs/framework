@@ -22,10 +22,10 @@ import {
   replaceMutator,
   reverseMutator,
   rtrimMutator,
-  safeHtmlMutator,
   slugMutator,
   snakeCaseMutator,
   stringifyMutator,
+  stripTagsMutator,
   titleCaseMutator,
   trimMultipleWhitespaceMutator,
   trimMutator,
@@ -175,9 +175,26 @@ export class StringValidator extends PrimitiveValidator {
     return this.addMutator(padEndMutator, { length, char });
   }
 
-  /** Remove HTML tags (safe HTML) */
+  /**
+   * Strip HTML tags with a naive `<...>` regex.
+   *
+   * This is a **tag stripper, not an XSS sanitizer**: it is not a parser,
+   * so malformed/nested markup or content re-introduced later in a
+   * pipeline can defeat it. Do not rely on this alone to make untrusted
+   * rich text safe to render — use a real parser-based sanitizer (e.g.
+   * DOMPurify / sanitize-html) for that.
+   */
+  public stripTags() {
+    return this.addMutator(stripTagsMutator);
+  }
+
+  /**
+   * @deprecated Renamed to {@link StringValidator.stripTags} — the old
+   * name implied XSS safety this tag-stripping regex does not provide.
+   * Kept as an alias for backward compatibility; switch to `.stripTags()`.
+   */
   public safeHtml() {
-    return this.addMutator(safeHtmlMutator);
+    return this.stripTags();
   }
 
   /** HTML escape special characters */

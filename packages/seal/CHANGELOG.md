@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 4.15.0
 
+### Security
+
+- **Renamed `safeHtmlMutator`/`.safeHtml()` to `stripTagsMutator`/`.stripTags()`.** The old name implied XSS safety it never provided — the implementation is a naive `<[^>]*>` regex, not an HTML parser, and can be defeated by malformed/nested markup or content re-introduced later in a pipeline. A developer building `v.string().safeHtml()` for user-supplied rich text was liable to treat the output as pre-sanitized and skip further output encoding, opening a stored/reflected XSS path. The new names and doc comments make clear this is tag-stripping only; use a real parser-based sanitizer (DOMPurify / sanitize-html) for untrusted rich text. `safeHtmlMutator` and `.safeHtml()` remain as deprecated aliases (same behavior, `@deprecated` JSDoc pointing at the new names) so existing callers do not break.
+
 ### Dependencies
 
 - Bumped `@mongez/supportive-is` to `^2.1.4` (no breaking changes) and `@mongez/reinforcements` to `^4.0.1`. The reinforcements major makes `Random.string/nanoid/id/token/uuid` CSPRNG-backed (WebCrypto) and removes `Random.seed()` support — audited this package's source and tests for `Random.seed(` and for seeded/reproducible use of `Random.*`; none found, so no code changes were needed.

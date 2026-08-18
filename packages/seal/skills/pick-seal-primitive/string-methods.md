@@ -119,7 +119,7 @@ JSON Schema: `format: "color"` for `.hexColor()`; the others map to `format: "co
 | `.toAlphanumeric()` | strip non-alphanumerics |
 | `.removeSpecialCharacters()` | keep alphanumerics + whitespace |
 | `.removeNumbers()` | strip digits |
-| `.safeHtml()` | strip HTML tags |
+| `.stripTags()` | strip HTML tags via a naive `<...>` regex — **not** an XSS sanitizer; `.safeHtml()` is a deprecated alias |
 | `.htmlEscape()` | `<` → `&lt;` etc |
 | `.unescapeHtml()` | reverse `htmlEscape()` |
 
@@ -158,8 +158,8 @@ v.string().strongPassword(12)
 // URL with strict format
 v.string().url().startsWith("https://")
 
-// Sanitized HTML body
-v.string().safeHtml().min(1)
+// Tag-stripped HTML body (not XSS-safe — sanitize with DOMPurify/sanitize-html before rendering untrusted rich text)
+v.string().stripTags().min(1)
 
 // Masked phone for response
 v.string().pattern(/^\+\d{8,}$/).mask(3, -2)

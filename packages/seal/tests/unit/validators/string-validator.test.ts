@@ -92,7 +92,12 @@ describe("StringValidator - Comprehensive", () => {
   });
 
   describe("HTML Mutators", () => {
-    it("safeHtml", async () => {
+    it("stripTags", async () => {
+      const result = await validate(v.string().stripTags(), "<div>test</div>");
+      expect(result.data).toBe("test");
+    });
+
+    it("safeHtml (deprecated alias) behaves identically to stripTags", async () => {
       const result = await validate(v.string().safeHtml(), "<div>test</div>");
       expect(result.data).toBe("test");
     });

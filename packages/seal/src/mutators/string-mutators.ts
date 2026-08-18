@@ -51,10 +51,25 @@ export const trimMutator: Mutator = async (value, context) => {
   return trim(value?.toString(), context?.options?.needle ?? " ");
 };
 
-/** Remove HTML tags (safe HTML) */
-export const safeHtmlMutator: Mutator = async (value) => {
+/**
+ * Strip HTML tags with a naive `<...>` regex.
+ *
+ * This is a **tag stripper, not an XSS sanitizer**: it is not a parser, so
+ * malformed/nested markup, attribute payloads, or content re-introduced
+ * later in a pipeline can defeat it. Do not rely on this alone to make
+ * untrusted rich text safe to render — use a real parser-based sanitizer
+ * (e.g. DOMPurify / sanitize-html) for that.
+ */
+export const stripTagsMutator: Mutator = async (value) => {
   return value?.toString().replace(/<[^>]*>?/gm, "");
 };
+
+/**
+ * @deprecated Renamed to {@link stripTagsMutator} — the old name implied
+ * XSS safety this tag-stripping regex does not provide. Kept as an alias
+ * for backward compatibility; switch to `stripTagsMutator`.
+ */
+export const safeHtmlMutator: Mutator = stripTagsMutator;
 
 /** HTML escape */
 export const htmlEscapeMutator: Mutator = async (value) => {

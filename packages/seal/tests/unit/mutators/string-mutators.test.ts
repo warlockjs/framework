@@ -19,6 +19,7 @@ import {
   slugMutator,
   snakeCaseMutator,
   stringifyMutator,
+  stripTagsMutator,
   titleCaseMutator,
   trimMutator,
   truncateMutator,
@@ -106,9 +107,15 @@ describe("String Mutators", () => {
       expect(await htmlEscapeMutator("a & b")).toBe("a &amp; b");
     });
 
-    it("safeHtml", async () => {
+    it("stripTags", async () => {
+      expect(await stripTagsMutator("<div>test</div>")).toBe("test");
+      expect(await stripTagsMutator("<p>Hello <b>World</b></p>")).toBe("Hello World");
+    });
+
+    it("safeHtml (deprecated alias) behaves identically to stripTags", async () => {
       expect(await safeHtmlMutator("<div>test</div>")).toBe("test");
       expect(await safeHtmlMutator("<p>Hello <b>World</b></p>")).toBe("Hello World");
+      expect(safeHtmlMutator).toBe(stripTagsMutator);
     });
 
     it("removeSpecialCharacters", async () => {
