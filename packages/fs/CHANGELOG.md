@@ -4,6 +4,14 @@ All notable changes to `@warlock.js/fs` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.15.0
+
+### Security
+
+- **`fs.files.mergeJson()` / `File#mergeJson()` now drop `__proto__` / `constructor` / `prototype` keys from both sides of the merge, at every depth.** The deep-merge path assigned with `output[key] = value`, and for a key of `__proto__` that is not a property write — it invokes the inherited setter and reparents the merged object. `JSON.parse` is itself safe but happily produces an own property with that name, so `mergeJson(configPath, requestBody)` — the natural shape for a "PATCH this JSON config" endpoint — let a partial of `{"__proto__":{"isAdmin":true}}` poison the object being written, and any property lookup against the in-memory result resolved through the attacker's data
+
+  The filter also runs on the shallow path and on the object read from disk. Object spread never triggered the setter, so the shallow path was not a live pollution primitive — but both paths persisted the key verbatim, leaving a file that becomes one the moment anything else merges it. Non-literal values (dates, class instances) still pass through untouched and serialize as before
+
 ## 4.12.0
 
 ### Changed

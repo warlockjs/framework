@@ -32,15 +32,72 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function deepMerge(target: unknown, source: unknown): unknown {
-  if (!isPlainObject(target) || !isPlainObject(source)) return source;
+/**
+ * A literal object — not a `Date`, `Map`, or class instance, which
+ * `isPlainObject` also accepts. Rebuilding one of those key-by-key would
+ * destroy it (a `Date` would serialize as `{}` instead of an ISO string), so
+ * only these are safe to walk into and copy.
+ */
+function isLiteralObject(value: unknown): value is Record<string, unknown> {
+  if (!isPlainObject(value)) return false;
 
-  const output: Record<string, unknown> = { ...target };
+  const prototype = Object.getPrototypeOf(value);
+
+  return prototype === Object.prototype || prototype === null;
+}
+
+/**
+ * Keys that hit `Object.prototype` rather than the object when assigned.
+ *
+ * `JSON.parse` is itself safe, but it happily produces an object with an own
+ * property literally named `__proto__` — and `output[key] = value` on that key
+ * is not a property write, it invokes the inherited `__proto__` setter and
+ * reparents `output`. `constructor` / `prototype` are the same ladder one rung
+ * up.
+ */
+const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
+ * Copy a JSON value with prototype-poisoning keys removed at every depth.
+ *
+ * Applied to both sides of a merge, and to whole subtrees copied across, so a
+ * merged document can neither reparent an object in this process nor persist a
+ * `__proto__` key to disk for whatever reads the file next. Non-literal values
+ * (dates, class instances, primitives) are passed through by reference — they
+ * carry no such keys and rebuilding them would change what gets serialized.
+ */
+function stripDangerousKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripDangerousKeys);
+
+  if (!isLiteralObject(value)) return value;
+
+  const output: Record<string, unknown> = {};
+
+  for (const [key, nested] of Object.entries(value)) {
+    if (DANGEROUS_KEYS.has(key)) continue;
+
+    output[key] = stripDangerousKeys(nested);
+  }
+
+  return output;
+}
+
+function deepMerge(target: unknown, source: unknown): unknown {
+  if (!isPlainObject(target) || !isPlainObject(source)) return stripDangerousKeys(source);
+
+  // Copy rather than mutate the caller's object, as the spread used to — a
+  // non-literal target (a `Date`, say) keeps the old "spread its own props"
+  // result, which the strip then leaves alone.
+  const output = stripDangerousKeys(
+    isLiteralObject(target) ? target : { ...target },
+  ) as Record<string, unknown>;
 
   for (const [key, value] of Object.entries(source)) {
+    if (DANGEROUS_KEYS.has(key)) continue;
+
     output[key] = isPlainObject(value) && isPlainObject(output[key])
       ? deepMerge(output[key], value)
-      : value;
+      : stripDangerousKeys(value);
   }
 
   return output;
@@ -246,7 +303,16 @@ async function editJson<T = unknown>(
   await putJson(path, next, options);
 }
 
-/** Read → merge a partial into the JSON object → write. Shallow unless `{ deep:true }`. */
+/**
+ * Read → merge a partial into the JSON object → write. Shallow unless
+ * `{ deep:true }`.
+ *
+ * Keys named `__proto__`, `constructor`, or `prototype` are dropped from both
+ * sides at every depth. `mergeJson(configPath, requestBody)` is a natural
+ * shape for a "PATCH this config" endpoint, and without the filter a partial
+ * of `{"__proto__":{"isAdmin":true}}` would reparent the merged object in the
+ * deep path and be written verbatim to disk in either.
+ */
 async function mergeJson<T = Record<string, unknown>>(
   path: string,
   partial: Partial<T>,
@@ -255,7 +321,7 @@ async function mergeJson<T = Record<string, unknown>>(
   const current = await getJson<T>(path);
   const merged = options?.deep
     ? (deepMerge(current, partial) as T)
-    : ({ ...current, ...partial } as T);
+    : (stripDangerousKeys({ ...current, ...partial }) as T);
   await putJson(path, merged, options);
 }
 
