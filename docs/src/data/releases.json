@@ -1,5 +1,36 @@
 {
   "_doc": "Release-level metadata for the unified changelog — the DATE and the 'what shipped' SUMMARY for each version. Per-package change details (Added/Changed/Fixed/Removed) live in each package's CHANGELOG.md and are aggregated by scripts/generate-changelog.mjs; this file supplies the release date + summary that the per-package files don't carry. Hand-maintained: add one entry per release, keyed by the version string. `date` is a display string (e.g. \"June 4, 2026\"); `summary` supports inline `code`, **bold**, and [links](url); `featured` (optional) is an array of package names floated to the top of that release's package list, in the listed order (the rest follow most-changed-first, then alphabetical). Keep the summary to ONE short headline — what shipped and which packages — not an API-by-API tour; the per-package list below it carries the detail.",
+  "4.16.0": {
+    "date": "August 18, 2026",
+    "summary": "**Security release across the framework.** A full security audit closed 10 release-blockers — shell RCE, NoSQL/operator injection, filesystem path traversal, SSRF, dashboard stored XSS, IP-spoofing, and mass-assignment IDOR — and hardened orchestrator session/tenant isolation, supervisor fan-out, default log redaction, and `trustProxy` handling across `ai`, `cascade`, `core`, `cache`, `logger`, `herald`, `access`, `ai-workspace`, `ai-panoptic`, `notifications`, `seal`, `context`, `fs`, and `create-warlock`. Also bumps `@mongez/*` to the 2026-08-17 security release (`reinforcements` 4 CSPRNG `Random`).",
+    "featured": [
+      "@warlock.js/ai",
+      "@warlock.js/cascade",
+      "@warlock.js/core"
+    ]
+  },
+  "4.15.0": {
+    "date": "August 16, 2026",
+    "summary": "**`@warlock.js/ai`** lands a batch of type + mock-SDK fixes: `ctx.run` now stringifies a non-string payload, `ToolMeta` keys are optional, `new Error(msg, { cause })` compiles, and the mock honours `usage`/`deltas`. **`@warlock.js/herald`** fixes a non-idempotent lazy `amqplib` loader that could race concurrent loads and silently poison test isolation.",
+    "featured": [
+      "@warlock.js/ai",
+      "@warlock.js/herald"
+    ]
+  },
+  "4.14.0": {
+    "date": "August 16, 2026",
+    "summary": "**`@warlock.js/core`** adds `teardownTest()` to close a framework a test brought up and scopes test-lifecycle state to the worker runtime instead of the module. Two breaking `setupTest` changes: an explicit `{ connectors }` now wins over `tests.connectors` config, and a conflicting concurrent call rejects instead of being silently ignored.",
+    "featured": [
+      "@warlock.js/core"
+    ]
+  },
+  "4.13.0": {
+    "date": "August 12, 2026",
+    "summary": "**`@warlock.js/core`** adds `build.singleBundle` for a single runnable `node dist/app.js`, makes `@warlock.js/core/tests` and `@warlock.js/core/vite` real importable subpaths, and fixes `setupTest()` crashing in a project without a `tests` config plus the test request helpers dropping falsy JSON bodies (`false`/`0`/`\"\"`/`null`).",
+    "featured": [
+      "@warlock.js/core"
+    ]
+  },
   "4.12.0": {
     "date": "August 11, 2026",
     "summary": "**`@warlock.js/core`** adds `warlock migrate --pending` — what will run next, in execution order, with exit codes you can gate a deploy on — and stops two CLI flags doing the opposite of what they say: `migrate --rollback=false` dropped every table, and `generate.module --force=false` overwrote your files, because boolean options were parsed as raw strings and `\"false\"` is truthy. **`@warlock.js/auth`** closes a token-expiry hole: an unparseable `expiresIn` minted a JWT with no `exp` claim, such a token was then accepted forever, and the rows were never purged — tokens are now rejected at issue and at verification, and `auth:purge-never-expiring` finds and revokes the ones already in your database. **`@warlock.js/core`** also fixes `Image` and `renderReact` racing their own optional-dependency imports, where a constructor could run before `sharp` or `react` had loaded and fail with `not a function`.",
