@@ -1,6 +1,6 @@
 ---
 name: perform-atomic-ops
-description: 'Avoid races on concurrent writes — `Model.increase(filter, field, n)` / `Model.decrease` for atomic counters, `Model.atomic(filter, ops)` for arbitrary mutations (`$set` / `$inc` / `$push` / `$pull`), `Model.createMany` / `Model.findAndUpdate` / `Model.delete` for bulk. Triggers: `Model.increase`, `Model.decrease`, `Model.atomic`, `Model.createMany`, `createMany bulk`, `batchSize`, `Model.findAndUpdate`, `Model.delete`, `$inc`, `$set`; "increment counter under concurrency", "bulk insert without N+1", "fast bulk insert", "insert thousands of rows", "atomic update without loading"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: multi-row atomicity — `@warlock.js/cascade/manage-transactions/SKILL.md`; competing patterns `mongoose findOneAndUpdate`, `pg` `UPDATE ... SET x = x + 1`.'
+description: 'Avoid races on concurrent writes — `Model.increase(filter, field, n)` / `Model.decrease` for atomic counters, `Model.atomic(filter, ops)` for arbitrary mutations (`$set` / `$inc` / `$push` / `$pull`), `Model.createMany` / `Model.findAndUpdate` / `Model.delete` for bulk. `atomic()` / `findAndUpdate()` / `findOneAndUpdate()` / `findAndReplace()` / `findOneAndDelete()` sanitize their `filter` argument — `$`-prefixed keys throw `UnsafeFilterError`, same check as `where()`. Triggers: `Model.increase`, `Model.decrease`, `Model.atomic`, `Model.createMany`, `createMany bulk`, `batchSize`, `Model.findAndUpdate`, `Model.findOneAndUpdate`, `Model.findAndReplace`, `Model.findOneAndDelete`, `Model.delete`, `$inc`, `$set`, `UnsafeFilterError`; "increment counter under concurrency", "bulk insert without N+1", "fast bulk insert", "insert thousands of rows", "atomic update without loading", "is atomic() safe with a request body filter"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: multi-row atomicity — `@warlock.js/cascade/manage-transactions/SKILL.md`; competing patterns `mongoose findOneAndUpdate`, `pg` `UPDATE ... SET x = x + 1`.'
 ---
 
 # Use atomic operations
@@ -26,6 +26,8 @@ await User.atomic({ id: userId }, {
 ```
 
 `Model.atomic(filter, operations)` → `Promise<number>`. Driver-flavored atomic mutation — MongoDB has `$set` / `$inc` / `$push` / `$pull`; the Postgres driver translates the equivalents. Use when you need to combine multiple field changes atomically without loading the model first.
+
+**`filter` is sanitized like `where()`.** `atomic()`, `findAndUpdate()`, `findOneAndUpdate()`, `findAndReplace()` and `findOneAndDelete()` all run their `filter` argument through the same `$`-prefixed-key check as `Model.where()` (see [`query-data`](@warlock.js/cascade/query-data/SKILL.md)) and throw `UnsafeFilterError` on a key like `$ne`. Before this, these five bypassed `where()` entirely, so a filter forwarded straight from a request body — `User.atomic(req.body.filter, { $set: { role: "admin" } })` — could still smuggle an operator like `{ role: { $ne: "admin" } }` through as a live query even though `where()` itself was already guarded. Only the FILTER is checked — the update-operator object (`$set`/`$inc`/`$unset`/…) is untouched, since that's meant to carry `$` keys. If you legitimately need operator conditions in the filter, express them through `Model.query().where(...)` instead of the raw filter argument.
 
 ## Bulk insert — `Model.createMany`
 
@@ -111,6 +113,7 @@ for (const user of targets) {
 - Don't expect `findAndUpdate` / `delete` to fire per-row `saved` / `deleted` events or honor the delete strategy. They don't. Iterate if you need that.
 - Don't hand-roll chunking around `createMany` — it already chunks by `batchSize` (default 500). Tune `batchSize` instead of slicing the array yourself.
 - Don't assume `bulk: true` fires per-row `saving` / `created` / `saved` events or runs instance hooks — it doesn't. Casts/timestamps/defaults/ids still apply, but if you need the lifecycle, use the default path (or iterate with `.save()`).
+- Don't forward a raw request-body object as the `filter` to `atomic()`/`findAndUpdate()`/`findOneAndUpdate()`/`findAndReplace()`/`findOneAndDelete()` expecting it to be un-sanitized — it isn't, `$`-prefixed keys throw `UnsafeFilterError` — but don't rely on that as your only authorization check either; it blocks operator injection, not "does this caller own this row."
 
 ## See also
 

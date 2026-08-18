@@ -22,7 +22,7 @@ Pick the delete behavior — `permanent` (hard delete), `soft` (set deletedAt, k
 
 ### [`define-model/`](./define-model/SKILL.md)
 
-Define a Cascade model — @RegisterModel() decorator, class extends Model<TSchema>, static table, static schema, three update idioms (.set / .merge / .save), .unset, .destroy, static toJsonColumns / resource for output shaping. Load when creating a model file, adding accessors, or shaping serialized output.
+Define a Cascade model — @RegisterModel() decorator, class extends Model<TSchema>, static table, static schema, three update idioms (.set / .merge / .save), .unset, .destroy, static toJsonColumns / resource / static hidden for output shaping. Covers why merge() on a persisted model can't retarget a write via a spoofed id, and why static hidden — not toJsonColumns/resource alone — is the field that's guaranteed to never serialize. Load when creating a model file, adding accessors, shaping serialized output, or hiding a password/token from responses.
 
 ### [`define-relations/`](./define-relations/SKILL.md)
 
@@ -42,11 +42,11 @@ Paginate query results — `.paginate({ page, limit })` for offset (returns `dat
 
 ### [`perform-atomic-ops/`](./perform-atomic-ops/SKILL.md)
 
-Avoid races on concurrent writes — Model.increase(filter, field, n) / Model.decrease for atomic counters, Model.atomic(filter, ops) for arbitrary atomic mutations, Model.createMany(rows, { bulk, batchSize }) / Model.findAndUpdate / Model.delete for bulk. Load when incrementing counters under concurrency, fast bulk inserts (native multi-row insertMany), bulk ops without N+1, or single-document atomic mutations without a full transaction.
+Avoid races on concurrent writes — Model.increase(filter, field, n) / Model.decrease for atomic counters, Model.atomic(filter, ops) for arbitrary atomic mutations, Model.createMany(rows, { bulk, batchSize }) / Model.findAndUpdate / Model.delete for bulk. atomic() / findAndUpdate() / findOneAndUpdate() / findAndReplace() / findOneAndDelete() sanitize their filter argument the same way where() does. Load when incrementing counters under concurrency, fast bulk inserts (native multi-row insertMany), bulk ops without N+1, or single-document atomic mutations without a full transaction.
 
 ### [`query-data/`](./query-data/SKILL.md)
 
-Query records via the model — .where(field, value) / .where(field, op, value), .find(id) / .first(filter?) / .all(filter?), .count / .exists, plus the broader query-builder vocabulary (.orderBy / .whereIn / .whereBetween / .whereLike / .pluck / .firstOrFail / scopes) via .query() or chained off .where(). Load when filtering, fetching by ID, getting a single match, or ordering.
+Query records via the model — .where(field, value) / .where(field, op, value), .find(id) / .first(filter?) / .all(filter?), .count / .exists, plus the broader query-builder vocabulary (.orderBy / .whereIn / .whereBetween / .whereLike / .whereRaw / .pluck / .firstOrFail / scopes) via .query() or chained off .where(). Covers filter safety (where() rejects $-prefixed keys, whereRaw() string mode rejects $where, whereLike/whereSearch match strings literally). Load when filtering, fetching by ID, getting a single match, ordering, or checking whether a filter/search built from request data is safe.
 
 ### [`run-cascade-cli/`](./run-cascade-cli/SKILL.md)
 

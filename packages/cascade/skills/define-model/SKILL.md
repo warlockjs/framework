@@ -1,6 +1,6 @@
 ---
 name: define-model
-description: 'Define a Cascade model — `@RegisterModel()`, class extends `Model<TSchema>`, `static table`, `static schema`, three update idioms (`.set` / `.merge` / `.save`), `.unset`, `.destroy`, `static toJsonColumns` / `resource` for output shaping. Triggers: `Model`, `RegisterModel`, `static schema`, `.set`, `.merge`, `.save`, `.unset`, `.destroy`, `toJsonColumns`, `resource`; "how do I define a model", "shape the JSON output", "remove a field"; typical import `import { Model, RegisterModel } from "@warlock.js/cascade"`. Skip: querying — `@warlock.js/cascade/query-data/SKILL.md`; relations — `@warlock.js/cascade/define-relations/SKILL.md`; competing libs `mongoose`, `prisma`, `typeorm` `@Entity`.'
+description: 'Define a Cascade model — `@RegisterModel()`, class extends `Model<TSchema>`, `static table`, `static schema`, three update idioms (`.set` / `.merge` / `.save`), `.unset`, `.destroy`, `static toJsonColumns` / `resource` / `static hidden` for output shaping. Covers write safety: `static hidden` fields are ALWAYS stripped from `toJSON()` regardless of `resource`/`toJsonColumns`, cascade warns once per model on an unhidden credential-shaped field, and `merge()` on a persisted model drops identity columns so request data can never retarget an `update()`/`destroy()` at another row. Triggers: `Model`, `RegisterModel`, `static schema`, `.set`, `.merge`, `.save`, `.unset`, `.destroy`, `toJsonColumns`, `resource`, `hidden`, `trustedPrimaryKey`; "how do I define a model", "shape the JSON output", "remove a field", "hide password from response", "prevent id in request body overwriting another row"; typical import `import { Model, RegisterModel } from "@warlock.js/cascade"`. Skip: querying — `@warlock.js/cascade/query-data/SKILL.md`; relations — `@warlock.js/cascade/define-relations/SKILL.md`; competing libs `mongoose`, `prisma`, `typeorm` `@Entity`.'
 ---
 
 # Define a model
@@ -94,6 +94,8 @@ await user.merge({ name: "Augusta Ada King", status: "active" }).save();
 
 The everyday case. Service takes `Partial<UserSchema>` from a request body, merges it into the instance, saves. Existing fields not in the object are untouched.
 
+**Safe against id-retargeting by design.** `model.merge(req.body); await model.save();` is the canonical update-my-profile shape — and `req.body` is attacker-controlled. On an already-persisted model, `merge()` drops identity columns (`id`, `_id`, the configured primary key) instead of applying them, so a body carrying `{ id: "<victim-id>", role: "admin" }` cannot redirect the write onto someone else's row: `update()`/`replace()`/`destroy()` build their filter from `model.trustedPrimaryKey` — the id captured when the instance became persisted (hydration, or right after an insert), never the current in-memory value. Identity columns are also excluded from the `$set`/`$unset` payload, so an explicit `.set("id", …)` on a loaded record doesn't rewrite the key of the row it's pinned to either. This only applies to an *existing* record — `User.create({ id, ... })` with an explicit id is unchanged, since there's no row to retarget yet. If you deliberately need to change a primary key, do it through the atomic/raw APIs (see [`perform-atomic-ops`](@warlock.js/cascade/perform-atomic-ops/SKILL.md)), not `merge()`.
+
 ### `.save()` after manual mutation — when changes are spread
 
 ```ts
@@ -173,11 +175,25 @@ export class User extends Model<UserSchema> {
 
 Plain TypeScript class. No framework dependencies. `static resourceColumns` narrows which columns reach the resource; pair the two for strongly-typed public output.
 
+### Fields that must never serialize — `static hidden`
+
+```ts
+@RegisterModel()
+export class User extends Model<UserSchema> {
+  public static table = "users";
+  public static schema = userSchema;
+  public static hidden = ["password", "resetToken"];
+}
+```
+
+`static hidden: string[]` names top-level fields `toJSON()` (and therefore `JSON.stringify(user)` / `res.json(user)`) can **never** emit — stripped whether the model falls back to the raw-document default, uses `toJsonColumns`, or goes through `resource` (hidden wins over all three). Defaults to `[]`, so declaring it is opt-in and nothing changes on an existing model until you add fields — but because that default fails open, cascade logs a one-time `console.warn` per model whose schema declares a credential-shaped column (`password`, `passwordHash`, `secret`, `token`, `apiKey`/`api_key`, case-insensitive) that isn't covered by `hidden`, `resource`, or `toJsonColumns`. Treat that warning as "add this field to `hidden`," not noise to suppress. Prefer `hidden` over remembering to exclude the field from every `toJsonColumns` list by hand — it's enforced regardless of which shaping strategy a given model (or a future refactor) picks.
+
 ## Things NOT to do
 
 - Don't `new User()` to create a record — `User.create({...})` validates, persists, fires events.
 - Don't `.set("relation_name", instance)` for a relation slot. Use `setRelation("name", instance)`.
 - Don't return the raw model from an HTTP route without shaping output. Add `toJsonColumns` or `resource`.
+- Don't rely on `toJsonColumns`/`resource` alone to keep a password or token out of responses — declare it in `static hidden` too; that's the one path enforced no matter which shaping strategy is used, and the only one that survives someone adding a second `resource` later.
 - Don't `await user.save()` and forget the `await` — your changes live only on the instance and never reach the DB.
 - Don't expect schema defaults to apply on `.merge()` — defaults fire on `.create()` only.
 
