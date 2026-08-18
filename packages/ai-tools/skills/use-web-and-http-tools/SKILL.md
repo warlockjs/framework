@@ -1,6 +1,6 @@
 ---
 name: use-web-and-http-tools
-description: 'Wire the @warlock.js/ai-tools belt — web search, fetch/scrape, HTTP/REST, calculator, date-time — into an agent under their guardrails. Triggers: `ai.tools.webSearch`, `ai.tools.fetchUrl`, `ai.tools.http`, `ai.tools.calculator`, `ai.tools.dateTime`, `webSearchTool`, `fetchUrlTool`, `httpRequestTool`, `calculatorTool`, `dateTimeTool`, `web_search`, `fetch_url`, `http_request`, `calculator`, `date_time`, `WebToolError`, `HttpPolicyError`, `CalculatorError`, `DateTimeError`, `allowHosts`, `allowMethods`, `baseUrl`, `maxBytes`, `SearchProvider`, `TAVILY_API_KEY`; ''give an agent web search'', ''let an agent fetch/scrape a page'', ''let an agent call a REST API'', ''restrict which hosts/methods an agent can hit'', ''add a calculator/date tool to an agent'', ''SSRF guardrail for an agent tool''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: connecting to an external MCP server — `@warlock.js/ai-tools/connect-mcp-server/SKILL.md`; exposing tools AS an MCP server — `@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`; filesystem/shell tools — `@warlock.js/ai-workspace/use-a-workspace/SKILL.md`; defining your own custom tool — `@warlock.js/ai/define-ai-tool/SKILL.md`.'
+description: 'Wire the @warlock.js/ai-tools belt — web search, fetch/scrape, HTTP/REST, calculator, date-time — into an agent under their guardrails. Triggers: `ai.tools.webSearch`, `ai.tools.fetchUrl`, `ai.tools.http`, `ai.tools.calculator`, `ai.tools.dateTime`, `webSearchTool`, `fetchUrlTool`, `httpRequestTool`, `calculatorTool`, `dateTimeTool`, `web_search`, `fetch_url`, `http_request`, `calculator`, `date_time`, `WebToolError`, `HttpPolicyError`, `CalculatorError`, `DateTimeError`, `allowHosts`, `allowMethods`, `allowPrivateNetwork`, `baseUrl`, `maxBytes`, `guardedFetch`, `SearchProvider`, `TAVILY_API_KEY`; ''give an agent web search'', ''let an agent fetch/scrape a page'', ''let an agent call a REST API'', ''restrict which hosts/methods an agent can hit'', ''add a calculator/date tool to an agent'', ''SSRF guardrail for an agent tool'', ''let a tool reach an internal/dev service''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: connecting to an external MCP server — `@warlock.js/ai-tools/connect-mcp-server/SKILL.md`; exposing tools AS an MCP server — `@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`; filesystem/shell tools — `@warlock.js/ai-workspace/use-a-workspace/SKILL.md`; defining your own custom tool — `@warlock.js/ai/define-ai-tool/SKILL.md`.'
 ---
 
 # Use the web + HTTP tool belt
@@ -57,7 +57,9 @@ ai.tools.fetchUrl({ extract: "text", allowHosts: ["docs.stripe.com"], maxBytes: 
 ```
 
 - `extract`: `"text"` (default — readability-extracted main text), `"html"` (raw body), or `"markdown"`. **`"text"`/`"markdown"` lazily import the `@mozilla/readability` + `jsdom` optional peers** — a missing peer is a `WebToolError` of type `"missing-peer"` carrying the `npm install @mozilla/readability jsdom` string. `"html"` needs nothing.
-- `allowHosts` (when set) rejects any other host **before the fetch** (an SSRF guardrail) → `"denied-host"`.
+- `allowHosts` (when set) rejects any other host **before the fetch** (an SSRF guardrail) → `"denied-host"`, and redirect targets are held to the same allowlist.
+- **Private-network deny by default.** Every request — and every redirect hop — now routes through `@warlock.js/ai`'s hardened `guardedFetch` outbound policy instead of a local host check. It refuses private / loopback / link-local / CGNAT / cloud-metadata addresses (`169.254.169.254`, RFC1918, `localhost`, …) by resolving the hostname via DNS and checking every returned address, failing closed on resolution failure — and re-validates every redirect `Location` (scheme, allowlist, private-IP deny) before following it. This applies even with no `allowHosts` set, so a bare `ai.tools.fetchUrl()` is no longer an SSRF primitive; blocks surface as `WebToolError` `type: "denied-host"`.
+- `allowPrivateNetwork` (default `false`) — set `true` to deliberately permit a private/internal target, e.g. a tool that must call a local dev server. Pair with `allowHosts` to scope it rather than opening the whole private range.
 - `maxBytes` caps the body and flags `truncated`; `timeoutMs` aborts via `AbortSignal.timeout`.
 
 ## `http_request` — a guarded REST client
@@ -70,6 +72,7 @@ ai.tools.http({
   headers: { authorization: `Bearer ${process.env.STRIPE_KEY}` },
   timeoutMs: 15_000,
   maxBytes: 1_000_000,
+  // allowPrivateNetwork: true,             // only for a deliberate internal/dev target
 });
 ```
 
@@ -77,6 +80,7 @@ All guardrails are enforced **before the network call** and surface as a typed `
 - a method outside `allowMethods` → `"method-not-allowed"`;
 - a host outside `allowHosts` → `"host-not-allowed"` (SSRF guardrail);
 - an unresolvable URL → `"invalid-url"`.
+- **Private-network deny by default** — like `fetch_url`, every request and redirect hop routes through `guardedFetch`, refusing private/loopback/link-local/CGNAT/cloud-metadata addresses (DNS-resolved and re-checked per redirect hop) even when `allowHosts` isn't set → `"host-not-allowed"`. Set `allowPrivateNetwork: true` (default `false`) to permit a deliberate internal target.
 
 When `baseUrl` is set the model passes a **path** joined against it; otherwise it must pass an absolute `http(s)` URL. Static `headers` merge **under** the per-call headers (per-call wins). An object `body` is JSON-serialized (with a default `content-type: application/json`); a string `body` is sent verbatim; `body` is dropped for `GET`. The response body is JSON-parsed when the `content-type` is JSON, else returned as text.
 
