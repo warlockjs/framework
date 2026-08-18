@@ -351,6 +351,36 @@ describe("createOps.grep", () => {
 
     expect(result.matches.some((m) => m.path.startsWith(".git/"))).toBe(false);
   });
+
+  it("rejects a catastrophic-backtracking pattern (ReDoS shape) instead of compiling it", async () => {
+    const ops = createOps(backend, policy());
+
+    await expect(ops.grep("(a+)+$")).rejects.toMatchObject({ type: "unsafe-pattern" });
+  });
+
+  it("rejects an overly long pattern", async () => {
+    const ops = createOps(backend, policy());
+
+    await expect(ops.grep("a".repeat(500))).rejects.toMatchObject({ type: "unsafe-pattern" });
+  });
+
+  it("bounds the worst-case time a pathological pattern can spend on one line", async () => {
+    // A ReDoS-shaped pattern that's still short and passes the length cap
+    // but is caught by the nested-quantifier heuristic — proves the guard
+    // isn't solely relying on length.
+    const ops = createOps(backend, policy());
+
+    await expect(ops.grep("(a*)*b")).rejects.toBeInstanceOf(WorkspacePolicyError);
+  });
+
+  it("skips lines longer than the scan cap rather than testing them", async () => {
+    backend.files.set(abs("src/long.ts"), `${"x".repeat(3000)}foo\n`);
+    const ops = createOps(backend, policy());
+
+    const result = await ops.grep("foo");
+
+    expect(result.matches.some((m) => m.path === "src/long.ts")).toBe(false);
+  });
 });
 
 describe("createOps.glob", () => {

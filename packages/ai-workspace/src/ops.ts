@@ -19,6 +19,20 @@ const DEFAULT_READ_LINES = 2000;
 const DEFAULT_MAX_GREP_MATCHES = 1000;
 /** Default per-command output byte cap when the policy sets none. */
 const DEFAULT_MAX_OUTPUT_BYTES = 1_000_000;
+/**
+ * Hard ceiling on `grep` pattern length. A model-controlled regex has no
+ * legitimate reason to be this long; longer patterns are rejected outright
+ * rather than compiled.
+ */
+const MAX_GREP_PATTERN_LENGTH = 200;
+/**
+ * Hard ceiling on the number of characters of a single line handed to
+ * `RegExp#test` during a `grep`. Catastrophic backtracking is exponential
+ * in input length, so bounding the input scanned per call bounds the
+ * worst-case time a single pathological line can cost — lines longer than
+ * this are skipped rather than scanned.
+ */
+const MAX_GREP_LINE_SCAN_LENGTH = 2000;
 
 /**
  * Number the lines of `content` `cat -n` style: a right-aligned line
@@ -91,6 +105,36 @@ function globToRegExp(glob: string): RegExp {
   }
 
   return new RegExp(`^${source}$`);
+}
+
+/**
+ * A quantifier: `+`, `*`, `?`, or a `{m,n}` bound.
+ */
+const QUANTIFIER_SOURCE = String.raw`[+*?]|\{\d*,?\d*\}`;
+
+/**
+ * Heuristic catastrophic-backtracking detector: flags a quantified group
+ * that itself contains a quantifier (e.g. `(a+)+`, `(a*)*`, `(.+)*`) —
+ * the classic exponential-blowup shape. Not a full regex-safety analyzer
+ * (it won't catch every ReDoS shape, e.g. quantified alternation like
+ * `(a|a)+`), but it rejects the shape an agent is most likely to emit,
+ * intentionally or via prompt injection.
+ */
+const NESTED_QUANTIFIER_PATTERN = new RegExp(
+  String.raw`\([^()]*(?:${QUANTIFIER_SOURCE})[^()]*\)(?:${QUANTIFIER_SOURCE})`,
+);
+
+/**
+ * Whether `pattern` is safe enough to compile and run against workspace
+ * content: within the length cap and free of the nested-quantifier shape
+ * that causes catastrophic regex backtracking (ReDoS).
+ */
+function isSafeGrepPattern(pattern: string): boolean {
+  if (pattern.length > MAX_GREP_PATTERN_LENGTH) {
+    return false;
+  }
+
+  return !NESTED_QUANTIFIER_PATTERN.test(pattern);
 }
 
 /**
@@ -274,6 +318,13 @@ class Ops implements WorkspaceOps {
     pattern: string,
     opts?: { glob?: string; ignoreCase?: boolean },
   ): Promise<GrepResult> {
+    if (!isSafeGrepPattern(pattern)) {
+      throw new WorkspacePolicyError(
+        `Grep pattern is too long or too likely to cause catastrophic regex backtracking: ${pattern}`,
+        { type: "unsafe-pattern", pattern },
+      );
+    }
+
     const { absolutePath: jailRoot } = await resolveInJail(this.policy, ".");
     const flags = opts?.ignoreCase ? "i" : "";
     const regex = new RegExp(pattern, flags);
@@ -306,8 +357,18 @@ class Ops implements WorkspaceOps {
       const lines = content.split("\n");
 
       for (let index = 0; index < lines.length; index++) {
-        if (regex.test(lines[index])) {
-          matches.push({ path: relativePath, line: index + 1, text: lines[index] });
+        const line = lines[index];
+
+        // Cap the input size a single `RegExp#test` call scans: backtracking
+        // cost is exponential in input length, so this bounds the worst-case
+        // time even a pathological (but length/shape-allowed) pattern can
+        // burn on any one line.
+        if (line.length > MAX_GREP_LINE_SCAN_LENGTH) {
+          continue;
+        }
+
+        if (regex.test(line)) {
+          matches.push({ path: relativePath, line: index + 1, text: line });
 
           if (matches.length >= DEFAULT_MAX_GREP_MATCHES) {
             return { matches, total: matches.length };

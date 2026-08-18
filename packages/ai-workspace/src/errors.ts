@@ -7,8 +7,11 @@ import { AIError, type AIErrorOptions } from "@warlock.js/ai";
  *   `allowPaths` root), or matched a `denyPaths` glob.
  * - `"denied-command"` — a shell command's leading executable basename
  *   was not in `shell.allow`, or was explicitly in `shell.deny`.
+ * - `"unsafe-pattern"` — a `grep` pattern was too long or matched a
+ *   catastrophic-backtracking shape (nested quantifiers) that could hang
+ *   the process (ReDoS).
  */
-export type WorkspacePolicyViolation = "path-escape" | "denied-command";
+export type WorkspacePolicyViolation = "path-escape" | "denied-command" | "unsafe-pattern";
 
 /**
  * Options for {@link WorkspacePolicyError} — the structured `type`
@@ -22,6 +25,8 @@ export type WorkspacePolicyErrorOptions = AIErrorOptions & {
   path?: string;
   /** The offending command line (for `"denied-command"`). */
   command?: string;
+  /** The offending regex pattern (for `"unsafe-pattern"`). */
+  pattern?: string;
 };
 
 /**
@@ -48,6 +53,8 @@ export class WorkspacePolicyError extends AIError {
   public readonly path?: string;
   /** The offending command, when the violation was a denied command. */
   public readonly command?: string;
+  /** The offending regex pattern, when the violation was `"unsafe-pattern"`. */
+  public readonly pattern?: string;
 
   public constructor(message: string, options: WorkspacePolicyErrorOptions) {
     super("TOOL_EXEC_FAILED", message, options);
@@ -56,6 +63,7 @@ export class WorkspacePolicyError extends AIError {
     this.type = options.type;
     this.path = options.path;
     this.command = options.command;
+    this.pattern = options.pattern;
   }
 }
 
