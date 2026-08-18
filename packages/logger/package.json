@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@mongez/copper": "^2.1.2",
-    "@mongez/reinforcements": "^3.3.0",
+    "@mongez/reinforcements": "^4.0.1",
     "@warlock.js/fs": "*",
     "dayjs": "^1.11.9",
     "safe-stable-stringify": "^2.5.0"

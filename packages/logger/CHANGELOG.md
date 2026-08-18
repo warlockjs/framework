@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/logger` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.15.0
+
+### Dependencies
+
+- Bumped `@mongez/reinforcements` to `^4.0.1`. The major makes `Random.string/nanoid/id/token/uuid` CSPRNG-backed (WebCrypto) and removes `Random.seed()` support. This package uses `Random.string(32)` only for the non-security `logger-<id>` instance identifier; audited for `Random.seed(` with no hits, so no code changes were needed.
+
 ## 4.12.0
 
 ### Changed
