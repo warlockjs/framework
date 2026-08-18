@@ -59,6 +59,11 @@ export const accessConfig = {
     return current?.cache?.ttl ?? "10m";
   },
 
+  /** Whether an unpoliced instance-level check should throw instead of warn. */
+  strictPolicies(): boolean {
+    return current?.strictPolicies ?? false;
+  },
+
   /** Ambient tenant for this user, delegated to the resolver's optional hook. */
   tenant(user: Auth): string | undefined {
     return this.resolver().resolveTenant?.(user);

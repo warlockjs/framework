@@ -18,11 +18,11 @@ vi.mock("@warlock.js/cache", () => ({
 }));
 
 vi.mock("@warlock.js/logger", () => ({
-  log: { error: vi.fn() },
+  log: { error: vi.fn(), warn: vi.fn() },
 }));
 
 import { log } from "@warlock.js/logger";
-import { check, flush, permissionsFor, rolesFor } from "./engine";
+import { check, flush, permissionsFor, resetUnpolicedWarnings, rolesFor } from "./engine";
 import { clearPolicies, definePolicy } from "./policies";
 import { resetAccessConfig, setAccessConfig } from "./access-config";
 import { AccessConfigError } from "../utils/access-config-error";
@@ -36,6 +36,7 @@ beforeEach(() => {
   store.clear();
   vi.clearAllMocks();
   clearPolicies();
+  resetUnpolicedWarnings();
   resolvePermissions.mockResolvedValue(["orders.*"]);
   resolveRoles.mockResolvedValue(["editor"]);
   setAccessConfig({ resolver: { resolvePermissions, resolveRoles } });
@@ -152,6 +153,56 @@ describe("check — policies", () => {
       { id: 9 },
       expect.objectContaining({ amount: 50, tenant: undefined }),
     );
+  });
+});
+
+describe("check — unpoliced instance check (RBAC-only fallback)", () => {
+  it("still grants (fail-closed semantics unchanged) but warns once when no policy is registered", async () => {
+    expect(await check(user, "orders.update", { resource: { id: 9 } })).toBe(true);
+
+    expect(log.warn).toHaveBeenCalledTimes(1);
+    expect(log.warn).toHaveBeenCalledWith(
+      "access",
+      "unpoliced-check",
+      expect.stringContaining('"orders.update"'),
+    );
+  });
+
+  it("does not warn again for the same permission on a later call", async () => {
+    await check(user, "orders.update", { resource: { id: 9 } });
+    await check(user, "orders.update", { resource: { id: 10 } });
+
+    expect(log.warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not warn for a class-level check (no resource)", async () => {
+    await check(user, "orders.update");
+
+    expect(log.warn).not.toHaveBeenCalled();
+  });
+
+  it("does not warn when a policy IS registered", async () => {
+    definePolicy("orders.update", () => true);
+
+    await check(user, "orders.update", { resource: { id: 9 } });
+
+    expect(log.warn).not.toHaveBeenCalled();
+  });
+
+  it("does not warn when the grant itself is missing (nothing to fall back from)", async () => {
+    resolvePermissions.mockResolvedValue(["posts.*"]);
+
+    expect(await check(user, "orders.update", { resource: { id: 9 } })).toBe(false);
+    expect(log.warn).not.toHaveBeenCalled();
+  });
+
+  it("strict mode throws AccessConfigError instead of warning", async () => {
+    setAccessConfig({ resolver: { resolvePermissions, resolveRoles }, strictPolicies: true });
+
+    await expect(check(user, "orders.update", { resource: { id: 9 } })).rejects.toBeInstanceOf(
+      AccessConfigError,
+    );
+    expect(log.warn).not.toHaveBeenCalled();
   });
 });
 

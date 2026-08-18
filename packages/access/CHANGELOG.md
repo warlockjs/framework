@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/access` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 4.15.0
+
+### Security
+
+- Instance-level checks (a `resource` supplied to `check`/`authorize`) that match an RBAC grant but have no registered ABAC policy now emit a one-time `log.warn` naming the permission, instead of silently falling back to the RBAC grant alone — a typo'd permission name or a forgotten `import "./policies"` side-effect previously degraded a resource-scoped check to a class-level one with no runtime signal, a silent IDOR footgun. Fail-closed/fail-open semantics are unchanged everywhere else; this is visibility only. Added an opt-in `strictPolicies: true` access config flag that throws `AccessConfigError` instead of warning, for apps that want the gap to fail the request/boot rather than just log.
+
 ## 4.12.0
 
 ### Changed

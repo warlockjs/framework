@@ -46,4 +46,17 @@ export type AccessConfigurations = {
     /** TTL for a cached set. @default "10m" */
     ttl?: string | number;
   };
+
+  /**
+   * When `true`, an instance-level check (a `resource` was supplied) for a
+   * permission with no registered ABAC policy throws {@link AccessConfigError}
+   * instead of warning and falling back to the RBAC grant alone. Off by
+   * default so existing apps aren't broken by a missing `definePolicy` call;
+   * turn it on once every ABAC-guarded permission has a policy registered, to
+   * catch the next typo/forgotten-import at the source instead of at review
+   * time.
+   *
+   * @default false
+   */
+  strictPolicies?: boolean;
 };

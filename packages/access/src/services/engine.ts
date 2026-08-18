@@ -10,6 +10,17 @@ import { getPolicy } from "./policies";
 const PERMISSIONS_PREFIX = "access.perms.";
 const ROLES_PREFIX = "access.roles.";
 
+/**
+ * Permissions that have already triggered the "unpoliced instance check"
+ * warning below — kept so a hot path doesn't log once per request.
+ */
+const warnedUnpolicedPermissions = new Set<string>();
+
+/** Reset the once-per-permission warning tracker. Primarily for tests. */
+export function resetUnpolicedWarnings(): void {
+  warnedUnpolicedPermissions.clear();
+}
+
 /** Resolve the effective tenant for a check (explicit → ambient → undefined). */
 function tenantFor(user: Auth, context: AccessContext): string | undefined {
   return context.tenant ?? accessConfig.tenant(user);
@@ -78,6 +89,45 @@ export async function flush(user: Auth, tenant?: string): Promise<void> {
 }
 
 /**
+ * Surface a resource-scoped check that has no registered ABAC policy: it
+ * silently falls back to the RBAC grant alone, which is a plausible IDOR if
+ * the permission was meant to be resource-scoped (typo'd permission name, or
+ * a forgotten `import "./policies"` side-effect — the single most common
+ * mistake app teams make with this package, per the `define-policies` skill).
+ *
+ * In strict mode ({@link AccessConfigurations.strictPolicies}) this throws
+ * {@link AccessConfigError} instead, which `check()`'s catch re-throws loud
+ * rather than folding into the fail-closed deny — a misconfiguration, not a
+ * runtime denial.
+ *
+ * Warns once per permission (not once per call) so a hot request path
+ * doesn't spam logs — mirrors cascade's `warnUndeclaredSensitiveFields`.
+ */
+function warnUnpoliced(permission: string): void {
+  if (accessConfig.strictPolicies()) {
+    throw new AccessConfigError(
+      `@warlock.js/access: instance-level check for permission "${permission}" has no registered ` +
+        `ABAC policy — refusing to fall back to the RBAC grant alone while strictPolicies is enabled. ` +
+        `Register one with definePolicy("${permission}", ...), or make sure the module that calls ` +
+        `definePolicy is actually imported.`,
+    );
+  }
+
+  if (warnedUnpolicedPermissions.has(permission)) return;
+  warnedUnpolicedPermissions.add(permission);
+
+  log.warn(
+    "access",
+    "unpoliced-check",
+    `Instance-level check for permission "${permission}" has no registered ABAC policy — falling ` +
+      `back to the RBAC grant alone, so any holder of "${permission}" can act on ANY resource. If ` +
+      `this permission is meant to be resource-scoped, register a policy with ` +
+      `definePolicy("${permission}", ...) (and confirm the module that calls it is imported). ` +
+      `Set strictPolicies: true in the access config to turn this into a thrown error instead.`,
+  );
+}
+
+/**
  * The core decision: does the user hold `permission`, and — when a `resource`
  * is supplied — does its policy pass too?
  *
@@ -98,6 +148,10 @@ export async function check(
 
     // A policy only runs on an instance check (a resource was supplied);
     // class-level checks (`gate`) stop at the grant.
+    if (context.resource !== undefined && policy === undefined) {
+      warnUnpoliced(permission);
+    }
+
     if (policy === undefined || context.resource === undefined) return true;
 
     const roles = await rolesFor(user, tenant);
