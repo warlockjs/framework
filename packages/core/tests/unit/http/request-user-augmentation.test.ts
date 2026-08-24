@@ -56,12 +56,17 @@ describe("Request — user (module augmentation)", () => {
     expect(request.user).toBeUndefined();
   });
 
-  it("clearCurrentUser() resets user to undefined", () => {
-    const request = new Request();
-    request.user = { id: "u_1", email: "sam@example.com" } as unknown as RequestUser;
+  /*
+    REMOVED 2026-08-24 — there was a third case here asserting
+    `request.clearCurrentUser()` resets `user` to undefined.
 
-    request.clearCurrentUser();
+    @Hasan removed `clearCurrentUser` deliberately: the `Request` class carries
+    no BEHAVIOUR about `user`. `user` is a property an app's auth middleware
+    writes and the app's own augmentation types; clearing it is the caller's
+    business, not a method the framework owes them. The test outlived the API,
+    which is the ordinary way a red-first test goes stale — it was asserting a
+    shape we chose not to build.
 
-    expect(request.user).toBeUndefined();
-  });
+    Deleted rather than skipped: a skipped test is a claim nobody checks.
+  */
 });
