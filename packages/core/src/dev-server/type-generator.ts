@@ -1,12 +1,11 @@
-import { env } from "@mongez/dotenv";
 import { ensureDirectoryAsync } from "@warlock.js/fs";
-import { spawn } from "child_process";
 import { constants } from "fs";
 import { access, readFile, writeFile } from "fs/promises";
 import { join, resolve } from "path";
 import ts from "typescript";
 import { warlockPath } from "../utils";
 import { devLogError, devLogInfo, devLogSuccess, devServeLog } from "./dev-logger";
+import { runTypingsGeneration, type TypingsGenerationPorts } from "./run-typings-generation";
 import { filesOrchestrator } from "./files-orchestrator";
 import { Path } from "../utils/normalized-path";
 
@@ -664,64 +663,49 @@ ${keyEntries}
   }
 
   /**
-   * Execute generateAll command using spawn
+   * The ports `runTypingsGeneration` needs, bound to this instance and this
+   * package's dev logger.
    */
-  public async executeGenerateAllCommand(): Promise<void> {
-    devLogInfo("Checking for types generation");
-    const isDevServeCore = env("DEV_SERVER_CORE");
-    const childProcess = spawn(
-      isDevServeCore ? "yarn" : "npx",
-      [isDevServeCore ? "cli" : "warlock", "generate.typings"],
-      {
-        // const childProcess = spawn("yarn", ["cli", "generate.typings"], {
-        stdio: "inherit",
-        cwd: process.cwd(),
-        shell: true, // Required on Windows to find yarn in PATH
-      },
-    );
-
-    childProcess.on("exit", (code) => {
-      if (code === 0) {
-        devLogSuccess("Types generated successfully");
-      } else {
-        devLogError("Failed to generate types");
-      }
-    });
+  private get typingsGenerationPorts(): TypingsGenerationPorts {
+    return {
+      generate: () => this.generateAll(),
+      info: (message) => devLogInfo(message),
+      success: (message) => devLogSuccess(message),
+      error: (message) => devLogError(message),
+    };
   }
 
   /**
-   * Execute a typings generator for the given files
+   * Generate every config's typings.
+   *
+   * Runs IN THIS PROCESS. It used to spawn `npx warlock generate.typings`,
+   * which could not resolve in a source checkout — see
+   * `run-typings-generation.ts` for the whole story.
+   */
+  public async executeGenerateAllCommand(): Promise<void> {
+    await runTypingsGeneration(this.typingsGenerationPorts);
+  }
+
+  /**
+   * Regenerate typings after a batch reload — but only when the batch actually
+   * touched a config file, since nothing else contributes to them.
    */
   public async executeTypingsGenerator(upcomingFiles: string[]): Promise<void> {
-    const uniqueFiles = Array.from(new Set(upcomingFiles));
-
-    const configFilesOnly = uniqueFiles.filter((file) =>
+    const touchedAConfig = Array.from(new Set(upcomingFiles)).some((file) =>
       Path.normalize(file).includes("src/config/"),
     );
 
-    if (configFilesOnly.length === 0) return;
+    if (!touchedAConfig) return;
 
-    const files = configFilesOnly.map((file) => "./" + Path.toRelative(file));
-
-    const isDevServeCore = env("DEV_SERVER_CORE");
-
-    const childProcess = spawn(
-      isDevServeCore ? "yarn" : "npx",
-      [isDevServeCore ? "cli" : "warlock", "generate.typings"],
-      {
-        stdio: "inherit",
-        cwd: process.cwd(),
-        shell: true, // Required on Windows to find yarn in PATH
-      },
-    );
-
-    childProcess.on("exit", (code) => {
-      if (code === 0) {
-        devLogSuccess("Types generated successfully");
-      } else {
-        devLogError("Failed to generate types");
-      }
-    });
+    /*
+      The changed paths are deliberately NOT passed along. The previous version
+      built a `files` array here and then threw it away, spawning the same
+      whole-project command as the branch above — so "incremental" was a name,
+      not a behaviour. `generateAll()` reads the orchestrator, which the batch
+      reload has already updated, so the full pass is both correct and the only
+      pass that ever actually ran.
+    */
+    await runTypingsGeneration(this.typingsGenerationPorts);
   }
 }
 
