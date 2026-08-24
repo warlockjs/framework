@@ -5,6 +5,7 @@ import { join, resolve } from "path";
 import ts from "typescript";
 import { warlockPath } from "../utils";
 import { devLogError, devLogInfo, devLogSuccess, devServeLog } from "./dev-logger";
+import { readConfigAst } from "./read-config-ast";
 import { runTypingsGeneration, type TypingsGenerationPorts } from "./run-typings-generation";
 import { filesOrchestrator } from "./files-orchestrator";
 import { Path } from "../utils/normalized-path";
@@ -290,7 +291,7 @@ ${interfaceContent}
         // Extract config name
         const configName = path.replace("src/config/", "").replace(/\.[^.]+$/, "");
 
-        // Use optimized combined extraction (single ts.createProgram call)
+        // One parse per config, both extractions off it — see `read-config-ast.ts`.
         const info = await this.extractConfigInfo(fileManager.absolutePath, configName);
 
         this.configCache.set(configName, {
@@ -444,9 +445,10 @@ ${keyEntries}
   /**
    * Extract BOTH type info AND keys in a single pass
    *
-   * This is optimized to create ts.createProgram() only ONCE per file
-   * instead of twice (once for type extraction, once for keys).
-   * This reduces parsing time by ~50%.
+   * One parse serves both extractions. It used to be one whole TypeScript
+   * Program per file — halved from two by an earlier pass, which optimised
+   * inside a premise that did not need to hold. `read-config-ast.ts` has the
+   * numbers.
    *
    * @param configPath Absolute path to the config file
    * @param configName Config name (e.g., "auth", "notifications")
@@ -464,14 +466,9 @@ ${keyEntries}
       return { typeName: null, importSource: null, keys: [] };
     }
 
-    // Create program ONCE (this is the expensive operation)
-    const program = ts.createProgram([configPath], {
-      target: ts.ScriptTarget.ESNext,
-      module: ts.ModuleKind.ESNext,
-      moduleResolution: ts.ModuleResolutionKind.NodeJs,
-    });
+    // Parse, do not resolve — `read-config-ast.ts` explains why, with numbers.
+    const sourceFile = await readConfigAst(configPath);
 
-    const sourceFile = program.getSourceFile(configPath);
     if (!sourceFile) {
       return { typeName: null, importSource: null, keys: [] };
     }
@@ -574,13 +571,7 @@ ${keyEntries}
       return [];
     }
 
-    const program = ts.createProgram([absolutePath], {
-      target: ts.ScriptTarget.ESNext,
-      module: ts.ModuleKind.ESNext,
-      moduleResolution: ts.ModuleResolutionKind.NodeJs,
-    });
-
-    const sourceFile = program.getSourceFile(absolutePath);
+    const sourceFile = await readConfigAst(absolutePath);
 
     if (!sourceFile) {
       devServeLog(`âš ï¸ Could not parse storage config: ${absolutePath}`);
