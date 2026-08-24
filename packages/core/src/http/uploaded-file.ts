@@ -25,6 +25,24 @@ type UploadedFileMetadata = {
 };
 
 /**
+ * What an `UploadedFile` looks like on the wire.
+ *
+ * Every member is knowable **without reading the file**, which is what lets
+ * {@link UploadedFile.toJSON} be synchronous — see the note there. `size` is
+ * the one exception and it is optional for exactly that reason: present when
+ * the file has already been buffered, absent otherwise, never guessed.
+ */
+export type UploadedFileJson = {
+  name: string;
+  mimeType: string;
+  extension: string;
+  isImage: boolean;
+  isVideo: boolean;
+  isAudio: boolean;
+  size?: number;
+};
+
+/**
  * Options for validating file before saving
  */
 export type FileValidationOptions = {
@@ -844,21 +862,50 @@ export class UploadedFile {
   // ============================================================
 
   /**
-   * Convert to JSON representation
+   * Convert to JSON representation.
    *
-   * Includes file metadata and base64 content for serialization.
+   * **Synchronous, and that is the whole point.** `toJSON` is not an ordinary
+   * method name — it is the hook `JSON.stringify` calls, and `JSON.stringify`
+   * does not await. While this was `async`, every implicit serialization of an
+   * upload produced `{}`: no base64, no size, not even the filename.
+   *
+   * Two call sites in core awaited it and worked (`http/response.ts:304`,
+   * `utils/to-json.ts:9`). The ones that could not were the ones that mattered:
+   * `cascade`'s model serializer calls `toJSON()` without awaiting, and
+   * `Resource.toJSON()` is itself synchronous. Those paths were silently
+   * broken. See canon `cd60b894`.
+   *
+   * **What is NOT here, and why.** `base64` forced the async — `buffer()` is
+   * async — and it also put the entire file, inflated by a third, into any
+   * response that happened to carry an upload. It is opt-in now via
+   * {@link UploadedFile.toBase64}. `dimensions` costs an image decode; ask for
+   * it with {@link UploadedFile.dimensions} when you want it.
+   *
+   * `size` is reported **only when the file has already been read**. Reading it
+   * here would make the method async again, and guessing would be worse than
+   * omitting: a wrong number is believed, an absent one is asked about. In
+   * practice validation or `save()` has usually buffered the file long before
+   * anything serializes it.
    */
-  public async toJSON() {
+  public toJSON(): UploadedFileJson {
     return {
       name: this.name,
       mimeType: this.mimeType,
       extension: this.extension,
-      size: await this.size(),
       isImage: this.isImage,
       isVideo: this.isVideo,
       isAudio: this.isAudio,
-      dimensions: this.isImage ? await this.dimensions() : undefined,
-      base64: (await this.buffer()).toString("base64"),
+      size: this.bufferedFileContent?.length,
     };
+  }
+
+  /**
+   * The file's contents as base64.
+   *
+   * Explicit because it is expensive: it reads the whole file into memory and
+   * grows it by a third. This used to happen on every serialization.
+   */
+  public async toBase64(): Promise<string> {
+    return (await this.buffer()).toString("base64");
   }
 }
