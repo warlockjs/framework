@@ -33,6 +33,8 @@ import {
   notificationRoutesStub,
   notificationsConfigStub,
   socketConfigStub,
+  webHomePageStub,
+  webRootStub,
 } from "./stubs";
 
 /**
@@ -382,6 +384,90 @@ async function scaffoldAccessFiles() {
   console.log(`${colors.green("✓")} Created src/app/access/services/access-resolver.ts`);
 }
 
+/**
+ * Register the WebConnector in `warlock.config.ts`, and ONLY there.
+ *
+ * It belongs to the config array or to app code, never both. Both halves are
+ * registered before app code loads — the CLI preloader in dev, the generated
+ * entry in production — so also calling `connectorsManager.register(...)` in
+ * `src/app/main.ts` boots the connector twice and installs every page route
+ * twice. That surfaces at PRODUCTION boot as `Route name "..." is already
+ * taken`, because pages and API routes share one route-name namespace.
+ *
+ * The config array is the half to prefer: `warlock build` reads the same array
+ * to drain each connector's build contribution, so "built for" and "boots with"
+ * cannot drift.
+ *
+ * String surgery rather than a TypeScript parse: `warlock.config.ts` is an
+ * app-owned file that may carry any formatting, and a parse-and-print would
+ * reformat the parts we did not come to change.
+ */
+async function registerWebConnector(): Promise<void> {
+  const configPath = rootPath("warlock.config.ts");
+
+  if (!(await fileExistsAsync(configPath))) {
+    console.log(
+      `${colors.yellowBright("warlock.config.ts")} not found — add this yourself:\n` +
+        `  import { webConnector } from "@warlock.js/web/connector";\n` +
+        `  export default defineConfig({ connectors: [webConnector()] });`,
+    );
+
+    return;
+  }
+
+  const current = await getFileAsync(configPath);
+
+  if (current.includes("webConnector")) {
+    console.log(`${colors.yellowBright("webConnector")} already registered, skipping...`);
+
+    return;
+  }
+
+  const importLine = 'import { webConnector } from "@warlock.js/web/connector";';
+  let next = current.includes(importLine) ? current : `${importLine}\n${current}`;
+
+  // An existing `connectors: [` gains one entry; otherwise the key is added to
+  // the object `defineConfig` receives.
+  if (/connectors:\s*\[/.test(next)) {
+    next = next.replace(/connectors:\s*\[/, "connectors: [webConnector(),");
+  } else if (next.includes("defineConfig({")) {
+    next = next.replace("defineConfig({", "defineConfig({\n  connectors: [webConnector()],");
+  } else {
+    console.log(
+      `${colors.yellowBright("warlock.config.ts")} has no recognisable defineConfig({...}) — ` +
+        "add `connectors: [webConnector()]` yourself.",
+    );
+
+    return;
+  }
+
+  await putFileAsync(configPath, next);
+  console.log(`${colors.green("✓")} Registered webConnector in warlock.config.ts`);
+}
+
+/**
+ * Scaffold the smallest page layer that renders, and register the connector.
+ *
+ * `src/web/root.tsx` is the sentinel for "already scaffolded" — the framework
+ * ships a default root, so its presence means a human has been here.
+ */
+async function completeWebInstallation(_options: CommandActionData) {
+  const rootFile = srcPath("web/root.tsx");
+
+  if (await fileExistsAsync(rootFile)) {
+    console.log(`${colors.yellowBright("src/web")} already scaffolded, skipping...`);
+  } else {
+    await ensureDirectoryAsync(srcPath("web"));
+    await putFileAsync(rootFile, webRootStub);
+    console.log(`${colors.green("✓")} Created src/web/root.tsx`);
+
+    await putFileAsync(srcPath("web/home.page.tsx"), webHomePageStub);
+    console.log(`${colors.green("✓")} Created src/web/home.page.tsx`);
+  }
+
+  await registerWebConnector();
+}
+
 async function completeAccessInstallation(_options: CommandActionData) {
   await registerAccessLocale();
   await scaffoldAccessFiles();
@@ -549,6 +635,24 @@ export const featuresMap: Record<
       vitest: "^4.1.8",
       "@vitest/coverage-v8": "^4.1.8",
     },
+  },
+  web: {
+    description:
+      "Installs @warlock.js/web — SSR React pages served by the Warlock HTTP server. Scaffolds src/web (root.tsx + a home page) and registers the WebConnector in warlock.config.ts. Pages are opt-in: a Warlock app is an API until you add this.",
+    dependencies: {
+      "@warlock.js/web": "~4.0.0",
+      react: "^19.2.3",
+      "react-dom": "^19.2.3",
+    },
+    devDependencies: {
+      "@types/react": "^19.2.7",
+      "@types/react-dom": "^19.2.3",
+      // Loaded through `await import()` by the dev server only, so both are
+      // optional peers of `web` rather than hard dependencies.
+      vite: "^7.3.5",
+      "@vitejs/plugin-react": "^5.2.0",
+    },
+    onExecuting: completeWebInstallation,
   },
   herald: {
     description: "Installs herald for message broker (Herald Package)",

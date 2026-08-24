@@ -588,3 +588,85 @@ router.group({ prefix: "/notifications", middleware: [authMiddleware([])] }, () 
   router.delete("/:id", deleteNotificationController);
 });
 `;
+
+/**
+ * `src/web/root.tsx` — the application root for the SSR page layer.
+ *
+ * Deliberately minimal. The framework ships a default root, so this exists to
+ * give you a place to start rather than because anything requires it. The
+ * reference app (`v5/app/src/web/root.tsx`) is where to look for the fuller
+ * shape: middleware, an app-level loader, locales, an ErrorBoundary.
+ */
+export const webRootStub = `import { Head, Scripts } from "@warlock.js/web";
+import type { AppProps } from "@warlock.js/web";
+
+/**
+ * The application root.
+ *
+ * NOT async, and it receives no request/response: it renders on the server and
+ * again in the browser during hydration, where neither exists.
+ */
+export default function App({ children }: AppProps) {
+  return (
+    <html lang="en">
+      <head>
+        {/*
+          Placement only. The framework injects the page's \`metadata\`, the
+          stylesheet and preload tags for this route, and the canonical links
+          into <head> by default — <Head /> just says WHERE they land.
+
+          Do not add a <title> here: the page's \`metadata\` owns it, and a root
+          that emits one too produces two.
+        */}
+        <Head />
+      </head>
+      <body>
+        {children}
+        {/*
+          The hydration payload and module tags. Written explicitly because
+          placement occasionally matters — a CSP nonce, or ordering against
+          your own scripts.
+        */}
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+`;
+
+/**
+ * `src/web/home.page.tsx` — one page, so \`warlock dev\` has something to serve
+ * the moment this finishes.
+ */
+export const webHomePageStub = `import type { PageProps } from "@warlock.js/web";
+
+/**
+ * A page route is an ordinary Warlock route whose handler renders React
+ * instead of returning JSON.
+ *
+ * The URL is DECLARED here rather than derived from the filename. Omit
+ * \`route\` and it is derived from this file's location instead — never both.
+ */
+export const route = "/";
+
+export const metadata = { title: "Home" };
+
+/**
+ * Add a \`loader\` export to fetch data on the server, and it arrives here as
+ * \`data\`, typed:
+ *
+ *   export const loader = (async () => ({ items: await itemsRepository.all() }));
+ *   export default function HomePage({ data }: PageProps<typeof loader>) { ... }
+ */
+export default function HomePage(_props: PageProps) {
+  return (
+    <>
+      <h1>It renders.</h1>
+      <p>
+        This page is <code>src/web/home.page.tsx</code>. Edit it and the browser
+        updates without losing state.
+      </p>
+    </>
+  );
+}
+`;
