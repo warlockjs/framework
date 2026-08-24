@@ -9,6 +9,7 @@ import { container } from "../container";
 import { Request } from "../http/request";
 import { Response } from "../http/response";
 import { type FastifyInstance } from "../http/server";
+import { logRequestLifecycle } from "./log-request-lifecycle";
 import { RouteBuilder } from "./route-builder";
 import { RouteRegistry } from "./route-registry";
 import type {
@@ -958,17 +959,29 @@ export class Router {
 
       request.setRequest(fastifyRequest).setRoute(route);
 
-      log.info({
-        module: "route",
-        action: route.method + " " + route.path.replace("/*", ""),
-        message: `Starting Request: ${request.id}`,
-        context: {
-          request,
-          response,
+      /*
+        Both ends of the entry, not just the start — see
+        `log-request-lifecycle.ts`. A start line on its own made a hung request
+        and an instant one look identical, and the completion line is what makes
+        a MISSING one legible as a hang.
+      */
+      const result = await logRequestLifecycle(
+        {
+          info: entry => log.info(entry),
+          warn: entry => log.warn(entry),
+          error: entry => log.error(entry),
+          now: () => performance.now(),
         },
-      });
-
-      const result = await request.execute();
+        {
+          module: "route",
+          action: route.method + " " + route.path.replace("/*", ""),
+          requestId: request.id,
+          context: { request, response },
+          // Read after the run: the status is decided during the request.
+          statusCode: () => fastifyResponse.statusCode,
+        },
+        () => request.execute(),
+      );
 
       return {
         output: result,
