@@ -300,7 +300,14 @@ describe("HTTP error mapping — thrown HttpError subclasses", () => {
     expect(harness.json(result)).toMatchObject({ error: "i am a teapot" });
   });
 
-  it("falls back to 400 for a non-HttpError thrown from the handler", async () => {
+  it("falls back to 500 for a non-HttpError thrown from the handler", async () => {
+    // An unhandled non-HttpError is a SERVER fault, not a client one. Answering
+    // 4xx would blame the caller for a break that is ours, and 4xx is typically
+    // not alerted on while 5xx is — so a 400 default hides real faults from
+    // monitoring. Unrelated to validation failures, which stay in the 4xx family.
+    //
+    // The body is deliberately opaque: an unrecognised error's own message may
+    // carry internals, so it goes to the server log, not to the client.
     harness = await bootHarness((router) => {
       router.get("/throw-plain", () => {
         throw new Error("unexpected");
@@ -309,8 +316,8 @@ describe("HTTP error mapping — thrown HttpError subclasses", () => {
 
     const result = await harness.inject({ method: "GET", url: "/throw-plain" });
 
-    expect(result.statusCode).toBe(400);
-    expect(harness.json(result)).toMatchObject({ error: "unexpected" });
+    expect(result.statusCode).toBe(500);
+    expect(harness.json(result)).toMatchObject({ error: "Internal server error." });
   });
 
   it("omits the stack in non-development environments", async () => {

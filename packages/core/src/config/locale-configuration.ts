@@ -1,6 +1,13 @@
 export type LocaleConfiguration = {
   defaultLocaleCode: string;
-  localeCodes: string[];
+  /**
+   * The declared allow-list, or `undefined` when the application declares none.
+   *
+   * The absence of a list is NOT an implicit list of one. With nothing to
+   * validate against, a client locale has nothing it can fail — coercing it to
+   * the default would discard what the client actually asked for.
+   */
+  localeCodes: string[] | undefined;
 };
 
 type AppLocaleConfiguration = {
@@ -17,7 +24,11 @@ function isNonEmptyStringArray(value: unknown): value is string[] {
 }
 
 /**
- * Resolve the fail-closed locale configuration used by every request.
+ * Resolve the locale configuration used by every request.
+ *
+ * It fails closed only where there is a declared allow-list to fail against;
+ * an application that declares none opts out of validation, not into a
+ * single-locale list.
  */
 export function resolveLocaleConfiguration(
   localeCode: unknown,
@@ -28,7 +39,7 @@ export function resolveLocaleConfiguration(
 
   return {
     defaultLocaleCode,
-    localeCodes: isNonEmptyStringArray(localeCodes) ? localeCodes : [defaultLocaleCode],
+    localeCodes: isNonEmptyStringArray(localeCodes) ? localeCodes : undefined,
   };
 }
 

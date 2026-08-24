@@ -66,6 +66,21 @@ function exitAfterFlush(code: number) {
   process.stderr.write("", drained);
 }
 
+/**
+ * How a command run ended, from the process's point of view.
+ *
+ * - `succeeded` — finished, nothing rejected afterwards; the CLI may exit 0.
+ * - `failed` — reported an error; the exit code is owned by whoever reported it.
+ * - `running` — a persistent command (dev/start) now owns the process.
+ *
+ * `execute` returns this instead of exiting on success itself. A method that
+ * terminates the process out from under its caller cannot be awaited honestly:
+ * the exit it schedules outlives the call, so the success it represents is
+ * still unsettled when `execute` resolves — which is exactly how a green check
+ * ends up printed next to the failure that contradicts it.
+ */
+export type CommandRunVerdict = "succeeded" | "failed" | "running";
+
 export class CLICommandsManager {
   /**
    * List of commands
@@ -243,10 +258,20 @@ export class CLICommandsManager {
     // declared options so a `type: "boolean"` option arrives as a boolean.
     const resolved = this.resolveCommandArgs(command);
 
-    await this.execute(command, {
+    const verdict = await this.execute(command, {
       options: resolved.options,
       args: resolved.args,
     });
+
+    // The process-level exit belongs to the entrypoint, not to `execute`.
+    // A one-shot command can leave a handle open (a db connection, a watcher a
+    // plugin forgot to close), so the CLI exits explicitly rather than waiting
+    // for the loop to drain — but only on a verdict of `succeeded`. `failed`
+    // already exited non-zero through whoever reported it, and `running` means
+    // a persistent command owns the process now.
+    if (verdict === "succeeded") {
+      exitAfterFlush(0);
+    }
   }
 
   /**
@@ -477,9 +502,12 @@ export class CLICommandsManager {
   }
 
   /**
-   * Execute the given command
+   * Execute the given command and report how it ended.
+   *
+   * Returning the verdict — rather than exiting on success from in here — is
+   * what makes the awaited result trustworthy: see {@link CommandRunVerdict}.
    */
-  public async execute(command: CLICommand, data: CommandActionData) {
+  public async execute(command: CLICommand, data: CommandActionData): Promise<CommandRunVerdict> {
     const startTime = Date.now();
 
     // Validate required options
@@ -522,31 +550,39 @@ export class CLICommandsManager {
     try {
       await command.execute(data);
 
-      if (!command.isPersistent) {
-        // Yield one full event-loop turn before declaring success. Node flags
-        // an unhandled rejection only after the current turn's microtasks
-        // drain, so reporting + exiting synchronously here fired FIRST and
-        // erased the failure — a `build` whose async work rejected exited 0
-        // having emitted nothing. The banner moves with the exit so a command
-        // that is about to fail never prints a green check on its way out.
-        //
-        // `setImmediate` runs in the same loop iteration's check phase, so this
-        // cannot hang on a lingering handle the way dropping the exit would; it
-        // only lets `captureFatalAsyncErrors` win the race when there is one.
-        setImmediate(() => {
-          // Deferring is not enough on its own: `exitAfterFlush` waits for the
-          // streams to drain rather than exiting synchronously, so a fatal
-          // async error that already fired leaves this callback still queued.
-          // Without the guard it would print a green check *after* the error
-          // and reset `process.exitCode` to 0 — re-erasing the very failure
-          // this whole path exists to surface.
-          if (this.fatalAsyncErrorReported) return;
+      // Persistent commands (dev/start) hand control to their run loop here.
+      // There is no success banner to print and nothing to exit for.
+      if (command.isPersistent) return "running";
 
-          displayCommandSuccess(command.name, Date.now() - startTime);
+      // Yield one full event-loop turn before declaring success, and AWAIT that
+      // yield. Node flags an unhandled rejection only after the current turn's
+      // microtasks drain, so reporting success synchronously here fired FIRST
+      // and erased the failure — a `build` whose async work rejected exited 0
+      // having emitted nothing.
+      //
+      // The await is the load-bearing part, not the yield. Scheduling this as a
+      // bare `setImmediate` let `execute()` RESOLVE while the verdict was still
+      // pending: the callback outlived the call it belonged to, so the green
+      // check could surface after the caller had already moved on — in a later
+      // command, or after a rejection reported in the interim, which the guard
+      // below cannot see because by then it reads the state of a run that has
+      // already ended. Awaiting binds the banner to THIS invocation: `execute`
+      // does not resolve until the verdict it is about to report has settled.
+      //
+      // `setImmediate` runs in the same loop iteration's check phase, so this
+      // cannot hang on a lingering handle the way dropping the exit would; it
+      // only lets `captureFatalAsyncErrors` win the race when there is one.
+      await new Promise<void>((resolve) => setImmediate(resolve));
 
-          exitAfterFlush(0);
-        });
-      }
+      // The yield is what gives a floating rejection the chance to be reported;
+      // this is what acts on it. A green check printed after that error would
+      // contradict it, and the exit that follows would reset `process.exitCode`
+      // to 0 — re-erasing the very failure this whole path exists to surface.
+      if (this.fatalAsyncErrorReported) return "failed";
+
+      displayCommandSuccess(command.name, Date.now() - startTime);
+
+      return "succeeded";
     } catch (error) {
       displayCommandError(command.name, error as Error);
       // Persistent commands (dev/start) own their startup-failure exits;
@@ -557,6 +593,8 @@ export class CLICommandsManager {
       if (!command.isPersistent) {
         process.exit(1);
       }
+
+      return "failed";
     }
   }
 

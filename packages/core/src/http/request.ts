@@ -281,20 +281,24 @@ export class Request<RequestValidation = any> {
 
   /**
    * Cache one supported locale without coercing request-controlled input.
+   *
+   * The default is the answer for a client that asked for NOTHING. A client
+   * that did ask is only overridden when its value fails a declared
+   * `app.localeCodes` allow-list; with no list declared there is nothing to
+   * fail, so the requested locale passes through unchanged.
    */
   protected cacheLocale(candidate: unknown): string {
-    const localeConfiguration = resolveLocaleConfiguration(
+    const { defaultLocaleCode, localeCodes } = resolveLocaleConfiguration(
       config.key("app.localeCode"),
       config.key("app.localeCodes"),
     );
-    const acceptedLocale =
-      typeof candidate === "string" &&
-      candidate.length > 0 &&
-      localeConfiguration.localeCodes.includes(candidate)
-        ? candidate
-        : localeConfiguration.defaultLocaleCode;
 
-    this._locale = acceptedLocale;
+    const requested = typeof candidate === "string" && candidate.length > 0 ? candidate : undefined;
+
+    this._locale =
+      requested !== undefined && (localeCodes === undefined || localeCodes.includes(requested))
+        ? requested
+        : defaultLocaleCode;
 
     return this._locale;
   }
