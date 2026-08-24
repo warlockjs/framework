@@ -9,6 +9,7 @@ import { container } from "../container";
 import { Request } from "../http/request";
 import { Response } from "../http/response";
 import { type FastifyInstance } from "../http/server";
+import { describeRouteForLog } from "./describe-route-for-log";
 import { logRequestLifecycle } from "./log-request-lifecycle";
 import { RouteBuilder } from "./route-builder";
 import { RouteRegistry } from "./route-registry";
@@ -974,7 +975,7 @@ export class Router {
         },
         {
           module: "route",
-          action: route.method + " " + route.path.replace("/*", ""),
+          action: describeRouteForLog(route.method, route.path),
           requestId: request.id,
           context: { request, response },
           // Read after the run: the status is decided during the request.
