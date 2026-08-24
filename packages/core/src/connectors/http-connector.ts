@@ -10,6 +10,7 @@ import { Environment } from "../utils";
 import { setBaseUrl } from "../utils/urls";
 import { container } from "./../container";
 import { BaseConnector } from "./base-connector";
+import { describeServerAddress } from "./describe-server-address";
 import { ConnectorLifecyclePhase, ConnectorPriority } from "./types";
 
 function environmentColor(environment: Environment) {
@@ -143,17 +144,28 @@ export class HttpConnector extends BaseConnector {
     log.info("http", "routes", `${router.routeCount()} route(s) registered`);
 
     try {
-      // We can use the url of the server
-      await this.http.listen({
+      // `listen()` RESOLVES with the address it actually bound — which is the
+      // only address worth announcing. See `describe-server-address.ts` for why
+      // announcing `app.baseUrl` here instead was a defect rather than a
+      // shortcut.
+      const boundAddress = await this.http.listen({
         port: httpConfig.port,
         host: httpConfig.host || "localhost",
       });
 
       Application.setServedPort(httpConfig.port);
 
-      const baseUrl = config.get("app.baseUrl");
+      const address = describeServerAddress(boundAddress, config.get("app.baseUrl"));
 
-      log.success(`http`, "connection", `Server ready at ${baseUrl}`);
+      log.success(`http`, "connection", address.ready);
+
+      if (address.publicUrl) {
+        log.info(`http`, "connection", address.publicUrl);
+      }
+
+      if (address.warning) {
+        log.warn(`http`, "connection", address.warning);
+      }
     } catch (error) {
       // A failed listen()/port-bind at boot means the app can't serve — fatal.
       // `log.fatal` reaches Sentry/file; `await log.flush()` drains buffered and
