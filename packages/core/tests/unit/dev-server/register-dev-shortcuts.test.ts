@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DevServerShortcut } from "../../../src/dev-server/shortcuts";
 
 const isSupported = vi.fn(() => true);
-const register = vi.fn(() => true);
+const register = vi.fn((_shortcut: DevServerShortcut) => true);
 const list = vi.fn((): DevServerShortcut[] => []);
 const resume = vi.fn();
 const restartDevServer = vi.fn(async () => true);
@@ -11,7 +11,7 @@ const shutdown = vi.fn(async () => undefined);
 vi.mock("../../../src/dev-server/shortcuts", () => ({
   devServerShortcuts: {
     isSupported: () => isSupported(),
-    register: (shortcut: DevServerShortcut) => register(shortcut as never),
+    register: (shortcut: DevServerShortcut) => register(shortcut),
     list: () => list(),
     resume: () => resume(),
   },
@@ -32,9 +32,7 @@ const printed = () => output.join("\n");
 
 /** The shortcut registered under `key`, or undefined. */
 function armed(key: string): DevServerShortcut | undefined {
-  return register.mock.calls
-    .map(([shortcut]) => shortcut as unknown as DevServerShortcut)
-    .find(shortcut => shortcut.key === key);
+  return register.mock.calls.map(([shortcut]) => shortcut).find(shortcut => shortcut.key === key);
 }
 
 describe("registerDevShortcuts", () => {
@@ -54,7 +52,7 @@ describe("registerDevShortcuts", () => {
   it("arms the standing shortcuts and prints the hint", () => {
     registerDevShortcuts(devServer);
 
-    expect(register.mock.calls.map(([shortcut]) => (shortcut as DevServerShortcut).key)).toEqual([
+    expect(register.mock.calls.map(([shortcut]) => shortcut.key)).toEqual([
       "r",
       "c",
       "q",

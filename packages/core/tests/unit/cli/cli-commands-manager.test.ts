@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CLICommand } from "../../../src/commands/cli-command";
 import { CLICommandsManager } from "../../../src/cli/cli-commands.manager";
 import { displayBootError, isMatchingCommandName } from "../../../src/cli/cli-commands.utils";
@@ -180,6 +180,102 @@ describe("CLICommandsManager — fatal boot errors", () => {
 
     logSpy.mockRestore();
     exitSpy.mockRestore();
+  });
+});
+
+describe("CLICommandsManager — async failures that escape the command's own promise", () => {
+  let exits: (number | undefined)[];
+  let logs: string[];
+  let parkedListeners: {
+    unhandledRejection: NodeJS.UnhandledRejectionListener[];
+    uncaughtException: NodeJS.UncaughtExceptionListener[];
+  };
+
+  beforeEach(() => {
+    exits = [];
+    logs = [];
+
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      // Record instead of terminating the runner. Deliberately NOT a throw:
+      // the exits under test happen inside event-loop callbacks, where a throw
+      // would escape as an uncaught exception rather than reach an assertion.
+      exits.push(code);
+    }) as never);
+
+    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.join(" "));
+    });
+
+    // These tests reject on purpose. Vitest's own process-level listeners would
+    // report that as a run-level failure, so they are parked for the duration
+    // of each test and restored afterwards — the manager registers its own
+    // listener during `execute`, so the rejection is never listener-less.
+    parkedListeners = {
+      unhandledRejection: process.listeners("unhandledRejection"),
+      uncaughtException: process.listeners("uncaughtException"),
+    };
+
+    process.removeAllListeners("unhandledRejection");
+    process.removeAllListeners("uncaughtException");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+
+    process.removeAllListeners("unhandledRejection");
+    process.removeAllListeners("uncaughtException");
+
+    parkedListeners.unhandledRejection.forEach((listener) => {
+      process.on("unhandledRejection", listener);
+    });
+
+    parkedListeners.uncaughtException.forEach((listener) => {
+      process.on("uncaughtException", listener);
+    });
+  });
+
+  it("does not exit while a rejection the command left floating is still unreported", async () => {
+    const manager = new CLICommandsManager();
+    const command = new CLICommand("build").action(async () => undefined);
+
+    await manager.execute(command, { args: [], options: {} });
+
+    // Node flags an unhandled rejection only after the current turn's
+    // microtasks drain. Exiting synchronously here happens first and erases it,
+    // so a successful exit must be deferred past that boundary.
+    expect(exits).toEqual([]);
+  });
+
+  it("exits non-zero and prints when work the command started rejects after it resolved", async () => {
+    const manager = new CLICommandsManager();
+    const command = new CLICommand("build").action(async () => {
+      // Work the command starts but never awaits — exactly what a synchronous
+      // `trigger()` does with an async listener that throws.
+      void Promise.reject(new Error("emit failed: disk full"));
+    });
+
+    await manager.execute(command, { args: [], options: {} });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(exits[0]).toBe(1);
+    expect(logs.join("\n")).toContain("emit failed: disk full");
+    // The green check must never precede the failure it is about to contradict.
+    expect(logs.join("\n")).not.toContain("completed successfully");
+  });
+
+  it("keeps a persistent command running on a floating rejection, but still prints it", async () => {
+    const manager = new CLICommandsManager();
+    const command = new CLICommand("dev").persistent().action(async () => {
+      void Promise.reject(new Error("hmr worker died"));
+    });
+
+    await manager.execute(command, { args: [], options: {} });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    // dev/start own a run loop that is expected to survive runtime errors, the
+    // same exemption the catch block in `execute` makes.
+    expect(exits).toEqual([]);
+    expect(logs.join("\n")).toContain("hmr worker died");
   });
 });
 

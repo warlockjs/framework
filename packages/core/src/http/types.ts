@@ -11,6 +11,43 @@ export type RequestEvent =
   | "executedAction";
 
 /**
+ * Private, server-only, per-request data bag — `request.locals`.
+ *
+ * Empty by default. Augment it via module augmentation, in the module that
+ * OWNS the key (not centrally), the same mechanism `RequestUser` and the web
+ * layer's `SharedContext` use:
+ *
+ * @example
+ * ```typescript
+ * declare module "@warlock.js/core" {
+ *   interface RequestLocals {
+ *     session?: { token: string };
+ *   }
+ * }
+ * ```
+ */
+export interface RequestLocals {}
+
+/**
+ * The authenticated user attached to the current request — `request.user`.
+ *
+ * Empty by default so any shape is assignable at the declaration site;
+ * apps/packages narrow it via module augmentation instead of the v4
+ * `GuardedRequest` intersection type (`Request<T> & { user: User }`,
+ * hand-declared per app):
+ *
+ * @example
+ * ```typescript
+ * declare module "@warlock.js/core" {
+ *   interface RequestUser {
+ *     id: string | number;
+ *   }
+ * }
+ * ```
+ */
+export interface RequestUser {}
+
+/**
  * Allowed response type
  */
 export type ReturnedResponse =

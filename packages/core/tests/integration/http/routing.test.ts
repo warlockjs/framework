@@ -19,7 +19,7 @@ afterEach(async () => {
 describe("HTTP routing — dispatch", () => {
   it("routes a GET to the matching controller and returns its body", async () => {
     harness = await bootHarness((router) => {
-      router.get("/ping", (_request, response) => {
+      router.get("/ping", ({ response }) => {
         return response.success({ pong: true });
       });
     });
@@ -32,11 +32,11 @@ describe("HTTP routing — dispatch", () => {
 
   it("routes a POST to a different controller than the GET on the same path", async () => {
     harness = await bootHarness((router) => {
-      router.get("/articles", (_request, response) => {
+      router.get("/articles", ({ response }) => {
         return response.success({ action: "list" });
       });
 
-      router.post("/articles", (_request, response) => {
+      router.post("/articles", ({ response }) => {
         return response.successCreate({ action: "create" });
       });
     });
@@ -53,7 +53,7 @@ describe("HTTP routing — dispatch", () => {
 
   it("parses a path param into request.input()", async () => {
     harness = await bootHarness((router) => {
-      router.get("/users/:id", (request, response) => {
+      router.get("/users/:id", ({ request, response }) => {
         return response.success({ id: request.input("id") });
       });
     });
@@ -65,7 +65,7 @@ describe("HTTP routing — dispatch", () => {
 
   it("parses query-string values into request.query and request.input()", async () => {
     harness = await bootHarness((router) => {
-      router.get("/search", (request, response) => {
+      router.get("/search", ({ request, response }) => {
         return response.success({
           term: request.input("term"),
           page: request.input("page"),
@@ -85,7 +85,7 @@ describe("HTTP routing — dispatch", () => {
 
   it("parses a JSON body into request.body", async () => {
     harness = await bootHarness((router) => {
-      router.post("/echo", (request, response) => {
+      router.post("/echo", ({ request, response }) => {
         return response.success({ body: request.body });
       });
     });
@@ -101,7 +101,7 @@ describe("HTTP routing — dispatch", () => {
 
   it("merges param + query + body into request.all()", async () => {
     harness = await bootHarness((router) => {
-      router.post("/merge/:id", (request, response) => {
+      router.post("/merge/:id", ({ request, response }) => {
         return response.success(request.all());
       });
     });
@@ -124,7 +124,7 @@ describe("HTTP routing — dispatch", () => {
 describe("HTTP routing — misses", () => {
   it("returns 404 for an unregistered path", async () => {
     harness = await bootHarness((router) => {
-      router.get("/known", (_request, response) => response.success());
+      router.get("/known", ({ response }) => response.success());
     });
 
     const result = await harness.inject({ method: "GET", url: "/unknown" });
@@ -134,7 +134,7 @@ describe("HTTP routing — misses", () => {
 
   it("returns 404 when the path matches but the method does not", async () => {
     harness = await bootHarness((router) => {
-      router.get("/only-get", (_request, response) => response.success());
+      router.get("/only-get", ({ response }) => response.success());
     });
 
     const result = await harness.inject({ method: "DELETE", url: "/only-get" });
@@ -144,7 +144,7 @@ describe("HTTP routing — misses", () => {
 
   it("does not merge a trailing slash onto a registered route", async () => {
     harness = await bootHarness((router) => {
-      router.get("/strict", (_request, response) => response.success({ ok: true }));
+      router.get("/strict", ({ response }) => response.success({ ok: true }));
     });
 
     const exact = await harness.inject({ method: "GET", url: "/strict" });
@@ -158,7 +158,7 @@ describe("HTTP routing — misses", () => {
 describe("HTTP routing — request correlation", () => {
   it("stamps the X-Request-Id response header", async () => {
     harness = await bootHarness((router) => {
-      router.get("/correlated", (_request, response) => response.success());
+      router.get("/correlated", ({ response }) => response.success());
     });
 
     const result = await harness.inject({ method: "GET", url: "/correlated" });
@@ -168,7 +168,7 @@ describe("HTTP routing — request correlation", () => {
 
   it("inherits a client-supplied X-Request-Id", async () => {
     harness = await bootHarness((router) => {
-      router.get("/inherit-id", (request, response) => response.success({ id: request.id }));
+      router.get("/inherit-id", ({ request, response }) => response.success({ id: request.id }));
     });
 
     const result = await harness.inject({

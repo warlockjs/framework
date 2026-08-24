@@ -142,9 +142,15 @@ export class CLICommand {
    * Add command option
    */
   public option(option: CLICommandOption): this;
-  public option(name: string, description?: string, options?: Omit<CLICommandOption, "name">): this;
   public option(
-    ...args: [CLICommandOption] | [string, string?, Omit<CLICommandOption, "name">?]
+    name: string,
+    description?: string,
+    options?: Omit<CLICommandOption, "name" | "text" | "description">,
+  ): this;
+  public option(
+    ...args:
+      | [CLICommandOption]
+      | [string, string?, Omit<CLICommandOption, "name" | "text" | "description">?]
   ): this {
     let option: CLICommandOption;
     if (args.length === 1) {

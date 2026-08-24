@@ -9,6 +9,7 @@ Configuration loading and access system. Loads config from TypeScript files, pro
 | `config-getter.ts`           | `config(key, defaultValue?)` — primary config accessor          |
 | `config-handlers.ts`         | Registers handlers that react when specific config keys are set |
 | `config-loader.ts`           | Loads config files from `src/config/` directory                 |
+| `locale-configuration.ts`    | Resolves locale defaults/allow-list and rejects contradictory boot config |
 | `config-manager.ts`          | Low-level config store                                          |
 | `config-special-handlers.ts` | Built-in special handlers (e.g., locale setup)                  |
 | `load-config-files.ts`       | File discovery for config directory                             |

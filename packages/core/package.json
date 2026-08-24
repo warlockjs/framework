@@ -2,11 +2,15 @@
   "name": "@warlock.js/core",
   "version": "4.16.0",
   "description": "A robust nodejs framework for building blazing fast applications",
-  "main": "./esm/index.js",
+  "main": "./src/index.ts",
+  "warlock": {
+    "environment": "server"
+  },
   "bin": {
     "warlock": "./bin/warlock.js"
   },
   "scripts": {
+    "typecheck": "node ../node_modules/typescript/bin/tsc -p tsconfig.typecheck.json",
     "test": "vitest run",
     "update": "ncu -u"
   },
@@ -126,8 +130,8 @@
   ],
   "author": "hassanzohdy",
   "license": "MIT",
-  "module": "./esm/index.js",
-  "typings": "./esm/index.d.ts",
+  "module": "./src/index.ts",
+  "typings": "./src/index.ts",
   "type": "module",
   "devDependencies": {
     "vitest": "4.1.10"

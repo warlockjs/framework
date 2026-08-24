@@ -56,6 +56,11 @@ export class DevelopmentServer {
 
       await filesOrchestrator.moduleLoader.loadAll();
 
+      // A rejecting validator (Application.onValidateBoot) must abort boot
+      // before late-phase connectors bind a port — this is what makes the
+      // hook actually prevent serving instead of merely being defined.
+      await Application.runStartupValidators();
+
       // Late-phase connectors (http, socket) bind after app code has
       // registered routes/listeners.
       await connectorsManager.startPhase(ConnectorLifecyclePhase.Late);

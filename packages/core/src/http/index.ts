@@ -27,3 +27,4 @@ export * from "./types";
 
 // contexts
 export * from "./context/request-context";
+export * from "./context/request-memo";

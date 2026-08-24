@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { DevelopmentServer } from "../../../src/dev-server/development-server";
 
 const fetchLatestVersion = vi.fn();
 const getWarlockVersion = vi.fn(async () => "4.8.2");
-const getConfig = vi.fn(async () => ({}) as Record<string, unknown> | undefined);
+const getConfig = vi.fn(async (_key: string) => ({}) as Record<string, unknown> | undefined);
 const updateWarlockPackages = vi.fn();
-const restartDevServer = vi.fn(async () => true);
+const restartDevServer = vi.fn(async (_devServer: DevelopmentServer) => true);
 const register = vi.fn(() => true);
 const unregister = vi.fn();
 const release = vi.fn();
@@ -22,7 +23,7 @@ vi.mock("../../../src/utils/framework-vesion", () => ({
 }));
 
 vi.mock("../../../src/warlock-config", () => ({
-  warlockConfigManager: { get: (key: string) => getConfig(key as never) },
+  warlockConfigManager: { get: (key: string) => getConfig(key) },
 }));
 
 vi.mock("../../../src/updater/update-warlock-packages", () => ({
@@ -30,7 +31,7 @@ vi.mock("../../../src/updater/update-warlock-packages", () => ({
 }));
 
 vi.mock("../../../src/dev-server/restart-dev-server", () => ({
-  restartDevServer: (...args: unknown[]) => restartDevServer(...args),
+  restartDevServer: (devServer: DevelopmentServer) => restartDevServer(devServer),
 }));
 
 vi.mock("../../../src/dev-server/shortcuts", () => ({

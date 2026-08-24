@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Request } from "../../request";
+import type { RequestUser } from "../../types";
 
 /**
  * Idempotency-key validation rules.
@@ -51,9 +52,30 @@ export function hashBody(body: unknown): string {
  * @example
  * buildIdempotencyCacheKey(request, "01J9XZQ-ABC"); // "idem:client:user_123:01J9XZQ-ABC"
  */
+/**
+ * Read `id` off `request.user` without assuming every app's `RequestUser`
+ * augmentation declares it.
+ *
+ * `RequestUser` (`core/src/http/types.ts`) is empty by default — apps narrow
+ * it to their own model shape. Adding `id` directly to `RequestUser` here
+ * would force that exact field (and type) onto every app: TypeScript
+ * interface merging requires all declarations of a shared member to have an
+ * identical type, so an app augmenting `RequestUser` with, say, `id: string`
+ * only would conflict with a core-declared `id?: string | number`. A local,
+ * narrow read survives any augmentation shape (eed20184 step (b) —
+ * `implementation/2026-08-20-A2-request-locals.md` §6.2) — no `as any`.
+ */
+function readUserId(user: RequestUser | undefined): string | number | undefined {
+  if (!user || typeof user !== "object" || !("id" in user)) return undefined;
+
+  const id = (user as { id?: unknown }).id;
+
+  return typeof id === "string" || typeof id === "number" ? id : undefined;
+}
+
 export function buildIdempotencyCacheKey(request: Request, idempotencyKey: string): string {
   const userType = request.decodedAccessToken?.userType || "anonymous";
-  const userId = request.user?.id || request.detectIp() || "unknown";
+  const userId = readUserId(request.user) || request.detectIp() || "unknown";
 
   return `idem:${userType}:${userId}:${idempotencyKey}`;
 }

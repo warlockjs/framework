@@ -121,9 +121,9 @@ describe("buildIdempotencyCacheKey", () => {
 
   describe("with http.trustProxy enabled", () => {
     afterEach(() => {
-      // `config.set(key, undefined)` stores `null` rather than unsetting, so
-      // reset by deleting the key.
-      delete config.list()?.http?.trustProxy;
+      // A stored `null` is not the same as an absent key, so remove it
+      // outright rather than setting it to `undefined`.
+      config.unset("http.trustProxy");
     });
 
     /**

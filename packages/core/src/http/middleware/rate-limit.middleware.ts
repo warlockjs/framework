@@ -72,7 +72,7 @@ function pruneExpired(now: number) {
  * });
  */
 export function rateLimitMiddleware(options: RateLimitOptions): Middleware {
-  return (request, response) => {
+  return ({ request, response }) => {
     const now = Date.now();
 
     if (now - lastPruneAt > 60_000) {

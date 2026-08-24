@@ -66,7 +66,7 @@ export async function validateAll(
   }
 
   if (validation.validate) {
-    const result = await validation.validate(request, response);
+    const result = await validation.validate({ request, response });
 
     // if there is a result, it means it failed
     if (result) {

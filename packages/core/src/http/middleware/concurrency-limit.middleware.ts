@@ -69,7 +69,7 @@ export function concurrencyLimitMiddleware(
   max: number,
   options: ConcurrencyLimitOptions = {},
 ): Middleware {
-  return (request, response) => {
+  return ({ request, response }) => {
     const key = options.keyGenerator?.(request) || request.route.path;
     const current = counters.get(key) || 0;
 

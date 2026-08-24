@@ -54,7 +54,7 @@ export type IpFilterOptions = {
  * });
  */
 export function ipFilterMiddleware(options: IpFilterOptions): Middleware {
-  return (request, response) => {
+  return ({ request, response }) => {
     const ip = request.detectIp();
 
     if (!ip || typeof ip !== "string") {

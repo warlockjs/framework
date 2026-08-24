@@ -87,7 +87,22 @@ export class SocketConnector extends BaseConnector {
 
     container.set("socket.rawServer", server);
 
-    this.socket = new SocketServer(server, socketConfig.options);
+    this.socket = new SocketServer(server, {
+      // The shared raw server may carry OTHER `upgrade` consumers — Vite's HMR
+      // websocket does exactly that when `WebConnector` is registered
+      // (`web/src/server/web-connector.ts`, `server.hmr.server = fastify.server`).
+      // engine.io's default `destroyUpgrade: true` schedules a destroy for every
+      // upgrade whose path is not `/socket.io`
+      // (`engine.io/build/server.js:676-695`: `setTimeout(… socket.end(), 1000)`),
+      // and the only thing saving a foreign websocket today is that it wrote its
+      // handshake bytes synchronously and so trips the `bytesWritten <= 0` guard
+      // before the 1s timer fires. That is an undocumented race, not a contract.
+      // Turning the destroy off removes the coupling outright and makes the
+      // shared server safe for any app-owned websocket route.
+      // A project can still override it via `socket.options`.
+      destroyUpgrade: false,
+      ...socketConfig.options,
+    });
 
     container.set("socket", this.socket);
   }

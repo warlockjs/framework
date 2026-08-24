@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { makeCtx } from "../../test-support/make-ctx";
 
 /**
  * Unit coverage for the maintenance middleware focused on the allowlist
@@ -38,7 +39,7 @@ function makeResponse(): FakeResponse {
 }
 
 function makeRequest(path: string) {
-  return { path } as never;
+  return { path };
 }
 
 describe("maintenanceMiddleware", () => {
@@ -63,7 +64,7 @@ describe("maintenanceMiddleware", () => {
     const middleware = maintenanceMiddleware();
     const response = makeResponse();
 
-    const result = middleware(makeRequest("/anything"), response as never);
+    const result = middleware(makeCtx({ request: makeRequest("/anything"), response }));
 
     expect(result).toBeUndefined();
     expect(response.serviceUnavailable).not.toHaveBeenCalled();
@@ -75,7 +76,7 @@ describe("maintenanceMiddleware", () => {
     const middleware = maintenanceMiddleware({ allowlist: ["/health"] });
     const response = makeResponse();
 
-    middleware(makeRequest("/api/orders"), response as never);
+    middleware(makeCtx({ request: makeRequest("/api/orders"), response }));
 
     expect(response.serviceUnavailable).toHaveBeenCalledTimes(1);
   });
@@ -87,8 +88,7 @@ describe("maintenanceMiddleware", () => {
     const response = makeResponse();
 
     const result = middleware(
-      makeRequest("/webhooks/stripe?sig=abc&t=123"),
-      response as never,
+      makeCtx({ request: makeRequest("/webhooks/stripe?sig=abc&t=123"), response }),
     );
 
     expect(result).toBeUndefined();
@@ -102,8 +102,7 @@ describe("maintenanceMiddleware", () => {
     const response = makeResponse();
 
     const result = middleware(
-      makeRequest("/admin/users?page=2"),
-      response as never,
+      makeCtx({ request: makeRequest("/admin/users?page=2"), response }),
     );
 
     expect(result).toBeUndefined();

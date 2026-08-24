@@ -11,11 +11,12 @@ export type MiddlewareResponse = ReturnedResponse | undefined | void;
 
 /**
  * Middleware method
- * Receives the request and response objects
- * And returns a response object or undefined if the request should continue
+ * Receives the single context object (`{ request, response }`), same calling
+ * convention as `RequestHandler`, and returns a response object or undefined
+ * if the request should continue
  */
 export type Middleware<MiddlewareRequest extends Request = Request> = {
-  (request: MiddlewareRequest, response: Response): MiddlewareResponse;
+  (context: HttpContext<MiddlewareRequest>): MiddlewareResponse;
 };
 
 export type RouterGroupCallback = () => void;
@@ -68,11 +69,29 @@ export interface RequestControllerContract {
   middleware?: () => Promise<MiddlewareResponse> | MiddlewareResponse;
 }
 
+/**
+ * The single context object a route handler receives.
+ *
+ * v5 handlers are written `async ({ request, response }) => …` — one
+ * parameter, destructured at the call site, replacing the v4 positional
+ * `(request, response)` pair.
+ */
+export type HttpContext<TRequest extends Request = Request> = {
+  /**
+   * Request object
+   */
+  request: TRequest;
+  /**
+   * Response object
+   */
+  response: Response;
+};
+
 export type RequestHandler<TRequest extends Request = Request> = {
   /**
    * Function Declaration
    */
-  (request: TRequest, response: Response): ReturnedResponse | void;
+  (context: HttpContext<TRequest>): ReturnedResponse | void;
 
   /**
    * Validation static object property which can be optional

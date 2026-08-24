@@ -4,6 +4,7 @@ import { Application } from "../application";
 import { bootstrap } from "../bootstrap";
 import { loadConfigFiles } from "../config/load-config-files";
 import { connectorsManager } from "../connectors/connectors-manager";
+import { registerConfiguredConnectors } from "../connectors/register-configured-connectors";
 import { ConnectorLifecyclePhase } from "../connectors/types";
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
 import { manifestManager } from "../manifest/manifest-manager";
@@ -30,6 +31,40 @@ import { frameworkCommands } from "./framework-cli-commands";
 import { CliOptionValueError, ParsedCliArgs, parseCliArgs } from "./parse-cli-args";
 import { findSimilar } from "./string-similarity";
 import { CommandActionData, ResolvedCLICommandOption } from "../commands/types";
+
+/**
+ * Best-effort budget (ms) for draining stdout/stderr before a forced exit.
+ * Bounded so a stuck stream can never hang the CLI.
+ */
+const EXIT_FLUSH_BUDGET = 500;
+
+/**
+ * Exit with `code` once stdout/stderr have drained.
+ *
+ * `process.exit()` truncates writes still queued on a non-TTY stdout — a pipe,
+ * a CI log — which is how the *reason* for a failure gets lost even when the
+ * exit code is right. `exitCode` is set up front so that a natural exit (should
+ * the drain outlive the process's remaining work) is non-zero too.
+ */
+function exitAfterFlush(code: number) {
+  process.exitCode = code;
+
+  const timer = setTimeout(() => process.exit(code), EXIT_FLUSH_BUDGET);
+  timer.unref?.();
+
+  let pending = 2;
+  const drained = () => {
+    if (--pending > 0) return;
+
+    clearTimeout(timer);
+    process.exit(code);
+  };
+
+  // A zero-length write's callback fires once everything queued ahead of it has
+  // been handed to the OS.
+  process.stdout.write("", drained);
+  process.stderr.write("", drained);
+}
 
 export class CLICommandsManager {
   /**
@@ -482,13 +517,35 @@ export class CLICommandsManager {
       }
     }
 
+    this.captureFatalAsyncErrors(command);
+
     try {
       await command.execute(data);
 
       if (!command.isPersistent) {
-        displayCommandSuccess(command.name, Date.now() - startTime);
+        // Yield one full event-loop turn before declaring success. Node flags
+        // an unhandled rejection only after the current turn's microtasks
+        // drain, so reporting + exiting synchronously here fired FIRST and
+        // erased the failure — a `build` whose async work rejected exited 0
+        // having emitted nothing. The banner moves with the exit so a command
+        // that is about to fail never prints a green check on its way out.
+        //
+        // `setImmediate` runs in the same loop iteration's check phase, so this
+        // cannot hang on a lingering handle the way dropping the exit would; it
+        // only lets `captureFatalAsyncErrors` win the race when there is one.
+        setImmediate(() => {
+          // Deferring is not enough on its own: `exitAfterFlush` waits for the
+          // streams to drain rather than exiting synchronously, so a fatal
+          // async error that already fired leaves this callback still queued.
+          // Without the guard it would print a green check *after* the error
+          // and reset `process.exitCode` to 0 — re-erasing the very failure
+          // this whole path exists to surface.
+          if (this.fatalAsyncErrorReported) return;
 
-        process.exit(0);
+          displayCommandSuccess(command.name, Date.now() - startTime);
+
+          exitAfterFlush(0);
+        });
       }
     } catch (error) {
       displayCommandError(command.name, error as Error);
@@ -504,6 +561,45 @@ export class CLICommandsManager {
   }
 
   /**
+   * Fail loudly on async errors that escape the command's own promise.
+   *
+   * `execute` awaits `command.execute(data)`, but work the command merely
+   * *started* settles outside that await — `@mongez/events` `trigger` /
+   * `triggerAll` are synchronous and do not await their listeners, so an async
+   * listener that throws leaves a floating rejection behind. Node reports it at
+   * the end of the turn, by which point the CLI had already exited 0: the
+   * failure was erased and the command looked green.
+   *
+   * Persistent commands (dev/start) are exempt from the exit for the same
+   * reason as the catch block in `execute`: by the time they reach this point
+   * they own a run loop that is expected to survive runtime errors so HMR or a
+   * supervisor can recover. They still print — silence is what made this class
+   * of failure invisible in the first place.
+   */
+  protected fatalAsyncErrorReported = false;
+
+  protected captureFatalAsyncErrors(command: CLICommand) {
+    const onFatalAsyncError = (reason: unknown) => {
+      // A rejection reason is not necessarily an Error (`Promise.reject("x")`),
+      // and a crash handler must never itself throw.
+      const error = reason instanceof Error ? reason : new Error(String(reason));
+
+      // Set before printing, so the deferred success banner is suppressed even
+      // if displaying the error yields.
+      this.fatalAsyncErrorReported = true;
+
+      displayCommandError(command.name, error);
+
+      if (!command.isPersistent) {
+        exitAfterFlush(1);
+      }
+    };
+
+    process.on("unhandledRejection", onFatalAsyncError);
+    process.on("uncaughtException", onFatalAsyncError);
+  }
+
+  /**
    * Load preloaders
    */
   protected async loadPreloaders(command: CLICommand) {
@@ -513,8 +609,21 @@ export class CLICommandsManager {
       Application.setRuntimeStrategy(preloaders.runtimeStrategy);
     }
 
-    if (preloaders.environemnt) {
-      Application.setEnvironment(preloaders.environemnt);
+    // Override, not a default: a command that declares an environment gets it
+    // regardless of what the shell exported. Then read it back — `process.env`
+    // is process-global and anything may have written to it, so a value that
+    // did not take must fail here, loudly, rather than surface later as a
+    // production React bundle under `warlock dev`.
+    if (preloaders.environment) {
+      Application.setEnvironment(preloaders.environment);
+
+      if (process.env.NODE_ENV !== preloaders.environment) {
+        throw new Error(
+          `Command "${command.name}" set NODE_ENV to "${preloaders.environment}", but it read back as ` +
+            `"${process.env.NODE_ENV}". The environment did not take, and every decision made ` +
+            `downstream of it — env file selection, bundler dep optimisation — would be wrong.`,
+        );
+      }
     }
 
     // Env BEFORE config, unconditionally, for every command.
@@ -563,6 +672,32 @@ export class CLICommandsManager {
     // app code. Explicit lists bypass phase splitting (caller knows
     // exactly which connectors they want).
     if (preloaders.connectors) {
+      // REGISTER before starting — the non-bundled counterpart of section 2.5
+      // of the generated production entry, and the "dev preloader" path
+      // `register-configured-connectors.ts` documents.
+      //
+      // Without this, `warlock.config.ts > connectors` drove the BUILD only:
+      // `warlock build` read the array to drain each connector's contribution,
+      // but under `warlock dev` nothing ever registered it, so an app had to
+      // call `connectorsManager.register(...)` from its own `main.ts` to get a
+      // connector running. Apps that did BOTH then registered the same
+      // connector twice in production — once here from the baked config, once
+      // from their own app code — and it booted twice, which surfaced as
+      // `Route name "..." is already taken` while installing page routes.
+      //
+      // The array is omitted deliberately, so the function reads the config
+      // loaded above; `expectedNames` is omitted too, because drift is a
+      // build↔runtime relationship and dev has no build to drift from.
+      //
+      // The idempotency this function provides is against ITSELF — a second
+      // call skips names the first registered. It does NOT protect against an
+      // app calling `connectorsManager.register()` directly, which pushes
+      // unconditionally, and which runs AFTER this point in both modes. So a
+      // connector belongs in the config array or in app code, never both:
+      // listing it in both is the duplicate this comment's route-name error
+      // describes.
+      registerConfiguredConnectors();
+
       if (preloaders.connectors === true) {
         await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);
       } else {

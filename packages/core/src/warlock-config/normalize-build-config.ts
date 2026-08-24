@@ -14,7 +14,9 @@ type BuildConfig = NonNullable<WarlockConfig["build"]>;
  * Returns the input untouched when there is nothing to fold, so the common
  * case allocates nothing.
  */
-export function normalizeBuildConfig<T extends BuildConfig>(build: T): T {
+export function normalizeBuildConfig<T extends BuildConfig>(
+  build: T,
+): T & Pick<BuildConfig, "outdir"> {
   if (!build.outDirectory || build.outdir) {
     return build;
   }

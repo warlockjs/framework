@@ -153,3 +153,113 @@ describe("safeFetchToBuffer — SSRF guard", () => {
     expect(result.contentType).toBe("image/jpeg");
   });
 });
+
+/** Build a bare 3xx redirect Response pointing `location` at `location`. */
+function redirectResponse(status: number, location: string): Response {
+  return new Response(null, { status, headers: { location } });
+}
+
+// Public IP literals — same convention the file already uses for
+// "does not flag public addresses" (8.8.8.8 / 1.1.1.1). IP literals skip
+// DNS entirely, so these tests don't depend on real network resolution of
+// made-up hostnames the way the pre-existing "example.com" tests do.
+const ALLOWED_HOST_A = "8.8.8.8";
+const ALLOWED_HOST_B = "1.1.1.1";
+
+describe("safeFetchToBuffer — redirect re-validation (SSRF hop check)", () => {
+  it("refuses a 302 from an allowed host to the cloud-metadata address", async () => {
+    const fetchSpy = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url === `https://${ALLOWED_HOST_A}/redirect-me`) {
+        return redirectResponse(302, "http://169.254.169.254/latest/meta-data/");
+      }
+      throw new Error(`unexpected fetch to ${url}`);
+    });
+
+    await expect(
+      safeFetchToBuffer(`https://${ALLOWED_HOST_A}/redirect-me`, {
+        fetch: fetchSpy as unknown as typeof fetch,
+      }),
+    ).rejects.toBeInstanceOf(StorageError);
+
+    // The metadata hop must never be dispatched — the guard refuses before
+    // following it, same as a direct request to that address.
+    expect(fetchSpy).toHaveBeenCalledOnce();
+  });
+
+  it("refuses a multi-hop chain whose LAST hop is internal", async () => {
+    const fetchSpy = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url === `https://${ALLOWED_HOST_A}/start`) {
+        return redirectResponse(302, `https://${ALLOWED_HOST_A}/hop-2`);
+      }
+      if (url === `https://${ALLOWED_HOST_A}/hop-2`) {
+        return redirectResponse(302, "http://127.0.0.1/internal");
+      }
+      throw new Error(`unexpected fetch to ${url}`);
+    });
+
+    await expect(
+      safeFetchToBuffer(`https://${ALLOWED_HOST_A}/start`, {
+        fetch: fetchSpy as unknown as typeof fetch,
+      }),
+    ).rejects.toBeInstanceOf(StorageError);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("refuses once the redirect-hop bound is exceeded, even when every hop stays public", async () => {
+    const fetchSpy = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      const match = url.match(/\/hop-(\d+)$/);
+      const n = match ? Number(match[1]) : 0;
+      return redirectResponse(302, `https://${ALLOWED_HOST_A}/hop-${n + 1}`);
+    });
+
+    await expect(
+      safeFetchToBuffer(`https://${ALLOWED_HOST_A}/hop-0`, {
+        fetch: fetchSpy as unknown as typeof fetch,
+      }),
+    ).rejects.toBeInstanceOf(StorageError);
+
+    // DEFAULT_MAX_REDIRECTS is 5: hops 0-4 may redirect (5 fetches), the
+    // 6th fetch (hop index 5) is where the bound trips before dispatch —
+    // so the loop performs exactly 6 fetches total.
+    expect(fetchSpy).toHaveBeenCalledTimes(6);
+  });
+
+  it("still follows a legitimate 302 to another allowed public host (no over-blocking)", async () => {
+    const fetchSpy = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url === `https://${ALLOWED_HOST_A}/start`) {
+        return redirectResponse(302, `https://${ALLOWED_HOST_B}/final`);
+      }
+      if (url === `https://${ALLOWED_HOST_B}/final`) {
+        return streamingResponse(4, "image/png");
+      }
+      throw new Error(`unexpected fetch to ${url}`);
+    });
+
+    const result = await safeFetchToBuffer(`https://${ALLOWED_HOST_A}/start`, {
+      fetch: fetchSpy as unknown as typeof fetch,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.buffer.byteLength).toBe(4);
+    expect(result.contentType).toBe("image/png");
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("issues every hop with redirect: \"manual\" so the platform never auto-follows", async () => {
+    const fetchSpy = vi.fn(async (_input: string | URL, init?: RequestInit) => {
+      expect(init?.redirect).toBe("manual");
+      return streamingResponse(1);
+    });
+
+    await safeFetchToBuffer(`https://${ALLOWED_HOST_A}/x`, {
+      fetch: fetchSpy as unknown as typeof fetch,
+    });
+
+    expect(fetchSpy).toHaveBeenCalledOnce();
+  });
+});

@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.0.0 - UNRELEASED (in development — date stamps at release)
+
+### Upgrading
+
+- **BREAKING — `Request` no longer has a `[key: string]: any` index signature.** Attaching arbitrary properties (`request.post = post`) no longer compiles. Migrate per attachment: per-request data written by middleware → `request.locals` (augment `RequestLocals`); per-request memoized computation → `requestMemo(key, fn)`; new typed members → module augmentation of `Request` itself
+- **BREAKING — `fromRequest(key, callback)` is removed.** It cached values as dynamic `Request` properties, which only compiled because of the deleted index signature. `requestMemo(key, fn)` is the drop-in successor: same per-request lifetime, single-flight (concurrent callers share one promise), and it never touches the `Request` object
+- **BREAKING — client-supplied locales are validated against `app.localeCodes`.** A `locale`/`translation-locale-code` header or `locale` query value outside the configured list is treated as absent and falls through to the default locale — it previously won as-is, steering every translated string and every serialized Resource. Apps that declare no `app.localeCodes` keep the pass-through behavior
+- **`request.trans()` / `request.t()` now resolve the locale at call time.** Previously the translator captured the locale once during request construction (before routing), so a locale set later — a path locale, `setLocaleCode()` — changed `request.locale` but not the language of translated strings
+
+### Added
+
+- **`request.requireUser()`** — returns the authenticated user non-optionally, or throws `UnAuthorizedError` when no user is attached. For handlers behind an auth guard, where an absent user is a misconfigured route rather than a normal state; replaces `request.user!` assertions
+
 ## 4.16.0 - 2026-08-18
 
 ### Security

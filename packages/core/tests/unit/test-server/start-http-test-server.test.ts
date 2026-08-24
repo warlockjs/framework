@@ -1,5 +1,6 @@
 import config from "@mongez/config";
 import { env } from "@mongez/dotenv";
+import assert from "node:assert";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:net";
 import { tmpdir } from "node:os";
@@ -168,9 +169,12 @@ describe("startHttpTestServer", () => {
   it("fails the preflight with an actionable message, not EADDRINUSE, when the port is held", async () => {
     holder = await holdPort(envPort);
 
-    const error = await startHttpTestServer().catch((thrown: unknown) => thrown as PortInUseError);
+    const error = await startHttpTestServer().catch((thrown: unknown) => thrown);
 
     expect(error).toBeInstanceOf(PortInUseError);
+    // `expect()` is not a type guard and `.catch()` widens the binding to
+    // include the resolved value, so narrow before reading `.message`.
+    assert(error instanceof PortInUseError);
     expect(error.message).toContain(`Port ${envPort} is already in use`);
     expect(error.message).toContain("Stop the dev server");
     expect(error.message).not.toContain("EADDRINUSE");
@@ -184,10 +188,11 @@ describe("startHttpTestServer", () => {
     holder = await holdPort(explicitPort);
 
     const error = await startHttpTestServer({ port: explicitPort }).catch(
-      (thrown: unknown) => thrown as PortInUseError,
+      (thrown: unknown) => thrown,
     );
 
     expect(error).toBeInstanceOf(PortInUseError);
+    assert(error instanceof PortInUseError);
     expect(error.message).toContain(`Port ${explicitPort} is already in use`);
   });
 

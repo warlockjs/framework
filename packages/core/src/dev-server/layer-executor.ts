@@ -6,6 +6,7 @@ import { devLogHMR } from "./dev-logger";
 import { FileManager } from "./file-manager";
 import type { ModuleLoader } from "./module-loader";
 import type { SpecialFilesCollector } from "./special-files-collector";
+import { environmentLoaderOptions } from "../utils/load-environment";
 
 /**
  * Decides what to reload when a batch of files changes.
@@ -109,7 +110,9 @@ export class LayerExecutor {
     filesMap: Map<string, FileManager>,
   ): Promise<string[]> {
     const isEnvAffected = chain.some(isEnvPath);
-    if (isEnvAffected) await loadEnv();
+    // Same precedence policy as the boot-time load: an exported variable is not
+    // demoted to the file's value just because the file was touched.
+    if (isEnvAffected) await loadEnv(undefined, environmentLoaderOptions);
 
     const isAffected = (file: FileManager) => isFileAffected(file, chain);
 

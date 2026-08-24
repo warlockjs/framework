@@ -1,12 +1,14 @@
-import { AppConfigurations } from "../utils/types";
+import type { AppConfigurations } from "../utils/types";
 import { configSpecialHandlers } from "./config-special-handlers";
+import { assertLocaleConfiguration } from "./locale-configuration";
 
 /**
- * App Config Handler
- * Handles locale loading for dayjs
+ * Enforce request-locale configuration when app config loads.
  */
-export const registerAppConfig = async (config: AppConfigurations) => {
-  // Load dayjs locales based on app.localeCodes
+export const registerAppConfig = async (config: AppConfigurations): Promise<void> => {
+  assertLocaleConfiguration(config);
+
+  // Load dayjs locales from the legacy app.locales integration.
   const locales = config.locales || ["en"];
 
   for (const locale of locales) {

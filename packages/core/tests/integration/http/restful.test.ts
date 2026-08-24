@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Restful } from "../../../src/restful/restful";
-import type { Request, Response } from "../../../src/http";
+import type { HttpContext } from "../../../src/router/types";
 import { bootHarness, type HttpHarness } from "./harness";
 
 /**
@@ -222,7 +222,7 @@ describe("HTTP restful — custom Restful subclass", () => {
 
       protected middleware = {
         get: [
-          (_request: Request, response: Response) => response.forbidden({ error: "no peeking" }),
+          ({ response }: HttpContext) => response.forbidden({ error: "no peeking" }),
         ],
       } as any;
     }

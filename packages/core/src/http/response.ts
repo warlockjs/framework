@@ -1401,7 +1401,7 @@ export class Response {
       errors: "errors",
       inputKey: "input",
       inputError: "error",
-      status: 400,
+      status: 422,
     });
 
     log.error("request", "validation", `${this.request.id} - Validation failed`);

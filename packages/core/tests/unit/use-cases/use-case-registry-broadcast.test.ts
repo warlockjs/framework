@@ -38,6 +38,10 @@ describe("useCase — schema validation", () => {
       handler: async () => ({ ok: true }),
     });
 
+    // Invalid input on purpose. The compiler rejecting `{}` is half the
+    // contract — the other half is that the runtime schema rejects it too, so
+    // the call has to survive typechecking to be made at all.
+    // @ts-expect-error - `name` is required by the schema
     await expect(run({})).rejects.toBeInstanceOf(BadSchemaUseCaseError);
   });
 

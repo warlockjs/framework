@@ -126,7 +126,7 @@ describe("Router — name collisions", () => {
         router.get("/dup", () => undefined as any, { name: "dup" });
         router.get("/dup2", () => undefined as any, { name: "dup" });
       }),
-    ).rejects.toThrow(/Route name "dup" already exists/);
+    ).rejects.toThrow(/Route name "dup" is already taken/);
 
     // The first route still landed before the second threw.
     expect(scopedRoutes().map((route) => route.path)).toEqual(["/dup"]);

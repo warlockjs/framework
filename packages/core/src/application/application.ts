@@ -33,6 +33,29 @@ export type BootContext = {
 export type BootListener = (context: BootContext) => void | Promise<void>;
 
 /**
+ * A callback registered through `Application.onValidateBoot`. May be async —
+ * unlike {@link BootListener}, its rejection is NOT caught: it aborts boot.
+ *
+ * Use this for configuration that makes the application WRONG rather than
+ * degraded when missing (a signing secret, a required integration key) — the
+ * kind of check that must fail closed. Use `onceBooted` for everything else;
+ * that contract stays fire-and-forget on purpose (it is the right behaviour
+ * for plugins reacting to boot, not for gating it).
+ */
+export type BootValidator = () => void | Promise<void>;
+
+/**
+ * `new Error(message, { cause })` is ES2022, and this package still compiles
+ * against the ES2020 lib, where `Error` is typed as taking a message only.
+ * Node has supported the option since v16, so this is the type layer
+ * catching up with the runtime, not a change in what the code does. Same
+ * workaround as `image.ts` (see #16).
+ */
+type ErrorWithCauseConstructor = new (message: string, options: { cause: unknown }) => Error;
+
+const ErrorWithCause = Error as ErrorWithCauseConstructor;
+
+/**
  * A callback registered through `Application.onShutdown`. Runs once, while the
  * connectors (db, cache, http) are still up, so it can release app-owned
  * resources cleanly. May be async — its rejection is caught and logged.
@@ -65,6 +88,19 @@ export class Application {
    * `markBooted`.
    */
   private static bootListeners: BootListener[] = [];
+
+  /**
+   * Whether `runStartupValidators` has already run. Flipped once, so a
+   * validator registered afterwards is refused instead of silently skipped
+   * or run too late to matter.
+   */
+  private static validated = false;
+
+  /**
+   * Startup validators queued before `runStartupValidators` ran, drained in
+   * registration order.
+   */
+  private static bootValidators: BootValidator[] = [];
 
   /**
    * The http port this process actually bound, once it has. Reported in the
@@ -209,6 +245,86 @@ export class Application {
       await listener(context);
     } catch (error) {
       log.error("application", "booted-listener", error as Error);
+    }
+  }
+
+  /**
+   * Register a startup validator — distinct from {@link onceBooted}. A
+   * rejecting validator aborts boot instead of being caught and logged, so
+   * this is where configuration that must fail closed belongs (a signing
+   * secret, a required integration key), not `onceBooted`.
+   *
+   * Must be registered before the framework calls `runStartupValidators` —
+   * typically at module scope in `src/app/main.ts`, the same place a
+   * `BootListener` would be registered. Registering one after validation has
+   * already run throws: by then a rejection could no longer stop the app
+   * from serving, so running it late would silently defeat the guarantee
+   * this hook exists to give.
+   *
+   * @example
+   * Application.onValidateBoot(() => {
+   *   if (!env("JWT_SECRET")) {
+   *     throw new Error(
+   *       "JWT_SECRET is not set. Sessions cannot be signed without it. " +
+   *         "Generate one with `yarn jwt` and put it in .env.",
+   *     );
+   *   }
+   * });
+   */
+  public static onValidateBoot(validator: BootValidator): void {
+    if (this.validated) {
+      throw new Error(
+        "Application.onValidateBoot(): startup validators already ran — " +
+          "this validator was registered too late to block boot. Register it " +
+          "before the framework calls Application.runStartupValidators(), " +
+          "typically at module scope in `src/app/main.ts`.",
+      );
+    }
+
+    this.bootValidators.push(validator);
+  }
+
+  /**
+   * Run every registered startup validator, in registration order, and abort
+   * on the first rejection. Idempotent — a second call is a no-op.
+   *
+   * Distinct from `runBootListener`: a listener's failure is isolated so it
+   * can never break boot; a validator's failure IS the boot failing — that is
+   * the entire point of registering one instead of the other. The thrown
+   * error names the failing validator and the original cause, so whatever
+   * catches it (the dev server's boot try/catch, the production entry's
+   * top-level await) reports which check failed and why, not a bare
+   * rejection.
+   *
+   * @internal Framework entry points call this once app code (main.ts et al)
+   * has loaded and BEFORE late-phase connectors (http, socket) start, so a
+   * failing validator runs before anything can bind a port or accept a
+   * request. Application code must not call this directly.
+   */
+  public static async runStartupValidators(): Promise<void> {
+    if (this.validated) {
+      return;
+    }
+
+    this.validated = true;
+
+    const validators = this.bootValidators;
+    this.bootValidators = [];
+
+    for (const validator of validators) {
+      try {
+        await validator();
+      } catch (error) {
+        const name = validator.name || "<anonymous>";
+        const cause = error instanceof Error ? error.message : String(error);
+
+        throw new ErrorWithCause(
+          `Startup validator "${name}" rejected boot: ${cause}. ` +
+            `Fix the condition it checks, or remove the validator if it no ` +
+            `longer applies — boot cannot proceed while it fails.`,
+          { cause: error },
+        );
+      }
     }
   }
 

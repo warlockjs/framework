@@ -145,7 +145,7 @@ describe("Restful.list", () => {
     const resource = makeResource(repository);
     const response = makeResponse();
 
-    await resource.list(makeRequest(), response);
+    await resource.list({ request: makeRequest(), response: response });
 
     expect(response.calls[0].method).toBe("success");
     expect(response.calls[0].payload).toMatchObject({
@@ -159,7 +159,7 @@ describe("Restful.list", () => {
     const resource = makeResource(repository);
     const request = makeRequest({ heavy: { paginate: "false" } });
 
-    await resource.list(request, makeResponse());
+    await resource.list({ request: request, response: makeResponse() });
 
     expect(repository.listCached).toHaveBeenCalledWith({ paginate: false });
   });
@@ -170,7 +170,7 @@ describe("Restful.list", () => {
     const resource = makeResource(repository);
     const response = makeResponse();
 
-    await resource.list(makeRequest(), response);
+    await resource.list({ request: makeRequest(), response: response });
 
     expect(response.calls[0].method).toBe("serverError");
   });
@@ -182,7 +182,7 @@ describe("Restful.get", () => {
     const resource = makeResource(repository);
     const response = makeResponse();
 
-    await resource.get(makeRequest({ inputs: { id: 1 } }), response);
+    await resource.get({ request: makeRequest({ inputs: { id: 1 } }), response: response });
 
     expect(response.calls[0].method).toBe("success");
     expect((response.calls[0].payload as { record: Row }).record.id).toBe(1);
@@ -193,7 +193,7 @@ describe("Restful.get", () => {
     const resource = makeResource(repository);
     const response = makeResponse();
 
-    await resource.get(makeRequest({ inputs: { id: 404 } }), response);
+    await resource.get({ request: makeRequest({ inputs: { id: 404 } }), response: response });
 
     expect(response.calls[0].method).toBe("notFound");
   });
@@ -205,7 +205,7 @@ describe("Restful.create", () => {
     const resource = makeResource(repository);
     const response = makeResponse();
 
-    await resource.create(makeRequest({ all: { title: "New" } }), response);
+    await resource.create({ request: makeRequest({ all: { title: "New" } }), response: response });
 
     expect(repository.create).toHaveBeenCalledWith({ title: "New" });
     expect(response.calls.at(-1)?.method).toBe("successCreate");
@@ -218,7 +218,7 @@ describe("Restful.create", () => {
     });
     const response = makeResponse();
 
-    await resource.create(makeRequest({ all: { title: "X" } }), response);
+    await resource.create({ request: makeRequest({ all: { title: "X" } }), response: response });
 
     // The list path emits success (not successCreate) and queries the repo list.
     expect(repository.listCached).toHaveBeenCalled();
@@ -231,7 +231,7 @@ describe("Restful.create", () => {
     const resource = makeResource(repository);
     const response = makeResponse();
 
-    await resource.create(makeRequest({ all: {} }), response);
+    await resource.create({ request: makeRequest({ all: {} }), response: response });
 
     expect(response.calls.at(-1)).toMatchObject({
       method: "badRequest",
@@ -246,7 +246,7 @@ describe("Restful.update / delete — not found guards", () => {
     const resource = makeResource(repository);
     const response = makeResponse();
 
-    await resource.update(makeRequest({ inputs: { id: 404 } }), response);
+    await resource.update({ request: makeRequest({ inputs: { id: 404 } }), response: response });
 
     expect(response.calls[0].method).toBe("notFound");
   });
@@ -256,7 +256,7 @@ describe("Restful.update / delete — not found guards", () => {
     const resource = makeResource(repository);
     const response = makeResponse();
 
-    await resource.delete(makeRequest({ inputs: { id: 404 } }), response);
+    await resource.delete({ request: makeRequest({ inputs: { id: 404 } }), response: response });
 
     expect(response.calls[0].method).toBe("notFound");
   });
@@ -266,7 +266,7 @@ describe("Restful.update / delete — not found guards", () => {
     const resource = makeResource(repository);
     const response = makeResponse();
 
-    await resource.delete(makeRequest({ inputs: { id: 1 } }), response);
+    await resource.delete({ request: makeRequest({ inputs: { id: 1 } }), response: response });
 
     expect(response.calls.at(-1)?.method).toBe("success");
   });
@@ -278,7 +278,7 @@ describe("Restful.bulkDelete", () => {
     const resource = makeResource(repository);
     const response = makeResponse();
 
-    await resource.bulkDelete(makeRequest({ inputs: { id: "not-array" } }), response);
+    await resource.bulkDelete({ request: makeRequest({ inputs: { id: "not-array" } }), response: response });
 
     expect(response.calls[0]).toMatchObject({
       method: "badRequest",
@@ -294,7 +294,7 @@ describe("Restful.bulkDelete", () => {
     const resource = makeResource(repository);
     const response = makeResponse();
 
-    await resource.bulkDelete(makeRequest({ inputs: { id: ["1", "2"] } }), response);
+    await resource.bulkDelete({ request: makeRequest({ inputs: { id: ["1", "2"] } }), response: response });
 
     expect(repository.all).toHaveBeenCalled();
     expect(response.calls.at(-1)).toMatchObject({ method: "success", payload: { deleted: 2 } });
@@ -308,7 +308,7 @@ describe("Restful — middleware short-circuit", () => {
     const resource = makeResource(repository, { middleware: { list: [guard] } });
     const response = makeResponse();
 
-    await resource.list(makeRequest(), response);
+    await resource.list({ request: makeRequest(), response: response });
 
     expect(guard).toHaveBeenCalled();
     // Short-circuited before the repository was queried.
@@ -322,7 +322,7 @@ describe("Restful — middleware short-circuit", () => {
     const resource = makeResource(repository, { middleware: { get: [pass] } });
     const response = makeResponse();
 
-    await resource.get(makeRequest({ inputs: { id: 1 } }), response);
+    await resource.get({ request: makeRequest({ inputs: { id: 1 } }), response: response });
 
     expect(pass).toHaveBeenCalled();
     expect(response.calls[0].method).toBe("success");

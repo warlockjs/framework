@@ -21,20 +21,61 @@ export class ConnectorsManager {
   private readonly connectors: Connector[] = [];
 
   /**
+   * The names the framework's own connectors hold.
+   *
+   * Filled by the constructor's own registration calls rather than declared
+   * beside them, so there is exactly ONE place a built-in name exists: the
+   * connector that owns it. A second list — in the builder, in a config
+   * validator, in a test double — is a list that drifts the moment a built-in
+   * is added or renamed, and it drifts silently, because nothing compares the
+   * two. Both halves of a connector's life read this one through
+   * {@link isBuiltInName}: the build refuses a `connectors` array that claims
+   * a built-in name, and so does registration.
+   */
+  private readonly builtInNames = new Set<string>();
+
+  /**
    * Constructor
    */
   public constructor() {
-    this.register(new LoggerConnector());
-    this.register(new MailerConnector());
-    this.register(new HttpConnector());
-    this.register(new DatabaseConnector());
-    this.register(new HeraldConnector());
-    this.register(new CacheConnector());
-    this.register(new StorageConnector());
-    this.register(new SocketConnector());
-    this.register(new NotificationsConnector());
-    this.register(new AccessConnector());
-    this.register(new AiConnector());
+    this.registerBuiltIn(new LoggerConnector());
+    this.registerBuiltIn(new MailerConnector());
+    this.registerBuiltIn(new HttpConnector());
+    this.registerBuiltIn(new DatabaseConnector());
+    this.registerBuiltIn(new HeraldConnector());
+    this.registerBuiltIn(new CacheConnector());
+    this.registerBuiltIn(new StorageConnector());
+    this.registerBuiltIn(new SocketConnector());
+    this.registerBuiltIn(new NotificationsConnector());
+    this.registerBuiltIn(new AccessConnector());
+    this.registerBuiltIn(new AiConnector());
+  }
+
+  /**
+   * Register a framework-owned connector and reserve its name.
+   *
+   * Private on purpose: an app connector must not be able to reserve a name,
+   * and the set is only correct if every entry in it came from a connector
+   * this class constructed itself.
+   */
+  private registerBuiltIn(...connectors: Connector[]): void {
+    for (const connector of connectors) {
+      this.builtInNames.add(connector.name);
+    }
+
+    this.register(...connectors);
+  }
+
+  /**
+   * Whether the given name belongs to a framework built-in connector.
+   *
+   * Reserved, not merely taken: a configured connector carrying one of these
+   * names would be skipped by {@link has} at boot while the build had already
+   * drained its contribution, so the artifact would carry a connector the
+   * server never runs. Callers refuse the name instead of skipping it.
+   */
+  public isBuiltInName(name: string): boolean {
+    return this.builtInNames.has(name);
   }
 
   /**
@@ -51,6 +92,17 @@ export class ConnectorsManager {
    */
   public list(): Connector[] {
     return this.connectors;
+  }
+
+  /**
+   * Whether a connector with the given name is already registered.
+   *
+   * Names are the identity of a connector here, which is what lets a caller
+   * that may run more than once per process register idempotently instead of
+   * stacking duplicates that would each boot and shut down.
+   */
+  public has(name: ConnectorName): boolean {
+    return this.connectors.some((connector) => connector.name === name);
   }
 
   /**

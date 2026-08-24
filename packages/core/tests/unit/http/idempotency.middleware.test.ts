@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { makeCtx } from "../../test-support/make-ctx";
 
 /**
  * Unit coverage for the idempotency middleware's MISS-path caching.
@@ -63,7 +64,7 @@ function makeRequest(seed: {
     detectIp: () => seed.ip ?? "127.0.0.1",
     user: undefined,
     decodedAccessToken: undefined,
-  } as never;
+  };
 }
 
 function makeResponse(seed: {
@@ -123,7 +124,7 @@ describe("idempotencyMiddleware", () => {
     const request = makeRequest({ idempotencyKey: "01J9XZQ-ABC" });
     const response = makeResponse({ statusCode: 201, contentType: "application/json" });
 
-    await middleware(request, response as never);
+    await middleware(makeCtx({ request, response }));
 
     response.fireSent();
 
@@ -153,7 +154,7 @@ describe("idempotencyMiddleware", () => {
     const request = makeRequest({ idempotencyKey: "01J9XZQ-ABC" });
     const response = makeResponse({});
 
-    const result = await middleware(request, response as never);
+    const result = await middleware(makeCtx({ request, response }));
 
     expect(response.replay).toHaveBeenCalledWith({
       status: 201,
@@ -170,7 +171,7 @@ describe("idempotencyMiddleware", () => {
     const request = makeRequest({ idempotencyKey: "01J9XZQ-ABC" });
     const response = makeResponse({ statusCode: 503 });
 
-    await middleware(request, response as never);
+    await middleware(makeCtx({ request, response }));
 
     response.fireSent();
 

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const calls: string[] = [];
 
@@ -22,11 +22,16 @@ vi.mock("../../../src/bootstrap", () => ({
   }),
 }));
 
+// Mirrors the real `Application.setEnvironment` (utils/environment.ts:13-14):
+// it writes `process.env.NODE_ENV`. A mock that only records the call would
+// make the manager's read-back assertion untestable — and would have kept
+// passing under the very defect this spec exists to pin.
 vi.mock("../../../src/application", () => ({
   Application: {
     setRuntimeStrategy: vi.fn(),
-    setEnvironment: vi.fn(() => {
+    setEnvironment: vi.fn((env: string) => {
       calls.push("setEnvironment");
+      process.env.NODE_ENV = env;
     }),
   },
 }));
@@ -69,9 +74,17 @@ const commandWithPreload = (preload: Record<string, unknown>) => {
 };
 
 describe("loadPreloaders ordering", () => {
+  // These cases write `process.env.NODE_ENV` on purpose. It is process-global
+  // and the rest of the suite runs under "test", so put it back.
+  const originalNodeEnv = process.env.NODE_ENV;
+
   beforeEach(() => {
     calls.length = 0;
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
   });
 
   it("loads env BEFORE warlock.config.ts is evaluated", async () => {
@@ -95,11 +108,45 @@ describe("loadPreloaders ordering", () => {
     // `loadEnv()` reads `process.env.NODE_ENV` at call time to choose
     // `.env.<NODE_ENV>` over `.env`, so the order here decides which file wins.
     await new PreloadManager().preload(
-      commandWithPreload({ environemnt: "production", warlockConfig: true }),
+      commandWithPreload({ environment: "production", warlockConfig: true }),
     );
 
     expect(Application.setEnvironment).toHaveBeenCalledWith("production");
     expect(calls.indexOf("setEnvironment")).toBeLessThan(calls.indexOf("loadEnv"));
+  });
+
+  it("overrides an inherited NODE_ENV instead of deferring to it", async () => {
+    // The defect this covers: `warlock dev` inherited NODE_ENV=production from
+    // the shell, so Vite's dep optimiser pre-bundled the production build of
+    // React and hydration-mismatch warnings went silent. A declared
+    // environment is an override, never a fallback.
+    process.env.NODE_ENV = "production";
+
+    await new PreloadManager().preload(commandWithPreload({ environment: "development" }));
+
+    expect(Application.setEnvironment).toHaveBeenCalledWith("development");
+    expect(process.env.NODE_ENV).toBe("development");
+  });
+
+  it("ignores the old misspelled `environemnt` key rather than honouring it", async () => {
+    // The key was `environemnt` for its whole life. It is gone, not aliased:
+    // nobody spelled it that way, so nothing can be relying on it, and a
+    // silently-accepted misspelling is what made this defect invisible.
+    await new PreloadManager().preload(commandWithPreload({ environemnt: "production" }));
+
+    expect(Application.setEnvironment).not.toHaveBeenCalled();
+  });
+
+  it("fails loudly when the environment it set does not read back", async () => {
+    // `process.env` is process-global; a value that did not take must not be
+    // discovered later as a wrong bundle. Simulated by making `setEnvironment`
+    // a no-op — exactly what the misspelled key produced in practice.
+    vi.mocked(Application.setEnvironment).mockImplementationOnce(() => undefined);
+    process.env.NODE_ENV = "production";
+
+    await expect(
+      new PreloadManager().preload(commandWithPreload({ environment: "development" })),
+    ).rejects.toThrow(/read back as "production"/);
   });
 
   it("asks for env exactly once itself, whatever the command declares", async () => {

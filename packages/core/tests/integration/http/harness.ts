@@ -22,7 +22,7 @@ import type { FastifyInstance } from "../../../src/http/server";
  *
  * @example
  * const harness = await bootHarness((router) => {
- *   router.get("/ping", (request, response) => response.success({ ok: true }));
+ *   router.get("/ping", ({ request, response }) => response.success({ ok: true }));
  * });
  *
  * const result = await harness.inject({ method: "GET", url: "/ping" });

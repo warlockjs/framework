@@ -10,9 +10,14 @@ import {
 import esbuild from "esbuild";
 import glob from "fast-glob";
 import path from "path";
+import { assertNoReservedConnectorNames } from "../connectors/assert-no-reserved-connector-names";
+import { assertUniqueConnectorNames } from "../connectors/assert-unique-connector-names";
+import type { Connector, ConnectorBuildContext, ConnectorEsbuildPatch } from "../connectors/types";
 import { tsconfigManager } from "../dev-server/tsconfig-manager";
 import { appPath, rootPath, warlockPath } from "../utils";
+import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 import { assertGeneratedImportsAreDeclared } from "./assert-generated-imports";
+import { dedupe, runEmitContributions, runGenerateContributions } from "./build-contributions";
 import { nativeNodeModulesPlugin } from "./esbuild-plugins";
 import { resolveBuildConfig, type ResolvedBuildConfig } from "./resolve-build-config";
 import { toCamelCase, toKebabCase } from "@mongez/reinforcements";
@@ -69,6 +74,17 @@ function mergeBanner(
 }
 
 /**
+ * Prefix every generated file uses to reach the app root.
+ *
+ * Generated sources are written into `.warlock/production/`, two levels below
+ * the app root, so `../../` lands back on it — the same hop already spelled
+ * out in the `../../src/app/…` and `../../src/config/…` imports the module and
+ * config-loader generators emit. Named once so a generator that needs a new
+ * app-root file (`warlock.config`) cannot pick a different depth.
+ */
+const APP_ROOT_FROM_PRODUCTION_DIR = "../../";
+
+/**
  * Production Builder
  * Generates production-ready files and bundles them for deployment
  * Build options are loaded from warlock.config.ts
@@ -76,6 +92,19 @@ function mergeBanner(
 export class ProductionBuilder {
   private options!: ResolvedBuildConfig;
   private readonly productionDir = warlockPath("production");
+
+  /**
+   * Connectors declared in `warlock.config.ts`. Read statically — `build`
+   * never calls `boot()`/`start()` on them; it only
+   * drains their `build` contributions.
+   */
+  private connectors: readonly Connector[] = [];
+
+  /**
+   * The contributors' merged esbuild patch, produced by the `generate` pass
+   * and consumed by {@link bundle}.
+   */
+  private contributedEsbuild: ConnectorEsbuildPatch = {};
 
   /**
    * Main build entry point
@@ -95,8 +124,28 @@ export class ProductionBuilder {
     // Step 4: Refuse to bundle code the app could not resolve at runtime
     await this.assertGeneratedImports();
 
+    // Step 4.5: Drain the connectors' `generate` contributions
+    const contributed = await this.runGenerateContributions();
+
+    // Step 4.6: Re-assert over what the contributors just wrote.
+    //
+    // Step 4 only saw core's own generated files; a contributor writes its
+    // code (a pages barrel, say) AFTER that assertion, so an undeclared bare
+    // specifier in it reaches the bundle unchecked. Under
+    // `packages: "external"` that specifier survives verbatim into the
+    // artifact and dies as ERR_MODULE_NOT_FOUND at runtime — the same failure
+    // step 4 exists to prevent. Skipped when nothing contributed: re-globbing
+    // and re-reading the production dir is pure cost in the common case.
+    if (contributed) {
+      await this.assertGeneratedImports();
+    }
+
     // Step 5: Bundle with esbuild
     await this.bundle();
+
+    // Step 5.5: Drain the connectors' `emit` contributions — after the
+    // bundle, and BEFORE step 6 deletes the directory they may still read.
+    await runEmitContributions(this.connectors, this.buildContext());
 
     // Step 6: Remove production folder
     await removeDirectoryAsync(this.productionDir);
@@ -110,9 +159,79 @@ export class ProductionBuilder {
    */
   private async initializeOptions(): Promise<void> {
     this.options = resolveBuildConfig();
+    // Same config object `resolveBuildConfig` just read — `warlock build`
+    // preloads warlock.config.ts, so no additional load happens here.
+    const connectors = warlockConfigManager.get("connectors") ?? [];
+
+    // Checked here, where the array is first read, so nothing downstream has
+    // drained anything yet: the `generate` and `emit` passes run per ENTRY, so
+    // a name listed twice would write its files and merge its esbuild options
+    // twice into an artifact the runtime then boots that name only once from.
+    // A build that half-applied a connector and reported success is worse than
+    // one that never started.
+    assertUniqueConnectorNames([...connectors]);
+
+    // And here rather than only at boot, for the same reason: a name a built-in
+    // already owns is skipped by the runtime, so an artifact built from it
+    // carries the custom connector's generated files and esbuild patches while
+    // the server boots the built-in instead. Refusing it at boot alone would
+    // mean the build had already emitted that artifact — the failure has to
+    // land on the developer running `warlock build`, not on whoever starts the
+    // server. Same assertion the registration half calls, over the same names.
+    assertNoReservedConnectorNames([...connectors]);
+
+    this.connectors = connectors;
 
     // Ensure production directory exists
     await ensureDirectoryAsync(this.productionDir);
+  }
+
+  /**
+   * The context handed to every build contribution.
+   */
+  private buildContext(): ConnectorBuildContext {
+    return {
+      productionDir: this.productionDir,
+      appRoot: rootPath(),
+      options: this.options,
+    };
+  }
+
+  /**
+   * Drain the `generate` hooks and fold what they returned back into the
+   * build.
+   *
+   * The entry point is REGENERATED here rather than generated later. The
+   * contribution slot is fixed — after `assertGeneratedImports` (so nothing
+   * bundles that the app could not resolve) and before `bundle` — while
+   * `generateEntryPoint` must stay at step 3, because `app.ts` is itself
+   * generated code the assertion has to see; moving it past the assertion
+   * would silently drop the entry from that check. Rewriting one small file
+   * is cheaper than losing either guarantee, and the write is pure
+   * (`generatedFiles` + these imports), so doing it twice is not a
+   * correctness risk.
+   *
+   * @returns whether any connector ran a `generate` hook — the caller uses it
+   * to decide if the import assertion is worth a second pass. Keyed on the
+   * hook EXISTING, not on what it returned: a hook that returns nothing may
+   * still have written files into `productionDir`, and those are exactly the
+   * files the second pass is there to read.
+   */
+  private async runGenerateContributions(): Promise<boolean> {
+    const contributed = this.connectors.some((connector) => Boolean(connector.build?.generate));
+
+    const { entryImports, esbuild } = await runGenerateContributions(
+      this.connectors,
+      this.buildContext(),
+    );
+
+    this.contributedEsbuild = esbuild;
+
+    if (entryImports.length > 0) {
+      await this.generateEntryPoint(entryImports);
+    }
+
+    return contributed;
   }
 
   /**
@@ -341,9 +460,22 @@ bootstrap();
 
   /**
    * Generate the main entry point (app.ts)
+   *
+   * @param contributedImports lines from connector `generate` hooks, appended
+   * to section 4 after `./routes`
    */
-  private async generateEntryPoint(): Promise<void> {
+  private async generateEntryPoint(contributedImports: string[] = []): Promise<void> {
     console.log(colors.yellow("   Generating entry point..."));
+
+    // The names this build resolved, baked in as a literal. The entry imports
+    // the config source, and that source is re-evaluated at startup — an
+    // env-conditional `connectors` array can hand the boot a different list
+    // than the one drained here. A literal is the only part of the array that
+    // survives into the artifact unchanged, so it is what the boot compares
+    // against.
+    const expectedNames = this.connectors
+      .map((connector) => JSON.stringify(connector.name))
+      .join(", ");
 
     // Build imports based on which files were generated
     const imports: string[] = [
@@ -352,6 +484,24 @@ bootstrap();
       "",
       "// 2. Load configs",
       'import "./config-loader";',
+      "",
+      // Registration has to sit between the config being available and the
+      // first phase starting: the connectors listed in `connectors` are the
+      // same ones this build drained contributions from, so the bundle boots
+      // exactly what it was built for. Register any later and an early-phase
+      // connector would miss its own start.
+      "// 2.5 Register connectors declared in warlock.config (the same array this",
+      "//     build read its contributions from, so built-for and boots-with match).",
+      "//     The config is imported STATICALLY so esbuild bakes it into the bundle",
+      "//     and the array is handed over explicitly — an artifact has no",
+      "//     warlock.config.ts beside it to read at runtime, and a registration",
+      "//     that quietly found nothing to register is the exact drift this",
+      "//     section exists to prevent.",
+      "//     `expectedNames` is the list this build resolved, in order — boot",
+      "//     refuses to start when the config hands over a different set or order.",
+      'import { registerConfiguredConnectors } from "@warlock.js/core";',
+      `import warlockConfig from "${APP_ROOT_FROM_PRODUCTION_DIR}warlock.config";`,
+      `registerConfiguredConnectors(warlockConfig.connectors ?? [], { expectedNames: [${expectedNames}] });`,
       "",
       "// 3. Start early-phase connectors (database, cache, logger, ...)",
       "//    so data sources, cache, etc. are ready before app code runs",
@@ -385,14 +535,29 @@ bootstrap();
       imports.push('await import("./routes");');
     }
 
+    // Contributor imports come AFTER `./routes`, never before: a connector
+    // that registers pages needs the routes app code already collected —
+    // the same ordering dev uses (routes first, then the connector installs
+    // on top of them). Emitted verbatim; the contributor writes the whole
+    // statement (e.g. `await import("./pages");`).
+    imports.push(...contributedImports);
+
+    // A rejecting validator (Application.onValidateBoot) must abort boot
+    // before late-phase connectors bind a port.
+    imports.push(
+      "",
+      "// 5. Run startup validators registered via Application.onValidateBoot(...)",
+      "await Application.runStartupValidators();",
+    );
+
     // Start late-phase connectors after app code registers routes/listeners
     imports.push(
       "",
-      "// 5. Start late-phase connectors (http, socket) â€” routes and",
+      "// 6. Start late-phase connectors (http, socket) â€” routes and",
       "//    listeners registered by app code are now ready to bind",
       "await connectorsManager.startPhase(ConnectorLifecyclePhase.Late);",
       "",
-      "// 6. Signal a complete boot so `Application.onceBooted(...)` listeners fire",
+      "// 7. Signal a complete boot so `Application.onceBooted(...)` listeners fire",
       "Application.markBooted({ environment: Application.environment, runtimeStrategy: Application.runtimeStrategy });",
       "connectorsManager.shutdownOnProcessKill();",
     );
@@ -437,6 +602,39 @@ bootstrap();
     const isEsm = (this.options.format ?? "esm") === "esm";
     const banner = mergeBanner(userBanner, esmShim && isEsm ? ESM_INTEROP_SHIM : undefined);
 
+    // Contributor patch, split into the part that can ride the spread order
+    // and the three keys that cannot. `jsx` and `jsxImportSource` are placed
+    // BEFORE the user spread below, which gives the ruled precedence for
+    // free: builder defaults < contributor < user config.
+    //
+    // `define`, `external` and `loader` are pulled out because a spread
+    // REPLACES them wholesale — the same trap `banner` documents. Two
+    // contributors' env defines, a contributor's optional peers plus the
+    // user's, or a contributor's `.svg` loader alongside the user's `.png`,
+    // must both survive, so they are merged by key/by set and re-applied
+    // after the spread with the user still winning per key.
+    const {
+      define: contributedDefine,
+      external: contributedExternal,
+      loader: contributedLoader,
+      ...contributedOptions
+    } = this.contributedEsbuild;
+
+    const userDefine: Record<string, string> | undefined = this.options.define;
+    const userExternal: string[] | undefined = this.options.external;
+    const userLoader: ConnectorEsbuildPatch["loader"] = this.options.loader;
+
+    const define =
+      contributedDefine || userDefine ? { ...contributedDefine, ...userDefine } : undefined;
+
+    const loader =
+      contributedLoader || userLoader ? { ...contributedLoader, ...userLoader } : undefined;
+
+    const external =
+      contributedExternal || userExternal
+        ? dedupe([...(contributedExternal ?? []), ...(userExternal ?? [])])
+        : undefined;
+
     if (singleBundle) {
       console.log(
         colors.magenta(
@@ -475,7 +673,15 @@ bootstrap();
       entryNames: entryName,
       alias,
       plugins: [nativeNodeModulesPlugin],
+      // Between the defaults and the user spread — the ruled precedence.
+      ...contributedOptions,
       ...(this.options as any),
+      // AFTER the spread for the same reason `banner` is: a spread replaces
+      // these objects instead of merging them, so the merged values are
+      // re-applied here. The user still wins — they were merged in last.
+      ...(define ? { define } : {}),
+      ...(external ? { external } : {}),
+      ...(loader ? { loader } : {}),
       // AFTER the spread, and intentionally so: `banner` is an object, and
       // both the config merge and this spread REPLACE it wholesale rather
       // than merging. Left as a default above, any user banner would delete

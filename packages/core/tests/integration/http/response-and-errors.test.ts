@@ -1,3 +1,4 @@
+import config from "@mongez/config";
 import { afterEach, describe, expect, it } from "vitest";
 import { v } from "@warlock.js/seal";
 import {
@@ -28,7 +29,7 @@ afterEach(async () => {
 describe("HTTP response helpers", () => {
   it("success() returns 200 with the given body as JSON", async () => {
     harness = await bootHarness((router) => {
-      router.get("/ok", (_request, response) => response.success({ value: 1 }));
+      router.get("/ok", ({ response }) => response.success({ value: 1 }));
     });
 
     const result = await harness.inject({ method: "GET", url: "/ok" });
@@ -40,7 +41,7 @@ describe("HTTP response helpers", () => {
 
   it("success() defaults to { success: true } when no body is given", async () => {
     harness = await bootHarness((router) => {
-      router.get("/ok-default", (_request, response) => response.success());
+      router.get("/ok-default", ({ response }) => response.success());
     });
 
     const result = await harness.inject({ method: "GET", url: "/ok-default" });
@@ -51,7 +52,7 @@ describe("HTTP response helpers", () => {
 
   it("successCreate() returns 201", async () => {
     harness = await bootHarness((router) => {
-      router.post("/created", (_request, response) => response.successCreate({ id: 10 }));
+      router.post("/created", ({ response }) => response.successCreate({ id: 10 }));
     });
 
     const result = await harness.inject({ method: "POST", url: "/created", payload: {} });
@@ -62,7 +63,7 @@ describe("HTTP response helpers", () => {
 
   it("notFound() returns 404 with the default envelope", async () => {
     harness = await bootHarness((router) => {
-      router.get("/missing", (_request, response) => response.notFound());
+      router.get("/missing", ({ response }) => response.notFound());
     });
 
     const result = await harness.inject({ method: "GET", url: "/missing" });
@@ -73,7 +74,7 @@ describe("HTTP response helpers", () => {
 
   it("badRequest() returns 400 with the given body", async () => {
     harness = await bootHarness((router) => {
-      router.get("/bad", (_request, response) => response.badRequest({ error: "nope" }));
+      router.get("/bad", ({ response }) => response.badRequest({ error: "nope" }));
     });
 
     const result = await harness.inject({ method: "GET", url: "/bad" });
@@ -84,7 +85,7 @@ describe("HTTP response helpers", () => {
 
   it("unauthorized() returns 401 with the default envelope", async () => {
     harness = await bootHarness((router) => {
-      router.get("/unauth", (_request, response) => response.unauthorized());
+      router.get("/unauth", ({ response }) => response.unauthorized());
     });
 
     const result = await harness.inject({ method: "GET", url: "/unauth" });
@@ -95,7 +96,7 @@ describe("HTTP response helpers", () => {
 
   it("forbidden() returns 403", async () => {
     harness = await bootHarness((router) => {
-      router.get("/forbidden", (_request, response) => response.forbidden({ error: "denied" }));
+      router.get("/forbidden", ({ response }) => response.forbidden({ error: "denied" }));
     });
 
     const result = await harness.inject({ method: "GET", url: "/forbidden" });
@@ -122,7 +123,7 @@ describe("HTTP validation — schema bound", () => {
    * exactly as the router lifts it from a controller in production.
    */
   function makeValidatedHandler(): RequestHandler {
-    const handler: RequestHandler = (request, response) => {
+    const handler: RequestHandler = ({ request, response }) => {
       return response.successCreate({ data: request.validated() });
     };
 
@@ -147,13 +148,39 @@ describe("HTTP validation — schema bound", () => {
       payload: { name: "Sam" },
     });
 
-    expect(result.statusCode).toBe(400);
+    // D2: schema-validation failures default to 422, not 400 — see implementation/2026-08-20-D2-core-422.md
+    expect(result.statusCode).toBe(422);
 
     const body = harness.json(result);
 
     expect(Array.isArray(body.errors)).toBe(true);
     expect(body.errors[0]).toMatchObject({ input: "age" });
     expect(typeof body.errors[0].error).toBe("string");
+  });
+
+  it("honours an app-configured validation.response.status back to 400 (D2)", async () => {
+    config.set("validation.response", {
+      errors: "errors",
+      inputKey: "input",
+      inputError: "error",
+      status: 400,
+    });
+
+    try {
+      harness = await bootHarness((router) => {
+        router.post("/signup-legacy-status", makeValidatedHandler());
+      });
+
+      const result = await harness.inject({
+        method: "POST",
+        url: "/signup-legacy-status",
+        payload: { name: "Sam" },
+      });
+
+      expect(result.statusCode).toBe(400);
+    } finally {
+      config.set("validation.response", undefined);
+    }
   });
 
   it("accepts good input and exposes it via request.validated()", async () => {
@@ -172,10 +199,10 @@ describe("HTTP validation — schema bound", () => {
   });
 
   it("short-circuits with a custom validate() result before the handler", async () => {
-    const handler: RequestHandler = (_request, response) => response.success({ reached: true });
+    const handler: RequestHandler = ({ response }) => response.success({ reached: true });
 
     handler.validation = {
-      validate: (request, response) => {
+      validate: ({ request, response }) => {
         if (!request.input("token")) {
           return response.badRequest({ error: "token required" });
         }

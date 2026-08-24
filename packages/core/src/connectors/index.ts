@@ -4,6 +4,8 @@
  */
 export * from "./access-connector";
 export * from "./ai-connector";
+export * from "./assert-no-reserved-connector-names";
+export * from "./assert-unique-connector-names";
 export * from "./base-connector";
 export * from "./cache-connector";
 export * from "./herald-connector";
@@ -13,6 +15,7 @@ export * from "./http-connector";
 export * from "./logger-connector";
 export * from "./mail-connector";
 export * from "./notifications-connector";
+export * from "./register-configured-connectors";
 export * from "./socket-connector";
 export * from "./storage.connector";
 export * from "./types";

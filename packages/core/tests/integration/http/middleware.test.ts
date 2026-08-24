@@ -33,7 +33,7 @@ describe("HTTP middleware — ordering", () => {
 
       router.get(
         "/ordered",
-        (_request, response) => {
+        ({ response }) => {
           trail.push("handler");
 
           return response.success({ trail });
@@ -54,7 +54,7 @@ describe("HTTP middleware — short-circuit", () => {
     const trail: string[] = [];
 
     harness = await bootHarness((router) => {
-      const blocker: Middleware = (_request, response) => {
+      const blocker: Middleware = ({ response }) => {
         trail.push("blocker");
 
         return response.badRequest({ error: "blocked" });
@@ -66,7 +66,7 @@ describe("HTTP middleware — short-circuit", () => {
 
       router.get(
         "/blocked",
-        (_request, response) => {
+        ({ response }) => {
           trail.push("handler");
 
           return response.success();
@@ -88,7 +88,7 @@ describe("HTTP middleware — short-circuit", () => {
 
       router.get(
         "/passes",
-        (_request, response) => response.success({ reached: true }),
+        ({ response }) => response.success({ reached: true }),
         { middleware: [passThrough] },
       );
     });
@@ -102,7 +102,7 @@ describe("HTTP middleware — short-circuit", () => {
 
 describe("HTTP middleware — guarded route", () => {
   it("rejects an unauthenticated request with 401 before the handler", async () => {
-    const guard: Middleware = (request, response) => {
+    const guard: Middleware = ({ request, response }) => {
       if (!request.header("authorization")) {
         return response.unauthorized({ error: "no token" });
       }
@@ -111,7 +111,7 @@ describe("HTTP middleware — guarded route", () => {
     harness = await bootHarness((router) => {
       router.get(
         "/guarded",
-        (_request, response) => response.success({ secret: "value" }),
+        ({ response }) => response.success({ secret: "value" }),
         { middleware: [guard] },
       );
     });
@@ -123,7 +123,7 @@ describe("HTTP middleware — guarded route", () => {
   });
 
   it("lets an authenticated request reach the handler", async () => {
-    const guard: Middleware = (request, response) => {
+    const guard: Middleware = ({ request, response }) => {
       if (!request.header("authorization")) {
         return response.unauthorized({ error: "no token" });
       }
@@ -132,7 +132,7 @@ describe("HTTP middleware — guarded route", () => {
     harness = await bootHarness((router) => {
       router.get(
         "/guarded-ok",
-        (_request, response) => response.success({ secret: "value" }),
+        ({ response }) => response.success({ secret: "value" }),
         { middleware: [guard] },
       );
     });
@@ -164,7 +164,7 @@ describe("HTTP middleware — group middleware", () => {
       router.group({ prefix: "/admin", middleware: [groupMiddleware] }, () => {
         router.get(
           "/dashboard",
-          (_request, response) => {
+          ({ response }) => {
             trail.push("handler");
 
             return response.success({ trail });
@@ -183,10 +183,10 @@ describe("HTTP middleware — group middleware", () => {
 
   it("lets group middleware short-circuit a route inside the group", async () => {
     harness = await bootHarness((router) => {
-      const denyAll: Middleware = (_request, response) => response.forbidden({ error: "denied" });
+      const denyAll: Middleware = ({ response }) => response.forbidden({ error: "denied" });
 
       router.group({ prefix: "/locked", middleware: [denyAll] }, () => {
-        router.get("/page", (_request, response) => response.success({ reached: true }));
+        router.get("/page", ({ response }) => response.success({ reached: true }));
       });
     });
 

@@ -84,9 +84,17 @@ export type CLICommandPreload = {
   runtimeStrategy?: RuntimeStrategy;
 
   /**
-   * Override current detect environment
+   * The environment this command runs under, whatever the shell exported.
+   *
+   * Set unconditionally — this is an override, not a default. A gate decides
+   * its own environment; inheriting `NODE_ENV` from whoever typed the command
+   * is how `warlock dev` ended up serving the production build of React.
+   *
+   * The key was spelled `environemnt` until it was fixed here. It was internally
+   * consistent, so it compiled and never failed — it just silently ignored every
+   * command that spelled it correctly, which was all of them.
    */
-  environemnt?: "production" | "development" | "test";
+  environment?: "production" | "development" | "test";
 
   /**
    * Whether to load environment variables from .env files.

@@ -407,7 +407,10 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
     event: StorageEventType,
     payload: T,
   ): Promise<void> {
-    await events.triggerAll(`storage.${event}`, payload);
+    // `triggerAll` is synchronous — it never awaits its handlers, so awaiting it
+    // would make async listeners fire-and-forget. `triggerAllAsync` takes the
+    // same `(event, ...args)` shape and awaits each handler in turn.
+    await events.triggerAllAsync(`storage.${event}`, payload);
   }
 
   // ============================================================

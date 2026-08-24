@@ -1,5 +1,5 @@
 import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
+import { isIP } from "@warlock.js/seal";
 import { StorageError } from "./storage-error";
 
 /**
@@ -16,6 +16,15 @@ import { StorageError } from "./storage-error";
 const DEFAULT_MAX_BYTES = 50 * 1024 * 1024;
 /** 30s — default per-request timeout. */
 const DEFAULT_TIMEOUT_MS = 30_000;
+/**
+ * Cap on the number of re-validated redirect hops. Mirrors
+ * `@warlock.js/ai`'s `DEFAULT_MAX_REDIRECTS`
+ * (ai/src/security/outbound-policy.ts:15).
+ */
+const DEFAULT_MAX_REDIRECTS = 5;
+
+/** 3xx statuses whose `Location` a follow re-issues — mirrors ai/src/security/outbound-policy.ts:18. */
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 /**
  * Options controlling a guarded outbound fetch. Every field is optional;
@@ -258,14 +267,24 @@ export type SafeFetchResult = {
  * the moment the running total exceeds `maxBytes`. A declared
  * `content-length` over the cap fails fast.
  *
- * @throws {StorageError} On a blocked URL, timeout, or oversized body.
+ * Redirects are NEVER delegated to the platform: every hop is issued with
+ * `redirect: "manual"` and its `Location` is re-run through
+ * {@link assertUrlAllowed} — including the DNS-resolution private-IP check
+ * — before being followed (capped at {@link DEFAULT_MAX_REDIRECTS}), so a
+ * 3xx from an allowed host cannot smuggle the request to a private /
+ * metadata target. Mirrors `@warlock.js/ai`'s `guardedFetch`
+ * (ai/src/security/outbound-policy.ts:188-284); duplicated per this
+ * module's file-header note since core cannot depend on ai.
+ *
+ * @throws {StorageError} On a blocked URL (initial or redirect target),
+ * a redirect-hop bound overflow, timeout, or oversized body.
  */
 export async function safeFetchToBuffer(
   rawUrl: string,
   options: SafeFetchOptions = {},
 ): Promise<SafeFetchResult> {
   const policy = resolveFetchPolicy(options);
-  const url = await assertUrlAllowed(rawUrl, policy);
+  let url = await assertUrlAllowed(rawUrl, policy);
 
   const controller = new AbortController();
   const timer = setTimeout(() => {
@@ -277,7 +296,43 @@ export async function safeFetchToBuffer(
   }, policy.timeoutMs);
 
   try {
-    const response = await policy.fetch(url, { signal: controller.signal });
+    let response: Response;
+
+    for (let hop = 0; ; hop++) {
+      response = await policy.fetch(url, { signal: controller.signal, redirect: "manual" });
+
+      const location = response.headers.get("location");
+      if (!REDIRECT_STATUSES.has(response.status) || location === null) {
+        break;
+      }
+
+      if (hop >= DEFAULT_MAX_REDIRECTS) {
+        throw new StorageError(
+          `outbound request blocked — more than ${DEFAULT_MAX_REDIRECTS} redirects`,
+          { context: { url: rawUrl, maxRedirects: DEFAULT_MAX_REDIRECTS } },
+        );
+      }
+
+      let target: URL;
+      try {
+        target = new URL(location, url);
+      } catch {
+        throw new StorageError(`outbound request blocked — invalid redirect Location: ${location}`, {
+          context: { url: url.toString(), location },
+        });
+      }
+
+      // Discard the interim body so the connection can be reused.
+      if (response.body) {
+        await response.body.cancel().catch(() => undefined);
+      }
+
+      // The redirect target gets the SAME scheme + private-IP validation
+      // (incl. DNS resolution) as the initial URL — this is what closes
+      // the redirect-based SSRF bypass: a 302 from an allowed host to
+      // 169.254.169.254 is re-validated here, not blindly followed.
+      url = await assertUrlAllowed(target.toString(), policy);
+    }
 
     const declared = Number(response.headers.get("content-length"));
     if (Number.isFinite(declared) && declared > policy.maxBytes) {

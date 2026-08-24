@@ -55,7 +55,7 @@ describe("dev server — per-route serverOptions", () => {
     const server = await bootDevServer((router) => {
       router.get(
         "/guarded",
-        (_request, response) => {
+        ({ response }) => {
           phases.push("handler");
 
           return response.success({ ok: true });
@@ -82,7 +82,7 @@ describe("dev server — per-route serverOptions", () => {
     const server = await bootDevServer((router) => {
       router.post(
         "/upload",
-        (_request, response) => {
+        ({ response }) => {
           handlerRan = true;
 
           return response.success({ ok: true });
@@ -107,7 +107,7 @@ describe("dev server — per-route serverOptions", () => {
     const order: string[] = [];
 
     const server = await bootDevServer((router) => {
-      router.get("/multi", (_request, response) => response.success({ ok: true }), {
+      router.get("/multi", ({ response }) => response.success({ ok: true }), {
         serverOptions: {
           onRequest: [
             async () => {
@@ -132,7 +132,7 @@ describe("dev server — per-route serverOptions", () => {
     const server = await bootDevServer((router) => {
       router.get(
         "/pre",
-        (_request, response) => {
+        ({ response }) => {
           phases.push("handler");
 
           return response.success({ ok: true });
@@ -156,7 +156,7 @@ describe("dev server — per-route serverOptions", () => {
     let guardedHookRan = false;
 
     const server = await bootDevServer((router) => {
-      router.get("/guarded", (_request, response) => response.success({ ok: true }), {
+      router.get("/guarded", ({ response }) => response.success({ ok: true }), {
         serverOptions: {
           onRequest: async () => {
             guardedHookRan = true;
@@ -164,7 +164,7 @@ describe("dev server — per-route serverOptions", () => {
         },
       });
 
-      router.get("/open", (_request, response) => response.success({ ok: true }));
+      router.get("/open", ({ response }) => response.success({ ok: true }));
     });
 
     await server.inject({ method: "GET", url: "/open" });
@@ -177,7 +177,7 @@ describe("dev server — per-route serverOptions", () => {
     const replacementSource = `dev-server-route-options-hmr-${harnessCounter++}`;
 
     const server = await bootDevServer((initialRouter) => {
-      initialRouter.get("/old", (_request, response) => response.success({ where: "old" }));
+      initialRouter.get("/old", ({ response }) => response.success({ where: "old" }));
     });
 
     expect((await server.inject({ method: "GET", url: "/old" })).statusCode).toBe(200);
@@ -190,7 +190,7 @@ describe("dev server — per-route serverOptions", () => {
     router.removeRoutesBySourceFile(bootedSourceFile);
 
     await router.withSourceFile(replacementSource, () => {
-      router.get("/new", (_request, response) => response.success({ where: "new" }));
+      router.get("/new", ({ response }) => response.success({ where: "new" }));
     });
 
     close = async () => {
@@ -205,7 +205,7 @@ describe("dev server — per-route serverOptions", () => {
 
   it("still answers 404 for an unmatched path", async () => {
     const server = await bootDevServer((router) => {
-      router.get("/known", (_request, response) => response.success({ ok: true }));
+      router.get("/known", ({ response }) => response.success({ ok: true }));
     });
 
     const result = await server.inject({ method: "GET", url: "/unknown" });

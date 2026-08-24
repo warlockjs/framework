@@ -40,7 +40,3 @@ Transport-agnostic use case pattern. A use case encapsulates a single business o
 
 - Application-level use cases (e.g. `loginUseCase`, `registerUseCase`)
 - Any business logic that needs structured execution with observability/broadcast
-
-## Design
-
-See [`domains/core/design/use-cases.md`](../../../../domains/core/design/use-cases.md) for the architecture and locked decisions.

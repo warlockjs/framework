@@ -58,7 +58,7 @@ function isAllowlisted(path: string, patterns: string[]) {
  * };
  */
 export function maintenanceMiddleware(options: MaintenanceOptions = {}): Middleware {
-  return (request, response) => {
+  return ({ request, response }) => {
     const enabled = config.get("http.maintenance.enabled", false);
 
     if (!enabled) return;

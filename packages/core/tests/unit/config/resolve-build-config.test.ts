@@ -1,6 +1,7 @@
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { normalizeBuildConfig } from "../../../src/warlock-config/normalize-build-config";
+import type { WarlockConfig } from "../../../src/warlock-config/types";
 
 const getConfig = vi.fn();
 
@@ -8,7 +9,25 @@ vi.mock("../../../src/warlock-config/warlock-config.manager", () => ({
   warlockConfigManager: { get: (key: string) => getConfig(key) },
 }));
 
-const { resolveBuildConfig } = await import("../../../src/production/resolve-build-config");
+const { resolveBuildConfig, ForbiddenBuildOptionError } = await import(
+  "../../../src/production/resolve-build-config"
+);
+
+/**
+ * Compile-time half of the tsconfig guard. The `@ts-expect-error` directives
+ * are the negative controls: esbuild's `tsconfig`/`tsconfigRaw` force the
+ * app's compiler options onto every workspace package in the bundle, so they
+ * must not be reachable from a typed config. If either ever compiles again,
+ * the directive turns into a TS2578 "unused directive" error.
+ */
+
+// @ts-expect-error — esbuild's `tsconfig` must NOT be settable in warlock build config
+const buildWithTsconfig: WarlockConfig["build"] = { tsconfig: "./tsconfig.json" };
+
+const buildWithTsconfigRaw: WarlockConfig["build"] = {
+  // @ts-expect-error — esbuild's `tsconfigRaw` must NOT be settable in warlock build config
+  tsconfigRaw: { compilerOptions: { verbatimModuleSyntax: true } },
+};
 
 describe("normalizeBuildConfig", () => {
   it("folds outDirectory into outdir", () => {
@@ -59,5 +78,20 @@ describe("resolveBuildConfig", () => {
     getConfig.mockReturnValue({ outdir: "out", outFile: "server.js" });
 
     expect(resolveBuildConfig().entryPath).toBe(path.resolve("out", "server.js"));
+  });
+
+  it("keeps the compile-time tsconfig rejections referenced", () => {
+    expect(buildWithTsconfig).toBeTypeOf("object");
+    expect(buildWithTsconfigRaw).toBeTypeOf("object");
+  });
+
+  // The type guard above is erased at runtime, so an `as any` config — or a
+  // plain JS warlock.config.js — can still carry the key through. Rejected,
+  // never stripped: silently dropping it would hide a real intent mismatch.
+  it.each(["tsconfig", "tsconfigRaw"] as const)("rejects an esbuild %s", key => {
+    getConfig.mockReturnValue({ [key]: "./tsconfig.json" });
+
+    expect(() => resolveBuildConfig()).toThrow(ForbiddenBuildOptionError);
+    expect(() => resolveBuildConfig()).toThrow(key);
   });
 });

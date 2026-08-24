@@ -14,6 +14,10 @@ export type AppConfigurations = {
    */
   localeCode?: string;
   /**
+   * List of supported request locale codes
+   */
+  localeCodes?: string[];
+  /**
    * List of allowed locale codes in the app
    */
   locales?: string[];

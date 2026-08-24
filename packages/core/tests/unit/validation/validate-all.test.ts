@@ -104,6 +104,6 @@ describe("validateAll - custom validate function", () => {
     const result = await validateAll(validation as never, request as never, response as never);
 
     expect(result).toBeUndefined();
-    expect(validation.validate).toHaveBeenCalledWith(request, response);
+    expect(validation.validate).toHaveBeenCalledWith({ request, response });
   });
 });

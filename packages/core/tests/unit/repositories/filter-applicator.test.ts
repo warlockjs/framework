@@ -265,3 +265,44 @@ describe("FilterApplicator — standard where operators", () => {
     expect(query.callTo("whereLike")?.args).toEqual(["email", "%@x.com"]);
   });
 });
+
+describe("FilterApplicator — multi-column 'like' (D1 regression)", () => {
+  it("keeps single-column 'like' working (whereLike, not equality)", () => {
+    const query = apply({ email: "like" }, { email: "%@x.com" });
+
+    expect(query.callTo("whereLike")?.args).toEqual(["email", "%@x.com"]);
+    expect(query.methodNames).not.toContain("where");
+  });
+
+  it("builds a like-OR group across columns instead of equality", () => {
+    const query = apply(
+      { search: ["like", ["name", "description"]] },
+      { search: "%coffee%" },
+    );
+
+    const orWhereCall = query.callTo("orWhere");
+    expect(orWhereCall).toBeDefined();
+    expect(typeof orWhereCall!.args[0]).toBe("function");
+
+    // Regression: previously this was `orWhere({ name: value, description: value })`,
+    // i.e. exact equality across both columns instead of like semantics.
+    expect(orWhereCall!.args[0]).not.toEqual({ name: "%coffee%", description: "%coffee%" });
+
+    // Run the callback against a fresh sub-query to assert the built shape.
+    const sub = new RecordingQuery();
+    (orWhereCall!.args[0] as (q: RecordingQuery) => void)(sub);
+
+    expect(sub.callTo("where")?.args).toEqual(["name", "like", "%coffee%"]);
+    expect(sub.callTo("orWhere")?.args).toEqual(["description", "like", "%coffee%"]);
+  });
+
+  it("throws naming the rule and the operator for a genuinely unsupported multi-column operator", () => {
+    expect(() =>
+      apply({ range: [">", ["startDate", "endDate"]] }, { range: 5 }),
+    ).toThrowError(/range/);
+
+    expect(() =>
+      apply({ range: [">", ["startDate", "endDate"]] }, { range: 5 }),
+    ).toThrowError(/>/);
+  });
+});

@@ -7,13 +7,15 @@ import type { LogLevel } from "@warlock.js/logger";
 import { log } from "@warlock.js/logger";
 import { BaseValidator, v } from "@warlock.js/seal";
 import type { FastifyRequest } from "fastify";
+import { randomBytes } from "node:crypto";
 import { type IncomingHttpHeaders } from "node:http2";
 import { config } from "../config/config-getter";
+import { resolveLocaleConfiguration } from "../config/locale-configuration";
 import type { Middleware, Route } from "../router";
 import { validateAll } from "../validation/validateAll";
 import { createRequestStore } from "./middleware/inject-request-context";
 import { Response } from "./response";
-import type { RequestEvent } from "./types";
+import type { RequestEvent, RequestLocals, RequestUser } from "./types";
 import { UploadedFile } from "./uploaded-file";
 
 type StandardHeaders = {
@@ -67,6 +69,96 @@ export class Request<RequestValidation = any> {
   public decodedAccessToken?: any;
 
   /**
+   * The authenticated user attached to this request, if any.
+   *
+   * `RequestUser` is empty by default, so ANY shape is assignable here at the
+   * declaration site — the app or auth package declares its real fields via
+   * module augmentation:
+   *
+   * ```typescript
+   * declare module "@warlock.js/core" {
+   *   interface RequestUser {
+   *     id: string | number;
+   *   }
+   * }
+   * ```
+   *
+   * Replaces the v4 `GuardedRequest` convention
+   * (`create-warlock/.../guarded.request.ts` — `Request<T> & { user: User }`,
+   * an intersection type hand-declared per app) with a property core itself
+   * declares and types. `clearCurrentUser()` below is the one place core
+   * writes it directly; auth middleware is expected to do the same after a
+   * successful token resolution.
+   */
+  public user?: RequestUser;
+
+  /**
+   * Private, server-only, per-request data bag.
+   *
+   * Distinct from the input payload (`body` / `query` / `params` / `all()`):
+   * a write here never surfaces in `request.all()`, `request.validated()`, or
+   * `request.input()`. That is the trap `request.set()` sets for private data
+   * — it writes into the payload `all` bag, so anything stored there leaks
+   * into every input accessor and, from there, into the client-facing
+   * payload. `locals` is the correct home for private per-request app data
+   * (a resolved session, a fetched-once model) that must never be mistaken
+   * for client input.
+   *
+   * Augmentable via module augmentation, in the module that OWNS the key:
+   *
+   * ```typescript
+   * declare module "@warlock.js/core" {
+   *   interface RequestLocals {
+   *     session?: { token: string };
+   *   }
+   * }
+   * ```
+   *
+   * A plain class-field initializer is sufficient for "fresh per request":
+   * `router.ts:925` constructs `new Request()` for every incoming request —
+   * `Request` instances are not pooled or reused across requests — so this
+   * initializer runs exactly once per request and no value can leak in from
+   * a prior one.
+   */
+  public locals: RequestLocals = {};
+
+  /**
+   * Backing field for the lazily-generated CSP nonce. Left `undefined` until
+   * the first `request.nonce` read; see the `nonce` getter below.
+   */
+  protected _nonce?: string;
+
+  /**
+   * Per-request Content-Security-Policy nonce — a fresh, unguessable value
+   * the web layer hands to `<Scripts nonce={...} />` (the inline payload
+   * script) and to the `Content-Security-Policy` header, so a strict
+   * `script-src 'nonce-...'` allows only the script this request actually
+   * rendered.
+   *
+   * Generated LAZILY on first access, not eagerly in `setRequest()`: most
+   * requests (API routes, anything that isn't rendering HTML) never read it,
+   * and spending a `randomBytes` call on every single request for a value
+   * most of them discard is wasted entropy draw + CPU. Once generated it is
+   * cached in `_nonce`, so every subsequent read within the SAME request
+   * returns the identical value — required, since the header and the inline
+   * `<script>` tag must agree on one nonce. `_nonce` is a plain field on a
+   * per-request `Request` instance (see `locals` above — `router.ts:925`,
+   * no pooling), so the cache can never leak into the next request; a fresh
+   * `Request` means a fresh, unset `_nonce`.
+   *
+   * 16 random bytes, base64-encoded — the size the CSP Level 3 spec's own
+   * examples use, and far more entropy than an attacker could feasibly guess
+   * to defeat the policy.
+   */
+  public get nonce(): string {
+    if (!this._nonce) {
+      this._nonce = randomBytes(16).toString("base64");
+    }
+
+    return this._nonce;
+  }
+
+  /**
    * Current request instance
    */
   public static current: Request;
@@ -82,23 +174,15 @@ export class Request<RequestValidation = any> {
    */
   public t: ReturnType<typeof trans> = trans;
 
-  /**
-   * Dynamic properties index signature
-   *
-   * This allows attaching custom properties to the request instance,
-   * commonly used during validation middleware to attach fetched models.
-   *
-   * @example
-   * // In validation middleware:
-   * const post = await Post.find(request.int("id"));
-   * if (!post) return response.notFound();
-   * request.post = post; // Attach the model to the request
-   *
-   * // In route handler:
-   * const post = request.post;
-   * // Work with the pre-fetched model
+  /*
+   * v5 removed the `[key: string]: any` index signature (eed20184). Attaching
+   * arbitrary properties compiled silently and hid real bugs behind `any`.
+   * The sanctioned extension paths are:
+   * - `request.locals` (augment `RequestLocals` via module augmentation) for
+   *   per-request attached data, e.g. models fetched in validation middleware.
+   * - `requestMemo(key, fn)` for per-request memoized computation.
+   * - Module augmentation of the `Request` class itself for new typed members.
    */
-  [key: string]: any;
 
   /**
    * Locale code
@@ -135,9 +219,13 @@ export class Request<RequestValidation = any> {
 
     this.parsePayload();
 
-    const localeCode = this.getLocaleCode();
-
-    this.trans = this.t = transFrom.bind(null, localeCode);
+    // Resolve the locale at CALL time, never at bind time. `setRequest` runs
+    // before routing, so a locale set later (path locale, `setLocaleCode`, the
+    // web layer's C3 derivation) must steer translations too — the old
+    // `transFrom.bind(null, localeCode)` snapshot made `request.locale` and
+    // `request.trans()` silently disagree for the rest of the request.
+    this.trans = this.t = (keyword: string, placeholders?: any) =>
+      transFrom(this.getLocaleCode(), keyword, placeholders);
 
     return this;
   }
@@ -192,44 +280,71 @@ export class Request<RequestValidation = any> {
   }
 
   /**
+   * Cache one supported locale without coercing request-controlled input.
+   */
+  protected cacheLocale(candidate: unknown): string {
+    const localeConfiguration = resolveLocaleConfiguration(
+      config.key("app.localeCode"),
+      config.key("app.localeCodes"),
+    );
+    const acceptedLocale =
+      typeof candidate === "string" &&
+      candidate.length > 0 &&
+      localeConfiguration.localeCodes.includes(candidate)
+        ? candidate
+        : localeConfiguration.defaultLocaleCode;
+
+    this._locale = acceptedLocale;
+
+    return this._locale;
+  }
+
+  /**
+   * Resolve the first present Mode B source. Unsupported values fail closed to
+   * the configured default instead of widening the application's locale set.
+   */
+  protected resolveLocale(): string {
+    const candidate = [
+      this.query["locale"],
+      this.cookies["locale"],
+      this.header("locale"),
+    ].find((value) => typeof value === "string" && value.length > 0);
+
+    return this.cacheLocale(candidate);
+  }
+
+  /**
    * Get current locale code
    */
-  public get locale() {
+  public get locale(): string {
     if (this._locale) return this._locale;
 
-    return this.header("translation-locale-code") || this.localized;
+    return this.resolveLocale();
   }
 
   /**
    * Set locale code
    */
   public set locale(localeCode: string) {
-    this._locale = localeCode;
-  }
-
-  /**
-   * Get locale code that will be used for translation
-   */
-  public get localized() {
-    if (this._locale) return this._locale;
-
-    return (this._locale = this.header("locale") || this.query["locale"]);
+    this.cacheLocale(localeCode);
   }
 
   /**
    * Set locale code
    */
   public setLocaleCode(localeCode: string) {
-    this._locale = localeCode;
+    this.locale = localeCode;
 
     return this;
   }
 
   /**
-   * Get current locale code or return default locale code
+   * @deprecated Use `request.locale`. This alias is removed after one version.
+   * The legacy default argument is accepted for source compatibility but the
+   * resolved default is owned exclusively by app configuration.
    */
-  public getLocaleCode(defaultLocaleCode: string = config.key("app.localeCode") || "en") {
-    return this.locale || defaultLocaleCode;
+  public getLocaleCode(_legacyDefaultLocaleCode?: string): string {
+    return this.locale;
   }
 
   /**
@@ -244,13 +359,6 @@ export class Request<RequestValidation = any> {
    */
   public async validate(validation: BaseValidator, selectedInputs?: string[]) {
     return await v.validate(validation, selectedInputs ? this.only(selectedInputs) : this.all());
-  }
-
-  /**
-   * Clear current user
-   */
-  public clearCurrentUser() {
-    this.user = undefined;
   }
 
   /**
@@ -523,7 +631,7 @@ export class Request<RequestValidation = any> {
    * Listen to the given event
    */
   public on(eventName: RequestEvent, callback: any) {
-    return this.subscribe(eventName, callback);
+    return events.subscribe(`request.${eventName}`, callback);
   }
 
   /**
@@ -672,7 +780,7 @@ export class Request<RequestValidation = any> {
 
     for (const middleware of middlewares) {
       this.log("Executing middleware " + colors.yellowBright(middleware.name));
-      const output = await middleware(this, this.response);
+      const output = await middleware({ request: this, response: this.response });
       this.log("Executed middleware " + colors.yellowBright(middleware.name), "success");
 
       if (output !== undefined) {

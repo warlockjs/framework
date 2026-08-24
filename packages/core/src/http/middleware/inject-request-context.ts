@@ -10,10 +10,7 @@ import { DatabaseWriterValidationError } from "@warlock.js/cascade";
 import { contextManager } from "@warlock.js/context";
 import config from "@mongez/config";
 import { environment } from "../../utils";
-import {
-  requestContext as requestContextInstance,
-  useRequestStore,
-} from "../context/request-context";
+import { requestContext as requestContextInstance } from "../context/request-context";
 import {
   BadRequestError,
   ForbiddenError,
@@ -77,15 +74,15 @@ export function createRequestStore(
 
       request.log("Executing Handler", "info");
 
-      const output = await handler(request, response);
+      const output = await handler({ request, response });
 
       request.log("Handler Executed Successfully", "success");
 
       request.trigger("executedAction", request.route);
 
       return output as ReturnedResponse;
-    } catch (error: any) {
-      request.log(`${error.constructor.name}: Request failed: ${error.message}`, "error");
+    } catch (error) {
+      request.log(error, "error");
       return handleRequestError(error, response);
     }
   });
@@ -95,7 +92,7 @@ export function createRequestStore(
  * Handle request errors
  * @internal
  */
-function handleRequestError(error: any, response: Response): ReturnedResponse {
+function handleRequestError(error: unknown, response: Response): ReturnedResponse {
   if (error instanceof HttpError) {
     const payload: GenericObject = {
       error: error.message,
@@ -152,11 +149,15 @@ function handleRequestError(error: any, response: Response): ReturnedResponse {
     });
   }
 
-  console.log(error);
+  // Last resort: the error matched none of the known shapes above, so the
+  // client gets a deliberately opaque message. Without this line the error
+  // itself is discarded here — no stack, no message, nothing in any log — and
+  // an unrecognised failure becomes indistinguishable from a working server
+  // returning 500. Never swallow the only copy of an error (`65e476ee`).
+  console.error("[warlock] unhandled request error:", error);
 
-  return response.badRequest({
-    error: error.message,
-    ...error.payload,
+  return response.serverError({
+    error: "Internal server error.",
   });
 }
 
@@ -170,23 +171,8 @@ export function t(keyword: string, placeholders?: any) {
   );
 }
 
-/**
- * Get or compute a value from the request cache
- *
- * If the value exists in request, return it.
- * Otherwise, execute callback, store result in request, and return it.
- */
-export async function fromRequest<T>(
-  key: string,
-  callback: (request?: Request) => Promise<T>,
-): Promise<T> {
-  const { request } = useRequestStore();
-
-  if (!request) return await callback();
-
-  if (request[key]) return request[key];
-
-  request[key] = await callback(request);
-
-  return request[key];
-}
+// `fromRequest` was removed in v5. It cached computed values as dynamic
+// properties on the Request instance, which only compiled because of the
+// `[key: string]: any` index signature that v5 deletes (eed20184). Use
+// `requestMemo(key, fn)` from `../context/request-memo` instead — same
+// per-request lifetime, single-flight, and it never touches the Request object.

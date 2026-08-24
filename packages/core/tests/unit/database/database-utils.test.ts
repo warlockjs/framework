@@ -8,8 +8,28 @@ vi.mock("@warlock.js/auth", () => ({
   authService: { hashPassword: vi.fn((value: string) => `hashed:${value}`) },
 }));
 
+import type { SchemaContext } from "@warlock.js/seal";
 import { seeder } from "../../../src/database/seeds/seeder";
 import { useComputedSlug } from "../../../src/database/utils";
+
+/**
+ * A complete `SchemaContext`. The computed-slug callback only reads
+ * `allValues` and `rootContext`, but it is typed against the whole context the
+ * schema engine passes, so the spec supplies the whole thing rather than
+ * casting a two-key partial at the call site.
+ */
+function makeSchemaContext(overrides: Partial<SchemaContext> = {}): SchemaContext {
+  return {
+    allValues: {},
+    parent: {},
+    value: undefined,
+    key: "",
+    path: "",
+    translateRule: () => "",
+    translateAttribute: () => "",
+    ...overrides,
+  };
+}
 
 /**
  * Database-module utility tests. The database slice's public surface is thin —
@@ -85,7 +105,10 @@ describe("useComputedSlug — global scope", () => {
 
     const model = { get: vi.fn() };
     const data = {};
-    const context = { rootContext: { model }, allValues: { seo: { title: "Deep Title" } } };
+    const context = makeSchemaContext({
+      rootContext: { model },
+      allValues: { seo: { title: "Deep Title" } },
+    });
 
     expect(callback(data, context)).toBe("deep-title");
   });

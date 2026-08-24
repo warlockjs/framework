@@ -12,8 +12,8 @@ export type { RateLimitOptions } from "./rate-limit.middleware";
 
 // Framework-level utilities (not middleware factories) stay top-level.
 // - `t` — translation helper bound to the request context
-// - `fromRequest` — per-request memoization helper
 // - `createRequestStore` — context bootstrapper used by the server
+// (`fromRequest` was removed in v5 — use `requestMemo` from the context module.)
 export * from "./inject-request-context";
 
 // Shared middleware helpers — useful for consumers building their own middlewares

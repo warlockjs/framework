@@ -71,18 +71,82 @@ describe("Router.restfulResource — full chain", () => {
       router.restfulResource("/users", fullResource(), { name: "users" });
     });
 
-    // NOTE: the `users` base is doubled (`users.users.*`) because the wrapping
-    // `prefix("/users")` group auto-derives the name segment `users` from the
-    // path AND `options.name` re-applies `users` as the resource base. This
-    // pins the CURRENT behavior; the doubling is tracked as a naming defect.
     expect(shape().map((entry) => entry.name)).toEqual([
-      "users.users.list",
-      "users.users.single",
-      "users.users.create",
-      "users.users.update",
-      "users.users.patch",
-      "users.users.delete",
-      "users.users.bulkDelete",
+      "users.list",
+      "users.single",
+      "users.create",
+      "users.update",
+      "users.patch",
+      "users.delete",
+      "users.bulkDelete",
+    ]);
+  });
+
+  it("derives the resource name from the path when `options.name` is omitted", async () => {
+    await withScope(() => {
+      router.restfulResource("/products", fullResource());
+    });
+
+    expect(shape().map((entry) => entry.name)).toEqual([
+      "products.list",
+      "products.single",
+      "products.create",
+      "products.update",
+      "products.patch",
+      "products.delete",
+      "products.bulkDelete",
+    ]);
+  });
+
+  it("lets `options.name` replace the path-derived name instead of composing with it", async () => {
+    await withScope(() => {
+      router.restfulResource("/products", fullResource(), { name: "catalog" });
+    });
+
+    expect(shape().map((entry) => entry.name)).toEqual([
+      "catalog.list",
+      "catalog.single",
+      "catalog.create",
+      "catalog.update",
+      "catalog.patch",
+      "catalog.delete",
+      "catalog.bulkDelete",
+    ]);
+  });
+
+  it("prefixes names with the enclosing group when nested inside one", async () => {
+    await withScope(() => {
+      router.group({ prefix: "/api", name: "api" }, () => {
+        router.restfulResource("/products", fullResource());
+      });
+    });
+
+    expect(shape().map((entry) => entry.name)).toEqual([
+      "api.products.list",
+      "api.products.single",
+      "api.products.create",
+      "api.products.update",
+      "api.products.patch",
+      "api.products.delete",
+      "api.products.bulkDelete",
+    ]);
+  });
+
+  it("lets `options.name` replace the path-derived name when nested in a group too", async () => {
+    await withScope(() => {
+      router.group({ prefix: "/api", name: "api" }, () => {
+        router.restfulResource("/products", fullResource(), { name: "catalog" });
+      });
+    });
+
+    expect(shape().map((entry) => entry.name)).toEqual([
+      "api.catalog.list",
+      "api.catalog.single",
+      "api.catalog.create",
+      "api.catalog.update",
+      "api.catalog.patch",
+      "api.catalog.delete",
+      "api.catalog.bulkDelete",
     ]);
   });
 
@@ -103,9 +167,7 @@ describe("Router.restfulResource — full chain", () => {
 
     expect(listRoute?.method).toBe("GET");
     expect(listRoute?.$prefixStack).toContain("/admin/posts");
-    // The path's own segments feed the auto-derived group name too, so the
-    // multi-segment base shows up as `admin.posts.posts.list`.
-    expect(listRoute?.name).toBe("admin.posts.posts.list");
+    expect(listRoute?.name).toBe("posts.list");
   });
 });
 

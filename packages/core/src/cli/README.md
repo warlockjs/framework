@@ -12,6 +12,7 @@ Command-line interface system. Parses CLI arguments, discovers commands from the
 | `parse-cli-args.ts`         | Parses raw `process.argv` into structured command + flags                                        |
 | `commands-loader.ts`        | Discovers and loads commands from framework + project                                            |
 | `framework-cli-commands.ts` | Registers all built-in framework commands                                                        |
+| `migration-renames.ts`      | Mechanical request-surface rename list for the v5 migration CLI                                  |
 | `start.ts`                  | Entry point that kicks off CLI processing                                                        |
 | `string-similarity.ts`      | Fuzzy string matching for "did you mean?" suggestions                                            |
 | `types.ts`                  | CLI-related TypeScript types                                                                     |

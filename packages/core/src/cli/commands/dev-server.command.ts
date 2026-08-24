@@ -10,6 +10,13 @@ export const devServerCommand = command({
   persistent: true,
   preload: {
     runtimeStrategy: "development",
+    // Overrides whatever NODE_ENV the shell exported. A shell with
+    // NODE_ENV=production made Vite's dep optimiser pre-bundle the PRODUCTION
+    // build of React, which silently suppresses hydration-mismatch warnings —
+    // the dev server was hiding the exact class of bug it exists to surface.
+    // Set here, in preload, because preloaders run before the action, and the
+    // action is what eventually reaches Vite's `createServer`.
+    environment: "development",
     config: true, // load all config
     bootstrap: true,
     prestart: true, // load prestart file (if exists)

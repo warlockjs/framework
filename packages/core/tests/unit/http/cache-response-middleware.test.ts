@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { makeCtx } from "../../test-support/make-ctx";
 
 /**
  * Unit coverage for the response-cache middleware.
@@ -37,7 +38,7 @@ function makeRequest(path: string) {
   return {
     path,
     getLocaleCode: () => "en",
-  } as never;
+  };
 }
 
 function makeResponse(seed: {
@@ -98,7 +99,7 @@ describe("cacheMiddleware", () => {
     const middleware = cacheMiddleware({ cacheKey: "key", withLocale: false });
     const response = makeResponse({ path: "/items" });
 
-    const result = await middleware(makeRequest("/items"), response as never);
+    const result = await middleware(makeCtx({ request: makeRequest("/items"), response }));
 
     expect(response.replay).toHaveBeenCalledTimes(1);
     expect(response.replay).toHaveBeenCalledWith({
@@ -119,7 +120,7 @@ describe("cacheMiddleware", () => {
     const middleware = cacheMiddleware({ cacheKey: "key", withLocale: false });
     const response = makeResponse({ path: "/items" });
 
-    await middleware(makeRequest("/items"), response as never);
+    await middleware(makeCtx({ request: makeRequest("/items"), response }));
 
     expect(response.replay).toHaveBeenCalledWith({
       status: 200,
@@ -140,7 +141,7 @@ describe("cacheMiddleware", () => {
       parsedBody: { id: 7, user: { secret: true } },
     });
 
-    await middleware(makeRequest("/items"), response as never);
+    await middleware(makeCtx({ request: makeRequest("/items"), response }));
 
     response.fireSent();
 
@@ -166,7 +167,7 @@ describe("cacheMiddleware", () => {
       parsedBody: { id: 1 },
     });
 
-    await middleware(makeRequest("/items"), response as never);
+    await middleware(makeCtx({ request: makeRequest("/items"), response }));
 
     response.fireSent();
 
@@ -192,7 +193,7 @@ describe("cacheMiddleware", () => {
       parsedBody: { error: "boom" },
     });
 
-    await middleware(makeRequest("/items"), response as never);
+    await middleware(makeCtx({ request: makeRequest("/items"), response }));
 
     response.fireSent();
 

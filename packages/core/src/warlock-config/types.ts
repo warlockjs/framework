@@ -1,5 +1,6 @@
 import type { MigrationConstructor } from "@warlock.js/cascade";
 import type { CLICommand } from "../commands/cli-command";
+import type { Connector } from "../connectors/types";
 import type { FileHealthCheckerContract } from "../dev-server/health-checker/file-health-checker.contract";
 import { BuildOptions } from "esbuild";
 
@@ -20,8 +21,16 @@ export type WarlockConfig = {
 
   /**
    * Build configuration
+   *
+   * `tsconfig` and `tsconfigRaw` are deliberately omitted alongside
+   * `entryPoints`. Either one applies the app's compiler options to EVERY
+   * file esbuild touches, workspace packages included — so an app-level
+   * `verbatimModuleSyntax: true` is imposed on package sources that were
+   * never written for it, and the bundle dies at import time with
+   * `Class extends value undefined`. The builder derives what it needs from
+   * the app's tsconfig itself (see `buildAliasMapFromTsconfig`).
    */
-  build?: Omit<BuildOptions, 'entryPoints'> & {
+  build?: Omit<BuildOptions, "entryPoints" | "tsconfig" | "tsconfigRaw"> & {
     /**
      * Output directory
      *
@@ -91,6 +100,32 @@ export type WarlockConfig = {
      */
     sourcemap?: boolean | "inline" | "linked";
   };
+
+  /**
+   * Connectors this application adds beyond the built-in ones.
+   *
+   * ONE key drives both halves of a connector's life:
+   *
+   * - `warlock build` reads this array STATICALLY and drains each
+   *   connector's `build` contribution. It never calls `boot()`/`start()` —
+   *   listing a connector here does not run it.
+   * - `warlock dev` and the generated production entry register the same
+   *   array with the connectors manager, which is what actually boots it.
+   *
+   * A second key ("built for X" beside "boots X") was rejected precisely
+   * because the two would drift, and that drift is silent: a green build
+   * with no client bundle.
+   *
+   * @example
+   * ```typescript
+   * import { webConnector } from "@warlock.js/web/connector";
+   *
+   * export default defineConfig({
+   *   connectors: [webConnector({ pagesDirectory: "pages" })],
+   * });
+   * ```
+   */
+  connectors?: Connector[];
 
   /**
    * CLI configuration

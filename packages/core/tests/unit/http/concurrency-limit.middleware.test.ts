@@ -80,13 +80,13 @@ describe("concurrencyLimitMiddleware", () => {
     const second = makeResponse();
     const third = makeResponse();
 
-    middleware(makeRequest("/reports"), first as never);
-    middleware(makeRequest("/reports"), second as never);
+    middleware({ request: makeRequest("/reports"), response: first as never });
+    middleware({ request: makeRequest("/reports"), response: second as never });
 
     expect(first.tooManyRequests).not.toHaveBeenCalled();
     expect(second.tooManyRequests).not.toHaveBeenCalled();
 
-    middleware(makeRequest("/reports"), third as never);
+    middleware({ request: makeRequest("/reports"), response: third as never });
 
     expect(third.tooManyRequests).toHaveBeenCalledTimes(1);
   });
@@ -95,7 +95,7 @@ describe("concurrencyLimitMiddleware", () => {
     const middleware = concurrencyLimitMiddleware(1);
 
     const first = makeResponse();
-    middleware(makeRequest("/reports"), first as never);
+    middleware({ request: makeRequest("/reports"), response: first as never });
 
     // Simulate a noContent/redirect/sendFile response: the raw socket finishes
     // but `onSent` never fires.
@@ -103,7 +103,7 @@ describe("concurrencyLimitMiddleware", () => {
 
     // The slot must now be free — a new request should NOT be throttled.
     const second = makeResponse();
-    middleware(makeRequest("/reports"), second as never);
+    middleware({ request: makeRequest("/reports"), response: second as never });
 
     expect(second.tooManyRequests).not.toHaveBeenCalled();
   });
@@ -112,12 +112,12 @@ describe("concurrencyLimitMiddleware", () => {
     const middleware = concurrencyLimitMiddleware(1);
 
     const first = makeResponse();
-    middleware(makeRequest("/reports"), first as never);
+    middleware({ request: makeRequest("/reports"), response: first as never });
 
     first.raw.emit("close");
 
     const second = makeResponse();
-    middleware(makeRequest("/reports"), second as never);
+    middleware({ request: makeRequest("/reports"), response: second as never });
 
     expect(second.tooManyRequests).not.toHaveBeenCalled();
   });
@@ -126,7 +126,7 @@ describe("concurrencyLimitMiddleware", () => {
     const middleware = concurrencyLimitMiddleware(2);
 
     const first = makeResponse();
-    middleware(makeRequest("/reports"), first as never);
+    middleware({ request: makeRequest("/reports"), response: first as never });
 
     // Both the onSent path and the raw finish path fire (the normal send case).
     first.fireSent();
@@ -138,8 +138,8 @@ describe("concurrencyLimitMiddleware", () => {
     const second = makeResponse();
     const third = makeResponse();
 
-    middleware(makeRequest("/reports"), second as never);
-    middleware(makeRequest("/reports"), third as never);
+    middleware({ request: makeRequest("/reports"), response: second as never });
+    middleware({ request: makeRequest("/reports"), response: third as never });
 
     expect(second.tooManyRequests).not.toHaveBeenCalled();
     expect(third.tooManyRequests).not.toHaveBeenCalled();

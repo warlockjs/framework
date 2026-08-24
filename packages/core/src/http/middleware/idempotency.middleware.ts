@@ -77,7 +77,7 @@ const DEFAULT_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
  * });
  */
 export function idempotencyMiddleware(options: IdempotencyOptions = {}): Middleware {
-  return async (request, response) => {
+  return async ({ request, response }) => {
     const headerName =
       options.headerName ||
       config.get("http.idempotency.headerName", "Idempotency-Key");

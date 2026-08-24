@@ -40,12 +40,13 @@ function makeRequest(seed: {
 }
 
 /**
- * `config.set(key, undefined)` stores `null` rather than unsetting, and a
- * later `config.get(key, fallback)` returns that `null` instead of the
- * fallback — so reset by deleting the key.
+ * Reset by removing the key outright: a stored `null` is not the same as an
+ * absent key, and only an absent key makes a later `config.get(key, fallback)`
+ * return the fallback. `unset()` exists for exactly this — reaching into
+ * `list()` and deleting by hand relied on it returning the live object.
  */
 function unsetTrustProxy() {
-  delete config.list()?.http?.trustProxy;
+  config.unset("http.trustProxy");
 }
 
 /**

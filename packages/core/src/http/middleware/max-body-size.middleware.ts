@@ -34,7 +34,7 @@ import { parseSize } from "./utils/parse-size";
 export function maxBodySizeMiddleware(limit: string | number): Middleware {
   const limitBytes = parseSize(limit);
 
-  return (request, response) => {
+  return ({ request, response }) => {
     const contentLengthHeader = request.header("content-length");
 
     if (!contentLengthHeader) return;

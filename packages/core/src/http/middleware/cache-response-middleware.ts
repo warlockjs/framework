@@ -1,6 +1,7 @@
 import { except } from "@mongez/reinforcements";
 import { cache } from "@warlock.js/cache";
 import { log } from "@warlock.js/logger";
+import type { Middleware } from "../../router/types";
 import type { Request } from "./../request";
 import type { Response } from "./../response";
 
@@ -95,8 +96,11 @@ async function parseCacheOptions(
 
 export function cacheMiddleware(
   responseCacheOptions: CacheMiddlewareOptions | string,
-) {
-  return async function (request: Request, response: Response) {
+): Middleware {
+  // The `Middleware` return annotation is load-bearing: without it, tsc never
+  // checks this factory's calling convention, which is how the positional v4
+  // shape survived an earlier refactor unnoticed.
+  return async function ({ request, response }) {
     const { ttl, omit, cacheKey, driver } = await parseCacheOptions(
       responseCacheOptions,
       request,

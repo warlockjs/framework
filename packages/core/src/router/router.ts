@@ -13,6 +13,7 @@ import { RouteBuilder } from "./route-builder";
 import { RouteRegistry } from "./route-registry";
 import type {
   GroupedRoutesOptions,
+  HttpContext,
   RequestHandler,
   RequestHandlerType,
   RequestHandlerValidation,
@@ -94,6 +95,26 @@ async function runRouteHooks(
   return undefined;
 }
 
+/**
+ * Describe one claimant of a route name, for the duplicate-name error.
+ *
+ * `warlock dev` registers SSR page routes on the same router as API routes, so
+ * the two share a single route-name namespace and collide across kinds. The
+ * error is only actionable if it says which claimant is which, so `isPage` —
+ * the router's only route-kind discriminator — is what separates them here.
+ *
+ * `sourceFile` is stamped only on routes registered through `withSourceFile`,
+ * which page routes are not (the stack is a single slot, so page installation
+ * cannot nest inside a route file's scope without clobbering it). Say the
+ * source is unknown rather than printing an empty string.
+ */
+function describeRouteClaimant(route: Route) {
+  const type = route.isPage ? "page route" : "API route";
+  const source = route.sourceFile ? `declared in ${route.sourceFile}` : "source file unknown";
+
+  return `${type} ${route.method} ${route.path} (${source})`;
+}
+
 export class Router {
   /**
    * Routes list
@@ -173,7 +194,7 @@ export class Router {
    * Redirect path to another path
    */
   public redirect(from: string, to: string, redirectMode: "temporary" | "permanent" = "temporary") {
-    return this.get(from, (_request, response) => {
+    return this.get(from, ({ response }) => {
       response.redirect(to, redirectMode === "temporary" ? 302 : 301);
     });
   }
@@ -191,7 +212,7 @@ export class Router {
    * Serve file
    */
   public file(path: string, location: string, cacheTime?: number) {
-    return this.get(path, (_request, response) => {
+    return this.get(path, ({ response }) => {
       response.sendFile(location, cacheTime);
     });
   }
@@ -200,7 +221,7 @@ export class Router {
    * Serve cached file, it will cache the file to 1 year by default
    */
   public cachedFile(path: string, location: string, cacheTime?: number) {
-    return this.get(path, (_request, response) => {
+    return this.get(path, ({ response }) => {
       response.sendCachedFile(location, cacheTime);
     });
   }
@@ -210,7 +231,7 @@ export class Router {
    */
   public files(files: Record<string, string>, cacheTime?: number) {
     for (const [path, location] of Object.entries(files)) {
-      this.get(path, (_request, response) => {
+      this.get(path, ({ response }) => {
         response.sendFile(location, cacheTime);
       });
     }
@@ -221,7 +242,7 @@ export class Router {
    */
   public cachedFiles(files: Record<string, string>, cacheTime?: number) {
     for (const [path, location] of Object.entries(files)) {
-      this.get(path, (_request, response) => {
+      this.get(path, ({ response }) => {
         response.sendCachedFile(location, cacheTime);
       });
     }
@@ -331,7 +352,13 @@ export class Router {
       if (route) {
         // check again if the route name exists with the same method
         if (route.method === routeData.method) {
-          throw new Error(`Route name "${routeData.name}" already exists`);
+          throw new Error(
+            `Route name "${routeData.name}" is already taken.\n` +
+              `  already registered: ${describeRouteClaimant(route)}\n` +
+              `  now being added:    ${describeRouteClaimant(routeData)}\n` +
+              `Pages and API routes share one route-name namespace, so a name can only be ` +
+              `claimed once. Rename one of them via the "name" route option.`,
+          );
         } else {
           routeData.name += `.${routeData.method.toLowerCase()}`;
         }
@@ -429,10 +456,14 @@ export class Router {
       };
     } = {},
   ) {
-    return this.prefix(path, () => {
-      path = "";
-      // get base resource name
-      const baseResourceName = options.name || toCamelCase(ltrim(path, "/"));
+    // Derive the base resource name from the path before the group below
+    // clears it for use as the routes' relative path. `options.name`, when
+    // given, replaces the path-derived name entirely (see the explicit
+    // `name` passed to `group()`) rather than composing with it.
+    const baseResourceName = options.name || toCamelCase(ltrim(path, "/"));
+
+    return this.group({ prefix: path, name: baseResourceName }, () => {
+      const path = "";
 
       // clone the resource so we don't mess up with it
       const routeResource = resource;
@@ -447,83 +478,70 @@ export class Router {
       };
 
       if (routeResource.list && isAcceptableResource("list")) {
-        const resourceName = baseResourceName + ".list";
         this.get(path, options.replace?.list || routeResource.list.bind(routeResource), {
           ...options,
-          name: resourceName,
+          name: "list",
           restful: true,
         });
       }
 
       if (routeResource.get && isAcceptableResource("get")) {
-        const resourceName = baseResourceName + ".single";
-
         this.get(path + "/:id", options.replace?.get || routeResource.get.bind(routeResource), {
           ...options,
-          name: resourceName,
+          name: "single",
           restful: true,
         });
       }
 
       if (routeResource.create && isAcceptableResource("create")) {
-        const resourceName = baseResourceName + ".create";
-
         const handler = options.replace?.create || this.manageValidation(routeResource, "create");
 
         this.post(path, handler, {
           ...options,
-          name: resourceName,
+          name: "create",
           restful: true,
         });
       }
 
       if (routeResource.update && isAcceptableResource("update")) {
-        const resourceName = baseResourceName + ".update";
-
         const handler = options.replace?.update || this.manageValidation(routeResource, "update");
 
         this.put(path + "/:id", handler, {
           ...options,
-          name: resourceName,
+          name: "update",
           restful: true,
         });
       }
 
       if (routeResource.patch && isAcceptableResource("patch")) {
-        const resourceName = baseResourceName + ".patch";
-
         const handler = options.replace?.patch || this.manageValidation(routeResource, "patch");
 
         this.patch(path + "/:id", handler, {
           ...options,
-          name: resourceName,
+          name: "patch",
           restful: true,
         });
       }
 
       if (routeResource.delete && isAcceptableResource("delete")) {
-        const resourceName = baseResourceName + ".delete";
-
         this.delete(
           path + "/:id",
           options.replace?.delete || routeResource.delete.bind(routeResource),
           {
             ...options,
-            name: resourceName,
+            name: "delete",
             restful: true,
           },
         );
       }
 
       if (routeResource.bulkDelete && isAcceptableResource("delete")) {
-        const resourceName = baseResourceName + ".bulkDelete";
-
         this.delete(
           path,
           options.replace?.bulkDelete || routeResource.bulkDelete.bind(routeResource),
           {
             ...options,
-            name: resourceName,
+            name: "bulkDelete",
             restful: true,
           },
         );
@@ -703,15 +721,15 @@ export class Router {
       }
 
       if (validationMethods.all || validationMethods[method]) {
-        validation.validate = async (request: Request, response: Response) => {
+        validation.validate = async ({ request, response }: HttpContext) => {
           if (validationMethods.all) {
-            const output = await validationMethods.all.call(resource, request, response);
+            const output = await validationMethods.all.call(resource, { request, response });
 
             if (output) return output;
           }
 
           if (validationMethods[method]) {
-            return await validationMethods[method]?.call(resource, request, response);
+            return await validationMethods[method]?.call(resource, { request, response });
           }
 
           return;

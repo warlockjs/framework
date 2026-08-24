@@ -3,7 +3,7 @@ import type { Model } from "@warlock.js/cascade";
 import { log } from "@warlock.js/logger";
 import type { Request, Response } from "../http";
 import type { QueryBuilderContract, RepositoryManager } from "../repositories";
-import type { RestfulMiddleware, RouteResource } from "../router";
+import type { HttpContext, RestfulMiddleware, RouteResource } from "../router";
 
 export abstract class Restful<T extends Model> implements RouteResource {
   /**
@@ -54,7 +54,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
   /**
    * List records
    */
-  public async list(request: Request, response: Response) {
+  public async list({ request, response }: HttpContext) {
     try {
       if (await this.callMiddleware("list", request, response)) return;
 
@@ -86,7 +86,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
   /**
    * Get single record
    */
-  public async get(request: Request, response: Response) {
+  public async get({ request, response }: HttpContext) {
     try {
       if (await this.callMiddleware("get", request, response)) return;
 
@@ -107,7 +107,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
   /**
    * Create a new record
    */
-  public async create(request: Request, response: Response) {
+  public async create({ request, response }: HttpContext) {
     try {
       const model = this.repository.newModel();
       const beforeCreate = await this.beforeCreate(request, response, model);
@@ -137,7 +137,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
       }
 
       if (this.returnOn.create === "records") {
-        return this.list(request, response);
+        return this.list({ request, response });
       }
 
       return response.successCreate({
@@ -155,7 +155,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
   /**
    * Update record
    */
-  public async update(request: Request, response: Response) {
+  public async update({ request, response }: HttpContext) {
     try {
       // Find record
       const record = await this.find(request.input("id"));
@@ -185,7 +185,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
       this.onSave(request, response, record, oldRecord);
 
       if (this.returnOn.update === "records") {
-        return this.list(request, response);
+        return this.list({ request, response });
       }
 
       return response.success({
@@ -199,7 +199,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
   /**
    * Patch record
    */
-  public async patch(request: Request, response: Response) {
+  public async patch({ request, response }: HttpContext) {
     try {
       const record = await this.find(request.input("id"));
 
@@ -220,7 +220,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
       this.onSave(request, response, record, oldRecord);
 
       if (this.returnOn.patch === "records") {
-        return this.list(request, response);
+        return this.list({ request, response });
       }
 
       return response.success({
@@ -234,7 +234,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
   /**
    * Delete record
    */
-  public async delete(request: Request, response: Response) {
+  public async delete({ request, response }: HttpContext) {
     try {
       const record = await this.find(request.input("id"));
 
@@ -251,7 +251,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
       this.onDelete(request, response, record);
 
       if (this.returnOn.delete === "records") {
-        return this.list(request, response);
+        return this.list({ request, response });
       }
 
       return response.success();
@@ -267,7 +267,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
   /**
    * Bulk delete records
    */
-  public async bulkDelete(request: Request, response: Response) {
+  public async bulkDelete({ request, response }: HttpContext) {
     try {
       const ids = request.input("id");
 
@@ -298,7 +298,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
       );
 
       if (this.returnOn.delete === "records") {
-        return this.list(request, response);
+        return this.list({ request, response });
       }
 
       return response.success({
@@ -425,7 +425,7 @@ export abstract class Restful<T extends Model> implements RouteResource {
     if (!this.middleware[method]) return;
 
     for (const middleware of this.middleware[method]) {
-      const output = await middleware(request, response);
+      const output = await middleware({ request, response });
 
       if (output) {
         return output;

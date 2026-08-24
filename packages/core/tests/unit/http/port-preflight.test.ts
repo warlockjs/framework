@@ -1,3 +1,4 @@
+import assert from "node:assert";
 import { createServer, type Server } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -73,11 +74,13 @@ describe("port preflight", () => {
 
     const port = await holdPort(holder);
 
-    const error = await assertPortIsAvailable(port, host).catch(
-      (thrown: unknown) => thrown as PortInUseError,
-    );
+    const error = await assertPortIsAvailable(port, host).catch((thrown: unknown) => thrown);
 
     expect(error).toBeInstanceOf(PortInUseError);
+    // `expect()` is not a type guard and `.catch()` widens the binding to
+    // include the resolved `void`, so narrow before reading the error's own
+    // properties below.
+    assert(error instanceof PortInUseError);
     expect(error.port).toBe(port);
     expect(error.host).toBe(host);
     expect(error.message).toContain(`Port ${port} is already in use`);

@@ -38,7 +38,7 @@ export class FilterApplicator {
   private parseFilterRule(key: string, rule: FilterRule) {
     // Handle custom function
     if (typeof rule === "function") {
-      return { type: "function", fn: rule, column: key };
+      return { type: "function", fn: rule, column: key, key };
     }
 
     // Handle array format: ["operator"] or ["operator", "column"] or ["operator", ["col1", "col2"]]
@@ -46,18 +46,18 @@ export class FilterApplicator {
       const [operator, target] = rule;
 
       if (target === undefined) {
-        return { type: operator, column: key, columns: undefined };
+        return { type: operator, column: key, columns: undefined, key };
       }
 
       if (Array.isArray(target)) {
-        return { type: operator, column: undefined, columns: target };
+        return { type: operator, column: undefined, columns: target, key };
       }
 
-      return { type: operator, column: target, columns: undefined };
+      return { type: operator, column: target, columns: undefined, key };
     }
 
     // Handle simple operator string
-    return { type: rule, column: key, columns: undefined };
+    return { type: rule, column: key, columns: undefined, key };
   }
 
   /**
@@ -84,7 +84,7 @@ export class FilterApplicator {
     }
 
     // 3. Standard where operators
-    this.applyWhereOperator(query, rule.type, rule.column, rule.columns, value);
+    this.applyWhereOperator(query, rule.type, rule.column, rule.columns, value, rule.key);
   }
 
   /**
@@ -171,6 +171,7 @@ export class FilterApplicator {
     column?: string,
     columns?: string[],
     value?: any,
+    ruleName?: string,
   ): void {
     // Handle "in" prefix for array values
     if (operator.startsWith("in") && operator !== "int" && !Array.isArray(value)) {
@@ -215,11 +216,34 @@ export class FilterApplicator {
     }
     // Multiple columns (OR condition)
     else if (columns) {
-      const conditions: any = {};
-      for (const col of columns) {
-        conditions[col] = value;
+      if (operator === "=") {
+        const conditions: any = {};
+        for (const col of columns) {
+          conditions[col] = value;
+        }
+        query.orWhere(conditions);
+      } else if (operator === "like") {
+        // (col0 LIKE value OR col1 LIKE value OR ...), OR'd with prior conditions —
+        // the object form of orWhere() only ever emits "=", so "like" needs the
+        // callback/group form to keep the operator instead of silently degrading
+        // to equality (D1).
+        query.orWhere((sub: QueryBuilderContract) => {
+          columns.forEach((col, index) => {
+            if (index === 0) {
+              sub.where(col, "like", value);
+            } else {
+              sub.orWhere(col, "like", value);
+            }
+          });
+        });
+      } else {
+        // Every other operator silently degraded to equality via the object form
+        // of orWhere() — refuse instead of returning a correct-looking, wrong query.
+        throw new Error(
+          `Unsupported multi-column filter operator "${operator}" for rule "${ruleName ?? columns.join(",")}". ` +
+            `Multi-column filters only support "=" and "like".`,
+        );
       }
-      query.orWhere(conditions);
     }
   }
 

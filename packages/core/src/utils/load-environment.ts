@@ -1,6 +1,37 @@
-import { loadEnv } from "@mongez/dotenv";
+import { loadEnv, type EnvLoaderOptions } from "@mongez/dotenv";
 import { existsSync } from "node:fs";
 import path from "node:path";
+
+/**
+ * Core's env precedence policy, in one place because two callers load env:
+ * this module at boot, and the dev server when an `.env` file changes.
+ *
+ * `@mongez/dotenv` defaults to `precedence: "file-wins"`, which is backwards.
+ * The `.env` file is a checked-in DEFAULT; a variable already exported into
+ * `process.env` is the deliberate, situational override — a second instance on
+ * another port, CI pointed at another database, a container's configuration.
+ * Under the default, `PORT=6060 warlock dev` produced a server on the `.env`
+ * file's 3000 and said nothing. A default that silently beats an explicit
+ * instruction is the wrong way round, so core opts into `process-wins`:
+ * the file supplies only the keys the environment does not already carry.
+ *
+ * EMPTY STRING — `FOO=` in the environment counts as SET, and wins, so the
+ * file's value is discarded and `env("FOO")` returns `""`. Chosen over
+ * "empty means absent" because the loader cannot tell a deliberate blanking
+ * from an accident, and only one of the two readings is expressible: an
+ * operator who wants the file's value can unset the variable, whereas under
+ * "empty means absent" an operator who wants a blank value has no way to ask
+ * for one. It also matches POSIX (an exported empty variable is set), dotenv,
+ * dotenv-flow and Vite. Note the consequence: a blank export beats the second
+ * argument too, so `env("FOO", "fallback")` yields `""`, not the fallback.
+ *
+ * Keys this loader itself wrote are tracked by the library and are NOT treated
+ * as process-provided, so editing `.env` during a dev session still takes
+ * effect on reload rather than being pinned by the previous load's own writes.
+ */
+export const environmentLoaderOptions: EnvLoaderOptions = {
+  precedence: "process-wins",
+};
 
 /**
  * The files `loadEnv()` will look for, in the order it considers them.
@@ -68,7 +99,11 @@ export async function loadEnvironmentFiles(directory: string = process.cwd()): P
 
   environmentLoaded = true;
 
-  await loadEnv();
+  // `dir` has to be forwarded: `loadEnv()` defaults it to `process.cwd()`, so
+  // without this the existence check above asks about `directory` while the
+  // load itself reads somewhere else entirely. Identical in production, where
+  // `directory` IS `process.cwd()`.
+  await loadEnv(undefined, { ...environmentLoaderOptions, dir: directory });
 }
 
 /**
