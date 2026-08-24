@@ -485,6 +485,35 @@ export class Request<RequestValidation = any> {
   /**
    * Parse the payload and merge it from the request body, params and query string
    */
+  /**
+   * Turn a bracket-notation key into the dotted path `set()` expects.
+   *
+   * `a[b][c]` -> `a.b.c`. Used only for NON-numeric nesting; numeric indices
+   * keep the array-of-objects path in {@link parseBody}, which builds real
+   * arrays rather than objects with numeric keys.
+   */
+  protected bracketKeyToPath(key: string): string {
+    return key
+      .replace(/\]\[/g, ".")
+      .replace(/\[/g, ".")
+      .replace(/\]/g, "");
+  }
+
+  /**
+   * Apply the `key[]` array marker to a parsed value.
+   *
+   * The subtlety this exists to remove: a key declared `[]` should ALWAYS be an
+   * array, but the underlying query/body parser only hands us one when the
+   * caller sent the key more than once. Deciding the TYPE from the number of
+   * occurrences means one selected filter is a string and two are an array —
+   * a shape that changes under the user's hands.
+   */
+  protected arrayValueFor(value: any, isArrayKey: boolean, parse: (value: any) => any) {
+    if (Array.isArray(value)) return value.map(parse);
+
+    return isArrayKey ? [parse(value)] : parse(value);
+  }
+
   protected parsePayload() {
     this.payload.body = this.parseBody(this.baseRequest.body);
 
@@ -529,13 +558,42 @@ export class Request<RequestValidation = any> {
             const keyParts = key.split("[");
 
             const keyName = keyParts[0];
-            if (!arrayOfObjectValues[keyName]) {
-              arrayOfObjectValues[keyName] = [];
-            }
 
             const keyNameParts = keyParts[1].split("]");
 
             const index = Number(keyNameParts[0]);
+
+            /*
+              A NON-NUMERIC first segment is not an array index — it is a deeper
+              nested object. `a[b][c]=x` reaches this branch because it contains
+              "][", but `Number("b")` is NaN, and the code below used to write to
+              `[NaN]`: that sets a "NaN" PROPERTY on an array whose length stays
+              0, so the request arrived as `{a: []}` and the value was gone. No
+              error, no warning — the caller simply never got `x`.
+
+              Deciding between refusing (4xx) and interpreting: a doubly-nested
+              key is unambiguous and is exactly what every bracket-notation
+              parser means by it, so we interpret. Refusing would reject a URL
+              shape that is standard elsewhere and that we ourselves already
+              honour one level shallower, five lines below. What was definitely
+              wrong was answering with a shape the caller did not send.
+
+              Numeric indices keep the array-of-objects path below unchanged —
+              `items[0][name]` is still an array.
+            */
+            if (Number.isNaN(index)) {
+              set(
+                body,
+                this.bracketKeyToPath(key),
+                this.arrayValueFor(value, isArrayKey, this.parseValue.bind(this)),
+              );
+
+              continue;
+            }
+
+            if (!arrayOfObjectValues[keyName]) {
+              arrayOfObjectValues[keyName] = [];
+            }
 
             if (!arrayOfObjectValues[keyName][index]) {
               arrayOfObjectValues[keyName][index] = {};
@@ -554,10 +612,23 @@ export class Request<RequestValidation = any> {
           const keyName = keyParts[0];
           const keyNameParts = keyParts[1].split("]");
 
+          /*
+            `isArrayKey` is honoured HERE, and used not to be. `filter[tags][]=a`
+            sets the flag at the top of the loop, but this branch only wrapped
+            when the underlying value was ALREADY an array — which it is for two
+            or more occurrences and is not for one. So `filter[tags][]=a` arrived
+            as `{filter:{tags:"a"}}` while `…=a&…=b` arrived as `{tags:["a","b"]}`:
+            the same declared shape, two different types, decided by how many
+            times the caller happened to send it.
+
+            That single-element case is the one a UI hits first — one filter
+            chip selected — and `@warlock.js/web`'s decoder reads it as an array,
+            so the page and the server disagreed about the same URL.
+          */
           set(
             body,
             keyName + "." + keyNameParts[0],
-            Array.isArray(value) ? value.map(this.parseValue.bind(this)) : this.parseValue(value),
+            this.arrayValueFor(value, isArrayKey, this.parseValue.bind(this)),
           );
 
           continue;
