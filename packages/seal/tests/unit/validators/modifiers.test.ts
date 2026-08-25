@@ -49,6 +49,57 @@ describe("cross-cutting modifiers", () => {
       const result = await validate(schema, { bio: null });
       expect(result.isValid).toBe(false);
     });
+
+    // D8 (design/core-defects-found.md): a present-but-empty value must still
+    // run the value rules — `.optional()` only widens *absence* to
+    // `undefined`, it must not turn `""` into a free pass. Absence (the key
+    // missing entirely) is the only path to `undefined`.
+    describe("D8 — present-but-empty runs the value rules (not a free pass)", () => {
+      it("v.int().optional() given an absent key passes with the key omitted", async () => {
+        const schema = v.object({ page: v.int().optional() });
+        const result = await validate(schema, {});
+        expect(result.isValid).toBe(true);
+        expect("page" in result.data).toBe(false);
+      });
+
+      it("v.int().optional() given '' (present but empty, e.g. ?page=) fails validation", async () => {
+        const schema = v.object({ page: v.int().optional() });
+        const result = await validate(schema, { page: "" });
+        expect(result.isValid).toBe(false);
+        // must never hand back a value the declared `number | undefined` output forbids
+        expect(result.data?.page).not.toBe("");
+      });
+
+      it("v.int().optional() given a real integer passes and returns it unchanged", async () => {
+        const schema = v.object({ page: v.int().optional() });
+        const result = await validate(schema, { page: 5 });
+        expect(result.isValid).toBe(true);
+        expect(result.data).toEqual({ page: 5 });
+      });
+
+      it("v.int().optional() given a numeric string fails, matching non-optional v.int() (no coercion)", async () => {
+        // v.int() never coerces numeric strings (see coercion.test.ts) — .optional()
+        // must not silently change that contract.
+        const schema = v.object({ page: v.int().optional() });
+        const result = await validate(schema, { page: "5" });
+        expect(result.isValid).toBe(false);
+      });
+
+      it("v.int().min(1).optional() given '' fails validation", async () => {
+        const schema = v.object({ page: v.int().min(1).optional() });
+        const result = await validate(schema, { page: "" });
+        expect(result.isValid).toBe(false);
+      });
+
+      it("v.string().optional() given '' stays valid — an empty string is a fully-typed string", async () => {
+        // Not the D8 defect: `""` genuinely satisfies `string | undefined`, unlike
+        // an unvalidated `""` masquerading as `number | undefined`.
+        const schema = v.object({ bio: v.string().optional() });
+        const result = await validate(schema, { bio: "" });
+        expect(result.isValid).toBe(true);
+        expect(result.data).toEqual({ bio: "" });
+      });
+    });
   });
 
   describe(".nullable() / .nullish()", () => {

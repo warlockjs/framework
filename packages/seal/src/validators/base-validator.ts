@@ -677,12 +677,23 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
 
     const isEmpty = isEmptyValue(valueForRules);
 
+    // D8 fix (design/core-defects-found.md): for an optional field, only a
+    // truly ABSENT value (`valueForRules === undefined` — the key was
+    // missing, or was `null`/`undefined` and got coalesced above) may skip
+    // the value rules. A PRESENT-but-empty value (e.g. `""` from `?page=`)
+    // must still run them, so `v.int().optional()` given `""` fails instead
+    // of silently handing back a string that `Infer.Output`'s
+    // `number | undefined` forbids. Non-optional fields are unaffected —
+    // their `requiredRule` (not nulled out by `.optional()`) already rejects
+    // `""` before these rules matter.
+    const skipEmptyRules = this.isOptional ? valueForRules === undefined : isEmpty;
+
     // Prepend the required-condition rule if set, so it always runs first.
     // requiredRule has requiresValue = false so it runs even on empty values.
     const rulesToRun = this.requiredRule ? [this.requiredRule, ...this.rules] : this.rules;
 
     for (const rule of rulesToRun) {
-      if ((rule.requiresValue ?? true) && isEmpty) continue;
+      if ((rule.requiresValue ?? true) && skipEmptyRules) continue;
 
       this.setRuleAttributesList(rule);
 
