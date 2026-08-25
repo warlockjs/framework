@@ -21030,6 +21030,485 @@ They compose. For a hard ceiling on request volume *and* failure-aware account l
 
 
 ================================================================================
+# @warlock.js/access
+================================================================================
+
+# Warlock Access — full skills
+
+> Package: `@warlock.js/access`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/access/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## check-permissions  `@warlock.js/access/check-permissions/SKILL.md`
+
+---
+name: check-permissions
+description: 'Check permissions in `@warlock.js/access` — `can` / `cannot` / `canAll` / `canAny` (boolean), `authorize` / `authorizeAll` / `authorizeAny` (throw 403), and the `gate` / `gateAny` / `gateAll` route middleware. Class-level vs instance-level (pass a `resource` to run its policy). TRIGGER: `can(`, `authorize(`, `canAll`, `canAny`, `gate`, `gateAny`, `gateAll`, "check a permission", "protect route by permission", "403 forbidden", "any vs all permissions". Skip: ownership / tenant conditions — `@warlock.js/access/define-policies/SKILL.md`; role checks — `@warlock.js/access/manage-roles/SKILL.md`.'
+---
+
+# Check permissions
+
+## In a route — class-level gate
+
+Stack it AFTER `authMiddleware` (which sets `request.user`):
+
+```ts
+import { authMiddleware } from "@warlock.js/auth";
+import { gate } from "@warlock.js/access";
+
+router.post("/orders", createOrder, {
+  middleware: [authMiddleware([]), gate("orders.create")],
+});
+```
+
+A missing permission → `403` before your controller runs. Use `gateAny([...])` / `gateAll([...])` for sets.
+
+## In code — boolean
+
+```ts
+import { can, cannot, canAll, canAny } from "@warlock.js/access";
+
+if (await can(user, "orders.update")) { /* … */ }
+
+await canAll(user, ["orders.update", "orders.viewCost"]); // needs BOTH
+await canAny(user, ["orders.update", "orders.updateStatus"]); // needs EITHER
+```
+
+> **Multi-permission checks are named, never defaulted.** Use `canAll` / `canAny` (and `gateAll` / `gateAny`). There is no `can(user, [array])` — a wrong implicit any/all default is a silent privilege-escalation or a lockout.
+
+## In a service — throw
+
+```ts
+import { authorize, authorizeAll } from "@warlock.js/access";
+
+await authorize(user, "orders.update"); //              throws ForbiddenError (403, EC100) on deny
+await authorizeAll(user, ["orders.update", "orders.viewCost"]);
+```
+
+## Instance-level — "this resource"
+
+Pass a `resource` and the permission's policy runs on top of the grant (see [`define-policies`](@warlock.js/access/define-policies/SKILL.md)):
+
+```ts
+const order = await Order.find(orderId);
+
+await authorize(user, "orders.update", { resource: order, tenant }); // grant AND policy
+```
+
+- `gate` is **class-level only** — no resource, runs before the controller ("can they update orders at all?").
+- `authorize(…, { resource })` is **instance-level** — after you load the row ("can they update THIS order?").
+
+## Wildcards
+
+`*` grants everything; `orders.*` covers `orders.update` and any nested `orders.update.status` — but **not** the bare `orders` (the prefix needs a trailing `.`, so granting `orders.*` and checking `orders` is silently denied). Give a role `["*"]` to make it a super-admin.
+
+## Gotchas
+
+- **Fails closed, but config errors are loud.** A resolver or policy that throws → denied and logged (a user with no roles is denied, never allowed by accident). The one exception: `AccessConfigError` (e.g. no resolver configured) is **re-thrown**, not denied — a misconfig must surface, not hide. A cache outage is different again: it degrades to the resolver (the cache fails *open*; the decision still fails closed).
+- Stack `gate` **after** `authMiddleware` — it reads `request.user`; without an authenticated user it `403`s.
+- The boolean `can*` family never throws; the `authorize*` family throws `ForbiddenError`. Pick per layer (controllers gate with middleware, services assert with `authorize`).
+
+## See also
+
+- [`@warlock.js/access/define-policies/SKILL.md`](@warlock.js/access/define-policies/SKILL.md) — the `{ resource }` conditions.
+- [`@warlock.js/auth/protect-routes/SKILL.md`](@warlock.js/auth/protect-routes/SKILL.md) — `authMiddleware`, which runs first.
+
+
+## configure-access  `@warlock.js/access/configure-access/SKILL.md`
+
+---
+name: configure-access
+description: 'Configure `@warlock.js/access` — the REQUIRED `resolver` (the quickstart `DefaultAccessResolver` over a fixed code map vs the ejected, DB-backed `DatabaseAccessResolver`), `cache: { ttl }`, and the ambient tenant via the resolver''s optional `resolveTenant()`. TRIGGER: `AccessConfigurations`, `config.access`, `src/config/access.ts`, "set up permissions", "DefaultAccessResolver", "DatabaseAccessResolver", "access cache ttl", "access tenant". Skip: checking permissions — `@warlock.js/access/check-permissions/SKILL.md`; custom storage — `@warlock.js/access/implement-resolver/SKILL.md`.'
+---
+
+# Configure access
+
+The resolver is the **one required piece**. It tells the engine how to read a user's roles + permissions. There is no separate `roles` config map — the role→permission catalog lives INSIDE the resolver.
+
+## Quickstart — a fixed, code-defined catalog
+
+`DefaultAccessResolver` reads a user's roles from `user.get("roles")` (or a single `user.get("role")`) and maps them to permissions through a code map. No tables, no migrations.
+
+```ts title="src/config/access.ts"
+import { type AccessConfigurations, DefaultAccessResolver } from "@warlock.js/access";
+
+const access: AccessConfigurations = {
+  resolver: new DefaultAccessResolver({
+    owner: ["*"], //                                 `*` is the super-grant
+    editor: ["orders.*", "posts.create"], //         `orders.*` covers orders.update, orders.view, …
+    viewer: ["orders.view"],
+  }),
+};
+
+export default access;
+```
+
+`can(user, "orders.update")` now works for any user whose `roles` column includes `editor`.
+
+> `DefaultAccessResolver` is **not tenant-aware** — it returns the same roles in every tenant. For per-tenant roles, use the dynamic resolver below.
+
+## Real apps — dynamic, DB-backed roles
+
+`npx warlock add access` ejects a `DatabaseAccessResolver` (plus the `Role` + `UserRole` tables) into `src/app/access/`. Roles come from the `user_roles` table (multi-role, tenant-aware); permissions are joined through the `roles` catalog table — so admins manage both at runtime, in the DB.
+
+```ts title="src/config/access.ts"
+import { type AccessConfigurations } from "@warlock.js/access";
+import { DatabaseAccessResolver } from "app/access/services/access-resolver";
+
+const access: AccessConfigurations = {
+  resolver: new DatabaseAccessResolver(),
+};
+
+export default access;
+```
+
+Assign roles via the ejected `UserRole.assign(user, "editor", tenant)` — it flushes that user's cached set for you (see [`manage-roles`](@warlock.js/access/manage-roles/SKILL.md)).
+
+## The full shape
+
+```ts
+type AccessConfigurations = {
+  resolver: AccessResolver; //          REQUIRED — reads roles + permissions (+ optional tenant)
+  cache?: {
+    ttl?: string | number; //           resolved-set TTL, default "10m"
+  };
+  strictPolicies?: boolean; //          default false — see below
+};
+```
+
+### `strictPolicies`
+
+An instance check (`{ resource }`) for a permission with no registered ABAC policy normally **warns once per permission** (`log.warn`) and falls back to the RBAC grant alone. Set `strictPolicies: true` to turn that gap into a thrown `AccessConfigError` instead — for apps that want a missing policy to fail the request/boot loudly rather than just log. See [`define-policies`](@warlock.js/access/define-policies/SKILL.md) for the full decision table.
+
+A missing resolver throws `AccessConfigError` **at boot** — the framework's access connector wires `src/config/access.ts` (the same way the notifications connector wires `config/notifications.ts`), so a misconfig fails at startup, never a silent deny.
+
+## Tenant
+
+Checks accept an explicit tenant (`can(user, "x", { tenant })`), but add a `resolveTenant(user)` to your resolver so you never pass it on the happy path. Derive the tenant from the **user**, not from request input — a client-supplied `organizationId` is attacker-controlled and would let a user check (or act) across tenant boundaries:
+
+```ts
+public resolveTenant(user: Auth): string | undefined {
+  return user.get("organization_id");
+}
+```
+
+## Caching
+
+The engine caches each user's resolved set (`cache.ttl`, default `10m`). Roles changed out of band? Call `access.flush(user, tenant)`. The cache is **best-effort**: an outage degrades to the resolver, it never denies.
+
+## See also
+
+- [`@warlock.js/access/implement-resolver/SKILL.md`](@warlock.js/access/implement-resolver/SKILL.md) — write a resolver for your own storage.
+- [`@warlock.js/access/manage-roles/SKILL.md`](@warlock.js/access/manage-roles/SKILL.md) — assign / revoke with the ejected table.
+```
+
+
+## define-policies  `@warlock.js/access/define-policies/SKILL.md`
+
+---
+name: define-policies
+description: 'ABAC conditions in `@warlock.js/access` — `definePolicy(permission, (user, resource, ctx) => boolean)` adds an instance-level rule (ownership / tenant / state) on top of the RBAC grant, evaluated when an authorization check carries a `resource`. TRIGGER: `definePolicy`, "ownership check", "only their own", "can edit this specific record", "ABAC", "policy", "resource-level permission", `authorize(user, perm, { resource })`. Skip: plain grant checks — `@warlock.js/access/check-permissions/SKILL.md`.'
+---
+
+# Define policies (ABAC)
+
+RBAC says "can update orders". A **policy** adds "...but only THIS order" — the instance-level condition.
+
+## Register a condition
+
+Policies live **per module**, in `src/app/<module>/policies/`, and are loaded by an `import "./policies";` side-effect in that module's `main.ts` — a policy defined in an unimported file silently never registers.
+
+```ts title="src/app/orders/policies/index.ts"
+import { definePolicy } from "@warlock.js/access";
+
+definePolicy("orders.update", (user, order, ctx) =>
+  order.get("organization_id") === ctx.tenant &&
+  (order.get("customer_id") === user.id || ctx.hasRole("manager")),
+);
+```
+
+```ts title="src/app/orders/main.ts"
+import "./policies"; // register this module's policies at boot
+```
+
+## It runs ONLY on an instance check
+
+```ts
+await authorize(user, "orders.update"); //                     class-level → grant only, policy SKIPPED
+await authorize(user, "orders.update", { resource: order }); // instance → grant AND policy
+```
+
+So `gate("orders.update")` (a route gate, no resource) checks the grant; the per-order rule runs in your service, after you load the order.
+
+## The decision = grant AND policy
+
+- No grant → denied (the policy never runs).
+- Grant + no policy registered → allowed (RBAC-only), and logs a one-time `log.warn` naming the permission — a typo'd permission or a forgotten `import "./policies"` degrades an instance check to a class-level one, and this is the runtime signal for it. Set `strictPolicies: true` in the access config (see [`configure-access`](@warlock.js/access/configure-access/SKILL.md)) to throw `AccessConfigError` instead of warning.
+- Grant + policy → the policy decides.
+
+Policies **deny**, they don't grant — a policy can't let a user past a permission they don't hold.
+
+## The policy context
+
+`(user, resource, ctx)`, where `ctx` carries:
+
+- `tenant` — the resolved tenant.
+- `hasRole(role)` / `hasPermission(perm)` — engine-injected helpers.
+- any extra keys you passed on the check:
+
+```ts
+await authorize(user, "orders.refund", { resource: order, amount: 5000 });
+
+definePolicy("orders.refund", (user, order, ctx) =>
+  ctx.hasRole("manager") || (ctx.amount as number) <= 1000,
+);
+```
+
+## Gotchas
+
+- Policies are global by permission name — define each once at boot.
+- A throwing policy is treated as a **denial** (fail-closed) and logged.
+- Need "own resource" at graph scale (deep relationships)? That's ReBAC — out of scope; a policy covers the common ownership case.
+
+## See also
+
+- [`@warlock.js/access/check-permissions/SKILL.md`](@warlock.js/access/check-permissions/SKILL.md) — `authorize(…, { resource })`.
+
+
+## implement-resolver  `@warlock.js/access/implement-resolver/SKILL.md`
+
+---
+name: implement-resolver
+description: 'Connect `@warlock.js/access` to your role/permission storage by implementing the `AccessResolver` contract (`resolveRoles` / `resolvePermissions`, optional `resolveTenant`) — for a DB-backed catalog, a user column, a pivot table, a token claim, or an external directory. The engine owns matching / caching / policies; the resolver only fetches. TRIGGER: `AccessResolver`, `DatabaseAccessResolver`, `resolveTenant`, "custom resolver", "where do roles come from", "roles in a token claim", "permissions from an external API", "implement resolver". Skip: the quickstart `DefaultAccessResolver` — `@warlock.js/access/configure-access/SKILL.md`.'
+---
+
+# Implement a resolver
+
+The resolver is the ONE thing only you can write — your schema — and it's just a function over your own data. The engine does matching, caching, policies, and fail-closed for you.
+
+```ts
+export interface AccessResolver {
+  resolveRoles(user: Auth, tenant?: string): Promise<string[]>; //       powers hasRole
+  resolvePermissions(user: Auth, tenant?: string): Promise<string[]>; // powers can / authorize
+  resolveTenant?(user: Auth): string | undefined; //                     optional ambient tenant
+}
+```
+
+Register it: `access: { resolver: new MyResolver() }`.
+
+## The default: dynamic, DB-backed (ejected)
+
+`npx warlock add access` ejects this `DatabaseAccessResolver` — roles come from the `user_roles` table, permissions are joined through the `roles` catalog table. This is what most apps run, because admins manage roles + permissions at runtime.
+
+```ts
+import type { AccessResolver } from "@warlock.js/access";
+import type { Auth } from "@warlock.js/auth";
+import { Role } from "app/access/models/role";
+import { UserRole } from "app/access/models/user-role";
+
+export class DatabaseAccessResolver implements AccessResolver {
+  public async resolveRoles(user: Auth, tenant?: string): Promise<string[]> {
+    return UserRole.rolesFor(user, tenant);
+  }
+
+  public async resolvePermissions(user: Auth, tenant?: string): Promise<string[]> {
+    const names = await this.resolveRoles(user, tenant);
+
+    if (names.length === 0) return [];
+
+    const roles = await Role.query().whereIn("name", names).get();
+
+    return [...new Set(roles.flatMap((role) => role.permissions))];
+  }
+
+  // Multi-tenant? Uncomment to scope checks to the user's tenant. Derive it from
+  // the user — never trust client-supplied request input for the tenant boundary:
+  // public resolveTenant(user: Auth): string | undefined {
+  //   return user.get("organization_id");
+  // }
+}
+```
+
+## Other recipes
+
+**A single role column, permissions mapped in code**
+
+```ts
+class ColumnResolver implements AccessResolver {
+  public constructor(private readonly roles: Record<string, string[]>) {}
+  public async resolveRoles(user: Auth): Promise<string[]> {
+    return [user.get("role")].filter(Boolean);
+  }
+  public async resolvePermissions(user: Auth): Promise<string[]> {
+    return (await this.resolveRoles(user)).flatMap((role) => this.roles[role] ?? []);
+  }
+}
+```
+
+**Roles from a token claim (external IdP — no DB)**
+
+```ts
+class ClaimResolver implements AccessResolver {
+  public async resolveRoles(user: Auth): Promise<string[]> {
+    return user.get("decodedAccessToken")?.roles ?? [];
+  }
+  public async resolvePermissions(user: Auth): Promise<string[]> {
+    return user.get("decodedAccessToken")?.permissions ?? [];
+  }
+}
+```
+
+**Direct permissions per user (role is just a label)**
+
+```ts
+class DirectResolver implements AccessResolver {
+  public async resolveRoles(user: Auth): Promise<string[]> {
+    return [user.get("role")];
+  }
+  public async resolvePermissions(user: Auth): Promise<string[]> {
+    const rows = await UserPermission.query().where({ user_id: user.id }).get();
+    return rows.map((row) => row.get("name") as string);
+  }
+}
+```
+
+## Rules
+
+- **Only fetch — never cache inside the resolver.** The engine caches per `(user, tenant)`; caching twice causes stale grants. Invalidate with `access.flush(user, tenant)` when your data changes.
+- Return plain `string[]`. Wildcards (`orders.*`, `*`) in the returned permissions are honored by the engine.
+- `resolveRoles` and `resolvePermissions` may read **different** sources — roles and permissions are independent axes (a role can be a pure label with permissions granted directly).
+- Throwing from the resolver fails the check **closed** (denied + logged).
+
+## See also
+
+- [`@warlock.js/access/configure-access/SKILL.md`](@warlock.js/access/configure-access/SKILL.md) — the quickstart `DefaultAccessResolver`.
+```
+
+
+## manage-roles  `@warlock.js/access/manage-roles/SKILL.md`
+
+---
+name: manage-roles
+description: 'Assign and read roles in `@warlock.js/access` — the ejected `UserRole.assign` / `UserRole.revoke` (the `user_roles` table) followed by `access.flush`, plus `hasRole` / `hasAnyRole` / `hasAllRoles`. The role→permission catalog is the ejected `Role` table (dynamic). TRIGGER: `UserRole.assign`, `UserRole.revoke`, `access.flush`, `hasRole`, `hasAnyRole`, `hasAllRoles`, `Role` table, "give a user a role", "assign role", "check a user role", "roles per tenant". Skip: permission checks — `@warlock.js/access/check-permissions/SKILL.md`; resolver choice — `@warlock.js/access/configure-access/SKILL.md`.'
+---
+
+# Manage roles
+
+Role storage is **ejected into your app** (`npx warlock add access`): a `UserRole` table (who holds which role) and a `Role` catalog table (role → permissions). Both are dynamic — admins manage them at runtime. The package itself only reads them through the `DatabaseAccessResolver`.
+
+## Assign / revoke
+
+Assign and revoke with the ejected `UserRole` model. Both **flush the affected user's cached set for you** — no manual `access.flush` after a role change:
+
+```ts
+import { UserRole } from "app/access/models/user-role";
+
+await UserRole.assign(user, "editor", "tenant-1"); // editor in tenant-1 (auto-flushes that user)
+await UserRole.assign(user, "viewer", "tenant-2"); // viewer in tenant-2 — same user, different role
+
+await UserRole.revoke(user, "editor", "tenant-1"); // auto-flushes too
+```
+
+The `tenant` arg is optional — omit it for single-tenant apps (roles are stored globally). In a **multi-tenant** app, always pass the tenant: an omitted or unresolved tenant scopes to *global* roles only, never the union across tenants.
+
+### When you still need `access.flush`
+
+`assign` / `revoke` cover the common case. The cache keys off `(user, tenant)`, so flush manually only for **out-of-band** changes those two methods can't see:
+
+```ts
+import { access } from "@warlock.js/access";
+
+// A role's permission set changed in the `Role` catalog — every holder's cached
+// permissions are now stale, so flush each affected user:
+await access.flush(user, "tenant-1");
+
+// You changed a user's role membership WITHOUT UserRole (e.g. wrote the user's
+// `role` column directly, or a bulk SQL update):
+await access.flush(user, "tenant-1");
+```
+
+`access.flush(user, tenant)` is per-user — it has no "drop everything" form. For a sweeping catalog change with many holders, flush each affected user, or let the entries expire on their own (`cache.ttl`, default `10m`).
+
+## Read roles
+
+```ts
+import { hasAllRoles, hasAnyRole, hasRole } from "@warlock.js/access";
+
+await hasRole(user, "editor"); //              tenant is an optional 3rd arg
+await hasAnyRole(user, ["admin", "manager"]);
+await hasAllRoles(user, ["staff", "verified"]);
+```
+
+> **Prefer permission checks over role checks.** Role checks couple your code to the role taxonomy; `can(user, "orders.update")` survives a role rename. Reach for `hasRole` only for coarse UI gating.
+
+## The catalog (the `Role` table)
+
+A role's permissions live in the ejected `Role` table — `{ name, permissions }`. Add a role, or change what it grants, by writing rows; the `DatabaseAccessResolver` joins `user_roles` through it. No redeploy needed.
+
+## The model (overridable)
+
+The ejected `UserRole` is a thin cascade model — `{ user_id, user_type, role, tenant }`. `user_id` defaults to `uuid` — edit the ejected migration in `src/app/access/models/user-role/migrations/` if your user ids are integers.
+
+## Roles stored elsewhere?
+
+If roles live on the user (a `roles` column) or in a token claim, you don't use `UserRole` — you manage assignment your way and a resolver reads them. See [`implement-resolver`](@warlock.js/access/implement-resolver/SKILL.md).
+
+## See also
+
+- [`@warlock.js/access/configure-access/SKILL.md`](@warlock.js/access/configure-access/SKILL.md) — choosing the resolver.
+- [`@warlock.js/access/implement-resolver/SKILL.md`](@warlock.js/access/implement-resolver/SKILL.md) — non-table role storage.
+```
+
+
+## overview  `@warlock.js/access/overview/SKILL.md`
+
+---
+name: overview
+description: 'Front-door for `@warlock.js/access` — authorization (RBAC + ABAC) for Warlock apps: `can` / `authorize` / `gate` permission checks, `definePolicy` attribute conditions, role management, and a pluggable `AccessResolver` that connects the engine to however you store roles. Depends on `@warlock.js/auth` (reads `request.user`). TRIGGER when: importing from `@warlock.js/access`; "permissions in Warlock", "RBAC", "can this user do X", "protect a route by permission", "role-based access", "ownership / policy check". Skip: authentication / login (that is `@warlock.js/auth`); a known task — load the matching skill (`check-permissions`, `define-policies`, `manage-roles`, `implement-resolver`, `configure-access`).'
+---
+
+# `@warlock.js/access` — overview
+
+Authorization for Warlock apps. `@warlock.js/auth` answers _who you are_; `access` answers _what you can do_.
+
+## The mental model in one paragraph
+
+The package owns the **engine** — wildcard matching, caching, ABAC policies, fail-closed decisions. You hand it **one required adapter**, an `AccessResolver`, that reads a user's roles + permissions from however YOUR app stores them (the role→permission catalog lives inside the resolver). Then `can(user, "orders.update")` and `gate("orders.update")` just work. The two concepts inside are **permissions** (RBAC grants) and **policies** (ABAC conditions) — which is why the package is called `access`, not either half.
+
+## When to reach for it
+
+- A Warlock app (already on `@warlock.js/auth`) that needs per-action / per-resource authorization beyond auth's user-type gate.
+- **Multi-tenant** role scoping — `editor` in tenant A, `viewer` in tenant B.
+- "Only their own / only in their tenant / only while pending" conditions → ABAC policies.
+
+Skip if you only need "is the user an admin" — `authMiddleware("admin")` from `@warlock.js/auth` already covers coarse type gating.
+
+## The two-stage model (important)
+
+- **Class-level** (no resource): _"can this user update orders at all?"_ → `gate("orders.update")` in middleware, `can(user, "orders.update")` in code. Cheap, cached, runs before the controller.
+- **Instance-level** (a resource): _"can they update THIS order?"_ → `authorize(user, "orders.update", { resource: order })` in the service, after you load the row. Runs the registered policy on top of the grant.
+
+## Skills index
+
+- [`configure-access`](@warlock.js/access/configure-access/SKILL.md) — the required resolver (`DefaultAccessResolver` vs the ejected `DatabaseAccessResolver`), cache + tenant.
+- [`check-permissions`](@warlock.js/access/check-permissions/SKILL.md) — `can` / `cannot` / `canAll` / `canAny` / `authorize*` + the `gate*` middleware.
+- [`define-policies`](@warlock.js/access/define-policies/SKILL.md) — `definePolicy` for ownership / tenant / state conditions (ABAC).
+- [`manage-roles`](@warlock.js/access/manage-roles/SKILL.md) — assign / revoke via the ejected `UserRole` + `access.flush`, `hasRole` / `hasAnyRole` / `hasAllRoles`.
+- [`implement-resolver`](@warlock.js/access/implement-resolver/SKILL.md) — connect the engine to your storage (a DB catalog, a column, a pivot, a token claim).
+
+## What it deliberately doesn't do
+
+- **Authentication.** Use `@warlock.js/auth`; `access` reads `request.user`.
+- **Ship a permission admin UI.** The engine reads permission strings; whether the catalog is code-defined (`DefaultAccessResolver`) or DB-managed (the ejected `DatabaseAccessResolver`) is your resolver's choice — the package ships no admin screens.
+- **ReBAC graphs / row-level query scoping.** Use a policy for "own resource"; graph-scale relationships are out of scope.
+
+## See also
+
+- [`@warlock.js/auth/overview/SKILL.md`](@warlock.js/auth/overview/SKILL.md) — authentication, the layer below.
+- [`@warlock.js/auth/protect-routes/SKILL.md`](@warlock.js/auth/protect-routes/SKILL.md) — `authMiddleware`; stack `gate` after it.
+
+
+================================================================================
 # @warlock.js/context
 ================================================================================
 
@@ -23027,6 +23506,1052 @@ Without a model passed, defaults to `user_id` + `read_at` (read_at-only). See [`
 - [`use-in-app/SKILL.md`](../use-in-app/SKILL.md) — the model + repository the migration backs.
 - [`@warlock.js/cascade/write-migration/SKILL.md`](../../../cascade/skills/write-migration/SKILL.md) — generic Cascade migration form, `Migration.alter`, etc.
 - [`@warlock.js/cascade/manage-data-sources/SKILL.md`](../../../cascade/skills/manage-data-sources/SKILL.md) — multi-data-source setup.
+
+
+================================================================================
+# @warlock.js/web
+================================================================================
+
+# Warlock Web — full skills
+
+> Package: `@warlock.js/web`
+
+> SSR React pages served by the same Warlock HTTP server that serves the API — a backend framework that renders React, not a React framework.
+
+> First published release: 5.0.0. `@warlock.js/web` had never been published to npm before this release.
+
+> Consumer entry points: `@warlock.js/web`, `@warlock.js/web/client/runtime`, `@warlock.js/web/connector`, and `@warlock.js/web/vite`. The published `@warlock.js/web/hydration` subpath is a framework build input; application code never imports it.
+
+> Deliberate non-goals: server actions are a v2 design decision rather than a missing v1 feature; page routes reject regex parameters, optional parameters, and multiple parameters in one segment.
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/web/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## add-web-to-an-app  `@warlock.js/web/add-web-to-an-app/SKILL.md`
+
+---
+name: add-web-to-an-app
+description: 'Install the SSR page layer with `warlock add web`: add React/Vite peers, scaffold `src/web/root.tsx` and `src/web/home.page.tsx`, register `webConnector()`, and safely relocate the stock top-level `GET "/"` JSON route to `/welcome`. Triggers: `warlock add web`, `webConnector`, `src/web/root.tsx`, `src/web/home.page.tsx`, `GET "/welcome"`; "add web to an app", "install Warlock web", "scaffold SSR", "homepage route collision". Skip: author a page — `@warlock.js/web/create-a-page/SKILL.md`; customize the document — `@warlock.js/web/write-the-root/SKILL.md`; dev/build/start commands — `@warlock.js/core/run-app/SKILL.md`; competing installers `create-next-app`, `vite create`, `remix init`.'
+---
+
+# Warlock — add web to an app
+
+`warlock add web` turns an existing Warlock API application into an application that can also serve SSR React pages. It installs the web and React packages, adds the Vite development peers, scaffolds the smallest page layer, and registers the late-phase web connector.
+
+## The shape
+
+```bash
+yarn warlock add web
+```
+
+On the ordinary path it leaves this application-owned shape:
+
+```text
+src/
+  web/
+    root.tsx
+    home.page.tsx
+warlock.config.ts
+```
+
+The generated home page declares `route = "/"`. The generated root owns the document, renders `<Head />`, keeps `{children}` inside `#root`, and renders `<Scripts />`.
+
+## Connector registration
+
+The command adds `webConnector()` to `warlock.config.ts`. If the config cannot be patched safely, add the same wiring yourself:
+
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+import { webConnector } from "@warlock.js/web/connector";
+
+export default defineConfig({
+  connectors: [webConnector()],
+});
+```
+
+Keep the connector in `warlock.config.ts`. The build reads this same array to collect web's build contribution, while dev/start use it to boot the runtime. Registering it again from `src/app/main.ts` boots it twice and duplicates page routes.
+
+## What happens to an existing `GET "/"`
+
+The stock project template already owns `/` with a JSON welcome route. The page stub also owns `/`, and two `GET` handlers for one path fail at request time. The installer preserves both surfaces by changing the existing JSON route to `/welcome` before it writes the page.
+
+The automatic move is intentionally narrow. It only inspects:
+
+```text
+src/app/shared/routes.ts
+```
+
+and only rewrites exactly one top-level declaration shaped like this:
+
+```ts
+router.get("/", homePageController);
+```
+
+After the move:
+
+```ts
+router.get("/welcome", homePageController);
+```
+
+Indented `router.get("/", ...)` declarations inside a prefixed group are not root collisions and are not touched.
+
+## Collision outcomes
+
+- No `src/app/shared/routes.ts`, or no top-level `GET "/"`: create the root page normally.
+- Exactly one recognized top-level `GET "/"` and no top-level `GET "/welcome"`: move it to `/welcome`, then create the home page.
+- More than one top-level `GET "/"`, an existing top-level `GET "/welcome"`, an unreadable/unwritable routes file, or an unrecognized rewrite: create `root.tsx`, do not create `home.page.tsx`, set a failing exit code, and still register the connector.
+
+On the refusal path, free `/` yourself and create a page with either `route = "/"` or another literal route.
+
+## Re-running the command
+
+`src/web/root.tsx` is the scaffold sentinel. If it already exists, the command skips the `src/web` scaffold rather than overwriting a human-owned root. Connector registration is independently idempotent: if the config already mentions `webConnector`, it is left alone.
+
+## Verify the result
+
+Read the files rather than assuming the command could patch every application shape:
+
+```bash
+yarn warlock routes --method GET --path /
+yarn warlock routes --method GET --path /welcome
+```
+
+The desired result is one page route at `/` and, when the stock JSON route existed, one API route at `/welcome`.
+
+## Gotchas
+
+- **The collision scan is not codebase-wide.** A root route declared outside `src/app/shared/routes.ts` is not moved. Check `warlock routes` after installation.
+- **`/welcome` must be free before relocation.** The installer refuses to trade one duplicate route for another.
+- **A partial scaffold exits non-zero.** `root.tsx` and connector registration may still have been written; complete only the missing home page after resolving the collision.
+- **Do not register the connector twice.** Use `warlock.config.ts`, not an additional `connectorsManager.register(...)` call.
+- **Do not import the hydration entry.** The connector and build contribution own it.
+
+## See also
+
+- [`create-a-page/SKILL.md`](../create-a-page/SKILL.md) — write the page after installation.
+- [`write-the-root/SKILL.md`](../write-the-root/SKILL.md) — customize the generated document shell.
+- [`serve-styles/SKILL.md`](../serve-styles/SKILL.md) — add global CSS from the root.
+- [`@warlock.js/core/run-app/SKILL.md`](@warlock.js/core/run-app/SKILL.md) — run dev, build, and production.
+
+## create-a-page  `@warlock.js/web/create-a-page/SKILL.md`
+
+---
+name: create-a-page
+description: 'Create an SSR React page under `src/web/**` or `src/app/<module>/web/**` with a literal `route`, a default component, an optional typed `loader`, and page `metadata`. Triggers: `*.page.tsx`, `route`, `PageLoader`, `PageProps`, `PageMetadata`; "create a page", "add an SSR route", "make a React page", "type page loader data"; typical import `import type { PageLoader, PageProps } from "@warlock.js/web"`. Skip: root document shell — `@warlock.js/web/write-the-root/SKILL.md`; layout wrappers and prefixes — `@warlock.js/web/use-layouts/SKILL.md`; loader lifecycle and `shared` — `@warlock.js/web/load-page-data/SKILL.md`; competing frameworks `next`, `remix`, `react-router` file routes.'
+---
+
+# Warlock — create a page
+
+A page is any `*.page.tsx` beneath the global `src/web/` tree or a module's `src/app/<module>/web/` tree. Its URL is declared by `route`; its default export renders React.
+
+## The shape
+
+```tsx title="src/app/products/web/product-details.page.tsx"
+import type { PageLoader, PageMetadata, PageProps } from "@warlock.js/web";
+
+export const route = {
+  path: "/products/:id",
+  name: "products.details",
+} as const;
+
+export const loader = (async ({ request, response }) => {
+  const id = request.input("id");
+
+  response.header("cache-control", "private, max-age=60");
+
+  return {
+    product: {
+      id,
+      name: `Product ${id}`,
+    },
+  };
+}) satisfies PageLoader<undefined, typeof route>;
+
+export const metadata: PageMetadata<typeof loader> = ({ data }) => ({
+  title: data.product.name,
+  description: `Details for ${data.product.name}`,
+});
+
+export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
+  return (
+    <main>
+      <h1>{data.product.name}</h1>
+      <p>Product id: {data.product.id}</p>
+    </main>
+  );
+}
+```
+
+Use `satisfies PageLoader`, not `: PageLoader`. `satisfies` checks the context contract while retaining the loader's concrete return type, which is how `PageProps<typeof loader>` knows the shape of `data`.
+
+## The minimum page
+
+```tsx title="src/web/contact.page.tsx"
+export const route = "/contact";
+
+export default function ContactPage() {
+  return (
+    <main>
+      <h1>Contact</h1>
+      <a href="mailto:support@example.com">support@example.com</a>
+    </main>
+  );
+}
+```
+
+The `route` export is required. Development skips a page without it; the production discovery pass refuses to build it.
+
+## Route declarations
+
+Use either a bare path or a literal object:
+
+```ts
+export const route = "/products";
+```
+
+```ts
+export const route = {
+  path: "/products/:id",
+  name: "products.details",
+} as const;
+```
+
+Prefer an explicit stable `name` for links. Without one, Warlock derives a name from the module and declared path: a module page gets `<module>.<path-as-dots>`, a global root page gets `index`, and another global page gets its dotted path.
+
+The build reads `route` without executing application code. Declare it directly with `export const` and literal strings. Variables, function calls, computed object keys, spreads, and `export { route }` are refused.
+
+## Page-route grammar
+
+Page routes deliberately accept less than API routes:
+
+- Supported: `/`, static segments, whole-segment params such as `/products/:id`, the exact wildcard `*`, and a terminal wildcard such as `/docs/*`.
+- Not supported: regex params, optional params, multiple params in one segment, params mixed with text, doubled or trailing slashes, and non-terminal wildcards.
+
+Write two pages for an optional segment. Validate a constrained parameter in the page instead of putting a regex in its path.
+
+## Metadata
+
+`metadata` may be a static object or a function of the resolved loader data and readonly `shared` payload:
+
+```tsx
+import type { PageMetadata } from "@warlock.js/web";
+
+export const metadata: PageMetadata = {
+  title: "Products",
+  description: "Browse the product catalogue",
+  robots: "index,follow",
+  openGraph: {
+    type: "website",
+    image: "/images/catalogue-card.png",
+  },
+};
+```
+
+Supported fields are `title`, `description`, `keywords`, `canonical`, `robots`, `openGraph`, and `twitter`. Function metadata runs after a successful loader. If a loader fails, Warlock uses error metadata instead of calling the page function with missing data.
+
+## The client boundary
+
+The browser boundary is decided by the import graph, not by the file's location. A `*.page.tsx` is universal:
+
+- `route`, `middleware`, `validation`, `loader`, and `metadata` are stripped from the client projection.
+- The default component and any other surviving exports form the client graph.
+- An import used only by a stripped server export is removed with it.
+- An import also used by the component survives and therefore must be browser-safe.
+
+Keep server-only repository and service reads inside `loader`. Do not read them from module-scope initializers or the default component.
+
+## Gotchas
+
+- **Do not derive URLs from filenames.** The file chooses discovery; `route` chooses the public URL.
+- **Keep `route` literal.** A computed route cannot be discovered without executing app code and is refused.
+- **Do not annotate the loader with `: PageLoader`.** That erases the return type `PageProps` needs.
+- **Components receive data, not HTTP objects.** `request` and `response` belong to loaders; the component also renders in the browser.
+- **A default component is synchronous.** Fetch in the loader, then render its result.
+- **There are no server actions.** Mutations remain ordinary API requests; call `refresh()` after a successful mutation.
+- **Do not import the hydration entry.** `esm/hydration/index.mjs` is a framework build input, not a consumer API. The public low-level runtime subpath is `@warlock.js/web/client/runtime`.
+
+## See also
+
+- [`load-page-data/SKILL.md`](../load-page-data/SKILL.md) — validation, loader context, response short-circuits, and `shared`.
+- [`use-layouts/SKILL.md`](../use-layouts/SKILL.md) — positional layouts, prefixes, and persistence.
+- [`navigate-on-the-client/SKILL.md`](../navigate-on-the-client/SKILL.md) — `Link`, `href`, navigation, and `refresh()`.
+- [`serve-styles/SKILL.md`](../serve-styles/SKILL.md) — CSS imports in page and root modules.
+
+## load-page-data  `@warlock.js/web/load-page-data/SKILL.md`
+
+---
+name: load-page-data
+description: 'Load App, Layout, and Page data with `AppLoader`, `LayoutLoader`, and `PageLoader`; type component `data`, validate page input, short-circuit with the buffered response, and publish request-scoped browser-safe values through `shared`. Triggers: `PageLoader`, `LayoutLoader`, `AppLoader`, `PageProps`, `shared`, `useShared`, `validation`, `request.validated`; "load page data", "pass server data to React", "share request data", "redirect from a loader". Skip: page module basics — `@warlock.js/web/create-a-page/SKILL.md`; layouts — `@warlock.js/web/use-layouts/SKILL.md`; mutation follow-up — `@warlock.js/web/navigate-on-the-client/SKILL.md`; competing loaders Next data functions, Remix loaders, React Server Components.'
+---
+
+# Warlock — load page data
+
+Loaders run on the server and return serializable data to their own component level. Use the level-specific loader type with `satisfies`, then pass `typeof loader` to the matching props type.
+
+## The shape
+
+```tsx title="src/app/products/web/product-details.page.tsx"
+import { v } from "@warlock.js/seal";
+import type { PageLoader, PageProps } from "@warlock.js/web";
+
+export const route = {
+  path: "/products/:id",
+  name: "products.details",
+} as const;
+
+export const validation = {
+  schema: v.object({
+    id: v.string().minLength(2),
+  }),
+  validating: ["params"],
+} as const;
+
+export const loader = (async ({ request, response, shared }) => {
+  const { id } = request.validated();
+
+  if (id === "missing") {
+    return response.notFound();
+  }
+
+  response.header("cache-control", "private, max-age=60");
+
+  return {
+    product: {
+      id,
+      name: `Product ${id}`,
+    },
+    locale: (shared as { locale?: string }).locale ?? "en",
+  };
+}) satisfies PageLoader<typeof validation, typeof route>;
+
+export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
+  return (
+    <article lang={data.locale}>
+      <h1>{data.product.name}</h1>
+    </article>
+  );
+}
+```
+
+`LoaderShortCircuit` values from `notFound()` and redirects are excluded from `PageProps["data"]`, so the component sees only the successful loader return.
+
+## Three loader levels
+
+| Module | Contract | Component props |
+| --- | --- | --- |
+| `src/web/root.tsx` | `AppLoader` | `AppProps<typeof loader>` |
+| positional `layout.tsx` | `LayoutLoader` | `LayoutProps<typeof loader>` |
+| `*.page.tsx` | `PageLoader` | `PageProps<typeof loader>` |
+
+All receive one context object with `request`, `response`, and `shared`. Page loaders add generics that connect their sibling `validation` and `route` exports to `request.validated()` and `request.input()`.
+
+## Validation
+
+A page's `validation` export has:
+
+- `schema`: a Seal validator.
+- `validating`: any ordered subset of `"body"`, `"query"`, `"params"`, and `"headers"`.
+
+When `validating` is absent or empty, pages validate query + params, with params winning a duplicate key. Validation runs before loaders and a failure short-circuits with 422.
+
+`request.validated()` uses the schema's output type, so fields with `.default(...)` are present. `request.input("id")` is narrowed from a literal route path when the loader uses `typeof route`.
+
+## Loader response surface
+
+Each loader gets its own buffered response because App, Layout, and Page loaders execute in parallel. The public loader methods are:
+
+```ts
+response.header("cache-control", "private, max-age=60");
+response.setStatusCode(201);
+return response.redirect("/login");
+return response.permanentRedirect("/products");
+return response.notFound();
+```
+
+Do not continue after a redirect or `notFound`; return the result. Surviving buffers are committed root to leaf. For the same header key, the leafward write wins. A loader that throws or a lower level discarded by a short-circuit does not leak its buffered writes.
+
+## Declare the shared payload
+
+`SharedContext` ships empty and has no index signature. Augment it once with everything the browser is allowed to receive:
+
+```ts title="src/web/types.ts"
+declare module "@warlock.js/web" {
+  interface SharedContext {
+    locale: string;
+    user?: {
+      name: string;
+    };
+  }
+}
+
+export {};
+```
+
+Required keys need an unconditional middleware writer. Optional keys may be written conditionally:
+
+```tsx title="src/web/root.tsx"
+import { Head, Scripts, shared as writableShared } from "@warlock.js/web";
+import type { AppProps } from "@warlock.js/web";
+import "./types";
+
+const publishLocale = async () => {
+  writableShared.locale = "en";
+};
+
+export const middleware = [publishLocale];
+
+export default function App({ children, shared }: AppProps) {
+  return (
+    <html lang={shared.locale}>
+      <head>
+        <Head />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+```
+
+## Shared lifecycle
+
+`shared` looks global but resolves through the current request's store on every access. Two requests never share its target.
+
+The request pipeline is:
+
+1. App, layout, and page middleware run outermost first and write `shared`.
+2. `shared` is normalized, checked, and sealed.
+3. App, layout, and page loaders run in parallel and may only read it.
+4. Components receive a readonly snapshot through props or `useShared()`.
+
+Use `useShared()` in a deep component that is not already receiving level props:
+
+```tsx title="src/web/components/locale-label.tsx"
+import { useShared } from "@warlock.js/web";
+
+export function LocaleLabel() {
+  const shared = useShared();
+
+  return <span>Locale: {shared.locale}</span>;
+}
+```
+
+Only put browser-safe data in `shared`: scalars, arrays, plain objects, or values with a valid `toJSON()` contract. Functions, `Date`, `Map`, `Set`, and arbitrary class instances are rejected. Prefer a narrow Resource output over a model.
+
+## Parallelism rules
+
+- App, Layout, and Page loaders cannot read each other's return values.
+- A loader may read `shared` because middleware completed and it was sealed first.
+- A loader must not write `shared`; a post-seal write throws.
+- Loader response mutations are buffered per level and settled deterministically.
+
+## Gotchas
+
+- **Use `satisfies`, not a type annotation.** Preserve the return type for component props.
+- **Return client-safe data.** Components render again in the browser; models and server handles do not survive the wire.
+- **Write `shared` in middleware only.** Loaders run after the seal.
+- **Required shared keys need unconditional writers.** The type is a promise for every request.
+- **Do not use loader return values as cross-level communication.** The loaders run in parallel.
+- **Server actions are not supported.** POST to an ordinary Warlock API route and call `refresh()` after success.
+
+## See also
+
+- [`create-a-page/SKILL.md`](../create-a-page/SKILL.md) — the complete page module.
+- [`write-the-root/SKILL.md`](../write-the-root/SKILL.md) — `AppLoader`, `<Head />`, and `<Scripts />`.
+- [`use-layouts/SKILL.md`](../use-layouts/SKILL.md) — `LayoutLoader` and persistent wrappers.
+- [`navigate-on-the-client/SKILL.md`](../navigate-on-the-client/SKILL.md) — re-fetch loaders with `refresh()`.
+
+## navigate-on-the-client  `@warlock.js/web/navigate-on-the-client/SKILL.md`
+
+---
+name: navigate-on-the-client
+description: 'Navigate hydrated pages with `<Link>`, resolve named URLs with `href()`, use `navigateTo` / `navigateBack`, prefetch on interaction, inspect the server match with `currentRoute()`, and re-fetch loaders after a mutation with `refresh()`. Triggers: `Link`, `href`, `navigateTo`, `navigateBack`, `refresh`, `currentRoute`, `previousRoute`; "navigate without a reload", "link to a named route", "refresh page data", "revalidate loaders", "client-side back"; typical import `import { Link, refresh } from "@warlock.js/web"`. Skip: define a page route — `@warlock.js/web/create-a-page/SKILL.md`; loader mechanics — `@warlock.js/web/load-page-data/SKILL.md`; root hydration boundary — `@warlock.js/web/write-the-root/SKILL.md`; competing routers `@mongez/react-router`, `react-router-dom`, Next navigation.'
+---
+
+# Warlock — navigate on the client
+
+`<Link>` renders a real anchor for progressive enhancement and intercepts a plain in-app click after hydration. The server remains the only route matcher; client navigation fetches the page-data representation of the URL and swaps the Layout + Page tree.
+
+## The shape
+
+```tsx title="src/web/components/product-link.tsx"
+import { Link } from "@warlock.js/web";
+
+export function ProductLink({ id }: { id: string }) {
+  return (
+    <Link
+      to="products.details"
+      params={{ id }}
+      query={{ tab: "specifications" }}
+      prefetch
+    >
+      View product
+    </Link>
+  );
+}
+```
+
+Route-name destinations resolve through the table published from the same page graph the server installs. Missing or extra params throw rather than producing a URL that silently 404s.
+
+## Link destinations
+
+Pass exactly one destination prop:
+
+```tsx
+import { Link } from "@warlock.js/web";
+
+export function NavigationLinks() {
+  return (
+    <nav>
+      <Link to="products.index">Products</Link>
+      <Link href="/pricing">Pricing</Link>
+      <Link href="https://example.com/docs" newTab>External docs</Link>
+      <Link email="sales@example.com">Email sales</Link>
+      <Link tel="+201000000000">Call sales</Link>
+    </nav>
+  );
+}
+```
+
+`to` and `href` both accept a route name or literal URL:
+
+- A value beginning with `/` or with a URI scheme is literal and is passed through.
+- Any other value is a route name and is resolved through `href()`.
+- `params` and `query` apply only to route names.
+- `newTab` supplies `_blank` and `noopener noreferrer` unless you provide your own `target` or `rel`.
+
+`prefetch` fetches in-app page data on hover or keyboard focus. It is ignored for external, email, telephone, new-tab, and explicitly targeted links. Prefetch is best-effort and never delays the interaction.
+
+Modified clicks, middle clicks, downloads, another browsing context, or an earlier `preventDefault()` remain browser-owned.
+
+## Build a URL without React
+
+`href(name, params?, query?)` is the durable primitive for redirects, headers, email bodies, and other non-component callers:
+
+```ts
+import { href } from "@warlock.js/web";
+
+const productUrl = href(
+  "products.details",
+  { id: "42" },
+  { tab: "reviews", tags: ["featured", "sale"] },
+);
+```
+
+Unknown route names throw at runtime with the known names. Call `href()` after the route table has been published—during a page render, event, or request—not from an eager module initializer before boot.
+
+## Programmatic navigation
+
+```tsx title="src/web/components/checkout-button.tsx"
+import { href, navigateBack, navigateTo } from "@warlock.js/web";
+
+export function CheckoutButtons() {
+  const openCheckout = () => {
+    const url = href("checkout.index");
+
+    if (!navigateTo(url)) {
+      window.location.assign(url);
+    }
+  };
+
+  return (
+    <div>
+      <button type="button" onClick={navigateBack}>Back</button>
+      <button type="button" onClick={openCheckout}>Checkout</button>
+    </div>
+  );
+}
+```
+
+`navigateTo(path, { replace?: boolean })` accepts a path, not a route name. Resolve a name with `href()` first. It returns `false` when no client runtime accepted the navigation; use a real browser navigation when arrival is mandatory. `navigateBack()` is a no-op without a browser.
+
+## Re-fetch after a mutation
+
+The public primitive is `refresh()`. There is no `revalidate()` export.
+
+```tsx title="src/app/products/web/delete-product-button.tsx"
+import { refresh } from "@warlock.js/web";
+
+export function DeleteProductButton({ id }: { id: string }) {
+  const deleteProduct = async () => {
+    const response = await fetch(`/api/products/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Delete failed with status ${response.status}`);
+    }
+
+    const refreshed = await refresh();
+
+    if (!refreshed) {
+      window.location.reload();
+    }
+  };
+
+  return <button type="button" onClick={deleteProduct}>Delete product</button>;
+}
+```
+
+`refresh()` re-fetches the current URL's App, Layout, and Page loaders and swaps fresh data without pushing history. It returns `true` only when fresh data reached the screen. On network/build failure it returns `false` and leaves the current page intact.
+
+This is an ordinary API mutation followed by a re-fetch. Server actions are not supported.
+
+## Current and previous routes
+
+`currentRoute()` and `previousRoute()` report route names and params sent by the server; they never re-match the browser URL.
+
+```tsx title="src/web/components/current-product-id.tsx"
+import { currentRoute, previousRoute } from "@warlock.js/web";
+
+export function CurrentProductId() {
+  const current = currentRoute();
+  const previous = previousRoute();
+
+  return (
+    <dl>
+      <dt>Current product</dt>
+      <dd>{current?.params?.id ?? "none"}</dd>
+      <dt>Previous page</dt>
+      <dd>{previous?.name ?? "first visit"}</dd>
+    </dl>
+  );
+}
+```
+
+`previousRoute()` means the previously swapped page, not the previous browser-history entry. On the first page it is `undefined`.
+
+`routerEvents` is exported and `refresh()` emits its start/end/error lifecycle today. Ordinary Link and `navigateTo` swaps are not yet wired to that emitter, so do not use it as a complete global navigation progress signal yet.
+
+## Failure behavior
+
+- A failed navigation falls back to a full browser load so the user still arrives.
+- A failed `refresh()` keeps the current page and reports `false`; it never spends the page the user already has.
+- Back/Forward uses the same data fetch and tree swap, replacing the existing history entry rather than pushing another.
+- Navigating within one layout preserves layout state through React reconciliation.
+
+## Gotchas
+
+- **Use `refresh()`, not `revalidate()`.** `refresh` is the exported loader re-fetch primitive.
+- **`navigateTo` accepts a URL/path.** Resolve named routes with `href()` first.
+- **Pass exactly one Link destination.** Combining `to`, `href`, `email`, or `tel` throws.
+- **Do not add `params` or `query` to a literal URL.** Put them in the URL itself or use a route name.
+- **Do not build a client matcher.** The server's matched name and params travel in the payload.
+- **Do not import `esm/hydration/index.mjs`.** Normal consumers import navigation from `@warlock.js/web`; low-level runtime contracts live at `@warlock.js/web/client/runtime`.
+
+## See also
+
+- [`create-a-page/SKILL.md`](../create-a-page/SKILL.md) — declare route names and params.
+- [`load-page-data/SKILL.md`](../load-page-data/SKILL.md) — what `refresh()` re-runs.
+- [`use-layouts/SKILL.md`](../use-layouts/SKILL.md) — why layout state persists.
+- [`write-the-root/SKILL.md`](../write-the-root/SKILL.md) — the `#root` swap boundary.
+
+## serve-styles  `@warlock.js/web/serve-styles/SKILL.md`
+
+---
+name: serve-styles
+description: 'Serve CSS imported by `root.tsx` or `*.page.tsx`, with render-blocking `<link rel="stylesheet">` delivery from Vite source URLs in development and Vite manifest assets in production. Triggers: `import "./app.css"`, page CSS, `?direct`, `manifest.json`, stylesheet flash, FOUC, `<head>`; "add global styles", "style a page", "CSS missing in SSR", "page flashes unstyled", "serve CSS in production". Skip: root document markup — `@warlock.js/web/write-the-root/SKILL.md`; page authoring — `@warlock.js/web/create-a-page/SKILL.md`; client navigation — `@warlock.js/web/navigate-on-the-client/SKILL.md`; competing styling systems CSS-in-JS, Next CSS, styled-components.'
+---
+
+# Warlock — serve styles
+
+Import styles from `root.tsx` for global, render-blocking CSS. A page may also import its own stylesheet, but development and production deliver page-local CSS differently.
+
+## The shape
+
+```tsx title="src/web/root.tsx"
+import { Head, Scripts } from "@warlock.js/web";
+import type { AppProps } from "@warlock.js/web";
+import "./app.css";
+
+export default function App({ children }: AppProps) {
+  return (
+    <html lang="en">
+      <head>
+        <Head />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+```
+
+```css title="src/web/app.css"
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  max-width: 72rem;
+  margin-inline: auto;
+  padding: 2rem;
+}
+```
+
+Use a bare side-effect import in `root.tsx`. In development the server parses that exact form to discover global styles before rendering the document.
+
+## Development delivery
+
+Development has no client manifest, so Warlock reads `root.tsx`, finds bare stylesheet imports, resolves them relative to the root file, and emits a link before `</head>`:
+
+```html
+<link rel="stylesheet" href="/src/web/app.css?direct">
+```
+
+The `?direct` query is required: without it Vite serves an imported CSS URL as a JavaScript module, which a stylesheet link cannot apply. With it Vite returns real `text/css`.
+
+Root imports ending in `.css`, `.scss`, `.sass`, `.less`, or `.styl` are recognized. The source file must resolve inside the app root; an outside path is left to the client graph rather than converted to an unsafe `/@fs/` guess.
+
+## Page-local styles
+
+A page may import CSS directly:
+
+```tsx title="src/app/products/web/products.page.tsx"
+import "./products.css";
+
+export const route = {
+  path: "/products",
+  name: "products.index",
+} as const;
+
+export default function ProductsPage() {
+  return (
+    <main className="products-page">
+      <h1>Products</h1>
+    </main>
+  );
+}
+```
+
+```css title="src/app/products/web/products.css"
+.products-page {
+  display: grid;
+  gap: 1rem;
+}
+```
+
+Recognized asset imports survive the page's client projection. The client boundary is determined by the import graph, not by the file living under `web/`.
+
+In development, only root stylesheet imports are converted into render-blocking document links. A page-local import is loaded by Vite's client module graph around hydration, so it still applies but is not guaranteed before first paint. Move above-the-fold or site-wide rules into a stylesheet imported by `root.tsx` when avoiding a flash matters.
+
+## Production delivery
+
+The production client build enables Vite's manifest. Vite records emitted CSS against the chunks that imported it. At boot, Warlock reads:
+
+```text
+<build.outdir>/client/.vite/manifest.json
+```
+
+It collects every valid `css` asset across all manifest entries, deduplicates them in manifest order, and emits each as a render-blocking link before `</head>`.
+
+That means both root-imported and page-imported CSS are linked in the initial production document. The current implementation collects across the whole client manifest rather than selecting only the matched route's CSS, so every page receives the emitted stylesheet set.
+
+Only manifest URLs under the one client asset prefix are emitted; a stylesheet outside the mounted asset directory is dropped instead of producing a dead link.
+
+## Where links land
+
+Stylesheet links are inserted into the rendered HTML immediately before the final `</head>`. They are not rendered by the `<Head />` component itself.
+
+Consequences:
+
+- A custom root must render a real `<head>...</head>` for automatic stylesheet links.
+- Root-authored `<link>` and `<style>` elements appear before Warlock's injected stylesheet links, so later injected rules can win normal cascade ties.
+- `<Head />` remains responsible for page metadata; the closing `</head>` is what stylesheet installation needs.
+- A root with no closing `</head>` is returned unchanged and receives no automatic stylesheet links.
+
+## What ships to the browser
+
+The hydration entry is built from the projected client graph. CSS imports are known-safe asset edges and survive projection even when server exports in the same page module are removed. Application code never imports the published hydration file directly; the web build uses `esm/hydration/index.mjs` as an input and the route handler installs its emitted module URL.
+
+## Diagnose missing or late CSS
+
+1. For global CSS in development, confirm `root.tsx` uses a bare import such as `import "./app.css";`.
+2. Confirm the rendered document contains a closing `</head>` and a stylesheet URL ending in `?direct`.
+3. For page-local CSS in development, expect Vite's client graph to apply it after hydration; move critical rules to the root import if first paint matters.
+4. In production, confirm `.vite/manifest.json` has `css` arrays and the referenced files live under the client asset prefix.
+5. Do not hand-author a link to a hashed production asset; its name belongs to the Vite manifest.
+
+## Gotchas
+
+- **Root CSS and page CSS differ in dev.** Root imports are render-blocking; page imports are client-injected.
+- **Production currently links all emitted CSS on every page.** It is safe for first paint but not route-minimal.
+- **Use a bare root import.** `devStylesheetUrls` scans `import "./app.css"`, not a bound CSS-module import.
+- **Keep a closing `</head>`.** Automatic link installation has nowhere safe to write without it.
+- **Do not remove `?direct` from a dev stylesheet link.** Vite otherwise responds with JavaScript.
+- **Do not import the hydration entry yourself.** The connector owns dev serving and production asset URLs.
+
+## See also
+
+- [`write-the-root/SKILL.md`](../write-the-root/SKILL.md) — the document `<head>` these links enter.
+- [`create-a-page/SKILL.md`](../create-a-page/SKILL.md) — page-local asset imports and projection.
+- [`navigate-on-the-client/SKILL.md`](../navigate-on-the-client/SKILL.md) — client swaps after the initial styled document.
+
+## use-layouts  `@warlock.js/web/use-layouts/SKILL.md`
+
+---
+name: use-layouts
+description: 'Wrap pages with positional `layout.tsx` modules, compose literal `prefix` exports, load typed layout data with `LayoutLoader` / `LayoutProps`, and preserve layout state during client navigation. Triggers: `layout.tsx`, `prefix`, `LayoutLoader`, `LayoutProps`, `children`; "add a page layout", "share navigation between pages", "prefix page routes", "keep a layout mounted". Skip: full-document root — `@warlock.js/web/write-the-root/SKILL.md`; page route export — `@warlock.js/web/create-a-page/SKILL.md`; loader and shared lifecycle — `@warlock.js/web/load-page-data/SKILL.md`; competing layout systems `next/layout`, React Router outlets, Remix nested routes.'
+---
+
+# Warlock — use layouts
+
+A positional `layout.tsx` applies to pages in its directory and descendant directories. Its default export wraps the page; its optional `prefix` contributes to every descendant page's effective URL.
+
+## The shape
+
+```tsx title="src/app/products/web/layout.tsx"
+import type { LayoutLoader, LayoutProps } from "@warlock.js/web";
+
+export const prefix = "/products";
+
+export const loader = (async () => {
+  return {
+    navigation: [
+      { href: "/products", label: "Products" },
+      { href: "/products/new", label: "New product" },
+    ],
+  };
+}) satisfies LayoutLoader;
+
+export default function ProductsLayout({
+  data,
+  children,
+}: LayoutProps<typeof loader>) {
+  return (
+    <section>
+      <nav aria-label="Products">
+        {data.navigation.map(item => (
+          <a key={item.href} href={item.href}>
+            {item.label}
+          </a>
+        ))}
+      </nav>
+      {children}
+    </section>
+  );
+}
+```
+
+A page beside it can declare its path relative to the prefix:
+
+```tsx title="src/app/products/web/index.page.tsx"
+export const route = {
+  path: "/",
+  name: "products.index",
+} as const;
+
+export default function ProductsPage() {
+  return <h1>Products</h1>;
+}
+```
+
+The effective URL is `/products`. A page with `route.path = "/:id"` under the same layout is served at `/products/:id`.
+
+## Prefix composition
+
+Every positional layout on the page's directory ancestry may export a literal `prefix`. Prefixes compose outermost first, then the page's own route path.
+
+```tsx title="src/app/users/web/layout.tsx"
+export const prefix = "/users";
+```
+
+```tsx title="src/app/users/web/account/layout.tsx"
+export const prefix = "/account";
+```
+
+```tsx title="src/app/users/web/account/settings.page.tsx"
+export const route = {
+  path: "/settings",
+  name: "users.account.settings",
+} as const;
+
+export default function SettingsPage() {
+  return <h1>Account settings</h1>;
+}
+```
+
+This page's effective URL is `/users/account/settings`.
+
+Like page routes, prefixes are read statically at build time. Write `export const prefix = "/account";` directly; computed prefixes are refused.
+
+## Rendering-layout limit
+
+Prefix nesting does not imply wrapper nesting. Pages currently support at most one rendering layout—one `layout.tsx` with a default export—on their ancestry path.
+
+The two prefix-only layouts above are legal because neither renders. Add a default export to at most one of them. If two layouts on the path have default exports, discovery and boot throw `NestedLayoutsNotSupportedError`, naming the page and both rendering layouts.
+
+Non-rendering layouts may carry prefixes and middleware and may nest freely. Do not delete a middleware-only authorization boundary to satisfy the rendering limit; consolidate only the default-export wrappers.
+
+## Why layout state persists
+
+Client navigation rebuilds the Layout + Page element tree at the same `#root` position. When the next page uses the same layout component type in the same position, React reconciles it instead of remounting it. Layout state such as open menus, scroll containers, and media survives.
+
+`refresh()` has the same property: it re-fetches loaders and swaps the page data while the layout stays mounted. Navigating to a page with a different layout component changes the tree type and remounts that wrapper.
+
+## Loader data
+
+`LayoutLoader` receives the full `PageContext` and its return reaches `LayoutProps<typeof loader>["data"]`. Layout, App, and Page loaders run in parallel; a layout loader cannot read the page loader's result.
+
+Use `shared` when multiple levels need one request-derived value, and write it in middleware before loaders run. See [load-page-data](../load-page-data/SKILL.md).
+
+## Gotchas
+
+- **`layout.tsx` is positional.** It applies by directory ancestry; moving a page can change its layout and URL prefix together.
+- **Only one layout on a path may render.** Multiple prefix/middleware-only layouts are fine; multiple default exports are not.
+- **A layout prefix changes the registered URL.** Check the composed path, not only the page's `route.path`.
+- **Keep `prefix` literal.** The build parses it without executing the module.
+- **Use `LayoutProps<typeof loader>`.** Bare `LayoutProps` is for a layout with no loader and gives `data` as `undefined`.
+- **Layout persistence is type-and-position based.** Changing to another layout component remounts it, as normal React reconciliation requires.
+
+## See also
+
+- [`create-a-page/SKILL.md`](../create-a-page/SKILL.md) — declare the page path composed after the prefix.
+- [`write-the-root/SKILL.md`](../write-the-root/SKILL.md) — the document and `#root` outside the layout.
+- [`load-page-data/SKILL.md`](../load-page-data/SKILL.md) — `LayoutLoader`, parallel execution, and `shared`.
+- [`navigate-on-the-client/SKILL.md`](../navigate-on-the-client/SKILL.md) — client swaps and `refresh()`.
+
+## write-the-root  `@warlock.js/web/write-the-root/SKILL.md`
+
+---
+name: write-the-root
+description: 'Author `src/web/root.tsx`, the full-document application root that owns `<html>`, `<head>`, and `<body>`, places page metadata with `<Head />`, renders the hydrated subtree inside `#root`, and emits the payload with `<Scripts />`. Triggers: `root.tsx`, `AppProps`, `AppLoader`, `Head`, `Scripts`, `id="root"`; "customize the root document", "add html lang", "add an app provider", "where do Head and Scripts go"; typical import `import { Head, Scripts, type AppProps } from "@warlock.js/web"`. Skip: page component contract — `@warlock.js/web/create-a-page/SKILL.md`; layout wrappers — `@warlock.js/web/use-layouts/SKILL.md`; CSS delivery — `@warlock.js/web/serve-styles/SKILL.md`; competing roots `next/layout`, Remix `root`, React `createRoot`.'
+---
+
+# Warlock — write the root
+
+`src/web/root.tsx` is the application document. Its default export renders the complete `<html>` tree and contains the one DOM node the browser hydrates: `#root`.
+
+## The shape
+
+```tsx title="src/web/root.tsx"
+import { Head, Scripts } from "@warlock.js/web";
+import type { AppProps } from "@warlock.js/web";
+
+export default function App({ children }: AppProps) {
+  return (
+    <html lang="en">
+      <head>
+        <Head />
+        <link rel="icon" href="/favicon.svg" />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+```
+
+The root component is synchronous. HTTP work belongs in an `AppLoader`; the component receives its result as `data`.
+
+## `#root` is the hydration boundary
+
+The server renders this document shape:
+
+```text
+App document
+└── #root
+    └── Layout
+        └── Page
+```
+
+The browser hydrates `#root`, not the whole document. The client tree deliberately contains Layout + Page and excludes App because App contains the mount point. Keep exactly one element with `id="root"` around `{children}`. It may be nested inside your own body markup, but it must not be renamed or omitted.
+
+Because App is outside the hydrated subtree, put client state that must survive navigation in a layout or component beneath `#root`, not in the document root.
+
+## `<Head />`
+
+`<Head />` renders the resolved page metadata at that position. It takes no props and emits:
+
+- `<meta charset="utf-8">`
+- title, description, keywords, canonical, and robots tags
+- Open Graph and Twitter tags
+
+Do not also hard-code a `<title>` for the current page; that produces two titles. Static root-wide tags such as a favicon or application name can sit beside `<Head />`.
+
+## `<Scripts />`
+
+`<Scripts />` emits the escaped `application/json` payload that hydration and client navigation consume. Put it after `#root`, normally near the end of `<body>`.
+
+For a Content Security Policy nonce:
+
+```tsx title="src/web/root.tsx"
+import { Head, Scripts } from "@warlock.js/web";
+import type { AppProps } from "@warlock.js/web";
+
+export default function App({ children, shared }: AppProps) {
+  return (
+    <html lang="en">
+      <head>
+        <Head />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+        <Scripts nonce={(shared as { nonce?: string }).nonce} />
+      </body>
+    </html>
+  );
+}
+```
+
+Prefer declaring `nonce` on `SharedContext` so the cast is unnecessary; see [load-page-data](../load-page-data/SKILL.md). If no prop is supplied, `<Scripts />` falls back to the framework's request nonce slot.
+
+`<Scripts />` owns the inline data payload. The separate hydration module is appended by the page route handler. Its published `esm/hydration/index.mjs` file is a build input and must never be imported by application code.
+
+## Add an application loader
+
+```tsx title="src/web/root.tsx"
+import { Head, Scripts } from "@warlock.js/web";
+import type { AppLoader, AppProps } from "@warlock.js/web";
+
+export const loader = (async () => {
+  return { applicationName: "Warlock Store" };
+}) satisfies AppLoader;
+
+export default function App({ data, children }: AppProps<typeof loader>) {
+  return (
+    <html lang="en">
+      <head>
+        <Head />
+        <meta name="application-name" content={data.applicationName} />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+```
+
+The App loader runs in parallel with layout and page loaders. Its return is for the App component; use `shared` for request data that multiple levels need.
+
+## Gotchas
+
+- **The root owns the complete document.** Return `<html>`, `<head>`, and `<body>`, not a fragment.
+- **Keep `{children}` inside `#root`.** Server rendering can still look correct without it, but hydration cannot mount.
+- **Render `<Head />` in a custom root.** It is what turns the page's `metadata` into elements.
+- **Render `<Scripts />` in a custom root.** Without the payload script, the browser cannot hydrate the server-rendered page.
+- **Do not make the component `async`.** Load data with `AppLoader`.
+- **Do not import browser-only state into the root expecting it to persist.** The client hydrates the subtree inside the root, not the root itself.
+- **Stylesheet links are installed separately.** They are inserted before `</head>`; read [serve-styles](../serve-styles/SKILL.md) for the dev/production rules.
+
+## See also
+
+- [`create-a-page/SKILL.md`](../create-a-page/SKILL.md) — the Page level rendered under the root.
+- [`use-layouts/SKILL.md`](../use-layouts/SKILL.md) — the persistent wrapper inside `#root`.
+- [`load-page-data/SKILL.md`](../load-page-data/SKILL.md) — `AppLoader` and typed `shared`.
+- [`serve-styles/SKILL.md`](../serve-styles/SKILL.md) — global CSS from `root.tsx`.
 
 
 ================================================================================
@@ -29756,6 +31281,493 @@ Set `cachedInput` / `cachedOutput` in `ModelPricing` to have cache reads/writes 
 
 
 ================================================================================
+# @warlock.js/ai-deepseek
+================================================================================
+
+# Warlock AI Deepseek — full skills
+
+> Package: `@warlock.js/ai-deepseek`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-deepseek/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## setup-deepseek  `@warlock.js/ai-deepseek/setup-deepseek/SKILL.md`
+
+---
+name: setup-deepseek
+description: 'Wire @warlock.js/ai-deepseek — new DeepSeekSDK({apiKey, baseURL?, provider?, pricing?}) for DeepSeek''s OpenAI-compatible API, .model({name, reasoning?, vision?, structuredOutput?, responseFormat?}) for ModelContract. Thin wrapper over @warlock.js/ai-openai''s OpenAISDK pinned to https://api.deepseek.com with provider "deepseek"; injects DeepSeek-specific reasoning/vision inference + built-in pricing. Models: deepseek-chat (non-thinking), deepseek-reasoner (thinking/reasoning), deepseek-v4-flash, deepseek-v4-pro. Triggers: `DeepSeekSDK`, `deepseek-chat`, `deepseek-reasoner`, `deepseek-v4`, `api.deepseek.com`, `DEEPSEEK_API_KEY`, reasoning effort on deepseek; "wire deepseek into a warlock agent", "use deepseek-reasoner", "configure deepseek-chat", "route a warlock agent through deepseek". Skip: OpenAI/Azure/OpenRouter — `@warlock.js/ai-openai`; agent wiring — `@warlock.js/ai/run-ai-agent/SKILL.md`; adapter comparison — `@warlock.js/ai/pick-ai-provider/SKILL.md`; raw deepseek HTTP / the `openai` SDK directly. Typical import `import { DeepSeekSDK } from "@warlock.js/ai-deepseek"`.'
+---
+
+# `@warlock.js/ai-deepseek`
+
+Provider adapter for DeepSeek. DeepSeek's API is **OpenAI-compatible**, so this package is a **thin wrapper** over [`@warlock.js/ai-openai`](@warlock.js/ai-openai/skills/setup-openai/SKILL.md)'s `OpenAISDK`: it constructs an internal `OpenAISDK` pinned to `https://api.deepseek.com` with `provider: "deepseek"` and delegates `model()` / `embedder()` / `image()` / `count()` to it — while injecting DeepSeek's own capability inference and pricing so the right flags are set even though the model names aren't OpenAI names. Pair with `@warlock.js/ai` for the agent / tool / system-prompt surface.
+
+## Construction
+
+```ts
+import { DeepSeekSDK } from "@warlock.js/ai-deepseek";
+
+const deepseek = new DeepSeekSDK({ apiKey: process.env.DEEPSEEK_API_KEY! });
+```
+
+`apiKey` is the only required field — `baseURL` defaults to `https://api.deepseek.com` (DeepSeek's OpenAI-compatible endpoint) and `provider` defaults to `"deepseek"`. Override `baseURL` only for a proxy/gateway, or `provider` to relabel the upstream:
+
+```ts
+new DeepSeekSDK({ apiKey, baseURL: "https://my-gateway/deepseek", provider: "deepseek-proxy" });
+```
+
+`DeepSeekSDK` is a class (like `OpenAISDK`) holding one long-lived wrapped client — construct once per account and reuse.
+
+## Producing a model
+
+```ts
+deepseek.model({ name: "deepseek-chat" })            // V3 lineage, non-thinking
+deepseek.model({ name: "deepseek-reasoner" })        // R1 lineage, reasoning-capable
+deepseek.model({ name: "deepseek-chat", temperature: 0.2 })
+```
+
+Returns a `ModelContract` you pass straight into `ai.agent({ model })`.
+
+## Models
+
+| Model | Notes |
+| --- | --- |
+| `deepseek-chat` | Non-thinking surface (V3 lineage). Fast, cheap, broad coverage. Reasoning **off**. |
+| `deepseek-reasoner` | Thinking surface (R1 lineage). Emits a reasoning channel. Reasoning **on**. |
+| `deepseek-v4-flash` | Newer flash tier. Reasoning **off** by default. |
+| `deepseek-v4-pro` | Newer quality tier. Reasoning **on** by default. |
+
+DeepSeek announced the legacy `deepseek-chat` / `deepseek-reasoner` names retire 2026/07/24 in favor of the `deepseek-v4-*` family; both name sets are understood by the capability inference. `deepseek.model({ name })` accepts any id the upstream serves.
+
+## Capabilities — what's auto-set
+
+| Flag | Default |
+| --- | --- |
+| `reasoning` | Inferred from the DeepSeek model name. `true` for `deepseek-reasoner` and the `*-pro` tier; `false` for `deepseek-chat` / `*-flash`. Drives whether the reasoning-effort knob is forwarded. |
+| `vision` | `false` for every DeepSeek model — no DeepSeek chat model documents image input (mid-2026). |
+| `structuredOutput` | `true` (inherited from the wrapped OpenAI model), unless `responseFormat` is set to a loose mode. |
+| `promptCaching` | `true` (inherited). DeepSeek reports cache hits via `usage.cachedTokens`, the same shape as OpenAI. |
+
+**Override any flag explicitly** via `.model({ name, reasoning?, vision?, structuredOutput? })` — an explicit value always wins over the injected inference.
+
+```ts
+deepseek.model({ name: "deepseek-chat", reasoning: true })   // force thinking flag
+deepseek.model({ name: "deepseek-reasoner", reasoning: false }) // suppress it
+```
+
+## Uses the OpenAI-compatible endpoint
+
+Everything on the wire — Chat Completions request/response shape, streaming loop, tool-call accumulation, structured-output `response_format`, multipart message mapping, and error wrapping — is inherited **unchanged** from `OpenAIModel`. See [`setup-openai`](@warlock.js/ai-openai/skills/setup-openai/SKILL.md) for the wire-level detail; it all applies here against `https://api.deepseek.com`.
+
+Structured output, reasoning effort, and streaming therefore behave exactly as documented for the OpenAI adapter:
+
+```ts
+const model = deepseek.model({ name: "deepseek-reasoner" });        // reasoning auto-true
+await model.complete(messages, { reasoning: { effort: "high" } });  // → reasoning_effort: "high"
+```
+
+## Embeddings & images
+
+`deepseek.embedder({...})` and `deepseek.image({...})` delegate to the wrapped `OpenAISDK`. **DeepSeek does not officially document an OpenAI-compatible embeddings endpoint or an image-generation endpoint (mid-2026)** — these delegates exist for adapter parity and work against a compatible gateway you point `baseURL` at, but may fail against the stock DeepSeek endpoint. Use a dedicated embeddings provider (e.g. `@warlock.js/ai-openai` / `@warlock.js/ai-google`) for RAG.
+
+## Pricing
+
+The adapter ships **built-in DeepSeek pricing defaults** (USD per 1M tokens, from DeepSeek's published table), so `usage.cost` is computed out of the box:
+
+```ts
+const deepseek = new DeepSeekSDK({ apiKey }); // deepseek-chat → { input: 0.14, output: 0.28, cachedInput: 0.0028 }
+```
+
+Override per model or per SDK exactly like the OpenAI adapter. Resolution at `model()` time: per-model `pricing` > SDK `pricing` registry > built-in DeepSeek default > `undefined`.
+
+```ts
+new DeepSeekSDK({ apiKey, pricing: { "deepseek-reasoner": { input: 0.55, output: 2.19 } } });
+```
+
+## Errors
+
+Raw errors surface through the wrapped OpenAI adapter's wrapper into the typed `@warlock.js/ai` `AIError` hierarchy — see [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md).
+
+## When NOT to use this skill
+
+- OpenAI / Azure OpenAI / OpenRouter / local OpenAI-compatible gateways — use `@warlock.js/ai-openai`.
+- Anthropic — `@warlock.js/ai-anthropic`. Gemini — `@warlock.js/ai-google`. Ollama — `@warlock.js/ai-ollama`.
+- Calling the DeepSeek HTTP API or the raw `openai` SDK directly without going through `@warlock.js/ai` agents.
+
+## See also
+
+- [`@warlock.js/ai-openai/skills/setup-openai/SKILL.md`](@warlock.js/ai-openai/skills/setup-openai/SKILL.md) — the wrapped adapter; all wire-level behavior.
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — passing the model into `ai.agent({...})`.
+- [`@warlock.js/ai/pick-ai-provider/SKILL.md`](@warlock.js/ai/pick-ai-provider/SKILL.md) — adapter comparison.
+
+
+================================================================================
+# @warlock.js/ai-groq
+================================================================================
+
+# Warlock AI Groq — full skills
+
+> Package: `@warlock.js/ai-groq`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-groq/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## setup-groq  `@warlock.js/ai-groq/setup-groq/SKILL.md`
+
+---
+name: setup-groq
+description: 'Wire @warlock.js/ai-groq — new GroqSDK({apiKey, baseURL?, provider?, pricing?}) for Groq-hosted open models on LPU hardware (llama-3.3-70b-versatile, llama-3.1-8b-instant, openai/gpt-oss-120b/20b, deepseek-r1-distill-llama-70b). Thin wrapper over @warlock.js/ai-openai — uses the OpenAI-compatible endpoint https://api.groq.com/openai/v1, delegating transport/streaming/structured-output/errors to OpenAISDK while injecting Groqs OWN vision/reasoning inference + default pricing. .model({name, vision?, reasoning?, structuredOutput?}) for ModelContract. Triggers: `GroqSDK`, `groq.model`, `groq.count`, `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `gpt-oss`, `deepseek-r1-distill`, `groq vision`, `groq reasoning`, `reasoning_effort`, `https://api.groq.com/openai/v1`, OpenAI-compatible Groq, LPU, fast inference; "wire groq into a warlock agent", "use llama 3.3 on groq", "run gpt-oss / deepseek reasoning on groq", "point warlock at the groq endpoint"; import `import { GroqSDK } from "@warlock.js/ai-groq"`. Skip: agent wiring — `@warlock.js/ai/run-ai-agent/SKILL.md`; adapter comparison — `@warlock.js/ai/pick-ai-provider/SKILL.md`; the wrapped adapter `@warlock.js/ai-openai` (`setup-openai`); embeddings (Groq has none — use openai/google); siblings `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `groq-sdk` / `openai` SDK.'
+---
+
+# `@warlock.js/ai-groq`
+
+Provider adapter for **Groq** — open models (Llama, GPT-OSS, DeepSeek-R1 distill) served fast on Groq's LPU hardware. Groq speaks the OpenAI Chat Completions protocol, so this package is a **thin wrapper over `@warlock.js/ai-openai`**: it owns an internal `OpenAISDK` pointed at Groq's endpoint and delegates the wire work, while injecting Groq's own capability inference and default pricing. Pair with `@warlock.js/ai` for the agent / tool / system-prompt surface.
+
+## Construction
+
+```ts
+import { GroqSDK } from "@warlock.js/ai-groq";
+
+// Common path — apiKey only. baseURL + provider default to Groq.
+const groq = new GroqSDK({ apiKey: process.env.GROQ_API_KEY! });
+```
+
+`baseURL` defaults to `https://api.groq.com/openai/v1` (Groq's **OpenAI-compatible endpoint**) — override only to route through a proxy/gateway. `provider` defaults to `"groq"` and flows through to `ModelContract.provider`, `AgentReport.model.provider`, and logs.
+
+`GroqSDK` is a class (not a factory) — it holds a long-lived internal `OpenAISDK` and aligns with the other adapter entry points. Every upstream `openai` `ClientOptions` field (`timeout`, `maxRetries`, `defaultHeaders`, `fetch`, …) is forwarded verbatim to that inner client.
+
+## Producing a model
+
+```ts
+groq.model({ name: "llama-3.3-70b-versatile" })          // flagship general-purpose text
+groq.model({ name: "llama-3.1-8b-instant" })             // fastest / cheapest small text
+groq.model({ name: "openai/gpt-oss-120b" })              // vision + reasoning auto-true
+groq.model({ name: "deepseek-r1-distill-llama-70b" })    // reasoning auto-true
+```
+
+Returns a `ModelContract` you pass straight into `ai.agent({ model })`. `name` is the Groq-hosted **open-weight** id (the upstream name, e.g. `openai/gpt-oss-120b`), NOT an OpenAI id. Any current Groq model id works — the list above is curated, not an allow-list.
+
+## Capabilities — what's auto-set
+
+The whole reason this wrapper exists: Groq's ids aren't OpenAI's, so the OpenAI adapter's prefix inference would never fire. `GroqSDK` carries its **own** name lists.
+
+| Flag | Default |
+| --- | --- |
+| `vision` | Inferred from the Groq model id. `true` for `gpt-oss`, `llama-4`, `llama-3.2-*-vision`; `false` otherwise (e.g. `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`). |
+| `reasoning` | Inferred from the Groq model id. `true` for `gpt-oss`, `deepseek-r1` / `deepseek-r1-distill`, `qwq`, `qwen3`; `false` otherwise. Drives whether `reasoning_effort` is forwarded. |
+| `structuredOutput` | `true` — Groq accepts OpenAI-style `response_format`. |
+| `promptCaching` | Inherited from the inner OpenAI adapter (`true`; read-side `cachedTokens` accounting). |
+
+**Override `vision`, `reasoning`, or `structuredOutput` explicitly** via `.model({ name, vision?, reasoning?, structuredOutput? })` — an explicit value always wins over inference.
+
+```ts
+groq.model({ name: "some-custom-llama", vision: true })  // force on for an unlisted multimodal id
+groq.model({ name: "openai/gpt-oss-120b", reasoning: false }) // pin off
+```
+
+## Reasoning (gpt-oss / deepseek-r1 distill)
+
+Reasoning models accept a discrete effort knob, forwarded by the inner adapter as OpenAI's `reasoning_effort`:
+
+```ts
+const model = groq.model({ name: "deepseek-r1-distill-llama-70b" }); // reasoning auto-true
+await model.complete(messages, { reasoning: { effort: "high" } });   // → reasoning_effort: "high"
+```
+
+- `reasoning.effort` (`"low" | "medium" | "high"`) maps verbatim.
+- `reasoning.maxTokens` has no Chat Completions equivalent and is ignored (same as the OpenAI adapter).
+- When `capabilities.reasoning` is `false` (e.g. `llama-3.3-70b-versatile`), the option is dropped — never sent as an unsupported param.
+
+## Structured output & streaming
+
+Inherited unchanged from `@warlock.js/ai-openai`: a `responseSchema` maps to `response_format: json_schema` (strict) when the schema is a proper root object, else loose `json_object`; `model.stream()` drains the streaming Chat Completions response and yields `delta` / `tool-call` / `done` chunks with `include_usage` on. See [`setup-openai`](@warlock.js/ai-openai/skills/setup-openai/SKILL.md) for the full wire behavior.
+
+## Embeddings — not available on Groq
+
+As of mid-2026 Groq exposes **no** OpenAI-compatible embeddings endpoint. `groq.embedder({ name })` constructs (delegated to the inner adapter) but a live `.embed()` call fails at the provider. Use `@warlock.js/ai-openai` or `@warlock.js/ai-google` for retrieval embeddings.
+
+There is also no image-generation API on Groq, so `GroqSDK` intentionally does **not** define `image()` — `ai.groq.image(...)` is a compile-time error (structural capability guard, like Anthropic / Bedrock / Ollama).
+
+## Pricing — per-model registry + built-in defaults
+
+`pricing` is a registry keyed by model name, rates in **USD per 1,000,000 tokens** (`ModelPricing`: `input`, `output`, optional `cachedInput` / `cachedOutput`). The adapter ships **built-in default rates** for the known Groq models as the final fallback.
+
+```ts
+const groq = new GroqSDK({
+  apiKey,
+  pricing: {
+    "llama-3.3-70b-versatile": { input: 0.59, output: 0.79 }, // USD per 1M tokens
+  },
+});
+```
+
+Resolution at `model()` time: per-model `pricing` (`groq.model({ name, pricing })`) > SDK `pricing[name]` > adapter built-in default for the id > `undefined` (no cost computed). Built-in defaults exist for `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `openai/gpt-oss-120b`, `openai/gpt-oss-20b`, and `deepseek-r1-distill-llama-70b`; supply your own for anything else.
+
+## Token counting
+
+```ts
+await groq.count("some text")  // approximate heuristic (delegated), not a real tokenizer
+```
+
+Good for budgeting; not for billing.
+
+## Errors
+
+Raw errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by the inner OpenAI adapter's error wrapper (dispatch keys on `status + code`). See [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md). Note Groq's documented OpenAI-compat gaps — `n` must be `1`, and `logprobs` / `logit_bias` / `top_logprobs` / `messages[].name` are unsupported.
+
+## When NOT to use this skill
+
+- Embeddings or image generation — Groq has neither; use `@warlock.js/ai-openai` / `@warlock.js/ai-google`.
+- OpenAI / Azure / OpenRouter — use `@warlock.js/ai-openai` (`setup-openai`); this wraps it but for Groq specifically.
+- Anthropic — `@warlock.js/ai-anthropic`. Bedrock — `@warlock.js/ai-bedrock`. Gemini — `@warlock.js/ai-google`. Local Ollama — `@warlock.js/ai-ollama`.
+
+## See also
+
+- [`@warlock.js/ai-openai/skills/setup-openai/SKILL.md`](@warlock.js/ai-openai/skills/setup-openai/SKILL.md) — the wrapped adapter; full wire / streaming / structured-output detail
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — passing the model into `ai.agent({...})`
+- [`@warlock.js/ai/pick-ai-provider/SKILL.md`](@warlock.js/ai/pick-ai-provider/SKILL.md) — adapter comparison
+
+
+================================================================================
+# @warlock.js/ai-mistral
+================================================================================
+
+# Warlock AI Mistral — full skills
+
+> Package: `@warlock.js/ai-mistral`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-mistral/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## setup-mistral  `@warlock.js/ai-mistral/setup-mistral/SKILL.md`
+
+---
+name: setup-mistral
+description: 'Wire @warlock.js/ai-mistral — new MistralSDK({apiKey, baseURL?, provider?, pricing?}) for Mistral AI, a thin wrapper over the OpenAI adapter that uses Mistral''s OpenAI-compatible endpoint (https://api.mistral.ai/v1). .model({name, vision?, reasoning?, structuredOutput?, responseFormat?, pdf?, audio?}) for a ModelContract with Mistral-aware capabilities (vision auto-inferred for the pixtral family, reasoning for the magistral family + hybrid mistral-small), .embedder({name, dimensions?}) for mistral-embed via /v1/embeddings. Triggers: `MistralSDK`, `mistral.model`, `mistral.embedder`, `pixtral`, `magistral`, `mistral-large`, `mistral-small`, `mistral-medium`, `ministral`, `mistral-embed`, `api.mistral.ai`, OpenAI-compatible Mistral, `reasoning_effort`, `responseFormat`, `pricing`; "use mistral", "wire mistral into a warlock agent", "configure mistral-large", "use magistral reasoning", "pixtral vision", "mistral embeddings with warlock". Skip: image generation (Mistral has no OpenAI-compatible image endpoint — `mistral.image()` does not exist); the wrapped adapter internals `@warlock.js/ai-openai`; agent wiring `@warlock.js/ai/run-ai-agent/SKILL.md`; embedder usage `@warlock.js/ai/embed-text/SKILL.md`; provider picking `@warlock.js/ai/pick-ai-provider/SKILL.md`; siblings `@warlock.js/ai-google`, `@warlock.js/ai-anthropic`, `@warlock.js/ai-bedrock`, `@warlock.js/ai-ollama`; raw `@mistralai/mistralai`, Vercel `@ai-sdk/mistral`.'
+---
+
+# `@warlock.js/ai-mistral`
+
+Provider adapter for Mistral AI. Mistral exposes an **OpenAI-compatible** API, so `MistralSDK` is a **thin wrapper** over [`@warlock.js/ai-openai`](@warlock.js/ai-openai/skills/setup-openai/SKILL.md) — it does not re-implement the wire protocol, streaming, tool calls, structured output, error wrapping, or token accounting. It builds one internal `OpenAISDK` pointed at Mistral's `baseURL` with `provider: "mistral"`, then layers on this provider's own capability inference + default pricing. Pair with `@warlock.js/ai` for the agent / tool / system-prompt surface.
+
+## Construction
+
+```ts
+import { MistralSDK } from "@warlock.js/ai-mistral";
+
+const mistral = new MistralSDK({ apiKey: process.env.MISTRAL_API_KEY! });
+```
+
+`baseURL` defaults to `https://api.mistral.ai/v1` (the OpenAI-compatible endpoint serving `/chat/completions` and `/embeddings`). `provider` defaults to `"mistral"` and flows through to `ModelContract.provider`, `AgentReport.model.provider`, and logs. Override `baseURL` only to reach a Mistral-compatible gateway/proxy. Every other upstream OpenAI `ClientOptions` value (`timeout`, `maxRetries`, `defaultHeaders`, `fetch`, …) is forwarded verbatim.
+
+## Producing a model
+
+```ts
+mistral.model({ name: "mistral-large-latest" })             // multimodal flagship
+mistral.model({ name: "magistral-medium-latest" })          // reasoning
+mistral.model({ name: "pixtral-large-latest" })             // vision
+mistral.model({ name: "some-fine-tune", vision: true })     // explicit capability override
+```
+
+Returns a `ModelContract` you pass straight into `ai.agent({ model })`.
+
+## Capabilities — what's auto-set
+
+The wrapper injects **Mistral-aware** inference before delegating to the OpenAI adapter (the OpenAI prefix lists never match Mistral names):
+
+| Flag | Default |
+| --- | --- |
+| `vision` | Inferred from the model name. `true` for the `pixtral` family and the recent multimodal generations (`mistral-large`, `mistral-medium`, `ministral-3`); `false` otherwise. |
+| `reasoning` | Inferred from the model name. `true` for the `magistral` family and the hybrid `mistral-small` generation; `false` otherwise. Drives whether `reasoning_effort` is forwarded. |
+| `structuredOutput` | `true`, unless `responseFormat` is forced to `"json_object"` / `"text"` (loose modes). |
+| `promptCaching` | `true` (inherited from the OpenAI adapter — read-side `cachedTokens` accounting). |
+| `pdf` / `audio` | `false` by default (opt-in `.model({ pdf: true })` / `{ audio: true }`). |
+
+**Override any flag explicitly** via `.model({ name, vision?, reasoning?, structuredOutput?, responseFormat?, pdf?, audio? })` — an explicit value always wins over inference. The known-family fragments live in `known-models.ts` (`inferVisionCapability`, `inferReasoningCapability`).
+
+The headline `-latest` aliases are exported as `MISTRAL_MODELS` ({ chat, vision, reasoning, embedding }) for convenience — `mistral.model()` also accepts any version-pinned id (`mistral-large-2512`, `magistral-medium-2509`).
+
+## Uses the OpenAI-compatible endpoint
+
+Because Mistral speaks the OpenAI Chat Completions + Embeddings protocol, everything the OpenAI adapter does applies unchanged: streaming deltas + consolidated tool calls, `response_format: json_schema` structured output (override per model with `responseFormat`), `reasoning_effort` for reasoning models, multipart image input, and the neutral `Usage` breakdown (`input` / `output` / `cachedTokens` / `reasoningTokens`). See [`@warlock.js/ai-openai`](@warlock.js/ai-openai/skills/setup-openai/SKILL.md) for the wire-level detail — it is identical here.
+
+**No image generation.** Mistral has no OpenAI-compatible image endpoint, so `MistralSDK` intentionally does **not** expose `image()` — the structural absence is the capability guard (`ai.mistral.image(...)` is a compile-time error).
+
+## Embeddings
+
+```ts
+const embedder = mistral.embedder({ name: "mistral-embed" });
+
+const { vector, dimensions, usage } = await embedder.embed("Hello world");
+const { vectors } = await embedder.embedMany(["doc 1", "doc 2"]);
+```
+
+`mistral-embed` is reachable through the OpenAI-compatible `/v1/embeddings`; the embedder delegates to the wrapped OpenAI embedder.
+
+## Pricing — per-model registry
+
+The adapter ships a conservative default registry (`MISTRAL_DEFAULT_PRICING`, USD per 1,000,000 tokens) so cost truth works out of the box. Pass your own `pricing` to win per model id:
+
+```ts
+const mistral = new MistralSDK({
+  apiKey,
+  pricing: {
+    // USD per 1M tokens — billing-grade overrides.
+    "mistral-large-latest":    { input: 2,   output: 6 },
+    "magistral-medium-latest": { input: 2,   output: 5 },
+  },
+});
+```
+
+Resolution at `model()` time: per-model `pricing` (`mistral.model({ name, pricing })`) > SDK-level `pricing` > `MISTRAL_DEFAULT_PRICING` > `undefined`. The defaults are list-price approximations — pass explicit rates for billing.
+
+## Errors
+
+Raw errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by the wrapped OpenAI adapter (dispatch keys on `APIError.status + code`) — see [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md).
+
+## When NOT to use this skill
+
+- Image generation — Mistral has no OpenAI-compatible image endpoint; `mistral.image()` does not exist.
+- Other providers — OpenAI `@warlock.js/ai-openai`, Gemini `@warlock.js/ai-google`, Anthropic `@warlock.js/ai-anthropic`, Bedrock `@warlock.js/ai-bedrock`, Ollama `@warlock.js/ai-ollama`.
+- Raw `@mistralai/mistralai` SDK or Vercel `@ai-sdk/mistral` without going through `@warlock.js/ai` agents.
+
+## See also
+
+- [`@warlock.js/ai-openai/skills/setup-openai/SKILL.md`](@warlock.js/ai-openai/skills/setup-openai/SKILL.md) — the wrapped adapter; identical wire behavior.
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — passing the model into `ai.agent({...})`.
+- [`@warlock.js/ai/pick-ai-provider/SKILL.md`](@warlock.js/ai/pick-ai-provider/SKILL.md) — adapter comparison.
+
+
+================================================================================
+# @warlock.js/ai-xai
+================================================================================
+
+# Warlock AI Xai — full skills
+
+> Package: `@warlock.js/ai-xai`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-xai/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## setup-xai  `@warlock.js/ai-xai/setup-xai/SKILL.md`
+
+---
+name: setup-xai
+description: 'Wire @warlock.js/ai-xai — new XaiSDK({apiKey, baseURL?, provider?, pricing?}) for xAI Grok, .model({name, vision?, reasoning?, structuredOutput?}) for a ModelContract, .embedder({name, dimensions?}) and .image({name, pricing?}) delegated to the OpenAI-compatible adapter. Thin wrapper over OpenAISDK: uses the xAI OpenAI-compatible endpoint (https://api.x.ai/v1) and injects xAI''s own vision/reasoning inference so Grok names resolve to the right capabilities. Triggers: `XaiSDK`, `grok`, `grok-4`, `grok-3`, `grok-3-mini`, `grok-2-vision`, `.model`, `x.ai`, `api.x.ai`, `XAI_API_KEY`, `reasoning_effort` on Grok, "wire xai/grok into a warlock agent", "configure grok-4", "use grok reasoning effort", "send an image to grok-4 / grok-2-vision"; typical import `import { XaiSDK } from "@warlock.js/ai-xai"`. Skip: agent wiring — `@warlock.js/ai/run-ai-agent/SKILL.md`; the underlying OpenAI-compatible adapter and its full capability/streaming/error surface — `@warlock.js/ai-openai/skills/setup-openai/SKILL.md`; adapter comparison — `@warlock.js/ai/pick-ai-provider/SKILL.md`; competing adapters `@warlock.js/ai-anthropic`, `@warlock.js/ai-google`, `@warlock.js/ai-ollama`; raw `openai` SDK pointed at x.ai by hand.'
+---
+
+# `@warlock.js/ai-xai`
+
+Provider adapter for xAI's **Grok** models. xAI speaks the OpenAI Chat Completions protocol, so `XaiSDK` is a **thin wrapper** over [`OpenAISDK`](../../../ai-openai/skills/setup-openai/SKILL.md) — it does not reimplement the wire layer. It constructs one internal `OpenAISDK` pointed at xAI's `baseURL` and labeled `provider: "xai"`, then delegates `model()` / `embedder()` / `image()` / `count()`, injecting xAI's own capability inference so Grok model names resolve correctly. Pair with `@warlock.js/ai` for the agent / tool / system-prompt surface.
+
+## Construction
+
+```ts
+import { XaiSDK } from "@warlock.js/ai-xai";
+
+const xai = new XaiSDK({ apiKey: process.env.XAI_API_KEY! });
+```
+
+- `baseURL` defaults to `https://api.x.ai/v1` (the xAI OpenAI-compatible endpoint). Override only to target a proxy/gateway.
+- `provider` defaults to `"xai"` — flows through to `ModelContract.provider`, `AgentReport.model.provider`, and logs. Set it to relabel a gateway upstream.
+- Every other upstream `ClientOptions` value (`timeout`, `maxRetries`, `defaultHeaders`, `fetch`, …) is forwarded verbatim to the wrapped client.
+
+`XaiSDK` is a class (not a factory) — it holds a long-lived wrapped `OpenAISDK` (which holds a long-lived `OpenAI` client). Construct one per account and reuse it.
+
+## Producing a model
+
+```ts
+xai.model({ name: "grok-4" })                       // vision + reasoning auto-true
+xai.model({ name: "grok-3-mini" })                  // reasoning auto-true, vision false
+xai.model({ name: "grok-2-vision" })                // vision auto-true
+xai.model({ name: "grok-4", temperature: 0.2 })     // sampling controls
+xai.model({ name: "grok-3", vision: true })         // explicit capability override
+```
+
+Returns a `ModelContract` you pass straight into `ai.agent({ model })`.
+
+## Models & capabilities — what's auto-set
+
+This adapter ships xAI's OWN name lists (Grok ids don't match OpenAI's `gpt-*` / `o*` prefixes). Capabilities are injected per model before delegating; an explicit value always wins over inference.
+
+| Model | `vision` | `reasoning` |
+| --- | --- | --- |
+| `grok-4` | true | true (reasoning-first) |
+| `grok-3` | false | false |
+| `grok-3-mini` | false | true (the "think" variant) |
+| `grok-2-vision` | true | false |
+| `grok-2` | false | false |
+
+- `vision` — inferred `true` for the `grok-4` and `grok-2-vision` prefixes; `false` otherwise.
+- `reasoning` — inferred `true` for `grok-4` and `grok-3-mini`; drives whether `reasoning.effort` is forwarded as `reasoning_effort` on the wire.
+- `structuredOutput` / `promptCaching` and the image/PDF/audio wire mapping all come from the wrapped OpenAI adapter unchanged — see [`setup-openai`](../../../ai-openai/skills/setup-openai/SKILL.md).
+
+**Override `vision`, `reasoning`, or `structuredOutput` explicitly** via `.model({ name, vision?, reasoning?, structuredOutput? })`.
+
+> Model availability changes over time — pass any current Grok id through `.model({ name })`; the prefix inference covers dated / `-latest` / `-fast` / `-beta` variants. Don't assume a model exists; check xAI's docs.
+
+## Reasoning (grok-4 / grok-3-mini)
+
+```ts
+const model = xai.model({ name: "grok-4" });   // reasoning auto-true
+await model.complete(messages, { reasoning: { effort: "high" } });  // → reasoning_effort: "high"
+```
+
+`reasoning.effort` (`"low" | "medium" | "high"`) maps verbatim to the OpenAI-compatible `reasoning_effort` param. When `capabilities.reasoning` is `false` (e.g. `grok-3`), the option is dropped — the adapter never forwards it. Pin `reasoning: true` to force it for a custom/gateway id.
+
+## Multipart messages (image input)
+
+Image attachments reach the wire only on a vision-capable model (`grok-4`, `grok-2-vision`); the agent's modality gate throws otherwise. Mapping to OpenAI `image_url` parts is identical to the OpenAI adapter — see [`setup-openai`](../../../ai-openai/skills/setup-openai/SKILL.md).
+
+## Uses the OpenAI-compatible endpoint
+
+All wire work — request/response mapping, streaming, tool-call accumulation, structured output, usage extraction — is the wrapped `OpenAISDK`'s, unchanged. The wrapper only: (1) sets the xAI `baseURL` + `provider` defaults, and (2) injects xAI's vision/reasoning inference per model. For streaming, structured output, and the full multipart surface, read [`@warlock.js/ai-openai/skills/setup-openai/SKILL.md`](../../../ai-openai/skills/setup-openai/SKILL.md).
+
+## Embeddings — not available on xAI
+
+```ts
+xai.embedder({ name: "text-embedding-3-small" }); // delegates, but xAI has no embeddings API yet
+```
+
+xAI does **not** currently expose a public embeddings endpoint. `embedder()` is wired for protocol parity, but a call to `embed()` / `embedMany()` fails upstream. Point an embedder at a dedicated provider (e.g. `@warlock.js/ai-openai`) for vectors.
+
+## Image generation — delegated guard
+
+`image()` delegates to the wrapped OpenAI Images adapter, which only recognizes `gpt-image-*` / `dall-e-*` ids and rejects anything else at construction. xAI's image generation ("Grok Imagine") is a separate, non-OpenAI-Images-compatible surface, so use `@warlock.js/ai-openai`'s `image()` for OpenAI-Images generation.
+
+## Pricing — per-model registry
+
+`pricing` is a registry keyed by model name, rates in **USD per 1,000,000 tokens** (`ModelPricing`: `input`, `output`, optional `cachedInput` / `cachedOutput`). Resolution is delegated: per-model `pricing` > SDK registry > `undefined` (no cost computed).
+
+```ts
+const xai = new XaiSDK({
+  apiKey,
+  pricing: {
+    "grok-4":      { input: 3, output: 15 },
+    "grok-3-mini": { input: 0.3, output: 0.5 },
+  },
+});
+
+const { usage } = await ai.agent({ model: xai.model({ name: "grok-4" }) }).execute("hi");
+usage.cost; // per-channel USD breakdown of THIS run, or undefined when unpriced
+```
+
+> Pricing numbers above are illustrative placeholders — set the current xAI rates yourself.
+
+## Errors
+
+Raw xAI / OpenAI-SDK errors are wrapped into the typed `@warlock.js/ai` `AIError` hierarchy by the wrapped adapter's error wrapper (dispatch keys on `APIError.status + code`). See [`@warlock.js/ai/handle-ai-errors/SKILL.md`](@warlock.js/ai/handle-ai-errors/SKILL.md).
+
+## When NOT to use this skill
+
+- Direct calls to the `openai` SDK pointed at `api.x.ai` by hand — without going through `@warlock.js/ai` agents.
+- Non-Grok models — OpenAI: `@warlock.js/ai-openai`. Anthropic: `@warlock.js/ai-anthropic`. Gemini: `@warlock.js/ai-google`. Ollama: `@warlock.js/ai-ollama`.
+
+## See also
+
+- [`@warlock.js/ai-openai/skills/setup-openai/SKILL.md`](../../../ai-openai/skills/setup-openai/SKILL.md) — the wrapped adapter; full wire / streaming / structured-output / multipart surface
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — passing the model into `ai.agent({...})`
+- [`@warlock.js/ai/pick-ai-provider/SKILL.md`](@warlock.js/ai/pick-ai-provider/SKILL.md) — adapter comparison
+```
+
+
+================================================================================
 # @warlock.js/ai-ollama
 ================================================================================
 
@@ -29905,6 +31917,808 @@ Per-call `Usage` comes from the chat response's `prompt_eval_count` (→ `input`
 - [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md)
 - [`@warlock.js/ai/pick-ai-provider/SKILL.md`](@warlock.js/ai/pick-ai-provider/SKILL.md)
 - [`@warlock.js/ai/embed-text/SKILL.md`](@warlock.js/ai/embed-text/SKILL.md)
+
+
+================================================================================
+# @warlock.js/ai-live
+================================================================================
+
+# Warlock AI Live — full skills
+
+> Package: `@warlock.js/ai-live`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-live/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## use-ai-live  `@warlock.js/ai-live/use-ai-live/SKILL.md`
+
+---
+name: use-ai-live
+description: 'Live & generative rich-media add-on for @warlock.js/ai. A side-effect import `import "@warlock.js/ai-live"` mounts two heavy modalities onto the shared `ai.*` facade: `ai.video({ model, prompt })` — text-to-video (Sora / Veo / Kling-class), the async submit→poll job hidden behind the same uniform never-throws `{ data, error, usage, report }` envelope as `ai.image`, with per-second cost-truth folded into `Usage.cost`; and `ai.realtime({ transport, model })` — a stateful duplex VOICE SESSION over a pluggable `RealtimeTransport` (sendAudio / sendText / events() / close()→RealtimeReport). Videos are a discriminated `GeneratedVideo = { type: "url" } | { type: "base64" }`; session output is a `RealtimeEvent` union (audio | transcript | tool-call | error | done). Ships `MockVideoModel` + `MockRealtimeTransport` for HTTP-free tests. Triggers: `ai.video`, `ai.realtime`, `VideoModelContract`, `GeneratedVideo`, `VideoModelPricing`, `RealtimeSession`, `RealtimeTransport`, `RealtimeEvent`, `RealtimeReport`, `MockVideoModel`, `MockRealtimeTransport`; ''generate a video'', ''text to video'', ''sora'', ''veo'', ''realtime voice'', ''duplex voice session'', ''live voice agent'', ''barge-in'', ''per-second video cost''; typical import `import "@warlock.js/ai-live"` + `import { ai } from "@warlock.js/ai"`. Skip: still-image OUTPUT — [[generate-images]]; text-to-speech / transcription (one-shot audio, not a session) — [[generate-speech]]; chat agents / tools / workflows — `@warlock.js/ai/run-ai-agent/SKILL.md`.'
+---
+
+# Live rich-media — `ai.video` + `ai.realtime` (`@warlock.js/ai-live`)
+
+`@warlock.js/ai` ships the synchronous modality verbs (`ai.agent`, `ai.image`, `ai.speech`, `ai.transcribe`). `ai-live` adds the two that need heavyweight, demand-gated machinery — a **long-running job** (video) and a **persistent network session** (realtime voice) — kept in their own package so the core stays dependency-light.
+
+Both mount onto the same `ai.*` facade by a **side-effect import**:
+
+```ts
+import "@warlock.js/ai-live"; // lights up ai.video + ai.realtime on the shared Ai facade
+import { ai } from "@warlock.js/ai";
+```
+
+The mount mirrors how `@warlock.js/ai-tools` mounts `ai.mcp` and `@warlock.js/ai-workspace` mounts `ai.workspace`: a `declare module "@warlock.js/ai"` interface-merge plus `ai.video = video; ai.realtime = realtime` at load. Forget the side-effect import and `ai.video` is a compile-time `undefined` — not a silent runtime miss.
+
+## `ai.video` — text-to-video, uniform envelope
+
+Prompt in / one video out. The adapter hides the provider's async **submit→poll** lifecycle and resolves only when the clip is ready, so the verb returns the framework's uniform **never-throws** `{ data, error, usage, report }` — the exact shape `ai.image` returns, so video spend and traces fold into the same dashboards.
+
+```ts
+import { ai } from "@warlock.js/ai";
+
+const { data, error, usage, report } = await ai.video({
+  model: sora.video({ name: "sora-2", pricing: { perSecond: 0.1 } }), // VideoModelContract
+  prompt: "a timelapse of a city skyline at dusk, cinematic",
+  durationSeconds: 8,
+  aspectRatio: "16:9",
+});
+
+if (error) {
+  console.warn(error.code);   // typed AIError — NEVER thrown
+} else {
+  const clip = data.video;    // GeneratedVideo (discriminated)
+  if (clip.type === "url") download(clip.url);
+  else save(Buffer.from(clip.base64, "base64"), clip.mediaType);
+}
+```
+
+### Shape
+
+```ts
+type VideoResult = ExecuteResult<VideoData> & { type: "video"; report: VideoReport };
+type VideoData = { video: GeneratedVideo };
+
+type GeneratedVideo =
+  | { type: "url"; url: string; mediaType?: string }
+  | { type: "base64"; base64: string; mediaType: string };
+
+// VideoParams (provider-neutral) — the model is the only required field beyond prompt:
+await ai.video({
+  model,                 // VideoModelContract from an adapter's video({ name })
+  prompt: "...",
+  durationSeconds: 8,    // requested clip length
+  aspectRatio: "9:16",
+  resolution: "1080p",   // hint
+  negativePrompt: "blurry, watermark",
+  signal,                // AbortSignal → status "cancelled"
+  observe: collector,    // route the report to an Observer (panoptic), like agents
+  sessionId: "campaign-42",
+  name: "hero-clip",     // report node name (defaults to "video")
+  options: { seed: 7 },  // provider-specific escape hatch, forwarded verbatim
+});
+```
+
+`VideoModelContract` is the moving-image sibling of `ImageModelContract` — `{ name, provider, pricing?, generate(prompt, options) }` — produced by an adapter's `video()` factory. An adapter with no video API simply doesn't define `video()`.
+
+## Video cost-truth — per-second first
+
+`VideoModelPricing` carries `{ perSecond?, input?, output? }`. Per-second wins when set (video is metered by clip length): `usage.cost = { input: 0, output: durationSeconds × perSecond }`, attributed to `cost.output`. A token-metered model falls back to the standard `computeCost` against reported tokens. No usable pricing → `usage.cost` stays `undefined` (honest "cost unknown", never a false zero). A pre-priced adapter response is honored, not overwritten. The final `durationSeconds` from the provider (not just the requested one) drives the math and lands on `report.durationSeconds`.
+
+## `ai.realtime` — a duplex voice SESSION (not a one-shot)
+
+Unlike every other `ai.*` verb, `ai.realtime()` returns a **stateful, long-lived session** — its closest sibling is `ai.orchestrator`. You open it over a pluggable **`RealtimeTransport`** (the low-level connection to the provider's realtime endpoint), push microphone audio / text turns in, consume an async **event stream** out, and `close()` to end it and receive a `RealtimeReport` for the cost/observability surfaces.
+
+```ts
+import { ai } from "@warlock.js/ai";
+
+const session = await ai.realtime({
+  transport: openAiRealtime({ apiKey }), // RealtimeTransport (own adapter)
+  model: "gpt-realtime",
+  voice: "alloy",
+  instructions: "You are a friendly phone receptionist.",
+  sessionId: "call-8891",
+});
+
+session.sendAudio(micChunkBase64, "audio/pcm"); // push mic audio upstream
+session.sendText("Please hold for one moment."); // or a text turn
+
+for await (const event of session.events()) {    // duplex output
+  switch (event.type) {
+    case "audio":      speaker.write(event.base64); break;
+    case "transcript": if (event.final) log(event.role, event.text); break;
+    case "tool-call":  await handleTool(event.name, event.input); break;
+    case "error":      console.warn(event.error.code); break;
+    case "done":       break;
+  }
+}
+
+const report = await session.close(); // RealtimeReport — idempotent
+```
+
+### Session contract & event union
+
+```ts
+interface RealtimeSession {
+  sendAudio(base64: string, mediaType: string): void;
+  sendText(text: string): void;
+  events(): AsyncIterable<RealtimeEvent>;
+  close(): Promise<RealtimeReport>; // idempotent — second close() returns the first report
+}
+
+type RealtimeEvent =
+  | { type: "audio"; base64: string; mediaType: string }
+  | { type: "transcript"; role: "user" | "assistant"; text: string; final: boolean }
+  | { type: "tool-call"; id: string; name: string; input: unknown }
+  | { type: "error"; error: AIError }   // typed, non-fatal
+  | { type: "done" };                   // server ended the session
+
+type RealtimeReport = {
+  runId: string; rootRunId: string; type: "realtime";
+  name: string; status: "completed" | "failed" | "cancelled";
+  startedAt: string; endedAt: string; duration: number; sessionId?: string;
+};
+```
+
+The transport seam is what lets `ai-live` ship the session surface without hard-wiring `ws` (it's an optional peer). A concrete transport implements just two interfaces: `RealtimeTransport.connect(config) → RealtimeConnection` (with `sendAudio` / `sendText` / `events()` / `close()`).
+
+## Pattern — a live phone receptionist over a channel
+
+```ts
+import "@warlock.js/ai-live";
+import { ai } from "@warlock.js/ai";
+
+async function handleCall(caller: PhoneChannel, transport: RealtimeTransport) {
+  const session = await ai.realtime({
+    transport,
+    model: "gpt-realtime",
+    voice: "alloy",
+    instructions: "Greet the caller and route them to the right department.",
+    sessionId: caller.id,
+  });
+
+  // Pump caller audio → session (fire-and-forget).
+  caller.onAudio((chunk) => session.sendAudio(chunk, "audio/pcm"));
+
+  // Pump session output → caller, until the model signals done.
+  for await (const event of session.events()) {
+    if (event.type === "audio") caller.playAudio(event.base64);
+    if (event.type === "done") break;
+  }
+
+  const report = await session.close();
+  metrics.record({ runId: report.runId, seconds: report.duration / 1000 });
+}
+```
+
+## Testing — mocks, no HTTP, no sockets
+
+`@warlock.js/ai-live` exports deterministic doubles so both verbs test offline.
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { MockVideoModel, MockRealtimeTransport } from "@warlock.js/ai-live";
+
+// Video — script the returned clip / usage / duration; assert cost math + recorded calls.
+const model = new MockVideoModel("mock-video", [{ durationSeconds: 8 }], { perSecond: 0.1 });
+const { data, usage } = await ai.video({ model, prompt: "x", durationSeconds: 8 });
+// data.video → { type: "url", url: "https://mock/video.mp4", ... }
+// usage.cost.output === 0.8   (8 × 0.1)
+// model.calls[0] → { prompt: "x", options: { durationSeconds: 8, ... } }
+
+// Realtime — script the outbound event stream; assert what the session sent.
+const transport = new MockRealtimeTransport([
+  { type: "transcript", role: "assistant", text: "Hi!", final: true },
+  { type: "done" },
+]);
+const session = await ai.realtime({ transport, model: "mock-realtime" });
+session.sendText("hello");
+for await (const e of session.events()) { /* ... */ }
+const report = await session.close();
+// transport.lastConnection.sentText → ["hello"]
+// transport.connectConfigs[0] → { model: "mock-realtime", ... }
+// report.status === "completed"
+```
+
+Feed `MockVideoModel` an `{ error }` response and `ai.video` lands it on `result.error` (never throws), setting `report.status` to `"failed"` (or `"cancelled"` when the signal aborted).
+
+## Status — contracts now, transports next
+
+`4.6.0` introduces the package: the `VideoModelContract` / `RealtimeSession` contracts, the `ai.video()` verb (uniform envelope + per-second cost-truth, tested against `MockVideoModel`), and the `ai.realtime()` session primitive over a pluggable transport (tested against `MockRealtimeTransport`). The first **concrete provider transports** — an OpenAI Realtime **WebSocket** for `ai.realtime`, and **Sora / Veo** video adapters for `ai.video` — are the next implementation step; the seams are defined so they drop in without changing the verb surface.
+
+## See also
+
+- [[generate-images]] — still-image OUTPUT (`ai.image`), the synchronous sibling `ai.video` mirrors.
+- [[generate-speech]] — one-shot text-to-speech / transcription (`ai.speech` / `ai.transcribe`); use `ai.realtime` instead when you need a live duplex conversation, not a single audio render.
+- `@warlock.js/ai/observe-ai-flows/SKILL.md` — the `observe` seam both verbs route their reports through.
+- `@warlock.js/ai/run-orchestrator/SKILL.md` — the other session-shaped primitive `ai.realtime` resembles.
+
+
+================================================================================
+# @warlock.js/ai-tools
+================================================================================
+
+# Warlock AI Tools — full skills
+
+> Package: `@warlock.js/ai-tools`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-tools/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## connect-mcp-server  `@warlock.js/ai-tools/connect-mcp-server/SKILL.md`
+
+---
+name: connect-mcp-server
+description: 'Connect a @warlock.js/ai agent to an external Model Context Protocol (MCP) server and adapt its tools as native agent tools (Direction A) with `ai.mcp(server)`. Triggers: `ai.mcp(`, `ai.mcp.serve` (the other direction), `mcp(`, `McpClient`, `McpClientOptions`, `McpTransport`, `client.tools()`, `client.close()`, `namePrefix`, `filter`, `McpTransportError`, `{ type: "stdio" }`, `{ type: "http" }`, `tools/list`, `tools/call`, `jsonSchemaToStandard`, `@modelcontextprotocol/sdk`, `ajv`; ''consume an MCP server'', ''use an external MCP server''s tools in my agent'', ''connect to the GitHub/Slack/Filesystem MCP server'', ''adapt MCP tools as agent tools'', ''bridge my agent to the MCP ecosystem'', ''run an MCP server over stdio/http''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: exposing YOUR agent/tools AS an MCP server (the reverse direction) — `@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`; the built-in web/HTTP/calc/date tools — `@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md`.'
+---
+
+# Connect to an external MCP server (Direction A)
+
+`ai.mcp(server, options?)` opens a connection to any Model Context Protocol server, lists its tools, and adapts each one into a native `ToolContract` — so a remote MCP tool is indistinguishable from a local one and drops straight into `ai.agent({ tools: [...] })`.
+
+```ts
+import "@warlock.js/ai-tools";
+import { ai } from "@warlock.js/ai";
+
+const github = ai.mcp(
+  { type: "stdio", command: "npx", args: ["-y", "@modelcontextprotocol/server-github"] },
+  { namePrefix: "github." },
+);
+
+const dev = ai.agent({
+  model,
+  systemPrompt: "Use the GitHub tools to triage issues.",
+  tools: [...(await github.tools())], // handshake + tools/list, run once and cached
+  maxTrips: 20,
+});
+
+await dev.execute("Find the oldest open 'bug' issue and propose a fix.");
+
+await github.close(); // on teardown — kills the child / ends the HTTP session
+```
+
+## The transport — `stdio` or `http`
+
+The `server` argument is discriminated by `type`:
+
+```ts
+// Spawn a child process and speak JSON-RPC over its stdin/stdout.
+// Uses node:child_process + node:readline — NO dependency.
+{ type: "stdio", command: "npx", args: ["-y", "@modelcontextprotocol/server-github"], env: { GITHUB_TOKEN: "…" } }
+
+// Streamable HTTP against an endpoint.
+{ type: "http", url: "https://mcp.example.com/rpc", headers: { authorization: "Bearer …" } }
+```
+
+> **stdio env is not inherited.** When you pass `env`, only those keys reach the child — pass what the server needs (e.g. its API token) explicitly.
+
+## Client options
+
+```ts
+ai.mcp(server, {
+  namePrefix: "github.",                       // prepended to every remote tool name
+  filter: (name) => name.startsWith("issues_"),// only adapt tools whose name passes
+  timeoutMs: 30_000,                           // per tools/call deadline (default 30s)
+});
+```
+
+- **`namePrefix`** is the collision mitigation — there is **no runtime tool-name collision guard** (the agent resolves a tool by first name match), so the author owns uniqueness. Prefix remote tools to keep them distinct from local ones.
+- **`filter`** receives each tool's *unprefixed* name; return `false` to drop it.
+
+## What `tools()` does
+
+`client.tools()` is lazy and cached: the **first** call runs the `initialize` handshake, sends `notifications/initialized`, then `tools/list`, and maps each descriptor into a `ToolContract`. Repeat calls return the cached array without re-handshaking.
+
+For each remote tool:
+1. its JSON-Schema `inputSchema` is wrapped as a Standard Schema via `jsonSchemaToStandard` (Ajv-backed — `ajv` is an optional peer needed only for the client);
+2. `execute` issues `tools/call` honoring `ctx.signal` (cooperative abort) and the configured `timeoutMs`, then unwraps the result content (a single JSON text block is parsed back into an object);
+3. an MCP `isError` result is thrown so the surrounding `tool()` wraps it as a `ToolExecutionError` — the agent reads it as `{ error }` data and self-corrects.
+
+## `type`, never `kind`
+
+MCP's wire vocabulary uses `kind` in some content/capability descriptors. The client translates any inbound `kind` to `type` when normalizing content blocks, so a value a tool returns never carries MCP's `kind` — every discriminator the agent sees is `type`.
+
+## Errors
+
+Connection / handshake failures surface **at agent-construction time** because the example `await`s `github.tools()` — you see them then, not mid-run. A `tools/call` failure raised mid-run is wrapped by `tool()` and reaches the model as data. Branch on `McpTransportError.type`:
+
+```ts
+import { McpTransportError } from "@warlock.js/ai-tools";
+
+try {
+  await github.tools();
+} catch (error) {
+  if (error instanceof McpTransportError && error.type === "connect") {
+    // the child failed to spawn, the endpoint was unreachable, or the handshake failed
+  }
+}
+```
+
+`McpTransportError.type`: `"connect"` | `"protocol"` | `"timeout"` | `"closed"` (plus an optional `.method` naming the in-flight JSON-RPC method).
+
+## Optional peers
+
+The MCP client lazily imports `@modelcontextprotocol/sdk` (the protocol SDK) and `ajv` (runtime JSON-Schema validation) — both optional peers. A missing one surfaces a curated `npm install` string at first use, never a raw module-resolution crash at import time. The stdio transport itself needs no dependency.
+
+## See also
+
+- [`@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`](@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md) — the reverse direction: publish a local primitive AS an MCP server.
+- [`@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md`](@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md) — the built-in web / HTTP / calculator / date-time belt.
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent that consumes the adapted tools.
+
+
+## expose-as-mcp-server  `@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`
+
+---
+name: expose-as-mcp-server
+description: 'Expose a @warlock.js/ai agent / supervisor / orchestrator (or a raw ToolContract[]) AS a Model Context Protocol (MCP) server other clients consume (Direction B) with `ai.mcp.serve(source, options)`. Triggers: `ai.mcp.serve(`, `serve(`, `createServeHandler`, `McpServer`, `McpServeOptions`, `McpServeSource`, `McpServeTransport`, `server.start()`, `server.stop()`, `schemaTarget`, `draft-2020-12`, `extractJsonSchema`, `tools/list`, `tools/call`, `{ type: "stdio" }`, `{ type: "http"; port }`; ''expose my agent as an MCP server'', ''publish my tools to Cursor/Claude Desktop'', ''make my warlock workspace an MCP server'', ''serve my ToolContract[] over MCP'', ''let other MCP clients call my agent''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: CONSUMING an external MCP server (the reverse direction) — `@warlock.js/ai-tools/connect-mcp-server/SKILL.md`; the built-in web/HTTP/calc/date tools — `@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md`.'
+---
+
+# Expose tools AS an MCP server (Direction B)
+
+`ai.mcp.serve(source, options)` turns a local set of `ToolContract`s into a Model Context Protocol server — so Cursor, Claude Desktop, or any MCP client can call your warlock tools / agent over the wire.
+
+```ts
+import "@warlock.js/ai-tools";
+import { ai } from "@warlock.js/ai";
+
+const server = ai.mcp.serve(
+  [ai.tools.calculator(), ai.tools.dateTime()],
+  { name: "warlock-utils", transport: { type: "stdio" } },
+);
+
+await server.start();
+// ...later, on teardown:
+await server.stop();
+```
+
+## The `source` — array or anything with `tools()`
+
+```ts
+// A literal array of contracts:
+ai.mcp.serve([calc, dt], { name: "utils" });
+
+// Anything that can enumerate its ToolContracts — e.g. a workspace:
+ai.mcp.serve({ tools: () => ws.tools.all() }, { name: "acme-workspace" });
+```
+
+The tools are snapshotted at construction (`source.tools()` is called once), so a stable surface is advertised for the life of the server.
+
+## Serve options
+
+```ts
+ai.mcp.serve(source, {
+  name: "warlock-utils",          // advertised in the initialize response (required)
+  version: "1.0.0",               // default: the package version
+  transport: { type: "stdio" },   // default: stdio
+  schemaTarget: "draft-2020-12",  // JSON-Schema dialect for each tool's inputSchema
+});
+```
+
+- **`schemaTarget`** defaults to `"draft-2020-12"` — a neutral MCP draft, deliberately overriding `extractJsonSchema`'s own `"openai-strict"` default. Set it to match a consuming client's expectation.
+
+## How the protocol maps
+
+- **`initialize`** → advertises `{ name, version }` and `capabilities: { tools: {} }`.
+- **`tools/list`** → one descriptor per contract; each tool's `inputSchema` is produced by `extractJsonSchema(contract.input, { target: schemaTarget })`.
+- **`tools/call`** → routes to the named contract's `invoke()` and maps the **never-throwing** result: `data` becomes a `{ type: "text" }` content block (a string is sent verbatim, anything else is JSON-stringified), and `error` becomes an `isError: true` result. So a failing tool surfaces as a normal MCP tool error — the server never crashes on it. An unknown tool name answers with a JSON-RPC error.
+
+Everything the server emits uses `type`, never `kind`.
+
+## Transport — stdio is auto-pumped; HTTP is host-owned
+
+```ts
+{ type: "stdio" }            // default — reads JSON-RPC lines from process.stdin, writes to stdout
+{ type: "http", port: 8080 } // accepted in options, but start() does NOT bind a socket
+```
+
+`start()` over `stdio` wires a `node:readline` line reader on `process.stdin` and writes one-line JSON-RPC responses to `process.stdout` (notifications without an `id` are ignored). **Serving over HTTP is left to a server you own** — `start()` rejects an `http` transport. For that path, drive the pure protocol core yourself with `createServeHandler`:
+
+```ts
+import { createServeHandler } from "@warlock.js/ai-tools";
+
+const handler = createServeHandler([calc, dt], { name: "warlock-utils" });
+
+// In your own HTTP handler:
+const response = await handler.handle(jsonRpcRequest); // request → response, no I/O
+```
+
+`createServeHandler` is also the cleanest seam for unit tests: feed it a JSON-RPC request, assert the response — no real transport needed.
+
+## Errors
+
+`McpTransportError` covers serve-side failures (`type: "connect"` when `start()` is asked to bind an unsupported transport; `type: "protocol"` for a malformed `tools/call` or an unknown tool name). Tool-level failures are *not* errors here — they come back as `isError: true` results, exactly as MCP expects.
+
+## See also
+
+- [`@warlock.js/ai-tools/connect-mcp-server/SKILL.md`](@warlock.js/ai-tools/connect-mcp-server/SKILL.md) — the reverse direction: consume an external MCP server's tools.
+- [`@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md`](@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md) — the built-in tools you might expose.
+- [`@warlock.js/ai-workspace/use-a-workspace/SKILL.md`](@warlock.js/ai-workspace/use-a-workspace/SKILL.md) — a workspace whose `tools.all()` is a natural `serve` source.
+
+
+## use-web-and-http-tools  `@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md`
+
+---
+name: use-web-and-http-tools
+description: 'Wire the @warlock.js/ai-tools belt — web search, fetch/scrape, HTTP/REST, calculator, date-time — into an agent under their guardrails. Triggers: `ai.tools.webSearch`, `ai.tools.fetchUrl`, `ai.tools.http`, `ai.tools.calculator`, `ai.tools.dateTime`, `webSearchTool`, `fetchUrlTool`, `httpRequestTool`, `calculatorTool`, `dateTimeTool`, `web_search`, `fetch_url`, `http_request`, `calculator`, `date_time`, `WebToolError`, `HttpPolicyError`, `CalculatorError`, `DateTimeError`, `allowHosts`, `allowMethods`, `allowPrivateNetwork`, `baseUrl`, `maxBytes`, `guardedFetch`, `SearchProvider`, `TAVILY_API_KEY`; ''give an agent web search'', ''let an agent fetch/scrape a page'', ''let an agent call a REST API'', ''restrict which hosts/methods an agent can hit'', ''add a calculator/date tool to an agent'', ''SSRF guardrail for an agent tool'', ''let a tool reach an internal/dev service''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: connecting to an external MCP server — `@warlock.js/ai-tools/connect-mcp-server/SKILL.md`; exposing tools AS an MCP server — `@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`; filesystem/shell tools — `@warlock.js/ai-workspace/use-a-workspace/SKILL.md`; defining your own custom tool — `@warlock.js/ai/define-ai-tool/SKILL.md`.'
+---
+
+# Use the web + HTTP tool belt
+
+`@warlock.js/ai-tools` ships five ready-made tools. Import the package once for its side effect and they register on the shared `ai` object under `ai.tools.*` — each is a factory returning a `ToolContract` you spread into `ai.agent({ tools: [...] })`.
+
+```ts
+import "@warlock.js/ai-tools";
+import { ai } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
+
+const agent = ai.agent({
+  model: openai.model({ name: "gpt-4o" }),
+  systemPrompt: "Research, then call the API. Read tool errors and adjust.",
+  tools: [
+    ai.tools.webSearch({ provider: "tavily" }),
+    ai.tools.fetchUrl({ extract: "text", allowHosts: ["docs.stripe.com"] }),
+    ai.tools.http({ baseUrl: "https://api.stripe.com", allowHosts: ["api.stripe.com"] }),
+    ai.tools.calculator(),
+    ai.tools.dateTime({ defaultTimeZone: "UTC" }),
+  ],
+  maxTrips: 15,
+});
+```
+
+The construction `options` are the **rails** — they bound what the model may do; the model supplies the per-call inputs *within* those rails. Least-privilege is just array composition: hand an agent only the tools (and only the methods/hosts) it needs.
+
+## The five tools
+
+| Factory | Name | Model input | Returns |
+|---|---|---|---|
+| `ai.tools.webSearch(options)` | `web_search` | `{ query, maxResults? }` | `{ results: { title, url, snippet, score? }[] }` |
+| `ai.tools.fetchUrl(options?)` | `fetch_url` | `{ url }` | `{ url, status, content, truncated }` |
+| `ai.tools.http(options?)` | `http_request` | `{ method?, url, headers?, body? }` | `{ status, headers, body, truncated }` |
+| `ai.tools.calculator(options?)` | `calculator` | `{ expression }` | `{ result }` |
+| `ai.tools.dateTime(options?)` | `date_time` | `{ op, iso?, from?, to?, amount?, unit?, timeZone?, format? }` | `{ value }` |
+
+## `web_search` — pick a provider, supply a key
+
+```ts
+ai.tools.webSearch({ provider: "tavily", apiKey: process.env.TAVILY_API_KEY, maxResults: 8 });
+```
+
+- `provider`: `"tavily"` (LLM-ready snippets + a relevance `score`), `"brave"`, or `"serpapi"`. Each is called over the global `fetch` — **no provider SDK is required**.
+- `apiKey` falls back to a per-provider env var: `TAVILY_API_KEY` / `BRAVE_API_KEY` / `SERPAPI_API_KEY`. A missing key is a `WebToolError` of type `"missing-key"`.
+- The model's `maxResults` is clamped into `[1, options.maxResults]` (default `5`).
+
+## `fetch_url` — read a page you have the URL for
+
+```ts
+ai.tools.fetchUrl({ extract: "text", allowHosts: ["docs.stripe.com"], maxBytes: 500_000, timeoutMs: 10_000 });
+```
+
+- `extract`: `"text"` (default — readability-extracted main text), `"html"` (raw body), or `"markdown"`. **`"text"`/`"markdown"` lazily import the `@mozilla/readability` + `jsdom` optional peers** — a missing peer is a `WebToolError` of type `"missing-peer"` carrying the `npm install @mozilla/readability jsdom` string. `"html"` needs nothing.
+- `allowHosts` (when set) rejects any other host **before the fetch** (an SSRF guardrail) → `"denied-host"`, and redirect targets are held to the same allowlist.
+- **Private-network deny by default.** Every request — and every redirect hop — now routes through `@warlock.js/ai`'s hardened `guardedFetch` outbound policy instead of a local host check. It refuses private / loopback / link-local / CGNAT / cloud-metadata addresses (`169.254.169.254`, RFC1918, `localhost`, …) by resolving the hostname via DNS and checking every returned address, failing closed on resolution failure — and re-validates every redirect `Location` (scheme, allowlist, private-IP deny) before following it. This applies even with no `allowHosts` set, so a bare `ai.tools.fetchUrl()` is no longer an SSRF primitive; blocks surface as `WebToolError` `type: "denied-host"`.
+- `allowPrivateNetwork` (default `false`) — set `true` to deliberately permit a private/internal target, e.g. a tool that must call a local dev server. Pair with `allowHosts` to scope it rather than opening the whole private range.
+- `maxBytes` caps the body and flags `truncated`; `timeoutMs` aborts via `AbortSignal.timeout`.
+
+## `http_request` — a guarded REST client
+
+```ts
+ai.tools.http({
+  baseUrl: "https://api.stripe.com",
+  allowHosts: ["api.stripe.com"],
+  allowMethods: ["GET", "POST"],            // default ["GET"] — mutating methods are opt-in
+  headers: { authorization: `Bearer ${process.env.STRIPE_KEY}` },
+  timeoutMs: 15_000,
+  maxBytes: 1_000_000,
+  // allowPrivateNetwork: true,             // only for a deliberate internal/dev target
+});
+```
+
+All guardrails are enforced **before the network call** and surface as a typed `HttpPolicyError`:
+- a method outside `allowMethods` → `"method-not-allowed"`;
+- a host outside `allowHosts` → `"host-not-allowed"` (SSRF guardrail);
+- an unresolvable URL → `"invalid-url"`.
+- **Private-network deny by default** — like `fetch_url`, every request and redirect hop routes through `guardedFetch`, refusing private/loopback/link-local/CGNAT/cloud-metadata addresses (DNS-resolved and re-checked per redirect hop) even when `allowHosts` isn't set → `"host-not-allowed"`. Set `allowPrivateNetwork: true` (default `false`) to permit a deliberate internal target.
+
+When `baseUrl` is set the model passes a **path** joined against it; otherwise it must pass an absolute `http(s)` URL. Static `headers` merge **under** the per-call headers (per-call wins). An object `body` is JSON-serialized (with a default `content-type: application/json`); a string `body` is sent verbatim; `body` is dropped for `GET`. The response body is JSON-parsed when the `content-type` is JSON, else returned as text.
+
+## `calculator` — SAFE arithmetic (never `eval`)
+
+```ts
+const { data } = await ai.tools.calculator().invoke({ expression: "(3 + 4) * 2 ^ 3" });
+data?.result; // 56
+```
+
+Supports `+ - * / % ^`, unary signs, parentheses, and decimal/scientific literals, with the usual precedence (`^` highest and right-associative). The expression is tokenized and evaluated with a shunting-yard pass — there is no path to an identifier, function call, or property access, so nothing code-like can be smuggled in. Failures are a `CalculatorError`: `"syntax"`, `"divide-by-zero"`, or `"overflow"`.
+
+## `date_time` — clock + calendar
+
+```ts
+await ai.tools.dateTime().invoke({ op: "now", format: "iso" });
+await ai.tools.dateTime().invoke({ op: "add", iso: "2026-06-22T00:00:00Z", amount: 3, unit: "days" });
+await ai.tools.dateTime().invoke({ op: "diff", iso: "2026-06-22T00:00:00Z", to: "2026-06-25T00:00:00Z", unit: "days" }); // "3"
+await ai.tools.dateTime({ defaultTimeZone: "Africa/Cairo" }).invoke({ op: "format", iso: "2026-06-22T12:00:00Z", format: "datetime" });
+```
+
+- `op`: `"now"` / `"add"` / `"diff"` / `"format"`. `format`: `"iso"` (default), `"date"`, `"time"`, `"datetime"`.
+- For `diff`, pass the start instant as `iso` **or** `from` (an alias models reach for naturally with `from`/`to`); `iso` wins when both are set. The end instant is always `to`.
+- Units are millisecond-based: `milliseconds`, `seconds`, `minutes`, `hours`, `days`, `weeks` (plus singular/short aliases like `day`/`d`). Calendar-relative `month`/`year` are intentionally **unsupported** — they have no fixed length. An unknown unit → `DateTimeError` `"invalid-unit"`; an unknown IANA zone → `"invalid-time-zone"`.
+- For deterministic tests, inject a clock by calling the factory directly: `import { dateTimeTool } from "@warlock.js/ai-tools"; dateTimeTool({}, { clock: () => Date.parse("2026-06-22T00:00:00Z") })`.
+
+## Errors flow as data, not throws
+
+Every failure above is thrown inside the tool handler, caught by the framework's `tool()` wrapper, and surfaced in the returned `{ error }` field — `invoke()` never throws, so the agent reads the failure as a `role: "tool"` message and self-corrects on the next trip. Each error class extends the `@warlock.js/ai` `AIError` base; branch on `.type`:
+
+```ts
+import { WebToolError } from "@warlock.js/ai-tools";
+
+const { error } = await ai.tools.fetchUrl({ allowHosts: ["docs.stripe.com"] }).invoke({ url: "http://evil.test" });
+if (error instanceof WebToolError && error.type === "denied-host") {
+  // rejected before any network call
+}
+```
+
+## See also
+
+- [`@warlock.js/ai-tools/connect-mcp-server/SKILL.md`](@warlock.js/ai-tools/connect-mcp-server/SKILL.md) — adapt an external MCP server's tools as agent tools.
+- [`@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`](@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md) — publish these tools AS an MCP server.
+- [`@warlock.js/ai-workspace/use-a-workspace/SKILL.md`](@warlock.js/ai-workspace/use-a-workspace/SKILL.md) — the filesystem + shell tool belt (jailed `read_file` / `edit_file` / `run_shell` / …).
+- [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md) — the `tool()` / `ToolContract` seam every tool here is built on.
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent that consumes these tools.
+
+
+================================================================================
+# @warlock.js/ai-workspace
+================================================================================
+
+# Warlock AI Workspace — full skills
+
+> Package: `@warlock.js/ai-workspace`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-workspace/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## build-loop-agent  `@warlock.js/ai-workspace/build-loop-agent/SKILL.md`
+
+---
+name: build-loop-agent
+description: 'Wire a @warlock.js/ai-workspace into a coding agent that closes the read → edit → run-tests loop on its own. Triggers: `ws.tools.all()`, `ai.agent({ tools: ws.tools.all() })`, `maxTrips`, `run_tests`, `run_shell`, ''agent that fixes a failing test'', ''make the suite green'', ''coding agent that edits a repo'', ''build-loop agent'', ''self-correcting agent'', ''read-only code reviewer'', ''scaffold then hand off to an agent'', ''share one workspace across a supervisor'', ''least-privilege agent tools'', ''errors as tool data''; typical wiring `const ws = ai.workspace({ cwd, shell }); ai.agent({ model, tools: ws.tools.all(), maxTrips })`. Skip: constructing the workspace / its policy / direct methods / readonly / scope — `@warlock.js/ai-workspace/use-a-workspace/SKILL.md`; the agent loop / maxTrips / events themselves — `@warlock.js/ai/run-ai-agent/SKILL.md`.'
+---
+
+# Build a build-loop agent — read → edit → run tests, until green
+
+The point of a workspace is to hand its tools to an agent and let it close the loop itself: read the failing spec, edit the source, run the tests, read the failure, fix again. The failure comes back as tool **data** (a non-zero `exitCode`, the captured `stderr`), not a thrown error — so the model can see what broke and self-correct.
+
+```ts
+import "@warlock.js/ai-workspace";
+import { ai } from "@warlock.js/ai";
+
+const ws = ai.workspace({
+  cwd: "/srv/acme-api",
+  denyPaths: [".git/**", ".env*"],
+  shell: { allow: ["npm", "node"], inheritEnv: ["PATH"], timeoutMs: 120_000 },
+});
+
+const dev = ai.agent({
+  model,
+  tools: ws.tools.all(),   // read_file, edit_file, write_file, run_shell, run_tests, grep, glob
+  maxTrips: 25,            // give the loop room to iterate
+});
+
+await dev.execute("`npm test` fails on the cart-total suite. Make it green.");
+```
+
+## Why the loop works: errors as data
+
+A failing test isn't a tool error — it's a normal result with `exitCode !== 0`. `run_tests` (and `run_shell`) return `{ exitCode, stdout, stderr, timedOut, truncated }` as the tool's `data`, so the model reads the failure on the next trip and tries again. The same is true of the policy/edit guards: a jail escape, a denied command, a non-unique edit, or a stale hash all come back as tool-error data the agent can react to, never a thrown run-killer. Give `maxTrips` enough headroom for the read → edit → test cycle to converge.
+
+## Give the test command a path
+
+`run_tests` defaults to `npm test`. It runs through the **same shell policy** as `run_shell`, so the agent can't run it unless:
+
+- the executable basename is allowed — `shell: { allow: ["npm", "node"] }`, and
+- the env can find it — `inheritEnv: ["PATH"]` (the workspace never inherits `process.env` wholesale).
+
+Override the base command per agent: `ws.tools.runTests({ command: "pnpm test" })`. A `pattern` the model supplies is appended as a filter (e.g. `pnpm test cart-total`).
+
+## Least-privilege variants
+
+### A read-only reviewer
+
+A reviewer should never write or run a shell. Pick exactly the read tools, or hand it a `readonly()` projection (which omits the mutating tools *and* rejects the mutating direct methods):
+
+```ts
+const reviewer = ai.agent({
+  model,
+  tools: ws.tools.pick("readFile", "grep", "glob"),
+});
+await reviewer.execute("Review src/cart for off-by-one bugs and summarize.");
+
+// Equivalent projection of the same jail:
+ai.agent({ model, tools: ws.readonly().tools.all() }); // read_file + grep + glob only
+```
+
+### Scope an agent to one package
+
+`scope(subdir)` narrows the jail so a per-package agent can't reach outside it — one sub-agent per package, isolated blast radius:
+
+```ts
+const apiDev  = ai.agent({ model, tools: ws.scope("packages/api").tools.all() });
+const webDev  = ai.agent({ model, tools: ws.scope("packages/web").tools.all() });
+```
+
+## Scaffold from code, then hand off
+
+You don't have to let the agent do everything. Seed structure (and install deps) with the direct methods, then hand the tools to the agent for the creative part:
+
+```ts
+await ws.writeFile("src/routes.ts", ROUTES_BOILERPLATE);
+await ws.exec("npm install zod");
+await dev.execute("Implement the handlers declared in src/routes.ts.");
+```
+
+For a purely mechanical change, skip the LLM entirely: `ws.glob(...)` + a loop of `ws.editFile(...)` under the stale-hash guard.
+
+## Share one workspace across a team
+
+One workspace is one jail and one tree. Pass it to several members of a supervisor, varying only the tool slice each gets — they all read/write the **same** files:
+
+```ts
+const ws = ai.workspace({ cwd, shell: { allow: ["npm", "node"], inheritEnv: ["PATH"] } });
+
+ai.supervisor({
+  members: [
+    ai.agent({ /* executor */ model, tools: ws.tools.all() }),
+    ai.agent({ /* reviewer */ model, tools: ws.readonly().tools.all() }),
+    ai.agent({ /* tester   */ model, tools: ws.tools.pick("readFile", "runTests") }),
+  ],
+});
+```
+
+## See also
+
+- [`@warlock.js/ai-workspace/use-a-workspace/SKILL.md`](@warlock.js/ai-workspace/use-a-workspace/SKILL.md) — building the workspace, the policy surface, the direct methods, `readonly` / `scope`, and the typed errors.
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — the agent loop, `maxTrips`, and the run report.
+- [`@warlock.js/ai/run-supervisor/SKILL.md`](@warlock.js/ai/run-supervisor/SKILL.md) — coordinating the members that share one workspace.
+
+
+## use-a-workspace  `@warlock.js/ai-workspace/use-a-workspace/SKILL.md`
+
+---
+name: use-a-workspace
+description: 'Build and operate a policy-jailed filesystem + shell workspace with @warlock.js/ai-workspace. Triggers: `ai.workspace`, `workspace(`, `WorkspacePolicy`, `WorkspaceShellPolicy`, `WorkspaceToolName`, `ws.tools.all`, `ws.tools.pick`, `ws.readFile`, `ws.writeFile`, `ws.editFile`, `ws.exec`, `ws.grep`, `ws.glob`, `ws.readonly`, `ws.scope`, `WorkspacePolicyError`, `WorkspaceEditError`, `denyPaths`, `inheritEnv`, `expectHash`, `tokenizeCommand`, `read_file`/`edit_file`/`write_file`/`run_shell`/`run_tests`/`grep`; ''give an agent file tools'', ''jail an agent to a directory'', ''let an agent read/write/grep a repo'', ''read-only workspace for a reviewer'', ''scope an agent to a subdirectory'', ''run a shell command under policy'', ''edit a file with a stale-hash guard'', ''command injection guard for an agent shell tool'', ''ReDoS-safe grep for an agent''; typical import `import "@warlock.js/ai-workspace"; import { ai } from "@warlock.js/ai"`. Skip: building the agent loop that consumes the tools — `@warlock.js/ai-workspace/build-loop-agent/SKILL.md`; defining a non-filesystem custom tool — `@warlock.js/ai/define-ai-tool/SKILL.md`.'
+---
+
+# Use a workspace — a policy jail for an agent's filesystem + shell
+
+`ai.workspace(policy)` returns a **workspace**: a bounded place an agent reads, writes, and runs commands. One policy, one shared rule set, two ways to touch it — the agent uses `ws.tools.*`; you use the direct methods. Import the package once for its side effect so the verb is registered on the shared `ai`:
+
+```ts
+import "@warlock.js/ai-workspace";
+import { ai } from "@warlock.js/ai";
+
+const ws = ai.workspace({
+  cwd: "/srv/acme-api",
+  denyPaths: [".git/**", ".env*"],
+  shell: { allow: ["npm", "node"], inheritEnv: ["PATH"], timeoutMs: 60_000 },
+  read: { defaultLines: 2_000 },
+  backend: "local", // default; use "mock" for hermetic tests
+});
+```
+
+## A policy jail, NOT OS isolation
+
+This is least-privilege guardrails for a **trusted** agent — not a sandbox around hostile code. It enforces a `realpath`-resolved `cwd` jail, path allow/deny, a fail-closed shell allow/deny list, timeouts, output caps, and a non-inherited environment. It does **not** contain what an *allowed* process does once it runs. Real isolation (container / microVM) is a later phase.
+
+## The policy surface
+
+| Field | What it does |
+|---|---|
+| `cwd` | **Absolute** jail root. Every path resolves against it and must stay inside. |
+| `allowPaths` | Extra readable roots outside `cwd`. |
+| `denyPaths` | Globs (`*`, `**`, `?`) blocked **even inside `cwd`** — e.g. `[".git/**", ".env*"]`. A bare dir name (`"node_modules"`) also blocks its contents. |
+| `shell.allow` / `shell.deny` | Executable **basenames** matched against the command's leading argv token (after tokenizing — see below). **Deny wins.** An `allow` list is exhaustive (fail-closed); no `shell` block at all ⇒ nothing may run. |
+| `shell.inheritEnv` | Opt-in `process.env` keys to pass through (e.g. `["PATH"]`). **Nothing leaks in otherwise** — a command can't find `node`/`npm` without `PATH`. |
+| `shell.env` | Explicit env vars injected into every spawned process (override inherited on collision). |
+| `shell.timeoutMs` / `shell.maxOutputBytes` | Per-command wall-clock cap (SIGKILL on expiry) and stdout/stderr byte cap. |
+| `read.defaultLines` / `read.maxBytes` | Default read window + a byte ceiling. |
+| `backend` | `"local"` (default — real disk) or `"mock"` (in-memory, for tests). |
+
+> **The most common gotcha:** `run_shell` fails to find `node`/`npm` because the env is empty. Add `shell: { allow: ["npm", "node"], inheritEnv: ["PATH"] }`.
+
+## `run_shell`/`exec` run argv, NOT a shell
+
+Commands are tokenized (via `tokenizeCommand`) into an argv and spawned with **no shell semantics** — no pipes, redirection, chaining, backticks, or variable expansion. `npm test && rm -rf /` or `` `curl evil` `` doesn't chain or substitute; it's rejected outright rather than executed piecemeal:
+
+```ts
+await ws.exec("npm test");                    // OK — ["npm", "test"]
+await ws.exec('node -e "console.log(1)"');     // OK — quotes respected, one argv element
+await ws.exec("npm test; curl http://evil");   // rejected — unquoted `;` is a metacharacter
+```
+
+- **Quoting is respected**; **unquoted** shell metacharacters — `;` `&` `|` `<` `>` `` ` `` `$` `(` `)` and newlines — are rejected as a `WorkspacePolicyError` `type: "denied-command"` before anything spawns. The `shell.allow`/`shell.deny` basename check runs against the tokenized argv's first element, not a raw string prefix, so a disguised leading token can't slip past the gate.
+- **On Windows**, the argv is run through a `cmd.exe /d /s /c` wrapper with every element individually quoted (needed because batch shims like `npm.cmd` can't be spawned shell-less); arguments containing `"`, `%`, or newlines are refused there rather than risked (guards the BatBadBut-class argument-smuggling bug class).
+- **`run_tests`'s `pattern`** (model-controlled test-name filter) is forwarded as a **single double-quoted argv token** to the runner, not concatenated into the command string — a pattern containing double quotes or newlines is rejected at input validation rather than passed through.
+- This is a **behavior change, not just a hardening detail**: shell conveniences your commands may have relied on (pipes, redirection, `&&` chaining, `$(...)` substitution) no longer work in `run_shell`/`exec`. Compose multi-step work as separate `ws.exec()` calls instead of a single shelled pipeline.
+
+## Two callers, one jail
+
+### Agent-facing — `ws.tools.*`
+
+Each tool is a `ToolContract` ready for `ai.agent({ tools })`. The seven LLM-visible tool names are `read_file`, `edit_file`, `write_file`, `run_shell`, `run_tests`, `grep`, `glob`.
+
+```ts
+ws.tools.all();                              // all seven, canonical order
+ws.tools.pick("readFile", "grep", "glob");   // a least-privilege subset
+ws.tools.readFile({ name: "open" });          // one tool, optionally renamed
+ws.tools.runTests({ command: "pnpm test" });  // override the test base command
+```
+
+### Human-facing — direct methods
+
+The same policy seam, callable from code (no LLM):
+
+```ts
+const { content, hash, totalLines } = await ws.readFile("src/index.ts", { offset: 1, limit: 200 });
+await ws.writeFile("src/new.ts", "export const x = 1;\n");
+await ws.editFile({ path: "src/index.ts", oldString: "old", newString: "new", expectHash: hash });
+const { exitCode, stdout, stderr, timedOut, truncated } = await ws.exec("npm test");
+const { matches } = await ws.grep("TODO", { glob: "src/**/*.ts", ignoreCase: true });
+const paths = await ws.glob("src/models/**/*.ts");
+await ws.exists("package.json");
+await ws.mkdir("src/generated");
+await ws.remove("dist");
+```
+
+## `grep` is ReDoS-bounded
+
+The model supplies `pattern` freely, so `grep` treats it as untrusted input before compiling it into a `RegExp`: patterns over 200 characters and patterns matching a nested-quantifier shape (`(x+)+`, `(x*)*`, `(x+)*`, `(x*)+`-style groups — the classic catastrophic-backtracking shape) are rejected up front as a `WorkspacePolicyError` `type: "unsafe-pattern"`, before any regex is compiled. Any scanned line longer than 2000 characters is skipped (not tested), bounding the worst-case backtracking cost of any single call regardless of pattern shape.
+
+## Read-before-edit (the stale-hash guard)
+
+`readFile` returns a SHA-256 `hash` of the full file. Pass it to `editFile`'s `expectHash`; if the file changed since you read it, the edit is rejected as stale so you re-read before clobbering. `editFile` also requires the `oldString` to be **exact and unique** — pass `replaceAll: true` to replace every occurrence, or include more surrounding context to disambiguate.
+
+## Errors flow as data, not throws
+
+Policy and edit failures are typed errors extending the `@warlock.js/ai` `AIError` base. Inside a tool the `tool()` wrapper catches them and surfaces them in `{ error }`, so the agent reads the failure and self-corrects. Branch on `.type`:
+
+```ts
+import { WorkspacePolicyError, WorkspaceEditError } from "@warlock.js/ai-workspace";
+
+try {
+  await ws.exec("rm -rf /");
+} catch (error) {
+  if (error instanceof WorkspacePolicyError && error.type === "denied-command") {
+    console.warn(`Blocked: ${error.command}`);
+  }
+}
+```
+
+- `WorkspacePolicyError.type`: `"path-escape"` (jail escape / deny glob) | `"denied-command"` (not allow-listed, or rejected during tokenizing — unquoted metacharacters, disallowed Windows-wrapper characters) | `"unsafe-pattern"` (`grep` pattern too long or nested-quantifier ReDoS shape).
+- `WorkspaceEditError.type`: `"not-found"` | `"not-unique"` | `"stale-hash"`.
+
+## Composition — `readonly()` and `scope()`
+
+```ts
+const ro = ws.readonly();         // vends only read/grep/glob; mutating direct methods reject
+const api = ws.scope("packages/api"); // a sub-jailed workspace rooted at the subdir
+```
+
+`readonly()` is the least-privilege reviewer projection — `tools.all()` on it returns `read_file` + `grep` + `glob` only, and `writeFile` / `editFile` / `exec` / `mkdir` / `remove` throw a `WorkspacePolicyError`. `scope(subdir)` narrows `cwd` to `join(cwd, subdir)` (same sub-policies, same backend), so a per-package agent gets a tighter blast radius.
+
+## Hermetic tests with the mock backend
+
+`backend: "mock"` swaps the local disk for an in-memory `Map` + scripted `exec` — same policy, same tool/method surface, no filesystem:
+
+```ts
+const ws = ai.workspace({ cwd: "/srv/app", backend: "mock", shell: { allow: ["npm"] } });
+// (Seed files / scripted commands via createMockBackend when constructing a backend directly.)
+```
+
+## See also
+
+- [`@warlock.js/ai-workspace/build-loop-agent/SKILL.md`](@warlock.js/ai-workspace/build-loop-agent/SKILL.md) — wiring these tools into a read → edit → test agent loop.
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent that consumes `ws.tools.all()`.
+- [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md) — the `tool()` / `ToolContract` seam every workspace tool is built on.
 
 
 ================================================================================

@@ -1,0 +1,132 @@
+---
+banner:
+  content: "This page documents Warlock v4. <a href='/v/latest'>View the latest docs.</a>"
+title: "Installation"
+description: Install @warlock.js/fs standalone in any Node project, or pick it up through @warlock.js/core. Zero runtime dependencies.
+sidebar:
+  order: 2
+  label: "Installation"
+---
+
+import { Tabs, TabItem, Aside } from "@astrojs/starlight/components";
+
+`@warlock.js/fs` is standalone. It has no runtime dependencies beyond
+Node's built-in `node:fs` and `node:crypto`. Requires Node 18 or newer
+(uses `cp` with the `recursive` option from `node:fs/promises`).
+
+<Tabs syncKey="context">
+  <TabItem label="Standalone">
+
+    Install with your package manager:
+
+    <Tabs syncKey="pm">
+      <TabItem label="yarn">
+      ```bash
+      yarn add @warlock.js/fs
+      ```
+      </TabItem>
+      <TabItem label="npm">
+      ```bash
+      npm install @warlock.js/fs
+      ```
+      </TabItem>
+      <TabItem label="pnpm">
+      ```bash
+      pnpm add @warlock.js/fs
+      ```
+      </TabItem>
+    </Tabs>
+
+    Then import the `fs` object — no setup, no factory, no config:
+
+    ```ts
+    import { fs } from "@warlock.js/fs";
+
+    await fs.files.putJson("./out/manifest.json", { version: "1.0.0" });
+    const manifest = await fs.files.getJson<{ version: string }>("./out/manifest.json");
+    ```
+
+    That's the whole entry point: one import, and the entire filesystem
+    toolkit is on `fs`.
+
+  </TabItem>
+  <TabItem label="Warlock.js">
+
+    `@warlock.js/fs` is a dependency of `@warlock.js/core`, so any
+    Warlock project already has it on the dependency graph. If your
+    `package.json` doesn't list it directly, add it so you get a stable
+    version pin:
+
+    <Tabs syncKey="pm">
+      <TabItem label="yarn">
+      ```bash
+      yarn add @warlock.js/fs
+      ```
+      </TabItem>
+      <TabItem label="npm">
+      ```bash
+      npm install @warlock.js/fs
+      ```
+      </TabItem>
+      <TabItem label="pnpm">
+      ```bash
+      pnpm add @warlock.js/fs
+      ```
+      </TabItem>
+    </Tabs>
+
+    Use it the same way as the standalone setup — no framework wiring,
+    no config file, no connector. Pair it with `@warlock.js/core`'s path
+    helpers when you want the framework's path conventions:
+
+    ```ts
+    import { fs } from "@warlock.js/fs";
+    import { storagePath } from "@warlock.js/core";
+
+    await fs.files.putJson(storagePath("manifest.json"), manifest, { atomic: true });
+    ```
+
+  </TabItem>
+</Tabs>
+
+## TypeScript
+
+Types ship with the package — no separate `@types/...` install. Every
+method is fully typed, and the JSON reads are generic:
+
+```ts
+type Manifest = { version: string; files: string[] };
+
+const manifest = await fs.files.getJson<Manifest>("./manifest.json");
+//    ^? Manifest
+```
+
+Skip the generic and you get `unknown` — narrow it with a guard, or pass
+a `schema` to `getJson` to validate and type in one step (see
+[Read and write files](../guides/read-and-write-files)).
+
+## Verifying the install
+
+A one-liner to prove it's wired up:
+
+```ts
+import { fs } from "@warlock.js/fs";
+
+await fs.files.put("./.fs-check", "ok");
+console.log(await fs.files.get("./.fs-check"));   // → "ok"
+```
+
+If that prints `ok`, you're done.
+
+<Aside type="tip" title="Need synchronous, tree-shakeable functions?">
+The `fs` facade is async by design. Synchronous callers — CLI tools, code
+generators — and bundles that want to pull in a single operation can drop to
+the [low-level primitives](../reference/api#low-level-primitives-sync--async)
+(`putFile`, `getFile`, `hashString`, …), which are individually tree-shakeable.
+For app code, reach for `fs` first.
+</Aside>
+
+## Next
+
+- [Your first write](./03-your-first-write) — write JSON, read it back
+  typed, and grab a lazy file handle, all through the `fs` facade.

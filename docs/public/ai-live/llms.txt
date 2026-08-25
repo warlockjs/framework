@@ -1,0 +1,9 @@
+# Warlock AI Live
+
+> Package: `@warlock.js/ai-live`
+
+> Live & generative rich-media for @warlock.js/ai — ai.realtime() duplex voice sessions and ai.video() text-to-video. The heavy, demand-gated modalities, kept out of core so text/image/speech stay dependency-light.
+
+## Skills
+
+- [use-ai-live](@warlock.js/ai-live/use-ai-live/SKILL.md): Live & generative rich-media add-on for @warlock.js/ai. A side-effect import `import "@warlock.js/ai-live"` mounts two heavy modalities onto the shared `ai.*` facade: `ai.video({ model, prompt })` — text-to-video (Sora / Veo / Kling-class), the async submit→poll job hidden behind the same uniform never-throws `{ data, error, usage, report }` envelope as `ai.image`, with per-second cost-truth folded into `Usage.cost`; and `ai.realtime({ transport, model })` — a stateful duplex VOICE SESSION over a pluggable `RealtimeTransport` (sendAudio / sendText / events() / close()→RealtimeReport). Videos are a discriminated `GeneratedVideo = { type: "url" } | { type: "base64" }`; session output is a `RealtimeEvent` union (audio | transcript | tool-call | error | done). Ships `MockVideoModel` + `MockRealtimeTransport` for HTTP-free tests. Triggers: `ai.video`, `ai.realtime`, `VideoModelContract`, `GeneratedVideo`, `VideoModelPricing`, `RealtimeSession`, `RealtimeTransport`, `RealtimeEvent`, `RealtimeReport`, `MockVideoModel`, `MockRealtimeTransport`; 'generate a video', 'text to video', 'sora', 'veo', 'realtime voice', 'duplex voice session', 'live voice agent', 'barge-in', 'per-second video cost'; typical import `import "@warlock.js/ai-live"` + `import { ai } from "@warlock.js/ai"`. Skip: still-image OUTPUT — [[generate-images]]; text-to-speech / transcription (one-shot audio, not a session) — [[generate-speech]]; chat agents / tools / workflows — `@warlock.js/ai/run-ai-agent/SKILL.md`.

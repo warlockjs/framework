@@ -10,20 +10,20 @@ import starlightSidebarTopics from "starlight-sidebar-topics";
 // package has a full Diátaxis tree the items array expands to the five
 // canonical sections per the blueprint.
 
-function pkgTopic({ label, slug, sections = [] }) {
-  const items = [{ label: "Overview", link: `/v/latest/${slug}/` }];
+function pkgTopic({ label, slug, sections = [] }, version) {
+  const items = [{ label: "Overview", link: `/v/${version}/${slug}/` }];
 
   for (const section of sections) {
     items.push({
       label: section.label,
       collapsed: section.collapsed ?? false,
-      items: [{ autogenerate: { directory: `v/latest/${slug}/${section.dir}` } }],
+      items: [{ autogenerate: { directory: `v/${version}/${slug}/${section.dir}` } }],
     });
   }
 
   return {
     label,
-    link: `/v/latest/${slug}/`,
+    link: `/v/${version}/${slug}/`,
     items,
   };
 }
@@ -259,7 +259,8 @@ const contextSections = fullSections.filter((s) => s.dir !== "recipes");
 // can mix pages from any physical folder without moving files. Order here IS
 // the order in the sidebar.
 function cacheItem(label, name) {
-  return { label, slug: `v/latest/cache/${name}` };
+  const slug = name ? `v/latest/cache/${name}` : "v/latest/cache";
+  return { label, slug };
 }
 
 const cacheTopic = {
@@ -271,7 +272,7 @@ const cacheTopic = {
       label: "Getting Started",
       collapsed: false,
       items: [
-        cacheItem("Introduction", "introduction"),
+        cacheItem("Introduction", ""),
         cacheItem("Quick Start", "quick-start"),
         cacheItem("Configuration", "configurations"),
       ],
@@ -354,9 +355,9 @@ const cacheTopic = {
 
 const topics = [
   // Foundation
-  pkgTopic({ label: "Core", slug: "core", sections: coreSections }),
-  pkgTopic({ label: "Create Warlock", slug: "create-warlock" }),
-  pkgTopic({ label: "Seal", slug: "seal", sections: fullSections }),
+  pkgTopic({ label: "Core", slug: "core", sections: coreSections }, "latest"),
+  pkgTopic({ label: "Create Warlock", slug: "create-warlock" }, "latest"),
+  pkgTopic({ label: "Seal", slug: "seal", sections: fullSections }, "latest"),
   // Logger uses a custom 4-section structure (Getting Started · Channels ·
   // Advanced · API Reference) instead of the generic Diátaxis sections —
   // see domains/logger/plans for the full rationale.
@@ -398,19 +399,19 @@ const topics = [
       },
     ],
   },
-  pkgTopic({ label: "Context", slug: "context", sections: contextSections }),
-  pkgTopic({ label: "File System", slug: "fs", sections: fullSections }),
+  pkgTopic({ label: "Context", slug: "context", sections: contextSections }, "latest"),
+  pkgTopic({ label: "File System", slug: "fs", sections: fullSections }, "latest"),
 
   // Data
-  pkgTopic({ label: "Cascade", slug: "cascade", sections: cascadeSections }),
+  pkgTopic({ label: "Cascade", slug: "cascade", sections: cascadeSections }, "latest"),
   cacheTopic,
 
   // Lifecycle
-  pkgTopic({ label: "Auth", slug: "auth", sections: fullSections }),
-  pkgTopic({ label: "Access", slug: "access", sections: fullSections }),
-  pkgTopic({ label: "Scheduler", slug: "scheduler", sections: fullSections }),
-  pkgTopic({ label: "Herald", slug: "herald", sections: fullSections }),
-  pkgTopic({ label: "Notifications", slug: "notifications", sections: fullSections }),
+  pkgTopic({ label: "Auth", slug: "auth", sections: fullSections }, "latest"),
+  pkgTopic({ label: "Access", slug: "access", sections: fullSections }, "latest"),
+  pkgTopic({ label: "Scheduler", slug: "scheduler", sections: fullSections }, "latest"),
+  pkgTopic({ label: "Herald", slug: "herald", sections: fullSections }, "latest"),
+  pkgTopic({ label: "Notifications", slug: "notifications", sections: fullSections }, "latest"),
 
   // AI uses domain sections + a Providers subgroup with the adapter
   // pages nested in. Custom items array (not via pkgTopic) so we can
@@ -457,10 +458,35 @@ const topics = [
   },
 ];
 
+function buildTopics(version) {
+  // Hand-curated topics above retain their exact latest shape. Clone and
+  // retarget every path only when building a frozen version's sidebar.
+  const versionedTopics = version === "latest"
+    ? topics
+    : JSON.parse(JSON.stringify(topics).replaceAll("v/latest", `v/${version}`));
+
+  return versionedTopics.map((topic) => ({
+    ...topic,
+    id: `${version}-${topic.link.split("/").filter(Boolean).at(-1)}`,
+  }));
+}
+
 // Global pages that don't belong to any package topic (landing, packages
 // grid, skills explainer, 404). They render with no sidebar — fine for
 // landing-style pages.
-const excludedFromTopics = ["/", "/index", "/packages", "/skills", "/changelog", "/404"];
+const excludedFromTopics = [
+  "/",
+  "/index",
+  "/packages",
+  "/skills",
+  "/changelog",
+  "/v/latest/upgrade-to-v5",
+  "/404",
+];
+const sidebarTopics = [...buildTopics("latest"), ...buildTopics("v4")];
+const sidebarTopicRoutes = Object.fromEntries(
+  sidebarTopics.map((topic) => [topic.id, [`${topic.link}**`]]),
+);
 
 // https://astro.build/config
 export default defineConfig({
@@ -561,6 +587,7 @@ export default defineConfig({
         // Full chrome replacement — header, sidebar, footer all custom.
         Header: "./src/components/Header.astro",
         Sidebar: "./src/components/Sidebar.astro",
+        Banner: "./src/components/Banner.astro",
         Footer: "./src/components/Footer.astro",
       },
       customCss: ["./src/styles/global.css"],
@@ -582,7 +609,12 @@ export default defineConfig({
       },
       lastUpdated: true,
       pagination: true,
-      plugins: [starlightSidebarTopics(topics, { exclude: excludedFromTopics })],
+      plugins: [
+        starlightSidebarTopics(
+          sidebarTopics,
+          { exclude: excludedFromTopics, topics: sidebarTopicRoutes },
+        ),
+      ],
     }),
   ],
 });

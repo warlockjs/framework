@@ -1,0 +1,297 @@
+---
+title: Upgrade to v5
+description: The breaking changes between Warlock v4 and v5, with the exact edits an existing application needs.
+---
+
+Warlock v5's headline feature is the new **WEB layer**: server-rendered React pages, hydration, and client navigation served by the same Warlock HTTP server as your API. It is opt-in for an existing application:
+
+```bash
+warlock add web
+```
+
+`@warlock.js/web` was never published before 5.0.0. It is an addition, not an upgrade, so it cannot break an existing v4 application merely because you upgraded the package family. Add it only if you want Warlock to serve pages as well as API routes.
+
+The first release includes route metadata, shared data, and Vite integration as well as SSR and navigation. Its hydration runtime is a public package entry, and both development and production route wiring resolve the packaged client manifest and stylesheets. None of that changes an API-only application until you opt in.
+
+For the upgrade itself, move the `@warlock.js/*` packages you use to v5 together, then make the edits below.
+
+## Required changes
+
+### Route handlers and middleware receive one context object
+
+v4 called handlers with positional `request` and `response` arguments. v5 passes one `HttpContext` object. A v4 handler still registers, but its second parameter is `undefined` and the first request that uses it fails. The same calling convention applies to middleware.
+
+**Before (v4)**
+
+```ts
+import type { Middleware, RequestHandler } from "@warlock.js/core";
+
+export const listProducts: RequestHandler = async (request, response) => {
+  return response.success({ products: await productsRepository.all() });
+};
+
+export const loadTenant: Middleware = async (request, response) => {
+  // ...
+};
+```
+
+**After (v5)**
+
+```ts
+import type { Middleware, RequestHandler } from "@warlock.js/core";
+
+export const listProducts: RequestHandler = async ({ request, response }) => {
+  return response.success({ products: await productsRepository.all() });
+};
+
+export const loadTenant: Middleware = async ({ request, response }) => {
+  // ...
+};
+```
+
+Run `warlock doctor` after upgrading. Its `handler-signature` check reports handlers that still look like the v4 two-parameter form. Also search validation callbacks and application middleware, not only controllers.
+
+### Arbitrary properties can no longer be attached to `Request`
+
+`Request` no longer has a `[key: string]: any` index signature. Code such as `request.post = post` no longer compiles. Data written by middleware belongs in `request.locals`; augment `RequestLocals` where your application owns the key.
+
+**Before (v4)**
+
+```ts
+request.post = await Post.find(request.int("id"));
+
+// Later in the same request:
+await request.post.publish();
+```
+
+**After (v5)**
+
+```ts
+import type { Post } from "../models/post.model";
+
+declare module "@warlock.js/core" {
+  interface RequestLocals {
+    post?: Post;
+  }
+}
+
+request.locals.post = await Post.find(request.int("id"));
+
+// Later in the same request:
+await request.locals.post?.publish();
+```
+
+Choose the replacement per attachment:
+
+- Middleware-owned, server-only request data: `request.locals` plus `RequestLocals` augmentation.
+- A computed value that should run once per request: `requestMemo()`.
+- A genuine new typed `Request` member with its own runtime implementation: module augmentation of `Request` itself.
+
+Do not use `request.set()` as a substitute for locals. It writes into the input payload read by `all()`, `input()`, and `validated()`.
+
+### `fromRequest()` is removed
+
+`fromRequest(key, callback)` depended on dynamic `Request` properties. Replace it with the root export `requestMemo(key, fn)`. The lifetime is still one request, concurrent callers share the same promise, and a rejected computation is evicted so a later call may retry.
+
+**Before (v4)**
+
+```ts
+import { fromRequest } from "@warlock.js/core";
+
+const tenant = await fromRequest("currentTenant", () =>
+  tenantsRepository.find(request.header("x-tenant-id")),
+);
+```
+
+**After (v5)**
+
+```ts
+import { requestMemo } from "@warlock.js/core";
+
+const tenant = await requestMemo("currentTenant", () =>
+  tenantsRepository.find(request.header("x-tenant-id")),
+);
+```
+
+`requestMemo()` must run inside the HTTP request pipeline. Use a process-level cache for data that should be shared across requests.
+
+### Use `request.locale`
+
+The v4 `request.localized` getter is gone. `request.getLocaleCode()` remains as a deprecated compatibility alias for one version, but its legacy fallback argument is ignored; the default now belongs to application configuration.
+
+**Before (v4)**
+
+```ts
+const locale = request.localized;
+const localeWithFallback = request.getLocaleCode("ar");
+```
+
+**After (v5)**
+
+```ts title="src/config/app.ts"
+export default {
+  localeCode: "ar",
+  localeCodes: ["ar", "en"],
+};
+
+// In request code:
+const locale = request.locale;
+```
+
+### Client-supplied locales are allow-listed
+
+When `app.localeCodes` is configured, a client-supplied `locale` or `translation-locale-code` header, or a `locale` query value, outside that list is treated as absent and falls back to `app.localeCode`. In v4, the client value won as-is and could steer translations and serialized Resources to an unsupported locale. The default locale must itself appear in `localeCodes`.
+
+**Before (v4)**
+
+```ts title="src/config/app.ts"
+export default {
+  localeCode: "en",
+};
+
+// A client-supplied `locale: xx` was accepted as "xx".
+```
+
+**After (v5)**
+
+```ts title="src/config/app.ts"
+export default {
+  localeCode: "en",
+  localeCodes: ["en", "ar"],
+};
+
+// A client-supplied `locale: xx` now resolves to "en".
+```
+
+If your application deliberately accepts arbitrary locale codes, leave `app.localeCodes` undefined; v5 preserves the old pass-through behavior when no list is declared. Test the `locale` query/header paths your clients use after choosing the policy.
+
+### `request.t()` follows locale changes made during the request
+
+In v4, `request.t()` and `request.trans()` captured the locale when the request was constructed. Calling `setLocaleCode()` later changed `request.locale` but not those translators. v5 resolves the locale when each translation is called.
+
+**Before (v4 workaround)**
+
+```ts
+request.setLocaleCode(user.preferredLocale);
+
+// Pin the locale explicitly because request.t() may still use the old one.
+const message = request.transFrom(user.preferredLocale, "account.welcome");
+```
+
+**After (v5)**
+
+```ts
+request.setLocaleCode(user.preferredLocale);
+
+const message = request.t("account.welcome");
+```
+
+This is a behavior correction. Remove workarounds only where they existed to compensate for the captured v4 locale; keep `transFrom()` when you intentionally want a locale different from the request's locale.
+
+### Access no longer chooses the type of `request.user`
+
+`@warlock.js/access` no longer globally augments `RequestUser` to the generic `Auth` model. That declaration prevented an application from extending the interface with its own auth model. An app using gates must now make the contract explicit in the module that authenticates and writes `request.user`.
+
+**Before (v4)**
+
+```ts
+import { gate } from "@warlock.js/access";
+
+// Installing access supplied a blanket Auth type for request.user.
+router.get("/orders", listOrders, {
+  middleware: [authMiddleware("user"), gate("orders.list")],
+});
+```
+
+**After (v5)**
+
+```ts
+import type { User } from "app/users/models/user";
+
+declare module "@warlock.js/core" {
+  interface RequestUser extends User {}
+}
+
+router.get("/orders", listOrders, {
+  middleware: [authMiddleware("user"), gate("orders.list")],
+});
+```
+
+Use your own `Auth`-derived model in the augmentation. The route and gate APIs do not otherwise change.
+
+### Optional Seal fields no longer skip validation for present empty values
+
+An optional validator now skips value rules only when the value is absent. A present empty value such as `""` is validated. This closes the v4 case where `v.int().optional()` could succeed with a string even though its output type is `number | undefined`.
+
+**Before (v4)**
+
+```ts
+const schema = v.object({ page: v.int().optional() });
+const result = await v.validate(schema, { page: "" });
+
+// result.isValid === true; result.data.page === ""
+```
+
+**After (v5)**
+
+```ts
+const schema = v.object({ page: v.int().optional() });
+const rawPage = request.input("page");
+
+const result = await v.validate(schema, {
+  // Normalize at the input boundary only if your API defines empty as absent.
+  page: rawPage === "" ? undefined : rawPage,
+});
+
+// Without normalization, { page: "" } is invalid.
+```
+
+If an empty value should be rejected, make no schema change and update the affected test expectation. The IP validators' move away from Node's `net` module preserves the IPv4/IPv6 rules and needs no migration.
+
+## Review these changes; most apps need no edit
+
+### Auth
+
+`authMiddleware()` still reads the authorization header by default. v5 additionally lets one middleware instance read a named cookie, and `auth.canAuthenticate` can reject an otherwise valid user:
+
+```ts
+authMiddleware("user", "cookie:accessToken");
+
+export default {
+  userType: { user: User },
+  canAuthenticate: user => accountPolicy.canAuthenticate(user),
+};
+```
+
+Invalid, malformed, expired, or wrong-type credentials still produce `401`. Verification, storage, and configuration failures now propagate through the normal server error path instead of every verification exception being mislabeled as an invalid credential. Review tests or clients only if they assumed every auth failure was a `401`; operational failures should be observed as server errors.
+
+### `request.requireUser()`
+
+Core adds `request.requireUser()`. It returns the authenticated user non-optionally or throws `UnAuthorizedError` when no user is attached. It is a safer replacement for assertions behind an auth guard, but existing assertions continue to compile:
+
+```ts
+// v4-compatible assertion
+const user = request.user!;
+
+// v5 guard assertion
+const user = request.requireUser();
+```
+
+### create-warlock
+
+The project creator now offers the `web` feature, emits the v5 context-object handler shape shown above, and honors `CACHE_DRIVER` in generated cache configuration. It also stops and reports dependency-install, Git, feature-addition, and cache-warmup failures instead of printing later success output. These changes affect newly generated projects; they do not rewrite an existing v4 app.
+
+## Nothing to do for the other packages
+
+The Warlock family contains 28 lockstep-versioned packages. Only `core`, `web`, `auth`, `access`, `seal`, and `create-warlock` changed at all for 5.0.0, and `web` is a first release rather than an upgrade. The other 22 packages received the v5 family version only. There are no package-specific migrations to hunt for in them.
+
+## Fifteen-minute checklist
+
+1. Upgrade the `@warlock.js/*` packages you use together.
+2. Change `(request, response)` handlers and middleware to `({ request, response })`; run `warlock doctor` to catch likely leftovers.
+3. Search for dynamic `request.<name> =`, `fromRequest`, `request.localized`, and fallback arguments passed to `getLocaleCode()`.
+4. Declare `app.localeCodes` if your application has a closed set of supported locales, and test invalid client locale input.
+5. Add your application's `RequestUser` augmentation if you use `@warlock.js/access` gates.
+6. Test optional numeric, date, boolean, and other non-string inputs when clients may send `""`.
+7. Review auth failure tests for the new credential-versus-server-error distinction.
+8. Optionally run `warlock add web`; it is not part of the compatibility work.

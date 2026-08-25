@@ -13,11 +13,12 @@
  */
 import Search from "@astrojs/starlight/components/Search.astro";
 import ThemeSelect from "@astrojs/starlight/components/ThemeSelect.astro";
+import { getCollection } from "astro:content";
 import logo from "../assets/logo.png";
-import { currentVersion } from "../utils/current-version";
 
 const navLinks = [
   { label: "Documentation", href: "/v/latest/core/getting-started/01-introduction/" },
+  { label: "Upgrade to v5", href: "/v/latest/upgrade-to-v5/", upgrade: true },
   { label: "AI", href: "/v/latest/ai/", ai: true },
   { label: "Features", href: "/features/" },
   { label: "Packages", href: "/packages/" },
@@ -26,10 +27,39 @@ const navLinks = [
 ];
 
 const currentPath = Astro.url.pathname;
-const onAiDocs =
-  currentPath === "/v/latest/ai" || currentPath.startsWith("/v/latest/ai/");
+const onAiDocs = /^\/v\/(?:latest|v4)\/ai(?:\/|$)/.test(currentPath);
+const currentDocsVersion = currentPath.match(/^\/v\/(latest|v4)(?=\/|$)/)?.[1];
+const readingVersion = currentDocsVersion === "v4" ? "v4" : "v5";
+
+const normalizePath = (path: string) => {
+  const withLeadingSlash = path.startsWith("/") ? path : `/${path}`;
+  return withLeadingSlash === "/" ? "/" : `${withLeadingSlash.replace(/\/$/, "")}/`;
+};
+
+// Only preserve the current page when that exact counterpart exists. New v5
+// pages (such as the upgrade guide) safely fall back to each version's intro.
+const docs = await getCollection("docs");
+const docRoutes = new Set(
+  docs
+    .filter(({ data }) => import.meta.env.MODE !== "production" || data.draft === false)
+    .map(({ id }) => normalizePath(id === "index" ? "/" : id)),
+);
+const versionHref = (version: "latest" | "v4") => {
+  if (currentDocsVersion) {
+    const counterpart = normalizePath(
+      currentPath.replace(/^\/v\/(?:latest|v4)(?=\/|$)/, `/v/${version}`),
+    );
+    if (docRoutes.has(counterpart)) return counterpart;
+  }
+
+  return `/v/${version}/core/getting-started/01-introduction/`;
+};
+
+const latestHref = versionHref("latest");
+const v4Href = versionHref("v4");
 function isActive(link) {
-  const { href, ai } = link;
+  const { href, ai, upgrade } = link;
+  if (upgrade) return currentPath === href || currentPath === href.slice(0, -1);
   if (ai) return onAiDocs;
   if (href === "/features/") return currentPath === "/features/";
   if (href === "/packages/") return currentPath === "/packages/";
@@ -44,13 +74,33 @@ function isActive(link) {
 
 <div class="warlock-header">
   <div class="warlock-header-inner">
-    <a class="warlock-brand" href="/" aria-label="Warlock.js home">
-      <span class="warlock-brand-mark-wrap" aria-hidden="true">
-        <img src={logo.src} alt="" width="28" height="28" class="warlock-brand-mark" />
-      </span>
-      <span class="warlock-brand-name">Warlock<span class="warlock-brand-tld">.js</span></span>
-      <span class="warlock-brand-version">v{currentVersion}</span>
-    </a>
+    <div class="warlock-brand-cluster">
+      <a class="warlock-brand" href="/" aria-label="Warlock.js home">
+        <span class="warlock-brand-mark-wrap" aria-hidden="true">
+          <img src={logo.src} alt="" width="28" height="28" class="warlock-brand-mark" />
+        </span>
+        <span class="warlock-brand-name">Warlock<span class="warlock-brand-tld">.js</span></span>
+      </a>
+
+      <details class="warlock-version-picker">
+        <summary aria-label={`Documentation version: ${readingVersion}`}>
+          Docs {readingVersion}
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </summary>
+        <div class="warlock-version-menu">
+          <a href={latestHref} aria-current={currentDocsVersion !== "v4" ? "page" : undefined}>
+            <span>v5</span>
+            <small>Current</small>
+          </a>
+          <a href={v4Href} aria-current={currentDocsVersion === "v4" ? "page" : undefined}>
+            <span>v4</span>
+            <small>Frozen</small>
+          </a>
+        </div>
+      </details>
+    </div>
 
     <nav class="warlock-topnav" aria-label="Top">
       {navLinks.map((link) => (
@@ -126,6 +176,13 @@ function isActive(link) {
   }
 
   /* Brand block */
+  .warlock-brand-cluster {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-width: max-content;
+  }
+
   .warlock-brand {
     display: inline-flex;
     align-items: center;
@@ -180,9 +237,15 @@ function isActive(link) {
     font-weight: 700;
   }
 
-  .warlock-brand-version {
-    margin-inline-start: 0.4rem;
-    padding: 0.15rem 0.45rem;
+  .warlock-version-picker {
+    position: relative;
+  }
+
+  .warlock-version-picker summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.5rem;
     border-radius: var(--warlock-radius-sm);
     background-color: var(--warlock-yellow-glow);
     color: var(--sl-color-text-accent);
@@ -190,6 +253,57 @@ function isActive(link) {
     font-size: 0.7rem;
     font-weight: 600;
     letter-spacing: 0.02em;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .warlock-version-picker summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .warlock-version-picker[open] summary svg {
+    transform: rotate(180deg);
+  }
+
+  .warlock-version-menu {
+    position: absolute;
+    z-index: 20;
+    inset-block-start: calc(100% + 0.55rem);
+    inset-inline-start: 0;
+    width: 9.5rem;
+    padding: 0.35rem;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--warlock-radius);
+    background: var(--sl-color-bg-nav);
+    box-shadow: var(--sl-shadow-lg);
+  }
+
+  .warlock-version-menu a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.5rem 0.6rem;
+    border-radius: var(--warlock-radius-sm);
+    color: var(--sl-color-gray-2);
+    text-decoration: none;
+  }
+
+  .warlock-version-menu a:hover,
+  .warlock-version-menu a[aria-current="page"] {
+    color: var(--sl-color-text-accent);
+    background: color-mix(in srgb, var(--sl-color-text-accent) 10%, transparent);
+  }
+
+  .warlock-version-menu small {
+    color: var(--sl-color-gray-3);
+    font-size: 0.68rem;
+  }
+
+  @media (max-width: 34rem) {
+    .warlock-brand-name {
+      display: none;
+    }
   }
 
   /* Top nav (centered) */

@@ -1,0 +1,281 @@
+---
+banner:
+  content: "This page documents Warlock v4. <a href='/v/latest'>View the latest docs.</a>"
+title: OpenAI provider
+description: OpenAI provider adapter for @warlock.js/ai — works with OpenAI, Azure OpenAI, OpenRouter, and any OpenAI-compatible endpoint.
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+> Standalone — usable in any Node project, no `@warlock.js/core` required.
+
+`@warlock.js/ai-openai` is the OpenAI provider adapter for
+[`@warlock.js/ai`](/v/v4/ai/). It turns OpenAI Chat Completions into
+a vendor-neutral `ModelContract` you pass to any agent, workflow, or
+supervisor.
+
+It also works with **any OpenAI-compatible endpoint** — Azure OpenAI,
+OpenRouter, local LLM gateways — by passing a custom `baseURL`.
+
+## Install
+
+<Tabs syncKey="pm">
+  <TabItem label="npm">
+    ```bash
+    npm install @warlock.js/ai @warlock.js/ai-openai
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn add @warlock.js/ai @warlock.js/ai-openai
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm add @warlock.js/ai @warlock.js/ai-openai
+    ```
+  </TabItem>
+</Tabs>
+
+## Construct
+
+```ts
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
+
+// Or route through an OpenAI-compatible endpoint:
+const openrouter = new OpenAISDK({
+  apiKey: process.env.OPENROUTER_API_KEY!,
+  baseURL: "https://openrouter.ai/api/v1",
+  provider: "openrouter",
+});
+```
+
+## Use as a model
+
+```ts
+const model = openai.model({ name: "gpt-4o-mini" });
+// Pass to any @warlock.js/ai agent / workflow / supervisor.
+```
+
+## Use as an embedder
+
+```ts
+const embedder = openai.embedder({ name: "text-embedding-3-small" });
+const { vector } = await embedder.embed("Hello world");
+```
+
+## Capabilities
+
+- **Structured output** — on by default (`response_format: json_schema,
+  strict: true`); pass `responseFormat: "json_object"` or `"text"` on the
+  model call to downgrade to the soft "respond in JSON only" system-prompt
+  hint instead.
+- **Vision** — auto-detected for `gpt-4o*`, `gpt-4-turbo*`, `gpt-4.1*`,
+  `o1*`, `o3*`, `chatgpt-4o*`. Override with the `vision` flag.
+- **Streaming** — token deltas, tool-call fragments, terminal `done`.
+- **Per-model pricing** — pass a `pricing` map (USD per million tokens)
+  for a cost breakdown in the agent's usage report.
+
+## Pricing and usage
+
+Every response reports token `usage` (`input`, `output`, `total`). OpenAI prompt-cache hits surface as `cachedTokens`, and reasoning-model thinking tokens as `reasoningTokens` (counted within `output`) when present.
+
+Attach a `pricing` registry — keyed by model name, in USD per million tokens — to turn tokens into money. It can live on the SDK (one source of truth) or per-model (wins when both are set); with pricing set, cost rolls up through every node of the `AgentReport`. When neither is set, `Usage.cost` stays `undefined`.
+
+```ts
+const openai = new OpenAISDK({
+  apiKey: process.env.OPENAI_API_KEY!,
+  pricing: {
+    "gpt-4o-mini": { input: 0.15, output: 0.6, cachedInput: 0.075 },
+    "gpt-4o": { input: 2.5, output: 10, cachedInput: 1.25 },
+  },
+});
+
+// Or per model, overriding the SDK entry:
+const model = openai.model({ name: "gpt-4o", pricing: { input: 2.5, output: 10 } });
+```
+
+Need an offline token estimate before a call? `openai.count(text)` returns a fast character-heuristic approximation — good for budgeting and quota guards, not for billing.
+
+## Response format override
+
+By default the adapter emits strict `response_format: { type: "json_schema", strict: true }` whenever an agent passes an output schema, so the JSON always matches the shape. Some OpenAI-compatible targets reject strict `json_schema` (older models, certain OpenRouter routes, Ollama's OpenAI-compat endpoint, some fine-tunes). For those, set `responseFormat` on the model call to pick a looser wire mode:
+
+```ts
+const model = openai.model({ name: "some-legacy-model", responseFormat: "json_object" });
+```
+
+| `responseFormat` | Wire `response_format` | Shape enforcement |
+| --- | --- | --- |
+| `"json_schema"` | `{ type: "json_schema", strict: true }` | Token-level — the model can only emit JSON matching the schema. The default when omitted. |
+| `"json_object"` | `{ type: "json_object" }` | Valid JSON, but **not** the shape — re-communicated via the agent's soft system-prompt hint. |
+| `"text"` | _(none emitted)_ | No `response_format` on the wire — relies entirely on the soft prompt hint. |
+
+Picking `"json_object"` or `"text"` also flips the model's inferred `capabilities.structuredOutput` to `false`, so the agent runtime re-injects a soft "respond in JSON only" hint. Client-side validation against your output schema still runs, so `result.data` is shape-checked either way.
+
+For the full surface (pricing config, streaming caveats, embedding
+dimension truncation, token counting), see the
+`setup-openai` skill.
+
+## Image generation
+
+`openai.image({ name })` returns an `ImageModelContract` for the
+[`ai.image()`](/v/v4/ai/) output verb — prompt in, images out, in the
+same never-throws `{ data, error, usage, report }` envelope every
+executable returns. OpenAI ships two metering models behind one factory:
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
+
+// gpt-image-1 — token-metered; always returns base64 bytes.
+const gpt = openai.image({ name: "gpt-image-1", pricing: { input: 5, output: 40 } });
+
+// dall-e-3 — per-image pricing; base64 by default.
+const dalle = openai.image({ name: "dall-e-3", pricing: { perImage: 0.04 } });
+
+const { data, error } = await ai.image({
+  model: gpt,
+  prompt: "an isometric office desk, soft studio lighting",
+  size: "1024x1024",
+  quality: "high",
+});
+
+if (error) {
+  console.warn(error.code); // typed AIError (content-filter / rate-limit / …)
+} else {
+  for (const img of data.images) {
+    if (img.type === "base64") save(Buffer.from(img.base64, "base64"), img.mediaType);
+    else download(img.url);
+  }
+}
+```
+
+- `gpt-image-*` is **token-metered** — price it with `{ input, output }` (USD
+  per 1M tokens). The adapter never sends `response_format` (the API rejects
+  it), so it always returns base64 bytes.
+- `dall-e-*` is **per-image** — price it with `{ perImage }` (or
+  `perImageBySize`). It defaults to base64; opt into a hosted URL with
+  `options: { responseFormat: "url" }`.
+- The model id is **not validated locally**. `openai.image({ name })` passes it
+  straight to `client.images.generate` — the same goes for `openai.speech()`
+  and `openai.transcribe()` — so an id OpenAI does not serve fails at the
+  provider (as a typed `AIError`), not at construction. There are no model-id
+  helpers to consult — `isOpenAIImageModel()`, `OPENAI_IMAGE_MODEL_PREFIXES`,
+  `isOpenAISpeechModel()` and `isOpenAITranscriptionModel()` were all removed in
+  4.13.0. Branch on your own id list if you need one.
+
+The image spend folds into the same `Usage.cost` rollup as text — no second
+accounting path. See [`ai.image`](/v/v4/ai/) for the full verb surface
+(options, cost-truth, `GeneratedImage`).
+
+## Speech (text-to-speech)
+
+`openai.speech({ name })` returns a `SpeechModelContract` for the
+[`ai.speech()`](/v/v4/ai/) verb — text in, audio out.
+
+```ts
+// tts-1 / tts-1-hd — billed per INPUT CHARACTER.
+const classic = openai.speech({ name: "tts-1", voice: "alloy", pricing: { perMillionCharacters: 15 } });
+
+// gpt-4o-mini-tts — billed per TOKEN; supports `instructions` tone steering.
+const steered = openai.speech({ name: "gpt-4o-mini-tts", pricing: { input: 0.6, output: 12 } });
+
+const { data, error } = await ai.speech({
+  model: steered,
+  text: "Welcome aboard. Let's get you set up.",
+  voice: "verse",             // overrides the model default
+  format: "wav",              // "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm"
+  speed: 1.25,                // OpenAI 0.25–4.0
+  instructions: "calm, warm", // gpt-4o-mini-tts only
+});
+
+if (error) {
+  console.warn(error.code);
+} else {
+  const { base64, mediaType } = data.audio; // GeneratedAudio, always base64 today
+  await fs.writeFile("welcome.wav", Buffer.from(base64, "base64"));
+}
+```
+
+The OpenAI container defaults to `mp3` (→ `audio/mpeg`); `speed` and
+`instructions` are only sent when set, and the default voice is `alloy` when
+neither the call nor the model config supplies one. `tts-1` reports no token
+usage, so its cost is priced entirely from the input character count.
+
+## Transcription (speech-to-text)
+
+`openai.transcribe({ name })` returns a `TranscriptionModelContract` for the
+[`ai.transcribe()`](/v/v4/ai/) verb — audio in, text out. Build the
+`AudioInput` with `ai.audioFromFile(path)` (reads disk, infers the media type,
+recognizes WhatsApp `.ogg` / `.opus` and iOS `.m4a`) or
+`ai.audioFromBuffer(bytes, mediaType)`.
+
+```ts
+// whisper-1 — defaults to verbose_json (segments + duration); billed PER MINUTE.
+const whisper = openai.transcribe({ name: "whisper-1", pricing: { perMinute: 0.006 } });
+
+// gpt-4o-transcribe — defaults to json; billed PER TOKEN.
+const gpt4o = openai.transcribe({ name: "gpt-4o-transcribe", pricing: { input: 2.5, output: 10 } });
+
+const audio = await ai.audioFromFile("./voice-note.ogg");
+
+const { data, error } = await ai.transcribe({
+  model: whisper,
+  audio,
+  language: "en",             // BCP-47 hint — improves accuracy + latency
+});
+
+if (error) {
+  console.warn(error.code);
+} else {
+  console.log(data.text);     // full transcript
+  for (const seg of data.segments ?? []) {
+    console.log(seg.start, seg.end, seg.text); // whisper verbose_json segments
+  }
+}
+```
+
+`segments` and `report.durationSeconds` appear only in whisper's
+`verbose_json` mode — use them to build subtitles or jump-to-timestamp. The
+adapter wraps the base64 bytes in an uploadable via the SDK's `toFile`,
+declaring the codec from `audio.mediaType` / `audio.filename`. `whisper-1`
+cost derives from `durationSeconds`; if the provider reports no duration, cost
+stays `undefined` — no guessing.
+
+## PDF and audio input (opt-in)
+
+Vision is auto-detected, but **PDF and audio input parts are off by default** —
+OpenAI accepts them only on specific model families, so the capability is
+honest-off until you opt in:
+
+```ts
+const doc = openai.model({ name: "gpt-4o", pdf: true });    // PDF file parts
+const listen = openai.model({ name: "gpt-4o-audio-preview", audio: true }); // input_audio
+```
+
+| Content part | OpenAI wire mapping | Requires |
+| --- | --- | --- |
+| `{ type: "pdf", source: { base64, mediaType } }` | `{ type: "file", file: { filename, file_data } }` | `.model({ pdf: true })` |
+| `{ type: "audio", source: { base64, mediaType } }` | `{ type: "input_audio", input_audio: { data, format } }` | `.model({ audio: true })` |
+
+PDF and audio reach the wire only when the model declares the matching
+capability — the agent's modality gate throws otherwise, so capability ≡
+behavior. Only `wav` / `mp3` audio media types are accepted, and a remote-URL
+PDF/audio source raises a typed `InvalidRequestError` (OpenAI has no remote
+file/audio source — resolve to base64 first). An explicit flag always wins
+over inference.
+
+## Related
+
+- [`ai.image` / `ai.speech` / `ai.transcribe`](/v/v4/ai/) — the modality
+  verb surfaces these factories feed.
+- [Google provider](/v/v4/ai/providers/google/) — Gemini and Imagen image
+  generation, and Gemini `inlineData` multimodal input.
+- [API reference](/v/v4/ai/reference/api/) — every public export.

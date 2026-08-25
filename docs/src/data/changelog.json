@@ -106,11 +106,515 @@
       "slug": "seal"
     },
     {
+      "name": "@warlock.js/web",
+      "slug": "web"
+    },
+    {
       "name": "create-warlock",
       "slug": "create-warlock"
     }
   ],
   "releases": [
+    {
+      "version": "5.0.0",
+      "id": "v5-0-0",
+      "date": "2026-08-25",
+      "isUnreleased": false,
+      "summaryHtml": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "The project creator now offers the <code>web</code> feature for Warlock SSR pages."
+            },
+            {
+              "type": "Changed",
+              "html": "Scaffold command failures are captured and reported instead of allowing later success output to hide a failed dependency install, Git initialization, feature addition, or cache warm-up."
+            },
+            {
+              "type": "Changed",
+              "html": "Generated route handlers use the new request-context argument shape, and generated cache configuration honors <code>CACHE_DRIVER</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "IP validation no longer imports Node's <code>net</code> module, so the same IPv4 and IPv6 rules can run in browser bundles."
+            },
+            {
+              "type": "Changed",
+              "html": "Optional validators now skip value rules only for absent values; present empty values such as <code>\"\"</code> are validated instead of passing through with the wrong output type."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "SSR React pages with hydration, client navigation, route metadata, shared data, and Vite integration."
+            },
+            {
+              "type": "Changed",
+              "html": "The hydration runtime is packaged as its own public entry, and production/dev route wiring now resolves the packaged client manifest and stylesheets."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Authentication can now use an explicit header or named-cookie credential source and a configurable <code>canAuthenticate</code> policy; invalid credentials are distinguished from server and configuration failures instead of turning every verification error into a 401."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>request.requireUser()</code></strong> — returns the authenticated user non-optionally, or throws <code>UnAuthorizedError</code> when no user is attached. For handlers behind an auth guard, where an absent user is a misconfigured route rather than a normal state; replaces <code>request.user!</code> assertions"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "This package is unchanged in 5.0.0; its version moved only because the Warlock family releases in lockstep."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 0,
+          "counts": [],
+          "items": []
+        }
+      ]
+    },
     {
       "version": "4.16.0",
       "id": "v4-16-0",
@@ -243,6 +747,63 @@
             {
               "type": "Dependencies",
               "html": "<code>@mongez/encryption</code> 2.0.1 (async <code>encrypt</code>/<code>decrypt</code>, throws on failure) does not apply to this package — <code>core</code> is not a consumer; <code>src/encryption/encrypt.ts</code> uses Node's built-in <code>crypto</code> module directly and is unaffected"
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 10,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 7
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "SSR React pages served by the Warlock HTTP server. A page route is an ordinary Warlock route whose handler renders React instead of returning JSON."
+            },
+            {
+              "type": "Added",
+              "html": "Hydration, and client-side navigation via <code>&lt;Link&gt;</code> — no document reload, Back and Forward included."
+            },
+            {
+              "type": "Added",
+              "html": "React Fast Refresh in <code>warlock dev</code>, including a server render that reflects the edit rather than the pre-edit module."
+            },
+            {
+              "type": "Added",
+              "html": "Typed links: <code>href(name, params, query)</code>; an unknown route name is a compile error."
+            },
+            {
+              "type": "Added",
+              "html": "<code>revalidate()</code> — re-run the current route's loaders after a mutation."
+            },
+            {
+              "type": "Added",
+              "html": "MRR's navigation API mirrored by name (<code>navigateTo</code>, <code>navigateBack</code>, <code>currentRoute</code>, <code>queryString</code>, …) without depending on that package."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock add web</code> scaffolds <code>src/web/</code> and registers the connector."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>metadata()</code> no longer runs when a loader rejected. It used to be called with <code>data: undefined</code> while the type promised otherwise, so a metadata function reading its data threw a <code>TypeError</code> that <strong>replaced the loader's real error</strong> and pointed at the wrong file."
+            },
+            {
+              "type": "Fixed",
+              "html": "Validation reads the same query the loader reads. Stage 4 took <code>query</code> and <code>params</code> from a hand-parsed URL while <code>body</code> and <code>headers</code> came from the request — so <code>?tags=a&amp;tags=b</code> reached validation as <code>\"b\"</code>, and a rule on <code>filter.status</code> never fired because validation saw a key literally named <code>filter[status]</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>href()</code> emits the query grammar core actually parses; nested objects and arrays are no longer destroyed by <code>String(value)</code>."
             }
           ]
         },

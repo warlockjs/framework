@@ -1,0 +1,292 @@
+---
+banner:
+  content: "This page documents Warlock v4. <a href='/v/latest'>View the latest docs.</a>"
+title: Google provider
+description: Google provider adapter for @warlock.js/ai — Gemini models as a vendor-neutral ModelContract.
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+> Standalone — usable in any Node project, no `@warlock.js/core` required.
+
+`@warlock.js/ai-google` is the Google provider adapter for
+[`@warlock.js/ai`](/v/v4/ai/). It wraps the `@google/genai` SDK
+(`models.generateContent`) and exposes Gemini as a vendor-neutral
+`ModelContract` — the same shape every agent, workflow, and supervisor
+already speaks. Works against both the Gemini Developer API and Vertex
+AI.
+
+## Install
+
+<Tabs syncKey="pm">
+  <TabItem label="npm">
+    ```bash
+    npm install @warlock.js/ai @warlock.js/ai-google
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn add @warlock.js/ai @warlock.js/ai-google
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm add @warlock.js/ai @warlock.js/ai-google
+    ```
+  </TabItem>
+</Tabs>
+
+## Construct
+
+One `GoogleSDK` holds one live `GoogleGenAI` client. Build it once at
+boot and reuse it everywhere — every model and embedder it produces
+shares the same client and auth.
+
+```ts
+import { GoogleSDK } from "@warlock.js/ai-google";
+
+const google = new GoogleSDK({
+  apiKey: process.env.GEMINI_API_KEY!,
+});
+```
+
+The config wraps `GoogleGenAIOptions`, so the whole object is forwarded
+to `new GoogleGenAI(...)`. The common path is the Gemini API with an
+`apiKey`; the same options also drive **Vertex AI**:
+
+```ts
+const google = new GoogleSDK({
+  vertexai: true,
+  project: "my-proj",
+  location: "us-central1",
+});
+```
+
+`provider` relabels the upstream (defaults to `"google"`) and flows
+through to `AgentReport.model`, logs, and provider-aware middleware.
+
+## First call
+
+Build a model, hand it to an agent, run it. `execute()` never throws —
+failures land in `error` as a typed `AIError`.
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { GoogleSDK } from "@warlock.js/ai-google";
+
+const google = new GoogleSDK({ apiKey: process.env.GEMINI_API_KEY! });
+
+const assistant = ai.agent({
+  model: google.model({ name: "gemini-2.5-flash" }),
+  systemPrompt: "You are a concise senior TypeScript engineer.",
+});
+
+const { text, usage, error } = await assistant.execute("Why use generics?");
+
+if (error) {
+  console.warn(error.code, error.category);
+} else {
+  console.log(text, usage.total);
+}
+```
+
+## Use as a model
+
+```ts
+google.model({ name: "gemini-2.5-flash", temperature: 0.7 });
+google.model({ name: "gemini-2.5-pro" });
+```
+
+## Use as an embedder
+
+```ts
+const embedder = google.embedder({ name: "gemini-embedding-001" });
+const { vector } = await embedder.embed("Hello world");
+const { vectors } = await embedder.embedMany(["doc 1", "doc 2"]);
+```
+
+`embedContent` accepts an array natively, so `embedMany` is a single
+request — embeddings come back in input order. Pass `dimensions` to
+forward Gemini's `outputDimensionality` truncation hint (supported by
+2024+ models):
+
+```ts
+google.embedder({ name: "gemini-embedding-001", dimensions: 768 });
+```
+
+> **Embeddings report no token usage.** Gemini's embed endpoint returns
+> no token counts, so `usage` on an embedding result is always
+> `{ promptTokens: 0, totalTokens: 0 }` — an honest absence, not a
+> fabricated estimate.
+
+## Capabilities
+
+- **Tool calling** — vendor-neutral `ToolConfig`s map to Gemini
+  function declarations; calls round-trip as `functionCall` /
+  `functionResponse` parts. (Thinking models' opaque `thoughtSignature`
+  is carried through automatically so follow-up turns don't 400.)
+- **Streaming** — `stream()` runs `generateContentStream` and yields
+  text `delta`s, a `tool-call` per function call (Gemini emits a
+  fully-formed call, not partial JSON), and a terminal `done` with the
+  final finish reason and usage.
+- **Structured output** — on by default. A root-object JSON Schema is
+  forwarded to Gemini's native structured output
+  (`responseMimeType: "application/json"` + `responseJsonSchema`).
+  Otherwise it degrades to the agent's soft system-prompt hint plus
+  client-side validation.
+- **Vision** — auto-detected from the model id substring. Every Gemini
+  1.5, 2.x, and 2.5 model is multimodal (plus the legacy
+  `gemini-pro-vision`); only the original text-only `gemini-1.0-pro` is
+  excluded. Override either way with the `vision` flag.
+- **Embeddings** — `gemini-embedding-001`, `text-embedding-004`, native
+  batch (see above).
+
+- **PDF + audio input** — the multimodal Gemini families accept document
+  and audio parts, both mapped to Gemini's media-agnostic `inlineData`
+  block (see below). `pdf` / `audio` mirror the `vision` inference; override
+  either with `google.model({ name, pdf: true, audio: false })`.
+
+Image attachments accept inlined `base64` bytes (with `mediaType`). Note:
+`generateContent` does not fetch arbitrary remote URLs, so a `{ source: { url } }`
+PDF or audio part throws `InvalidRequestError` — resolve to base64 first.
+
+## Multimodal input maps to `inlineData`
+
+Gemini's multimodal input is **media-agnostic** — every binary modality maps
+to one `inlineData` block keyed by IANA mime type, so image, PDF, and audio
+all take the same shape:
+
+- `{ type: "image", source: { base64, mediaType } }` → `{ inlineData: { mimeType, data } }`
+- `{ type: "pdf", source: { base64, mediaType: "application/pdf" } }` → `{ inlineData: { mimeType: "application/pdf", data } }` (gated on `capabilities.pdf`)
+- `{ type: "audio", source: { base64, mediaType: "audio/mpeg" } }` → `{ inlineData: { mimeType: "audio/mpeg", data } }` (gated on `capabilities.audio`)
+
+PDF and audio reach the wire only when the model declares the matching
+capability (inferred for the multimodal Gemini families) — so capability ≡
+behavior.
+
+## Image generation (Imagen and Gemini)
+
+`google.image({ name })` returns an `ImageModelContract` for the
+[`ai.image()`](/v/v4/ai/) output verb — prompt in, images out, in the same
+never-throws `{ data, error, usage, report }` envelope every executable
+returns.
+
+**The model id picks the transport:**
+
+| Model id | Transport | Usage it can report |
+| --- | --- | --- |
+| `gemini-*` (e.g. `gemini-3.1-flash-lite-image`) | `ai.models.generateContent`, `responseModalities` including `"IMAGE"` | whatever Google attaches — `{ input, output }` |
+| anything else (`imagen-*`, unknown ids) | `ai.models.generateImages` | none, always zero — `{ perImage }` |
+
+A `gemini-` id sent to `generateImages` comes back
+`404 … is not supported for predict` — that call routes to `{model}:predict`.
+`generateContent` is the SDK's own named replacement: its runtime deprecation
+notice for `generateImages` reads *"Please use the generateContent method with
+image models instead."* Routing on the id is what makes both families work
+through one factory.
+
+:::caution[What is measured here vs what is reported]
+No test in this package calls the live API, so the evidence comes in two tiers.
+**Measured here:** a `gemini-*` image id that 404s on the Imagen transport
+reached the model on `generateContent` and came back with a quota error
+(HTTP 429) — the endpoint accepts the id. **Reported by the maintainer:** once
+billing was enabled on the project, an image came back end-to-end from an
+application running a locally linked build. **Still unknown:** whether these
+models report token usage — no `usageMetadata` from a successful image call has
+been seen, so check your first live `usage` before relying on token pricing.
+:::
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { GoogleSDK } from "@warlock.js/ai-google";
+
+const google = new GoogleSDK({ apiKey: process.env.GEMINI_API_KEY! });
+const imagen = google.image({ name: "imagen-4.0-generate-001", pricing: { perImage: 0.04 } });
+
+const { data, error } = await ai.image({
+  model: imagen,
+  prompt: "a watercolor lighthouse at dawn",
+  aspectRatio: "3:4",              // Imagen ratio (vs OpenAI's WxH `size`)
+  negativePrompt: "text, watermark",
+  options: { imageSize: "2K", personGeneration: "allow_adult" }, // Imagen passthroughs
+});
+
+if (error) {
+  console.warn(error.code); // typed AIError — content-filter when every candidate is safety-filtered
+} else {
+  for (const img of data.images) {
+    save(Buffer.from(img.base64, "base64"), img.mediaType); // Imagen returns base64 bytes
+  }
+}
+```
+
+```ts
+// Gemini-native — same envelope, same GeneratedImage shape, usage passed through:
+const gemini = google.image({
+  name: "gemini-3.1-flash-lite-image",
+  pricing: { input: 0.3, output: 30 },       // token-metered, not per-image
+});
+
+const { data, usage } = await ai.image({
+  model: gemini,
+  prompt: "a red bicycle on a white background",
+  aspectRatio: "16:9",                       // → config.imageConfig.aspectRatio
+});
+```
+
+- Imagen is **per-image-metered** — price it with `{ perImage }`. It returns
+  base64 bytes (no hosted URL, no token usage), and the spend folds into the
+  same `Usage.cost` rollup as text.
+- The Gemini path **passes token usage through** rather than zeroing it: any
+  `usageMetadata` Google attaches becomes `usage.input` / `output` / `total`
+  (plus `cachedTokens` / `reasoningTokens`), and only an absent block collapses
+  to zeros — so price it with `{ input, output }` and check your first live
+  `usage`. It requests `responseModalities: ["TEXT", "IMAGE"]` by default
+  (override verbatim with `options.responseModalities`) and maps `aspectRatio` /
+  `imageSize` / `personGeneration` onto `config.imageConfig`. `count`,
+  `negativePrompt`, and `format` have no equivalent on this endpoint and are not
+  forwarded.
+- **`generateImages` is deprecated by Google**, so the `imagen-*` path is on a
+  clock: *"The generateImages method is deprecated and will be removed in the
+  next major release (not before Jan. 1 2027). Please use the generateContent
+  method with image models instead."* Nothing breaks today; prefer a `gemini-`
+  id for new work.
+- When Google filters the request, the run surfaces a typed
+  `ContentFilterError` on `result.error`. On the Gemini path, a response that
+  came back as text instead of an image surfaces a `ProviderError` quoting that
+  text — never a silent empty success.
+- The model id is **not validated locally**. It selects a route; it is never
+  refused. An id Google does not serve fails as a typed provider error on
+  `result.error` — not with a local throw at construction. Google adds and
+  retires image models on its own schedule; you pick the model, the API rules
+  on it.
+
+See [`ai.image`](/v/v4/ai/) for the full verb surface (options,
+cost-truth, `GeneratedImage`).
+
+## Pricing and usage
+
+Every response reports token `usage` (`input`, `output`, `total`);
+cached-content tokens surface as `cachedTokens` when present.
+
+Attach a `pricing` registry — keyed by model name, in USD per million
+tokens — to turn tokens into money. SDK-level or per-model (per-model
+wins). With pricing set, cost rolls up through every node of the
+`AgentReport`.
+
+```ts
+const google = new GoogleSDK({
+  apiKey: process.env.GEMINI_API_KEY!,
+  pricing: {
+    "gemini-2.5-flash": { input: 0.3, output: 2.5 },
+  },
+});
+```
+
+Need an offline token estimate? `google.count(text)` returns a fast
+character-heuristic approximation — Gemini's `countTokens` is a network
+round-trip, so this stays offline for budgeting, not billing.
+
+For the agent/workflow surface these models plug into, see
+[`@warlock.js/ai`](/v/v4/ai/). For provider-specific notes and the
+latest model ids, see the `setup-google` skill.

@@ -1,0 +1,328 @@
+# Warlock AI Tools — full skills
+
+> Package: `@warlock.js/ai-tools`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/ai-tools/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## connect-mcp-server  `@warlock.js/ai-tools/connect-mcp-server/SKILL.md`
+
+---
+name: connect-mcp-server
+description: 'Connect a @warlock.js/ai agent to an external Model Context Protocol (MCP) server and adapt its tools as native agent tools (Direction A) with `ai.mcp(server)`. Triggers: `ai.mcp(`, `ai.mcp.serve` (the other direction), `mcp(`, `McpClient`, `McpClientOptions`, `McpTransport`, `client.tools()`, `client.close()`, `namePrefix`, `filter`, `McpTransportError`, `{ type: "stdio" }`, `{ type: "http" }`, `tools/list`, `tools/call`, `jsonSchemaToStandard`, `@modelcontextprotocol/sdk`, `ajv`; ''consume an MCP server'', ''use an external MCP server''s tools in my agent'', ''connect to the GitHub/Slack/Filesystem MCP server'', ''adapt MCP tools as agent tools'', ''bridge my agent to the MCP ecosystem'', ''run an MCP server over stdio/http''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: exposing YOUR agent/tools AS an MCP server (the reverse direction) — `@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`; the built-in web/HTTP/calc/date tools — `@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md`.'
+---
+
+# Connect to an external MCP server (Direction A)
+
+`ai.mcp(server, options?)` opens a connection to any Model Context Protocol server, lists its tools, and adapts each one into a native `ToolContract` — so a remote MCP tool is indistinguishable from a local one and drops straight into `ai.agent({ tools: [...] })`.
+
+```ts
+import "@warlock.js/ai-tools";
+import { ai } from "@warlock.js/ai";
+
+const github = ai.mcp(
+  { type: "stdio", command: "npx", args: ["-y", "@modelcontextprotocol/server-github"] },
+  { namePrefix: "github." },
+);
+
+const dev = ai.agent({
+  model,
+  systemPrompt: "Use the GitHub tools to triage issues.",
+  tools: [...(await github.tools())], // handshake + tools/list, run once and cached
+  maxTrips: 20,
+});
+
+await dev.execute("Find the oldest open 'bug' issue and propose a fix.");
+
+await github.close(); // on teardown — kills the child / ends the HTTP session
+```
+
+## The transport — `stdio` or `http`
+
+The `server` argument is discriminated by `type`:
+
+```ts
+// Spawn a child process and speak JSON-RPC over its stdin/stdout.
+// Uses node:child_process + node:readline — NO dependency.
+{ type: "stdio", command: "npx", args: ["-y", "@modelcontextprotocol/server-github"], env: { GITHUB_TOKEN: "…" } }
+
+// Streamable HTTP against an endpoint.
+{ type: "http", url: "https://mcp.example.com/rpc", headers: { authorization: "Bearer …" } }
+```
+
+> **stdio env is not inherited.** When you pass `env`, only those keys reach the child — pass what the server needs (e.g. its API token) explicitly.
+
+## Client options
+
+```ts
+ai.mcp(server, {
+  namePrefix: "github.",                       // prepended to every remote tool name
+  filter: (name) => name.startsWith("issues_"),// only adapt tools whose name passes
+  timeoutMs: 30_000,                           // per tools/call deadline (default 30s)
+});
+```
+
+- **`namePrefix`** is the collision mitigation — there is **no runtime tool-name collision guard** (the agent resolves a tool by first name match), so the author owns uniqueness. Prefix remote tools to keep them distinct from local ones.
+- **`filter`** receives each tool's *unprefixed* name; return `false` to drop it.
+
+## What `tools()` does
+
+`client.tools()` is lazy and cached: the **first** call runs the `initialize` handshake, sends `notifications/initialized`, then `tools/list`, and maps each descriptor into a `ToolContract`. Repeat calls return the cached array without re-handshaking.
+
+For each remote tool:
+1. its JSON-Schema `inputSchema` is wrapped as a Standard Schema via `jsonSchemaToStandard` (Ajv-backed — `ajv` is an optional peer needed only for the client);
+2. `execute` issues `tools/call` honoring `ctx.signal` (cooperative abort) and the configured `timeoutMs`, then unwraps the result content (a single JSON text block is parsed back into an object);
+3. an MCP `isError` result is thrown so the surrounding `tool()` wraps it as a `ToolExecutionError` — the agent reads it as `{ error }` data and self-corrects.
+
+## `type`, never `kind`
+
+MCP's wire vocabulary uses `kind` in some content/capability descriptors. The client translates any inbound `kind` to `type` when normalizing content blocks, so a value a tool returns never carries MCP's `kind` — every discriminator the agent sees is `type`.
+
+## Errors
+
+Connection / handshake failures surface **at agent-construction time** because the example `await`s `github.tools()` — you see them then, not mid-run. A `tools/call` failure raised mid-run is wrapped by `tool()` and reaches the model as data. Branch on `McpTransportError.type`:
+
+```ts
+import { McpTransportError } from "@warlock.js/ai-tools";
+
+try {
+  await github.tools();
+} catch (error) {
+  if (error instanceof McpTransportError && error.type === "connect") {
+    // the child failed to spawn, the endpoint was unreachable, or the handshake failed
+  }
+}
+```
+
+`McpTransportError.type`: `"connect"` | `"protocol"` | `"timeout"` | `"closed"` (plus an optional `.method` naming the in-flight JSON-RPC method).
+
+## Optional peers
+
+The MCP client lazily imports `@modelcontextprotocol/sdk` (the protocol SDK) and `ajv` (runtime JSON-Schema validation) — both optional peers. A missing one surfaces a curated `npm install` string at first use, never a raw module-resolution crash at import time. The stdio transport itself needs no dependency.
+
+## See also
+
+- [`@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`](@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md) — the reverse direction: publish a local primitive AS an MCP server.
+- [`@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md`](@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md) — the built-in web / HTTP / calculator / date-time belt.
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent that consumes the adapted tools.
+
+
+## expose-as-mcp-server  `@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`
+
+---
+name: expose-as-mcp-server
+description: 'Expose a @warlock.js/ai agent / supervisor / orchestrator (or a raw ToolContract[]) AS a Model Context Protocol (MCP) server other clients consume (Direction B) with `ai.mcp.serve(source, options)`. Triggers: `ai.mcp.serve(`, `serve(`, `createServeHandler`, `McpServer`, `McpServeOptions`, `McpServeSource`, `McpServeTransport`, `server.start()`, `server.stop()`, `schemaTarget`, `draft-2020-12`, `extractJsonSchema`, `tools/list`, `tools/call`, `{ type: "stdio" }`, `{ type: "http"; port }`; ''expose my agent as an MCP server'', ''publish my tools to Cursor/Claude Desktop'', ''make my warlock workspace an MCP server'', ''serve my ToolContract[] over MCP'', ''let other MCP clients call my agent''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: CONSUMING an external MCP server (the reverse direction) — `@warlock.js/ai-tools/connect-mcp-server/SKILL.md`; the built-in web/HTTP/calc/date tools — `@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md`.'
+---
+
+# Expose tools AS an MCP server (Direction B)
+
+`ai.mcp.serve(source, options)` turns a local set of `ToolContract`s into a Model Context Protocol server — so Cursor, Claude Desktop, or any MCP client can call your warlock tools / agent over the wire.
+
+```ts
+import "@warlock.js/ai-tools";
+import { ai } from "@warlock.js/ai";
+
+const server = ai.mcp.serve(
+  [ai.tools.calculator(), ai.tools.dateTime()],
+  { name: "warlock-utils", transport: { type: "stdio" } },
+);
+
+await server.start();
+// ...later, on teardown:
+await server.stop();
+```
+
+## The `source` — array or anything with `tools()`
+
+```ts
+// A literal array of contracts:
+ai.mcp.serve([calc, dt], { name: "utils" });
+
+// Anything that can enumerate its ToolContracts — e.g. a workspace:
+ai.mcp.serve({ tools: () => ws.tools.all() }, { name: "acme-workspace" });
+```
+
+The tools are snapshotted at construction (`source.tools()` is called once), so a stable surface is advertised for the life of the server.
+
+## Serve options
+
+```ts
+ai.mcp.serve(source, {
+  name: "warlock-utils",          // advertised in the initialize response (required)
+  version: "1.0.0",               // default: the package version
+  transport: { type: "stdio" },   // default: stdio
+  schemaTarget: "draft-2020-12",  // JSON-Schema dialect for each tool's inputSchema
+});
+```
+
+- **`schemaTarget`** defaults to `"draft-2020-12"` — a neutral MCP draft, deliberately overriding `extractJsonSchema`'s own `"openai-strict"` default. Set it to match a consuming client's expectation.
+
+## How the protocol maps
+
+- **`initialize`** → advertises `{ name, version }` and `capabilities: { tools: {} }`.
+- **`tools/list`** → one descriptor per contract; each tool's `inputSchema` is produced by `extractJsonSchema(contract.input, { target: schemaTarget })`.
+- **`tools/call`** → routes to the named contract's `invoke()` and maps the **never-throwing** result: `data` becomes a `{ type: "text" }` content block (a string is sent verbatim, anything else is JSON-stringified), and `error` becomes an `isError: true` result. So a failing tool surfaces as a normal MCP tool error — the server never crashes on it. An unknown tool name answers with a JSON-RPC error.
+
+Everything the server emits uses `type`, never `kind`.
+
+## Transport — stdio is auto-pumped; HTTP is host-owned
+
+```ts
+{ type: "stdio" }            // default — reads JSON-RPC lines from process.stdin, writes to stdout
+{ type: "http", port: 8080 } // accepted in options, but start() does NOT bind a socket
+```
+
+`start()` over `stdio` wires a `node:readline` line reader on `process.stdin` and writes one-line JSON-RPC responses to `process.stdout` (notifications without an `id` are ignored). **Serving over HTTP is left to a server you own** — `start()` rejects an `http` transport. For that path, drive the pure protocol core yourself with `createServeHandler`:
+
+```ts
+import { createServeHandler } from "@warlock.js/ai-tools";
+
+const handler = createServeHandler([calc, dt], { name: "warlock-utils" });
+
+// In your own HTTP handler:
+const response = await handler.handle(jsonRpcRequest); // request → response, no I/O
+```
+
+`createServeHandler` is also the cleanest seam for unit tests: feed it a JSON-RPC request, assert the response — no real transport needed.
+
+## Errors
+
+`McpTransportError` covers serve-side failures (`type: "connect"` when `start()` is asked to bind an unsupported transport; `type: "protocol"` for a malformed `tools/call` or an unknown tool name). Tool-level failures are *not* errors here — they come back as `isError: true` results, exactly as MCP expects.
+
+## See also
+
+- [`@warlock.js/ai-tools/connect-mcp-server/SKILL.md`](@warlock.js/ai-tools/connect-mcp-server/SKILL.md) — the reverse direction: consume an external MCP server's tools.
+- [`@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md`](@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md) — the built-in tools you might expose.
+- [`@warlock.js/ai-workspace/use-a-workspace/SKILL.md`](@warlock.js/ai-workspace/use-a-workspace/SKILL.md) — a workspace whose `tools.all()` is a natural `serve` source.
+
+
+## use-web-and-http-tools  `@warlock.js/ai-tools/use-web-and-http-tools/SKILL.md`
+
+---
+name: use-web-and-http-tools
+description: 'Wire the @warlock.js/ai-tools belt — web search, fetch/scrape, HTTP/REST, calculator, date-time — into an agent under their guardrails. Triggers: `ai.tools.webSearch`, `ai.tools.fetchUrl`, `ai.tools.http`, `ai.tools.calculator`, `ai.tools.dateTime`, `webSearchTool`, `fetchUrlTool`, `httpRequestTool`, `calculatorTool`, `dateTimeTool`, `web_search`, `fetch_url`, `http_request`, `calculator`, `date_time`, `WebToolError`, `HttpPolicyError`, `CalculatorError`, `DateTimeError`, `allowHosts`, `allowMethods`, `allowPrivateNetwork`, `baseUrl`, `maxBytes`, `guardedFetch`, `SearchProvider`, `TAVILY_API_KEY`; ''give an agent web search'', ''let an agent fetch/scrape a page'', ''let an agent call a REST API'', ''restrict which hosts/methods an agent can hit'', ''add a calculator/date tool to an agent'', ''SSRF guardrail for an agent tool'', ''let a tool reach an internal/dev service''; typical import `import "@warlock.js/ai-tools"; import { ai } from "@warlock.js/ai"`. Skip: connecting to an external MCP server — `@warlock.js/ai-tools/connect-mcp-server/SKILL.md`; exposing tools AS an MCP server — `@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`; filesystem/shell tools — `@warlock.js/ai-workspace/use-a-workspace/SKILL.md`; defining your own custom tool — `@warlock.js/ai/define-ai-tool/SKILL.md`.'
+---
+
+# Use the web + HTTP tool belt
+
+`@warlock.js/ai-tools` ships five ready-made tools. Import the package once for its side effect and they register on the shared `ai` object under `ai.tools.*` — each is a factory returning a `ToolContract` you spread into `ai.agent({ tools: [...] })`.
+
+```ts
+import "@warlock.js/ai-tools";
+import { ai } from "@warlock.js/ai";
+import { OpenAISDK } from "@warlock.js/ai-openai";
+
+const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
+
+const agent = ai.agent({
+  model: openai.model({ name: "gpt-4o" }),
+  systemPrompt: "Research, then call the API. Read tool errors and adjust.",
+  tools: [
+    ai.tools.webSearch({ provider: "tavily" }),
+    ai.tools.fetchUrl({ extract: "text", allowHosts: ["docs.stripe.com"] }),
+    ai.tools.http({ baseUrl: "https://api.stripe.com", allowHosts: ["api.stripe.com"] }),
+    ai.tools.calculator(),
+    ai.tools.dateTime({ defaultTimeZone: "UTC" }),
+  ],
+  maxTrips: 15,
+});
+```
+
+The construction `options` are the **rails** — they bound what the model may do; the model supplies the per-call inputs *within* those rails. Least-privilege is just array composition: hand an agent only the tools (and only the methods/hosts) it needs.
+
+## The five tools
+
+| Factory | Name | Model input | Returns |
+|---|---|---|---|
+| `ai.tools.webSearch(options)` | `web_search` | `{ query, maxResults? }` | `{ results: { title, url, snippet, score? }[] }` |
+| `ai.tools.fetchUrl(options?)` | `fetch_url` | `{ url }` | `{ url, status, content, truncated }` |
+| `ai.tools.http(options?)` | `http_request` | `{ method?, url, headers?, body? }` | `{ status, headers, body, truncated }` |
+| `ai.tools.calculator(options?)` | `calculator` | `{ expression }` | `{ result }` |
+| `ai.tools.dateTime(options?)` | `date_time` | `{ op, iso?, from?, to?, amount?, unit?, timeZone?, format? }` | `{ value }` |
+
+## `web_search` — pick a provider, supply a key
+
+```ts
+ai.tools.webSearch({ provider: "tavily", apiKey: process.env.TAVILY_API_KEY, maxResults: 8 });
+```
+
+- `provider`: `"tavily"` (LLM-ready snippets + a relevance `score`), `"brave"`, or `"serpapi"`. Each is called over the global `fetch` — **no provider SDK is required**.
+- `apiKey` falls back to a per-provider env var: `TAVILY_API_KEY` / `BRAVE_API_KEY` / `SERPAPI_API_KEY`. A missing key is a `WebToolError` of type `"missing-key"`.
+- The model's `maxResults` is clamped into `[1, options.maxResults]` (default `5`).
+
+## `fetch_url` — read a page you have the URL for
+
+```ts
+ai.tools.fetchUrl({ extract: "text", allowHosts: ["docs.stripe.com"], maxBytes: 500_000, timeoutMs: 10_000 });
+```
+
+- `extract`: `"text"` (default — readability-extracted main text), `"html"` (raw body), or `"markdown"`. **`"text"`/`"markdown"` lazily import the `@mozilla/readability` + `jsdom` optional peers** — a missing peer is a `WebToolError` of type `"missing-peer"` carrying the `npm install @mozilla/readability jsdom` string. `"html"` needs nothing.
+- `allowHosts` (when set) rejects any other host **before the fetch** (an SSRF guardrail) → `"denied-host"`, and redirect targets are held to the same allowlist.
+- **Private-network deny by default.** Every request — and every redirect hop — now routes through `@warlock.js/ai`'s hardened `guardedFetch` outbound policy instead of a local host check. It refuses private / loopback / link-local / CGNAT / cloud-metadata addresses (`169.254.169.254`, RFC1918, `localhost`, …) by resolving the hostname via DNS and checking every returned address, failing closed on resolution failure — and re-validates every redirect `Location` (scheme, allowlist, private-IP deny) before following it. This applies even with no `allowHosts` set, so a bare `ai.tools.fetchUrl()` is no longer an SSRF primitive; blocks surface as `WebToolError` `type: "denied-host"`.
+- `allowPrivateNetwork` (default `false`) — set `true` to deliberately permit a private/internal target, e.g. a tool that must call a local dev server. Pair with `allowHosts` to scope it rather than opening the whole private range.
+- `maxBytes` caps the body and flags `truncated`; `timeoutMs` aborts via `AbortSignal.timeout`.
+
+## `http_request` — a guarded REST client
+
+```ts
+ai.tools.http({
+  baseUrl: "https://api.stripe.com",
+  allowHosts: ["api.stripe.com"],
+  allowMethods: ["GET", "POST"],            // default ["GET"] — mutating methods are opt-in
+  headers: { authorization: `Bearer ${process.env.STRIPE_KEY}` },
+  timeoutMs: 15_000,
+  maxBytes: 1_000_000,
+  // allowPrivateNetwork: true,             // only for a deliberate internal/dev target
+});
+```
+
+All guardrails are enforced **before the network call** and surface as a typed `HttpPolicyError`:
+- a method outside `allowMethods` → `"method-not-allowed"`;
+- a host outside `allowHosts` → `"host-not-allowed"` (SSRF guardrail);
+- an unresolvable URL → `"invalid-url"`.
+- **Private-network deny by default** — like `fetch_url`, every request and redirect hop routes through `guardedFetch`, refusing private/loopback/link-local/CGNAT/cloud-metadata addresses (DNS-resolved and re-checked per redirect hop) even when `allowHosts` isn't set → `"host-not-allowed"`. Set `allowPrivateNetwork: true` (default `false`) to permit a deliberate internal target.
+
+When `baseUrl` is set the model passes a **path** joined against it; otherwise it must pass an absolute `http(s)` URL. Static `headers` merge **under** the per-call headers (per-call wins). An object `body` is JSON-serialized (with a default `content-type: application/json`); a string `body` is sent verbatim; `body` is dropped for `GET`. The response body is JSON-parsed when the `content-type` is JSON, else returned as text.
+
+## `calculator` — SAFE arithmetic (never `eval`)
+
+```ts
+const { data } = await ai.tools.calculator().invoke({ expression: "(3 + 4) * 2 ^ 3" });
+data?.result; // 56
+```
+
+Supports `+ - * / % ^`, unary signs, parentheses, and decimal/scientific literals, with the usual precedence (`^` highest and right-associative). The expression is tokenized and evaluated with a shunting-yard pass — there is no path to an identifier, function call, or property access, so nothing code-like can be smuggled in. Failures are a `CalculatorError`: `"syntax"`, `"divide-by-zero"`, or `"overflow"`.
+
+## `date_time` — clock + calendar
+
+```ts
+await ai.tools.dateTime().invoke({ op: "now", format: "iso" });
+await ai.tools.dateTime().invoke({ op: "add", iso: "2026-06-22T00:00:00Z", amount: 3, unit: "days" });
+await ai.tools.dateTime().invoke({ op: "diff", iso: "2026-06-22T00:00:00Z", to: "2026-06-25T00:00:00Z", unit: "days" }); // "3"
+await ai.tools.dateTime({ defaultTimeZone: "Africa/Cairo" }).invoke({ op: "format", iso: "2026-06-22T12:00:00Z", format: "datetime" });
+```
+
+- `op`: `"now"` / `"add"` / `"diff"` / `"format"`. `format`: `"iso"` (default), `"date"`, `"time"`, `"datetime"`.
+- For `diff`, pass the start instant as `iso` **or** `from` (an alias models reach for naturally with `from`/`to`); `iso` wins when both are set. The end instant is always `to`.
+- Units are millisecond-based: `milliseconds`, `seconds`, `minutes`, `hours`, `days`, `weeks` (plus singular/short aliases like `day`/`d`). Calendar-relative `month`/`year` are intentionally **unsupported** — they have no fixed length. An unknown unit → `DateTimeError` `"invalid-unit"`; an unknown IANA zone → `"invalid-time-zone"`.
+- For deterministic tests, inject a clock by calling the factory directly: `import { dateTimeTool } from "@warlock.js/ai-tools"; dateTimeTool({}, { clock: () => Date.parse("2026-06-22T00:00:00Z") })`.
+
+## Errors flow as data, not throws
+
+Every failure above is thrown inside the tool handler, caught by the framework's `tool()` wrapper, and surfaced in the returned `{ error }` field — `invoke()` never throws, so the agent reads the failure as a `role: "tool"` message and self-corrects on the next trip. Each error class extends the `@warlock.js/ai` `AIError` base; branch on `.type`:
+
+```ts
+import { WebToolError } from "@warlock.js/ai-tools";
+
+const { error } = await ai.tools.fetchUrl({ allowHosts: ["docs.stripe.com"] }).invoke({ url: "http://evil.test" });
+if (error instanceof WebToolError && error.type === "denied-host") {
+  // rejected before any network call
+}
+```
+
+## See also
+
+- [`@warlock.js/ai-tools/connect-mcp-server/SKILL.md`](@warlock.js/ai-tools/connect-mcp-server/SKILL.md) — adapt an external MCP server's tools as agent tools.
+- [`@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md`](@warlock.js/ai-tools/expose-as-mcp-server/SKILL.md) — publish these tools AS an MCP server.
+- [`@warlock.js/ai-workspace/use-a-workspace/SKILL.md`](@warlock.js/ai-workspace/use-a-workspace/SKILL.md) — the filesystem + shell tool belt (jailed `read_file` / `edit_file` / `run_shell` / …).
+- [`@warlock.js/ai/define-ai-tool/SKILL.md`](@warlock.js/ai/define-ai-tool/SKILL.md) — the `tool()` / `ToolContract` seam every tool here is built on.
+- [`@warlock.js/ai/run-ai-agent/SKILL.md`](@warlock.js/ai/run-ai-agent/SKILL.md) — running the agent that consumes these tools.

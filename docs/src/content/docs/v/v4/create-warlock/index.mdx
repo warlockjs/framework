@@ -1,0 +1,59 @@
+---
+banner:
+  content: "This page documents Warlock v4. <a href='/v/latest'>View the latest docs.</a>"
+title: Create Warlock
+description: The official project scaffolder — one command spins up a complete, configured Warlock app in a couple of minutes.
+---
+
+`create-warlock` is the official project scaffolder. One command drops you into a short interactive wizard, and a couple of questions later you have a complete, configured Warlock project that boots.
+
+```bash
+npm create warlock@latest my-app
+# or:  yarn create warlock my-app  ·  pnpm create warlock my-app
+cd my-app
+```
+
+The wizard asks a few questions — project name, package manager, database driver (or **None**, to skip it), the optional features you want (mail, caching, the scheduler, storage, and friends), and whether to initialize git and generate JWT secrets — then writes everything from your answers and runs the install for you.
+
+What lands is a ready-to-run app: the `src/app` (one folder per feature) + `src/config` (one file per subsystem) layout, a `warlock.config.ts`, decorators already enabled in `tsconfig.json`, and a dev server you start with `npm run dev`.
+
+## One command, no prompts
+
+Scripting it in CI, or driving it from an agent? Pass `--yes` (or `-y`) and the whole app is scaffolded in a **single non-interactive command** — every prompt is answered from flags, with sensible defaults for anything you leave out:
+
+```bash
+npx create-warlock my-app --yes \
+  --db=postgres --pm=pnpm \
+  --features=test,redis --ai=ai-openai \
+  --git --jwt
+```
+
+The first positional argument (or `--name`) is the project name. Value flags accept either `--db=postgres` or `--db postgres`. Unknown `--db`, `--features`, `--ai`, or `--pm` keys fail fast — before anything is written to disk — so a typo (or a hostile value) never leaves you with a half-scaffolded project.
+
+| Flag | Default | Purpose |
+| --- | --- | --- |
+| `--db` | `mongodb` | Database driver — `mongodb`, `postgres`, or `none` |
+| `--pm` | auto-detected | Package manager — must be `npm` / `yarn` / `pnpm` / `bun`; any other value is rejected before scaffolding starts |
+| `--features` | none | Comma-separated optional feature keys |
+| `--ai` | none | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`) |
+| `--git` / `--no-git` | off | Initialize a Git repository |
+| `--jwt` / `--no-jwt` | off | Generate JWT secret keys |
+
+## Scaffolding without a database
+
+Not every app needs a database. Pick **None** in the wizard's database step — or pass `--db=none` (`--no-db` is a shorthand) — and the scaffold leaves the database out entirely: no driver is selected, no driver package is installed, and the template's `src/config/database.ts` is removed. Warlock's database connector is gated on that config file, so the app boots cleanly with no database wired.
+
+```bash
+# A database-free API in one command
+npx create-warlock my-api --yes --no-db --features=test
+```
+
+:::note
+You can add a database back at any time by creating a `src/config/database.ts` (the `DB_*` variables are still present in `.env`) and installing the driver package.
+:::
+
+## Where to go next
+
+- **Full walkthrough** → [Core · Installation](/v/v4/core/getting-started/02-installation/) — every question, the scaffolded file tree, and booting the dev server, step by step.
+- **Your first endpoint** → [Core · Getting Started](/v/v4/core/getting-started/01-introduction/) — from a fresh project to a working route.
+- **Scaffold as you build** → [Core · Generators](/v/v4/core/cli/generators/) — `warlock generate.module`, `generate.controller`, and the rest of the family.

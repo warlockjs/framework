@@ -29,8 +29,10 @@ const packagesRoot = join(docsRoot, "..", "..", "@warlock.js");
 const publicDir = join(docsRoot, "public");
 const SITE = "https://warlock.js.org";
 
-// Reading order: foundations first, then subsystems, then AI, then tooling.
-const PACKAGES = [
+// Preferred reading order: foundations first, then subsystems, then AI, then
+// tooling. Package membership itself comes from the workspace manifest below,
+// so a newly added package cannot be silently omitted from the site routes.
+const PACKAGE_ORDER = [
   "core",
   "cascade",
   "seal",
@@ -39,18 +41,57 @@ const PACKAGES = [
   "logger",
   "scheduler",
   "auth",
+  "access",
   "context",
   "herald",
   "notifications",
+  "web",
   "ai",
   "ai-openai",
   "ai-anthropic",
   "ai-google",
   "ai-bedrock",
+  "ai-deepseek",
+  "ai-groq",
+  "ai-mistral",
+  "ai-xai",
   "ai-ollama",
+  "ai-live",
+  "ai-tools",
+  "ai-workspace",
   "ai-panoptic",
   "create-warlock",
 ];
+
+const workspaceManifest = JSON.parse(
+  readFileSync(join(packagesRoot, "package.json"), "utf8"),
+);
+const workspacePackages = workspaceManifest.workspaces
+  .map((workspace) => {
+    const packageDir = join(packagesRoot, workspace);
+    const manifestPath = join(packageDir, "package.json");
+
+    if (!existsSync(manifestPath)) {
+      return null;
+    }
+
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    if (
+      manifest.private === true ||
+      (manifest.name !== "create-warlock" && !manifest.name?.startsWith("@warlock.js/"))
+    ) {
+      return null;
+    }
+
+    return workspace;
+  })
+  .filter(Boolean);
+const orderIndex = new Map(PACKAGE_ORDER.map((pkg, index) => [pkg, index]));
+const PACKAGES = workspacePackages.sort((a, b) => {
+  const aIndex = orderIndex.get(a) ?? Number.MAX_SAFE_INTEGER;
+  const bIndex = orderIndex.get(b) ?? Number.MAX_SAFE_INTEGER;
+  return aIndex - bIndex || a.localeCompare(b);
+});
 
 /** Pull the human description line from a package llms.txt (the last `>` quote in the header). */
 function readDescription(llms) {
@@ -87,8 +128,8 @@ for (const pkg of PACKAGES) {
   const llmsPath = join(pkgDir, "llms.txt");
   const fullPath = join(pkgDir, "llms-full.txt");
 
-  if (!existsSync(llmsPath)) {
-    continue;
+  if (!existsSync(llmsPath) || !existsSync(fullPath)) {
+    throw new Error(`Missing llms source files for workspace package: ${pkg}`);
   }
 
   const llms = readFileSync(llmsPath, "utf8");
