@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/logger",
-  "version": "5.0.1",
+  "version": "5.0.2",
   "type": "module",
   "description": "A powerful logging system  for messages and errors in nodejs.",
   "scripts": {
