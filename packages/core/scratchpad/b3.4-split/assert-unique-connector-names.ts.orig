@@ -1,0 +1,95 @@
+/**
+ * Refuses a `connectors` array that lists the same name more than once.
+ *
+ * A name is a connector's identity across both halves of its life, and the two
+ * halves treat a repeat differently. The build works per ARRAY ENTRY: it drains
+ * the build contribution of every element, so a name listed twice contributes
+ * twice — files written twice, esbuild patches merged twice. The runtime works
+ * per NAME: the first entry registers and every later one with that name is
+ * skipped, because registering it again would boot and shut down the same
+ * connector twice.
+ *
+ * So a duplicate is half-applied: built for twice, booted once, with nothing
+ * reported either way. The name-set the drift check compares is identical on
+ * both sides, so it passes the array straight through — this asymmetry is
+ * invisible to it, which is why it is caught here instead.
+ *
+ * Called by both halves (the build before it drains, the registration before it
+ * registers) so neither can be reached with an array the other would refuse.
+ * It rejects duplicates WITHIN the array it is handed; a name held OUTSIDE it
+ * is {@link assertNoReservedConnectorNames}' business.
+ */
+import { connectorsManager } from "./connectors-manager";
+import type { Connector } from "./types";
+
+export function assertUniqueConnectorNames(connectors: Connector[]): void {
+  const seen = new Set<string>();
+  const duplicated = new Set<string>();
+
+  for (const connector of connectors) {
+    if (seen.has(connector.name)) {
+      duplicated.add(connector.name);
+      continue;
+    }
+
+    seen.add(connector.name);
+  }
+
+  if (duplicated.size === 0) return;
+
+  const names = [...duplicated].map((name) => JSON.stringify(name)).join(", ");
+  const subject = duplicated.size === 1 ? "name is" : "names are";
+
+  throw new Error(
+    `The same connector ${subject} listed more than once in \`connectors\`: [${names}].\n` +
+      "Every connector in `warlock.config.ts > connectors` must have a unique name. " +
+      "The build prepares artifacts per ENTRY — it drains the build contribution of each one, so a repeated name contributes twice — " +
+      "while the runtime registers each NAME once and skips the rest. " +
+      "A duplicate is therefore half-applied, and neither half reports it. " +
+      "Remove the extra entry, or give the connectors distinct names.",
+  );
+}
+
+/**
+ * Refuses a `connectors` array that claims a name a framework built-in owns.
+ *
+ * The sibling above rejects a name repeated inside the array; this rejects one
+ * already held outside it. The manager registers its built-ins in its own
+ * constructor, so those names are taken before any config is read — and the
+ * two halves disagreed about what that meant. The build drains per ENTRY and
+ * knows nothing of the manager, so it prepared the custom connector's
+ * artifacts; the runtime registers per NAME and found the built-in already
+ * there, so it skipped the entry. The result booted the built-in the app did
+ * not ask for, never booted the connector it did, and reported success from
+ * both halves.
+ *
+ * Refused rather than resolved in the app's favour: the built-ins are the
+ * framework's own wiring — other framework code reaches for `http`, `cache`,
+ * `database` by name — so letting a config replace one silently repoints
+ * everything that looks it up. The name is the app's to change; the built-in's
+ * is not.
+ *
+ * Reads {@link ConnectorsManager.isBuiltInName}, which is the ONLY inventory of
+ * built-in names, so this cannot fall out of step with what the manager
+ * actually registered.
+ */
+export function assertNoReservedConnectorNames(connectors: Connector[]): void {
+  const reserved = connectors
+    .map((connector) => connector.name)
+    .filter((name) => connectorsManager.isBuiltInName(name));
+
+  if (reserved.length === 0) return;
+
+  const unique = [...new Set(reserved)];
+  const names = unique.map((name) => JSON.stringify(name)).join(", ");
+  const subject = unique.length === 1 ? "name is" : "names are";
+  const object = unique.length === 1 ? "it" : "one of them";
+
+  throw new Error(
+    `The following connector ${subject} reserved by a framework built-in connector: [${names}].\n` +
+      "Every connector name must be unique, and the framework already registers a built-in connector under " +
+      `${unique.length === 1 ? "that name" : "those names"}, so a custom connector carrying ${object} ` +
+      "would be built for and then never booted. " +
+      "Rename the custom connector in `warlock.config.ts > connectors` to a name of your own.",
+  );
+}

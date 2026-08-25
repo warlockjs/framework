@@ -11,6 +11,11 @@ import { Response } from "../http/response";
 import { type FastifyInstance } from "../http/server";
 import { describeRouteForLog } from "./describe-route-for-log";
 import { logRequestLifecycle } from "./log-request-lifecycle";
+import {
+  forgetPositionalHandlerSuspects,
+  inspectHandlerSignature,
+  reportPositionalHandlerSuspects,
+} from "./positional-handler-diagnostics";
 import { RouteBuilder } from "./route-builder";
 import { RouteRegistry } from "./route-registry";
 import type {
@@ -367,6 +372,13 @@ export class Router {
       }
     }
 
+    // Registration-time only — nothing here runs per request. Suspects are
+    // collected now and reported together at boot (see `scan`), so a route file
+    // written against v4 produces one legible list instead of a mystery 500 per
+    // request. Recorded after the collision check so a route that never lands
+    // is never reported.
+    inspectHandlerSignature(routeData.handler, routeData);
+
     this.routes.push(routeData);
 
     this.routesVersion++;
@@ -673,6 +685,10 @@ export class Router {
   public removeRoutesBySourceFile(sourceFile: string): void {
     this.routes = this.routes.filter((route) => route.sourceFile !== sourceFile);
 
+    // Keep the signature diagnostics in step, so a reload that fixes a handler
+    // stops reporting the version it replaced.
+    forgetPositionalHandlerSuspects(sourceFile);
+
     this.routesVersion++;
   }
 
@@ -775,6 +791,11 @@ export class Router {
    * Register routes to the server
    */
   public scan(server: FastifyInstance) {
+    // Every route is registered by the time we scan, so this is the first
+    // moment the whole list can be reported at once — and it is still before a
+    // single request is served.
+    reportPositionalHandlerSuspects();
+
     this.eventListeners.beforeScan?.forEach((callback) => callback(this, server));
 
     this.routes.forEach((route) => {
@@ -815,6 +836,11 @@ export class Router {
    * Uses wildcard routing with find-my-way for HMR support
    */
   public scanDevServer(server: FastifyInstance) {
+    // Same boot-time report as production `scan`. Routes reloaded later by HMR
+    // are still recorded, but only surface on the next scan or via
+    // `warlock doctor`.
+    reportPositionalHandlerSuspects();
+
     this.eventListeners.beforeScan?.forEach((callback) => callback(this, server));
 
     let routeRegistry: RouteRegistry | undefined;

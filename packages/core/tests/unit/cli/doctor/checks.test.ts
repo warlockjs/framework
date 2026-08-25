@@ -183,3 +183,42 @@ describe("optionalPeersCheck", () => {
     expect(result.detail).toContain("S3 cloud storage");
   });
 });
+
+describe("handlerSignatureCheck", () => {
+  it("passes when no handler looks like the v4 positional signature", async () => {
+    vi.doMock("../../../../src/router/positional-handler-diagnostics", () => ({
+      listPositionalHandlerSuspects: () => [],
+      describePositionalHandlerSuspect: () => "",
+    }));
+
+    const { handlerSignatureCheck } = await import(
+      "../../../../src/cli/commands/doctor/checks/handler-signature.check"
+    );
+    const result = await handlerSignatureCheck.run();
+
+    expect(result.status).toBe("ok");
+    expect(result.detail).toContain("no handlers");
+  });
+
+  it("warns — never fails — listing every suspect with its fix", async () => {
+    vi.doMock("../../../../src/router/positional-handler-diagnostics", () => ({
+      listPositionalHandlerSuspects: () => [
+        { method: "GET", path: "/", handlerName: "homePageController", sourceFile: "routes.ts" },
+        { method: "POST", path: "/users", handlerName: "createUser", sourceFile: "routes.ts" },
+      ],
+      describePositionalHandlerSuspect: (suspect: any) =>
+        `Handler "${suspect.handlerName}" (${suspect.method} ${suspect.path}) fix it`,
+    }));
+
+    const { handlerSignatureCheck } = await import(
+      "../../../../src/cli/commands/doctor/checks/handler-signature.check"
+    );
+    const result = await handlerSignatureCheck.run();
+
+    // A heuristic must not fail a build.
+    expect(result.status).toBe("warn");
+    expect(result.detail).toContain("2 handlers look like the v4 positional signature");
+    expect(result.detail).toContain('Handler "homePageController" (GET /)');
+    expect(result.detail).toContain('Handler "createUser" (POST /users)');
+  });
+});

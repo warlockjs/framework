@@ -1,0 +1,432 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  ConnectorLifecyclePhase,
+  type Connector,
+  type ConnectorBuildContribution,
+  type ConnectorEsbuildPatch,
+} from "../../../src/connectors/types";
+import type { ResolvedBuildConfig } from "../../../src/production/resolve-build-config";
+
+/**
+ * B1 — what the contribution drain hands back has to reach the two places
+ * that consume it: the generated entry (`entryImports`) and the esbuild call
+ * (`esbuild` patch). Both are asserted on the ARTIFACT — the written entry
+ * text and the options object esbuild was actually called with — not on the
+ * builder's internal bookkeeping.
+ */
+
+const putFileAsync = vi.hoisted(() =>
+  vi.fn(async (_filePath: string, _content: string) => undefined),
+);
+
+const esbuildBuild = vi.hoisted(() => vi.fn(async (_options: Record<string, unknown>) => ({})));
+
+/**
+ * The production directory as the filesystem mocks see it: relative path →
+ * file contents. `glob` lists its keys, `getFileAsync` reads them. A `generate`
+ * hook writes into this map exactly as a real contributor writes to disk.
+ */
+const productionFiles = vi.hoisted(() => new Map<string, string>());
+
+/** What `package.json` declares — the allowlist the assertion checks against. */
+const declaredDependencies = vi.hoisted(() => ({ value: {} as Record<string, string> }));
+
+/** The connectors `initializeOptions` reads out of warlock.config.ts. */
+const configuredConnectors = vi.hoisted(() => ({ value: [] as Connector[] }));
+
+const glob = vi.hoisted(() =>
+  vi.fn(async (_pattern: string, _options: unknown) => [...productionFiles.keys()]),
+);
+
+vi.mock("@warlock.js/fs", () => ({
+  ensureDirectoryAsync: vi.fn(async () => undefined),
+  fileExistsAsync: vi.fn(async () => false),
+  getFileAsync: vi.fn(async (filePath: string) => {
+    for (const [file, content] of productionFiles) {
+      if (filePath.endsWith(file)) return content;
+    }
+
+    return "";
+  }),
+  getJsonFileAsync: vi.fn(async () => ({ dependencies: declaredDependencies.value })),
+  putFileAsync,
+  removeDirectoryAsync: vi.fn(async () => undefined),
+}));
+
+vi.mock("esbuild", () => ({ default: { build: esbuildBuild } }));
+
+vi.mock("fast-glob", () => ({ default: glob }));
+
+vi.mock("../../../src/dev-server/tsconfig-manager", () => ({
+  tsconfigManager: { init: vi.fn(), aliases: {}, baseUrl: "." },
+}));
+
+/** Whether the config manager reports a resolved config. Mutable so the
+ * unloaded-config case can be exercised without a second module mock. */
+const configIsLoaded = vi.hoisted(() => ({ value: true }));
+
+vi.mock("../../../src/warlock-config/warlock-config.manager", () => ({
+  warlockConfigManager: {
+    get isLoaded() {
+      return configIsLoaded.value;
+    },
+    get: vi.fn(() => configuredConnectors.value),
+  },
+}));
+
+vi.mock("../../../src/production/resolve-build-config", () => ({
+  resolveBuildConfig: vi.fn(() => ({
+    outdir: "/app/dist",
+    outFile: "app.js",
+    minify: false,
+    sourcemap: false,
+  })),
+}));
+
+const { ProductionBuilder } = await import("../../../src/production/production-builder");
+
+// Imported after the config-manager mock is in place, so the registration
+// under test reads `configuredConnectors` and not a real warlock.config.
+const { connectorsManager } = await import("../../../src/connectors/connectors-manager");
+const { registerConfiguredConnectors } = await import(
+  "../../../src/connectors/register-configured-connectors"
+);
+const { warlockConfigManager } = await import(
+  "../../../src/warlock-config/warlock-config.manager"
+);
+
+/** `generateEntryPoint`, `bundle` and the contribution fields are private;
+ * reached through an instance cast, as the sibling entry-point test does. */
+type BuilderInternals = {
+  options: ResolvedBuildConfig;
+  contributedEsbuild: ConnectorEsbuildPatch;
+  generatedFiles: { locales: boolean; events: boolean; main: boolean; routes: boolean };
+  generateEntryPoint(contributedImports?: string[]): Promise<void>;
+  bundle(): Promise<void>;
+};
+
+function builderInternals(): BuilderInternals {
+  return new ProductionBuilder() as unknown as BuilderInternals;
+}
+
+describe("generated entry — contributor imports land after ./routes", () => {
+  beforeEach(() => {
+    putFileAsync.mockClear();
+  });
+
+  async function entryContent(contributedImports: string[]): Promise<string> {
+    const builder = builderInternals();
+    builder.generatedFiles = { locales: true, events: true, main: true, routes: true };
+
+    await builder.generateEntryPoint(contributedImports);
+
+    const call = putFileAsync.mock.calls.find(([filePath]) => filePath.endsWith("app.ts"));
+
+    return call?.[1] as string;
+  }
+
+  it("emits contributor imports after ./routes and before the startup validators", async () => {
+    const content = await entryContent(['await import("./pages");']);
+
+    const routesIndex = content.indexOf('await import("./routes");');
+    const pagesIndex = content.indexOf('await import("./pages");');
+    const validatorsIndex = content.indexOf("await Application.runStartupValidators();");
+
+    expect(pagesIndex).toBeGreaterThan(routesIndex);
+    expect(validatorsIndex).toBeGreaterThan(pagesIndex);
+  });
+
+  it("preserves contributor order", async () => {
+    const content = await entryContent(['await import("./pages");', 'await import("./docs");']);
+
+    expect(content.indexOf('await import("./docs");')).toBeGreaterThan(
+      content.indexOf('await import("./pages");'),
+    );
+  });
+
+  it("changes nothing when no connector contributed", async () => {
+    const content = await entryContent([]);
+
+    expect(content).toContain('await import("./routes");');
+    expect(content.split("\n").filter((line) => line.includes("await import("))).toHaveLength(4);
+  });
+});
+
+describe("esbuild merge precedence — defaults < contributor < user config", () => {
+  beforeEach(() => {
+    esbuildBuild.mockClear();
+  });
+
+  async function bundleWith(
+    userBuild: Partial<ResolvedBuildConfig>,
+    contributed: ConnectorEsbuildPatch,
+  ): Promise<Record<string, unknown>> {
+    const builder = builderInternals();
+
+    builder.options = {
+      outdir: "/app/dist",
+      outFile: "app.js",
+      minify: true,
+      sourcemap: false,
+      ...userBuild,
+    } as ResolvedBuildConfig;
+    builder.contributedEsbuild = contributed;
+
+    await builder.bundle();
+
+    return esbuildBuild.mock.calls[0]![0] as Record<string, unknown>;
+  }
+
+  it("applies a contributor patch over the builder defaults", async () => {
+    const options = await bundleWith({}, { jsx: "automatic", jsxImportSource: "react" });
+
+    expect(options).toMatchObject({ jsx: "automatic", jsxImportSource: "react" });
+  });
+
+  it("lets the user config beat the contributor", async () => {
+    const options = await bundleWith(
+      { jsxImportSource: "preact" } as Partial<ResolvedBuildConfig>,
+      { jsx: "automatic", jsxImportSource: "react" },
+    );
+
+    // contributor still supplies what the user did not set
+    expect(options).toMatchObject({ jsx: "automatic", jsxImportSource: "preact" });
+  });
+
+  it("merges define per key, with the user winning on a shared key", async () => {
+    const options = await bundleWith(
+      { define: { "import.meta.env.DEV": "true", "process.env.APP": '"user"' } } as Partial<
+        ResolvedBuildConfig
+      >,
+      { define: { "import.meta.env.DEV": "false", "import.meta.env.SSR": "true" } },
+    );
+
+    expect(options.define).toEqual({
+      "import.meta.env.DEV": "true",
+      "import.meta.env.SSR": "true",
+      "process.env.APP": '"user"',
+    });
+  });
+
+  it("concatenates and dedupes external instead of replacing it", async () => {
+    const options = await bundleWith(
+      { external: ["sharp", "react"] } as Partial<ResolvedBuildConfig>,
+      { external: ["react", "react-dom"] },
+    );
+
+    expect(options.external).toEqual(["react", "react-dom", "sharp"]);
+  });
+
+  it("omits define and external entirely when neither side set them", async () => {
+    const options = await bundleWith({}, {});
+
+    expect(options).not.toHaveProperty("define");
+    expect(options).not.toHaveProperty("external");
+  });
+
+  it("does not let a contributor reach the framework's own keys", async () => {
+    const options = await bundleWith({}, { jsx: "automatic" });
+
+    expect(options.entryPoints).toEqual([expect.stringContaining("app.ts")]);
+    expect(options).not.toHaveProperty("tsconfig");
+    expect(options).not.toHaveProperty("tsconfigRaw");
+  });
+
+  it("merges loader per extension instead of replacing the contributor map", async () => {
+    const options = await bundleWith({ loader: { ".png": "dataurl" } } as Partial<
+      ResolvedBuildConfig
+    >, { loader: { ".svg": "file" } });
+
+    expect(options.loader).toEqual({ ".svg": "file", ".png": "dataurl" });
+  });
+
+  it("lets the user win on a shared extension", async () => {
+    const options = await bundleWith({ loader: { ".svg": "text" } } as Partial<
+      ResolvedBuildConfig
+    >, { loader: { ".svg": "file", ".png": "file" } });
+
+    expect(options.loader).toEqual({ ".svg": "text", ".png": "file" });
+  });
+
+  it("omits loader entirely when neither side set it", async () => {
+    const options = await bundleWith({}, {});
+
+    expect(options).not.toHaveProperty("loader");
+  });
+});
+
+/**
+ * The second assertion pass (step 4.6). Step 4 runs before the contributors
+ * write anything, so without a re-run a contributor-written barrel could carry
+ * a bare specifier the app never declared — invisible until the artifact runs
+ * under `packages: "external"` and Node answers ERR_MODULE_NOT_FOUND.
+ */
+describe("generated-import assertion — second pass over contributor output", () => {
+  function connector(name: string, build?: ConnectorBuildContribution): Connector {
+    return {
+      name,
+      priority: 0,
+      lifecyclePhase: ConnectorLifecyclePhase.Early,
+      build,
+      isActive: () => false,
+      boot: () => undefined,
+      start: async () => undefined,
+      stop: async () => undefined,
+    } as unknown as Connector;
+  }
+
+  beforeEach(() => {
+    productionFiles.clear();
+    glob.mockClear();
+    esbuildBuild.mockClear();
+    declaredDependencies.value = {};
+    configuredConnectors.value = [];
+  });
+
+  it("fails the build when a contributor writes an undeclared bare import", async () => {
+    configuredConnectors.value = [
+      connector("pages", {
+        generate: async () => {
+          productionFiles.set("pages.ts", 'import { render } from "@acme/pages-runtime";');
+
+          return { entryImports: ['await import("./pages");'] };
+        },
+      }),
+    ];
+
+    await expect(new ProductionBuilder().build()).rejects.toThrow("@acme/pages-runtime");
+    expect(esbuildBuild).not.toHaveBeenCalled();
+  });
+
+  it("passes when the contributor's import is declared by the app", async () => {
+    declaredDependencies.value = { "@acme/pages-runtime": "^1.0.0" };
+    configuredConnectors.value = [
+      connector("pages", {
+        generate: async () => {
+          productionFiles.set("pages.ts", 'import { render } from "@acme/pages-runtime";');
+
+          return { entryImports: ['await import("./pages");'] };
+        },
+      }),
+    ];
+
+    await expect(new ProductionBuilder().build()).resolves.toBeUndefined();
+    expect(esbuildBuild).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips the second pass when no connector contributed a generate hook", async () => {
+    configuredConnectors.value = [connector("plain")];
+
+    await new ProductionBuilder().build();
+
+    const assertionPasses = glob.mock.calls.filter(
+      ([pattern]) => pattern === "**/*.{ts,tsx,js,mjs}",
+    );
+
+    expect(assertionPasses).toHaveLength(1);
+  });
+});
+
+/**
+ * The runtime half of the same `connectors` array the drain above reads, so the
+ * bundle boots exactly the connectors it was built for. Idempotent because more
+ * than one caller (generated entry, dev preloader) may reach it in one process.
+ */
+function runtimeConnector(name: string): Connector {
+  return {
+    name,
+    priority: 99,
+    lifecyclePhase: ConnectorLifecyclePhase.Early,
+    isActive: () => false,
+    boot: () => undefined,
+    start: async () => undefined,
+    restart: async () => undefined,
+    shutdown: async () => undefined,
+    shouldRestart: () => false,
+  };
+}
+
+function registeredCount(name: string): number {
+  return connectorsManager.list().filter((connector) => connector.name === name).length;
+}
+
+/**
+ * How the generated production entry calls it. The config is bundled into the
+ * artifact and its array handed straight over, so nothing reads a config file
+ * at runtime — there is none beside a bundle to read.
+ */
+describe("registerConfiguredConnectors — explicit array (production entry)", () => {
+  beforeEach(() => {
+    vi.mocked(warlockConfigManager.get).mockClear();
+  });
+
+  it("registers the connectors it was handed", () => {
+    registerConfiguredConnectors([runtimeConnector("explicitly-passed")]);
+
+    expect(registeredCount("explicitly-passed")).toBe(1);
+  });
+
+  it("never reads the config manager when the array is passed", () => {
+    registerConfiguredConnectors([runtimeConnector("no-manager-read")]);
+
+    expect(warlockConfigManager.get).not.toHaveBeenCalled();
+  });
+
+  it("registers nothing twice when called again in the same process", () => {
+    const connectors = [runtimeConnector("passed-twice")];
+
+    registerConfiguredConnectors(connectors);
+    registerConfiguredConnectors(connectors);
+
+    expect(registeredCount("passed-twice")).toBe(1);
+  });
+
+  it("skips a name the manager already holds instead of stacking a duplicate", () => {
+    const builtInsBefore = registeredCount("http");
+
+    registerConfiguredConnectors([runtimeConnector("http")]);
+
+    expect(registeredCount("http")).toBe(builtInsBefore);
+  });
+
+  it("does nothing when handed an empty array", () => {
+    const before = connectorsManager.list().length;
+
+    registerConfiguredConnectors([]);
+
+    expect(connectorsManager.list()).toHaveLength(before);
+  });
+});
+
+/**
+ * How the dev preloader calls it: no array, config already resolved. The
+ * unloaded case is the one that matters — it used to return quietly, which is
+ * how a caller could register zero connectors and never learn it.
+ */
+describe("registerConfiguredConnectors — omitted array (dev preloader)", () => {
+  beforeEach(() => {
+    configIsLoaded.value = true;
+  });
+
+  it("registers what the resolved config declares", () => {
+    configuredConnectors.value = [runtimeConnector("from-loaded-config")];
+
+    registerConfiguredConnectors();
+
+    expect(registeredCount("from-loaded-config")).toBe(1);
+  });
+
+  it("throws instead of skipping when the config is not loaded", () => {
+    configIsLoaded.value = false;
+
+    expect(() => registerConfiguredConnectors()).toThrow(/warlock config is not loaded/);
+  });
+
+  it("names the way out in the error, so the caller knows to pass the array", () => {
+    configIsLoaded.value = false;
+
+    expect(() => registerConfiguredConnectors()).toThrow(
+      /pass the connectors array explicitly or load the config first/,
+    );
+  });
+});

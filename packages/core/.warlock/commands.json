@@ -1,0 +1,521 @@
+{
+  "commands": {
+    "dev": {
+      "source": "framework",
+      "description": "Start development server (HMR, type-gen, health checks)",
+      "options": [
+        {
+          "text": "--fresh, -f",
+          "description": "Delete .warlock/manifest.json before start (force full re-parse from disk)",
+          "type": "boolean",
+          "name": "fresh",
+          "alias": "f"
+        },
+        {
+          "text": "--skip-typings, -st",
+          "description": "Skip background type generation for this run",
+          "type": "boolean",
+          "name": "skip-typings",
+          "alias": "st"
+        },
+        {
+          "text": "--skip-health, -sh",
+          "description": "Skip file health checkers for this run",
+          "type": "boolean",
+          "name": "skip-health",
+          "alias": "sh"
+        }
+      ]
+    },
+    "generate.typings": {
+      "source": "framework",
+      "description": "Generate type definitions for the project",
+      "options": [
+        {
+          "text": "--files, -f",
+          "description": "Files to generate typings for, if not passed, it will generate typings for all files",
+          "name": "files",
+          "alias": "f"
+        }
+      ]
+    },
+    "doctor": {
+      "source": "framework",
+      "description": "Run read-only health checks (routes, config, connectors, optional peers, health endpoints, release hygiene) and print a pass/warn/fail report"
+    },
+    "routes": {
+      "source": "framework",
+      "description": "List the registered HTTP routes as a table (read-only); filter with --method / --path / --name, or emit JSON with --json",
+      "options": [
+        {
+          "text": "--method, -m",
+          "description": "Filter by HTTP method (case-insensitive, e.g. GET, POST)",
+          "type": "string",
+          "name": "method",
+          "alias": "m"
+        },
+        {
+          "text": "--path, -p",
+          "description": "Filter by a case-insensitive path substring",
+          "type": "string",
+          "name": "path",
+          "alias": "p"
+        },
+        {
+          "text": "--name, -n",
+          "description": "Filter by a case-insensitive route-name substring",
+          "type": "string",
+          "name": "name",
+          "alias": "n"
+        },
+        {
+          "text": "--json, -j",
+          "description": "Output the routes as JSON instead of a table",
+          "type": "boolean",
+          "name": "json",
+          "alias": "j"
+        }
+      ]
+    },
+    "build": {
+      "source": "framework",
+      "description": "Build the project for production"
+    },
+    "start": {
+      "source": "framework",
+      "description": "Start production server"
+    },
+    "migrate": {
+      "source": "framework",
+      "description": "Run database migrations",
+      "options": [
+        {
+          "text": "--fresh, -f",
+          "description": "Drop all tables and re-run migrations",
+          "type": "boolean",
+          "name": "fresh",
+          "alias": "f"
+        },
+        {
+          "text": "--rollback, -r",
+          "description": "Rollback migrations, drop all tables",
+          "type": "boolean",
+          "name": "rollback",
+          "alias": "r"
+        },
+        {
+          "text": "--path, -p",
+          "description": "Migration file path, if not provided, all migrations will be wroking",
+          "type": "string",
+          "name": "path",
+          "alias": "p"
+        },
+        {
+          "text": "--list, -l",
+          "description": "Show migration state: executed migrations, then what will run next",
+          "type": "boolean",
+          "name": "list",
+          "alias": "l"
+        },
+        {
+          "text": "--pending",
+          "description": "List only what will run next, in execution order. Exits 0 if nothing is pending, 1 if something is, 2 if it could not be determined",
+          "type": "boolean",
+          "name": "pending",
+          "alias": ""
+        },
+        {
+          "text": "--all, -a",
+          "description": "List all migrations files in the app",
+          "type": "boolean",
+          "name": "all",
+          "alias": "a"
+        },
+        {
+          "text": "--sql, -s",
+          "description": "Export all migrations as phase-ordered SQL files instead of executing them",
+          "type": "boolean",
+          "name": "sql",
+          "alias": "s"
+        },
+        {
+          "text": "--pending-only",
+          "description": "When used with --sql, exports only pending migrations instead of all",
+          "type": "boolean",
+          "name": "pending-only",
+          "alias": ""
+        },
+        {
+          "text": "--compact, -c",
+          "description": "When used with --sql, strips out generated comments and blank lines to reduce file size",
+          "type": "boolean",
+          "name": "compact",
+          "alias": "c"
+        }
+      ]
+    },
+    "seed": {
+      "source": "framework",
+      "description": "Run database seeds",
+      "options": [
+        {
+          "text": "--fresh, -f",
+          "description": "Drop all tables records and run seeds",
+          "type": "boolean",
+          "name": "fresh",
+          "alias": "f"
+        },
+        {
+          "text": "--list, -l",
+          "description": "Display the seeds list in order without execution",
+          "type": "boolean",
+          "name": "list",
+          "alias": "l"
+        },
+        {
+          "text": "--transaction, -t",
+          "description": "Run seeds in a transaction",
+          "type": "boolean",
+          "defaultValue": true,
+          "name": "transaction",
+          "alias": "t"
+        },
+        {
+          "text": "--drop, -d",
+          "description": "Undo seeded data — delete tracked records (reverse order) and reset the seed log; scope to one seeder with --drop=\"Seed Name\"",
+          "type": "string",
+          "name": "drop",
+          "alias": "d"
+        }
+      ]
+    },
+    "create-database <name>": {
+      "source": "framework",
+      "description": "Create a new database",
+      "alias": "cdb",
+      "options": [
+        {
+          "text": "--connection, -c",
+          "description": "Database connection name",
+          "defaultValue": "default",
+          "name": "connection",
+          "alias": "c"
+        }
+      ]
+    },
+    "drop.tables": {
+      "source": "framework",
+      "description": "Drop all tables in the database",
+      "options": [
+        {
+          "text": "--force, -f",
+          "description": "Drop tables without confirmation",
+          "type": "boolean",
+          "name": "force",
+          "alias": "f"
+        }
+      ]
+    },
+    "add <features...>": {
+      "source": "framework",
+      "description": "Add new feature(s) to the project",
+      "options": [
+        {
+          "text": "--package-manager -pm",
+          "description": "Package manager to use, if not passed, it will be detected automatically",
+          "name": "package-manager",
+          "alias": ""
+        },
+        {
+          "text": "--list, -l",
+          "description": "List available features",
+          "type": "boolean",
+          "name": "list",
+          "alias": "l"
+        },
+        {
+          "text": "--no-install",
+          "description": "Record dependencies in package.json without installing them — still ejects configs, adds scripts, and runs setup hooks. Used by scaffolders that run a single install afterwards.",
+          "type": "boolean",
+          "name": "no-install",
+          "alias": ""
+        }
+      ]
+    },
+    "update": {
+      "source": "framework",
+      "description": "Update all @warlock.js packages in this project to their latest version",
+      "options": [
+        {
+          "text": "--no-install",
+          "description": "Rewrite the @warlock.js versions in package.json without running the package manager install",
+          "type": "boolean",
+          "name": "no-install",
+          "alias": ""
+        },
+        {
+          "text": "--dry-run",
+          "description": "Show which packages would be updated without changing package.json",
+          "type": "boolean",
+          "name": "dry-run",
+          "alias": ""
+        },
+        {
+          "text": "--check",
+          "description": "Like --dry-run, but exits 1 when any package is behind — a CI gate for staying current",
+          "type": "boolean",
+          "name": "check",
+          "alias": ""
+        }
+      ]
+    },
+    "generate <generator> [args...]": {
+      "source": "framework",
+      "description": "Scaffold a new component",
+      "alias": "g",
+      "options": [
+        {
+          "text": "--force, -f",
+          "description": "Overwrite existing files",
+          "type": "boolean",
+          "name": "force",
+          "alias": "f"
+        },
+        {
+          "text": "--dry-run",
+          "description": "Preview the files that would be generated without writing anything",
+          "type": "boolean",
+          "name": "dry-run",
+          "alias": ""
+        }
+      ]
+    },
+    "generate.module <name>": {
+      "source": "framework",
+      "description": "Generate a new module",
+      "alias": "gen.m",
+      "options": [
+        {
+          "text": "--minimal, -m",
+          "description": "Generate a minimal skeleton (routes, main, locales, empty subfolders) instead of the full CRUD scaffold",
+          "type": "boolean",
+          "name": "minimal",
+          "alias": "m"
+        },
+        {
+          "text": "--force, -f",
+          "description": "Overwrite existing files",
+          "type": "boolean",
+          "name": "force",
+          "alias": "f"
+        },
+        {
+          "text": "--dry-run",
+          "description": "Preview the files that would be generated without writing anything",
+          "type": "boolean",
+          "name": "dry-run",
+          "alias": ""
+        }
+      ]
+    },
+    "generate.controller <module>/<name>": {
+      "source": "framework",
+      "description": "Generate a new controller",
+      "alias": "gen.c",
+      "options": [
+        {
+          "text": "--with-validation, -v",
+          "description": "Generate a validation schema and bind it to the controller",
+          "type": "boolean",
+          "name": "with-validation",
+          "alias": "v"
+        },
+        {
+          "text": "--force, -f",
+          "description": "Overwrite existing files",
+          "type": "boolean",
+          "name": "force",
+          "alias": "f"
+        },
+        {
+          "text": "--dry-run",
+          "description": "Preview the files that would be generated without writing anything",
+          "type": "boolean",
+          "name": "dry-run",
+          "alias": ""
+        }
+      ]
+    },
+    "generate.service <module>/<name>": {
+      "source": "framework",
+      "description": "Generate a new service",
+      "alias": "gen.s",
+      "options": [
+        {
+          "text": "--force, -f",
+          "description": "Overwrite existing files",
+          "type": "boolean",
+          "name": "force",
+          "alias": "f"
+        },
+        {
+          "text": "--dry-run",
+          "description": "Preview the files that would be generated without writing anything",
+          "type": "boolean",
+          "name": "dry-run",
+          "alias": ""
+        }
+      ]
+    },
+    "generate.model <module>/<name>": {
+      "source": "framework",
+      "description": "Generate a new model with migration",
+      "alias": "gen.md",
+      "options": [
+        {
+          "text": "--with-resource, -rs",
+          "description": "Generate resource",
+          "type": "boolean",
+          "name": "with-resource",
+          "alias": "rs"
+        },
+        {
+          "text": "--table <name>",
+          "description": "Specify table name",
+          "name": "table",
+          "alias": ""
+        },
+        {
+          "text": "--force, -f",
+          "description": "Overwrite existing files",
+          "type": "boolean",
+          "name": "force",
+          "alias": "f"
+        },
+        {
+          "text": "--dry-run",
+          "description": "Preview the files that would be generated without writing anything",
+          "type": "boolean",
+          "name": "dry-run",
+          "alias": ""
+        },
+        {
+          "text": "--timestamps [bool]",
+          "description": "Include timestamps in migration (default: true)",
+          "type": "boolean",
+          "name": "timestamps",
+          "alias": ""
+        }
+      ]
+    },
+    "generate.repository <module>/<name>": {
+      "source": "framework",
+      "description": "Generate a new repository",
+      "alias": "gen.r",
+      "options": [
+        {
+          "text": "--force, -f",
+          "description": "Overwrite existing files",
+          "type": "boolean",
+          "name": "force",
+          "alias": "f"
+        },
+        {
+          "text": "--dry-run",
+          "description": "Preview the files that would be generated without writing anything",
+          "type": "boolean",
+          "name": "dry-run",
+          "alias": ""
+        }
+      ]
+    },
+    "generate.resource <module>/<name>": {
+      "source": "framework",
+      "description": "Generate a new resource",
+      "alias": "gen.rs",
+      "options": [
+        {
+          "text": "--force, -f",
+          "description": "Overwrite existing files",
+          "type": "boolean",
+          "name": "force",
+          "alias": "f"
+        },
+        {
+          "text": "--dry-run",
+          "description": "Preview the files that would be generated without writing anything",
+          "type": "boolean",
+          "name": "dry-run",
+          "alias": ""
+        }
+      ]
+    },
+    "generate.migration <model-path>": {
+      "source": "framework",
+      "description": "Generate a new migration for a model",
+      "alias": "gen.mig",
+      "options": [
+        {
+          "text": "--force, -f",
+          "description": "Overwrite existing files",
+          "type": "boolean",
+          "name": "force",
+          "alias": "f"
+        },
+        {
+          "text": "--dry-run",
+          "description": "Preview the files that would be generated without writing anything",
+          "type": "boolean",
+          "name": "dry-run",
+          "alias": ""
+        },
+        {
+          "text": "--add <columns>",
+          "description": "Columns to add (DSL: name:type:modifier,...)",
+          "name": "add",
+          "alias": ""
+        },
+        {
+          "text": "--drop <columns>",
+          "description": "Columns to drop (comma-separated names)",
+          "name": "drop",
+          "alias": ""
+        },
+        {
+          "text": "--rename <columns>",
+          "description": "Columns to rename (DSL: old:new,...)",
+          "name": "rename",
+          "alias": ""
+        },
+        {
+          "text": "--timestamps [bool]",
+          "description": "Include timestamps (default: true)",
+          "type": "boolean",
+          "name": "timestamps",
+          "alias": ""
+        }
+      ]
+    },
+    "storage.put <localPath> [destination]": {
+      "source": "framework",
+      "description": "Upload a local file or directory to storage",
+      "alias": "sput",
+      "options": [
+        {
+          "text": "--driver, -d",
+          "description": "Storage driver name (as defined in config). Defaults to the configured default driver.",
+          "name": "driver",
+          "alias": "d"
+        },
+        {
+          "text": "--concurrency, -c",
+          "description": "Number of concurrent uploads when uploading a directory",
+          "type": "number",
+          "defaultValue": 5,
+          "name": "concurrency",
+          "alias": "c"
+        }
+      ]
+    }
+  }
+}

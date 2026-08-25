@@ -1,0 +1,33 @@
+/**
+ * Registration half of the `connectors` config key.
+ *
+ * ONE key drives both halves of a connector's life: `warlock build` reads the
+ * same array to drain each connector's build contribution, and this function
+ * registers that array with the connectors manager so the runtime boots it.
+ * Reading them from one place is the whole point — a bundle "built for" web
+ * that "boots without" web is a green build with a missing client bundle, and
+ * the failure is silent. A second key would let the two drift; this cannot.
+ *
+ * Called by the generated production entry (through the `@warlock.js/core`
+ * package specifier) and by the dev preloader, which is why it is idempotent:
+ * a connector whose name is already registered — a built-in, or the result of
+ * an earlier call in the same process — is skipped rather than stacked, since
+ * a duplicate would boot and shut down twice.
+ */
+import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
+import { connectorsManager } from "./connectors-manager";
+
+export function registerConfiguredConnectors(): void {
+  // Nothing to read before the config is resolved. Not an error: callers that
+  // never load a warlock config (a plain app with only built-in connectors)
+  // reach this line legitimately, and `get` would throw at them.
+  if (!warlockConfigManager.isLoaded) return;
+
+  const configured = warlockConfigManager.get("connectors") ?? [];
+
+  for (const connector of configured) {
+    if (connectorsManager.has(connector.name)) continue;
+
+    connectorsManager.register(connector);
+  }
+}

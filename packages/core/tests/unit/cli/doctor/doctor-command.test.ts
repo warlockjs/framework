@@ -45,6 +45,7 @@ describe("default doctor check set", () => {
 
     expect(names).toEqual([
       "routes",
+      "handler-signature",
       "config",
       "connectors",
       "optional-peers",
