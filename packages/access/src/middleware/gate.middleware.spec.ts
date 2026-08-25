@@ -15,15 +15,13 @@ vi.mock("@warlock.js/core", () => ({
 }));
 
 import { gate, gateAll, gateAny } from "./gate.middleware";
+import { makeCtx } from "./test-support/make-ctx";
 
 function context(user?: unknown) {
   const forbidden = vi.fn();
+  const { request, response } = makeCtx({ request: { user }, response: { forbidden } });
 
-  return {
-    request: { user } as never,
-    response: { forbidden } as never,
-    forbidden,
-  };
+  return { request, response, forbidden };
 }
 
 beforeEach(() => {
@@ -35,7 +33,7 @@ describe("gate", () => {
     can.mockResolvedValue(true);
     const { request, response, forbidden } = context({ id: 1 });
 
-    await gate("orders.create")(request, response);
+    await gate("orders.create")({ request, response });
 
     expect(forbidden).not.toHaveBeenCalled();
   });
@@ -44,7 +42,7 @@ describe("gate", () => {
     can.mockResolvedValue(false);
     const { request, response, forbidden } = context({ id: 1 });
 
-    await gate("orders.create")(request, response);
+    await gate("orders.create")({ request, response });
 
     expect(forbidden).toHaveBeenCalled();
   });
@@ -52,7 +50,7 @@ describe("gate", () => {
   it("forbids (without a permission check) when there is no authenticated user", async () => {
     const { request, response, forbidden } = context(undefined);
 
-    await gate("orders.create")(request, response);
+    await gate("orders.create")({ request, response });
 
     expect(forbidden).toHaveBeenCalled();
     expect(can).not.toHaveBeenCalled();
@@ -64,7 +62,7 @@ describe("gateAny", () => {
     canAny.mockResolvedValue(true);
     const { request, response, forbidden } = context({ id: 1 });
 
-    await gateAny(["a", "b"])(request, response);
+    await gateAny(["a", "b"])({ request, response });
 
     expect(forbidden).not.toHaveBeenCalled();
   });
@@ -73,7 +71,7 @@ describe("gateAny", () => {
     canAny.mockResolvedValue(false);
     const { request, response, forbidden } = context({ id: 1 });
 
-    await gateAny(["a", "b"])(request, response);
+    await gateAny(["a", "b"])({ request, response });
 
     expect(forbidden).toHaveBeenCalled();
   });
@@ -81,7 +79,7 @@ describe("gateAny", () => {
   it("forbids (without a permission check) when there is no authenticated user", async () => {
     const { request, response, forbidden } = context(undefined);
 
-    await gateAny(["a", "b"])(request, response);
+    await gateAny(["a", "b"])({ request, response });
 
     expect(forbidden).toHaveBeenCalled();
     expect(canAny).not.toHaveBeenCalled();
@@ -93,7 +91,7 @@ describe("gateAll", () => {
     canAll.mockResolvedValue(true);
     const { request, response, forbidden } = context({ id: 1 });
 
-    await gateAll(["a", "b"])(request, response);
+    await gateAll(["a", "b"])({ request, response });
 
     expect(forbidden).not.toHaveBeenCalled();
   });
@@ -102,7 +100,7 @@ describe("gateAll", () => {
     canAll.mockResolvedValue(false);
     const { request, response, forbidden } = context({ id: 1 });
 
-    await gateAll(["a", "b"])(request, response);
+    await gateAll(["a", "b"])({ request, response });
 
     expect(forbidden).toHaveBeenCalled();
   });
@@ -110,7 +108,7 @@ describe("gateAll", () => {
   it("forbids (without a permission check) when there is no authenticated user", async () => {
     const { request, response, forbidden } = context(undefined);
 
-    await gateAll(["a", "b"])(request, response);
+    await gateAll(["a", "b"])({ request, response });
 
     expect(forbidden).toHaveBeenCalled();
     expect(canAll).not.toHaveBeenCalled();
