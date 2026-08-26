@@ -16,7 +16,7 @@ Findings from the release-polish pass (2026-06-01). Newest first.
     `buildStores` calling each `buildStore`, `runAll` activation + registration-order
     nesting + empty-store seeding for unmatched keys, `enterAll` truthy-only entry,
     `clearAll`, `getContext`, `unregister`, singleton identity.
-  - Run with: `cd D:/xampp/htdocs/mongez/node/@warlock.js && npx vitest run --root context`.
+  - Run with: `npx vitest run` from the repo root.
 - **Docs fixed (drift / broken links):**
   - `getting-started/02-installation.mdx` — broken `../../../core/docs/getting-started/01-introduction`
     → `../../../core/getting-started/01-introduction` (no `docs/` segment under `core/`).
