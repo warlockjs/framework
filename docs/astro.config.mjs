@@ -356,6 +356,7 @@ const cacheTopic = {
 const topics = [
   // Foundation
   pkgTopic({ label: "Core", slug: "core", sections: coreSections }, "latest"),
+  pkgTopic({ label: "Web", slug: "web" }, "latest"),
   pkgTopic({ label: "Create Warlock", slug: "create-warlock" }, "latest"),
   pkgTopic({ label: "Seal", slug: "seal", sections: fullSections }, "latest"),
   // Logger uses a custom 4-section structure (Getting Started · Channels ·
@@ -461,9 +462,12 @@ const topics = [
 function buildTopics(version) {
   // Hand-curated topics above retain their exact latest shape. Clone and
   // retarget every path only when building a frozen version's sidebar.
-  const versionedTopics = version === "latest"
+  const topicsForVersion = version === "latest"
     ? topics
-    : JSON.parse(JSON.stringify(topics).replaceAll("v/latest", `v/${version}`));
+    : topics.filter((topic) => topic.link !== "/v/latest/web/");
+  const versionedTopics = version === "latest"
+    ? topicsForVersion
+    : JSON.parse(JSON.stringify(topicsForVersion).replaceAll("v/latest", `v/${version}`));
 
   return versionedTopics.map((topic) => ({
     ...topic,

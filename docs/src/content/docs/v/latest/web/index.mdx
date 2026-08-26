@@ -1,0 +1,44 @@
+---
+title: "@warlock.js/web"
+description: SSR React pages for Warlock apps, with hydration, client navigation, and Fast Refresh.
+sidebar:
+  order: 1
+  label: "Overview"
+---
+
+`@warlock.js/web` adds a React page layer to an existing Warlock app. Pages
+are ordinary Warlock routes that render documents instead of JSON, so they use
+the same route table, middleware chain, validation, and request context as the
+rest of the application.
+
+## Install
+
+```bash
+warlock add web
+```
+
+The command installs the package, scaffolds `src/web/`, and registers the Web
+connector in `warlock.config.ts`. `src/web/` is the page root; it contains the
+web layer's pages, layouts, and related middleware.
+
+## Rendering and navigation
+
+Pages render on the server and hydrate in the browser. This is SSR with
+hydration, not React Server Components. After hydration, `<Link>` supports
+client-side navigation, including Back and Forward, without a document reload.
+
+In development, React Fast Refresh preserves component state while edits also
+update server-rendered output.
+
+## Loaders and metadata
+
+A page loader is its controller: it runs with the full Warlock request context,
+including DI, guards, and access to the response for headers, cookies, or
+status. It returns data for the page to render. Server-only `metadata` runs
+after the loader and can derive document metadata from its data.
+
+## Requirements
+
+- `@warlock.js/core`
+- `react` and `react-dom` 19+
+- `vite` and `@vitejs/plugin-react` as lazily loaded, optional dev peers
