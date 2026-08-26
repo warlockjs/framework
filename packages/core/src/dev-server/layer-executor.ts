@@ -54,11 +54,14 @@ export class LayerExecutor {
     // Env-only change: reload all configs, restart connectors that watch them.
     if (changedPaths.length === 0 && envFilesChanged) {
       const configPaths = await this.reloadAffectedModules([".env"], filesMap);
-      await this.restartAffectedConnectors(configPaths);
+      await this.restartAffectedConnectors([...deletedFiles, ...configPaths]);
       return;
     }
 
-    if (changedPaths.length === 0) return;
+    if (changedPaths.length === 0) {
+      await this.restartAffectedConnectors(deletedFiles);
+      return;
+    }
 
     const invalidationChain = new Set<string>();
     for (const path of changedPaths) {
@@ -87,7 +90,11 @@ export class LayerExecutor {
     const affectedConfigPaths = await this.reloadAffectedModules(chain, filesMap);
 
     // Step 4: restart any connector whose watched-files overlap the chain.
-    await this.restartAffectedConnectors([...changedPaths, ...affectedConfigPaths]);
+    await this.restartAffectedConnectors([
+      ...changedPaths,
+      ...deletedFiles,
+      ...affectedConfigPaths,
+    ]);
   }
 
   private async restartAffectedConnectors(affectedFiles: string[]): Promise<void> {
