@@ -110,10 +110,9 @@ async function runRouteHooks(
  * error is only actionable if it says which claimant is which, so `isPage` —
  * the router's only route-kind discriminator — is what separates them here.
  *
- * `sourceFile` is stamped only on routes registered through `withSourceFile`,
- * which page routes are not (the stack is a single slot, so page installation
- * cannot nest inside a route file's scope without clobbering it). Say the
- * source is unknown rather than printing an empty string.
+ * `sourceFile` is stamped only on routes registered through `withSourceFile`.
+ * Routes registered without that scope have no owner, so say the source is
+ * unknown rather than printing an empty string.
  */
 function describeRouteClaimant(route: Route) {
   const type = route.isPage ? "page route" : "API route";
@@ -137,6 +136,16 @@ export class Router {
    * paths that no longer exist. A version counter cannot miss that.
    */
   private routesVersion = 0;
+
+  /**
+   * In-progress atomic replacement, when one exists. Reads continue to use
+   * {@link routes}; mutations and collision checks use this isolated draft.
+   */
+  private routeReplacementTransaction?: {
+    routes: Route[];
+    removedSourceFiles: Set<string>;
+    addedRoutes: Route[];
+  };
 
   /**
    * Router Instance
@@ -352,9 +361,11 @@ export class Router {
       sourceFile: this.stacks.sourceFile || "",
     };
 
+    const routes = this.routeReplacementTransaction?.routes ?? this.routes;
+
     if (routeData.name) {
       // check if the name exists
-      const route = this.routes.find((route) => route.name === routeData.name);
+      const route = routes.find((route) => route.name === routeData.name);
 
       if (route) {
         // check again if the route name exists with the same method
@@ -377,11 +388,17 @@ export class Router {
     // written against v4 produces one legible list instead of a mystery 500 per
     // request. Recorded after the collision check so a route that never lands
     // is never reported.
-    inspectHandlerSignature(routeData.handler, routeData);
+    if (this.routeReplacementTransaction) {
+      this.routeReplacementTransaction.addedRoutes.push(routeData);
+    } else {
+      inspectHandlerSignature(routeData.handler, routeData);
+    }
 
-    this.routes.push(routeData);
+    routes.push(routeData);
 
-    this.routesVersion++;
+    if (!this.routeReplacementTransaction) {
+      this.routesVersion++;
+    }
 
     return this;
   }
@@ -683,6 +700,14 @@ export class Router {
    * @param sourceFile Relative path to the source file
    */
   public removeRoutesBySourceFile(sourceFile: string): void {
+    if (this.routeReplacementTransaction) {
+      this.routeReplacementTransaction.routes = this.routeReplacementTransaction.routes.filter(
+        (route) => route.sourceFile !== sourceFile,
+      );
+      this.routeReplacementTransaction.removedSourceFiles.add(sourceFile);
+      return;
+    }
+
     this.routes = this.routes.filter((route) => route.sourceFile !== sourceFile);
 
     // Keep the signature diagnostics in step, so a reload that fixes a handler
@@ -690,6 +715,60 @@ export class Router {
     forgetPositionalHandlerSuspects(sourceFile);
 
     this.routesVersion++;
+  }
+
+  /**
+   * Atomically replace every route owned by the given exact source-file keys.
+   *
+   * The installer mutates an isolated draft. Public reads keep seeing the old
+   * live table across awaits, and a failed installer discards every draft
+   * mutation. A successful installer swaps the whole draft in one synchronous
+   * commit and invalidates the dev route registry exactly once.
+   */
+  public async replaceRoutesBySourceFiles<T>(
+    sourceFiles: Iterable<string>,
+    install: () => T | Promise<T>,
+  ): Promise<T> {
+    if (this.routeReplacementTransaction) {
+      throw new Error("Cannot nest route replacement transactions");
+    }
+
+    const removedSourceFiles = new Set(sourceFiles);
+
+    this.routeReplacementTransaction = {
+      routes: this.routes.filter((route) => !removedSourceFiles.has(route.sourceFile)),
+      removedSourceFiles,
+      addedRoutes: [],
+    };
+
+    try {
+      const result = await install();
+      const transaction = this.routeReplacementTransaction!;
+
+      this.routes = transaction.routes;
+      this.routeReplacementTransaction = undefined;
+
+      // Diagnostic state follows the same commit boundary as the route table.
+      // Added routes were deliberately not inspected while still speculative.
+      for (const sourceFile of transaction.removedSourceFiles) {
+        forgetPositionalHandlerSuspects(sourceFile);
+      }
+
+      const committedRoutes = new Set(transaction.routes);
+
+      for (const route of transaction.addedRoutes) {
+        if (committedRoutes.has(route)) {
+          inspectHandlerSignature(route.handler, route);
+        }
+      }
+
+      this.routesVersion++;
+
+      return result;
+    } catch (error) {
+      this.routeReplacementTransaction = undefined;
+      throw error;
+    }
   }
 
   /**
