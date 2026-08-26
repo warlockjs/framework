@@ -4,6 +4,7 @@ import { log } from "@warlock.js/logger";
 import { Application } from "../application";
 import { health } from "../http/health";
 import { registerHttpPlugins } from "../http/plugins";
+import { setHttpReadyReport } from "../http/ready-report";
 import { closeServerWithTimeout, FastifyInstance, getHttpServer, startHttpServer } from "../http/server";
 import { router } from "../router/router";
 import { Environment } from "../utils";
@@ -52,6 +53,27 @@ export class HttpConnector extends BaseConnector {
    * Fastify Server instance
    */
   protected http?: FastifyInstance;
+
+  /**
+   * Whether someone downstream will render the combined ready block.
+   *
+   * Only the dev server does (`dev-server/ready-block.ts`), and only it can:
+   * the block reports facts — boot duration, the web surface — that this
+   * connector does not own and must not wait for. When it will, this connector
+   * records and stays quiet; otherwise it narrates as it always has.
+   *
+   * Keyed on the runtime strategy rather than on `NODE_ENV`, because that is
+   * what actually distinguishes "a dev server is driving this boot" from "an
+   * app happens to be running with development config".
+   *
+   * `!isBooted` is the second half and it is not a detail. The block summarises
+   * a BOOT. A `restart()` after boot — an edited `src/config/http.ts` — is an
+   * EVENT, and there is no block coming to carry it, so suppressing the lines
+   * there would rebind the port in total silence.
+   */
+  protected get rendersReadyBlock(): boolean {
+    return Application.runtimeStrategy === "development" && !Application.isBooted;
+  }
 
   /**
    * Boot the connector — construction only (create Fastify, register
@@ -130,6 +152,11 @@ export class HttpConnector extends BaseConnector {
 
     if (!httpConfig || !this.http) return;
 
+    // Read once. `Application.isBooted` flips during the same boot this method
+    // belongs to, and a predicate that answered differently before and after
+    // `listen()` would print half a report.
+    const deferToReadyBlock = this.rendersReadyBlock;
+
     if (Application.runtimeStrategy === "development") {
       router.scanDevServer(this.http);
     } else {
@@ -141,7 +168,17 @@ export class HttpConnector extends BaseConnector {
     // detectable instead of silently 404ing. `addRoutesRegisteredCheck` is
     // keyed by name, so re-running on restart is idempotent.
     health.addRoutesRegisteredCheck(() => router.routeCount());
-    log.info("http", "routes", `${router.routeCount()} route(s) registered`);
+
+    const routeCount = router.routeCount();
+
+    // In development this fact is one line of the single ready block rendered
+    // after boot completes (`dev-server/ready-block.ts`); printing it here as
+    // well would put the same number on screen twice, in two formats. Outside
+    // development the line is load-bearing — a supervisor or CI log greps it —
+    // so it stays exactly as it was.
+    if (!deferToReadyBlock) {
+      log.info("http", "routes", `${routeCount} route(s) registered`);
+    }
 
     try {
       // `listen()` RESOLVES with the address it actually bound — which is the
@@ -157,12 +194,30 @@ export class HttpConnector extends BaseConnector {
 
       const address = describeServerAddress(boundAddress, config.get("app.baseUrl"));
 
-      log.success(`http`, "connection", address.ready);
+      // Recorded unconditionally: the ready block reads it in development, and
+      // in every other mode it is simply the one place that knows what was
+      // bound, which is worth having whether or not anything renders it.
+      setHttpReadyReport({
+        boundAddress: address.boundAddress,
+        url: address.url,
+        wildcardBind: address.wildcardBind,
+        port: httpConfig.port,
+        routeCount,
+        publicUrl: address.publicUrl,
+      });
 
-      if (address.publicUrl) {
-        log.info(`http`, "connection", address.publicUrl);
+      if (!deferToReadyBlock) {
+        log.success(`http`, "connection", address.ready);
+
+        if (address.publicUrl) {
+          log.info(`http`, "connection", address.publicUrl);
+        }
       }
 
+      // NEVER conditional on the block. A base URL pointing at a port nothing
+      // is listening on is the single most misleading state this connector can
+      // be in, and a warning a status block swallows is a warning nobody reads
+      // — so it is logged where it lands ABOVE the block, in both modes.
       if (address.warning) {
         log.warn(`http`, "connection", address.warning);
       }

@@ -26,14 +26,99 @@
  * **loopback on a port nothing is listening on**, because someone will paste it
  * into a browser and conclude the server is broken. A non-loopback base URL is
  * a deployment address, reported plainly and never flagged.
+ *
+ * ## Why the address bound and the address printed are not the same string
+ *
+ * `listen()` resolves `localhost` and hands back whichever address it actually
+ * bound — on a dual-stack machine that is `http://[::1]:2030`. That literal is
+ * correct and useless: most terminals will not linkify a bracketed IPv6 host,
+ * and on a first run it reads as broken output. So {@link toDisplayUrl} maps
+ * the *loopback and wildcard* spellings onto `localhost`, which resolves back
+ * to the very socket that was bound.
+ *
+ * This is a DISPLAY transform and nothing else — `host` still reaches
+ * `listen()` untouched (`http-connector.ts`), so the set of interfaces the
+ * server accepts on is byte-for-byte what it was. A genuine routable IPv6
+ * address is left exactly as it is: there is no synonym for it, and inventing
+ * one would be the same class of lie as printing `app.baseUrl` was.
  */
 
 /** Hosts that all mean "this machine" for the purpose of comparing addresses. */
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0", ""]);
 
+/**
+ * Hosts for which `localhost` is a truthful, reachable synonym.
+ *
+ * The two loopback literals are exact synonyms. The two wildcards (`::`,
+ * `0.0.0.0`) are not synonyms — they are strictly wider — but every one of them
+ * *includes* loopback, so `localhost` always reaches the server. Callers that
+ * need to tell the reader the bind is wider than loopback should say so
+ * separately; see `dev-server/ready-block.ts`.
+ *
+ * The bracketed spellings are the ones that actually occur: WHATWG `hostname`
+ * KEEPS the brackets for an IPv6 host (`new URL("http://[::1]:1").hostname ===
+ * "[::1]"`). The bare forms are listed too so a caller that hands over a host
+ * rather than a URL is not silently missed.
+ */
+const DISPLAY_AS_LOCALHOST = new Set(["127.0.0.1", "[::1]", "::1", "0.0.0.0", "[::]", "::"]);
+
+/** The wildcard spellings — a bind wider than loopback. */
+const WILDCARD_HOSTS = new Set(["0.0.0.0", "[::]", "::"]);
+
+/**
+ * Whether the given bound address listens on more than loopback.
+ *
+ * Used to add "(all interfaces)" next to a URL that has been rewritten to
+ * `localhost`, so the rewrite never hides a wider bind than the reader thinks.
+ */
+export function isWildcardBind(boundAddress: string | undefined): boolean {
+  const url = parseUrl(boundAddress);
+
+  if (!url) return false;
+
+  return WILDCARD_HOSTS.has(url.hostname);
+}
+
+/**
+ * The address as it should be SHOWN to a human. See the module doc above.
+ *
+ * Anything unparseable is returned untouched: a best-effort prettifier must
+ * never be the reason a developer is shown something other than what the
+ * server reported.
+ */
+export function toDisplayUrl(boundAddress: string | undefined): string {
+  if (!boundAddress) return "";
+
+  const url = parseUrl(boundAddress);
+
+  if (!url) return boundAddress;
+
+  if (!DISPLAY_AS_LOCALHOST.has(url.hostname)) return boundAddress;
+
+  url.hostname = "localhost";
+
+  // `URL.href` re-appends a trailing slash to a bare origin, which is noise in
+  // a status line and is not what `listen()` returned.
+  return url.href.replace(/\/$/, "");
+}
+
 export type ServerAddressReport = {
-  /** Where the server is genuinely reachable. Always present. */
+  /** Where the server is genuinely reachable, spelled for a human. Always present. */
   ready: string;
+  /**
+   * The same address as a bare URL, ready to paste into a browser — the value
+   * `ready` embeds. Callers that render their own layout (the dev ready block)
+   * use this instead of re-deriving it.
+   */
+  url: string;
+  /**
+   * Exactly what `listen()` returned, untransformed. Kept so a caller that
+   * needs to reason about the BIND (which interfaces, which family) reads the
+   * fact rather than the presentation of it.
+   */
+  boundAddress?: string;
+  /** Whether the bind covers more than loopback (`0.0.0.0` / `::`). */
+  wildcardBind: boolean;
   /** The configured public address, when it is a deployment URL rather than a local one. */
   publicUrl?: string;
   /** Set only when `app.baseUrl` points at loopback on a port nothing bound. */
@@ -74,23 +159,38 @@ export function describeServerAddress(
   // configured URL is then the only thing we know, and saying nothing would be
   // worse than saying the one thing we have.
   if (!bound) {
-    return { ready: `Server ready at ${configured?.href ?? boundAddress ?? baseUrl}` };
+    const fallback = String(configured?.href ?? boundAddress ?? baseUrl ?? "");
+
+    return {
+      ready: `Server ready at ${fallback}`,
+      url: fallback,
+      boundAddress,
+      wildcardBind: false,
+    };
   }
 
-  const ready = `Server ready at ${boundAddress}`;
+  // The URL a human is shown. `boundAddress` (the literal `listen()` returned)
+  // travels on the report untouched — see the module doc on why these differ.
+  const url = toDisplayUrl(boundAddress);
+  const base = {
+    ready: `Server ready at ${url}`,
+    url,
+    boundAddress,
+    wildcardBind: isWildcardBind(boundAddress),
+  };
 
-  if (!configured) return { ready };
+  if (!configured) return base;
 
   if (!isLoopback(configured)) {
-    return { ready, publicUrl: `Public URL (app.baseUrl): ${baseUrl}` };
+    return { ...base, publicUrl: `Public URL (app.baseUrl): ${baseUrl}` };
   }
 
   if (effectivePort(configured) === effectivePort(bound)) {
-    return { ready };
+    return base;
   }
 
   return {
-    ready,
+    ...base,
     warning:
       `app.baseUrl is ${baseUrl}, but the server bound port ${effectivePort(bound)}. ` +
       `Nothing is listening on port ${effectivePort(configured)} — ` +

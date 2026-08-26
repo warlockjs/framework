@@ -6,6 +6,53 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.1.0
+
+> **If you use `@warlock.js/web`, upgrade.** React did not execute at all in published
+> installs of 5.0.0 through 5.0.2 — the defect and its fix are in that package's
+> changelog. `core` ships the CLI-side half of this release.
+
+### Added
+
+- **`warlock add tailwind`** — installs and wires Tailwind CSS v4 through PostCSS.
+- **`warlock add shadcn`** — sets up the prerequisites shadcn/ui expects. It is *not* a
+  wrapper around the shadcn CLI: you still run that yourself to add components, this
+  only makes the project ready for it.
+
+### Changed
+
+- **`warlock dev` prints one status block per run.** The banner is printed exactly once,
+  and the URL it prints is never a raw `[::1]` address. The single-boot guard behind
+  this is **new in this release — it was never present in any published version**, so
+  duplicate boots on 5.0.x were real, not a display artefact.
+- **`warlock doctor` now reports the same route count as `warlock dev`.** The two walked
+  routes differently and disagreed. `doctor` also emits zero warnings on a healthy
+  project — so a warning now means something — and fails loudly on a route module that
+  genuinely fails to load, instead of counting it as fine.
+
+### Removed
+
+- **A false comment that the `warlock add web` scaffold emitted in 5.0.0 through 5.0.2**,
+  claiming a page's route is derived from its file location. No such derivation has ever
+  existed. The stub no longer emits it; **apps already scaffolded on those versions still
+  carry the comment in their own source** and must delete it by hand.
+
+### Internal
+
+- The `add` feature registry was split into one module per feature, replacing the single
+  growing switch.
+- Fixed 7 mojibake checkmarks in CLI output.
+
+## 5.0.2 - 2026-08-25
+
+No changes to `@warlock.js/core`. Released in lockstep with the `@warlock.js/web` SSR
+fix (`ssr.noExternal`) — see that package's changelog.
+
+## 5.0.1 - 2026-08-25
+
+No changes to `@warlock.js/core`. Released in lockstep with the `create-warlock` vite
+resolution pin and the `@warlock.js/web` peer narrowing — see those packages' changelogs.
+
 ## 5.0.0 - 2026-08-25
 
 ### Upgrading

@@ -32,7 +32,10 @@ vi.mock("../../../src/application", () => ({
 }));
 
 vi.mock("../../../src/connectors/connectors-manager", () => ({
-  connectorsManager: { startPhase },
+  // `list` is read by the ready block after boot, to decide whether a web/SSR
+  // surface shares the port. Empty here: this test is about ORDER, and an
+  // API-only app is the smaller of the two shapes.
+  connectorsManager: { startPhase, list: vi.fn(() => []) },
 }));
 
 vi.mock("../../../src/warlock-config", () => ({

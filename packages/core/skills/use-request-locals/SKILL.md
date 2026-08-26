@@ -103,7 +103,30 @@ declare module "@warlock.js/core" {
 export {};
 ```
 
-The module specifier must be `"@warlock.js/core"`, matching the public package import whose `RequestLocals` interface is exported. Ensure the `.d.ts` file is included by the application's TypeScript configuration.
+The module specifier must be `"@warlock.js/core"`, matching the public package import whose `RequestLocals` interface is exported.
+
+## Where the augmentation file goes
+
+A new project scaffolds `src/typings.d.ts` and lists it explicitly in `tsconfig.json`'s `include`. That is the sanctioned home for application-wide augmentations — `RequestLocals` and `RequestUser` both ship there as empty `interface` declarations with the reasoning written above them.
+
+```ts title="src/typings.d.ts"
+declare module "@warlock.js/core" {
+  interface RequestLocals {}
+
+  interface RequestUser {}
+}
+
+export {};
+```
+
+Feature-local files such as `src/app/organizations/request-locals.d.ts` are equally valid and keep ownership next to the middleware that writes the key; the scaffold's `include` covers all of `src`. Use `src/typings.d.ts` for declarations no single feature owns.
+
+Two rules the scaffold's own comments spell out, and both bite silently:
+
+- **Keep the trailing `export {}`.** `declare module "x"` inside a file with no top-level import or export declares an *ambient* module, which REPLACES `@warlock.js/core`'s real typings instead of merging into them — every framework export vanishes. The `export {}` is what makes the file a module and the block an augmentation. It is not an unused statement to clean up.
+- **Keep them `interface`, not `type`.** This project otherwise prefers `type`; these are the named exception, because declaration merging is interface-only. `type RequestUser = { ... }` is a duplicate-identifier error, not an augmentation.
+
+On a project scaffolded before 5.1 there is no `src/typings.d.ts`, and `tsconfig.json` carries `"typeRoots": ["./src/typings.d.ts"]` — wrong twice, since `typeRoots` takes directories of `@types` packages rather than files, and that file did not exist. Drop the `typeRoots` entry, create the file, and list it under `include`.
 
 ## What belongs in `locals`
 

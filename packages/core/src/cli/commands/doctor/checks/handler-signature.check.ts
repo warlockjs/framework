@@ -17,13 +17,20 @@ import type { DoctorCheck } from "../check.types";
  * `warn`, never `fail`: the detection is a heuristic on the handler's declared
  * parameters, so a false positive is possible and must not break a build.
  *
- * Read-only: reads the list the router collected while routes registered. It
- * therefore reports on the routes this process has loaded — a run before route
- * registration sees nothing.
+ * NEEDS A BOOTED APP: the router collects suspects as routes register, so this
+ * reads a list the boot pass filled. Before that pass existed the list was
+ * always empty and this check always passed — it was green because it had
+ * nothing to look at, which is indistinguishable from green because the app is
+ * fine. It stays silent when there are no routes for the same reason: a check
+ * with no input reports nothing rather than a clean bill of health.
  */
 export const handlerSignatureCheck: DoctorCheck = {
   name: "handler-signature",
-  run: () => {
+  run: (context) => {
+    if (context.totalRoutes === 0) {
+      return undefined;
+    }
+
     const suspects = listPositionalHandlerSuspects();
 
     if (suspects.length === 0) {

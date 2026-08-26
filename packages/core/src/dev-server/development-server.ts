@@ -5,10 +5,11 @@ import { Application } from "../application";
 import { connectorsManager } from "../connectors/connectors-manager";
 import { ConnectorLifecyclePhase } from "../connectors/types";
 import { warlockConfigManager } from "../warlock-config";
-import { devLogInfo, devLogReady, devLogSection, devLogWarn, devServeLog } from "./dev-logger";
+import { devLogInfo, devLogSection, devLogWarn, devServeLog } from "./dev-logger";
 import { filesOrchestrator } from "./files-orchestrator";
 import { MANIFEST_PATH } from "./flags";
 import { LayerExecutor } from "./layer-executor";
+import { printReadyBlock } from "./ready-block";
 import { restartDevServer } from "./restart-dev-server";
 import { devServerShortcuts } from "./shortcuts";
 import type { StartDevServerOptions } from "./start-development-server";
@@ -76,7 +77,6 @@ export class DevelopmentServer {
       this.running = true;
 
       const duration = performance.now() - startedAt;
-      devLogReady(`Development Server is ready in ${colors.greenBright(parseDuration(duration))}`);
 
       // App modules are loaded and both connector phases are active — signal a
       // complete boot so `Application.onceBooted(...)` listeners fire.
@@ -85,6 +85,12 @@ export class DevelopmentServer {
         runtimeStrategy: Application.runtimeStrategy,
         bootDurationMs: duration,
       });
+
+      // ONE block, AFTER the boot it summarises, replacing the scattered
+      // "N route(s) registered" / "Server ready at …" / "ready in …" lines that
+      // used to arrive in completion order. Warnings logged during boot sit
+      // above it and stay there — see `ready-block.ts`.
+      printReadyBlock(duration);
 
       // Precedence: explicit CLI option > devServer.* config > default.
       const devServerConfig = await warlockConfigManager.get("devServer");
@@ -229,10 +235,4 @@ export class DevelopmentServer {
 function isEnvPath(path: string): boolean {
   const basename = path.split("/").pop() ?? path;
   return basename === ".env" || basename.startsWith(".env.");
-}
-
-function parseDuration(ms: number): string {
-  if (ms < 1000) return `${ms.toFixed(2)}ms`;
-  if (ms > 60_000) return `${(ms / 60_000).toFixed(2)}m`;
-  return `${(ms / 1000).toFixed(2)}s`;
 }

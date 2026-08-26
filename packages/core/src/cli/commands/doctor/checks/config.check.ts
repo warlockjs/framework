@@ -17,8 +17,11 @@ function isPresent(value: unknown): boolean {
 }
 
 /**
- * Verifies that the required top-level config sections are present. Reads each
- * section via `config.get` only — never mutates configuration.
+ * Verifies that the required top-level config sections are present.
+ *
+ * NEEDS NO BOOTED APP — config files are loaded by the command's preloaders,
+ * before the boot pass. Reads each section via `config.get` only; never mutates
+ * configuration.
  */
 export const configCheck: DoctorCheck = {
   name: "config",

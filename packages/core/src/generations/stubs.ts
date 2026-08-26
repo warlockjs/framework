@@ -650,14 +650,16 @@ export default function App({ children }: AppProps) {
  * `src/web/home.page.tsx` — one page, so \`warlock dev\` has something to serve
  * the moment this finishes.
  */
-export const webHomePageStub = `import type { PageProps } from "@warlock.js/web";
+export const webHomePageStub = `import { useState } from "react";
+import type { PageProps } from "@warlock.js/web";
 
 /**
  * A page route is an ordinary Warlock route whose handler renders React
  * instead of returning JSON.
  *
- * The URL is DECLARED here rather than derived from the filename. Omit
- * \`route\` and it is derived from this file's location instead — never both.
+ * The URL is the one this file DECLARES below. This page answers \`GET "/"\`
+ * because \`route = "/"\`, not because of where the file lives. A page file with
+ * no \`route\` export is REFUSED by both the dev server and the build.
  */
 export const route = "/";
 
@@ -671,13 +673,98 @@ export const metadata = { title: "Home" };
  *   export default function HomePage({ data }: PageProps<typeof loader>) { ... }
  */
 export default function HomePage(_props: PageProps) {
+  // Live state. If the button below does nothing, the page rendered on the
+  // server but never hydrated — the runtime never mounted at \`#root\`. This is
+  // deliberately here so that failure is impossible to miss.
+  const [count, setCount] = useState(0);
+
   return (
     <>
-      <h1>It renders.</h1>
-      <p>
-        This page is <code>src/web/home.page.tsx</code>. Edit it and the browser
-        updates without losing state.
-      </p>
+      {/*
+        Self-contained, dependency-free styling: plain CSS, system fonts, and
+        CSS custom properties, scoped to this page. No CSS framework, no utility
+        classes, no external stylesheet — this page looks the same whether or
+        not \`warlock add tailwind\` has ever been run.
+      */}
+      <style>{\`
+        .wk-home {
+          --wk-fg: #0f172a;
+          --wk-muted: #64748b;
+          --wk-accent: #4f46e5;
+          --wk-border: #e2e8f0;
+          font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+          color: var(--wk-fg);
+          max-width: 42rem;
+          margin: 4rem auto;
+          padding: 0 1.5rem;
+          line-height: 1.6;
+        }
+        .wk-home h1 { font-size: 2.25rem; margin: 0 0 0.5rem; }
+        .wk-home p { color: var(--wk-muted); margin: 0 0 1.5rem; }
+        .wk-home code {
+          font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+          background: #f1f5f9;
+          padding: 0.1rem 0.35rem;
+          border-radius: 0.25rem;
+        }
+        .wk-check {
+          border: 1px solid var(--wk-border);
+          border-radius: 0.75rem;
+          padding: 1.25rem 1.5rem;
+          margin: 2rem 0;
+        }
+        .wk-check strong { display: block; font-size: 1.5rem; }
+        .wk-check button {
+          font: inherit;
+          cursor: pointer;
+          background: var(--wk-accent);
+          color: #fff;
+          border: 0;
+          border-radius: 0.5rem;
+          padding: 0.5rem 1rem;
+          margin-top: 0.75rem;
+        }
+        .wk-links { display: flex; gap: 1.25rem; font-size: 0.95rem; }
+        .wk-links a { color: var(--wk-accent); text-decoration: none; }
+        .wk-links a:hover { text-decoration: underline; }
+      \`}</style>
+
+      <main className="wk-home">
+        <h1>Your Warlock app is running.</h1>
+        <p>
+          This is <code>src/web/home.page.tsx</code>, an SSR React page served by
+          the Warlock HTTP server. Edit it and the browser updates without
+          losing state.
+        </p>
+
+        <section className="wk-check">
+          <label>If this number goes up when you click, React is hydrated:</label>
+          <strong>{count}</strong>
+          <button type="button" onClick={() => setCount(c => c + 1)}>
+            Count up
+          </button>
+        </section>
+
+        <nav className="wk-links">
+          <a href="https://warlock.js.org" target="_blank" rel="noreferrer">
+            Docs
+          </a>
+          <a
+            href="https://warlock.js.org/web"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Web / SSR pages
+          </a>
+          <a
+            href="https://github.com/hassanzohdy/warlock"
+            target="_blank"
+            rel="noreferrer"
+          >
+            GitHub
+          </a>
+        </nav>
+      </main>
     </>
   );
 }

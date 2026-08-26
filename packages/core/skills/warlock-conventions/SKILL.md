@@ -114,9 +114,13 @@ import { Product } from "../../../products/models/product";
 
 Within the same module, use relative paths (`./`, `../`).
 
+## Type augmentations
+
+`src/typings.d.ts` is the project's module-augmentation file. It ships with the scaffold, is listed explicitly in `tsconfig.json`'s `include`, and is where application-wide `declare module "@warlock.js/core"` blocks live — `RequestLocals` and `RequestUser` are already there as empty interfaces. Keep its trailing `export {}` (without it the block declares an ambient module and erases the framework's real typings) and keep the augmented declarations as `interface`, the one sanctioned exception to this project's prefer-`type` rule, since declaration merging is interface-only. See [`use-request-locals`](../use-request-locals/SKILL.md).
+
 ## Decorators
 
-Cascade uses `@RegisterModel()` for the model registry and `@BelongsTo` / `@HasMany` / `@MorphTo` for relations. The scaffolded `tsconfig.json` has `"experimentalDecorators": true`. If you ever see "model not registered" errors at runtime, check that flag first.
+Cascade uses `@RegisterModel()` for the model registry and `@BelongsTo` / `@HasMany` / `@MorphTo` for relations. The scaffolded `tsconfig.json` has `"experimentalDecorators": false` — these are native Stage-3 decorators, not legacy. Never set that flag to `true`; see [`lower-stage3-decorators`](../lower-stage3-decorators/SKILL.md).
 
 ## See also
 

@@ -7,6 +7,7 @@ import { connectorsManager } from "../connectors/connectors-manager";
 import { registerConfiguredConnectors } from "../connectors/register-configured-connectors";
 import { ConnectorLifecyclePhase } from "../connectors/types";
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
+import { isDevWorker } from "../dev-server/supervisor";
 import { manifestManager } from "../manifest/manifest-manager";
 import { appPath } from "../utils";
 import { loadEnvironmentFiles } from "../utils/load-environment";
@@ -80,6 +81,41 @@ function exitAfterFlush(code: number) {
  * ends up printed next to the failure that contradicts it.
  */
 export type CommandRunVerdict = "succeeded" | "failed" | "running";
+
+/**
+ * Whether this process is the CHILD half of a supervised command.
+ *
+ * ## The finding this encodes
+ *
+ * `warlock dev` printing `› Running dev...` twice was NOT a double boot, and
+ * the distinction is the whole point of this function existing rather than the
+ * line simply being deleted. The sequence, in file order:
+ *
+ * 1. `execute()` prints the header (below) — BEFORE `commandPreAction`.
+ * 2. `cli/commands/dev-server.command.ts` `preAction` calls
+ *    `superviseDevServer()` when `!isDevWorker()`.
+ * 3. `dev-server/supervisor.ts` `spawnWorker()` re-spawns `process.argv` with
+ *    `WARLOCK_DEV_WORKER=1`, so the child runs `warlock dev` again and prints
+ *    the header too.
+ * 4. `superviseDevServer()` returns a promise that never settles, so the
+ *    supervisor's `await commandPreAction(...)` never resolves — `loadPreloaders`
+ *    and `command.execute` are unreachable in the supervisor.
+ *
+ * Step 4 is why only ONE process ever loads config, connectors, app modules or
+ * a scheduler. Verified by running it: one `APP-CODE-LOADED`, one
+ * `Application.markBooted`, one `⚡ Warlock.js` banner, one route registration,
+ * two processes. The `2 job(s) registered` in the original report is two jobs
+ * in one scheduler, not two schedulers — a genuine double boot would have
+ * printed that warning twice.
+ *
+ * So the defect is exactly one duplicated line, and this is the guard that
+ * keeps it one. `tests/unit/cli/dev-command-single-boot.test.ts` fails if the
+ * supervisor ever starts running preloaders — i.e. if the double boot the
+ * duplicated line looked like ever becomes real.
+ */
+function isRespawnedWorker(): boolean {
+  return isDevWorker();
+}
 
 export class CLICommandsManager {
   /**
@@ -520,7 +556,28 @@ export class CLICommandsManager {
     // Apply default values
     data.options = this.applyDefaultOptions(command, data.options);
 
-    displayExecutingCommand(command.name);
+    // ONE header per `warlock <command>` the user typed — not one per process.
+    //
+    // `warlock dev` is TWO processes by design: the invocation the user typed
+    // becomes a thin supervisor (`dev-server/supervisor.ts`) that re-spawns
+    // `process.argv` with `WARLOCK_DEV_WORKER=1`, and the child is the actual
+    // server. Both are `warlock dev`, so both reached this line and the user saw
+    //
+    //     › Running dev...
+    //     › Running dev...
+    //
+    // which reads exactly like the application booting twice. It is not — see
+    // the block comment on `isRespawnedWorker` — but the line was still wrong,
+    // and it re-printed on every crash-restart on top of the supervisor's own
+    // "restarting" notice.
+    //
+    // The SUPERVISOR keeps the header, not the worker: it prints immediately
+    // (so a slow boot is not silent), it prints once for the whole session
+    // (restarts are already announced as restarts), and it is the process the
+    // user actually started.
+    if (!isRespawnedWorker()) {
+      displayExecutingCommand(command.name);
+    }
 
     if (command.commandPreAction) {
       await command.commandPreAction(data);

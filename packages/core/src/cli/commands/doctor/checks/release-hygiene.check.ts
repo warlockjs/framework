@@ -14,6 +14,15 @@ type ChangelogHeading = {
 };
 
 /**
+ * The parts of `package.json` this check reads.
+ */
+type ProjectManifest = {
+  version?: unknown;
+  private?: unknown;
+  name?: unknown;
+};
+
+/**
  * Parse the top-most `## x.y.z[ - YYYY-MM-DD]` heading out of a CHANGELOG body.
  * Returns `undefined` when no version heading is present.
  */
@@ -35,18 +44,35 @@ function parseTopHeading(changelog: string): ChangelogHeading | undefined {
 }
 
 /**
- * Checks that the project's `package.json` version matches the top-most
- * `## x.y.z` heading in `CHANGELOG.md` — the same version↔changelog invariant
- * the release-hygiene unit guard enforces, surfaced as a pre-release doctor
- * check.
+ * Whether this project is something anyone could `npm publish`.
+ *
+ * THE GATE, and the reason it exists: a changelog is a promise to the people
+ * who install your package. An application has no such people. Running this
+ * check on every project projected the framework monorepo's own release
+ * practice onto users building an app, who were told — on every single run,
+ * forever — that their private application was missing a CHANGELOG.md it had no
+ * reason to have. `"private": true` is exactly the field npm itself reads to
+ * refuse a publish, so it is the honest test of whether the concern applies.
+ */
+function isPublishable(manifest: ProjectManifest): boolean {
+  return manifest.private !== true && typeof manifest.name === "string";
+}
+
+/**
+ * Checks that a PUBLISHABLE package's `package.json` version matches the
+ * top-most `## x.y.z` heading in `CHANGELOG.md` — the same version↔changelog
+ * invariant the release-hygiene unit guard enforces, surfaced as a pre-release
+ * doctor check.
+ *
+ * NEEDS NO BOOTED APP — it reads two files from the project root.
  *
  * Verdicts:
- * - no `CHANGELOG.md` → `warn` (a changelog is recommended, not mandatory);
+ * - `"private": true`, or no package name → not applicable, no line at all;
+ * - no `CHANGELOG.md` → `warn` (recommended for a published package, not
+ *   mandatory);
  * - no parseable heading → `warn`;
  * - heading version ≠ package.json version → `fail`;
  * - otherwise → `ok`.
- *
- * Read-only: reads `package.json` and `CHANGELOG.md` from the project root.
  */
 export const releaseHygieneCheck: DoctorCheck = {
   name: "release-hygiene",
@@ -54,13 +80,19 @@ export const releaseHygieneCheck: DoctorCheck = {
     const packageJsonPath = rootPath("package.json");
     const changelogPath = rootPath("CHANGELOG.md");
 
-    const pkgVersion: unknown = JSON.parse(readFileSync(packageJsonPath, "utf8")).version;
+    const manifest: ProjectManifest = JSON.parse(readFileSync(packageJsonPath, "utf8"));
+
+    if (!isPublishable(manifest)) {
+      return undefined;
+    }
+
+    const pkgVersion = manifest.version;
 
     if (typeof pkgVersion !== "string") {
       return {
         name: "release-hygiene",
         status: "fail",
-        detail: "package.json has no string version field",
+        detail: "package.json is publishable but has no string version field",
       };
     }
 
