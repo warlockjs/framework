@@ -4,6 +4,9 @@
   "type": "module",
   "description": "Multi-channel notifications for Warlock.js — define once, fire anywhere; mail / in-app database / pluggable custom channels with preferences, rate limits, and idempotency.",
   "main": "./src/index.ts",
+  "warlock": {
+    "environment": "server"
+  },
   "module": "./src/index.ts",
   "typings": "./src/index.ts",
   "dependencies": {
