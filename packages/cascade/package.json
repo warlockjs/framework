@@ -4,6 +4,9 @@
   "type": "module",
   "description": "ORM for managing databases",
   "main": "./src/index.ts",
+  "warlock": {
+    "environment": "server"
+  },
   "bin": {
     "cascade": "./bin/cascade.js"
   },
