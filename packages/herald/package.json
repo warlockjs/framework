@@ -4,6 +4,9 @@
   "type": "module",
   "description": "Message bus/brokers for RabbitMQ, Kafka, and more",
   "main": "./src/index.ts",
+  "warlock": {
+    "environment": "server"
+  },
   "dependencies": {
     "@mongez/copper": "^2.1.2",
     "@mongez/events": "^2.2.7",
