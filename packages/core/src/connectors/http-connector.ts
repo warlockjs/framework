@@ -3,6 +3,7 @@ import { colors } from "@mongez/copper";
 import { log } from "@warlock.js/logger";
 import { Application } from "../application";
 import { health } from "../http/health";
+import { assertPortIsAvailable } from "../http/port-preflight";
 import { registerHttpPlugins } from "../http/plugins";
 import { setHttpReadyReport } from "../http/ready-report";
 import { closeServerWithTimeout, FastifyInstance, getHttpServer, startHttpServer } from "../http/server";
@@ -181,6 +182,11 @@ export class HttpConnector extends BaseConnector {
     }
 
     try {
+      // Preflight the bind before `listen()` so a collision surfaces as the
+      // instruction in `PortInUseError.message` (which names the port) instead
+      // of a raw `EADDRINUSE` from deep inside Fastify/libuv.
+      await assertPortIsAvailable(httpConfig.port, httpConfig.host || "localhost");
+
       // `listen()` RESOLVES with the address it actually bound — which is the
       // only address worth announcing. See `describe-server-address.ts` for why
       // announcing `app.baseUrl` here instead was a defect rather than a

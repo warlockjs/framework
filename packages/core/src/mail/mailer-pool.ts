@@ -95,6 +95,14 @@ async function getSesMailer(config: SESConfigurations): Promise<Transporter> {
     throw new Error(`@aws-sdk/client-sesv2 is not installed.\n\n${SES_INSTALL_INSTRUCTIONS}`);
   }
 
+  if (moduleExists === null && nodemailerLoadPromise) {
+    await nodemailerLoadPromise;
+  }
+
+  if (moduleExists === false) {
+    throw new Error(`nodemailer is not installed.\n\n${NODEMAILER_INSTALL_INSTRUCTIONS}`);
+  }
+
   const hash = `ses_${config.region}_${config.accessKeyId}`;
 
   const existingTransporter = mailerPool.get(hash);
@@ -112,11 +120,6 @@ async function getSesMailer(config: SESConfigurations): Promise<Transporter> {
     },
   });
 
-  // PRECONDITION: callers must already have awaited `nodemailerLoadPromise` — `getMailer` does, at
-  // its own guard above, before it dispatches here. This function reads `nodemailerModule` WITHOUT
-  // resolving it, and is safe only because it is unexported with a single call site. Exporting it,
-  // or adding a caller outside `getMailer`, reintroduces defect #20: a synchronous read of a module
-  // whose load was started and never awaited. Tracked as #29.
   const transporter = nodemailerModule.createTransport({
     SES: { sesClient: ses, SendEmailCommand: sesModule.SendEmailCommand },
   });

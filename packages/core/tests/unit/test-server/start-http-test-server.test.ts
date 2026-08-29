@@ -350,4 +350,94 @@ describe("startHttpTestServer", () => {
 
     expect(fixture.portAtLatePhase).toBe(secondPort);
   });
+
+  describe("boot parity", () => {
+    it("fails loudly with the raw value when HTTP_PORT does not round-trip through Number()", async () => {
+      // Mirrors what `env()` hands back for e.g. `HTTP_PORT=03999`: a string,
+      // because it does not round-trip through `Number()` exactly.
+      const badEnvDir = mkdtempSync(join(tmpdir(), "warlock-test-server-bad-port-"));
+      writeFileSync(join(badEnvDir, ".env"), "HTTP_PORT=03999\n", "utf-8");
+
+      const originalEnvDir = fixture.envDir;
+      fixture.envDir = badEnvDir;
+
+      const { connectorsManager } = await import("../../../src/connectors/connectors-manager");
+
+      vi.mocked(connectorsManager.startPhase).mockClear();
+
+      try {
+        const error = await startHttpTestServer().catch((thrown: unknown) => thrown);
+
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toContain('"03999"');
+        expect(connectorsManager.startPhase).not.toHaveBeenCalledWith("late");
+      } finally {
+        fixture.envDir = originalEnvDir;
+        rmSync(badEnvDir, { recursive: true, force: true });
+      }
+    });
+
+    it("calls runStartupValidators after modules load and before the late connector phase", async () => {
+      const { filesOrchestrator } = await import("../../../src/dev-server/files-orchestrator");
+      const { connectorsManager } = await import("../../../src/connectors/connectors-manager");
+      const { Application } = await import("../../../src/application");
+
+      vi.mocked(filesOrchestrator.moduleLoader.loadAll).mockClear();
+      vi.mocked(connectorsManager.startPhase).mockClear();
+
+      const validatorsSpy = vi
+        .spyOn(Application, "runStartupValidators")
+        .mockResolvedValue(undefined);
+
+      try {
+        const port = await reserveFreePort();
+
+        await startHttpTestServer({ port });
+
+        expect(filesOrchestrator.moduleLoader.loadAll).toHaveBeenCalledOnce();
+        expect(validatorsSpy).toHaveBeenCalledOnce();
+
+        const lateCallIndex = vi
+          .mocked(connectorsManager.startPhase)
+          .mock.calls.findIndex(([phase]) => phase === "late");
+
+        expect(lateCallIndex).toBeGreaterThanOrEqual(0);
+
+        const loadAllOrder = vi.mocked(filesOrchestrator.moduleLoader.loadAll).mock
+          .invocationCallOrder[0];
+        const validatorsOrder = validatorsSpy.mock.invocationCallOrder[0];
+        const lateOrder = vi.mocked(connectorsManager.startPhase).mock.invocationCallOrder[
+          lateCallIndex
+        ];
+
+        expect(loadAllOrder).toBeLessThan(validatorsOrder);
+        expect(validatorsOrder).toBeLessThan(lateOrder);
+      } finally {
+        validatorsSpy.mockRestore();
+      }
+    });
+
+    it("a rejecting validator stops the late connector phase from ever starting", async () => {
+      const { connectorsManager } = await import("../../../src/connectors/connectors-manager");
+      const { Application } = await import("../../../src/application");
+
+      vi.mocked(connectorsManager.startPhase).mockClear();
+
+      const validatorsSpy = vi
+        .spyOn(Application, "runStartupValidators")
+        .mockRejectedValueOnce(
+          new Error('Startup validator "requireJwtSecret" rejected boot: JWT_SECRET is not set'),
+        );
+
+      try {
+        const port = await reserveFreePort();
+
+        await expect(startHttpTestServer({ port })).rejects.toThrow(/JWT_SECRET is not set/);
+
+        expect(connectorsManager.startPhase).not.toHaveBeenCalledWith("late");
+      } finally {
+        validatorsSpy.mockRestore();
+      }
+    });
+  });
 });

@@ -7,7 +7,12 @@ import {
 } from "@warlock.js/fs";
 import { CommandActionData } from "../../commands/types";
 import { rootPath, srcPath } from "../../utils";
-import { webHomePageStub, webRootStub } from "../stubs";
+import {
+  webContactControllerStub,
+  webContactRoutesStub,
+  webHomePageStub,
+  webRootStub,
+} from "../stubs";
 import { FeatureDefinition } from "./types";
 
 /**
@@ -245,7 +250,14 @@ async function completeWebInstallation(_options: CommandActionData) {
       process.exitCode = 1;
     } else {
       await putFileAsync(srcPath("web/home.page.tsx"), webHomePageStub);
+      await ensureDirectoryAsync(srcPath("app/contact/controllers"));
+      await putFileAsync(
+        srcPath("app/contact/controllers/contact.controller.ts"),
+        webContactControllerStub,
+      );
+      await putFileAsync(srcPath("app/contact/routes.ts"), webContactRoutesStub);
       console.log(`${colors.green("✓")} Created src/web/home.page.tsx`);
+      console.log(`${colors.green("✓")} Created POST /api/contact starter route`);
     }
   }
 
@@ -257,6 +269,9 @@ export const webFeature: FeatureDefinition = {
     "Installs @warlock.js/web — SSR React pages served by the Warlock HTTP server. Scaffolds src/web (root.tsx + a home page) and registers the WebConnector in warlock.config.ts. Pages are opt-in: a Warlock app is an API until you add this.",
   dependencies: {
     "@warlock.js/web": "~4.0.0",
+    "@mongez/http": "^3.5.0",
+    "@mongez/react-form": "^4.0.0",
+    "@mongez/react-localization": "^3.4.7",
     react: "^19.2.3",
     "react-dom": "^19.2.3",
   },

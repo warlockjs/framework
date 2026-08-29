@@ -647,11 +647,53 @@ export default function App({ children }: AppProps) {
 `;
 
 /**
+ * `src/app/contact/controllers/contact.controller.ts` — a real API endpoint
+ * for the Web starter's contact form. It intentionally has no persistence
+ * dependency: replace the acknowledgement with a mail/job/database action.
+ */
+export const webContactControllerStub = `import { type Request, type RequestHandler } from "@warlock.js/core";
+import { type Infer, v } from "@warlock.js/seal";
+
+export const contactSchema = v.object({
+  name: v.string().min(2).required(),
+  email: v.email().required(),
+  message: v.string().min(10).required(),
+});
+
+export type ContactSchema = Infer.Output<typeof contactSchema>;
+
+/** POST /api/contact — validates the starter contact form. */
+export const contactController: RequestHandler<Request<ContactSchema>> = async ({ request, response }) => {
+  const contact = request.validated();
+
+  // Replace this with delivery/persistence for your app. Keeping the accepted
+  // payload visible makes the endpoint useful while remaining side-effect free.
+  return response.success({
+    message: "Thanks, " + contact.name + ". Your message has been received.",
+  });
+};
+
+contactController.validation = { schema: contactSchema };
+`;
+
+/** `src/app/contact/routes.ts` — discovered by the standard app route loader. */
+export const webContactRoutesStub = `import { router } from "@warlock.js/core";
+import { contactController } from "./controllers/contact.controller";
+
+router.post("/api/contact", contactController);
+`;
+
+/**
  * `src/web/home.page.tsx` — one page, so \`warlock dev\` has something to serve
  * the moment this finishes.
  */
-export const webHomePageStub = `import { useState } from "react";
-import type { PageProps } from "@warlock.js/web";
+export const webHomePageStub = `import { http } from "@mongez/http";
+import { Form, useFormControl, type FormControlProps } from "@mongez/react-form";
+import { extend, setCurrentLocaleCode } from "@mongez/localization";
+import { transX } from "@mongez/react-localization";
+import { v } from "@warlock.js/seal";
+import { useState } from "react";
+import { Link, type PageProps } from "@warlock.js/web";
 
 /**
  * A page route is an ordinary Warlock route whose handler renders React
@@ -665,6 +707,51 @@ export const route = "/";
 
 export const metadata = { title: "Home" };
 
+const contactSchema = v.object({
+  name: v.string().min(2).required(),
+  email: v.email().required(),
+  message: v.string().min(10).required(),
+});
+
+extend("en", {
+  starter: {
+    title: "Your Warlock app is running.",
+    introduction: "This page is rendered on the server and hydrated in the browser.",
+    language: "العربية",
+    contact: "Send a message",
+    name: "Name",
+    email: "Email",
+    message: "Message",
+    submit: "Send message",
+    sent: "Thanks — your message has been received.",
+  },
+});
+extend("ar", {
+  starter: {
+    title: "تطبيق Warlock يعمل الآن.",
+    introduction: "تُعرض هذه الصفحة على الخادم ثم تُفعَّل في المتصفح.",
+    language: "English",
+    contact: "أرسل رسالة",
+    name: "الاسم",
+    email: "البريد الإلكتروني",
+    message: "الرسالة",
+    submit: "إرسال الرسالة",
+    sent: "شكرًا — تم استلام رسالتك.",
+  },
+});
+
+function TextInput(props: FormControlProps) {
+  const { error, getErrorProps, getInputProps } = useFormControl(props);
+
+  return (
+    <div className="wk-field">
+      <label htmlFor={props.name}>{props.label}</label>
+      <input {...getInputProps()} />
+      {error && <p {...getErrorProps()}>{error}</p>}
+    </div>
+  );
+}
+
 /**
  * Add a \`loader\` export to fetch data on the server, and it arrives here as
  * \`data\`, typed:
@@ -677,6 +764,15 @@ export default function HomePage(_props: PageProps) {
   // server but never hydrated — the runtime never mounted at \`#root\`. This is
   // deliberately here so that failure is impossible to miss.
   const [count, setCount] = useState(0);
+  const [locale, setLocale] = useState<"en" | "ar">("en");
+  const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const toggleLocale = () => {
+    const nextLocale = locale === "en" ? "ar" : "en";
+    setCurrentLocaleCode(nextLocale);
+    setLocale(nextLocale);
+  };
 
   return (
     <>
@@ -727,15 +823,30 @@ export default function HomePage(_props: PageProps) {
         .wk-links { display: flex; gap: 1.25rem; font-size: 0.95rem; }
         .wk-links a { color: var(--wk-accent); text-decoration: none; }
         .wk-links a:hover { text-decoration: underline; }
+        .wk-language { margin-left: auto; }
+        .wk-contact { margin-top: 2rem; }
+        .wk-field { display: grid; gap: 0.35rem; margin: 0.8rem 0; }
+        .wk-field input, .wk-field textarea { font: inherit; padding: 0.55rem; }
+        .wk-field p, .wk-submit-error { color: #b91c1c; margin: 0; }
+        .wk-success { color: #047857; }
       \`}</style>
 
-      <main className="wk-home">
-        <h1>Your Warlock app is running.</h1>
-        <p>
-          This is <code>src/web/home.page.tsx</code>, an SSR React page served by
-          the Warlock HTTP server. Edit it and the browser updates without
-          losing state.
-        </p>
+      <main className="wk-home" dir={locale === "ar" ? "rtl" : "ltr"}>
+        <nav className="wk-links" aria-label="Starter links">
+          <a href="https://warlock.js.org" target="_blank" rel="noreferrer">Docs</a>
+          <Link href="/" aria-current="page">Home</Link>
+          <button
+            className="wk-language"
+            type="button"
+            aria-pressed={locale === "ar"}
+            onClick={toggleLocale}
+          >
+            {transX("starter.language")}
+          </button>
+        </nav>
+
+        <h1>{transX("starter.title")}</h1>
+        <p>{transX("starter.introduction")}</p>
 
         <section className="wk-check">
           <label>If this number goes up when you click, React is hydrated:</label>
@@ -745,27 +856,62 @@ export default function HomePage(_props: PageProps) {
           </button>
         </section>
 
-        <nav className="wk-links">
-          <a href="https://warlock.js.org" target="_blank" rel="noreferrer">
-            Docs
-          </a>
-          <a
-            href="https://warlock.js.org/web"
-            target="_blank"
-            rel="noreferrer"
+        <section className="wk-contact" aria-labelledby="contact-heading">
+          <h2 id="contact-heading">{transX("starter.contact")}</h2>
+          <Form<typeof contactSchema>
+            schema={contactSchema}
+            onSubmit={async ({ form, values }) => {
+              setSubmitted(false);
+              setSubmitError(null);
+              const result = await http.post<{ message: string }>("/api/contact", values);
+
+              if (result.error) {
+                if (result.error.isValidationError) {
+                  const body = result.error.body as {
+                    errors?: Record<string, string | string[]>;
+                    message?: string;
+                  };
+                  form.setErrors(
+                    Object.fromEntries(
+                      Object.entries(body.errors ?? {}).map(([name, error]) => [
+                        name,
+                        Array.isArray(error) ? error[0] : error,
+                      ]),
+                    ),
+                  );
+                  setSubmitError(body.message ?? "Please correct the highlighted fields.");
+                } else {
+                  setSubmitError("Your message could not be sent. Please try again.");
+                }
+                return;
+              }
+
+              setSubmitted(true);
+              form.reset();
+            }}
           >
-            Web / SSR pages
-          </a>
-          <a
-            href="https://github.com/hassanzohdy/warlock"
-            target="_blank"
-            rel="noreferrer"
-          >
-            GitHub
-          </a>
-        </nav>
+            <TextInput name="name" label={transX("starter.name")} autoComplete="name" />
+            <TextInput name="email" label={transX("starter.email")} type="email" autoComplete="email" />
+            <ContactMessage />
+            <button type="submit">{transX("starter.submit")}</button>
+            {submitError && <p className="wk-submit-error" role="alert">{submitError}</p>}
+            {submitted && <p className="wk-success" role="status">{transX("starter.sent")}</p>}
+          </Form>
+        </section>
       </main>
     </>
+  );
+}
+
+function ContactMessage() {
+  const { error, getErrorProps, getInputProps } = useFormControl({ name: "message" });
+
+  return (
+    <div className="wk-field">
+      <label htmlFor="message">{transX("starter.message")}</label>
+      <textarea {...getInputProps()} rows={5} />
+      {error && <p {...getErrorProps()}>{error}</p>}
+    </div>
   );
 }
 `;

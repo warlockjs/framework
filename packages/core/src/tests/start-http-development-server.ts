@@ -66,15 +66,17 @@ async function applyTestServerPort(port?: number): Promise<void> {
   // the workers resolve the same one from their own config, so both ends agree
   // without the channel.
   //
-  // ⚠ A non-numeric port also lands here, and that is NOT fine — it is just not
-  // this function's bug to fix. `env()` coerces a value only when it round-trips
-  // exactly (`String(Number(v)) === v`), so `HTTP_PORT=3999` and `HTTP_PORT=0`
-  // arrive as numbers, but `03999`, `+3999`, `1e3` and anything with stray
-  // whitespace stay strings. Those skip the preflight and the publish here, and
-  // reach `HttpConnector.start()`'s `listen({ port })` unchanged — a production
-  // path, not a test one. Tracked separately rather than widened into this fix.
+  // A non-numeric port is NOT fine, and must fail loudly rather than skip the
+  // preflight silently. `env()` coerces a value only when it round-trips exactly
+  // (`String(Number(v)) === v`), so `HTTP_PORT=3999` and `HTTP_PORT=0` arrive as
+  // numbers, but `03999`, `+3999`, `1e3` and anything with stray whitespace stay
+  // strings. Letting those through used to reach `HttpConnector.start()`'s
+  // `listen({ port })` unchanged — no preflight, no published port, and every
+  // test worker resolving a URL from a channel nothing ever wrote to.
   if (typeof resolvedPort !== "number") {
-    return;
+    throw new Error(
+      `startHttpTestServer() cannot use \`http.port\` value ${JSON.stringify(resolvedPort)} — it did not round-trip through Number() (env() only coerces a value when \`String(Number(v)) === v\`, so "03999", "+3999", "1e3", and values with stray whitespace stay strings). Fix \`HTTP_PORT\` in .env, or pass an explicit numeric port: startHttpTestServer({ port: 3999 }).`,
+    );
   }
 
   // `0` is the OS's "pick a free one for me" idiom, and the test server cannot
@@ -140,6 +142,11 @@ export async function startHttpTestServer(
     await filesOrchestrator.moduleLoader.loadAll();
 
     await applyTestServerPort(options.port);
+
+    // A rejecting validator (Application.onValidateBoot) must abort boot
+    // before late-phase connectors bind a port — same slot as
+    // `DevelopmentServer.start()` and the generated production `app.ts`.
+    await Application.runStartupValidators();
 
     // Late-phase connectors (http, socket) bind after app code has
     // registered its routes and listeners.

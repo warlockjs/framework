@@ -9,6 +9,11 @@ import {
   schemaStub,
   serviceStub,
 } from "../../../src/cli/commands/generate/templates/stubs";
+import {
+  webContactControllerStub,
+  webContactRoutesStub,
+  webHomePageStub,
+} from "../../../src/generations/stubs";
 
 /**
  * Unit coverage for the generator templates — the pure functions that turn a
@@ -153,5 +158,24 @@ describe("migrationAlterStub", () => {
     expect(output).toContain('drop: ["legacy"],');
     expect(output).toContain('rename: { old: "new" },');
     expect(output).toContain('import { Migration, string } from "@warlock.js/cascade"');
+  });
+});
+
+describe("web starter stubs", () => {
+  it("ships an interactive localized contact form backed by the real API route", () => {
+    expect(webHomePageStub).toContain('from "@mongez/react-localization"');
+    expect(webHomePageStub).toContain('from "@mongez/react-form"');
+    expect(webHomePageStub).toContain('from "@mongez/http"');
+    expect(webHomePageStub).toContain("<Link href=\"/\" aria-current=\"page\">Home</Link>");
+    expect(webHomePageStub).toContain('http.post<{ message: string }>("/api/contact", values)');
+    expect(webHomePageStub).toContain("schema={contactSchema}");
+    expect(webHomePageStub).toContain("result.error.isValidationError");
+    expect(webHomePageStub).toContain("aria-pressed={locale === \"ar\"}");
+  });
+
+  it("generates a validated Warlock API controller and route", () => {
+    expect(webContactControllerStub).toContain('from "@warlock.js/seal"');
+    expect(webContactControllerStub).toContain("contactController.validation = { schema: contactSchema }");
+    expect(webContactRoutesStub).toContain('router.post("/api/contact", contactController)');
   });
 });

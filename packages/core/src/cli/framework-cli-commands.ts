@@ -15,7 +15,7 @@ import {
   generateServiceCommand,
 } from "./commands/generate/generate.command";
 import { migrateCommand } from "./commands/migrate.command";
-import { routesCommand } from "./commands/routes.command";
+import { routesCommand, routesDiffCommand } from "./commands/routes.command";
 import { seedCommand } from "./commands/seed.command";
 import { startProductionCommand } from "./commands/start-production.command";
 import { storagePutCommand } from "./commands/storage-put.command";
@@ -30,6 +30,7 @@ export const frameworkCommands = [
   // diagnostics commands
   doctorCommand,
   routesCommand,
+  routesDiffCommand,
 
   // production commands
   buildCommand,

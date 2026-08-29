@@ -39,4 +39,14 @@ describe("add command feature registry", () => {
       expect(featuresMap[satellite].requires).toEqual(["ai"]);
     }
   });
+
+  it("keeps the Web starter's direct browser dependencies scoped to Web", () => {
+    expect(featuresMap.web.dependencies).toMatchObject({
+      "@mongez/http": "^3.5.0",
+      "@mongez/react-form": "^4.0.0",
+      "@mongez/react-localization": "^3.4.7",
+    });
+    expect(featuresMap.web.dependencies).not.toHaveProperty("@mongez/react-atom");
+    expect(featuresMap.web.dependencies).not.toHaveProperty("@mongez/atomic-query");
+  });
 });
