@@ -28,6 +28,10 @@ Some but not all of the features:
 - **Syncing Models**: Auto update documents when model's data is updated or deleted.
 
 
+## Server-only
+
+`@warlock.js/cascade`'s entire runtime surface is server-only — its `package.json` declares `"warlock": { "environment": "server" }`. `@warlock.js/web`'s build treats this as a boundary: app client code cannot value-import this package (type-only imports are still allowed), while server loaders/controllers/modules can import it freely.
+
 ## Installation
 
 ```bash

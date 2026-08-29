@@ -698,6 +698,8 @@ Model-first TypeScript ORM for MongoDB and Postgres. Query straight off the mode
 
 > This skill is the cascade **map** — read it first, then load the specific skill for the task.
 
+Server-only: `package.json` declares `"warlock": { "environment": "server" }`. `@warlock.js/web`'s build refuses app client code that value-imports this package; type-only imports are allowed, and server loaders/controllers/modules are unaffected.
+
 ## Install
 
 ```bash
