@@ -19,6 +19,14 @@ Multi-channel notifications for Warlock.js — **define once, fire anywhere**.
 npx warlock add notifications
 ```
 
+## Server-only package
+
+`@warlock.js/notifications`'s entire runtime surface is server-only. Its `package.json` declares `"warlock": { "environment": "server" }` — build-boundary metadata that `@warlock.js/web`'s Gate A (import resolution) and Gate C (emitted-bundle verification) read to keep it out of the browser bundle.
+
+- App code that reaches the client bundle (including page and layout modules) must not value-import `@warlock.js/notifications` — Gate A refuses the build.
+- A type-only import (`import type { ... } from "@warlock.js/notifications"`) is allowed — it carries no runtime edge.
+- Server loaders, controllers, and modules may import it freely.
+
 ```ts
 // src/app/orders/notifications/order-shipped.ts
 import { defineNotification } from "@warlock.js/notifications";
