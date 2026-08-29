@@ -1,6 +1,6 @@
 ---
 name: add-connector
-description: 'Extend Warlock''s lifecycle with a `BaseConnector` subclass — `name`, `priority`, `lifecyclePhase`, `start()`, `shutdown()`, `watchedFiles`. Register the instance via `connectorsManager.register(...)`; framework-level `warlock.config.ts > connectors` is planned but not shipped yet. Triggers: `BaseConnector`, `connectorsManager.register`, `ConnectorLifecyclePhase`, `ConnectorPriority`, `ConnectorName`; "add a queue worker", "wire a scheduler into bootstrap", "control startup ordering", "graceful shutdown hook"; typical import `import { BaseConnector, connectorsManager } from "@warlock.js/core"`. Skip: app context accessors — `@warlock.js/core/use-app-context/SKILL.md`; warlock.config.ts surface — `@warlock.js/core/configure-app/SKILL.md`; competing pattern: hand-rolled `process.on("SIGINT")` blocks, NestJS `OnModuleInit` lifecycle.'
+description: 'Extend Warlock with a `BaseConnector` subclass and register its instance in `warlock.config.ts > connectors`. Covers runtime lifecycle (`boot`, `start`, `shutdown`, priority, phase, watched files) and the optional static `build.generate` / `build.emit` contribution used by `warlock build`. Triggers: `BaseConnector`, `connectors`, `ConnectorLifecyclePhase`, `ConnectorBuildContribution`, `build.generate`, `build.emit`; "add a queue worker", "wire a subsystem into bootstrap", "contribute files to warlock build", "control startup ordering", "graceful shutdown hook". Skip: app context accessors — `@warlock.js/core/use-app-context/SKILL.md`; general config shape — `@warlock.js/core/configure-app/SKILL.md`; competing pattern: hand-rolled process signal blocks, NestJS lifecycle hooks.'
 ---
 
 # Warlock — add a connector
@@ -36,7 +36,7 @@ export class QueueConnector extends BaseConnector {
 }
 ```
 
-That's the connector class. The file's home is `src/connectors/<name>.ts` by convention — but **placing it there does not register it**. Custom connectors must be registered explicitly via `connectorsManager.register(...)` (see [Registering a connector](#registering-a-connector) below).
+That's the connector class. The file's home is `src/connectors/<name>.ts` by convention — but **placing it there does not register it**. Add an instance to `warlock.config.ts > connectors` (see [Registering a connector](#registering-a-connector) below).
 
 ## `BaseConnector` — required surface
 
@@ -92,37 +92,44 @@ If your connector is a self-contained service (queue client, scheduler), `Early`
 
 ## Registering a connector
 
-`connectorsManager.register(new YourConnector())` is the only path today. Nothing scans `src/connectors/` automatically — the folder is a convention for *where the file lives*, not a discovery mechanism. Place the registration call in your project's `src/app/main.ts` (auto-loaded once at boot, before the manager runs the early-phase startup):
+`warlock.config.ts > connectors` is the canonical source for both runtime boot and production-build contributions. Nothing scans `src/connectors/` automatically.
 
-```ts title="src/app/main.ts"
-import { connectorsManager } from "@warlock.js/core";
-import { QueueConnector } from "../connectors/queue-connector";
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+import { QueueConnector } from "./src/connectors/queue-connector";
 
-connectorsManager.register(new QueueConnector());
+export default defineConfig({
+  connectors: [new QueueConnector()],
+});
 ```
 
-`connectorsManager` is the singleton instance of `ConnectorsManager` exported from `@warlock.js/core`. `register(...connectors)` accepts one or many; it appends each to the list and re-sorts by priority.
+Order the array deliberately: runtime startup still follows connector priority, while build hooks are drained sequentially in array order. Names must be unique and must not claim a built-in connector name; Warlock rejects either mistake before boot or build work begins.
 
-Conditional registration is just an `if`:
+## Optional production-build contribution
 
-```ts title="src/app/main.ts"
-import { config, connectorsManager } from "@warlock.js/core";
-import { ExperimentalIndexerConnector } from "../connectors/experimental-indexer-connector";
+A connector may expose a static `build` object with `generate` and/or `emit`. Import `ConnectorBuildContribution` as a type and add the following property to the connector class. `warlock build` reads it from the configured instance without calling runtime `boot()` or `start()`.
 
-if (config.key("search.experimental.enabled")) {
-  connectorsManager.register(new ExperimentalIndexerConnector());
-}
+```ts title="inside your connector class"
+public readonly build: ConnectorBuildContribution = {
+  generate: async context => {
+    // Write generated server files beneath context.productionDir.
+    // Import optional build tooling inside this hook, not at module scope.
+    return {
+      entryImports: ['await import("./pages");'],
+      esbuild: { external: ["optional-server-peer"] },
+    };
+  },
+  emit: async context => {
+    // Emit non-esbuild artifacts after the server bundle is complete.
+  },
+};
 ```
 
-> **Heads up — planned change.** A framework-level `warlock.config.ts > connectors: [...]` field is planned so connectors register the same way `cli.commands` do today. Once shipped, the canonical pattern becomes:
->
-> ```ts title="warlock.config.ts (planned)"
-> export default defineConfig({
->   connectors: [new QueueConnector(), new SchedulerConnector()],
-> });
-> ```
->
-> Tracking: [`domains/core/plans/2026-05-23-connectors-in-warlock-config.md`](../../../../domains/core/plans/2026-05-23-connectors-in-warlock-config.md). Until that lands, use `connectorsManager.register(...)` in `main.ts`.
+- `generate(context)` runs before esbuild. It may write into `context.productionDir`, append generated-entry imports, and return a narrow esbuild patch (`jsx`, `jsxImportSource`, `define`, `external`, or `loader`). Generated files are dependency-checked again before bundling.
+- `emit(context)` runs after esbuild and before `.warlock/production` is removed; use it for artifacts esbuild does not produce, such as a client bundle or manifest.
+- Hooks are awaited sequentially in configured array order. A throw names the connector and fails the build.
+- The `build` object is closed to these two hooks. Construct plugins, pipelines, and aliases inside a hook via dynamic import so build-only dependencies do not enter the connector's runtime import graph.
+- Contributor esbuild patches merge before the user's `build` config; user values win. `define` and `loader` merge by key, while `external` concatenates and deduplicates.
 
 ## `watchedFiles` and dev restarts
 
@@ -219,7 +226,7 @@ See the [Registering a connector](#registering-a-connector) section above for th
 - **Set `this.active = true` only on success.** If `start()` throws partway, leaving `active` true means `shutdown()` thinks it has work to do and may double-close half-initialized resources.
 - **`shutdown()` must be idempotent.** SIGINT can fire twice on Windows. The manager guards re-entry with its own flag, but individual connectors get called once per shutdown loop — guard with `if (!this.active) return`.
 - **Don't reach across connector boundaries in `start()`.** The manager's `start()` loop runs all `boot()`s first, then all `start()`s — wiring across connectors goes through the `container` (`container.get("http.server")`), not through imports.
-- **Production build still needs registration.** Placing the connector under `src/connectors/<name>.ts` doesn't auto-register it in dev or prod. The connector exists wherever its `connectorsManager.register(...)` call runs — typically `src/app/main.ts`. The production bundle picks up that registration because `main.ts` is auto-loaded.
+- **Production build still needs config registration.** Placing the connector under `src/connectors/<name>.ts` does not auto-register it. Put the same instance in `warlock.config.ts > connectors`; that array is what build-time contribution discovery and runtime boot share.
 - **`watchedFiles` is restart-trigger, not dependency.** It says "I want to restart when this file changes." It does *not* mean the framework reloads that file first — that's the file orchestrator's job.
 
 ## See also

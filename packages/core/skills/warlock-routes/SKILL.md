@@ -1,6 +1,6 @@
 ---
 name: warlock-routes
-description: 'Run `warlock routes` — a read-only command that lists the registered HTTP routes as a verb-colored table (method / path / name / action / middleware-count / source), a sibling of `warlock doctor`. Filter with `--method` / `--path` / `--name`, or emit normalized rows as JSON with `--json`. Triggers: `warlock routes`, `routesCommand`, "list my routes", "show all routes", "route table", "what endpoints does my app expose", "dump routes as JSON", "which routes have middleware", "route map for CI"; run as `yarn warlock routes`. Skip: read-only health/preflight checks — `@warlock.js/core/warlock-doctor/SKILL.md`; defining/naming/grouping routes — `@warlock.js/core/register-route/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; competing tools `nest`/`express` route listers, `php artisan route:list`.'
+description: 'Run `warlock routes` — a read-only command that lists the registered HTTP routes as a verb-colored table (method / path / name / action / middleware-count / source), a sibling of `warlock doctor`. Filter with `--method` / `--path` / `--name`, or emit normalized rows as JSON with `--json`. Also covers `warlock routes:diff`, which compares live page routes against the last `warlock build`''s route snapshot and exits non-zero on drift. Triggers: `warlock routes`, `routesCommand`, `warlock routes:diff`, `routesDiffCommand`, "list my routes", "show all routes", "route table", "what endpoints does my app expose", "dump routes as JSON", "which routes have middleware", "route map for CI", "did my page routes drift from the last build"; run as `yarn warlock routes` / `yarn warlock routes:diff`. Skip: read-only health/preflight checks — `@warlock.js/core/warlock-doctor/SKILL.md`; defining/naming/grouping routes — `@warlock.js/core/register-route/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; competing tools `nest`/`express` route listers, `php artisan route:list`.'
 ---
 
 # Warlock — `warlock routes`
@@ -77,6 +77,36 @@ yarn warlock routes --name users.create
 
 An empty result means the route isn't registered — re-run `warlock dev` and read the boot error (the route-module loader is fail-loud, so a throwing route file aborts boot rather than being silently dropped).
 
+## `warlock routes:diff` — catch page-route drift before it ships
+
+Compares the **live dev-server page routes** (`router.list().filter(r => r.isPage)`) against a **snapshot written by the last successful `warlock build`** (`page-routes.manifest.json` in `resolveBuildConfig().outdir`, e.g. `dist/page-routes.manifest.json`). Boots the same diagnostic way as `warlock routes` — route modules registered, no connectors started — then diffs.
+
+```bash
+yarn warlock routes:diff
+```
+
+```
+Page routes match (4 routes).
+```
+
+or, on drift:
+
+```
+changed - GET /blog/:slug  blog.post (src/web/blog/[slug].page.tsx)
+        + GET /blog/:id    blog.post (src/web/blog/[slug].page.tsx)
+removed - GET /legacy      legacy.home
+added   + GET /promo       promo.home   (src/web/promo.page.tsx)
+Page route drift: 1 changed, 1 removed, 1 added. Run `warlock build` after reviewing these changes.
+```
+
+and exits non-zero.
+
+- **Identity is `method` + `path` + `name`.** A route is only reported `changed` — instead of one `removed` line and one unrelated `added` line — when it shares its **`source` file** with the route it's being paired against. A moved checkout (same source, different absolute path on disk) never shows as drift; a route whose declared path/name literally changed in the same file does.
+- **Requires a prior successful build.** No `page-routes.manifest.json` yet, or a malformed one → the command refuses to run and tells you to `warlock build` first, rather than diffing against nothing.
+- **Fails loudly on a broken dev boot**, same as `warlock routes` / `warlock doctor` — a route module that throws on import, or a connector registration error, aborts before any comparison happens.
+- **Only page routes are compared.** API routes registered without `isPage` never appear on either side of the diff; this command exists for the file-system page-routing surface `@warlock.js/web` adds, not the general route table.
+- **Core reads the snapshot; it does not write it.** `warlock build` writes `page-routes.manifest.json` through a connector's `build`/`emit` contribution (`@warlock.js/web`'s build integration, keyed off pages it discovers) — a project with no `@warlock.js/web` page routes never produces one, and `routes:diff` has nothing to compare against.
+
 ## Gotchas
 
 - **No connectors are started.** The list reflects what's *registered*, not what would connect. It never opens a DB/cache/socket.
@@ -88,4 +118,5 @@ An empty result means the route isn't registered — re-run `warlock dev` and re
 
 - [`warlock-doctor/SKILL.md`](../warlock-doctor/SKILL.md) — the read-only diagnostics sibling; its `routes` check warns when this table would be empty.
 - [`register-route/SKILL.md`](../register-route/SKILL.md) — defining, naming, and grouping the routes this command lists.
+- [`run-app/SKILL.md`](../run-app/SKILL.md) — `warlock build`, the command that produces the snapshot `routes:diff` compares against.
 - [`write-cli-command/SKILL.md`](../write-cli-command/SKILL.md) — the command + `preload` shape `routesCommand` is built from.

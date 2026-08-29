@@ -1,6 +1,6 @@
 ---
 name: run-app
-description: 'Three operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — `@warlock.js/core/write-cli-command/SKILL.md`; config shape — `@warlock.js/core/configure-app/SKILL.md`; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
+description: 'Three operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`, `PortInUseError`, `assertPortIsAvailable`, `EADDRINUSE`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server", "port already in use"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — `@warlock.js/core/write-cli-command/SKILL.md`; config shape — `@warlock.js/core/configure-app/SKILL.md`; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
 ---
 
 # Warlock — run the app
@@ -82,6 +82,8 @@ A worker that dies **after running healthily for at least 5s** — OOM, a native
 ```
 
 A worker that dies *sooner* than that failed to **boot** — a broken config, a port already taken — and it has already printed why. Restarting there would just reprint the same error and bury it, so the supervisor mirrors the exit code and stops.
+
+A busy port is now caught *before* the bind attempt: the HTTP connector calls `assertPortIsAvailable(port, host)` immediately before `listen()`, so the failure is `Port <port> is already in use on <host>. Stop the dev server (or whatever else is listening on port <port>) and run again, or start on a free port…` — not a raw `EADDRINUSE` surfacing from inside Fastify. Same connector, same preflight, for `warlock start`.
 
 Flapping is capped: more than 3 crashes inside 60s and the supervisor gives up rather than restarting behind your back.
 
@@ -195,6 +197,8 @@ Just `warlockConfig: true`. Build doesn't need the app booted — it reads `warl
 ```
 
 `warlock start` uses the same `resolveBuildConfig()` helper to find the bundle, so the two commands stay in sync no matter how you override the config. If `build` and `start` disagree on where the bundle is, it's because `warlock.config.ts` is being read with different cwds — never the case in normal operation.
+
+If the app uses `@warlock.js/web` page routes, a successful `warlock build` also writes `page-routes.manifest.json` next to the bundle (same `outdir`) — the snapshot `warlock routes:diff` compares the live dev surface against. See [`warlock-routes/SKILL.md`](../warlock-routes/SKILL.md#warlock-routesdiff--catch-page-route-drift-before-it-ships).
 
 ## `warlock start` — run the production bundle
 
@@ -403,3 +407,4 @@ NODE_OPTIONS=--max-old-space-size=4096 yarn warlock start
 - [`use-app-context/SKILL.md`](../use-app-context/SKILL.md) — `Application.environment` vs `Application.runtimeStrategy`.
 - [`add-connector/SKILL.md`](../add-connector/SKILL.md) — Early vs Late connector phases (why HTTP/socket boot late in dev).
 - [`update-packages/SKILL.md`](../update-packages/SKILL.md) — `warlock update` + the dev-server update notice (`devServer.checkForUpdates`).
+- [`warlock-routes/SKILL.md`](../warlock-routes/SKILL.md) — `warlock routes` / `warlock routes:diff`, the latter comparing live page routes against the manifest `warlock build` writes.

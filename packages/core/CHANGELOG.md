@@ -6,6 +6,64 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## Unreleased
+
+### Added
+
+- **Connectors can contribute to `warlock build` through an optional static
+  `build` object.** Configured connectors may define ordered, awaited
+  `generate(context)` and `emit(context)` hooks without being booted or started.
+  `generate` can add generated entry imports and a narrow esbuild patch; `emit`
+  can produce non-esbuild artifacts after the server bundle. Unknown contribution
+  keys, duplicate/reserved connector names, generated unresolved imports, and hook
+  failures stop the build instead of producing a partial artifact.
+- **`warlock routes:diff`** — compares the live dev-server page-route surface against
+  the last successful `warlock build`'s snapshot (`page-routes.manifest.json` in the
+  build `outdir`). Boots diagnostically (same fail-loud boot as `warlock routes` /
+  `warlock doctor` — no connectors started), then reports `changed` / `removed` /
+  `added` page routes and exits non-zero on drift; exits `0` with "Page routes match"
+  when the two agree. Refuses to run (with an instruction to run `warlock build`
+  first) when no snapshot exists yet, or when an existing one is malformed. A route
+  whose `path`/`name` moved but whose `source` file didn't is reported as one
+  `changed` line instead of a `removed` + `added` pair.
+
+### Changed
+
+- **The HTTP connector now preflights its port before binding.** `warlock dev` and
+  `warlock start` both go through `HttpConnector.start()`, which now calls
+  `assertPortIsAvailable(port, host)` immediately before `listen()`. A collision now
+  surfaces as `Port <port> is already in use on <host>. Stop the dev server (or
+  whatever else is listening on port <port>) and run again...` instead of a raw
+  `EADDRINUSE` thrown from inside Fastify. The test server (`startHttpTestServer`)
+  already preflighted its port before this release; this brings `dev`/`start` to the
+  same behavior.
+- **`startHttpTestServer()` now runs `Application.runStartupValidators()`** — the
+  same slot `warlock dev` and the generated production `app.ts` already ran it in —
+  after application modules load and before the late-phase connectors (http, socket)
+  bind. A validator registered via `Application.onValidateBoot(...)` that rejects now
+  aborts the test server's boot exactly as it aborts `dev`/`start`, instead of only
+  being enforced outside of tests.
+- **`warlock add web` scaffolds a real, validated API endpoint**, not just a static
+  page. It now also writes `src/app/contact/routes.ts` and
+  `src/app/contact/controllers/contact.controller.ts` (a `POST /api/contact` route
+  validated with `@warlock.js/seal`), and `src/web/home.page.tsx` ships an
+  interactive, localized (en/ar) contact form wired to that route via `@mongez/http`
+  + `@mongez/react-form` + `@mongez/react-localization`. The `web` feature now also
+  installs those three packages as dependencies.
+
+### Fixed
+
+- **`startHttpTestServer()` fails loudly instead of silently skipping the preflight**
+  when `http.port` doesn't round-trip through `Number()` (e.g. `HTTP_PORT=03999`,
+  `+3999`, `1e3`, or a value with stray whitespace) — previously it returned early
+  and let the connector reach `listen({ port })` with the unvalidated value and no
+  published port for test workers to resolve.
+- **A race in the mail SES driver** where `getSesMailer()` could read the
+  eagerly-loaded `nodemailer` module before its load promise had settled. It now
+  awaits the in-flight load first (throwing the "nodemailer is not installed"
+  install-instructions error if the load ultimately failed), matching the guard the
+  SMTP path already had.
+
 ## 5.1.0
 
 > **If you use `@warlock.js/web`, upgrade.** React did not execute at all in published

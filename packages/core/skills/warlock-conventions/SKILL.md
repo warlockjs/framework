@@ -13,7 +13,7 @@ This skill is the foundation. Every other warlock skill (`register-route`, `crea
 2. **Several files are auto-loaded — never `import` them.** The dev-server file watcher and the production builder categorize these as "special" and load them on boot.
    - `src/app/<module>/routes.ts` — route declarations
    - `src/app/<module>/main.ts` — per-module one-time setup
-   - `src/app/main.ts` — **project-level** one-time setup (where `connectorsManager.register(...)`, global hooks, etc. live)
+   - `src/app/main.ts` — **project-level** one-time application setup (global hooks and other app initialization; connector instances belong in `warlock.config.ts > connectors`)
    - `src/app/<module>/events/*.ts(x)` — **any** `.ts(x)` file inside the `events/` folder (the `*.event.ts` suffix is convention, not a framework requirement)
    - `src/app/<module>/utils/locales.ts` — module translations via `groupedTranslations(...)`
    - `src/config/*.ts(x)` — subsystem config files

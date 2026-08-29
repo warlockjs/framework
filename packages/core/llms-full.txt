@@ -8,7 +8,7 @@
 
 ---
 name: add-connector
-description: 'Extend Warlock''s lifecycle with a `BaseConnector` subclass — `name`, `priority`, `lifecyclePhase`, `start()`, `shutdown()`, `watchedFiles`. Register the instance via `connectorsManager.register(...)`; framework-level `warlock.config.ts > connectors` is planned but not shipped yet. Triggers: `BaseConnector`, `connectorsManager.register`, `ConnectorLifecyclePhase`, `ConnectorPriority`, `ConnectorName`; "add a queue worker", "wire a scheduler into bootstrap", "control startup ordering", "graceful shutdown hook"; typical import `import { BaseConnector, connectorsManager } from "@warlock.js/core"`. Skip: app context accessors — `@warlock.js/core/use-app-context/SKILL.md`; warlock.config.ts surface — `@warlock.js/core/configure-app/SKILL.md`; competing pattern: hand-rolled `process.on("SIGINT")` blocks, NestJS `OnModuleInit` lifecycle.'
+description: 'Extend Warlock with a `BaseConnector` subclass and register its instance in `warlock.config.ts > connectors`. Covers runtime lifecycle (`boot`, `start`, `shutdown`, priority, phase, watched files) and the optional static `build.generate` / `build.emit` contribution used by `warlock build`. Triggers: `BaseConnector`, `connectors`, `ConnectorLifecyclePhase`, `ConnectorBuildContribution`, `build.generate`, `build.emit`; "add a queue worker", "wire a subsystem into bootstrap", "contribute files to warlock build", "control startup ordering", "graceful shutdown hook". Skip: app context accessors — `@warlock.js/core/use-app-context/SKILL.md`; general config shape — `@warlock.js/core/configure-app/SKILL.md`; competing pattern: hand-rolled process signal blocks, NestJS lifecycle hooks.'
 ---
 
 # Warlock — add a connector
@@ -44,7 +44,7 @@ export class QueueConnector extends BaseConnector {
 }
 ```
 
-That's the connector class. The file's home is `src/connectors/<name>.ts` by convention — but **placing it there does not register it**. Custom connectors must be registered explicitly via `connectorsManager.register(...)` (see [Registering a connector](#registering-a-connector) below).
+That's the connector class. The file's home is `src/connectors/<name>.ts` by convention — but **placing it there does not register it**. Add an instance to `warlock.config.ts > connectors` (see [Registering a connector](#registering-a-connector) below).
 
 ## `BaseConnector` — required surface
 
@@ -100,37 +100,44 @@ If your connector is a self-contained service (queue client, scheduler), `Early`
 
 ## Registering a connector
 
-`connectorsManager.register(new YourConnector())` is the only path today. Nothing scans `src/connectors/` automatically — the folder is a convention for *where the file lives*, not a discovery mechanism. Place the registration call in your project's `src/app/main.ts` (auto-loaded once at boot, before the manager runs the early-phase startup):
+`warlock.config.ts > connectors` is the canonical source for both runtime boot and production-build contributions. Nothing scans `src/connectors/` automatically.
 
-```ts title="src/app/main.ts"
-import { connectorsManager } from "@warlock.js/core";
-import { QueueConnector } from "../connectors/queue-connector";
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+import { QueueConnector } from "./src/connectors/queue-connector";
 
-connectorsManager.register(new QueueConnector());
+export default defineConfig({
+  connectors: [new QueueConnector()],
+});
 ```
 
-`connectorsManager` is the singleton instance of `ConnectorsManager` exported from `@warlock.js/core`. `register(...connectors)` accepts one or many; it appends each to the list and re-sorts by priority.
+Order the array deliberately: runtime startup still follows connector priority, while build hooks are drained sequentially in array order. Names must be unique and must not claim a built-in connector name; Warlock rejects either mistake before boot or build work begins.
 
-Conditional registration is just an `if`:
+## Optional production-build contribution
 
-```ts title="src/app/main.ts"
-import { config, connectorsManager } from "@warlock.js/core";
-import { ExperimentalIndexerConnector } from "../connectors/experimental-indexer-connector";
+A connector may expose a static `build` object with `generate` and/or `emit`. Import `ConnectorBuildContribution` as a type and add the following property to the connector class. `warlock build` reads it from the configured instance without calling runtime `boot()` or `start()`.
 
-if (config.key("search.experimental.enabled")) {
-  connectorsManager.register(new ExperimentalIndexerConnector());
-}
+```ts title="inside your connector class"
+public readonly build: ConnectorBuildContribution = {
+  generate: async context => {
+    // Write generated server files beneath context.productionDir.
+    // Import optional build tooling inside this hook, not at module scope.
+    return {
+      entryImports: ['await import("./pages");'],
+      esbuild: { external: ["optional-server-peer"] },
+    };
+  },
+  emit: async context => {
+    // Emit non-esbuild artifacts after the server bundle is complete.
+  },
+};
 ```
 
-> **Heads up — planned change.** A framework-level `warlock.config.ts > connectors: [...]` field is planned so connectors register the same way `cli.commands` do today. Once shipped, the canonical pattern becomes:
->
-> ```ts title="warlock.config.ts (planned)"
-> export default defineConfig({
->   connectors: [new QueueConnector(), new SchedulerConnector()],
-> });
-> ```
->
-> Tracking: [`domains/core/plans/2026-05-23-connectors-in-warlock-config.md`](../../../../domains/core/plans/2026-05-23-connectors-in-warlock-config.md). Until that lands, use `connectorsManager.register(...)` in `main.ts`.
+- `generate(context)` runs before esbuild. It may write into `context.productionDir`, append generated-entry imports, and return a narrow esbuild patch (`jsx`, `jsxImportSource`, `define`, `external`, or `loader`). Generated files are dependency-checked again before bundling.
+- `emit(context)` runs after esbuild and before `.warlock/production` is removed; use it for artifacts esbuild does not produce, such as a client bundle or manifest.
+- Hooks are awaited sequentially in configured array order. A throw names the connector and fails the build.
+- The `build` object is closed to these two hooks. Construct plugins, pipelines, and aliases inside a hook via dynamic import so build-only dependencies do not enter the connector's runtime import graph.
+- Contributor esbuild patches merge before the user's `build` config; user values win. `define` and `loader` merge by key, while `external` concatenates and deduplicates.
 
 ## `watchedFiles` and dev restarts
 
@@ -227,7 +234,7 @@ See the [Registering a connector](#registering-a-connector) section above for th
 - **Set `this.active = true` only on success.** If `start()` throws partway, leaving `active` true means `shutdown()` thinks it has work to do and may double-close half-initialized resources.
 - **`shutdown()` must be idempotent.** SIGINT can fire twice on Windows. The manager guards re-entry with its own flag, but individual connectors get called once per shutdown loop — guard with `if (!this.active) return`.
 - **Don't reach across connector boundaries in `start()`.** The manager's `start()` loop runs all `boot()`s first, then all `start()`s — wiring across connectors goes through the `container` (`container.get("http.server")`), not through imports.
-- **Production build still needs registration.** Placing the connector under `src/connectors/<name>.ts` doesn't auto-register it in dev or prod. The connector exists wherever its `connectorsManager.register(...)` call runs — typically `src/app/main.ts`. The production bundle picks up that registration because `main.ts` is auto-loaded.
+- **Production build still needs config registration.** Placing the connector under `src/connectors/<name>.ts` does not auto-register it. Put the same instance in `warlock.config.ts > connectors`; that array is what build-time contribution discovery and runtime boot share.
 - **`watchedFiles` is restart-trigger, not dependency.** It says "I want to restart when this file changes." It does *not* mean the framework reloads that file first — that's the file orchestrator's job.
 
 ## See also
@@ -1435,7 +1442,7 @@ description: 'Scaffold a new feature module under `src/app/<name>/` via `warlock
 
 # Warlock — create a module
 
-A module is a self-contained feature folder under `src/app/<name>/`. The CLI scaffolds the standard subfolders; the framework auto-loads `routes.ts`, `main.ts`, every `.ts(x)` file inside `events/`, and `utils/locales.ts`. You never `import` those files. (`src/app/main.ts` at the project root is also auto-loaded — that's the home for global one-time setup like `connectorsManager.register(...)`.)
+A module is a self-contained feature folder under `src/app/<name>/`. The CLI scaffolds the standard subfolders; the framework auto-loads `routes.ts`, `main.ts`, every `.ts(x)` file inside `events/`, and `utils/locales.ts`. You never `import` those files. (`src/app/main.ts` at the project root is also auto-loaded for global one-time application setup; connector instances belong in `warlock.config.ts > connectors`.)
 
 ## The shape
 
@@ -3270,7 +3277,7 @@ const result = await measure("publish-event", () =>
 
 ---
 name: run-app
-description: 'Three operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — `@warlock.js/core/write-cli-command/SKILL.md`; config shape — `@warlock.js/core/configure-app/SKILL.md`; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
+description: 'Three operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`, `PortInUseError`, `assertPortIsAvailable`, `EADDRINUSE`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server", "port already in use"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — `@warlock.js/core/write-cli-command/SKILL.md`; config shape — `@warlock.js/core/configure-app/SKILL.md`; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
 ---
 
 # Warlock — run the app
@@ -3352,6 +3359,8 @@ A worker that dies **after running healthily for at least 5s** — OOM, a native
 ```
 
 A worker that dies *sooner* than that failed to **boot** — a broken config, a port already taken — and it has already printed why. Restarting there would just reprint the same error and bury it, so the supervisor mirrors the exit code and stops.
+
+A busy port is now caught *before* the bind attempt: the HTTP connector calls `assertPortIsAvailable(port, host)` immediately before `listen()`, so the failure is `Port <port> is already in use on <host>. Stop the dev server (or whatever else is listening on port <port>) and run again, or start on a free port…` — not a raw `EADDRINUSE` surfacing from inside Fastify. Same connector, same preflight, for `warlock start`.
 
 Flapping is capped: more than 3 crashes inside 60s and the supervisor gives up rather than restarting behind your back.
 
@@ -3465,6 +3474,8 @@ Just `warlockConfig: true`. Build doesn't need the app booted — it reads `warl
 ```
 
 `warlock start` uses the same `resolveBuildConfig()` helper to find the bundle, so the two commands stay in sync no matter how you override the config. If `build` and `start` disagree on where the bundle is, it's because `warlock.config.ts` is being read with different cwds — never the case in normal operation.
+
+If the app uses `@warlock.js/web` page routes, a successful `warlock build` also writes `page-routes.manifest.json` next to the bundle (same `outdir`) — the snapshot `warlock routes:diff` compares the live dev surface against. See [`warlock-routes/SKILL.md`](../warlock-routes/SKILL.md#warlock-routesdiff--catch-page-route-drift-before-it-ships).
 
 ## `warlock start` — run the production bundle
 
@@ -3673,6 +3684,7 @@ NODE_OPTIONS=--max-old-space-size=4096 yarn warlock start
 - [`use-app-context/SKILL.md`](../use-app-context/SKILL.md) — `Application.environment` vs `Application.runtimeStrategy`.
 - [`add-connector/SKILL.md`](../add-connector/SKILL.md) — Early vs Late connector phases (why HTTP/socket boot late in dev).
 - [`update-packages/SKILL.md`](../update-packages/SKILL.md) — `warlock update` + the dev-server update notice (`devServer.checkForUpdates`).
+- [`warlock-routes/SKILL.md`](../warlock-routes/SKILL.md) — `warlock routes` / `warlock routes:diff`, the latter comparing live page routes against the manifest `warlock build` writes.
 
 
 ## send-mail  `@warlock.js/core/send-mail/SKILL.md`
@@ -7867,7 +7879,7 @@ This skill is the foundation. Every other warlock skill (`register-route`, `crea
 2. **Several files are auto-loaded — never `import` them.** The dev-server file watcher and the production builder categorize these as "special" and load them on boot.
    - `src/app/<module>/routes.ts` — route declarations
    - `src/app/<module>/main.ts` — per-module one-time setup
-   - `src/app/main.ts` — **project-level** one-time setup (where `connectorsManager.register(...)`, global hooks, etc. live)
+   - `src/app/main.ts` — **project-level** one-time application setup (global hooks and other app initialization; connector instances belong in `warlock.config.ts > connectors`)
    - `src/app/<module>/events/*.ts(x)` — **any** `.ts(x)` file inside the `events/` folder (the `*.event.ts` suffix is convention, not a framework requirement)
    - `src/app/<module>/utils/locales.ts` — module translations via `groupedTranslations(...)`
    - `src/config/*.ts(x)` — subsystem config files
@@ -8126,7 +8138,7 @@ A `⚠ routes: 0 routes registered` line is the tell that a route module threw o
 
 ---
 name: warlock-routes
-description: 'Run `warlock routes` — a read-only command that lists the registered HTTP routes as a verb-colored table (method / path / name / action / middleware-count / source), a sibling of `warlock doctor`. Filter with `--method` / `--path` / `--name`, or emit normalized rows as JSON with `--json`. Triggers: `warlock routes`, `routesCommand`, "list my routes", "show all routes", "route table", "what endpoints does my app expose", "dump routes as JSON", "which routes have middleware", "route map for CI"; run as `yarn warlock routes`. Skip: read-only health/preflight checks — `@warlock.js/core/warlock-doctor/SKILL.md`; defining/naming/grouping routes — `@warlock.js/core/register-route/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; competing tools `nest`/`express` route listers, `php artisan route:list`.'
+description: 'Run `warlock routes` — a read-only command that lists the registered HTTP routes as a verb-colored table (method / path / name / action / middleware-count / source), a sibling of `warlock doctor`. Filter with `--method` / `--path` / `--name`, or emit normalized rows as JSON with `--json`. Also covers `warlock routes:diff`, which compares live page routes against the last `warlock build`''s route snapshot and exits non-zero on drift. Triggers: `warlock routes`, `routesCommand`, `warlock routes:diff`, `routesDiffCommand`, "list my routes", "show all routes", "route table", "what endpoints does my app expose", "dump routes as JSON", "which routes have middleware", "route map for CI", "did my page routes drift from the last build"; run as `yarn warlock routes` / `yarn warlock routes:diff`. Skip: read-only health/preflight checks — `@warlock.js/core/warlock-doctor/SKILL.md`; defining/naming/grouping routes — `@warlock.js/core/register-route/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; competing tools `nest`/`express` route listers, `php artisan route:list`.'
 ---
 
 # Warlock — `warlock routes`
@@ -8203,6 +8215,36 @@ yarn warlock routes --name users.create
 
 An empty result means the route isn't registered — re-run `warlock dev` and read the boot error (the route-module loader is fail-loud, so a throwing route file aborts boot rather than being silently dropped).
 
+## `warlock routes:diff` — catch page-route drift before it ships
+
+Compares the **live dev-server page routes** (`router.list().filter(r => r.isPage)`) against a **snapshot written by the last successful `warlock build`** (`page-routes.manifest.json` in `resolveBuildConfig().outdir`, e.g. `dist/page-routes.manifest.json`). Boots the same diagnostic way as `warlock routes` — route modules registered, no connectors started — then diffs.
+
+```bash
+yarn warlock routes:diff
+```
+
+```
+Page routes match (4 routes).
+```
+
+or, on drift:
+
+```
+changed - GET /blog/:slug  blog.post (src/web/blog/[slug].page.tsx)
+        + GET /blog/:id    blog.post (src/web/blog/[slug].page.tsx)
+removed - GET /legacy      legacy.home
+added   + GET /promo       promo.home   (src/web/promo.page.tsx)
+Page route drift: 1 changed, 1 removed, 1 added. Run `warlock build` after reviewing these changes.
+```
+
+and exits non-zero.
+
+- **Identity is `method` + `path` + `name`.** A route is only reported `changed` — instead of one `removed` line and one unrelated `added` line — when it shares its **`source` file** with the route it's being paired against. A moved checkout (same source, different absolute path on disk) never shows as drift; a route whose declared path/name literally changed in the same file does.
+- **Requires a prior successful build.** No `page-routes.manifest.json` yet, or a malformed one → the command refuses to run and tells you to `warlock build` first, rather than diffing against nothing.
+- **Fails loudly on a broken dev boot**, same as `warlock routes` / `warlock doctor` — a route module that throws on import, or a connector registration error, aborts before any comparison happens.
+- **Only page routes are compared.** API routes registered without `isPage` never appear on either side of the diff; this command exists for the file-system page-routing surface `@warlock.js/web` adds, not the general route table.
+- **Core reads the snapshot; it does not write it.** `warlock build` writes `page-routes.manifest.json` through a connector's `build`/`emit` contribution (`@warlock.js/web`'s build integration, keyed off pages it discovers) — a project with no `@warlock.js/web` page routes never produces one, and `routes:diff` has nothing to compare against.
+
 ## Gotchas
 
 - **No connectors are started.** The list reflects what's *registered*, not what would connect. It never opens a DB/cache/socket.
@@ -8214,6 +8256,7 @@ An empty result means the route isn't registered — re-run `warlock dev` and re
 
 - [`warlock-doctor/SKILL.md`](../warlock-doctor/SKILL.md) — the read-only diagnostics sibling; its `routes` check warns when this table would be empty.
 - [`register-route/SKILL.md`](../register-route/SKILL.md) — defining, naming, and grouping the routes this command lists.
+- [`run-app/SKILL.md`](../run-app/SKILL.md) — `warlock build`, the command that produces the snapshot `routes:diff` compares against.
 - [`write-cli-command/SKILL.md`](../write-cli-command/SKILL.md) — the command + `preload` shape `routesCommand` is built from.
 
 

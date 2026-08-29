@@ -17,6 +17,8 @@ Command-line interface system. Parses CLI arguments, discovers commands from the
 | `string-similarity.ts`      | Fuzzy string matching for "did you mean?" suggestions                                            |
 | `types.ts`                  | CLI-related TypeScript types                                                                     |
 | `commands/`                 | Built-in command implementations (migrate, seed, generate, etc.)                                 |
+| `commands/routes.command.ts` | Defines `routesCommand` (`warlock routes`) and `routesDiffCommand` (`warlock routes:diff`)      |
+| `commands/routes/routes-diff.action.ts` | `routesDiffCommandAction()` — compares live page routes against the last `warlock build`'s `page-routes.manifest.json` snapshot in `resolveBuildConfig().outdir`; boots diagnostically via `bootForDiagnostics()`, throws (non-zero exit) on drift |
 
 ## Key Exports
 

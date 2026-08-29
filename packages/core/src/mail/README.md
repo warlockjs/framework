@@ -8,7 +8,7 @@ Email sending system. Supports SMTP via nodemailer with connection pooling, Reac
 | ----------------- | ---------------------------------------------------------- |
 | `mail.ts`         | `Mail` class — builds and sends an email with fluent API   |
 | `send-mail.ts`    | `sendMail()` — lower-level send function with full options |
-| `mailer-pool.ts`  | SMTP connection pool management                            |
+| `mailer-pool.ts`  | Mailer connection pool (SMTP + SES) management; `nodemailer` and `@aws-sdk/client-sesv2` are both eager-loaded at import time behind a load promise. Every path that reads the cached module — SMTP directly, and SES via `nodemailerModule.createTransport({ SES: ... })` — awaits that promise first, so neither reads an unsettled import |
 | `react-mail.ts`   | Renders React components to HTML for email bodies          |
 | `config.ts`       | Mail configuration defaults and types                      |
 | `events.ts`       | Mail event hooks (before/after send)                       |

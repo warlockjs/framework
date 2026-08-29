@@ -9,7 +9,7 @@ Lifecycle management for all framework subsystems (HTTP server, database, cache,
 | `base-connector.ts`           | `BaseConnector` abstract class — name, priority, `start()`, `shutdown()`                   |
 | `logger-connector.ts`         | Initializes the logging subsystem                                                          |
 | `mail-connector.ts`           | Initializes the mailer subsystem                                                           |
-| `http-connector.ts`           | Starts the Fastify HTTP server                                                             |
+| `http-connector.ts`           | Starts the Fastify HTTP server; `start()` preflights the configured port via `assertPortIsAvailable()` before `listen()`, so a collision raises `PortInUseError` (actionable message) instead of a raw `EADDRINUSE` |
 | `database-connector.ts`       | Connects to the database via `@warlock.js/cascade`                                         |
 | `herald-connector.ts`         | Connects to message brokers via `@warlock.js/herald`                                       |
 | `cache-connector.ts`          | Initializes the cache subsystem via `@warlock.js/cache`                                    |
@@ -19,7 +19,7 @@ Lifecycle management for all framework subsystems (HTTP server, database, cache,
 | `access-connector.ts`         | Wires `@warlock.js/access` authorization from config                                       |
 | `ai-connector.ts`             | Wires `@warlock.js/ai` from config                                                         |
 | `connectors-manager.ts`       | `ConnectorsManager` — registers, starts, shuts down connectors; handles `SIGINT`/`SIGTERM` |
-| `types.ts`                    | `Connector`, `ConnectorName`, `ConnectorPriority`, `ConnectorLifecyclePhase` types         |
+| `types.ts`                    | Runtime connector types plus the closed `ConnectorBuildContribution` (`generate` / `emit`) contract used by `warlock build` |
 | `index.ts`                    | Barrel export                                                                              |
 
 ## Key Exports
@@ -27,7 +27,7 @@ Lifecycle management for all framework subsystems (HTTP server, database, cache,
 - `connectorsManager` — singleton `ConnectorsManager` instance
 - `BaseConnector` — abstract base for custom connectors
 - `LoggerConnector`, `MailerConnector`, `HttpConnector`, `DatabaseConnector`, `HeraldConnector`, `CacheConnector`, `StorageConnector`, `SocketConnector`, `NotificationsConnector`, `AccessConnector`, `AiConnector`
-- `Connector`, `ConnectorName` types
+- `Connector`, `ConnectorName`, `ConnectorBuildContribution`, `ConnectorBuildContext`, `ConnectorBuildGenerateResult`, `ConnectorEsbuildPatch` types
 
 ## Dependencies
 
@@ -36,6 +36,7 @@ Lifecycle management for all framework subsystems (HTTP server, database, cache,
 - `../dev-server/dev-logger` — colored log output
 - `../config` — reads subsystem-specific configuration
 - `../http` — HTTP server instance
+- `../http/port-preflight` — `assertPortIsAvailable()` / `PortInUseError` used by `http-connector.ts` before binding
 - `../router` — route scanning on HTTP start
 - `../storage` — storage driver initialization
 
@@ -49,5 +50,5 @@ Lifecycle management for all framework subsystems (HTTP server, database, cache,
 
 - Application startup (`bootstrap` → `connectors.start()`)
 - `dev-server/` — starts connectors during development
-- `production/` — starts connectors during production build
+- `production/` — reads `warlock.config.ts > connectors` statically and drains their build contributions without starting runtime connectors
 - `tests/` — starts subset of connectors for test environment

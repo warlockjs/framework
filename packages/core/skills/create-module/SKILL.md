@@ -5,7 +5,7 @@ description: 'Scaffold a new feature module under `src/app/<name>/` via `warlock
 
 # Warlock — create a module
 
-A module is a self-contained feature folder under `src/app/<name>/`. The CLI scaffolds the standard subfolders; the framework auto-loads `routes.ts`, `main.ts`, every `.ts(x)` file inside `events/`, and `utils/locales.ts`. You never `import` those files. (`src/app/main.ts` at the project root is also auto-loaded — that's the home for global one-time setup like `connectorsManager.register(...)`.)
+A module is a self-contained feature folder under `src/app/<name>/`. The CLI scaffolds the standard subfolders; the framework auto-loads `routes.ts`, `main.ts`, every `.ts(x)` file inside `events/`, and `utils/locales.ts`. You never `import` those files. (`src/app/main.ts` at the project root is also auto-loaded for global one-time application setup; connector instances belong in `warlock.config.ts > connectors`.)
 
 ## The shape
 
