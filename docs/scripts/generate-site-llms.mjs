@@ -104,6 +104,11 @@ function readDescription(llms) {
   return quotes[0] ?? "";
 }
 
+/** Keep generated site artifacts deterministic across Windows and Unix package checkouts. */
+function normalizeNewlines(contents) {
+  return contents.replace(/\r\n?/g, "\n");
+}
+
 /** Map a package name to its docs landing URL on the site. */
 function docUrl(pkg) {
   // ai-panoptic is an observability companion, not a provider adapter — it
@@ -132,7 +137,7 @@ for (const pkg of PACKAGES) {
     throw new Error(`Missing llms source files for workspace package: ${pkg}`);
   }
 
-  const llms = readFileSync(llmsPath, "utf8");
+  const llms = normalizeNewlines(readFileSync(llmsPath, "utf8"));
   const description = readDescription(llms);
   const scopedName = pkg === "create-warlock" ? "create-warlock" : `@warlock.js/${pkg}`;
 
@@ -145,7 +150,7 @@ for (const pkg of PACKAGES) {
   let full = "";
 
   if (hasFull) {
-    full = readFileSync(fullPath, "utf8").trim();
+    full = normalizeNewlines(readFileSync(fullPath, "utf8")).trim();
     writeFileSync(join(pkgPublicDir, "llms-full.txt"), full);
     perPackageCount++;
   }

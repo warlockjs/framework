@@ -83,8 +83,44 @@ Because the route-module loader is **fail-loud**, a route file that throws on im
 - **`MW` counts middleware, it doesn't name them.** It's a quick "is this route guarded?" signal; for the actual middleware chain, read the route definition.
 - **`ACTION` is the handler function name.** A controller method shows its method name; an inline arrow handler with no name shows `anonymous`.
 
+## `warlock routes:diff`
+
+`warlock routes:diff` bootstraps the current application in diagnostic mode
+(route modules loaded, connectors not started), then compares those live page
+routes against the **page-route manifest** the last successful `warlock build` wrote
+(`page-routes.manifest.json` under the build output directory). It exists for
+the same failure `@warlock.js/web`'s live dev re-registration is built to
+avoid at runtime: a page renamed, added, or route-changed in dev must not
+silently ship a production build with a stale route surface.
+
+```bash
+warlock routes:diff
+```
+
+```
+Page routes match (6 routes).
+```
+
+When the two disagree, it prints one line per drift and exits non-zero — a
+CI-friendly gate to run before deploying:
+
+```
+changed - GET /contact-us  contact-us  (src/web/contact-us.page.tsx)
+        + GET /contact-us2  contact-us  (src/web/contact-us.page.tsx)
+added   + GET /about  about  (src/web/about.page.tsx)
+```
+
+It requires a prior `warlock build` — there is no manifest to diff against
+otherwise, and the command refuses with an explicit instruction rather than
+comparing against nothing. Comparison identity is method + path + name; a
+route whose declared source file moved (a checkout relocated on disk) is
+shown as context only and does not itself count as drift. Only page routes
+(`isPage: true`) are compared — ordinary API routes are out of scope for this
+command.
+
 ## Going further
 
 - [`warlock doctor`](./doctor.md) — the read-only diagnostics sibling (the `routes` check there warns when the table would be empty).
 - [CLI commands](./cli-commands.md) — every other built-in `warlock` command.
-- [Routing](../basics/routing.md) — how routes are defined, named, and grouped in the first place.
+- [Routing](../the-basics/02-routing.md) — how routes are defined, named, and grouped in the first place.
+- [`@warlock.js/web`](../../web/) — the page layer `routes:diff` is built for.

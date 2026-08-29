@@ -161,7 +161,7 @@ After app code is imported, the framework starts late-phase connectors:
 Two-stage startup:
 
 - **`boot()`**: reads `config.get("http")`, creates a Fastify instance with `startHttpServer(...)`, registers HTTP plugins (CORS, cookies, file upload, rate limiting, etc.), and stores the instance in the container under `"http.server"`. Also calls `setBaseUrl(...)` so utilities like `url("/api/foo")` produce absolute URLs.
-- **`start()`**: scans the router. In development the framework uses `router.scanDevServer(...)` (a wildcard route that delegates to find-my-way so HMR can swap routes without re-registering); in production it uses `router.scan(...)` (registers each route directly with Fastify). Then `await this.http.listen(...)` opens the port.
+- **`start()`**: scans the router. In development the framework uses `router.scanDevServer(...)` (a wildcard route that delegates to find-my-way so HMR can swap routes without re-registering); in production it uses `router.scan(...)` (registers each route directly with Fastify). The port is preflighted with a probe bind-and-release before the real `listen()` call, so a port already taken by another process surfaces as a `PortInUseError` naming the port and host — an actionable message instead of a raw `EADDRINUSE` from deep inside the HTTP stack. Then `await this.http.listen(...)` opens the port.
 
 Two-stage startup matters because the socket connector's `boot()` runs in between and needs the Fastify instance.
 
@@ -283,18 +283,20 @@ Four properties, two methods. That's the whole contract.
 
 The watched files matter only in development — when one of them changes, the dev server tells this connector to restart itself. Use it for the connector's own config file plus any other file whose change should refresh the connection (`.env` if you read env vars in `start()`).
 
-### Step 2 — Register it
+### Step 2 — Declare it in `warlock.config.ts`
 
-A custom connector must be registered with the connectors manager before the boot sequence runs. Connect it in your app's main entry:
+A custom connector belongs in `warlock.config.ts > connectors`. That one array is what drives both halves of its life: `warlock dev` and the generated production entry hand it to `registerConfiguredConnectors(...)`, which registers each entry with the connectors manager (the same manager whose constructor registers the built-ins) before the boot sequence runs; `warlock build` reads the same array statically to drain each connector's optional `build` contribution (see [Build-time contribution](#build-time-contribution) below).
 
-```ts title="src/app/main.ts"
-import { connectorsManager } from "@warlock.js/core";
-import { FeatureFlagsConnector } from "src/connectors/feature-flags.connector";
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+import { FeatureFlagsConnector } from "./src/connectors/feature-flags.connector";
 
-connectorsManager.register(new FeatureFlagsConnector());
+export default defineConfig({
+  connectors: [new FeatureFlagsConnector()],
+});
 ```
 
-The manager re-sorts by priority on every `register(...)` call, so the order you register doesn't matter — only the `priority` property does.
+The manager re-sorts by priority when it registers the array, so the order you list connectors in doesn't matter for boot — only the `priority` property does. Order DOES matter for the build, which drains `build` contributions sequentially in array order.
 
 ### Step 3 — Pick a priority
 
@@ -327,7 +329,7 @@ There's no clash detection — two connectors with the same priority just run in
 
 ### Where the file lives
 
-By convention: `src/connectors/<name>.connector.ts`. The framework doesn't enforce this — register from anywhere — but co-locating connectors in one folder makes them easy to find:
+By convention: `src/connectors/<name>.connector.ts`. The framework doesn't enforce this — import the class from wherever `warlock.config.ts` reaches it — but co-locating connectors in one folder makes them easy to find:
 
 ```
 src/connectors/
@@ -378,13 +380,41 @@ public async restart(): Promise<void> {
 }
 ```
 
+## Build-time contribution
+
+A connector can also participate in `warlock build` by exporting an optional `build` property — `ConnectorBuildContribution` — with two hooks, both awaited, drained from the same `connectors` array in array order:
+
+- **`generate(context)`** — write files into `context.productionDir` and/or return `{ entryImports, esbuild }`: entry lines appended after the `./routes` import in the generated production entry, and an esbuild patch (`define`, `external`, `loader`, `jsx`, `jsxImportSource`) merged into the build. Runs after the generated-imports check and before esbuild bundles.
+- **`emit(context)`** — produce artifacts esbuild itself doesn't, such as a separate client bundle. Runs after esbuild and before `.warlock/production` is removed, so it can still read what `generate` wrote there.
+
+```ts title="src/connectors/feature-flags.connector.ts"
+import type { ConnectorBuildContext, ConnectorBuildGenerateResult, ConnectorName } from "@warlock.js/core";
+import { BaseConnector } from "@warlock.js/core";
+
+export class FeatureFlagsConnector extends BaseConnector {
+  public readonly name: ConnectorName = "featureFlags";
+  public readonly priority = 10;
+
+  // ...start()/shutdown() as above
+
+  public readonly build = {
+    async generate(context: ConnectorBuildContext): Promise<ConnectorBuildGenerateResult> {
+      // write a resolved flags manifest into context.productionDir, if needed
+      return {};
+    },
+  };
+}
+```
+
+`context` (`ConnectorBuildContext`) hands over `productionDir`, `appRoot`, and the resolved build `options` — nothing that lets a heavy plugin instance or a compiled pipeline live on the contribution object itself; anything heavy is constructed *inside* a hook, after a dynamic import. The type is closed to exactly `generate` and `emit` — a connector declaring anything else on `build` fails the build, naming the connector and the offending key. `warlock build` never calls `boot()`/`start()`: only `build.generate`/`build.emit` run, reading the same `connectors` array declared in `warlock.config.ts`, statically. This is how `@warlock.js/web` gets its `pages` barrel imported into the generated entry, emits the page-route manifest `routes:diff` reads, and builds the hydration client — most app connectors never need it.
+
 ## Gotchas
 
 - **Connectors silently no-op when their config is missing.** A `database` connector with no `config.get("database")` simply doesn't connect — no error, no warning. If you expected a connection and didn't get one, check that `src/config/database.ts` exists and exports a default config.
 - **Models register at import time.** If you write a custom connector that depends on a model being registered, your connector MUST be `Late` phase — otherwise the model doesn't exist yet. (This is rare; the built-in DATABASE connector handles the registration story for you.)
 - **`Application.runtimeStrategy` is set by the framework's dev or prod entry point** before the connectors start. Connectors that branch on it (HTTP does) read the value during `start()`, not at module load time.
 - **Shutdown failures are caught and logged, never thrown.** If your connector's `shutdown()` throws, the framework keeps walking the rest of the connectors. This is intentional — one broken connector shouldn't take down a clean shutdown.
-- **Don't `register` a connector from inside another connector's `start()`.** The manager has already taken the snapshot it's iterating; new registrations land in the list but won't start in this boot. Register before bootstrap kicks off.
+- **A connector's build contribution and its runtime behaviour must agree.** The generated production entry passes the array the build resolved, along with the names the build drained; a boot whose resolved `connectors` array doesn't match is refused rather than silently booting (or skipping) a connector the bundle wasn't built for.
 - **The `Socket` connector reads HTTP's instance via the container.** If you write a connector that wants the Fastify server, pull it from `container.get("http.server")` — and make sure your priority is greater than `5` so HTTP has booted first.
 
 ## See also

@@ -1,6 +1,6 @@
 ---
 title: "Custom connector"
-description: Plug a new subsystem (queue worker, scheduler, search client, custom broker) into Warlock's lifecycle — extend `BaseConnector`, pick a priority, decide Early vs Late, register it with connectorsManager, and get graceful SIGINT shutdown for free.
+description: Plug a new subsystem (queue worker, scheduler, search client, custom broker) into Warlock's lifecycle — extend `BaseConnector`, pick a priority, decide Early vs Late, declare it in `warlock.config.ts > connectors`, and get graceful SIGINT shutdown for free.
 sidebar:
   label: "Custom connector"
 ---
@@ -49,7 +49,7 @@ export class QueueWorkerConnector extends BaseConnector {
 }
 ```
 
-That's the entire shape. Put the file under `src/connectors/<name>.ts` (a convention, not a requirement) and register it with `connectorsManager.register(...)` — see [Registering the connector](#registering-the-connector) below. Five things to know — covered below in order.
+That's the entire shape. Put the file under `src/connectors/<name>.ts` (a convention, not a requirement) and declare an instance of it in `warlock.config.ts > connectors` — see [Registering the connector](#registering-the-connector) below. Five things to know — covered below in order.
 
 ## The required surface
 
@@ -113,27 +113,38 @@ A scheduler that reads job definitions from `src/app/<module>/main.ts`? `Late`. 
 
 ## Registering the connector
 
-There is **one** way to register a connector: call `connectorsManager.register(new YourConnector())`. There is no auto-discovery — the framework does **not** scan `src/connectors/` and instantiate classes for you. The built-in connectors are registered the same way, in the `ConnectorsManager` constructor; yours go through the same door from your app's `main.ts`:
+The canonical way to add a connector to your app is to list an instance of it in `warlock.config.ts > connectors`. There is no auto-discovery — the framework does **not** scan `src/connectors/` and instantiate classes for you. That one array drives both halves of the connector's life:
 
-```ts title="src/app/main.ts"
-import { connectorsManager } from "@warlock.js/core";
-import { QueueWorkerConnector } from "../connectors/queue-worker-connector";
+- `warlock dev` and the generated production entry hand the array to `registerConfiguredConnectors(...)`, which registers each connector with the connectors manager (the same manager that registers the built-ins in its constructor) and is what actually boots it.
+- `warlock build` reads the same array **statically** and drains each connector's `build` contribution — it never calls `boot()`/`start()`. See [Build-time contribution](#build-time-contribution) below.
 
-connectorsManager.register(new QueueWorkerConnector());
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+import { QueueWorkerConnector } from "./src/connectors/queue-worker-connector";
+
+export default defineConfig({
+  connectors: [new QueueWorkerConnector()],
+});
 ```
 
-`connectorsManager` is the singleton exported from `@warlock.js/core`. `register(...connectors)` appends and re-sorts by priority, so registration order doesn't matter — only the `priority` property does. Do this at module top-level: `main.ts` is auto-loaded once at boot, _before_ the manager starts the connectors.
+`connectors` is a normal array expression, so registration order doesn't matter for boot — the manager re-sorts by `priority` — but it does matter for the build, which drains contributions sequentially in array order.
 
-Because registration is explicit, conditional registration is trivial — gate it behind a config key, an env flag, anything:
+The exported `connectorsManager.register(...)` API is the low-level runtime mechanism used underneath. Calling it from app code registers only the runtime half, so `warlock build` cannot see or drain that connector's build contribution; use the config array for application connectors.
 
-```ts title="src/app/main.ts"
-import { config, connectorsManager } from "@warlock.js/core";
-import { ExperimentalIndexerConnector } from "../connectors/experimental-indexer-connector";
+Because it's a plain expression, conditional registration is trivial — gate it behind an env flag, anything that resolves the same way at build time and at boot:
 
-if (config.get("search.experimental.enabled")) {
-  connectorsManager.register(new ExperimentalIndexerConnector());
-}
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+import { ExperimentalIndexerConnector } from "./src/connectors/experimental-indexer-connector";
+
+export default defineConfig({
+  connectors: [
+    ...(process.env.SEARCH_EXPERIMENTAL_ENABLED === "true" ? [new ExperimentalIndexerConnector()] : []),
+  ],
+});
 ```
+
+Keep the condition stable between build and boot — `warlock build` resolves this array once, and a production boot whose resolved array doesn't match what the build drained is refused rather than silently booting a connector the bundle wasn't built for.
 
 ## A complete queue worker example
 
@@ -281,14 +292,61 @@ public async shutdown(): Promise<void> {
 }
 ```
 
+## Build-time contribution
+
+Beyond the runtime lifecycle, a connector may also export an optional `build` property — `ConnectorBuildContribution` — with two hooks that `warlock build` drains from the same `connectors` array, sequentially, in array order:
+
+- **`generate(context)`** — write files into `context.productionDir` and/or return `{ entryImports, esbuild }` to append import lines to the generated production entry (after the `./routes` import) and patch the esbuild call (`define`, `external`, `loader`, `jsx`, `jsxImportSource`). Runs after the generated-imports check and before esbuild bundles.
+- **`emit(context)`** — produce artifacts esbuild itself doesn't, such as a separate client bundle. Runs after esbuild and before `.warlock/production` is removed, so it may still read what `generate` wrote there.
+
+`context` (`ConnectorBuildContext`) hands over `productionDir`, `appRoot`, and the resolved build `options` — nothing that would let a plugin instance or a compiled pipeline live on the contribution object itself. The type is closed on purpose: exactly `generate` and `emit`, no data-bearing fields. A connector declaring anything else on `build` fails the build, naming the connector and the offending key, instead of the key being silently dropped.
+
+```ts title="src/connectors/queue-worker-connector.ts"
+import {
+  BaseConnector,
+  ConnectorLifecyclePhase,
+  type ConnectorBuildContext,
+  type ConnectorBuildGenerateResult,
+  type ConnectorName,
+} from "@warlock.js/core";
+
+export class QueueWorkerConnector extends BaseConnector {
+  public readonly name: ConnectorName = "queueWorker";
+  public readonly priority = 10;
+  public readonly lifecyclePhase = ConnectorLifecyclePhase.Early;
+
+  protected readonly watchedFiles = ["src/config/queue.ts"];
+
+  public async start(): Promise<void> {
+    // …
+    this.active = true;
+  }
+
+  public async shutdown(): Promise<void> {
+    // …
+    this.active = false;
+  }
+
+  public readonly build = {
+    async generate(context: ConnectorBuildContext): Promise<ConnectorBuildGenerateResult> {
+      // e.g. write a resolved job manifest into context.productionDir
+      return {};
+    },
+  };
+}
+```
+
+Most connectors never need this — it's for the rare case where a subsystem needs generated files or a separate client bundle at build time, the way `@warlock.js/web` uses `generate`/`emit` to emit the page-route manifest and build the hydration client. `warlock build` never calls `boot()`/`start()`; only `build.generate`/`build.emit` run, reading the same `connectors` array declared in `warlock.config.ts`, statically.
+
 ## Gotchas
 
 - **Set `this.active = true` only on success.** If `start()` throws partway through and you've flipped the flag too early, `shutdown()` thinks it has real work to do and may double-close half-initialized resources.
 - **`shutdown()` must be idempotent.** SIGINT can fire twice on Windows. The manager guards re-entry with its own flag, but individual connectors get called once per shutdown loop — guard with `if (!this.active) return;`.
 - **Don't reach across connector boundaries in `start()`.** The manager's loop runs all `boot()`s first, then all `start()`s — wiring across connectors goes through the DI container (`container.get("http.server")`), not through imports.
-- **Registration is explicit — there is no auto-discovery.** Putting a file in `src/connectors/` does nothing on its own. You must call `connectorsManager.register(new YourConnector())` (typically from `src/app/main.ts`). The framework never scans the folder for connector classes.
+- **Registration is explicit — there is no auto-discovery.** Putting a file in `src/connectors/` does nothing on its own. You must list an instance of it in `warlock.config.ts > connectors`. The framework never scans the folder for connector classes.
 - **`watchedFiles` is a restart trigger, not a dependency.** It says "I want to restart when this file changes." It does _not_ mean the framework reloads that file first — that's the file orchestrator's job.
 - **Don't pick `name`s the framework already uses.** `"logger"`, `"mailer"`, `"database"`, `"herald"`, `"cache"`, `"http"`, `"storage"`, `"socket"`, `"notifications"`, and `"access"` are taken. Pick something distinctive.
+- **A connector listed in `connectors` but never boot-relevant to the build still gets drained.** `warlock build` reads the array statically for every entry's `build` contribution, whether or not that connector does anything at runtime in this environment.
 
 ## See also
 

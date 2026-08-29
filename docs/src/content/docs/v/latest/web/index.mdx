@@ -1,6 +1,6 @@
 ---
 title: "@warlock.js/web"
-description: SSR React pages for Warlock apps, with hydration, client navigation, and Fast Refresh.
+description: SSR React pages for Warlock apps, with hydration, client navigation, filesystem routing, and Fast Refresh.
 sidebar:
   order: 1
   label: "Overview"
@@ -18,8 +18,10 @@ warlock add web
 ```
 
 The command installs the package, scaffolds `src/web/`, and registers the Web
-connector in `warlock.config.ts`. `src/web/` is the page root; it contains the
-web layer's pages, layouts, and related middleware.
+connector in `warlock.config.ts`. `src/web/` is the page root — the only page
+root a project has today. It contains the web layer's pages, layouts, and
+related middleware. (A per-module page root, e.g. `src/app/blog/web/`, is not
+implemented; every page lives under the one project-level `src/web/`.)
 
 ## Rendering and navigation
 
@@ -30,15 +32,241 @@ client-side navigation, including Back and Forward, without a document reload.
 In development, React Fast Refresh preserves component state while edits also
 update server-rendered output.
 
+## Filesystem routing
+
+A page with no `route` export derives its URL and name from where it lives
+beneath `src/web`:
+
+- `index.page.tsx` claims its own directory (`src/web/index.page.tsx` → `/`,
+  `src/web/blog/index.page.tsx` → `/blog`).
+- Every other directory contributes its own name as a path segment
+  (`src/web/about.page.tsx` → `/about`; `home.page.tsx` is **not** magic —
+  it derives to `/home`, not `/`).
+- `[id]` directories or filenames become a `:id` route param
+  (`src/web/products/[id].page.tsx` → `/products/:id`).
+- `(group)` directories — parentheses, not braces — contribute **nothing** to
+  the path or the derived name; they exist purely to organize files on disk.
+- The derived route **name** is the dotted path of contributing segments
+  (groups omitted), e.g. `src/web/products/[id].page.tsx` → name `products.id`.
+
+An explicit `route` export always wins over derivation, for both the path and
+the name:
+
+```tsx title="src/web/products/[id].page.tsx"
+export const route = { path: "/products/:id", name: "products.show" };
+
+export default function ProductPage() { /* ... */ }
+```
+
+Two pages that resolve to the same effective path, or the same route name,
+fail the build/boot loudly rather than leaving one of them silently
+unreachable — the second file is named in the error alongside the first.
+
+### Layouts and the prefix override
+
+A `layout.tsx` may export a `prefix` and/or a `middleware` array. Every
+`layout.tsx` from the web root down to a page's own directory contributes,
+outermost first:
+
+- **Middleware** always composes — every layout on the path that declares
+  `middleware` runs, outer to inner, whether or not that layout renders
+  anything.
+- **Rendering** is capped at one: a layout counts against the
+  single-rendering-layout rule only if it has a **default export**. A
+  `layout.tsx` that exports only `prefix` and/or `middleware` renders nothing
+  and nests freely; two or more layouts on one path that *do* render is a
+  build error naming every offending layout.
+- **A layout's `prefix` overrides its own directory's segment — it does not
+  append to it.** For a page with no explicit `route`, a directory whose
+  layout declares `prefix: "/store"` contributes `/store` in place of that
+  directory's own name-derived segment, not in addition to it. This is why
+  `src/web/products/index.page.tsx` under a `layout.tsx` with
+  `prefix: "/store"` resolves to `/store`, not `/store/products`.
+- For a page **with** an explicit `route` export, composition is prefix +
+  declared path (`composeRoutePath`): the nearest layout's composed prefix is
+  joined to the page's own `route.path` — a root prefix (`"/"`) or a root
+  path (`"/"`) contributes nothing to avoid a double slash.
+
+### Special pages
+
+Exactly two page files carry reserved meaning; both are matched by filename
+only, never by directory:
+
+- **`404.page.tsx`** — the not-found page. It answers every URL nothing else
+  matches. Registered even when a project has none: the framework's own
+  fallback still answers `404` with the right status, so a project without a
+  `404.page.tsx` behaves correctly from the first request, and adding one
+  later only changes the body. It renders inside the application root with
+  **no layout**. A loader exported by the custom 404 module currently runs as
+  its page loader; keep that fallback self-contained, because a loader that
+  throws or redirects can turn a simple miss into a second failure path.
+  Declaring a `route` export on it is refused at build/boot time: `404` is not
+  a URL anyone browses to.
+- **`error.page.tsx`** — the one application-wide error boundary. At most one
+  may exist beneath `src/web`; a second one is a build error naming both
+  files. It also may not declare a `route` export — it is a boundary, not a
+  browsable page, and is not folded into the 404 path (an unmatched URL is not
+  an error). Its `metadata` may improve on the framework default but can never
+  remove `robots: "noindex"` — an error render is a transient server state
+  reachable at a real URL, and letting a crawler index "Something went wrong"
+  for a page that actually works is the failure this default prevents.
+
+  Its default component receives `{ error, status }`: the original thrown
+  value during SSR and a JSON-safe error record after serialization. When a
+  root/page module cannot load or `register()` itself throws, Warlock first
+  tries this application boundary, then falls back to a framework-owned plain
+  document if application code is no longer trustworthy. That response omits
+  the hydration script so the browser never hydrates against a different tree.
+
+There is no `500.page.tsx`, and none is planned — every non-404 failure path
+goes through `error.page.tsx`.
+
+## `register()`
+
+`root.tsx`, `layout.tsx`, and `*.page.tsx` may export a synchronous,
+no-argument `register()` hook. It runs once per real module namespace on both
+the server and browser, before that module's middleware or loader. Layouts use
+their real namespaces, never a composed wrapper, so a hook runs once per
+layout identity rather than once per page below it. Returning a Promise (or
+another thenable) throws: registration must finish before the module is usable.
+
 ## Loaders and metadata
 
-A page loader is its controller: it runs with the full Warlock request context,
-including DI, guards, and access to the response for headers, cookies, or
-status. It returns data for the page to render. Server-only `metadata` runs
-after the loader and can derive document metadata from its data.
+A page loader is its controller: it runs with the full Warlock request
+context, including DI, guards, and access to the response for headers,
+cookies, or status. It returns data for the page to render. Server-only
+`metadata` runs after the loader and can derive document metadata from its
+data.
+
+`metadata` never runs after a failed loader. When an earlier stage recorded an
+error — the page's own loader threw, or an ancestor layout's did — the page's
+`metadata` function is not called at all, and the framework substitutes
+`{ title: "Something went wrong", robots: "noindex" }` (the same default
+`error.page.tsx` starts from). A metadata function's `data` argument is
+therefore never `undefined` on the success path — there is no discriminated
+"no data yet" case for an author to forget to check.
+
+If a page's `metadata` object declares a key nothing reads (a typo like
+`tittle`), the build refuses it by name and line, with a same-distance
+suggestion where one exists — an unannotated `metadata` export is valid,
+uncaught TypeScript, so this check exists because the type system alone
+cannot close that hole.
+
+## Live dev re-registration
+
+Editing a page's `route` export, adding a new `*.page.tsx`, renaming one, or
+deleting one is picked up **without a full dev-server restart**. The web
+connector classifies each watcher batch, and when membership or a page's
+canonical route identity changed, it atomically replaces the page-owned
+routes on the live router — a route removal is a table edit against the
+single wildcard dispatch Fastify already has registered, so no restart of the
+HTTP listener is needed.
+
+Two things ship together with that replacement, and both matter:
+
+- **The client page registry (`virtual:warlock/pages`) is invalidated and a
+  full document reload is sent to the browser.** Without this, a page that
+  full-loads right after being added or renamed renders as visible-but-dead,
+  un-hydrated HTML — the server serves the new route, but the browser's
+  module registry still points at the old graph, so no `useState` works and
+  no `<Link>` intercepts navigation. Assert hydration when verifying this by
+  hand: a `useState` button that responds, or a `<Link>` that reflects the
+  current path — not just a 200 response.
+- **The replacement is atomic.** Page registration can throw partway through
+  a batch (a route-path collision, a page with a missing default export); a
+  naive remove-then-reinstall would leave the page surface partially down
+  until the next good save. The router snapshots and restores around the
+  transaction instead.
+
+A component-body-only edit (JSX inside a page or layout, with no change to
+imports, module-level declarations, or any of the six server exports — `route`,
+`middleware`, `validation`, `loader`, `metadata`, `prefix`) is left entirely to
+React Fast Refresh: zero reloads, state preserved. Anything else — including a
+change to a module-level helper the JSX alone reads — forces a full document
+reload, because the honest way to apply a change that could affect
+server-rendered `<head>` is to re-run SSR. This is a deliberate
+over-approximation: two earlier, narrower rules each shipped a stale `<head>`
+in a real app, so the rule only ever widens toward reloading, never toward a
+missed refresh.
+
+### Unregistered-page diagnostic
+
+If a request 404s and a matching `*.page.tsx` exists on disk under `src/web`
+but isn't in the active route table, the dev server logs a one-time warning
+naming the file — the case where the source tree and the running route table
+have drifted apart in a way that would otherwise show up as nothing but a
+plain `404` with no further explanation.
+
+## Server-only boundaries (Gate A / B / C)
+
+The client build enforces, at bundle time, that server-only code never reaches
+the browser. Three checks, run at different points in the pipeline:
+
+- **Gate A** — a `resolveId` refusal. It rejects, for the client build only,
+  imports of: Node builtins; any `@warlock.js/*` or `@mongez/*` package whose
+  `package.json` declares `"warlock": { "environment": "server" }` (an absent
+  marker is not itself a refusal); files named `*.server.ts`, anything under a
+  `.server/` directory, or — for the app's own source — anything under a
+  plain `server/` directory segment; local modules outside a `web/` folder
+  that aren't a recognized universal surface (`*.page.tsx`, `layout.tsx`); and
+  the `server-only` npm package by name, for code that wants to declare its
+  own server-only status explicitly.
+- **Gate B** — an AST transform applied to every module the client build
+  processes. It refuses any client-side read of `process.env.*` (Node's
+  `process` doesn't exist in the browser, so this is always wrong) and any
+  `import.meta.env.X` read where `X` doesn't start with `PUBLIC_` — the
+  project's convention for what may cross into client code. Vite's own
+  built-in keys (`MODE`, `DEV`, `PROD`, `BASE_URL`, `SSR`) are allowed without
+  the prefix.
+- **Gate C** — runs once, on the emitted client bundle, after the build
+  completes. It re-scans the actual output for any of the six server export
+  names (`route`, `middleware`, `validation`, `loader`, `metadata`, `prefix`)
+  surviving as a top-level binding, and for any import edge into a
+  server-environment package — using the same classifier Gate A uses, not a
+  second one that could drift. This is defense in depth: if projection or
+  Gate A has a bug, Gate C turns "shipped a leak" into a failed build instead
+  of a silent one.
+
+Projection (a separate, earlier step) strips the six server exports from a
+page or layout module before the client graph ever forms — Gates A/B/C are
+what catch what projection, by construction, cannot: whole forbidden imports,
+inline env reads, and a bundle-level regression check on the final output.
+
+## Production build, route manifest, and CSS
+
+`warlock build` walks the same page graph the dev server does — one shared
+`discoverPages()` scan, so a page that exists for the server can never be
+absent for the client or vice versa. The build:
+
+- Emits a page-route manifest (`page-routes.manifest.json` under the build
+  output directory) recording each page's method, path, name, and source file
+  — the baseline `warlock routes:diff` compares a fresh diagnostic boot against.
+- Refuses to produce an artifact for a layout chain with more than one
+  rendering layout, the same rule dev enforces, so that failure is caught
+  before it reaches production rather than only at the next boot.
+- Computes each page's own CSS chain — root, then every matched layout outer
+  to inner, then the page — so first paint arrives styled instead of
+  flashing unstyled content while the client bundle's JavaScript loads.
+- Bakes the client bundle's directory (`clientDir`) into the manifest read at
+  boot, rather than having the production server re-derive it from
+  `warlock.config.ts` — `warlock start` spawns a plain `node dist/app.js`
+  child that never loads a TypeScript build config, so build and start read
+  back the same string instead of risking disagreement.
+
+At production boot, the Web connector refuses to start with no page manifest
+present (`WebConnector booted in production without a page manifest`) rather
+than silently serving 404s while reporting healthy — a production process
+must have been built with the web connector registered.
 
 ## Requirements
 
 - `@warlock.js/core`
 - `react` and `react-dom` 19+
 - `vite` and `@vitejs/plugin-react` as lazily loaded, optional dev peers
+
+## Going further
+
+- [`warlock routes:diff`](../core/cli/routes.md#warlock-routesdiff) — compare
+  a fresh diagnostic boot's page routes against the last successful build.
+- [Connectors](../core/architecture-concepts/connectors.md) — how the Web
+  connector fits into the boot sequence beside `http`.

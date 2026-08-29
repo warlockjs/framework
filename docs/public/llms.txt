@@ -49,7 +49,7 @@ combined `llms-full.txt` below is the whole framework and is far larger.
 - [@warlock.js/notifications](https://warlock.js.org/v/latest/notifications/): Multi-channel notifications for Warlock.js — define once, fire anywhere; mail / in-app database / pluggable custom channels with preferences, rate limits, and idempotency.
   - llms.txt: https://warlock.js.org/notifications/llms.txt
   - llms-full.txt: https://warlock.js.org/notifications/llms-full.txt
-- [@warlock.js/web](https://warlock.js.org/v/latest/web/): SSR React pages served by the same Warlock HTTP server that serves the API — a backend framework that renders React, not a React framework.
+- [@warlock.js/web](https://warlock.js.org/v/latest/web/): Warlock.js web layer for the SSR page pipeline and client runtime.
   - llms.txt: https://warlock.js.org/web/llms.txt
   - llms-full.txt: https://warlock.js.org/web/llms-full.txt
 - [@warlock.js/ai](https://warlock.js.org/v/latest/ai/): Core @warlock.js AI framework — contracts, agent, workflow, supervisor

@@ -37,6 +37,8 @@ The first positional argument (or `--name`) is the project name. Value flags acc
 | `--git` / `--no-git` | off | Initialize a Git repository |
 | `--jwt` / `--no-jwt` | off | Generate JWT secret keys |
 
+`-h`/`--help` prints usage and exits; `-v`/`--version` prints the installed `create-warlock` version and exits. Both are checked before anything else runs, so they work even with no project name given.
+
 ## Scaffolding without a database
 
 Not every app needs a database. Pick **None** in the wizard's database step — or pass `--db=none` (`--no-db` is a shorthand) — and the scaffold leaves the database out entirely: no driver is selected, no driver package is installed, and the template's `src/config/database.ts` is removed. Warlock's database connector is gated on that config file, so the app boots cleanly with no database wired.

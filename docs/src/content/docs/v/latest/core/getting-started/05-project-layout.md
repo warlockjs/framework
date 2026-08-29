@@ -58,7 +58,7 @@ A few of these are framework-magic:
 
 - **`routes.ts`** — auto-loaded. Don't import it from anywhere. Put `router.get(...)` calls here and the framework picks them up.
 - **`main.ts`** (per-module) — auto-loaded once, at boot, for one-time setup (event listener registration, scheduled jobs, side-effect imports). Don't import it from anywhere either.
-- **`src/app/main.ts`** (project-level) — also auto-loaded. The natural home for global one-time setup that doesn't belong to any one module: `connectorsManager.register(...)`, global hooks, feature-flagged registrations.
+- **`src/app/main.ts`** (project-level) — also auto-loaded. The natural home for global one-time setup that doesn't belong to any one module: `Application.onceBooted(...)` hooks, global side effects. Custom connectors don't go here — they're declared in `warlock.config.ts > connectors` (see [Bootstrap and connectors](../architecture-concepts/bootstrap-and-connectors.md#writing-a-custom-connector)).
 - **`events/`** — auto-loaded. **Any** `.ts(x)` file in this folder runs its top-level side effects on boot. The `*.event.ts` suffix is convention, not a framework requirement.
 - **`utils/locales.ts`** — auto-loaded. Holds `groupedTranslations(...)` so `t("module.key")` resolves at request time.
 
@@ -87,7 +87,7 @@ The arrows go one way. Repositories don't call services; services don't call con
 ## What lives in the project root, not in `src/app/`
 
 - **`src/config/*.ts`** — subsystem config (one file each). See [Configuration](./03-configuration.md).
-- **`src/connectors/`** — custom connectors that need to start/stop with the app lifecycle. Rare — most apps stay empty here.
+- **`src/connectors/`** — custom connectors that need to start/stop with the app lifecycle. Not auto-loaded — each one must be listed as an instance in `warlock.config.ts > connectors` to register and boot. Rare — most apps stay empty here.
 - **`src/integrations/`** — third-party adapter code (e.g. wrapping an external API client) that's shared across modules.
 - **`warlock.config.ts`** — project-level config. See [Configuration](./03-configuration.md).
 - **`public/`** — static assets served as-is.

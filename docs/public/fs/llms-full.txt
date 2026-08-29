@@ -285,6 +285,10 @@ description: 'Front-door orientation for `@warlock.js/fs` — filesystem primiti
 
 Thin, opinionated wrapper over `node:fs` and `node:fs/promises`. Same operations you'd write by hand against the Node primitives, but with consistent naming, parent-directory auto-creation, ENOENT-safe deletes, atomic writes, and streaming hashes — the boring-but-load-bearing utilities every backend grows by month two anyway.
 
+## Server-only package
+
+`@warlock.js/fs`'s entire runtime surface is server-only — its `package.json` declares `"warlock": { "environment": "server" }`. This is build-boundary metadata read by `@warlock.js/web`'s Gate A (import resolution) and Gate C (emitted-bundle verification), not application behavior. App code that reaches the client bundle (including page and layout modules) must not value-import `@warlock.js/fs` — Gate A refuses the build. A type-only import (`import type { ... }`) is allowed. Server loaders, controllers, and modules may import it freely.
+
 ## When to reach for it
 
 - You're inside a `@warlock.js/*` project — every other framework package already depends on this one. Use it for consistency.

@@ -116,6 +116,222 @@
   ],
   "releases": [
     {
+      "version": "5.1.0",
+      "id": "v5-1-0",
+      "date": null,
+      "isUnreleased": false,
+      "summaryHtml": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            },
+            {
+              "type": "Removed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>404.page.tsx</code></strong> — an app-owned not-found page. It renders only when <code>text/html</code> is explicitly present in the request's <code>Accept</code> header, so an unmatched <code>/api/...</code> path still returns the JSON 404 an API client expects rather than a document. It renders with no layouts: discovery reports an empty layout chain for this page only, so the client hydration registry matches what the server has always rendered instead of wrapping a failure page in chrome that can itself throw or need data. Ordinary pages beside it keep their full layout chain, and nested-layout refusal on its path is unchanged."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>export const metadata</code> is typed (<code>PageMetadata</code>) and checked at build time.</strong> An unannotated object literal with a misspelled key — <code>{ tittle: \"x\" }</code> — now fails the build, naming the file, the line and the offending key. It previously typechecked as a plain object and was silently ignored at runtime."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Fast Refresh in dev now applies only when an edit is confined to component bodies.</strong> Any module-level change — an import, a module-level declaration, or any server export, <code>metadata</code> included — forces a full page reload instead of a stale hot update; a JSX-only edit still hot-updates in place with component state intact."
+            },
+            {
+              "type": "Changed",
+              "html": "**<code>warlock dev</code> now refuses a <code>*.page.tsx</code> that exports no route**, throwing <code>MissingRouteExportError</code> and naming the file. It previously 404'd silently, so a missing <code>export const route</code> looked like a routing bug at request time. This matches what <code>warlock build</code> already did — dev and build now reject the same file."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>React did not run at all in published installs of 5.0.0 through 5.0.2.</strong> The dev Vite server served <code>react-dom/client</code> as raw CJS, so <code>hydrateRoot</code> did not exist and the hydration module threw while being parsed. This one defect is the cause of all four symptoms reported against those versions: <code>useState</code> never updated, Fast Refresh never ran, metadata never refreshed, and <code>&lt;Link&gt;</code> fell back to a full page reload. Fixed by declaring the React entries in the dev server's <code>optimizeDeps</code> so they are pre-bundled to ESM before the browser asks for them. This is not a hydration *improvement* — hydration did not happen."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>The browser was loading two copies of every <code>@warlock.js/web</code> client module.</strong> Module-level state (context, the navigation runtime) existed twice, so a value written through one copy was invisible to the component reading the other."
+            },
+            {
+              "type": "Removed",
+              "html": "<strong>A false comment shipped in 5.0.0 through 5.0.2</strong> claiming that a page's route is derived from its file location. No such derivation has ever existed in this package; the route comes from the page's <code>route</code> export and nothing else. The comment is gone from the scaffold emitted by <code>warlock add web</code>, but <strong>every app scaffolded on 5.0.0, 5.0.1 or 5.0.2 still carries it in its own source</strong> — delete it by hand."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Removed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>warlock add tailwind</code></strong> — installs and wires Tailwind CSS v4 through PostCSS."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>warlock add shadcn</code></strong> — sets up the prerequisites shadcn/ui expects. It is *not* a wrapper around the shadcn CLI: you still run that yourself to add components, this only makes the project ready for it."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong><code>warlock dev</code> prints one status block per run.</strong> The banner is printed exactly once, and the URL it prints is never a raw <code>[::1]</code> address. The single-boot guard behind this is <strong>new in this release — it was never present in any published version</strong>, so duplicate boots on 5.0.x were real, not a display artefact."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong><code>warlock doctor</code> now reports the same route count as <code>warlock dev</code>.</strong> The two walked routes differently and disagreed. <code>doctor</code> also emits zero warnings on a healthy project — so a warning now means something — and fails loudly on a route module that genuinely fails to load, instead of counting it as fine."
+            },
+            {
+              "type": "Removed",
+              "html": "<strong>A false comment that the <code>warlock add web</code> scaffold emitted in 5.0.0 through 5.0.2</strong>, claiming a page's route is derived from its file location. No such derivation has ever existed. The stub no longer emits it; <strong>apps already scaffolded on those versions still carry the comment in their own source</strong> and must delete it by hand."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong>The scaffold typechecks from a fresh install, and a CI gate keeps it that way.</strong> A newly created project previously could fail <code>tsc</code> on its own generated source."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>A real home page</strong>, replacing the placeholder — it includes a counter whose working state is proof that hydration actually ran in the browser."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong><code>src/typings.d.ts</code> is now the sanctioned home for <code>RequestLocals</code> / <code>RequestUser</code> module augmentation.</strong> The file is generated with both augmentation blocks stubbed and commented, so there is one obvious place to declare per-request typed data."
+            },
+            {
+              "type": "Changed",
+              "html": "Replaced stale scaffold values that had been carried forward: the <code>wow2</code> project name and the <code>4.15.0</code> dependency version no longer appear in generated projects."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "5.0.2",
+      "id": "v5-0-2",
+      "date": "2026-08-25",
+      "isUnreleased": false,
+      "summaryHtml": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<strong><code>&lt;Head/&gt;</code> read an empty document context under SSR.</strong> The connector now sets <code>ssr.noExternal: [\"@warlock.js/web\"]</code> in <code>web-connector.ts</code>. Without it the server loaded two instances of this package — one externalised, one bundled — so the context the renderer wrote to was not the one <code>&lt;Head/&gt;</code> read from. A published 5.0.1 install that returned 500 on a page request returns 200 after this fix."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "5.0.1",
+      "id": "v5-0-1",
+      "date": "2026-08-25",
+      "isUnreleased": false,
+      "summaryHtml": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Narrowed the <code>vite</code> peer dependency to <code>\"&gt;=7.3.5 &lt;8\"</code>, so a consumer resolving vite for this package cannot land on a version outside the range it is built against."
+            },
+            {
+              "type": "Fixed",
+              "html": "Internal: a test in <code>gate-b-secrets.spec.ts</code> depended on the ambient <code>NODE_ENV</code> and failed depending on how the suite was invoked. No runtime behaviour changed."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<strong>The <code>warlock</code> binary was never linked in a yarn-1 scaffold.</strong> Installing the batched features under yarn 1 hit an *Invariant Violation* in yarn's linker, which aborted the install before <code>node_modules/.bin</code> was written — leaving a scaffolded project whose own <code>warlock</code> command did not exist. <code>App.pinViteResolution()</code> now writes matching <code>resolutions</code> and <code>overrides</code> entries for vite into the generated <code>package.json</code> *before* the batched feature install runs, so a single vite version is resolved and the linker completes."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.0.0",
       "id": "v5-0-0",
       "date": "2026-08-25",

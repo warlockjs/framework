@@ -72,6 +72,9 @@ All ten connectors, in priority order (lower starts first). The **public name** 
 | 8        | `notifications` | `NotificationsConnector` | Early | `src/config/notifications.ts`    | lazy-imports `@warlock.js/notifications`, `setNotificationConfig(...)`                          |
 | 9        | `access`        | `AccessConnector`        | Early | `src/config/access.ts`           | lazy-imports `@warlock.js/access`, `setAccessConfig(...)` — validates a resolver is present so a misconfigured authorization layer fails at STARTUP |
 | 10       | `ai`            | `AiConnector`            | Early | `src/config/ai.ts`               | lazy-imports `@warlock.js/ai`, `ai.config(...)` from the ejected `config/ai.ts`; satellite side-effect imports at the top of that file register their surface first |
+| 5.5      | `web`           | `WebConnector` (`@warlock.js/web`) | Late  | —                        | registers page routes (dev: discovered and loaded through Vite; production: read from the build's page manifest); mounts Vite in middleware mode in dev |
+
+`web` is not one of the framework's built-ins above — it's registered by `warlock add web`, which wires it into `warlock.config.ts > connectors`. Its priority (`5.5`) sits deliberately between `http` (5) and `storage` (6): its `boot()` needs the Fastify instance `http.boot()` just published in the container, and reverse-priority teardown closes Vite before the HTTP server does.
 
 A few notes worth calling out:
 
@@ -142,18 +145,29 @@ flowchart LR
 
 `BaseConnector.restart()` runs `shutdown()` then `start()` and **never calls `boot()`**. The `socket` connector builds its server in `boot()`, not `start()`. So editing `src/config/socket.ts` in dev tears the old Socket.IO server **down**, but does **not** stand up a fresh one with the new options — that needs a full dev-server restart to re-run `boot()`. (The `http` connector avoids this by overriding `restart()` to re-run `boot()` itself, because re-scanning the same Fastify instance would otherwise register every route twice.)
 
+## Build-time contribution
+
+A connector may additionally export a `build` object (`ConnectorBuildContribution`) with two optional hooks run by `warlock build`, in `connectors` array order, both awaited:
+
+- **`generate(context)`** — write files into the production output directory and/or return extra entry-file import lines. Runs after the generated-imports check and before esbuild bundles. This is how `@warlock.js/web` gets its `pages` barrel imported into the generated production entry, and how it emits the page-route manifest `routes:diff` reads.
+- **`emit(context)`** — produce artifacts esbuild itself does not, such as a separate client bundle. Runs after esbuild and before `.warlock/production` is removed. `@warlock.js/web` uses this to build the hydration client.
+
+The context handed to both is deliberately narrow — the production directory, the app root, and the resolved build config, nothing that lets a heavy plugin instance or compiled pipeline live on the contribution object itself. Anything heavy is constructed *inside* the hook, after a dynamic import, so a connector's static import graph never drags Vite/esbuild plugin instances into the runtime the built app actually ships. A connector that declares an unknown key on `build` fails the build rather than being silently ignored.
+
 ## Writing your own connector
 
-You register custom connectors exactly the same way the framework registers the built-ins: extend `BaseConnector`, then call `connectorsManager.register(new YourConnector())`. There is **no auto-discovery** — `register(...)` is the only path in.
+Custom connectors are NOT registered the way the built-ins are — the built-ins are always registered unconditionally, in the `ConnectorsManager` constructor. The canonical app path is `warlock.config.ts > connectors`: extend `BaseConnector`, then list an instance of it in that array. There is **no auto-discovery**. `registerConfiguredConnectors(...)` passes the array to the same low-level connectors manager at runtime, while `warlock build` drains any `build` contribution from that same array statically. Calling the exported `connectorsManager.register(...)` directly is a low-level runtime-only escape hatch; it bypasses the build half and is therefore not the app registration path.
 
-```ts title="src/app/main.ts"
-import { connectorsManager } from "@warlock.js/core";
-import { FeatureFlagsConnector } from "../connectors/feature-flags.connector";
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+import { FeatureFlagsConnector } from "./src/connectors/feature-flags.connector";
 
-connectorsManager.register(new FeatureFlagsConnector());
+export default defineConfig({
+  connectors: [new FeatureFlagsConnector()],
+});
 ```
 
-The full walkthrough — the four properties and two methods of the contract, picking a priority, choosing a phase, overriding `restart()`, and the graceful-shutdown ordering — lives in [Bootstrap and connectors](./bootstrap-and-connectors.md#writing-a-custom-connector).
+The full walkthrough — the four properties and two methods of the contract, picking a priority, choosing a phase, overriding `restart()`, the graceful-shutdown ordering, and the optional `generate`/`emit` build contribution — lives in [Bootstrap and connectors](./bootstrap-and-connectors.md#writing-a-custom-connector).
 
 ## Gotchas
 

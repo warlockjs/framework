@@ -454,6 +454,19 @@ warlock routes --json          # machine-readable rows (pipe to jq / CI)
 
 Bootstraps app code so route modules register, but starts no connectors. Because the route-module loader is fail-loud, a route file that throws on import surfaces here instead of being silently dropped. Full output, filters, and JSON shape are in the [`warlock routes` guide](./routes.md).
 
+### `routes:diff`
+
+Bootstrap the current app diagnostically (without starting connectors) and
+compare its page routes against the page-route manifest the last successful
+`warlock build` wrote. Exits non-zero on drift — a CI gate
+against shipping a page renamed or route-changed in dev without a rebuild.
+
+```bash
+warlock routes:diff
+```
+
+Requires a prior `warlock build`. See the [`routes:diff` section](./routes.md#warlock-routesdiff) for the output shape and comparison rules.
+
 ---
 
 ## Generators
