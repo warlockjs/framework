@@ -436,6 +436,8 @@ description: 'Front-door for `@warlock.js/access` — authorization (RBAC + ABAC
 
 Authorization for Warlock apps. `@warlock.js/auth` answers _who you are_; `access` answers _what you can do_.
 
+Server-only: `package.json` declares `"warlock": { "environment": "server" }`. `@warlock.js/web`'s build refuses app client code that value-imports this package; type-only imports are allowed, and server loaders/controllers/modules are unaffected.
+
 ## The mental model in one paragraph
 
 The package owns the **engine** — wildcard matching, caching, ABAC policies, fail-closed decisions. You hand it **one required adapter**, an `AccessResolver`, that reads a user's roles + permissions from however YOUR app stores them (the role→permission catalog lives inside the resolver). Then `can(user, "orders.update")` and `gate("orders.update")` just work. The two concepts inside are **permissions** (RBAC grants) and **policies** (ABAC conditions) — which is why the package is called `access`, not either half.

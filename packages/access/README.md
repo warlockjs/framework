@@ -4,6 +4,10 @@ Authorization (RBAC + ABAC) for [Warlock.js](https://github.com/warlockjs/core) 
 
 `@warlock.js/auth` answers _who you are_; `@warlock.js/access` answers _what you can do_.
 
+## Server-only
+
+`@warlock.js/access`'s entire runtime surface is server-only — its `package.json` declares `"warlock": { "environment": "server" }`. `@warlock.js/web`'s build treats this as a boundary: app client code cannot value-import this package (type-only imports are still allowed), while server loaders/controllers/modules can import it freely.
+
 ## Installation
 
 ```bash
