@@ -10,6 +10,14 @@ npm install @warlock.js/logger
 yarn add @warlock.js/logger
 ```
 
+## Server-only package
+
+`@warlock.js/logger`'s entire runtime surface is server-only. Its `package.json` declares `"warlock": { "environment": "server" }` — build-boundary metadata that `@warlock.js/web`'s Gate A (import resolution) and Gate C (emitted-bundle verification) read to keep it out of the browser bundle.
+
+- App code that reaches the client bundle (including page and layout modules) must not value-import `@warlock.js/logger` — Gate A refuses the build.
+- A type-only import (`import type { ... } from "@warlock.js/logger"`) is allowed — it carries no runtime edge.
+- Server loaders, controllers, and modules may import it freely.
+
 ## 30-second tour
 
 ```ts
