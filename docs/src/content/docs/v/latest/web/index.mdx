@@ -97,9 +97,9 @@ only, never by directory:
   fallback still answers `404` with the right status, so a project without a
   `404.page.tsx` behaves correctly from the first request, and adding one
   later only changes the body. It renders inside the application root with
-  **no layout**. A loader exported by the custom 404 module currently runs as
-  its page loader; keep that fallback self-contained, because a loader that
-  throws or redirects can turn a simple miss into a second failure path.
+  **no layout**, and its page loader does not run even if the module exports
+  one. A missing URL therefore cannot trigger application data work, redirect,
+  or fail a second time through the fallback itself.
   Declaring a `route` export on it is refused at build/boot time: `404` is not
   a URL anyone browses to.
 - **`error.page.tsx`** — the one application-wide error boundary. At most one
