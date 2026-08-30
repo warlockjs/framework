@@ -10,7 +10,7 @@ import {
   notificationsConfigStub,
 } from "../stubs";
 import { migrationTimestamp } from "./shared/migration-timestamp";
-import { FeatureDefinition } from "./types";
+import { FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
 
 async function completeNotificationsInstallation(_options: CommandActionData) {
   const modelPath = srcPath("app/notifications/notification.model.ts");
@@ -64,8 +64,8 @@ export const notificationsFeature: FeatureDefinition = {
   // `authMiddleware`, so `@warlock.js/auth` is pulled in too.
   requires: ["mail"],
   dependencies: {
-    "@warlock.js/notifications": "~4.0.0",
-    "@warlock.js/auth": "~4.0.0",
+    "@warlock.js/notifications": INSTALLED_WARLOCK_VERSION,
+    "@warlock.js/auth": INSTALLED_WARLOCK_VERSION,
   },
   ejectConfig: {
     content: notificationsConfigStub,

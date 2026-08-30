@@ -31,6 +31,22 @@ type ProjectPackageJson = {
 
 export const allowedFeatures = Object.keys(featuresMap);
 
+/**
+ * Resolve the internal feature-map placeholder to the version of Core that is
+ * actually executing the command. Every @warlock.js package is lockstep, so
+ * Core is the single source of truth; non-Warlock dependencies are untouched.
+ */
+export function resolveWarlockDependencyVersions(
+  dependencies: Record<string, string>,
+  frameworkVersion: string,
+): void {
+  for (const dependency of Object.keys(dependencies)) {
+    if (dependency.startsWith("@warlock.js/")) {
+      dependencies[dependency] = frameworkVersion;
+    }
+  }
+}
+
 function resolveFeatures(features: string[], visited = new Set<string>()): string[] {
   const resolved: string[] = [];
 
@@ -95,11 +111,7 @@ export async function addCommandAction(options: CommandActionData) {
   // a scaffolded project's features match its core version instead of drifting to
   // the feature map's static range.
   const frameworkVersion = await getWarlockVersion();
-  for (const dependency of Object.keys(dependencies)) {
-    if (dependency.startsWith("@warlock.js/")) {
-      dependencies[dependency] = frameworkVersion;
-    }
-  }
+  resolveWarlockDependencyVersions(dependencies, frameworkVersion);
 
   const currentPackageJson = await getJsonFileAsync<ProjectPackageJson>(rootPath("package.json"));
 
@@ -242,4 +254,3 @@ function validateFeatures(features: string[]) {
     }
   }
 }
-

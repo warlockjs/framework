@@ -18,7 +18,7 @@ import {
   accessUserRoleModelStub,
 } from "../stubs";
 import { migrationTimestamp } from "./shared/migration-timestamp";
-import { FeatureDefinition } from "./types";
+import { FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
 
 async function registerAccessLocale() {
   // Register the access locale in the project's shared translations file so a
@@ -148,7 +148,7 @@ export const accessFeature: FeatureDefinition = {
   description:
     "Installs @warlock.js/access — authorization (RBAC + ABAC): permission checks, ABAC policies, and roles. Ejects config/access.ts, the DatabaseAccessResolver + Role/UserRole models and migrations into src/app/access, and registers the access locale in src/app/shared/utils/locales.ts",
   dependencies: {
-    "@warlock.js/access": "~4.0.0",
+    "@warlock.js/access": INSTALLED_WARLOCK_VERSION,
   },
   ejectConfig: {
     content: accessConfigStub,

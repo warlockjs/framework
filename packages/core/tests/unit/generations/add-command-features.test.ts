@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { allowedFeatures, featuresMap } from "../../../src/generations/add-command.action";
+import {
+  allowedFeatures,
+  featuresMap,
+  resolveWarlockDependencyVersions,
+} from "../../../src/generations/add-command.action";
+import { INSTALLED_WARLOCK_VERSION } from "../../../src/generations/features/types";
 
 /**
  * Unit coverage for the `warlock add` feature registry — a pure data map, so
@@ -48,5 +53,34 @@ describe("add command feature registry", () => {
     });
     expect(featuresMap.web.dependencies).not.toHaveProperty("@mongez/react-atom");
     expect(featuresMap.web.dependencies).not.toHaveProperty("@mongez/atomic-query");
+  });
+
+  it("uses one explicit installed-Core placeholder for every Warlock feature dependency", () => {
+    const warlockDependencies = Object.values(featuresMap).flatMap(feature =>
+      Object.entries(feature.dependencies ?? {}).filter(([name]) =>
+        name.startsWith("@warlock.js/"),
+      ),
+    );
+
+    expect(warlockDependencies).not.toHaveLength(0);
+    expect(new Set(warlockDependencies.map(([, version]) => version))).toEqual(
+      new Set([INSTALLED_WARLOCK_VERSION]),
+    );
+  });
+
+  it("resolves Warlock feature dependencies to installed Core without touching other packages", () => {
+    const dependencies = {
+      "@warlock.js/web": INSTALLED_WARLOCK_VERSION,
+      "@warlock.js/auth": INSTALLED_WARLOCK_VERSION,
+      react: "^19.2.3",
+    };
+
+    resolveWarlockDependencyVersions(dependencies, "5.1.0");
+
+    expect(dependencies).toEqual({
+      "@warlock.js/web": "5.1.0",
+      "@warlock.js/auth": "5.1.0",
+      react: "^19.2.3",
+    });
   });
 });

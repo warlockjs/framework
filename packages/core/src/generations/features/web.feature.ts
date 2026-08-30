@@ -13,7 +13,7 @@ import {
   webHomePageStub,
   webRootStub,
 } from "../stubs";
-import { FeatureDefinition } from "./types";
+import { FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
 
 /**
  * Register the WebConnector in `warlock.config.ts`, and ONLY there.
@@ -268,7 +268,7 @@ export const webFeature: FeatureDefinition = {
   description:
     "Installs @warlock.js/web — SSR React pages served by the Warlock HTTP server. Scaffolds src/web (root.tsx + a home page) and registers the WebConnector in warlock.config.ts. Pages are opt-in: a Warlock app is an API until you add this.",
   dependencies: {
-    "@warlock.js/web": "~4.0.0",
+    "@warlock.js/web": INSTALLED_WARLOCK_VERSION,
     "@mongez/http": "^3.5.0",
     "@mongez/react-form": "^4.0.0",
     "@mongez/react-localization": "^3.4.7",

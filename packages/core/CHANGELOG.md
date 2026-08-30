@@ -53,6 +53,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Feature definitions no longer carry stale `~4.0.0` defaults for
+  `@warlock.js/*`.** They now use an explicit internal placeholder that
+  `warlock add` must resolve from the installed Core version before invoking a
+  package manager or writing `package.json`. A forgotten resolution therefore
+  fails loudly instead of silently selecting an old framework major.
 - **`startHttpTestServer()` fails loudly instead of silently skipping the preflight**
   when `http.port` doesn't round-trip through `Number()` (e.g. `HTTP_PORT=03999`,
   `+3999`, `1e3`, or a value with stray whitespace) — previously it returned early
