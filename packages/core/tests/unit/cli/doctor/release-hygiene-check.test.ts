@@ -11,6 +11,13 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+/**
+ * Every manifest below carries a `name`: the check gates on `isPublishable()`
+ * (`private !== true` AND a string `name`) and returns `undefined` for anything
+ * else, because an unpublishable package has no version-vs-changelog invariant
+ * to hold. Dropping the name here does not weaken a scenario — it silently
+ * skips the check entirely and the assertion reads `.status` off `undefined`.
+ */
 type FsMock = {
   packageJson: string;
   changelog?: string;
@@ -52,7 +59,7 @@ const importCheck = async () => {
 describe("releaseHygieneCheck", () => {
   it("passes when package.json version matches the top changelog heading", async () => {
     mockProject({
-      packageJson: JSON.stringify({ version: "4.5.0" }),
+      packageJson: JSON.stringify({ name: "demo-app", version: "4.5.0" }),
       changelog: "# Changelog\n\n## 4.5.0 - 2026-06-30\n\n- stuff\n",
     });
 
@@ -64,7 +71,7 @@ describe("releaseHygieneCheck", () => {
 
   it("fails when the changelog heading disagrees with package.json", async () => {
     mockProject({
-      packageJson: JSON.stringify({ version: "4.5.0" }),
+      packageJson: JSON.stringify({ name: "demo-app", version: "4.5.0" }),
       changelog: "## 4.4.0\n\n- old\n",
     });
 
@@ -76,7 +83,7 @@ describe("releaseHygieneCheck", () => {
   });
 
   it("warns when there is no CHANGELOG.md", async () => {
-    mockProject({ packageJson: JSON.stringify({ version: "1.0.0" }) });
+    mockProject({ packageJson: JSON.stringify({ name: "demo-app", version: "1.0.0" }) });
 
     const result = await (await importCheck()).run();
 
@@ -86,7 +93,7 @@ describe("releaseHygieneCheck", () => {
 
   it("warns when the changelog has no parseable version heading", async () => {
     mockProject({
-      packageJson: JSON.stringify({ version: "1.0.0" }),
+      packageJson: JSON.stringify({ name: "demo-app", version: "1.0.0" }),
       changelog: "# Changelog\n\nsome prose without a version heading\n",
     });
 
