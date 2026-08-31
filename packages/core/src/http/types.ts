@@ -202,8 +202,15 @@ export interface HttpConfigurations {
    *
    * - `false` (default) — trust nothing; the socket peer address is the client.
    * - `true` — trust the whole chain; the leftmost `X-Forwarded-For` entry wins.
-   * - `number` — trust that many rightmost hops (an edge that APPENDS to
-   *   `X-Forwarded-For`; `2` = "my CDN plus my load balancer").
+   * - `number` — **grants no trust at all. Do not use.** Fastify refuses
+   *   hop-count trust outright (`fastify/lib/request.js`, `getTrustProxyFn`):
+   *   a hop count cannot validate the immediate peer, so a direct client could
+   *   spoof `X-Forwarded-*` simply by supplying enough hops. It fails closed —
+   *   `request.ip` stays the socket peer — which is safe but silent, so a
+   *   number here reads like bounded trust while delivering none. Behind a real
+   *   proxy that means every client resolves to the PROXY's address, collapsing
+   *   ip-filter allowlists, rate-limit buckets and idempotency scoping onto one
+   *   key. Use the `string` / `string[]` form to name your proxies instead.
    * - `string` / `string[]` — trust only these proxy addresses: exact IPs,
    *   CIDR blocks (`"10.0.0.0/8"`), the named ranges `"loopback"`,
    *   `"linklocal"`, `"uniquelocal"`, or a comma-separated string of those.
