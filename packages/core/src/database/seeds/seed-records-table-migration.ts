@@ -24,6 +24,8 @@ export class SeedRecordsTableMigration extends Migration {
   }
 
   public down() {
-    this.dropTableIfExists(seedRecordsTableName);
+    // No argument: dropTableIfExists() operates on `this.table`, set as a class
+    // field above. The name passed here was silently ignored at runtime.
+    this.dropTableIfExists();
   }
 }

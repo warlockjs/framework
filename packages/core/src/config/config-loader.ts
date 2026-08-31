@@ -8,7 +8,11 @@ import { configSpecialHandlers } from "./config-special-handlers";
  * Special Config Handler
  * A function that handles special configuration loading
  */
-export type SpecialConfigHandler = (configValue: any) => void | Promise<void>;
+// Returns unknown, not void: ConfigSpecialHandlers.execute() RETURNS handler(config)
+// rather than discarding it, and a test pins that ("returns the handler's resolved
+// value"). The implementation and the test agreed; only this type said handlers
+// produce nothing, which made any value-returning handler fail to typecheck.
+export type SpecialConfigHandler = (configValue: any) => unknown | Promise<unknown>;
 
 /**
  * Config Loader

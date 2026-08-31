@@ -11,5 +11,7 @@ import { env } from "@warlock.js/core";
 export const httpConfig: HttpConfigurations = {
   port: env("PORT", 3000),
   host: env("HOST", "localhost"),
-  timeout: 30000,
+  // bodyLimit, not timeout: this fixture is annotated HttpConfigurations and only
+  // ever parsed, but an invalid key still fails the typecheck.
+  bodyLimit: 30000,
 };
