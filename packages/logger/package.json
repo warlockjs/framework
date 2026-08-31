@@ -11,7 +11,7 @@
   "dependencies": {
     "@mongez/copper": "^2.1.2",
     "@mongez/reinforcements": "^4.0.1",
-    "@warlock.js/fs": "*",
+    "@warlock.js/fs": "workspace:^",
     "dayjs": "^1.11.9",
     "safe-stable-stringify": "^2.5.0"
   },
@@ -46,5 +46,6 @@
     "environment": "server"
   },
   "module": "./src/index.ts",
-  "typings": "./src/index.ts"
+  "typings": "./src/index.ts",
+  "packageManager": "pnpm@11.24.0"
 }
