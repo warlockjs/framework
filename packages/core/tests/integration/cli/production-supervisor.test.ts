@@ -1,5 +1,16 @@
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { stripAnsi } from "@mongez/copper";
+
+/*
+  Captured output is ANSI-stripped before assertion.
+
+  displayProductionStartFailure writes `${colors.bold("warlock start")} failed`, so the
+  escape codes land BETWEEN the two words and the literal string "warlock start failed"
+  never appears in the raw text. Asserting on the raw stream therefore tested whether
+  colour happened to be enabled, not what the operator is told — and colour depends on
+  NO_COLOR / FORCE_COLOR and on whether the stream is a TTY.
+*/
 import { displayMissingReadinessNotice } from "../../../src/cli/cli-commands.utils";
 import { superviseProductionProcess } from "../../../src/production/production-supervisor";
 
@@ -19,11 +30,11 @@ describe("superviseProductionProcess", () => {
     stderr = [];
 
     vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
-      stdout.push(args.join(" "));
+      stdout.push(stripAnsi(args.join(" ")));
     });
 
     vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
-      stderr.push(args.join(" "));
+      stderr.push(stripAnsi(args.join(" ")));
     });
   });
 
@@ -58,11 +69,14 @@ describe("superviseProductionProcess", () => {
     expect(result.ready).toBe(false);
     expect(result.exitCode).not.toBe(0);
 
-    // The failure has to reach BOTH streams: stderr for humans and log
-    // collectors, stdout for a supervisor that greps it for the banner and
-    // would otherwise read silence as health.
+    // Failure belongs on stderr exactly once. Production launchers commonly
+    // merge stdout and stderr, so mirroring it to both streams duplicates every
+    // diagnostic line. The non-zero result is the machine-readable failure.
     expect(stderr.join("\n")).toContain("failed");
-    expect(stdout.join("\n")).toContain("failed");
+    expect(stdout.join("\n")).not.toContain("failed");
+    expect(
+      [...stderr, ...stdout].filter((line) => line.includes("warlock start failed")),
+    ).toHaveLength(1);
     expect(stdout.join("\n")).not.toContain("production server started");
   });
 
