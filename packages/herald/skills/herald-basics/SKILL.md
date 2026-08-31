@@ -12,7 +12,7 @@ Message bus library — wraps RabbitMQ (Kafka WIP) behind a unified pub/sub API.
 ## Install
 
 ```bash
-yarn add @warlock.js/herald amqplib   # amqplib for RabbitMQ
+pnpm add @warlock.js/herald amqplib   # amqplib for RabbitMQ
 ```
 
 ## Server-only package
