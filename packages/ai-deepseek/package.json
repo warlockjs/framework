@@ -25,14 +25,16 @@
     "url": "https://github.com/warlockjs/ai-deepseek"
   },
   "dependencies": {
-    "@warlock.js/ai-openai": "*",
-    "@warlock.js/logger": "*"
+    "@warlock.js/ai-openai": "workspace:^",
+    "@warlock.js/logger": "workspace:^"
   },
   "peerDependencies": {
     "@warlock.js/ai": "*"
   },
   "devDependencies": {
+    "@warlock.js/ai": "workspace:^",
     "typescript": "^5.0.0",
     "vitest": "4.1.10"
-  }
+  },
+  "packageManager": "pnpm@11.24.0"
 }
