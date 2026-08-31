@@ -29,6 +29,9 @@
     "url": "https://github.com/warlockjs/ai-panoptic"
   },
   "devDependencies": {
+    "@warlock.js/ai": "workspace:^",
+    "@warlock.js/cache": "workspace:^",
+    "@warlock.js/logger": "workspace:^",
     "typescript": "^5.0.0",
     "vitest": "4.1.10"
   },
@@ -56,5 +59,6 @@
   },
   "dependencies": {
     "langfuse": "^3.38.20"
-  }
+  },
+  "packageManager": "pnpm@11.24.0"
 }
