@@ -27,6 +27,7 @@
     "url": "https://github.com/warlockjs/ai-groq"
   },
   "devDependencies": {
+    "@warlock.js/ai": "workspace:^",
     "typescript": "^5.0.0",
     "vitest": "4.1.10"
   },
@@ -34,7 +35,8 @@
     "@warlock.js/ai": "*"
   },
   "dependencies": {
-    "@warlock.js/ai-openai": "*",
-    "@warlock.js/logger": "*"
-  }
+    "@warlock.js/ai-openai": "workspace:^",
+    "@warlock.js/logger": "workspace:^"
+  },
+  "packageManager": "pnpm@11.24.0"
 }
