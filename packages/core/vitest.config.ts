@@ -28,6 +28,19 @@ export default defineConfig({
     },
   },
   test: {
+    /**
+     * Pin NODE_ENV for the whole suite.
+     *
+     * Vitest only defaults this to "test" when it is UNSET, so an ambient
+     * `NODE_ENV=production` in a developer's shell or a CI image is inherited
+     * instead and the suite silently exercises production branches. This
+     * machine exports exactly that, and several sources here branch on it.
+     *
+     * A test whose verdict tracks the machine it runs on is worse than a
+     * failing one. Specs that want the production branch set it themselves,
+     * per-test, and restore it afterwards.
+     */
+    env: { NODE_ENV: "test" },
     environment: "node",
     include: ["tests/{unit,integration}/**/*.test.ts"],
     testTimeout: 10_000,

@@ -34,6 +34,32 @@ const imageEntry = path.resolve(__dirname, "../../../src/image/index.ts");
 const hookEntry = path.resolve(__dirname, "fixtures/sharp-load-failure-hook.mjs");
 const sharpLibEntry = path.resolve(repoRoot, "node_modules/sharp/lib/constructor.js");
 
+/**
+ * The child's inherited environment, minus `NODE_PATH`.
+ *
+ * Vitest sets `NODE_PATH` for its workers, and under pnpm that list ends with
+ * `node_modules/.pnpm/node_modules` — the flat virtual store, which contains
+ * EVERY installed package rather than just this project's direct dependencies.
+ * `NODE_PATH` entries become `Module.globalPaths`, which Node consults from any
+ * directory, so inheriting it makes `require("sharp")` succeed even when
+ * resolved from a path in the OS temp directory.
+ *
+ * That destroys the `missing` mode's whole premise. The hook builds its
+ * `MODULE_NOT_FOUND` by asking Node for a module that genuinely is not there;
+ * with the store on `NODE_PATH` sharp IS there, the hook detects that it can no
+ * longer produce a real absence, and it fails loudly rather than fabricating
+ * one — which is the correct behaviour and how this surfaced.
+ *
+ * Under yarn's hoisted layout the same `NODE_PATH` was harmless (its entries
+ * held only vitest's own dependencies), so this is pnpm-migration fallout, not
+ * a pre-existing bug. `transitive` mode survived by luck: it asks for `color`,
+ * which happens not to be in the flat store.
+ *
+ * The child is meant to be a pristine process, so dropping the variable is also
+ * the more faithful simulation. `tsx` still resolves from `cwd` (the repo root).
+ */
+const { NODE_PATH: _storePathsFromVitest, ...inheritedEnv } = process.env;
+
 type Attempt = { message: string; cause: string | null };
 
 /**
@@ -67,7 +93,7 @@ function constructTwiceWithFailingSharp(mode: "missing" | "transitive" | "unload
       stdio: "pipe",
       encoding: "utf8",
       env: {
-        ...process.env,
+        ...inheritedEnv,
         WARLOCK_SHARP_FAILURE: mode,
         WARLOCK_SHARP_LIB_ENTRY: sharpLibEntry,
       },
