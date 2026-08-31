@@ -21,5 +21,6 @@
   },
   "devDependencies": {
     "vitest": "4.1.10"
-  }
+  },
+  "packageManager": "pnpm@11.24.0"
 }
