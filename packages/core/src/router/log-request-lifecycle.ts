@@ -32,7 +32,13 @@ export type RequestLogEntry = {
   module: string;
   action: string;
   message: string;
-  context?: unknown;
+  /**
+   * Typed as the logger accepts it, not as `unknown`. These entries exist to be
+   * handed to `log.info` / `warn` / `error`, whose parameter is
+   * `Record<string, any>` — `unknown` was not assignable, so the adapter in
+   * router.ts could not compile even though every real caller passes an object.
+   */
+  context?: Record<string, any>;
 };
 
 export type RequestLogPorts = {
@@ -47,7 +53,13 @@ export type RequestLogDescriptor = {
   module: string;
   action: string;
   requestId: string;
-  context?: unknown;
+  /**
+   * Typed as the logger accepts it, not as `unknown`. These entries exist to be
+   * handed to `log.info` / `warn` / `error`, whose parameter is
+   * `Record<string, any>` — `unknown` was not assignable, so the adapter in
+   * router.ts could not compile even though every real caller passes an object.
+   */
+  context?: Record<string, any>;
   /**
    * Read AFTER the run settles — the status is decided during the request, so
    * capturing it up front would report the default on every entry.

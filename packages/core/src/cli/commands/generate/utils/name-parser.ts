@@ -24,7 +24,13 @@ export function parseModulePath(input: string): { module?: string; name: string 
 /**
  * Parse name into all case variants
  */
-export function parseName(input: string): ParsedName {
+// Returns the Name class, which is what it has always constructed. Annotating it as
+// ParsedName understated the result: Name carries `plural` and `singular` getters that
+// the CRUD stubs need, and a protected member that makes it nominal in practice — so
+// four generators could not pass this value to a stub expecting a Name, even though
+// that is exactly what they had. Name still satisfies ParsedName for callers that only
+// want the cased strings.
+export function parseName(input: string): Name {
   return new Name(input);
 }
 
