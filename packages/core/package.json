@@ -10,7 +10,7 @@
     "warlock": "./bin/warlock.js"
   },
   "scripts": {
-    "typecheck": "node ../node_modules/typescript/bin/tsc -p tsconfig.typecheck.json",
+    "typecheck": "node node_modules/typescript/bin/tsc -p tsconfig.typecheck.json",
     "test": "vitest run",
     "update": "ncu -u"
   },
@@ -32,13 +32,13 @@
     "@mongez/slug": "^1.0.7",
     "@mongez/supportive-is": "^2.1.4",
     "@mongez/time-wizard": "^1.0.6",
-    "@warlock.js/auth": "*",
-    "@warlock.js/cache": "*",
-    "@warlock.js/cascade": "*",
-    "@warlock.js/context": "*",
-    "@warlock.js/logger": "*",
-    "@warlock.js/seal": "*",
-    "@warlock.js/fs": "*",
+    "@warlock.js/auth": "workspace:^",
+    "@warlock.js/cache": "workspace:^",
+    "@warlock.js/cascade": "workspace:^",
+    "@warlock.js/context": "workspace:^",
+    "@warlock.js/logger": "workspace:^",
+    "@warlock.js/seal": "workspace:^",
+    "@warlock.js/fs": "workspace:^",
     "chokidar": "^5.0.0",
     "dayjs": "^1.11.19",
     "es-module-lexer": "^2.0.0",
@@ -134,6 +134,11 @@
   "typings": "./src/index.ts",
   "type": "module",
   "devDependencies": {
+    "@warlock.js/access": "workspace:^",
+    "@warlock.js/ai": "workspace:^",
+    "@warlock.js/herald": "workspace:^",
+    "@warlock.js/notifications": "workspace:^",
     "vitest": "4.1.10"
-  }
+  },
+  "packageManager": "pnpm@11.24.0"
 }
