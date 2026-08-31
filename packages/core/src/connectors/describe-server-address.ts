@@ -80,6 +80,25 @@ export function isWildcardBind(boundAddress: string | undefined): boolean {
 }
 
 /**
+ * Whether the host a caller ASKED to bind is a wildcard.
+ *
+ * Needed because `isWildcardBind` alone cannot answer this. Fastify's
+ * `listen()` normalises a `0.0.0.0` bind and resolves back
+ * `http://127.0.0.1:<port>` — the loopback spelling — while `::` comes back
+ * as `http://[::]:<port>` untouched. So the returned address reports the
+ * wildcard for one of the two spellings and hides it for the other, and
+ * `0.0.0.0` is the one people actually write.
+ *
+ * The requested host is the ground truth for INTENT; the bound address is the
+ * ground truth for what happened. A wildcard in either is a wildcard bind.
+ */
+export function isWildcardHost(host: string | undefined): boolean {
+  if (!host) return false;
+
+  return WILDCARD_HOSTS.has(host.trim().toLowerCase());
+}
+
+/**
  * The address as it should be SHOWN to a human. See the module doc above.
  *
  * Anything unparseable is returned untouched: a best-effort prettifier must
@@ -151,6 +170,13 @@ function effectivePort(url: URL): string {
 export function describeServerAddress(
   boundAddress: string | undefined,
   baseUrl: unknown,
+  /**
+   * The host passed to `listen()`. Optional so existing callers keep working,
+   * but the connector passes it: without it a `0.0.0.0` bind is reported as
+   * loopback-only, and the dev block then omits its "(all interfaces)" note in
+   * exactly the case a developer most needs it.
+   */
+  requestedHost?: string,
 ): ServerAddressReport {
   const bound = parseUrl(boundAddress);
   const configured = parseUrl(baseUrl);
@@ -165,7 +191,7 @@ export function describeServerAddress(
       ready: `Server ready at ${fallback}`,
       url: fallback,
       boundAddress,
-      wildcardBind: false,
+      wildcardBind: isWildcardHost(requestedHost),
     };
   }
 
@@ -176,7 +202,7 @@ export function describeServerAddress(
     ready: `Server ready at ${url}`,
     url,
     boundAddress,
-    wildcardBind: isWildcardBind(boundAddress),
+    wildcardBind: isWildcardBind(boundAddress) || isWildcardHost(requestedHost),
   };
 
   if (!configured) return base;

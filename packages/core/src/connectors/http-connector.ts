@@ -198,7 +198,14 @@ export class HttpConnector extends BaseConnector {
 
       Application.setServedPort(httpConfig.port);
 
-      const address = describeServerAddress(boundAddress, config.get("app.baseUrl"));
+      const address = describeServerAddress(
+        boundAddress,
+        config.get("app.baseUrl"),
+        // Passed because `listen()` does not report it back: Fastify resolves a
+        // `0.0.0.0` bind to `http://127.0.0.1:<port>`, so the wildcard is only
+        // recoverable from what we ASKED for.
+        httpConfig.host || "localhost",
+      );
 
       // Recorded unconditionally: the ready block reads it in development, and
       // in every other mode it is simply the one place that knows what was

@@ -168,3 +168,63 @@ describe("describeServerAddress — the report carries the bind, not only its di
     expect(describeServerAddress("http://0.0.0.0:2030", undefined).wildcardBind).toBe(true);
   });
 });
+
+/**
+ * The gap that let a real defect through: every wildcard case above feeds
+ * `describeServerAddress` a hand-written `http://0.0.0.0:2030`, and **Fastify
+ * never returns that**. `listen({ host: "0.0.0.0" })` resolves back
+ * `http://127.0.0.1:<port>` — the loopback spelling — so in production
+ * `wildcardBind` was computed from an address that had already lost the
+ * wildcard, and the dev block's "(all interfaces)" note could not fire for the
+ * spelling people actually write.
+ *
+ * `::` was unaffected: it comes back as `http://[::]:<port>` untouched. One of
+ * the two wildcards worked, which is why the unit tests looked adequate.
+ *
+ * Measured against Fastify 5, `listen({ port: 0, host })`:
+ *
+ *   0.0.0.0    -> http://127.0.0.1:<port>   <- wildcard lost
+ *   ::         -> http://[::]:<port>
+ *   localhost  -> http://[::1]:<port>
+ *   127.0.0.1  -> http://127.0.0.1:<port>
+ *
+ * `printed-url-is-reachable.test.ts` boots a real server and asserts the same
+ * property end to end.
+ */
+describe("wildcardBind survives Fastify normalising a 0.0.0.0 bind to loopback", () => {
+  it("reports a wildcard from the REQUESTED host when the bound address no longer shows one", () => {
+    // Exactly what Fastify hands back for `host: "0.0.0.0"`.
+    const report = describeServerAddress("http://127.0.0.1:2030", undefined, "0.0.0.0");
+
+    expect(report.wildcardBind).toBe(true);
+  });
+
+  it.each(["0.0.0.0", "::", "[::]", " 0.0.0.0 "])(
+    "treats %j as a wildcard host",
+    (host) => {
+      expect(describeServerAddress("http://127.0.0.1:2030", undefined, host).wildcardBind).toBe(
+        true,
+      );
+    },
+  );
+
+  it.each(["localhost", "127.0.0.1", "::1", "192.168.1.10", undefined])(
+    "does not invent a wildcard for %j",
+    (host) => {
+      expect(describeServerAddress("http://127.0.0.1:2030", undefined, host).wildcardBind).toBe(
+        false,
+      );
+    },
+  );
+
+  it("still reports a wildcard from the bound address when no host is supplied", () => {
+    // The original path must keep working — `::` is only ever visible there.
+    expect(describeServerAddress("http://[::]:2030", undefined).wildcardBind).toBe(true);
+  });
+
+  it("reports a wildcard even when listen() gave nothing back at all", () => {
+    // The degenerate branch used to hardcode `false`, which would have hidden a
+    // wide bind precisely when the connector knew least about it.
+    expect(describeServerAddress(undefined, undefined, "0.0.0.0").wildcardBind).toBe(true);
+  });
+});
