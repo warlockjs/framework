@@ -12,7 +12,7 @@ Schema-first validation. Single entry point: the `v` factory. Every validator ch
 ## Install
 
 ```bash
-yarn add @warlock.js/seal
+pnpm add @warlock.js/seal
 ```
 
 Most warlock projects already have `@warlock.js/seal` transitively via `@warlock.js/core` (which re-exports the `v` factory and `Infer` types). Import direct from the package you control: `@warlock.js/seal` if you build a leaf package, `@warlock.js/core` if you write app code.
