@@ -4,7 +4,7 @@
  *
  * It's highly recommended using it instead of declaring manual channel namd and publishing data
  */
-import { GenericObject } from "@mongez/reinforcements";
+import { type GenericObject } from "@mongez/reinforcements";
 import { type ObjectValidator } from "@warlock.js/seal";
 import { randomUUID } from "crypto";
 

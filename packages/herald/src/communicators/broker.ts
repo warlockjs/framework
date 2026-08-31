@@ -1,7 +1,7 @@
 import type { BrokerDriverContract } from "../contracts";
 import type { ChannelContract } from "../contracts/channel.contract";
 import { EventMessage } from "../message-managers/event-message";
-import { EventConsumerClass } from "../message-managers/types";
+import { type EventConsumerClass } from "../message-managers/types";
 import type { ChannelOptions } from "../types";
 
 /**

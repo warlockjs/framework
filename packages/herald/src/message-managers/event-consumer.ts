@@ -4,10 +4,10 @@
  *
  * It's highly recommended using it instead of declaring manual channel namd and subscribing to event
  */
-import { v, ValidationResult, type ObjectValidator } from "@warlock.js/seal";
+import { v, type ValidationResult, type ObjectValidator } from "@warlock.js/seal";
 import { randomUUID } from "crypto";
 import { Consumable } from "../decorators";
-import { ConsumedEventMessage, EventConsumerClass } from "./types";
+import { type ConsumedEventMessage, type EventConsumerClass } from "./types";
 
 export abstract class EventConsumer<Payload = Record<string, any>> {
   /**

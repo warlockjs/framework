@@ -1,5 +1,5 @@
 import { type EventMessage } from "../message-managers/event-message";
-import { EventConsumerClass } from "../message-managers/types";
+import { type EventConsumerClass } from "../message-managers/types";
 import type {
   BrokerDriverType,
   BrokerEvent,

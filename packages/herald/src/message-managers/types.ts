@@ -1,4 +1,4 @@
-import { Message } from "../types";
+import { type Message } from "../types";
 import { type EventConsumer } from "./event-consumer";
 
 export type ConsumedEventMessage = {

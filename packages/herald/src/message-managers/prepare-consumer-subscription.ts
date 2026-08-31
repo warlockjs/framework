@@ -1,5 +1,5 @@
 import type { MessageHandler } from "./../types";
-import { EventConsumerClass } from "./types";
+import { type EventConsumerClass } from "./types";
 
 export function prepareConsumerSubscription(
   Consumer: EventConsumerClass,

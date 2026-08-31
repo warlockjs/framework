@@ -1,6 +1,6 @@
 import { Broker, brokerRegistry } from "../communicators";
 import type { BrokerDriverContract, ChannelContract } from "../contracts";
-import { EventConsumerClass, EventMessage } from "../message-managers";
+import { type EventConsumerClass, EventMessage } from "../message-managers";
 import type { ChannelOptions, ConnectionOptions, RabbitMQConnectionOptions } from "../types";
 
 /**
