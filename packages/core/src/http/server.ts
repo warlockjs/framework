@@ -1,4 +1,5 @@
 import config from "@mongez/config";
+import { log } from "@warlock.js/logger";
 import Fastify, { type FastifyServerOptions } from "fastify";
 
 export type FastifyInstance = ReturnType<typeof Fastify>;
@@ -6,9 +7,45 @@ export type FastifyInstance = ReturnType<typeof Fastify>;
 // Instantiate Fastify server
 let server: FastifyInstance | undefined = undefined;
 
+/**
+ * Warn when `http.trustProxy` is a number.
+ *
+ * Fastify refuses hop-count trust outright and returns no trust at all
+ * (`lib/request.js`, `getTrustProxyFn`) — a hop count cannot validate the
+ * immediate peer, so honouring one would let a direct client spoof
+ * `X-Forwarded-*` by supplying enough hops.
+ *
+ * Failing closed is the right call, but it is SILENT, and silence is the whole
+ * defect: a number reads like bounded trust and delivers none. Behind a real
+ * proxy every client then resolves to the PROXY's address, which collapses
+ * ip-filter allowlists, rate-limit buckets and idempotency scoping onto a
+ * single key. That is a correctness and availability failure, not a security
+ * one — but nothing tells the operator it is happening.
+ *
+ * Boot is the only honest place to say so: the value is inert from the first
+ * request onward, so there is no later moment where the mistake surfaces.
+ */
+function warnOnInertTrustProxy(trustProxy: unknown): void {
+  if (typeof trustProxy !== "number") return;
+
+  log.warn(
+    "http",
+    "config",
+    `http.trustProxy is set to the number ${trustProxy}, which grants NO proxy trust — ` +
+      `Fastify refuses hop-count trust because a hop count cannot validate the immediate peer. ` +
+      `request.ip will stay the socket peer, so behind a proxy every client resolves to the ` +
+      `proxy's address and ip-filter allowlists, rate-limit buckets and idempotency scoping ` +
+      `collapse onto one key. Name your proxies instead — http.trustProxy: "10.0.0.0/8" (an IP, ` +
+      `CIDR block, or list of them), or true if nothing but your edge can reach this process.`,
+  );
+}
 export function startHttpServer(options?: FastifyServerOptions): FastifyInstance {
   // `config.set(key, undefined)` stores null rather than unsetting, so an app
   // that clears a key would otherwise hand Fastify `null` and crash the boot.
+  const trustProxy: unknown = config.get("http.trustProxy", false);
+
+  warnOnInertTrustProxy(trustProxy);
+
   const bodyLimit = config.get("http.bodyLimit") ?? undefined;
 
   return (server = Fastify({
@@ -27,7 +64,7 @@ export function startHttpServer(options?: FastifyServerOptions): FastifyInstance
     // validate the immediate peer, so a direct client could spoof
     // `X-Forwarded-*` by supplying enough hops. A number therefore fails closed
     // and SILENTLY does nothing; name your proxies with the list form instead.
-    trustProxy: config.get("http.trustProxy", false),
+    trustProxy,
     // No default: an app that configures nothing keeps Fastify's own 1MB limit
     // rather than the historical 200GB, which silently removed the protection
     // Fastify provides. Per-route caps go through `serverOptions.bodyLimit`;
