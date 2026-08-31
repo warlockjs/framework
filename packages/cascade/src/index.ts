@@ -82,6 +82,16 @@ export * from "./migration";
 // Operations API
 export * from "./operations";
 
+// PendingMigration is declared twice under the same name: the rich runner-internal
+// shape in ./migration/types (name, table, migration instance, filePath, Date) and
+// the lean public dry-run shape in ./operations/migrations (name, optional string
+// createdAt). Both reach this barrel through the star exports above, so the name was
+// ambiguous and a consumer silently got whichever TypeScript resolved first.
+// listPendingMigrations() returns the public one, so that is what this barrel exports.
+// The runner-internal shape stays importable from ./migration for anything that
+// genuinely needs it.
+export type { PendingMigration } from "./operations/migrations";
+
 // MongoDB Migration Driver
 export { MongoMigrationDriver } from "./drivers/mongodb/mongodb-migration-driver";
 
