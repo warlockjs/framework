@@ -4,6 +4,8 @@ import {
   type BedrockRuntimeClient,
   type ConverseResponse,
   type ConverseStreamOutput,
+  type TokenUsage,
+  type ToolUseBlock,
 } from "@aws-sdk/client-bedrock-runtime";
 import { describe, expect, it } from "vitest";
 import { BedrockModel } from "./model";
@@ -11,7 +13,20 @@ import { BedrockModel } from "./model";
 type AnyCommand = ConverseCommand | ConverseStreamCommand;
 
 function makeFakeClient(options: {
-  converse?: ConverseResponse;
+  /**
+   * Deliberately a PARTIAL of the SDK response.
+   *
+   * Several cases here exist precisely to drive degenerate payloads through the
+   * model: a response with no `output`, usage with no `totalTokens`, usage with no
+   * `inputTokens`, an empty `toolUse` block. Requiring the complete SDK shape would
+   * mean filling those fields in — which is the one thing that would stop each of
+   * those tests testing anything.
+   *
+   * A recursive DeepPartial was the obvious shape and it does not compile: the AWS
+   * SDK types are deep enough to hit TS2589 ("type instantiation is excessively
+   * deep"). One level plus casts on the nested fixtures is what actually works.
+   */
+  converse?: Partial<ConverseResponse>;
   streamEvents?: ConverseStreamOutput[];
   /** When set, omit the `stream` property from the stream response entirely. */
   noStream?: boolean;
@@ -253,7 +268,10 @@ describe("BedrockModel.complete()", () => {
 
   it("falls back total to input + output when totalTokens is absent", async () => {
     const { client } = makeFakeClient({
-      converse: { ...baseConverse, usage: { inputTokens: 7, outputTokens: 5 } },
+      // no totalTokens: that absence is what this test drives
+      converse: {
+        ...baseConverse,
+        usage: { inputTokens: 7, outputTokens: 5 } as TokenUsage },
     });
     const model = new BedrockModel(client, { name: "amazon.nova-pro-v1:0" });
 
@@ -266,7 +284,8 @@ describe("BedrockModel.complete()", () => {
 
   it("treats partial usage fields as zero", async () => {
     const { client } = makeFakeClient({
-      converse: { ...baseConverse, usage: { outputTokens: 4 } },
+      converse: { ...baseConverse, // no inputTokens either: partial usage is the case under test
+        usage: { outputTokens: 4 } as TokenUsage },
     });
     const model = new BedrockModel(client, { name: "amazon.nova-pro-v1:0" });
 
@@ -297,7 +316,7 @@ describe("BedrockModel.complete()", () => {
       converse: {
         ...baseConverse,
         stopReason: "tool_use",
-        output: { message: { role: "assistant", content: [{ toolUse: {} }] } },
+        output: { message: { role: "assistant", content: [{ toolUse: {} as ToolUseBlock }] } },
       },
     });
     const model = new BedrockModel(client, { name: "amazon.nova-pro-v1:0" });
