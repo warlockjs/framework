@@ -586,8 +586,17 @@ bootstrap();
     // spread, so a user banner must not be lost to it or clobber the shim.
     const userBanner = this.options.banner;
 
-    delete this.options.outFile;
-    delete this.options.entryPath;
+    // `outFile` and `entryPath` are REQUIRED on ResolvedBuildConfig on purpose:
+    // resolve-build-config.ts documents that widening them pushed a lie downstream
+    // into start-production.command.ts, which then could not trust its own config.
+    // This is the one place they must be absent - the object is spread into esbuild's
+    // call verbatim and esbuild throws on unknown keys. Strip them through a local
+    // optional view rather than weakening the type every other caller relies on; both
+    // were already read into locals above.
+    const strippable = this.options as Partial<ResolvedBuildConfig>;
+
+    delete strippable.outFile;
+    delete strippable.entryPath;
     delete this.options.singleBundle;
     delete this.options.esmShim;
     delete this.options.banner;

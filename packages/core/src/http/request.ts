@@ -1231,7 +1231,14 @@ export class Request<RequestValidation = any> {
   public detectIp() {
     // Trusting `X-Real-IP` is only sound when the config trusts the entire
     // upstream chain; bounded shapes get chain-aware resolution instead.
-    if (config.get("http.trustProxy", false) === true) {
+    // Typed as `unknown`: config.get(key, fallback) infers the FALLBACK's type, so
+    // the literal `false` narrowed this to `false` and TypeScript called the
+    // comparison unreachable. The stored value is genuinely unconstrained at compile
+    // time - trustProxy accepts a boolean, a CIDR list or a predicate - so `unknown`
+    // is what it actually is, and the === true check is the narrowing.
+    const trustProxy: unknown = config.get("http.trustProxy", false);
+
+    if (trustProxy === true) {
       const realIp = this.header("x-real-ip");
 
       if (realIp) {
