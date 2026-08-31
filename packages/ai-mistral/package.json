@@ -27,14 +27,16 @@
     "url": "https://github.com/warlockjs/ai-mistral"
   },
   "dependencies": {
-    "@warlock.js/ai-openai": "*",
-    "@warlock.js/logger": "*"
+    "@warlock.js/ai-openai": "workspace:^",
+    "@warlock.js/logger": "workspace:^"
   },
   "devDependencies": {
+    "@warlock.js/ai": "workspace:^",
     "typescript": "^5.0.0",
     "vitest": "4.1.10"
   },
   "peerDependencies": {
     "@warlock.js/ai": "*"
-  }
+  },
+  "packageManager": "pnpm@11.24.0"
 }
