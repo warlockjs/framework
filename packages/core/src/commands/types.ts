@@ -4,7 +4,7 @@
  * These types define the structure for commands, options, preloading, and actions.
  */
 
-import { ConnectorName } from "../connectors";
+import { type ConnectorName } from "../connectors";
 import type { RuntimeStrategy } from "../utils/environment";
 
 /**

@@ -1,4 +1,4 @@
-import { cache, CacheKey, type CacheDriver } from "@warlock.js/cache";
+import { cache, type CacheKey, type CacheDriver } from "@warlock.js/cache";
 import { config } from "../config";
 import { CascadeAdapter } from "./adapters/cascade";
 import type {

@@ -9,7 +9,7 @@ import { storage } from "../storage";
 dayjs.extend(relativeTime);
 import { uploadsUrl, url } from "../utils/urls";
 import { type LocalizedObject } from "./../utils/get-localized";
-import { ResourceFieldBuilderDateOutputOptions, type ResourceOutputValueCastType } from "./types";
+import { type ResourceFieldBuilderDateOutputOptions, type ResourceOutputValueCastType } from "./types";
 
 export class ResourceFieldBuilder {
   /**

@@ -3,7 +3,7 @@ import { get } from "@mongez/reinforcements";
 import { readFile, unlink, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "url";
 import { rootPath } from "../utils";
-import { WarlockConfig } from "./types";
+import { type WarlockConfig } from "./types";
 
 /**
  * True when `error` is Node's "this runtime can't import a `.ts` file" error.

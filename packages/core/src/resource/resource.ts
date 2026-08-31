@@ -3,10 +3,10 @@ import { Model } from "@warlock.js/cascade";
 import { useRequestStore } from "../http/context/request-context";
 import { ResourceFieldBuilder } from "./resource-field-builder";
 import {
-  ResourceArraySchema,
-  ResourceFieldConfig,
-  ResourceOutputValueCastType,
-  ResourceSchema,
+  type ResourceArraySchema,
+  type ResourceFieldConfig,
+  type ResourceOutputValueCastType,
+  type ResourceSchema,
 } from "./types";
 
 /**

@@ -1,7 +1,7 @@
 import { cache } from "@warlock.js/cache";
 import { log } from "@warlock.js/logger";
 import { config } from "../config";
-import { RegisteredUseCase, UseCaseConfigurations, UseCaseResult } from "./types";
+import { type RegisteredUseCase, type UseCaseConfigurations, type UseCaseResult } from "./types";
 
 /**
  * Store registered use cases

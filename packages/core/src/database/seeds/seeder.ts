@@ -1,4 +1,4 @@
-import { SeedContext, SeedResult } from "./types";
+import { type SeedContext, type SeedResult } from "./types";
 
 export type Seeder = {
   /**

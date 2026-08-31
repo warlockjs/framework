@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { config } from "../config";
-import { EncryptionConfigurations } from "./types";
+import { type EncryptionConfigurations } from "./types";
 
 /**
  * Default encryption algorithm.

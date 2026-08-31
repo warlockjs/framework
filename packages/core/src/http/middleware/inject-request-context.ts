@@ -5,7 +5,7 @@
  * All framework contexts (request, storage, database) are available throughout the request lifecycle.
  */
 import { trans } from "@mongez/localization";
-import { GenericObject } from "@mongez/reinforcements";
+import { type GenericObject } from "@mongez/reinforcements";
 import { DatabaseWriterValidationError } from "@warlock.js/cascade";
 import { contextManager } from "@warlock.js/context";
 import config from "@mongez/config";

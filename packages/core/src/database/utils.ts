@@ -2,7 +2,7 @@ import { get } from "@mongez/reinforcements";
 import { slugify } from "@mongez/slug";
 import { authService } from "@warlock.js/auth";
 import { Model, useModelTransformer } from "@warlock.js/cascade";
-import { ComputedCallback, SchemaContext } from "@warlock.js/seal";
+import { type ComputedCallback, type SchemaContext } from "@warlock.js/seal";
 
 /**
  * Hash password on saving if password changes

@@ -1,7 +1,7 @@
-import { CacheDriver } from "@warlock.js/cache";
+import { type CacheDriver } from "@warlock.js/cache";
 import { RepositoryManager } from "../repository.manager";
-import { QueryBuilderContract } from "./query-builder.contract";
-import { RepositoryAdapterContract } from "./repository-adapter.contract";
+import { type QueryBuilderContract } from "./query-builder.contract";
+import { type RepositoryAdapterContract } from "./repository-adapter.contract";
 
 /**
  * Pagination result structure returned by repository list methods

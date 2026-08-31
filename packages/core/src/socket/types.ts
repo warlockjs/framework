@@ -1,4 +1,4 @@
-import { ServerOptions } from "node:http";
+import { type ServerOptions } from "node:http";
 
 /**
  * Socket options

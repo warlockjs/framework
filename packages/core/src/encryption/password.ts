@@ -1,5 +1,5 @@
 import { config } from "../config";
-import { EncryptionPasswordConfigurations } from "./types";
+import { type EncryptionPasswordConfigurations } from "./types";
 
 /**
  * Default bcrypt salt rounds.

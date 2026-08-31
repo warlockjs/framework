@@ -1,5 +1,5 @@
 import { Model } from "@warlock.js/cascade";
-import { Infer, v } from "@warlock.js/seal";
+import { type Infer, v } from "@warlock.js/seal";
 
 const schema = v.object({
   module: v.string(),

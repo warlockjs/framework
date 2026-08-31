@@ -1,5 +1,5 @@
 import config from "@mongez/config";
-import Fastify, { FastifyServerOptions } from "fastify";
+import Fastify, { type FastifyServerOptions } from "fastify";
 
 export type FastifyInstance = ReturnType<typeof Fastify>;
 

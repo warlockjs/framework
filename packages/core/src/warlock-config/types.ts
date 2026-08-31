@@ -2,7 +2,7 @@ import type { MigrationConstructor } from "@warlock.js/cascade";
 import type { CLICommand } from "../commands/cli-command";
 import type { Connector } from "../connectors/types";
 import type { FileHealthCheckerContract } from "../dev-server/health-checker/file-health-checker.contract";
-import { BuildOptions } from "esbuild";
+import { type BuildOptions } from "esbuild";
 
 /**
  * Resolved Warlock Configuration

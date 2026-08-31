@@ -5,7 +5,7 @@ import { createServer as createHttpsServer } from "https";
 import type { Server } from "socket.io";
 import { container } from "../container";
 import { BaseConnector } from "./base-connector";
-import { ConnectorLifecyclePhase, ConnectorName, ConnectorPriority } from "./types";
+import { ConnectorLifecyclePhase, type ConnectorName, ConnectorPriority } from "./types";
 
 /**
  * Shown when a project enables sockets (a `socket` config is present) but the

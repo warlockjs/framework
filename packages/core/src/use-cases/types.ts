@@ -1,6 +1,6 @@
 import type { RetryOptions } from "@mongez/reinforcements";
 import { type Infer, type ObjectValidator } from "@warlock.js/seal";
-import { BenchmarkOptions } from "../benchmark";
+import { type BenchmarkOptions } from "../benchmark";
 
 /**
  * Shared context object passed through the entire use case pipeline.

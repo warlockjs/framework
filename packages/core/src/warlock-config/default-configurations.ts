@@ -1,4 +1,4 @@
-import { WarlockConfig } from "./types";
+import { type WarlockConfig } from "./types";
 
 export const defaultWarlockConfigurations: WarlockConfig = {
   build: {

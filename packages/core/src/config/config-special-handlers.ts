@@ -1,4 +1,4 @@
-import { SpecialConfigHandler } from "./config-loader";
+import { type SpecialConfigHandler } from "./config-loader";
 
 export class ConfigSpecialHandlers {
   /**
