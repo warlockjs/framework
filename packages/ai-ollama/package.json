@@ -25,6 +25,7 @@
     "url": "https://github.com/warlockjs/ai-ollama"
   },
   "devDependencies": {
+    "@warlock.js/ai": "workspace:^",
     "typescript": "^5.0.0",
     "vitest": "4.1.10"
   },
@@ -33,6 +34,7 @@
   },
   "dependencies": {
     "ollama": "^0.6.3",
-    "@warlock.js/logger": "*"
-  }
+    "@warlock.js/logger": "workspace:^"
+  },
+  "packageManager": "pnpm@11.24.0"
 }
