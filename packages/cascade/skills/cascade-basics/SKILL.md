@@ -14,7 +14,7 @@ Server-only: `package.json` declares `"warlock": { "environment": "server" }`. `
 ## Install
 
 ```bash
-yarn add @warlock.js/cascade @warlock.js/seal
+pnpm add @warlock.js/cascade @warlock.js/seal
 ```
 
 ## Foundations

@@ -52,10 +52,10 @@ See [`@warlock.js/cascade/configure-delete-strategy/SKILL.md`](@warlock.js/casca
 ## Running migrations
 
 ```bash
-yarn cascade migrate            # apply pending migrations
-yarn cascade migrate:rollback   # undo the last batch
-yarn cascade migrate:list       # which migrations have been executed
-yarn cascade migrate:export-sql # write .up.sql / .down.sql instead of executing
+pnpm cascade migrate            # apply pending migrations
+pnpm cascade migrate:rollback   # undo the last batch
+pnpm cascade migrate:list       # which migrations have been executed
+pnpm cascade migrate:export-sql # write .up.sql / .down.sql instead of executing
 ```
 
 `cascade migrate` discovers migration files via the `-p`/`--path` glob (default `./migrations/**`), runs them in order, and records each in the `_migrations` table / collection. See [`@warlock.js/cascade/run-cascade-cli/SKILL.md`](@warlock.js/cascade/run-cascade-cli/SKILL.md) for every flag and the programmatic Operations API.
