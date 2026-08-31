@@ -36,6 +36,13 @@
   "module": "./src/index.ts",
   "typings": "./src/index.ts",
   "devDependencies": {
+    "@warlock.js/auth": "workspace:^",
+    "@warlock.js/cache": "workspace:^",
+    "@warlock.js/cascade": "workspace:^",
+    "@warlock.js/core": "workspace:^",
+    "@warlock.js/logger": "workspace:^",
+    "@warlock.js/seal": "workspace:^",
     "vitest": "4.1.10"
-  }
+  },
+  "packageManager": "pnpm@11.24.0"
 }
