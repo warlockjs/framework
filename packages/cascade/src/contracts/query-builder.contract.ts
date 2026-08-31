@@ -1819,6 +1819,20 @@ export interface QueryBuilderContract<T = unknown> {
    * @example
    * const total = await User.query().where('isActive', true).count();
    */
+  /**
+   * Apply the given field updates to every row the current query matches.
+   *
+   * Both concrete builders — MongoDB and Postgres — have implemented this all
+   * along with an identical signature; only the contract was missing it. So a
+   * caller typed against the CONTRACT could not update through a query builder,
+   * even though the call works at runtime. The seeders manager is that caller: its
+   * "seeder has run before" branch updates the run counters this way.
+   *
+   * @param fields - Column/field values to set on the matched rows
+   * @returns Number of rows affected
+   */
+  update(fields: Record<string, unknown>): Promise<number>;
+
   count(): Promise<number>;
 
   /**
