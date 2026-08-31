@@ -10,7 +10,7 @@ description: 'Extend Context<TStore> to define an AsyncLocalStorage-backed typed
 ## Install
 
 ```bash
-yarn add @warlock.js/context
+pnpm add @warlock.js/context
 ```
 
 ## Shape
