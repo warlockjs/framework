@@ -264,7 +264,14 @@ export class SentryLog extends LogChannel<SentryLogConfig> {
       return;
     }
 
-    if (isModuleExists === null) {
+    // Only wait for the optional SDK when we do not already have a forwarder.
+    // An INJECTED client is resolved synchronously in the constructor, and that is
+    // the whole point of doing it there: an entry logged on the same tick as
+    // construction must still send. Awaiting loadSentry() unconditionally undid
+    // that — with @sentry/node absent (it is an optional peer) the import can take
+    // seconds, so a log with a perfectly good injected client stalled behind an SDK
+    // it was never going to use.
+    if (!this.sentry && isModuleExists === null) {
       // wait until module is fully loaded
       await loadSentry();
     }
