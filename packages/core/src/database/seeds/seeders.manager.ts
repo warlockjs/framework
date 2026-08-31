@@ -36,7 +36,12 @@ export type SeedersManagerOptions = {
 export class SeedersManager {
   public seeders: Seeder[] = [];
 
-  protected datasource?: DataSource;
+  // Not optional: the constructor assigns unconditionally, falling back to
+  // dataSourceRegistry.get(), which itself returns a DataSource rather than
+  // undefined. The `?` here described the OPTIONS field, not this one, and made
+  // every read of `this.datasource.driver` a type error. The options field stays
+  // optional, because that input genuinely is.
+  protected datasource: DataSource;
 
   /**
    * The single clock every timestamp in a run reads from. Defaults to
@@ -337,7 +342,10 @@ export class SeedersManager {
   /**
    * Get seed info from database
    */
-  protected getMetadata(seeder: Seeder): Promise<SeederMetadata> {
+  // Returns null when the seeder has never run. first() has always resolved to
+  // SeederMetadata | null; annotating it as non-null pushed that lie to every
+  // caller, each of which already branches on the absent case.
+  protected getMetadata(seeder: Seeder): Promise<SeederMetadata | null> {
     const driver = this.datasource.driver;
 
     return driver.queryBuilder(seedsTableName).where("name", seeder.name).first();
