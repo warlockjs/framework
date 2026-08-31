@@ -10,7 +10,7 @@ That is exactly what `ai.planner` is for. You register a toolbox of capabilities
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
 ```
 
 ## The toolbox: two agents and a tool

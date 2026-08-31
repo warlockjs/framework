@@ -21,8 +21,8 @@ The whole thing is one `*.spec.ts` that the build runs.
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/ai-anthropic @warlock.js/seal
-yarn add -D vitest
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/ai-anthropic @warlock.js/seal
+pnpm add -D vitest
 ```
 
 CI needs the provider keys in the environment. Gate the suite so local runs without keys skip rather than fail.

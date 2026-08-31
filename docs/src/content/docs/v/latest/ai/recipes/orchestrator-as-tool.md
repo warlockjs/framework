@@ -38,7 +38,7 @@ The practical rule: **design `inputSchema` as the orchestrator's complete per-ca
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
 ```
 
 ## The wrapped orchestrator

@@ -16,7 +16,7 @@ Two pieces matter:
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
 ```
 
 ## The schema

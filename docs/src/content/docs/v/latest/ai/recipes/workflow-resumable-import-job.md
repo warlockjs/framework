@@ -10,7 +10,7 @@ A nightly job imports a vendor catalog: **fetch** the feed, **normalize** the ro
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/seal
 ```
 
 ## The workflow

@@ -13,7 +13,7 @@ This is the cheapest path to a working RAG setup. Production volumes will eventu
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/cache @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/cache @warlock.js/seal
 ```
 
 You need a Postgres database with pgvector enabled. Locally:

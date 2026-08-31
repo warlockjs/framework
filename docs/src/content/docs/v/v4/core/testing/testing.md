@@ -16,13 +16,13 @@ This guide explains the architecture, then walks both modes end-to-end.
 
 ```bash
 # One command from a fresh project — drops vite.config.ts, test-global-setup.ts, test-setup.ts
-yarn warlock add test
+pnpm warlock add test
 
 # Run the suite
-yarn test
+pnpm test
 
 # Watch mode while you work
-yarn test:watch
+pnpm test:watch
 ```
 
 A unit test looks like this:
@@ -300,17 +300,17 @@ src/app/products/
 ## Running tests
 
 ```bash
-yarn test                  # one-shot run
-yarn test:watch            # watch mode
-yarn test:coverage         # with v8 coverage
-yarn test:ui               # vitest UI
+pnpm test                  # one-shot run
+pnpm test:watch            # watch mode
+pnpm test:coverage         # with v8 coverage
+pnpm test:ui               # vitest UI
 ```
 
 You can scope down with vitest's filename or test-name filters:
 
 ```bash
-yarn test create-product           # files matching "create-product"
-yarn test -t "creates a product"   # test name pattern
+pnpm test create-product           # files matching "create-product"
+pnpm test -t "creates a product"   # test name pattern
 ```
 
 ## Caveats and trade-offs

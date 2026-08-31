@@ -16,7 +16,7 @@ This guide walks the boot sequence end-to-end, names every built-in connector an
 
 ```mermaid
 flowchart TD
-    cli["yarn dev / production bundle"]
+    cli["pnpm dev / production bundle"]
     boot["bootstrap()<br/><i>loadEnv · initializeDayjs · capture rejections</i>"]
     early["Early phase connectors<br/><i>logger · mailer · database · herald · cache · storage · notifications · access</i>"]
     appcode["App code imports<br/><i>routes.ts · main.ts · models · events</i>"]

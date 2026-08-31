@@ -21,7 +21,7 @@ You're not building this from scratch. The package is the API.
 ## Step 1 — Install and bootstrap auth
 
 ```bash
-yarn add @warlock.js/auth
+pnpm add @warlock.js/auth
 ```
 
 Then wire the package's auth migrations and CLI commands in `warlock.config.ts`:
@@ -47,13 +47,13 @@ export default defineConfig({
 `authMigrations` ships the `access_tokens` and `refresh_tokens` tables. Generate a JWT secret:
 
 ```bash
-yarn warlock jwt.generate
+pnpm warlock jwt.generate
 ```
 
 The command writes `JWT_SECRET` (and `JWT_REFRESH_SECRET`) into your `.env`. Then run migrations:
 
 ```bash
-yarn warlock migrate
+pnpm warlock migrate
 ```
 
 You now have the schema. The deep details of login flows, refresh tokens, and user-type registration live in the auth package's own docs; this recipe focuses on the route side.

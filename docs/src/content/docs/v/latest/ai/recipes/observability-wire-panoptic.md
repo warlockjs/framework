@@ -13,7 +13,7 @@ That is exactly what `@warlock.js/ai-panoptic` does: one `panoptic({ exporters }
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/ai-panoptic @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/ai-panoptic @warlock.js/seal
 ```
 
 ```bash

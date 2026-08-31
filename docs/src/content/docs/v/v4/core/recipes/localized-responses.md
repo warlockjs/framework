@@ -105,7 +105,7 @@ Wire it as a global middleware in `src/config/http.ts` so every request runs thr
 
 ## Step 3 — Translations per module
 
-Every module owns its translations in `utils/locales.ts` — the file is auto-loaded by the framework. The scaffold gives you this when you run `yarn warlock generate.module <name>`:
+Every module owns its translations in `utils/locales.ts` — the file is auto-loaded by the framework. The scaffold gives you this when you run `pnpm warlock generate.module <name>`:
 
 ```ts title="src/app/products/utils/locales.ts"
 import { groupedTranslations } from "@mongez/localization";

@@ -21,8 +21,8 @@ No API key, no network, no variance.
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/seal
-yarn add -D vitest
+pnpm add @warlock.js/ai @warlock.js/seal
+pnpm add -D vitest
 ```
 
 `mockRouter`, `mockAgent`, and the matchers all ship from the package root. Register the matchers once per test file before using them.

@@ -378,7 +378,7 @@ await new Image(originalPath)
 
 ## Gotchas
 
-- **Sharp is lazy-loaded.** If you see `sharp is not installed` at first `new Image(...)`, run `yarn add sharp` (or `warlock add image`). The constructor throws; chained methods are unreachable.
+- **Sharp is lazy-loaded.** If you see `sharp is not installed` at first `new Image(...)`, run `pnpm add sharp` (or `warlock add image`). The constructor throws; chained methods are unreachable.
 - **Operations execute in queue order, not declaration order optimally.** `.resize(800).watermark(logo)` resizes first, then stamps the logo on the resized canvas — the watermark scales with the result. `.watermark(logo).resize(800)` stamps first then shrinks the whole thing, including the watermark.
 - **`apply(options)` ordering is fixed.** It's a sensible default order (resize → crop → rotate → effects → format), but if you need watermark-before-resize, use the chainable methods directly.
 - **PNG quality is mapped, not native.** `quality(85)` translates to `compressionLevel: 1` for PNG. For finer control, drop to sharp directly via the `image.image` escape hatch (`new Image(buffer).image.png({ compressionLevel: 4 }).toBuffer()`).

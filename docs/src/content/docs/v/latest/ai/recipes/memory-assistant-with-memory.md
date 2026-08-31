@@ -14,7 +14,7 @@ This recipe wires `ai.memory` into an orchestrator so Atlas does three things au
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/cache
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/cache
 ```
 
 The semantic tier needs an embedder (to turn preferences into vectors) and a vector-capable cache driver (to index and search them). For local development the in-memory driver is enough — it does an O(N) cosine scan with zero infrastructure. Production swaps it for `pg` + pgvector or `redis` + RediSearch without touching the rest of the code.

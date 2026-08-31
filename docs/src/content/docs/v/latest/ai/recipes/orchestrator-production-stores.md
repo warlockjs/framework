@@ -35,10 +35,10 @@ The checkpoint store resolves the same way — the per-orchestrator `checkpointS
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
 # the store clients are YOUR dependency — @warlock.js/ai never imports them:
-yarn add pg
-yarn add redis   # only if you use the redis snapshot store
+pnpm add pg
+pnpm add redis   # only if you use the redis snapshot store
 ```
 
 `@warlock.js/ai` takes **no peer dependency** on `pg` or `redis`. You install the client, build it, and pass it in via `{ client }`. The store never opens, closes, or quits the connection — its lifecycle stays entirely yours.

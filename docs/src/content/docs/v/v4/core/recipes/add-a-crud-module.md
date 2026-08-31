@@ -15,7 +15,7 @@ We'll build `products`. Substitute your own name everywhere you see it.
 ## Step 1 — Scaffold the module
 
 ```bash
-yarn warlock generate.module products
+pnpm warlock generate.module products
 ```
 
 That command creates the module folder with all the standard subdirectories at once:
@@ -54,7 +54,7 @@ We'll come back to it once the controllers exist.
 ## Step 2 — Generate the model with a resource
 
 ```bash
-yarn warlock generate.model products/product --with-resource
+pnpm warlock generate.model products/product --with-resource
 ```
 
 The argument is `<module>/<entity>`. The module is plural (`products`); the entity is singular (`product`). The `--with-resource` flag also drops a resource file under `resources/`.
@@ -168,7 +168,7 @@ Resources are output-only — they map model fields to wire fields and nothing e
 The generator created the `migrations/` folder but not a migration file. Generate one explicitly with the column DSL:
 
 ```bash
-yarn warlock generate.migration products/product \
+pnpm warlock generate.migration products/product \
   --add "name:text,slug:text:unique,price:double,description:text:nullable,in_stock:boolean"
 ```
 
@@ -192,7 +192,7 @@ export default Migration.create(Product, {
 Run it:
 
 ```bash
-yarn warlock migrate
+pnpm warlock migrate
 ```
 
 You should see `products` created. The migration also adds `id`, `createdAt`, `updatedAt`, and `deletedAt` (for soft-delete support) by default — you don't declare those.
@@ -200,7 +200,7 @@ You should see `products` created. The migration also adds `id`, `createdAt`, `u
 ## Step 4 — Generate the repository
 
 ```bash
-yarn warlock generate.repository products/product
+pnpm warlock generate.repository products/product
 ```
 
 Output:
@@ -275,11 +275,11 @@ export const productsRepository = new ProductsRepository();
 Five separate calls, each scoped to one endpoint:
 
 ```bash
-yarn warlock generate.controller products/list-products
-yarn warlock generate.controller products/get-product
-yarn warlock generate.controller products/create-product --with-validation
-yarn warlock generate.controller products/update-product --with-validation
-yarn warlock generate.controller products/remove-product
+pnpm warlock generate.controller products/list-products
+pnpm warlock generate.controller products/get-product
+pnpm warlock generate.controller products/create-product --with-validation
+pnpm warlock generate.controller products/update-product --with-validation
+pnpm warlock generate.controller products/remove-product
 ```
 
 The naming convention: `list-<plural>`, `get-<singular>`, `create-<singular>`, `update-<singular>`, `remove-<singular>` (or `delete-<singular>` — pick one). The `--with-validation` flag also creates a schema in `schema/` — value + inferred type from one file, no separate `*.request.ts`.
@@ -544,7 +544,7 @@ export default seeder({
 `once: true` means the seeder skips if it has run before. Run it:
 
 ```bash
-yarn warlock seed
+pnpm warlock seed
 ```
 
 ## Step 8 — Hit the endpoints

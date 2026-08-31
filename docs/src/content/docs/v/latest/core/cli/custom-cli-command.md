@@ -179,7 +179,7 @@ Notes on the code:
 Run it:
 
 ```bash
-yarn warlock report.sales --from=2026-01-01 --to=2026-01-31
+pnpm warlock report.sales --from=2026-01-01 --to=2026-01-31
 ```
 
 ```
@@ -205,7 +205,7 @@ src/app/reports/commands/report-sales.command.ts
 
 The convention is `<verb-noun>.command.ts`. The file's default export is the `CLICommand` instance.
 
-If the loader can't find your command, run `yarn warlock --warm-cache` to force a rescan. Add `--no-cache` to any invocation to skip the manifest entirely.
+If the loader can't find your command, run `pnpm warlock --warm-cache` to force a rescan. Add `--no-cache` to any invocation to skip the manifest entirely.
 
 ### Plugin / package commands — explicit factory
 
@@ -276,7 +276,7 @@ export default command({
 });
 ```
 
-Invocation: `yarn warlock report.tax us --year=2025`. The string `us` lands in `args[0]`; `--year` lands in `options.year`.
+Invocation: `pnpm warlock report.tax us --year=2025`. The string `us` lands in `args[0]`; `--year` lands in `options.year`.
 
 If you want the placeholder visible in `--help`, embed it in the command name:
 
@@ -330,13 +330,13 @@ Persistent commands also have different error handling — runtime errors after 
 ## Listing every command
 
 ```bash
-yarn warlock --help
+pnpm warlock --help
 ```
 
 Prints every framework, plugin, and project command grouped by source. The CLI also shows the closest matches if you typo a name:
 
 ```bash
-$ yarn warlock report.sallles
+$ pnpm warlock report.sallles
 Command "report.sallles" not found.
 
 Did you mean one of these?
@@ -349,7 +349,7 @@ Did you mean one of these?
 - **Don't `import` your command from app code.** It's a CLI entry point. Importing it inside `routes.ts` or a service will execute the `command()` factory at module load and register the command twice.
 - **`preload.bootstrap: true` is heavy.** It runs every auto-loaded file (`main.ts`, `routes.ts`, etc.) for every module. For ops commands, prefer explicit `config` + `connectors` lists.
 - **`process.exit(0)` is implicit on success.** The manager exits for you after a non-persistent command's action returns. Calling `process.exit(0)` yourself is harmless but redundant.
-- **The manifest can go stale in dev.** If you add a new command and `warlock <new-name>` says "not found," run `yarn warlock --warm-cache` (or add `--no-cache` to your invocation) to force a rescan.
+- **The manifest can go stale in dev.** If you add a new command and `warlock <new-name>` says "not found," run `pnpm warlock --warm-cache` (or add `--no-cache` to your invocation) to force a rescan.
 - **Pre-existing `name`s shadow each other.** Two commands with `name: "report.sales"` in different modules — last one registered wins. The loader doesn't warn. Pick unique verbs.
 
 ## See also

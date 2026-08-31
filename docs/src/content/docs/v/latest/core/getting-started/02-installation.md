@@ -28,7 +28,7 @@ Pick your package manager — the rest of this page assumes the same one end to 
   </TabItem>
   <TabItem label="yarn">
     ```bash
-    yarn create warlock my-app
+    pnpm create warlock my-app
     cd my-app
     ```
   </TabItem>
@@ -56,7 +56,7 @@ The scaffolder runs `<your-pm> install` for you at the end. If you cloned an exi
 npm install
 ```</TabItem>
   <TabItem label="yarn">```bash
-yarn install
+pnpm install
 ```</TabItem>
   <TabItem label="pnpm">```bash
 pnpm install
@@ -97,7 +97,7 @@ Two layers of config and it's worth knowing which is which from the start:
 npm run dev
 ```</TabItem>
   <TabItem label="yarn">```bash
-yarn dev
+pnpm dev
 ```</TabItem>
   <TabItem label="pnpm">```bash
 pnpm dev

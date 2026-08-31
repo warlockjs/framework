@@ -10,7 +10,7 @@ This is **semantic recall**: store each answered question paired with its answer
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/cache
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/cache
 ```
 
 Semantic recall needs two collaborators:

@@ -20,7 +20,7 @@ A nightly job classifies the day's incoming tickets so the morning shift sees a 
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
 ```
 
 ```bash

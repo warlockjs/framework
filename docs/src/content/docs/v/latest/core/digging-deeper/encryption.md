@@ -155,7 +155,7 @@ The framework uses **`bcryptjs`** — pure JS, lazy-loaded. You get a clear inst
 ```
 Password encryption requires the bcryptjs package.
 Install it with:
-  yarn add bcryptjs
+  pnpm add bcryptjs
 ```
 
 Don't swap for native `bcrypt` without a reason — `bcryptjs` is portable across every platform (no native build), and the perf delta isn't meaningful at the verify-on-login frequency. If you're hashing 1000 passwords per second, you have a different problem.

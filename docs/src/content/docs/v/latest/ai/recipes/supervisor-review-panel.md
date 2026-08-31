@@ -10,7 +10,7 @@ This recipe fans one reviewer agent out into three parallel branches with `ai.fa
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
 ```
 
 ```bash

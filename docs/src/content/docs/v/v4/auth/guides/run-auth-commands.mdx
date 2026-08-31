@@ -43,7 +43,7 @@ Both functions return a `CLICommand` — they don't have side effects until the 
   </TabItem>
   <TabItem label="yarn">
     ```bash
-    yarn warlock jwt.generate
+    pnpm warlock jwt.generate
     ```
   </TabItem>
   <TabItem label="pnpm">
@@ -78,7 +78,7 @@ Don't commit `.env`. The default Warlock `.gitignore` already excludes it.
   </TabItem>
   <TabItem label="yarn">
     ```bash
-    yarn warlock auth.cleanup
+    pnpm warlock auth.cleanup
     ```
   </TabItem>
   <TabItem label="pnpm">
@@ -115,7 +115,7 @@ Best when you already run the scheduler. No shell call, no env duplication. See 
 ### Out-of-process (system cron)
 
 ```bash
-0 3 * * *  cd /path/to/app && /usr/local/bin/yarn warlock auth.cleanup
+0 3 * * *  cd /path/to/app && /usr/local/bin/pnpm warlock auth.cleanup
 ```
 
 Best when this service doesn't run the scheduler subsystem (smaller process surface, isolated cleanup).

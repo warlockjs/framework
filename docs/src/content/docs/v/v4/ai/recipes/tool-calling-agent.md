@@ -13,7 +13,7 @@ A support agent that can look up an order, check shipping status, and quietly up
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
 ```
 
 ## The tools

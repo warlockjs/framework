@@ -25,7 +25,7 @@ No `db:create`, no `db:drop-tables`, no `seed`. Those only really make sense ins
 ## Install and invoke
 
 ```bash
-yarn add @warlock.js/cascade
+pnpm add @warlock.js/cascade
 ```
 
 Cascade ships a `cascade` bin entry, so `npx cascade` works once installed — that's the canonical invocation in CI, container init, and anywhere a production-shape command beats running a local script. If your migrations are `.ts` files you'll want to invoke through a TypeScript runtime — Cascade bundles no transpiler:

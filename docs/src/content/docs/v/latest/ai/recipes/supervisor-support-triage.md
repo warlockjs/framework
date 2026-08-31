@@ -23,7 +23,7 @@ Triage has a cost ladder. Pick the **cheapest** pattern your problem actually ne
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
 ```
 
 ```bash

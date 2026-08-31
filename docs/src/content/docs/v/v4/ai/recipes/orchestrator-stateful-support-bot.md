@@ -17,7 +17,7 @@ This recipe builds that bot end to end: per-turn state, dev-passed history, auto
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
 ```
 
 ## The session state

@@ -47,9 +47,9 @@ src/app/products/controllers/
 Scaffold with the CLI:
 
 ```bash
-yarn warlock generate.controller products/list-products
+pnpm warlock generate.controller products/list-products
 # add --with-validation to scaffold the schema + request type alongside
-yarn warlock generate.controller products/create-product --with-validation
+pnpm warlock generate.controller products/create-product --with-validation
 ```
 
 ## Reading input

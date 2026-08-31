@@ -117,7 +117,7 @@ const mailConfigurations: MailConfigurations = {
 export default mailConfigurations;
 ```
 
-Install the SDK once: `yarn add @aws-sdk/client-sesv2`. The first send that uses the SES config triggers lazy module loading; if the SDK isn't installed you get a clear install hint.
+Install the SDK once: `pnpm add @aws-sdk/client-sesv2`. The first send that uses the SES config triggers lazy module loading; if the SDK isn't installed you get a clear install hint.
 
 ## Sending — the fluent builder
 
@@ -261,7 +261,7 @@ Both APIs share the same `MailOptions` shape. Pick whichever reads better at the
 
 `.component(<Template />)` (or `component:` in `sendMail`) pipes a React element through the renderer:
 
-1. If `@react-email/render` is installed, it runs the full React Email pipeline — style inlining, MSO conditionals, the works. Install with `yarn add @react-email/components @react-email/render`.
+1. If `@react-email/render` is installed, it runs the full React Email pipeline — style inlining, MSO conditionals, the works. Install with `pnpm add @react-email/components @react-email/render`.
 2. If not, it falls back to `react-dom/server`'s `renderToStaticMarkup`, wrapped in a minimal `<html>` shell — readable in dev, but missing the polish you'd want for production HTML.
 
 A typical template:
@@ -635,7 +635,7 @@ When `config` is `undefined` the call uses the global default. When it's set, it
 - **`.send()` validates synchronously.** Missing `to`, `subject`, or any of `text` / `html` / `component` throws before the pipeline runs.
 - **Test mode is process-global.** Set it in `beforeAll` or `beforeEach`; reset to `"production"` between suites (or rely on test runner isolation). Forgetting to set test mode means real sends in CI.
 - **`@react-email/render` is optional.** Without it the renderer falls back to `react-dom/server` — readable but missing style inlining, MSO conditionals, and the full React Email pipeline. Install it for production-quality HTML.
-- **`nodemailer` is lazy-loaded.** If you see `nodemailer is not installed` at first send, run `yarn add nodemailer` (or `warlock add mail`).
+- **`nodemailer` is lazy-loaded.** If you see `nodemailer is not installed` at first send, run `pnpm add nodemailer` (or `warlock add mail`).
 - **`secure: true` requires port 465.** For port 587 use `secure: false` and `tls: true` (STARTTLS). Mismatching these is the most common config bug.
 - **Per-mail handlers don't replace global handlers — both fire.** If you're counting sends, count once or use a single source of truth.
 - **`assertMailSent(predicate)` throws when no mail matches.** That's by design — it's an assertion. Catch the thrown error in your test runner; don't silently swallow it.

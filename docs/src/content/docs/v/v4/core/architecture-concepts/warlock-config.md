@@ -52,7 +52,7 @@ The contrast with `src/config/*`:
 | You want to...                                       | File                                  |
 | ---------------------------------------------------- | ------------------------------------- |
 | Change the HTTP port your app listens on             | `src/config/http.ts` → `port: ...`    |
-| Add a new CLI command to `yarn warlock`              | `warlock.config.ts` → `cli.commands`  |
+| Add a new CLI command to `pnpm warlock`              | `warlock.config.ts` → `cli.commands`  |
 | Configure your cache driver                          | `src/config/cache.ts`                 |
 | Skip dev-server health checks                        | `warlock.config.ts` → `devServer.healthCheckers: false` |
 | Pull migrations from `@warlock.js/auth`              | `warlock.config.ts` → `database.migrations` |
@@ -152,7 +152,7 @@ cli: {
 }
 ```
 
-Each entry is a `CLICommand` produced by a framework helper or package. The reference codebase pulls two from `@warlock.js/auth` — they show up as `yarn warlock auth.generateJWTSecret` and `yarn warlock auth.cleanup` after this file loads.
+Each entry is a `CLICommand` produced by a framework helper or package. The reference codebase pulls two from `@warlock.js/auth` — they show up as `pnpm warlock auth.generateJWTSecret` and `pnpm warlock auth.cleanup` after this file loads.
 
 Use this for:
 
@@ -225,7 +225,7 @@ database: {
 }
 ```
 
-After this, `yarn warlock migrate` runs both the project's discovered migrations and these package migrations in order.
+After this, `pnpm warlock migrate` runs both the project's discovered migrations and these package migrations in order.
 
 ### `testing` — test discovery (optional)
 
@@ -296,7 +296,7 @@ If you find yourself wanting one of these in `warlock.config.ts`, you've probabl
 2. The framework picks up the new values.
 3. Some changes apply immediately (dev-server flags like `transpileCacheDebug`).
 4. Some changes require a hard restart of the dev server (server port, build flags).
-5. CLI command changes take effect on the next `yarn warlock <command>` invocation; running commands aren't restarted.
+5. CLI command changes take effect on the next `pnpm warlock <command>` invocation; running commands aren't restarted.
 
 In practice, the safe pattern: when you change `warlock.config.ts`, stop the dev server (Ctrl+C) and restart. The reload story is best-effort and not every field is HMR-friendly.
 
@@ -348,7 +348,7 @@ export default defineConfig({
 });
 ```
 
-Each command factory returns a `CLICommand`. The framework registers them under `yarn warlock <namespace>.<name>`.
+Each command factory returns a `CLICommand`. The framework registers them under `pnpm warlock <namespace>.<name>`.
 
 ### Tightening file watching
 

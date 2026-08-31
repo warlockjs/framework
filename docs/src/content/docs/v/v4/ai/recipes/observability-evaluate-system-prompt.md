@@ -15,7 +15,7 @@ This is the dashboard's **one write-capable route** — everything else is `GET`
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/ai-panoptic
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/ai-panoptic
 ```
 
 Content capture must be on — `evaluate` reads the system prompt off `span.input`, which only exists when the collector captured it:

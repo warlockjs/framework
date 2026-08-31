@@ -12,7 +12,7 @@ This is the canonical shape for `ai.workflow`: a few sequential agent steps feed
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
 ```
 
 ## The agents

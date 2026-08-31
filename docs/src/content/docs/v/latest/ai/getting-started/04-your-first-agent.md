@@ -11,7 +11,7 @@ Five minutes from zero to a streaming agent. By the end you'll have run a real O
 ## 1. Install
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai
+pnpm add @warlock.js/ai @warlock.js/ai-openai
 ```
 
 Set your API key in `.env`:

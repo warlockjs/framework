@@ -15,7 +15,7 @@ This recipe builds that dashboard view on top of the in-memory trace store — u
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/ai-panoptic
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/ai-panoptic
 ```
 
 Pricing must be configured on the SDK (or per model) for cost to populate — an unpriced run reports `usage.cost === undefined`, and `aggregate().cost` stays `undefined` until at least one priced run lands. Honest absence over a false zero.

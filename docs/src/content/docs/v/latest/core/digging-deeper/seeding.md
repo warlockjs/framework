@@ -143,8 +143,8 @@ Two ways it fails loudly:
 Every record you `track()` is recorded so it can be undone:
 
 ```bash
-yarn warlock seed --drop                # undo every tracked record across all seeders
-yarn warlock seed --drop=default-roles  # undo just one seeder's records
+pnpm warlock seed --drop                # undo every tracked record across all seeders
+pnpm warlock seed --drop=default-roles  # undo just one seeder's records
 ```
 
 Inside a single transaction, `--drop` deletes the tracked records in reverse run/insertion order, clears the refs, then resets the matching seeds-log rows so a `once: true` seed re-runs on the next `warlock seed`. Only **tracked** rows are deleted — a seed that never calls `track()` has nothing to undo. Contrast with `--fresh`, which truncates *every* table; `--drop` is the surgical alternative.

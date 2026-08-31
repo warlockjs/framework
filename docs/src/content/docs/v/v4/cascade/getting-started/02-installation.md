@@ -39,7 +39,7 @@ pnpm add @warlock.js/cascade @warlock.js/seal
   <TabItem label="yarn">
 
 ```bash
-yarn add @warlock.js/cascade @warlock.js/seal
+pnpm add @warlock.js/cascade @warlock.js/seal
 ```
 
   </TabItem>

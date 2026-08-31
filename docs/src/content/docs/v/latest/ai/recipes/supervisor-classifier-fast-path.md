@@ -10,7 +10,7 @@ The supervisor's `classifier` mode is the fast path. It runs **once**, on iterat
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
 ```
 
 ```bash

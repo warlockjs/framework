@@ -15,7 +15,7 @@ We'll test a `products` controller. Substitute your own module name as you read.
 ## Step 1 — Install test support
 
 ```bash
-yarn warlock add test
+pnpm warlock add test
 ```
 
 That command drops three files into the project:
@@ -123,7 +123,7 @@ describe("GET /products", () => {
 Run it:
 
 ```bash
-yarn test products.controller
+pnpm test products.controller
 ```
 
 The HTTP server boots in the main process, your worker thread spawns, the test fires a `GET /products` over `fetch`, the controller runs, and the response gets parsed. If the route doesn't exist yet, you get a clear `Expected status 200, got 404` failure — `expectJson` includes the response body in the error message so you can see what came back.
@@ -309,7 +309,7 @@ Either works. The first is easier to find when you're fixing a specific endpoint
 ## Common pitfalls
 
 - **`globalSetup` failed silently → all tests get `fetch failed`.** Check that `src/test-global-setup.ts` exports `setup` and `teardown` (not default exports). A typo in the export name = no error at compile time, just every HTTP test failing.
-- **Port conflict with running dev server.** If `yarn start` is running on `:2031`, the preflight stops the run with `Port 2031 is already in use` before anything binds. Stop the dev server, or start the suite on a free port: `startHttpTestServer({ port: 3999 })`.
+- **Port conflict with running dev server.** If `pnpm start` is running on `:2031`, the preflight stops the run with `Port 2031 is already in use` before anything binds. Stop the dev server, or start the suite on a free port: `startHttpTestServer({ port: 3999 })`.
 - **JWT signed against a different secret.** Make sure `JWT_SECRET` (or whatever your auth config reads) is in `.env`. The test server reads the same env as the dev server — no `.env.test` overlay by default.
 - **`User.create(...)` for fixtures hits the `useHashedPassword()` transformer.** Pass the plain password; the model hashes it on save. Tokens generated via `authService` use the hashed password from the DB, so the round-trip is consistent.
 - **Don't `await testPost(...)` once and reuse `response`.** `Response.json()` consumes the body stream — call `expectJson` (or `parseJsonResponse`) at most once per response.

@@ -20,7 +20,7 @@ This recipe combines two `@warlock.js/ai` features:
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
 ```
 
 ## The artifact-emitting tool

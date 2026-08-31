@@ -13,7 +13,7 @@ This recipe builds that agent and wires up the `agent.tool.*` event stream so yo
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
 ```
 
 ## The three tools

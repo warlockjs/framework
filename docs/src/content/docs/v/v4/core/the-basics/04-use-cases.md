@@ -312,7 +312,7 @@ Use-cases don't import `request` or `response`. They take plain data and return 
 
 - A controller (HTTP)
 - A queue / broker worker (`@warlock.js/herald`)
-- A CLI command (`yarn warlock <command>`)
+- A CLI command (`pnpm warlock <command>`)
 - A scheduled task (`@warlock.js/scheduler`)
 - A test (no mocking framework needed)
 - Another use-case

@@ -192,7 +192,7 @@ Three notes on writing email-safe React:
 The reference project ships a `react-email` dev server — point your browser at it and edit the template with hot reload:
 
 ```bash
-yarn email:preview
+pnpm email:preview
 ```
 
 Opens at `http://localhost:3000` (the preview server, not your app). Edits to `emails/*.tsx` rebuild instantly. Use this to iterate on copy and layout before you ever wire it into a service.

@@ -11,7 +11,7 @@ This is the page where Warlock actually does something. By the end you'll have a
 ## Step 1 — Scaffold the module
 
 ```bash
-yarn warlock generate.module products
+pnpm warlock generate.module products
 ```
 
 One command. That's it. The full CRUD scaffold is the default, so this lays down the entire feature module under `src/app/products/`:
@@ -92,7 +92,7 @@ If you want this route public, swap `guarded(() => { ... })` for plain calls on 
 The scaffold *created* the migration file under `models/product/migrations/` but didn't apply it. Run it now:
 
 ```bash
-yarn warlock migrate
+pnpm warlock migrate
 ```
 
 That creates the `products` table in your database.
@@ -110,7 +110,7 @@ curl http://localhost:3000/products
 }
 ```
 
-The list endpoint returns an empty paginated payload — no rows yet. Either seed some data via `seeds/products.seed.ts` and run `yarn warlock seed`, or `POST /products` with a body matching `createProductSchema`.
+The list endpoint returns an empty paginated payload — no rows yet. Either seed some data via `seeds/products.seed.ts` and run `pnpm warlock seed`, or `POST /products` with a body matching `createProductSchema`.
 
 ## What got generated, briefly
 

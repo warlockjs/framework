@@ -53,7 +53,7 @@ export default Migration.create(Notification, notificationColumns(Notification))
 ```
 
 ```bash
-yarn cascade migrate
+pnpm cascade migrate
 ```
 
 ## 3. The definition

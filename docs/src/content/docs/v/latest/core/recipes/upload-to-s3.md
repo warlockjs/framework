@@ -15,7 +15,7 @@ We'll build `POST /uploads/avatar` — accepts a single image, resizes to 400x40
 Warlock's storage layer talks to S3 via the AWS SDK v3. It's a peer dependency, so you install it in the project:
 
 ```bash
-yarn add @aws-sdk/client-s3
+pnpm add @aws-sdk/client-s3
 ```
 
 R2 and DigitalOcean Spaces use the same SDK — they're S3-compatible. No separate package per provider.
@@ -92,8 +92,8 @@ r2: storageConfigurations.r2({
 If you don't have an `uploads` module yet, scaffold one:
 
 ```bash
-yarn warlock generate.module uploads
-yarn warlock generate.controller uploads/upload-avatar --with-validation
+pnpm warlock generate.module uploads
+pnpm warlock generate.controller uploads/upload-avatar --with-validation
 ```
 
 That gives you the routes file, the controller stub, a schema, and a request type.

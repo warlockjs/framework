@@ -20,7 +20,7 @@ A math-word-problem agent is right most of the time but wrong on the same ~10% o
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
 ```
 
 ## The solver agent and its output slice

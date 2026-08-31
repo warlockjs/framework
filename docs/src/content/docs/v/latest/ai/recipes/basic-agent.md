@@ -15,7 +15,7 @@ A summarizer agent that takes a long article and returns `{ title, bullets }`. S
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
 ```
 
 ```bash

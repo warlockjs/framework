@@ -12,7 +12,7 @@ A document-processing workflow calls a third-party OCR service that is occasiona
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/seal
 ```
 
 ## Retry: bounded backoff on the flaky step

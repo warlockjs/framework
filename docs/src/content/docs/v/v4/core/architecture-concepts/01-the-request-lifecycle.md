@@ -10,7 +10,7 @@ sidebar:
 
 Knowing the lifecycle is knowing Warlock. Every other primitive — controllers, use-cases, repositories, resources — lives at a specific point on this spine. Once you can picture the spine, you can place anything new on it without thinking.
 
-This page walks the journey end-to-end: from `yarn dev` to a JSON body landing in a browser. We'll keep the prose tight and lean on the diagram for the shape.
+This page walks the journey end-to-end: from `pnpm dev` to a JSON body landing in a browser. We'll keep the prose tight and lean on the diagram for the shape.
 
 ## The spine
 

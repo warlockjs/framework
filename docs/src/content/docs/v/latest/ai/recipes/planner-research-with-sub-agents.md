@@ -10,7 +10,7 @@ You are building a market-research assistant. A goal like *"Compare the three le
 ## Setup
 
 ```bash
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/seal
 ```
 
 ## A sub-agent delegating capability

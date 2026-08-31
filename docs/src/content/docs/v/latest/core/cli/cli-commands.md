@@ -15,17 +15,17 @@ Every command is a `CLICommand` instance produced by the `command()` factory. Bu
 In a Warlock project, `warlock` is wired into `package.json` via `yarn`:
 
 ```bash
-yarn warlock dev
-yarn warlock migrate --fresh
-yarn warlock generate.module products
+pnpm warlock dev
+pnpm warlock migrate --fresh
+pnpm warlock generate.module products
 ```
 
 Equivalent shortcuts your project may have configured:
 
 ```bash
-yarn start         # → yarn warlock dev
-yarn migrate       # → yarn warlock migrate
-yarn build         # → yarn warlock build
+pnpm start         # → pnpm warlock dev
+pnpm migrate       # → pnpm warlock migrate
+pnpm build         # → pnpm warlock build
 ```
 
 Look at the project's `package.json > scripts` to see the local shortcuts. Under the hood everything routes through the same CLI runner.
@@ -524,7 +524,7 @@ export default command({
 });
 ```
 
-Run it: `yarn warlock users.promote --email=hasan@example.com` (or `yarn warlock up -e hasan@example.com`).
+Run it: `pnpm warlock users.promote --email=hasan@example.com` (or `pnpm warlock up -e hasan@example.com`).
 
 Two rules for project-local commands:
 

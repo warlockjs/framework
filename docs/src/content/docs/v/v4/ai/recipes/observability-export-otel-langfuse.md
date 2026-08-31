@@ -18,13 +18,13 @@ That's what the OTel and Langfuse exporters do. Both are factories returning an 
 
 ```bash
 # Base package
-yarn add @warlock.js/ai @warlock.js/ai-openai @warlock.js/ai-panoptic
+pnpm add @warlock.js/ai @warlock.js/ai-openai @warlock.js/ai-panoptic
 
 # For the OTel exporter (the app owns SDK wiring):
-yarn add @opentelemetry/api @opentelemetry/sdk-trace-base
+pnpm add @opentelemetry/api @opentelemetry/sdk-trace-base
 
 # For the Langfuse exporter:
-yarn add langfuse
+pnpm add langfuse
 ```
 
 A missing SDK surfaces as a curated *"install this"* error on first export — never a boot-time stack trace. So you can register the OTel exporter without `langfuse` installed, and vice versa.
