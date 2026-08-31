@@ -31,6 +31,7 @@
     "url": "https://github.com/warlockjs/ai-workspace"
   },
   "devDependencies": {
+    "@warlock.js/ai": "workspace:^",
     "typescript": "^5.0.0",
     "vitest": "4.1.10"
   },
@@ -38,6 +39,8 @@
     "@warlock.js/ai": "*"
   },
   "dependencies": {
-    "@warlock.js/fs": "*"
-  }
+    "@standard-schema/spec": "^1.0.0",
+    "@warlock.js/fs": "workspace:^"
+  },
+  "packageManager": "pnpm@11.24.0"
 }
