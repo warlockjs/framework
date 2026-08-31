@@ -200,17 +200,35 @@ describe("healthCheck", () => {
    * returns undefined, because a project with no HTTP server has no probes to
    * report on. These mocks are therefore key-aware rather than blanket.
    */
-  function mockHealthConfig(health: unknown) {
+  /**
+   * healthCheck reads THREE globals, not one: config, the container (for the booted
+   * Fastify instance) and the router (to detect an app route claiming a probe path).
+   * Mocking only config left the other two live, so the verdict depended on whatever
+   * else the suite had registered — these passed alone and failed in the full run.
+   * All three are pinned here so the assertion is about the check, not the order.
+   */
+  function mockHealthEnv(health: unknown, options: { hasServer?: boolean; routes?: unknown[] } = {}) {
     vi.doMock("../../../../src/config/config-getter", () => ({
       config: {
         get: (key: string) => (key === "http.health" ? health : key === "http" ? {} : undefined),
       },
     }));
+
+    vi.doMock("../../../../src/container", () => ({
+      container: {
+        has: () => options.hasServer === true,
+        get: () => undefined,
+      },
+    }));
+
+    vi.doMock("../../../../src/router/router", () => ({
+      router: { list: () => options.routes ?? [] },
+    }));
   }
 
   /** Disabling the probes on purpose is a stated fact, not a warning. */
   it("reports probes as disabled — without warning — when config turns them off", async () => {
-    mockHealthConfig({ enabled: false });
+    mockHealthEnv({ enabled: false });
 
     const { healthCheck } = await import("../../../../src/cli/commands/doctor/checks/health.check");
     const result = await healthCheck.run(makeContext());
@@ -226,7 +244,7 @@ describe("healthCheck", () => {
    * paths are the ones carried through.
    */
   it("uses the default probe paths when none are configured", async () => {
-    mockHealthConfig(undefined);
+    mockHealthEnv(undefined);
 
     const { healthCheck } = await import("../../../../src/cli/commands/doctor/checks/health.check");
     const result = await healthCheck.run(makeContext());
@@ -237,7 +255,7 @@ describe("healthCheck", () => {
   });
 
   it("uses the overridden probe paths when configured", async () => {
-    mockHealthConfig({ path: "/livez", readinessPath: "/readyz" });
+    mockHealthEnv({ path: "/livez", readinessPath: "/readyz" });
 
     const { healthCheck } = await import("../../../../src/cli/commands/doctor/checks/health.check");
     const result = await healthCheck.run(makeContext());
@@ -253,7 +271,7 @@ describe("healthCheck", () => {
    * inflate one defect into two, so this check stays silent.
    */
   it("stays silent when the http connector never booted", async () => {
-    mockHealthConfig(undefined);
+    mockHealthEnv(undefined);
 
     const { healthCheck } = await import("../../../../src/cli/commands/doctor/checks/health.check");
     const result = await healthCheck.run(
