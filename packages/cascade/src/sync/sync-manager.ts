@@ -5,7 +5,7 @@
  */
 
 import type { DriverContract } from "../contracts/database-driver.contract";
-import { ChildModel, Model } from "../model/model";
+import { type ChildModel, Model } from "../model/model";
 import { DEFAULT_MAX_SYNC_DEPTH, SyncContextManager } from "./sync-context";
 import type {
   CollectInstructionsPayload,

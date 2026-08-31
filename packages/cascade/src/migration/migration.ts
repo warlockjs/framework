@@ -11,7 +11,7 @@ import type {
 import type { DataSource } from "../data-source/data-source";
 import type { ChildModel, Model } from "../model/model";
 import type { DeleteStrategy, MigrationDefaults } from "../types";
-import { DatabaseDriver } from "../utils/connect-to-database";
+import { type DatabaseDriver } from "../utils/connect-to-database";
 import { ColumnBuilder } from "./column-builder";
 import { ForeignKeyBuilder } from "./foreign-key-builder";
 

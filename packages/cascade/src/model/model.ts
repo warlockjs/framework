@@ -9,7 +9,7 @@ import type {
   UpdateOperations,
   WriterOptions,
 } from "../contracts";
-import { QueryBuilderContract, WhereCallback, WhereObject, WhereOperator } from "../contracts";
+import { type QueryBuilderContract, type WhereCallback, type WhereObject, type WhereOperator } from "../contracts";
 import type { DataSource } from "../data-source/data-source";
 import { DatabaseDirtyTracker } from "../database-dirty-tracker";
 import type { ModelEventListener, ModelEventName } from "../events/model-events";

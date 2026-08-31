@@ -32,7 +32,7 @@ import { TransactionRollbackError } from "../../errors/transaction-rollback.erro
 import { SQLSerializer } from "../../migration/sql-serializer";
 import { SqlDatabaseDirtyTracker } from "../../sql-database-dirty-tracker";
 import type { ModelDefaults } from "../../types";
-import { DatabaseDriver } from "../../utils/connect-to-database";
+import { type DatabaseDriver } from "../../utils/connect-to-database";
 import { isValidDateValue } from "../../utils/is-valid-date-value";
 import { PostgresBlueprint } from "./postgres-blueprint";
 import { PostgresDialect } from "./postgres-dialect";

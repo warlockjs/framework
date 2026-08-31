@@ -1,4 +1,4 @@
-import { DriverContract, TransactionContext } from "../contracts";
+import { type DriverContract, type TransactionContext } from "../contracts";
 import { DataSource } from "../data-source/data-source";
 import { dataSourceRegistry } from "../data-source/data-source-registry";
 import { MongoDbDriver } from "../drivers/mongodb/mongodb-driver";

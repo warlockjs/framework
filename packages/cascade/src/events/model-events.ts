@@ -1,6 +1,6 @@
-import { QueryBuilderContract } from "../contracts";
+import { type QueryBuilderContract } from "../contracts";
 import type { Model } from "../model/model";
-import { DeleteStrategy } from "../types";
+import { type DeleteStrategy } from "../types";
 
 type OnValidatingEventContext = {
   isInsert: boolean;

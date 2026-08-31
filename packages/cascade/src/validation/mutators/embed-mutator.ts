@@ -1,5 +1,5 @@
 import type { Mutator } from "@warlock.js/seal";
-import { ChildModel, Model } from "../../model/model";
+import { type ChildModel, Model } from "../../model/model";
 import { getModelFromRegistry } from "../../model/register-model";
 
 type DatabaseModelMutatorOptions = {

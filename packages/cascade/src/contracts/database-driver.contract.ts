@@ -1,7 +1,7 @@
 import type { DatabaseDirtyTracker } from "../database-dirty-tracker";
 import type { ModelDefaults } from "../types";
-import { DatabaseDriver } from "../utils/connect-to-database";
-import { DriverBlueprintContract } from "./driver-blueprint.contract";
+import { type DatabaseDriver } from "../utils/connect-to-database";
+import { type DriverBlueprintContract } from "./driver-blueprint.contract";
 import type { MigrationDriverContract } from "./migration-driver.contract";
 import type { QueryBuilderContract } from "./query-builder.contract";
 import type { SyncAdapterContract } from "./sync-adapter.contract";

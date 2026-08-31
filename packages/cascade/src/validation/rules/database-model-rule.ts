@@ -1,5 +1,5 @@
 import { invalidRule, VALID_RULE, type SchemaRule } from "@warlock.js/seal";
-import { ChildModel, Model } from "./../../model/model";
+import { type ChildModel, Model } from "./../../model/model";
 import { getModelFromRegistry } from "./../../model/register-model";
 
 export const databaseModelRule: SchemaRule = {

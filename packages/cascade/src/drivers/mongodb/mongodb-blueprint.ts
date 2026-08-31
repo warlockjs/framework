@@ -1,8 +1,8 @@
 import { colors } from "@mongez/copper";
 import type { Db, IndexDescriptionInfo } from "mongodb";
 import {
-  DriverBlueprintContract,
-  TableIndexInformation,
+  type DriverBlueprintContract,
+  type TableIndexInformation,
 } from "../../contracts/driver-blueprint.contract";
 
 export class MongoDBBlueprint implements DriverBlueprintContract {

@@ -1,5 +1,5 @@
 /* eslint-disable no-case-declarations */
-import { GenericObject, get } from "@mongez/reinforcements";
+import { type GenericObject, get } from "@mongez/reinforcements";
 import type { AggregateOptions, ClientSession, Collection } from "mongodb";
 import { databaseTransactionContext } from "../../context/database-transaction-context";
 import type {
