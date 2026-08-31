@@ -4,6 +4,7 @@ import {
   freshMigrate,
   listExecutedMigrations,
   Migration,
+  type MigrationConstructor,
   migrationRunner,
   rollbackMigrations,
   runMigrations,
@@ -192,7 +193,11 @@ export async function migrateAction(options: CommandActionData) {
 async function loadMigrationFile(absPath: string) {
   const relativePath = Path.toRelative(absPath);
 
-  const loadedModule = await filesOrchestrator.load<{ default: typeof Migration }>(relativePath);
+  // MigrationConstructor, not `typeof Migration`: a migration file default-exports a
+  // CONCRETE subclass, while Migration itself is abstract and so cannot satisfy a
+  // `new () => ...` parameter. The annotation described the base class rather than
+  // what is actually loaded, and that is what migrationRunner.register() rejected.
+  const loadedModule = await filesOrchestrator.load<{ default: MigrationConstructor }>(relativePath);
 
   if (!loadedModule?.default) {
     throw new Error(`${Path.toRelative(absPath)} must have a default export`);
