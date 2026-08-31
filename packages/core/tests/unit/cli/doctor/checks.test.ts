@@ -94,11 +94,11 @@ describe("configCheck", () => {
     }));
 
     const { configCheck } = await import("../../../../src/cli/commands/doctor/checks/config.check");
-    const result = await configCheck.run();
+    const result = await configCheck.run(makeContext());
 
-    expect(result.status).toBe("fail");
-    expect(result.detail).toContain("app");
-    expect(result.detail).toContain("http");
+    expect(result?.status).toBe("fail");
+    expect(result?.detail).toContain("app");
+    expect(result?.detail).toContain("http");
   });
 
   it("passes when all required sections are present", async () => {
@@ -107,9 +107,9 @@ describe("configCheck", () => {
     }));
 
     const { configCheck } = await import("../../../../src/cli/commands/doctor/checks/config.check");
-    const result = await configCheck.run();
+    const result = await configCheck.run(makeContext());
 
-    expect(result.status).toBe("ok");
+    expect(result?.status).toBe("ok");
   });
 });
 

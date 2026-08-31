@@ -1,4 +1,21 @@
 import { describe, expect, it } from "vitest";
+import type { DoctorBootContext } from "../../../../src/cli/commands/doctor/check.types";
+
+/**
+ * runChecks takes the boot context and hands it to each check. These aggregation
+ * tests use stub checks that ignore it, but the signature requires it — a bare
+ * one-argument call runs fine and does not typecheck, which is how this drifted.
+ */
+function makeContext(): DoctorBootContext {
+  return {
+    booted: true,
+    routeModules: 0,
+    appRoutes: 0,
+    totalRoutes: 0,
+    moduleFailures: [],
+    connectors: { registered: [], configured: [], booted: [], skipped: [], failures: [] },
+  };
+}
 import type { CheckResult, DoctorCheck } from "../../../../src/cli/commands/doctor/check.types";
 import { runChecks } from "../../../../src/cli/commands/doctor/run-checks";
 
@@ -33,21 +50,21 @@ const throwingCheck = (name: string, message: string): DoctorCheck => ({
 
 describe("runChecks aggregation", () => {
   it("counts each status and preserves registration order", async () => {
-    const report = await runChecks([okCheck("a"), warnCheck("b"), okCheck("c")]);
+    const report = await runChecks([okCheck("a"), warnCheck("b"), okCheck("c")], makeContext());
 
     expect(report.results.map((result) => result.name)).toEqual(["a", "b", "c"]);
     expect(report.summary).toEqual({ ok: 2, warn: 1, fail: 0 });
   });
 
   it("exits 0 and reports no failures when only ok/warn results exist", async () => {
-    const report = await runChecks([okCheck("a"), warnCheck("b")]);
+    const report = await runChecks([okCheck("a"), warnCheck("b")], makeContext());
 
     expect(report.hasFailures).toBe(false);
     expect(report.exitCode).toBe(0);
   });
 
   it("exits 1 and flags failures when any check fails", async () => {
-    const report = await runChecks([okCheck("a"), failCheck("b"), warnCheck("c")]);
+    const report = await runChecks([okCheck("a"), failCheck("b"), warnCheck("c")], makeContext());
 
     expect(report.summary).toEqual({ ok: 1, warn: 1, fail: 1 });
     expect(report.hasFailures).toBe(true);
@@ -57,7 +74,7 @@ describe("runChecks aggregation", () => {
 
 describe("runChecks crash-proofing", () => {
   it("records a thrown check as a fail result instead of throwing", async () => {
-    const report = await runChecks([okCheck("a"), throwingCheck("boom", "kaboom")]);
+    const report = await runChecks([okCheck("a"), throwingCheck("boom", "kaboom")], makeContext());
 
     const boom = report.results.find((result) => result.name === "boom");
 
@@ -74,7 +91,7 @@ describe("runChecks crash-proofing", () => {
       throwingCheck("first", "nope"),
       okCheck("second"),
       okCheck("third"),
-    ]);
+    ], makeContext());
 
     expect(report.results.map((result) => result.name)).toEqual(["first", "second", "third"]);
     expect(report.summary).toEqual({ ok: 2, warn: 0, fail: 1 });
@@ -88,7 +105,7 @@ describe("runChecks crash-proofing", () => {
       },
     };
 
-    const report = await runChecks([rejectingCheck]);
+    const report = await runChecks([rejectingCheck], makeContext());
 
     expect(report.results[0].status).toBe("fail");
     expect(report.results[0].detail).toContain("async boom");

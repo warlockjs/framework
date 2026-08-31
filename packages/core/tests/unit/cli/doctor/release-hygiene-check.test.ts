@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { DoctorBootContext } from "../../../../src/cli/commands/doctor/check.types";
 
 /**
  * Unit coverage for the doctor RELEASE-HYGIENE check: the version↔changelog
@@ -48,6 +49,23 @@ function mockProject({ packageJson, changelog }: FsMock): void {
   }));
 }
 
+/**
+ * releaseHygieneCheck ignores the context at runtime — it reads two files from
+ * the project root. But DoctorCheck.run REQUIRES one, so a bare run() does not
+ * typecheck even where it happens to work. A minimal healthy context keeps the
+ * call honest against the contract.
+ */
+function makeContext(): DoctorBootContext {
+  return {
+    booted: true,
+    routeModules: 0,
+    appRoutes: 0,
+    totalRoutes: 0,
+    moduleFailures: [],
+    connectors: { registered: [], configured: [], booted: [], skipped: [], failures: [] },
+  };
+}
+
 const importCheck = async () => {
   const module = await import(
     "../../../../src/cli/commands/doctor/checks/release-hygiene.check"
@@ -63,10 +81,10 @@ describe("releaseHygieneCheck", () => {
       changelog: "# Changelog\n\n## 4.5.0 - 2026-06-30\n\n- stuff\n",
     });
 
-    const result = await (await importCheck()).run();
+    const result = await (await importCheck()).run(makeContext());
 
-    expect(result.status).toBe("ok");
-    expect(result.detail).toContain("4.5.0");
+    expect(result?.status).toBe("ok");
+    expect(result?.detail).toContain("4.5.0");
   });
 
   it("fails when the changelog heading disagrees with package.json", async () => {
@@ -75,20 +93,20 @@ describe("releaseHygieneCheck", () => {
       changelog: "## 4.4.0\n\n- old\n",
     });
 
-    const result = await (await importCheck()).run();
+    const result = await (await importCheck()).run(makeContext());
 
-    expect(result.status).toBe("fail");
-    expect(result.detail).toContain("4.5.0");
-    expect(result.detail).toContain("4.4.0");
+    expect(result?.status).toBe("fail");
+    expect(result?.detail).toContain("4.5.0");
+    expect(result?.detail).toContain("4.4.0");
   });
 
   it("warns when there is no CHANGELOG.md", async () => {
     mockProject({ packageJson: JSON.stringify({ name: "demo-app", version: "1.0.0" }) });
 
-    const result = await (await importCheck()).run();
+    const result = await (await importCheck()).run(makeContext());
 
-    expect(result.status).toBe("warn");
-    expect(result.detail).toContain("no CHANGELOG.md");
+    expect(result?.status).toBe("warn");
+    expect(result?.detail).toContain("no CHANGELOG.md");
   });
 
   it("warns when the changelog has no parseable version heading", async () => {
@@ -97,18 +115,18 @@ describe("releaseHygieneCheck", () => {
       changelog: "# Changelog\n\nsome prose without a version heading\n",
     });
 
-    const result = await (await importCheck()).run();
+    const result = await (await importCheck()).run(makeContext());
 
-    expect(result.status).toBe("warn");
-    expect(result.detail).toContain("no parseable");
+    expect(result?.status).toBe("warn");
+    expect(result?.detail).toContain("no parseable");
   });
 
   it("fails when package.json has no string version", async () => {
     mockProject({ packageJson: JSON.stringify({ name: "x" }) });
 
-    const result = await (await importCheck()).run();
+    const result = await (await importCheck()).run(makeContext());
 
-    expect(result.status).toBe("fail");
-    expect(result.detail).toContain("no string version");
+    expect(result?.status).toBe("fail");
+    expect(result?.detail).toContain("no string version");
   });
 });
