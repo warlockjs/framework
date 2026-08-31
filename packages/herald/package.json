@@ -11,8 +11,8 @@
     "@mongez/copper": "^2.1.2",
     "@mongez/events": "^2.2.7",
     "@mongez/reinforcements": "^4.0.1",
-    "@warlock.js/logger": "*",
-    "@warlock.js/seal": "*"
+    "@warlock.js/logger": "workspace:^",
+    "@warlock.js/seal": "workspace:^"
   },
   "scripts": {
     "update": "npx ncu -u",
@@ -52,5 +52,6 @@
   "devDependencies": {
     "@vitest/coverage-v8": "4.1.10",
     "vitest": "4.1.10"
-  }
+  },
+  "packageManager": "pnpm@11.24.0"
 }
