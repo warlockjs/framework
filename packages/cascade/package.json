@@ -16,9 +16,9 @@
     "@mongez/events": "^2.2.7",
     "@mongez/reinforcements": "^4.0.1",
     "@mongez/supportive-is": "^2.1.4",
-    "@warlock.js/context": "*",
-    "@warlock.js/logger": "*",
-    "@warlock.js/seal": "*",
+    "@warlock.js/context": "workspace:^",
+    "@warlock.js/logger": "workspace:^",
+    "@warlock.js/seal": "workspace:^",
     "citty": "^0.2.2",
     "fast-glob": "^3.3.3"
   },
@@ -43,6 +43,7 @@
     "@testcontainers/postgresql": "^10.28.0",
     "@types/node": "^22.10.5",
     "@vitest/coverage-v8": "4.1.10",
+    "esbuild": "^0.27.2",
     "eslint": "^8.46.0",
     "eslint-config-prettier": "^8.9.0",
     "eslint-plugin-prettier": "^5.0.0",
@@ -53,6 +54,7 @@
     "prettier": "^3.0.0",
     "prettier-plugin-organize-imports": "^3.2.3",
     "typescript": "^5.1.6",
+    "vite": "^7.3.5",
     "vitest": "4.1.10"
   },
   "peerDependencies": {
@@ -76,5 +78,6 @@
   "author": "hassanzohdy",
   "license": "MIT",
   "module": "./src/index.ts",
-  "typings": "./src/index.ts"
+  "typings": "./src/index.ts",
+  "packageManager": "pnpm@11.24.0"
 }
