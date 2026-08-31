@@ -1010,6 +1010,25 @@ export interface ScopedStorageContract {
   putStream(stream: Readable, location: string, options?: PutOptions): Promise<StorageFile>;
 
   /**
+   * Recursively store every file under a local directory.
+   *
+   * ScopedStorage has implemented this since it was added, but the method was
+   * never declared here — so anything typed against the CONTRACT rather than the
+   * class could not call it. `warlock storage:put` is exactly that caller, and it
+   * failed to typecheck along with the five callback parameters it passes, which
+   * had nowhere to get their types from.
+   *
+   * @param localDirPath - Directory on the local filesystem to upload
+   * @param destination - Destination prefix within the scoped store
+   * @param options - Concurrency, per-file filter, and progress callback
+   */
+  putDirectory(
+    localDirPath: string,
+    destination: string,
+    options?: PutDirectoryOptions,
+  ): Promise<PutDirectoryResult>;
+
+  /**
    * Get file contents
    */
   get(location: string): Promise<Buffer>;
