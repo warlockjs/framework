@@ -10,13 +10,13 @@
   "module": "./src/index.ts",
   "typings": "./src/index.ts",
   "dependencies": {
-    "@warlock.js/cache": "*",
-    "@warlock.js/cascade": "*",
-    "@warlock.js/core": "*",
-    "@warlock.js/logger": "*"
+    "@warlock.js/cache": "workspace:^",
+    "@warlock.js/cascade": "workspace:^",
+    "@warlock.js/core": "workspace:^",
+    "@warlock.js/logger": "workspace:^"
   },
   "optionalDependencies": {
-    "@warlock.js/herald": "*"
+    "@warlock.js/herald": "workspace:^"
   },
   "scripts": {
     "test": "vitest",
@@ -44,5 +44,6 @@
     "typescript"
   ],
   "author": "hassanzohdy",
-  "license": "MIT"
+  "license": "MIT",
+  "packageManager": "pnpm@11.24.0"
 }
