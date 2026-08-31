@@ -25,7 +25,7 @@ That's the full contract. The `RequestHandler` annotation carries both parameter
 - File: `src/app/<module>/controllers/<action>.controller.ts`.
 - Export name matches the action in camelCase + `Controller` suffix: `listProductsController`, `createProductController`, `getProductController`.
 
-Scaffold with: `yarn warlock generate.controller <module>/<action>` (add `--with-validation` to get the schema generated alongside).
+Scaffold with: `pnpm warlock generate.controller <module>/<action>` (add `--with-validation` to get the schema generated alongside).
 
 ## Reading input
 

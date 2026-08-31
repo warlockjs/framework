@@ -1,6 +1,6 @@
 ---
 name: warlock-routes
-description: 'Run `warlock routes` — a read-only command that lists the registered HTTP routes as a verb-colored table (method / path / name / action / middleware-count / source), a sibling of `warlock doctor`. Filter with `--method` / `--path` / `--name`, or emit normalized rows as JSON with `--json`. Also covers `warlock routes:diff`, which compares live page routes against the last `warlock build`''s route snapshot and exits non-zero on drift. Triggers: `warlock routes`, `routesCommand`, `warlock routes:diff`, `routesDiffCommand`, "list my routes", "show all routes", "route table", "what endpoints does my app expose", "dump routes as JSON", "which routes have middleware", "route map for CI", "did my page routes drift from the last build"; run as `yarn warlock routes` / `yarn warlock routes:diff`. Skip: read-only health/preflight checks — `@warlock.js/core/warlock-doctor/SKILL.md`; defining/naming/grouping routes — `@warlock.js/core/register-route/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; competing tools `nest`/`express` route listers, `php artisan route:list`.'
+description: 'Run `warlock routes` — a read-only command that lists the registered HTTP routes as a verb-colored table (method / path / name / action / middleware-count / source), a sibling of `warlock doctor`. Filter with `--method` / `--path` / `--name`, or emit normalized rows as JSON with `--json`. Also covers `warlock routes:diff`, which compares live page routes against the last `warlock build`''s route snapshot and exits non-zero on drift. Triggers: `warlock routes`, `routesCommand`, `warlock routes:diff`, `routesDiffCommand`, "list my routes", "show all routes", "route table", "what endpoints does my app expose", "dump routes as JSON", "which routes have middleware", "route map for CI", "did my page routes drift from the last build"; run as `pnpm warlock routes` / `pnpm warlock routes:diff`. Skip: read-only health/preflight checks — `@warlock.js/core/warlock-doctor/SKILL.md`; defining/naming/grouping routes — `@warlock.js/core/register-route/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; competing tools `nest`/`express` route listers, `php artisan route:list`.'
 ---
 
 # Warlock — `warlock routes`
@@ -8,7 +8,7 @@ description: 'Run `warlock routes` — a read-only command that lists the regist
 `warlock routes` lists every registered HTTP route as a table. It's the read-only sibling of [`warlock doctor`](../warlock-doctor/SKILL.md): it boots the app far enough to register route modules — but **starts no connectors**, so it never opens a database, cache, or socket connection.
 
 ```bash
-yarn warlock routes
+pnpm warlock routes
 ```
 
 ```
@@ -39,10 +39,10 @@ The `METHOD` column is verb-colored (GET green, POST blue, PUT/PATCH yellow, DEL
 Optional, case-insensitive, AND-combined:
 
 ```bash
-yarn warlock routes --method GET     # -m  exact HTTP method
-yarn warlock routes --path /users    # -p  path substring
-yarn warlock routes --name users     # -n  route-name substring
-yarn warlock routes -m POST -p /users
+pnpm warlock routes --method GET     # -m  exact HTTP method
+pnpm warlock routes --path /users    # -p  path substring
+pnpm warlock routes --name users     # -n  route-name substring
+pnpm warlock routes -m POST -p /users
 ```
 
 ## JSON output
@@ -50,7 +50,7 @@ yarn warlock routes -m POST -p /users
 `--json` (`-j`) emits the normalized rows instead of the table — for `jq`, a CI diff, or a generated API map. Filters apply before serialization.
 
 ```bash
-yarn warlock routes --json
+pnpm warlock routes --json
 ```
 
 ```json
@@ -64,7 +64,7 @@ yarn warlock routes --json
 ### Audit which routes are guarded
 
 ```bash
-yarn warlock routes --json | jq '[.[] | select(.middleware == 0)]'
+pnpm warlock routes --json | jq '[.[] | select(.middleware == 0)]'
 ```
 
 Surfaces public routes (no middleware) — a quick check that auth-protected paths actually carry a guard.
@@ -72,7 +72,7 @@ Surfaces public routes (no middleware) — a quick check that auth-protected pat
 ### Confirm a route registered
 
 ```bash
-yarn warlock routes --name users.create
+pnpm warlock routes --name users.create
 ```
 
 An empty result means the route isn't registered — re-run `warlock dev` and read the boot error (the route-module loader is fail-loud, so a throwing route file aborts boot rather than being silently dropped).
@@ -82,7 +82,7 @@ An empty result means the route isn't registered — re-run `warlock dev` and re
 Compares the **live dev-server page routes** (`router.list().filter(r => r.isPage)`) against a **snapshot written by the last successful `warlock build`** (`page-routes.manifest.json` in `resolveBuildConfig().outdir`, e.g. `dist/page-routes.manifest.json`). Boots the same diagnostic way as `warlock routes` — route modules registered, no connectors started — then diffs.
 
 ```bash
-yarn warlock routes:diff
+pnpm warlock routes:diff
 ```
 
 ```

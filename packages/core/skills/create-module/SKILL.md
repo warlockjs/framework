@@ -1,6 +1,6 @@
 ---
 name: create-module
-description: 'Scaffold a new feature module under `src/app/<name>/` via `warlock generate.module` and the follow-up generators for controllers, models, repositories, resources, and validation schemas. Triggers: `warlock generate.module`, `generate.controller`, `generate.service`, `generate.model`, `generate.repository`, `generate.resource`, `generate.migration`, `--minimal`, `gen.m`; "scaffold a new module", "create CRUD bootstrap", "add a controller to a module", "generate a model"; typical CLI `yarn warlock generate.module <name>`. Skip: framework-wide layout rules — `@warlock.js/core/warlock-conventions/SKILL.md`; routes file shape — `@warlock.js/core/register-route/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing tooling: `@nestjs/cli`, `hygen`, hand-rolled folder layouts.'
+description: 'Scaffold a new feature module under `src/app/<name>/` via `warlock generate.module` and the follow-up generators for controllers, models, repositories, resources, and validation schemas. Triggers: `warlock generate.module`, `generate.controller`, `generate.service`, `generate.model`, `generate.repository`, `generate.resource`, `generate.migration`, `--minimal`, `gen.m`; "scaffold a new module", "create CRUD bootstrap", "add a controller to a module", "generate a model"; typical CLI `pnpm warlock generate.module <name>`. Skip: framework-wide layout rules — `@warlock.js/core/warlock-conventions/SKILL.md`; routes file shape — `@warlock.js/core/register-route/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing tooling: `@nestjs/cli`, `hygen`, hand-rolled folder layouts.'
 ---
 
 # Warlock — create a module
@@ -10,8 +10,8 @@ A module is a self-contained feature folder under `src/app/<name>/`. The CLI sca
 ## The shape
 
 ```bash
-yarn warlock generate.module products            # full CRUD bootstrap (default — controllers, model, services, repository, resource, schemas, routes, seed)
-yarn warlock generate.module products --minimal  # bare bones (routes.ts + main.ts + utils/locales.ts + empty subfolders)
+pnpm warlock generate.module products            # full CRUD bootstrap (default — controllers, model, services, repository, resource, schemas, routes, seed)
+pnpm warlock generate.module products --minimal  # bare bones (routes.ts + main.ts + utils/locales.ts + empty subfolders)
 ```
 
 Full CRUD is the default — opt down to a bare skeleton with `--minimal` (`-m`) when you want to build the module piece by piece. `--force` (`-f`) overwrites existing files. The plural form is auto-derived: `generate.module product` and `generate.module products` produce the same `src/app/products/` folder.
@@ -117,9 +117,9 @@ Inside the same module, plain relative imports (`./`, `../`).
 ### Full CRUD bootstrap
 
 ```bash
-yarn warlock generate.module products
+pnpm warlock generate.module products
 # edit schemas + model fields, then
-yarn warlock migrate
+pnpm warlock migrate
 ```
 
 The CRUD scaffold's `routes.ts` already chains the five controllers behind `guarded(...)`:
@@ -147,11 +147,11 @@ guarded(() => {
 ### Skeleton module, add pieces piecemeal
 
 ```bash
-yarn warlock generate.module orders --minimal
-yarn warlock generate.model orders/order --with-resource
-yarn warlock generate.repository orders/order
-yarn warlock generate.controller orders/place-order --with-validation
-yarn warlock generate.controller orders/list-orders
+pnpm warlock generate.module orders --minimal
+pnpm warlock generate.model orders/order --with-resource
+pnpm warlock generate.repository orders/order
+pnpm warlock generate.controller orders/place-order --with-validation
+pnpm warlock generate.controller orders/list-orders
 ```
 
 Then wire URLs by editing `src/app/orders/routes.ts` and the schema rules in `src/app/orders/schema/`.
@@ -172,7 +172,7 @@ await warmupProductCache();
 - **There's no standalone `generate.validation` command.** Validation is no longer scaffolded on its own — each controller carries its own schema (imported from `schema/` and bound via `controller.validation`). Generate the controller with `--with-validation` to get the paired schema file, or hand-write the `schema/*.schema.ts`.
 - **No `requests/` folder.** Controllers import the schema's exported type + value directly from `schema/*.schema.ts`; there is no `*.request.ts` alias.
 - **Subfolder is `seeds/` (plural), not `seed/`.** The seed file is `<module>.seed.ts`.
-- **`generate.module` does not run the migration.** It only creates the migration file. Run `yarn warlock migrate` separately to apply it.
+- **`generate.module` does not run the migration.** It only creates the migration file. Run `pnpm warlock migrate` separately to apply it.
 - **`models/<entity>/` is its own folder, not a flat file.** The generator puts `product.model.ts` inside `models/product/` so migrations can sit beside the model in `models/product/migrations/`.
 - **Don't import `routes.ts`, `main.ts`, or anything in `events/`.** They're auto-loaded; double-loading errors out at boot.
 - **`utils/locales.ts` is mandatory for translation keys.** Skip it and `t("products.notFound")` silently falls back to the key itself.

@@ -11,13 +11,13 @@ Three commands move the app through its lifecycle: `dev` while you're editing, `
 
 ```bash
 # Local development
-yarn warlock dev
+pnpm warlock dev
 
 # Production build
-yarn warlock build
+pnpm warlock build
 
 # Run the built bundle
-yarn warlock start
+pnpm warlock start
 ```
 
 `dev` and `start` are **persistent** (long-running, no auto-exit). `build` is one-shot — it exits when the bundle is written.
@@ -207,9 +207,9 @@ Spawns `node <entryPath>` as a child process, forwarding signals (SIGINT / SIGTE
 ### Behavior
 
 ```bash
-yarn warlock start                        # → spawns node --enable-source-maps dist/app.js
-yarn warlock start --inspect              # → spawns node --enable-source-maps --inspect dist/app.js
-yarn warlock start --max-old-space-size=4096  # → spawns node --enable-source-maps --max-old-space-size=4096 dist/app.js
+pnpm warlock start                        # → spawns node --enable-source-maps dist/app.js
+pnpm warlock start --inspect              # → spawns node --enable-source-maps --inspect dist/app.js
+pnpm warlock start --max-old-space-size=4096  # → spawns node --enable-source-maps --max-old-space-size=4096 dist/app.js
 ```
 
 Everything you pass after `start` is forwarded to the spawned Node process. Use this to attach a debugger (`--inspect`), tune memory (`--max-old-space-size`), or pass any other Node flag without editing the command.
@@ -261,7 +261,7 @@ The started banner prints **only** when the running application reports a comple
 
 ```bash
 # a CI gate can be this blunt, and it is now correct
-yarn warlock start | grep -q "production server started"
+pnpm warlock start | grep -q "production server started"
 ```
 
 ### How readiness is reported
@@ -308,7 +308,7 @@ If you need conditional behavior, branch on `Application.environment` (the ortho
 }
 ```
 
-Now `yarn dev` / `yarn build` / `yarn start`. Standard Node hosting providers (Render, Fly, Railway, Heroku) recognize this layout.
+Now `pnpm dev` / `pnpm build` / `pnpm start`. Standard Node hosting providers (Render, Fly, Railway, Heroku) recognize this layout.
 
 ### Production Dockerfile
 
@@ -316,9 +316,9 @@ Now `yarn dev` / `yarn build` / `yarn start`. Standard Node hosting providers (R
 FROM node:20-alpine AS build
 WORKDIR /app
 COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 COPY . .
-RUN yarn warlock build
+RUN pnpm warlock build
 
 FROM node:20-alpine
 WORKDIR /app
@@ -362,7 +362,7 @@ That is deliberate: `build` and `start` do **not** force `production`. Forcing i
 ### Skip type-gen on machines without write access
 
 ```bash
-yarn warlock dev --skip-typings
+pnpm warlock dev --skip-typings
 ```
 
 Or persist it:
@@ -380,20 +380,20 @@ Useful in a containerized dev environment where `.warlock/typings.d.ts` is read-
 ### Memory-tune the production process
 
 ```bash
-yarn warlock start --max-old-space-size=4096
+pnpm warlock start --max-old-space-size=4096
 ```
 
 Or via `NODE_OPTIONS` in the deployment env if you don't want to change the start invocation:
 
 ```bash
-NODE_OPTIONS=--max-old-space-size=4096 yarn warlock start
+NODE_OPTIONS=--max-old-space-size=4096 pnpm warlock start
 ```
 
 ## Gotchas
 
 - **`warlock dev` is persistent — `Ctrl+C` to stop.** The framework's `persistent: true` flag keeps the process alive after `action` returns. Same for `start`.
 - **`--fresh` only deletes the manifest, not the transpile cache.** If you're chasing a stale-compile bug, `rm -rf .warlock/` clears everything. The manifest restoring is what `--fresh` solves.
-- **`warlock build` does NOT run migrations.** Production bundles ship the migration files but don't apply them. Run `yarn warlock migrate` against the production DB separately.
+- **`warlock build` does NOT run migrations.** Production bundles ship the migration files but don't apply them. Run `pnpm warlock migrate` against the production DB separately.
 - **`warlock start` requires a built bundle.** Run `warlock build` first, or you'll spawn `node` against a non-existent file and crash immediately.
 - **`outdir` is the directory, `outFile` is the filename within it.** A common mistake is putting the full path in one and leaving the other default — you end up with `<full-path>/app.js` or `dist/<full-path>`. They concatenate.
 - **`sourcemap: false` cascades to `start`.** Stack traces lose `.ts` precision. Keep sourcemaps on unless artifact size is a hard constraint.

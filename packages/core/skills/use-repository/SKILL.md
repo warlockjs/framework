@@ -53,7 +53,7 @@ Five lines do the heavy lifting:
 4. **`defaultOptions`** — applied to every call (`orderBy`, default `limit`, etc.).
 5. **`new FaqsRepository()`** singleton — import this everywhere; never instantiate again.
 
-The class is intentionally private — only the singleton escapes the module. Scaffold with `yarn warlock generate.repository <module>/<entity>`.
+The class is intentionally private — only the singleton escapes the module. Scaffold with `pnpm warlock generate.repository <module>/<entity>`.
 
 ## The `filterBy` rules
 

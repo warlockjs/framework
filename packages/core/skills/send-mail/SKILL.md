@@ -85,7 +85,7 @@ const config: MailConfigurations = {
 };
 ```
 
-Requires `@aws-sdk/client-sesv2` installed (`yarn add @aws-sdk/client-sesv2`).
+Requires `@aws-sdk/client-sesv2` installed (`pnpm add @aws-sdk/client-sesv2`).
 
 ## Mail modes
 
@@ -361,7 +361,7 @@ await Mail.to(user.email)
 
 - **`.send()` validates** — `to`, `subject`, and at least one of `text`/`html`/`component` are required. Missing any throws synchronously.
 - **`@react-email/render` is optional.** Without it you get the basic fallback (inline styles, no MSO conditionals). Install it for production-quality HTML.
-- **`nodemailer` is loaded lazily** at import time. If you see `nodemailer is not installed` errors, run `warlock add mail` (or `yarn add nodemailer`).
+- **`nodemailer` is loaded lazily** at import time. If you see `nodemailer is not installed` errors, run `warlock add mail` (or `pnpm add nodemailer`).
 - **`secure: true` requires port 465.** For port 587 use `secure: false` and `tls: true` (STARTTLS).
 - **Test mode is process-global.** Set it in `beforeAll`/`beforeEach`; reset with `setMailMode("production")` (or rely on test runner isolation).
 - **Per-mail handlers don't replace global ones** — both fire. Avoid double-counting metrics.
