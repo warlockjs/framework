@@ -1,0 +1,9 @@
+# This repo is BOTH a member of the Warlock monorepo and an independently
+# deployed site. Its GitHub Pages workflow checks it out alone, so it needs
+# its own pnpm config: the root's allowBuilds does not travel with a
+# standalone checkout.
+#
+# Both are native binaries that do not function without their install scripts.
+allowBuilds:
+  esbuild: true
+  sharp: true
