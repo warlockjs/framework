@@ -1,4 +1,4 @@
-import { SealConfig } from "../config";
+import { type SealConfig } from "../config";
 import type { StandardSchemaV1 } from "../standard-schema/types";
 import type { Schema, SchemaContext, ValidationResult } from "../types";
 import type { Infer } from "../types/inference-types";

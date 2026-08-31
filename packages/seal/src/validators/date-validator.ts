@@ -47,7 +47,7 @@ import {
   minDayRule,
   minMonthRule,
   minYearRule,
-  Month,
+  type Month,
   monthRule,
   pastRule,
   quarterRule,
