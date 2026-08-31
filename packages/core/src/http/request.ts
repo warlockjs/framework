@@ -123,6 +123,21 @@ export class Request<RequestValidation = any> {
   public locals: RequestLocals = {};
 
   /**
+   * Forget the authenticated user for this request.
+   *
+   * The `user` documentation above already names this as "the one place core
+   * writes it directly", and `@warlock.js/auth`'s middleware already calls it when
+   * a token is forged, malformed, expired, or of the wrong type. It was designed,
+   * documented and called — just never written, so `auth` could not typecheck.
+   *
+   * Clearing rather than leaving a stale value matters: a request that failed
+   * authentication must not carry the identity of whoever this object last held.
+   */
+  public clearCurrentUser(): void {
+    this.user = undefined;
+  }
+
+  /**
    * Backing field for the lazily-generated CSP nonce. Left `undefined` until
    * the first `request.nonce` read; see the `nonce` getter below.
    */
