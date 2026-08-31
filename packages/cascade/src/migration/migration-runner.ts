@@ -5,7 +5,7 @@ import path from "path";
 import type { MigrationDriverContract } from "../contracts/migration-driver.contract";
 import type { DataSource } from "../data-source/data-source";
 import { dataSourceRegistry } from "../data-source/data-source-registry";
-import { type Migration } from "./migration";
+import { type Migration, type MigrationContract } from "./migration";
 import { sortMigrations, sortMigrationsForRollback } from "./migration-order";
 import { parseCreatedAt } from "./parse-created-at";
 import { SQLGrammar } from "./sql-grammar";
@@ -16,6 +16,27 @@ import type { MigrationRecord, MigrationResult, TaggedSQL } from "./types";
  */
 type MigrationClass = (new () => Migration) & {
   migrationName: string;
+  createdAt?: string;
+};
+
+/**
+ * What a caller may hand to {@link MigrationRunner.register}.
+ *
+ * Looser than {@link MigrationClass} in exactly one way: `migrationName` may be
+ * absent. That is the documented workflow — the CLI imports a migration file and
+ * sets the name from the filename afterwards — and `register()` enforces it at
+ * runtime, throwing a message that says so. Once past that check the name IS
+ * present, which is why everything stored and read downstream uses the stricter
+ * type. Requiring it on the INPUT made the runner reject the very classes the
+ * public `MigrationConstructor` describes.
+ *
+ * It constructs a MigrationContract rather than the abstract Migration class for the
+ * same reason: `typeof Migration` is abstract and cannot satisfy `new () => Migration`,
+ * and the public MigrationConstructor is declared against the contract. The runner only
+ * ever uses contract members on what it registers.
+ */
+type RegisterableMigration = (new () => MigrationContract) & {
+  migrationName?: string;
   createdAt?: string;
 };
 
@@ -158,7 +179,7 @@ export class MigrationRunner {
    * runner.register(CreateUsersTable);
    * ```
    */
-  public register(MigrationClass: MigrationClass): this {
+  public register(MigrationClass: RegisterableMigration): this {
     const name = MigrationClass.migrationName;
     if (!name) {
       throw new Error(
@@ -168,7 +189,9 @@ export class MigrationRunner {
     }
     // Avoid duplicates
     if (!this.migrations.some((m) => m.migrationName === name)) {
-      this.migrations.push(MigrationClass);
+      // `name` is proven present by the throw above, so this satisfies the stricter
+      // stored type that every reader downstream relies on.
+      this.migrations.push(MigrationClass as MigrationClass);
     }
 
     return this;
@@ -180,7 +203,7 @@ export class MigrationRunner {
    * @param migrations - Array of migration classes
    * @returns This runner for chaining
    */
-  public registerMany(migrations: MigrationClass[]): this {
+  public registerMany(migrations: RegisterableMigration[]): this {
     for (const MigrationClass of migrations) {
       this.register(MigrationClass);
     }

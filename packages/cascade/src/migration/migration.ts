@@ -731,7 +731,11 @@ export abstract class Migration implements MigrationContract {
    *
    * Format: ISO 8601 or any parseable date string.
    */
-  public static readonly createdAt?: string;
+  // Not readonly: the two lines of documentation directly above say the migration
+  // runner extracts this from the filename, and that is what @warlock.js/core does
+  // when a migration does not set it explicitly. `readonly` contradicted the
+  // documented behaviour and made the runner unable to do its stated job.
+  public static createdAt?: string;
 
   /**
    * Whether to wrap migration in a transaction.
