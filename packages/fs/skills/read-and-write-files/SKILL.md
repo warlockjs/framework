@@ -10,7 +10,7 @@ Thin, opinionated wrapper around `node:fs` and `node:fs/promises`. Two-suffix co
 ## Install
 
 ```bash
-yarn add @warlock.js/fs
+pnpm add @warlock.js/fs
 ```
 
 ## Read
