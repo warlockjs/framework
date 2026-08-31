@@ -34,5 +34,6 @@
   },
   "main": "./src/index.ts",
   "module": "./src/index.ts",
-  "typings": "./src/index.ts"
+  "typings": "./src/index.ts",
+  "packageManager": "pnpm@11.24.0"
 }
