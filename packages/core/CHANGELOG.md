@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.2.3 - 2026-09-02
+
+### Fixed
+
+- `warlock add` now preserves exact lockstep versions for added Warlock family packages while retaining declared ranges for third-party dependencies.
+- `warlock add web` now emits a projection-safe `register()` hook and one `index` route identity for SSR and hydration, with deterministic form and favicon markup for a clean browser console.
+
 ## 5.2.2
 
 ### Fixed
