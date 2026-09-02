@@ -1,6 +1,5 @@
-import Fastify from "fastify";
 import { Router } from "../../../src/router/router";
-import type { FastifyInstance } from "../../../src/http/server";
+import { startHttpServer, type FastifyInstance } from "../../../src/http/server";
 
 /**
  * In-process HTTP harness for exercising the real Fastify → router → request →
@@ -14,7 +13,7 @@ import type { FastifyInstance } from "../../../src/http/server";
  * exactly the routes this harness added.
  *
  * **Responsibility.**
- * - Owns: per-test source-file scoping, booting + readying the Fastify
+ * - Owns: per-test source-file scoping, booting + readying Warlock's Fastify
  *   instance, scanning routes, injecting requests, and full teardown (route
  *   removal + server close).
  * - Does NOT own: how the router builds routes, how the request lifecycle runs,
@@ -73,7 +72,7 @@ export async function bootHarness(
     register(router);
   });
 
-  const server = Fastify();
+  const server = startHttpServer();
 
   router.scan(server);
 

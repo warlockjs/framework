@@ -69,7 +69,7 @@ describe("port preflight", () => {
     await expect(assertPortIsAvailable(port, host)).resolves.toBeUndefined();
   });
 
-  it("throws an actionable message naming the port instead of EADDRINUSE", async () => {
+  it("throws an actionable message naming both the port and EADDRINUSE", async () => {
     holder = createServer();
 
     const port = await holdPort(holder);
@@ -83,8 +83,12 @@ describe("port preflight", () => {
     assert(error instanceof PortInUseError);
     expect(error.port).toBe(port);
     expect(error.host).toBe(host);
+    expect(error.code).toBe("EADDRINUSE");
+    // Named up front so a developer scanning the terminal — or grepping a
+    // captured log — recognizes it as the same failure every other Node tool
+    // reports, on top of the human-actionable instruction that follows it.
+    expect(error.message).toContain("EADDRINUSE");
     expect(error.message).toContain(`Port ${port} is already in use`);
     expect(error.message).toContain("Stop the dev server");
-    expect(error.message).not.toContain("EADDRINUSE");
   });
 });

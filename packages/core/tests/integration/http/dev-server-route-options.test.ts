@@ -49,6 +49,16 @@ async function bootDevServer(register: (router: Router) => void) {
 }
 
 describe("dev server — per-route serverOptions", () => {
+  it("matches a route with one trailing slash through the shared normalizer", async () => {
+    const server = await bootDevServer((router) => {
+      router.get("/about", ({ response }) => response.success({ ok: true }));
+    });
+
+    const response = await server.inject({ method: "GET", url: "/about/" });
+
+    expect(response.statusCode).toBe(200);
+  });
+
   it("runs a route's onRequest hook before the handler", async () => {
     const phases: string[] = [];
 

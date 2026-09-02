@@ -57,28 +57,36 @@ export function isDevWorker(): boolean {
 export function superviseDevServer(now: () => number = Date.now): Promise<never> {
   let worker: ChildProcess | undefined;
   let shuttingDown = false;
-  let startedAt = 0;
 
   /** Timestamps of recent crash-restarts, used to detect flapping. */
   let crashes: number[] = [];
 
   const spawnWorker = (): void => {
-    startedAt = now();
+    const spawnedAt = now();
 
-    worker = spawn(process.execPath, [...process.execArgv, ...process.argv.slice(1)], {
+    const spawnedWorker = spawn(process.execPath, [...process.execArgv, ...process.argv.slice(1)], {
       cwd: process.cwd(),
       env: { ...process.env, [WORKER_ENV_FLAG]: "1" },
       stdio: "inherit",
       windowsHide: false,
     });
+    worker = spawnedWorker;
 
-    worker.on("error", (error) => {
+    spawnedWorker.on("error", (error) => {
+      if (worker !== spawnedWorker) return;
+
       shuttingDown = true;
       devLogError(`Could not start the development server: ${error.message}`);
       process.exit(1);
     });
 
-    worker.on("exit", (code, signal) => {
+    spawnedWorker.on("exit", (code, signal) => {
+      // A replaced worker can finish emitting lifecycle events after its
+      // successor is already healthy. It must not spend that successor's crash
+      // budget, spawn another worker, or print a terminal flapping diagnosis.
+      if (worker !== spawnedWorker) return;
+
+      worker = undefined;
       releaseTerminal();
 
       // `return` after every exit deliberately: `process.exit` is typed
@@ -96,7 +104,7 @@ export function superviseDevServer(now: () => number = Date.now): Promise<never>
 
       const crashed = signal !== null || (code ?? 0) !== 0;
 
-      if (crashed && shouldRecoverFromCrash(now() - startedAt)) {
+      if (crashed && shouldRecoverFromCrash(now() - spawnedAt)) {
         devLogWarn(
           `Development server ${signal ? `was killed by ${signal}` : `exited with code ${code}`} — restarting.`,
         );

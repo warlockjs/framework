@@ -16,8 +16,10 @@ import {
   inspectHandlerSignature,
   reportPositionalHandlerSuspects,
 } from "./positional-handler-diagnostics";
+import { normalizeRoutePath } from "./normalize-route-path";
 import { RouteBuilder } from "./route-builder";
 import { RouteRegistry } from "./route-registry";
+import { routeNameMethodSuffix } from "./route-name-method-suffix";
 import type {
   GroupedRoutesOptions,
   HttpContext,
@@ -314,7 +316,10 @@ export class Router {
       options.name || trim(path.replace(/\//g, "."), "."),
     );
 
-    path = concatRoute(prefix, path);
+    // The one place a route path becomes canonical. `normalizeRoutePath` is
+    // exported so the build-time page-route manifest can produce the very same
+    // string without registering anything.
+    path = normalizeRoutePath(prefix, path);
 
     const middlewarePrecedence = options.middlewarePrecedence || "after";
 
@@ -378,7 +383,7 @@ export class Router {
               `claimed once. Rename one of them via the "name" route option.`,
           );
         } else {
-          routeData.name += `.${routeData.method.toLowerCase()}`;
+          routeData.name += routeNameMethodSuffix(routeData.method);
         }
       }
     }

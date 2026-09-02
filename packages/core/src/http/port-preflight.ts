@@ -11,14 +11,23 @@ const DEFAULT_PROBE_HOST = "localhost";
  * Carries the port and host so a caller can report them without parsing the
  * message, and its message is the developer-facing instruction — the whole
  * point of preflighting is that nobody has to decode a raw `EADDRINUSE`.
+ *
+ * The message leads with `EADDRINUSE` on purpose: it is the string a
+ * developer greps their terminal for, and the one every other Node tool
+ * already trained them to recognize as "something else is on this port".
+ * `code` mirrors it as a property so a caller can branch on it without
+ * parsing text, the same way `NodeJS.ErrnoException.code` works.
  */
 export class PortInUseError extends Error {
+  /** Mirrors Node's own `ErrnoException.code` for this failure. */
+  public readonly code = "EADDRINUSE";
+
   public constructor(
     public readonly port: number,
     public readonly host: string,
   ) {
     super(
-      `Port ${port} is already in use on ${host}. Stop the dev server (or whatever else is listening on port ${port}) and run again, or start on a free port — e.g. startHttpTestServer({ port: ${port + 1} }).`,
+      `EADDRINUSE: Port ${port} is already in use on ${host}. Stop the dev server (or whatever else is listening on port ${port}) and run again, or start on a free port — e.g. startHttpTestServer({ port: ${port + 1} }).`,
     );
 
     this.name = "PortInUseError";

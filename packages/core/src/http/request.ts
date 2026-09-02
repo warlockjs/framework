@@ -1,7 +1,15 @@
 import { colors } from "@mongez/copper";
 import events from "@mongez/events";
 import { trans, transFrom } from "@mongez/localization";
-import { Random, except, get, only, rtrim, set, unset } from "@mongez/reinforcements";
+import {
+  Random,
+  except,
+  get,
+  only,
+  rtrim,
+  set,
+  unset,
+} from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
 import type { LogLevel } from "@warlock.js/logger";
 import { log } from "@warlock.js/logger";
@@ -21,11 +29,13 @@ import { UploadedFile } from "./uploaded-file";
 type StandardHeaders = {
   // copy every declared property from http.IncomingHttpHeaders
   // but remove index signatures
-  [K in keyof IncomingHttpHeaders as string extends K
-    ? never
-    : number extends K
+  [
+    K in keyof IncomingHttpHeaders as string extends K
       ? never
-      : K]: IncomingHttpHeaders[K];
+      : number extends K
+        ? never
+        : K
+  ]: IncomingHttpHeaders[K];
 };
 
 type HeaderKeys = keyof StandardHeaders;
@@ -308,10 +318,14 @@ export class Request<RequestValidation = any> {
       config.key("app.localeCodes"),
     );
 
-    const requested = typeof candidate === "string" && candidate.length > 0 ? candidate : undefined;
+    const requested =
+      typeof candidate === "string" && candidate.length > 0
+        ? candidate
+        : undefined;
 
     this._locale =
-      requested !== undefined && (localeCodes === undefined || localeCodes.includes(requested))
+      requested !== undefined &&
+      (localeCodes === undefined || localeCodes.includes(requested))
         ? requested
         : defaultLocaleCode;
 
@@ -377,7 +391,10 @@ export class Request<RequestValidation = any> {
    * Validate the given validation schema
    */
   public async validate(validation: BaseValidator, selectedInputs?: string[]) {
-    return await v.validate(validation, selectedInputs ? this.only(selectedInputs) : this.all());
+    return await v.validate(
+      validation,
+      selectedInputs ? this.only(selectedInputs) : this.all(),
+    );
   }
 
   /**
@@ -508,10 +525,7 @@ export class Request<RequestValidation = any> {
    * arrays rather than objects with numeric keys.
    */
   protected bracketKeyToPath(key: string): string {
-    return key
-      .replace(/\]\[/g, ".")
-      .replace(/\[/g, ".")
-      .replace(/\]/g, "");
+    return key.replace(/\]\[/g, ".").replace(/\[/g, ".").replace(/\]/g, "");
   }
 
   /**
@@ -523,7 +537,11 @@ export class Request<RequestValidation = any> {
    * occurrences means one selected filter is a string and two are an array —
    * a shape that changes under the user's hands.
    */
-  protected arrayValueFor(value: any, isArrayKey: boolean, parse: (value: any) => any) {
+  protected arrayValueFor(
+    value: any,
+    isArrayKey: boolean,
+    parse: (value: any) => any,
+  ) {
     if (Array.isArray(value)) return value.map(parse);
 
     return isArrayKey ? [parse(value)] : parse(value);
@@ -600,7 +618,11 @@ export class Request<RequestValidation = any> {
               set(
                 body,
                 this.bracketKeyToPath(key),
-                this.arrayValueFor(value, isArrayKey, this.parseValue.bind(this)),
+                this.arrayValueFor(
+                  value,
+                  isArrayKey,
+                  this.parseValue.bind(this),
+                ),
               );
 
               continue;
@@ -618,7 +640,8 @@ export class Request<RequestValidation = any> {
             const keyNameParts2 = keyParts[2].split("]");
             const keyName2 = keyNameParts2[0];
 
-            arrayOfObjectValues[keyName][index][keyName2] = this.parseValue(value);
+            arrayOfObjectValues[keyName][index][keyName2] =
+              this.parseValue(value);
 
             continue;
           }
@@ -732,7 +755,11 @@ export class Request<RequestValidation = any> {
 
     log.log({
       module: "request",
-      action: this.route.method + " " + this.route.path.replace("/*", "") + `:${this.id}`,
+      action:
+        this.route.method +
+        " " +
+        this.route.path.replace("/*", "") +
+        `:${this.id}`,
       message,
       type: level,
       context: {
@@ -787,7 +814,11 @@ export class Request<RequestValidation = any> {
     if (!handler.validation) return;
 
     // 👇🏻 check for validation using validateAll helper function
-    const validationOutput = await validateAll(handler.validation, this, this.response);
+    const validationOutput = await validateAll(
+      handler.validation,
+      this,
+      this.response,
+    );
 
     return validationOutput;
   }
@@ -805,7 +836,9 @@ export class Request<RequestValidation = any> {
    * Get inputs that has been validated only
    * You can also pass an array of inputs to get only the validated inputs
    */
-  public validated<Output = RequestValidation>(inputs?: (keyof Output | (string & {}))[]): Output {
+  public validated<Output = RequestValidation>(
+    inputs?: (keyof Output | (string & {}))[],
+  ): Output {
     if (this.validatedData) {
       return inputs
         ? only(this.validatedData as Output, inputs as string[])
@@ -870,12 +903,19 @@ export class Request<RequestValidation = any> {
 
     for (const middleware of middlewares) {
       this.log("Executing middleware " + colors.yellowBright(middleware.name));
-      const output = await middleware({ request: this, response: this.response });
-      this.log("Executed middleware " + colors.yellowBright(middleware.name), "success");
+      const output = await middleware({
+        request: this,
+        response: this.response,
+      });
+      this.log(
+        "Executed middleware " + colors.yellowBright(middleware.name),
+        "success",
+      );
 
       if (output !== undefined) {
         this.log(
-          colors.yellow("request intercepted by middleware ") + colors.cyanBright(middleware.name),
+          colors.yellow("request intercepted by middleware ") +
+            colors.cyanBright(middleware.name),
           "warn",
         );
 
@@ -1233,10 +1273,10 @@ export class Request<RequestValidation = any> {
    *
    * `X-Real-IP` is NOT part of that resolution — Fastify never looks at it,
    * and unlike `X-Forwarded-For` it carries no chain, so there is nothing to
-   * validate a hop count or proxy allowlist against. It is therefore honoured
+   * validate a proxy allowlist against. It is therefore honoured
    * only under `trustProxy: true` ("everything upstream is mine"), where it is
    * no weaker than the trust already granted. Under a bounded `trustProxy`
-   * (hop count / CIDR list) it is ignored: a trusted-but-passthrough edge that
+   * (CIDR / IP list) it is ignored: a trusted-but-passthrough edge that
    * forwards the client's own `X-Real-IP` verbatim would otherwise hand any
    * client a way around the bound.
    *

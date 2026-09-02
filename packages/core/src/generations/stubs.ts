@@ -740,12 +740,12 @@ extend("ar", {
   },
 });
 
-function TextInput(props: FormControlProps) {
-  const { error, getErrorProps, getInputProps } = useFormControl(props);
+function TextInput({ label, ...controlProps }: FormControlProps & { label: string }) {
+  const { error, getErrorProps, getInputProps } = useFormControl(controlProps);
 
   return (
     <div className="wk-field">
-      <label htmlFor={props.name}>{props.label}</label>
+      <label htmlFor={controlProps.name}>{label}</label>
       <input {...getInputProps()} />
       {error && <p {...getErrorProps()}>{error}</p>}
     </div>
@@ -868,15 +868,12 @@ export default function HomePage(_props: PageProps) {
               if (result.error) {
                 if (result.error.isValidationError) {
                   const body = result.error.body as {
-                    errors?: Record<string, string | string[]>;
+                    errors?: Array<{ input: string; error: string }>;
                     message?: string;
                   };
                   form.setErrors(
                     Object.fromEntries(
-                      Object.entries(body.errors ?? {}).map(([name, error]) => [
-                        name,
-                        Array.isArray(error) ? error[0] : error,
-                      ]),
+                      (body.errors ?? []).map(({ input, error }) => [input, error]),
                     ),
                   );
                   setSubmitError(body.message ?? "Please correct the highlighted fields.");

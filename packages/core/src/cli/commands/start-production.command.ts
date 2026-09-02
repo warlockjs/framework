@@ -1,3 +1,4 @@
+import { checkDistReadyToStartAsync } from "../../production/assert-dist-ready-to-start";
 import { superviseProductionProcess } from "../../production/production-supervisor";
 import { resolveBuildConfig } from "../../production/resolve-build-config";
 import { command } from "../../commands/cli-command";
@@ -10,7 +11,19 @@ export const startProductionCommand = command({
     warlockConfig: true,
   },
   action: async () => {
-    const { entryPath, sourcemap } = resolveBuildConfig();
+    const { entryPath, sourcemap, outdir } = resolveBuildConfig();
+
+    // Refuse a `dist` that did not come from a successful `warlock build` —
+    // named explicitly, rather than failing later and incidentally because
+    // some file the server happens to need (the client manifest, say) is
+    // missing. See `assert-dist-ready-to-start.ts`.
+    const readiness = await checkDistReadyToStartAsync(outdir);
+
+    if (!readiness.ready) {
+      console.error(`✖ ${readiness.reason}`);
+      process.exit(1);
+      return;
+    }
 
     // Build node args
     const nodeArgs: string[] = [];

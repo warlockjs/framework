@@ -189,6 +189,23 @@ Defaults are sensible for the typical "Node service" deployment. Knobs to actual
 
 Just `warlockConfig: true`. Build doesn't need the app booted — it reads `warlock.config.ts`, runs esbuild, writes the file. Fast.
 
+### The build is all-or-nothing (5.2)
+
+`warlock build` never writes into `outdir` while it works. It builds into a hidden **sibling** temp directory — `.<outdir-basename>.build-<12 hex>`, e.g. `./.dist.build-9f1c2ab40de7` next to `./dist` — and only when every step has succeeded does it promote that directory into place with a rename. Same volume, so the promotion is atomic.
+
+Two consequences you can rely on:
+
+- **A successful build leaves no stale files.** Promotion replaces `outdir` wholesale (the old one is moved aside, the temp is renamed in, the old one is deleted). A file that an earlier build emitted and this one did not is gone — it is not merged over.
+- **A failed build leaves no usable `dist`.** The error path removes the temp directory and rethrows without ever touching `outdir`. A previous good `dist` is left exactly as it was; if there was none, none appears.
+
+The last thing written into the temp directory before promotion is `.warlock-build.json`, a two-field marker:
+
+```json
+{ "status": "success", "builtAt": "2026-09-01T12:34:56.789Z" }
+```
+
+It exists so `warlock start` can tell a promoted build from a directory that merely looks like one.
+
 ### Where the bundle lands
 
 ```
@@ -203,6 +220,16 @@ If the app uses `@warlock.js/web` page routes, a successful `warlock build` also
 ## `warlock start` — run the production bundle
 
 Spawns `node <entryPath>` as a child process, forwarding signals (SIGINT / SIGTERM). `entryPath` is resolved from the same `build` config that produced the bundle.
+
+### It refuses a `dist` no successful build produced (5.2)
+
+Before spawning anything, `start` looks for the `.warlock-build.json` success marker in `outdir`. Missing, unreadable, malformed, or `status !== "success"` all collapse to one refusal on **stderr**, exit code `1`:
+
+```
+✖ "dist" was not produced by a successful `warlock build` run (no build-success marker found). Run `warlock build` before `warlock start`.
+```
+
+The three cases that reach it are: never built; a build that failed before promotion; and a directory assembled or edited by hand. They are deliberately not distinguished — the answer to all three is the same command. Note this replaces the old behaviour where `start` ran whatever happened to be sitting in `dist/`.
 
 ### Behavior
 
@@ -263,6 +290,34 @@ The started banner prints **only** when the running application reports a comple
 # a CI gate can be this blunt, and it is now correct
 pnpm warlock start | grep -q "production server started"
 ```
+
+### Reading a failed start (5.2)
+
+The child is spawned with piped stdout/stderr and **every chunk is forwarded verbatim, live**, to the parent's matching stream. The application's own boot error is the thing you read — `warlock start` adds a summary underneath it, it does not replace it:
+
+```
+  ✖ warlock start failed — the server never finished booting
+  the application process exited with code 1
+  the cause is printed above, in the application's own output
+```
+
+The third line is conditional on the parent having actually seen child output. When the child produced none, it says so instead of pointing at something that isn't there:
+
+```
+  no output was captured from the application process — its cause did not reach this terminal
+```
+
+That distinction is the point of the change: an unhelpful "see above" printed above an empty terminal used to be the entire diagnostic.
+
+**Port already in use.** The HTTP connector preflights the port immediately before `listen()`, so a collision is named rather than surfacing as a raw `EADDRINUSE` from inside Fastify:
+
+```
+EADDRINUSE: Port 3000 is already in use on 127.0.0.1. Stop the dev server (or whatever
+else is listening on port 3000) and run again, or start on a free port — e.g.
+startHttpTestServer({ port: 3001 }).
+```
+
+The connector logs it fatally and exits `1`; the supervisor forwards that text and then prints the failure summary above it. `EACCES` on the port is treated the same way as `EADDRINUSE` (a privileged port you may not bind is also "not available"); anything else the probe throws is rethrown untouched.
 
 ### How readiness is reported
 
@@ -394,7 +449,8 @@ NODE_OPTIONS=--max-old-space-size=4096 pnpm warlock start
 - **`warlock dev` is persistent — `Ctrl+C` to stop.** The framework's `persistent: true` flag keeps the process alive after `action` returns. Same for `start`.
 - **`--fresh` only deletes the manifest, not the transpile cache.** If you're chasing a stale-compile bug, `rm -rf .warlock/` clears everything. The manifest restoring is what `--fresh` solves.
 - **`warlock build` does NOT run migrations.** Production bundles ship the migration files but don't apply them. Run `pnpm warlock migrate` against the production DB separately.
-- **`warlock start` requires a built bundle.** Run `warlock build` first, or you'll spawn `node` against a non-existent file and crash immediately.
+- **`warlock start` requires a build it can vouch for.** Since 5.2 it refuses any `outdir` without the `.warlock-build.json` success marker — a hand-assembled `dist/`, or one left behind by a build that failed, is rejected by that reason instead of being spawned and crashing halfway through boot. Run `warlock build` first.
+- **Do not add `.warlock-build.json` to `.gitignore`-driven artifact pruning.** Stripping it from a `dist/` you ship makes `warlock start` refuse the artifact on the target host. Copy `outdir` whole.
 - **`outdir` is the directory, `outFile` is the filename within it.** A common mistake is putting the full path in one and leaving the other default — you end up with `<full-path>/app.js` or `dist/<full-path>`. They concatenate.
 - **`sourcemap: false` cascades to `start`.** Stack traces lose `.ts` precision. Keep sourcemaps on unless artifact size is a hard constraint.
 - **`NODE_ENV` is not set by these commands.** The deployment env (your Dockerfile, CI, hosting provider) sets it. Forget it on a production server and `Application.isProduction` returns `false`, which flips cookie security, CORS, logging — silently. Always set `NODE_ENV=production` in production deployments.

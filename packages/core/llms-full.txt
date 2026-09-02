@@ -1235,7 +1235,7 @@ That's the full contract. The `RequestHandler` annotation carries both parameter
 - File: `src/app/<module>/controllers/<action>.controller.ts`.
 - Export name matches the action in camelCase + `Controller` suffix: `listProductsController`, `createProductController`, `getProductController`.
 
-Scaffold with: `yarn warlock generate.controller <module>/<action>` (add `--with-validation` to get the schema generated alongside).
+Scaffold with: `pnpm warlock generate.controller <module>/<action>` (add `--with-validation` to get the schema generated alongside).
 
 ## Reading input
 
@@ -1437,7 +1437,7 @@ No `if (!product)` branch in the controller. The error class carries the HTTP se
 
 ---
 name: create-module
-description: 'Scaffold a new feature module under `src/app/<name>/` via `warlock generate.module` and the follow-up generators for controllers, models, repositories, resources, and validation schemas. Triggers: `warlock generate.module`, `generate.controller`, `generate.service`, `generate.model`, `generate.repository`, `generate.resource`, `generate.migration`, `--minimal`, `gen.m`; "scaffold a new module", "create CRUD bootstrap", "add a controller to a module", "generate a model"; typical CLI `yarn warlock generate.module <name>`. Skip: framework-wide layout rules — `@warlock.js/core/warlock-conventions/SKILL.md`; routes file shape — `@warlock.js/core/register-route/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing tooling: `@nestjs/cli`, `hygen`, hand-rolled folder layouts.'
+description: 'Scaffold a new feature module under `src/app/<name>/` via `warlock generate.module` and the follow-up generators for controllers, models, repositories, resources, and validation schemas. Triggers: `warlock generate.module`, `generate.controller`, `generate.service`, `generate.model`, `generate.repository`, `generate.resource`, `generate.migration`, `--minimal`, `gen.m`; "scaffold a new module", "create CRUD bootstrap", "add a controller to a module", "generate a model"; typical CLI `pnpm warlock generate.module <name>`. Skip: framework-wide layout rules — `@warlock.js/core/warlock-conventions/SKILL.md`; routes file shape — `@warlock.js/core/register-route/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing tooling: `@nestjs/cli`, `hygen`, hand-rolled folder layouts.'
 ---
 
 # Warlock — create a module
@@ -1447,8 +1447,8 @@ A module is a self-contained feature folder under `src/app/<name>/`. The CLI sca
 ## The shape
 
 ```bash
-yarn warlock generate.module products            # full CRUD bootstrap (default — controllers, model, services, repository, resource, schemas, routes, seed)
-yarn warlock generate.module products --minimal  # bare bones (routes.ts + main.ts + utils/locales.ts + empty subfolders)
+pnpm warlock generate.module products            # full CRUD bootstrap (default — controllers, model, services, repository, resource, schemas, routes, seed)
+pnpm warlock generate.module products --minimal  # bare bones (routes.ts + main.ts + utils/locales.ts + empty subfolders)
 ```
 
 Full CRUD is the default — opt down to a bare skeleton with `--minimal` (`-m`) when you want to build the module piece by piece. `--force` (`-f`) overwrites existing files. The plural form is auto-derived: `generate.module product` and `generate.module products` produce the same `src/app/products/` folder.
@@ -1554,9 +1554,9 @@ Inside the same module, plain relative imports (`./`, `../`).
 ### Full CRUD bootstrap
 
 ```bash
-yarn warlock generate.module products
+pnpm warlock generate.module products
 # edit schemas + model fields, then
-yarn warlock migrate
+pnpm warlock migrate
 ```
 
 The CRUD scaffold's `routes.ts` already chains the five controllers behind `guarded(...)`:
@@ -1584,11 +1584,11 @@ guarded(() => {
 ### Skeleton module, add pieces piecemeal
 
 ```bash
-yarn warlock generate.module orders --minimal
-yarn warlock generate.model orders/order --with-resource
-yarn warlock generate.repository orders/order
-yarn warlock generate.controller orders/place-order --with-validation
-yarn warlock generate.controller orders/list-orders
+pnpm warlock generate.module orders --minimal
+pnpm warlock generate.model orders/order --with-resource
+pnpm warlock generate.repository orders/order
+pnpm warlock generate.controller orders/place-order --with-validation
+pnpm warlock generate.controller orders/list-orders
 ```
 
 Then wire URLs by editing `src/app/orders/routes.ts` and the schema rules in `src/app/orders/schema/`.
@@ -1609,7 +1609,7 @@ await warmupProductCache();
 - **There's no standalone `generate.validation` command.** Validation is no longer scaffolded on its own — each controller carries its own schema (imported from `schema/` and bound via `controller.validation`). Generate the controller with `--with-validation` to get the paired schema file, or hand-write the `schema/*.schema.ts`.
 - **No `requests/` folder.** Controllers import the schema's exported type + value directly from `schema/*.schema.ts`; there is no `*.request.ts` alias.
 - **Subfolder is `seeds/` (plural), not `seed/`.** The seed file is `<module>.seed.ts`.
-- **`generate.module` does not run the migration.** It only creates the migration file. Run `yarn warlock migrate` separately to apply it.
+- **`generate.module` does not run the migration.** It only creates the migration file. Run `pnpm warlock migrate` separately to apply it.
 - **`models/<entity>/` is its own folder, not a flat file.** The generator puts `product.model.ts` inside `models/product/` so migrations can sit beside the model in `models/product/migrations/`.
 - **Don't import `routes.ts`, `main.ts`, or anything in `events/`.** They're auto-loaded; double-loading errors out at boot.
 - **`utils/locales.ts` is mandatory for translation keys.** Skip it and `t("products.notFound")` silently falls back to the key itself.
@@ -2292,7 +2292,7 @@ The "same error for missing user vs wrong password" pattern is deliberate — it
 `hashPassword` / `verifyPassword` need `bcryptjs`. Install it directly:
 
 ```bash
-yarn add bcryptjs
+pnpm add bcryptjs
 ```
 
 If you skip the install, the first call throws with the framework's install hint:
@@ -2301,14 +2301,14 @@ If you skip the install, the first call throws with the framework's install hint
 Password encryption requires the bcryptjs package.
 Install it with:
 
-  yarn add bcryptjs
+  pnpm add bcryptjs
 
 Or with your preferred package manager:
 
-  yarn add bcryptjs
+  pnpm add bcryptjs
 ```
 
-There is no `warlock add` feature for password hashing — `bcryptjs` is a plain dependency, so install it directly with `yarn add bcryptjs`.
+There is no `warlock add` feature for password hashing — `bcryptjs` is a plain dependency, so install it directly with `pnpm add bcryptjs`.
 
 ## Gotchas
 
@@ -3288,13 +3288,13 @@ Three commands move the app through its lifecycle: `dev` while you're editing, `
 
 ```bash
 # Local development
-yarn warlock dev
+pnpm warlock dev
 
 # Production build
-yarn warlock build
+pnpm warlock build
 
 # Run the built bundle
-yarn warlock start
+pnpm warlock start
 ```
 
 `dev` and `start` are **persistent** (long-running, no auto-exit). `build` is one-shot — it exits when the bundle is written.
@@ -3466,6 +3466,23 @@ Defaults are sensible for the typical "Node service" deployment. Knobs to actual
 
 Just `warlockConfig: true`. Build doesn't need the app booted — it reads `warlock.config.ts`, runs esbuild, writes the file. Fast.
 
+### The build is all-or-nothing (5.2)
+
+`warlock build` never writes into `outdir` while it works. It builds into a hidden **sibling** temp directory — `.<outdir-basename>.build-<12 hex>`, e.g. `./.dist.build-9f1c2ab40de7` next to `./dist` — and only when every step has succeeded does it promote that directory into place with a rename. Same volume, so the promotion is atomic.
+
+Two consequences you can rely on:
+
+- **A successful build leaves no stale files.** Promotion replaces `outdir` wholesale (the old one is moved aside, the temp is renamed in, the old one is deleted). A file that an earlier build emitted and this one did not is gone — it is not merged over.
+- **A failed build leaves no usable `dist`.** The error path removes the temp directory and rethrows without ever touching `outdir`. A previous good `dist` is left exactly as it was; if there was none, none appears.
+
+The last thing written into the temp directory before promotion is `.warlock-build.json`, a two-field marker:
+
+```json
+{ "status": "success", "builtAt": "2026-09-01T12:34:56.789Z" }
+```
+
+It exists so `warlock start` can tell a promoted build from a directory that merely looks like one.
+
 ### Where the bundle lands
 
 ```
@@ -3481,12 +3498,22 @@ If the app uses `@warlock.js/web` page routes, a successful `warlock build` also
 
 Spawns `node <entryPath>` as a child process, forwarding signals (SIGINT / SIGTERM). `entryPath` is resolved from the same `build` config that produced the bundle.
 
+### It refuses a `dist` no successful build produced (5.2)
+
+Before spawning anything, `start` looks for the `.warlock-build.json` success marker in `outdir`. Missing, unreadable, malformed, or `status !== "success"` all collapse to one refusal on **stderr**, exit code `1`:
+
+```
+✖ "dist" was not produced by a successful `warlock build` run (no build-success marker found). Run `warlock build` before `warlock start`.
+```
+
+The three cases that reach it are: never built; a build that failed before promotion; and a directory assembled or edited by hand. They are deliberately not distinguished — the answer to all three is the same command. Note this replaces the old behaviour where `start` ran whatever happened to be sitting in `dist/`.
+
 ### Behavior
 
 ```bash
-yarn warlock start                        # → spawns node --enable-source-maps dist/app.js
-yarn warlock start --inspect              # → spawns node --enable-source-maps --inspect dist/app.js
-yarn warlock start --max-old-space-size=4096  # → spawns node --enable-source-maps --max-old-space-size=4096 dist/app.js
+pnpm warlock start                        # → spawns node --enable-source-maps dist/app.js
+pnpm warlock start --inspect              # → spawns node --enable-source-maps --inspect dist/app.js
+pnpm warlock start --max-old-space-size=4096  # → spawns node --enable-source-maps --max-old-space-size=4096 dist/app.js
 ```
 
 Everything you pass after `start` is forwarded to the spawned Node process. Use this to attach a debugger (`--inspect`), tune memory (`--max-old-space-size`), or pass any other Node flag without editing the command.
@@ -3538,8 +3565,36 @@ The started banner prints **only** when the running application reports a comple
 
 ```bash
 # a CI gate can be this blunt, and it is now correct
-yarn warlock start | grep -q "production server started"
+pnpm warlock start | grep -q "production server started"
 ```
+
+### Reading a failed start (5.2)
+
+The child is spawned with piped stdout/stderr and **every chunk is forwarded verbatim, live**, to the parent's matching stream. The application's own boot error is the thing you read — `warlock start` adds a summary underneath it, it does not replace it:
+
+```
+  ✖ warlock start failed — the server never finished booting
+  the application process exited with code 1
+  the cause is printed above, in the application's own output
+```
+
+The third line is conditional on the parent having actually seen child output. When the child produced none, it says so instead of pointing at something that isn't there:
+
+```
+  no output was captured from the application process — its cause did not reach this terminal
+```
+
+That distinction is the point of the change: an unhelpful "see above" printed above an empty terminal used to be the entire diagnostic.
+
+**Port already in use.** The HTTP connector preflights the port immediately before `listen()`, so a collision is named rather than surfacing as a raw `EADDRINUSE` from inside Fastify:
+
+```
+EADDRINUSE: Port 3000 is already in use on 127.0.0.1. Stop the dev server (or whatever
+else is listening on port 3000) and run again, or start on a free port — e.g.
+startHttpTestServer({ port: 3001 }).
+```
+
+The connector logs it fatally and exits `1`; the supervisor forwards that text and then prints the failure summary above it. `EACCES` on the port is treated the same way as `EADDRINUSE` (a privileged port you may not bind is also "not available"); anything else the probe throws is rethrown untouched.
 
 ### How readiness is reported
 
@@ -3585,7 +3640,7 @@ If you need conditional behavior, branch on `Application.environment` (the ortho
 }
 ```
 
-Now `yarn dev` / `yarn build` / `yarn start`. Standard Node hosting providers (Render, Fly, Railway, Heroku) recognize this layout.
+Now `pnpm dev` / `pnpm build` / `pnpm start`. Standard Node hosting providers (Render, Fly, Railway, Heroku) recognize this layout.
 
 ### Production Dockerfile
 
@@ -3593,9 +3648,9 @@ Now `yarn dev` / `yarn build` / `yarn start`. Standard Node hosting providers (R
 FROM node:20-alpine AS build
 WORKDIR /app
 COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 COPY . .
-RUN yarn warlock build
+RUN pnpm warlock build
 
 FROM node:20-alpine
 WORKDIR /app
@@ -3639,7 +3694,7 @@ That is deliberate: `build` and `start` do **not** force `production`. Forcing i
 ### Skip type-gen on machines without write access
 
 ```bash
-yarn warlock dev --skip-typings
+pnpm warlock dev --skip-typings
 ```
 
 Or persist it:
@@ -3657,21 +3712,22 @@ Useful in a containerized dev environment where `.warlock/typings.d.ts` is read-
 ### Memory-tune the production process
 
 ```bash
-yarn warlock start --max-old-space-size=4096
+pnpm warlock start --max-old-space-size=4096
 ```
 
 Or via `NODE_OPTIONS` in the deployment env if you don't want to change the start invocation:
 
 ```bash
-NODE_OPTIONS=--max-old-space-size=4096 yarn warlock start
+NODE_OPTIONS=--max-old-space-size=4096 pnpm warlock start
 ```
 
 ## Gotchas
 
 - **`warlock dev` is persistent — `Ctrl+C` to stop.** The framework's `persistent: true` flag keeps the process alive after `action` returns. Same for `start`.
 - **`--fresh` only deletes the manifest, not the transpile cache.** If you're chasing a stale-compile bug, `rm -rf .warlock/` clears everything. The manifest restoring is what `--fresh` solves.
-- **`warlock build` does NOT run migrations.** Production bundles ship the migration files but don't apply them. Run `yarn warlock migrate` against the production DB separately.
-- **`warlock start` requires a built bundle.** Run `warlock build` first, or you'll spawn `node` against a non-existent file and crash immediately.
+- **`warlock build` does NOT run migrations.** Production bundles ship the migration files but don't apply them. Run `pnpm warlock migrate` against the production DB separately.
+- **`warlock start` requires a build it can vouch for.** Since 5.2 it refuses any `outdir` without the `.warlock-build.json` success marker — a hand-assembled `dist/`, or one left behind by a build that failed, is rejected by that reason instead of being spawned and crashing halfway through boot. Run `warlock build` first.
+- **Do not add `.warlock-build.json` to `.gitignore`-driven artifact pruning.** Stripping it from a `dist/` you ship makes `warlock start` refuse the artifact on the target host. Copy `outdir` whole.
 - **`outdir` is the directory, `outFile` is the filename within it.** A common mistake is putting the full path in one and leaving the other default — you end up with `<full-path>/app.js` or `dist/<full-path>`. They concatenate.
 - **`sourcemap: false` cascades to `start`.** Stack traces lose `.ts` precision. Keep sourcemaps on unless artifact size is a hard constraint.
 - **`NODE_ENV` is not set by these commands.** The deployment env (your Dockerfile, CI, hosting provider) sets it. Forget it on a production server and `Application.isProduction` returns `false`, which flips cookie security, CORS, logging — silently. Always set `NODE_ENV=production` in production deployments.
@@ -3776,7 +3832,7 @@ const config: MailConfigurations = {
 };
 ```
 
-Requires `@aws-sdk/client-sesv2` installed (`yarn add @aws-sdk/client-sesv2`).
+Requires `@aws-sdk/client-sesv2` installed (`pnpm add @aws-sdk/client-sesv2`).
 
 ## Mail modes
 
@@ -4052,7 +4108,7 @@ await Mail.to(user.email)
 
 - **`.send()` validates** — `to`, `subject`, and at least one of `text`/`html`/`component` are required. Missing any throws synchronously.
 - **`@react-email/render` is optional.** Without it you get the basic fallback (inline styles, no MSO conditionals). Install it for production-quality HTML.
-- **`nodemailer` is loaded lazily** at import time. If you see `nodemailer is not installed` errors, run `warlock add mail` (or `yarn add nodemailer`).
+- **`nodemailer` is loaded lazily** at import time. If you see `nodemailer is not installed` errors, run `warlock add mail` (or `pnpm add nodemailer`).
 - **`secure: true` requires port 465.** For port 587 use `secure: false` and `tls: true` (STARTTLS).
 - **Test mode is process-global.** Set it in `beforeAll`/`beforeEach`; reset with `setMailMode("production")` (or rely on test runner isolation).
 - **Per-mail handlers don't replace global ones** — both fire. Avoid double-counting metrics.
@@ -6613,16 +6669,25 @@ export default {
 
 ⚠ **Since 4.13.0 `http.trustProxy` defaults to `false`**, so `request.detectIp()` returns the socket address and **`X-Real-IP` / `X-Forwarded-For` are ignored unless you opt in.** Before 4.13.0 the default was `true`, which meant any client could set its own forwarding header and be believed.
 
-⚠ **Opt in with the narrowest shape your topology allows, not with `true`.** Since 4.15.0 `http.trustProxy` takes a hop count or a trusted-proxy list, and `detectIp()` resolves the chain the same way Fastify's `request.ip` does:
+⚠ **Opt in with the narrowest shape your topology allows, not with `true`.** `http.trustProxy` takes a trusted-proxy list, and `detectIp()` resolves the chain the same way Fastify's `request.ip` does:
 
 | `http.trustProxy` | Client IP |
 | --- | --- |
 | `false` *(default)* | Socket peer address |
-| `2` | Walks past the 2 rightmost `X-Forwarded-For` hops — for an edge that **appends** (the usual case: nginx, ALB, most CDNs) |
-| `"10.0.0.0/8"` / `["10.0.0.0/8", "192.168.0.0/16"]` | Walks left while each hop is a listed proxy |
+| `"10.0.0.0/8"` / `"loopback, 10.0.0.0/8"` / `["10.0.0.0/8", "192.168.0.0/16"]` | Walks left while each hop is a listed proxy, stops at the first that isn't |
+| `(address, hop) => boolean` | Your own predicate |
 | `true` | Trusts the whole chain — the leftmost hop, i.e. **whatever the client put there** if your edge appends rather than overwrites |
 
-With `true`, any client that can reach the process directly picks its own IP and this allowlist is decorative. `X-Real-IP` is honoured only under `true` — it carries no chain to check a hop count or proxy list against — so if your edge sets only that header, have it set `X-Forwarded-For` too.
+⚠ **Since 5.2 the value is validated at boot, and a hop count is refused.** The accepted shapes are exactly `boolean`, a non-empty string (comma-separated IPs/CIDRs), a non-empty `string[]`, and an `(address, hop) => boolean` predicate. Missing or nullish means `false`. Anything else — a **number**, `""`, `[]`, a mixed array, a plain object — throws a `TypeError` while the HTTP server is being constructed instead of being silently coerced:
+
+```
+Invalid http.trustProxy configuration: expected a boolean, a non-empty IP/CIDR string,
+a non-empty string array, or a predicate function; received number.
+```
+
+A hop count (`trustProxy: 2`) used to be documented as the shape to prefer. It is now refused **loudly**, because the Fastify version Warlock builds against treats a number as always-false at runtime: it silently degraded to "trust nothing" rather than walking past your proxies. Express the same topology as a proxy list (`"10.0.0.0/8"`) or a predicate.
+
+With `true`, any client that can reach the process directly picks its own IP and this allowlist is decorative. `X-Real-IP` is honoured only under `true` — it carries no chain to check a proxy list against — so if your edge sets only that header, have it set `X-Forwarded-For` too.
 
 ```ts
 import { middleware } from "@warlock.js/core";
@@ -6796,7 +6861,7 @@ What it does at save time:
 | Existing row, password unchanged | Pass through (no re-hashing — stored hash preserved). |
 | Empty / undefined value         | Pass through untouched.                     |
 
-Calls `authService.hashPassword(String(value))` under the hood — same bcryptjs path as the standalone `hashPassword()` helper. See [`hash-password/SKILL.md`](../hash-password/SKILL.md) for full bcrypt setup (salt rounds, `yarn add bcryptjs`).
+Calls `authService.hashPassword(String(value))` under the hood — same bcryptjs path as the standalone `hashPassword()` helper. See [`hash-password/SKILL.md`](../hash-password/SKILL.md) for full bcrypt setup (salt rounds, `pnpm add bcryptjs`).
 
 ### Why declarative wins
 
@@ -6950,7 +7015,7 @@ Rule of thumb: transformers are for **pure, deterministic** transforms of the ro
 
 ## See also
 
-- [`hash-password/SKILL.md`](../hash-password/SKILL.md) — the bcrypt setup that `useHashedPassword` calls under the hood; salt rounds, `yarn add bcryptjs`.
+- [`hash-password/SKILL.md`](../hash-password/SKILL.md) — the bcrypt setup that `useHashedPassword` calls under the hood; salt rounds, `pnpm add bcryptjs`.
 - [`use-repository/SKILL.md`](../use-repository/SKILL.md) — where `create` / `save` calls happen that trigger the transformers.
 - [`define-resource/SKILL.md`](../define-resource/SKILL.md) — filtering transformed fields (`password`) out of API responses.
 - [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — schema files live in `src/app/<module>/models/<entity>/<entity>.model.ts`.
@@ -7013,7 +7078,7 @@ Five lines do the heavy lifting:
 4. **`defaultOptions`** — applied to every call (`orderBy`, default `limit`, etc.).
 5. **`new FaqsRepository()`** singleton — import this everywhere; never instantiate again.
 
-The class is intentionally private — only the singleton escapes the module. Scaffold with `yarn warlock generate.repository <module>/<entity>`.
+The class is intentionally private — only the singleton escapes the module. Scaffold with `pnpm warlock generate.repository <module>/<entity>`.
 
 ## The `filterBy` rules
 
@@ -7612,7 +7677,7 @@ Two pieces, always:
 
 No separate `*.request.ts` alias file. `RequestHandler<Request<TSchema>>` types `request.validated()` directly off the schema's inferred type.
 
-Scaffold with `yarn warlock generate.controller <module>/<action> --with-validation`. If the scaffolder emits a `requests/<action>.request.ts` file, delete it — the inline pattern is the convention.
+Scaffold with `pnpm warlock generate.controller <module>/<action> --with-validation`. If the scaffolder emits a `requests/<action>.request.ts` file, delete it — the inline pattern is the convention.
 
 ## The `v.*` factory surface
 
@@ -7999,7 +8064,7 @@ Cascade uses `@RegisterModel()` for the model registry and `@BelongsTo` / `@HasM
 
 ---
 name: warlock-doctor
-description: 'Run `warlock doctor` — a read-only diagnostics command that checks routes / config / connectors / optional-peers / health endpoints / release hygiene and prints a pass/warn/fail report, exiting non-zero on any failure. Add your own probe with the `DoctorCheck` contract and `runChecks` / `formatReportLines`. Triggers: `warlock doctor`, `doctorCommand`, `DoctorCheck`, `CheckResult`, `CheckStatus`, `DoctorReport`, `runChecks`, `formatReportLines`, `printReport`, `defaultDoctorChecks`; "diagnose my app", "preflight / preflight check", "is the app healthy", "why are there 0 routes", "pre-release sanity check", "CI smoke check"; run as `yarn warlock doctor`. Skip: the live `/health` + `/ready` HTTP probes — `@warlock.js/core/health-checks/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; releasing the package — `releasing-warlock-monorepo`; competing tools `npm doctor`, `nest info`, hand-rolled preflight scripts.'
+description: 'Run `warlock doctor` — a read-only diagnostics command that checks routes / config / connectors / optional-peers / health endpoints / release hygiene and prints a pass/warn/fail report, exiting non-zero on any failure. Add your own probe with the `DoctorCheck` contract and `runChecks` / `formatReportLines`. Triggers: `warlock doctor`, `doctorCommand`, `DoctorCheck`, `CheckResult`, `CheckStatus`, `DoctorReport`, `runChecks`, `formatReportLines`, `printReport`, `defaultDoctorChecks`; "diagnose my app", "preflight / preflight check", "is the app healthy", "why are there 0 routes", "pre-release sanity check", "CI smoke check"; run as `pnpm warlock doctor`. Skip: the live `/health` + `/ready` HTTP probes — `@warlock.js/core/health-checks/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; releasing the package — `releasing-warlock-monorepo`; competing tools `npm doctor`, `nest info`, hand-rolled preflight scripts.'
 ---
 
 # Warlock — `warlock doctor`
@@ -8007,7 +8072,7 @@ description: 'Run `warlock doctor` — a read-only diagnostics command that chec
 `warlock doctor` is a read-only preflight. It boots the app far enough to introspect it — loads every config file and bootstrap code so routes and connectors register — but **starts no connectors**, so it never opens a database, cache, or socket connection. It then runs a set of checks and prints a grouped pass / warn / fail report.
 
 ```bash
-yarn warlock doctor
+pnpm warlock doctor
 ```
 
 ```
@@ -8110,7 +8175,7 @@ if (report.hasFailures) process.exit(report.exitCode);
 ### CI / pre-release gate
 
 ```bash
-yarn warlock doctor || exit 1   # non-zero exit fails the job
+pnpm warlock doctor || exit 1   # non-zero exit fails the job
 ```
 
 A red `release-hygiene` line catches the classic "bumped `package.json` but forgot the CHANGELOG heading" mistake before a publish.
@@ -8138,7 +8203,7 @@ A `⚠ routes: 0 routes registered` line is the tell that a route module threw o
 
 ---
 name: warlock-routes
-description: 'Run `warlock routes` — a read-only command that lists the registered HTTP routes as a verb-colored table (method / path / name / action / middleware-count / source), a sibling of `warlock doctor`. Filter with `--method` / `--path` / `--name`, or emit normalized rows as JSON with `--json`. Also covers `warlock routes:diff`, which compares live page routes against the last `warlock build`''s route snapshot and exits non-zero on drift. Triggers: `warlock routes`, `routesCommand`, `warlock routes:diff`, `routesDiffCommand`, "list my routes", "show all routes", "route table", "what endpoints does my app expose", "dump routes as JSON", "which routes have middleware", "route map for CI", "did my page routes drift from the last build"; run as `yarn warlock routes` / `yarn warlock routes:diff`. Skip: read-only health/preflight checks — `@warlock.js/core/warlock-doctor/SKILL.md`; defining/naming/grouping routes — `@warlock.js/core/register-route/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; competing tools `nest`/`express` route listers, `php artisan route:list`.'
+description: 'Run `warlock routes` — a read-only command that lists the registered HTTP routes as a verb-colored table (method / path / name / action / middleware-count / source), a sibling of `warlock doctor`. Filter with `--method` / `--path` / `--name`, or emit normalized rows as JSON with `--json`. Also covers `warlock routes:diff`, which compares live page routes against the last `warlock build`''s route snapshot and exits non-zero on drift. Triggers: `warlock routes`, `routesCommand`, `warlock routes:diff`, `routesDiffCommand`, "list my routes", "show all routes", "route table", "what endpoints does my app expose", "dump routes as JSON", "which routes have middleware", "route map for CI", "did my page routes drift from the last build"; run as `pnpm warlock routes` / `pnpm warlock routes:diff`. Skip: read-only health/preflight checks — `@warlock.js/core/warlock-doctor/SKILL.md`; defining/naming/grouping routes — `@warlock.js/core/register-route/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; competing tools `nest`/`express` route listers, `php artisan route:list`.'
 ---
 
 # Warlock — `warlock routes`
@@ -8146,7 +8211,7 @@ description: 'Run `warlock routes` — a read-only command that lists the regist
 `warlock routes` lists every registered HTTP route as a table. It's the read-only sibling of [`warlock doctor`](../warlock-doctor/SKILL.md): it boots the app far enough to register route modules — but **starts no connectors**, so it never opens a database, cache, or socket connection.
 
 ```bash
-yarn warlock routes
+pnpm warlock routes
 ```
 
 ```
@@ -8177,10 +8242,10 @@ The `METHOD` column is verb-colored (GET green, POST blue, PUT/PATCH yellow, DEL
 Optional, case-insensitive, AND-combined:
 
 ```bash
-yarn warlock routes --method GET     # -m  exact HTTP method
-yarn warlock routes --path /users    # -p  path substring
-yarn warlock routes --name users     # -n  route-name substring
-yarn warlock routes -m POST -p /users
+pnpm warlock routes --method GET     # -m  exact HTTP method
+pnpm warlock routes --path /users    # -p  path substring
+pnpm warlock routes --name users     # -n  route-name substring
+pnpm warlock routes -m POST -p /users
 ```
 
 ## JSON output
@@ -8188,7 +8253,7 @@ yarn warlock routes -m POST -p /users
 `--json` (`-j`) emits the normalized rows instead of the table — for `jq`, a CI diff, or a generated API map. Filters apply before serialization.
 
 ```bash
-yarn warlock routes --json
+pnpm warlock routes --json
 ```
 
 ```json
@@ -8202,7 +8267,7 @@ yarn warlock routes --json
 ### Audit which routes are guarded
 
 ```bash
-yarn warlock routes --json | jq '[.[] | select(.middleware == 0)]'
+pnpm warlock routes --json | jq '[.[] | select(.middleware == 0)]'
 ```
 
 Surfaces public routes (no middleware) — a quick check that auth-protected paths actually carry a guard.
@@ -8210,7 +8275,7 @@ Surfaces public routes (no middleware) — a quick check that auth-protected pat
 ### Confirm a route registered
 
 ```bash
-yarn warlock routes --name users.create
+pnpm warlock routes --name users.create
 ```
 
 An empty result means the route isn't registered — re-run `warlock dev` and read the boot error (the route-module loader is fail-loud, so a throwing route file aborts boot rather than being silently dropped).
@@ -8220,12 +8285,19 @@ An empty result means the route isn't registered — re-run `warlock dev` and re
 Compares the **live dev-server page routes** (`router.list().filter(r => r.isPage)`) against a **snapshot written by the last successful `warlock build`** (`page-routes.manifest.json` in `resolveBuildConfig().outdir`, e.g. `dist/page-routes.manifest.json`). Boots the same diagnostic way as `warlock routes` — route modules registered, no connectors started — then diffs.
 
 ```bash
-yarn warlock routes:diff
+pnpm warlock routes:diff
 ```
 
 ```
 Page routes match (4 routes).
+Note: page names are compared as DERIVED by the build, so a clean diff does not prove
+that no route name collided at registration (the router appends `.<method>` to a name
+already claimed by another method). Run `warlock routes` to see the registered names.
 ```
+
+**A clean baseline is now expected immediately after a successful `warlock build`.** Through 5.1, running `routes:diff` on an untouched checkout right after a green build reported drift, because the manifest recorded the catch-all as `"*"` while the router serves it as `"/*"`. The manifest is now written through the router's own path normalizer, so the two sides agree and a clean tree reports clean. If you see drift on a tree you have not edited since building, that is a bug worth reporting — it is no longer the expected greeting.
+
+⚠ **What a clean diff does NOT prove.** The manifest records what each page's name was **derived** as, not what it was **registered** as. `warlock build` never boots connectors, so it cannot see the API routes a page name might collide with; when a name is already claimed by another method the router appends a `.<method>` suffix at registration, and the comparison accepts that suffix rather than reporting it as drift. So `Page routes match` means *the page surface did not move since the build* — it does not mean *no page route name collided*. Use `warlock routes` to see the names as actually registered.
 
 or, on drift:
 
@@ -8591,7 +8663,7 @@ export default command({
 });
 ```
 
-Run it: `yarn warlock users.promote --email=hasan@example.com` (or `yarn warlock up -e hasan@example.com`).
+Run it: `pnpm warlock users.promote --email=hasan@example.com` (or `pnpm warlock up -e hasan@example.com`).
 
 ## `CLICommandOptions` — the factory input
 
@@ -9123,12 +9195,12 @@ export default seeder({
 Run them:
 
 ```bash
-yarn warlock seed                            # discover + run all
-yarn warlock seed --list                     # show registry, don't run
-yarn warlock seed --path=src/app/roles/seeds/default-roles.seed.ts  # one file
-yarn warlock seed --fresh                    # truncate every table first, then run all
-yarn warlock seed --drop                     # undo every tracked record, reset the log
-yarn warlock seed --drop=default-roles       # undo just one seeder's records
+pnpm warlock seed                            # discover + run all
+pnpm warlock seed --list                     # show registry, don't run
+pnpm warlock seed --path=src/app/roles/seeds/default-roles.seed.ts  # one file
+pnpm warlock seed --fresh                    # truncate every table first, then run all
+pnpm warlock seed --drop                     # undo every tracked record, reset the log
+pnpm warlock seed --drop=default-roles       # undo just one seeder's records
 ```
 
 `--fresh` truncates **every** table in the DB (`datasource.driver.truncateTable(table, { cascade: true })`), including the `seeds` tracking table. After `--fresh`, `once: true` seeds will run again.
@@ -9266,8 +9338,8 @@ Every record you `track()` is written to a `seed_records` table (created on firs
 `warlock seed --drop` reads those refs and undoes the seed:
 
 ```bash
-yarn warlock seed --drop                # undo every tracked record across all seeders
-yarn warlock seed --drop=default-roles  # undo just one seeder's records
+pnpm warlock seed --drop                # undo every tracked record across all seeders
+pnpm warlock seed --drop=default-roles  # undo just one seeder's records
 ```
 
 What it does, inside a single transaction:

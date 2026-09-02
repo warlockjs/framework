@@ -125,4 +125,39 @@ describe("HttpConnector.start — port preflight ordering", () => {
       exitSpy.mock.invocationCallOrder[0],
     );
   });
+
+  it("writes the error to stderr when no terminal channel would print it", async () => {
+    // The whole reported defect: `log.fatal` fans out over `log.channels`, so
+    // in the ordinary production shape — a file channel only, or no `log`
+    // config at all, which leaves the list empty — the fatal reached ZERO
+    // destinations and the process exited 1 having written nothing. Piping the
+    // child's streams in the supervisor could never fix that; there was
+    // nothing on them to pipe.
+    config.set("http", { port, host });
+
+    const originalChannels = log.channels;
+    log.channels = [];
+
+    const error = new PortInUseError(port, host);
+
+    preflightMock.assertPortIsAvailable.mockImplementation(async () => {
+      throw error;
+    });
+
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(log, "flush").mockImplementation(async () => {});
+    vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+    const server = startHttpServer();
+    const connector = new TestHttpConnector();
+    connector.setHttp(server);
+
+    try {
+      await connector.start();
+
+      expect(errorSpy).toHaveBeenCalledWith(error);
+    } finally {
+      log.channels = originalChannels;
+    }
+  });
 });

@@ -87,7 +87,14 @@ pnpm warlock routes:diff
 
 ```
 Page routes match (4 routes).
+Note: page names are compared as DERIVED by the build, so a clean diff does not prove
+that no route name collided at registration (the router appends `.<method>` to a name
+already claimed by another method). Run `warlock routes` to see the registered names.
 ```
+
+**A clean baseline is now expected immediately after a successful `warlock build`.** Through 5.1, running `routes:diff` on an untouched checkout right after a green build reported drift, because the manifest recorded the catch-all as `"*"` while the router serves it as `"/*"`. The manifest is now written through the router's own path normalizer, so the two sides agree and a clean tree reports clean. If you see drift on a tree you have not edited since building, that is a bug worth reporting — it is no longer the expected greeting.
+
+⚠ **What a clean diff does NOT prove.** The manifest records what each page's name was **derived** as, not what it was **registered** as. `warlock build` never boots connectors, so it cannot see the API routes a page name might collide with; when a name is already claimed by another method the router appends a `.<method>` suffix at registration, and the comparison accepts that suffix rather than reporting it as drift. So `Page routes match` means *the page surface did not move since the build* — it does not mean *no page route name collided*. Use `warlock routes` to see the names as actually registered.
 
 or, on drift:
 

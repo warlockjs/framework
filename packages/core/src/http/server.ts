@@ -1,52 +1,62 @@
 import config from "@mongez/config";
-import { log } from "@warlock.js/logger";
 import Fastify, { type FastifyServerOptions } from "fastify";
+import { normalizeRequestPath } from "../router/normalize-request-path";
 
 export type FastifyInstance = ReturnType<typeof Fastify>;
 
 // Instantiate Fastify server
 let server: FastifyInstance | undefined = undefined;
 
-/**
- * Warn when `http.trustProxy` is a number.
- *
- * Fastify refuses hop-count trust outright and returns no trust at all
- * (`lib/request.js`, `getTrustProxyFn`) — a hop count cannot validate the
- * immediate peer, so honouring one would let a direct client spoof
- * `X-Forwarded-*` by supplying enough hops.
- *
- * Failing closed is the right call, but it is SILENT, and silence is the whole
- * defect: a number reads like bounded trust and delivers none. Behind a real
- * proxy every client then resolves to the PROXY's address, which collapses
- * ip-filter allowlists, rate-limit buckets and idempotency scoping onto a
- * single key. That is a correctness and availability failure, not a security
- * one — but nothing tells the operator it is happening.
- *
- * Boot is the only honest place to say so: the value is inert from the first
- * request onward, so there is no later moment where the mistake surfaces.
- */
-function warnOnInertTrustProxy(trustProxy: unknown): void {
-  if (typeof trustProxy !== "number") return;
+/** Fastify's accepted, non-null `trustProxy` configuration shape. */
+type TrustProxy = NonNullable<FastifyServerOptions["trustProxy"]>;
+type TrustProxyPredicate = (address: string, hop: number) => boolean;
 
-  log.warn(
-    "http",
-    "config",
-    `http.trustProxy is set to the number ${trustProxy}, which grants NO proxy trust — ` +
-      `Fastify refuses hop-count trust because a hop count cannot validate the immediate peer. ` +
-      `request.ip will stay the socket peer, so behind a proxy every client resolves to the ` +
-      `proxy's address and ip-filter allowlists, rate-limit buckets and idempotency scoping ` +
-      `collapse onto one key. Name your proxies instead — http.trustProxy: "10.0.0.0/8" (an IP, ` +
-      `CIDR block, or list of them), or true if nothing but your edge can reach this process.`,
+function isTrustProxyPredicate(value: unknown): value is TrustProxyPredicate {
+  return typeof value === "function";
+}
+
+function isTrustProxyList(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((entry) => typeof entry === "string" && entry.trim().length > 0)
   );
 }
-export function startHttpServer(options?: FastifyServerOptions): FastifyInstance {
-  // `config.set(key, undefined)` stores null rather than unsetting, so an app
-  // that clears a key would otherwise hand Fastify `null` and crash the boot.
-  const trustProxy: unknown = config.get("http.trustProxy", false);
 
-  warnOnInertTrustProxy(trustProxy);
+function resolveTrustProxy(value: unknown): TrustProxy {
+  if (value === undefined || value === null) return false;
+
+  if (typeof value === "boolean" || isTrustProxyPredicate(value)) return value;
+
+  if (typeof value === "string" && value.trim().length > 0) return value;
+
+  if (isTrustProxyList(value)) return value;
+
+  const received = Array.isArray(value) ? "array" : typeof value;
+
+  throw new TypeError(
+    "Invalid http.trustProxy configuration: expected a boolean, a non-empty IP/CIDR string, " +
+      `a non-empty string array, or a predicate function; received ${received}.`,
+  );
+}
+
+function normalizeRequestUrl(url: string): string {
+  const queryIndex = url.indexOf("?");
+
+  if (queryIndex === -1) return normalizeRequestPath(url);
+
+  return normalizeRequestPath(url.slice(0, queryIndex)) + url.slice(queryIndex);
+}
+
+export function startHttpServer(
+  options?: FastifyServerOptions,
+): FastifyInstance {
+  // `config.set(key, undefined)` stores null rather than unsetting, so an app
+  // that clears a key is treated the same as an app that never configured it.
+  const trustProxy = resolveTrustProxy(config.get("http.trustProxy", false));
 
   const bodyLimit = config.get("http.bodyLimit") ?? undefined;
+  const configuredRewriteUrl = options?.rewriteUrl;
 
   return (server = Fastify({
     // `X-Forwarded-For` is client-settable and spoofable, and `request.ip` is
@@ -54,16 +64,8 @@ export function startHttpServer(options?: FastifyServerOptions): FastifyInstance
     // makes rate limiting bypassable on any deployment NOT behind a proxy that
     // strips the header. Apps behind such a proxy opt in explicitly.
     //
-    // The value is passed through untouched, so this resolves exactly as
-    // Fastify does: `true`, a CIDR/IP list (string, comma-separated string or
-    // array), or a predicate. `request.detectIp()` reads the client off
-    // `request.ip`, so it walks the chain the same way.
-    //
-    // NOT a hop count: Fastify refuses numeric trustProxy outright and returns
-    // no trust (`lib/request.js`, `getTrustProxyFn`) — a hop count cannot
-    // validate the immediate peer, so a direct client could spoof
-    // `X-Forwarded-*` by supplying enough hops. A number therefore fails closed
-    // and SILENTLY does nothing; name your proxies with the list form instead.
+    // Validated shapes resolve exactly as Fastify does: `true`, a CIDR/IP list
+    // (string, comma-separated string or array), or a predicate.
     trustProxy,
     // No default: an app that configures nothing keeps Fastify's own 1MB limit
     // rather than the historical 200GB, which silently removed the protection
@@ -74,8 +76,22 @@ export function startHttpServer(options?: FastifyServerOptions): FastifyInstance
     // Close idle keep-alive connections on shutdown while letting in-flight
     // requests finish — the basis for graceful draining. Override via
     // `http.gracefulShutdown.forceCloseConnections`.
-    forceCloseConnections: config.get("http.gracefulShutdown.forceCloseConnections", "idle"),
+    forceCloseConnections: config.get(
+      "http.gracefulShutdown.forceCloseConnections",
+      "idle",
+    ),
     ...options,
+    // Fastify calls this before route matching in both production `scan()` and
+    // the development wildcard dispatcher. Compose an app-supplied rewrite
+    // first, then apply the one framework request-path normalizer so the two
+    // modes cannot disagree about a terminal slash.
+    rewriteUrl(request) {
+      const rewritten = configuredRewriteUrl
+        ? configuredRewriteUrl.call(this, request)
+        : (request.url ?? "/");
+
+      return normalizeRequestUrl(rewritten);
+    },
   }));
 }
 

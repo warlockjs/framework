@@ -2,13 +2,14 @@ import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const spawn = vi.fn();
+const devLogError = vi.fn();
 
 vi.mock("node:child_process", () => ({
   spawn: (...args: unknown[]) => spawn(...args),
 }));
 
 vi.mock("../../../src/dev-server/dev-logger", () => ({
-  devLogError: () => {},
+  devLogError: (...args: unknown[]) => devLogError(...args),
   devLogWarn: () => {},
   devServeLog: () => {},
 }));
@@ -240,6 +241,33 @@ describe("supervisor", () => {
 
       expect(spawn).toHaveBeenCalledTimes(4);
       expect(exit).toHaveBeenCalledWith(1);
+      expect(devLogError).toHaveBeenCalledOnce();
+      expect(devLogError).toHaveBeenCalledWith(
+        expect.stringContaining("not restarting again"),
+      );
+    });
+
+    it("ignores a stale worker exit while its healthy successor remains active", () => {
+      const time = clock();
+
+      void superviseDevServer(time.now);
+
+      time.advance(6_000);
+      workers[0].emit("exit", 1, null);
+
+      expect(spawn).toHaveBeenCalledTimes(2);
+
+      // Model delayed stale lifecycle delivery after the replacement has been
+      // running healthily. It must not consume the current worker's crash
+      // budget or produce a terminal status for that live worker.
+      time.advance(6_000);
+      for (let event = 0; event < 3; event++) {
+        workers[0].emit("exit", 1, null);
+      }
+
+      expect(spawn).toHaveBeenCalledTimes(2);
+      expect(exit).not.toHaveBeenCalled();
+      expect(devLogError).not.toHaveBeenCalled();
     });
 
     it("forgives crashes that have aged out of the window", () => {

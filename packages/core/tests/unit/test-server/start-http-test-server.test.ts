@@ -166,7 +166,7 @@ describe("startHttpTestServer", () => {
     expect(explicitPort).not.toBe(envPort);
   });
 
-  it("fails the preflight with an actionable message, not EADDRINUSE, when the port is held", async () => {
+  it("fails the preflight with an actionable message that also names EADDRINUSE, when the port is held", async () => {
     holder = await holdPort(envPort);
 
     const error = await startHttpTestServer().catch((thrown: unknown) => thrown);
@@ -177,7 +177,9 @@ describe("startHttpTestServer", () => {
     assert(error instanceof PortInUseError);
     expect(error.message).toContain(`Port ${envPort} is already in use`);
     expect(error.message).toContain("Stop the dev server");
-    expect(error.message).not.toContain("EADDRINUSE");
+    // Named up front, not hidden behind the actionable instruction — see
+    // `PortInUseError` in `port-preflight.ts`.
+    expect(error.message).toContain("EADDRINUSE");
     // nothing bound — the late phase never ran
     expect(fixture.portAtLatePhase).toBeUndefined();
   });

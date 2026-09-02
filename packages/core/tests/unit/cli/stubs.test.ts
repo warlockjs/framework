@@ -178,4 +178,28 @@ describe("web starter stubs", () => {
     expect(webContactControllerStub).toContain("contactController.validation = { schema: contactSchema }");
     expect(webContactRoutesStub).toContain('router.post("/api/contact", contactController)');
   });
+
+  it("maps Core's `errors: Array<{input,error}>` validation shape onto form.setErrors, with a message fallback", () => {
+    expect(webHomePageStub).toContain(
+      "errors?: Array<{ input: string; error: string }>;",
+    );
+    expect(webHomePageStub).toContain(
+      "(body.errors ?? []).map(({ input, error }) => [input, error])",
+    );
+    expect(webHomePageStub).toContain(
+      'setSubmitError(body.message ?? "Please correct the highlighted fields.")',
+    );
+    // Not the old, incorrect Record<string, string | string[]> shape.
+    expect(webHomePageStub).not.toContain("Record<string, string | string[]>");
+  });
+
+  it("keeps the presentational `label` prop out of useFormControl and the native <input>", () => {
+    expect(webHomePageStub).toContain(
+      "function TextInput({ label, ...controlProps }: FormControlProps & { label: string }) {",
+    );
+    expect(webHomePageStub).toContain("useFormControl(controlProps)");
+    expect(webHomePageStub).toContain("<label htmlFor={controlProps.name}>{label}</label>");
+    // useFormControl/getInputProps must never receive the raw props object containing `label`.
+    expect(webHomePageStub).not.toContain("useFormControl(props)");
+  });
 });

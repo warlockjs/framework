@@ -78,6 +78,11 @@ describe("superviseProductionProcess", () => {
       [...stderr, ...stdout].filter((line) => line.includes("warlock start failed")),
     ).toHaveLength(1);
     expect(stdout.join("\n")).not.toContain("production server started");
+
+    // Node's own ERR_MODULE_NOT_FOUND trace is real output the child wrote
+    // before dying, so the summary is allowed to point at it.
+    expect(stderr.join("\n")).toContain("cause is printed above");
+    expect(stderr.join("\n")).not.toContain("no output was captured");
   });
 
   it("forces a non-zero exit when the child exits 0 without ever booting", async () => {
@@ -88,6 +93,12 @@ describe("superviseProductionProcess", () => {
 
     expect(result).toEqual({ exitCode: 1, ready: false });
     expect(stdout.join("\n")).not.toContain("production server started");
+
+    // `silent-exit-app.mjs` writes nothing to either stream before calling
+    // `process.exit(0)`, so claiming "the cause is printed above" would send
+    // the developer looking for output that was never there.
+    expect(stderr.join("\n")).toContain("no output was captured");
+    expect(stderr.join("\n")).not.toContain("cause is printed above");
   });
 
   it("notes a missing readiness signal on stderr only, never on stdout", async () => {

@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
-## Unreleased
+## 5.2.0
 
 ### Added
 
@@ -27,14 +27,94 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   whose `path`/`name` moved but whose `source` file didn't is reported as one
   `changed` line instead of a `removed` + `added` pair.
 
+  **A clean baseline is reported immediately after a successful build.** The manifest
+  is written through the router's own path normalizer, so the catch-all page route is
+  recorded the way the router registers it (`/*`) rather than the way discovery derives
+  it (`*`) — an untouched checkout right after a green `warlock build` reports
+  `Page routes match`, where an earlier draft of this command reported drift on the
+  first run every time.
+
+  ⚠ **What a clean diff does not prove.** The manifest records what each page's route
+  name was *derived* as, not what it was *registered* as: `warlock build` boots no
+  connectors, so it cannot see the API routes a page name may collide with, and the
+  router appends a `.<method>` suffix to a name another method already claimed —
+  which the comparison accepts rather than reporting. `Page routes match` therefore
+  means the page surface has not moved since the build; it does **not** mean no page
+  route name collided at registration. The clean-run output says so in a trailing note,
+  and `warlock routes` shows the names as actually registered
+
 ### Changed
+
+- **Incoming routes now match with or without one trailing slash in both
+  development and production.** `/about` and `/about/` dispatch to the same
+  route; `/` remains `/`, query strings are preserved, and case matching is
+  unchanged. Both router paths call the same request-path normalizer before
+  matching instead of relying on different Fastify/find-my-way defaults.
+
+- ⚠ **BREAKING — `http.trustProxy` is validated at boot, and a number is refused.** The
+  accepted shapes are exactly `boolean`, a non-empty string (a single IP/CIDR or several
+  comma-separated), a non-empty `string[]`, and an `(address, hop) => boolean` predicate;
+  a missing or nullish value means `false`. Anything else — a number, `""`, `[]`, an array
+  with a non-string entry, a plain object — now throws a `TypeError` while the HTTP server
+  is being constructed, before Fastify is instantiated, instead of being handed through
+  and silently coerced
+
+  ```
+  Invalid http.trustProxy configuration: expected a boolean, a non-empty IP/CIDR string,
+  a non-empty string array, or a predicate function; received number.
+  ```
+
+  ⚠ **The hop-count shape 4.16.0 introduced and recommended (`http.trustProxy: 2`) no
+  longer boots.** The Fastify version this release builds against evaluates a numeric
+  `trustProxy` as always-false at runtime, so a hop count never walked past your proxies —
+  it silently degraded to "trust nothing" while reading like a configured proxy chain, and
+  `detectIp()` returned the socket peer for every request. Refusing it loudly is the only
+  honest option: **migrate a hop count to a trusted-proxy list (`"10.0.0.0/8"`) or a
+  predicate before upgrading.** `true`, a list, and a predicate are unaffected
+
+- **`warlock build` writes into a temporary directory and promotes it only on success.**
+  The build no longer writes into `outdir` as it goes. It builds into a hidden sibling
+  directory (`.<outdir-basename>.build-<hex>`, same volume so the promotion is a rename),
+  writes a `.warlock-build.json` success marker (`{ status, builtAt }`) as its last step,
+  then swaps the directory into place. **A successful build therefore leaves no stale
+  files** — `outdir` is replaced wholesale rather than merged over, so an artifact a
+  previous build emitted and this one did not is gone. **A failed build leaves no usable
+  `dist`** — the temp directory is removed and the error rethrown without `outdir` ever
+  being touched, so a previous good build survives intact and no half-written one takes
+  its place
+
+- **`warlock start` refuses a `dist` that was not produced by a successful build**, and
+  names that as the reason. It checks for the `.warlock-build.json` marker in `outdir`
+  before spawning anything; missing, unreadable, malformed, or `status !== "success"` all
+  exit `1` on stderr with
+
+  ```
+  ✖ "dist" was not produced by a successful `warlock build` run (no build-success marker found). Run `warlock build` before `warlock start`.
+  ```
+
+  Never built, a build that failed before promotion, and a hand-assembled directory are
+  deliberately not distinguished — the fix for all three is the same command. Previously
+  `start` spawned whatever happened to be sitting in `outdir` and failed somewhere inside
+  the boot instead. ⚠ Ship `outdir` whole: an artifact pipeline that prunes dotfiles
+  strips the marker and makes the build unstartable on the target host
+
+- **`warlock start` surfaces the child process's real output on a failed boot.** The
+  production supervisor forwards every stdout/stderr chunk from the spawned bundle
+  verbatim and live, and its failure summary now reports whether a cause actually arrived:
+  `the cause is printed above, in the application's own output` when output was seen, and
+  `no output was captured from the application process — its cause did not reach this
+  terminal` when none was. It previously pointed at "above" unconditionally, which on a
+  silent child meant pointing at an empty terminal
 
 - **The HTTP connector now preflights its port before binding.** `warlock dev` and
   `warlock start` both go through `HttpConnector.start()`, which now calls
   `assertPortIsAvailable(port, host)` immediately before `listen()`. A collision now
-  surfaces as `Port <port> is already in use on <host>. Stop the dev server (or
-  whatever else is listening on port <port>) and run again...` instead of a raw
-  `EADDRINUSE` thrown from inside Fastify. The test server (`startHttpTestServer`)
+  surfaces as `EADDRINUSE: Port <port> is already in use on <host>. Stop the dev server
+  (or whatever else is listening on port <port>) and run again...` — the code and the
+  port named in the same sentence — instead of a bare `EADDRINUSE` thrown from inside
+  Fastify with no indication of which port it meant. `EACCES` on the port is treated
+  the same way, since "cannot bind" is one problem from the operator's side. The test
+  server (`startHttpTestServer`)
   already preflighted its port before this release; this brings `dev`/`start` to the
   same behavior.
 - **`startHttpTestServer()` now runs `Application.runStartupValidators()`** — the

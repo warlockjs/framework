@@ -101,6 +101,24 @@ describe("ProductionBuilder.generateEntryPoint — D7 boot-order wiring", () => 
     expect(latePhaseIndex).toBeGreaterThan(validatorsIndex);
   });
 
+  it("preflights the http port after the config loader and before the early phase", async () => {
+    const content = await generatedEntryContent(NO_APP_FILES);
+
+    const configLoaderIndex = content.indexOf('import "./config-loader";');
+    const preflightIndex = content.indexOf("await preflightConfiguredHttpPort();");
+    const earlyPhaseIndex = content.indexOf(
+      "await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);",
+    );
+
+    // The port is the cheapest thing in the boot to check and the one most
+    // likely to be wrong; checking it after the early phase — which is where
+    // the late-phase http connector's own preflight lands — pays for a
+    // database and cache connection before reporting a busy port.
+    expect(configLoaderIndex).toBeGreaterThan(-1);
+    expect(preflightIndex).toBeGreaterThan(configLoaderIndex);
+    expect(earlyPhaseIndex).toBeGreaterThan(preflightIndex);
+  });
+
   it("does not introduce a new import — Application is already imported for early-phase startup", async () => {
     const content = await generatedEntryContent({
       locales: false,
@@ -118,7 +136,9 @@ describe("ProductionBuilder.generateEntryPoint — D7 boot-order wiring", () => 
       'import "./config-loader";',
       'import { registerConfiguredConnectors } from "@warlock.js/core";',
       'import warlockConfig from "../../warlock.config";',
-      'import { Application, connectorsManager, ConnectorLifecyclePhase } from "@warlock.js/core";',
+      // `preflightConfiguredHttpPort` rides the import the entry already has
+      // rather than adding a sixth line — it comes from the same package.
+      'import { Application, connectorsManager, ConnectorLifecyclePhase, preflightConfiguredHttpPort } from "@warlock.js/core";',
     ]);
   });
 });

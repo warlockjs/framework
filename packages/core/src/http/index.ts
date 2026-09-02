@@ -15,6 +15,7 @@ export * from "./errors";
 export * from "./middleware";
 export * from "./plugins";
 // port preflight
+export * from "./boot-port-preflight";
 export * from "./port-preflight";
 // the recorded result of a successful bind, rendered by the dev ready block
 export * from "./ready-report";

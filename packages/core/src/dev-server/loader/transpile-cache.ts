@@ -23,7 +23,7 @@
  *   if (!hit) cache.put(key, { code, map });
  */
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   mkdirSync,
   readdirSync,
@@ -205,17 +205,36 @@ export class TranspileCache {
   }
 
   private atomicWrite(filePath: string, content: string): void {
-    const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+    const tempPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
     try {
       writeFileSync(tempPath, content);
       renameSync(tempPath, filePath);
     } catch (error) {
+      // Windows can report EPERM/EACCES when another loader process wins the
+      // rename to this content-addressed destination. The winner's file is a
+      // valid commit only when it contains the exact bytes we meant to store;
+      // otherwise preserve the original error instead of accepting corruption.
+      const code = (error as NodeJS.ErrnoException).code;
+      const mayBeConcurrentCommit =
+        code === "EEXIST" || code === "EPERM" || code === "EACCES";
+
+      if (!mayBeConcurrentCommit || !this.hasCommittedContent(filePath, content)) {
+        throw error;
+      }
+    } finally {
       try {
         rmSync(tempPath, { force: true });
       } catch {
-        // best effort — original error is the one that matters
+        // Best effort: a cleanup failure must not mask the rename result.
       }
-      throw error;
+    }
+  }
+
+  private hasCommittedContent(filePath: string, content: string): boolean {
+    try {
+      return readFileSync(filePath, "utf8") === content;
+    } catch {
+      return false;
     }
   }
 

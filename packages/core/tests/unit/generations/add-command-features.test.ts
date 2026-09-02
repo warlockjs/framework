@@ -1,9 +1,17 @@
-import { describe, expect, it } from "vitest";
-import {
+import { describe, expect, it, vi } from "vitest";
+
+const execSync = vi.fn();
+
+vi.mock("node:child_process", () => ({
+  execSync: (...args: unknown[]) => execSync(...args),
+}));
+
+const {
   allowedFeatures,
   featuresMap,
+  installDependencies,
   resolveWarlockDependencyVersions,
-} from "../../../src/generations/add-command.action";
+} = await import("../../../src/generations/add-command.action");
 import { INSTALLED_WARLOCK_VERSION } from "../../../src/generations/features/types";
 
 /**
@@ -82,5 +90,26 @@ describe("add command feature registry", () => {
       "@warlock.js/auth": "5.1.0",
       react: "^19.2.3",
     });
+  });
+});
+
+describe("add command dependency installation", () => {
+  it("passes declared versions and ranges to production and development installs", async () => {
+    await installDependencies(
+      "npm",
+      { react: "^19.2.3", "@warlock.js/web": "5.2.0" },
+      { typescript: "~5.8.3", "@types/react": "^19.0.0" },
+    );
+
+    expect(execSync).toHaveBeenNthCalledWith(
+      1,
+      "npm install react@^19.2.3 @warlock.js/web@5.2.0",
+      expect.objectContaining({ cwd: process.cwd(), stdio: "inherit" }),
+    );
+    expect(execSync).toHaveBeenNthCalledWith(
+      2,
+      "npm install typescript@~5.8.3 @types/react@^19.0.0 -D",
+      expect.objectContaining({ cwd: process.cwd(), stdio: "inherit" }),
+    );
   });
 });

@@ -18,7 +18,15 @@ import { appPath, rootPath, warlockPath } from "../utils";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 import { assertGeneratedImportsAreDeclared } from "./assert-generated-imports";
 import { dedupe, runEmitContributions, runGenerateContributions } from "./build-contributions";
+import { writeDistBuildManifestAsync } from "./dist-build-manifest";
 import { nativeNodeModulesPlugin } from "./esbuild-plugins";
+import {
+  commitDistAsync,
+  createTempOutputDir,
+  rollbackDistAsync,
+  stageDistAsync,
+  type StagedDist,
+} from "./promote-dist";
 import { resolveBuildConfig, type ResolvedBuildConfig } from "./resolve-build-config";
 import { toCamelCase, toKebabCase } from "@mongez/reinforcements";
 
@@ -108,6 +116,32 @@ export class ProductionBuilder {
 
   /**
    * Main build entry point
+   *
+   * The esbuild bundle is written into a TEMP directory next to the real
+   * output directory, never into it, and that directory is renamed over
+   * `outdir` as one filesystem operation — so `outdir` is never observed as
+   * a mix of the old build and the new one, and a build that fails before
+   * that rename never touches `outdir` at all.
+   *
+   * `this.options.outdir` is NOT repointed at the temp directory while that
+   * happens, and must never be. It is not merely a write target: consumers
+   * BAKE it into runtime output — `web`'s build contribution derives the
+   * `clientDir` recorded in its pages manifest from it
+   * (`web/src/build/contribution.ts`) — so a temp path reaching them
+   * produces an artifact whose browser paths point at a directory promotion
+   * has since renamed away. The temp path is passed explicitly, as a
+   * parameter, to the one operation that writes into it ({@link bundle});
+   * everything else, `buildContext()` included, keeps reading the final
+   * destination.
+   *
+   * That is also why promotion is STAGED rather than done at the very end.
+   * Connector `emit` hooks write real artifacts (the web client bundle) and
+   * see the final `outdir`, so they must run when `outdir` genuinely holds
+   * this build — after the rename, not before it, or promotion would replace
+   * the directory they just wrote into. The previous build is kept parked
+   * aside until they finish: `emit` throwing rolls the whole promotion back,
+   * and the build-success marker `warlock start` checks is written last of
+   * all, so a failure at any point leaves no `dist` that start will boot.
    */
   public async build(): Promise<void> {
     console.log(colors.cyan("Building for production...\n"));
@@ -115,37 +149,76 @@ export class ProductionBuilder {
     // Step 1: Initialize options from config
     await this.initializeOptions();
 
-    // Step 2: Generate combined files
-    await this.generateCombinedFiles();
+    const finalOutDir = this.options.outdir!;
+    const tempOutDir = createTempOutputDir(finalOutDir);
 
-    // Step 3: Generate entry point
-    await this.generateEntryPoint();
+    // Set once the temp directory has been renamed onto `finalOutDir`. Its
+    // presence is what tells the catch below whether a failure has a
+    // promotion to undo or only a temp directory to discard.
+    let staged: StagedDist | undefined;
 
-    // Step 4: Refuse to bundle code the app could not resolve at runtime
-    await this.assertGeneratedImports();
+    try {
+      // Step 2: Generate combined files
+      await this.generateCombinedFiles();
 
-    // Step 4.5: Drain the connectors' `generate` contributions
-    const contributed = await this.runGenerateContributions();
+      // Step 3: Generate entry point
+      await this.generateEntryPoint();
 
-    // Step 4.6: Re-assert over what the contributors just wrote.
-    //
-    // Step 4 only saw core's own generated files; a contributor writes its
-    // code (a pages barrel, say) AFTER that assertion, so an undeclared bare
-    // specifier in it reaches the bundle unchecked. Under
-    // `packages: "external"` that specifier survives verbatim into the
-    // artifact and dies as ERR_MODULE_NOT_FOUND at runtime — the same failure
-    // step 4 exists to prevent. Skipped when nothing contributed: re-globbing
-    // and re-reading the production dir is pure cost in the common case.
-    if (contributed) {
+      // Step 4: Refuse to bundle code the app could not resolve at runtime
       await this.assertGeneratedImports();
+
+      // Step 4.5: Drain the connectors' `generate` contributions
+      const contributed = await this.runGenerateContributions();
+
+      // Step 4.6: Re-assert over what the contributors just wrote.
+      //
+      // Step 4 only saw core's own generated files; a contributor writes its
+      // code (a pages barrel, say) AFTER that assertion, so an undeclared bare
+      // specifier in it reaches the bundle unchecked. Under
+      // `packages: "external"` that specifier survives verbatim into the
+      // artifact and dies as ERR_MODULE_NOT_FOUND at runtime — the same failure
+      // step 4 exists to prevent. Skipped when nothing contributed: re-globbing
+      // and re-reading the production dir is pure cost in the common case.
+      if (contributed) {
+        await this.assertGeneratedImports();
+      }
+
+      // Step 5: Bundle with esbuild into the temp directory. The ONLY
+      // operation handed that path — it is a write target, not config.
+      await this.bundle(tempOutDir);
+
+      // Step 5.5: Promote the bundle into `outdir`, keeping the previous
+      // build parked aside. `outdir` now holds exactly this build, so the
+      // steps below write into — and record — the real destination.
+      staged = await stageDistAsync(tempOutDir, finalOutDir);
+
+      // Step 5.6: Drain the connectors' `emit` contributions — after the
+      // bundle is in place (so what they write survives promotion and the
+      // paths they bake in resolve), and BEFORE step 6 deletes the
+      // production directory they may still read.
+      await runEmitContributions(this.connectors, this.buildContext());
+
+      // Step 5.7: Mark `dist` as a genuine, complete build — the one thing
+      // `warlock start` trusts. Written LAST on purpose: every earlier step
+      // can still fail, and until this file exists nothing will boot what
+      // they left behind.
+      await writeDistBuildManifestAsync(finalOutDir);
+
+      // Step 5.8: Commit — drop the parked previous build. Cannot throw.
+      await commitDistAsync(staged);
+    } catch (error) {
+      if (staged) {
+        // The promotion already happened; put the previous build back and
+        // take this half-finished one out of `outdir`.
+        await rollbackDistAsync(staged);
+      } else {
+        // Nothing this build produced ever reached `outdir` — discard the
+        // temp directory and leave `outdir` exactly as it was.
+        await removeDirectoryAsync(tempOutDir).catch(() => undefined);
+      }
+
+      throw error;
     }
-
-    // Step 5: Bundle with esbuild
-    await this.bundle();
-
-    // Step 5.5: Drain the connectors' `emit` contributions — after the
-    // bundle, and BEFORE step 6 deletes the directory they may still read.
-    await runEmitContributions(this.connectors, this.buildContext());
 
     // Step 6: Remove production folder
     await removeDirectoryAsync(this.productionDir);
@@ -503,9 +576,17 @@ bootstrap();
       `import warlockConfig from "${APP_ROOT_FROM_PRODUCTION_DIR}warlock.config";`,
       `registerConfiguredConnectors(warlockConfig.connectors ?? [], { expectedNames: [${expectedNames}] });`,
       "",
+      "// 2.6 Fail fast on a busy port. `http` is a LATE-phase connector, so its",
+      "//     own preflight is not reached until the database and cache have",
+      "//     connected and every app module has been imported — seconds of work",
+      "//     thrown away before anyone learns the port was taken. This probe is",
+      "//     a bind-and-release on a socket that is never served, and it reports",
+      "//     on stderr because no log channel is configured this early.",
+      'import { Application, connectorsManager, ConnectorLifecyclePhase, preflightConfiguredHttpPort } from "@warlock.js/core";',
+      "await preflightConfiguredHttpPort();",
+      "",
       "// 3. Start early-phase connectors (database, cache, logger, ...)",
       "//    so data sources, cache, etc. are ready before app code runs",
-      'import { Application, connectorsManager, ConnectorLifecyclePhase } from "@warlock.js/core";',
       "await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);",
     ];
 
@@ -568,12 +649,18 @@ bootstrap();
 
   /**
    * Bundle with esbuild
+   *
+   * @param writeOutDir the directory esbuild writes into — the build's
+   * private temp directory, NOT `options.outdir`. Taken as a parameter
+   * rather than read off `this.options` because the two are different paths
+   * with different meanings: `options.outdir` is the final destination every
+   * consumer bakes into the artifact, and this is only where bytes land
+   * before promotion moves them there.
    */
-  private async bundle(): Promise<void> {
+  private async bundle(writeOutDir: string): Promise<void> {
     console.log(colors.magenta("   Bundling with esbuild..."));
 
     const entryPoint = path.join(this.productionDir, "app.ts");
-    const outDir = this.options.outdir!;
     const outFileName = this.options.outFile!;
     // Strip extension so entryNames produces "<base>.js" via esbuild
     const entryName = path.basename(outFileName, path.extname(outFileName));
@@ -601,7 +688,7 @@ bootstrap();
     delete this.options.esmShim;
     delete this.options.banner;
 
-    await ensureDirectoryAsync(outDir);
+    await ensureDirectoryAsync(writeOutDir);
 
     const alias = this.buildAliasMapFromTsconfig();
 
@@ -678,13 +765,19 @@ bootstrap();
       // transpiles TC39 stage 3 decorators into helpers â€” Node does not
       // implement them natively yet.
       target: ["node22"],
-      outdir: outDir,
       entryNames: entryName,
       alias,
       plugins: [nativeNodeModulesPlugin],
       // Between the defaults and the user spread — the ruled precedence.
       ...contributedOptions,
       ...(this.options as any),
+      // AFTER the spread, and NOT overridable: `this.options.outdir` rides
+      // that spread carrying the FINAL destination, which is exactly where
+      // this build must not write yet. The final path is the user's setting
+      // and stays authoritative for everyone reading the config — it is only
+      // this one esbuild call that is redirected, and only until promotion
+      // moves the result onto that very path.
+      outdir: writeOutDir,
       // AFTER the spread for the same reason `banner` is: a spread replaces
       // these objects instead of merging them, so the merged values are
       // re-applied here. The user still wins — they were merged in last.

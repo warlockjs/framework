@@ -1,4 +1,5 @@
 import FindMyWay, { type HTTPMethod, type Instance } from "find-my-way";
+import { normalizeRequestPath } from "./normalize-request-path";
 import type { RequestMethod, Route } from "./types";
 
 /**
@@ -25,7 +26,10 @@ export class RouteRegistry {
 
   public constructor() {
     this.router = FindMyWay({
-      ignoreTrailingSlash: true,
+      // Request paths are normalized explicitly in `find`; leaving this off
+      // makes that shared normalizer, rather than a second router option, the
+      // reason development accepts a terminal slash.
+      ignoreTrailingSlash: false,
       caseSensitive: false,
     });
   }
@@ -68,7 +72,7 @@ export class RouteRegistry {
     url: string,
   ): { route: Route; params: Record<string, string> } | null {
     // Strip query string from URL (find-my-way expects just the path)
-    const path = url.split("?")[0];
+    const path = normalizeRequestPath(url.split("?")[0]);
 
     const match = this.router.find(method as HTTPMethod, path);
 

@@ -176,7 +176,7 @@ export async function addCommandAction(options: CommandActionData) {
  * Install the resolved dependency sets through the project's package manager.
  * Runs two passes (prod then dev) so each lands in the correct section.
  */
-async function installDependencies(
+export async function installDependencies(
   packageManager: PackageManager | undefined,
   dependencies: Record<string, string>,
   devDependencies: Record<string, string>,
@@ -187,7 +187,11 @@ async function installDependencies(
   if (Object.keys(dependencies).length > 0) {
     console.log(`Installing dependencies ${colors.magenta(Object.keys(dependencies).join(", "))}`);
 
-    execSync(`${packageManagerCommand} ${Object.keys(dependencies).join(" ")}`, {
+    const dependencySpecs = Object.entries(dependencies).map(
+      ([name, version]) => `${name}@${version}`,
+    );
+
+    execSync(`${packageManagerCommand} ${dependencySpecs.join(" ")}`, {
       cwd: process.cwd(),
       stdio: "inherit",
     });
@@ -202,7 +206,11 @@ async function installDependencies(
       `Installing dev dependencies ${colors.magenta(Object.keys(devDependencies).join(", "))}`,
     );
 
-    execSync(`${packageManagerCommand} ${Object.keys(devDependencies).join(" ")} -D`, {
+    const devDependencySpecs = Object.entries(devDependencies).map(
+      ([name, version]) => `${name}@${version}`,
+    );
+
+    execSync(`${packageManagerCommand} ${devDependencySpecs.join(" ")} -D`, {
       cwd: process.cwd(),
       stdio: "inherit",
     });

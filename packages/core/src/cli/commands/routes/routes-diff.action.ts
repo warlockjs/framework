@@ -4,13 +4,7 @@ import { resolveBuildConfig } from "../../../production/resolve-build-config";
 import { router } from "../../../router/router";
 import type { Route } from "../../../router/types";
 import { bootForDiagnostics } from "../doctor/boot-for-diagnostics";
-
-type PageRoute = {
-  method: "GET";
-  path: string;
-  name: string;
-  source: string;
-};
+import { comparePageRoutes, diffPageRoutes, type PageRoute } from "./diff-page-routes";
 
 type PageRoutesSnapshot = {
   version: 1;
@@ -19,6 +13,15 @@ type PageRoutesSnapshot = {
 
 const SNAPSHOT_FILE = "page-routes.manifest.json";
 
+/**
+ * What a clean `warlock routes:diff` does and does NOT prove, printed on a
+ * clean run so the guarantee is stated where it is relied on.
+ */
+const CLEAN_RUN_LIMIT =
+  "Note: page names are compared as DERIVED by the build, so a clean diff does not prove " +
+  "that no route name collided at registration (the router appends `.<method>` to a name " +
+  "already claimed by another method). Run `warlock routes` to see the registered names.";
+
 function routeFromLive(route: Route): PageRoute {
   return {
     method: route.method.toUpperCase() as "GET",
@@ -26,10 +29,6 @@ function routeFromLive(route: Route): PageRoute {
     name: route.name ?? "",
     source: route.sourceFile ?? "",
   };
-}
-
-function compare(left: PageRoute, right: PageRoute): number {
-  return left.path.localeCompare(right.path) || left.name.localeCompare(right.name);
 }
 
 function snapshotPath(): string {
@@ -81,7 +80,15 @@ function printRoute(prefix: string, route: PageRoute): void {
   console.log(`${prefix} GET ${route.path}  ${route.name}${source}`);
 }
 
-/** Compare the last successful production page surface with the live dev surface. */
+/**
+ * Compare the last successful production page surface with the live dev
+ * surface.
+ *
+ * The comparison itself lives in `diff-page-routes.ts`, which also documents
+ * why the route-name method suffix is the one registration-time difference the
+ * build-time manifest cannot record — and therefore what a clean run of this
+ * command does not prove.
+ */
 export async function routesDiffCommandAction(): Promise<void> {
   const snapshot = readSnapshot(snapshotPath());
   const context = await bootForDiagnostics();
@@ -102,54 +109,21 @@ export async function routesDiffCommandAction(): Promise<void> {
     );
   }
 
-  const live = router.list().filter((route) => route.isPage).map(routeFromLive).sort(compare);
-  const expected = [...snapshot.routes].sort(compare);
-  const remainingExpected = new Set(expected);
-  const remainingLive = new Set(live);
-  const changes: Array<{ before: PageRoute; after: PageRoute }> = [];
-
-  // Exact route identity is the comparison contract. A differing source is
-  // displayed only as context and must not make an otherwise identical route
-  // drift (a checkout can be relocated without changing its surface).
-  for (const before of expected) {
-    const after = live.find(
-      (candidate) =>
-        remainingLive.has(candidate) &&
-        candidate.method === before.method &&
-        candidate.path === before.path &&
-        candidate.name === before.name,
-    );
-
-    if (after) {
-      remainingExpected.delete(before);
-      remainingLive.delete(after);
-    }
-  }
-
-  // A stable source is diagnostic context, never itself a diff. It only groups
-  // a changed page into one useful line instead of a removal plus an addition.
-  for (const before of remainingExpected) {
-    const after = [...remainingLive].find(
-      (candidate) =>
-        remainingLive.has(candidate) && candidate.source !== "" && candidate.source === before.source,
-    );
-
-    if (after && (before.path !== after.path || before.name !== after.name)) {
-      changes.push({ before, after });
-      remainingExpected.delete(before);
-      remainingLive.delete(after);
-    }
-  }
-
-  const removed = [...remainingExpected].sort(compare);
-  const added = [...remainingLive].sort(compare);
+  const live = router
+    .list()
+    .filter((route) => route.isPage)
+    .map(routeFromLive)
+    .sort(comparePageRoutes);
+  const expected = [...snapshot.routes].sort(comparePageRoutes);
+  const { changes, removed, added } = diffPageRoutes(expected, live);
 
   if (changes.length === 0 && removed.length === 0 && added.length === 0) {
     console.log(`Page routes match (${expected.length} routes).`);
+    console.log(CLEAN_RUN_LIMIT);
     return;
   }
 
-  for (const { before, after } of changes.sort((left, right) => compare(left.before, right.before))) {
+  for (const { before, after } of changes) {
     printRoute("changed -", before);
     printRoute("        +", after);
   }

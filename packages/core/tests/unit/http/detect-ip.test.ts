@@ -21,7 +21,7 @@ vi.setConfig({ testTimeout: 120_000 });
  * `X-Forwarded-For` resolution is delegated to Fastify (`request.ip`), so the
  * chain tests below run against a live Fastify booted through the framework's
  * own `startHttpServer()` with a real socket peer address — asserting the
- * config value shapes end to end (`true`, hop count, CIDR list) rather than a
+ * config value shapes end to end (`true`, CIDR list) rather than a
  * re-implementation of the chain walk. `X-Real-IP` is not part of Fastify's
  * resolution and is asserted against a seeded `baseRequest`.
  */
@@ -124,7 +124,10 @@ describe("Request.detectIp", () => {
       config.set("http.trustProxy", true);
 
       const request = makeRequest({
-        headers: { "x-real-ip": "198.51.100.5", "x-forwarded-for": "203.0.113.9" },
+        headers: {
+          "x-real-ip": "198.51.100.5",
+          "x-forwarded-for": "203.0.113.9",
+        },
         ip: "10.0.0.1",
       });
 
@@ -145,7 +148,9 @@ describe("Request.detectIp", () => {
       expect(
         await detectIpThroughServer({
           trustProxy: true,
-          headers: { "x-forwarded-for": "203.0.113.9, 70.41.3.18, 150.172.238.178" },
+          headers: {
+            "x-forwarded-for": "203.0.113.9, 70.41.3.18, 150.172.238.178",
+          },
           remoteAddress: "10.0.0.1",
         }),
       ).toBe("203.0.113.9");
@@ -181,81 +186,13 @@ describe("Request.detectIp", () => {
     });
   });
 
-  describe("with a numeric http.trustProxy (grants NO trust)", () => {
-    /**
-     * These three cases previously asserted hop-count semantics — that
-     * `trustProxy: 1` lands on the entry the edge appended, `2` walks one
-     * further left, and so on. **Fastify does not do that, deliberately.**
-     *
-     * `fastify/lib/request.js`, `getTrustProxyFn`:
-     *
-     *     if (typeof tp === 'number') {
-     *       // Hop-count-only trust cannot validate the immediate peer. Fail
-     *       // closed so direct clients cannot spoof X-Forwarded-* values by
-     *       // supplying enough hops.
-     *       return function () { return false }
-     *     }
-     *
-     * So a number grants no trust and `request.ip` stays the socket peer.
-     * Verified against bare Fastify 5.12.1 — both through `inject` and against
-     * a real listening socket — with no Warlock code in the path.
-     *
-     * That is a SECURITY property and it was previously untested: the tests
-     * that stood here asserted its opposite, and would have gone green only if
-     * Warlock started honouring a hop count Fastify refuses. They now pin the
-     * real behaviour so a future change cannot loosen it unnoticed.
-     *
-     * The silent part is the defect, and it is a documentation one: a number
-     * looks like bounded trust and delivers none. See `http/types.ts`.
-     */
-    it("grants no trust for one hop — the socket peer wins over the whole chain", async () => {
-      expect(
-        await detectIpThroughServer({
-          trustProxy: 1,
-          headers: { "x-forwarded-for": "203.0.113.9, 198.51.100.7" },
-          remoteAddress: "10.0.0.1",
-        }),
-      ).toBe("10.0.0.1");
-    });
-
-    it("grants no trust for two hops either — a larger number is not more trust", async () => {
-      expect(
-        await detectIpThroughServer({
-          trustProxy: 2,
-          headers: { "x-forwarded-for": "203.0.113.9, 198.51.100.7" },
-          remoteAddress: "10.0.0.1",
-        }),
-      ).toBe("10.0.0.1");
-    });
-
-    it("cannot be widened by inflating the hop count past the chain length", async () => {
-      expect(
-        await detectIpThroughServer({
-          trustProxy: 5,
-          headers: { "x-forwarded-for": "203.0.113.9" },
-          remoteAddress: "10.0.0.1",
-        }),
-      ).toBe("10.0.0.1");
-    });
-
-    it("ignores x-real-ip under a bounded hop count", async () => {
-      expect(
-        await detectIpThroughServer({
-          trustProxy: 1,
-          headers: { "x-real-ip": "203.0.113.9" },
-          remoteAddress: "10.0.0.1",
-        }),
-      ).toBe("10.0.0.1");
-    });
-
-    it("trusts nothing when the hop count is 0", async () => {
-      expect(
-        await detectIpThroughServer({
-          trustProxy: 0,
-          headers: { "x-forwarded-for": "203.0.113.9" },
-          remoteAddress: "10.0.0.1",
-        }),
-      ).toBe("10.0.0.1");
+  describe("with a numeric http.trustProxy", () => {
+    it("rejects the unsupported hop-count shape before the server starts", async () => {
+      await expect(
+        detectIpThroughServer({ trustProxy: 1 }),
+      ).rejects.toThrowError(
+        /Invalid http\.trustProxy configuration.*received number/,
+      );
     });
   });
 

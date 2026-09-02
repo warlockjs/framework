@@ -94,4 +94,18 @@ describe("HTTP server options", () => {
 
     expect(await resolveRequestIp(server)).toBe(FORGED_IP);
   });
+
+  it("composes an app URL rewrite before trailing-slash normalization", async () => {
+    const server = startHttpServer({
+      rewriteUrl(request) {
+        return request.url?.replace("/legacy", "/current") ?? "/";
+      },
+    });
+
+    server.get("/current", async () => ({ ok: true }));
+
+    const response = await server.inject({ method: "GET", url: "/legacy/" });
+
+    expect(response.statusCode).toBe(200);
+  });
 });

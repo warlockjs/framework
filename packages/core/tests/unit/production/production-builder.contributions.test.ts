@@ -41,6 +41,7 @@ const glob = vi.hoisted(() =>
 vi.mock("@warlock.js/fs", () => ({
   ensureDirectoryAsync: vi.fn(async () => undefined),
   fileExistsAsync: vi.fn(async () => false),
+  directoryExistsAsync: vi.fn(async () => false),
   getFileAsync: vi.fn(async (filePath: string) => {
     for (const [file, content] of productionFiles) {
       if (filePath.endsWith(file)) return content;
@@ -50,6 +51,8 @@ vi.mock("@warlock.js/fs", () => ({
   }),
   getJsonFileAsync: vi.fn(async () => ({ dependencies: declaredDependencies.value })),
   putFileAsync,
+  putJsonFileAsync: vi.fn(async () => undefined),
+  renameFileAsync: vi.fn(async () => undefined),
   removeDirectoryAsync: vi.fn(async () => undefined),
 }));
 
@@ -102,7 +105,7 @@ type BuilderInternals = {
   contributedEsbuild: ConnectorEsbuildPatch;
   generatedFiles: { locales: boolean; events: boolean; main: boolean; routes: boolean };
   generateEntryPoint(contributedImports?: string[]): Promise<void>;
-  bundle(): Promise<void>;
+  bundle(writeOutDir: string): Promise<void>;
 };
 
 function builderInternals(): BuilderInternals {
@@ -172,7 +175,9 @@ describe("esbuild merge precedence — defaults < contributor < user config", ()
     } as ResolvedBuildConfig;
     builder.contributedEsbuild = contributed;
 
-    await builder.bundle();
+    // The write target is a parameter now, not `options.outdir` — the latter
+    // stays the final destination for every other reader.
+    await builder.bundle("/app/.dist.build-test");
 
     return esbuildBuild.mock.calls[0]![0] as Record<string, unknown>;
   }

@@ -69,23 +69,37 @@ export async function displayProductionReadyBanner({
 /**
  * Report that the production server died before it ever served anything.
  *
- * Written to **both** streams on purpose. Stderr is where a human and a log
- * collector look; stdout is where a supervisor that greps for the success
- * banner looks, and it must find a failure there rather than silence — silence
- * on stdout is what let a boot failure be recorded as a healthy start.
+ * Written to **stderr** only. `warlock start` inherits both child streams, and
+ * production launchers commonly merge them (`2>&1`), so mirroring this block to
+ * stdout prints every line twice. The command's non-zero exit code is the
+ * machine-readable failure signal; stdout remains reserved for the ready
+ * banner.
+ *
+ * `causeWasCaptured` gates the "the cause is printed above" line. The
+ * supervisor cannot always guarantee the child wrote anything before it
+ * died — an import that throws before the logger configures its channels,
+ * a bundle with no console channel at all — and claiming a cause is above
+ * when nothing was ever captured sends the developer looking for output
+ * that doesn't exist, which is worse than admitting the gap.
  */
-export function displayProductionStartFailure(exitCode: number) {
+export function displayProductionStartFailure(
+  exitCode: number,
+  causeWasCaptured: boolean,
+) {
+  const causeLine = causeWasCaptured
+    ? `  ${colors.dim("the cause is printed above, in the application's own output")}`
+    : `  ${colors.dim("no output was captured from the application process — its cause did not reach this terminal")}`;
+
   const lines = [
     "",
     `  ${colors.red("✖")} ${colors.bold("warlock start")} failed — the server never finished booting`,
     `  ${colors.dim(`the application process exited with code ${exitCode}`)}`,
-    `  ${colors.dim("the cause is printed above, in the application's own output")}`,
+    causeLine,
     "",
   ];
 
   for (const line of lines) {
     console.error(line);
-    console.log(line);
   }
 }
 

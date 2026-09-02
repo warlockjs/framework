@@ -142,16 +142,24 @@ describe("HTTP routing — misses", () => {
     expect(result.statusCode).toBe(404);
   });
 
-  it("does not merge a trailing slash onto a registered route", async () => {
+  it("matches one trailing slash to the same route while preserving root and case", async () => {
     harness = await bootHarness((router) => {
-      router.get("/strict", ({ response }) => response.success({ ok: true }));
+      router.get("/strict", ({ request, response }) =>
+        response.success({ from: request.input("from") }),
+      );
+      router.get("/", ({ response }) => response.success({ root: true }));
     });
 
     const exact = await harness.inject({ method: "GET", url: "/strict" });
-    const trailing = await harness.inject({ method: "GET", url: "/strict/" });
+    const trailing = await harness.inject({ method: "GET", url: "/strict/?from=slash" });
+    const root = await harness.inject({ method: "GET", url: "/" });
+    const wrongCase = await harness.inject({ method: "GET", url: "/Strict/" });
 
     expect(exact.statusCode).toBe(200);
-    expect(trailing.statusCode).toBe(404);
+    expect(trailing.statusCode).toBe(200);
+    expect(harness.json(trailing)).toEqual({ from: "slash" });
+    expect(root.statusCode).toBe(200);
+    expect(wrongCase.statusCode).toBe(404);
   });
 });
 

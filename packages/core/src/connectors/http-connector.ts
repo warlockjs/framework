@@ -7,6 +7,7 @@ import { assertPortIsAvailable } from "../http/port-preflight";
 import { registerHttpPlugins } from "../http/plugins";
 import { setHttpReadyReport } from "../http/ready-report";
 import { closeServerWithTimeout, type FastifyInstance, getHttpServer, startHttpServer } from "../http/server";
+import { ensureFatalIsVisible } from "../logger/fatal-visibility";
 import { router } from "../router/router";
 import { type Environment } from "../utils";
 import { setBaseUrl } from "../utils/urls";
@@ -239,6 +240,17 @@ export class HttpConnector extends BaseConnector {
       // `log.fatal` reaches Sentry/file; `await log.flush()` drains buffered and
       // async channels before the process exits.
       await log.fatal("http", "connection", error);
+
+      // …and `log.fatal` reaches NOBODY when the app's log config declares no
+      // terminal channel — the ordinary production shape (`production: {
+      // channels: [new FileLog()] }`), and the shape of every app with no `log`
+      // config at all, since `LoggerConnector.start()` then returns before
+      // `log.configure`. That is how an `EADDRINUSE` at boot became a process
+      // that exited 1 in total silence: the error was constructed, thrown and
+      // caught exactly as designed, and then written to zero channels. stderr
+      // is the one destination that is always there.
+      ensureFatalIsVisible(error);
+
       await log.flush();
 
       process.exit(1); // stop the process, exit with error
