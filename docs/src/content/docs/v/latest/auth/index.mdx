@@ -10,6 +10,8 @@ issuance and rotation, and route protection.
 `auth` is the only `@warlock.js/*` package that's not standalone — it
 depends on `@warlock.js/core` for HTTP and module conventions.
 
+Upgrading from v4? Review the [Auth migration notes](/v/latest/core/upgrade-to-v5/#auth).
+
 Gate any route with one middleware — `request.user` arrives hydrated, no token decoding in your handler:
 
 ```ts

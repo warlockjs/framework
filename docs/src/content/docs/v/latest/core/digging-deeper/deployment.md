@@ -104,6 +104,21 @@ export default defineConfig({
 
 The entry the bundle produces is `{outdir}/{outFile}` — by default `dist/app.js`. `warlock start` resolves that exact path through the same `resolveBuildConfig()` helper, so `build` and `start` always agree on where the artifact lives.
 
+### The output directory is written all-or-nothing
+
+`warlock build` does not write into `outdir` as it goes. It builds into a hidden sibling directory — `.<basename>.build-<12 hex>`, e.g. `./.dist.build-9f1c2ab40de7` beside `./dist` — and promotes it into place with a rename only after every step has succeeded. The sibling is deliberate: same volume, so the promotion is a rename rather than a copy.
+
+- **A successful build leaves no stale files.** Promotion swaps the whole directory (the previous `outdir` is moved aside, the temp is renamed in, the old one is then deleted). Anything an earlier build emitted and this one did not is gone — output is replaced, never merged over.
+- **A failed build leaves no usable `dist`.** On any error the temp directory is removed and the error rethrown without `outdir` ever being touched. A previous good build survives intact; if there wasn't one, no half-written directory appears in its place.
+
+The final file written before promotion is `.warlock-build.json`:
+
+```json
+{ "status": "success", "builtAt": "2026-09-01T12:34:56.789Z" }
+```
+
+It is the success marker `warlock start` checks. Copy `outdir` whole when you ship it — an artifact pipeline that prunes dotfiles will strip the marker and make the build unstartable on the target host.
+
 ## `warlock start`
 
 `warlock start` does not re-bundle. It resolves the build config to find the entry path, then spawns a child Node process on the bundle:
@@ -121,6 +136,40 @@ Specifically:
 `start` exits with the child's exit code, except that a child which never finished booting always exits non-zero. It forwards `SIGTERM` to the child explicitly and lets `SIGINT` (Ctrl+C) reach the child naturally; the actual graceful shutdown is handled *inside* the bundle by the connectors manager (next section).
 
 > The build must exist before you call `start`. `start` does not build for you — run `warlock build` first (typically as a deploy step), then `warlock start` on the server.
+
+### `start` refuses a `dist` no successful build produced
+
+Before it spawns anything, `start` looks for the `.warlock-build.json` success marker in `outdir`. Missing, unreadable, malformed, or carrying anything other than `"status": "success"` all produce the same refusal on stderr, and exit code `1`:
+
+```
+✖ "dist" was not produced by a successful `warlock build` run (no build-success marker found). Run `warlock build` before `warlock start`.
+```
+
+Three situations reach it — never built, a build that failed before it could promote, and a directory assembled or edited by hand — and they are deliberately not distinguished, because the fix for all three is the same command. The refusal happens before Node is spawned, so a bad artifact fails on the first line of output rather than partway through a boot.
+
+### Reading a failed start
+
+The child process is spawned with piped stdio and every chunk is forwarded verbatim and live to the parent's matching stream, so **the application's own error is what you read**. `warlock start` then adds a summary beneath it:
+
+```
+  ✖ warlock start failed — the server never finished booting
+  the application process exited with code 1
+  the cause is printed above, in the application's own output
+```
+
+That last line is conditional on the parent having actually received output from the child. When nothing came through, it says so rather than pointing at an empty terminal:
+
+```
+  no output was captured from the application process — its cause did not reach this terminal
+```
+
+**A port collision is named.** The HTTP connector preflights the port immediately before `listen()`, so `EADDRINUSE` arrives identified, with the port in the text, instead of as a raw error thrown from inside Fastify:
+
+```
+EADDRINUSE: Port 3000 is already in use on 127.0.0.1. Stop the dev server (or whatever else is listening on port 3000) and run again, or start on a free port — e.g. startHttpTestServer({ port: 3001 }).
+```
+
+`EACCES` on the port — a privileged port the process may not bind — is reported through the same path, since "cannot bind" is the operator's problem either way.
 
 ### Installing with pnpm
 
@@ -282,7 +331,7 @@ Before `warlock start` on a fresh host:
 
 ## Gotchas
 
-- **`start` does not build.** Running `warlock start` against a missing/stale `dist/` just runs whatever is there (or fails to find the entry). Always `warlock build` first in your pipeline.
+- **`start` does not build, and it will not run a `dist/` it cannot vouch for.** It checks for the `.warlock-build.json` success marker and refuses by that reason if it is absent — a directory left by a failed build, or one assembled by hand, is rejected rather than half-run. Always `warlock build` first in your pipeline.
 - **`NODE_ENV` is read before the bundle forces it.** The generated bootstrap sets the environment to `production` *inside* the process, but `loadEnv` already chose the `.env` file from the `NODE_ENV` the process started with. Setting `NODE_ENV=production` in the bundle does **not** retroactively change which `.env` file was loaded.
 - **`loadEnv` throws on a missing file.** If `.env.<NODE_ENV>` doesn't exist it falls back to `.env`, but if *that* is also missing it throws. Make sure at least one resolvable env file is on the host.
 - **Dependencies aren't bundled.** `packages: "external"` keeps `node_modules` out of the bundle, so a host without the installed packages will fail at runtime, not at build time.

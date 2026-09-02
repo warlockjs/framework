@@ -2,11 +2,21 @@
 /**
  * Stats band — at-a-glance metrics, custom layout (not a card grid).
  */
+import { currentVersion } from "../utils/current-version";
+import { getSiteMetrics } from "../utils/site-metrics";
+
+const { publishedPackageCount, documentationPageCount, documentedTopicCount } =
+  await getSiteMetrics();
+
 const stats = [
-  { value: "15", label: "Standalone packages", note: "Pick what you need" },
-  { value: "256", label: "Documentation pages", note: "Written & verified" },
-  { value: "120+", label: "AI-readable skills", note: "Per-task surface" },
-  { value: "5", label: "AI provider adapters", note: "Same agent API" },
+  { value: String(publishedPackageCount), label: "Published packages", note: "Pick what you need" },
+  {
+    value: String(documentationPageCount),
+    label: "Documentation pages across all versions",
+    note: "Written & verified",
+  },
+  { value: String(documentedTopicCount), label: "Documented topics", note: "Latest editorial map" },
+  { value: `v${currentVersion}`, label: "Current release", note: "Derived from the changelog" },
 ];
 ---
 

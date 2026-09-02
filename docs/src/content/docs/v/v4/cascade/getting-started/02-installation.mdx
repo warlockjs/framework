@@ -1,9 +1,13 @@
 ---
+banner:
+  content: "This page documents Warlock v4. <a href='/v/latest'>View the latest docs.</a>"
 title: "Installation"
 sidebar:
   order: 2
   label: "Installation"
 ---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
 
 Five minutes from zero to a project that loads Cascade. No conceptual content on this page — pure mechanics. Three steps: install the packages, install your driver, turn on decorators. If you're done before your coffee finishes brewing, that's the right amount of time.
 
@@ -16,8 +20,6 @@ Five minutes from zero to a project that loads Cascade. No conceptual content on
 ## Step 1 — Install Cascade and seal
 
 Cascade ships with `@warlock.js/seal` as a dependency, but you'll import directly from seal in your schemas (`v` and `Infer`). Install both explicitly so they're both in your `package.json` — stricter package managers (pnpm strict mode, Yarn PnP) need it.
-
-import { Tabs, TabItem } from "@astrojs/starlight/components";
 
 <Tabs groupId="package-manager">
   <TabItem label="npm">

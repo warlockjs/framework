@@ -18,7 +18,6 @@ import logo from "../assets/logo.png";
 
 const navLinks = [
   { label: "Documentation", href: "/v/latest/core/getting-started/01-introduction/" },
-  { label: "Upgrade to v5", href: "/v/latest/upgrade-to-v5/", upgrade: true },
   { label: "AI", href: "/v/latest/ai/", ai: true },
   { label: "Features", href: "/features/" },
   { label: "Packages", href: "/packages/" },
@@ -58,8 +57,7 @@ const versionHref = (version: "latest" | "v4") => {
 const latestHref = versionHref("latest");
 const v4Href = versionHref("v4");
 function isActive(link) {
-  const { href, ai, upgrade } = link;
-  if (upgrade) return currentPath === href || currentPath === href.slice(0, -1);
+  const { href, ai } = link;
   if (ai) return onAiDocs;
   if (href === "/features/") return currentPath === "/features/";
   if (href === "/packages/") return currentPath === "/packages/";
@@ -151,7 +149,6 @@ function isActive(link) {
         <ThemeSelect />
       </div>
 
-      <starlight-menu-button class="warlock-menu-button" />
     </div>
   </div>
 </div>
@@ -457,14 +454,4 @@ function isActive(link) {
     border-radius: var(--warlock-radius) !important;
   }
 
-  /* Mobile menu button hidden on desktop (Starlight handles the hookup) */
-  .warlock-menu-button {
-    display: inline-flex;
-  }
-
-  @media (min-width: 50rem) {
-    .warlock-menu-button {
-      display: none;
-    }
-  }
 </style>

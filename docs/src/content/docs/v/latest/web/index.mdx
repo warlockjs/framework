@@ -11,6 +11,8 @@ are ordinary Warlock routes that render documents instead of JSON, so they use
 the same route table, middleware chain, validation, and request context as the
 rest of the application.
 
+Upgrading from v4? See the [v5 migration guide](/v/latest/core/upgrade-to-v5/); Web is an opt-in addition.
+
 ## Install
 
 ```bash
@@ -22,6 +24,12 @@ connector in `warlock.config.ts`. `src/web/` is the page root — the only page
 root a project has today. It contains the web layer's pages, layouts, and
 related middleware. (A per-module page root, e.g. `src/app/blog/web/`, is not
 implemented; every page lives under the one project-level `src/web/`.)
+
+The generated home page keeps its universal non-component setup in
+`src/web/index.register.ts` and re-exports `register` from
+`src/web/index.page.tsx`. Keep that split when editing the starter: Warlock
+still runs the hook in both realms, while page edits stay inside React's Fast
+Refresh boundary.
 
 ## Rendering and navigation
 
@@ -61,6 +69,45 @@ export default function ProductPage() { /* ... */ }
 Two pages that resolve to the same effective path, or the same route name,
 fail the build/boot loudly rather than leaving one of them silently
 unreachable — the second file is named in the error alongside the first.
+
+### Every page needs a default export
+
+`route` is optional; the default export is not. A `*.page.tsx` carrying only
+named exports is a hard discovery/build failure that names the file:
+
+```
+The page "src/web/contact.page.tsx" has no runtime default export. Every `*.page.tsx`
+file must default-export the React component it renders. For example:
+`export default function Page() { return <main />; }`
+```
+
+Such a file used to be discovered and registered anyway, and then served a
+blank `200` at its URL — a page that looked deployed, rendered nothing, and
+reported no error anywhere. `export { Page as default }` satisfies the rule
+(the check is for a runtime default binding, not the keyword form);
+`export default interface Page {}` does not, because a type-only default is
+erased and leaves no component behind. A file that cannot be parsed reports as
+a parse failure instead, so a syntax error never masquerades as a missing
+export.
+
+:::danger[Catch-all routes are not supported]
+**`[...slug].page.tsx` does not do what it looks like.** Filesystem routing
+recognizes only `[name]` — a plain identifier in brackets — as a dynamic
+segment. `[...slug]` does not match that, so it is taken as an ordinary
+**literal** segment.
+
+`src/web/docs/[...slug].page.tsx` therefore derives the path
+`/docs/[...slug]` and the route name `docs.[...slug]`. It builds, it
+registers, and it serves — at the literal URL `/docs/%5B...slug%5D` and
+nowhere else. `/docs/a/b` does not match it.
+
+**There is no build error, no dev warning, and no refusal.** If you are
+arriving from Next.js or Remix, this is the failure to recognize: the page is
+simply unreachable at the URLs you meant.
+
+Until a real catch-all exists, use the terminal wildcard with an explicit
+route: `export const route = { path: "/docs/*", name: "docs.catchAll" }`.
+:::
 
 ### Layouts and the prefix override
 
@@ -102,6 +149,15 @@ only, never by directory:
   or fail a second time through the fallback itself.
   Declaring a `route` export on it is refused at build/boot time: `404` is not
   a URL anyone browses to.
+
+  Precisely what is and isn't skipped, since "the 404 page doesn't run
+  loaders" is a useful shorthand and not the whole rule: only the **page-level
+  `loader`** is omitted from the request. The real module namespace is still
+  used, so `register()` runs and the component renders normally, and the
+  page's **middleware still runs**. Layout loaders don't run because this page
+  has an empty layout chain by construction, not because loaders are disabled.
+  And the **`root.tsx` App loader does still run** — keep it cheap, and make
+  sure it tolerates a request that matched nothing.
 - **`error.page.tsx`** — the one application-wide error boundary. At most one
   may exist beneath `src/web`; a second one is a build error naming both
   files. It also may not declare a `route` export — it is a boundary, not a
@@ -130,6 +186,20 @@ their real namespaces, never a composed wrapper, so a hook runs once per
 layout identity rather than once per page below it. Returning a Promise (or
 another thenable) throws: registration must finish before the module is usable.
 
+For page-level registration, prefer a sidecar module and a named re-export:
+
+```tsx title="src/web/index.page.tsx"
+export { register } from "./index.register";
+
+export default function HomePage() {
+  return <main>Home</main>;
+}
+```
+
+Declaring a non-component `register()` function inline beside the component
+causes React Fast Refresh to treat the page export boundary as incompatible,
+reload the page, and lose live component state.
+
 ## Loaders and metadata
 
 A page loader is its controller: it runs with the full Warlock request
@@ -137,6 +207,39 @@ context, including DI, guards, and access to the response for headers,
 cookies, or status. It returns data for the page to render. Server-only
 `metadata` runs after the loader and can derive document metadata from its
 data.
+
+### Execution order
+
+Loaders run **sequentially, root to leaf, each awaited before the next
+starts**: the `root.tsx` App loader, then the layout loader, then the page
+loader. There are exactly three levels, and no more — a page has at most one
+*rendering* layout (nested rendering layouts are a build error), so there is no
+outermost-to-innermost layout chain to reason about for loaders. Layout
+**middleware** still composes across the whole ancestry; only the loader levels
+are capped at three.
+
+Each level gets its own buffered response rather than the live one, and
+surviving buffers are committed root to leaf, so a level that is discarded
+cannot leak half-written headers onto a response it no longer owns.
+
+**The first core `Response` a loader returns is terminal.** It stops every
+lower loader from starting, and it is more terminal than a short-circuit:
+because the response is returned whole, it also bypasses buffer commit and
+metadata resolution, so the header and cookie writes buffered at that same
+level go with it.
+
+The other two terminal outcomes behave differently, and the difference is the
+reason to prefer them:
+
+- **A short-circuit** — `response.redirect()`, `response.permanentRedirect()`,
+  `response.notFound()` — stops lower loaders but commits buffers *inclusively*
+  through its own level, so writes made before returning survive. Metadata is
+  skipped.
+- **A throw** stops lower loaders, discards the throwing level's own buffer,
+  and commits only the levels above it.
+
+Return a raw `Response` when you mean exactly that response and nothing else;
+reach for a short-circuit when the headers you already set should still apply.
 
 `metadata` never runs after a failed loader. When an earlier stage recorded an
 error — the page's own loader threw, or an ancestor layout's did — the page's
@@ -212,12 +315,13 @@ the browser. Three checks, run at different points in the pipeline:
   the `server-only` npm package by name, for code that wants to declare its
   own server-only status explicitly.
 - **Gate B** — an AST transform applied to every module the client build
-  processes. It refuses any client-side read of `process.env.*` (Node's
-  `process` doesn't exist in the browser, so this is always wrong) and any
+  processes. It refuses **every** client-side read of `process.env` (Node's
+  `process` doesn't exist in the browser, so this is always wrong), and any
   `import.meta.env.X` read where `X` doesn't start with `PUBLIC_` — the
   project's convention for what may cross into client code. Vite's own
   built-in keys (`MODE`, `DEV`, `PROD`, `BASE_URL`, `SSR`) are allowed without
-  the prefix.
+  the prefix. See [Environment variables in pages](#environment-variables-in-pages)
+  for what the `process.env` refusal covers and what to do instead.
 - **Gate C** — runs once, on the emitted client bundle, after the build
   completes. It re-scans the actual output for any of the six server export
   names (`route`, `middleware`, `validation`, `loader`, `metadata`, `prefix`)
@@ -232,6 +336,83 @@ page or layout module before the client graph ever forms — Gates A/B/C are
 what catch what projection, by construction, cannot: whole forbidden imports,
 inline env reads, and a bundle-level regression check on the final output.
 
+## Environment variables in pages
+
+**`process.env` is refused entirely in the client/universal graph. There is no
+`PUBLIC_` exception to it, static or computed.** `env("PUBLIC_X")` does not work
+client-side either — `env` comes from `@warlock.js/core`, a package marked
+server-only, so importing it into client-bound code is refused by Gate A before
+Gate B ever looks at the call.
+
+**The supported pattern is to read the value in a page loader — which is server
+code — and pass it to the page as loader data.**
+
+```tsx title="src/web/index.page.tsx"
+import { env } from "@warlock.js/core";
+import type { PageLoader, PageProps } from "@warlock.js/web";
+
+export const loader = (async () => ({
+  siteName: env("PUBLIC_SITE_NAME"),
+})) satisfies PageLoader;
+
+export default function HomePage({ data }: PageProps<typeof loader>) {
+  return <h1>{data.siteName}</h1>;
+}
+```
+
+`loader` is one of the six server exports, stripped by projection before the
+client graph forms, so it may read configuration normally. Its return value is
+serialized to the browser — return only what is safe to expose.
+
+### What the refusal covers
+
+Reachable from a default page or layout component, from `register()`, or from
+any helper they import, all of these fail:
+
+```tsx
+process.env.API_URL;             // static key
+process.env.PUBLIC_API_URL;      // the PUBLIC_ prefix changes nothing
+process.env[key];                // computed key — the compiler cannot prove it safe
+const { API_URL } = process.env; // bare value-read
+const all = { ...process.env };  // bare value-read
+Object.keys(process.env);        // bare value-read
+JSON.stringify(process.env);     // bare value-read
+```
+
+The bare value-reads are the newer half of this rule and the more important
+one: referencing the object at all — assigned, destructured, spread, or passed
+as an argument — is already broken in a browser, and handing the whole object
+to a component is how an entire server environment ships to the client in one
+line. `globalThis.process.env`, `window.process.env` and `process["env"]` are
+matched too.
+
+**Enforcement covers dev SSR as well as the client bundle, and a violation
+fails the build.** The same refusal fires under `warlock dev`, so this is not a
+production-only check you discover at deploy time.
+
+Server-side code is unrestricted, and reads inside `loader`, `route`,
+`middleware`, `validation` and `metadata` are never affected. Files under
+`node_modules` are out of scope by design — a dependency's own
+`process.env.NODE_ENV` guard is not the application's problem.
+
+### The one client-side escape hatch
+
+If a value genuinely has to be inlined into browser code rather than passed
+through loader data, the supported spelling is `import.meta.env.PUBLIC_*` with
+a **static** key:
+
+```tsx
+export default function HomePage() {
+  return <h1>{import.meta.env.PUBLIC_SITE_NAME}</h1>;
+}
+```
+
+That is Vite's env surface, not Node's, and only the `PUBLIC_` prefix (plus
+Vite's five built-ins) crosses. It is inlined at build time, so it is fixed for
+the life of the bundle and cannot vary per request or per deployment — which is
+why loader data stays the default answer, and the only one for anything
+request-scoped.
+
 ## Production build, route manifest, and CSS
 
 `warlock build` walks the same page graph the dev server does — one shared
@@ -240,7 +421,12 @@ absent for the client or vice versa. The build:
 
 - Emits a page-route manifest (`page-routes.manifest.json` under the build
   output directory) recording each page's method, path, name, and source file
-  — the baseline `warlock routes:diff` compares a fresh diagnostic boot against.
+  — the baseline `warlock routes:diff` compares a fresh diagnostic boot
+  against. Paths are written through the router's own normalizer, so an
+  untouched checkout reports clean immediately after a successful build rather
+  than flagging the catch-all as drift. Note the manifest records what each
+  page's name was *derived* as, not what it was *registered* as: a clean diff
+  does **not** prove that no route name collided at registration time.
 - Refuses to produce an artifact for a layout chain with more than one
   rendering layout, the same rule dev enforces, so that failure is caught
   before it reaches production rather than only at the next boot.

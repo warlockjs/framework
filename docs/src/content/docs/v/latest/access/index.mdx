@@ -5,6 +5,8 @@ description: Authorization for Warlock — RBAC permission checks, ABAC policies
 
 `@warlock.js/access` is the authorization layer for Warlock apps. Where `@warlock.js/auth` answers _who you are_, `access` answers _what you can do_.
 
+Upgrading from v4? Review the [Access request-user change](/v/latest/core/upgrade-to-v5/#access-no-longer-chooses-the-type-of-requestuser).
+
 The deal is simple: the package owns the hard part — wildcard matching, caching, policies, fail-closed decisions — and you hand it **one small adapter** that reads a user's roles from however your app stores them. Then permission checks work everywhere.
 
 Gate a route with one middleware (stacked after `authMiddleware`):

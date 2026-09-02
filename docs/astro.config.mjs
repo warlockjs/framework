@@ -3,6 +3,11 @@ import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import mermaid from "astro-mermaid";
 import starlightSidebarTopics from "starlight-sidebar-topics";
+import remarkValidateMdxComponents from "./scripts/remark-validate-mdx-components.mjs";
+
+// `BASE_URL` is an Astro built-in. Discard an unrelated host-level value
+// before Astro loads its environment so configured deployment bases still win.
+delete process.env.BASE_URL;
 
 // Each package gets its own topic — the sidebar swaps based on which
 // package the reader is currently inside. Topic items default to
@@ -89,16 +94,17 @@ const aiSections = [
   { label: "Reference", dir: "reference", collapsed: true },
 ];
 
-// Old AI docs URLs → new homes (2026-07-04 IA restructure: the-basics and
+// Moved documentation routes keep redirects. This includes the former global
+// upgrade-guide route and the 2026-07-04 AI IA restructure (the-basics and
 // digging-deeper retired into domain sections, two how-tos pulled out of
-// best-practices, log-ai-calls re-homed into observability). Old URLs are
-// indexed and referenced from package skills/llms snapshots, so every
-// moved page keeps a redirect. Filenames never changed — only the section
-// directory did. Static output emits a meta-refresh page per entry.
-const aiRedirects = {
+// best-practices, log-ai-calls re-homed into observability). Static output
+// emits a meta-refresh page per entry.
+const docsRedirects = {
+  "/v/latest/upgrade-to-v5": "/v/latest/core/upgrade-to-v5",
   // the-basics (14)
   "/v/latest/ai/the-basics/run-agent": "/v/latest/ai/agents/run-agent",
-  "/v/latest/ai/the-basics/stream-structured-output": "/v/latest/ai/agents/stream-structured-output",
+  "/v/latest/ai/the-basics/stream-structured-output":
+    "/v/latest/ai/agents/stream-structured-output",
   "/v/latest/ai/the-basics/spawn-sub-agent": "/v/latest/ai/agents/spawn-sub-agent",
   "/v/latest/ai/the-basics/define-tools": "/v/latest/ai/tools/define-tools",
   "/v/latest/ai/the-basics/use-ai-tools": "/v/latest/ai/tools/use-ai-tools",
@@ -133,7 +139,8 @@ const aiRedirects = {
   "/v/latest/ai/digging-deeper/redact-secrets": "/v/latest/ai/reliability/redact-secrets",
   "/v/latest/ai/digging-deeper/log-ai-calls": "/v/latest/ai/observability/log-ai-calls",
   // best-practices (2)
-  "/v/latest/ai/best-practices/evaluation-and-datasets": "/v/latest/ai/testing/evaluation-and-datasets",
+  "/v/latest/ai/best-practices/evaluation-and-datasets":
+    "/v/latest/ai/testing/evaluation-and-datasets",
   "/v/latest/ai/best-practices/record-replay-testing": "/v/latest/ai/testing/record-replay-testing",
 };
 
@@ -462,15 +469,23 @@ const topics = [
 function buildTopics(version) {
   // Hand-curated topics above retain their exact latest shape. Clone and
   // retarget every path only when building a frozen version's sidebar.
-  const topicsForVersion = version === "latest"
-    ? topics
-    : topics.filter((topic) => topic.link !== "/v/latest/web/");
-  const versionedTopics = version === "latest"
-    ? topicsForVersion
-    : JSON.parse(JSON.stringify(topicsForVersion).replaceAll("v/latest", `v/${version}`));
+  const topicsForVersion =
+    version === "latest" ? topics : topics.filter((topic) => topic.link !== "/v/latest/web/");
+  const versionedTopics =
+    version === "latest"
+      ? topicsForVersion
+      : JSON.parse(JSON.stringify(topicsForVersion).replaceAll("v/latest", `v/${version}`));
 
   return versionedTopics.map((topic) => ({
     ...topic,
+    items:
+      version === "latest" && topic.label === "Core"
+        ? [
+            topic.items[0],
+            { label: "Upgrade to v5", link: "/v/latest/core/upgrade-to-v5/" },
+            ...topic.items.slice(1),
+          ]
+        : topic.items,
     id: `${version}-${topic.link.split("/").filter(Boolean).at(-1)}`,
   }));
 }
@@ -478,15 +493,7 @@ function buildTopics(version) {
 // Global pages that don't belong to any package topic (landing, packages
 // grid, skills explainer, 404). They render with no sidebar — fine for
 // landing-style pages.
-const excludedFromTopics = [
-  "/",
-  "/index",
-  "/packages",
-  "/skills",
-  "/changelog",
-  "/v/latest/upgrade-to-v5",
-  "/404",
-];
+const excludedFromTopics = ["/", "/index", "/packages", "/skills", "/changelog", "/404"];
 const sidebarTopics = [...buildTopics("latest"), ...buildTopics("v4")];
 const sidebarTopicRoutes = Object.fromEntries(
   sidebarTopics.map((topic) => [topic.id, [`${topic.link}**`]]),
@@ -495,7 +502,10 @@ const sidebarTopicRoutes = Object.fromEntries(
 // https://astro.build/config
 export default defineConfig({
   site: "https://warlock.js.org",
-  redirects: aiRedirects,
+  redirects: docsRedirects,
+  markdown: {
+    remarkPlugins: [remarkValidateMdxComponents],
+  },
   integrations: [
     // mermaid must run BEFORE starlight per astro-mermaid's docs.
     // themeVariables are layered on top of autoTheme's default/dark base
@@ -554,8 +564,7 @@ export default defineConfig({
     }),
     starlight({
       title: "Warlock.js",
-      description:
-        "AI-native TypeScript framework for backend, real-time, and AI operations.",
+      description: "AI-native TypeScript framework for backend, real-time, and AI operations.",
       head: [
         {
           tag: "meta",
@@ -614,10 +623,10 @@ export default defineConfig({
       lastUpdated: true,
       pagination: true,
       plugins: [
-        starlightSidebarTopics(
-          sidebarTopics,
-          { exclude: excludedFromTopics, topics: sidebarTopicRoutes },
-        ),
+        starlightSidebarTopics(sidebarTopics, {
+          exclude: excludedFromTopics,
+          topics: sidebarTopicRoutes,
+        }),
       ],
     }),
   ],

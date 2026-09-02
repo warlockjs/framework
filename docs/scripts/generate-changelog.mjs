@@ -19,11 +19,12 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DOCS_ROOT = resolve(here, "..");
 const WORKSPACE_ROOT = resolve(DOCS_ROOT, "..");
+const PNPM_WORKSPACE = resolve(WORKSPACE_ROOT, "pnpm-workspace.yaml");
 const RELEASES_META = resolve(DOCS_ROOT, "src/data/releases.json");
 const OUT_DIR = resolve(DOCS_ROOT, "src/data");
 const OUT_FILE = resolve(OUT_DIR, "changelog.json");
@@ -35,7 +36,17 @@ const SHOW_UNRELEASED = false;
 // `⚠ BREAKING` is surfaced first when a package's CHANGELOG flags a
 // breaking change with that heading, so the most consequential change
 // in a release reads at the top of the package block.
-const TYPE_ORDER = ["⚠ BREAKING", "New", "Added", "Changed", "Fixed", "Deprecated", "Removed", "Security", "Dependencies"];
+const TYPE_ORDER = [
+  "⚠ BREAKING",
+  "New",
+  "Added",
+  "Changed",
+  "Fixed",
+  "Deprecated",
+  "Removed",
+  "Security",
+  "Dependencies",
+];
 
 function slugOf(name) {
   const i = name.lastIndexOf("/");
@@ -119,13 +130,91 @@ function parseChangelog(md) {
   return versions;
 }
 
-function cmpVersionDesc(a, b) {
-  const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
-  const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
-  for (let i = 0; i < 3; i++) {
-    if ((pb[i] || 0) !== (pa[i] || 0)) return (pb[i] || 0) - (pa[i] || 0);
+// Full SemVer 2.0.0 grammar (https://semver.org/#backusnaur-form-grammar-for-valid-semver-versions).
+// Numeric core identifiers must not carry leading zeros; prerelease identifiers
+// follow the same rule when purely numeric, but may otherwise be alphanumeric.
+const SEMVER_RE =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
+
+/** Parse a SemVer string, throwing a clear error on anything malformed. */
+function parseSemver(version) {
+  const m = typeof version === "string" ? SEMVER_RE.exec(version) : null;
+  if (!m) {
+    throw new Error(`Invalid SemVer version: ${JSON.stringify(version)}`);
   }
-  return 0;
+  const [, major, minor, patch, prerelease] = m;
+  return { major, minor, patch, prerelease };
+}
+
+// Compare two numeric-core identifiers (decimal strings with no leading
+// zeros) without ever widening them to `Number`, so arbitrarily large core
+// numbers can't lose precision: same-length decimal strings compare in the
+// same order numerically as they do lexically, so length is the only thing
+// that has to be checked first.
+function compareNumericCore(a, b) {
+  if (a.length !== b.length) return a.length - b.length;
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function isNumericIdentifier(id) {
+  return /^\d+$/.test(id);
+}
+
+// Per the SemVer spec: numeric identifiers compare numerically; identifiers
+// with letters/hyphens compare by ASCII order; numeric identifiers always
+// sort below alphanumeric ones.
+function compareIdentifier(x, y) {
+  const xNum = isNumericIdentifier(x);
+  const yNum = isNumericIdentifier(y);
+  if (xNum && yNum) return compareNumericCore(x, y);
+  if (xNum !== yNum) return xNum ? -1 : 1;
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
+// A release outranks its own prerelease; when both have a prerelease, compare
+// dot-separated identifiers left to right, and a shorter equal-prefix loses.
+function comparePrerelease(a, b) {
+  if (a === undefined && b === undefined) return 0;
+  if (a === undefined) return 1;
+  if (b === undefined) return -1;
+
+  const ai = a.split(".");
+  const bi = b.split(".");
+  const len = Math.min(ai.length, bi.length);
+  for (let i = 0; i < len; i++) {
+    const c = compareIdentifier(ai[i], bi[i]);
+    if (c !== 0) return c;
+  }
+  return ai.length - bi.length;
+}
+
+/** Ascending SemVer 2.0.0 precedence comparator; build metadata is ignored. */
+export function compareSemverAsc(a, b) {
+  const pa = parseSemver(a);
+  const pb = parseSemver(b);
+  return (
+    compareNumericCore(pa.major, pb.major) ||
+    compareNumericCore(pa.minor, pb.minor) ||
+    compareNumericCore(pa.patch, pb.patch) ||
+    comparePrerelease(pa.prerelease, pb.prerelease)
+  );
+}
+
+export function cmpVersionDesc(a, b) {
+  return -compareSemverAsc(a, b);
+}
+
+const releaseDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+function formatPublishedAt(publishedAt) {
+  if (typeof publishedAt !== "string" || !publishedAt.trim()) return null;
+  const date = new Date(publishedAt);
+  return Number.isNaN(date.getTime()) ? null : releaseDateFormatter.format(date);
 }
 
 function versionId(v) {
@@ -148,6 +237,30 @@ async function loadReleaseMeta() {
   }
 }
 
+async function loadWorkspaceEntries(rootPkg) {
+  const packageJsonEntries = Array.isArray(rootPkg.workspaces)
+    ? rootPkg.workspaces
+    : rootPkg.workspaces?.packages;
+  if (Array.isArray(packageJsonEntries)) return packageJsonEntries;
+  if (!existsSync(PNPM_WORKSPACE)) return [];
+
+  const yaml = await readFile(PNPM_WORKSPACE, "utf8");
+  const entries = [];
+  let inPackages = false;
+  for (const line of yaml.split(/\r?\n/)) {
+    if (/^packages:\s*$/.test(line)) {
+      inPackages = true;
+      continue;
+    }
+    if (!inPackages) continue;
+    if (/^\S/.test(line)) break;
+    const match = line.match(/^\s+-\s+(.+?)\s*$/);
+    if (!match) continue;
+    entries.push(match[1].replace(/^(['"])(.*)\1$/, "$2"));
+  }
+  return entries;
+}
+
 async function main() {
   // In a docs-only checkout (e.g. the GitHub Pages CI build) the sibling
   // packages + the workspace package.json aren't present. Skip regeneration
@@ -163,7 +276,7 @@ async function main() {
   }
 
   const rootPkg = JSON.parse(await readFile(rootPkgPath, "utf8"));
-  const entries = rootPkg.workspaces || [];
+  const entries = await loadWorkspaceEntries(rootPkg);
   const meta = await loadReleaseMeta();
 
   // version -> { date, typed: Map<type, [{package,slug,html}]>, present: [{name,slug}] }
@@ -227,8 +340,16 @@ async function main() {
     bucketFor(version);
   }
 
+  // Package changelogs may already stage the next release. releases.json is
+  // the site's publication boundary: keep older package-only history, but do
+  // not surface anything newer than its newest authored release entry.
+  const latestPublishedVersion = Object.keys(meta)
+    .filter((v) => !/unreleased/i.test(v))
+    .sort(cmpVersionDesc)[0];
+
   const versionKeys = [...byVersion.keys()]
     .filter((v) => SHOW_UNRELEASED || !/unreleased/i.test(v))
+    .filter((v) => !latestPublishedVersion || cmpVersionDesc(v, latestPublishedVersion) >= 0)
     .sort(cmpVersionDesc);
 
   const shownSlugs = new Set();
@@ -236,7 +357,7 @@ async function main() {
   const releases = versionKeys.map((version) => {
     const bucket = byVersion.get(version);
     const m = meta[version] || {};
-    const date = m.date || bucket.date || null;
+    const date = formatPublishedAt(m.publishedAt) || m.date || bucket.date || null;
     const summaryHtml = m.summary ? renderInline(m.summary) : null;
 
     // Group BY PACKAGE: one block per package, with per-type counts + a
@@ -302,7 +423,13 @@ async function main() {
   );
 }
 
-main().catch((err) => {
-  console.error("generate-changelog failed:", err);
-  process.exit(1);
-});
+// Guard so `import` (e.g. from the test file) never triggers a full run —
+// only executing this file directly (`node scripts/generate-changelog.mjs`) does.
+const isDirectExecution =
+  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isDirectExecution) {
+  main().catch((err) => {
+    console.error("generate-changelog failed:", err);
+    process.exit(1);
+  });
+}

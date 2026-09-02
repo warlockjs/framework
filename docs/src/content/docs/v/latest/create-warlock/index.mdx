@@ -5,22 +5,23 @@ description: The official project scaffolder — one command spins up a complete
 
 `create-warlock` is the official project scaffolder. One command drops you into a short interactive wizard, and a couple of questions later you have a complete, configured Warlock project that boots.
 
+Migrating an existing app? Start with the [v5 migration guide](/v/latest/core/upgrade-to-v5/#create-warlock).
+
 ```bash
-npm create warlock@latest my-app
-# or:  yarn create warlock my-app  ·  pnpm create warlock my-app
+pnpm create warlock my-app
 cd my-app
 ```
 
 The wizard asks a few questions — project name, package manager, database driver (or **None**, to skip it), the optional features you want (mail, caching, the scheduler, storage, and friends), and whether to initialize git and generate JWT secrets — then writes everything from your answers and runs the install for you.
 
-What lands is a ready-to-run app: the `src/app` (one folder per feature) + `src/config` (one file per subsystem) layout, a `warlock.config.ts`, decorators already enabled in `tsconfig.json`, and a dev server you start with `npm run dev`.
+What lands is a ready-to-run app: the `src/app` (one folder per feature) + `src/config` (one file per subsystem) layout, a `warlock.config.ts`, decorators already enabled in `tsconfig.json`, and a dev server you start with `pnpm dev`.
 
 ## One command, no prompts
 
 Scripting it in CI, or driving it from an agent? Pass `--yes` (or `-y`) and the whole app is scaffolded in a **single non-interactive command** — every prompt is answered from flags, with sensible defaults for anything you leave out:
 
 ```bash
-npx create-warlock my-app --yes \
+pnpm create warlock my-app --yes \
   --db=postgres --pm=pnpm \
   --features=test,redis --ai=ai-openai \
   --git --jwt
@@ -45,7 +46,7 @@ Not every app needs a database. Pick **None** in the wizard's database step — 
 
 ```bash
 # A database-free API in one command
-npx create-warlock my-api --yes --no-db --features=test
+pnpm create warlock my-api --yes --no-db --features=test
 ```
 
 :::note

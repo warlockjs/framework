@@ -1,5 +1,53 @@
 {
-  "_doc": "Release-level metadata for the unified changelog — the DATE and the 'what shipped' SUMMARY for each version. Per-package change details (Added/Changed/Fixed/Removed) live in each package's CHANGELOG.md and are aggregated by scripts/generate-changelog.mjs; this file supplies the release date + summary that the per-package files don't carry. Hand-maintained: add one entry per release, keyed by the version string. `date` is a display string (e.g. \"June 4, 2026\"); `summary` supports inline `code`, **bold**, and [links](url); `featured` (optional) is an array of package names floated to the top of that release's package list, in the listed order (the rest follow most-changed-first, then alphabetical). Keep the summary to ONE short headline — what shipped and which packages — not an API-by-API tour; the per-package list below it carries the detail.",
+  "_doc": "Release-level metadata for the unified changelog — the npm PUBLISH TIMESTAMP and the 'what shipped' SUMMARY for each version. Per-package change details (Added/Changed/Fixed/Removed) live in each package's CHANGELOG.md and are aggregated by scripts/generate-changelog.mjs; this file supplies release metadata that the per-package files don't carry. Hand-maintained: add one entry per release, keyed by the version string. `publishedAt` is the full ISO timestamp reported by npm for @warlock.js/core (e.g. \"2026-09-02T00:54:41.833Z\"); the generator derives the human UTC display date from it. Legacy entries may retain `date` as a display-string fallback. `summary` supports inline `code`, **bold**, and [links](url); `featured` (optional) is an array of package names floated to the top of that release's package list, in the listed order (the rest follow most-changed-first, then alphabetical). Keep the summary to ONE short headline — what shipped and which packages — not an API-by-API tour; the per-package list below it carries the detail.",
+  "5.2.4": {
+    "publishedAt": "2026-09-02T04:49:12.518Z",
+    "summary": "**Web starter HMR repair.** `warlock add web` now isolates universal page registration in a stable sidecar so React Fast Refresh preserves component state while SSR and hydration keep the same lifecycle.",
+    "featured": [
+      "@warlock.js/core",
+      "@warlock.js/web"
+    ]
+  },
+  "5.2.3": {
+    "publishedAt": "2026-09-02T02:50:09.589Z",
+    "summary": "**Generator repair.** `warlock add` preserves exact Warlock family pins, while `warlock add web` emits a projection-safe generated page with one `index` identity shared by SSR and hydration plus deterministic favicon and form IDs that remove the generated-page console errors. **Published fixes only:** the Web starter remains under release-gate hold pending 5.2.4.",
+    "featured": [
+      "@warlock.js/core",
+      "@warlock.js/web"
+    ]
+  },
+  "5.2.2": {
+    "publishedAt": "2026-09-02T00:54:41.833Z",
+    "summary": "**Lockstep packaging repair.** Restores exact `5.2.2` pins across the complete Warlock package family after the partial 5.2.0 and 5.2.1 releases could not satisfy reciprocal exact peers. **Known issue:** `warlock add web` generates an app that does not boot or hydrate.",
+    "featured": [
+      "@warlock.js/core",
+      "@warlock.js/web"
+    ]
+  },
+  "5.2.1": {
+    "publishedAt": "2026-09-02T00:27:14.123Z",
+    "summary": "**Packaging repair.** `@warlock.js/core` rebuilds the published manifest with the complete family registry and npm-resolvable internal ranges after 5.2.0 leaked `workspace:` specifications, while `@warlock.js/web` tightens its Core and Seal peer ranges; this partial family release still could not satisfy the family's reciprocal exact pins.",
+    "featured": [
+      "@warlock.js/core",
+      "@warlock.js/web"
+    ]
+  },
+  "5.2.0": {
+    "publishedAt": "2026-09-02T00:05:38.479Z",
+    "summary": "**Web routing and production-build release.** `@warlock.js/web` adds filesystem-derived routes, error boundaries, universal registration, live development route updates, and stricter client safety; `@warlock.js/core` adds connector build hooks, `warlock routes:diff`, validated proxy configuration, atomic build promotion, and start-time artifact checks.",
+    "featured": [
+      "@warlock.js/web",
+      "@warlock.js/core"
+    ]
+  },
+  "5.1.0": {
+    "publishedAt": "2026-08-26T08:24:20.858Z",
+    "summary": "**`@warlock.js/web` repairs published React hydration** and adds an application-owned 404 page, typed metadata, and safer Fast Refresh boundaries; `@warlock.js/core` adds Tailwind and shadcn setup commands.",
+    "featured": [
+      "@warlock.js/web",
+      "@warlock.js/core"
+    ]
+  },
   "4.16.0": {
     "date": "August 18, 2026",
     "summary": "**Security release across the framework.** A full security audit closed 10 release-blockers — shell RCE, NoSQL/operator injection, filesystem path traversal, SSRF, dashboard stored XSS, IP-spoofing, and mass-assignment IDOR — and hardened orchestrator session/tenant isolation, supervisor fan-out, default log redaction, and `trustProxy` handling across `ai`, `cascade`, `core`, `cache`, `logger`, `herald`, `access`, `ai-workspace`, `ai-panoptic`, `notifications`, `seal`, `context`, `fs`, and `create-warlock`. Also bumps `@mongez/*` to the 2026-08-17 security release (`reinforcements` 4 CSPRNG `Random`).",

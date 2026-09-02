@@ -116,11 +116,906 @@
   ],
   "releases": [
     {
+      "version": "5.2.4",
+      "id": "v5-2-4",
+      "date": "September 2, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Web starter HMR repair.</strong> <code>warlock add web</code> now isolates universal page registration in a stable sidecar so React Fast Refresh preserves component state while SSR and hydration keep the same lifecycle.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>warlock add web</code> now writes universal page setup to <code>src/web/index.register.ts</code> and re-exports <code>register()</code> from the page, preserving component state across React Fast Refresh edits without changing SSR or hydration registration."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "5.2.3",
+      "id": "v5-2-3",
+      "date": "September 2, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Generator repair.</strong> <code>warlock add</code> preserves exact Warlock family pins, while <code>warlock add web</code> emits a projection-safe generated page with one <code>index</code> identity shared by SSR and hydration plus deterministic favicon and form IDs that remove the generated-page console errors. <strong>Published fixes only:</strong> the Web starter remains under release-gate hold pending 5.2.4.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>warlock add</code> now preserves exact lockstep versions for added Warlock family packages while retaining declared ranges for third-party dependencies."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock add web</code> now emits a projection-safe <code>register()</code> hook and one <code>index</code> route identity for SSR and hydration, with deterministic form and favicon markup for a clean browser console."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "The generated Web starter now projects and hydrates unchanged with one <code>index</code> page identity, universal localization registration, and deterministic browser markup."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Released in exact lockstep with Core's Web generator repairs so every family dependency remains installable at 5.2.3."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "New projects now resolve and stamp the coherent 5.2.3 family, making the repaired Web generator the default scaffold path."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "5.2.2",
+      "id": "v5-2-2",
+      "date": "September 2, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Lockstep packaging repair.</strong> Restores exact <code>5.2.2</code> pins across the complete Warlock package family after the partial 5.2.0 and 5.2.1 releases could not satisfy reciprocal exact peers. <strong>Known issue:</strong> <code>warlock add web</code> generates an app that does not boot or hydrate.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Restored exact 5.2.2 pins across the complete Warlock family. The partial 5.2.0 and 5.2.1 releases could not satisfy the family's reciprocal exact peer requirements in a clean install."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Restored exact Core and Seal peer pins at the family's shared 5.2.2 version. The partial 5.2.1 release could not satisfy reciprocal family peer pins."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong>A resolver-boundary check (<code>scripts/check-resolver-boundaries.mjs</code>), run in CI.</strong> Every <code>package.json</code> in the checkout is treated as a publish boundary; the script walks each package's <code>tsconfig.json</code> <code>paths</code> and any <code>vite.config.*</code> / <code>vitest.config.*</code> alias and fails if one resolves outside its own package. A test/build-only alias that reaches into a sibling checkout (e.g. <code>../core/src</code>) proves nothing about the published package — it resolves locally today and 404s the moment the package is installed on its own. Covered by <code>specs/resolver-boundaries.spec.ts</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>--help</code>/<code>--version</code> are now exercised end to end</strong> (<code>specs/cli-entry.spec.ts</code>): both exit 0 before <code>createNewApp</code> runs — no prompt, filesystem write, or network call — and <code>--help</code> wins even over a positional project name and other flags. <code>--version</code> prints this package's own <code>package.json</code> version, pinned loosely (a bare semver-ish string) since the exact value drifts every release."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>A CI workflow (<code>.github/workflows/ci.yml</code>)</strong>, with two jobs: <code>specs</code> (resolver-boundary check, a <code>--version</code> smoke test asserting the built CLI's reported version matches <code>package.json</code>, then <code>vitest</code>) and <code>scaffold-typecheck</code> (the existing <code>typecheck:scaffold</code> gate, scaffolding a real project and installing it). <code>specs</code> runs on pushes to <code>main</code>/<code>master</code> and every pull request; both jobs also run nightly (<code>schedule: cron \"0 4 * * *\"</code>) plus <code>workflow_dispatch</code>, since the scaffold-typecheck gate installs the framework from the registry and can go red from a framework release alone, without anyone touching this repo."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 0,
+          "counts": [],
+          "items": []
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 0,
+          "counts": [],
+          "items": []
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 0,
+          "counts": [],
+          "items": []
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 0,
+          "counts": [],
+          "items": []
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 0,
+          "counts": [],
+          "items": []
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 0,
+          "counts": [],
+          "items": []
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 0,
+          "counts": [],
+          "items": []
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 0,
+          "counts": [],
+          "items": []
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 0,
+          "counts": [],
+          "items": []
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 0,
+          "counts": [],
+          "items": []
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 0,
+          "counts": [],
+          "items": []
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 0,
+          "counts": [],
+          "items": []
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 0,
+          "counts": [],
+          "items": []
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 0,
+          "counts": [],
+          "items": []
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 0,
+          "counts": [],
+          "items": []
+        }
+      ]
+    },
+    {
+      "version": "5.2.1",
+      "id": "v5-2-1",
+      "date": "September 2, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Packaging repair.</strong> <code>@warlock.js/core</code> rebuilds the published manifest with the complete family registry and npm-resolvable internal ranges after 5.2.0 leaked <code>workspace:</code> specifications, while <code>@warlock.js/web</code> tightens its Core and Seal peer ranges; this partial family release still could not satisfy the family's reciprocal exact pins.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Rebuilt the published package with the complete Warlock family registry and installable npm ranges for every internal dependency. The 5.2.0 registry manifest leaked six <code>workspace:</code> dependency specifications and could not be installed outside the monorepo."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Tightened the Core and Seal peer ranges to <code>^5.2.0</code>. Web 5.2 production code imports Core APIs that were not available in Core 5.0, while the former Seal <code>*</code> range promised compatibility across unrelated major versions."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "5.2.0",
+      "id": "v5-2-0",
+      "date": "September 2, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Web routing and production-build release.</strong> <code>@warlock.js/web</code> adds filesystem-derived routes, error boundaries, universal registration, live development route updates, and stricter client safety; <code>@warlock.js/core</code> adds connector build hooks, <code>warlock routes:diff</code>, validated proxy configuration, atomic build promotion, and start-time artifact checks.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 14,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 5
+            },
+            {
+              "type": "Changed",
+              "n": 8
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong><code>error.page.tsx</code></strong> — the application's one error boundary. It renders when a middleware, loader, or component throws; declares no <code>route</code>, exactly like <code>404.page.tsx</code>; and a second <code>error.page.tsx</code> anywhere beneath <code>src/web</code> is a build error. Its component receives <code>{ error, status }</code> — the real thrown value during SSR, a JSON-safe <code>{ name, message, stack? }</code> after hydration. <code>robots: noindex</code> is a framework default on this path and cannot be overridden away. If the failure happens before any page module could load — a module-load or <code>register()</code> throw — the response falls back further, to a framework-owned boundary with no application code at all, and is served without a hydration script rather than risk hydrating against markup nothing can vouch for."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>A page's <code>route</code> export is now optional.</strong> A <code>*.page.tsx</code> with no <code>route</code> derives its path and its name from its location beneath <code>src/web</code>: directories contribute segments, <code>(group)</code> directories contribute nothing, <code>index.page.tsx</code> claims its own directory, and <code>[id]</code> becomes <code>:id</code>. An explicit <code>route</code> still always wins over the derived one. This replaces the 5.1 behaviour, where an omitted <code>route</code> threw <code>MissingRouteExportError</code> at install time — that error class no longer exists."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Live page-route re-registration in <code>warlock dev</code>.</strong> Creating, deleting, or editing a page's <code>route</code> export used to require a manual restart to take effect — the route table was built once at boot and never again, so a renamed route kept serving its old path and a deleted page kept 404-ing at its old URL forever. The dev connector now re-registers the affected routes in place, atomically, with no dev-server restart and no loss of Vite's HMR state. A component-body-only edit still takes the ordinary Fast Refresh path; only membership and route-identity changes go through this path."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>A dev-only diagnostic for a page file that exists but isn't reachable.</strong> When a request 404s, Warlock checks whether an unregistered <code>*.page.tsx</code> under <code>src/web</code> would have matched it, and if so, warns naming the file. This is the case that used to be silent: a page created after boot, or one whose <code>route</code> was edited to a path nothing else claims, previously 404'd with no explanation anywhere in the terminal."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>export const register</code></strong> — an optional, synchronous, no-argument hook on <code>root.tsx</code>, <code>layout.tsx</code>, and <code>*.page.tsx</code>. It runs once per module namespace instance, on both the server and the browser, before that module's middleware or loader — the seam for one-time setup a page or layout needs on both sides of hydration. It must not return a Promise; returning one throws."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Page requests now tolerate one trailing slash identically in development and production.</strong> <code>/about</code> and <code>/about/</code> serve the same page; <code>/</code> remains the root path and case handling is unchanged. Previously the development dispatcher accepted the slash while the production Fastify route returned 404."
+            },
+            {
+              "type": "Changed",
+              "html": "⚠ <strong>BREAKING — <code>process.env</code> is refused entirely in the client/universal graph, and there is no <code>PUBLIC_</code> exception.</strong> Neither a static key (<code>process.env.PUBLIC_API_URL</code>) nor a computed one (<code>process.env[key]</code>) is allowed: <code>process</code> does not exist in a browser, so there is no such thing as a \"public\" <code>process.env</code> key. <strong>Bare value-reads of the object now fail too</strong> — <code>const { X } = process.env</code>, <code>{ ...process.env }</code>, <code>Object.keys(process.env)</code>, <code>JSON.stringify(process.env)</code>, or passing it as an argument — which is the case that previously let an entire server environment reach a component in one line while every keyed read was being refused. <code>globalThis.process.env</code>, <code>window.process.env</code> and <code>process[\"env\"]</code> are matched as well."
+            },
+            {
+              "type": "Changed",
+              "html": "⚠ **BREAKING — a <code>*.page.tsx</code> with no default export is now a hard discovery/build failure, naming the file.** It previously built and registered, then served a blank <code>200</code> at its URL — a page that looked deployed, rendered nothing, and produced no error anywhere."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Initial stylesheet links are route-scoped in development and production.</strong> Each response now links the ordered, deduplicated CSS chain for its own <code>[root, ...matched layouts, page]</code>. Production follows those source entries and their static imports in Vite's manifest instead of collecting CSS across the whole application; development promotes direct stylesheet imports from the matched page and layouts as well as the root. Unrelated page CSS no longer ships on every response, and page-local critical CSS no longer waits for hydration in development."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>The production static-asset refusal now names the working 5.2 alternative.</strong> Imported non-stylesheet assets still work under Vite in development but are refused by the esbuild server bundle rather than risk a server/client URL mismatch. The diagnostic now tells the developer to place the file under the application's <code>public/</code> directory and reference its root URL (<code>public/logo.svg</code> → <code>/logo.svg</code>) instead of waiting for an unspecified future server build. Stylesheet imports remain supported."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Loader execution is sequential, root to leaf, and terminal responses stop lower work.</strong> The <code>root.tsx</code> App loader runs first, followed by every matched layout loader from outermost to innermost, then the page loader. The runtime has three top-level slots (<code>app</code>, <code>layout</code>, <code>page</code>), but the layout slot composes the full matched layout chain. A page still has at most one *rendering* layout; loader-only and middleware-only layouts may appear at multiple ancestry levels."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Catch-all page routes are documented as unsupported.</strong> <code>[...slug].page.tsx</code> does not do what it looks like: filesystem routing recognizes only <code>[name]</code> as a dynamic segment, so <code>[...slug]</code> is taken as a <strong>literal</strong> segment and derives the path <code>/docs/[...slug]</code> and the name <code>docs.[...slug]</code> — reachable only at the literal URL <code>/docs/%5B...slug%5D</code>. ⚠ <strong>Nothing warns about it</strong>: no build error, no dev warning, no refusal, just a page that answers a URL nobody will request. A real catch-all is deferred; until then use a terminal wildcard with an explicit route (<code>route = { path: \"/docs/*\" }</code>). This entry records the gap, it does not close it."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong><code>src/web</code> is the only page root.</strong> A per-module <code>src/app/&lt;module&gt;/web/</code> tree is no longer discovered, walked, or installed as a page root by either <code>warlock dev</code> or <code>warlock build</code>. Move any page, layout, or root file that lived under <code>src/app/&lt;module&gt;/web/</code> into <code>src/web/</code> (a subdirectory is fine — it still contributes a route segment the same way)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>A custom <code>404.page.tsx</code> loader no longer executes.</strong> The not-found page still registers and renders its real module namespace, but its request triple omits the page loader in both development and production. A missing URL therefore cannot trigger application data work, redirect, or fail a second time through the fallback itself."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 13,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 8
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong>Connectors can contribute to <code>warlock build</code> through an optional static <code>build</code> object.</strong> Configured connectors may define ordered, awaited <code>generate(context)</code> and <code>emit(context)</code> hooks without being booted or started. <code>generate</code> can add generated entry imports and a narrow esbuild patch; <code>emit</code> can produce non-esbuild artifacts after the server bundle. Unknown contribution keys, duplicate/reserved connector names, generated unresolved imports, and hook failures stop the build instead of producing a partial artifact."
+            },
+            {
+              "type": "Added",
+              "html": "<strong><code>warlock routes:diff</code></strong> — compares the live dev-server page-route surface against the last successful <code>warlock build</code>'s snapshot (<code>page-routes.manifest.json</code> in the build <code>outdir</code>). Boots diagnostically (same fail-loud boot as <code>warlock routes</code> / <code>warlock doctor</code> — no connectors started), then reports <code>changed</code> / <code>removed</code> / <code>added</code> page routes and exits non-zero on drift; exits <code>0</code> with \"Page routes match\" when the two agree. Refuses to run (with an instruction to run <code>warlock build</code> first) when no snapshot exists yet, or when an existing one is malformed. A route whose <code>path</code>/<code>name</code> moved but whose <code>source</code> file didn't is reported as one <code>changed</code> line instead of a <code>removed</code> + <code>added</code> pair."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Incoming routes now match with or without one trailing slash in both development and production.</strong> <code>/about</code> and <code>/about/</code> dispatch to the same route; <code>/</code> remains <code>/</code>, query strings are preserved, and case matching is unchanged. Both router paths call the same request-path normalizer before matching instead of relying on different Fastify/find-my-way defaults."
+            },
+            {
+              "type": "Changed",
+              "html": "⚠ <strong>BREAKING — <code>http.trustProxy</code> is validated at boot, and a number is refused.</strong> The accepted shapes are exactly <code>boolean</code>, a non-empty string (a single IP/CIDR or several comma-separated), a non-empty <code>string[]</code>, and an <code>(address, hop) =&gt; boolean</code> predicate; a missing or nullish value means <code>false</code>. Anything else — a number, <code>\"\"</code>, <code>[]</code>, an array with a non-string entry, a plain object — now throws a <code>TypeError</code> while the HTTP server is being constructed, before Fastify is instantiated, instead of being handed through and silently coerced"
+            },
+            {
+              "type": "Changed",
+              "html": "<strong><code>warlock build</code> writes into a temporary directory and promotes it only on success.</strong> The build no longer writes into <code>outdir</code> as it goes. It builds into a hidden sibling directory (<code>.&lt;outdir-basename&gt;.build-&lt;hex&gt;</code>, same volume so the promotion is a rename), writes a <code>.warlock-build.json</code> success marker (<code>{ status, builtAt }</code>) as its last step, then swaps the directory into place. <strong>A successful build therefore leaves no stale files</strong> — <code>outdir</code> is replaced wholesale rather than merged over, so an artifact a previous build emitted and this one did not is gone. <strong>A failed build leaves no usable <code>dist</code></strong> — the temp directory is removed and the error rethrown without <code>outdir</code> ever being touched, so a previous good build survives intact and no half-written one takes its place"
+            },
+            {
+              "type": "Changed",
+              "html": "<strong><code>warlock start</code> refuses a <code>dist</code> that was not produced by a successful build</strong>, and names that as the reason. It checks for the <code>.warlock-build.json</code> marker in <code>outdir</code> before spawning anything; missing, unreadable, malformed, or <code>status !== \"success\"</code> all exit <code>1</code> on stderr with"
+            },
+            {
+              "type": "Changed",
+              "html": "<strong><code>warlock start</code> surfaces the child process's real output on a failed boot.</strong> The production supervisor forwards every stdout/stderr chunk from the spawned bundle verbatim and live, and its failure summary now reports whether a cause actually arrived: <code>the cause is printed above, in the application's own output</code> when output was seen, and <code>no output was captured from the application process — its cause did not reach this terminal</code> when none was. It previously pointed at \"above\" unconditionally, which on a silent child meant pointing at an empty terminal"
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>The HTTP connector now preflights its port before binding.</strong> <code>warlock dev</code> and <code>warlock start</code> both go through <code>HttpConnector.start()</code>, which now calls <code>assertPortIsAvailable(port, host)</code> immediately before <code>listen()</code>. A collision now surfaces as <code>EADDRINUSE: Port &lt;port&gt; is already in use on &lt;host&gt;. Stop the dev server (or whatever else is listening on port &lt;port&gt;) and run again...</code> — the code and the port named in the same sentence — instead of a bare <code>EADDRINUSE</code> thrown from inside Fastify with no indication of which port it meant. <code>EACCES</code> on the port is treated the same way, since \"cannot bind\" is one problem from the operator's side. The test server (<code>startHttpTestServer</code>) already preflighted its port before this release; this brings <code>dev</code>/<code>start</code> to the same behavior."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong><code>startHttpTestServer()</code> now runs <code>Application.runStartupValidators()</code></strong> — the same slot <code>warlock dev</code> and the generated production <code>app.ts</code> already ran it in — after application modules load and before the late-phase connectors (http, socket) bind. A validator registered via <code>Application.onValidateBoot(...)</code> that rejects now aborts the test server's boot exactly as it aborts <code>dev</code>/<code>start</code>, instead of only being enforced outside of tests."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong><code>warlock add web</code> scaffolds a real, validated API endpoint</strong>, not just a static page. It now also writes <code>src/app/contact/routes.ts</code> and <code>src/app/contact/controllers/contact.controller.ts</code> (a <code>POST /api/contact</code> route validated with <code>@warlock.js/seal</code>), and <code>src/web/home.page.tsx</code> ships an interactive, localized (en/ar) contact form wired to that route via <code>@mongez/http</code> + <code>@mongez/react-form</code> + <code>@mongez/react-localization</code>. The <code>web</code> feature now also installs those three packages as dependencies."
+            },
+            {
+              "type": "Fixed",
+              "html": "**Feature definitions no longer carry stale <code>~4.0.0</code> defaults for <code>@warlock.js/*</code>.** They now use an explicit internal placeholder that <code>warlock add</code> must resolve from the installed Core version before invoking a package manager or writing <code>package.json</code>. A forgotten resolution therefore fails loudly instead of silently selecting an old framework major."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong><code>startHttpTestServer()</code> fails loudly instead of silently skipping the preflight</strong> when <code>http.port</code> doesn't round-trip through <code>Number()</code> (e.g. <code>HTTP_PORT=03999</code>, <code>+3999</code>, <code>1e3</code>, or a value with stray whitespace) — previously it returned early and let the connector reach <code>listen({ port })</code> with the unvalidated value and no published port for test workers to resolve."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>A race in the mail SES driver</strong> where <code>getSesMailer()</code> could read the eagerly-loaded <code>nodemailer</code> module before its load promise had settled. It now awaits the in-flight load first (throwing the \"nodemailer is not installed\" install-instructions error if the load ultimately failed), matching the guard the SMTP path already had."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.1.0",
       "id": "v5-1-0",
-      "date": null,
+      "date": "August 26, 2026",
       "isUnreleased": false,
-      "summaryHtml": null,
+      "summaryHtml": "<strong><code>@warlock.js/web</code> repairs published React hydration</strong> and adds an application-owned 404 page, typed metadata, and safer Fast Refresh boundaries; <code>@warlock.js/core</code> adds Tailwind and shadcn setup commands.",
       "mode": "detail",
       "packages": [
         {

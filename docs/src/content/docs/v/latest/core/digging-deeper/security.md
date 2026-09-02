@@ -183,11 +183,23 @@ Inherited values are validated before use — non-empty printable ASCII, max 128
 | --- | --- |
 | `false` *(default)* | Socket peer address; forwarding headers ignored — cannot be forged. |
 | `true` | Leftmost `X-Forwarded-For` hop — trusts the **whole chain**, including whatever the client itself prepended if your edge only appends. |
-| `2` (a number) | Walks past the 2 rightmost hops — for an edge that appends to the chain (the common case: nginx, an ALB, most CDNs). |
 | `"10.0.0.0/8"`, `"loopback, 10.0.0.0/8"`, `["10.0.0.0/8", "192.168.0.0/16"]` | Walks left while each hop is a listed proxy, stops at the first that isn't. |
 | `(address, hop) => boolean` | Your own predicate. |
 
-Prefer the narrowest shape your topology allows. With `true`, any client that can reach the process directly can pick its own IP — an `ipFilter` allowlist in front of it becomes decorative. **`X-Real-IP` is honoured only under `trustProxy: true`** — it carries no chain to walk a hop count or proxy list against; under a bounded `trustProxy` the client IP comes from `X-Forwarded-For` instead, so if your edge only sets `X-Real-IP`, have it set `X-Forwarded-For` too.
+Prefer the narrowest shape your topology allows. With `true`, any client that can reach the process directly can pick its own IP — an `ipFilter` allowlist in front of it becomes decorative. **`X-Real-IP` is honoured only under `trustProxy: true`** — it carries no chain to walk a proxy list against; under a bounded `trustProxy` the client IP comes from `X-Forwarded-For` instead, so if your edge only sets `X-Real-IP`, have it set `X-Forwarded-For` too.
+
+#### The value is validated at boot (5.2)
+
+Those four shapes are the **only** accepted ones: a `boolean`, a non-empty string (one CIDR/IP, or several comma-separated), a non-empty `string[]`, or an `(address, hop) => boolean` predicate. A missing or nullish value means `false`. Anything else throws a `TypeError` while the HTTP server is being constructed — the process never reaches `listen()`:
+
+```
+Invalid http.trustProxy configuration: expected a boolean, a non-empty IP/CIDR string,
+a non-empty string array, or a predicate function; received number.
+```
+
+⚠ **A number is rejected, including the hop counts earlier releases recommended.** `trustProxy: 2` used to be the documented shape for an edge that appends to `X-Forwarded-For`. The Fastify version Warlock builds against treats a number as *always false* at runtime, so a hop count did not walk past your proxies — it silently degraded to "trust nothing", which is a security-relevant surprise that looks like a working config. Rather than coerce it into something plausible, Warlock refuses it loudly. Express the same topology as a proxy list (`"10.0.0.0/8"`) or a predicate.
+
+The other refused values are `""`, `[]`, an array with any non-string entry, and a plain object. Each throws the same `TypeError` with `received` naming what it got (`"array"` for any array, otherwise `typeof value`).
 
 ## Validation as a boundary
 

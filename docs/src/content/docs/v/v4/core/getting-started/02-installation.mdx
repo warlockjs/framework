@@ -1,4 +1,6 @@
 ---
+banner:
+  content: "This page documents Warlock v4. <a href='/v/latest'>View the latest docs.</a>"
 title: "Installation"
 description: Scaffold a Warlock project, install dependencies, and boot the dev server — five minutes from zero.
 sidebar:
@@ -20,24 +22,9 @@ Five minutes from zero to a Warlock project that boots. Three steps: scaffold, i
 Pick your package manager — the rest of this page assumes the same one end to end.
 
 <Tabs syncKey="pm">
-  <TabItem label="npm">
-    ```bash
-    npm create warlock@latest my-app
-    cd my-app
-    ```
-  </TabItem>
-  <TabItem label="yarn">
-    ```bash
-    pnpm create warlock my-app
-    cd my-app
-    ```
-  </TabItem>
-  <TabItem label="pnpm">
-    ```bash
-    pnpm create warlock my-app
-    cd my-app
-    ```
-  </TabItem>
+  <TabItem label="npm">```bash npm create warlock@latest my-app cd my-app ```</TabItem>
+  <TabItem label="yarn">```bash pnpm create warlock my-app cd my-app ```</TabItem>
+  <TabItem label="pnpm">```bash pnpm create warlock my-app cd my-app ```</TabItem>
 </Tabs>
 
 The scaffolder asks six questions and writes everything based on your answers:
@@ -52,15 +39,9 @@ The scaffolder asks six questions and writes everything based on your answers:
 The scaffolder runs `<your-pm> install` for you at the end. If you cloned an existing Warlock project instead of scaffolding fresh, install manually:
 
 <Tabs syncKey="pm">
-  <TabItem label="npm">```bash
-npm install
-```</TabItem>
-  <TabItem label="yarn">```bash
-pnpm install
-```</TabItem>
-  <TabItem label="pnpm">```bash
-pnpm install
-```</TabItem>
+  <TabItem label="npm">```bash npm install ```</TabItem>
+  <TabItem label="yarn">```bash pnpm install ```</TabItem>
+  <TabItem label="pnpm">```bash pnpm install ```</TabItem>
 </Tabs>
 
 ## Step 2 — What got scaffolded
@@ -93,15 +74,9 @@ Two layers of config and it's worth knowing which is which from the start:
 ## Step 3 — Boot the dev server
 
 <Tabs syncKey="pm">
-  <TabItem label="npm">```bash
-npm run dev
-```</TabItem>
-  <TabItem label="yarn">```bash
-pnpm dev
-```</TabItem>
-  <TabItem label="pnpm">```bash
-pnpm dev
-```</TabItem>
+  <TabItem label="npm">```bash npm run dev ```</TabItem>
+  <TabItem label="yarn">```bash pnpm dev ```</TabItem>
+  <TabItem label="pnpm">```bash pnpm dev ```</TabItem>
 </Tabs>
 
 You'll see the dev server pick up your modules, start subsystem connectors (HTTP, database, cache, mail, storage, …) in priority order, and print the URL it's listening on. Open it — the framework prints a welcome response from the default route so you know the loop closed.

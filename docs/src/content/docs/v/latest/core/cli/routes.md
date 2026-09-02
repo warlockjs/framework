@@ -99,7 +99,31 @@ warlock routes:diff
 
 ```
 Page routes match (6 routes).
+Note: page names are compared as DERIVED by the build, so a clean diff does not
+prove that no route name collided at registration (the router appends
+`.<method>` to a name already claimed by another method). Run `warlock routes`
+to see the registered names.
 ```
+
+A tree you have not touched since a successful `warlock build` now reports
+clean. That was not true through 5.1: the manifest recorded the catch-all page
+route as `"*"` while the router registers it as `"/*"`, so the very first
+`routes:diff` after a green build reported drift on an untouched checkout. The
+manifest is written through the router's own path normalizer now, so drift on
+an unedited tree is a real signal rather than the expected greeting.
+
+:::caution[What a clean diff does not prove]
+The manifest is a record of what each page's route name was **derived** as, not
+of what it was **registered** as. `warlock build` never boots connectors, so it
+cannot see the API routes a page name could collide with — and when a name is
+already claimed by another method, the router appends a `.<method>` suffix at
+registration time, which the comparison accepts rather than reporting.
+
+`Page routes match` therefore means *the page surface has not moved since the
+build*. It does **not** mean *no page route name collided*. Run plain
+`warlock routes` (the table at the top of this page) to see the names as they
+were actually registered.
+:::
 
 When the two disagree, it prints one line per drift and exits non-zero — a
 CI-friendly gate to run before deploying:

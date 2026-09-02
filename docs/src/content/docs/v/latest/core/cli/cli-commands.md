@@ -141,6 +141,8 @@ warlock build
 
 No flags. Output lands in `dist/` (or wherever `warlock.config.ts > build.outDir` points). See [How it works](../architecture-concepts/how-it-works.md) for the bundler story.
 
+The build is all-or-nothing: it writes into a hidden sibling temp directory and promotes it into `outdir` with a rename only on success. A successful build therefore leaves no stale files from a previous one, and a failed build leaves `outdir` untouched rather than half-written. The promoted directory carries a `.warlock-build.json` success marker that `start` checks. See [Deployment](../digging-deeper/deployment).
+
 ### `start`
 
 Start the production server from the build output.
@@ -150,6 +152,14 @@ warlock start
 ```
 
 Persistent. Reads `warlock.config.ts` to resolve the entry path and source-map flag, then `spawn`s `node` with the right arguments. Forwards `SIGTERM` / `SIGINT` to the child cleanly — Ctrl+C does what you expect.
+
+It refuses an output directory that no successful `warlock build` produced — missing, unreadable or non-success `.warlock-build.json` — naming that as the reason and exiting `1` before spawning anything:
+
+```
+✖ "dist" was not produced by a successful `warlock build` run (no build-success marker found). Run `warlock build` before `warlock start`.
+```
+
+The child's own stdout and stderr are forwarded verbatim, so a boot failure shows the application's real error; the summary underneath says whether a cause actually reached the terminal rather than always claiming one was printed. A port collision is preflighted and named — `EADDRINUSE: Port 3000 is already in use on 127.0.0.1. …`.
 
 The started banner goes to stdout **only after the running app reports a completed boot**; progress goes to stderr. A boot that fails prints to both streams and exits non-zero, even if the child process exited `0` — so `warlock start | grep -q "production server started"` is a sound health gate. See [Deployment](../digging-deeper/deployment) for the readiness contract.
 
@@ -329,6 +339,10 @@ warlock add auth --no-install                # record deps, run setup, skip the 
 | `--no-install`             | Record the dependencies in `package.json` and run the setup (eject configs, add scripts, run setup hooks) without invoking the package manager install. Pass it last, after the feature list. Used by scaffolders that run a single install afterwards. |
 
 The command installs the npm package(s), runs their post-install hooks (configuration files, migrations, etc.), and updates your `warlock.config.ts` where needed.
+
+#### Web feature
+
+`warlock add web` scaffolds the application-wide Web tree under `src/web/`. Its generated home page re-exports the universal `register()` hook from `src/web/index.register.ts`: Warlock still discovers the hook from the page namespace and runs it during SSR and hydration, while React Fast Refresh can update the page component without reloading it or resetting component state.
 
 #### AI features
 

@@ -3,15 +3,14 @@ title: Upgrade to v5
 description: The breaking changes between Warlock v4 and v5, with the exact edits an existing application needs.
 ---
 
-Warlock v5's headline feature is the new **WEB layer**: server-rendered React pages, hydration, and client navigation served by the same Warlock HTTP server as your API. It is opt-in for an existing application:
+Warlock v5 introduces an optional **Web layer**: server-rendered React pages, hydration, and client navigation served by the same Warlock HTTP server as your API. Adopting Web is separate from upgrading an API-only v4 application; the API migration does not add a page layer by itself.
 
-```bash
-warlock add web
-```
+The current 5.2 model is compact but specific:
 
-`@warlock.js/web` was never published before 5.0.0. It is an addition, not an upgrade, so it cannot break an existing v4 application merely because you upgraded the package family. Add it only if you want Warlock to serve pages as well as API routes.
-
-The first release includes route metadata, shared data, and Vite integration as well as SSR and navigation. Its hydration runtime is a public package entry, and both development and production route wiring resolve the packaged client manifest and stylesheets. None of that changes an API-only application until you opt in.
+- Page files live under `src/web`. With no `route` export, directories contribute path segments, `index.page.tsx` claims its directory, `(group)` directories contribute nothing, and a whole `[id]` segment becomes dynamic; an explicit `route` always wins. Catch-all (`[...slug]`) and composite dynamic (`[lat]-[lng]`) filenames are unsupported and remain literal. See [filesystem routing](/v/latest/web/#filesystem-routing).
+- Layouts on the page's ancestry compose outer-to-inner. At most one may render, while non-rendering layouts may still contribute middleware, loaders, and prefixes; a layout prefix replaces its own directory segment. See [layouts and the prefix override](/v/latest/web/#layouts-and-the-prefix-override).
+- Adding, removing, renaming, or changing a page's route identity in development atomically re-registers the page routes without restarting the server. Component-body-only edits stay on React Fast Refresh. See [live dev re-registration](/v/latest/web/#live-dev-re-registration).
+- Keep universal `register()` setup in a sidecar and named-re-export it (`export { register } from "./index.register";`). Declaring the non-component hook inline breaks the page's Fast Refresh boundary. See [`register()`](/v/latest/web/#register).
 
 For the upgrade itself, move the `@warlock.js/*` packages you use to v5 together, then make the edits below.
 
@@ -294,4 +293,4 @@ The Warlock family contains 28 lockstep-versioned packages. Only `core`, `web`, 
 5. Add your application's `RequestUser` augmentation if you use `@warlock.js/access` gates.
 6. Test optional numeric, date, boolean, and other non-string inputs when clients may send `""`.
 7. Review auth failure tests for the new credential-versus-server-error distinction.
-8. Optionally run `warlock add web`; it is not part of the compatibility work.
+8. If you adopt Web, audit its current page model separately; it is not part of an API-only upgrade.

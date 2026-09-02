@@ -1,7 +1,7 @@
 ---
 /**
- * Starlight banner override: preserve per-page banners everywhere and add a
- * site-wide frozen-version notice to every route under /v/v4/.
+ * Starlight banner override: preserve per-page banners everywhere and show a
+ * frozen-version notice on routes under /v/v4/.
  */
 import Default from "@astrojs/starlight/components/Banner.astro";
 
@@ -12,7 +12,7 @@ const isV4 = /^\/v\/v4(?:\/|$)/.test(Astro.url.pathname);
     <div class="sl-banner" data-pagefind-ignore>
       You are reading the frozen <strong>Warlock.js v4 documentation</strong>.
       {" "}<a href="/v/latest/core/getting-started/01-introduction/">Read the current v5 docs</a>
-      {" | "}<a href="/v/latest/upgrade-to-v5/">Upgrade to v5</a>
+      {" | "}<a href="/v/latest/core/upgrade-to-v5/">Upgrade to v5</a>
     </div>
 )}
 

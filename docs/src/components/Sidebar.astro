@@ -15,8 +15,6 @@ const topics = data?.topics ?? [];
 const currentTopic = topics.find((topic) => topic.isCurrent);
 const currentVersionRoot = currentTopic?.link.match(/^\/v\/[^/]+\//)?.[0] ?? "/v/latest/";
 const currentVersionTopics = topics.filter((topic) => topic.link.startsWith(currentVersionRoot));
-const currentPath = Astro.url.pathname;
-const onUpgradePage = currentPath === "/v/latest/upgrade-to-v5/";
 
 // Groupings reflect dev intent, not alphabetical sort.
 const groups = {
@@ -57,20 +55,6 @@ const iconFor = (label: string): string => {
 ---
 
 {
-  <a
-    class:list={["warlock-upgrade-link", onUpgradePage && "is-active"]}
-    href="/v/latest/upgrade-to-v5/"
-    aria-current={onUpgradePage ? "page" : undefined}
-  >
-    <span aria-hidden="true">^</span>
-    <span>
-      <strong>Upgrade to v5</strong>
-      <small>Migration guide</small>
-    </span>
-  </a>
-}
-
-{
   topics.length > 0 && (
     <div class="warlock-pkg" data-pkg-switcher>
       <div class="warlock-pkg-eyebrow">
@@ -96,7 +80,9 @@ const iconFor = (label: string): string => {
             {currentTopic?.label ?? "Pick a package"}
           </span>
           <span class="warlock-pkg-trigger-sub">
-            {currentTopic ? "@warlock.js/" + currentTopic.label.toLowerCase() : "Browse all 13"}
+            {currentTopic
+              ? "@warlock.js/" + currentTopic.label.toLowerCase()
+              : `Browse all ${currentVersionTopics.length} topics`}
           </span>
         </span>
         <svg class="warlock-pkg-trigger-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -148,47 +134,6 @@ const iconFor = (label: string): string => {
 }
 
 <Default><slot /></Default>
-
-<style>
-  .warlock-upgrade-link {
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-    margin: 0 0 0.8rem;
-    padding: 0.7rem 0.75rem;
-    border: 1px solid color-mix(in srgb, var(--sl-color-text-accent) 38%, transparent);
-    border-radius: var(--warlock-radius);
-    background: color-mix(in srgb, var(--sl-color-text-accent) 9%, transparent);
-    color: var(--sl-color-white);
-    text-decoration: none;
-  }
-
-  .warlock-upgrade-link:hover,
-  .warlock-upgrade-link.is-active {
-    border-color: var(--sl-color-text-accent);
-    background: color-mix(in srgb, var(--sl-color-text-accent) 15%, transparent);
-  }
-
-  .warlock-upgrade-link > span:first-child {
-    color: var(--sl-color-text-accent);
-    font-size: 1.15rem;
-    font-weight: 700;
-  }
-
-  .warlock-upgrade-link > span:last-child {
-    display: grid;
-    gap: 0.1rem;
-  }
-
-  .warlock-upgrade-link strong {
-    font-size: 0.84rem;
-  }
-
-  .warlock-upgrade-link small {
-    color: var(--sl-color-gray-3);
-    font-size: 0.7rem;
-  }
-</style>
 
 <script>
   // Custom dropdown behavior: open/close, outside-click, Escape, arrow keys.
