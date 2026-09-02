@@ -45,7 +45,7 @@ Each folder holds one `SKILL.md` (an agent-facing how-to for a single task). The
 
 - [warlock-doctor](warlock-doctor/SKILL.md) — `warlock doctor`: read-only diagnostics (routes/config/connectors/optional-peers/health/release-hygiene) with a pass/warn/fail report and non-zero exit on failure.
 - [warlock-routes](warlock-routes/SKILL.md) — `warlock routes`: list the registered HTTP routes as a verb-colored table (method/path/name/action/middleware/source); filter by method/path/name or emit JSON. Read-only, no connectors.
-- [write-cli-command](write-cli-command/SKILL.md) — author a custom `warlock <cmd>` via the `command()` factory (name, action, options, preload).
+- [write-cli-command](write-cli-command/SKILL.md) — author a custom `warlock <cmd>` via the `command()` factory, or inspect built-in `warlock add` feature scaffolding such as the Web starter.
 - [run-app](run-app/SKILL.md) — `warlock dev` / `warlock build` / `warlock start` operational commands.
 - [update-packages](update-packages/SKILL.md) — bump every `@warlock.js/*` dependency with `warlock update`.
 

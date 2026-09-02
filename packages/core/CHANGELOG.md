@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.2.4 - 2026-09-02
+
+### Fixed
+
+- `warlock add web` now writes universal page setup to `src/web/index.register.ts` and re-exports `register()` from the page, preserving component state across React Fast Refresh edits without changing SSR or hydration registration.
+
 ## 5.2.3 - 2026-09-02
 
 ### Fixed
