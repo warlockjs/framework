@@ -1,5 +1,6 @@
 // @ts-check
 import { defineConfig } from "astro/config";
+import sitemap from "@astrojs/sitemap";
 import starlight from "@astrojs/starlight";
 import mermaid from "astro-mermaid";
 import starlightSidebarTopics from "starlight-sidebar-topics";
@@ -567,6 +568,11 @@ export default defineConfig({
           mirrorActors: false,
         },
       },
+    }),
+    sitemap({
+      // /home2 is a temporary design-review route. Keep it deployable for
+      // evaluation without advertising a second product homepage to crawlers.
+      filter: (page) => new URL(page).pathname !== "/home2/",
     }),
     starlight({
       title: "Warlock.js",
