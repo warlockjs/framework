@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/access",
-  "version": "5.2.3",
+  "version": "5.2.4",
   "type": "module",
   "description": "Authorization (RBAC + ABAC) for Warlock.js applications",
   "main": "./src/index.ts",
