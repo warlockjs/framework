@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.2.2
+
+### Fixed
+
+- Restored exact 5.2.2 pins across the complete Warlock family. The partial
+  5.2.0 and 5.2.1 releases could not satisfy the family's reciprocal exact
+  peer requirements in a clean install.
+
 ## 5.2.1
 
 ### Fixed
