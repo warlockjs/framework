@@ -23,7 +23,7 @@ import type { Middleware, Route } from "../router";
 import { validateAll } from "../validation/validateAll";
 import { createRequestStore } from "./middleware/inject-request-context";
 import { Response } from "./response";
-import type { RequestEvent, RequestLocals, RequestUser } from "./types";
+import type { DecodedAccessToken, RequestEvent, RequestLocals, RequestUser } from "./types";
 import { UploadedFile } from "./uploaded-file";
 
 type StandardHeaders = {
@@ -74,9 +74,30 @@ export class Request<RequestValidation = any> {
   protected payload: any = {};
 
   /**
-   * Decoded access token payload (set by auth middleware)
+   * Backing field for `decodedAccessToken` — see the accessor below.
    */
-  public decodedAccessToken?: any;
+  private _decodedAccessToken?: DecodedAccessToken;
+
+  /**
+   * Decoded access token payload (set by auth middleware).
+   *
+   * A prototype accessor, not a plain field, so assignment can mark the
+   * request `authDerived` (see the setter below and `RequestLocals` in
+   * `types.ts`) without every call site remembering to do so itself.
+   */
+  public get decodedAccessToken(): DecodedAccessToken | undefined {
+    return this._decodedAccessToken;
+  }
+
+  public set decodedAccessToken(value: DecodedAccessToken | undefined) {
+    this._decodedAccessToken = value;
+    this.locals.authDerived = true;
+  }
+
+  /**
+   * Backing field for `user` — see the accessor below.
+   */
+  private _user?: RequestUser;
 
   /**
    * The authenticated user attached to this request, if any.
@@ -97,10 +118,22 @@ export class Request<RequestValidation = any> {
    * (`create-warlock/.../guarded.request.ts` — `Request<T> & { user: User }`,
    * an intersection type hand-declared per app) with a property core itself
    * declares and types. `clearCurrentUser()` below is the one place core
-   * writes it directly; auth middleware is expected to do the same after a
-   * successful token resolution.
+   * writes it directly; auth middleware writes it after a successful token
+   * resolution.
+   *
+   * A prototype accessor, not a plain field: the setter also marks the
+   * request `authDerived` (see below), so `clearCurrentUser()`'s
+   * `this.user = undefined` still counts as touching auth state rather than
+   * un-marking it.
    */
-  public user?: RequestUser;
+  public get user(): RequestUser | undefined {
+    return this._user;
+  }
+
+  public set user(value: RequestUser | undefined) {
+    this._user = value;
+    this.locals.authDerived = true;
+  }
 
   /**
    * Private, server-only, per-request data bag.

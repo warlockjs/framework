@@ -13,9 +13,16 @@ export type RequestEvent =
 /**
  * Private, server-only, per-request data bag — `request.locals`.
  *
- * Empty by default. Augment it via module augmentation, in the module that
- * OWNS the key (not centrally), the same mechanism `RequestUser` and the web
- * layer's `SharedContext` use:
+ * An `interface`, not a `type`, because it is a declaration-merging target
+ * (the project's `type`-by-default rule's one legitimate exception): apps
+ * and packages augment it via `declare module`, and only an `interface` can
+ * be reopened that way.
+ *
+ * `authDerived` is core's own first occupant, set by the `user` and
+ * `decodedAccessToken` accessors below — see `request.ts` for what it means
+ * and why it is set-once. Augment further via module augmentation, in the
+ * module that OWNS the key (not centrally), the same mechanism `RequestUser`
+ * and the web layer's `SharedContext` use:
  *
  * @example
  * ```typescript
@@ -26,7 +33,16 @@ export type RequestEvent =
  * }
  * ```
  */
-export interface RequestLocals {}
+export interface RequestLocals {
+  /**
+   * Whether this request has, at any point, been assigned a `user` or a
+   * `decodedAccessToken` — set by their accessors in `request.ts`, never by
+   * anything else, and never cleared once set. Absent (not `false`) on a
+   * request that never touched auth state; a later stage reads this to
+   * decide cache headers, but that stage is not this one.
+   */
+  authDerived?: boolean;
+}
 
 /**
  * The authenticated user attached to the current request — `request.user`.
@@ -46,6 +62,22 @@ export interface RequestLocals {}
  * ```
  */
 export interface RequestUser {}
+
+/**
+ * Decoded access-token claims attached to the current request —
+ * `request.decodedAccessToken`.
+ *
+ * `userType` is the one claim core itself reads (the idempotency key builder,
+ * `core/src/http/middleware/utils/idempotency-key.ts`); the auth package's
+ * own middleware decodes and assigns the full JWT payload, which carries
+ * more (`id`, `created_at`, `tokenType`, `iat`, `exp`) than core needs to
+ * know the shape of. Declared as a `type`, not a declaration-merging
+ * `interface`, because nothing in core augments it — auth's own richer
+ * shape is simply assignable here.
+ */
+export type DecodedAccessToken = {
+  userType?: string;
+};
 
 /**
  * Allowed response type
