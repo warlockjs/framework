@@ -45,6 +45,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertArtifactContainsItsEntryPoints as assertEntries } from "../../../builder/scripts/artifact-entry-points.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const appDirectory = path.join(here, "pnpm-production-app");
@@ -274,38 +275,16 @@ function assertArtifactContainsItsEntryPoints(artifactDirectory, name) {
 
   const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
 
-  const declaredEntries = [
-    ["main", manifest.main],
-    ["module", manifest.module],
-    ["types", manifest.types ?? manifest.typings],
-  ].filter(([, target]) => typeof target === "string" && target.length > 0);
-
-  if (declaredEntries.length === 0) {
-    throw new Error(
-      `${name}: its package.json declares no main, module or types, so there is nothing to verify. ` +
-        `A published package that names no entry point cannot be imported.`,
-    );
+  const entries = [];
+  function collectEntries(directory, prefix = "") {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const relativePath = path.posix.join(prefix, entry.name);
+      if (entry.isDirectory()) collectEntries(path.join(directory, entry.name), relativePath);
+      else entries.push(relativePath);
+    }
   }
-
-  const missing = declaredEntries.filter(([, target]) => {
-    return !existsSync(path.join(artifactDirectory, target));
-  });
-
-  if (missing.length > 0) {
-    throw new Error(
-      [
-        `${name}: the built artifact names entry points it does not contain.`,
-        "",
-        ...missing.map(([field, target]) => `  ${field}: ${target}  → MISSING`),
-        "",
-        `  in ${artifactDirectory}`,
-        "",
-        "This is what an interrupted build leaves behind: a directory carrying a",
-        "manifest, docs and bin/ with no compiled output. It looks built. Packing",
-        "and shipping it produces a package that cannot be imported at all.",
-      ].join("\n"),
-    );
-  }
+  collectEntries(artifactDirectory);
+  assertEntries(manifest, entries, name);
 }
 
 async function packFramework() {
