@@ -93,6 +93,27 @@ export function createRequestStore(
  * @internal
  */
 function handleRequestError(error: unknown, response: Response): ReturnedResponse {
+  // Availability floor, not a cache-policy nit: `handleRequestError` is the
+  // single funnel every unhandled error in every Warlock app passes through
+  // (`createRequestStore`'s catch above), and none of the branches below set
+  // a `Cache-Control` header. Without this, an error response — a 500 as
+  // much as a 401/403/404 carrying per-request/-user state — can be stored
+  // by a shared cache or CDN and replayed to other requests/users long after
+  // the condition that caused it is gone: a cached 500 becomes an outage
+  // that outlives its cause; a cached 401/403 becomes a leak across users.
+  // Set once, here, before any branch runs — not per branch — because the
+  // branches below do not cleanly partition by status: `ResourceNotFoundError`,
+  // `UnAuthorizedError`, `ForbiddenError`, `BadRequestError` and `ServerError`
+  // all extend `HttpError`, so `error instanceof HttpError` below matches
+  // every one of them and returns first — their own `instanceof` checks
+  // further down are unreachable. A raw `HttpError` can also carry any
+  // caller-chosen status, 4xx or 5xx. Trying to gate the floor on the
+  // eventual status would mean re-deriving that status per branch, which is
+  // exactly the "one rule meeting one form while others reach the same
+  // output" shape this card calls out. Applying it once, unconditionally,
+  // is both simpler and safer.
+  response.header("Cache-Control", "private, no-store");
+
   if (error instanceof HttpError) {
     const payload: GenericObject = {
       error: error.message,
