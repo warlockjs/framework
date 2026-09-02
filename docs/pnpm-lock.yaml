@@ -26,10 +26,6 @@ importers:
       starlight-sidebar-topics:
         specifier: ^0.7.1
         version: 0.7.2(@astrojs/starlight@0.39.3(astro@6.4.8(@types/node@24.13.3)(rollup@4.63.1)))
-    devDependencies:
-      '@astrojs/sitemap':
-        specifier: 3.7.3
-        version: 3.7.3
 
 packages:
 
