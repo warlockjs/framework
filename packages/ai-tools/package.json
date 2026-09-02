@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/ai-tools",
-  "version": "5.2.2",
+  "version": "5.2.3",
   "type": "module",
   "description": "Ready-made agent tools (web search, fetch, HTTP, calculator, date-time) + an MCP client/server for @warlock.js/ai",
   "main": "./src/index.ts",
