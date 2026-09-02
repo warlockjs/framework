@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/notifications",
-  "version": "5.2.2",
+  "version": "5.2.3",
   "type": "module",
   "description": "Multi-channel notifications for Warlock.js — define once, fire anywhere; mail / in-app database / pluggable custom channels with preferences, rate limits, and idempotency.",
   "main": "./src/index.ts",
@@ -16,7 +16,7 @@
     "@warlock.js/logger": "workspace:^"
   },
   "optionalDependencies": {
-    "@warlock.js/herald": "workspace:^"
+    "@warlock.js/herald": "5.2.3"
   },
   "scripts": {
     "test": "vitest",
