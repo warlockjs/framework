@@ -115,10 +115,10 @@ type HomeRouteCollision =
   | { outcome: "failed"; reason: string };
 
 /**
- * Make room for a page that declares `route = "/"`.
+ * Make room for a page that declares `route.path = "/"`.
  *
  * The project template registers `router.get("/", homePageController)` and the
- * page stub declares `route = "/"`. Fastify rejects the second registration
+ * page stub declares `route.path = "/"`. Fastify rejects the second registration
  * (`Method 'GET' already declared for route '/'`) and the homepage 500s at
  * request time — so `warlock add web` cannot just write the page and hope.
  *
@@ -230,12 +230,12 @@ async function completeWebInstallation(_options: CommandActionData) {
       const verb = collision.outcome === "failed" ? colors.redBright("✗") : colors.yellowBright("!");
 
       console.log(
-        `${verb} Did not create src/web/home.page.tsx: ` +
+        `${verb} Did not create src/web/index.page.tsx: ` +
           `${colors.yellowBright(`src/${APP_ROUTES_FILE}`)} ${collision.reason}.\n` +
-          `  The page stub declares ${colors.yellowBright('route = "/"')}, and two handlers on one ` +
+          `  The page stub declares ${colors.yellowBright('route.path = "/"')}, and two handlers on one ` +
           "path is a 500 at request time, not a startup error.\n" +
           `  Free up ${colors.yellowBright('GET "/"')} in that file — move it to a path of its own, ` +
-          "or remove it — then create src/web/home.page.tsx yourself. Giving the page a `route` other " +
+          "or remove it — then create src/web/index.page.tsx yourself. Giving the page a `route` other " +
           "than `/` works too.",
       );
 
@@ -249,14 +249,14 @@ async function completeWebInstallation(_options: CommandActionData) {
       // still has to install, or the project is left half-wired on top of this.
       process.exitCode = 1;
     } else {
-      await putFileAsync(srcPath("web/home.page.tsx"), webHomePageStub);
+      await putFileAsync(srcPath("web/index.page.tsx"), webHomePageStub);
       await ensureDirectoryAsync(srcPath("app/contact/controllers"));
       await putFileAsync(
         srcPath("app/contact/controllers/contact.controller.ts"),
         webContactControllerStub,
       );
       await putFileAsync(srcPath("app/contact/routes.ts"), webContactRoutesStub);
-      console.log(`${colors.green("✓")} Created src/web/home.page.tsx`);
+      console.log(`${colors.green("✓")} Created src/web/index.page.tsx`);
       console.log(`${colors.green("✓")} Created POST /api/contact starter route`);
     }
   }

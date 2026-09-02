@@ -10,6 +10,7 @@ import { CommandActionData } from "../commands/types";
 import {
   detectPackageManager,
   getAddCommand,
+  getExactAddCommand,
   type PackageManager,
 } from "../updater/package-manager";
 import { rootPath, srcPath } from "../utils";
@@ -31,6 +32,10 @@ type ProjectPackageJson = {
 
 export const allowedFeatures = Object.keys(featuresMap);
 
+function isWarlockPackage(packageName: string): boolean {
+  return packageName.startsWith("@warlock.js/");
+}
+
 /**
  * Resolve the internal feature-map placeholder to the version of Core that is
  * actually executing the command. Every @warlock.js package is lockstep, so
@@ -41,7 +46,7 @@ export function resolveWarlockDependencyVersions(
   frameworkVersion: string,
 ): void {
   for (const dependency of Object.keys(dependencies)) {
-    if (dependency.startsWith("@warlock.js/")) {
+    if (isWarlockPackage(dependency)) {
       dependencies[dependency] = frameworkVersion;
     }
   }
@@ -182,19 +187,40 @@ export async function installDependencies(
   devDependencies: Record<string, string>,
 ) {
   // `--package-manager` is optional; without it, fall back to the lockfile.
-  const packageManagerCommand = getAddCommand(packageManager ?? (await detectPackageManager()));
+  const resolvedPackageManager = packageManager ?? (await detectPackageManager());
+  const packageManagerCommand = getAddCommand(resolvedPackageManager);
+  const exactPackageManagerCommand = getExactAddCommand(resolvedPackageManager);
+
+  const installDependencySet = (
+    dependencySet: Record<string, string>,
+    development: boolean,
+  ) => {
+    const regularSpecs: string[] = [];
+    const exactWarlockSpecs: string[] = [];
+
+    for (const [name, version] of Object.entries(dependencySet)) {
+      const spec = `${name}@${version}`;
+      (isWarlockPackage(name) ? exactWarlockSpecs : regularSpecs).push(spec);
+    }
+
+    const developmentFlag = development ? " -D" : "";
+    const runInstall = (command: string, specs: string[]) => {
+      if (specs.length === 0) return;
+
+      execSync(`${command} ${specs.join(" ")}${developmentFlag}`, {
+        cwd: process.cwd(),
+        stdio: "inherit",
+      });
+    };
+
+    runInstall(packageManagerCommand, regularSpecs);
+    runInstall(exactPackageManagerCommand, exactWarlockSpecs);
+  };
 
   if (Object.keys(dependencies).length > 0) {
     console.log(`Installing dependencies ${colors.magenta(Object.keys(dependencies).join(", "))}`);
 
-    const dependencySpecs = Object.entries(dependencies).map(
-      ([name, version]) => `${name}@${version}`,
-    );
-
-    execSync(`${packageManagerCommand} ${dependencySpecs.join(" ")}`, {
-      cwd: process.cwd(),
-      stdio: "inherit",
-    });
+    installDependencySet(dependencies, false);
 
     console.log(
       `Dependencies installed successfully ${colors.green(Object.keys(dependencies).join(", "))}`,
@@ -206,14 +232,7 @@ export async function installDependencies(
       `Installing dev dependencies ${colors.magenta(Object.keys(devDependencies).join(", "))}`,
     );
 
-    const devDependencySpecs = Object.entries(devDependencies).map(
-      ([name, version]) => `${name}@${version}`,
-    );
-
-    execSync(`${packageManagerCommand} ${devDependencySpecs.join(" ")} -D`, {
-      cwd: process.cwd(),
-      stdio: "inherit",
-    });
+    installDependencySet(devDependencies, true);
 
     console.log(
       `Dev dependencies installed successfully ${colors.green(Object.keys(devDependencies).join(", "))}`,

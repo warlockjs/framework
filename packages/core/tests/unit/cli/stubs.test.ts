@@ -13,6 +13,7 @@ import {
   webContactControllerStub,
   webContactRoutesStub,
   webHomePageStub,
+  webRootStub,
 } from "../../../src/generations/stubs";
 
 /**
@@ -171,6 +172,21 @@ describe("web starter stubs", () => {
     expect(webHomePageStub).toContain("schema={contactSchema}");
     expect(webHomePageStub).toContain("result.error.isValidationError");
     expect(webHomePageStub).toContain("aria-pressed={locale === \"ar\"}");
+  });
+
+  it("declares one stable route identity and registers localization inside the projection hook", () => {
+    expect(webHomePageStub).toContain(
+      'export const route = { path: "/", name: "index" } as const;',
+    );
+    expect(webHomePageStub).toContain("export function register() {");
+    expect(webHomePageStub.indexOf('extend("en", {')).toBeGreaterThan(
+      webHomePageStub.indexOf("export function register() {"),
+    );
+  });
+
+  it("keeps the generated browser console clean with deterministic root markup", () => {
+    expect(webRootStub).toContain('<link rel="icon" href="data:," />');
+    expect(webHomePageStub).toContain('id="contact-form"');
   });
 
   it("generates a validated Warlock API controller and route", () => {

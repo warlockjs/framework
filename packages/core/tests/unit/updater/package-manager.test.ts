@@ -10,9 +10,8 @@ vi.mock("../../../src/utils", () => ({
   rootPath: (file: string) => `/project/${file}`,
 }));
 
-const { detectPackageManager, getAddCommand, getInstallCommand } = await import(
-  "../../../src/updater/package-manager"
-);
+const { detectPackageManager, getAddCommand, getExactAddCommand, getInstallCommand } =
+  await import("../../../src/updater/package-manager");
 
 /** Pretend the project root carries exactly these lockfiles. */
 function withLockfiles(...files: string[]) {
@@ -61,12 +60,13 @@ describe("detectPackageManager", () => {
 
 describe("install and add commands", () => {
   it.each([
-    ["npm", "npm install", "npm install"],
-    ["yarn", "yarn install", "yarn add"],
-    ["pnpm", "pnpm install", "pnpm add"],
-    ["bun", "bun install", "bun add"],
-  ] as const)("maps %s correctly", (packageManager, install, add) => {
+    ["npm", "npm install", "npm install", "npm install --save-exact"],
+    ["yarn", "yarn install", "yarn add", "yarn add --exact"],
+    ["pnpm", "pnpm install", "pnpm add", "pnpm add --save-exact"],
+    ["bun", "bun install", "bun add", "bun add --exact"],
+  ] as const)("maps %s correctly", (packageManager, install, add, exactAdd) => {
     expect(getInstallCommand(packageManager)).toBe(install);
     expect(getAddCommand(packageManager)).toBe(add);
+    expect(getExactAddCommand(packageManager)).toBe(exactAdd);
   });
 });

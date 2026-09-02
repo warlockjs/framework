@@ -8,7 +8,7 @@ Code scaffolding / generation system. Provides the `add` CLI command action that
 | ----------------------- | -------------------------------------------------------------------- |
 | `add-command.action.ts` | Main action: prompts for module name, generates files from templates |
 | `stubs.ts`              | Template strings for generated files, including the `warlock add web` starter (`webRootStub`, `webHomePageStub`, `webContactControllerStub`, `webContactRoutesStub`) |
-| `features/web.feature.ts` | The `web` feature installer — scaffolds `src/web/root.tsx` + `src/web/home.page.tsx` plus `src/app/contact/{routes.ts,controllers/contact.controller.ts}` (a real `POST /api/contact` route validated with `@warlock.js/seal`), registers the `WebConnector`, and declares the feature's npm dependencies |
+| `features/web.feature.ts` | The `web` feature installer — scaffolds `src/web/root.tsx` + `src/web/index.page.tsx` plus `src/app/contact/{routes.ts,controllers/contact.controller.ts}` (a real `POST /api/contact` route validated with `@warlock.js/seal`), registers the `WebConnector`, and declares the feature's npm dependencies |
 
 ## Key Exports
 

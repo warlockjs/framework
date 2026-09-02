@@ -98,17 +98,31 @@ describe("add command dependency installation", () => {
     await installDependencies(
       "npm",
       { react: "^19.2.3", "@warlock.js/web": "5.2.0" },
-      { typescript: "~5.8.3", "@types/react": "^19.0.0" },
+      {
+        typescript: "~5.8.3",
+        "@types/react": "^19.0.0",
+        "@warlock.js/tests": "5.2.0",
+      },
     );
 
     expect(execSync).toHaveBeenNthCalledWith(
       1,
-      "npm install react@^19.2.3 @warlock.js/web@5.2.0",
+      "npm install react@^19.2.3",
       expect.objectContaining({ cwd: process.cwd(), stdio: "inherit" }),
     );
     expect(execSync).toHaveBeenNthCalledWith(
       2,
+      "npm install --save-exact @warlock.js/web@5.2.0",
+      expect.objectContaining({ cwd: process.cwd(), stdio: "inherit" }),
+    );
+    expect(execSync).toHaveBeenNthCalledWith(
+      3,
       "npm install typescript@~5.8.3 @types/react@^19.0.0 -D",
+      expect.objectContaining({ cwd: process.cwd(), stdio: "inherit" }),
+    );
+    expect(execSync).toHaveBeenNthCalledWith(
+      4,
+      "npm install --save-exact @warlock.js/tests@5.2.0 -D",
       expect.objectContaining({ cwd: process.cwd(), stdio: "inherit" }),
     );
   });

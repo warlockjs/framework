@@ -619,6 +619,7 @@ export default function App({ children }: AppProps) {
           that emits one too produces two.
         */}
         <Head />
+        <link rel="icon" href="data:," />
       </head>
       <body>
         {/*
@@ -684,7 +685,7 @@ router.post("/api/contact", contactController);
 `;
 
 /**
- * `src/web/home.page.tsx` — one page, so \`warlock dev\` has something to serve
+ * `src/web/index.page.tsx` — one page, so \`warlock dev\` has something to serve
  * the moment this finishes.
  */
 export const webHomePageStub = `import { http } from "@mongez/http";
@@ -699,11 +700,12 @@ import { Link, type PageProps } from "@warlock.js/web";
  * A page route is an ordinary Warlock route whose handler renders React
  * instead of returning JSON.
  *
- * The URL is the one this file DECLARES below. This page answers \`GET "/"\`
- * because \`route = "/"\`, not because of where the file lives. A page file with
+ * The URL and stable hydration name are the ones this file DECLARES below.
+ * This page answers \`GET "/"\` because \`route.path = "/"\`, not because of
+ * where the file lives. A page file with
  * no \`route\` export is REFUSED by both the dev server and the build.
  */
-export const route = "/";
+export const route = { path: "/", name: "index" } as const;
 
 export const metadata = { title: "Home" };
 
@@ -713,32 +715,34 @@ const contactSchema = v.object({
   message: v.string().min(10).required(),
 });
 
-extend("en", {
-  starter: {
-    title: "Your Warlock app is running.",
-    introduction: "This page is rendered on the server and hydrated in the browser.",
-    language: "العربية",
-    contact: "Send a message",
-    name: "Name",
-    email: "Email",
-    message: "Message",
-    submit: "Send message",
-    sent: "Thanks — your message has been received.",
-  },
-});
-extend("ar", {
-  starter: {
-    title: "تطبيق Warlock يعمل الآن.",
-    introduction: "تُعرض هذه الصفحة على الخادم ثم تُفعَّل في المتصفح.",
-    language: "English",
-    contact: "أرسل رسالة",
-    name: "الاسم",
-    email: "البريد الإلكتروني",
-    message: "الرسالة",
-    submit: "إرسال الرسالة",
-    sent: "شكرًا — تم استلام رسالتك.",
-  },
-});
+export function register() {
+  extend("en", {
+    starter: {
+      title: "Your Warlock app is running.",
+      introduction: "This page is rendered on the server and hydrated in the browser.",
+      language: "العربية",
+      contact: "Send a message",
+      name: "Name",
+      email: "Email",
+      message: "Message",
+      submit: "Send message",
+      sent: "Thanks — your message has been received.",
+    },
+  });
+  extend("ar", {
+    starter: {
+      title: "تطبيق Warlock يعمل الآن.",
+      introduction: "تُعرض هذه الصفحة على الخادم ثم تُفعَّل في المتصفح.",
+      language: "English",
+      contact: "أرسل رسالة",
+      name: "الاسم",
+      email: "البريد الإلكتروني",
+      message: "الرسالة",
+      submit: "إرسال الرسالة",
+      sent: "شكرًا — تم استلام رسالتك.",
+    },
+  });
+}
 
 function TextInput({ label, ...controlProps }: FormControlProps & { label: string }) {
   const { error, getErrorProps, getInputProps } = useFormControl(controlProps);
@@ -859,6 +863,7 @@ export default function HomePage(_props: PageProps) {
         <section className="wk-contact" aria-labelledby="contact-heading">
           <h2 id="contact-heading">{transX("starter.contact")}</h2>
           <Form<typeof contactSchema>
+            id="contact-form"
             schema={contactSchema}
             onSubmit={async ({ form, values }) => {
               setSubmitted(false);

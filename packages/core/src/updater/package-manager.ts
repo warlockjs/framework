@@ -74,3 +74,25 @@ export function getAddCommand(packageManager: PackageManager): string {
       return "npm install";
   }
 }
+
+/**
+ * The package-manager command that saves an exact version. Warlock family
+ * dependencies use this path so the version selected by the executing Core is
+ * preserved verbatim in package.json instead of being widened by a manager's
+ * default save prefix.
+ */
+export function getExactAddCommand(packageManager: PackageManager): string {
+  switch (packageManager) {
+    case "yarn":
+      return "yarn add --exact";
+
+    case "pnpm":
+      return "pnpm add --save-exact";
+
+    case "bun":
+      return "bun add --exact";
+
+    default:
+      return "npm install --save-exact";
+  }
+}
