@@ -473,7 +473,7 @@ import { Notification } from "../notification.model";
 export default Migration.create(Notification, notificationColumns(Notification));
 `;
 
-export const notificationControllersStub = `import { type Request, type RequestHandler, type Response } from "@warlock.js/core";
+export const notificationControllersStub = `import { type RequestHandler } from "@warlock.js/core";
 import { inApp } from "@warlock.js/notifications";
 
 /**
@@ -484,10 +484,7 @@ import { inApp } from "@warlock.js/notifications";
  */
 
 /** GET /notifications — list, most recent first (page / limit / type / unread via query). */
-export const listNotificationsController: RequestHandler = async (
-  request: Request,
-  response: Response,
-) => {
+export const listNotificationsController: RequestHandler = async ({ request, response }) => {
   const { data, pagination } = await inApp.list(request.user!, request.all());
 
   return response.success({ notifications: data, pagination });
@@ -496,10 +493,10 @@ export const listNotificationsController: RequestHandler = async (
 listNotificationsController.description = "List notifications";
 
 /** GET /notifications/unread-count — drives the bell badge. */
-export const unreadNotificationsCountController: RequestHandler = async (
-  request: Request,
-  response: Response,
-) => {
+export const unreadNotificationsCountController: RequestHandler = async ({
+  request,
+  response,
+}) => {
   const count = await inApp.countUnread(request.user!);
 
   return response.success({ count });
@@ -508,10 +505,7 @@ export const unreadNotificationsCountController: RequestHandler = async (
 unreadNotificationsCountController.description = "Unread notifications count";
 
 /** PATCH /notifications/:id/read — mark one read, return the updated row. */
-export const markNotificationReadController: RequestHandler = async (
-  request: Request,
-  response: Response,
-) => {
+export const markNotificationReadController: RequestHandler = async ({ request, response }) => {
   const id = request.input("id");
 
   await inApp.markAsRead(request.user!, id);
@@ -523,10 +517,10 @@ export const markNotificationReadController: RequestHandler = async (
 markNotificationReadController.description = "Mark notification read";
 
 /** PATCH /notifications/read-all — mark every unread one read. */
-export const markAllNotificationsReadController: RequestHandler = async (
-  request: Request,
-  response: Response,
-) => {
+export const markAllNotificationsReadController: RequestHandler = async ({
+  request,
+  response,
+}) => {
   const count = await inApp.markAsRead(request.user!);
 
   return response.success({ count });
@@ -535,10 +529,7 @@ export const markAllNotificationsReadController: RequestHandler = async (
 markAllNotificationsReadController.description = "Mark all notifications read";
 
 /** DELETE /notifications — dismiss all for the user. */
-export const clearNotificationsController: RequestHandler = async (
-  request: Request,
-  response: Response,
-) => {
+export const clearNotificationsController: RequestHandler = async ({ request, response }) => {
   await inApp.dismiss(request.user!);
 
   return response.noContent();
@@ -547,10 +538,7 @@ export const clearNotificationsController: RequestHandler = async (
 clearNotificationsController.description = "Clear notifications";
 
 /** DELETE /notifications/:id — dismiss one. */
-export const deleteNotificationController: RequestHandler = async (
-  request: Request,
-  response: Response,
-) => {
+export const deleteNotificationController: RequestHandler = async ({ request, response }) => {
   await inApp.dismiss(request.user!, request.input("id"));
 
   return response.noContent();

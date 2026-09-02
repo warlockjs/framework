@@ -161,9 +161,9 @@ warlock generate.controller products/list-products
 **Output:**
 
 ```typescript
-import type { RequestHandler, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 
-export const listProductsController: RequestHandler = async (request, response: Response) => {
+export const listProductsController: RequestHandler = async ({ response }) => {
   // TODO: Implement controller logic
   return response.success({});
 };
@@ -184,14 +184,13 @@ warlock generate.controller products/create-product --with-validation
 **Controller Output:**
 
 ```typescript
-import type { RequestHandler, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 import { type CreateProductRequest } from "../requests/create-product.request";
 import { createProductSchema } from "../validation/create-product.schema";
 
-export const createProductController: RequestHandler = async (
-  request: CreateProductRequest,
-  response: Response,
-) => {
+export const createProductController: RequestHandler<CreateProductRequest> = async ({
+  response,
+}) => {
   // TODO: Implement controller logic
   return response.success({});
 };
@@ -277,10 +276,10 @@ export async function createProductService(data: any): Promise<any> {
 ```typescript
 import { createProductService } from "../services/create-product.service";
 
-export const createProductController: RequestHandler = async (
-  request: CreateProductRequest,
-  response: Response,
-) => {
+export const createProductController: RequestHandler<CreateProductRequest> = async ({
+  request,
+  response,
+}) => {
   const product = await createProductService(request.validated());
   return response.success({ product });
 };

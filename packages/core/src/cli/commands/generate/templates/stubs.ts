@@ -18,7 +18,7 @@ export function controllerStub(
   if (!withValidation) {
     return `import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 
-export const ${name.camel}Controller: GuardedRequestHandler = async (request, response) => {
+export const ${name.camel}Controller: GuardedRequestHandler = async ({ response }) => {
   // TODO: Implement controller logic
   return response.success({});
 };
@@ -28,10 +28,9 @@ export const ${name.camel}Controller: GuardedRequestHandler = async (request, re
   return `import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { type ${name.pascal}Schema, ${name.camel}Schema } from "../schema/${name.kebab}.schema";
 
-export const ${name.camel}Controller: GuardedRequestHandler<${name.pascal}Schema> = async (
-  request,
+export const ${name.camel}Controller: GuardedRequestHandler<${name.pascal}Schema> = async ({
   response,
-) => {
+}) => {
   // TODO: Implement controller logic
   return response.success({});
 };
@@ -51,10 +50,10 @@ export function crudCreateControllerStub(moduleName: Name): string {
 import { type Create${moduleName.pascal}Schema, create${moduleName.pascal}Schema } from "../schema/create-${moduleName.kebab}.schema";
 import { create${moduleName.pascal}Service } from "../services/create-${moduleName.kebab}.service";
 
-export const create${moduleName.pascal}Controller: GuardedRequestHandler<Create${moduleName.pascal}Schema> = async (
+export const create${moduleName.pascal}Controller: GuardedRequestHandler<Create${moduleName.pascal}Schema> = async ({
   request,
   response,
-) => {
+}) => {
   const ${moduleName.camel} = await create${moduleName.pascal}Service(request.validated());
 
   return response.successCreate({
@@ -76,10 +75,10 @@ export function crudUpdateControllerStub(moduleName: Name): string {
 import { type Update${moduleName.pascal}Schema, update${moduleName.pascal}Schema } from "../schema/update-${moduleName.kebab}.schema";
 import { update${moduleName.pascal}Service } from "../services/update-${moduleName.kebab}.service";
 
-export const update${moduleName.pascal}Controller: GuardedRequestHandler<Update${moduleName.pascal}Schema> = async (
+export const update${moduleName.pascal}Controller: GuardedRequestHandler<Update${moduleName.pascal}Schema> = async ({
   request,
   response,
-) => {
+}) => {
   const ${moduleName.camel} = await update${moduleName.pascal}Service(request.input("id"), request.validated());
 
   return response.success({
@@ -101,10 +100,10 @@ export function crudListControllerStub(moduleName: Name): string {
   return `import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { list${plural.pascal}Service } from "../services/list-${plural.kebab}.service";
 
-export const list${plural.pascal}Controller: GuardedRequestHandler = async (
+export const list${plural.pascal}Controller: GuardedRequestHandler = async ({
   request,
   response,
-) => {
+}) => {
   const { data, pagination } = await list${plural.pascal}Service(request.all());
 
   return response.success({
@@ -122,10 +121,10 @@ export function crudShowControllerStub(moduleName: Name): string {
   return `import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { get${moduleName.pascal}Service } from "../services/get-${moduleName.kebab}.service";
 
-export const get${moduleName.pascal}Controller: GuardedRequestHandler = async (
+export const get${moduleName.pascal}Controller: GuardedRequestHandler = async ({
   request,
   response,
-) => {
+}) => {
   const ${moduleName.camel} = await get${moduleName.pascal}Service(request.input("id"));
 
   if (!${moduleName.camel}) {
@@ -146,10 +145,10 @@ export function crudDeleteControllerStub(moduleName: Name): string {
   return `import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { delete${moduleName.pascal}Service } from "../services/delete-${moduleName.kebab}.service";
 
-export const delete${moduleName.pascal}Controller: GuardedRequestHandler = async (
+export const delete${moduleName.pascal}Controller: GuardedRequestHandler = async ({
   request,
   response,
-) => {
+}) => {
   await delete${moduleName.pascal}Service(request.input("id"));
 
   return response.noContent();
