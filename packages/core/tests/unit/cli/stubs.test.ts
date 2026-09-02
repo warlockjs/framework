@@ -13,6 +13,7 @@ import {
   webContactControllerStub,
   webContactRoutesStub,
   webHomePageStub,
+  webHomeRegisterStub,
   webRootStub,
 } from "../../../src/generations/stubs";
 
@@ -174,14 +175,17 @@ describe("web starter stubs", () => {
     expect(webHomePageStub).toContain("aria-pressed={locale === \"ar\"}");
   });
 
-  it("declares one stable route identity and registers localization inside the projection hook", () => {
+  it("keeps universal registration behind a stable Fast Refresh boundary", () => {
     expect(webHomePageStub).toContain(
       'export const route = { path: "/", name: "index" } as const;',
     );
-    expect(webHomePageStub).toContain("export function register() {");
-    expect(webHomePageStub.indexOf('extend("en", {')).toBeGreaterThan(
-      webHomePageStub.indexOf("export function register() {"),
-    );
+    expect(webHomePageStub).toContain('export { register } from "./index.register";');
+    expect(webHomePageStub).not.toContain("export function register() {");
+    expect(webHomePageStub).not.toContain('extend("en", {');
+
+    expect(webHomeRegisterStub).toContain("export function register() {");
+    expect(webHomeRegisterStub).toContain('extend("en", {');
+    expect(webHomeRegisterStub).toContain('extend("ar", {');
   });
 
   it("keeps the generated browser console clean with deterministic root markup", () => {

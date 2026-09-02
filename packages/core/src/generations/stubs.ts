@@ -685,35 +685,13 @@ router.post("/api/contact", contactController);
 `;
 
 /**
- * `src/web/index.page.tsx` — one page, so \`warlock dev\` has something to serve
- * the moment this finishes.
- */
-export const webHomePageStub = `import { http } from "@mongez/http";
-import { Form, useFormControl, type FormControlProps } from "@mongez/react-form";
-import { extend, setCurrentLocaleCode } from "@mongez/localization";
-import { transX } from "@mongez/react-localization";
-import { v } from "@warlock.js/seal";
-import { useState } from "react";
-import { Link, type PageProps } from "@warlock.js/web";
-
-/**
- * A page route is an ordinary Warlock route whose handler renders React
- * instead of returning JSON.
+ * `src/web/index.register.ts` — universal static setup for the starter page.
  *
- * The URL and stable hydration name are the ones this file DECLARES below.
- * This page answers \`GET "/"\` because \`route.path = "/"\`, not because of
- * where the file lives. A page file with
- * no \`route\` export is REFUSED by both the dev server and the build.
+ * The page re-exports this stable binding so Warlock's `register()` lifecycle
+ * still sees it in both realms without making React Fast Refresh treat every
+ * JSX edit as an incompatible function-export replacement.
  */
-export const route = { path: "/", name: "index" } as const;
-
-export const metadata = { title: "Home" };
-
-const contactSchema = v.object({
-  name: v.string().min(2).required(),
-  email: v.email().required(),
-  message: v.string().min(10).required(),
-});
+export const webHomeRegisterStub = `import { extend } from "@mongez/localization";
 
 export function register() {
   extend("en", {
@@ -743,6 +721,40 @@ export function register() {
     },
   });
 }
+`;
+
+/**
+ * `src/web/index.page.tsx` — one page, so \`warlock dev\` has something to serve
+ * the moment this finishes.
+ */
+export const webHomePageStub = `import { http } from "@mongez/http";
+import { Form, useFormControl, type FormControlProps } from "@mongez/react-form";
+import { setCurrentLocaleCode } from "@mongez/localization";
+import { transX } from "@mongez/react-localization";
+import { v } from "@warlock.js/seal";
+import { useState } from "react";
+import { Link, type PageProps } from "@warlock.js/web";
+
+export { register } from "./index.register";
+
+/**
+ * A page route is an ordinary Warlock route whose handler renders React
+ * instead of returning JSON.
+ *
+ * The URL and stable hydration name are the ones this file DECLARES below.
+ * This page answers \`GET "/"\` because \`route.path = "/"\`, not because of
+ * where the file lives. A page file with
+ * no \`route\` export is REFUSED by both the dev server and the build.
+ */
+export const route = { path: "/", name: "index" } as const;
+
+export const metadata = { title: "Home" };
+
+const contactSchema = v.object({
+  name: v.string().min(2).required(),
+  email: v.email().required(),
+  message: v.string().min(10).required(),
+});
 
 function TextInput({ label, ...controlProps }: FormControlProps & { label: string }) {
   const { error, getErrorProps, getInputProps } = useFormControl(controlProps);

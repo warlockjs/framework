@@ -11,6 +11,7 @@ import {
   webContactControllerStub,
   webContactRoutesStub,
   webHomePageStub,
+  webHomeRegisterStub,
   webRootStub,
 } from "../stubs";
 import { FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
@@ -250,6 +251,7 @@ async function completeWebInstallation(_options: CommandActionData) {
       process.exitCode = 1;
     } else {
       await putFileAsync(srcPath("web/index.page.tsx"), webHomePageStub);
+      await putFileAsync(srcPath("web/index.register.ts"), webHomeRegisterStub);
       await ensureDirectoryAsync(srcPath("app/contact/controllers"));
       await putFileAsync(
         srcPath("app/contact/controllers/contact.controller.ts"),
