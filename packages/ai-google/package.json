@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/ai-google",
-  "version": "5.2.2",
+  "version": "5.2.3",
   "type": "module",
   "description": "Google Gemini adapter for @warlock.js/ai",
   "main": "./src/index.ts",
