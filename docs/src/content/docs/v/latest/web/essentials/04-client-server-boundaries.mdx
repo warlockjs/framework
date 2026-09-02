@@ -1,0 +1,105 @@
+---
+title: Client and server boundaries
+slug: v/latest/web/essentials/client-server-boundaries
+description: Keep server-only modules and environment data out of the hydrated browser graph.
+sidebar:
+  order: 4
+  label: Client/server boundaries
+---
+
+A `*.page.tsx` file is universal: its default component renders on the server
+and in the browser. The client graph is determined by imports, not by a file
+living under `src/web/`.
+
+Warlock removes the server exports `route`, `middleware`, `validation`,
+`loader`, `metadata`, and `prefix` before the browser graph forms. An import
+used only by one of those exports disappears with it. An import also used by
+the component survives and must be browser-safe.
+
+## What the build refuses
+
+The client build enforces the boundary at three points:
+
+1. **Import resolution** refuses Node built-ins, server-environment Warlock and
+   Mongez packages, `server-only`, `*.server.ts`, `.server/` directories,
+   application `server/` directories, and local modules outside `web/` that are
+   not recognized universal surfaces.
+2. **Module transformation** refuses every client-side `process.env` read and
+   any non-public `import.meta.env` key.
+3. **Emitted-bundle validation** checks that no server export binding or import
+   edge into a server package survived projection.
+
+The checks apply to development SSR as well as production builds. A violation
+fails loudly before deployment.
+
+## Read environment data in a loader
+
+`process.env` has no `PUBLIC_` exception in the universal graph. These are all
+refused when reachable from a component or universal helper:
+
+```tsx
+process.env.API_URL;
+process.env.PUBLIC_API_URL;
+process.env[key];
+const { API_URL } = process.env;
+const all = { ...process.env };
+Object.keys(process.env);
+JSON.stringify(process.env);
+```
+
+`globalThis.process.env`, `window.process.env`, and `process["env"]` are also
+covered. Importing `env()` into a client-bound component does not work either;
+`@warlock.js/core` is server-only.
+
+Read the value from a loader and return the smallest safe payload:
+
+```tsx
+import { env } from "@warlock.js/core";
+import type { PageLoader, PageProps } from "@warlock.js/web";
+
+export const loader = (async () => ({
+  publicApiOrigin: env("PUBLIC_API_ORIGIN"),
+})) satisfies PageLoader;
+
+export default function HomePage({ data }: PageProps<typeof loader>) {
+  return <a href={data.publicApiOrigin}>API</a>;
+}
+```
+
+The loader is stripped from the client module, but its returned data crosses
+the hydration boundary. Never return a secret just because the read itself ran
+on the server.
+
+## The build-time public escape hatch
+
+When a genuinely public value must be compiled into browser code, use Vite's
+surface with a static `PUBLIC_` key:
+
+```tsx
+export default function HomePage() {
+  return <h1>{import.meta.env.PUBLIC_SITE_NAME}</h1>;
+}
+```
+
+Vite's built-ins (`MODE`, `DEV`, `PROD`, `BASE_URL`, and `SSR`) are also
+allowed. These values are fixed when the bundle is built; they cannot vary per
+request or deployment. Loader data remains the correct channel for anything
+request-scoped.
+
+## `.client.tsx` is not an SSR boundary
+
+In Web 5.2, `.client.tsx` is only a naming convention. A module statically
+imported by a page, layout, root, or one of their imports is still evaluated by
+the server. Top-level `window` or `document` access therefore breaks SSR.
+
+## Static assets
+
+Imported non-stylesheet assets are not supported by the production server
+build in 5.2. Put them in `public/` and reference their root URL:
+
+```text
+public/logo.svg  →  /logo.svg
+```
+
+Stylesheet imports are supported and remain part of the matched page's initial
+CSS chain.

@@ -1,0 +1,110 @@
+---
+title: Loaders and metadata
+slug: v/latest/web/essentials/loaders-and-metadata
+description: Load request-scoped data on the server and derive typed document metadata.
+sidebar:
+  order: 3
+  label: Loaders and metadata
+---
+
+A page loader is its server-side controller. It can use the Warlock request
+context, DI, guards, and response controls, then return serializable data to the
+React component.
+
+## Type loader data into the page
+
+```tsx title="src/web/products/[id].page.tsx"
+import type { PageLoader, PageMetadata, PageProps } from "@warlock.js/web";
+
+export const route = {
+  path: "/products/:id",
+  name: "products.show",
+} as const;
+
+export const loader = (async ({ request, response }) => {
+  const id = request.input("id");
+
+  response.header("cache-control", "private, max-age=60");
+
+  return {
+    product: { id, name: `Product ${id}` },
+  };
+}) satisfies PageLoader<undefined, typeof route>;
+
+export const metadata: PageMetadata<typeof loader> = ({ data }) => ({
+  title: data.product.name,
+  description: `Details for ${data.product.name}`,
+});
+
+export default function ProductPage({ data }: PageProps<typeof loader>) {
+  return <h1>{data.product.name}</h1>;
+}
+```
+
+Use `satisfies PageLoader`, not a `: PageLoader` annotation. `satisfies` checks
+the contract while preserving the concrete return type that
+`PageProps<typeof loader>` uses for `data`.
+
+Components receive data, not HTTP objects. Keep repositories, secrets, and
+request work in the loader; the default component must also render in the
+browser.
+
+## Execution order
+
+Loaders run sequentially and are awaited root to leaf:
+
+1. the `root.tsx` application loader;
+2. the one rendering layout's loader;
+3. the page loader.
+
+There are at most three loader levels because a page can have only one
+rendering layout. Middleware from non-rendering layouts still composes across
+the full ancestry.
+
+Each loader level writes to its own buffered response. Surviving buffers commit
+root to leaf, so a discarded level cannot leak partial headers.
+
+## Terminal outcomes
+
+- A core `Response` returned by any loader stops every lower loader and bypasses
+  buffered commits and metadata resolution. Return one only when that exact
+  response should win.
+- `response.redirect()`, `response.permanentRedirect()`, and
+  `response.notFound()` stop lower loaders but commit buffers through the
+  current level. Metadata is skipped.
+- A thrown error stops lower loaders, discards the throwing level's buffer, and
+  commits only levels above it.
+
+## Metadata behavior
+
+`metadata` can be a static object or a function of resolved loader data. It
+supports `title`, `description`, `keywords`, `canonical`, `robots`, `openGraph`,
+and `twitter`.
+
+Metadata does not run after a loader failure. Warlock substitutes
+`{ title: "Something went wrong", robots: "noindex" }`, so a metadata
+function's `data` is never an optional failure-state value.
+
+Unknown metadata fields fail the build with the field name, source line, and a
+nearby suggestion when one exists. This catches typos such as `tittle` even
+when the export has no explicit TypeScript annotation.
+
+## Environment values
+
+Read deployment or request-scoped values in the loader and return only what is
+safe for the browser:
+
+```tsx
+import { env } from "@warlock.js/core";
+import type { PageLoader, PageProps } from "@warlock.js/web";
+
+export const loader = (async () => ({
+  siteName: env("PUBLIC_SITE_NAME"),
+})) satisfies PageLoader;
+
+export default function HomePage({ data }: PageProps<typeof loader>) {
+  return <h1>{data.siteName}</h1>;
+}
+```
+
+[Understand the enforced client/server boundary →](/v/latest/web/essentials/client-server-boundaries/)

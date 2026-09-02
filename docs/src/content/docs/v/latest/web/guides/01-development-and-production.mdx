@@ -1,0 +1,104 @@
+---
+title: Development and production
+slug: v/latest/web/guides/development-and-production
+description: Know which edits Fast Refresh, how routes re-register, and how production assets are emitted.
+sidebar:
+  order: 1
+  label: Development and production
+---
+
+Warlock keeps one page graph for development SSR, browser hydration, and the
+production build. The same discovery rules decide which pages and layouts
+exist in every environment.
+
+## Component edits and Fast Refresh
+
+A component-body-only edit is left to React Fast Refresh. It updates the
+component without a document reload and preserves local state.
+
+Anything outside the component body changes the module's server-visible
+skeleton and forces a full reload. That includes:
+
+- imports and module-level declarations;
+- `route`, `middleware`, `validation`, `loader`, `metadata`, or `prefix`;
+- a module-level helper even when only the component calls it.
+
+Reloading is deliberately conservative: it re-runs SSR and refreshes the
+document head instead of risking stale metadata.
+
+## Live route-table changes
+
+Adding, deleting, or renaming a page, or changing its route identity, updates
+the live route table without restarting the development server. Warlock:
+
+1. atomically replaces the page-owned routes, restoring the previous table if
+   registration fails;
+2. invalidates the browser page registry;
+3. sends a full document reload so the new server route and hydrated client
+   graph agree.
+
+When checking this manually, verify hydration with an interactive state change
+or intercepted `<Link>` navigation. A visible `200` proves only the server half.
+
+If a request 404s while a matching `*.page.tsx` exists under `src/web/` but is
+not registered, the development server logs a one-time warning naming that
+file.
+
+## Global and page-local CSS
+
+Import global CSS directly from `src/web/root.tsx`:
+
+```tsx title="src/web/root.tsx"
+import "./app.css";
+```
+
+A page or matched layout may import its own stylesheet. Warlock creates one
+ordered chain for the response: root, ancestor layouts, then page. Only the
+matched chain contributes render-blocking CSS.
+
+In development, Warlock emits a source stylesheet link ending in `?direct`, so
+Vite serves `text/css` instead of a JavaScript CSS module. The rendered root
+must contain a closing `</head>` because stylesheet links are inserted
+immediately before it.
+
+## Production build
+
+`warlock build` uses the same `discoverPages()` scan and:
+
+- emits `page-routes.manifest.json` with each page's method, path, name, and
+  source file;
+- rejects page graphs that violate the one-rendering-layout rule;
+- builds the hydration client and a Vite manifest;
+- resolves root, matched-layout, and page CSS into ordered, deduplicated,
+  render-blocking asset links;
+- stores the client asset directory in the page manifest so `warlock start`
+  does not need to load the TypeScript build config.
+
+At production boot, the Web connector refuses to start without the page
+manifest instead of reporting healthy while serving only 404s.
+
+Use `warlock routes:diff` to compare the current diagnostic route table with
+the last successful build:
+
+```bash
+warlock routes:diff
+```
+
+The manifest records derived page names. A clean diff does not prove that no
+two routes collided during registration; discovery itself remains the source
+of that failure.
+
+## Diagnose missing CSS
+
+1. Confirm the root, current layout, or page directly imports the stylesheet.
+2. In development, inspect the rendered document for a link ending in
+   `?direct` and confirm it returns `text/css`.
+3. In production, confirm the matching source appears in
+   `client/.vite/manifest.json` with CSS assets beneath the configured client
+   prefix.
+4. Do not hand-author links to hashed production assets; the manifest owns
+   their filenames.
+
+See [`warlock routes:diff`](/v/latest/core/cli/routes/#warlock-routesdiff) and
+[connector lifecycle](/v/latest/core/architecture-concepts/connectors/) for
+the surrounding Core APIs.

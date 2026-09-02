@@ -1,0 +1,86 @@
+---
+title: Install Web
+slug: v/latest/web/getting-started/installation
+description: Add the React page layer alone, with Tailwind CSS, or ready for shadcn/ui.
+sidebar:
+  order: 1
+  label: Installation
+---
+
+Warlock's feature installer can add the page layer by itself or resolve the
+styling layers above it. Run one command: choose the highest layer your app
+needs.
+
+| Goal                  | Command                | What is included                      |
+| --------------------- | ---------------------- | ------------------------------------- |
+| React SSR pages       | `warlock add web`      | Web                                   |
+| Utility-first styling | `warlock add tailwind` | Web + Tailwind CSS v4                 |
+| shadcn/ui components  | `warlock add shadcn`   | Web + Tailwind + shadcn prerequisites |
+
+## Install the Web layer
+
+```bash
+warlock add web
+```
+
+The command installs `@warlock.js/web`, React 19, and the development tooling
+the connector loads when needed. It also:
+
+- registers the Web connector in `warlock.config.ts`;
+- creates the application-wide page root at `src/web/`;
+- creates `root.tsx`, the document shell shared by every page;
+- creates an index page and a separate `index.register.ts` setup hook.
+
+`src/web/` is the only page root. A tree such as `src/app/blog/web/` is not
+scanned; organize every page, layout, and page middleware beneath the one
+project-level `src/web/` directory.
+
+## The generated starting tree
+
+```text
+src/web/
+├── index.page.tsx
+├── index.register.ts
+└── root.tsx
+```
+
+The generated page re-exports `register` from `index.register.ts`. Keep
+non-component universal setup in that sidecar: Warlock runs it on the server
+and in the browser while edits to the component remain compatible with React
+Fast Refresh.
+
+## Requirements
+
+- `@warlock.js/core`
+- React and React DOM 19 or newer
+- Vite and `@vitejs/plugin-react`, loaded lazily as development peers
+
+You normally do not install those packages one by one; `warlock add web`
+records the compatible dependencies and uses the package manager detected for
+the project. Pass `--package-manager npm`, `yarn`, or `pnpm` when detection is
+not what you want.
+
+```bash
+warlock add web --package-manager pnpm
+```
+
+Use `--no-install` only when a scaffolder will run one package-manager install
+after several features have been recorded.
+
+## Add styling now or later
+
+Both styling features may be added to an existing Web app:
+
+```bash
+warlock add tailwind
+warlock add shadcn
+```
+
+`shadcn` requires `tailwind`, and `tailwind` requires `web`, so
+`warlock add shadcn` is also a valid one-command setup for a new project.
+
+[Configure Tailwind and add your first shadcn component →](/v/latest/web/getting-started/tailwind-and-shadcn/)
+
+## Next step
+
+[Create your first page →](/v/latest/web/getting-started/first-page/)

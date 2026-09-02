@@ -1,0 +1,103 @@
+---
+title: Layouts and special pages
+slug: v/latest/web/essentials/layouts-and-special-pages
+description: Compose layout middleware and prefixes, then own not-found and error rendering.
+sidebar:
+  order: 2
+  label: Layouts and special pages
+---
+
+A `layout.tsx` can contribute a React wrapper, a route prefix, middleware, and a
+loader to pages below its directory.
+
+## Layout composition
+
+Every `layout.tsx` from the Web root down to the page contributes outermost
+first:
+
+- **Middleware always composes.** Every ancestor layout with a `middleware`
+  export participates, whether the layout renders a component or not.
+- **Rendering is capped at one layout.** A layout counts only when it has a
+  default export. Prefix/middleware-only layouts may nest freely; two rendering
+  layouts on one page path fail the build and name every offender.
+- **A prefix replaces its directory segment for derived routes.** If
+  `src/web/products/layout.tsx` declares `prefix: "/store"`, then
+  `src/web/products/index.page.tsx` resolves to `/store`, not
+  `/store/products`.
+- **A prefix prepends an explicit page path.** The composed prefix joins the
+  literal `route.path`; root values do not create doubled slashes.
+
+```tsx title="src/web/products/layout.tsx"
+import type { LayoutProps } from "@warlock.js/web";
+
+export const prefix = "/store";
+
+export default function StoreLayout({ children }: LayoutProps) {
+  return <section className="store-shell">{children}</section>;
+}
+```
+
+## The not-found page
+
+`404.page.tsx` is the application-owned not-found page. It has no browsable
+route of its own and must not export `route`. When no application file exists,
+Warlock still answers unmatched URLs with its built-in `404` response.
+
+```tsx title="src/web/404.page.tsx"
+export default function NotFoundPage() {
+  return <main>We could not find that page.</main>;
+}
+```
+
+The 404 component renders inside `root.tsx` with no layout. Its page-level
+loader is skipped, so an unmatched URL cannot trigger page data work, redirect,
+or fail through the fallback. Its page middleware and `register()` still run,
+and the root application loader still runs; keep root work cheap and tolerant
+of an unmatched request.
+
+## The error boundary
+
+`error.page.tsx` is the one application-wide error boundary. A second copy
+beneath `src/web/` fails the build. It does not declare a route and does not
+handle ordinary 404s.
+
+```tsx title="src/web/error.page.tsx"
+import type { ErrorPageProps } from "@warlock.js/web";
+
+export default function ErrorPage({ error, status }: ErrorPageProps) {
+  return (
+    <main>
+      <h1>Something went wrong</h1>
+      <p>Status: {status}</p>
+    </main>
+  );
+}
+```
+
+During SSR, `error` is the thrown value. After serialization, the browser gets
+a JSON-safe `{ name, message, stack? }` record. Error metadata may improve on
+the framework default but cannot remove `robots: "noindex"`.
+
+If a root or page module cannot load, or `register()` throws, Warlock tries the
+application boundary and then falls back to a minimal framework document when
+application code is no longer trustworthy. That fallback omits hydration so
+the browser never hydrates a tree the server could not establish.
+
+There is no `500.page.tsx`; all non-404 failures use `error.page.tsx`.
+
+## The universal `register()` hook
+
+`root.tsx`, `layout.tsx`, and pages may export a synchronous, no-argument
+`register()` hook. It runs once per real module namespace in both realms,
+before that module's middleware or loader. It must not return a Promise.
+
+Prefer a sidecar and named re-export for page registration so React Fast
+Refresh sees a clean component boundary:
+
+```tsx title="src/web/index.page.tsx"
+export { register } from "./index.register";
+
+export default function HomePage() {
+  return <main>Home</main>;
+}
+```

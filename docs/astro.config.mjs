@@ -66,6 +66,12 @@ const cascadeSections = [
   { label: "Reference", dir: "reference", collapsed: true },
 ];
 
+const webSections = [
+  { label: "Getting Started", dir: "getting-started", collapsed: false },
+  { label: "Essentials", dir: "essentials", collapsed: false },
+  { label: "Guides", dir: "guides", collapsed: true },
+];
+
 // AI uses domain sections instead of the Laravel-style Basics/Deeper
 // split — the package outgrew it (restructured 2026-07-04, see
 // scripts/restructure-ai-docs.mjs; old URLs live on via `redirects`
@@ -363,7 +369,7 @@ const cacheTopic = {
 const topics = [
   // Foundation
   pkgTopic({ label: "Core", slug: "core", sections: coreSections }, "latest"),
-  pkgTopic({ label: "Web", slug: "web" }, "latest"),
+  pkgTopic({ label: "Web", slug: "web", sections: webSections }, "latest"),
   pkgTopic({ label: "Create Warlock", slug: "create-warlock" }, "latest"),
   pkgTopic({ label: "Seal", slug: "seal", sections: fullSections }, "latest"),
   // Logger uses a custom 4-section structure (Getting Started · Channels ·

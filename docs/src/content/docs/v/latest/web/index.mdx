@@ -1,458 +1,111 @@
 ---
 title: "@warlock.js/web"
-description: SSR React pages for Warlock apps, with hydration, client navigation, filesystem routing, and Fast Refresh.
+description: Server-rendered React pages for Warlock apps, with hydration, typed loaders, filesystem routing, and production CSS.
 sidebar:
   order: 1
   label: "Overview"
 ---
 
-`@warlock.js/web` adds a React page layer to an existing Warlock app. Pages
-are ordinary Warlock routes that render documents instead of JSON, so they use
-the same route table, middleware chain, validation, and request context as the
-rest of the application.
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-Upgrading from v4? See the [v5 migration guide](/v/latest/core/upgrade-to-v5/); Web is an opt-in addition.
+`@warlock.js/web` is Warlock's React page layer. A page is an ordinary Warlock
+route that renders a document instead of JSON, so pages share the application's
+route table, middleware, validation, request context, and lifecycle.
 
-## Install
+Pages render on the server and hydrate in the browser. After hydration,
+`<Link>` provides client navigation while loaders keep request-only work on the
+server.
+
+## Choose your starting point
+
+Install only the highest layer you need. Dependencies are resolved for you:
 
 ```bash
-warlock add web
+warlock add web       # React SSR page layer
+warlock add tailwind  # Web + Tailwind CSS v4
+warlock add shadcn    # Web + Tailwind + shadcn/ui prerequisites
 ```
 
-The command installs the package, scaffolds `src/web/`, and registers the Web
-connector in `warlock.config.ts`. `src/web/` is the page root — the only page
-root a project has today. It contains the web layer's pages, layouts, and
-related middleware. (A per-module page root, e.g. `src/app/blog/web/`, is not
-implemented; every page lives under the one project-level `src/web/`.)
+For shadcn/ui, Warlock prepares the project; shadcn's own CLI still adds the
+components:
 
-The generated home page keeps its universal non-component setup in
-`src/web/index.register.ts` and re-exports `register` from
-`src/web/index.page.tsx`. Keep that split when editing the starter: Warlock
-still runs the hook in both realms, while page edits stay inside React's Fast
-Refresh boundary.
-
-## Rendering and navigation
-
-Pages render on the server and hydrate in the browser. This is SSR with
-hydration, not React Server Components. After hydration, `<Link>` supports
-client-side navigation, including Back and Forward, without a document reload.
-
-In development, React Fast Refresh preserves component state while edits also
-update server-rendered output.
-
-## Filesystem routing
-
-A page with no `route` export derives its URL and name from where it lives
-beneath `src/web`:
-
-- `index.page.tsx` claims its own directory (`src/web/index.page.tsx` → `/`,
-  `src/web/blog/index.page.tsx` → `/blog`).
-- Every other directory contributes its own name as a path segment
-  (`src/web/about.page.tsx` → `/about`; `home.page.tsx` is **not** magic —
-  it derives to `/home`, not `/`).
-- `[id]` directories or filenames become a `:id` route param
-  (`src/web/products/[id].page.tsx` → `/products/:id`).
-- `(group)` directories — parentheses, not braces — contribute **nothing** to
-  the path or the derived name; they exist purely to organize files on disk.
-- The derived route **name** is the dotted path of contributing segments
-  (groups omitted), e.g. `src/web/products/[id].page.tsx` → name `products.id`.
-
-An explicit `route` export always wins over derivation, for both the path and
-the name:
-
-```tsx title="src/web/products/[id].page.tsx"
-export const route = { path: "/products/:id", name: "products.show" };
-
-export default function ProductPage() { /* ... */ }
+```bash
+npx shadcn@latest add button card
 ```
 
-Two pages that resolve to the same effective path, or the same route name,
-fail the build/boot loudly rather than leaving one of them silently
-unreachable — the second file is named in the error alongside the first.
+Do not run `shadcn init` after `warlock add shadcn`; Warlock has already written
+the project-specific aliases, stylesheet, design tokens, and `cn` helper.
 
-### Every page needs a default export
+[See the complete Tailwind and shadcn/ui setup →](./getting-started/tailwind-and-shadcn/)
 
-`route` is optional; the default export is not. A `*.page.tsx` carrying only
-named exports is a hard discovery/build failure that names the file:
+## A page in one file
 
-```
-The page "src/web/contact.page.tsx" has no runtime default export. Every `*.page.tsx`
-file must default-export the React component it renders. For example:
-`export default function Page() { return <main />; }`
-```
+Create `src/web/about.page.tsx`:
 
-Such a file used to be discovered and registered anyway, and then served a
-blank `200` at its URL — a page that looked deployed, rendered nothing, and
-reported no error anywhere. `export { Page as default }` satisfies the rule
-(the check is for a runtime default binding, not the keyword form);
-`export default interface Page {}` does not, because a type-only default is
-erased and leaves no component behind. A file that cannot be parsed reports as
-a parse failure instead, so a syntax error never masquerades as a missing
-export.
+```tsx title="src/web/about.page.tsx"
+import type { PageMetadata } from "@warlock.js/web";
 
-:::danger[Catch-all routes are not supported]
-**`[...slug].page.tsx` does not do what it looks like.** Filesystem routing
-recognizes only `[name]` — a plain identifier in brackets — as a dynamic
-segment. `[...slug]` does not match that, so it is taken as an ordinary
-**literal** segment.
+export const metadata: PageMetadata = {
+  title: "About",
+};
 
-`src/web/docs/[...slug].page.tsx` therefore derives the path
-`/docs/[...slug]` and the route name `docs.[...slug]`. It builds, it
-registers, and it serves — at the literal URL `/docs/%5B...slug%5D` and
-nowhere else. `/docs/a/b` does not match it.
-
-**There is no build error, no dev warning, and no refusal.** If you are
-arriving from Next.js or Remix, this is the failure to recognize: the page is
-simply unreachable at the URLs you meant.
-
-Until a real catch-all exists, use the terminal wildcard with an explicit
-route: `export const route = { path: "/docs/*", name: "docs.catchAll" }`.
-:::
-
-### Layouts and the prefix override
-
-A `layout.tsx` may export a `prefix` and/or a `middleware` array. Every
-`layout.tsx` from the web root down to a page's own directory contributes,
-outermost first:
-
-- **Middleware** always composes — every layout on the path that declares
-  `middleware` runs, outer to inner, whether or not that layout renders
-  anything.
-- **Rendering** is capped at one: a layout counts against the
-  single-rendering-layout rule only if it has a **default export**. A
-  `layout.tsx` that exports only `prefix` and/or `middleware` renders nothing
-  and nests freely; two or more layouts on one path that *do* render is a
-  build error naming every offending layout.
-- **A layout's `prefix` overrides its own directory's segment — it does not
-  append to it.** For a page with no explicit `route`, a directory whose
-  layout declares `prefix: "/store"` contributes `/store` in place of that
-  directory's own name-derived segment, not in addition to it. This is why
-  `src/web/products/index.page.tsx` under a `layout.tsx` with
-  `prefix: "/store"` resolves to `/store`, not `/store/products`.
-- For a page **with** an explicit `route` export, composition is prefix +
-  declared path (`composeRoutePath`): the nearest layout's composed prefix is
-  joined to the page's own `route.path` — a root prefix (`"/"`) or a root
-  path (`"/"`) contributes nothing to avoid a double slash.
-
-### Special pages
-
-Exactly two page files carry reserved meaning; both are matched by filename
-only, never by directory:
-
-- **`404.page.tsx`** — the not-found page. It answers every URL nothing else
-  matches. Registered even when a project has none: the framework's own
-  fallback still answers `404` with the right status, so a project without a
-  `404.page.tsx` behaves correctly from the first request, and adding one
-  later only changes the body. It renders inside the application root with
-  **no layout**, and its page loader does not run even if the module exports
-  one. A missing URL therefore cannot trigger application data work, redirect,
-  or fail a second time through the fallback itself.
-  Declaring a `route` export on it is refused at build/boot time: `404` is not
-  a URL anyone browses to.
-
-  Precisely what is and isn't skipped, since "the 404 page doesn't run
-  loaders" is a useful shorthand and not the whole rule: only the **page-level
-  `loader`** is omitted from the request. The real module namespace is still
-  used, so `register()` runs and the component renders normally, and the
-  page's **middleware still runs**. Layout loaders don't run because this page
-  has an empty layout chain by construction, not because loaders are disabled.
-  And the **`root.tsx` App loader does still run** — keep it cheap, and make
-  sure it tolerates a request that matched nothing.
-- **`error.page.tsx`** — the one application-wide error boundary. At most one
-  may exist beneath `src/web`; a second one is a build error naming both
-  files. It also may not declare a `route` export — it is a boundary, not a
-  browsable page, and is not folded into the 404 path (an unmatched URL is not
-  an error). Its `metadata` may improve on the framework default but can never
-  remove `robots: "noindex"` — an error render is a transient server state
-  reachable at a real URL, and letting a crawler index "Something went wrong"
-  for a page that actually works is the failure this default prevents.
-
-  Its default component receives `{ error, status }`: the original thrown
-  value during SSR and a JSON-safe error record after serialization. When a
-  root/page module cannot load or `register()` itself throws, Warlock first
-  tries this application boundary, then falls back to a framework-owned plain
-  document if application code is no longer trustworthy. That response omits
-  the hydration script so the browser never hydrates against a different tree.
-
-There is no `500.page.tsx`, and none is planned — every non-404 failure path
-goes through `error.page.tsx`.
-
-## `register()`
-
-`root.tsx`, `layout.tsx`, and `*.page.tsx` may export a synchronous,
-no-argument `register()` hook. It runs once per real module namespace on both
-the server and browser, before that module's middleware or loader. Layouts use
-their real namespaces, never a composed wrapper, so a hook runs once per
-layout identity rather than once per page below it. Returning a Promise (or
-another thenable) throws: registration must finish before the module is usable.
-
-For page-level registration, prefer a sidecar module and a named re-export:
-
-```tsx title="src/web/index.page.tsx"
-export { register } from "./index.register";
-
-export default function HomePage() {
-  return <main>Home</main>;
+export default function AboutPage() {
+  return (
+    <main>
+      <h1>About</h1>
+    </main>
+  );
 }
 ```
 
-Declaring a non-component `register()` function inline beside the component
-causes React Fast Refresh to treat the page export boundary as incompatible,
-reload the page, and lose live component state.
+With no `route` export, that file serves `/about`. Warlock derives routes from
+files beneath `src/web/`; an explicit literal `route` can override the path and
+name when needed.
 
-## Loaders and metadata
+## Learn Web by task
 
-A page loader is its controller: it runs with the full Warlock request
-context, including DI, guards, and access to the response for headers,
-cookies, or status. It returns data for the page to render. Server-only
-`metadata` runs after the loader and can derive document metadata from its
-data.
+<CardGrid>
+  <LinkCard
+    title="Install Web"
+    href="./getting-started/installation/"
+    description="Choose Web, Tailwind, or shadcn and see exactly what the command creates."
+  />
+  <LinkCard
+    title="Create your first page"
+    href="./getting-started/first-page/"
+    description="Render a page, declare metadata, and navigate without a reload."
+  />
+  <LinkCard
+    title="Add Tailwind and shadcn/ui"
+    href="./getting-started/tailwind-and-shadcn/"
+    description="Set up Tailwind v4, generate components, and avoid the init trap."
+  />
+  <LinkCard
+    title="Routing"
+    href="./essentials/routing/"
+    description="Filesystem routes, named routes, dynamic segments, groups, and wildcards."
+  />
+  <LinkCard
+    title="Layouts and special pages"
+    href="./essentials/layouts-and-special-pages/"
+    description="Compose prefixes and middleware; own the 404 and error boundaries."
+  />
+  <LinkCard
+    title="Loaders and metadata"
+    href="./essentials/loaders-and-metadata/"
+    description="Move server work into typed loaders and control the document head."
+  />
+  <LinkCard
+    title="Client/server boundaries"
+    href="./essentials/client-server-boundaries/"
+    description="Keep secrets and server-only imports out of the browser bundle."
+  />
+  <LinkCard
+    title="Development and production"
+    href="./guides/development-and-production/"
+    description="Understand Fast Refresh, live route changes, manifests, and CSS delivery."
+  />
+</CardGrid>
 
-### Execution order
-
-Loaders run **sequentially, root to leaf, each awaited before the next
-starts**: the `root.tsx` App loader, then the layout loader, then the page
-loader. There are exactly three levels, and no more — a page has at most one
-*rendering* layout (nested rendering layouts are a build error), so there is no
-outermost-to-innermost layout chain to reason about for loaders. Layout
-**middleware** still composes across the whole ancestry; only the loader levels
-are capped at three.
-
-Each level gets its own buffered response rather than the live one, and
-surviving buffers are committed root to leaf, so a level that is discarded
-cannot leak half-written headers onto a response it no longer owns.
-
-**The first core `Response` a loader returns is terminal.** It stops every
-lower loader from starting, and it is more terminal than a short-circuit:
-because the response is returned whole, it also bypasses buffer commit and
-metadata resolution, so the header and cookie writes buffered at that same
-level go with it.
-
-The other two terminal outcomes behave differently, and the difference is the
-reason to prefer them:
-
-- **A short-circuit** — `response.redirect()`, `response.permanentRedirect()`,
-  `response.notFound()` — stops lower loaders but commits buffers *inclusively*
-  through its own level, so writes made before returning survive. Metadata is
-  skipped.
-- **A throw** stops lower loaders, discards the throwing level's own buffer,
-  and commits only the levels above it.
-
-Return a raw `Response` when you mean exactly that response and nothing else;
-reach for a short-circuit when the headers you already set should still apply.
-
-`metadata` never runs after a failed loader. When an earlier stage recorded an
-error — the page's own loader threw, or an ancestor layout's did — the page's
-`metadata` function is not called at all, and the framework substitutes
-`{ title: "Something went wrong", robots: "noindex" }` (the same default
-`error.page.tsx` starts from). A metadata function's `data` argument is
-therefore never `undefined` on the success path — there is no discriminated
-"no data yet" case for an author to forget to check.
-
-If a page's `metadata` object declares a key nothing reads (a typo like
-`tittle`), the build refuses it by name and line, with a same-distance
-suggestion where one exists — an unannotated `metadata` export is valid,
-uncaught TypeScript, so this check exists because the type system alone
-cannot close that hole.
-
-## Live dev re-registration
-
-Editing a page's `route` export, adding a new `*.page.tsx`, renaming one, or
-deleting one is picked up **without a full dev-server restart**. The web
-connector classifies each watcher batch, and when membership or a page's
-canonical route identity changed, it atomically replaces the page-owned
-routes on the live router — a route removal is a table edit against the
-single wildcard dispatch Fastify already has registered, so no restart of the
-HTTP listener is needed.
-
-Two things ship together with that replacement, and both matter:
-
-- **The client page registry (`virtual:warlock/pages`) is invalidated and a
-  full document reload is sent to the browser.** Without this, a page that
-  full-loads right after being added or renamed renders as visible-but-dead,
-  un-hydrated HTML — the server serves the new route, but the browser's
-  module registry still points at the old graph, so no `useState` works and
-  no `<Link>` intercepts navigation. Assert hydration when verifying this by
-  hand: a `useState` button that responds, or a `<Link>` that reflects the
-  current path — not just a 200 response.
-- **The replacement is atomic.** Page registration can throw partway through
-  a batch (a route-path collision, a page with a missing default export); a
-  naive remove-then-reinstall would leave the page surface partially down
-  until the next good save. The router snapshots and restores around the
-  transaction instead.
-
-A component-body-only edit (JSX inside a page or layout, with no change to
-imports, module-level declarations, or any of the six server exports — `route`,
-`middleware`, `validation`, `loader`, `metadata`, `prefix`) is left entirely to
-React Fast Refresh: zero reloads, state preserved. Anything else — including a
-change to a module-level helper the JSX alone reads — forces a full document
-reload, because the honest way to apply a change that could affect
-server-rendered `<head>` is to re-run SSR. This is a deliberate
-over-approximation: two earlier, narrower rules each shipped a stale `<head>`
-in a real app, so the rule only ever widens toward reloading, never toward a
-missed refresh.
-
-### Unregistered-page diagnostic
-
-If a request 404s and a matching `*.page.tsx` exists on disk under `src/web`
-but isn't in the active route table, the dev server logs a one-time warning
-naming the file — the case where the source tree and the running route table
-have drifted apart in a way that would otherwise show up as nothing but a
-plain `404` with no further explanation.
-
-## Server-only boundaries (Gate A / B / C)
-
-The client build enforces, at bundle time, that server-only code never reaches
-the browser. Three checks, run at different points in the pipeline:
-
-- **Gate A** — a `resolveId` refusal. It rejects, for the client build only,
-  imports of: Node builtins; any `@warlock.js/*` or `@mongez/*` package whose
-  `package.json` declares `"warlock": { "environment": "server" }` (an absent
-  marker is not itself a refusal); files named `*.server.ts`, anything under a
-  `.server/` directory, or — for the app's own source — anything under a
-  plain `server/` directory segment; local modules outside a `web/` folder
-  that aren't a recognized universal surface (`*.page.tsx`, `layout.tsx`); and
-  the `server-only` npm package by name, for code that wants to declare its
-  own server-only status explicitly.
-- **Gate B** — an AST transform applied to every module the client build
-  processes. It refuses **every** client-side read of `process.env` (Node's
-  `process` doesn't exist in the browser, so this is always wrong), and any
-  `import.meta.env.X` read where `X` doesn't start with `PUBLIC_` — the
-  project's convention for what may cross into client code. Vite's own
-  built-in keys (`MODE`, `DEV`, `PROD`, `BASE_URL`, `SSR`) are allowed without
-  the prefix. See [Environment variables in pages](#environment-variables-in-pages)
-  for what the `process.env` refusal covers and what to do instead.
-- **Gate C** — runs once, on the emitted client bundle, after the build
-  completes. It re-scans the actual output for any of the six server export
-  names (`route`, `middleware`, `validation`, `loader`, `metadata`, `prefix`)
-  surviving as a top-level binding, and for any import edge into a
-  server-environment package — using the same classifier Gate A uses, not a
-  second one that could drift. This is defense in depth: if projection or
-  Gate A has a bug, Gate C turns "shipped a leak" into a failed build instead
-  of a silent one.
-
-Projection (a separate, earlier step) strips the six server exports from a
-page or layout module before the client graph ever forms — Gates A/B/C are
-what catch what projection, by construction, cannot: whole forbidden imports,
-inline env reads, and a bundle-level regression check on the final output.
-
-## Environment variables in pages
-
-**`process.env` is refused entirely in the client/universal graph. There is no
-`PUBLIC_` exception to it, static or computed.** `env("PUBLIC_X")` does not work
-client-side either — `env` comes from `@warlock.js/core`, a package marked
-server-only, so importing it into client-bound code is refused by Gate A before
-Gate B ever looks at the call.
-
-**The supported pattern is to read the value in a page loader — which is server
-code — and pass it to the page as loader data.**
-
-```tsx title="src/web/index.page.tsx"
-import { env } from "@warlock.js/core";
-import type { PageLoader, PageProps } from "@warlock.js/web";
-
-export const loader = (async () => ({
-  siteName: env("PUBLIC_SITE_NAME"),
-})) satisfies PageLoader;
-
-export default function HomePage({ data }: PageProps<typeof loader>) {
-  return <h1>{data.siteName}</h1>;
-}
-```
-
-`loader` is one of the six server exports, stripped by projection before the
-client graph forms, so it may read configuration normally. Its return value is
-serialized to the browser — return only what is safe to expose.
-
-### What the refusal covers
-
-Reachable from a default page or layout component, from `register()`, or from
-any helper they import, all of these fail:
-
-```tsx
-process.env.API_URL;             // static key
-process.env.PUBLIC_API_URL;      // the PUBLIC_ prefix changes nothing
-process.env[key];                // computed key — the compiler cannot prove it safe
-const { API_URL } = process.env; // bare value-read
-const all = { ...process.env };  // bare value-read
-Object.keys(process.env);        // bare value-read
-JSON.stringify(process.env);     // bare value-read
-```
-
-The bare value-reads are the newer half of this rule and the more important
-one: referencing the object at all — assigned, destructured, spread, or passed
-as an argument — is already broken in a browser, and handing the whole object
-to a component is how an entire server environment ships to the client in one
-line. `globalThis.process.env`, `window.process.env` and `process["env"]` are
-matched too.
-
-**Enforcement covers dev SSR as well as the client bundle, and a violation
-fails the build.** The same refusal fires under `warlock dev`, so this is not a
-production-only check you discover at deploy time.
-
-Server-side code is unrestricted, and reads inside `loader`, `route`,
-`middleware`, `validation` and `metadata` are never affected. Files under
-`node_modules` are out of scope by design — a dependency's own
-`process.env.NODE_ENV` guard is not the application's problem.
-
-### The one client-side escape hatch
-
-If a value genuinely has to be inlined into browser code rather than passed
-through loader data, the supported spelling is `import.meta.env.PUBLIC_*` with
-a **static** key:
-
-```tsx
-export default function HomePage() {
-  return <h1>{import.meta.env.PUBLIC_SITE_NAME}</h1>;
-}
-```
-
-That is Vite's env surface, not Node's, and only the `PUBLIC_` prefix (plus
-Vite's five built-ins) crosses. It is inlined at build time, so it is fixed for
-the life of the bundle and cannot vary per request or per deployment — which is
-why loader data stays the default answer, and the only one for anything
-request-scoped.
-
-## Production build, route manifest, and CSS
-
-`warlock build` walks the same page graph the dev server does — one shared
-`discoverPages()` scan, so a page that exists for the server can never be
-absent for the client or vice versa. The build:
-
-- Emits a page-route manifest (`page-routes.manifest.json` under the build
-  output directory) recording each page's method, path, name, and source file
-  — the baseline `warlock routes:diff` compares a fresh diagnostic boot
-  against. Paths are written through the router's own normalizer, so an
-  untouched checkout reports clean immediately after a successful build rather
-  than flagging the catch-all as drift. Note the manifest records what each
-  page's name was *derived* as, not what it was *registered* as: a clean diff
-  does **not** prove that no route name collided at registration time.
-- Refuses to produce an artifact for a layout chain with more than one
-  rendering layout, the same rule dev enforces, so that failure is caught
-  before it reaches production rather than only at the next boot.
-- Computes each page's own CSS chain — root, then every matched layout outer
-  to inner, then the page — so first paint arrives styled instead of
-  flashing unstyled content while the client bundle's JavaScript loads.
-- Bakes the client bundle's directory (`clientDir`) into the manifest read at
-  boot, rather than having the production server re-derive it from
-  `warlock.config.ts` — `warlock start` spawns a plain `node dist/app.js`
-  child that never loads a TypeScript build config, so build and start read
-  back the same string instead of risking disagreement.
-
-At production boot, the Web connector refuses to start with no page manifest
-present (`WebConnector booted in production without a page manifest`) rather
-than silently serving 404s while reporting healthy — a production process
-must have been built with the web connector registered.
-
-## Requirements
-
-- `@warlock.js/core`
-- `react` and `react-dom` 19+
-- `vite` and `@vitejs/plugin-react` as lazily loaded, optional dev peers
-
-## Going further
-
-- [`warlock routes:diff`](../core/cli/routes.md#warlock-routesdiff) — compare
-  a fresh diagnostic boot's page routes against the last successful build.
-- [Connectors](../core/architecture-concepts/connectors.md) — how the Web
-  connector fits into the boot sequence beside `http`.
+Upgrading from v4? Web is an opt-in addition in v5; start with the
+[v5 migration guide](/v/latest/core/upgrade-to-v5/).

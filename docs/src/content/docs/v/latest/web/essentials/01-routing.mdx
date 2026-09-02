@@ -1,0 +1,101 @@
+---
+title: Routing
+slug: v/latest/web/essentials/routing
+description: Derive page routes from files or declare literal paths and stable names.
+sidebar:
+  order: 1
+  label: Routing
+---
+
+A page with no `route` export derives its URL and name from its location beneath
+`src/web/`.
+
+## Filesystem routing
+
+| File                                   | Derived path    | Derived name  |
+| -------------------------------------- | --------------- | ------------- |
+| `src/web/index.page.tsx`               | `/`             | `index`       |
+| `src/web/about.page.tsx`               | `/about`        | `about`       |
+| `src/web/blog/index.page.tsx`          | `/blog`         | `blog`        |
+| `src/web/products/[id].page.tsx`       | `/products/:id` | `products.id` |
+| `src/web/(marketing)/pricing.page.tsx` | `/pricing`      | `pricing`     |
+
+The rules are:
+
+- `index.page.tsx` claims its directory. It is the only special ordinary-page
+  filename; `home.page.tsx` serves `/home`, not `/`.
+- Every directory and non-index filename contributes a path segment.
+- A plain `[id]` directory or filename becomes a whole-segment `:id` parameter.
+- A `(group)` directory contributes nothing to the path or route name; it only
+  organizes files.
+- The route name is the dotted sequence of contributing segments.
+
+## Explicit routes
+
+Export a bare literal path or a literal object:
+
+```tsx title="src/web/products/[id].page.tsx"
+export const route = {
+  path: "/catalog/:id",
+  name: "products.show",
+} as const;
+
+export default function ProductPage() {
+  return <main>Product</main>;
+}
+```
+
+An explicit route wins over filesystem derivation for both path and name. A
+bare string is also valid:
+
+```ts
+export const route = "/products";
+```
+
+Warlock reads this export without executing application code. Variables,
+function calls, computed keys, spreads, and indirect `export { route }` forms
+are refused.
+
+Two pages that resolve to the same effective path or name fail discovery and
+name both files, instead of leaving one page silently unreachable.
+
+## Page-route grammar
+
+Page routes support static segments, whole-segment parameters, the exact `*`
+wildcard, and a terminal wildcard such as `/docs/*`.
+
+They do not support regex parameters, optional parameters, multiple parameters
+inside one segment, parameters mixed with text, doubled or trailing slashes,
+or a non-terminal wildcard. Write two pages for an optional segment and
+validate constrained values in the loader.
+
+## Catch-all filenames are not supported
+
+:::danger[`[...slug]` is a literal filename]
+Filesystem routing recognizes `[name]`, not catch-all syntax.
+`src/web/docs/[...slug].page.tsx` therefore serves only the literal URL
+`/docs/%5B...slug%5D`. It does not match `/docs/a/b`, and no warning is emitted.
+:::
+
+Use an explicit terminal wildcard instead:
+
+```tsx title="src/web/docs/catch-all.page.tsx"
+export const route = {
+  path: "/docs/*",
+  name: "docs.catchAll",
+} as const;
+```
+
+## Default export failures
+
+Every discovered page must default-export a runtime component. A page with
+only named exports is a hard build failure naming the file. A type-only default
+export does not count because it disappears at runtime.
+
+## Prefixes from layouts
+
+Every URL segment is written either in the page route/filesystem path or in a
+layout prefix above it. A prefix replaces its own directory segment for a
+derived page route and prepends an explicit page path.
+
+[See layout prefix and middleware composition →](/v/latest/web/essentials/layouts-and-special-pages/)

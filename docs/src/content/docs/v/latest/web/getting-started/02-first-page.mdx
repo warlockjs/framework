@@ -1,0 +1,110 @@
+---
+title: Create your first page
+slug: v/latest/web/getting-started/first-page
+description: Add an SSR React page, metadata, and client-side navigation.
+sidebar:
+  order: 2
+  label: Your first page
+---
+
+Every `*.page.tsx` file beneath `src/web/` is a page. Its default export is the
+React component Warlock renders on the server and hydrates in the browser.
+
+## Create a route from the filename
+
+Create `src/web/about.page.tsx`:
+
+```tsx title="src/web/about.page.tsx"
+import type { PageMetadata } from "@warlock.js/web";
+
+export const metadata: PageMetadata = {
+  title: "About us",
+  description: "Meet the team behind the product.",
+};
+
+export default function AboutPage() {
+  return (
+    <main>
+      <h1>About us</h1>
+      <p>We build useful things.</p>
+    </main>
+  );
+}
+```
+
+The file is immediately available at `/about`. `index.page.tsx` claims its
+directory, so `src/web/index.page.tsx` serves `/` and
+`src/web/products/index.page.tsx` serves `/products`.
+
+## Declare a stable route name
+
+Export a literal `route` when the public URL should differ from the file path,
+or when callers need a stable name:
+
+```tsx title="src/web/company/about.page.tsx"
+export const route = {
+  path: "/about",
+  name: "company.about",
+} as const;
+
+export default function AboutPage() {
+  return <main>About us</main>;
+}
+```
+
+An explicit route always wins over filesystem derivation. Keep it literal;
+Warlock reads it during discovery without executing application code.
+
+## Link between pages
+
+Use `Link` after hydration for navigation without a full document reload:
+
+```tsx
+import { Link } from "@warlock.js/web";
+
+export default function HomePage() {
+  return <Link href="/about">About us</Link>;
+}
+```
+
+The initial request still returns server-rendered HTML. This is SSR with
+hydration, not React Server Components.
+
+## A runtime default export is required
+
+`route` is optional; the default component is not. A page with named exports
+but no runtime default export fails discovery and names the file. These forms
+matter:
+
+- `export default function Page() {}` works.
+- `export { Page as default }` works.
+- `export default interface Page {}` does not; the type disappears at runtime.
+
+A parse error is reported separately, so invalid syntax never masquerades as
+a missing component.
+
+## Keep registration outside the component file
+
+`root.tsx`, `layout.tsx`, and a page may export a synchronous, no-argument
+`register()` hook. It runs once per module namespace on both the server and the
+browser, before middleware or loaders.
+
+For page-level setup, use a sidecar:
+
+```tsx title="src/web/index.page.tsx"
+export { register } from "./index.register";
+
+export default function HomePage() {
+  return <main>Home</main>;
+}
+```
+
+An inline non-component export can make React Fast Refresh treat the module as
+an incompatible component boundary. The generated sidecar keeps stateful
+component edits refreshable. `register()` must not return a Promise.
+
+## Next steps
+
+- [Learn filesystem and explicit routing →](/v/latest/web/essentials/routing/)
+- [Load server data with a typed loader →](/v/latest/web/essentials/loaders-and-metadata/)
+- [Add Tailwind CSS or shadcn/ui →](/v/latest/web/getting-started/tailwind-and-shadcn/)

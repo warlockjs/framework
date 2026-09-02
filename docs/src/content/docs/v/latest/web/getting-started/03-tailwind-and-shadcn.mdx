@@ -1,0 +1,138 @@
+---
+title: Tailwind CSS and shadcn/ui
+slug: v/latest/web/getting-started/tailwind-and-shadcn
+description: Install Tailwind CSS v4 and prepare a Warlock Web app for shadcn/ui components.
+sidebar:
+  order: 3
+  label: Tailwind and shadcn/ui
+---
+
+Warlock owns the integration between its Web project layout and these tools.
+Tailwind compiles through PostCSS in development and production; shadcn's CLI
+copies components into `src/web/` after Warlock prepares the aliases, tokens,
+and shared helper it expects.
+
+## Install Tailwind CSS
+
+```bash
+warlock add tailwind
+```
+
+You do not need to run `warlock add web` first. The feature installer resolves
+Web before Tailwind and then:
+
+1. adds `tailwindcss` and `@tailwindcss/postcss` as development dependencies;
+2. creates `src/web/app.css` with `@import "tailwindcss";`;
+3. imports that stylesheet from `src/web/root.tsx`;
+4. creates `postcss.config.mjs` with the Tailwind PostCSS plugin.
+
+Tailwind v4 is CSS-first. There is no generated `tailwind.config.js` and no
+content-glob list to maintain. Put tokens and plugins in `src/web/app.css`:
+
+```css title="src/web/app.css"
+@import "tailwindcss";
+
+@theme {
+  --color-brand: oklch(0.62 0.19 259);
+  --font-display: "Inter", sans-serif;
+}
+```
+
+Those tokens produce utilities such as `bg-brand`, `text-brand`, and
+`font-display`. Use them from any page or layout:
+
+```tsx
+export default function HomePage() {
+  return <h1 className="font-display text-4xl text-brand">Hello</h1>;
+}
+```
+
+:::note[Existing PostCSS configuration]
+If any recognized PostCSS config already exists, Warlock leaves the file
+untouched. If it does not already include `@tailwindcss/postcss`, add this
+plugin to that config yourself:
+
+```js
+plugins: { "@tailwindcss/postcss": {} }
+```
+
+Two competing PostCSS config files are not created.
+:::
+
+## Prepare shadcn/ui
+
+```bash
+warlock add shadcn
+```
+
+This one command also resolves Tailwind and Web when they are missing. It adds
+the prerequisites that `shadcn init` normally owns, adjusted for Warlock's
+`src/web/` layout:
+
+- `components.json`, with `rsc: false`, Tailwind v4 configuration, and aliases
+  targeting `web/components`, `web/lib`, and `web/hooks`;
+- `src/web/lib/utils.ts`, exporting the `cn()` helper;
+- shadcn's neutral design tokens in `src/web/app.css`;
+- the `web/*` TypeScript path alias;
+- `clsx`, `tailwind-merge`, `class-variance-authority`, and `lucide-react`.
+
+Warlock prepares the project; shadcn's own CLI still owns component generation.
+Add the components you want:
+
+```bash
+npx shadcn@latest add button card
+```
+
+:::danger[Skip `shadcn init`]
+Do not run `shadcn init` after `warlock add shadcn`. It can rewrite
+`components.json` and replace Warlock's working Tailwind v4 token setup. Go
+straight to `shadcn add`.
+:::
+
+## Use a generated component
+
+The configured aliases place UI components under `src/web/components/ui/`:
+
+```tsx title="src/web/index.page.tsx"
+import { Button } from "web/components/ui/button";
+
+export default function HomePage() {
+  return (
+    <main className="p-8">
+      <Button>Ship it</Button>
+    </main>
+  );
+}
+```
+
+Generated components are copied into your source tree. They are application
+code: edit and version them like any other component.
+
+## Optional overlay animations
+
+Dialogs, menus, tooltips, and sheets work without an animation package; they
+appear immediately. To enable shadcn's enter and exit animations, install
+`tw-animate-css` with your package manager and import it directly below
+Tailwind at the top of the stylesheet:
+
+```css title="src/web/app.css"
+@import "tailwindcss";
+@import "tw-animate-css";
+```
+
+## When styles do not appear
+
+Check the rendered page and the generated project files:
+
+1. `src/web/root.tsx` directly imports `./app.css`.
+2. The active PostCSS config registers `@tailwindcss/postcss`.
+3. `src/web/app.css` begins with the Tailwind import.
+4. shadcn design tokens such as `--color-primary` exist in that stylesheet.
+5. `components.json` points its CSS path at `src/web/app.css` and its aliases at
+   `web/*`.
+
+In development, the document should contain a render-blocking stylesheet URL
+ending in `?direct`. In production, CSS is emitted from Vite's manifest for the
+matched root, layout, and page chain.
+
+[Learn how development and production CSS delivery differ →](/v/latest/web/guides/development-and-production/)
