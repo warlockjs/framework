@@ -11,10 +11,12 @@
   "scripts": {
     "sync:changelog": "node scripts/generate-changelog.mjs",
     "test:changelog": "node --test scripts/generate-changelog.test.mjs",
+    "check:changelog-freshness": "node scripts/check-changelog-freshness.mjs",
+    "test:changelog-freshness": "node --test scripts/check-changelog-freshness.test.mjs",
     "check:mdx-guard": "node scripts/check-mdx-in-md.mjs",
     "predev": "node scripts/generate-changelog.mjs",
     "prestart": "node scripts/generate-changelog.mjs",
-    "prebuild": "node scripts/check-mdx-in-md.mjs && node scripts/generate-changelog.mjs",
+    "prebuild": "node scripts/check-mdx-in-md.mjs && node scripts/generate-changelog.mjs && node scripts/check-changelog-freshness.mjs",
     "dev": "astro dev",
     "start": "astro dev",
     "build": "astro build",
