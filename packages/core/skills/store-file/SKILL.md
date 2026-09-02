@@ -345,12 +345,17 @@ Set `STORAGE_DRIVER=r2` in production, leave unset in dev — same code uses loc
 ### Uploading a request file
 
 ```ts
-import type { RequestHandler, Response } from "@warlock.js/core";
+import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { storage } from "@warlock.js/core";
 
-export const uploadAvatarController: RequestHandler = async (request, response: Response) => {
+export const uploadAvatarController: GuardedRequestHandler = async ({ request, response }) => {
   const upload = request.file("avatar");
-  const file = await storage.put(upload, `avatars/${request.user.id}/${upload.fileName}`);
+
+  if (!upload) {
+    return response.badRequest({ error: "missing file" });
+  }
+
+  const file = await storage.put(upload, `avatars/${request.user.id}/${upload.name}`);
 
   return response.successCreate({ url: file.url, hash: file.hash });
 };

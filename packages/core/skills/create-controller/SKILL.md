@@ -12,7 +12,7 @@ A controller is a thin function: pull inputs from `request`, call work, return t
 ```ts title="src/app/<module>/controllers/<action>.controller.ts"
 import { type RequestHandler } from "@warlock.js/core";
 
-export const listProductsController: RequestHandler = async (request, response) => {
+export const listProductsController: RequestHandler = async ({ request, response }) => {
   return response.success({ products: [] });
 };
 ```
@@ -67,10 +67,10 @@ import { type Request, type RequestHandler } from "@warlock.js/core";
 import { type CreateProductSchema, createProductSchema } from "../schema/create-product.schema";
 import { createProductService } from "../services/create-product.service";
 
-export const createProductController: RequestHandler<Request<CreateProductSchema>> = async (
+export const createProductController: RequestHandler<Request<CreateProductSchema>> = async ({
   request,
   response,
-) => {
+}) => {
   const product = await createProductService(request.validated());
 
   return response.successCreate({ product });
@@ -96,10 +96,10 @@ Routes behind `authMiddleware` need `request.user` typed. Project conventions ad
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { type CreateProductSchema, createProductSchema } from "../schema/create-product.schema";
 
-export const createProductController: GuardedRequestHandler<CreateProductSchema> = async (
+export const createProductController: GuardedRequestHandler<CreateProductSchema> = async ({
   request,
   response,
-) => {
+}) => {
   // request.user is typed
   const product = await createProductService(request.validated());
   return response.successCreate({ product });
@@ -146,7 +146,7 @@ If your controller is over ~30 lines, the work probably belongs in a service.
 import { type RequestHandler } from "@warlock.js/core";
 import { listProductsService } from "../services/list-products.service";
 
-export const listProductsController: RequestHandler = async (request, response) => {
+export const listProductsController: RequestHandler = async ({ request, response }) => {
   const { data: products, pagination } = await listProductsService({
     ...request.all(),
     organization_id: request.user.organizationId,
@@ -163,10 +163,10 @@ import { type Request, type RequestHandler } from "@warlock.js/core";
 import { type CreateProductSchema, createProductSchema } from "../schema/create-product.schema";
 import { createProductService } from "../services/create-product.service";
 
-export const createProductController: RequestHandler<Request<CreateProductSchema>> = async (
+export const createProductController: RequestHandler<Request<CreateProductSchema>> = async ({
   request,
   response,
-) => {
+}) => {
   const product = await createProductService(request.validated());
 
   return response.successCreate({ product });
@@ -200,7 +200,7 @@ export async function getProductService(id: string) {
 import type { RequestHandler } from "@warlock.js/core";
 import { getProductService } from "../services/get-product.service";
 
-export const getProductController: RequestHandler = async (request, response) => {
+export const getProductController: RequestHandler = async ({ request, response }) => {
   const product = await getProductService(request.input("id"));
 
   return response.success({ product });

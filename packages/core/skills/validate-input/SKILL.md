@@ -26,10 +26,10 @@ import type { Request, RequestHandler } from "@warlock.js/core";
 import { type CreateProductSchema, createProductSchema } from "../schema/create-product.schema";
 import { createProductService } from "../services/create-product.service";
 
-export const createProductController: RequestHandler<Request<CreateProductSchema>> = async (
+export const createProductController: RequestHandler<Request<CreateProductSchema>> = async ({
   request,
   response,
-) => {
+}) => {
   const product = await createProductService(request.validated());
 
   return response.successCreate({ product });

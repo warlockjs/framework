@@ -229,10 +229,14 @@ The error's message is locale-aware — the `inject-request-context` middleware 
 ### Translated response message in a controller
 
 ```ts
-export const createProductController: GuardedRequestHandler<CreateProductSchema> = async (
+import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
+import { type CreateProductSchema } from "../schema/create-product.schema";
+import { createProductService } from "../services/create-product.service";
+
+export const createProductController: GuardedRequestHandler<CreateProductSchema> = async ({
   request,
   response,
-) => {
+}) => {
   const product = await createProductService(request.validated());
   return response.success({
     message: request.t("products.created"),

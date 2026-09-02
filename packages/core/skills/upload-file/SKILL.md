@@ -9,8 +9,8 @@ Multipart uploads come in as `UploadedFile` instances. The class wraps Fastify's
 
 ## The shape
 
-```ts title="src/app/uploads/schema/index.ts"
-import { v } from "@warlock.js/seal";
+```ts title="src/app/uploads/schema/upload-avatar.schema.ts"
+import { v, type Infer } from "@warlock.js/seal";
 
 export const uploadAvatarSchema = v.object({
   avatar: v
@@ -19,16 +19,18 @@ export const uploadAvatarSchema = v.object({
     .maxSize({ unit: "MB", size: 5 })
     .mimeType(["image/jpeg", "image/png", "image/webp"]),
 });
+
+export type UploadAvatarSchema = Infer<typeof uploadAvatarSchema>;
 ```
 
 ```ts title="src/app/uploads/controllers/upload-avatar.controller.ts"
-import { type GuardedRequestHandler } from "app/auth/types/guarded-request.type";
+import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { type UploadAvatarSchema, uploadAvatarSchema } from "../schema/upload-avatar.schema";
 
-export const uploadAvatarController: GuardedRequestHandler<UploadAvatarSchema> = async (
+export const uploadAvatarController: GuardedRequestHandler<UploadAvatarSchema> = async ({
   request,
   response,
-) => {
+}) => {
   const { avatar } = request.validated();
 
   const file = await avatar
@@ -54,7 +56,7 @@ Inside a controller:
 ```ts
 import type { RequestHandler, UploadedFile } from "@warlock.js/core";
 
-export const uploadController: RequestHandler = async (request, response) => {
+export const uploadController: RequestHandler = async ({ request, response }) => {
   // option A — direct from request, no validation
   const file: UploadedFile | undefined = request.file("avatar");
 
@@ -236,7 +238,7 @@ export const uploadFilesSchema = v.object({
 ```ts title="src/app/uploads/controllers/create-upload.controller.ts"
 import type { RequestHandler } from "@warlock.js/core";
 
-export const createUploadController: RequestHandler = async (request, response) => {
+export const createUploadController: RequestHandler = async ({ request, response }) => {
   const { files } = request.validated();
 
   const saved = await Promise.all(

@@ -10,7 +10,7 @@ Each folder holds one `SKILL.md` (an agent-facing how-to for a single task). The
 - [send-response](send-response/SKILL.md) — `Response` helpers: success/error variants, status helpers, redirects, files, streams, SSE.
 - [validate-input](validate-input/SKILL.md) — author seal schemas, attach them to controllers, infer types, layer DTOs.
 - [use-middleware](use-middleware/SKILL.md) — attach built-in HTTP middleware (rateLimit, concurrencyLimit, maxBodySize, …) via the `middleware` namespace.
-- [write-middleware](write-middleware/SKILL.md) — author HTTP middleware: the `(request, response)` signature, short-circuit, request enrichment.
+- [write-middleware](write-middleware/SKILL.md) — author HTTP middleware: the `({ request, response })` signature, short-circuit, request enrichment.
 - [build-url](build-url/SKILL.md) — HTTP URL helpers (`url`, `publicUrl`, `assetsUrl`, `uploadsUrl`) anchored at `app.baseUrl`.
 - [upload-file](upload-file/SKILL.md) — handle multipart uploads: `request.file()`, `v.file()` validation, `UploadedFile.save()`.
 - [health-checks](health-checks/SKILL.md) — built-in `/health` + `/ready` endpoints, the `health` registry, and graceful request draining.

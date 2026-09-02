@@ -232,9 +232,9 @@ const template = await readFile(appPath("mailers/templates/welcome.html"), "utf-
 ### Health endpoint
 
 ```ts title="src/app/system/controllers/health.controller.ts"
-import { Application, type RequestHandler, type Response } from "@warlock.js/core";
+import { Application, type RequestHandler } from "@warlock.js/core";
 
-export const healthController: RequestHandler = async (_request, response: Response) => {
+export const healthController: RequestHandler = async ({ response }) => {
   return response.success({
     status: "ok",
     environment: Application.environment,

@@ -38,11 +38,11 @@ This skill is the foundation. Every other warlock skill (`register-route`, `crea
    ```
 
    ```ts title="src/app/<module>/controllers/create-<thing>.controller.ts"
-   import { type GuardedRequestHandler } from "app/auth/types/guarded-request.type";
+   import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
    import { type CreateThingSchema, createThingSchema } from "../schema/create-thing.schema";
    import { createThingService } from "../services/create-thing.service";
 
-   export const createThingController: GuardedRequestHandler<CreateThingSchema> = async (request, response) => {
+   export const createThingController: GuardedRequestHandler<CreateThingSchema> = async ({ request, response }) => {
      const thing = await createThingService(request.validated());
      return response.success({ thing });
    };

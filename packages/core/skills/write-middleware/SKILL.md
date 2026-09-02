@@ -1,6 +1,6 @@
 ---
 name: write-middleware
-description: 'Author HTTP middleware for @warlock.js/core — the `(request, response)` signature, short-circuit by returning a response, enrich the request with extra fields, register per-route, per-group, or app-wide. Triggers: `Middleware`, `MiddlewareResponse`, `router.group`, `guarded`, `request.detectIp`, `authMiddleware`; "write a custom middleware", "short-circuit a request", "enrich the request with extra fields", "per-route vs per-group middleware"; typical import `import type { Middleware } from "@warlock.js/core"`. Skip: built-in middleware catalog — `@warlock.js/core/use-middleware/SKILL.md`; route attachment — `@warlock.js/core/register-route/SKILL.md`; response helpers — `@warlock.js/core/send-response/SKILL.md`; competing patterns: `express` `(req, res, next)` middleware, Fastify `preHandler` hooks.'
+description: 'Author HTTP middleware for @warlock.js/core — the `({ request, response })` signature, short-circuit by returning a response, enrich the request with extra fields, register per-route, per-group, or app-wide. Triggers: `Middleware`, `MiddlewareResponse`, `router.group`, `guarded`, `request.detectIp`, `authMiddleware`; "write a custom middleware", "short-circuit a request", "enrich the request with extra fields", "per-route vs per-group middleware"; typical import `import type { Middleware } from "@warlock.js/core"`. Skip: built-in middleware catalog — `@warlock.js/core/use-middleware/SKILL.md`; route attachment — `@warlock.js/core/register-route/SKILL.md`; response helpers — `@warlock.js/core/send-response/SKILL.md`; competing patterns: `express` `(req, res, next)` middleware, Fastify `preHandler` hooks.'
 ---
 
 # Warlock — write a middleware
@@ -12,7 +12,7 @@ Middleware is a plain function that runs before the controller. Two outcomes: re
 ```ts title="src/app/<module>/utils/<name>.middleware.ts"
 import type { Middleware } from "@warlock.js/core";
 
-export const requireApiKey: Middleware = (request, response) => {
+export const requireApiKey: Middleware = ({ request, response }) => {
   const key = request.header("X-API-Key");
 
   if (!key || key !== process.env.API_KEY) {
@@ -23,16 +23,14 @@ export const requireApiKey: Middleware = (request, response) => {
 };
 ```
 
-That's the contract: `(request: Request, response: Response) => Response | undefined | void`. Async is fine — return a `Promise<Response | undefined | void>`.
+That's the contract: `(context: HttpContext<Request>) => Response | undefined | void`, where `context` is `{ request, response }`. Async is fine — return a `Promise<Response | undefined | void>`.
 
 The real type, from `@warlock.js/core/src/router/types.ts`:
 
 ```ts
 export type Middleware<MiddlewareRequest extends Request = Request> = {
-  (request: MiddlewareRequest, response: Response): MiddlewareResponse;
+  (context: HttpContext<MiddlewareRequest>): MiddlewareResponse;
 };
-
-export type MiddlewareResponse = ReturnedResponse | undefined | void;
 ```
 
 ## Short-circuit vs continue
@@ -42,7 +40,7 @@ The pattern is "return a response to stop, return nothing to continue":
 ```ts
 import type { Middleware } from "@warlock.js/core";
 
-export const requireFeatureFlag: Middleware = async (request, response) => {
+export const requireFeatureFlag: Middleware = async ({ request, response }) => {
   const flag = await loadFeatureFlag(request.input("organization_id"));
 
   if (!flag.enabled) {
@@ -60,8 +58,8 @@ If you short-circuit, the controller never runs. The response helper you pick (`
 You can attach arbitrary fields to `request` from a middleware, and they survive into the controller. The cleanest pattern is to extend `Request` via module augmentation in a `.d.ts` and assign in the middleware:
 
 ```ts title="src/app/feature-flags/middleware/load-feature-flag.middleware.ts"
-import type { Middleware } from "@warlock.js/core";
-import type { FeatureFlag } from "../models/feature-flag";
+import type { Middleware, Request, RequestUser } from "@warlock.js/core";
+import { FeatureFlag } from "../models/feature-flag";
 
 declare module "@warlock.js/core" {
   interface Request {
@@ -69,7 +67,7 @@ declare module "@warlock.js/core" {
   }
 }
 
-export const loadFeatureFlag: Middleware = async (request) => {
+export const loadFeatureFlag: Middleware<Request & { user: RequestUser }> = async ({ request }) => {
   request.featureFlag = await FeatureFlag.findBy("organization_id", request.user.organizationId);
 };
 ```
@@ -139,7 +137,7 @@ export function guarded(callback: () => void) {
 }
 
 export function guardedAdmin(callback: () => void) {
-  router.group({ prefix: "/admin", middleware: [authMiddleware()] }, callback);
+  router.group({ prefix: "/admin", middleware: [authMiddleware("admin")] }, callback);
 }
 
 export function publicRoutes(callback: () => void) {
@@ -157,7 +155,7 @@ guarded(() => {
 });
 ```
 
-`authMiddleware(allowedUserType?)` accepts a user-type string or array. Without an arg it just verifies the token is present; with `"user"` / `"admin"` it also checks the decoded `userType` matches.
+`authMiddleware(allowedUserType, tokenFrom?)` requires a user-type string or array — `[]` accepts any authenticated user without checking `userType`; `"user"` / `"admin"` also checks the decoded `userType` matches.
 
 ## Common patterns
 
@@ -184,13 +182,13 @@ router.group(
 ```ts
 import type { Middleware } from "@warlock.js/core";
 
-export const optionalAuth: Middleware = async (request, response) => {
+export const optionalAuth: Middleware = async ({ request, response }) => {
   if (!request.authorizationValue) {
     return; // anonymous — let it through
   }
 
   // token present → enforce it
-  return authMiddleware("user")(request, response);
+  return authMiddleware("user")({ request, response });
 };
 ```
 
@@ -206,7 +204,7 @@ export const optionalAuth: Middleware = async (request, response) => {
 - **Group middleware runs before per-route middleware**, in array order. The full chain is `app.all → group → per-route → controller`. Mind the order if you stack auth + rate-limit + audit.
 - **Middleware can be async.** Returning `Promise<undefined>` continues the chain. Returning `Promise<Response>` short-circuits. The framework awaits the result.
 - **Don't mutate `request.payload` directly.** Use `request.setValidatedData(...)` or attach a new named field (`request.featureFlag = ...`). The internals expect `payload.all` shapes to come from the validator pipeline.
-- **`Middleware` is generic over the request type.** For middleware that assumes a validated schema, narrow it: `const m: Middleware<CreateProductRequest> = (request) => { ... }`. But most middlewares run before validation, so the default `Middleware` is right.
+- **`Middleware` is generic over the request type.** For middleware that assumes a validated schema, narrow it: `const m: Middleware<CreateProductRequest> = ({ request }) => { ... }`. But most middlewares run before validation, so the default `Middleware` is right.
 - **No `next()` parameter.** Express-style `next()` doesn't apply here. The framework chains based on return value.
 - **`request.baseRequest` / `response.baseResponse` are escape hatches, not API.** They expose the underlying Fastify primitives for cases the framework hasn't covered yet (streaming was the historical precedent). Prefer framework helpers first — `response.send()`, `response.header()`, `response.replay()`, `request.input()`, `request.detectIp()`, etc. If you find yourself reaching for `baseResponse` or `baseRequest` for non-streaming work, that's a missing helper — file an issue. The cache and idempotency middlewares both shipped with a quietly-broken FastifyReply-return bug because they bypassed the helper layer; the framework now guards `Response.send()` against double-send, but the right answer is "use the helper."
 - **Behind any proxy, use `request.detectIp()` not `request.ip`.** `request.ip` is the immediate peer (likely your load balancer); `request.detectIp()` honors `X-Real-IP` / `X-Forwarded-For`. Either way, only trust the result as far as you trust the upstream chain — those headers are client-settable; verify the request came through your trusted edge before treating the value as authoritative.

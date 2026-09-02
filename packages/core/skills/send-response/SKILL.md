@@ -12,7 +12,7 @@ description: 'Send HTTP responses via @warlock.js/core''s Response helpers — s
 ```ts
 import type { RequestHandler, Response } from "@warlock.js/core";
 
-export const myController: RequestHandler = async (request, response: Response) => {
+export const myController: RequestHandler = async ({ request, response }) => {
   // …choose a helper and return it
   return response.success({ data: "…" });
 };
@@ -123,7 +123,7 @@ Each class takes `(message, payload?)`. The payload merges into the response bod
 Pick the class, throw from the service or use-case, and forget about response shaping at the call site. The controller stays focused on the success path:
 
 ```ts
-export const getProductController: RequestHandler = async (request, response) => {
+export const getProductController: RequestHandler = async ({ request, response }) => {
   const product = await getProductService(request.input("id"));   // throws ResourceNotFoundError on miss
   return response.success({ product });
 };

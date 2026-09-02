@@ -123,10 +123,10 @@ export async function notifyUserService(user: User, payload: unknown) {
 Then from a controller:
 
 ```ts
-import type { GuardedRequestHandler } from "app/auth/types/guarded-request.type";
+import type { GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { notifyUserService } from "../services/notify-user.service";
 
-export const sendNotificationController: GuardedRequestHandler = async (request, response) => {
+export const sendNotificationController: GuardedRequestHandler = async ({ request, response }) => {
   await notifyUserService(request.user, request.input("payload"));
   return response.success({ delivered: true });
 };

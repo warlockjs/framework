@@ -276,10 +276,10 @@ export async function listFaqsService(filters: FaqListOptions) {
 ```
 
 ```ts title="src/app/faqs/controllers/list-faqs.controller.ts"
-import type { RequestHandler, Response } from "@warlock.js/core";
+import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { listFaqsService } from "../services/list-faqs.service";
 
-export const listFaqsController: RequestHandler = async (request, response: Response) => {
+export const listFaqsController: GuardedRequestHandler = async ({ request, response }) => {
   const { data, pagination } = await listFaqsService({
     ...request.all(),
     organization_id: request.user.organizationId,
