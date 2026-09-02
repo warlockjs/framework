@@ -11,14 +11,7 @@ import { contextManager } from "@warlock.js/context";
 import config from "@mongez/config";
 import { environment } from "../../utils";
 import { requestContext as requestContextInstance } from "../context/request-context";
-import {
-  BadRequestError,
-  ForbiddenError,
-  HttpError,
-  ResourceNotFoundError,
-  ServerError,
-  UnAuthorizedError,
-} from "../errors";
+import { HttpError } from "../errors";
 import { type Request } from "../request";
 import { type Response } from "../response";
 import { type ReturnedResponse } from "./../types";
@@ -102,16 +95,13 @@ function handleRequestError(error: unknown, response: Response): ReturnedRespons
   // the condition that caused it is gone: a cached 500 becomes an outage
   // that outlives its cause; a cached 401/403 becomes a leak across users.
   // Set once, here, before any branch runs — not per branch — because the
-  // branches below do not cleanly partition by status: `ResourceNotFoundError`,
+  // branches below do not partition by status. `ResourceNotFoundError`,
   // `UnAuthorizedError`, `ForbiddenError`, `BadRequestError` and `ServerError`
-  // all extend `HttpError`, so `error instanceof HttpError` below matches
-  // every one of them and returns first — their own `instanceof` checks
-  // further down are unreachable. A raw `HttpError` can also carry any
-  // caller-chosen status, 4xx or 5xx. Trying to gate the floor on the
-  // eventual status would mean re-deriving that status per branch, which is
-  // exactly the "one rule meeting one form while others reach the same
-  // output" shape this card calls out. Applying it once, unconditionally,
-  // is both simpler and safer.
+  // all extend `HttpError`, so the `HttpError` branch answers for every one of
+  // them, and a raw `HttpError` can carry any caller-chosen status, 4xx or 5xx.
+  // Gating the floor on the eventual status would mean re-deriving that status
+  // per branch — one rule meeting one form while others reach the same output.
+  // Applying it once, unconditionally, is both simpler and safer.
   response.header("Cache-Control", "private, no-store");
 
   if (error instanceof HttpError) {
@@ -129,44 +119,9 @@ function handleRequestError(error: unknown, response: Response): ReturnedRespons
     return response.setStatusCode(error.status).send(payload);
   }
 
-  if (error instanceof ResourceNotFoundError) {
-    return response.notFound({
-      error: error.message,
-      ...error.payload,
-    });
-  }
-
-  if (error instanceof UnAuthorizedError) {
-    return response.unauthorized({
-      error: error.message,
-      ...error.payload,
-    });
-  }
-
-  if (error instanceof ForbiddenError) {
-    return response.forbidden({
-      error: error.message,
-      ...error.payload,
-    });
-  }
-
-  if (error instanceof BadRequestError) {
-    return response.badRequest({
-      error: error.message,
-      ...error.payload,
-    });
-  }
-
   if (error instanceof DatabaseWriterValidationError) {
     return response.badRequest({
       errors: error.errors,
-    });
-  }
-
-  if (error instanceof ServerError) {
-    return response.serverError({
-      error: error.message,
-      ...error.payload,
     });
   }
 
