@@ -7,20 +7,20 @@
  */
 const principles = [
   {
-    title: "Same primitives, top to bottom",
-    body: "An HTTP controller and an AI agent are both just typed code with typed inputs and outputs. No second mental model for the AI layer.",
+    title: "UI and server, one application",
+    body: "Server-rendered React pages boot inside the same Warlock lifecycle as routes, modules, middleware, and services — no second app to stitch together.",
   },
   {
     title: "Typed end to end",
     body: "Seal schemas are validation, TypeScript types, and JSON schema at once. Define a shape once; it holds at the edge, in the compiler, and in tool calls.",
   },
   {
-    title: "Pick what you need",
-    body: "Every package is independently installable. Start with Core, add Cascade, cache, auth, or the AI layer only when your app actually reaches for them.",
+    title: "One backend for people and agents",
+    body: "Pages, HTTP endpoints, and AI tools can call the same domain code. Add a new surface without rebuilding the product behind it.",
   },
   {
-    title: "AI-native, not bolted on",
-    body: "Agents, tools, workflows, and supervisors are first-class — with five provider adapters behind a single API. Swap models without touching agent code.",
+    title: "Full-stack, still modular",
+    body: "Start with Core and Web, then add Cascade, cache, auth, queues, or AI only when the product reaches for them. Every package remains independently installable.",
   },
 ];
 ---
@@ -28,10 +28,10 @@ const principles = [
 <section class="warlock-why">
   <div class="warlock-section-head">
     <p class="warlock-section-kicker">[ Why Warlock ]</p>
-    <h2 class="warlock-section-title">One framework, one mental model</h2>
+    <h2 class="warlock-section-title">One application, one mental model</h2>
     <p class="warlock-section-sub">
-      The AI layer isn't a separate world bolted to the side. It's the same
-      shape as everything else you write.
+      Browser UI, server logic, data, and agents compose through the same typed
+      modules instead of meeting across framework seams.
     </p>
   </div>
 

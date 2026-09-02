@@ -1,48 +1,75 @@
 ---
 /**
- * Side-by-side code preview showing Warlock's elegance.
- * Two cards: an HTTP route and an AI agent — same shape, same brevity.
+ * Three compact code previews showing the surfaces of one Warlock app:
+ * a server-rendered React page, an HTTP route, and an AI agent.
  */
 import { Code } from "@astrojs/starlight/components";
 
-const routeSnippet = `import { router } from "@warlock.js/core";
-import { listProducts } from "./controllers/list-products.controller";
+const pageSnippet = `import type { PageLoader, PageProps } from "@warlock.js/web";
+import { catalog } from "app/products/catalog";
+import ProductGrid from "./product-grid";
 
-router.get("/products", listProducts);`;
+export const loader = (async () => ({
+  products: await catalog.list(),
+})) satisfies PageLoader;
+
+export default function Products({ data }: PageProps<typeof loader>) {
+  return <ProductGrid items={data.products} />;
+}`;
+
+const routeSnippet = `import { router } from "@warlock.js/core";
+import { createProduct, listProducts, showProduct } from "./controllers";
+
+router.get("/api/products", listProducts);
+router.post("/api/products", createProduct);
+router.get("/api/products/:id", showProduct);`;
 
 const agentSnippet = `import { ai } from "@warlock.js/ai";
-import { OpenAISDK } from "@warlock.js/ai-openai";
+import { openai } from "./providers";
 
-const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
-
-const supportAgent = ai.agent({
+export const supportAgent = ai.agent({
   model: openai.model({ name: "gpt-4o-mini" }),
-  systemPrompt: "You are a concise senior engineer.",
+  systemPrompt: "Help customers choose a product.",
 });
 
-const { text } = await supportAgent.execute("Why use generics?");`;
+export function recommendProduct(prompt: string) {
+  return supportAgent.execute(prompt);
+}`;
 ---
 
 <section class="warlock-showcase">
   <div class="warlock-section-head">
-    <p class="warlock-section-kicker">[ Same shape, different layer ]</p>
-    <h2 class="warlock-section-title">Backends and AI on the same primitives</h2>
+    <p class="warlock-section-kicker">[ One app, every surface ]</p>
+    <h2 class="warlock-section-title">Pages, APIs, and agents belong together</h2>
     <p class="warlock-section-sub">
-      No bolted-on AI. No different mental model for the AI layer. An agent
-      is just another piece of code with typed inputs and outputs.
+      Render React on the server, expose typed HTTP routes, and give agents
+      the same application capabilities — inside one lifecycle and one codebase.
     </p>
   </div>
 
   <div class="warlock-showcase-grid">
     <article class="warlock-showcase-card">
       <header class="warlock-showcase-head">
-        <span class="warlock-showcase-tag">HTTP route</span>
+        <span class="warlock-showcase-tag">SSR page</span>
+        <span class="warlock-showcase-file">src/web/products/index.page.tsx</span>
+      </header>
+      <Code code={pageSnippet} lang="tsx" />
+      <p class="warlock-showcase-note">
+        A typed loader feeds the same React component on the server and in the
+        browser. Routing, metadata, layouts, hydration, and navigation live in
+        <a href="/v/latest/web/">web</a>.
+      </p>
+    </article>
+
+    <article class="warlock-showcase-card">
+      <header class="warlock-showcase-head">
+        <span class="warlock-showcase-tag">HTTP API</span>
         <span class="warlock-showcase-file">src/app/products/routes.ts</span>
       </header>
       <Code code={routeSnippet} lang="ts" />
       <p class="warlock-showcase-note">
-        One line registers a route. The controller, validation, response
-        helpers, and module conventions live in
+        One line registers an endpoint. Controllers, validation, response
+        helpers, middleware, and module conventions live in
         <a href="/v/latest/core/the-basics/02-routing/">core</a>.
       </p>
     </article>
@@ -54,8 +81,8 @@ const { text } = await supportAgent.execute("Why use generics?");`;
       </header>
       <Code code={agentSnippet} lang="ts" />
       <p class="warlock-showcase-note">
-        Pick a provider, define an agent, call it. Tools, retries,
-        structured output, and middleware live in
+        Pick a provider and define an agent beside the rest of the app. Tools,
+        retries, structured output, workflows, and middleware live in
         <a href="/v/latest/ai/">ai</a>.
       </p>
     </article>
@@ -64,7 +91,7 @@ const { text } = await supportAgent.execute("Why use generics?");`;
 
 <style>
   .warlock-showcase {
-    max-width: 72rem;
+    max-width: 78rem;
     margin: 0 auto;
     padding: clamp(3rem, 4rem + 2vw, 5rem) clamp(1.25rem, 4vw, 2.5rem);
   }
@@ -76,18 +103,20 @@ const { text } = await supportAgent.execute("Why use generics?");`;
     margin-block-start: 2.5rem;
   }
 
-  @media (min-width: 60rem) {
+  @media (min-width: 64rem) {
     .warlock-showcase-grid {
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
     }
   }
 
   .warlock-showcase-card {
     /* Reset Starlight's `.sl-markdown-content` auto-flow margin
      * (`:where(…) + :where(…) { margin-top: 1rem }`) — it leaks onto the
-     * second grid item and knocks the two code cards 16px out of line. */
+     * later grid items and knocks the code cards out of line. */
     margin: 0;
+    display: flex;
+    flex-direction: column;
     border: 1px solid var(--sl-color-hairline);
     border-radius: var(--warlock-radius);
     background-color: var(--warlock-surface-dark);
@@ -125,6 +154,10 @@ const { text } = await supportAgent.execute("Why use generics?");`;
   .warlock-showcase-file {
     color: var(--sl-color-gray-3);
     font-weight: 500;
+    max-width: 62%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .warlock-showcase-card :global(.expressive-code) {
@@ -155,7 +188,7 @@ const { text } = await supportAgent.execute("Why use generics?");`;
 
   .warlock-showcase-note {
     padding: 1rem;
-    margin: 0;
+    margin: auto 0 0;
     font-size: 0.875rem;
     line-height: 1.55;
     color: var(--sl-color-gray-2);
