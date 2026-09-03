@@ -11,9 +11,15 @@ import type { ChildModel, Model } from "@warlock.js/cascade";
 import type {
   ArrayValidator,
   BaseValidator,
+  Infer,
+  ObjectValidator,
+  ScalarValidator,
+  StandardSchemaV1,
+  StringValidator,
   TranslateAttributeCallback,
   TranslateRuleCallback,
 } from "@warlock.js/seal";
+import type { UploadedFile } from "../http";
 import type {
   ExistsExceptCurrentIdRuleOptions,
   ExistsExceptCurrentUserRuleOptions,
@@ -22,17 +28,38 @@ import type {
 } from "./database";
 import type { FileValidator } from "./validators";
 
+/**
+ * The object shape produced by `v.localized()`'s inner `v.object({
+ * localeCode, value })` — kept in sync with `localizedPlugin`'s runtime
+ * implementation (`core/src/validation/plugins/localized-plugin.ts`).
+ */
+type LocalizedEntryValidator<T extends BaseValidator> = ObjectValidator<{
+  localeCode: StringValidator & StandardSchemaV1<string>;
+  value: T;
+}> &
+  StandardSchemaV1<{
+    localeCode: string;
+    value: Infer<T>;
+  }>;
+
 // Type augmentation for v factory and validators
 declare module "@warlock.js/seal" {
   // Augment the v factory with file() method
   export interface ValidatorV {
-    file: (errorMessage?: string) => FileValidator;
-    localized: (
-      valueValidator?: BaseValidator,
+    file: (errorMessage?: string) => FileValidator & StandardSchemaV1<UploadedFile>;
+    localized: <
+      T extends BaseValidator = ScalarValidator & StandardSchemaV1<string | number | boolean>,
+    >(
+      valueValidator?: T,
       errorMessage?: string,
     ) => ArrayValidator & {
-      validator: BaseValidator;
-    };
+      validator: LocalizedEntryValidator<T>;
+    } & StandardSchemaV1<
+        Array<{
+          localeCode: string;
+          value: Infer<T>;
+        }>
+      >;
   }
 
   interface ScalarValidator {

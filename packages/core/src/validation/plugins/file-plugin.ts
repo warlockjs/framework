@@ -4,8 +4,9 @@
  * Adds file validation to Seal v factory
  */
 
-import type { SealPlugin } from "@warlock.js/seal";
+import type { SealPlugin, StandardSchemaV1 } from "@warlock.js/seal";
 import { v } from "@warlock.js/seal";
+import type { UploadedFile } from "../../http";
 import { FileValidator } from "../validators";
 
 /**
@@ -17,6 +18,7 @@ export const filePlugin: SealPlugin = {
   description: "Adds file upload validation (v.file())",
   install() {
     // Inject file() method into v factory
-    v.file = (errorMessage?: string) => new FileValidator(errorMessage);
+    v.file = (errorMessage?: string) =>
+      new FileValidator(errorMessage) as FileValidator & StandardSchemaV1<UploadedFile>;
   },
 };
