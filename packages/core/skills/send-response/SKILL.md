@@ -10,7 +10,7 @@ description: 'Send HTTP responses via @warlock.js/core''s Response helpers — s
 ## The shape
 
 ```ts
-import type { RequestHandler, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 
 export const myController: RequestHandler = async ({ request, response }) => {
   // …choose a helper and return it
@@ -22,11 +22,11 @@ Always `return response.<helper>(...)`. The return value drives Fastify's send.
 
 ## Success helpers
 
-| Method                              | Status | When                                      |
-| ----------------------------------- | ------ | ----------------------------------------- |
-| `response.success(data?)`           | 200    | normal read / update                      |
-| `response.successCreate(data)`      | 201    | resource created (POST)                   |
-| `response.noContent()`              | 204    | delete succeeded, no body needed          |
+| Method                         | Status | When                             |
+| ------------------------------ | ------ | -------------------------------- |
+| `response.success(data?)`      | 200    | normal read / update             |
+| `response.successCreate(data)` | 201    | resource created (POST)          |
+| `response.noContent()`         | 204    | delete succeeded, no body needed |
 
 ```ts
 return response.success({ products: [...] });
@@ -40,13 +40,13 @@ return response.noContent();
 
 ## Client-error helpers
 
-| Method                                              | Status | When                                  |
-| --------------------------------------------------- | ------ | ------------------------------------- |
-| `response.badRequest(data)`                         | 400    | malformed or invalid input            |
-| `response.unauthorized(data?)`                      | 401    | missing/invalid auth token            |
-| `response.forbidden(data?)`                         | 403    | authenticated but not allowed         |
-| `response.notFound(data?)`                          | 404    | record missing                        |
-| `response.conflict(data?)`                          | 409    | uniqueness violation, state conflict  |
+| Method                         | Status | When                                 |
+| ------------------------------ | ------ | ------------------------------------ |
+| `response.badRequest(data)`    | 400    | malformed or invalid input           |
+| `response.unauthorized(data?)` | 401    | missing/invalid auth token           |
+| `response.forbidden(data?)`    | 403    | authenticated but not allowed        |
+| `response.notFound(data?)`     | 404    | record missing                       |
+| `response.conflict(data?)`     | 409    | uniqueness violation, state conflict |
 
 ```ts
 return response.badRequest({ error: t("validation.invalid") });
@@ -65,8 +65,8 @@ Most error helpers accept an optional payload — if you omit it, they send a de
 ## Redirects
 
 ```ts
-return response.redirect("/login");                    // 302
-return response.redirect("/new-home", 301);            // permanent
+return response.redirect("/login"); // 302
+return response.redirect("/new-home", 301); // permanent
 ```
 
 ## Files
@@ -98,19 +98,19 @@ stream.end();
 
 ## Throwing HTTP errors
 
-Most of the time, controllers don't need to *choose* an error helper — they throw from the service layer instead. The request middleware (`http/middleware/inject-request-context.ts`) catches every `HttpError` subclass and produces the matching response. The error classes mirror the helpers above:
+Most of the time, controllers don't need to _choose_ an error helper — they throw from the service layer instead. The request middleware (`http/middleware/inject-request-context.ts`) catches every `HttpError` subclass and produces the matching response. The error classes mirror the helpers above:
 
 ```ts
 import {
-  ResourceNotFoundError,   // 404
-  UnAuthorizedError,        // 401
-  ForbiddenError,           // 403
-  BadRequestError,          // 400
-  ConflictError,            // 409
-  NotAcceptableError,       // 406
-  NotAllowedError,          // 405
-  ServerError,              // 500
-  HttpError,                // base class — `new HttpError(status, message, payload?)` for arbitrary codes
+  ResourceNotFoundError, // 404
+  UnAuthorizedError, // 401
+  ForbiddenError, // 403
+  BadRequestError, // 400
+  ConflictError, // 409
+  NotAcceptableError, // 406
+  NotAllowedError, // 405
+  ServerError, // 500
+  HttpError, // base class — `new HttpError(status, message, payload?)` for arbitrary codes
 } from "@warlock.js/core";
 
 throw new ResourceNotFoundError("product.notFound");
@@ -118,13 +118,27 @@ throw new ForbiddenError("permission.denied", { resource: "product", id });
 throw new ConflictError("user.duplicateEmail");
 ```
 
-Each class takes `(message, payload?)`. The payload merges into the response body alongside `error`. In development mode, the stack trace is included too.
+Each class takes `(message, payload?)`. The framework keeps the optional
+detail nested under `payload`:
+
+```json
+{
+  "error": "Product not found",
+  "payload": { "id": 42 }
+}
+```
+
+Every unhandled error response also carries
+`Cache-Control: private, no-store`, regardless of status. The floor is
+applied once at the shared error funnel, so API-route errors cannot be stored
+and replayed across users. In development mode, the stack trace is included
+too.
 
 Pick the class, throw from the service or use-case, and forget about response shaping at the call site. The controller stays focused on the success path:
 
 ```ts
 export const getProductController: RequestHandler = async ({ request, response }) => {
-  const product = await getProductService(request.input("id"));   // throws ResourceNotFoundError on miss
+  const product = await getProductService(request.input("id")); // throws ResourceNotFoundError on miss
   return response.success({ product });
 };
 ```
@@ -136,9 +150,9 @@ See [`create-controller`](../create-controller/SKILL.md) for the "throw from ser
 ```ts
 const sse = response.sse();
 
-sse.send("tick", { count: 1 });             // event name, data, optional id
-sse.send("tick", { count: 2 }, "msg-2");    // third arg is the SSE event id
-sse.comment("keep-alive");                  // invisible to the client, prevents timeout
+sse.send("tick", { count: 1 }); // event name, data, optional id
+sse.send("tick", { count: 2 }, "msg-2"); // third arg is the SSE event id
+sse.comment("keep-alive"); // invisible to the client, prevents timeout
 sse.end();
 ```
 
@@ -178,11 +192,11 @@ response.clearCookie("session_id");
 
 Every response cookie gets `httpOnly: true`, `sameSite: "lax"`, and `secure: true` outside development, unless you override them:
 
-| Flag | Default | Why it's the default |
-|---|---|---|
-| `httpOnly` | `true` | without it, any injected script can read the cookie |
-| `sameSite` | `"lax"` | without it, the cookie rides along on cross-site requests |
-| `secure` | `true`, except in development | without it, the cookie travels in cleartext |
+| Flag       | Default                       | Why it's the default                                      |
+| ---------- | ----------------------------- | --------------------------------------------------------- |
+| `httpOnly` | `true`                        | without it, any injected script can read the cookie       |
+| `sameSite` | `"lax"`                       | without it, the cookie rides along on cross-site requests |
+| `secure`   | `true`, except in development | without it, the cookie travels in cleartext               |
 
 `secure` is relaxed in development only — browsers drop a `Secure` cookie over plain http, which would silently break every local login. It stays on in test and staging.
 

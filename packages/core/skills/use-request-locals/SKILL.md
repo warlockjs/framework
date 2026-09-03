@@ -30,7 +30,7 @@ public locals: RequestLocals = {};
 ```ts title="src/app/observability/middleware/request-timing.middleware.ts"
 import type { Middleware } from "@warlock.js/core";
 
-export const requestTimingMiddleware: Middleware = request => {
+export const requestTimingMiddleware: Middleware = (request) => {
   request.startedAt = Date.now();
 };
 ```
@@ -38,7 +38,7 @@ export const requestTimingMiddleware: Middleware = request => {
 ```ts title="src/app/observability/controllers/timing.controller.ts"
 import type { RequestHandler } from "@warlock.js/core";
 
-export const timingController: RequestHandler = async (request, response) => {
+export const timingController: RequestHandler = async ({ request, response }) => {
   return response.success({ elapsedMs: Date.now() - request.startedAt });
 };
 ```
@@ -123,7 +123,7 @@ Feature-local files such as `src/app/organizations/request-locals.d.ts` are equa
 
 Two rules the scaffold's own comments spell out, and both bite silently:
 
-- **Keep the trailing `export {}`.** `declare module "x"` inside a file with no top-level import or export declares an *ambient* module, which REPLACES `@warlock.js/core`'s real typings instead of merging into them — every framework export vanishes. The `export {}` is what makes the file a module and the block an augmentation. It is not an unused statement to clean up.
+- **Keep the trailing `export {}`.** `declare module "x"` inside a file with no top-level import or export declares an _ambient_ module, which REPLACES `@warlock.js/core`'s real typings instead of merging into them — every framework export vanishes. The `export {}` is what makes the file a module and the block an augmentation. It is not an unused statement to clean up.
 - **Keep them `interface`, not `type`.** This project otherwise prefers `type`; these are the named exception, because declaration merging is interface-only. `type RequestUser = { ... }` is a duplicate-identifier error, not an augmentation.
 
 On a project scaffolded before 5.1 there is no `src/typings.d.ts`, and `tsconfig.json` carries `"typeRoots": ["./src/typings.d.ts"]` — wrong twice, since `typeRoots` takes directories of `@types` packages rather than files, and that file did not exist. Drop the `typeRoots` entry, create the file, and list it under `include`.
