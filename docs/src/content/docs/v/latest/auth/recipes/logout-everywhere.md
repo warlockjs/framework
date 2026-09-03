@@ -10,13 +10,13 @@ A controller that revokes every active session for the current user. Useful for 
 
 ```ts title="src/app/users/controllers/logout-everywhere.controller.ts"
 import { authService } from "@warlock.js/auth";
-import type { Request, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 
-export async function logoutEverywhereController(request: Request, response: Response) {
+export const logoutEverywhereController: RequestHandler = async ({ request, response }) => {
   await authService.revokeAllTokens(request.user!);
 
   return response.success({ message: "Logged out from every device" });
-}
+};
 ```
 
 Wire it behind required auth:
@@ -46,7 +46,9 @@ After this returns, every other client holding any token for this user gets a 40
 If the button isn't behind a recent-login window, gate it with a password confirmation:
 
 ```ts
-export async function logoutEverywhereController(request: Request, response: Response) {
+import type { RequestHandler } from "@warlock.js/core";
+
+const logoutEverywhereController: RequestHandler = async ({ request, response }) => {
   const user = request.user!;
   const ok = await user.confirmPassword(request.input("currentPassword"));
 
@@ -57,7 +59,7 @@ export async function logoutEverywhereController(request: Request, response: Res
   await authService.revokeAllTokens(user);
 
   return response.success({ message: "Logged out from every device" });
-}
+};
 ```
 
 `confirmPassword` is the instance-method form of `verifyPassword` against the user's stored hash.

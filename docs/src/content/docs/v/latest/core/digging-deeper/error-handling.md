@@ -277,7 +277,9 @@ export async function getProfile(userId: string) {
 **Call a `response` helper** when you're in a controller and already hold the `response` — it's the direct, explicit path and lets you shape the body freely:
 
 ```ts title="controller — response in hand, return it"
-export default async function showUser(request: Request, response: Response) {
+import type { RequestHandler } from "@warlock.js/core";
+
+const showUser: RequestHandler = async ({ request, response }) => {
   const user = await User.find(request.input("id"));
 
   if (!user) {
@@ -285,7 +287,9 @@ export default async function showUser(request: Request, response: Response) {
   }
 
   return response.success({ user });
-}
+};
+
+export default showUser;
 ```
 
 The `response` object ships matching helpers for the common statuses — `response.notFound()`, `response.unauthorized()`, `response.forbidden()`, `response.badRequest()`, `response.conflict()`, `response.serverError()`, `response.tooManyRequests()`, `response.unprocessableEntity()`, and more. Each sets the status and sends the body in one call.

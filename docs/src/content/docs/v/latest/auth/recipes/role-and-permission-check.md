@@ -6,7 +6,7 @@ sidebar:
   label: "Role & permission checks"
 ---
 
-`authMiddleware` answers **"who are you?"** and gates by user *type* (user vs admin vs vendor — usually separate tables). It does **not** do fine-grained roles or permissions. When the distinction is a role *within* one user shape — an `admin` user who is also a `super-admin`, an `editor` vs a `viewer` — you build that on top.
+`authMiddleware` answers **"who are you?"** and gates by user _type_ (user vs admin vs vendor — usually separate tables). It does **not** do fine-grained roles or permissions. When the distinction is a role _within_ one user shape — an `admin` user who is also a `super-admin`, an `editor` vs a `viewer` — you build that on top.
 
 The pattern: a `role` (or `permissions`) column on the user model, plus a small guard middleware that runs **after** `authMiddleware` (so `request.user` is already hydrated).
 
@@ -54,7 +54,7 @@ Adding `role` / `hasRole` / `hasPermission` as model accessors keeps the check i
 A guard is just a middleware. It runs after `authMiddleware`, reads the already-hydrated `request.user`, and short-circuits with `403` when the role doesn't match.
 
 ```ts title="src/app/users/middleware/has-role.middleware.ts"
-import type { Middleware, Request, Response } from "@warlock.js/core";
+import type { Middleware } from "@warlock.js/core";
 import type { User } from "../models/user.model";
 
 /**
@@ -68,7 +68,7 @@ import type { User } from "../models/user.model";
  * });
  */
 export function hasRole(...roles: string[]): Middleware {
-  return (request: Request, response: Response) => {
+  return ({ request, response }) => {
     const user = request.user as User | undefined;
 
     if (!user || !roles.includes(user.role)) {
@@ -98,25 +98,22 @@ router.post("/posts", createPostController, {
 For a whole admin area, hang both on a group:
 
 ```ts
-router.group(
-  { prefix: "/admin", middleware: [authMiddleware("user"), hasRole("admin")] },
-  () => {
-    router.get("/stats", statsController);
-    router.delete("/posts/:id", deletePostController);
-  },
-);
+router.group({ prefix: "/admin", middleware: [authMiddleware("user"), hasRole("admin")] }, () => {
+  router.get("/stats", statsController);
+  router.delete("/posts/:id", deletePostController);
+});
 ```
 
 ## 4. Permission check inside a controller
 
-When the rule is finer than a route — "you can edit *this* post only if you own it or you're an admin" — do it inline:
+When the rule is finer than a route — "you can edit _this_ post only if you own it or you're an admin" — do it inline:
 
 ```ts title="src/app/posts/controllers/update-post.controller.ts"
-import type { Request, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 import type { User } from "@/app/users/models/user.model";
 import { Post } from "../models/post.model";
 
-export async function updatePostController(request: Request, response: Response) {
+export const updatePostController: RequestHandler = async ({ request, response }) => {
   const user = request.user as User;
   const post = await Post.find(request.input("id"));
 
@@ -133,14 +130,14 @@ export async function updatePostController(request: Request, response: Response)
   await post.merge(request.only(["title", "body"])).save();
 
   return response.success({ post });
-}
+};
 ```
 
 Route-level guards handle the coarse "can this role reach this endpoint at all"; controller-level checks handle the row-specific "can this user touch this record". Use both.
 
 ## When to reach for separate user types instead
 
-If the difference is structural — different tables, different schemas, different registration flows (admins created in a back-office, users self-registering) — model them as separate [user types](../guides/customize-user-type.md) and gate with `authMiddleware("admin")`. Roles-on-one-model is the right tool only when the user *shape* is shared and the difference is a privilege level.
+If the difference is structural — different tables, different schemas, different registration flows (admins created in a back-office, users self-registering) — model them as separate [user types](../guides/customize-user-type.md) and gate with `authMiddleware("admin")`. Roles-on-one-model is the right tool only when the user _shape_ is shared and the difference is a privilege level.
 
 ## Related
 

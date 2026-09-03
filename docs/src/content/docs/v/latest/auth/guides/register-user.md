@@ -12,10 +12,10 @@ Sign-up is two steps on the server: persist the user with a hashed password, the
 
 ```ts title="src/app/users/controllers/register.controller.ts"
 import { authService } from "@warlock.js/auth";
-import { hashPassword, type Request, type Response } from "@warlock.js/core";
+import { hashPassword, type RequestHandler } from "@warlock.js/core";
 import { User } from "../models/user.model";
 
-export async function registerController(request: Request, response: Response) {
+export const registerController: RequestHandler = async ({ request, response }) => {
   const { email, name, password } = request.all();
 
   const existing = await User.first({ email });
@@ -36,7 +36,7 @@ export async function registerController(request: Request, response: Response) {
   });
 
   return response.successCreate({ user, tokens });
-}
+};
 ```
 
 That's the whole flow.
@@ -48,8 +48,8 @@ That's the whole flow.
 ```ts
 import { hashPassword, verifyPassword } from "@warlock.js/core";
 
-const hash = await hashPassword(plaintext);          // store this
-const ok = await verifyPassword(plaintext, hash);    // compare later
+const hash = await hashPassword(plaintext); // store this
+const ok = await verifyPassword(plaintext, hash); // compare later
 ```
 
 You normally don't call `verifyPassword` directly — `authService.attemptLogin` does it for you during login.

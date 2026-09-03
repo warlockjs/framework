@@ -108,7 +108,9 @@ Two things to lock in:
 The `confirmPassword(plaintext)` instance method checks the plaintext against the stored hash. Useful for "confirm with current password" steps before changing email, changing password, deleting the account:
 
 ```ts
-async function changeEmailController(request: Request, response: Response) {
+import type { RequestHandler } from "@warlock.js/core";
+
+const changeEmailController: RequestHandler = async ({ request, response }) => {
   const user = request.user!;
   const valid = await user.confirmPassword(request.input("currentPassword"));
 
@@ -118,7 +120,7 @@ async function changeEmailController(request: Request, response: Response) {
 
   await user.merge({ email: request.input("newEmail") }).save();
   return response.success({ user });
-}
+};
 ```
 
 ## `User.attempt` — static credential check

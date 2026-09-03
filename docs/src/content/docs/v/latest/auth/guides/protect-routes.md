@@ -21,7 +21,9 @@ router.get("/account", accountController, { middleware: [authMiddleware([])] });
 // Mode 2 — required, specific user types
 //   401s if no token, or if the token's user type isn't in the allowed list.
 router.get("/admin", adminController, { middleware: [authMiddleware("admin")] });
-router.get("/back-office", backOfficeController, { middleware: [authMiddleware(["admin", "staff"])] });
+router.get("/back-office", backOfficeController, {
+  middleware: [authMiddleware(["admin", "staff"])],
+});
 ```
 
 Middleware is attached through the route's `options.middleware` array — the third argument — not as a positional argument.
@@ -41,11 +43,11 @@ The user is loaded via `Model.find(decoded.id)` against the model class register
 
 ## What it does on failure
 
-| Error code | When |
-| --- | --- |
-| `MissingAccessToken` (`EC001`) | No `Authorization` header |
+| Error code                     | When                                                                           |
+| ------------------------------ | ------------------------------------------------------------------------------ |
+| `MissingAccessToken` (`EC001`) | No `Authorization` header                                                      |
 | `InvalidAccessToken` (`EC002`) | Token doesn't verify — signature, expired, doesn't match the DB row, user gone |
-| `Unauthorized` (`EC003`) | Token valid but user-type isn't in the allowed list |
+| `Unauthorized` (`EC003`)       | Token valid but user-type isn't in the allowed list                            |
 
 The response shape (via `response.unauthorized`):
 
@@ -58,24 +60,26 @@ The error code is from the `AuthErrorCodes` enum — handy for the frontend to s
 ## Reading the user in a controller
 
 ```ts
-import type { Request, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 
-async function accountController(request: Request, response: Response) {
+const accountController: RequestHandler = async ({ request, response }) => {
   const user = request.user!;
 
   return response.success({
     id: user.id,
     email: user.get("email"),
   });
-}
+};
 ```
 
 Because the middleware always requires a valid token, `request.user` is guaranteed inside any gated controller (the middleware would have 401'd otherwise). The `!` is safe here.
 
-A public route that wants *soft* personalization simply omits the middleware and reads the token itself:
+A public route that wants _soft_ personalization simply omits the middleware and reads the token itself:
 
 ```ts
-async function feedController(request: Request, response: Response) {
+import type { RequestHandler } from "@warlock.js/core";
+
+const feedController: RequestHandler = async ({ request, response }) => {
   const token = request.authorizationValue;
 
   if (token) {
@@ -83,7 +87,7 @@ async function feedController(request: Request, response: Response) {
   }
 
   return response.success({ feed: await publicFeed() });
-}
+};
 ```
 
 ## Route-group protection
@@ -108,7 +112,7 @@ router.get("/feed", feedController);
 
 // Protected
 router.get("/account", accountController, { middleware: [authMiddleware([])] });
-router.get("/admin",   adminController,   { middleware: [authMiddleware("admin")] });
+router.get("/admin", adminController, { middleware: [authMiddleware("admin")] });
 ```
 
 If a public route needs soft personalization, read `request.authorizationValue` yourself in the controller (see [Reading the user in a controller](#reading-the-user-in-a-controller)).
@@ -120,10 +124,12 @@ The middleware uses `response.unauthorized({...})`. To remap globally — say yo
 ## Reading the decoded payload
 
 ```ts
-async function adminController(request: Request, response: Response) {
+import type { RequestHandler } from "@warlock.js/core";
+
+const adminController: RequestHandler = async ({ request, response }) => {
   const decoded = request.decodedAccessToken;
   // decoded.id, decoded.userType, decoded.created_at, plus any custom claims you signed.
-}
+};
 ```
 
 The decoded payload is exactly what was passed to `jwt.generate`. The default shape is `{ id, userType, created_at }`; if you used a custom `payload` on `createTokenPair` / `generateAccessToken`, everything you signed is here.

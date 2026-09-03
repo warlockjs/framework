@@ -269,7 +269,7 @@ A controller that's longer than ~30 lines usually has work hiding inside it. Ext
 
 - **Don't `throw` for HTTP-shaped errors.** Use `response.<helper>()`. Throwing escalates to the framework's 500 handler unless you throw an `HttpError` subclass (`BadRequestError`, `ForbiddenError`, `ResourceNotFoundError`, …) — and even then, `response.<helper>()` reads more naturally.
 - **Don't read `request.body` directly.** Use `request.all()` / `request.validated()` — they handle multipart, JSON, and form bodies uniformly.
-- **Don't forget `: Response`** on the parameter — without it, autocomplete can't see the helpers and you'll think they don't exist.
+- **Don't omit the `RequestHandler` annotation.** It contextually types the single `{ request, response }` context object, including every response helper.
 - **The `validation` property is on the handler, not the route.** A common slip-up is setting it on the result of `router.get(...)`. The property goes on the controller function itself.
 
 ## See also

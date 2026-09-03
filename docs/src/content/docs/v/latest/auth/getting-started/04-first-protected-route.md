@@ -67,10 +67,10 @@ Also write the matching Cascade migration for the `users` table — see [Cascade
 
 ```ts title="src/app/users/controllers/register.controller.ts"
 import { authService } from "@warlock.js/auth";
-import { hashPassword, type Request, type Response } from "@warlock.js/core";
+import { hashPassword, type RequestHandler } from "@warlock.js/core";
 import { User } from "../models/user.model";
 
-export async function registerController(request: Request, response: Response) {
+export const registerController: RequestHandler = async ({ request, response }) => {
   const { email, name, password } = request.all();
 
   const existing = await User.first({ email });
@@ -91,7 +91,7 @@ export async function registerController(request: Request, response: Response) {
   });
 
   return response.successCreate({ user, tokens });
-}
+};
 ```
 
 That's the full register flow:
@@ -105,10 +105,10 @@ That's the full register flow:
 
 ```ts title="src/app/users/controllers/login.controller.ts"
 import { authService } from "@warlock.js/auth";
-import type { Request, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 import { User } from "../models/user.model";
 
-export async function loginController(request: Request, response: Response) {
+export const loginController: RequestHandler = async ({ request, response }) => {
   const result = await authService.login(
     User,
     {
@@ -126,7 +126,7 @@ export async function loginController(request: Request, response: Response) {
   }
 
   return response.success(result);
-}
+};
 ```
 
 `authService.login` is the full happy path — verifies password, creates the token pair, fires events. Returns `null` on a miss; you map that to a 401.
@@ -134,11 +134,11 @@ export async function loginController(request: Request, response: Response) {
 ## 4. The protected `/me` controller
 
 ```ts title="src/app/users/controllers/me.controller.ts"
-import type { Request, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 
-export async function meController(request: Request, response: Response) {
+export const meController: RequestHandler = async ({ request, response }) => {
   return response.success({ user: request.user });
-}
+};
 ```
 
 `request.user` is hydrated by the middleware before this controller runs. No manual decoding, no extra DB roundtrip in your code.

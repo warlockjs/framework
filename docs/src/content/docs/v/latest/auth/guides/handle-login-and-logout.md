@@ -12,10 +12,10 @@ sidebar:
 
 ```ts title="src/app/users/controllers/login.controller.ts"
 import { authService } from "@warlock.js/auth";
-import type { Request, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 import { User } from "../models/user.model";
 
-export async function loginController(request: Request, response: Response) {
+export const loginController: RequestHandler = async ({ request, response }) => {
   const result = await authService.login(
     User,
     {
@@ -33,7 +33,7 @@ export async function loginController(request: Request, response: Response) {
   }
 
   return response.success(result);
-}
+};
 ```
 
 The returned shape:
@@ -48,7 +48,7 @@ The returned shape:
 }
 ```
 
-Returns `null` on a miss (wrong password, user not found). Map that to a 401 — never tell the client *which* part failed.
+Returns `null` on a miss (wrong password, user not found). Map that to a 401 — never tell the client _which_ part failed.
 
 ## What `credentials` looks like
 
@@ -106,9 +106,9 @@ authService.login(User, credentials, {
 
 ```ts title="src/app/users/controllers/logout.controller.ts"
 import { authService } from "@warlock.js/auth";
-import type { Request, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 
-export async function logoutController(request: Request, response: Response) {
+export const logoutController: RequestHandler = async ({ request, response }) => {
   await authService.logout(
     request.user!,
     request.authorizationValue,
@@ -116,7 +116,7 @@ export async function logoutController(request: Request, response: Response) {
   );
 
   return response.success({ message: "Logged out" });
-}
+};
 ```
 
 The contract:
@@ -151,20 +151,20 @@ This is the "kick all my sessions" button.
 
 ```ts title="src/app/users/controllers/refresh.controller.ts"
 import { authService } from "@warlock.js/auth";
-import type { Request, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 
-export async function refreshController(request: Request, response: Response) {
-  const tokens = await authService.refreshTokens(
-    request.input("refreshToken"),
-    { userAgent: request.header("user-agent"), ip: request.ip },
-  );
+export const refreshController: RequestHandler = async ({ request, response }) => {
+  const tokens = await authService.refreshTokens(request.input("refreshToken"), {
+    userAgent: request.header("user-agent"),
+    ip: request.ip,
+  });
 
   if (!tokens) {
     return response.unauthorized({ error: "Invalid refresh token" });
   }
 
   return response.success({ tokens });
-}
+};
 ```
 
 Returns a new pair or `null` (token expired, revoked, replay-detected). The endpoint doesn't need `authMiddleware` — the refresh token itself is the credential.
@@ -176,11 +176,13 @@ Internals on the rotation flow are covered in [Manage tokens](./manage-tokens.md
 ```ts
 import { authEvents } from "@warlock.js/auth";
 
-authEvents.on("login.attempt",   (credentials) => audit("login.attempt", credentials));
-authEvents.on("login.success",   (user, tokens, deviceInfo) => audit("login.success", { user, deviceInfo }));
-authEvents.on("login.failed",    (credentials, reason) => alertOnBruteForce(credentials, reason));
-authEvents.on("logout",          (user) => audit("logout", { userId: user.id }));
-authEvents.on("logout.all",      (user) => audit("logout.all", { userId: user.id }));
+authEvents.on("login.attempt", (credentials) => audit("login.attempt", credentials));
+authEvents.on("login.success", (user, tokens, deviceInfo) =>
+  audit("login.success", { user, deviceInfo }),
+);
+authEvents.on("login.failed", (credentials, reason) => alertOnBruteForce(credentials, reason));
+authEvents.on("logout", (user) => audit("logout", { userId: user.id }));
+authEvents.on("logout.all", (user) => audit("logout.all", { userId: user.id }));
 authEvents.on("logout.failsafe", (user) => alert(`Fail-safe logout for ${user.id}`));
 authEvents.on("token.refreshed", (user, newPair, oldToken) => track(user, oldToken));
 ```

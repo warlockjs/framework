@@ -35,18 +35,18 @@ The whole package, in miniature: gate a route, then read the logged-in user insi
 
 ```ts title="src/app/users/routes.ts"
 import { authMiddleware } from "@warlock.js/auth";
-import { router, type Request, type Response } from "@warlock.js/core";
+import { router, type RequestHandler } from "@warlock.js/core";
 
 // `authMiddleware([])` = a valid token is required; any user type passes.
 // Attach it via the route's `middleware` array (the third argument).
 // On success the middleware has already hydrated `request.user` for you.
 router.get(
   "/me",
-  (request: Request, response: Response) => {
+  (({ request, response }) => {
     const user = request.user!;
 
     return response.success({ id: user.id, email: user.get("email") });
-  },
+  }) satisfies RequestHandler,
   { middleware: [authMiddleware([])] },
 );
 ```

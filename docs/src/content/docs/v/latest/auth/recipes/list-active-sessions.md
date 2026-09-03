@@ -15,9 +15,9 @@ A two-endpoint pattern for the "manage your sessions" screen:
 
 ```ts title="src/app/users/controllers/list-sessions.controller.ts"
 import { authService } from "@warlock.js/auth";
-import type { Request, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 
-export async function listSessionsController(request: Request, response: Response) {
+export const listSessionsController: RequestHandler = async ({ request, response }) => {
   const sessions = await authService.getActiveSessions(request.user!);
 
   return response.success({
@@ -29,7 +29,7 @@ export async function listSessionsController(request: Request, response: Respons
       lastUsedAt: session.get("last_used_at"),
     })),
   });
-}
+};
 ```
 
 `getActiveSessions` returns the non-revoked, non-expired `RefreshToken` instances for the user, newest first. `device_info` is whatever you passed to `createTokenPair(user, deviceInfo)` at login — typically `{ userAgent, ip, deviceId }`.
@@ -40,9 +40,9 @@ The instance-method form is `request.user!.activeSessions()`.
 
 ```ts title="src/app/users/controllers/revoke-session.controller.ts"
 import { RefreshToken } from "@warlock.js/auth";
-import type { Request, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 
-export async function revokeSessionController(request: Request, response: Response) {
+export const revokeSessionController: RequestHandler = async ({ request, response }) => {
   const user = request.user!;
   const sessionId = request.input("id");
 
@@ -59,7 +59,7 @@ export async function revokeSessionController(request: Request, response: Respon
   await session.revoke();
 
   return response.success({ message: "Session revoked" });
-}
+};
 ```
 
 Two things worth calling out:
