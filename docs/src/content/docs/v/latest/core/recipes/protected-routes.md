@@ -78,12 +78,12 @@ If any step fails, the middleware returns `401` with an `errorCode` and a transl
 
 The `userType` argument is a string or string array. Common values:
 
-| Argument             | Effect                                                       |
-| -------------------- | ------------------------------------------------------------ |
-| `authMiddleware()`   | Optional auth — populates `request.user` if a token is present, but doesn't `401` when missing. Useful for endpoints that change behavior based on whether the caller is logged in. |
-| `authMiddleware("user")`            | Requires a valid `user`-type token.                                                       |
-| `authMiddleware("admin")`           | Requires a valid `admin`-type token.                                                      |
-| `authMiddleware(["user", "admin"])` | Either user type is accepted.                                                             |
+| Argument                            | Effect                                                                                                                                                                              |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `authMiddleware()`                  | Optional auth — populates `request.user` if a token is present, but doesn't `401` when missing. Useful for endpoints that change behavior based on whether the caller is logged in. |
+| `authMiddleware("user")`            | Requires a valid `user`-type token.                                                                                                                                                 |
+| `authMiddleware("admin")`           | Requires a valid `admin`-type token.                                                                                                                                                |
+| `authMiddleware(["user", "admin"])` | Either user type is accepted.                                                                                                                                                       |
 
 User types live in your `auth` config (`src/config/auth.ts`) under `userType: { user: User, admin: Admin }`. The middleware does `config.key("auth.userType.<type>")` to find the model class.
 
@@ -209,7 +209,7 @@ Then in a controller:
 ```ts title="src/app/auth/controllers/me.controller.ts"
 import { type GuardedRequestHandler } from "../types/guarded-request.type";
 
-export const me: GuardedRequestHandler = async (request, response) => {
+export const me: GuardedRequestHandler = async ({ request, response }) => {
   return response.success({
     user: request.user,
   });
@@ -227,8 +227,8 @@ import { authMiddleware } from "@warlock.js/auth";
 import { router } from "@warlock.js/core";
 
 router.prefix("/posts", () => {
-  router.get("/", listPostsController);                                  // public
-  router.get("/:id", getPostController);                                 // public
+  router.get("/", listPostsController); // public
+  router.get("/:id", getPostController); // public
   router.post("/", { middleware: [authMiddleware("user")] }, createPostController);
   router.delete("/:id", { middleware: [authMiddleware("admin")] }, deletePostController);
 });
@@ -244,15 +244,12 @@ Same factory, attached per-route. Use this when most of a section is public and 
 import { ResourceNotFoundError } from "@warlock.js/core";
 import { type GuardedRequestHandler } from "app/auth/types/guarded-request.type";
 import { Post } from "../models/post";
-import {
-  type UpdatePostSchema,
-  updatePostSchema,
-} from "../schema/update-post.schema";
+import { type UpdatePostSchema, updatePostSchema } from "../schema/update-post.schema";
 
-export const updatePostController: GuardedRequestHandler<UpdatePostSchema> = async (
+export const updatePostController: GuardedRequestHandler<UpdatePostSchema> = async ({
   request,
   response,
-) => {
+}) => {
   const post = await Post.find(request.input("id"));
 
   if (!post) {
@@ -310,7 +307,7 @@ router.group(
 import { type RequestHandler } from "@warlock.js/core";
 import { Product } from "../models/product";
 
-export const showProductController: RequestHandler = async (request, response) => {
+export const showProductController: RequestHandler = async ({ request, response }) => {
   const product = await Product.first({ slug: request.input("slug") });
 
   if (!product) {
@@ -330,10 +327,10 @@ The middleware short-circuits when no token is present (no `401`), but populates
 
 ## 401 vs 403 — the rule
 
-| Status | Meaning                                          | Triggered by                                                                                  |
-| ------ | ------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| `401`  | "You're not authenticated."                      | Missing/invalid/expired token. Returned by `authMiddleware`.                                  |
-| `403`  | "You're authenticated, but you can't do this."   | Authorization failure — wrong role, not the owner, plan tier doesn't allow it. Returned by your controller. |
+| Status | Meaning                                        | Triggered by                                                                                                |
+| ------ | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `401`  | "You're not authenticated."                    | Missing/invalid/expired token. Returned by `authMiddleware`.                                                |
+| `403`  | "You're authenticated, but you can't do this." | Authorization failure — wrong role, not the owner, plan tier doesn't allow it. Returned by your controller. |
 
 Don't conflate the two. A client receiving `401` knows to refresh the token or redirect to login. A `403` tells them to stop trying — refreshing won't help. Use `response.unauthorized(...)` for `401` and `response.forbidden(...)` for `403`.
 

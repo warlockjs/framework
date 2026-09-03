@@ -57,26 +57,22 @@ export class HttpError extends Error {
 
 `HttpError` is the only class that takes a status as its first argument. Every subclass takes `(message, payload?)` and hard-codes the status:
 
-| Class                   | Status | Throw it when…                                                        |
-| ----------------------- | ------ | --------------------------------------------------------------------- |
-| `HttpError`             | _you choose_ | You want a status the subclasses don't cover (e.g. `429`, `503`). |
-| `ResourceNotFoundError` | `404`  | A looked-up record or route target doesn't exist.                     |
-| `UnAuthorizedError`     | `401`  | The caller isn't authenticated (missing / invalid credentials).       |
-| `ForbiddenError`        | `403`  | The caller is authenticated but not allowed to do this.               |
-| `BadRequestError`       | `400`  | The request is malformed or semantically wrong.                       |
-| `ConflictError`         | `409`  | The action conflicts with current state (duplicate, version clash).   |
-| `NotAcceptableError`    | `406`  | The server can't produce a representation the client will accept.     |
-| `NotAllowedError`       | `405`  | The HTTP method isn't allowed on this resource.                       |
-| `ServerError`           | `500`  | Something broke server-side that the client can't fix.                |
+| Class                   | Status       | Throw it when…                                                      |
+| ----------------------- | ------------ | ------------------------------------------------------------------- |
+| `HttpError`             | _you choose_ | You want a status the subclasses don't cover (e.g. `429`, `503`).   |
+| `ResourceNotFoundError` | `404`        | A looked-up record or route target doesn't exist.                   |
+| `UnAuthorizedError`     | `401`        | The caller isn't authenticated (missing / invalid credentials).     |
+| `ForbiddenError`        | `403`        | The caller is authenticated but not allowed to do this.             |
+| `BadRequestError`       | `400`        | The request is malformed or semantically wrong.                     |
+| `ConflictError`         | `409`        | The action conflicts with current state (duplicate, version clash). |
+| `NotAcceptableError`    | `406`        | The server can't produce a representation the client will accept.   |
+| `NotAllowedError`       | `405`        | The HTTP method isn't allowed on this resource.                     |
+| `ServerError`           | `500`        | Something broke server-side that the client can't fix.              |
 
 Note the spelling: it's `UnAuthorizedError` (capital `A`), not `UnauthorizedError`.
 
 ```ts title="src/app/posts/services/publish-post.service.ts"
-import {
-  ConflictError,
-  ForbiddenError,
-  ResourceNotFoundError,
-} from "@warlock.js/core";
+import { ConflictError, ForbiddenError, ResourceNotFoundError } from "@warlock.js/core";
 import { Post } from "../models/post";
 
 export async function publishPost(postId: string, userId: string) {
@@ -117,6 +113,12 @@ How the payload reaches the response depends on which class you threw — see th
 ## How a thrown error becomes a response
 
 The request pipeline wraps your middleware, validation, and handler in a single `try/catch`. When something throws, it runs `handleRequestError`, which inspects the error type and sends a response.
+
+Before it inspects the type, that single funnel sets
+`Cache-Control: private, no-store`. The floor applies to every unhandled
+error response—4xx and 5xx, page and API routes—so a CDN or shared cache cannot
+replay one request's failure to another user or keep serving an outage after
+its cause is gone.
 
 ```mermaid
 flowchart TD
@@ -182,12 +184,12 @@ So an out-of-the-box validation failure looks like:
 }
 ```
 
-| Config field (under `validation.response`) | Default    | Controls                                          |
-| ------------------------------------------ | ---------- | ------------------------------------------------- |
-| `errors`                                   | `"errors"` | The top-level key holding the array of failures.  |
-| `inputKey`                                 | `"input"`  | The per-error key naming the failed input.        |
-| `inputError`                               | `"error"`  | The per-error key holding the message.            |
-| `status`                                   | `400`      | The HTTP status for a schema-validation failure.  |
+| Config field (under `validation.response`) | Default    | Controls                                         |
+| ------------------------------------------ | ---------- | ------------------------------------------------ |
+| `errors`                                   | `"errors"` | The top-level key holding the array of failures. |
+| `inputKey`                                 | `"input"`  | The per-error key naming the failed input.       |
+| `inputError`                               | `"error"`  | The per-error key holding the message.           |
+| `status`                                   | `400`      | The HTTP status for a schema-validation failure. |
 
 Override any of these in your project config to reshape the envelope (for example, to match an existing API contract) without touching framework code.
 
@@ -214,7 +216,7 @@ The validation detail rides in the `payload` (under `code` and `errors`), so the
   "error": "Invalid input data",
   "payload": {
     "code": "BAD_SCHEMA_USE_CASE",
-    "errors": [ /* per-field validation errors */ ]
+    "errors": [/* per-field validation errors */]
   }
 }
 ```
@@ -233,15 +235,15 @@ if (response.body?.code === HttpErrorCodes.RateLimitExceeded) {
 }
 ```
 
-| Code    | Enum member               | Meaning                                                                       |
-| ------- | ------------------------- | ----------------------------------------------------------------------------- |
+| Code    | Enum member               | Meaning                                                                              |
+| ------- | ------------------------- | ------------------------------------------------------------------------------------ |
 | `EC100` | `IdempotencyKeyConflict`  | Same idempotency key reused with a **different** request body — likely a client bug. |
-| `EC101` | `IdempotencyKeyInvalid`   | Idempotency key header is malformed (wrong length / non-printable chars).      |
-| `EC102` | `RateLimitExceeded`       | Per-route rate limit exceeded (distinct from the global `@fastify/rate-limit` 429). |
-| `EC103` | `ConcurrencyLimitReached` | Per-route concurrency cap reached — too many in-flight requests on this endpoint. |
-| `EC104` | `BodyTooLarge`            | Request `Content-Length` exceeds the per-route body cap.                       |
-| `EC105` | `IpForbidden`             | Client IP failed the `ipFilter()` allow/deny check.                           |
-| `EC106` | `Maintenance`             | App is in maintenance mode and the request didn't match the allowlist.        |
+| `EC101` | `IdempotencyKeyInvalid`   | Idempotency key header is malformed (wrong length / non-printable chars).            |
+| `EC102` | `RateLimitExceeded`       | Per-route rate limit exceeded (distinct from the global `@fastify/rate-limit` 429).  |
+| `EC103` | `ConcurrencyLimitReached` | Per-route concurrency cap reached — too many in-flight requests on this endpoint.    |
+| `EC104` | `BodyTooLarge`            | Request `Content-Length` exceeds the per-route body cap.                             |
+| `EC105` | `IpForbidden`             | Client IP failed the `ipFilter()` allow/deny check.                                  |
+| `EC106` | `Maintenance`             | App is in maintenance mode and the request didn't match the allowlist.               |
 
 ### The numbering convention
 

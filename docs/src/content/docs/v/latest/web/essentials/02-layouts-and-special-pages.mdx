@@ -85,6 +85,11 @@ the browser never hydrates a tree the server could not establish.
 
 There is no `500.page.tsx`; all non-404 failures use `error.page.tsx`.
 
+Every unhandled error response is forced to
+`Cache-Control: private, no-store` at the framework's shared error funnel.
+This applies to every status and includes API-route failures; an intermediary
+must never replay one request's error to another user.
+
 ## The universal `register()` hook
 
 `root.tsx`, `layout.tsx`, and pages may export a synchronous, no-argument

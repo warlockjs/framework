@@ -29,8 +29,8 @@ export const createPostSchema = v.object({
 });
 
 // 2. controller
-export const createPostController: RequestHandler = async (request, response) => {
-  const data = request.validated();   // typed as Infer<typeof createPostSchema>
+export const createPostController: RequestHandler = async ({ request, response }) => {
+  const data = request.validated(); // typed as Infer<typeof createPostSchema>
 
   // ...
 };
@@ -63,52 +63,52 @@ The full toolbox lives in `@warlock.js/seal`. Highlights:
 
 #### Primitives
 
-| Factory                | Inferred type            | Notes                                     |
-| ---------------------- | ------------------------ | ----------------------------------------- |
-| `v.string(msg?)`       | `string`                 | `.min()`, `.max()`, `.email()`, `.url()`, `.pattern()`, `.uuid()`, `.alpha()`, `.alphanumeric()`, `.trim()`, `.in([...])` / `.oneOf([...])` (allowlist) |
-| `v.email(msg?)`        | `string`                 | shortcut for `v.string().email()`         |
-| `v.number(msg?)`       | `number`                 | `.min()`, `.max()`, `.positive()`, `.negative()` |
-| `v.int(msg?)`          | `number`                 | integer-only                              |
-| `v.float(msg?)`        | `number`                 | floats                                    |
-| `v.numeric(msg?)`      | `number`                 | string-or-number coerced to number        |
-| `v.boolean(msg?)`      | `boolean`                | accepts `"true"` / `"false"` / `true` / `false` / `0` / `1` |
-| `v.date(msg?)`         | `Date`                   | parses ISO strings                        |
-| `v.any()`              | `any`                    | accepts anything                          |
+| Factory           | Inferred type | Notes                                                                                                                                                   |
+| ----------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `v.string(msg?)`  | `string`      | `.min()`, `.max()`, `.email()`, `.url()`, `.pattern()`, `.uuid()`, `.alpha()`, `.alphanumeric()`, `.trim()`, `.in([...])` / `.oneOf([...])` (allowlist) |
+| `v.email(msg?)`   | `string`      | shortcut for `v.string().email()`                                                                                                                       |
+| `v.number(msg?)`  | `number`      | `.min()`, `.max()`, `.positive()`, `.negative()`                                                                                                        |
+| `v.int(msg?)`     | `number`      | integer-only                                                                                                                                            |
+| `v.float(msg?)`   | `number`      | floats                                                                                                                                                  |
+| `v.numeric(msg?)` | `number`      | string-or-number coerced to number                                                                                                                      |
+| `v.boolean(msg?)` | `boolean`     | accepts `"true"` / `"false"` / `true` / `false` / `0` / `1`                                                                                             |
+| `v.date(msg?)`    | `Date`        | parses ISO strings                                                                                                                                      |
+| `v.any()`         | `any`         | accepts anything                                                                                                                                        |
 
 #### Composition
 
-| Factory                                   | Inferred type                            | Notes                                                  |
-| ----------------------------------------- | ---------------------------------------- | ------------------------------------------------------ |
-| `v.object({ key: validator })`            | `{ key: T }`                             | nested via more `v.object(...)`                        |
-| `v.array(validator)`                      | `T[]`                                    | `.minLength()`, `.maxLength()`, `.length()`            |
-| `v.tuple([v.string(), v.number()])`       | `[string, number]`                       | fixed-length, position-specific types                  |
-| `v.record(validator)`                     | `Record<string, T>`                      | dynamic keys, consistent value type                    |
-| `v.union([v.string(), v.number()])`       | `string \| number`                       | try each in order                                      |
-| `v.discriminatedUnion("type", [a, b])`    | `A \| B`                                 | routed by discriminator literal                        |
-| `v.enum(["draft", "published"])`          | `"draft" \| "published"`                 | tuple form                                             |
-| `v.enum(MyEnum)`                          | `MyEnum[keyof MyEnum]`                   | TS enum object                                         |
-| `v.literal("active", "archived")`         | `"active" \| "archived"`                 | narrow to literal union                                |
-| `v.instanceof(MyClass)`                   | `MyClass`                                | `value instanceof MyClass`                             |
-| `v.lazy(() => schema)`                    | `T`                                      | recursive / forward-referenced schemas                 |
+| Factory                                | Inferred type            | Notes                                       |
+| -------------------------------------- | ------------------------ | ------------------------------------------- |
+| `v.object({ key: validator })`         | `{ key: T }`             | nested via more `v.object(...)`             |
+| `v.array(validator)`                   | `T[]`                    | `.minLength()`, `.maxLength()`, `.length()` |
+| `v.tuple([v.string(), v.number()])`    | `[string, number]`       | fixed-length, position-specific types       |
+| `v.record(validator)`                  | `Record<string, T>`      | dynamic keys, consistent value type         |
+| `v.union([v.string(), v.number()])`    | `string \| number`       | try each in order                           |
+| `v.discriminatedUnion("type", [a, b])` | `A \| B`                 | routed by discriminator literal             |
+| `v.enum(["draft", "published"])`       | `"draft" \| "published"` | tuple form                                  |
+| `v.enum(MyEnum)`                       | `MyEnum[keyof MyEnum]`   | TS enum object                              |
+| `v.literal("active", "archived")`      | `"active" \| "archived"` | narrow to literal union                     |
+| `v.instanceof(MyClass)`                | `MyClass`                | `value instanceof MyClass`                  |
+| `v.lazy(() => schema)`                 | `T`                      | recursive / forward-referenced schemas      |
 
 #### Modifiers
 
 Chained on any validator:
 
 ```ts
-v.string().optional()                              // field may be omitted
-v.string().nullable()                              // value may be null
-v.string().nullish()                               // optional + nullable
-v.string().default("anonymous")                    // default if missing/empty
-v.string().required()                              // explicit required (default)
-v.string().describe("user's display name")         // metadata for OpenAPI
+v.string().optional(); // field may be omitted
+v.string().nullable(); // value may be null
+v.string().nullish(); // optional + nullable
+v.string().default("anonymous"); // default if missing/empty
+v.string().required(); // explicit required (default)
+v.string().describe("user's display name"); // metadata for OpenAPI
 
-v.string().requiredIf("plan", "premium")           // required when plan === "premium"
-v.string().requiredWith("phone")                   // required if phone is present
-v.string().requiredWithout("email")                // required if email is missing
-v.string().requiredIfEmptySibling("email")         // required if sibling is empty
+v.string().requiredIf("plan", "premium"); // required when plan === "premium"
+v.string().requiredWith("phone"); // required if phone is present
+v.string().requiredWithout("email"); // required if email is missing
+v.string().requiredIfEmptySibling("email"); // required if sibling is empty
 
-v.string().refine((value) => value !== "admin", "Reserved username")    // custom validator
+v.string().refine((value) => value !== "admin", "Reserved username"); // custom validator
 ```
 
 `refine` is the escape hatch for project-specific rules — runs your function, you return `true` for valid, `false` (or an error message) for invalid.
@@ -163,16 +163,13 @@ The controller pulls the schema's inferred type and uses `RequestHandler<Request
 
 ```ts title="src/app/products/controllers/create-product.controller.ts"
 import type { Request, RequestHandler } from "@warlock.js/core";
-import {
-  type CreateProductSchema,
-  createProductSchema,
-} from "../schema/create-product.schema";
+import { type CreateProductSchema, createProductSchema } from "../schema/create-product.schema";
 
-export const createProductController: RequestHandler<Request<CreateProductSchema>> = async (
+export const createProductController: RequestHandler<Request<CreateProductSchema>> = async ({
   request,
   response,
-) => {
-  const data = request.validated();   // typed as CreateProductSchema
+}) => {
+  const data = request.validated(); // typed as CreateProductSchema
   // ...
 };
 ```
@@ -181,15 +178,12 @@ For routes behind `authMiddleware`, swap the annotation to `GuardedRequestHandle
 
 ```ts title="src/app/leads/controllers/create-lead.controller.ts"
 import { type GuardedRequestHandler } from "app/auth/types/guarded-request.type";
-import {
-  type CreateLeadSchema,
-  createLeadSchema,
-} from "../schema/create-lead.schema";
+import { type CreateLeadSchema, createLeadSchema } from "../schema/create-lead.schema";
 
-export const createLeadController: GuardedRequestHandler<CreateLeadSchema> = async (
+export const createLeadController: GuardedRequestHandler<CreateLeadSchema> = async ({
   request,
   response,
-) => {
+}) => {
   const data = request.validated();
   // request.user is typed too
 };
@@ -218,7 +212,7 @@ Override with `validating`:
 ```ts
 createProductController.validation = {
   schema: createProductSchema,
-  validating: ["body", "query", "params"],     // include params
+  validating: ["body", "query", "params"], // include params
 };
 ```
 
@@ -231,7 +225,7 @@ When validation fails, the framework calls `response.failedSchema(result)` which
 ```json
 {
   "errors": [
-    { "input": "name",  "error": "Name is required" },
+    { "input": "name", "error": "Name is required" },
     { "input": "price", "error": "Price must be at least 0" }
   ]
 }
@@ -242,9 +236,9 @@ Status code defaults to 400. Both the payload shape and status are configurable 
 ```ts title="src/config/validation.ts"
 const validationConfig = {
   response: {
-    errors: "errors",       // key holding the array
-    inputKey: "input",      // key for the field name
-    inputError: "error",    // key for the message
+    errors: "errors", // key holding the array
+    inputKey: "input", // key for the field name
+    inputError: "error", // key for the message
     status: 400,
   },
 };
@@ -305,8 +299,8 @@ Options:
 
 ```ts
 v.string().unique(User, {
-  column: "username",                     // override which column to check
-  except: "id",                           // when updating: exclude row by sibling input value
+  column: "username", // override which column to check
+  except: "id", // when updating: exclude row by sibling input value
   query: ({ query, value, allValues }) => {
     // extra scoping: only check within the same organization
     query.where("organization_id", allValues.organization_id);
@@ -391,7 +385,7 @@ if (!result.isValid) {
   return;
 }
 
-const product = result.data;   // typed as Infer<typeof schema>
+const product = result.data; // typed as Infer<typeof schema>
 ```
 
 `v.validate(schema, data)` returns `{ isValid, data, errors }`. The framework's request middleware is just a thin wrapper over this — same machinery, different driver.
@@ -424,10 +418,10 @@ You rarely need to call this manually — the framework does it via the validati
 ```ts
 v.object({
   name: v.string(),
-  nickname: v.string().optional(),                              // may be missing
-  bio: v.string().optional().default(""),                       // missing → ""
-  pinnedAt: v.date().nullable(),                                // value can be null
-  twitterHandle: v.string().nullish(),                          // both
+  nickname: v.string().optional(), // may be missing
+  bio: v.string().optional().default(""), // missing → ""
+  pinnedAt: v.date().nullable(), // value can be null
+  twitterHandle: v.string().nullish(), // both
 });
 ```
 
@@ -453,10 +447,9 @@ v.object({
 
 ```ts
 v.object({
-  username: v.string().refine(
-    (value) => !RESERVED_USERNAMES.includes(value),
-    "That username is reserved",
-  ),
+  username: v
+    .string()
+    .refine((value) => !RESERVED_USERNAMES.includes(value), "That username is reserved"),
 });
 ```
 
@@ -479,12 +472,14 @@ v.object({
 
 ```ts
 v.object({
-  items: v.array(
-    v.object({
-      productId: v.string().exists(Product, { column: "id" }),
-      quantity: v.int().min(1),
-    }),
-  ).minLength(1),
+  items: v
+    .array(
+      v.object({
+        productId: v.string().exists(Product, { column: "id" }),
+        quantity: v.int().min(1),
+      }),
+    )
+    .minLength(1),
 });
 ```
 
@@ -503,10 +498,7 @@ const smsNotification = v.object({
   body: v.string().max(160),
 });
 
-const notificationSchema = v.discriminatedUnion("type", [
-  emailNotification,
-  smsNotification,
-]);
+const notificationSchema = v.discriminatedUnion("type", [emailNotification, smsNotification]);
 
 type Notification = Infer<typeof notificationSchema>;
 // → { type: "email", to: string, subject: string }

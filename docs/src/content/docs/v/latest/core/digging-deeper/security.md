@@ -74,11 +74,11 @@ export default encryptionConfig;
 
 All three live in `@warlock.js/core`. Mixing them up is the single most common security mistake — encrypting a password turns a database leak into a credentials leak; HMAC-ing one makes it brute-forceable.
 
-| Helper                            | Direction  | Algorithm    | Use for                                                  |
-| --------------------------------- | ---------- | ------------ | -------------------------------------------------------- |
-| `hashPassword` / `verifyPassword` | one-way    | bcrypt (slow) | User-typed passwords. **Only** passwords.               |
-| `encrypt` / `decrypt`             | reversible | AES-256-GCM  | Secrets you must read back — API keys, OAuth tokens.     |
-| `hmacHash`                        | one-way    | HMAC-SHA256  | Deterministic fingerprints for lookup of encrypted data. |
+| Helper                            | Direction  | Algorithm     | Use for                                                  |
+| --------------------------------- | ---------- | ------------- | -------------------------------------------------------- |
+| `hashPassword` / `verifyPassword` | one-way    | bcrypt (slow) | User-typed passwords. **Only** passwords.                |
+| `encrypt` / `decrypt`             | reversible | AES-256-GCM   | Secrets you must read back — API keys, OAuth tokens.     |
+| `hmacHash`                        | one-way    | HMAC-SHA256   | Deterministic fingerprints for lookup of encrypted data. |
 
 ```ts
 import { hashPassword, verifyPassword, encrypt, decrypt, hmacHash } from "@warlock.js/core";
@@ -108,14 +108,14 @@ router.post("/auth/login", loginController, {
 
 Each rejection carries a stable `HttpErrorCodes` value so clients can branch on a code instead of parsing message text. The core range is `EC100..EC199` (`EC001..EC099` belongs to `@warlock.js/auth`).
 
-| Factory                       | Rejects with        | Error code  | Caps / guards                                                            |
-| ----------------------------- | ------------------- | ----------- | ----------------------------------------------------------------------- |
-| `middleware.maintenance(…)`   | 503 + `Retry-After` | `EC106`     | App in maintenance mode; allowlist bypass (default `["/health"]`).      |
-| `middleware.ipFilter(…)`      | 403                 | `EC105`     | Allow / deny by IP or IPv4 CIDR. Fail-closed; `deny` wins over `allow`. |
-| `middleware.rateLimit(…)`     | 429 + `Retry-After` | `EC102`     | Requests-per-window per group key (default: client IP).                 |
-| `middleware.concurrencyLimit(…)` | 429 + `Retry-After: 1` | `EC103`  | In-flight request cap per group key (default: route path).              |
-| `middleware.maxBodySize(…)`   | 413                 | `EC104`     | Rejects when `Content-Length` exceeds the per-route cap.                |
-| `middleware.idempotency(…)`   | 422 / 400           | `EC100` / `EC101` | Dedupes writes by `Idempotency-Key`; conflict vs. malformed key.  |
+| Factory                          | Rejects with           | Error code        | Caps / guards                                                           |
+| -------------------------------- | ---------------------- | ----------------- | ----------------------------------------------------------------------- |
+| `middleware.maintenance(…)`      | 503 + `Retry-After`    | `EC106`           | App in maintenance mode; allowlist bypass (default `["/health"]`).      |
+| `middleware.ipFilter(…)`         | 403                    | `EC105`           | Allow / deny by IP or IPv4 CIDR. Fail-closed; `deny` wins over `allow`. |
+| `middleware.rateLimit(…)`        | 429 + `Retry-After`    | `EC102`           | Requests-per-window per group key (default: client IP).                 |
+| `middleware.concurrencyLimit(…)` | 429 + `Retry-After: 1` | `EC103`           | In-flight request cap per group key (default: route path).              |
+| `middleware.maxBodySize(…)`      | 413                    | `EC104`           | Rejects when `Content-Length` exceeds the per-route cap.                |
+| `middleware.idempotency(…)`      | 422 / 400              | `EC100` / `EC101` | Dedupes writes by `Idempotency-Key`; conflict vs. malformed key.        |
 
 A few facts worth internalizing before you lean on these:
 
@@ -169,22 +169,22 @@ Every request gets a `request.id`. The framework echoes it back as a response he
 
 Inherited values are validated before use — non-empty printable ASCII, max 128 characters — to block log-injection from a malicious client (a forged newline in a header could otherwise corrupt your log stream). Knobs under `http.requestId`:
 
-| Key         | Default        | Effect                                                                     |
-| ----------- | -------------- | -------------------------------------------------------------------------- |
-| `header`    | `"X-Request-Id"` | Inbound + outbound header name.                                           |
-| `generator` | random 32-char | Override the id generator.                                                 |
-| `enabled`   | `true`         | Set `false` to stop echoing and inheriting. `request.id` is still generated for internal logging. |
+| Key         | Default          | Effect                                                                                            |
+| ----------- | ---------------- | ------------------------------------------------------------------------------------------------- |
+| `header`    | `"X-Request-Id"` | Inbound + outbound header name.                                                                   |
+| `generator` | random 32-char   | Override the id generator.                                                                        |
+| `enabled`   | `true`           | Set `false` to stop echoing and inheriting. `request.id` is still generated for internal logging. |
 
 ### `trustProxy` shapes
 
 `http.trustProxy` is passed to Fastify untouched, and `request.detectIp()` (and its `realIp` alias) reads the resolved client off `request.ip` — so both agree.
 
-| `http.trustProxy` | Client IP |
-| --- | --- |
-| `false` *(default)* | Socket peer address; forwarding headers ignored — cannot be forged. |
-| `true` | Leftmost `X-Forwarded-For` hop — trusts the **whole chain**, including whatever the client itself prepended if your edge only appends. |
-| `"10.0.0.0/8"`, `"loopback, 10.0.0.0/8"`, `["10.0.0.0/8", "192.168.0.0/16"]` | Walks left while each hop is a listed proxy, stops at the first that isn't. |
-| `(address, hop) => boolean` | Your own predicate. |
+| `http.trustProxy`                                                            | Client IP                                                                                                                              |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `false` _(default)_                                                          | Socket peer address; forwarding headers ignored — cannot be forged.                                                                    |
+| `true`                                                                       | Leftmost `X-Forwarded-For` hop — trusts the **whole chain**, including whatever the client itself prepended if your edge only appends. |
+| `"10.0.0.0/8"`, `"loopback, 10.0.0.0/8"`, `["10.0.0.0/8", "192.168.0.0/16"]` | Walks left while each hop is a listed proxy, stops at the first that isn't.                                                            |
+| `(address, hop) => boolean`                                                  | Your own predicate.                                                                                                                    |
 
 Prefer the narrowest shape your topology allows. With `true`, any client that can reach the process directly can pick its own IP — an `ipFilter` allowlist in front of it becomes decorative. **`X-Real-IP` is honoured only under `trustProxy: true`** — it carries no chain to walk a proxy list against; under a bounded `trustProxy` the client IP comes from `X-Forwarded-For` instead, so if your edge only sets `X-Real-IP`, have it set `X-Forwarded-For` too.
 
@@ -197,7 +197,7 @@ Invalid http.trustProxy configuration: expected a boolean, a non-empty IP/CIDR s
 a non-empty string array, or a predicate function; received number.
 ```
 
-⚠ **A number is rejected, including the hop counts earlier releases recommended.** `trustProxy: 2` used to be the documented shape for an edge that appends to `X-Forwarded-For`. The Fastify version Warlock builds against treats a number as *always false* at runtime, so a hop count did not walk past your proxies — it silently degraded to "trust nothing", which is a security-relevant surprise that looks like a working config. Rather than coerce it into something plausible, Warlock refuses it loudly. Express the same topology as a proxy list (`"10.0.0.0/8"`) or a predicate.
+⚠ **A number is rejected, including the hop counts earlier releases recommended.** `trustProxy: 2` used to be the documented shape for an edge that appends to `X-Forwarded-For`. The Fastify version Warlock builds against treats a number as _always false_ at runtime, so a hop count did not walk past your proxies — it silently degraded to "trust nothing", which is a security-relevant surprise that looks like a working config. Rather than coerce it into something plausible, Warlock refuses it loudly. Express the same topology as a proxy list (`"10.0.0.0/8"`) or a predicate.
 
 The other refused values are `""`, `[]`, an array with any non-string entry, and a plain object. Each throws the same `TypeError` with `received` naming what it got (`"array"` for any array, otherwise `typeof value`).
 
@@ -208,7 +208,7 @@ Validation is a security control, not just UX polish. A seal schema attached to 
 ```ts title="src/app/users/controllers/create-user.controller.ts"
 import { v } from "@warlock.js/seal";
 
-export const createUser = async (request, response) => {
+export const createUser = async ({ request, response }) => {
   // only runs if the schema below passed
 };
 

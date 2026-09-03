@@ -6,7 +6,7 @@ sidebar:
   label: "Middleware"
 ---
 
-Middleware is the code that runs between "router matched a route" and "controller starts". It's the place for auth checks, rate limits, request-scoped enrichment, and anything else that has to decide *whether* the controller runs and *what state* it sees.
+Middleware is the code that runs between "router matched a route" and "controller starts". It's the place for auth checks, rate limits, request-scoped enrichment, and anything else that has to decide _whether_ the controller runs and _what state_ it sees.
 
 In Warlock a middleware is just a function. No class, no decorator, no `next()` callback — you receive `request` and `response`, and either:
 
@@ -21,18 +21,18 @@ That's the whole contract. Let's unpack what it means in practice.
 export type MiddlewareResponse = ReturnedResponse | undefined | void;
 
 export type Middleware<MiddlewareRequest extends Request = Request> = {
-  (request: MiddlewareRequest, response: Response): MiddlewareResponse;
+  (context: HttpContext<MiddlewareRequest>): MiddlewareResponse;
 };
 ```
 
-A middleware is `(request, response) => something | undefined`. If `something` is truthy (an object, a `Response` instance, anything the framework can turn into a body), the request is short-circuited — the framework sends it back as the reply, and the controller does not run.
+A middleware is `({ request, response }) => something | undefined`. If `something` is truthy (an object, a `Response` instance, anything the framework can turn into a body), the request is short-circuited — the framework sends it back as the reply, and the controller does not run.
 
 The simplest middleware:
 
 ```ts
 import type { Middleware } from "@warlock.js/core";
 
-export const requireHttps: Middleware = (request, response) => {
+export const requireHttps: Middleware = ({ request, response }) => {
   if (request.protocol !== "https") {
     return response.badRequest({ error: "HTTPS required" });
   }
@@ -51,7 +51,7 @@ You can `async`-ify any middleware:
 ```ts
 import type { Middleware } from "@warlock.js/core";
 
-export const loadOrganization: Middleware = async (request, response) => {
+export const loadOrganization: Middleware = async ({ request, response }) => {
   const slug = request.input("orgSlug");
 
   if (!slug) {
@@ -115,7 +115,7 @@ Every route inside the callback inherits the middleware. `prefix` and `middlewar
 ```ts
 router.group({ prefix: "/api", middleware: [requestId] }, () => {
   router.group({ prefix: "/v1", middleware: [rateLimit] }, () => {
-    router.get("/health", healthController);   // both middlewares run
+    router.get("/health", healthController); // both middlewares run
   });
 });
 ```
@@ -177,7 +177,7 @@ If a route has middleware from both a group and the route itself, group middlewa
 ```ts
 router.get("/whatever", handler, {
   middleware: [routeSpecific],
-  middlewarePrecedence: "before",   // routeSpecific runs BEFORE group middleware
+  middlewarePrecedence: "before", // routeSpecific runs BEFORE group middleware
 });
 ```
 
@@ -187,13 +187,13 @@ The default `"after"` is the right choice 95% of the time — group middleware r
 
 Some "middleware-like" behaviour ships as Fastify plugins registered at boot, before any route-level middleware runs. You don't write these — they exist by virtue of using `@warlock.js/core`:
 
-| Plugin              | What it does                                                |
-| ------------------- | ----------------------------------------------------------- |
-| `@fastify/cors`     | CORS headers. Configured via `config.get("http.cors")`.     |
-| `@fastify/multipart`| Parses multipart bodies into files + fields.                |
-| `@fastify/cookie`   | Parses cookies into `request.cookies`.                      |
-| `@fastify/rate-limit`| Global rate limiter. `config.get("http.rateLimit")`.       |
-| `@fastify/static`   | Serves the `public/` directory at `/public/...`.            |
+| Plugin                | What it does                                            |
+| --------------------- | ------------------------------------------------------- |
+| `@fastify/cors`       | CORS headers. Configured via `config.get("http.cors")`. |
+| `@fastify/multipart`  | Parses multipart bodies into files + fields.            |
+| `@fastify/cookie`     | Parses cookies into `request.cookies`.                  |
+| `@fastify/rate-limit` | Global rate limiter. `config.get("http.rateLimit")`.    |
+| `@fastify/static`     | Serves the `public/` directory at `/public/...`.        |
 
 Real config (from the reference project):
 
@@ -227,15 +227,15 @@ middleware.maxBodySize("2mb");
 // ... and so on
 ```
 
-| Factory                                  | What it does                                                                | Status on reject       |
-| ---------------------------------------- | --------------------------------------------------------------------------- | ---------------------- |
+| Factory                                   | What it does                                                               | Status on reject       |
+| ----------------------------------------- | -------------------------------------------------------------------------- | ---------------------- |
 | `middleware.rateLimit({ max, duration })` | Per-route cap on top of the global plugin                                  | 429 + `Retry-After`    |
-| `middleware.concurrencyLimit(n)`         | Cap in-flight requests; no queue, fast reject                               | 429 + `Retry-After: 1` |
-| `middleware.maxBodySize("2mb")`          | Per-route `Content-Length` cap (in addition to `http.bodyLimit` global)     | 413                    |
-| `middleware.idempotency()`               | Dedupe writes by `Idempotency-Key`; same key + same body → cached replay    | 422 on conflict        |
-| `middleware.maintenance()`               | App-wide 503 toggle via `http.maintenance.enabled` (with allowlist bypass)  | 503 + `Retry-After`    |
-| `middleware.ipFilter({ allow })`         | Allowlist / denylist by client IP, IPv4 CIDRs supported, fail-closed        | 403                    |
-| `middleware.cache(opts)`                 | Cache + replay successful JSON responses                                    | n/a                    |
+| `middleware.concurrencyLimit(n)`          | Cap in-flight requests; no queue, fast reject                              | 429 + `Retry-After: 1` |
+| `middleware.maxBodySize("2mb")`           | Per-route `Content-Length` cap (in addition to `http.bodyLimit` global)    | 413                    |
+| `middleware.idempotency()`                | Dedupe writes by `Idempotency-Key`; same key + same body → cached replay   | 422 on conflict        |
+| `middleware.maintenance()`                | App-wide 503 toggle via `http.maintenance.enabled` (with allowlist bypass) | 503 + `Retry-After`    |
+| `middleware.ipFilter({ allow })`          | Allowlist / denylist by client IP, IPv4 CIDRs supported, fail-closed       | 403                    |
+| `middleware.cache(opts)`                  | Cache + replay successful JSON responses                                   | n/a                    |
 
 Composed example — a tight cap on logins, a concurrency cap + idempotency on AI calls:
 
@@ -283,7 +283,7 @@ The middleware decides whether the request is allowed; if not, return a response
 import type { Middleware } from "@warlock.js/core";
 
 export function requireFeatureFlag(flag: string): Middleware {
-  return async (request, response) => {
+  return async ({ request, response }) => {
     const flags = request.user?.featureFlags ?? [];
 
     if (!flags.includes(flag)) {
@@ -311,7 +311,7 @@ The middleware loads or computes something and attaches it for downstream code. 
 import type { Middleware } from "@warlock.js/core";
 import { Organization } from "app/organizations/models/organization";
 
-export const loadOrganizationFromHost: Middleware = async (request) => {
+export const loadOrganizationFromHost: Middleware = async ({ request }) => {
   const host = request.hostname;
   const organization = await Organization.first({ host });
 
@@ -328,10 +328,10 @@ Downstream controllers read `request.organization` if it's set. If you need it t
 The auth middleware in `@warlock.js/auth` is a clean example of both patterns combined. Stripped to the essentials:
 
 ```ts title="authMiddleware (from @warlock.js/auth)"
-import { type Middleware, type Request, type Response, t } from "@warlock.js/core";
+import { type Middleware, t } from "@warlock.js/core";
 
 export function authMiddleware(allowedUserType?: string | string[]) {
-  return async (request: Request, response: Response) => {
+  return async ({ request, response }) => {
     const token = request.authorizationValue;
 
     // 1. Public route — no auth needed and none provided

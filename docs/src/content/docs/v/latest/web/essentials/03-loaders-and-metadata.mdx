@@ -19,12 +19,11 @@ import type { PageLoader, PageMetadata, PageProps } from "@warlock.js/web";
 export const route = {
   path: "/products/:id",
   name: "products.show",
+  cache: { public: true, maxAge: 60 },
 } as const;
 
-export const loader = (async ({ request, response }) => {
+export const loader = (async ({ request }) => {
   const id = request.input("id");
-
-  response.header("cache-control", "private, max-age=60");
 
   return {
     product: { id, name: `Product ${id}` },
@@ -48,6 +47,11 @@ the contract while preserving the concrete return type that
 Components receive data, not HTTP objects. Keep repositories, secrets, and
 request work in the loader; the default component must also render in the
 browser.
+
+The route-level `cache` declaration is the only shared-cache opt-in. Warlock
+applies its final cache floor after loader buffers commit, so a loader-written
+`Cache-Control` header cannot override the `no-store`, authentication, or
+cookie rules. [Read the complete cache policy →](/v/latest/web/essentials/routing/#cache-public-pages-explicitly)
 
 ## Execution order
 

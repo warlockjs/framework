@@ -65,24 +65,24 @@ You never call `bootstrap()` directly. The CLI does it before importing your app
 
 ## Phase 2 — Connectors
 
-A *connector* is the framework's word for a subsystem that has a lifecycle (connect, restart, shutdown). Each ships with a priority so they start in the right order:
+A _connector_ is the framework's word for a subsystem that has a lifecycle (connect, restart, shutdown). Each ships with a priority so they start in the right order:
 
-| Priority | Connector       | Lifecycle phase | Why this order                                                  |
-| -------- | --------------- | --------------- | --------------------------------------------------------------- |
-| 0        | logger          | early           | Everything else logs                                            |
-| 1        | mailer          | early           | Other connectors may queue startup emails                       |
-| 2        | database        | early           | Models register at import time and need the connection ready    |
-| 3        | herald          | early           | Message broker (queues, event fan-out); up before app code      |
-| 4        | cache           | early           | Repositories cache lookups; needs to exist before they're used  |
-| 5        | http            | late            | Reads the router; only safe after `routes.ts` is imported       |
-| 6        | storage         | early           | Apps reference storage at import time                           |
-| 7        | socket          | late            | Wraps http's Fastify instance after it's been created           |
-| 8        | notifications   | early           | Wires `@warlock.js/notifications` from its config (lazy import)  |
-| 9        | access          | early           | Wires `@warlock.js/access`; fails fast on a bad auth config      |
+| Priority | Connector     | Lifecycle phase | Why this order                                                  |
+| -------- | ------------- | --------------- | --------------------------------------------------------------- |
+| 0        | logger        | early           | Everything else logs                                            |
+| 1        | mailer        | early           | Other connectors may queue startup emails                       |
+| 2        | database      | early           | Models register at import time and need the connection ready    |
+| 3        | herald        | early           | Message broker (queues, event fan-out); up before app code      |
+| 4        | cache         | early           | Repositories cache lookups; needs to exist before they're used  |
+| 5        | http          | late            | Reads the router; only safe after `routes.ts` is imported       |
+| 6        | storage       | early           | Apps reference storage at import time                           |
+| 7        | socket        | late            | Wraps http's Fastify instance after it's been created           |
+| 8        | notifications | early           | Wires `@warlock.js/notifications` from its config (lazy import) |
+| 9        | access        | early           | Wires `@warlock.js/access`; fails fast on a bad auth config     |
 
 Each connector boots in two halves around your app code:
 
-- **Early phase** runs first: logger, mailer, database, herald, cache, storage, notifications, access. These are services your code needs *at import time* — a model registers itself against the database connection when its file loads.
+- **Early phase** runs first: logger, mailer, database, herald, cache, storage, notifications, access. These are services your code needs _at import time_ — a model registers itself against the database connection when its file loads.
 - **App code imports** — `src/app/**/main.ts`, every `routes.ts`, every `events.ts`. Models, routes, and event listeners are all registered now.
 - **Late phase** runs second: http and socket. Both read state your code just registered; http scans the router, socket reads http's listening server.
 
@@ -103,7 +103,7 @@ If no route matches, Warlock returns a 404 immediately — no middleware, no con
 The route carries a `middleware` array (from `router.group({ middleware }, ...)`, the `guarded(...)` helper, or per-route options). They run in array order, each receiving the same `request` and `response`:
 
 ```ts
-const authMiddleware: Middleware = async (request, response) => {
+const authMiddleware: Middleware = async ({ request, response }) => {
   const token = request.accessToken;
 
   if (!token) {
@@ -141,13 +141,13 @@ The controller never runs. On success, the validated data is stored on the reque
 
 ### Step 4 — Controller
 
-Now the handler runs. The controller is *thin*: read inputs, call work, return through `response.<helper>(...)`. No business logic, no database queries.
+Now the handler runs. The controller is _thin_: read inputs, call work, return through `response.<helper>(...)`. No business logic, no database queries.
 
 ```ts
-export const createFaqController: RequestHandler = async (
-  request: CreateFaqRequest,
+export const createFaqController: RequestHandler<CreateFaqRequest> = async ({
+  request,
   response,
-) => {
+}) => {
   const faq = await createFaqService({
     ...request.validated(),
     organization_id: request.user.organizationId,
@@ -235,13 +235,13 @@ flowchart LR
 
 Five distinct error paths, each handled differently:
 
-| Where it fails               | What happens                                                                      |
-| ---------------------------- | --------------------------------------------------------------------------------- |
-| Middleware returns 4xx       | Response sent, chain halts, controller never runs                                 |
-| Schema validation fails      | Framework sends 400 with `{ errors: [{ input, error }] }`. Controller never runs. |
-| Controller throws `HttpError`| Status code + payload from the error class (e.g. `ForbiddenError` → 403)          |
-| Controller throws `Error`    | 500 with a generic body; full stack lands in the logger                           |
-| Use-case `*-ing` event throws| Pipeline aborts; same propagation as a controller throw                           |
+| Where it fails                | What happens                                                                      |
+| ----------------------------- | --------------------------------------------------------------------------------- |
+| Middleware returns 4xx        | Response sent, chain halts, controller never runs                                 |
+| Schema validation fails       | Framework sends 400 with `{ errors: [{ input, error }] }`. Controller never runs. |
+| Controller throws `HttpError` | Status code + payload from the error class (e.g. `ForbiddenError` → 403)          |
+| Controller throws `Error`     | 500 with a generic body; full stack lands in the logger                           |
+| Use-case `*-ing` event throws | Pipeline aborts; same propagation as a controller throw                           |
 
 The framework's catch-all sits at the outer request handler in `router.handleRoute`. If a controller throws an `HttpError` subclass (`BadRequestError`, `ResourceNotFoundError`, `ForbiddenError`, `ConflictError`, `ServerError`), the framework maps it to the right status code. Throwing a plain `Error` becomes a 500.
 

@@ -74,27 +74,27 @@ The exported value is PascalCase + `Resource` suffix: `ProductResource`, `FaqRes
 
 A field type is a string — these are the values the framework understands:
 
-| Type          | What it does                                                    | Output example                       |
-| ------------- | --------------------------------------------------------------- | ------------------------------------ |
-| `"string"`    | Coerce via `String(value)`                                      | `"hello"`                            |
-| `"int"`       | `parseInt(value)` — drops to `undefined` on `NaN`               | `42`                                 |
-| `"float"`     | `parseFloat(value)` — drops to `undefined` on `NaN`             | `19.99`                              |
-| `"number"`    | `Number(value)` — drops to `undefined` on `NaN`                 | `42` or `19.99`                      |
-| `"boolean"`   | `Boolean(value)`                                                | `true`                               |
-| `"date"`      | Run through dayjs — full date envelope by default               | `{ format, timestamp, humanTime, iso }` |
-| `"localized"` | Pick the value matching the request locale from a `[{ localeCode, value }]` array | `"Hello"`             |
-| `"url"`       | Pass through `url()` — turns a relative path into a full URL    | `"https://example.com/foo"`          |
-| `"uploadsUrl"`| Pass through `uploadsUrl()` — full URL into the uploads bucket  | `"https://cdn.example.com/u/foo.jpg"`|
-| `"storageUrl"`| Pass through `storage.url()` — full URL via the current storage disk | `"https://s3.../foo.jpg"`       |
-| `"object"`    | Pass through if the value is a non-empty plain object           | `{ key: "value" }`                   |
-| `"array"`     | Pass through if the value is an array                           | `[1, 2, 3]`                          |
+| Type           | What it does                                                                      | Output example                          |
+| -------------- | --------------------------------------------------------------------------------- | --------------------------------------- |
+| `"string"`     | Coerce via `String(value)`                                                        | `"hello"`                               |
+| `"int"`        | `parseInt(value)` — drops to `undefined` on `NaN`                                 | `42`                                    |
+| `"float"`      | `parseFloat(value)` — drops to `undefined` on `NaN`                               | `19.99`                                 |
+| `"number"`     | `Number(value)` — drops to `undefined` on `NaN`                                   | `42` or `19.99`                         |
+| `"boolean"`    | `Boolean(value)`                                                                  | `true`                                  |
+| `"date"`       | Run through dayjs — full date envelope by default                                 | `{ format, timestamp, humanTime, iso }` |
+| `"localized"`  | Pick the value matching the request locale from a `[{ localeCode, value }]` array | `"Hello"`                               |
+| `"url"`        | Pass through `url()` — turns a relative path into a full URL                      | `"https://example.com/foo"`             |
+| `"uploadsUrl"` | Pass through `uploadsUrl()` — full URL into the uploads bucket                    | `"https://cdn.example.com/u/foo.jpg"`   |
+| `"storageUrl"` | Pass through `storage.url()` — full URL via the current storage disk              | `"https://s3.../foo.jpg"`               |
+| `"object"`     | Pass through if the value is a non-empty plain object                             | `{ key: "value" }`                      |
+| `"array"`      | Pass through if the value is an array                                             | `[1, 2, 3]`                             |
 
 Two suffixes modify the base type:
 
-| Suffix  | Meaning                                                                                              |
-| ------- | ---------------------------------------------------------------------------------------------------- |
-| `"[]"`  | Field is an array — the base type is applied to each element. `"string[]"` is an array of strings.   |
-| `"?"`   | Nullable — `null` and `undefined` produce `null` in the output (otherwise the field is omitted).     |
+| Suffix | Meaning                                                                                            |
+| ------ | -------------------------------------------------------------------------------------------------- |
+| `"[]"` | Field is an array — the base type is applied to each element. `"string[]"` is an array of strings. |
+| `"?"`  | Nullable — `null` and `undefined` produce `null` in the output (otherwise the field is omitted).   |
 
 Combined: `"string[]?"` is a nullable array of strings. Order matters — `[]` before `?`.
 
@@ -102,9 +102,9 @@ Combined: `"string[]?"` is a nullable array of strings. Order matters — `[]` b
 defineResource({
   schema: {
     id: "string",
-    tags: "string[]",         // → ["tag-a", "tag-b"]
-    bio: "string?",           // → null if absent (key still present)
-    images: "uploadsUrl[]",   // → ["https://cdn/.../a.jpg", "https://cdn/.../b.jpg"]
+    tags: "string[]", // → ["tag-a", "tag-b"]
+    bio: "string?", // → null if absent (key still present)
+    images: "uploadsUrl[]", // → ["https://cdn/.../a.jpg", "https://cdn/.../b.jpg"]
   },
 });
 ```
@@ -119,7 +119,7 @@ When the wire name doesn't match the model column, declare a tuple — `[inputKe
 defineResource({
   schema: {
     id: "string",
-    fullName: ["full_name", "string"],    // model.full_name → wire.fullName
+    fullName: ["full_name", "string"], // model.full_name → wire.fullName
     avatar: ["profile_image", "uploadsUrl"],
   },
 });
@@ -141,8 +141,8 @@ export const ProjectResource = defineResource({
     id: "string",
     name: "string",
     description: "string",
-    organization: OrganizationResource,   // belongsTo Organization
-    createdBy: UserResource,              // belongsTo User (via `created_by`)
+    organization: OrganizationResource, // belongsTo Organization
+    createdBy: UserResource, // belongsTo User (via `created_by`)
     created_at: "date",
   },
 });
@@ -156,7 +156,7 @@ The same field works for both single relations and arrays — if the value is an
 defineResource({
   schema: {
     id: "string",
-    attachments: UploadResource,    // hasMany — also works
+    attachments: UploadResource, // hasMany — also works
   },
 });
 ```
@@ -172,8 +172,8 @@ defineResource({
   schema: {
     id: "string",
     title: "string",
-    parent: "self",          // single self-reference
-    children: "self[]",      // array of self-references
+    parent: "self", // single self-reference
+    children: "self[]", // array of self-references
   },
 });
 ```
@@ -214,7 +214,7 @@ You almost never call `new ProjectResource(project).toJSON()` by hand. The frame
 import type { RequestHandler } from "@warlock.js/core";
 import { projectsRepository } from "../repositories/projects.repository";
 
-export const listProjectsController: RequestHandler = async (request, response) => {
+export const listProjectsController: RequestHandler = async ({ request, response }) => {
   const { data: projects, pagination } = await projectsRepository.list(request.all());
 
   return response.success({ projects, pagination });

@@ -25,9 +25,9 @@ A few rules the framework enforces:
 - **Return the helper.** `return response.success(...)` — the return value drives the framework's send pipeline.
 
 ```ts
-import type { RequestHandler, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 
-export const showController: RequestHandler = async (request, response: Response) => {
+export const showController: RequestHandler = async ({ request, response }) => {
   // build up state via helpers
   response.header("X-Total-Count", "42");
 
@@ -38,12 +38,12 @@ export const showController: RequestHandler = async (request, response: Response
 
 ## Success helpers
 
-| Method                            | Status | When                                    |
-| --------------------------------- | ------ | --------------------------------------- |
-| `response.success(data?)`         | 200    | normal read / update                    |
-| `response.successCreate(data)`    | 201    | resource created (POST)                 |
-| `response.accepted(data?)`        | 202    | async work accepted, not yet processed  |
-| `response.noContent()`            | 204    | delete succeeded, no body needed        |
+| Method                         | Status | When                                   |
+| ------------------------------ | ------ | -------------------------------------- |
+| `response.success(data?)`      | 200    | normal read / update                   |
+| `response.successCreate(data)` | 201    | resource created (POST)                |
+| `response.accepted(data?)`     | 202    | async work accepted, not yet processed |
+| `response.noContent()`         | 204    | delete succeeded, no body needed       |
 
 ```ts
 return response.success({ products: [...] });
@@ -59,14 +59,14 @@ return response.noContent();
 
 ## Client-error helpers
 
-| Method                                | Status | When                                  |
-| ------------------------------------- | ------ | ------------------------------------- |
-| `response.badRequest(data)`           | 400    | malformed or invalid input            |
-| `response.unauthorized(data?)`        | 401    | missing/invalid auth                  |
-| `response.forbidden(data?)`           | 403    | authenticated but not allowed         |
-| `response.notFound(data?)`            | 404    | record missing                        |
-| `response.conflict(data?)`            | 409    | uniqueness violation, state conflict  |
-| `response.unprocessableEntity(data)`  | 422    | semantic validation error             |
+| Method                               | Status | When                                 |
+| ------------------------------------ | ------ | ------------------------------------ |
+| `response.badRequest(data)`          | 400    | malformed or invalid input           |
+| `response.unauthorized(data?)`       | 401    | missing/invalid auth                 |
+| `response.forbidden(data?)`          | 403    | authenticated but not allowed        |
+| `response.notFound(data?)`           | 404    | record missing                       |
+| `response.conflict(data?)`           | 409    | uniqueness violation, state conflict |
+| `response.unprocessableEntity(data)` | 422    | semantic validation error            |
 
 ```ts
 return response.badRequest({ error: t("validation.invalid") });
@@ -103,7 +103,7 @@ import { t, type Request, type RequestHandler } from "@warlock.js/core";
 import { type LoginSchema, loginSchema } from "../schema/login.schema";
 import { loginUseCase } from "../use-cases/login.usecase";
 
-export const login: RequestHandler<Request<LoginSchema>> = async (request, response) => {
+export const login: RequestHandler<Request<LoginSchema>> = async ({ request, response }) => {
   const result = await loginUseCase({
     data: request.validated(),
     deviceInfo: { userAgent: request.userAgent, ip: request.ip },
@@ -121,10 +121,10 @@ login.validation = { schema: loginSchema };
 
 ## Server-error helpers
 
-| Method                                | Status | When                            |
-| ------------------------------------- | ------ | ------------------------------- |
-| `response.serverError(data)`          | 500    | unexpected failure              |
-| `response.serviceUnavailable(data)`   | 503    | downstream is down, retry later |
+| Method                              | Status | When                            |
+| ----------------------------------- | ------ | ------------------------------- |
+| `response.serverError(data)`        | 500    | unexpected failure              |
+| `response.serviceUnavailable(data)` | 503    | downstream is down, retry later |
 
 ```ts
 return response.serverError({ error: "Unexpected" });
@@ -139,9 +139,9 @@ You rarely call `serverError` directly — uncaught exceptions are mapped to it 
 ## Redirects
 
 ```ts
-return response.redirect("/login");                  // 302
-return response.redirect("/new-home", 301);          // status override
-return response.permanentRedirect("/new-home");      // 301 shortcut
+return response.redirect("/login"); // 302
+return response.redirect("/new-home", 301); // status override
+return response.permanentRedirect("/new-home"); // 301 shortcut
 ```
 
 `response.redirect(url, status?)` sets the `Location` header and the status code. Default is 302 (temporary). Use 301 for permanent moves so search engines update their indexes.
@@ -161,14 +161,14 @@ return response.sendBuffer(buffer, { contentType: "image/png" });
 
 `SendFileOptions` and `SendBufferOptions` cover the common knobs:
 
-| Option        | Type        | Effect                                                     |
-| ------------- | ----------- | ---------------------------------------------------------- |
-| `cacheTime`   | `number`    | seconds for `Cache-Control: max-age=...`                   |
-| `immutable`   | `boolean`   | adds `immutable` to `Cache-Control`                        |
-| `inline`      | `boolean`   | `true` → render inline; `false` → download attachment      |
-| `filename`    | `string`    | download name (used in `Content-Disposition`)              |
-| `contentType` | `string`    | (buffer only) MIME type                                    |
-| `etag`        | `string`    | (buffer only) `ETag` header for conditional requests       |
+| Option        | Type      | Effect                                                |
+| ------------- | --------- | ----------------------------------------------------- |
+| `cacheTime`   | `number`  | seconds for `Cache-Control: max-age=...`              |
+| `immutable`   | `boolean` | adds `immutable` to `Cache-Control`                   |
+| `inline`      | `boolean` | `true` → render inline; `false` → download attachment |
+| `filename`    | `string`  | download name (used in `Content-Disposition`)         |
+| `contentType` | `string`  | (buffer only) MIME type                               |
+| `etag`        | `string`  | (buffer only) `ETag` header for conditional requests  |
 
 `sendFile` is `If-None-Match` and `If-Modified-Since` aware out of the box — it returns 304 when the client's cached copy matches. If the path doesn't exist, it returns 404 with `{ error: "File Not Found" }` automatically.
 
@@ -197,12 +197,12 @@ stream.end();
 
 The controller's surface:
 
-| Method                                | Effect                                                  |
-| ------------------------------------- | ------------------------------------------------------- |
-| `stream.send(data)`                   | write a chunk (string / Buffer)                         |
-| `stream.render(reactElement)`         | server-render a React node and write it as HTML         |
-| `stream.end()`                        | finish the response                                     |
-| `stream.ended`                        | boolean — has `end()` been called                       |
+| Method                        | Effect                                          |
+| ----------------------------- | ----------------------------------------------- |
+| `stream.send(data)`           | write a chunk (string / Buffer)                 |
+| `stream.render(reactElement)` | server-render a React node and write it as HTML |
+| `stream.end()`                | finish the response                             |
+| `stream.ended`                | boolean — has `end()` been called               |
 
 Once you call `stream()`, the response is "claimed" — don't call `success(...)` or any other terminal helper afterward.
 
@@ -221,13 +221,13 @@ sse.end();
 
 The controller's surface:
 
-| Method                                            | Effect                                                                                              |
-| ------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `sse.send(event, data, id?)`                      | emit an event (data JSON-stringified). `id` is optional, used by the browser's `Last-Event-ID`.     |
-| `sse.comment(text)`                               | write an SSE comment (invisible to the client) — useful for keep-alive pings                        |
-| `sse.onDisconnect(handler)`                       | register cleanup that runs when the client disconnects (cancel jobs, unsubscribe listeners)         |
-| `sse.end()`                                       | finish the stream                                                                                   |
-| `sse.ended`                                       | boolean — has the stream ended (manually or via disconnect)                                         |
+| Method                       | Effect                                                                                          |
+| ---------------------------- | ----------------------------------------------------------------------------------------------- |
+| `sse.send(event, data, id?)` | emit an event (data JSON-stringified). `id` is optional, used by the browser's `Last-Event-ID`. |
+| `sse.comment(text)`          | write an SSE comment (invisible to the client) — useful for keep-alive pings                    |
+| `sse.onDisconnect(handler)`  | register cleanup that runs when the client disconnects (cancel jobs, unsubscribe listeners)     |
+| `sse.end()`                  | finish the stream                                                                               |
+| `sse.ended`                  | boolean — has the stream ended (manually or via disconnect)                                     |
 
 Browsers consume SSE via `new EventSource(url)`. The framework already sets `text/event-stream`, `Cache-Control: no-cache`, and disables nginx buffering for you.
 
@@ -239,7 +239,7 @@ This is the actual stream controller from the reference codebase. It pipes an AI
 import { type Request, type RequestHandler } from "@warlock.js/core";
 import { chatMessageEventBus, type AIStreamEvent } from "../events/chat-message.event-bus";
 
-export const streamAiMessageController: RequestHandler = async (request: Request, response) => {
+export const streamAiMessageController: RequestHandler = async ({ request, response }) => {
   const aiMessageId = request.input("id");
   const sse = response.sse();
 
@@ -295,8 +295,8 @@ See `@warlock.js/ai/skills/subskills/agent.md` for the agent's event surface.
 
 ```ts
 response.cookie("session_id", "abc.def.ghi", { raw: true });
-response.cookie("preferences", { lang: "en", notifications: true });  // objects auto-JSON-stringified
-response.cookie("theme", "dark", { httpOnly: false });                // deliberately JS-readable
+response.cookie("preferences", { lang: "en", notifications: true }); // objects auto-JSON-stringified
+response.cookie("theme", "dark", { httpOnly: false }); // deliberately JS-readable
 response.clearCookie("session_id");
 ```
 
@@ -306,11 +306,11 @@ Cookie options come from Fastify's `@fastify/cookie` (`CookieSerializeOptions`):
 
 Since **4.10.0** every response cookie gets these unless you override them:
 
-| Flag | Default | Without it |
-|---|---|---|
-| `httpOnly` | `true` | any injected script can read the cookie |
-| `sameSite` | `"lax"` | the cookie rides along on cross-site requests |
-| `secure` | `true`, except in development | the cookie travels in cleartext |
+| Flag       | Default                       | Without it                                    |
+| ---------- | ----------------------------- | --------------------------------------------- |
+| `httpOnly` | `true`                        | any injected script can read the cookie       |
+| `sameSite` | `"lax"`                       | the cookie rides along on cross-site requests |
+| `secure`   | `true`, except in development | the cookie travels in cleartext               |
 
 `secure` is relaxed in development only — a browser drops a `Secure` cookie over plain http, which would silently break every local login. It stays on in test and staging.
 
@@ -345,7 +345,7 @@ Two things to check. A cookie your client-side JavaScript reads now needs `{ htt
 response.header("X-Total-Count", "42");
 response.header("Cache-Control", "no-cache");
 
-response.headers({ "X-A": "1", "X-B": "2" });   // batch set
+response.headers({ "X-A": "1", "X-B": "2" }); // batch set
 
 response.removeHeader("X-Internal");
 const ct = response.getHeader("Content-Type");

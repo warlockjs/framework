@@ -12,16 +12,16 @@ If you've never registered a route before, start with the essentials page. If yo
 
 ## The full method surface
 
-| Category        | Methods                                                                                       |
-| --------------- | --------------------------------------------------------------------------------------------- |
-| Verb routes     | `get`, `post`, `put`, `patch`, `delete`, `head`, `options`, `any`                             |
-| Builders        | `route(path)` → `RouteBuilder`, `restfulResource(path, resource)`                             |
-| Grouping        | `group(options, callback)`, `prefix(prefix, callback)`, `version(version, callback)`          |
-| Redirects       | `redirect(from, to, mode?)`                                                                   |
-| Static files    | `directory(options)`, `file(path, location, cacheTime?)`, `cachedFile`, `files`, `cachedFiles`|
-| Proxy           | `proxy(path, baseUrl, options?)`, `proxy(options)`                                            |
-| Scan hooks      | `beforeScanning(callback)`, `afterScanning(callback)`                                         |
-| Introspection   | `list()`, `getRoute(name, params?)`                                                           |
+| Category      | Methods                                                                                        |
+| ------------- | ---------------------------------------------------------------------------------------------- |
+| Verb routes   | `get`, `post`, `put`, `patch`, `delete`, `head`, `options`, `any`                              |
+| Builders      | `route(path)` → `RouteBuilder`, `restfulResource(path, resource)`                              |
+| Grouping      | `group(options, callback)`, `prefix(prefix, callback)`, `version(version, callback)`           |
+| Redirects     | `redirect(from, to, mode?)`                                                                    |
+| Static files  | `directory(options)`, `file(path, location, cacheTime?)`, `cachedFile`, `files`, `cachedFiles` |
+| Proxy         | `proxy(path, baseUrl, options?)`, `proxy(options)`                                             |
+| Scan hooks    | `beforeScanning(callback)`, `afterScanning(callback)`                                          |
+| Introspection | `list()`, `getRoute(name, params?)`                                                            |
 
 Each section below walks the methods in that category.
 
@@ -43,7 +43,7 @@ router.any(path, handler, options?);     // matches ALL methods
 `post` and `delete` accept either a single path or an array of paths (the framework registers each one). The others take a single string:
 
 ```ts
-router.post(["/products", "/items"], createHandler);   // both routes hit the same handler
+router.post(["/products", "/items"], createHandler); // both routes hit the same handler
 router.delete(["/products/:id", "/items/:id"], deleteHandler);
 ```
 
@@ -54,7 +54,7 @@ router.delete(["/products/:id", "/items/:id"], deleteHandler);
 A handler is a `RequestHandler`:
 
 ```ts
-type RequestHandler = (request: Request, response: Response) => ReturnedResponse | void;
+type RequestHandler = (context: HttpContext<Request>) => ReturnedResponse | void;
 ```
 
 It can have static properties for validation and OpenAPI metadata:
@@ -65,34 +65,34 @@ handler.description = "Lists all products";
 handler.responseSchema = { 200: { body: { products: [ProductResource] } } };
 ```
 
-The router doesn't care if you write the handler as `function`, `const = async`, or `(request, response) => ...` — anything callable works. Most projects use named `const` exports for the controller-per-file convention.
+The router doesn't care if you write the handler as `function`, `const = async`, or `({ request, response }) => ...` — anything callable works. Most projects use named `const` exports for the controller-per-file convention.
 
 ### Route options
 
 ```ts
 router.get("/products", listProducts, {
-  name: "products.list",                    // explicit route name
+  name: "products.list", // explicit route name
   middleware: [authMiddleware()],
-  middlewarePrecedence: "before",           // before group middleware (default: after)
+  middlewarePrecedence: "before", // before group middleware (default: after)
   description: "Lists all products",
   rateLimit: { max: 60, timeWindow: 60_000 },
-  serverOptions: { /* Fastify route options */ },
+  serverOptions: {/* Fastify route options */},
 });
 ```
 
 The full surface:
 
-| Option                  | Purpose                                                                              |
-| ----------------------- | ------------------------------------------------------------------------------------ |
-| `name`                  | Explicit route name (default: auto-generated from the path, dots replace slashes)    |
-| `middleware`            | Array of middleware fns for this route                                               |
-| `middlewarePrecedence`  | `"before"` or `"after"` — order vs. group middleware (default: `"after"`)            |
-| `description`           | Free text for OpenAPI / docs                                                          |
-| `label`                 | Route label for docs                                                                  |
-| `restful`               | Marks the route as part of a RESTful resource (the framework sets this for you)      |
-| `isPage`                | Marks the route as React SSR-rendered                                                 |
-| `rateLimit`             | Per-route rate limit override                                                         |
-| `serverOptions`         | Fastify route-shorthand options for very low-level tuning                            |
+| Option                 | Purpose                                                                           |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| `name`                 | Explicit route name (default: auto-generated from the path, dots replace slashes) |
+| `middleware`           | Array of middleware fns for this route                                            |
+| `middlewarePrecedence` | `"before"` or `"after"` — order vs. group middleware (default: `"after"`)         |
+| `description`          | Free text for OpenAPI / docs                                                      |
+| `label`                | Route label for docs                                                              |
+| `restful`              | Marks the route as part of a RESTful resource (the framework sets this for you)   |
+| `isPage`               | Marks the route as React SSR-rendered                                             |
+| `rateLimit`            | Per-route rate limit override                                                     |
+| `serverOptions`        | Fastify route-shorthand options for very low-level tuning                         |
 
 ## The `RouteBuilder` chain
 
@@ -101,23 +101,23 @@ The full surface:
 ```ts
 router
   .route("/products")
-  .list(listProducts)        // GET /products
-  .create(createProduct)     // POST /products
-  .show(showProduct)         // GET /products/:id
-  .update(updateProduct)     // PUT /products/:id
-  .destroy(deleteProduct);   // DELETE /products/:id
+  .list(listProducts) // GET /products
+  .create(createProduct) // POST /products
+  .show(showProduct) // GET /products/:id
+  .update(updateProduct) // PUT /products/:id
+  .destroy(deleteProduct); // DELETE /products/:id
 ```
 
 The semantic aliases (`list`, `create`, `show`, `update`, `destroy`) map to verb methods that auto-append `/:id` where appropriate:
 
-| Alias       | Underlying call                                       |
-| ----------- | ----------------------------------------------------- |
-| `.list(h)`  | `router.get(path, h)` — collection read               |
-| `.create(h)`| `router.post(path, h)` — collection write             |
-| `.show(h)`  | `router.get(path + "/:id", h)` — single resource read |
-| `.update(h)`| `router.put(path + "/:id", h)` — single resource write|
-| `.patch(h)` | `router.patch(path + "/:id", h)` — partial update     |
-| `.destroy(h)`| `router.delete(path + "/:id", h)` — single delete    |
+| Alias         | Underlying call                                        |
+| ------------- | ------------------------------------------------------ |
+| `.list(h)`    | `router.get(path, h)` — collection read                |
+| `.create(h)`  | `router.post(path, h)` — collection write              |
+| `.show(h)`    | `router.get(path + "/:id", h)` — single resource read  |
+| `.update(h)`  | `router.put(path + "/:id", h)` — single resource write |
+| `.patch(h)`   | `router.patch(path + "/:id", h)` — partial update      |
+| `.destroy(h)` | `router.delete(path + "/:id", h)` — single delete      |
 
 The verb methods on the builder are also exposed directly — `.get(h)`, `.post(h)`, `.put(h)`, `.patch(h)`, `.delete(h)` — but those don't auto-append `/:id`. The aliases are syntactic sugar over them.
 
@@ -126,14 +126,14 @@ The verb methods on the builder are also exposed directly — `.get(h)`, `.post(
 ```ts
 router
   .route("/products")
-  .get(listProducts)         // GET /products (same path)
-  .getOne(showProduct)       // GET /products/:id
-  .post(createProduct)       // POST /products
-  .postOne(specialAction)    // POST /products/:id
-  .put(replaceAll)           // PUT /products (rare)
-  .updateOne(updateProduct)  // PUT /products/:id
-  .delete(deleteAll)         // DELETE /products (bulk delete)
-  .deleteOne(deleteOne);     // DELETE /products/:id
+  .get(listProducts) // GET /products (same path)
+  .getOne(showProduct) // GET /products/:id
+  .post(createProduct) // POST /products
+  .postOne(specialAction) // POST /products/:id
+  .put(replaceAll) // PUT /products (rare)
+  .updateOne(updateProduct) // PUT /products/:id
+  .delete(deleteAll) // DELETE /products (bulk delete)
+  .deleteOne(deleteOne); // DELETE /products/:id
 ```
 
 The `.xxxOne` variants append `/:id`. The base verbs don't. Use whichever reads more clearly for the endpoint.
@@ -172,8 +172,8 @@ router
   .route("/posts/:id")
   .show(showPost)
   .nest("/comments")
-    .list(listComments)          // GET /posts/:id/comments
-    .create(createComment);      // POST /posts/:id/comments
+  .list(listComments) // GET /posts/:id/comments
+  .create(createComment); // POST /posts/:id/comments
 ```
 
 `.nest(path)` returns a NEW `RouteBuilder` rooted at the concatenated path, with the parent builder's options merged in. The original builder is unaffected — you can keep chaining on it after the `.nest(...)` returns.
@@ -188,15 +188,15 @@ router.restfulResource("/products", productController);
 
 The framework wires:
 
-| Method            | Verb + path                  |
-| ----------------- | ---------------------------- |
-| `list()`          | `GET /products`              |
-| `get()`           | `GET /products/:id`          |
-| `create()`        | `POST /products`             |
-| `update()`        | `PUT /products/:id`          |
-| `patch()`         | `PATCH /products/:id`        |
-| `delete()`        | `DELETE /products/:id`       |
-| `bulkDelete()`    | `DELETE /products` (no `:id`)|
+| Method         | Verb + path                   |
+| -------------- | ----------------------------- |
+| `list()`       | `GET /products`               |
+| `get()`        | `GET /products/:id`           |
+| `create()`     | `POST /products`              |
+| `update()`     | `PUT /products/:id`           |
+| `patch()`      | `PATCH /products/:id`         |
+| `delete()`     | `DELETE /products/:id`        |
+| `bulkDelete()` | `DELETE /products` (no `:id`) |
 
 Only methods that exist on the resource get registered — if your controller doesn't define `patch`, no `PATCH` route is added.
 
@@ -217,8 +217,8 @@ router.restfulResource("/products", productController, {
 ```ts
 router.restfulResource("/products", productController, {
   replace: {
-    list: customListHandler,        // overrides productController.list
-    bulkDelete: requireAdminGuard,  // overrides bulkDelete
+    list: customListHandler, // overrides productController.list
+    bulkDelete: requireAdminGuard, // overrides bulkDelete
   },
 });
 ```
@@ -243,9 +243,9 @@ router.group(
     middleware: [authMiddleware(), requireRoleMiddleware("admin")],
   },
   () => {
-    router.get("/users", listUsers);          // GET /admin/users, name: "admin.users"
-    router.post("/users", createUser);        // POST /admin/users, name: "admin.users.post" (auto-suffixed)
-    router.delete("/users/:id", deleteUser);  // DELETE /admin/users/:id, name: "admin.users.:id"
+    router.get("/users", listUsers); // GET /admin/users, name: "admin.users"
+    router.post("/users", createUser); // POST /admin/users, name: "admin.users.post" (auto-suffixed)
+    router.delete("/users/:id", deleteUser); // DELETE /admin/users/:id, name: "admin.users.:id"
   },
 );
 ```
@@ -255,7 +255,7 @@ All three options are optional. The framework collects them onto a stack — nes
 ```ts
 router.group({ prefix: "/v1" }, () => {
   router.group({ prefix: "/auth", middleware: [authMiddleware()] }, () => {
-    router.post("/login", login);     // POST /v1/auth/login, middleware: [authMiddleware]
+    router.post("/login", login); // POST /v1/auth/login, middleware: [authMiddleware]
   });
 });
 ```
@@ -268,7 +268,7 @@ Shorthand for `group({ prefix }, callback)` — just the prefix, no middleware o
 
 ```ts
 router.prefix("/api/v1", () => {
-  router.get("/users", listUsers);     // GET /api/v1/users
+  router.get("/users", listUsers); // GET /api/v1/users
   router.get("/products", listProducts);
 });
 ```
@@ -279,11 +279,11 @@ Shorthand for `prefix("/v<version>", callback)` — opinionated about the `/v` p
 
 ```ts
 router.version("1", () => {
-  router.get("/users", listUsersV1);    // GET /v1/users
+  router.get("/users", listUsersV1); // GET /v1/users
 });
 
 router.version("2", () => {
-  router.get("/users", listUsersV2);    // GET /v2/users
+  router.get("/users", listUsersV2); // GET /v2/users
 });
 ```
 
@@ -310,7 +310,7 @@ Set `middlewarePrecedence: "before"` on the route to flip:
 ```ts
 router.get("/foo", handler, {
   middleware: [middlewareC],
-  middlewarePrecedence: "before",   // now: C → A → B → handler
+  middlewarePrecedence: "before", // now: C → A → B → handler
 });
 ```
 
@@ -328,8 +328,8 @@ router.post("/products", createProduct);        // name: "products"
 When you register the same name twice (same path, different verbs), the framework auto-suffixes with the lowercased method:
 
 ```ts
-router.get("/products", listProducts);          // name: "products"
-router.post("/products", createProduct);        // name: "products.post"
+router.get("/products", listProducts); // name: "products"
+router.post("/products", createProduct); // name: "products.post"
 ```
 
 Two registrations of the SAME name + method throws:
@@ -368,8 +368,8 @@ The router walks registered routes in order — find-my-way (the underlying matc
 ## Redirects
 
 ```ts
-router.redirect("/old", "/new");                     // 302 temporary (default)
-router.redirect("/old", "/new", "permanent");        // 301 permanent
+router.redirect("/old", "/new"); // 302 temporary (default)
+router.redirect("/old", "/new", "permanent"); // 301 permanent
 ```
 
 A redirect is implemented as a `GET` route that calls `response.redirect(...)`. The `mode` argument decides the status code — `"temporary"` (302) or `"permanent"` (301).
@@ -523,12 +523,12 @@ import { logout } from "./controllers/logout.controller";
 import { me } from "./controllers/me.controller";
 
 router.prefix("/auth", () => {
-  router.post("/login", login);              // public
-  router.post("/forgot-password", forgotPassword);  // public
+  router.post("/login", login); // public
+  router.post("/forgot-password", forgotPassword); // public
 
   guarded(() => {
-    router.post("/logout", logout);          // requires auth
-    router.get("/me", me);                   // requires auth
+    router.post("/logout", logout); // requires auth
+    router.get("/me", me); // requires auth
   });
 });
 ```

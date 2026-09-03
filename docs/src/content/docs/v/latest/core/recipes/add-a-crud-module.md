@@ -302,7 +302,7 @@ The generator gives you a generic stub. Wire it to the repository:
 import { type RequestHandler } from "@warlock.js/core";
 import { productsRepository } from "../repositories/products.repository";
 
-export const listProductsController: RequestHandler = async (request, response) => {
+export const listProductsController: RequestHandler = async ({ request, response }) => {
   const { data, pagination } = await productsRepository.listCached(request.all());
 
   return response.success({
@@ -320,7 +320,7 @@ export const listProductsController: RequestHandler = async (request, response) 
 import { ResourceNotFoundError, type RequestHandler } from "@warlock.js/core";
 import { productsRepository } from "../repositories/products.repository";
 
-export const getProductController: RequestHandler = async (request, response) => {
+export const getProductController: RequestHandler = async ({ request, response }) => {
   const product = await productsRepository.getCached(request.input("id"));
 
   if (!product) {
@@ -358,15 +358,12 @@ Now the controller — the inferred `CreateProductSchema` type comes from the sc
 ```ts title="src/app/products/controllers/create-product.controller.ts"
 import { type Request, type RequestHandler } from "@warlock.js/core";
 import { Product } from "../models/product";
-import {
-  type CreateProductSchema,
-  createProductSchema,
-} from "../schema/create-product.schema";
+import { type CreateProductSchema, createProductSchema } from "../schema/create-product.schema";
 
-export const createProductController: RequestHandler<Request<CreateProductSchema>> = async (
+export const createProductController: RequestHandler<Request<CreateProductSchema>> = async ({
   request,
   response,
-) => {
+}) => {
   const product = await Product.create(request.validated());
 
   return response.successCreate({ product });
@@ -416,21 +413,14 @@ export type UpdateProductSchema = Infer<typeof updateProductSchema>;
 The controller:
 
 ```ts title="src/app/products/controllers/update-product.controller.ts"
-import {
-  ResourceNotFoundError,
-  type Request,
-  type RequestHandler,
-} from "@warlock.js/core";
+import { ResourceNotFoundError, type Request, type RequestHandler } from "@warlock.js/core";
 import { Product } from "../models/product";
-import {
-  type UpdateProductSchema,
-  updateProductSchema,
-} from "../schema/update-product.schema";
+import { type UpdateProductSchema, updateProductSchema } from "../schema/update-product.schema";
 
-export const updateProductController: RequestHandler<Request<UpdateProductSchema>> = async (
+export const updateProductController: RequestHandler<Request<UpdateProductSchema>> = async ({
   request,
   response,
-) => {
+}) => {
   const product = await Product.find(request.input("id"));
 
   if (!product) {
@@ -455,7 +445,7 @@ updateProductController.validation = {
 import { ResourceNotFoundError, type RequestHandler } from "@warlock.js/core";
 import { Product } from "../models/product";
 
-export const removeProductController: RequestHandler = async (request, response) => {
+export const removeProductController: RequestHandler = async ({ request, response }) => {
   const product = await Product.find(request.input("id"));
 
   if (!product) {
@@ -496,13 +486,13 @@ guarded(() => {
 
 `router.route(path)` returns a chainable builder with five named slots — `list`, `show`, `create`, `update`, `destroy`. Each registers the conventional REST verb:
 
-| Slot      | Verb     | Path             |
-| --------- | -------- | ---------------- |
-| `list`    | `GET`    | `/products`      |
-| `show`    | `GET`    | `/products/:id`  |
-| `create`  | `POST`   | `/products`      |
-| `update`  | `PUT`    | `/products/:id`  |
-| `destroy` | `DELETE` | `/products/:id`  |
+| Slot      | Verb     | Path            |
+| --------- | -------- | --------------- |
+| `list`    | `GET`    | `/products`     |
+| `show`    | `GET`    | `/products/:id` |
+| `create`  | `POST`   | `/products`     |
+| `update`  | `PUT`    | `/products/:id` |
+| `destroy` | `DELETE` | `/products/:id` |
 
 `.update()` registers `PUT /products/:id` — a full replacement of the resource. If you want a partial update, the builder also exposes a separate `.patch()` slot that registers `PATCH /products/:id`; the two are independent and can coexist on the same path.
 

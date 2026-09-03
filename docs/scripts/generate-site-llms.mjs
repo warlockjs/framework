@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const docsRoot = join(here, "..");
-const packagesRoot = join(docsRoot, "..", "..", "@warlock.js");
+const packagesRoot = join(docsRoot, "..");
 const publicDir = join(docsRoot, "public");
 const SITE = "https://warlock.js.org";
 
@@ -63,10 +63,32 @@ const PACKAGE_ORDER = [
   "create-warlock",
 ];
 
-const workspaceManifest = JSON.parse(
-  readFileSync(join(packagesRoot, "package.json"), "utf8"),
-);
-const workspacePackages = workspaceManifest.workspaces
+/** Read the explicit package paths from the canonical pnpm workspace manifest. */
+function readWorkspacePackagePaths() {
+  const manifest = readFileSync(join(packagesRoot, "pnpm-workspace.yaml"), "utf8");
+  const paths = [];
+  let inPackages = false;
+
+  for (const line of manifest.split(/\r?\n/)) {
+    if (line === "packages:") {
+      inPackages = true;
+      continue;
+    }
+
+    if (inPackages && /^\S/.test(line)) {
+      break;
+    }
+
+    const match = inPackages ? line.match(/^\s{2}-\s+['"]?([^'"]+)['"]?\s*$/) : null;
+    if (match) {
+      paths.push(match[1]);
+    }
+  }
+
+  return paths;
+}
+
+const workspacePackages = readWorkspacePackagePaths()
   .map((workspace) => {
     const packageDir = join(packagesRoot, workspace);
     const manifestPath = join(packageDir, "package.json");

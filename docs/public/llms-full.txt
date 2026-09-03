@@ -1231,7 +1231,7 @@ A controller is a thin function: pull inputs from `request`, call work, return t
 ```ts title="src/app/<module>/controllers/<action>.controller.ts"
 import { type RequestHandler } from "@warlock.js/core";
 
-export const listProductsController: RequestHandler = async (request, response) => {
+export const listProductsController: RequestHandler = async ({ request, response }) => {
   return response.success({ products: [] });
 };
 ```
@@ -1244,7 +1244,7 @@ That's the full contract. The `RequestHandler` annotation carries both parameter
 - File: `src/app/<module>/controllers/<action>.controller.ts`.
 - Export name matches the action in camelCase + `Controller` suffix: `listProductsController`, `createProductController`, `getProductController`.
 
-Scaffold with: `yarn warlock generate.controller <module>/<action>` (add `--with-validation` to get the schema generated alongside).
+Scaffold with: `pnpm warlock generate.controller <module>/<action>` (add `--with-validation` to get the schema generated alongside).
 
 ## Reading input
 
@@ -1286,10 +1286,10 @@ import { type Request, type RequestHandler } from "@warlock.js/core";
 import { type CreateProductSchema, createProductSchema } from "../schema/create-product.schema";
 import { createProductService } from "../services/create-product.service";
 
-export const createProductController: RequestHandler<Request<CreateProductSchema>> = async (
+export const createProductController: RequestHandler<Request<CreateProductSchema>> = async ({
   request,
   response,
-) => {
+}) => {
   const product = await createProductService(request.validated());
 
   return response.successCreate({ product });
@@ -1315,10 +1315,10 @@ Routes behind `authMiddleware` need `request.user` typed. Project conventions ad
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { type CreateProductSchema, createProductSchema } from "../schema/create-product.schema";
 
-export const createProductController: GuardedRequestHandler<CreateProductSchema> = async (
+export const createProductController: GuardedRequestHandler<CreateProductSchema> = async ({
   request,
   response,
-) => {
+}) => {
   // request.user is typed
   const product = await createProductService(request.validated());
   return response.successCreate({ product });
@@ -1365,7 +1365,7 @@ If your controller is over ~30 lines, the work probably belongs in a service.
 import { type RequestHandler } from "@warlock.js/core";
 import { listProductsService } from "../services/list-products.service";
 
-export const listProductsController: RequestHandler = async (request, response) => {
+export const listProductsController: RequestHandler = async ({ request, response }) => {
   const { data: products, pagination } = await listProductsService({
     ...request.all(),
     organization_id: request.user.organizationId,
@@ -1382,10 +1382,10 @@ import { type Request, type RequestHandler } from "@warlock.js/core";
 import { type CreateProductSchema, createProductSchema } from "../schema/create-product.schema";
 import { createProductService } from "../services/create-product.service";
 
-export const createProductController: RequestHandler<Request<CreateProductSchema>> = async (
+export const createProductController: RequestHandler<Request<CreateProductSchema>> = async ({
   request,
   response,
-) => {
+}) => {
   const product = await createProductService(request.validated());
 
   return response.successCreate({ product });
@@ -1419,7 +1419,7 @@ export async function getProductService(id: string) {
 import type { RequestHandler } from "@warlock.js/core";
 import { getProductService } from "../services/get-product.service";
 
-export const getProductController: RequestHandler = async (request, response) => {
+export const getProductController: RequestHandler = async ({ request, response }) => {
   const product = await getProductService(request.input("id"));
 
   return response.success({ product });
@@ -1446,7 +1446,7 @@ No `if (!product)` branch in the controller. The error class carries the HTTP se
 
 ---
 name: create-module
-description: 'Scaffold a new feature module under `src/app/<name>/` via `warlock generate.module` and the follow-up generators for controllers, models, repositories, resources, and validation schemas. Triggers: `warlock generate.module`, `generate.controller`, `generate.service`, `generate.model`, `generate.repository`, `generate.resource`, `generate.migration`, `--minimal`, `gen.m`; "scaffold a new module", "create CRUD bootstrap", "add a controller to a module", "generate a model"; typical CLI `yarn warlock generate.module <name>`. Skip: framework-wide layout rules — `@warlock.js/core/warlock-conventions/SKILL.md`; routes file shape — `@warlock.js/core/register-route/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing tooling: `@nestjs/cli`, `hygen`, hand-rolled folder layouts.'
+description: 'Scaffold a new feature module under `src/app/<name>/` via `warlock generate.module` and the follow-up generators for controllers, models, repositories, resources, and validation schemas. Triggers: `warlock generate.module`, `generate.controller`, `generate.service`, `generate.model`, `generate.repository`, `generate.resource`, `generate.migration`, `--minimal`, `gen.m`; "scaffold a new module", "create CRUD bootstrap", "add a controller to a module", "generate a model"; typical CLI `pnpm warlock generate.module <name>`. Skip: framework-wide layout rules — `@warlock.js/core/warlock-conventions/SKILL.md`; routes file shape — `@warlock.js/core/register-route/SKILL.md`; controller shape — `@warlock.js/core/create-controller/SKILL.md`; competing tooling: `@nestjs/cli`, `hygen`, hand-rolled folder layouts.'
 ---
 
 # Warlock — create a module
@@ -1456,8 +1456,8 @@ A module is a self-contained feature folder under `src/app/<name>/`. The CLI sca
 ## The shape
 
 ```bash
-yarn warlock generate.module products            # full CRUD bootstrap (default — controllers, model, services, repository, resource, schemas, routes, seed)
-yarn warlock generate.module products --minimal  # bare bones (routes.ts + main.ts + utils/locales.ts + empty subfolders)
+pnpm warlock generate.module products            # full CRUD bootstrap (default — controllers, model, services, repository, resource, schemas, routes, seed)
+pnpm warlock generate.module products --minimal  # bare bones (routes.ts + main.ts + utils/locales.ts + empty subfolders)
 ```
 
 Full CRUD is the default — opt down to a bare skeleton with `--minimal` (`-m`) when you want to build the module piece by piece. `--force` (`-f`) overwrites existing files. The plural form is auto-derived: `generate.module product` and `generate.module products` produce the same `src/app/products/` folder.
@@ -1563,9 +1563,9 @@ Inside the same module, plain relative imports (`./`, `../`).
 ### Full CRUD bootstrap
 
 ```bash
-yarn warlock generate.module products
+pnpm warlock generate.module products
 # edit schemas + model fields, then
-yarn warlock migrate
+pnpm warlock migrate
 ```
 
 The CRUD scaffold's `routes.ts` already chains the five controllers behind `guarded(...)`:
@@ -1593,11 +1593,11 @@ guarded(() => {
 ### Skeleton module, add pieces piecemeal
 
 ```bash
-yarn warlock generate.module orders --minimal
-yarn warlock generate.model orders/order --with-resource
-yarn warlock generate.repository orders/order
-yarn warlock generate.controller orders/place-order --with-validation
-yarn warlock generate.controller orders/list-orders
+pnpm warlock generate.module orders --minimal
+pnpm warlock generate.model orders/order --with-resource
+pnpm warlock generate.repository orders/order
+pnpm warlock generate.controller orders/place-order --with-validation
+pnpm warlock generate.controller orders/list-orders
 ```
 
 Then wire URLs by editing `src/app/orders/routes.ts` and the schema rules in `src/app/orders/schema/`.
@@ -1618,7 +1618,7 @@ await warmupProductCache();
 - **There's no standalone `generate.validation` command.** Validation is no longer scaffolded on its own — each controller carries its own schema (imported from `schema/` and bound via `controller.validation`). Generate the controller with `--with-validation` to get the paired schema file, or hand-write the `schema/*.schema.ts`.
 - **No `requests/` folder.** Controllers import the schema's exported type + value directly from `schema/*.schema.ts`; there is no `*.request.ts` alias.
 - **Subfolder is `seeds/` (plural), not `seed/`.** The seed file is `<module>.seed.ts`.
-- **`generate.module` does not run the migration.** It only creates the migration file. Run `yarn warlock migrate` separately to apply it.
+- **`generate.module` does not run the migration.** It only creates the migration file. Run `pnpm warlock migrate` separately to apply it.
 - **`models/<entity>/` is its own folder, not a flat file.** The generator puts `product.model.ts` inside `models/product/` so migrations can sit beside the model in `models/product/migrations/`.
 - **Don't import `routes.ts`, `main.ts`, or anything in `events/`.** They're auto-loaded; double-loading errors out at boot.
 - **`utils/locales.ts` is mandatory for translation keys.** Skip it and `t("products.notFound")` silently falls back to the key itself.
@@ -2301,7 +2301,7 @@ The "same error for missing user vs wrong password" pattern is deliberate — it
 `hashPassword` / `verifyPassword` need `bcryptjs`. Install it directly:
 
 ```bash
-yarn add bcryptjs
+pnpm add bcryptjs
 ```
 
 If you skip the install, the first call throws with the framework's install hint:
@@ -2310,14 +2310,14 @@ If you skip the install, the first call throws with the framework's install hint
 Password encryption requires the bcryptjs package.
 Install it with:
 
-  yarn add bcryptjs
+  pnpm add bcryptjs
 
 Or with your preferred package manager:
 
-  yarn add bcryptjs
+  pnpm add bcryptjs
 ```
 
-There is no `warlock add` feature for password hashing — `bcryptjs` is a plain dependency, so install it directly with `yarn add bcryptjs`.
+There is no `warlock add` feature for password hashing — `bcryptjs` is a plain dependency, so install it directly with `pnpm add bcryptjs`.
 
 ## Gotchas
 
@@ -3297,13 +3297,13 @@ Three commands move the app through its lifecycle: `dev` while you're editing, `
 
 ```bash
 # Local development
-yarn warlock dev
+pnpm warlock dev
 
 # Production build
-yarn warlock build
+pnpm warlock build
 
 # Run the built bundle
-yarn warlock start
+pnpm warlock start
 ```
 
 `dev` and `start` are **persistent** (long-running, no auto-exit). `build` is one-shot — it exits when the bundle is written.
@@ -3475,6 +3475,23 @@ Defaults are sensible for the typical "Node service" deployment. Knobs to actual
 
 Just `warlockConfig: true`. Build doesn't need the app booted — it reads `warlock.config.ts`, runs esbuild, writes the file. Fast.
 
+### The build is all-or-nothing (5.2)
+
+`warlock build` never writes into `outdir` while it works. It builds into a hidden **sibling** temp directory — `.<outdir-basename>.build-<12 hex>`, e.g. `./.dist.build-9f1c2ab40de7` next to `./dist` — and only when every step has succeeded does it promote that directory into place with a rename. Same volume, so the promotion is atomic.
+
+Two consequences you can rely on:
+
+- **A successful build leaves no stale files.** Promotion replaces `outdir` wholesale (the old one is moved aside, the temp is renamed in, the old one is deleted). A file that an earlier build emitted and this one did not is gone — it is not merged over.
+- **A failed build leaves no usable `dist`.** The error path removes the temp directory and rethrows without ever touching `outdir`. A previous good `dist` is left exactly as it was; if there was none, none appears.
+
+The last thing written into the temp directory before promotion is `.warlock-build.json`, a two-field marker:
+
+```json
+{ "status": "success", "builtAt": "2026-09-01T12:34:56.789Z" }
+```
+
+It exists so `warlock start` can tell a promoted build from a directory that merely looks like one.
+
 ### Where the bundle lands
 
 ```
@@ -3490,12 +3507,22 @@ If the app uses `@warlock.js/web` page routes, a successful `warlock build` also
 
 Spawns `node <entryPath>` as a child process, forwarding signals (SIGINT / SIGTERM). `entryPath` is resolved from the same `build` config that produced the bundle.
 
+### It refuses a `dist` no successful build produced (5.2)
+
+Before spawning anything, `start` looks for the `.warlock-build.json` success marker in `outdir`. Missing, unreadable, malformed, or `status !== "success"` all collapse to one refusal on **stderr**, exit code `1`:
+
+```
+✖ "dist" was not produced by a successful `warlock build` run (no build-success marker found). Run `warlock build` before `warlock start`.
+```
+
+The three cases that reach it are: never built; a build that failed before promotion; and a directory assembled or edited by hand. They are deliberately not distinguished — the answer to all three is the same command. Note this replaces the old behaviour where `start` ran whatever happened to be sitting in `dist/`.
+
 ### Behavior
 
 ```bash
-yarn warlock start                        # → spawns node --enable-source-maps dist/app.js
-yarn warlock start --inspect              # → spawns node --enable-source-maps --inspect dist/app.js
-yarn warlock start --max-old-space-size=4096  # → spawns node --enable-source-maps --max-old-space-size=4096 dist/app.js
+pnpm warlock start                        # → spawns node --enable-source-maps dist/app.js
+pnpm warlock start --inspect              # → spawns node --enable-source-maps --inspect dist/app.js
+pnpm warlock start --max-old-space-size=4096  # → spawns node --enable-source-maps --max-old-space-size=4096 dist/app.js
 ```
 
 Everything you pass after `start` is forwarded to the spawned Node process. Use this to attach a debugger (`--inspect`), tune memory (`--max-old-space-size`), or pass any other Node flag without editing the command.
@@ -3547,8 +3574,36 @@ The started banner prints **only** when the running application reports a comple
 
 ```bash
 # a CI gate can be this blunt, and it is now correct
-yarn warlock start | grep -q "production server started"
+pnpm warlock start | grep -q "production server started"
 ```
+
+### Reading a failed start (5.2)
+
+The child is spawned with piped stdout/stderr and **every chunk is forwarded verbatim, live**, to the parent's matching stream. The application's own boot error is the thing you read — `warlock start` adds a summary underneath it, it does not replace it:
+
+```
+  ✖ warlock start failed — the server never finished booting
+  the application process exited with code 1
+  the cause is printed above, in the application's own output
+```
+
+The third line is conditional on the parent having actually seen child output. When the child produced none, it says so instead of pointing at something that isn't there:
+
+```
+  no output was captured from the application process — its cause did not reach this terminal
+```
+
+That distinction is the point of the change: an unhelpful "see above" printed above an empty terminal used to be the entire diagnostic.
+
+**Port already in use.** The HTTP connector preflights the port immediately before `listen()`, so a collision is named rather than surfacing as a raw `EADDRINUSE` from inside Fastify:
+
+```
+EADDRINUSE: Port 3000 is already in use on 127.0.0.1. Stop the dev server (or whatever
+else is listening on port 3000) and run again, or start on a free port — e.g.
+startHttpTestServer({ port: 3001 }).
+```
+
+The connector logs it fatally and exits `1`; the supervisor forwards that text and then prints the failure summary above it. `EACCES` on the port is treated the same way as `EADDRINUSE` (a privileged port you may not bind is also "not available"); anything else the probe throws is rethrown untouched.
 
 ### How readiness is reported
 
@@ -3594,7 +3649,7 @@ If you need conditional behavior, branch on `Application.environment` (the ortho
 }
 ```
 
-Now `yarn dev` / `yarn build` / `yarn start`. Standard Node hosting providers (Render, Fly, Railway, Heroku) recognize this layout.
+Now `pnpm dev` / `pnpm build` / `pnpm start`. Standard Node hosting providers (Render, Fly, Railway, Heroku) recognize this layout.
 
 ### Production Dockerfile
 
@@ -3602,9 +3657,9 @@ Now `yarn dev` / `yarn build` / `yarn start`. Standard Node hosting providers (R
 FROM node:20-alpine AS build
 WORKDIR /app
 COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 COPY . .
-RUN yarn warlock build
+RUN pnpm warlock build
 
 FROM node:20-alpine
 WORKDIR /app
@@ -3648,7 +3703,7 @@ That is deliberate: `build` and `start` do **not** force `production`. Forcing i
 ### Skip type-gen on machines without write access
 
 ```bash
-yarn warlock dev --skip-typings
+pnpm warlock dev --skip-typings
 ```
 
 Or persist it:
@@ -3666,21 +3721,22 @@ Useful in a containerized dev environment where `.warlock/typings.d.ts` is read-
 ### Memory-tune the production process
 
 ```bash
-yarn warlock start --max-old-space-size=4096
+pnpm warlock start --max-old-space-size=4096
 ```
 
 Or via `NODE_OPTIONS` in the deployment env if you don't want to change the start invocation:
 
 ```bash
-NODE_OPTIONS=--max-old-space-size=4096 yarn warlock start
+NODE_OPTIONS=--max-old-space-size=4096 pnpm warlock start
 ```
 
 ## Gotchas
 
 - **`warlock dev` is persistent — `Ctrl+C` to stop.** The framework's `persistent: true` flag keeps the process alive after `action` returns. Same for `start`.
 - **`--fresh` only deletes the manifest, not the transpile cache.** If you're chasing a stale-compile bug, `rm -rf .warlock/` clears everything. The manifest restoring is what `--fresh` solves.
-- **`warlock build` does NOT run migrations.** Production bundles ship the migration files but don't apply them. Run `yarn warlock migrate` against the production DB separately.
-- **`warlock start` requires a built bundle.** Run `warlock build` first, or you'll spawn `node` against a non-existent file and crash immediately.
+- **`warlock build` does NOT run migrations.** Production bundles ship the migration files but don't apply them. Run `pnpm warlock migrate` against the production DB separately.
+- **`warlock start` requires a build it can vouch for.** Since 5.2 it refuses any `outdir` without the `.warlock-build.json` success marker — a hand-assembled `dist/`, or one left behind by a build that failed, is rejected by that reason instead of being spawned and crashing halfway through boot. Run `warlock build` first.
+- **Do not add `.warlock-build.json` to `.gitignore`-driven artifact pruning.** Stripping it from a `dist/` you ship makes `warlock start` refuse the artifact on the target host. Copy `outdir` whole.
 - **`outdir` is the directory, `outFile` is the filename within it.** A common mistake is putting the full path in one and leaving the other default — you end up with `<full-path>/app.js` or `dist/<full-path>`. They concatenate.
 - **`sourcemap: false` cascades to `start`.** Stack traces lose `.ts` precision. Keep sourcemaps on unless artifact size is a hard constraint.
 - **`NODE_ENV` is not set by these commands.** The deployment env (your Dockerfile, CI, hosting provider) sets it. Forget it on a production server and `Application.isProduction` returns `false`, which flips cookie security, CORS, logging — silently. Always set `NODE_ENV=production` in production deployments.
@@ -3785,7 +3841,7 @@ const config: MailConfigurations = {
 };
 ```
 
-Requires `@aws-sdk/client-sesv2` installed (`yarn add @aws-sdk/client-sesv2`).
+Requires `@aws-sdk/client-sesv2` installed (`pnpm add @aws-sdk/client-sesv2`).
 
 ## Mail modes
 
@@ -4061,7 +4117,7 @@ await Mail.to(user.email)
 
 - **`.send()` validates** — `to`, `subject`, and at least one of `text`/`html`/`component` are required. Missing any throws synchronously.
 - **`@react-email/render` is optional.** Without it you get the basic fallback (inline styles, no MSO conditionals). Install it for production-quality HTML.
-- **`nodemailer` is loaded lazily** at import time. If you see `nodemailer is not installed` errors, run `warlock add mail` (or `yarn add nodemailer`).
+- **`nodemailer` is loaded lazily** at import time. If you see `nodemailer is not installed` errors, run `warlock add mail` (or `pnpm add nodemailer`).
 - **`secure: true` requires port 465.** For port 587 use `secure: false` and `tls: true` (STARTTLS).
 - **Test mode is process-global.** Set it in `beforeAll`/`beforeEach`; reset with `setMailMode("production")` (or rely on test runner isolation).
 - **Per-mail handlers don't replace global ones** — both fire. Avoid double-counting metrics.
@@ -4086,9 +4142,9 @@ description: 'Send HTTP responses via @warlock.js/core''s Response helpers — s
 ## The shape
 
 ```ts
-import type { RequestHandler, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 
-export const myController: RequestHandler = async (request, response: Response) => {
+export const myController: RequestHandler = async ({ request, response }) => {
   // …choose a helper and return it
   return response.success({ data: "…" });
 };
@@ -4098,11 +4154,11 @@ Always `return response.<helper>(...)`. The return value drives Fastify's send.
 
 ## Success helpers
 
-| Method                              | Status | When                                      |
-| ----------------------------------- | ------ | ----------------------------------------- |
-| `response.success(data?)`           | 200    | normal read / update                      |
-| `response.successCreate(data)`      | 201    | resource created (POST)                   |
-| `response.noContent()`              | 204    | delete succeeded, no body needed          |
+| Method                         | Status | When                             |
+| ------------------------------ | ------ | -------------------------------- |
+| `response.success(data?)`      | 200    | normal read / update             |
+| `response.successCreate(data)` | 201    | resource created (POST)          |
+| `response.noContent()`         | 204    | delete succeeded, no body needed |
 
 ```ts
 return response.success({ products: [...] });
@@ -4116,13 +4172,13 @@ return response.noContent();
 
 ## Client-error helpers
 
-| Method                                              | Status | When                                  |
-| --------------------------------------------------- | ------ | ------------------------------------- |
-| `response.badRequest(data)`                         | 400    | malformed or invalid input            |
-| `response.unauthorized(data?)`                      | 401    | missing/invalid auth token            |
-| `response.forbidden(data?)`                         | 403    | authenticated but not allowed         |
-| `response.notFound(data?)`                          | 404    | record missing                        |
-| `response.conflict(data?)`                          | 409    | uniqueness violation, state conflict  |
+| Method                         | Status | When                                 |
+| ------------------------------ | ------ | ------------------------------------ |
+| `response.badRequest(data)`    | 400    | malformed or invalid input           |
+| `response.unauthorized(data?)` | 401    | missing/invalid auth token           |
+| `response.forbidden(data?)`    | 403    | authenticated but not allowed        |
+| `response.notFound(data?)`     | 404    | record missing                       |
+| `response.conflict(data?)`     | 409    | uniqueness violation, state conflict |
 
 ```ts
 return response.badRequest({ error: t("validation.invalid") });
@@ -4141,8 +4197,8 @@ Most error helpers accept an optional payload — if you omit it, they send a de
 ## Redirects
 
 ```ts
-return response.redirect("/login");                    // 302
-return response.redirect("/new-home", 301);            // permanent
+return response.redirect("/login"); // 302
+return response.redirect("/new-home", 301); // permanent
 ```
 
 ## Files
@@ -4174,19 +4230,19 @@ stream.end();
 
 ## Throwing HTTP errors
 
-Most of the time, controllers don't need to *choose* an error helper — they throw from the service layer instead. The request middleware (`http/middleware/inject-request-context.ts`) catches every `HttpError` subclass and produces the matching response. The error classes mirror the helpers above:
+Most of the time, controllers don't need to _choose_ an error helper — they throw from the service layer instead. The request middleware (`http/middleware/inject-request-context.ts`) catches every `HttpError` subclass and produces the matching response. The error classes mirror the helpers above:
 
 ```ts
 import {
-  ResourceNotFoundError,   // 404
-  UnAuthorizedError,        // 401
-  ForbiddenError,           // 403
-  BadRequestError,          // 400
-  ConflictError,            // 409
-  NotAcceptableError,       // 406
-  NotAllowedError,          // 405
-  ServerError,              // 500
-  HttpError,                // base class — `new HttpError(status, message, payload?)` for arbitrary codes
+  ResourceNotFoundError, // 404
+  UnAuthorizedError, // 401
+  ForbiddenError, // 403
+  BadRequestError, // 400
+  ConflictError, // 409
+  NotAcceptableError, // 406
+  NotAllowedError, // 405
+  ServerError, // 500
+  HttpError, // base class — `new HttpError(status, message, payload?)` for arbitrary codes
 } from "@warlock.js/core";
 
 throw new ResourceNotFoundError("product.notFound");
@@ -4194,13 +4250,27 @@ throw new ForbiddenError("permission.denied", { resource: "product", id });
 throw new ConflictError("user.duplicateEmail");
 ```
 
-Each class takes `(message, payload?)`. The payload merges into the response body alongside `error`. In development mode, the stack trace is included too.
+Each class takes `(message, payload?)`. The framework keeps the optional
+detail nested under `payload`:
+
+```json
+{
+  "error": "Product not found",
+  "payload": { "id": 42 }
+}
+```
+
+Every unhandled error response also carries
+`Cache-Control: private, no-store`, regardless of status. The floor is
+applied once at the shared error funnel, so API-route errors cannot be stored
+and replayed across users. In development mode, the stack trace is included
+too.
 
 Pick the class, throw from the service or use-case, and forget about response shaping at the call site. The controller stays focused on the success path:
 
 ```ts
-export const getProductController: RequestHandler = async (request, response) => {
-  const product = await getProductService(request.input("id"));   // throws ResourceNotFoundError on miss
+export const getProductController: RequestHandler = async ({ request, response }) => {
+  const product = await getProductService(request.input("id")); // throws ResourceNotFoundError on miss
   return response.success({ product });
 };
 ```
@@ -4212,9 +4282,9 @@ See [`create-controller`](../create-controller/SKILL.md) for the "throw from ser
 ```ts
 const sse = response.sse();
 
-sse.send("tick", { count: 1 });             // event name, data, optional id
-sse.send("tick", { count: 2 }, "msg-2");    // third arg is the SSE event id
-sse.comment("keep-alive");                  // invisible to the client, prevents timeout
+sse.send("tick", { count: 1 }); // event name, data, optional id
+sse.send("tick", { count: 2 }, "msg-2"); // third arg is the SSE event id
+sse.comment("keep-alive"); // invisible to the client, prevents timeout
 sse.end();
 ```
 
@@ -4254,11 +4324,11 @@ response.clearCookie("session_id");
 
 Every response cookie gets `httpOnly: true`, `sameSite: "lax"`, and `secure: true` outside development, unless you override them:
 
-| Flag | Default | Why it's the default |
-|---|---|---|
-| `httpOnly` | `true` | without it, any injected script can read the cookie |
-| `sameSite` | `"lax"` | without it, the cookie rides along on cross-site requests |
-| `secure` | `true`, except in development | without it, the cookie travels in cleartext |
+| Flag       | Default                       | Why it's the default                                      |
+| ---------- | ----------------------------- | --------------------------------------------------------- |
+| `httpOnly` | `true`                        | without it, any injected script can read the cookie       |
+| `sameSite` | `"lax"`                       | without it, the cookie rides along on cross-site requests |
+| `secure`   | `true`, except in development | without it, the cookie travels in cleartext               |
 
 `secure` is relaxed in development only — browsers drop a `Secure` cookie over plain http, which would silently break every local login. It stays on in test and staging.
 
@@ -4689,12 +4759,17 @@ Set `STORAGE_DRIVER=r2` in production, leave unset in dev — same code uses loc
 ### Uploading a request file
 
 ```ts
-import type { RequestHandler, Response } from "@warlock.js/core";
+import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { storage } from "@warlock.js/core";
 
-export const uploadAvatarController: RequestHandler = async (request, response: Response) => {
+export const uploadAvatarController: GuardedRequestHandler = async ({ request, response }) => {
   const upload = request.file("avatar");
-  const file = await storage.put(upload, `avatars/${request.user.id}/${upload.fileName}`);
+
+  if (!upload) {
+    return response.badRequest({ error: "missing file" });
+  }
+
+  const file = await storage.put(upload, `avatars/${request.user.id}/${upload.name}`);
 
   return response.successCreate({ url: file.url, hash: file.hash });
 };
@@ -5609,8 +5684,8 @@ Multipart uploads come in as `UploadedFile` instances. The class wraps Fastify's
 
 ## The shape
 
-```ts title="src/app/uploads/schema/index.ts"
-import { v } from "@warlock.js/seal";
+```ts title="src/app/uploads/schema/upload-avatar.schema.ts"
+import { v, type Infer } from "@warlock.js/seal";
 
 export const uploadAvatarSchema = v.object({
   avatar: v
@@ -5619,16 +5694,18 @@ export const uploadAvatarSchema = v.object({
     .maxSize({ unit: "MB", size: 5 })
     .mimeType(["image/jpeg", "image/png", "image/webp"]),
 });
+
+export type UploadAvatarSchema = Infer<typeof uploadAvatarSchema>;
 ```
 
 ```ts title="src/app/uploads/controllers/upload-avatar.controller.ts"
-import { type GuardedRequestHandler } from "app/auth/types/guarded-request.type";
+import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { type UploadAvatarSchema, uploadAvatarSchema } from "../schema/upload-avatar.schema";
 
-export const uploadAvatarController: GuardedRequestHandler<UploadAvatarSchema> = async (
+export const uploadAvatarController: GuardedRequestHandler<UploadAvatarSchema> = async ({
   request,
   response,
-) => {
+}) => {
   const { avatar } = request.validated();
 
   const file = await avatar
@@ -5654,7 +5731,7 @@ Inside a controller:
 ```ts
 import type { RequestHandler, UploadedFile } from "@warlock.js/core";
 
-export const uploadController: RequestHandler = async (request, response) => {
+export const uploadController: RequestHandler = async ({ request, response }) => {
   // option A — direct from request, no validation
   const file: UploadedFile | undefined = request.file("avatar");
 
@@ -5836,7 +5913,7 @@ export const uploadFilesSchema = v.object({
 ```ts title="src/app/uploads/controllers/create-upload.controller.ts"
 import type { RequestHandler } from "@warlock.js/core";
 
-export const createUploadController: RequestHandler = async (request, response) => {
+export const createUploadController: RequestHandler = async ({ request, response }) => {
   const { files } = request.validated();
 
   const saved = await Promise.all(
@@ -6133,9 +6210,9 @@ const template = await readFile(appPath("mailers/templates/welcome.html"), "utf-
 ### Health endpoint
 
 ```ts title="src/app/system/controllers/health.controller.ts"
-import { Application, type RequestHandler, type Response } from "@warlock.js/core";
+import { Application, type RequestHandler } from "@warlock.js/core";
 
-export const healthController: RequestHandler = async (_request, response: Response) => {
+export const healthController: RequestHandler = async ({ response }) => {
   return response.success({
     status: "ok",
     environment: Application.environment,
@@ -6434,10 +6511,14 @@ The error's message is locale-aware — the `inject-request-context` middleware 
 ### Translated response message in a controller
 
 ```ts
-export const createProductController: GuardedRequestHandler<CreateProductSchema> = async (
+import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
+import { type CreateProductSchema } from "../schema/create-product.schema";
+import { createProductService } from "../services/create-product.service";
+
+export const createProductController: GuardedRequestHandler<CreateProductSchema> = async ({
   request,
   response,
-) => {
+}) => {
   const product = await createProductService(request.validated());
   return response.success({
     message: request.t("products.created"),
@@ -6622,16 +6703,25 @@ export default {
 
 ⚠ **Since 4.13.0 `http.trustProxy` defaults to `false`**, so `request.detectIp()` returns the socket address and **`X-Real-IP` / `X-Forwarded-For` are ignored unless you opt in.** Before 4.13.0 the default was `true`, which meant any client could set its own forwarding header and be believed.
 
-⚠ **Opt in with the narrowest shape your topology allows, not with `true`.** Since 4.15.0 `http.trustProxy` takes a hop count or a trusted-proxy list, and `detectIp()` resolves the chain the same way Fastify's `request.ip` does:
+⚠ **Opt in with the narrowest shape your topology allows, not with `true`.** `http.trustProxy` takes a trusted-proxy list, and `detectIp()` resolves the chain the same way Fastify's `request.ip` does:
 
 | `http.trustProxy` | Client IP |
 | --- | --- |
 | `false` *(default)* | Socket peer address |
-| `2` | Walks past the 2 rightmost `X-Forwarded-For` hops — for an edge that **appends** (the usual case: nginx, ALB, most CDNs) |
-| `"10.0.0.0/8"` / `["10.0.0.0/8", "192.168.0.0/16"]` | Walks left while each hop is a listed proxy |
+| `"10.0.0.0/8"` / `"loopback, 10.0.0.0/8"` / `["10.0.0.0/8", "192.168.0.0/16"]` | Walks left while each hop is a listed proxy, stops at the first that isn't |
+| `(address, hop) => boolean` | Your own predicate |
 | `true` | Trusts the whole chain — the leftmost hop, i.e. **whatever the client put there** if your edge appends rather than overwrites |
 
-With `true`, any client that can reach the process directly picks its own IP and this allowlist is decorative. `X-Real-IP` is honoured only under `true` — it carries no chain to check a hop count or proxy list against — so if your edge sets only that header, have it set `X-Forwarded-For` too.
+⚠ **Since 5.2 the value is validated at boot, and a hop count is refused.** The accepted shapes are exactly `boolean`, a non-empty string (comma-separated IPs/CIDRs), a non-empty `string[]`, and an `(address, hop) => boolean` predicate. Missing or nullish means `false`. Anything else — a **number**, `""`, `[]`, a mixed array, a plain object — throws a `TypeError` while the HTTP server is being constructed instead of being silently coerced:
+
+```
+Invalid http.trustProxy configuration: expected a boolean, a non-empty IP/CIDR string,
+a non-empty string array, or a predicate function; received number.
+```
+
+A hop count (`trustProxy: 2`) used to be documented as the shape to prefer. It is now refused **loudly**, because the Fastify version Warlock builds against treats a number as always-false at runtime: it silently degraded to "trust nothing" rather than walking past your proxies. Express the same topology as a proxy list (`"10.0.0.0/8"`) or a predicate.
+
+With `true`, any client that can reach the process directly picks its own IP and this allowlist is decorative. `X-Real-IP` is honoured only under `true` — it carries no chain to check a proxy list against — so if your edge sets only that header, have it set `X-Forwarded-For` too.
 
 ```ts
 import { middleware } from "@warlock.js/core";
@@ -6805,7 +6895,7 @@ What it does at save time:
 | Existing row, password unchanged | Pass through (no re-hashing — stored hash preserved). |
 | Empty / undefined value         | Pass through untouched.                     |
 
-Calls `authService.hashPassword(String(value))` under the hood — same bcryptjs path as the standalone `hashPassword()` helper. See [`hash-password/SKILL.md`](../hash-password/SKILL.md) for full bcrypt setup (salt rounds, `yarn add bcryptjs`).
+Calls `authService.hashPassword(String(value))` under the hood — same bcryptjs path as the standalone `hashPassword()` helper. See [`hash-password/SKILL.md`](../hash-password/SKILL.md) for full bcrypt setup (salt rounds, `pnpm add bcryptjs`).
 
 ### Why declarative wins
 
@@ -6959,7 +7049,7 @@ Rule of thumb: transformers are for **pure, deterministic** transforms of the ro
 
 ## See also
 
-- [`hash-password/SKILL.md`](../hash-password/SKILL.md) — the bcrypt setup that `useHashedPassword` calls under the hood; salt rounds, `yarn add bcryptjs`.
+- [`hash-password/SKILL.md`](../hash-password/SKILL.md) — the bcrypt setup that `useHashedPassword` calls under the hood; salt rounds, `pnpm add bcryptjs`.
 - [`use-repository/SKILL.md`](../use-repository/SKILL.md) — where `create` / `save` calls happen that trigger the transformers.
 - [`define-resource/SKILL.md`](../define-resource/SKILL.md) — filtering transformed fields (`password`) out of API responses.
 - [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — schema files live in `src/app/<module>/models/<entity>/<entity>.model.ts`.
@@ -7022,7 +7112,7 @@ Five lines do the heavy lifting:
 4. **`defaultOptions`** — applied to every call (`orderBy`, default `limit`, etc.).
 5. **`new FaqsRepository()`** singleton — import this everywhere; never instantiate again.
 
-The class is intentionally private — only the singleton escapes the module. Scaffold with `yarn warlock generate.repository <module>/<entity>`.
+The class is intentionally private — only the singleton escapes the module. Scaffold with `pnpm warlock generate.repository <module>/<entity>`.
 
 ## The `filterBy` rules
 
@@ -7245,10 +7335,10 @@ export async function listFaqsService(filters: FaqListOptions) {
 ```
 
 ```ts title="src/app/faqs/controllers/list-faqs.controller.ts"
-import type { RequestHandler, Response } from "@warlock.js/core";
+import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { listFaqsService } from "../services/list-faqs.service";
 
-export const listFaqsController: RequestHandler = async (request, response: Response) => {
+export const listFaqsController: GuardedRequestHandler = async ({ request, response }) => {
   const { data, pagination } = await listFaqsService({
     ...request.all(),
     organization_id: request.user.organizationId,
@@ -7433,7 +7523,7 @@ public locals: RequestLocals = {};
 ```ts title="src/app/observability/middleware/request-timing.middleware.ts"
 import type { Middleware } from "@warlock.js/core";
 
-export const requestTimingMiddleware: Middleware = request => {
+export const requestTimingMiddleware: Middleware = (request) => {
   request.startedAt = Date.now();
 };
 ```
@@ -7441,7 +7531,7 @@ export const requestTimingMiddleware: Middleware = request => {
 ```ts title="src/app/observability/controllers/timing.controller.ts"
 import type { RequestHandler } from "@warlock.js/core";
 
-export const timingController: RequestHandler = async (request, response) => {
+export const timingController: RequestHandler = async ({ request, response }) => {
   return response.success({ elapsedMs: Date.now() - request.startedAt });
 };
 ```
@@ -7526,7 +7616,7 @@ Feature-local files such as `src/app/organizations/request-locals.d.ts` are equa
 
 Two rules the scaffold's own comments spell out, and both bite silently:
 
-- **Keep the trailing `export {}`.** `declare module "x"` inside a file with no top-level import or export declares an *ambient* module, which REPLACES `@warlock.js/core`'s real typings instead of merging into them — every framework export vanishes. The `export {}` is what makes the file a module and the block an augmentation. It is not an unused statement to clean up.
+- **Keep the trailing `export {}`.** `declare module "x"` inside a file with no top-level import or export declares an _ambient_ module, which REPLACES `@warlock.js/core`'s real typings instead of merging into them — every framework export vanishes. The `export {}` is what makes the file a module and the block an augmentation. It is not an unused statement to clean up.
 - **Keep them `interface`, not `type`.** This project otherwise prefers `type`; these are the named exception, because declaration merging is interface-only. `type RequestUser = { ... }` is a duplicate-identifier error, not an augmentation.
 
 On a project scaffolded before 5.1 there is no `src/typings.d.ts`, and `tsconfig.json` carries `"typeRoots": ["./src/typings.d.ts"]` — wrong twice, since `typeRoots` takes directories of `@types` packages rather than files, and that file did not exist. Drop the `typeRoots` entry, create the file, and list it under `include`.
@@ -7600,10 +7690,10 @@ import type { Request, RequestHandler } from "@warlock.js/core";
 import { type CreateProductSchema, createProductSchema } from "../schema/create-product.schema";
 import { createProductService } from "../services/create-product.service";
 
-export const createProductController: RequestHandler<Request<CreateProductSchema>> = async (
+export const createProductController: RequestHandler<Request<CreateProductSchema>> = async ({
   request,
   response,
-) => {
+}) => {
   const product = await createProductService(request.validated());
 
   return response.successCreate({ product });
@@ -7621,7 +7711,7 @@ Two pieces, always:
 
 No separate `*.request.ts` alias file. `RequestHandler<Request<TSchema>>` types `request.validated()` directly off the schema's inferred type.
 
-Scaffold with `yarn warlock generate.controller <module>/<action> --with-validation`. If the scaffolder emits a `requests/<action>.request.ts` file, delete it — the inline pattern is the convention.
+Scaffold with `pnpm warlock generate.controller <module>/<action> --with-validation`. If the scaffolder emits a `requests/<action>.request.ts` file, delete it — the inline pattern is the convention.
 
 ## The `v.*` factory surface
 
@@ -7913,11 +8003,11 @@ This skill is the foundation. Every other warlock skill (`register-route`, `crea
    ```
 
    ```ts title="src/app/<module>/controllers/create-<thing>.controller.ts"
-   import { type GuardedRequestHandler } from "app/auth/types/guarded-request.type";
+   import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
    import { type CreateThingSchema, createThingSchema } from "../schema/create-thing.schema";
    import { createThingService } from "../services/create-thing.service";
 
-   export const createThingController: GuardedRequestHandler<CreateThingSchema> = async (request, response) => {
+   export const createThingController: GuardedRequestHandler<CreateThingSchema> = async ({ request, response }) => {
      const thing = await createThingService(request.validated());
      return response.success({ thing });
    };
@@ -8008,7 +8098,7 @@ Cascade uses `@RegisterModel()` for the model registry and `@BelongsTo` / `@HasM
 
 ---
 name: warlock-doctor
-description: 'Run `warlock doctor` — a read-only diagnostics command that checks routes / config / connectors / optional-peers / health endpoints / release hygiene and prints a pass/warn/fail report, exiting non-zero on any failure. Add your own probe with the `DoctorCheck` contract and `runChecks` / `formatReportLines`. Triggers: `warlock doctor`, `doctorCommand`, `DoctorCheck`, `CheckResult`, `CheckStatus`, `DoctorReport`, `runChecks`, `formatReportLines`, `printReport`, `defaultDoctorChecks`; "diagnose my app", "preflight / preflight check", "is the app healthy", "why are there 0 routes", "pre-release sanity check", "CI smoke check"; run as `yarn warlock doctor`. Skip: the live `/health` + `/ready` HTTP probes — `@warlock.js/core/health-checks/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; releasing the package — `releasing-warlock-monorepo`; competing tools `npm doctor`, `nest info`, hand-rolled preflight scripts.'
+description: 'Run `warlock doctor` — a read-only diagnostics command that checks routes / config / connectors / optional-peers / health endpoints / release hygiene and prints a pass/warn/fail report, exiting non-zero on any failure. Add your own probe with the `DoctorCheck` contract and `runChecks` / `formatReportLines`. Triggers: `warlock doctor`, `doctorCommand`, `DoctorCheck`, `CheckResult`, `CheckStatus`, `DoctorReport`, `runChecks`, `formatReportLines`, `printReport`, `defaultDoctorChecks`; "diagnose my app", "preflight / preflight check", "is the app healthy", "why are there 0 routes", "pre-release sanity check", "CI smoke check"; run as `pnpm warlock doctor`. Skip: the live `/health` + `/ready` HTTP probes — `@warlock.js/core/health-checks/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; releasing the package — `releasing-warlock-monorepo`; competing tools `npm doctor`, `nest info`, hand-rolled preflight scripts.'
 ---
 
 # Warlock — `warlock doctor`
@@ -8016,7 +8106,7 @@ description: 'Run `warlock doctor` — a read-only diagnostics command that chec
 `warlock doctor` is a read-only preflight. It boots the app far enough to introspect it — loads every config file and bootstrap code so routes and connectors register — but **starts no connectors**, so it never opens a database, cache, or socket connection. It then runs a set of checks and prints a grouped pass / warn / fail report.
 
 ```bash
-yarn warlock doctor
+pnpm warlock doctor
 ```
 
 ```
@@ -8119,7 +8209,7 @@ if (report.hasFailures) process.exit(report.exitCode);
 ### CI / pre-release gate
 
 ```bash
-yarn warlock doctor || exit 1   # non-zero exit fails the job
+pnpm warlock doctor || exit 1   # non-zero exit fails the job
 ```
 
 A red `release-hygiene` line catches the classic "bumped `package.json` but forgot the CHANGELOG heading" mistake before a publish.
@@ -8147,7 +8237,7 @@ A `⚠ routes: 0 routes registered` line is the tell that a route module threw o
 
 ---
 name: warlock-routes
-description: 'Run `warlock routes` — a read-only command that lists the registered HTTP routes as a verb-colored table (method / path / name / action / middleware-count / source), a sibling of `warlock doctor`. Filter with `--method` / `--path` / `--name`, or emit normalized rows as JSON with `--json`. Also covers `warlock routes:diff`, which compares live page routes against the last `warlock build`''s route snapshot and exits non-zero on drift. Triggers: `warlock routes`, `routesCommand`, `warlock routes:diff`, `routesDiffCommand`, "list my routes", "show all routes", "route table", "what endpoints does my app expose", "dump routes as JSON", "which routes have middleware", "route map for CI", "did my page routes drift from the last build"; run as `yarn warlock routes` / `yarn warlock routes:diff`. Skip: read-only health/preflight checks — `@warlock.js/core/warlock-doctor/SKILL.md`; defining/naming/grouping routes — `@warlock.js/core/register-route/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; competing tools `nest`/`express` route listers, `php artisan route:list`.'
+description: 'Run `warlock routes` — a read-only command that lists the registered HTTP routes as a verb-colored table (method / path / name / action / middleware-count / source), a sibling of `warlock doctor`. Filter with `--method` / `--path` / `--name`, or emit normalized rows as JSON with `--json`. Also covers `warlock routes:diff`, which compares live page routes against the last `warlock build`''s route snapshot and exits non-zero on drift. Triggers: `warlock routes`, `routesCommand`, `warlock routes:diff`, `routesDiffCommand`, "list my routes", "show all routes", "route table", "what endpoints does my app expose", "dump routes as JSON", "which routes have middleware", "route map for CI", "did my page routes drift from the last build"; run as `pnpm warlock routes` / `pnpm warlock routes:diff`. Skip: read-only health/preflight checks — `@warlock.js/core/warlock-doctor/SKILL.md`; defining/naming/grouping routes — `@warlock.js/core/register-route/SKILL.md`; authoring a general CLI command — `@warlock.js/core/write-cli-command/SKILL.md`; competing tools `nest`/`express` route listers, `php artisan route:list`.'
 ---
 
 # Warlock — `warlock routes`
@@ -8155,7 +8245,7 @@ description: 'Run `warlock routes` — a read-only command that lists the regist
 `warlock routes` lists every registered HTTP route as a table. It's the read-only sibling of [`warlock doctor`](../warlock-doctor/SKILL.md): it boots the app far enough to register route modules — but **starts no connectors**, so it never opens a database, cache, or socket connection.
 
 ```bash
-yarn warlock routes
+pnpm warlock routes
 ```
 
 ```
@@ -8186,10 +8276,10 @@ The `METHOD` column is verb-colored (GET green, POST blue, PUT/PATCH yellow, DEL
 Optional, case-insensitive, AND-combined:
 
 ```bash
-yarn warlock routes --method GET     # -m  exact HTTP method
-yarn warlock routes --path /users    # -p  path substring
-yarn warlock routes --name users     # -n  route-name substring
-yarn warlock routes -m POST -p /users
+pnpm warlock routes --method GET     # -m  exact HTTP method
+pnpm warlock routes --path /users    # -p  path substring
+pnpm warlock routes --name users     # -n  route-name substring
+pnpm warlock routes -m POST -p /users
 ```
 
 ## JSON output
@@ -8197,7 +8287,7 @@ yarn warlock routes -m POST -p /users
 `--json` (`-j`) emits the normalized rows instead of the table — for `jq`, a CI diff, or a generated API map. Filters apply before serialization.
 
 ```bash
-yarn warlock routes --json
+pnpm warlock routes --json
 ```
 
 ```json
@@ -8211,7 +8301,7 @@ yarn warlock routes --json
 ### Audit which routes are guarded
 
 ```bash
-yarn warlock routes --json | jq '[.[] | select(.middleware == 0)]'
+pnpm warlock routes --json | jq '[.[] | select(.middleware == 0)]'
 ```
 
 Surfaces public routes (no middleware) — a quick check that auth-protected paths actually carry a guard.
@@ -8219,7 +8309,7 @@ Surfaces public routes (no middleware) — a quick check that auth-protected pat
 ### Confirm a route registered
 
 ```bash
-yarn warlock routes --name users.create
+pnpm warlock routes --name users.create
 ```
 
 An empty result means the route isn't registered — re-run `warlock dev` and read the boot error (the route-module loader is fail-loud, so a throwing route file aborts boot rather than being silently dropped).
@@ -8229,12 +8319,19 @@ An empty result means the route isn't registered — re-run `warlock dev` and re
 Compares the **live dev-server page routes** (`router.list().filter(r => r.isPage)`) against a **snapshot written by the last successful `warlock build`** (`page-routes.manifest.json` in `resolveBuildConfig().outdir`, e.g. `dist/page-routes.manifest.json`). Boots the same diagnostic way as `warlock routes` — route modules registered, no connectors started — then diffs.
 
 ```bash
-yarn warlock routes:diff
+pnpm warlock routes:diff
 ```
 
 ```
 Page routes match (4 routes).
+Note: page names are compared as DERIVED by the build, so a clean diff does not prove
+that no route name collided at registration (the router appends `.<method>` to a name
+already claimed by another method). Run `warlock routes` to see the registered names.
 ```
+
+**A clean baseline is now expected immediately after a successful `warlock build`.** Through 5.1, running `routes:diff` on an untouched checkout right after a green build reported drift, because the manifest recorded the catch-all as `"*"` while the router serves it as `"/*"`. The manifest is now written through the router's own path normalizer, so the two sides agree and a clean tree reports clean. If you see drift on a tree you have not edited since building, that is a bug worth reporting — it is no longer the expected greeting.
+
+⚠ **What a clean diff does NOT prove.** The manifest records what each page's name was **derived** as, not what it was **registered** as. `warlock build` never boots connectors, so it cannot see the API routes a page name might collide with; when a name is already claimed by another method the router appends a `.<method>` suffix at registration, and the comparison accepts that suffix rather than reporting it as drift. So `Page routes match` means *the page surface did not move since the build* — it does not mean *no page route name collided*. Use `warlock routes` to see the names as actually registered.
 
 or, on drift:
 
@@ -8396,10 +8493,10 @@ export async function notifyUserService(user: User, payload: unknown) {
 Then from a controller:
 
 ```ts
-import type { GuardedRequestHandler } from "app/auth/types/guarded-request.type";
+import type { GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { notifyUserService } from "../services/notify-user.service";
 
-export const sendNotificationController: GuardedRequestHandler = async (request, response) => {
+export const sendNotificationController: GuardedRequestHandler = async ({ request, response }) => {
   await notifyUserService(request.user, request.input("payload"));
   return response.success({ delivered: true });
 };
@@ -8561,7 +8658,7 @@ CLI commands, scheduled jobs, queue workers — anything running outside an HTTP
 
 ---
 name: write-cli-command
-description: 'Author a custom `warlock <my-cmd>` command via the `command()` factory — name, description, action, options, preload, then register in `warlock.config.ts > cli.commands` or drop in `src/app/<module>/commands/`. Triggers: `command`, `CLICommand`, `CLICommandPreload`, `CLICommandOption`, `preload`, `preAction`, `persistent`, `colors`; "write a custom warlock command", "one-off maintenance task", "ship a CLI from a package", "framework built-in commands"; typical import `import { command } from "@warlock.js/core"`. Skip: framework dev/build/start — `@warlock.js/core/run-app/SKILL.md`; warlock.config.ts wiring — `@warlock.js/core/configure-app/SKILL.md`; competing libs `commander`, `yargs`, `oclif`.'
+description: 'Author a custom `warlock <my-cmd>` command via the `command()` factory — name, description, action, options, preload, then register in `warlock.config.ts > cli.commands` or drop in `src/app/<module>/commands/`. Also covers built-in `warlock add` feature scaffolding, including the Web starter and `index.register.ts`. Triggers: `command`, `CLICommand`, `CLICommandPreload`, `CLICommandOption`, `preload`, `preAction`, `persistent`, `colors`, `warlock add`, `index.register.ts`; "write a custom warlock command", "one-off maintenance task", "ship a CLI from a package", "framework built-in commands"; typical import `import { command } from "@warlock.js/core"`. Skip: framework dev/build/start — `@warlock.js/core/run-app/SKILL.md`; warlock.config.ts wiring — `@warlock.js/core/configure-app/SKILL.md`; competing libs `commander`, `yargs`, `oclif`.'
 ---
 
 # Warlock — write a CLI command
@@ -8600,7 +8697,7 @@ export default command({
 });
 ```
 
-Run it: `yarn warlock users.promote --email=hasan@example.com` (or `yarn warlock up -e hasan@example.com`).
+Run it: `pnpm warlock users.promote --email=hasan@example.com` (or `pnpm warlock up -e hasan@example.com`).
 
 ## `CLICommandOptions` — the factory input
 
@@ -8766,6 +8863,7 @@ warlock generate                         (alias: g)      — interactive picker
 | Feature       | Installs                                                                                            |
 | ------------- | --------------------------------------------------------------------------------------------------- |
 | `react-email` | `react-email` + `@react-email/components` + `@react-email/render` + `@react-email/tailwind`; drops a `welcome-email.tsx` sample; patches `tsconfig.json` |
+| `web`         | Warlock Web + React stack; scaffolds the application page, localization, contact endpoint, and Web configuration                         |
 | `react`       | `react` + `react-dom` + types                                                                       |
 | `image`       | `sharp` (for the `Image` class)                                                                     |
 | `mail`        | `nodemailer` + types                                                                                |
@@ -8782,6 +8880,8 @@ warlock generate                         (alias: g)      — interactive picker
 | `test`        | `vitest` + `@mongez/vite` + coverage; drops `test-global-setup.ts` / `test-setup.ts` / `vite.config.ts` |
 
 Run `warlock add --list` to see what's currently registered. Pass `--packageManager <yarn\|pnpm\|npm>` to override auto-detection (defaults to whichever lockfile is present).
+
+The Web starter keeps the page's universal non-component setup in `src/web/index.register.ts`, while `src/web/index.page.tsx` re-exports `register`. Warlock still discovers and runs the hook from the page namespace in both SSR and the browser, but editing the page component remains inside React's Fast Refresh boundary. Do not move the `register()` declaration inline beside the component: React Refresh treats that non-component export as incompatible and reloads the page, losing component state.
 
 ### Misc
 
@@ -8872,7 +8972,7 @@ export default command({
 
 ---
 name: write-middleware
-description: 'Author HTTP middleware for @warlock.js/core — the `(request, response)` signature, short-circuit by returning a response, enrich the request with extra fields, register per-route, per-group, or app-wide. Triggers: `Middleware`, `MiddlewareResponse`, `router.group`, `guarded`, `request.detectIp`, `authMiddleware`; "write a custom middleware", "short-circuit a request", "enrich the request with extra fields", "per-route vs per-group middleware"; typical import `import type { Middleware } from "@warlock.js/core"`. Skip: built-in middleware catalog — `@warlock.js/core/use-middleware/SKILL.md`; route attachment — `@warlock.js/core/register-route/SKILL.md`; response helpers — `@warlock.js/core/send-response/SKILL.md`; competing patterns: `express` `(req, res, next)` middleware, Fastify `preHandler` hooks.'
+description: 'Author HTTP middleware for @warlock.js/core — the `({ request, response })` signature, short-circuit by returning a response, enrich the request with extra fields, register per-route, per-group, or app-wide. Triggers: `Middleware`, `MiddlewareResponse`, `router.group`, `guarded`, `request.detectIp`, `authMiddleware`; "write a custom middleware", "short-circuit a request", "enrich the request with extra fields", "per-route vs per-group middleware"; typical import `import type { Middleware } from "@warlock.js/core"`. Skip: built-in middleware catalog — `@warlock.js/core/use-middleware/SKILL.md`; route attachment — `@warlock.js/core/register-route/SKILL.md`; response helpers — `@warlock.js/core/send-response/SKILL.md`; competing patterns: `express` `(req, res, next)` middleware, Fastify `preHandler` hooks.'
 ---
 
 # Warlock — write a middleware
@@ -8884,7 +8984,7 @@ Middleware is a plain function that runs before the controller. Two outcomes: re
 ```ts title="src/app/<module>/utils/<name>.middleware.ts"
 import type { Middleware } from "@warlock.js/core";
 
-export const requireApiKey: Middleware = (request, response) => {
+export const requireApiKey: Middleware = ({ request, response }) => {
   const key = request.header("X-API-Key");
 
   if (!key || key !== process.env.API_KEY) {
@@ -8895,16 +8995,14 @@ export const requireApiKey: Middleware = (request, response) => {
 };
 ```
 
-That's the contract: `(request: Request, response: Response) => Response | undefined | void`. Async is fine — return a `Promise<Response | undefined | void>`.
+That's the contract: `(context: HttpContext<Request>) => Response | undefined | void`, where `context` is `{ request, response }`. Async is fine — return a `Promise<Response | undefined | void>`.
 
 The real type, from `@warlock.js/core/src/router/types.ts`:
 
 ```ts
 export type Middleware<MiddlewareRequest extends Request = Request> = {
-  (request: MiddlewareRequest, response: Response): MiddlewareResponse;
+  (context: HttpContext<MiddlewareRequest>): MiddlewareResponse;
 };
-
-export type MiddlewareResponse = ReturnedResponse | undefined | void;
 ```
 
 ## Short-circuit vs continue
@@ -8914,7 +9012,7 @@ The pattern is "return a response to stop, return nothing to continue":
 ```ts
 import type { Middleware } from "@warlock.js/core";
 
-export const requireFeatureFlag: Middleware = async (request, response) => {
+export const requireFeatureFlag: Middleware = async ({ request, response }) => {
   const flag = await loadFeatureFlag(request.input("organization_id"));
 
   if (!flag.enabled) {
@@ -8932,8 +9030,8 @@ If you short-circuit, the controller never runs. The response helper you pick (`
 You can attach arbitrary fields to `request` from a middleware, and they survive into the controller. The cleanest pattern is to extend `Request` via module augmentation in a `.d.ts` and assign in the middleware:
 
 ```ts title="src/app/feature-flags/middleware/load-feature-flag.middleware.ts"
-import type { Middleware } from "@warlock.js/core";
-import type { FeatureFlag } from "../models/feature-flag";
+import type { Middleware, Request, RequestUser } from "@warlock.js/core";
+import { FeatureFlag } from "../models/feature-flag";
 
 declare module "@warlock.js/core" {
   interface Request {
@@ -8941,7 +9039,7 @@ declare module "@warlock.js/core" {
   }
 }
 
-export const loadFeatureFlag: Middleware = async (request) => {
+export const loadFeatureFlag: Middleware<Request & { user: RequestUser }> = async ({ request }) => {
   request.featureFlag = await FeatureFlag.findBy("organization_id", request.user.organizationId);
 };
 ```
@@ -9011,7 +9109,7 @@ export function guarded(callback: () => void) {
 }
 
 export function guardedAdmin(callback: () => void) {
-  router.group({ prefix: "/admin", middleware: [authMiddleware()] }, callback);
+  router.group({ prefix: "/admin", middleware: [authMiddleware("admin")] }, callback);
 }
 
 export function publicRoutes(callback: () => void) {
@@ -9029,7 +9127,7 @@ guarded(() => {
 });
 ```
 
-`authMiddleware(allowedUserType?)` accepts a user-type string or array. Without an arg it just verifies the token is present; with `"user"` / `"admin"` it also checks the decoded `userType` matches.
+`authMiddleware(allowedUserType, tokenFrom?)` requires a user-type string or array — `[]` accepts any authenticated user without checking `userType`; `"user"` / `"admin"` also checks the decoded `userType` matches.
 
 ## Common patterns
 
@@ -9056,13 +9154,13 @@ router.group(
 ```ts
 import type { Middleware } from "@warlock.js/core";
 
-export const optionalAuth: Middleware = async (request, response) => {
+export const optionalAuth: Middleware = async ({ request, response }) => {
   if (!request.authorizationValue) {
     return; // anonymous — let it through
   }
 
   // token present → enforce it
-  return authMiddleware("user")(request, response);
+  return authMiddleware("user")({ request, response });
 };
 ```
 
@@ -9078,7 +9176,7 @@ export const optionalAuth: Middleware = async (request, response) => {
 - **Group middleware runs before per-route middleware**, in array order. The full chain is `app.all → group → per-route → controller`. Mind the order if you stack auth + rate-limit + audit.
 - **Middleware can be async.** Returning `Promise<undefined>` continues the chain. Returning `Promise<Response>` short-circuits. The framework awaits the result.
 - **Don't mutate `request.payload` directly.** Use `request.setValidatedData(...)` or attach a new named field (`request.featureFlag = ...`). The internals expect `payload.all` shapes to come from the validator pipeline.
-- **`Middleware` is generic over the request type.** For middleware that assumes a validated schema, narrow it: `const m: Middleware<CreateProductRequest> = (request) => { ... }`. But most middlewares run before validation, so the default `Middleware` is right.
+- **`Middleware` is generic over the request type.** For middleware that assumes a validated schema, narrow it: `const m: Middleware<CreateProductRequest> = ({ request }) => { ... }`. But most middlewares run before validation, so the default `Middleware` is right.
 - **No `next()` parameter.** Express-style `next()` doesn't apply here. The framework chains based on return value.
 - **`request.baseRequest` / `response.baseResponse` are escape hatches, not API.** They expose the underlying Fastify primitives for cases the framework hasn't covered yet (streaming was the historical precedent). Prefer framework helpers first — `response.send()`, `response.header()`, `response.replay()`, `request.input()`, `request.detectIp()`, etc. If you find yourself reaching for `baseResponse` or `baseRequest` for non-streaming work, that's a missing helper — file an issue. The cache and idempotency middlewares both shipped with a quietly-broken FastifyReply-return bug because they bypassed the helper layer; the framework now guards `Response.send()` against double-send, but the right answer is "use the helper."
 - **Behind any proxy, use `request.detectIp()` not `request.ip`.** `request.ip` is the immediate peer (likely your load balancer); `request.detectIp()` honors `X-Real-IP` / `X-Forwarded-For`. Either way, only trust the result as far as you trust the upstream chain — those headers are client-settable; verify the request came through your trusted edge before treating the value as authoritative.
@@ -9132,12 +9230,12 @@ export default seeder({
 Run them:
 
 ```bash
-yarn warlock seed                            # discover + run all
-yarn warlock seed --list                     # show registry, don't run
-yarn warlock seed --path=src/app/roles/seeds/default-roles.seed.ts  # one file
-yarn warlock seed --fresh                    # truncate every table first, then run all
-yarn warlock seed --drop                     # undo every tracked record, reset the log
-yarn warlock seed --drop=default-roles       # undo just one seeder's records
+pnpm warlock seed                            # discover + run all
+pnpm warlock seed --list                     # show registry, don't run
+pnpm warlock seed --path=src/app/roles/seeds/default-roles.seed.ts  # one file
+pnpm warlock seed --fresh                    # truncate every table first, then run all
+pnpm warlock seed --drop                     # undo every tracked record, reset the log
+pnpm warlock seed --drop=default-roles       # undo just one seeder's records
 ```
 
 `--fresh` truncates **every** table in the DB (`datasource.driver.truncateTable(table, { cascade: true })`), including the `seeds` tracking table. After `--fresh`, `once: true` seeds will run again.
@@ -9275,8 +9373,8 @@ Every record you `track()` is written to a `seed_records` table (created on firs
 `warlock seed --drop` reads those refs and undoes the seed:
 
 ```bash
-yarn warlock seed --drop                # undo every tracked record across all seeders
-yarn warlock seed --drop=default-roles  # undo just one seeder's records
+pnpm warlock seed --drop                # undo every tracked record across all seeders
+pnpm warlock seed --drop=default-roles  # undo just one seeder's records
 ```
 
 What it does, inside a single transaction:
@@ -20066,7 +20164,7 @@ JWT-based authentication for Warlock. `Auth` base model + `authMiddleware` gate 
 ## Install
 
 ```bash
-yarn add @warlock.js/auth
+pnpm add @warlock.js/auth
 ```
 
 ## Foundations
@@ -20445,9 +20543,10 @@ description: 'Run the full login flow via authService.login(Model, credentials, 
 
 ```ts
 import { authService } from "@warlock.js/auth";
+import { type RequestHandler } from "@warlock.js/core";
 import { User } from "@/app/users/models/user.model";
 
-async function loginController(request: Request, response: Response) {
+export const loginController: RequestHandler = async ({ request, response }) => {
   const result = await authService.login(User, {
     email: request.input("email"),
     password: request.input("password"),
@@ -20464,7 +20563,7 @@ async function loginController(request: Request, response: Response) {
     user: result.user,
     tokens: result.tokens,
   });
-}
+};
 ```
 
 The returned shape:
@@ -20516,7 +20615,9 @@ Useful for "show active sessions" UIs — see `authService.getActiveSessions(use
 ## Logout — `authService.logout(user, accessToken?, refreshToken?)`
 
 ```ts
-async function logoutController(request: Request, response: Response) {
+import { type RequestHandler } from "@warlock.js/core";
+
+export const logoutController: RequestHandler = async ({ request, response }) => {
   await authService.logout(
     request.user!,
     request.authorizationValue,        // access token from the Authorization header
@@ -20524,7 +20625,7 @@ async function logoutController(request: Request, response: Response) {
   );
 
   return response.success({ message: "Logged out" });
-}
+};
 ```
 
 The contract:
@@ -20548,7 +20649,9 @@ Useful for "logout from all devices" buttons. Fires `token.revoked` per token + 
 ## Refresh tokens — `authService.refreshTokens(refreshTokenString, deviceInfo?)`
 
 ```ts
-async function refreshController(request: Request, response: Response) {
+import { type RequestHandler } from "@warlock.js/core";
+
+export const refreshController: RequestHandler = async ({ request, response }) => {
   const tokens = await authService.refreshTokens(
     request.input("refreshToken"),
     { userAgent: request.header("user-agent"), ip: request.ip },
@@ -20559,7 +20662,7 @@ async function refreshController(request: Request, response: Response) {
   }
 
   return response.success({ tokens });
-}
+};
 ```
 
 Returns a new token pair or `null` (token expired, revoked, or replay-detected). With rotation enabled (default), the old refresh token is consumed; the new pair stays in the same "family." Replay → revoke the whole family. See [`@warlock.js/auth/manage-tokens/SKILL.md`](@warlock.js/auth/manage-tokens/SKILL.md).
@@ -20918,13 +21021,15 @@ On failure, the middleware returns one of these 401 responses:
 ## Reading the user in a controller
 
 ```ts
-async function accountController(request: Request, response: Response) {
+import { type RequestHandler } from "@warlock.js/core";
+
+export const accountController: RequestHandler = async ({ request, response }) => {
   const user = request.user!;          // typed via your Auth subclass
   return response.success({
     id: user.id,
     email: user.get("email"),
   });
-}
+};
 ```
 
 Because the middleware always requires a valid token, `request.user` is guaranteed present inside any gated controller (the middleware would have responded 401 otherwise). The `!` is safe here.
@@ -20945,10 +21050,12 @@ Every route inside the group is gated — the group's `middleware` array applies
 There is no "hydrate `request.user` if a token is present, otherwise continue" mode. `authMiddleware` always requires a valid token. If a route should be reachable anonymously, leave the middleware off — and read the token yourself in the controller if you want soft personalization:
 
 ```ts
-async function feedController(request: Request, response: Response) {
+import { type RequestHandler } from "@warlock.js/core";
+
+export const feedController: RequestHandler = async ({ request, response }) => {
   const token = request.authorizationValue;
   // optionally decode/hydrate manually when a token is present
-}
+};
 ```
 
 ## Custom error responses
@@ -21021,10 +21128,10 @@ Two-step on the server: create the user (with hashed password), then issue token
 
 ```ts
 import { authService } from "@warlock.js/auth";
-import { hashPassword } from "@warlock.js/core";
+import { hashPassword, type RequestHandler } from "@warlock.js/core";
 import { User } from "@/app/users/models/user.model";
 
-async function registerController(request: Request, response: Response) {
+export const registerController: RequestHandler = async ({ request, response }) => {
   const { email, password, name } = request.all();
 
   // 1. Check duplicates
@@ -21051,7 +21158,7 @@ async function registerController(request: Request, response: Response) {
     user,         // shape via static toJsonColumns / static resource
     tokens,
   });
-}
+};
 ```
 
 That's the whole flow. `User.create({...})` runs the schema validation (including `.email()`, `.min()`, etc. on each field), so you don't need a separate validation pass — see [`@warlock.js/seal/handle-seal-errors/SKILL.md`](@warlock.js/seal/handle-seal-errors/SKILL.md) for catching validation failures.
@@ -21180,7 +21287,7 @@ export default defineConfig({
 ## `warlock jwt.generate` — JWT secret bootstrap
 
 ```bash
-yarn warlock jwt.generate
+pnpm warlock jwt.generate
 ```
 
 Generates a cryptographically strong secret string and writes it to your `.env` as `JWT_SECRET=...` (and `JWT_REFRESH_SECRET=...` if refresh tokens are enabled).
@@ -21192,7 +21299,7 @@ Run it once when setting up a new project. Each developer typically runs it loca
 ## `warlock auth.cleanup` — expired token sweep
 
 ```bash
-yarn warlock auth.cleanup
+pnpm warlock auth.cleanup
 ```
 
 Runs `authService.cleanupExpiredTokens()` — deletes every refresh token whose `expires_at` has passed, then sweeps expired access-token rows too. Fires `token.expired` per refresh token and `cleanup.completed` once.
@@ -21220,7 +21327,7 @@ In-process — no shell call. See [`@warlock.js/scheduler/scheduler-basics/SKILL
 ### Via system cron
 
 ```cron
-0 3 * * *  cd /path/to/app && /usr/local/bin/yarn warlock auth.cleanup
+0 3 * * *  cd /path/to/app && /usr/local/bin/pnpm warlock auth.cleanup
 ```
 
 Out-of-process — works when you don't want the scheduler subsystem running in this service.
@@ -21234,8 +21341,8 @@ If you have very-short-lived refresh tokens (1h expiry) and a million-user scale
 ## `warlock auth.purge-never-expiring` — one-off remediation
 
 ```bash
-yarn warlock auth.purge-never-expiring --dry-run   # report only
-yarn warlock auth.purge-never-expiring             # report, then revoke
+pnpm warlock auth.purge-never-expiring --dry-run   # report only
+pnpm warlock auth.purge-never-expiring             # report, then revoke
 ```
 
 Register with `registerAuthPurgeNeverExpiringCommand()`.
@@ -23916,7 +24023,7 @@ Without a model passed, defaults to `user_id` + `read_at` (read_at-only). See [`
 
 ---
 name: add-web-to-an-app
-description: 'Install the SSR page layer with `warlock add web`: add React/Vite peers, scaffold `src/web/root.tsx` and `src/web/home.page.tsx`, register `webConnector()`, and safely relocate the stock top-level `GET "/"` JSON route to `/welcome`. Triggers: `warlock add web`, `webConnector`, `src/web/root.tsx`, `src/web/home.page.tsx`, `GET "/welcome"`; "add web to an app", "install Warlock web", "scaffold SSR", "homepage route collision". Skip: author a page — `@warlock.js/web/create-a-page/SKILL.md`; customize the document — `@warlock.js/web/write-the-root/SKILL.md`; dev/build/start commands — `@warlock.js/core/run-app/SKILL.md`; competing installers `create-next-app`, `vite create`, `remix init`.'
+description: 'Install the SSR page layer with `warlock add web`: add React/Vite peers, scaffold `src/web/root.tsx` and `src/web/index.page.tsx`, register `webConnector()`, and safely relocate the stock top-level `GET "/"` JSON route to `/welcome`. Triggers: `warlock add web`, `webConnector`, `src/web/root.tsx`, `src/web/index.page.tsx`, `GET "/welcome"`; "add web to an app", "install Warlock web", "scaffold SSR", "homepage route collision". Skip: author a page — `@warlock.js/web/create-a-page/SKILL.md`; customize the document — `@warlock.js/web/write-the-root/SKILL.md`; dev/build/start commands — `@warlock.js/core/run-app/SKILL.md`; competing installers `create-next-app`, `vite create`, `remix init`.'
 ---
 
 # Warlock — add web to an app
@@ -23926,7 +24033,7 @@ description: 'Install the SSR page layer with `warlock add web`: add React/Vite 
 ## The shape
 
 ```bash
-yarn warlock add web
+pnpm warlock add web
 ```
 
 On the ordinary path it leaves this application-owned shape:
@@ -23935,11 +24042,13 @@ On the ordinary path it leaves this application-owned shape:
 src/
   web/
     root.tsx
-    home.page.tsx
+    index.page.tsx
 warlock.config.ts
 ```
 
-The generated home page declares `route = "/"`. The generated root owns the document, renders `<Head />`, keeps `{children}` inside `#root`, and renders `<Scripts />`.
+The generated index page declares `route = { path: "/", name: "index" }`, so the server payload and client registry consume one explicit identity. Universal localization setup is inside its synchronous `register()` hook. The generated root owns the document, renders `<Head />`, keeps `{children}` inside `#root`, and renders `<Scripts />`.
+
+Every added `@warlock.js/*` package is saved at the exact version of the Core CLI executing the command. Third-party dependency ranges stay as declared by the feature.
 
 ## Connector registration
 
@@ -23984,9 +24093,9 @@ Indented `router.get("/", ...)` declarations inside a prefixed group are not roo
 
 - No `src/app/shared/routes.ts`, or no top-level `GET "/"`: create the root page normally.
 - Exactly one recognized top-level `GET "/"` and no top-level `GET "/welcome"`: move it to `/welcome`, then create the home page.
-- More than one top-level `GET "/"`, an existing top-level `GET "/welcome"`, an unreadable/unwritable routes file, or an unrecognized rewrite: create `root.tsx`, do not create `home.page.tsx`, set a failing exit code, and still register the connector.
+- More than one top-level `GET "/"`, an existing top-level `GET "/welcome"`, an unreadable/unwritable routes file, or an unrecognized rewrite: create `root.tsx`, do not create `index.page.tsx`, set a failing exit code, and still register the connector.
 
-On the refusal path, free `/` yourself and create a page with either `route = "/"` or another literal route.
+On the refusal path, free `/` yourself and create a page with either `route = { path: "/", name: "index" }` or another literal route.
 
 ## Re-running the command
 
@@ -23997,8 +24106,8 @@ On the refusal path, free `/` yourself and create a page with either `route = "/
 Read the files rather than assuming the command could patch every application shape:
 
 ```bash
-yarn warlock routes --method GET --path /
-yarn warlock routes --method GET --path /welcome
+pnpm warlock routes --method GET --path /
+pnpm warlock routes --method GET --path /welcome
 ```
 
 The desired result is one page route at `/` and, when the stock JSON route existed, one API route at `/welcome`.
@@ -24022,12 +24131,12 @@ The desired result is one page route at `/` and, when the stock JSON route exist
 
 ---
 name: create-a-page
-description: 'Create an SSR React page under `src/web/**`, with either a literal `route` or a filesystem-derived one, a default component, an optional typed `loader`, page `metadata`, the `error.page.tsx` boundary, and the universal `register()` hook. Triggers: `*.page.tsx`, `route`, `PageLoader`, `PageProps`, `PageMetadata`, `error.page.tsx`, `register`; "create a page", "add an SSR route", "make a React page", "type page loader data", "add an error boundary"; typical import `import type { PageLoader, PageProps } from "@warlock.js/web"`. Skip: root document shell — `@warlock.js/web/write-the-root/SKILL.md`; layout wrappers and prefixes — `@warlock.js/web/use-layouts/SKILL.md`; loader lifecycle and `shared` — `@warlock.js/web/load-page-data/SKILL.md`; competing frameworks `next`, `remix`, `react-router` file routes.'
+description: 'Create an SSR React page under `src/web/**`, with either a literal `route` or a filesystem-derived one, an explicit public-cache opt-in, a default component, an optional typed `loader`, page `metadata`, the `error.page.tsx` boundary, and the universal `register()` hook. Triggers: `*.page.tsx`, `route`, `route.cache`, `maxAge`, `PageLoader`, `PageProps`, `PageMetadata`, `error.page.tsx`, `register`, `[...slug]`; "create a page", "cache a public page", "add an SSR route", "make a React page", "type page loader data", "add an error boundary", "catch-all route", "page renders blank 200", "page has no default export"; typical import `import type { PageLoader, PageProps } from "@warlock.js/web"`. Skip: root document shell — `@warlock.js/web/write-the-root/SKILL.md`; layout wrappers and prefixes — `@warlock.js/web/use-layouts/SKILL.md`; loader lifecycle and `shared` — `@warlock.js/web/load-page-data/SKILL.md`; competing frameworks `next`, `remix`, `react-router` file routes.'
 ---
 
 # Warlock — create a page
 
-A page is any `*.page.tsx` beneath `src/web/` — the only page root. (A per-module `src/app/<module>/web/` tree is not scanned; move any page that lived there into `src/web/`, a subdirectory if you like.) Its URL is either a declared `route` or one derived from its own location; its default export renders React.
+A page is any `*.page.tsx` beneath `src/web/` — the page root. Its URL is either a declared `route` or one derived from its own location; its default export renders React.
 
 ## The shape
 
@@ -24037,12 +24146,11 @@ import type { PageLoader, PageMetadata, PageProps } from "@warlock.js/web";
 export const route = {
   path: "/products/:id",
   name: "products.details",
+  cache: { public: true, maxAge: 60 },
 } as const;
 
-export const loader = (async ({ request, response }) => {
+export const loader = (async ({ request }) => {
   const id = request.input("id");
-
-  response.header("cache-control", "private, max-age=60");
 
   return {
     product: {
@@ -24086,7 +24194,22 @@ export default function ContactPage() {
 
 `route` is optional. A page that omits it derives both its path and its name from where the file sits beneath `src/web` ([filesystem routing](#filesystem-routing), below). A page that declares `route` uses that instead — an explicit `route` always wins over the derived one, for both the path and (when it sets `name`) the name.
 
-Changed in 5.2: through 5.1 an omitted `route` was refused — `warlock dev` and the production discovery pass threw `MissingRouteExportError`, naming the file. That error class is gone; the same file now resolves to a real, browsable URL.
+### The default export is required
+
+`route` is optional; the default export is not. A `*.page.tsx` that exports only named bindings is a **hard discovery/build failure naming the file**:
+
+```
+The page "src/web/contact.page.tsx" has no runtime default export. Every `*.page.tsx`
+file must default-export the React component it renders. For example:
+`export default function Page() { return <main />; }`
+```
+
+Two details worth knowing:
+
+- **`export { Page as default }` satisfies the rule** — the check is for a runtime default binding, not for the `export default` keyword form specifically.
+- **`export default interface Page {}` does not.** A type-only default is erased at compile time, so there is no component at runtime; it is treated as missing.
+
+A file that cannot be parsed reports separately — `Cannot inspect the default export of "<file>": the file could not be parsed (…). Fix the syntax error and discovery will continue.` — so a syntax error never masquerades as a missing export.
 
 ## Route declarations
 
@@ -24100,6 +24223,7 @@ export const route = "/products";
 export const route = {
   path: "/products/:id",
   name: "products.details",
+  cache: { public: true, maxAge: 60 },
 } as const;
 ```
 
@@ -24109,26 +24233,73 @@ Every segment of a page's URL is written down somewhere: `route.path` (or the de
 
 The build reads `route` without executing application code. Declare it directly with `export const` and literal strings. Variables, function calls, computed object keys, spreads, and `export { route }` are refused.
 
+## Page caching
+
+Page documents and their `x-warlock-data` representations are `no-store` by
+default. Opt a public page into shared caching on its route:
+
+```tsx
+export const route = {
+  path: "/products",
+  name: "products.index",
+  cache: { public: true, maxAge: 60 },
+} as const;
+```
+
+`maxAge` is seconds. Both keys are required: `cache: { public: true }` is a
+boot-time `InvalidPageCacheOptInError`, because the framework will not invent
+a freshness window. Remove `cache` entirely to keep the safe `no-store`
+default.
+
+The declaration is an opt-in, not an override of request safety. A response
+that sets or clears a cookie, or a request that used authenticated state,
+emits `Cache-Control: private, no-store`. If Warlock cannot determine whether
+the request used authenticated state, it revokes the opt-in and emits
+`Cache-Control: no-store`. Only a provably unauthenticated request with no
+`Set-Cookie` can emit `public, max-age=<maxAge>`.
+
+This decision is applied once after loaders finish, to both representations.
+Setting `Cache-Control` manually in a loader cannot bypass the floor.
+
 ## Filesystem routing
 
 Omit `route` and the URL comes from the page's own path beneath `src/web`:
 
 - Every directory contributes a segment, in order — `src/web/products/featured.page.tsx` derives `/products/featured`.
-- A `(group)` directory — parentheses, not braces — contributes nothing to the URL, only to organization: `src/web/(marketing)/pricing.page.tsx` derives `/pricing`.
+- A `(group)` directory — parentheses, not braces — contributes nothing to the URL, only to organization: `src/web/(marketing)/pricing.page.tsx` derives `/pricing`. Bracket syntax inside a group name is refused at boot because it can never contribute a dynamic segment; use `(marketing)/[id]/page.page.tsx`, not `(marketing[id])/page.page.tsx`.
 - `index.page.tsx` claims its own directory rather than adding a segment: `src/web/products/index.page.tsx` derives `/products`. This is the ONLY filename with special meaning — `home.page.tsx` is not magic and derives `/home`.
 - `[id]` becomes `:id`: `src/web/products/[id].page.tsx` derives `/products/:id`.
 - A layout `prefix` on the page's ancestry composes in front of the derived path exactly as it does for an explicit `route.path` ([use-layouts](../use-layouts/SKILL.md)).
 
 Two pages that derive (or declare) the same effective path is a build error naming both files.
 
+### Catch-all segments are refused
+
+There is no catch-all / rest-parameter form in filesystem routing. Only
+`[name]` — a plain identifier in square brackets — is recognized as a
+dynamic segment. `src/web/docs/[...slug].page.tsx` raises
+`PageFileSegmentNotSupportedError` at boot and names both the page file and
+the rejected segment.
+
+Until a catch-all exists, use the terminal wildcard with an explicit `route`:
+
+```tsx
+export const route = { path: "/docs/*", name: "docs.catchAll" } as const;
+```
+
 ## Page-route grammar
 
 Page routes deliberately accept less than API routes:
 
 - Supported: `/`, static segments, whole-segment params such as `/products/:id`, the exact wildcard `*`, and a terminal wildcard such as `/docs/*`.
-- Not supported: regex params, optional params, multiple params in one segment, params mixed with text, doubled or trailing slashes, and non-terminal wildcards.
+- Not supported: regex params, optional params, multiple params in one segment, params mixed with text, doubled or trailing slashes, non-terminal wildcards, and catch-all/rest segments (`[...slug]`).
 
 Write two pages for an optional segment. Validate a constrained parameter in the page instead of putting a regex in its path.
+
+An unsupported declared path is a boot-time
+`PageRoutePathNotSupportedError`, never a literal or normalized route.
+Examples that fail include `/users/:id?`, `/users/:id(\\d+)`,
+`/near/:lat-:lng`, `/a//b`, and `/users/`.
 
 ## Metadata
 
@@ -24169,6 +24340,10 @@ export default function ErrorPage({ error, status }: ErrorPageProps) {
 
 During SSR the component receives the real thrown value in `error`. After hydration it receives the JSON-safe `{ name, message, stack? }` shape instead — the original value does not survive the wire. `robots: noindex` is a framework default on this path that an app-supplied `metadata` cannot remove.
 
+Every unhandled error response is also forced to
+`Cache-Control: private, no-store` at the framework's shared error funnel.
+This includes page and API-route failures.
+
 If the failure happens before any page module could even load — a module-load or `register()` throw — there is no trustworthy server composition left to hydrate against, so Warlock renders a plain framework fallback (your `error.page.tsx` if it can still be loaded, otherwise a minimal built-in boundary) with no hydration script at all rather than risk hydrating client code against markup nothing can vouch for.
 
 ## The `register()` hook
@@ -24194,9 +24369,27 @@ The browser boundary is decided by the import graph, not by the file's location.
 
 Keep server-only repository and service reads inside `loader`. Do not read them from module-scope initializers or the default component.
 
+### `.client` does not isolate SSR
+
+A `.client.tsx` suffix is a naming convention, not an SSR-isolation boundary. A
+module statically imported by a page, layout, root, or any of their imports is
+still evaluated by the server. Top-level browser globals such as `window`
+therefore crash SSR boot. Warlock does not ship a client-only component
+primitive; code that requires browser globals at module scope cannot be part of
+the SSR page graph.
+
+### Static assets use `public/`
+
+The production server build does not support imported non-stylesheet assets. An
+import such as `import logo from "./logo.svg"` works under Vite in development
+but `warlock build` refuses it rather than emit a server URL that disagrees with
+the client bundle. Put the file in the application's `public/` directory and
+reference it by root URL: `public/logo.svg` is `/logo.svg`. Stylesheet imports
+are the exception and remain supported.
+
 ## Editing a page in development
 
-`warlock dev` decides Fast Refresh vs. a full reload by comparing the module's *skeleton* — its source with every component body masked out — across the edit. Everything outside a component body is part of the skeleton: imports, module-level declarations, and all server exports (`route`, `middleware`, `validation`, `loader`, `metadata`). The skeleton moving, with or without a simultaneous JSX change, forces a full reload; the skeleton holding still defers to Fast Refresh.
+`warlock dev` decides Fast Refresh vs. a full reload by comparing the module's _skeleton_ — its source with every component body masked out — across the edit. Everything outside a component body is part of the skeleton: imports, module-level declarations, and all server exports (`route`, `middleware`, `validation`, `loader`, `metadata`). The skeleton moving, with or without a simultaneous JSX change, forces a full reload; the skeleton holding still defers to Fast Refresh.
 
 - **A JSX-only edit hot-updates.** The skeleton is unchanged, so Vite's Fast Refresh applies the projected client code with no reload and no lost component state.
 - **A `metadata`-only edit reloads the document.** `metadata` sits outside the skeleton's masked region, so the edit moves it. Warlock sends a full reload, which re-runs SSR and rebuilds `<head>`. Component state is lost — that is the price of seeing the new `<title>` without touching the browser.
@@ -24204,17 +24397,20 @@ Keep server-only repository and service reads inside `loader`. Do not read them 
 - **A helper function used only by the JSX still reloads if it is declared at module level.** The rule does not try to prove which half of a shared declaration the edit was "really" for — it over-approximates deliberately, because a false reload only costs component state, while a missed one ships a stale `<head>` and calls it a hot update.
 - Creating, deleting, or renaming a page file, or editing its `route` export, is page-GRAPH churn, not a skeleton edit — see below, not Fast Refresh.
 
-Changed in 5.1: a metadata-only edit previously left a stale `<head>` until you refreshed the browser by hand. The current skeleton-comparison rule replaces that earlier, narrower "metadata-only" special case.
-
 ## Route-table changes in development
 
 Creating a page, deleting one, or editing its `route` export's path is a different kind of dev edit from the skeleton comparison above — it changes which URLs exist, not just how one already-registered URL renders. `warlock dev` re-registers the affected route(s) in the live route table, atomically and with no dev-server restart, so the new file (or new path) is reachable on the very next request with no manual restart.
 
-Changed in 5.2: through 5.1 the route table was built once at boot and never again. Creating a page 404'd forever; deleting one kept it reachable at its old URL; editing `route` served the OLD path from the old file and 404'd the new one — the running server silently disagreed with the source on disk. All three are now live.
-
 ## Gotchas
 
-- **A page with no `route` is not unreachable.** It derives a real URL from its file location — see [Filesystem routing](#filesystem-routing). Nothing about a route-less page is refused anymore.
+- **A page with no `route` is not unreachable.** It derives a real URL from its file location — see [Filesystem routing](#filesystem-routing).
+- **A page with no default export IS refused.** Named exports alone fail the build naming the file, instead of serving a blank 200.
+- **`.client.tsx` does not prevent SSR evaluation.** It is a naming convention, not a client-only component primitive.
+- **Imported static assets do not build.** Put them in `public/` and reference their root URL; CSS imports remain supported.
+- **`[...slug]` is not a catch-all.** It fails boot with
+  `PageFileSegmentNotSupportedError`; use an explicit terminal `*` route
+  instead — see [Catch-all segments are refused](#catch-all-segments-are-refused).
+- **`process.env` is refused in the client/universal graph, `PUBLIC_` prefix included.** Read env values in a loader and return them as page data; see [`load-page-data/SKILL.md`](../load-page-data/SKILL.md).
 - **Keep `route` literal.** A computed route cannot be discovered without executing app code and is refused.
 - **Do not annotate the loader with `: PageLoader`.** That erases the return type `PageProps` needs.
 - **Components receive data, not HTTP objects.** `request` and `response` belong to loaders; the component also renders in the browser.
@@ -24233,12 +24429,82 @@ Changed in 5.2: through 5.1 the route table was built once at boot and never aga
 
 ---
 name: load-page-data
-description: 'Load App, Layout, and Page data with `AppLoader`, `LayoutLoader`, and `PageLoader`; type component `data`, validate page input, short-circuit with the buffered response, and publish request-scoped browser-safe values through `shared`. Triggers: `PageLoader`, `LayoutLoader`, `AppLoader`, `PageProps`, `shared`, `useShared`, `validation`, `request.validated`; "load page data", "pass server data to React", "share request data", "redirect from a loader". Skip: page module basics — `@warlock.js/web/create-a-page/SKILL.md`; layouts — `@warlock.js/web/use-layouts/SKILL.md`; mutation follow-up — `@warlock.js/web/navigate-on-the-client/SKILL.md`; competing loaders Next data functions, Remix loaders, React Server Components.'
+description: 'Load App, Layout, and Page data with `AppLoader`, `LayoutLoader`, and `PageLoader`; type component `data`, validate page input, short-circuit with the buffered response, and publish request-scoped browser-safe values through `shared`. Triggers: `PageLoader`, `LayoutLoader`, `AppLoader`, `PageProps`, `shared`, `useShared`, `validation`, `request.validated`, `process.env`, `env("PUBLIC_...")`, `import.meta.env.PUBLIC_`; "load page data", "pass server data to React", "share request data", "redirect from a loader", "read an environment variable in a page", "process.env refused in the client build", "loader execution order", "return a Response from a loader". Skip: page module basics — `@warlock.js/web/create-a-page/SKILL.md`; layouts — `@warlock.js/web/use-layouts/SKILL.md`; mutation follow-up — `@warlock.js/web/navigate-on-the-client/SKILL.md`; competing loaders Next data functions, Remix loaders, React Server Components.'
 ---
 
 # Warlock — load page data
 
 Loaders run on the server and return serializable data to their own component level. Use the level-specific loader type with `satisfies`, then pass `typeof loader` to the matching props type.
+
+## Pass environment values through loader data
+
+**`process.env` is refused outright in the client/universal graph, and there is
+no `PUBLIC_` exception to it — static or computed.** `env("PUBLIC_X")` does not
+work client-side either. **The supported pattern is: read the value in a loader,
+which is server code, and return it as page data.**
+
+```tsx
+import { env } from "@warlock.js/core";
+import type { PageLoader, PageProps } from "@warlock.js/web";
+
+export const loader = (async () => ({
+  siteName: env("PUBLIC_SITE_NAME"),
+})) satisfies PageLoader;
+
+export default function HomePage({ data }: PageProps<typeof loader>) {
+  return <h1>{data.siteName}</h1>;
+}
+```
+
+Loaders are server-only and may read configuration normally. Their return is
+serialized to the browser, so include only values that are safe to expose.
+
+### What is refused, and where
+
+Every one of these fails the build when it is reachable from a default page or
+layout component, `register()`, or any helper they import:
+
+```tsx
+process.env.API_URL; // static key — refused
+process.env.PUBLIC_API_URL; // a PUBLIC_ prefix changes nothing — refused
+process.env[key]; // computed key — refused
+const { API_URL } = process.env; // bare value-read — refused
+const all = { ...process.env }; // bare value-read — refused
+Object.keys(process.env); // bare value-read — refused
+JSON.stringify(process.env); // bare value-read — refused
+env("PUBLIC_API_URL"); // pulls in @warlock.js/core, a server package — refused
+```
+
+Bare value-reads matter as much as keyed ones: `process` does not exist in a
+browser, so referencing the object at all — assigned, destructured, spread, or
+passed as an argument — is already broken, and passing the whole object to a
+component is how a server secret reaches a page in one line.
+
+**Enforcement covers dev SSR as well as the client bundle, and a violation
+fails the build.** It is not a production-only check you can discover late: the
+same refusal fires under `warlock dev`.
+
+Reads inside `loader`, `route`, `middleware`, `validation`, and `metadata` are
+never affected — those exports are stripped before the client graph is formed.
+Server-side code is unrestricted.
+
+### The one client-side escape hatch
+
+If a value genuinely has to be inlined into browser code rather than passed
+through loader data, the supported spelling is `import.meta.env.PUBLIC_*` with a
+**static** key:
+
+```tsx
+export default function HomePage() {
+  return <h1>{import.meta.env.PUBLIC_SITE_NAME}</h1>;
+}
+```
+
+`import.meta.env` is the Vite surface, not Node's, and only the `PUBLIC_` prefix
+(plus Vite's own `MODE`, `DEV`, `PROD`, `BASE_URL`, `SSR`) is allowed through. It
+is inlined at build time, so it cannot vary per request or per deployment of the
+same bundle — which is why loader data remains the default answer, and the only
+one for anything request-scoped.
 
 ## The shape
 
@@ -24289,11 +24555,11 @@ export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
 
 ## Three loader levels
 
-| Module | Contract | Component props |
-| --- | --- | --- |
-| `src/web/root.tsx` | `AppLoader` | `AppProps<typeof loader>` |
+| Module                  | Contract       | Component props              |
+| ----------------------- | -------------- | ---------------------------- |
+| `src/web/root.tsx`      | `AppLoader`    | `AppProps<typeof loader>`    |
 | positional `layout.tsx` | `LayoutLoader` | `LayoutProps<typeof loader>` |
-| `*.page.tsx` | `PageLoader` | `PageProps<typeof loader>` |
+| `*.page.tsx`            | `PageLoader`   | `PageProps<typeof loader>`   |
 
 All receive one context object with `request`, `response`, and `shared`. Page loaders add generics that connect their sibling `validation` and `route` exports to `request.validated()` and `request.input()`.
 
@@ -24308,9 +24574,17 @@ When `validating` is absent or empty, pages validate query + params, with params
 
 `request.validated()` uses the schema's output type, so fields with `.default(...)` are present. `request.input("id")` is narrowed from a literal route path when the loader uses `typeof route`.
 
+## Execution order
+
+Loaders run **sequentially, root to leaf, each one awaited before the next starts**: `root.tsx`'s `AppLoader`, then every matched `LayoutLoader` from outermost to innermost, then the page's `PageLoader`. The runtime has three top-level slots (`app`, `layout`, `page`), but the layout slot composes the full matched layout chain. A page may have only one _rendering_ layout; prefix-, middleware-, and loader-only layouts may still appear at multiple ancestry levels.
+
+**The first core `Response` a loader returns is terminal.** Returning a `Response` object stops the pipeline immediately: no lower loader starts, `metadata` is not resolved, and that response is sent as-is. It is more terminal than a short-circuit — because the response is returned whole, the buffered header/cookie writes made at that same level are discarded along with everything below it. Use `response.redirect()` / `response.notFound()` (which produce a `LoaderShortCircuit`, committing that level's buffer inclusively) when you want your buffered writes to survive; return a raw `Response` only when you mean "this exact response, nothing else."
+
+A loader that **throws** is also terminal: it stops lower loaders, discards its own level's buffer, and commits only the levels above it.
+
 ## Loader response surface
 
-Each loader gets its own buffered response because App, Layout, and Page loaders execute in parallel. The public loader methods are:
+Each loader gets its own buffered response — never the live one — so that a level discarded by a short-circuit or a throw cannot leak half-written headers onto a response it no longer owns. The public loader methods are:
 
 ```ts
 response.header("cache-control", "private, max-age=60");
@@ -24375,7 +24649,7 @@ The request pipeline is:
 
 1. App, layout, and page middleware run outermost first and write `shared`.
 2. `shared` is normalized, checked, and sealed.
-3. App, layout, and page loaders run in parallel and may only read it.
+3. App, layout, and page loaders run in order, root to leaf, and may only read it.
 4. Components receive a readonly snapshot through props or `useShared()`.
 
 Use `useShared()` in a deep component that is not already receiving level props:
@@ -24392,12 +24666,12 @@ export function LocaleLabel() {
 
 Only put browser-safe data in `shared`: scalars, arrays, plain objects, or values with a valid `toJSON()` contract. Functions, `Date`, `Map`, `Set`, and arbitrary class instances are rejected. Prefer a narrow Resource output over a model.
 
-## Parallelism rules
+## Level isolation rules
 
-- App, Layout, and Page loaders cannot read each other's return values.
+- App, Layout, and Page loaders cannot read each other's return values. They run in order, but no channel is provided between them — a lower loader is not handed what an upper one returned. Put anything a lower level needs into `shared` from middleware instead.
 - A loader may read `shared` because middleware completed and it was sealed first.
 - A loader must not write `shared`; a post-seal write throws.
-- Loader response mutations are buffered per level and settled deterministically.
+- Loader response mutations are buffered per level and settled deterministically, root to leaf.
 
 ## Gotchas
 
@@ -24405,7 +24679,9 @@ Only put browser-safe data in `shared`: scalars, arrays, plain objects, or value
 - **Return client-safe data.** Components render again in the browser; models and server handles do not survive the wire.
 - **Write `shared` in middleware only.** Loaders run after the seal.
 - **Required shared keys need unconditional writers.** The type is a promise for every request.
-- **Do not use loader return values as cross-level communication.** The loaders run in parallel.
+- **Do not use loader return values as cross-level communication.** Levels run in order but are not wired to each other; use `shared`, written in middleware.
+- **`404.page.tsx` never runs its own loader.** The not-found page's module is registered and rendered for real — `register()` and its middleware still run — but the page loader is omitted from the request in both dev and production, so a missing URL cannot trigger application data work or fail a second time. Its ancestry contributes nothing either: the 404 page renders with an empty layout chain by construction. **The root `AppLoader` in `root.tsx` still runs** for a 404 request, so keep it cheap and make sure it tolerates a request that matched nothing.
+- **`process.env` is refused in the client/universal graph, with no `PUBLIC_` exception.** Read it in a loader and return it as page data.
 - **Server actions are not supported.** POST to an ordinary Warlock API route and call `refresh()` after success.
 
 ## See also
@@ -24426,7 +24702,7 @@ description: 'Navigate hydrated pages with `<Link>`, resolve named URLs with `hr
 
 `<Link>` renders a real anchor for progressive enhancement and intercepts a plain in-app click after hydration. The server remains the only route matcher; client navigation fetches the page-data representation of the URL and swaps the Layout + Page tree.
 
-Every behaviour on this page requires 5.1 in an installed app. In 5.0.0–5.0.2 no client JavaScript executed at all — `react-dom/client` was served as raw CommonJS and hydration never mounted — so `<Link>` degraded to its underlying anchor and every click was a full page load. See [write-the-root](../write-the-root/SKILL.md#root-is-the-hydration-boundary).
+Every behaviour on this page depends on hydration having mounted. See [write-the-root](../write-the-root/SKILL.md#root-is-the-hydration-boundary).
 
 ## The shape
 
@@ -24694,7 +24970,9 @@ export default function ProductsPage() {
 }
 ```
 
-Recognized asset imports survive the page's client projection. The client boundary is determined by the import graph, not by the file living under `web/`.
+Recognized stylesheet imports survive the page's client projection. The client boundary is determined by the import graph, not by the file living under `web/`.
+
+That support is specific to stylesheets in the production page graph. An imported non-stylesheet asset such as `import logo from "./logo.svg"` works under Vite in development but is refused by `warlock build`. Put it in the application's `public/` directory and reference its root URL instead: `public/logo.svg` is `/logo.svg`.
 
 For each matched handler, Warlock builds one ordered CSS chain: `[root, ...matched layouts, page]`. A stylesheet imported directly by any member of that chain becomes a render-blocking link in the initial document in both development and production. Unrelated pages and layouts do not contribute CSS to this response.
 
@@ -24847,7 +25125,7 @@ Non-rendering layouts may carry prefixes and middleware and may nest freely. Do 
 
 ## `404.page.tsx` never gets a layout
 
-A `404.page.tsx` renders with no layouts, even when it sits in a directory with a rendering `layout.tsx` above it. Discovery reports an empty layout chain for the not-found page only, and both the client hydration registry and the production route table read from that same chain — the server has always rendered it with no layout wrapper, so the client no longer hydrates one either. A page that exists to handle failure must not depend on app chrome that can itself throw or need data.
+A `404.page.tsx` renders with no layouts, even when it sits in a directory with a rendering `layout.tsx` above it. Discovery reports an empty layout chain for the not-found page only, and both the client hydration registry and the production route table read from that same chain — the server renders it with no layout wrapper, and the client hydrates it the same way, with no layout of its own. A page that exists to handle failure must not depend on app chrome that can itself throw or need data.
 
 This is scoped to the not-found page: an ordinary page in the same directory still gets its full layout chain, and nested-layout refusal on the 404's own path is still enforced exactly as it is for any other page.
 
@@ -24861,7 +25139,7 @@ Client navigation rebuilds the Layout + Page element tree at the same `#root` po
 
 ## Loader data
 
-`LayoutLoader` receives the full `PageContext` and its return reaches `LayoutProps<typeof loader>["data"]`. Layout, App, and Page loaders run in parallel; a layout loader cannot read the page loader's result.
+`LayoutLoader` receives the full `PageContext` and its return reaches `LayoutProps<typeof loader>["data"]`. Loaders run sequentially as App, every matched layout from outermost to innermost, then Page. Each loader's return belongs only to its own component, so a layout loader still cannot read another loader's result.
 
 Use `shared` when multiple levels need one request-derived value, and write it in middleware before loaders run. See [load-page-data](../load-page-data/SKILL.md).
 
@@ -24935,8 +25213,6 @@ The browser hydrates `#root`, not the whole document. The client tree deliberate
 
 Because App is outside the hydrated subtree, put client state that must survive navigation in a layout or component beneath `#root`, not in the document root.
 
-**Requires 5.1 in an installed app.** In 5.0.0–5.0.2 the dev server handed the browser `react-dom/client` as raw CommonJS, so `hydrateRoot` was not there as a named export and the hydration entry died on import — no client JavaScript ran at all. The symptoms were a page that server-rendered correctly but had dead `useState`, no HMR, and `<Link>` doing full page loads. The fix pre-bundles React through Vite's `optimizeDeps`. If you are debugging this against a checkout of the framework itself, note that the defect never reproduced there: inside the monorepo the hydration entry resolves outside `node_modules` and React was always optimized normally.
-
 If `root.tsx` (or any module it needs) fails to load or its `register()` throws, there is no trustworthy Layout+Page composition left to hydrate — Warlock falls back to a plain document with no hydration script at all rather than hydrate the browser against markup nothing can vouch for. See [create-a-page](../create-a-page/SKILL.md) for the app's own `error.page.tsx` boundary, which is tried first.
 
 ## `<Head />`
@@ -25004,7 +25280,7 @@ export default function App({ data, children }: AppProps<typeof loader>) {
 }
 ```
 
-The App loader runs in parallel with layout and page loaders. Its return is for the App component; use `shared` for request data that multiple levels need.
+The App loader runs first and is awaited before the outermost layout loader starts; matched layout loaders then run outermost to innermost before the page loader. Its return is for the App component; use `shared` for request data that multiple levels need.
 
 ## Gotchas
 

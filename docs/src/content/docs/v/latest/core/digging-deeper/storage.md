@@ -85,12 +85,12 @@ export default storageOptions;
 
 `default` names the disk that calls go to when no driver is specified. The factories (`storageConfigurations.local|aws|r2|spaces`) just stamp the matching `driver` field on the options — beyond that, every field is forwarded straight to the underlying driver.
 
-| Factory                          | Driver    | Required fields                                                    |
-| -------------------------------- | --------- | ------------------------------------------------------------------ |
-| `storageConfigurations.local()`  | `local`   | `root` (filesystem path), optional `urlPrefix` for public URLs     |
-| `storageConfigurations.aws()`    | `s3`      | `accessKeyId`, `secretAccessKey`, `region`, `bucket`               |
-| `storageConfigurations.r2()`     | `r2`      | `accessKeyId`, `secretAccessKey`, `bucket`, `accountId`            |
-| `storageConfigurations.spaces()` | `spaces`  | `accessKeyId`, `secretAccessKey`, `region`, `bucket`, `endpoint`   |
+| Factory                          | Driver   | Required fields                                                  |
+| -------------------------------- | -------- | ---------------------------------------------------------------- |
+| `storageConfigurations.local()`  | `local`  | `root` (filesystem path), optional `urlPrefix` for public URLs   |
+| `storageConfigurations.aws()`    | `s3`     | `accessKeyId`, `secretAccessKey`, `region`, `bucket`             |
+| `storageConfigurations.r2()`     | `r2`     | `accessKeyId`, `secretAccessKey`, `bucket`, `accountId`          |
+| `storageConfigurations.spaces()` | `spaces` | `accessKeyId`, `secretAccessKey`, `region`, `bucket`, `endpoint` |
 
 Cloud factories accept any S3-compatible option in addition to the required fields — `endpoint` for custom S3-API hosts, `prefix` for an auto-prepended key prefix, `retry` for backoff config.
 
@@ -103,7 +103,7 @@ const storageOptions: StorageConfigurations = {
   default: env("STORAGE_DRIVER", "local"),
   drivers: {
     local: storageConfigurations.local({ root: storagePath(), urlPrefix: "/uploads" }),
-    r2: storageConfigurations.r2({ /* ... */ }),
+    r2: storageConfigurations.r2({/* ... */}),
   },
 };
 ```
@@ -117,10 +117,10 @@ import { storage } from "@warlock.js/core";
 
 const file = await storage.put(buffer, "uploads/photo.jpg");
 
-console.log(file.url);     // "/uploads/uploads/photo.jpg" or full https URL on cloud
-console.log(file.name);    // "photo.jpg"
-console.log(file.path);    // "uploads/photo.jpg"
-console.log(file.hash);    // sha256:abc123...
+console.log(file.url); // "/uploads/uploads/photo.jpg" or full https URL on cloud
+console.log(file.name); // "photo.jpg"
+console.log(file.path); // "uploads/photo.jpg"
+console.log(file.hash); // sha256:abc123...
 ```
 
 That's the entire surface for the common case. `storage.put(...)` writes to the default driver and returns a `StorageFile`. Persist `file.path` to your DB and you can rebuild a `StorageFile` later with `storage.file(path)`.
@@ -151,10 +151,7 @@ await storage.putStream(createReadStream("./video.mp4"), "uploads/video.mp4");
 await storage.putFromUrl("https://example.com/image.jpg", "uploads/image.jpg");
 
 // From a base64 data URL — MIME extracted from the prefix automatically
-await storage.putFromBase64(
-  "data:image/png;base64,iVBORw0KGgo...",
-  "uploads/photo.png",
-);
+await storage.putFromBase64("data:image/png;base64,iVBORw0KGgo...", "uploads/photo.png");
 
 // From a multipart UploadedFile — pull from `request.file()` / `request.validated()`
 await storage.put(request.file("avatar"), `avatars/${userId}.jpg`);
@@ -166,11 +163,11 @@ For uploads, the usual pattern is `UploadedFile.save(directory, options?)` — t
 
 ```ts
 type PutOptions = {
-  mimeType?: string;              // Override the guessed MIME
-  metadata?: Record<string, string>;  // Custom metadata — cloud drivers only
-  cacheControl?: string;          // Cache-Control header — cloud drivers only
-  contentDisposition?: string;    // Content-Disposition header — cloud drivers only
-  visibility?: "public" | "private";  // Cloud drivers only
+  mimeType?: string; // Override the guessed MIME
+  metadata?: Record<string, string>; // Custom metadata — cloud drivers only
+  cacheControl?: string; // Cache-Control header — cloud drivers only
+  contentDisposition?: string; // Content-Disposition header — cloud drivers only
+  visibility?: "public" | "private"; // Cloud drivers only
 };
 ```
 
@@ -237,7 +234,7 @@ await storage.deleteDirectory("uploads/temp");
 // Upload an entire local directory tree into storage
 const result = await storage.putDirectory("./public/assets", "cdn/assets", {
   concurrency: 10,
-  filter: (_, relative) => !relative.startsWith("."),     // skip dotfiles
+  filter: (_, relative) => !relative.startsWith("."), // skip dotfiles
   onProgress: (done, total) => console.log(`${done}/${total}`),
 });
 // → { uploaded: StorageFile[], failed: { localPath, error }[], total }
@@ -251,7 +248,7 @@ const result = await storage.putDirectory("./public/assets", "cdn/assets", {
 const files = await storage.list("uploads", {
   recursive: true,
   limit: 100,
-  cursor: previousResponse.cursor,    // for pagination
+  cursor: previousResponse.cursor, // for pagination
 });
 
 // → StorageFileInfo[] — [{ path, name, size, isDirectory, lastModified?, mimeType?, etag? }]
@@ -284,8 +281,8 @@ For a single call against a non-default driver, scope to it:
 const r2File = await storage.use("r2").put(buffer, "exports/data.csv");
 const localFile = await storage.use("local").put(buffer, "tmp/preview.jpg");
 
-console.log(r2File.url);     // https://...
-console.log(localFile.url);  // /uploads/...
+console.log(r2File.url); // https://...
+console.log(localFile.url); // /uploads/...
 ```
 
 `storage.use(name)` returns a `ScopedStorage` view with the same surface — `put`, `get`, `delete`, `copy`, `move`, `list`, everything. Use it when you want one call to route somewhere other than the default without flipping the global default.
@@ -302,27 +299,27 @@ const file = storage.file("uploads/photo.jpg");
 
 ### Sync properties (no I/O)
 
-| Property         | Description                                            |
-| ---------------- | ------------------------------------------------------ |
-| `file.path`      | full storage path (`"uploads/photo.jpg"`)              |
-| `file.name`      | basename (`"photo.jpg"`)                               |
-| `file.extension` | lowercased extension, no dot (`"jpg"`)                 |
-| `file.directory` | parent directory                                       |
-| `file.driver`    | driver name (`"local"` / `"s3"` / `"r2"` / `"spaces"`) |
-| `file.url`       | public URL (uses cached value when available)          |
-| `file.hash`      | sha256, set by `put*` operations                       |
-| `file.absolutePath` | filesystem path — local driver only, else `undefined` |
-| `file.isDeleted` | `true` after `file.delete()`                           |
+| Property            | Description                                            |
+| ------------------- | ------------------------------------------------------ |
+| `file.path`         | full storage path (`"uploads/photo.jpg"`)              |
+| `file.name`         | basename (`"photo.jpg"`)                               |
+| `file.extension`    | lowercased extension, no dot (`"jpg"`)                 |
+| `file.directory`    | parent directory                                       |
+| `file.driver`       | driver name (`"local"` / `"s3"` / `"r2"` / `"spaces"`) |
+| `file.url`          | public URL (uses cached value when available)          |
+| `file.hash`         | sha256, set by `put*` operations                       |
+| `file.absolutePath` | filesystem path — local driver only, else `undefined`  |
+| `file.isDeleted`    | `true` after `file.delete()`                           |
 
 ### Async data
 
 ```ts
-await file.data();         // full StorageFileData — size, mimeType, url, hash, driver
+await file.data(); // full StorageFileData — size, mimeType, url, hash, driver
 await file.size();
 await file.mimeType();
 await file.lastModified();
-await file.etag();         // cloud only — undefined for local
-await file.metadata();     // StorageFileInfo — info object the driver returns from HEAD
+await file.etag(); // cloud only — undefined for local
+await file.metadata(); // StorageFileInfo — info object the driver returns from HEAD
 ```
 
 ### Content reads
@@ -330,32 +327,32 @@ await file.metadata();     // StorageFileInfo — info object the driver returns
 ```ts
 const buffer = await file.contents();
 const stream = await file.stream();
-const text = await file.text();           // utf-8
+const text = await file.text(); // utf-8
 const base64 = await file.base64();
-const dataUrl = await file.dataUrl();     // "data:image/jpeg;base64,..."
+const dataUrl = await file.dataUrl(); // "data:image/jpeg;base64,..."
 ```
 
 ### Operations
 
 ```ts
-await file.copy("backups/photo.jpg");      // → new StorageFile pointing at the copy
-await file.move("archive/photo.jpg");      // → this instance, with updated path
-await file.rename("photo-v2.jpg");         // → this instance, moved within same directory
-await file.delete();                        // marks `isDeleted = true`
-await file.exists();                        // boolean
-await file.temporaryUrl(3600);             // signed URL for this specific file
+await file.copy("backups/photo.jpg"); // → new StorageFile pointing at the copy
+await file.move("archive/photo.jpg"); // → this instance, with updated path
+await file.rename("photo-v2.jpg"); // → this instance, moved within same directory
+await file.delete(); // marks `isDeleted = true`
+await file.exists(); // boolean
+await file.temporaryUrl(3600); // signed URL for this specific file
 ```
 
 ### Type guards
 
 ```ts
-await file.isImage();    // mimeType.startsWith("image/")
-await file.isPdf();      // application/pdf
+await file.isImage(); // mimeType.startsWith("image/")
+await file.isPdf(); // application/pdf
 await file.isDocument(); // application/*
-await file.isExcel();    // openxml spreadsheet OR vnd.ms-excel
-await file.isDoc();      // msword OR openxml wordprocessingml
-await file.isAudio();    // audio/*
-await file.isVideo();    // video/*
+await file.isExcel(); // openxml spreadsheet OR vnd.ms-excel
+await file.isDoc(); // msword OR openxml wordprocessingml
+await file.isAudio(); // audio/*
+await file.isVideo(); // video/*
 ```
 
 Useful for routing logic — `if (await file.isImage()) { thumbnail = await new Image(buffer).resize(...).toBuffer(); }`.
@@ -371,19 +368,16 @@ For direct browser-to-cloud uploads and downloads — the server hands the clien
 ```ts
 // Download URL — client GETs the file directly
 const downloadUrl = await storage.use("r2").getPresignedUrl("private/doc.pdf", {
-  expiresIn: 3600,   // seconds
+  expiresIn: 3600, // seconds
 });
 
 // Upload URL — client PUTs bytes directly
-const uploadUrl = await storage.use("r2").getPresignedUploadUrl(
-  `uploads/${userId}/${filename}`,
-  {
-    expiresIn: 3600,
-    contentType: "application/pdf",
-    maxSize: 50 * 1024 * 1024,
-    metadata: { uploadedBy: userId },
-  },
-);
+const uploadUrl = await storage.use("r2").getPresignedUploadUrl(`uploads/${userId}/${filename}`, {
+  expiresIn: 3600,
+  contentType: "application/pdf",
+  maxSize: 50 * 1024 * 1024,
+  metadata: { uploadedBy: userId },
+});
 
 return response.success({ uploadUrl });
 ```
@@ -492,16 +486,16 @@ storage.on("afterDelete", ({ location, driver }) => {
 
 The full event list:
 
-| Event          | Fires                                            |
-| -------------- | ------------------------------------------------ |
-| `beforePut`    | Before write                                     |
-| `afterPut`     | After successful write                           |
-| `beforeDelete` | Before delete                                    |
-| `afterDelete`  | After delete                                     |
-| `beforeCopy`   | Before copy                                      |
-| `afterCopy`    | After copy                                       |
-| `beforeMove`   | Before move                                      |
-| `afterMove`    | After move                                       |
+| Event          | Fires                  |
+| -------------- | ---------------------- |
+| `beforePut`    | Before write           |
+| `afterPut`     | After successful write |
+| `beforeDelete` | Before delete          |
+| `afterDelete`  | After delete           |
+| `beforeCopy`   | Before copy            |
+| `afterCopy`    | After copy             |
+| `beforeMove`   | Before move            |
+| `afterMove`    | After move             |
 
 Event handlers receive a typed payload — `{ driver, location, timestamp }` plus event-specific extras (`file` on the after-events, `from`/`to` on copy/move). Subscribe in `src/app/<module>/main.ts` if the listener is module-specific, or in a top-level `main.ts` for global handlers.
 
@@ -522,10 +516,10 @@ const file = await storage.put(buffer, `avatars/${userId}.jpg`);
 ### Uploading a request file
 
 ```ts title="src/app/uploads/controllers/upload-avatar.controller.ts"
-import type { RequestHandler, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 import { storage } from "@warlock.js/core";
 
-export const uploadAvatarController: RequestHandler = async (request, response: Response) => {
+export const uploadAvatarController: RequestHandler = async ({ request, response }) => {
   const upload = request.file("avatar")!;
   const file = await storage.put(upload, `avatars/${request.user!.uuid}/${upload.fileName}`);
 
@@ -547,10 +541,12 @@ The classic large-file pattern. Server returns a signed URL; client uploads dire
 import { storage } from "@warlock.js/core";
 
 export async function issueUploadUrlService(userId: string, filename: string, mimeType: string) {
-  const uploadUrl = await storage.use("r2").getPresignedUploadUrl(
-    `uploads/${userId}/${filename}`,
-    { expiresIn: 600, contentType: mimeType },
-  );
+  const uploadUrl = await storage
+    .use("r2")
+    .getPresignedUploadUrl(`uploads/${userId}/${filename}`, {
+      expiresIn: 600,
+      contentType: mimeType,
+    });
 
   return { uploadUrl, key: `uploads/${userId}/${filename}` };
 }

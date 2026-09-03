@@ -74,7 +74,7 @@ SELECT id, name, deletedAt FROM products WHERE id = 5;
 --  5 | Old Hoodie | 2026-05-22 10:00:00
 ```
 
-A query like `Product.find(5)` still returns it — Cascade does *not* automatically hide soft-deleted rows. Hiding is a domain decision (sometimes you want them; the trash view is the whole point of this recipe), so you opt in with a global scope.
+A query like `Product.find(5)` still returns it — Cascade does _not_ automatically hide soft-deleted rows. Hiding is a domain decision (sometimes you want them; the trash view is the whole point of this recipe), so you opt in with a global scope.
 
 ## Step 2 — Hide soft-deleted rows from normal queries
 
@@ -91,8 +91,8 @@ Product.addGlobalScope("notDeleted", (query) => {
 `main.ts` is auto-loaded by the framework once at boot — the perfect place for one-time model setup. Now:
 
 ```ts
-await Product.find(5);              // null — hidden by the scope
-await Product.where("status", "active").get();  // never includes soft-deleted
+await Product.find(5); // null — hidden by the scope
+await Product.where("status", "active").get(); // never includes soft-deleted
 ```
 
 The scope **fails open**: when there's no `deletedAt` column on a row at all (a new model that hasn't been deleted), `whereNull("deletedAt")` matches and the row is included. That's what you want.
@@ -148,13 +148,13 @@ router.restfulResource("/products", productsRestful);
 
 That registers:
 
-| Method | Path             | Action                                                      |
-| ------ | ---------------- | ----------------------------------------------------------- |
-| GET    | `/products`      | list — global scope hides soft-deleted rows                 |
-| GET    | `/products/:id`  | show — returns 404 for soft-deleted rows (scope hides them) |
-| POST   | `/products`      | create                                                      |
-| PUT    | `/products/:id`  | update                                                      |
-| DELETE | `/products/:id`  | delete — runs the soft-delete strategy                      |
+| Method | Path            | Action                                                      |
+| ------ | --------------- | ----------------------------------------------------------- |
+| GET    | `/products`     | list — global scope hides soft-deleted rows                 |
+| GET    | `/products/:id` | show — returns 404 for soft-deleted rows (scope hides them) |
+| POST   | `/products`     | create                                                      |
+| PUT    | `/products/:id` | update                                                      |
+| DELETE | `/products/:id` | delete — runs the soft-delete strategy                      |
 
 `record.destroy()` inside `Restful.delete(...)` reads the model's static `deleteStrategy = "soft"` and writes the timestamp instead of removing the row. No code changes in `Restful` — the strategy is a property of the model, the action just delegates.
 
@@ -165,11 +165,11 @@ For the full `Restful` surface (lifecycle hooks, middleware, return shapes), see
 Admins should see soft-deleted rows. The endpoint bypasses the global scope and filters for `deletedAt IS NOT NULL`:
 
 ```ts title="src/app/products/controllers/list-trashed-products.controller.ts"
-import type { RequestHandler, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 import { Product } from "../models/product/product.model";
 import { ProductResource } from "../resources/product.resource";
 
-export const listTrashedProductsController: RequestHandler = async (request, response: Response) => {
+export const listTrashedProductsController: RequestHandler = async ({ request, response }) => {
   const trashed = await Product.query()
     .withoutGlobalScope("notDeleted")
     .whereNotNull("deletedAt")
@@ -220,11 +220,11 @@ If the gate fails, the request never reaches your handler — `authMiddleware` r
 Cascade ships a `Model.restore(id)` static that clears the soft-delete timestamp:
 
 ```ts title="src/app/products/controllers/restore-product.controller.ts"
-import { t, type RequestHandler, type Response } from "@warlock.js/core";
+import { t, type RequestHandler } from "@warlock.js/core";
 import { Product } from "../models/product/product.model";
 import { ProductResource } from "../resources/product.resource";
 
-export const restoreProductController: RequestHandler = async (request, response: Response) => {
+export const restoreProductController: RequestHandler = async ({ request, response }) => {
   const id = request.input("id");
 
   try {
@@ -251,8 +251,8 @@ For the `"soft"` strategy, that clears the `deletedAt` column and returns the li
 
 ```ts
 await Product.restore(id, {
-  onIdConflict: "fail",   // or "assignNew" (default) for trash strategy
-  skipEvents: true,       // suppress the restoring/restored model events
+  onIdConflict: "fail", // or "assignNew" (default) for trash strategy
+  skipEvents: true, // suppress the restoring/restored model events
 });
 ```
 
@@ -285,13 +285,10 @@ router.restfulResource("/products", productsRestful);
 The model is configured for soft delete by default. To hard-delete (the GDPR case, or a "we are definitely sure now" admin action), pass `strategy: "permanent"` per call:
 
 ```ts title="src/app/products/controllers/permanently-delete-product.controller.ts"
-import { t, type RequestHandler, type Response } from "@warlock.js/core";
+import { t, type RequestHandler } from "@warlock.js/core";
 import { Product } from "../models/product/product.model";
 
-export const permanentlyDeleteProductController: RequestHandler = async (
-  request,
-  response: Response,
-) => {
+export const permanentlyDeleteProductController: RequestHandler = async ({ request, response }) => {
   const product = await Product.query()
     .withoutGlobalScope("notDeleted")
     .where("id", request.input("id"))
@@ -347,11 +344,11 @@ Five lines for the admin endpoints, one line for the Restful resource. The route
 
 A quick decision guide for the three Cascade delete strategies:
 
-| Strategy        | What `.destroy()` does                       | Reach for                                                |
-| --------------- | -------------------------------------------- | -------------------------------------------------------- |
-| `"permanent"`   | Row gone. SQL `DELETE`. Default.             | Audit logs, ephemeral session data, expired tokens       |
-| `"soft"`        | `UPDATE ... SET deletedAt = NOW()`           | Restorable rows that live in the same table              |
-| `"trash"`       | Copy to `{table}Trash`, then `DELETE` original | Lean live table, separate trash, GDPR-style separation   |
+| Strategy      | What `.destroy()` does                         | Reach for                                              |
+| ------------- | ---------------------------------------------- | ------------------------------------------------------ |
+| `"permanent"` | Row gone. SQL `DELETE`. Default.               | Audit logs, ephemeral session data, expired tokens     |
+| `"soft"`      | `UPDATE ... SET deletedAt = NOW()`             | Restorable rows that live in the same table            |
+| `"trash"`     | Copy to `{table}Trash`, then `DELETE` original | Lean live table, separate trash, GDPR-style separation |
 
 This recipe uses `"soft"` because:
 
@@ -406,7 +403,7 @@ A model configured for permanent delete can still be soft-deleted by passing `st
 await oldUser.destroy({ strategy: "soft" });
 ```
 
-The model static is the *default*. The per-call argument wins when present. Useful for one-off GDPR hard-deletes that bypass the normal soft-delete pipeline.
+The model static is the _default_. The per-call argument wins when present. Useful for one-off GDPR hard-deletes that bypass the normal soft-delete pipeline.
 
 ## Gotchas
 

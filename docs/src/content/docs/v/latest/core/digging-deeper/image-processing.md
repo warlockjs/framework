@@ -42,16 +42,10 @@ This matters because:
 import { Image } from "@warlock.js/core";
 
 // Single await at the end — everything in between is sync
-await new Image("photo.jpg")
-  .resize({ width: 800 })
-  .quality(85)
-  .format("webp")
-  .save("photo.webp");
+await new Image("photo.jpg").resize({ width: 800 }).quality(85).format("webp").save("photo.webp");
 
 // Or to a Buffer:
-const thumb = await new Image(buffer)
-  .resize({ width: 200, height: 200, fit: "cover" })
-  .toBuffer();
+const thumb = await new Image(buffer).resize({ width: 200, height: 200, fit: "cover" }).toBuffer();
 ```
 
 Constructor accepts a string path, a `Buffer`, a `Uint8Array`, an `ArrayBuffer`, or an existing `sharp.Sharp` instance. Cloud-friendly: read from `storage`, transform, write back.
@@ -69,12 +63,12 @@ await storage.put(thumb, "thumbnails/photo.jpg");
 Three ways to start an `Image`:
 
 ```ts
-new Image("path/to/file.jpg");        // from filesystem path
-new Image(buffer);                     // from Buffer
+new Image("path/to/file.jpg"); // from filesystem path
+new Image(buffer); // from Buffer
 
-Image.fromFile("path/to/file.jpg");    // static, same as the path constructor
-Image.fromBuffer(buffer);              // static, same as the buffer constructor
-await Image.fromUrl("https://example.com/photo.jpg");   // download via @mongez/http
+Image.fromFile("path/to/file.jpg"); // static, same as the path constructor
+Image.fromBuffer(buffer); // static, same as the buffer constructor
+await Image.fromUrl("https://example.com/photo.jpg"); // download via @mongez/http
 ```
 
 `fromUrl` downloads the bytes with `@mongez/http` (`responseType: "arrayBuffer"`) and returns a fresh `Image`; it throws if the request errors or comes back empty. The `Buffer` and path constructors are synchronous — `fromUrl` is async because of the download.
@@ -86,13 +80,13 @@ Every transform method returns `this`. None of them touch the image until the pi
 ### Resize
 
 ```ts
-image.resize({ width: 800 });                    // by width, height auto
-image.resize({ height: 600 });                   // by height, width auto
-image.resize({ width: 800, height: 600 });       // both — uses sharp's default fit ("cover")
-image.resize({ width: 800, height: 600, fit: "cover" });    // crop to fill
-image.resize({ width: 800, height: 600, fit: "contain" });  // letterbox to fit
-image.resize({ width: 800, height: 600, fit: "inside" });   // never enlarge, fit within
-image.resize({ width: 800, height: 600, fit: "outside" });  // cover from outside
+image.resize({ width: 800 }); // by width, height auto
+image.resize({ height: 600 }); // by height, width auto
+image.resize({ width: 800, height: 600 }); // both — uses sharp's default fit ("cover")
+image.resize({ width: 800, height: 600, fit: "cover" }); // crop to fill
+image.resize({ width: 800, height: 600, fit: "contain" }); // letterbox to fit
+image.resize({ width: 800, height: 600, fit: "inside" }); // never enlarge, fit within
+image.resize({ width: 800, height: 600, fit: "outside" }); // cover from outside
 ```
 
 `fit` values come from sharp — `cover` (default), `contain`, `fill`, `inside`, `outside`. Use `cover` for thumbnails (crop to square), `contain` to preserve the whole image with letterboxing.
@@ -108,9 +102,9 @@ image.crop({ left: 100, top: 50, width: 400, height: 300 });
 ### Rotate, flip, flop
 
 ```ts
-image.rotate(90);     // degrees clockwise
-image.flip();          // vertical flip (top to bottom)
-image.flop();          // horizontal flip (left to right)
+image.rotate(90); // degrees clockwise
+image.flip(); // vertical flip (top to bottom)
+image.flop(); // horizontal flip (left to right)
 ```
 
 `rotate(0)` is a no-op; sharp also auto-rotates based on EXIF orientation if you call `rotate()` with no angle (warlock's API requires an angle, though — call sharp directly via `image.image.rotate()` if you need EXIF auto-rotation).
@@ -118,15 +112,15 @@ image.flop();          // horizontal flip (left to right)
 ### Effects
 
 ```ts
-image.blur(2);                   // sigma — minimum 0.3, higher = blurrier
-image.sharpen();                 // default sharp parameters
+image.blur(2); // sigma — minimum 0.3, higher = blurrier
+image.sharpen(); // default sharp parameters
 image.sharpen({ sigma: 1.5 });
-image.blackAndWhite();           // grayscale via "b-w" colourspace
-image.grayscale();               // alias for blackAndWhite
-image.negate();                  // invert colors
-image.tint({ r: 255, g: 100, b: 50 });   // overlay tint
-image.trim();                    // trim solid-color borders
-image.opacity(50);               // 0–100 percent
+image.blackAndWhite(); // grayscale via "b-w" colourspace
+image.grayscale(); // alias for blackAndWhite
+image.negate(); // invert colors
+image.tint({ r: 255, g: 100, b: 50 }); // overlay tint
+image.trim(); // trim solid-color borders
+image.opacity(50); // 0–100 percent
 ```
 
 `opacity` is implemented via a composite with an alpha pixel — useful for layering watermarks at half-strength.
@@ -134,8 +128,8 @@ image.opacity(50);               // 0–100 percent
 ### Format and quality
 
 ```ts
-image.format("webp");      // jpeg, png, webp, avif, tiff, gif, heif
-image.quality(85);          // 1–100, applies based on final format
+image.format("webp"); // jpeg, png, webp, avif, tiff, gif, heif
+image.quality(85); // 1–100, applies based on final format
 ```
 
 Quality semantics depend on the format:
@@ -151,13 +145,13 @@ If you don't call `.format(...)`, the output preserves the original format and a
 Composite another image (a logo, a brand mark, a "PREVIEW" stamp) on top:
 
 ```ts
-image.watermark("logo.png", { gravity: "southeast" });    // bottom-right
+image.watermark("logo.png", { gravity: "southeast" }); // bottom-right
 image.watermark(logoBuffer, {
   gravity: "northwest",
   top: 20,
   left: 20,
 });
-image.watermark(anotherImage, { blend: "over" });   // Image instance also valid
+image.watermark(anotherImage, { blend: "over" }); // Image instance also valid
 ```
 
 The second argument is sharp's `OverlayOptions` — `gravity`, `top`, `left`, `blend`, `tile`, `premultiplied`, etc.
@@ -197,10 +191,10 @@ The pipeline runs once, on the first output call. Multiple output calls on the s
 ```ts
 const image = new Image(buffer).resize({ width: 800 }).quality(85);
 
-await image.save("photo.jpg");        // → sharp.OutputInfo { format, width, height, size, ... }
-const buf = await image.toBuffer();    // → Buffer
-const b64 = await image.toBase64();    // → string (base64-encoded)
-const url = await image.toDataUrl();   // → "data:image/jpeg;base64,..."
+await image.save("photo.jpg"); // → sharp.OutputInfo { format, width, height, size, ... }
+const buf = await image.toBuffer(); // → Buffer
+const b64 = await image.toBase64(); // → string (base64-encoded)
+const url = await image.toDataUrl(); // → "data:image/jpeg;base64,..."
 
 // Convenience: save as WebP regardless of input format
 await image.saveAsWebp("photo.webp");
@@ -294,20 +288,11 @@ export async function generateThumbnailsService(file: StorageFile) {
 A real example from the reference codebase — the upload-serving controller resizes based on `?h=`, `?w=`, `?q=` query params and caches the result:
 
 ```ts title="src/app/uploads/controllers/get-public-upload.controller.ts"
-import {
-  Image,
-  storagePath,
-  type Request,
-  type RequestHandler,
-  type Response,
-} from "@warlock.js/core";
+import { Image, storagePath, type RequestHandler } from "@warlock.js/core";
 import { fileExistsAsync } from "@mongez/fs";
 import { getUploadServiceByPath } from "../services/get-upload.service";
 
-export const getPublicUploadController: RequestHandler = async (
-  request: Request,
-  response: Response,
-) => {
+export const getPublicUploadController: RequestHandler = async ({ request, response }) => {
   const upload = await getUploadServiceByPath(request.input("*"));
 
   if (request.input("h") || request.input("w") || request.input("q")) {

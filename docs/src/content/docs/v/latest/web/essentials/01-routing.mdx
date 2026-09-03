@@ -27,7 +27,10 @@ The rules are:
 - Every directory and non-index filename contributes a path segment.
 - A plain `[id]` directory or filename becomes a whole-segment `:id` parameter.
 - A `(group)` directory contributes nothing to the path or route name; it only
-  organizes files.
+  organizes files. Bracket syntax inside a group name is a boot-time error
+  because a group can never contribute a dynamic segment. Write
+  `(marketing)/[id]/page.page.tsx`, not
+  `(marketing[id])/page.page.tsx`.
 - The route name is the dotted sequence of contributing segments.
 
 ## Explicit routes
@@ -59,6 +62,37 @@ are refused.
 Two pages that resolve to the same effective path or name fail discovery and
 name both files, instead of leaving one page silently unreachable.
 
+## Cache public pages explicitly
+
+Page documents and their `x-warlock-data` representations are `no-store` by
+default. Opt a public page into shared caching on its route:
+
+```tsx title="src/web/products/index.page.tsx"
+export const route = {
+  path: "/products",
+  name: "products.index",
+  cache: { public: true, maxAge: 60 },
+} as const;
+```
+
+`maxAge` is seconds. Both keys are required:
+`cache: { public: true }` fails at boot with
+`InvalidPageCacheOptInError` because Warlock will not guess a freshness
+window. Remove `cache` entirely to keep the safe default.
+
+The declaration is an opt-in, not permission to cache every response:
+
+| Request or response state                                             | Final `Cache-Control`      |
+| --------------------------------------------------------------------- | -------------------------- |
+| No `cache` declaration                                                | `no-store`                 |
+| Opted in, provably unauthenticated, no cookie written                 | `public, max-age=<maxAge>` |
+| Authenticated state was used, or the response sets or clears a cookie | `private, no-store`        |
+| Warlock cannot determine whether authenticated state was used         | `no-store`                 |
+
+The final decision is applied once after loaders finish, to both the document
+and data response. A loader cannot bypass it by setting `Cache-Control`
+manually.
+
 ## Page-route grammar
 
 Page routes support static segments, whole-segment parameters, the exact `*`
@@ -68,6 +102,11 @@ They do not support regex parameters, optional parameters, multiple parameters
 inside one segment, parameters mixed with text, doubled or trailing slashes,
 or a non-terminal wildcard. Write two pages for an optional segment and
 validate constrained values in the loader.
+
+An unsupported declared path fails at boot with
+`PageRoutePathNotSupportedError`; Warlock does not normalize it or register
+it literally. Rejected examples include `/users/:id?`,
+`/users/:id(\\d+)`, `/near/:lat-:lng`, `/a//b`, and `/users/`.
 
 ## Catch-all filenames are not supported
 
@@ -81,6 +120,7 @@ both the page and rejected segment:
 ```text
 "docs/[...slug].page.tsx" contains the filesystem segment "[...slug]", which is not supported: Segment "[...slug]" is a catch-all pattern, which page routes do not support — page routes support only a whole-segment param such as "[id]", not a catch-all. Page routes support a plain static segment or a whole-segment dynamic param such as "[id]".
 ```
+
 :::
 
 Use an explicit terminal wildcard instead:

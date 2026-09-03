@@ -73,13 +73,13 @@ export default cacheConfigurations;
 
 Pick the driver that matches your deployment:
 
-| Driver             | When                                                                   |
-| ------------------ | ---------------------------------------------------------------------- |
-| `memory`           | Single-process dev. Cache dies on restart. Default for getting started |
-| `memoryExtended`   | Single-process with eviction + tagging. Sane local default              |
-| `redis`            | Production. Shared across processes, survives restarts                 |
-| `file`             | Edge cases — read-mostly data on a single host, no Redis available     |
-| `database`         | When you already have the DB and don't want a new dependency           |
+| Driver           | When                                                                   |
+| ---------------- | ---------------------------------------------------------------------- |
+| `memory`         | Single-process dev. Cache dies on restart. Default for getting started |
+| `memoryExtended` | Single-process with eviction + tagging. Sane local default             |
+| `redis`          | Production. Shared across processes, survives restarts                 |
+| `file`           | Edge cases — read-mostly data on a single host, no Redis available     |
+| `database`       | When you already have the DB and don't want a new dependency           |
 
 The `default` field picks which driver every cache call uses unless you override per-call. For local dev, `memoryExtended` is fine. For production with multiple worker processes (or even one — sticky to losing cache on every deploy), use `redis`.
 
@@ -273,22 +273,18 @@ cache.remember(key, ttl, callback);
 
 ### When `remember` beats `listCached`
 
-| Situation                                                    | Reach for         |
-| ------------------------------------------------------------ | ----------------- |
-| Standard repository list with filters                        | `listCached`      |
-| Derived statistic (counts, aggregates)                       | `cache.remember`  |
-| Result of an external API call                               | `cache.remember`  |
-| Tagged invalidation (clear by category, not by repo)         | `cache.remember` + `cache.remove` |
-| Per-user data that shouldn't share across users              | `cache.remember` with user id in the key |
+| Situation                                            | Reach for                                |
+| ---------------------------------------------------- | ---------------------------------------- |
+| Standard repository list with filters                | `listCached`                             |
+| Derived statistic (counts, aggregates)               | `cache.remember`                         |
+| Result of an external API call                       | `cache.remember`                         |
+| Tagged invalidation (clear by category, not by repo) | `cache.remember` + `cache.remove`        |
+| Per-user data that shouldn't share across users      | `cache.remember` with user id in the key |
 
 For the per-user case:
 
 ```ts
-return cache.remember(
-  `user.${userId}.preferences`,
-  "1h",
-  () => loadUserPreferences(userId),
-);
+return cache.remember(`user.${userId}.preferences`, "1h", () => loadUserPreferences(userId));
 ```
 
 The user id in the key makes each user's cache independent. Don't try to do this with `listCached` — the repository cache key is per-filter, not per-user; you'd need filter-keyed slicing the framework doesn't give you.
@@ -311,11 +307,9 @@ Before you call it done, prove the win. The framework's `measure` helper times a
 ```ts
 import { measure } from "@warlock.js/core";
 
-const result = await measure(
-  "products.list",
-  () => listProductsService({ status: "active" }),
-  { latencyRange: { excellent: 50, poor: 300 } },
-);
+const result = await measure("products.list", () => listProductsService({ status: "active" }), {
+  latencyRange: { excellent: 50, poor: 300 },
+});
 
 console.log(`latency: ${result.latency}ms — ${result.state}`);
 // First call (cache miss):  latency: 180ms — good
@@ -325,7 +319,7 @@ console.log(`latency: ${result.latency}ms — ${result.state}`);
 The shape:
 
 ```ts
-measure(name, callback, { latencyRange: { excellent, poor } })
+measure(name, callback, { latencyRange: { excellent, poor } });
 ```
 
 `name` is a label that shows up in your observability — `"products.list"` is a sensible default. `latencyRange.excellent` and `latencyRange.poor` are thresholds in milliseconds. The `state` field comes back as `"excellent"` (≤ excellent), `"good"` (between), or `"poor"` (> poor). The numbers are yours to set — what counts as "excellent" for a list endpoint is your call. 50ms is a reasonable bar for a cache hit; 300ms is a reasonable warning line.
@@ -394,11 +388,11 @@ export async function listProductsService(filter: ProductListOptions) {
 ```
 
 ```ts title="src/app/products/controllers/list-products.controller.ts"
-import type { RequestHandler, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 import { listProductsService } from "../services/list-products.service";
 import { ProductResource } from "../resources/product.resource";
 
-export const listProductsController: RequestHandler = async (request, response: Response) => {
+export const listProductsController: RequestHandler = async ({ request, response }) => {
   const { data, pagination } = await listProductsService({
     search: request.input("search"),
     category_id: request.input("category_id"),

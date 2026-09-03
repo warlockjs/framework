@@ -13,9 +13,9 @@ The thin-controller rule is the most load-bearing convention in the framework. O
 ## The shape
 
 ```ts title="src/app/products/controllers/list-products.controller.ts"
-import type { RequestHandler, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 
-export const listProductsController: RequestHandler = async (request, response: Response) => {
+export const listProductsController: RequestHandler = async ({ request, response }) => {
   // …pull inputs, call work, return
   return response.success({ products: [] });
 };
@@ -24,8 +24,9 @@ export const listProductsController: RequestHandler = async (request, response: 
 That's the contract:
 
 - `RequestHandler` is the function type.
-- `request` and `response` are the parameters.
-- Annotate `response: Response` so editor completions surface every helper. Without it, intellisense can't tell you what `response.success(...)` accepts.
+- `request` and `response` are properties of the handler's single context object.
+- The `RequestHandler` annotation contextually types both properties, so editor
+  completions surface every request method and response helper.
 
 The export name follows `<action>Controller` in camelCase: `listProductsController`, `createProductController`, `getProductController`, `removeProductController`.
 
@@ -54,18 +55,18 @@ pnpm warlock generate.controller products/create-product --with-validation
 
 The `Request` object exposes everything you need to pull data off the wire. The everyday helpers:
 
-| Method                              | Returns                                          | Use when                                                       |
-| ----------------------------------- | ------------------------------------------------ | -------------------------------------------------------------- |
-| `request.input("key", default?)`    | one field from query, params, or body            | reading a single param/body field                              |
-| `request.all()`                     | full merged input map (query + body + params)    | passing the whole thing to a service                           |
-| `request.validated()`               | schema-typed object (only when schema attached)  | controllers with validation — always preferred over `.all()`   |
-| `request.user`                      | authenticated user (after `authMiddleware`)      | guarded routes                                                 |
-| `request.file("key")`               | `UploadedFile` instance                          | multipart uploads (single file)                                |
-| `request.files("key")`              | `UploadedFile[]`                                 | multipart uploads (many files)                                 |
-| `request.header("X-Foo")`           | header value                                     | reading request metadata                                       |
-| `request.ip`, `request.realIp`      | client IP (proxy-aware via `realIp`)             | logging, rate limiting, geolocation                            |
-| `request.userAgent`                 | user-agent string                                | device-info capture                                            |
-| `request.locale`, `request.t(...)`  | locale code + scoped translator                  | localized responses                                            |
+| Method                             | Returns                                         | Use when                                                     |
+| ---------------------------------- | ----------------------------------------------- | ------------------------------------------------------------ |
+| `request.input("key", default?)`   | one field from query, params, or body           | reading a single param/body field                            |
+| `request.all()`                    | full merged input map (query + body + params)   | passing the whole thing to a service                         |
+| `request.validated()`              | schema-typed object (only when schema attached) | controllers with validation — always preferred over `.all()` |
+| `request.user`                     | authenticated user (after `authMiddleware`)     | guarded routes                                               |
+| `request.file("key")`              | `UploadedFile` instance                         | multipart uploads (single file)                              |
+| `request.files("key")`             | `UploadedFile[]`                                | multipart uploads (many files)                               |
+| `request.header("X-Foo")`          | header value                                    | reading request metadata                                     |
+| `request.ip`, `request.realIp`     | client IP (proxy-aware via `realIp`)            | logging, rate limiting, geolocation                          |
+| `request.userAgent`                | user-agent string                               | device-info capture                                          |
+| `request.locale`, `request.t(...)` | locale code + scoped translator                 | localized responses                                          |
 
 There are also typed shortcuts: `request.int("id")`, `request.bool("active")`, `request.float("price")`, `request.string("name")`, `request.email()`. Use them when you want a coerced value without writing the conversion yourself.
 
@@ -77,10 +78,10 @@ If the controller has a schema attached, **always** prefer `request.validated()`
 import type { Request, RequestHandler } from "@warlock.js/core";
 import { type CreateProductSchema } from "../schema/create-product.schema";
 
-export const createProductController: RequestHandler<Request<CreateProductSchema>> = async (
+export const createProductController: RequestHandler<Request<CreateProductSchema>> = async ({
   request,
   response,
-) => {
+}) => {
   const data = request.validated();
   // data.name, data.price are typed
 };
@@ -92,18 +93,18 @@ export const createProductController: RequestHandler<Request<CreateProductSchema
 
 The `Response` object exposes a helper per HTTP outcome. The helper carries the status code, so you almost never set one by hand. Pick the helper that matches the outcome:
 
-| Helper                              | Status | When                                  |
-| ----------------------------------- | ------ | ------------------------------------- |
-| `response.success(data)`            | 200    | normal read / update                  |
-| `response.successCreate(data)`      | 201    | resource created (POST)               |
-| `response.accepted(data?)`          | 202    | async work accepted but not yet done  |
-| `response.noContent()`              | 204    | delete succeeded, no body needed      |
-| `response.badRequest(data)`         | 400    | malformed or invalid input            |
-| `response.unauthorized(data?)`      | 401    | missing/invalid token                 |
-| `response.forbidden(data?)`         | 403    | authenticated but not allowed         |
-| `response.notFound(data?)`          | 404    | record missing                        |
-| `response.conflict(data?)`          | 409    | uniqueness violation, state conflict  |
-| `response.unprocessableEntity(data)`| 422    | semantic validation error             |
+| Helper                               | Status | When                                 |
+| ------------------------------------ | ------ | ------------------------------------ |
+| `response.success(data)`             | 200    | normal read / update                 |
+| `response.successCreate(data)`       | 201    | resource created (POST)              |
+| `response.accepted(data?)`           | 202    | async work accepted but not yet done |
+| `response.noContent()`               | 204    | delete succeeded, no body needed     |
+| `response.badRequest(data)`          | 400    | malformed or invalid input           |
+| `response.unauthorized(data?)`       | 401    | missing/invalid token                |
+| `response.forbidden(data?)`          | 403    | authenticated but not allowed        |
+| `response.notFound(data?)`           | 404    | record missing                       |
+| `response.conflict(data?)`           | 409    | uniqueness violation, state conflict |
+| `response.unprocessableEntity(data)` | 422    | semantic validation error            |
 
 Always `return response.<helper>(...)`. The return value drives the framework's send pipeline.
 
@@ -143,16 +144,13 @@ export type CreateProductSchema = Infer<typeof createProductSchema>;
 
 ```ts title="src/app/products/controllers/create-product.controller.ts"
 import type { Request, RequestHandler } from "@warlock.js/core";
-import {
-  type CreateProductSchema,
-  createProductSchema,
-} from "../schema/create-product.schema";
+import { type CreateProductSchema, createProductSchema } from "../schema/create-product.schema";
 import { createProductService } from "../services/create-product.service";
 
-export const createProductController: RequestHandler<Request<CreateProductSchema>> = async (
+export const createProductController: RequestHandler<Request<CreateProductSchema>> = async ({
   request,
   response,
-) => {
+}) => {
   const product = await createProductService(request.validated());
 
   return response.successCreate({ product });
@@ -196,7 +194,7 @@ import { t, type Request, type RequestHandler } from "@warlock.js/core";
 import { type LoginSchema, loginSchema } from "../schema/login.schema";
 import { loginUseCase } from "../use-cases/login.usecase";
 
-export const login: RequestHandler<Request<LoginSchema>> = async (request, response) => {
+export const login: RequestHandler<Request<LoginSchema>> = async ({ request, response }) => {
   const result = await loginUseCase({
     data: request.validated(),
     deviceInfo: {

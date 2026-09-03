@@ -23,9 +23,9 @@ A `Request` wraps one HTTP request for its full lifetime. It carries:
 You never construct a `Request` yourself. The framework hands one to every middleware and controller. Type it as `Request<Schema>` when a validation schema is attached so `request.validated()` returns the right shape.
 
 ```ts
-import type { RequestHandler, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 
-export const listProductsController: RequestHandler = async (request, response: Response) => {
+export const listProductsController: RequestHandler = async ({ request, response }) => {
   const filters = request.all();
   const userId = request.user.id;
 
@@ -37,13 +37,13 @@ export const listProductsController: RequestHandler = async (request, response: 
 
 Five everyday helpers cover ~90% of what you'll do:
 
-| Method                                | Returns                                       | Use when                                           |
-| ------------------------------------- | --------------------------------------------- | -------------------------------------------------- |
-| `request.validated()`                 | schema-typed object                           | a schema is attached — always prefer this          |
-| `request.input(key, default?)`        | one field from merged input                   | reading one named field                            |
-| `request.all()`                       | full merged input (body + query + params)     | passing everything to a service                    |
-| `request.allExceptParams()`           | body + query, no route params                 | excluding `:id`-style params                       |
-| `request.only(keys)` / `.except(keys)`| subset / complement of `.all()`               | partial field passing                              |
+| Method                                 | Returns                                   | Use when                                  |
+| -------------------------------------- | ----------------------------------------- | ----------------------------------------- |
+| `request.validated()`                  | schema-typed object                       | a schema is attached — always prefer this |
+| `request.input(key, default?)`         | one field from merged input               | reading one named field                   |
+| `request.all()`                        | full merged input (body + query + params) | passing everything to a service           |
+| `request.allExceptParams()`            | body + query, no route params             | excluding `:id`-style params              |
+| `request.only(keys)` / `.except(keys)` | subset / complement of `.all()`           | partial field passing                     |
 
 `input()` returns `any`. `validated()` returns the schema's `Infer` type. That's the headline difference — if you have a schema, never go back to `input()` for the validated fields.
 
@@ -53,16 +53,13 @@ When a schema is attached to the handler (see [Validation](./validation.md)), ca
 
 ```ts title="src/app/products/controllers/create-product.controller.ts"
 import type { Request, RequestHandler } from "@warlock.js/core";
-import {
-  type CreateProductSchema,
-  createProductSchema,
-} from "../schema/create-product.schema";
+import { type CreateProductSchema, createProductSchema } from "../schema/create-product.schema";
 import { createProductService } from "../services/create-product.service";
 
-export const createProductController: RequestHandler<Request<CreateProductSchema>> = async (
+export const createProductController: RequestHandler<Request<CreateProductSchema>> = async ({
   request,
   response,
-) => {
+}) => {
   const data = request.validated();
   // data.name, data.price — typed
 
@@ -107,7 +104,7 @@ const page = request.input("page", 1);
 import { type RequestHandler } from "@warlock.js/core";
 import { listFaqsService } from "../services/list-faqs.service";
 
-export const listFaqsController: RequestHandler = async (request, response) => {
+export const listFaqsController: RequestHandler = async ({ request, response }) => {
   const { data: faqs, pagination } = await listFaqsService({
     ...request.all(),
     organization_id: request.user.organizationId,
@@ -134,22 +131,22 @@ const rest = request.except(["password", "token"]);
 
 ```ts
 const credentials = request.pluck(["email", "password"]); // also removes them from request payload
-const profile = request.all();                            // no email/password here anymore
+const profile = request.all(); // no email/password here anymore
 ```
 
 ### Typed scalar shortcuts
 
 When you want a coerced value without writing the conversion yourself:
 
-| Method                                | Returns                              |
-| ------------------------------------- | ------------------------------------ |
-| `request.string("name", "")`          | `string` (coerced via `String(...)`) |
-| `request.int("id", 0)`                | `number` (via `parseInt`)            |
-| `request.float("price", 0)`           | `number` (via `parseFloat`)          |
-| `request.number("count", 0)`          | `number` (via `Number(...)`)         |
-| `request.bool("active", false)`       | `boolean` (handles "true"/"false")   |
-| `request.email("email", "")`          | `string` lowercased                  |
-| `request.idParam`                     | `number` — shortcut for `int("id")`  |
+| Method                          | Returns                              |
+| ------------------------------- | ------------------------------------ |
+| `request.string("name", "")`    | `string` (coerced via `String(...)`) |
+| `request.int("id", 0)`          | `number` (via `parseInt`)            |
+| `request.float("price", 0)`     | `number` (via `parseFloat`)          |
+| `request.number("count", 0)`    | `number` (via `Number(...)`)         |
+| `request.bool("active", false)` | `boolean` (handles "true"/"false")   |
+| `request.email("email", "")`    | `string` lowercased                  |
+| `request.idParam`               | `number` — shortcut for `int("id")`  |
 
 These don't run the schema validator — they just coerce. For untyped admin endpoints they're great; for typed controllers, stick with `validated()`.
 
@@ -158,9 +155,9 @@ These don't run the schema validator — they just coerce. For untyped admin end
 When you need to know **which segment** a value came from:
 
 ```ts
-request.body                    // parsed body only
-request.query                   // query string only
-request.params                  // route params only
+request.body; // parsed body only
+request.query; // query string only
+request.params; // route params only
 ```
 
 You can also mutate them (rare, but useful in middleware that needs to inject defaults):
@@ -193,8 +190,8 @@ request.unset("password", "passwordConfirmation");
 Multipart uploads land on the request as `UploadedFile` instances. Two readers:
 
 ```ts
-const avatar = request.file("avatar");                  // single file → UploadedFile | undefined
-const attachments = request.files("attachments");       // many files  → UploadedFile[]
+const avatar = request.file("avatar"); // single file → UploadedFile | undefined
+const attachments = request.files("attachments"); // many files  → UploadedFile[]
 ```
 
 The framework's multipart plugin attaches files to the body, so a schema with `v.file()` validators picks them up automatically:
@@ -204,10 +201,7 @@ import { type Request, type RequestHandler } from "@warlock.js/core";
 import { type UploadSchema, uploadSchema } from "../schema";
 import { createUploadService } from "../services/create-upload.service";
 
-export const createUploadController: RequestHandler = async (
-  request: Request<UploadSchema>,
-  response,
-) => {
+export const createUploadController: RequestHandler = async ({ request, response }) => {
   const { files } = request.validated();
 
   const uploads = await Promise.all(
@@ -233,11 +227,11 @@ See [File uploads](../digging-deeper/file-uploads.md) for the full `UploadedFile
 ## Headers
 
 ```ts
-const correlationId = request.header("X-Correlation-Id");          // value or null
-const userAgent = request.header("user-agent", "unknown");         // with default
-const allHeaders = request.headers;                                // full map (Fastify)
+const correlationId = request.header("X-Correlation-Id"); // value or null
+const userAgent = request.header("user-agent", "unknown"); // with default
+const allHeaders = request.headers; // full map (Fastify)
 
-request.setHeader("X-Internal", "true");                           // mutate (rare; usually for middleware)
+request.setHeader("X-Internal", "true"); // mutate (rare; usually for middleware)
 ```
 
 The `header(name)` lookup is case-insensitive — pass `"X-Foo"` or `"x-foo"` interchangeably.
@@ -248,22 +242,22 @@ There's also `request.authorization` (the raw `Authorization` header), `request.
 
 Helpers for "who is this request":
 
-| Property                    | Type                  | Note                                                       |
-| --------------------------- | --------------------- | ---------------------------------------------------------- |
-| `request.user`              | your user model       | populated by `authMiddleware`; `undefined` on guest routes |
-| `request.id`                | `string`              | 32-char request id, regenerated per request                |
-| `request.ip`                | `string`              | client IP (Fastify's parsed value)                         |
-| `request.realIp`            | `string`              | proxy-aware (`x-real-ip` → `x-forwarded-for` → `ip`)       |
-| `request.ips`               | `string[]`            | the full forwarded-for chain                               |
-| `request.userAgent`         | `string \| undefined` | user-agent header                                          |
-| `request.referer`           | `string \| undefined` | referer header                                             |
-| `request.origin`            | `string`              | `Origin` header                                            |
-| `request.originDomain`      | `string \| null`      | origin's hostname (no `www.`)                              |
-| `request.method`            | `string`              | HTTP verb                                                  |
-| `request.path` / `.url`     | `string`              | URL path                                                   |
-| `request.fullUrl`           | `string`              | scheme + host + path                                       |
-| `request.domain` / `.hostname` | `string`           | hostname (no `www.`)                                       |
-| `request.route`             | `Route`               | the matched route object                                   |
+| Property                       | Type                  | Note                                                       |
+| ------------------------------ | --------------------- | ---------------------------------------------------------- |
+| `request.user`                 | your user model       | populated by `authMiddleware`; `undefined` on guest routes |
+| `request.id`                   | `string`              | 32-char request id, regenerated per request                |
+| `request.ip`                   | `string`              | client IP (Fastify's parsed value)                         |
+| `request.realIp`               | `string`              | proxy-aware (`x-real-ip` → `x-forwarded-for` → `ip`)       |
+| `request.ips`                  | `string[]`            | the full forwarded-for chain                               |
+| `request.userAgent`            | `string \| undefined` | user-agent header                                          |
+| `request.referer`              | `string \| undefined` | referer header                                             |
+| `request.origin`               | `string`              | `Origin` header                                            |
+| `request.originDomain`         | `string \| null`      | origin's hostname (no `www.`)                              |
+| `request.method`               | `string`              | HTTP verb                                                  |
+| `request.path` / `.url`        | `string`              | URL path                                                   |
+| `request.fullUrl`              | `string`              | scheme + host + path                                       |
+| `request.domain` / `.hostname` | `string`              | hostname (no `www.`)                                       |
+| `request.route`                | `Route`               | the matched route object                                   |
 
 `request.user` is only present after an auth middleware sets it. On guarded routes you can trust it; on public routes, you have to narrow:
 
@@ -286,7 +280,7 @@ export function guarded(callback: () => void) {
 
 ```ts
 guarded(() => {
-  router.get("/me", meController);     // request.user is guaranteed
+  router.get("/me", meController); // request.user is guaranteed
 });
 ```
 
@@ -329,7 +323,7 @@ import { t, type Request, type RequestHandler } from "@warlock.js/core";
 import { type LoginSchema, loginSchema } from "../schema/login.schema";
 import { loginUseCase } from "../use-cases/login.usecase";
 
-export const login: RequestHandler<Request<LoginSchema>> = async (request, response) => {
+export const login: RequestHandler<Request<LoginSchema>> = async ({ request, response }) => {
   const result = await loginUseCase({
     data: request.validated(),
     deviceInfo: {
@@ -353,11 +347,11 @@ Three locale signals show up in twelve lines: `request.userAgent`, `request.ip`,
 ## Cookies
 
 ```ts
-const themeRaw = request.cookie("theme");        // parsed value (auto-JSON if possible) or undefined
-const theme = request.cookie("theme", "light");  // with default
+const themeRaw = request.cookie("theme"); // parsed value (auto-JSON if possible) or undefined
+const theme = request.cookie("theme", "light"); // with default
 
 const hasSession = request.hasCookie("session_id");
-const all = request.cookies;                     // full map
+const all = request.cookies; // full map
 ```
 
 Cookies are parsed by the framework's cookie plugin — they arrive on the request as already-decoded values. Set cookies on the **response** via `response.cookie(name, value, options)` — see [HTTP response](./http-response.md#cookies).
@@ -414,7 +408,7 @@ log.info("orders", "create", { correlationId });
 router.get("/orders/:id", getOrderController);
 
 // inside the controller
-const id = request.idParam;            // typed number
+const id = request.idParam; // typed number
 ```
 
 ## Gotchas

@@ -12,13 +12,13 @@ By the end you'll have `/api/v1/products` and `/api/v2/products` living in one r
 
 ## Why URL-prefix versioning
 
-There are three common ways to version an HTTP API. They all work; only one of them works *well* with how the router is shaped:
+There are three common ways to version an HTTP API. They all work; only one of them works _well_ with how the router is shaped:
 
-| Strategy            | Example                       | Reality check                                           |
-| ------------------- | ----------------------------- | ------------------------------------------------------- |
-| URL prefix          | `/api/v1/products`            | Trivial to route. Cacheable. Every CDN handles it.      |
-| Header              | `Accept: application/vnd.acme.v1+json` | Cleaner on paper. CDN cache keys are now a chore.   |
-| Query param         | `/api/products?v=1`           | Awkward to log, awkward to monitor, hard to deprecate.  |
+| Strategy    | Example                                | Reality check                                          |
+| ----------- | -------------------------------------- | ------------------------------------------------------ |
+| URL prefix  | `/api/v1/products`                     | Trivial to route. Cacheable. Every CDN handles it.     |
+| Header      | `Accept: application/vnd.acme.v1+json` | Cleaner on paper. CDN cache keys are now a chore.      |
+| Query param | `/api/products?v=1`                    | Awkward to log, awkward to monitor, hard to deprecate. |
 
 Warlock's `router.version(...)` and `router.prefix(...)` are first-class. The path stays in the URL, monitoring tools deal with it natively, and you can deprecate `/v1` with a CDN rule. This recipe uses URL-prefix versioning end to end.
 
@@ -43,7 +43,7 @@ flowchart TD
     v2c --> v2r
 ```
 
-The split is on the *edges* (controllers + resources). The middle (services + repositories + models) stays shared. That's the principle: version what the wire sees, not what the database sees.
+The split is on the _edges_ (controllers + resources). The middle (services + repositories + models) stays shared. That's the principle: version what the wire sees, not what the database sees.
 
 ## Step 1 — One routes file, two version blocks
 
@@ -71,13 +71,13 @@ router.prefix("/api", () => {
 
 What gets registered:
 
-| Method | Path                       |
-| ------ | -------------------------- |
-| GET    | `/api/v1/products`         |
-| GET    | `/api/v1/products/:id`     |
-| GET    | `/api/v2/products`         |
-| GET    | `/api/v2/products/:id`     |
-| POST   | `/api/v2/products`         |
+| Method | Path                   |
+| ------ | ---------------------- |
+| GET    | `/api/v1/products`     |
+| GET    | `/api/v1/products/:id` |
+| GET    | `/api/v2/products`     |
+| GET    | `/api/v2/products/:id` |
+| POST   | `/api/v2/products`     |
 
 `router.version("1", ...)` is sugar for `router.prefix("/v1", ...)`. The `/api` prefix on the outside stacks with it — that's the whole grouping mechanism. `router.prefix` nests freely; you can have `/api → /v1 → /products` if you want a third level.
 
@@ -150,11 +150,11 @@ export async function listProductsService(filter: ListProductsFilter) {
 The v1 controller calls the service, then shapes the response through the v1 resource:
 
 ```ts title="src/app/products/controllers/v1/list-products.controller.ts"
-import type { RequestHandler, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 import { listProductsService } from "../../services/list-products.service";
 import { ProductV1Resource } from "../../resources/v1/product.resource";
 
-export const listProductsV1Controller: RequestHandler = async (request, response: Response) => {
+export const listProductsV1Controller: RequestHandler = async ({ request, response }) => {
   const { data, pagination } = await listProductsService({
     search: request.input("search"),
     category_id: request.input("category_id"),
@@ -176,11 +176,11 @@ export const listProductsV1Controller: RequestHandler = async (request, response
 The v2 controller is the same shape, different resource:
 
 ```ts title="src/app/products/controllers/v2/list-products.controller.ts"
-import type { RequestHandler, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 import { listProductsService } from "../../services/list-products.service";
 import { ProductV2Resource } from "../../resources/v2/product.resource";
 
-export const listProductsV2Controller: RequestHandler = async (request, response: Response) => {
+export const listProductsV2Controller: RequestHandler = async ({ request, response }) => {
   const { data, pagination } = await listProductsService({
     search: request.input("search"),
     category_id: request.input("category_id"),
@@ -243,11 +243,11 @@ If your v2 needs to compute a field, do it in the model (a getter) or in a servi
 
 You announce a deprecation **before** you delete a route, not after. Three headers do the heavy lifting:
 
-| Header        | Value example                                                       | What it means                              |
-| ------------- | ------------------------------------------------------------------- | ------------------------------------------ |
-| `Deprecation` | `true` or RFC-3339 timestamp                                        | "This endpoint is deprecated."             |
-| `Sunset`      | HTTP-date, e.g. `Wed, 01 Oct 2026 00:00:00 GMT`                     | "It goes away on this date."               |
-| `Link`        | `</api/v2/products>; rel="successor-version"`                       | "Here's the replacement."                  |
+| Header        | Value example                                   | What it means                  |
+| ------------- | ----------------------------------------------- | ------------------------------ |
+| `Deprecation` | `true` or RFC-3339 timestamp                    | "This endpoint is deprecated." |
+| `Sunset`      | HTTP-date, e.g. `Wed, 01 Oct 2026 00:00:00 GMT` | "It goes away on this date."   |
+| `Link`        | `</api/v2/products>; rel="successor-version"`   | "Here's the replacement."      |
 
 These are draft-IETF standards (`draft-ietf-httpapi-deprecation-header` + RFC 8594). They're respected by enough tooling — API monitoring dashboards, log aggregators, OpenAPI generators — that adding them is essentially free.
 
@@ -258,7 +258,7 @@ return response
   .header("Deprecation", "true")
   .header("Sunset", "Wed, 01 Oct 2026 00:00:00 GMT")
   .header("Link", '</api/v2/products>; rel="successor-version"')
-  .success({ /* ... */ });
+  .success({/* ... */});
 ```
 
 Doing this in every controller gets repetitive. Extract a middleware:
@@ -266,7 +266,7 @@ Doing this in every controller gets repetitive. Extract a middleware:
 ```ts title="src/app/shared/middleware/deprecated-v1.middleware.ts"
 import type { Middleware } from "@warlock.js/core";
 
-export const deprecatedV1Middleware: Middleware = async (_request, response) => {
+export const deprecatedV1Middleware: Middleware = async ({ response }) => {
   response.header("Deprecation", "true");
   response.header("Sunset", "Wed, 01 Oct 2026 00:00:00 GMT");
   response.header("Link", '</api/v2/>; rel="successor-version"');
@@ -305,9 +305,9 @@ Now every v1 response carries the deprecation headers — no duplication in cont
 On sunset day, replace v1 controllers with a single 410 Gone responder. Don't delete the routes — clients pinging v1 should hit a clear error, not a 404 that confuses their stack traces:
 
 ```ts title="src/app/shared/controllers/gone.controller.ts"
-import type { RequestHandler, Response } from "@warlock.js/core";
+import type { RequestHandler } from "@warlock.js/core";
 
-export const goneController: RequestHandler = async (_request, response: Response) => {
+export const goneController: RequestHandler = async ({ response }) => {
   return response.setStatusCode(410).send({
     error: "This endpoint has been removed. Upgrade to /api/v2/.",
     successorVersion: "/api/v2/",
@@ -382,7 +382,7 @@ The point of versioning is to keep the contract stable. If a change wouldn't bre
 
 - **Routes are registered in declaration order, but matched longest-prefix-wins.** `/api/v2/products/:id` and `/api/v2/products/featured` both match `/api/v2/products/something`. Put the specific one first if there's ambiguity.
 - **`router.version(n, ...)` uses the `n` you pass verbatim.** `router.version("1.0", ...)` produces `/v1.0`. Stick to integer majors unless you really mean to ship `/v1.1`.
-- **Middleware on the prefix group applies to every nested route.** If you put `authMiddleware()` on `/api`, v1 *and* v2 require auth. That's usually what you want — but it's not always.
+- **Middleware on the prefix group applies to every nested route.** If you put `authMiddleware()` on `/api`, v1 _and_ v2 require auth. That's usually what you want — but it's not always.
 - **The `Deprecation` header doesn't change behaviour.** Clients ignoring it will happily keep hitting your endpoint until the day you 410 it. Pair the header with monitoring: log requests to v1, alert when traffic isn't dropping.
 - **Don't version the database.** Resources change between versions; the underlying columns don't. If you need a column rename, do it in a migration with a compatibility shim, not by forking the model.
 

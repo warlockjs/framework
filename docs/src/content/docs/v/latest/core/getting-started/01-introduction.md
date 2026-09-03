@@ -8,7 +8,7 @@ sidebar:
 
 Most backend frameworks were designed before LLM agents were a thing. AI shows up bolted on: a route handler that imports a provider SDK directly, talks to one vendor, and ages badly the moment you need a second model, a retry policy, or a cost dashboard. Warlock was designed AI-first — agents, tools, workflows, and multi-agent supervisors are framework primitives with the same conventions, observability, and testing story as a route or a model. The rest of the stack (HTTP, routing, validation, ORM, mail, storage, queues, sockets) is the boring, reliable parts you'd build anyway, already built and already wired together.
 
-This page shows what makes Warlock different in 30 seconds, the mental model that explains everything else, and what's *not* in scope so you know what you're signing up for.
+This page shows what makes Warlock different in 30 seconds, the mental model that explains everything else, and what's _not_ in scope so you know what you're signing up for.
 
 ## The 30-second look
 
@@ -24,7 +24,7 @@ router.get("/products", listProducts);
 ```ts title="src/app/products/controllers/list-products.controller.ts"
 import type { RequestHandler } from "@warlock.js/core";
 
-export const listProducts: RequestHandler = async (request, response) => {
+export const listProducts: RequestHandler = async ({ request, response }) => {
   return response.success({
     products: [
       { id: 1, name: "Hat" },
@@ -53,7 +53,7 @@ const supportAgent = ai.agent({
   systemPrompt: "Answer questions about our product catalog.",
 });
 
-router.post("/support", async (request, response) => {
+router.post("/support", async ({ request, response }) => {
   const { data, error } = await supportAgent.execute(request.input("message"));
 
   if (error) {
@@ -104,7 +104,7 @@ Bootstrap loads env and config files, then every subsystem connector (HTTP serve
 
 AI agents slot in next to controllers as another primitive — they consume the same `request`, can call use-cases as tools, share the same logger, and emit reports with the same envelope shape (`{ data, error, usage, report }`) as every other Warlock primitive.
 
-## What Warlock is *not*
+## What Warlock is _not_
 
 Three things worth being explicit about, so you know what you're signing up for:
 

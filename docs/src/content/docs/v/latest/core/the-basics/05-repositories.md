@@ -75,22 +75,22 @@ The exported instance is camelCase + `Repository` suffix: `productsRepository`, 
 
 These are the methods you'll reach for daily. Every repository inherits them from `RepositoryManager`:
 
-| Method                                | What it returns                              | Use when                                |
-| ------------------------------------- | -------------------------------------------- | --------------------------------------- |
-| `list(options?)`                      | `{ data, pagination }`                       | paginated read                          |
-| `listCached(options?)`                | `{ data, pagination }` (cached)              | list endpoints with stable filters      |
-| `all(options?)`                       | `T[]`                                        | non-paginated read (be careful)         |
-| `find(id)`                            | `T \| null`                                  | by primary key                          |
-| `findBy(column, value)`               | `T \| null`                                  | by any column                           |
-| `first(options?)`                     | `T \| null`                                  | first match for options                 |
-| `getCached(id)`                       | `T \| null` (cached)                         | by primary key, cached                  |
-| `create(data)`                        | `T`                                          | insert                                  |
-| `update(id, data)`                    | `T`                                          | update by id                            |
-| `delete(id)`                          | `void`                                       | delete by id                            |
-| `count(options?)`                     | `number`                                     | total matching records                  |
-| `exists(filter?)`                     | `boolean`                                    | existence check                         |
-| `findOrCreate(where, data)`           | `T`                                          | upsert-by-where (insert if missing)     |
-| `updateOrCreate(where, data)`         | `T`                                          | true upsert                             |
+| Method                        | What it returns                 | Use when                            |
+| ----------------------------- | ------------------------------- | ----------------------------------- |
+| `list(options?)`              | `{ data, pagination }`          | paginated read                      |
+| `listCached(options?)`        | `{ data, pagination }` (cached) | list endpoints with stable filters  |
+| `all(options?)`               | `T[]`                           | non-paginated read (be careful)     |
+| `find(id)`                    | `T \| null`                     | by primary key                      |
+| `findBy(column, value)`       | `T \| null`                     | by any column                       |
+| `first(options?)`             | `T \| null`                     | first match for options             |
+| `getCached(id)`               | `T \| null` (cached)            | by primary key, cached              |
+| `create(data)`                | `T`                             | insert                              |
+| `update(id, data)`            | `T`                             | update by id                        |
+| `delete(id)`                  | `void`                          | delete by id                        |
+| `count(options?)`             | `number`                        | total matching records              |
+| `exists(filter?)`             | `boolean`                       | existence check                     |
+| `findOrCreate(where, data)`   | `T`                             | upsert-by-where (insert if missing) |
+| `updateOrCreate(where, data)` | `T`                             | true upsert                         |
 
 There's also `chunk(size, callback)` for processing large datasets without loading everything into memory, the filter-aware aggregates `sum / avg / min / max / groupBy / aggregate` (see [Aggregation](#aggregation--sum--avg--min--max--groupby--aggregate) below), and `listActive/findActive/...` variants that auto-add an `isActive` filter — see [Repositories — deep dive](./repositories-deep.md).
 
@@ -141,11 +141,11 @@ public filterBy: FilterRules = {
 
 Three forms:
 
-| Form                            | Behaviour                                                       |
-| ------------------------------- | --------------------------------------------------------------- |
-| `"="` / `">"` / `"!="`          | direct comparison on the same-named column                      |
-| `["op", "column"]`              | comparison on a different column (rename incoming → DB column)  |
-| `["op", ["col1", "col2"]]`      | apply the comparison across multiple columns (OR'd)             |
+| Form                       | Behaviour                                                      |
+| -------------------------- | -------------------------------------------------------------- |
+| `"="` / `">"` / `"!="`     | direct comparison on the same-named column                     |
+| `["op", "column"]`         | comparison on a different column (rename incoming → DB column) |
+| `["op", ["col1", "col2"]]` | apply the comparison across multiple columns (OR'd)            |
 
 The full operator set includes `=`, `!=`, `>`, `>=`, `<`, `<=`, `like`, `not like`, `in`, `not in`, `between`, plus type-coercing operators (`int`, `bool`, `date`, `dateTime`, `dateBetween`, `inDate`, …) and relation operators (`with`, `joinWith`, `scope`).
 
@@ -212,7 +212,7 @@ You can also `create()` directly on the model — `Product.create(...)` — when
 
 ## Aggregation — `sum` / `avg` / `min` / `max` / `groupBy` / `aggregate`
 
-The repository exposes filter-aware aggregates that run **through the same `filterBy` machinery as `list()` and `count()`**. Each one applies the repository options first — `filterBy` (with its operator-injection guard), `where`, scopes, default options — and *then* runs the aggregate, so the result is always scoped by the same filters the rest of the repository honors. You don't reach into the model's query builder and re-implement filtering by hand.
+The repository exposes filter-aware aggregates that run **through the same `filterBy` machinery as `list()` and `count()`**. Each one applies the repository options first — `filterBy` (with its operator-injection guard), `where`, scopes, default options — and _then_ runs the aggregate, so the result is always scoped by the same filters the rest of the repository honors. You don't reach into the model's query builder and re-implement filtering by hand.
 
 ```ts
 // Scalar aggregates — same options shape as list() / count()
@@ -222,14 +222,14 @@ const cheapest = await ordersRepository.min("total");
 const priciest = await ordersRepository.max("total");
 ```
 
-| Method                                   | Returns               |
-| ---------------------------------------- | --------------------- |
-| `sum(field, options?)`                   | `Promise<number>`     |
-| `avg(field, options?)`                   | `Promise<number>`     |
-| `min(field, options?)`                   | `Promise<number>`     |
-| `max(field, options?)`                   | `Promise<number>`     |
-| `groupBy<R>(fields, aggregates, options?)` | `Promise<R[]>`      |
-| `aggregate<R>(aggregates, options?)`     | `Promise<R \| null>`  |
+| Method                                     | Returns              |
+| ------------------------------------------ | -------------------- |
+| `sum(field, options?)`                     | `Promise<number>`    |
+| `avg(field, options?)`                     | `Promise<number>`    |
+| `min(field, options?)`                     | `Promise<number>`    |
+| `max(field, options?)`                     | `Promise<number>`    |
+| `groupBy<R>(fields, aggregates, options?)` | `Promise<R[]>`       |
+| `aggregate<R>(aggregates, options?)`       | `Promise<R \| null>` |
 
 `groupBy` and `aggregate` take the same driver-agnostic `$agg.*` expressions Cascade's query builder uses:
 
@@ -255,7 +255,7 @@ The `options` argument is the same `TypedRepositoryOptions` shape every other me
 
 :::note — Why filter-first matters
 
-A naive `repo.sum(...)` that skipped `filterBy` would silently sum *every* row, ignoring the caller's filters and the operator-injection guard `list()` relies on. These methods deliberately mirror `count()`: options in, query built, *then* aggregate — so a controller can hand request filters straight to `repo.sum("total", request.all())` with the same safety guarantees as `repo.list(request.all())`.
+A naive `repo.sum(...)` that skipped `filterBy` would silently sum _every_ row, ignoring the caller's filters and the operator-injection guard `list()` relies on. These methods deliberately mirror `count()`: options in, query built, _then_ aggregate — so a controller can hand request filters straight to `repo.sum("total", request.all())` with the same safety guarantees as `repo.list(request.all())`.
 
 :::
 
@@ -317,7 +317,7 @@ And the controller's two lines:
 import { type RequestHandler } from "@warlock.js/core";
 import { listFaqsService } from "../services/list-faqs.service";
 
-export const listFaqsController: RequestHandler = async (request, response) => {
+export const listFaqsController: RequestHandler = async ({ request, response }) => {
   const { data: faqs, pagination } = await listFaqsService({
     ...request.all(),
     organization_id: request.user.organizationId,

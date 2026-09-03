@@ -32,21 +32,21 @@ useCase<TOutput, TInput>({
 
 Every field except `name` and `handler` is optional. The two type parameters are the output shape and the input shape — TypeScript infers the runtime types from these. (When you pass a `schema` and no explicit `TInput`, the handler's `data` is inferred straight from the schema — see [Schema-only inference](#schema-only-inference) below.)
 
-| Field         | Type                                         | When you reach for it                                                                  |
-| ------------- | -------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `name`        | `string`                                     | Always. The registry key, cache key, log key.                                          |
-| `handler`     | `(data, ctx) => Promise<TOutput>`            | Always. The actual work.                                                               |
-| `description` | `string`                                     | Optional human-readable label surfaced in the registry and observability.              |
-| `schema`      | `ObjectValidator` (from `@warlock.js/seal`)  | When input shape is non-trivial. Runs after guards. Infers `TInput` when set.           |
-| `guards`      | `UseCaseGuard<TInput>[]`                     | Authorization / preconditions that should kill the request before validation runs.     |
-| `before`      | `UseCaseBeforeMiddleware<TInput>[]`          | Data transforms — normalise email, calculate tax, enrich with pricing.                 |
-| `after`       | `UseCaseAfterMiddleware<TOutput>[]`          | Fire-and-forget side effects — emails, webhooks, cache invalidation.                   |
-| `onExecuting` | `(ctx) => void`                              | Per-use-case start hook — log every login attempt, kick off a tracing span.            |
-| `onCompleted` | `(result) => void`                           | Per-use-case success hook — push metrics, record analytics.                            |
-| `onError`     | `(ctx) => void`                              | Per-use-case error hook — alerting, error budget tracking.                             |
-| `retry`       | `RetryOptions` (from `@mongez/reinforcements`) | When the handler talks to a flaky external system that's worth retrying.             |
-| `benchmark`   | `boolean \| BenchmarkOptions`                | Latency classification + hooks. Set to `false` to disable for one use-case.            |
-| `broadcast`   | `boolean \| { event?, output? }`             | Emit the result on success through the globally-configured broadcast channels.         |
+| Field         | Type                                           | When you reach for it                                                              |
+| ------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `name`        | `string`                                       | Always. The registry key, cache key, log key.                                      |
+| `handler`     | `(data, ctx) => Promise<TOutput>`              | Always. The actual work.                                                           |
+| `description` | `string`                                       | Optional human-readable label surfaced in the registry and observability.          |
+| `schema`      | `ObjectValidator` (from `@warlock.js/seal`)    | When input shape is non-trivial. Runs after guards. Infers `TInput` when set.      |
+| `guards`      | `UseCaseGuard<TInput>[]`                       | Authorization / preconditions that should kill the request before validation runs. |
+| `before`      | `UseCaseBeforeMiddleware<TInput>[]`            | Data transforms — normalise email, calculate tax, enrich with pricing.             |
+| `after`       | `UseCaseAfterMiddleware<TOutput>[]`            | Fire-and-forget side effects — emails, webhooks, cache invalidation.               |
+| `onExecuting` | `(ctx) => void`                                | Per-use-case start hook — log every login attempt, kick off a tracing span.        |
+| `onCompleted` | `(result) => void`                             | Per-use-case success hook — push metrics, record analytics.                        |
+| `onError`     | `(ctx) => void`                                | Per-use-case error hook — alerting, error budget tracking.                         |
+| `retry`       | `RetryOptions` (from `@mongez/reinforcements`) | When the handler talks to a flaky external system that's worth retrying.           |
+| `benchmark`   | `boolean \| BenchmarkOptions`                  | Latency classification + hooks. Set to `false` to disable for one use-case.        |
+| `broadcast`   | `boolean \| { event?, output? }`               | Emit the result on success through the globally-configured broadcast channels.     |
 
 Two of these — `retry` and `benchmark` — also accept defaults from `config.get("use-cases")`. Per-use-case settings win; the config is what you fall through to. `broadcast` is opt-in per use-case but only fires when the config registers at least one channel.
 
@@ -157,10 +157,7 @@ Guards run sequentially in array order. Auth first, then role, then rate limit �
 The internal type is straightforward:
 
 ```ts
-type UseCaseGuard<TInput> = (
-  data: Readonly<TInput>,
-  ctx: UseCaseContext,
-) => void | Promise<void>;
+type UseCaseGuard<TInput> = (data: Readonly<TInput>, ctx: UseCaseContext) => void | Promise<void>;
 ```
 
 ### Phase 3 — schema validation
@@ -275,7 +272,7 @@ type UseCaseResult<TOutput> = {
 
 `retries` is present only when `retry` was configured. `attempts` echoes the configured total-attempt budget (default 3), `delay` the configured base delay, and `currentRetry` the number of retries actually performed (`0` means it succeeded on the first try).
 
-After `onCompleted` fires, the framework runs the **broadcast** step (the last thing in the success path): if the use case opted in with `broadcast` *and* the config registered at least one channel, the result is fanned out to those channels via `Promise.allSettled` — a failing channel is logged and never affects the return value. If `broadcast` is omitted or no channels are configured, this step is a no-op.
+After `onCompleted` fires, the framework runs the **broadcast** step (the last thing in the success path): if the use case opted in with `broadcast` _and_ the config registered at least one channel, the result is fanned out to those channels via `Promise.allSettled` — a failing channel is logged and never affects the return value. If `broadcast` is omitted or no channels are configured, this step is a no-op.
 
 ### Phase 8 — `onError`
 
@@ -373,16 +370,16 @@ type RetryOptions = {
 };
 ```
 
-| Field         | Default      | What it does                                                                                          |
-| ------------- | ------------ | ---------------------------------------------------------------------------------------------------- |
-| `attempts`    | `3`          | **Total** attempts including the first try. `attempts: 3` = one try plus two retries.                |
-| `delay`       | `0`          | Base milliseconds to wait between attempts (scaled by `backoff`, capped by `maxDelay`, spread by `jitter`). |
-| `backoff`     | `"linear"`   | Delay growth strategy, or a custom `(attempt, baseDelay) => ms` function.                             |
-| `maxDelay`    | none         | Ceiling applied to the computed delay before jitter.                                                  |
-| `jitter`      | `false`      | Randomise each delay to avoid a thundering herd.                                                      |
-| `onError`     | none         | Observe each failed attempt — `attempt` is 1-based. Fires per failure, for logging/metrics.           |
-| `shouldRetry` | none         | Predicate. Return `false` to bail out immediately without retrying — useful for "don't retry on 4xx". May be async. |
-| `signal`      | none         | `AbortSignal` to cancel the retry loop between or during attempts.                                    |
+| Field         | Default    | What it does                                                                                                        |
+| ------------- | ---------- | ------------------------------------------------------------------------------------------------------------------- |
+| `attempts`    | `3`        | **Total** attempts including the first try. `attempts: 3` = one try plus two retries.                               |
+| `delay`       | `0`        | Base milliseconds to wait between attempts (scaled by `backoff`, capped by `maxDelay`, spread by `jitter`).         |
+| `backoff`     | `"linear"` | Delay growth strategy, or a custom `(attempt, baseDelay) => ms` function.                                           |
+| `maxDelay`    | none       | Ceiling applied to the computed delay before jitter.                                                                |
+| `jitter`      | `false`    | Randomise each delay to avoid a thundering herd.                                                                    |
+| `onError`     | none       | Observe each failed attempt — `attempt` is 1-based. Fires per failure, for logging/metrics.                         |
+| `shouldRetry` | none       | Predicate. Return `false` to bail out immediately without retrying — useful for "don't retry on 4xx". May be async. |
+| `signal`      | none       | `AbortSignal` to cancel the retry loop between or during attempts.                                                  |
 
 There is no `count` field — the budget is expressed as the total `attempts`, not "retries after the first failure". If every attempt fails, the last error is what re-throws. The use-case-level `onError` lifecycle callback fires once with that final error; the per-attempt observer is the `retry.onError` hook above (the use case wraps it to also track `currentRetry`).
 
@@ -629,14 +626,14 @@ This is mainly for tests and short-lived/dynamically-defined use cases — anywh
 
 The framework provides one use-case-specific error class plus the generic `HttpError` family:
 
-| Error                  | When it fires                                         | Status |
-| ---------------------- | ----------------------------------------------------- | ------ |
-| `BadSchemaUseCaseError` | Schema validation failed                              | 400    |
-| `UnAuthorizedError`    | Guard threw this (typical for auth failures)          | 401    |
-| `ForbiddenError`       | Guard threw this (typical for permission failures)    | 403    |
-| `ConflictError`        | Guard or handler threw this (uniqueness / conflicts)  | 409    |
-| `ResourceNotFoundError`| Handler threw this (record missing)                   | 404    |
-| Any other `Error`      | Anywhere — re-thrown as 500 by the framework catch-all | 500    |
+| Error                   | When it fires                                          | Status |
+| ----------------------- | ------------------------------------------------------ | ------ |
+| `BadSchemaUseCaseError` | Schema validation failed                               | 400    |
+| `UnAuthorizedError`     | Guard threw this (typical for auth failures)           | 401    |
+| `ForbiddenError`        | Guard threw this (typical for permission failures)     | 403    |
+| `ConflictError`         | Guard or handler threw this (uniqueness / conflicts)   | 409    |
+| `ResourceNotFoundError` | Handler threw this (record missing)                    | 404    |
+| Any other `Error`       | Anywhere — re-thrown as 500 by the framework catch-all | 500    |
 
 All `HttpError` subclasses map to the right status code automatically. You only catch them yourself if you have something specific to do — most controllers don't have a try/catch at all.
 
@@ -768,7 +765,7 @@ And the controller:
 import type { RequestHandler } from "@warlock.js/core";
 import { placeOrderUseCase } from "../use-cases/place-order.usecase";
 
-export const placeOrderController: RequestHandler = async (request, response) => {
+export const placeOrderController: RequestHandler = async ({ request, response }) => {
   const result = await placeOrderUseCase(request.validated(), {
     ctx: { token: request.accessToken },
   });

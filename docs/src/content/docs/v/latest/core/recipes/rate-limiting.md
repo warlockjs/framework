@@ -68,10 +68,10 @@ export default httpConfigurations;
 
 That's the real default the reference project ships with — 260 requests per IP per minute. The two fields:
 
-| Field      | Type     | What it means                                                      |
-| ---------- | -------- | ------------------------------------------------------------------ |
-| `max`      | `number` | Maximum requests allowed within the window                         |
-| `duration` | `number` | Window length in **milliseconds** (60_000 = 1 minute)              |
+| Field      | Type     | What it means                                         |
+| ---------- | -------- | ----------------------------------------------------- |
+| `max`      | `number` | Maximum requests allowed within the window            |
+| `duration` | `number` | Window length in **milliseconds** (60_000 = 1 minute) |
 
 The keying is by client IP by default — every IP gets its own bucket. When an IP exceeds `max` requests within `duration` ms, every subsequent request inside that window comes back as a `429 Too Many Requests` until the window resets.
 
@@ -148,7 +148,7 @@ When the per-route block exists, it replaces the global default for that route e
 
 ### Loosening for a specific endpoint
 
-Same mechanism for going *up*:
+Same mechanism for going _up_:
 
 ```ts
 router.get("/health", healthController, {
@@ -177,7 +177,7 @@ type UserRateLimitOptions = {
 };
 
 export function userRateLimit(options: UserRateLimitOptions): Middleware {
-  return async (request, response) => {
+  return async ({ request, response }) => {
     const userId = request.user?.id;
 
     if (!userId) {
@@ -216,10 +216,7 @@ import { userRateLimit } from "app/shared/middleware/user-rate-limit.middleware"
 import { sendMessageController } from "./controllers/send-message.controller";
 
 router.post("/messages", sendMessageController, {
-  middleware: [
-    authMiddleware(),
-    userRateLimit({ max: 30, windowSeconds: 60 }),
-  ],
+  middleware: [authMiddleware(), userRateLimit({ max: 30, windowSeconds: 60 })],
 });
 ```
 
@@ -232,10 +229,7 @@ The two layers compose naturally — the global IP limit catches anonymous traff
 ```ts
 router.post("/comments", postCommentController, {
   // Global IP rate-limit still applies (from src/config/http.ts) — 260/min default.
-  middleware: [
-    authMiddleware(),
-    userRateLimit({ max: 60, windowSeconds: 60 }),
-  ],
+  middleware: [authMiddleware(), userRateLimit({ max: 60, windowSeconds: 60 })],
 });
 ```
 
@@ -243,7 +237,7 @@ The unauthed pathway is constrained by the IP rate-limit (260/min); authed users
 
 ## Step 4 — Bypass for trusted clients
 
-Load balancers, monitoring agents, internal service-to-service calls — all of them are *known* clients that should never count against anyone's bucket. The cleanest pattern is a middleware-level short-circuit that runs *before* the rate limit kicks in.
+Load balancers, monitoring agents, internal service-to-service calls — all of them are _known_ clients that should never count against anyone's bucket. The cleanest pattern is a middleware-level short-circuit that runs _before_ the rate limit kicks in.
 
 For the IP-based plugin layer, you can't disable it per-request without forking the plugin registration. The practical workaround is to detect trusted IPs in your handler logic and skip the rate-limited routes for them:
 
@@ -258,7 +252,7 @@ const trustedIps = new Set(
     .filter(Boolean),
 );
 
-export const trustedBypass: Middleware = async (request) => {
+export const trustedBypass: Middleware = async ({ request }) => {
   if (trustedIps.has(request.ip)) {
     // Mark the request so downstream middleware can see it.
     (request as any).isTrusted = true;
@@ -270,7 +264,7 @@ Then check `request.isTrusted` in your custom rate-limit middleware:
 
 ```ts title="src/app/shared/middleware/user-rate-limit.middleware.ts (excerpt)"
 export function userRateLimit(options: UserRateLimitOptions): Middleware {
-  return async (request, response) => {
+  return async ({ request, response }) => {
     if ((request as any).isTrusted) {
       return;
     }
@@ -297,7 +291,7 @@ Admins shouldn't trip rate limits aimed at preventing abuse from normal users. A
 
 ```ts title="src/app/shared/middleware/user-rate-limit.middleware.ts (excerpt)"
 export function userRateLimit(options: UserRateLimitOptions): Middleware {
-  return async (request, response) => {
+  return async ({ request, response }) => {
     const user = request.user;
 
     if (!user) {
@@ -322,7 +316,7 @@ import { t, type Middleware } from "@warlock.js/core";
 import { cache } from "@warlock.js/cache";
 
 export function localizedIpRateLimit(max: number, windowSeconds: number): Middleware {
-  return async (request, response) => {
+  return async ({ request, response }) => {
     const cacheKey = `ratelimit.ip.${request.ip}.${request.route?.name ?? request.path}`;
     const count = (await cache.get<number>(cacheKey)) ?? 0;
 
@@ -389,12 +383,12 @@ Retry-After: 60
 
 Three headers worth knowing:
 
-| Header                | Meaning                                                 |
-| --------------------- | ------------------------------------------------------- |
-| `X-RateLimit-Limit`   | The `max` for this window                               |
-| `X-RateLimit-Remaining` | How many requests are still allowed                   |
-| `X-RateLimit-Reset`   | Seconds until the window resets                         |
-| `Retry-After`         | Standard HTTP header — when to retry (seconds)          |
+| Header                  | Meaning                                        |
+| ----------------------- | ---------------------------------------------- |
+| `X-RateLimit-Limit`     | The `max` for this window                      |
+| `X-RateLimit-Remaining` | How many requests are still allowed            |
+| `X-RateLimit-Reset`     | Seconds until the window resets                |
+| `Retry-After`           | Standard HTTP header — when to retry (seconds) |
 
 Tell your client developers to read `Retry-After` and back off accordingly. Pounding a 429 doesn't make it go away faster.
 
@@ -402,11 +396,11 @@ Tell your client developers to read `Retry-After` and back off accordingly. Poun
 
 Three layers, three jobs:
 
-| Layer                          | Catches                                          | Cost                          |
-| ------------------------------ | ------------------------------------------------ | ----------------------------- |
-| **Global IP limit** (`http.rateLimit`) | Anonymous abuse, runaway scrapers        | One config line, zero runtime |
+| Layer                                             | Catches                                 | Cost                          |
+| ------------------------------------------------- | --------------------------------------- | ----------------------------- |
+| **Global IP limit** (`http.rateLimit`)            | Anonymous abuse, runaway scrapers       | One config line, zero runtime |
 | **Per-route override** (`RouteOptions.rateLimit`) | Endpoint-specific abuse (login, signup) | One block per route           |
-| **Custom user middleware**     | Authed abuse, per-user fairness                  | A small middleware            |
+| **Custom user middleware**                        | Authed abuse, per-user fairness         | A small middleware            |
 
 Don't try to do everything in one layer. The global IP limit catches scrapers; per-route overrides catch endpoint-specific abuse; custom user middleware caps individual authed users. They compose; each one solves a problem the others don't.
 

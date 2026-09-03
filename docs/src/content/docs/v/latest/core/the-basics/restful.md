@@ -39,29 +39,29 @@ guarded(() => {
 
 That declares five routes:
 
-| Method   | Path        | Handler                |
-| -------- | ----------- | ---------------------- |
-| `GET`    | `/faqs`     | `listFaqsController`   |
-| `GET`    | `/faqs/:id` | `getFaqController`     |
-| `POST`   | `/faqs`     | `createFaqController`  |
-| `PUT`    | `/faqs/:id` | `updateFaqController`  |
-| `DELETE` | `/faqs/:id` | `deleteFaqController`  |
+| Method   | Path        | Handler               |
+| -------- | ----------- | --------------------- |
+| `GET`    | `/faqs`     | `listFaqsController`  |
+| `GET`    | `/faqs/:id` | `getFaqController`    |
+| `POST`   | `/faqs`     | `createFaqController` |
+| `PUT`    | `/faqs/:id` | `updateFaqController` |
+| `DELETE` | `/faqs/:id` | `deleteFaqController` |
 
-Every action is its own controller — its own file, its own validation schema, its own permissions check via middleware. The five handlers fit the standard controller shape (`(request, response) => Promise<...>`), and the routing layer wires them together.
+Every action is its own controller — its own file, its own validation schema, its own permissions check via middleware. The five handlers fit the standard controller shape (`({ request, response }) => Promise<...>`), and the routing layer wires them together.
 
 ### Action aliases
 
 The builder exposes the RESTful aliases alongside the HTTP verbs. They mean the same things — pick the names that read cleanest:
 
-| Alias       | Equivalent HTTP method  | Path adjustment    |
-| ----------- | ----------------------- | ------------------ |
-| `.list()`   | `.get()`                | `path`             |
-| `.show()`   | `.getOne()`             | `path + "/:id"`    |
-| `.create()` | `.post()`               | `path`             |
-| `.update()` | `.updateOne()` / `.put()` | `path + "/:id"` |
-| `.destroy()`| `.deleteOne()` / `.delete()` | `path + "/:id"` |
-| `.patch()`  | (`PATCH path`)          | `path`             |
-| `.patchOne()` | (`PATCH path/:id`)    | `path + "/:id"`    |
+| Alias         | Equivalent HTTP method       | Path adjustment |
+| ------------- | ---------------------------- | --------------- |
+| `.list()`     | `.get()`                     | `path`          |
+| `.show()`     | `.getOne()`                  | `path + "/:id"` |
+| `.create()`   | `.post()`                    | `path`          |
+| `.update()`   | `.updateOne()` / `.put()`    | `path + "/:id"` |
+| `.destroy()`  | `.deleteOne()` / `.delete()` | `path + "/:id"` |
+| `.patch()`    | (`PATCH path`)               | `path`          |
+| `.patchOne()` | (`PATCH path/:id`)           | `path + "/:id"` |
 
 The `RouteBuilder` enforces "one verb per path" — calling `.get(...)` twice on the same route throws. Use `.list()` and `.show()` for the GET pair (different paths) instead.
 
@@ -76,7 +76,7 @@ router.route("/products").crud({
   create: createProductController,
   update: updateProductController,
   destroy: deleteProductController,
-  patch: patchProductController,  // optional
+  patch: patchProductController, // optional
 });
 ```
 
@@ -95,10 +95,10 @@ router
   .update(updateCatalogItemController)
   .destroy(deleteCatalogItemController)
   .nest("/:id/summary")
-    .get(getCatalogItemSummaryController)
-    .post(summarizeCatalogItemController)
-    .patch(approveCatalogItemSummaryController)
-    .delete(deleteCatalogItemSummaryController);
+  .get(getCatalogItemSummaryController)
+  .post(summarizeCatalogItemController)
+  .patch(approveCatalogItemSummaryController)
+  .delete(deleteCatalogItemSummaryController);
 ```
 
 The nested chain declares `GET/POST/PATCH/DELETE /catalog-items/:id/summary` on the same builder. Use this when a resource has sub-routes that aren't another CRUD set.
@@ -195,15 +195,15 @@ The handlers come from the class — `productsRestful.list`, `productsRestful.ge
 
 `Restful<T>` ships with seven public methods. Each is the default implementation for one route action.
 
-| Method         | Generated route         | What it does                                                                   |
-| -------------- | ----------------------- | ------------------------------------------------------------------------------ |
-| `list`         | `GET  path`             | Calls `repository.list[Cached]` and returns `{ records, pagination }`.        |
-| `get`          | `GET  path/:id`         | Calls `find(id)`; 404 if missing.                                              |
-| `create`       | `POST path`             | Calls `repository.create(request.all())`. Returns 201 + the record.            |
-| `update`       | `PUT  path/:id`         | Loads, saves with `request.allExceptParams()`, returns the updated record.     |
-| `patch`        | `PATCH path/:id`        | Loads, saves with `request.heavyExceptParams()`, returns the patched record.   |
-| `delete`       | `DELETE path/:id`       | Loads, calls `record.destroy()`, returns empty success.                        |
-| `bulkDelete`   | `DELETE path`           | Bulk delete from `request.input("id")` array. Returns `{ deleted: count }`.   |
+| Method       | Generated route   | What it does                                                                 |
+| ------------ | ----------------- | ---------------------------------------------------------------------------- |
+| `list`       | `GET  path`       | Calls `repository.list[Cached]` and returns `{ records, pagination }`.       |
+| `get`        | `GET  path/:id`   | Calls `find(id)`; 404 if missing.                                            |
+| `create`     | `POST path`       | Calls `repository.create(request.all())`. Returns 201 + the record.          |
+| `update`     | `PUT  path/:id`   | Loads, saves with `request.allExceptParams()`, returns the updated record.   |
+| `patch`      | `PATCH path/:id`  | Loads, saves with `request.heavyExceptParams()`, returns the patched record. |
+| `delete`     | `DELETE path/:id` | Loads, calls `record.destroy()`, returns empty success.                      |
+| `bulkDelete` | `DELETE path`     | Bulk delete from `request.input("id")` array. Returns `{ deleted: count }`.  |
 
 All seven exist on the base `Restful` class — `router.restfulResource(...)` generates a route for any of them the class exposes. The framework picks based on the presence of each method on the resource you pass.
 
@@ -228,7 +228,7 @@ class ProductsRestful extends Restful<Product> {
       schema: v.object({
         category_id: v.string(),
       }),
-      validate: async (request, response) => {
+      validate: async ({ request, response }) => {
         // Custom validation runs after schema. Return a response to abort.
       },
     },
@@ -274,18 +274,18 @@ Now the API responses use `product` / `products` — which is what the reference
 
 Override any of the protected methods to inject behaviour. The hook fires at well-known moments, receives `(request, response, record, oldRecord?)`, and **returning anything truthy short-circuits the action** — the framework treats it as the response.
 
-| Hook            | Fires                                                                | Use case                                |
-| --------------- | -------------------------------------------------------------------- | --------------------------------------- |
-| `beforeCreate`  | Before `create` calls the repository                                 | Set defaults, run async validations.    |
-| `onCreate`      | After `create` returns                                               | Send notifications, audit.              |
-| `beforeUpdate`  | Before `update` saves                                                | Compute derived fields.                 |
-| `onUpdate`      | After `update` returns                                               | Invalidate downstream caches.           |
-| `beforePatch`   | Before `patch` saves                                                 | Same as update.                         |
-| `onPatch`       | After `patch` returns                                                | Same as update.                         |
-| `beforeDelete`  | Before `destroy()` runs                                              | Pre-flight cleanup.                     |
-| `onDelete`      | After `destroy()` returns                                            | Post-flight cleanup.                    |
-| `beforeSave`    | Before any save (create / update / patch)                            | Cross-action setup.                     |
-| `onSave`        | After any save (create / update / patch)                             | Cross-action notification.              |
+| Hook           | Fires                                     | Use case                             |
+| -------------- | ----------------------------------------- | ------------------------------------ |
+| `beforeCreate` | Before `create` calls the repository      | Set defaults, run async validations. |
+| `onCreate`     | After `create` returns                    | Send notifications, audit.           |
+| `beforeUpdate` | Before `update` saves                     | Compute derived fields.              |
+| `onUpdate`     | After `update` returns                    | Invalidate downstream caches.        |
+| `beforePatch`  | Before `patch` saves                      | Same as update.                      |
+| `onPatch`      | After `patch` returns                     | Same as update.                      |
+| `beforeDelete` | Before `destroy()` runs                   | Pre-flight cleanup.                  |
+| `onDelete`     | After `destroy()` returns                 | Post-flight cleanup.                 |
+| `beforeSave`   | Before any save (create / update / patch) | Cross-action setup.                  |
+| `onSave`       | After any save (create / update / patch)  | Cross-action notification.           |
 
 A real shape:
 
@@ -347,7 +347,7 @@ router.restfulResource("/products", productsRestful, {
 
 // Everything except bulkDelete
 router.restfulResource("/products", productsRestful, {
-  except: ["delete"],   // also excludes bulkDelete
+  except: ["delete"], // also excludes bulkDelete
 });
 ```
 
@@ -373,7 +373,7 @@ The `replace.list` runs instead of `productsRestful.list` — useful when one ac
 class ProductsRestful extends Restful<Product> {
   protected repository = productsRepository;
 
-  public cache = false;  // hit the database directly on every read
+  public cache = false; // hit the database directly on every read
 }
 ```
 
@@ -400,10 +400,10 @@ Middleware here runs from the action handler itself (via `callMiddleware`). Rout
 
 ## When to prefer each
 
-| Pattern                          | When it fits                                                                                  |
-| -------------------------------- | --------------------------------------------------------------------------------------------- |
-| **Chainable builder**            | Most modules. Each action has its own controller file. The reference codebase default.        |
-| **`Restful` class**              | Internal admin endpoints. A CRUD module that's truly five identical-shaped actions over one repository, where lifecycle hooks beat per-action controllers. |
+| Pattern               | When it fits                                                                                                                                               |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Chainable builder** | Most modules. Each action has its own controller file. The reference codebase default.                                                                     |
+| **`Restful` class**   | Internal admin endpoints. A CRUD module that's truly five identical-shaped actions over one repository, where lifecycle hooks beat per-action controllers. |
 
 The chainable builder wins by default because the indirection cost (one file per action) is small and the upside (each action evolves independently, validation lives next to the controller, permissions are obvious from the route declaration) shows up the moment one action diverges.
 

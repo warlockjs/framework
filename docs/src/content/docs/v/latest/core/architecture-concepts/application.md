@@ -20,14 +20,14 @@ That's the only line. There's no `new Application()` — the class is purely sta
 
 Think of `Application` as the framework's read-only header — the bits of state every part of the app needs to know but nobody owns. It's not a container, not a DI scope, not a service locator. It's a small fixed surface of getters that always answer.
 
-| Layer            | What it knows                                        | Mutation                            |
-| ---------------- | ---------------------------------------------------- | ----------------------------------- |
-| Environment      | `development` / `production` / `test`                | `setEnvironment(env)` — bootstrap   |
-| Runtime mode     | Is this `dev-server` or the production bundle?       | `setRuntimeStrategy(mode)` — framework |
-| Boot & shutdown  | Run code after the late phase, or clean up before exit. | `onceBooted` / `whenBooted` / `onShutdown` — fired once by the framework |
-| Process timing   | When did we start? How long have we been up?         | None — derived from `process.uptime()` |
-| Framework version| What's the loaded `@warlock.js/core` version?        | Set once during boot                |
-| Paths            | Root, src, app, storage, uploads, public             | None — anchored at `process.cwd()`  |
+| Layer             | What it knows                                           | Mutation                                                                 |
+| ----------------- | ------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Environment       | `development` / `production` / `test`                   | `setEnvironment(env)` — bootstrap                                        |
+| Runtime mode      | Is this `dev-server` or the production bundle?          | `setRuntimeStrategy(mode)` — framework                                   |
+| Boot & shutdown   | Run code after the late phase, or clean up before exit. | `onceBooted` / `whenBooted` / `onShutdown` — fired once by the framework |
+| Process timing    | When did we start? How long have we been up?            | None — derived from `process.uptime()`                                   |
+| Framework version | What's the loaded `@warlock.js/core` version?           | Set once during boot                                                     |
+| Paths             | Root, src, app, storage, uploads, public                | None — anchored at `process.cwd()`                                       |
 
 Each row gets a section below.
 
@@ -44,10 +44,10 @@ It's read from `process.env.NODE_ENV`, defaulting to `"development"` if unset.
 ```ts
 import { Application } from "@warlock.js/core";
 
-Application.environment;       // "development" | "production" | "test"
-Application.isDevelopment;     // boolean
-Application.isProduction;      // boolean
-Application.isTest;            // boolean
+Application.environment; // "development" | "production" | "test"
+Application.isDevelopment; // boolean
+Application.isProduction; // boolean
+Application.isTest; // boolean
 ```
 
 The three `is*` getters are evaluated each time they're called — they read `process.env.NODE_ENV` live. No caching, no memoization, no need to invalidate.
@@ -65,7 +65,7 @@ const httpConfigurations: HttpConfigurations = {
     secret: env("COOKIE_SECRET", "super-secret-key-change-me"),
     options: {
       httpOnly: true,
-      secure: Application.isProduction,    // HTTPS-only cookies in prod
+      secure: Application.isProduction, // HTTPS-only cookies in prod
       path: "/",
     },
   },
@@ -98,7 +98,7 @@ Test framework caveat: `Application.isTest` returns `false` unless something exp
 A separate axis from environment — the framework runs your code via one of two strategies:
 
 ```ts
-Application.runtimeStrategy;       // "production" | "development"
+Application.runtimeStrategy; // "production" | "development"
 Application.setRuntimeStrategy("production");
 ```
 
@@ -122,8 +122,8 @@ Application.onceBooted(({ environment, runtimeStrategy, bootDurationMs }) => {
   // Runs once the app is fully booted — http listening, socket bound.
 });
 
-Application.isBooted;            // boolean — has boot finished?
-await Application.whenBooted();  // Promise<BootContext> — await form
+Application.isBooted; // boolean — has boot finished?
+await Application.whenBooted(); // Promise<BootContext> — await form
 ```
 
 ### Why not just put the code at the end of `main.ts`?
@@ -155,11 +155,11 @@ So a lazily-imported module, a plugin, or any code that wires itself up after st
 
 Every listener — and `whenBooted()`'s resolved value — receives a `BootContext`:
 
-| Field             | Type                                       | Notes                                                        |
-| ----------------- | ------------------------------------------ | ----------------------------------------------------------- |
-| `environment`     | `"development" \| "production" \| "test"`  | The active environment at boot                              |
-| `runtimeStrategy` | `"production" \| "development"`            | Dev server vs bundled output                                |
-| `bootDurationMs`  | `number \| undefined`                      | How long boot took — dev server only; omitted in production |
+| Field             | Type                                      | Notes                                                       |
+| ----------------- | ----------------------------------------- | ----------------------------------------------------------- |
+| `environment`     | `"development" \| "production" \| "test"` | The active environment at boot                              |
+| `runtimeStrategy` | `"production" \| "development"`           | Dev server vs bundled output                                |
+| `bootDurationMs`  | `number \| undefined`                     | How long boot took — dev server only; omitted in production |
 
 Both the dev server and the production bundle fire the latch exactly once, after the late phase. App code only ever _reads_ it (`onceBooted` / `whenBooted` / `isBooted`); the internal `markBooted` is a framework concern — don't call it.
 
@@ -193,8 +193,8 @@ The framework triggers this for you (the connectors manager runs the hooks at th
 Two read-only getters tell you when the process started and how long it's been running:
 
 ```ts
-Application.startedAt;     // Date — when the Node process started
-Application.uptime;        // number — milliseconds since process start
+Application.startedAt; // Date — when the Node process started
+Application.uptime; // number — milliseconds since process start
 ```
 
 `startedAt` is computed once at import time from `process.uptime()`. It's a `Date` — JSON-serializable, comparable, the usual moves.
@@ -207,7 +207,7 @@ Useful for health endpoints, logging at boot, and the kind of "this process has 
 import type { RequestHandler } from "@warlock.js/core";
 import { Application } from "@warlock.js/core";
 
-export const healthController: RequestHandler = async (request, response) => {
+export const healthController: RequestHandler = async ({ request, response }) => {
   return response.success({
     status: "ok",
     environment: Application.environment,
@@ -221,7 +221,7 @@ export const healthController: RequestHandler = async (request, response) => {
 ## Framework version
 
 ```ts
-Application.version;       // string | null — e.g. "2.5.0"
+Application.version; // string | null — e.g. "2.5.0"
 ```
 
 Reads from `@warlock.js/core/package.json`. Returns `null` until the framework has loaded the version file (which it does early during boot). Once loaded, it's cached — subsequent reads are free.
@@ -239,14 +239,14 @@ log.info("boot", "framework", `Warlock ${Application.version} starting`);
 
 Six absolute paths cover the well-known locations in a Warlock project. Every getter returns a fully-resolved string anchored at `process.cwd()`:
 
-| Getter                | Resolves to                          | Use for                                              |
-| --------------------- | ------------------------------------ | ---------------------------------------------------- |
-| `Application.rootPath`   | `<cwd>`                              | Anything project-relative                            |
-| `Application.srcPath`    | `<cwd>/src`                          | Targeting source — rarely needed at runtime          |
-| `Application.appPath`    | `<cwd>/src/app`                      | Targeting modules — also rarely needed at runtime    |
-| `Application.storagePath`| `<cwd>/storage`                      | Persistent disk artefacts (logs, cache, uploads root)|
-| `Application.uploadsPath`| Either `<cwd>/storage/uploads` or the path set in `config.uploads.root` | The uploads bucket for user-submitted files |
-| `Application.publicPath` | `<cwd>/public`                       | Static assets served via `router.directory(...)`      |
+| Getter                    | Resolves to                                                             | Use for                                               |
+| ------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------- |
+| `Application.rootPath`    | `<cwd>`                                                                 | Anything project-relative                             |
+| `Application.srcPath`     | `<cwd>/src`                                                             | Targeting source — rarely needed at runtime           |
+| `Application.appPath`     | `<cwd>/src/app`                                                         | Targeting modules — also rarely needed at runtime     |
+| `Application.storagePath` | `<cwd>/storage`                                                         | Persistent disk artefacts (logs, cache, uploads root) |
+| `Application.uploadsPath` | Either `<cwd>/storage/uploads` or the path set in `config.uploads.root` | The uploads bucket for user-submitted files           |
+| `Application.publicPath`  | `<cwd>/public`                                                          | Static assets served via `router.directory(...)`      |
 
 Each getter is a thin wrapper over the corresponding path helper. The helpers themselves accept extra path segments — if you want to compose deeper paths, import them directly:
 
@@ -267,7 +267,7 @@ If you've set `uploads.root` in your config — pointing to a CDN-mounted volume
 import { rootPath } from "@warlock.js/core";
 
 export default {
-  root: rootPath("..", "shared-uploads"),    // outside the project
+  root: rootPath("..", "shared-uploads"), // outside the project
   // or:
   // root: (relativePath: string) => `/mnt/uploads/${relativePath}`,
 };
@@ -322,7 +322,7 @@ Drop this into a module's `main.ts` and you'll get the boot annotation in your l
 import type { RequestHandler } from "@warlock.js/core";
 import { Application } from "@warlock.js/core";
 
-export const healthController: RequestHandler = async (request, response) => {
+export const healthController: RequestHandler = async ({ request, response }) => {
   return response.success({
     status: "ok",
     environment: Application.environment,

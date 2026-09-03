@@ -118,16 +118,16 @@ export type UploadAvatarSchema = Infer<typeof uploadAvatarSchema>;
 
 The methods on `v.file()`:
 
-| Method            | Effect                                                          |
-| ----------------- | --------------------------------------------------------------- |
-| `.image()`        | Requires the file to be an image (`mimeType.startsWith("image/")`). |
-| `.maxSize(opts)`  | Max file size. Accepts `{ unit: "MB"\|"KB"\|"GB", size: N }` or a raw byte count. |
-| `.minSize(opts)`  | Min file size. Same shape.                                      |
-| `.mimeType(list)` | Allow-list of MIME types. String or array.                      |
-| `.accept(exts)`   | Allow-list of file extensions (without the dot).                |
-| `.maxWidth(px)` / `.minWidth(px)` | Image-only. Max/min width in pixels.            |
-| `.maxHeight(px)` / `.minHeight(px)` | Image-only.                                   |
-| `.pdf()` / `.excel()` / `.word()` | Shortcut MIME-type filters.                     |
+| Method                              | Effect                                                                            |
+| ----------------------------------- | --------------------------------------------------------------------------------- |
+| `.image()`                          | Requires the file to be an image (`mimeType.startsWith("image/")`).               |
+| `.maxSize(opts)`                    | Max file size. Accepts `{ unit: "MB"\|"KB"\|"GB", size: N }` or a raw byte count. |
+| `.minSize(opts)`                    | Min file size. Same shape.                                                        |
+| `.mimeType(list)`                   | Allow-list of MIME types. String or array.                                        |
+| `.accept(exts)`                     | Allow-list of file extensions (without the dot).                                  |
+| `.maxWidth(px)` / `.minWidth(px)`   | Image-only. Max/min width in pixels.                                              |
+| `.maxHeight(px)` / `.minHeight(px)` | Image-only.                                                                       |
+| `.pdf()` / `.excel()` / `.word()`   | Shortcut MIME-type filters.                                                       |
 
 If validation fails, the framework returns `400` with `errors.avatar = "..."` and your controller never runs.
 
@@ -137,23 +137,15 @@ The schema file exports both the value and its inferred type — no separate `*.
 
 ```ts title="src/app/uploads/controllers/upload-avatar.controller.ts"
 import { type GuardedRequestHandler } from "app/auth/types/guarded-request.type";
-import {
-  type UploadAvatarSchema,
-  uploadAvatarSchema,
-} from "../schema/upload-avatar.schema";
+import { type UploadAvatarSchema, uploadAvatarSchema } from "../schema/upload-avatar.schema";
 
-export const uploadAvatarController: GuardedRequestHandler<UploadAvatarSchema> = async (
+export const uploadAvatarController: GuardedRequestHandler<UploadAvatarSchema> = async ({
   request,
   response,
-) => {
+}) => {
   const { avatar } = request.validated();
 
-  const file = await avatar
-    .resize(400, 400)
-    .format("webp")
-    .quality(85)
-    .use("s3")
-    .save("avatars");
+  const file = await avatar.resize(400, 400).format("webp").quality(85).use("s3").save("avatars");
 
   return response.successCreate({
     path: file.path,
@@ -196,24 +188,24 @@ Without `urlPrefix` configured, the URL is the raw S3 URL. With it set to your C
 
 ```ts
 await avatar.save("avatars", {
-  name: "original",                                           // → avatars/photo.webp
+  name: "original", // → avatars/photo.webp
 });
 
 await avatar.save("avatars", {
-  name: "random",                                             // (default) avatars/x7k9m2p4.webp
+  name: "random", // (default) avatars/x7k9m2p4.webp
 });
 
 await avatar.save("avatars", {
-  prefix: { format: "yyyy/MM/dd", as: "directory" },          // → avatars/2026/05/23/x7k9m2p4.webp
+  prefix: { format: "yyyy/MM/dd", as: "directory" }, // → avatars/2026/05/23/x7k9m2p4.webp
 });
 
 await avatar.save("avatars", {
   name: "original",
-  prefix: true,                                               // → avatars/23-05-2026-12-30-45-photo.webp
+  prefix: true, // → avatars/23-05-2026-12-30-45-photo.webp
 });
 
 await avatar.save("avatars", {
-  driver: "s3",                                               // alternative to .use("s3")
+  driver: "s3", // alternative to .use("s3")
 });
 ```
 
@@ -280,7 +272,7 @@ For private content (signed contracts, paid downloads, private documents), keep 
 ```ts title="src/app/uploads/controllers/get-document-url.controller.ts"
 import { storage, type RequestHandler } from "@warlock.js/core";
 
-export const getDocumentUrlController: RequestHandler = async (request, response) => {
+export const getDocumentUrlController: RequestHandler = async ({ request, response }) => {
   const path = request.input("path");
 
   const url = await storage.use("s3").temporaryUrl(path, 300); // 5 minutes
@@ -309,11 +301,7 @@ type SaveUploadInput = {
   uploadedBy: string;
 };
 
-export async function saveUploadService({
-  file,
-  directory,
-  uploadedBy,
-}: SaveUploadInput) {
+export async function saveUploadService({ file, directory, uploadedBy }: SaveUploadInput) {
   const storageFile = await file.use("s3").save(directory, {
     prefix: { format: "yyyy/MM/dd", as: "directory" },
   });
@@ -341,7 +329,8 @@ import { v } from "@warlock.js/seal";
 export const uploadGallerySchema = v.object({
   images: v
     .array(
-      v.file()
+      v
+        .file()
         .image()
         .maxSize({ unit: "MB", size: 10 })
         .mimeType(["image/jpeg", "image/png", "image/webp"]),
@@ -353,16 +342,14 @@ export const uploadGallerySchema = v.object({
 The controller reads the array and processes in parallel:
 
 ```ts
-export const uploadGalleryController: RequestHandler = async (
-  request: UploadGalleryRequest,
+export const uploadGalleryController: RequestHandler<UploadGalleryRequest> = async ({
+  request,
   response,
-) => {
+}) => {
   const { images } = request.validated();
 
   const files = await Promise.all(
-    images.map((image) =>
-      image.use("s3").save(`gallery/${request.user.id}`),
-    ),
+    images.map((image) => image.use("s3").save(`gallery/${request.user.id}`)),
   );
 
   return response.successCreate({

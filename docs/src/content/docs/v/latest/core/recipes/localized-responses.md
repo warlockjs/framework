@@ -77,7 +77,7 @@ import type { Middleware } from "@warlock.js/core";
 
 const supportedLocales = new Set(["en", "ar"]);
 
-export const localeFromAcceptLanguage: Middleware = async (request) => {
+export const localeFromAcceptLanguage: Middleware = async ({ request }) => {
   if (request.locale) {
     return;
   }
@@ -176,11 +176,11 @@ Pass the placeholders object as the second argument. The framework injects `{key
 Use `t()` from `@warlock.js/core` everywhere you build an error response. It reads the locale from the current request automatically:
 
 ```ts title="src/app/products/controllers/show-product.controller.ts"
-import { t, type RequestHandler, type Response } from "@warlock.js/core";
+import { t, type RequestHandler } from "@warlock.js/core";
 import { productsRepository } from "../repositories/products.repository";
 import { ProductResource } from "../resources/product.resource";
 
-export const showProductController: RequestHandler = async (request, response: Response) => {
+export const showProductController: RequestHandler = async ({ request, response }) => {
   const product = await productsRepository.get(request.input("id"));
 
   if (!product) {
@@ -196,9 +196,9 @@ The flow: the request lifecycle binds `t()` to the resolved locale before your h
 Real example from the reference codebase:
 
 ```ts title="src/app/auth/controllers/login.controller.ts"
-import { t, type RequestHandler, type Response } from "@warlock.js/core";
+import { t, type RequestHandler } from "@warlock.js/core";
 
-export const login: RequestHandler = async (request, response: Response) => {
+export const login: RequestHandler = async ({ request, response }) => {
   const result = await loginUseCase({ data: request.validated() });
 
   if (!result) {
@@ -338,12 +338,12 @@ A wrapper would have to pick options (locale, calendar, time zone, format option
 The full request flow for a localized product detail page:
 
 ```ts title="src/app/products/controllers/show-product.controller.ts"
-import { t, type RequestHandler, type Response } from "@warlock.js/core";
+import { t, type RequestHandler } from "@warlock.js/core";
 import { productsRepository } from "../repositories/products.repository";
 import { ProductResource } from "../resources/product.resource";
 import { formatDate, formatMoney } from "../utils/format";
 
-export const showProductController: RequestHandler = async (request, response: Response) => {
+export const showProductController: RequestHandler = async ({ request, response }) => {
   const product = await productsRepository.get(request.input("id"));
 
   if (!product) {
@@ -421,7 +421,7 @@ const message = trans("auth.otpExpired");
 
 - **`t()` returns the key when nothing matches.** Calling `t("products.unknown")` returns `"products.unknown"` (or the fallback locale's value). Treat unmatched keys as a development bug, not a user-facing string.
 - **`"localized"` only works on arrays of `{localeCode, value}`.** If you have `name: { en: "...", ar: "..." }` shape, that's not what the cast expects — convert at the model level via an accessor or change the storage shape.
-- **Locale resolution happens *once*, at request construction.** Calling `request.setLocaleCode("ar")` later doesn't re-bind `t()` for the current request. If you need to change locale mid-request (rare), use `request.transFrom("ar", "key")` explicitly.
+- **Locale resolution happens _once_, at request construction.** Calling `request.setLocaleCode("ar")` later doesn't re-bind `t()` for the current request. If you need to change locale mid-request (rare), use `request.transFrom("ar", "key")` explicitly.
 - **The `Sunset` header for deprecated endpoints isn't localized.** HTTP-date format is fixed. Locale belongs in body payloads, not in protocol headers.
 - **Cascading translations across modules don't share keys.** `t("auth.notFound")` and `t("products.notFound")` are independent — the module name is the namespace. Don't reach into another module's translations; if a key should be shared, define it under `shared.*` in `src/app/shared/utils/locales.ts`.
 

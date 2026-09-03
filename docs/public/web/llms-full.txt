@@ -8,7 +8,7 @@
 
 ---
 name: add-web-to-an-app
-description: 'Install the SSR page layer with `warlock add web`: add React/Vite peers, scaffold `src/web/root.tsx` and `src/web/home.page.tsx`, register `webConnector()`, and safely relocate the stock top-level `GET "/"` JSON route to `/welcome`. Triggers: `warlock add web`, `webConnector`, `src/web/root.tsx`, `src/web/home.page.tsx`, `GET "/welcome"`; "add web to an app", "install Warlock web", "scaffold SSR", "homepage route collision". Skip: author a page — `@warlock.js/web/create-a-page/SKILL.md`; customize the document — `@warlock.js/web/write-the-root/SKILL.md`; dev/build/start commands — `@warlock.js/core/run-app/SKILL.md`; competing installers `create-next-app`, `vite create`, `remix init`.'
+description: 'Install the SSR page layer with `warlock add web`: add React/Vite peers, scaffold `src/web/root.tsx` and `src/web/index.page.tsx`, register `webConnector()`, and safely relocate the stock top-level `GET "/"` JSON route to `/welcome`. Triggers: `warlock add web`, `webConnector`, `src/web/root.tsx`, `src/web/index.page.tsx`, `GET "/welcome"`; "add web to an app", "install Warlock web", "scaffold SSR", "homepage route collision". Skip: author a page — `@warlock.js/web/create-a-page/SKILL.md`; customize the document — `@warlock.js/web/write-the-root/SKILL.md`; dev/build/start commands — `@warlock.js/core/run-app/SKILL.md`; competing installers `create-next-app`, `vite create`, `remix init`.'
 ---
 
 # Warlock — add web to an app
@@ -18,7 +18,7 @@ description: 'Install the SSR page layer with `warlock add web`: add React/Vite 
 ## The shape
 
 ```bash
-yarn warlock add web
+pnpm warlock add web
 ```
 
 On the ordinary path it leaves this application-owned shape:
@@ -27,11 +27,13 @@ On the ordinary path it leaves this application-owned shape:
 src/
   web/
     root.tsx
-    home.page.tsx
+    index.page.tsx
 warlock.config.ts
 ```
 
-The generated home page declares `route = "/"`. The generated root owns the document, renders `<Head />`, keeps `{children}` inside `#root`, and renders `<Scripts />`.
+The generated index page declares `route = { path: "/", name: "index" }`, so the server payload and client registry consume one explicit identity. Universal localization setup is inside its synchronous `register()` hook. The generated root owns the document, renders `<Head />`, keeps `{children}` inside `#root`, and renders `<Scripts />`.
+
+Every added `@warlock.js/*` package is saved at the exact version of the Core CLI executing the command. Third-party dependency ranges stay as declared by the feature.
 
 ## Connector registration
 
@@ -76,9 +78,9 @@ Indented `router.get("/", ...)` declarations inside a prefixed group are not roo
 
 - No `src/app/shared/routes.ts`, or no top-level `GET "/"`: create the root page normally.
 - Exactly one recognized top-level `GET "/"` and no top-level `GET "/welcome"`: move it to `/welcome`, then create the home page.
-- More than one top-level `GET "/"`, an existing top-level `GET "/welcome"`, an unreadable/unwritable routes file, or an unrecognized rewrite: create `root.tsx`, do not create `home.page.tsx`, set a failing exit code, and still register the connector.
+- More than one top-level `GET "/"`, an existing top-level `GET "/welcome"`, an unreadable/unwritable routes file, or an unrecognized rewrite: create `root.tsx`, do not create `index.page.tsx`, set a failing exit code, and still register the connector.
 
-On the refusal path, free `/` yourself and create a page with either `route = "/"` or another literal route.
+On the refusal path, free `/` yourself and create a page with either `route = { path: "/", name: "index" }` or another literal route.
 
 ## Re-running the command
 
@@ -89,8 +91,8 @@ On the refusal path, free `/` yourself and create a page with either `route = "/
 Read the files rather than assuming the command could patch every application shape:
 
 ```bash
-yarn warlock routes --method GET --path /
-yarn warlock routes --method GET --path /welcome
+pnpm warlock routes --method GET --path /
+pnpm warlock routes --method GET --path /welcome
 ```
 
 The desired result is one page route at `/` and, when the stock JSON route existed, one API route at `/welcome`.
@@ -114,12 +116,12 @@ The desired result is one page route at `/` and, when the stock JSON route exist
 
 ---
 name: create-a-page
-description: 'Create an SSR React page under `src/web/**`, with either a literal `route` or a filesystem-derived one, a default component, an optional typed `loader`, page `metadata`, the `error.page.tsx` boundary, and the universal `register()` hook. Triggers: `*.page.tsx`, `route`, `PageLoader`, `PageProps`, `PageMetadata`, `error.page.tsx`, `register`; "create a page", "add an SSR route", "make a React page", "type page loader data", "add an error boundary"; typical import `import type { PageLoader, PageProps } from "@warlock.js/web"`. Skip: root document shell — `@warlock.js/web/write-the-root/SKILL.md`; layout wrappers and prefixes — `@warlock.js/web/use-layouts/SKILL.md`; loader lifecycle and `shared` — `@warlock.js/web/load-page-data/SKILL.md`; competing frameworks `next`, `remix`, `react-router` file routes.'
+description: 'Create an SSR React page under `src/web/**`, with either a literal `route` or a filesystem-derived one, an explicit public-cache opt-in, a default component, an optional typed `loader`, page `metadata`, the `error.page.tsx` boundary, and the universal `register()` hook. Triggers: `*.page.tsx`, `route`, `route.cache`, `maxAge`, `PageLoader`, `PageProps`, `PageMetadata`, `error.page.tsx`, `register`, `[...slug]`; "create a page", "cache a public page", "add an SSR route", "make a React page", "type page loader data", "add an error boundary", "catch-all route", "page renders blank 200", "page has no default export"; typical import `import type { PageLoader, PageProps } from "@warlock.js/web"`. Skip: root document shell — `@warlock.js/web/write-the-root/SKILL.md`; layout wrappers and prefixes — `@warlock.js/web/use-layouts/SKILL.md`; loader lifecycle and `shared` — `@warlock.js/web/load-page-data/SKILL.md`; competing frameworks `next`, `remix`, `react-router` file routes.'
 ---
 
 # Warlock — create a page
 
-A page is any `*.page.tsx` beneath `src/web/` — the only page root. (A per-module `src/app/<module>/web/` tree is not scanned; move any page that lived there into `src/web/`, a subdirectory if you like.) Its URL is either a declared `route` or one derived from its own location; its default export renders React.
+A page is any `*.page.tsx` beneath `src/web/` — the page root. Its URL is either a declared `route` or one derived from its own location; its default export renders React.
 
 ## The shape
 
@@ -129,12 +131,11 @@ import type { PageLoader, PageMetadata, PageProps } from "@warlock.js/web";
 export const route = {
   path: "/products/:id",
   name: "products.details",
+  cache: { public: true, maxAge: 60 },
 } as const;
 
-export const loader = (async ({ request, response }) => {
+export const loader = (async ({ request }) => {
   const id = request.input("id");
-
-  response.header("cache-control", "private, max-age=60");
 
   return {
     product: {
@@ -178,7 +179,22 @@ export default function ContactPage() {
 
 `route` is optional. A page that omits it derives both its path and its name from where the file sits beneath `src/web` ([filesystem routing](#filesystem-routing), below). A page that declares `route` uses that instead — an explicit `route` always wins over the derived one, for both the path and (when it sets `name`) the name.
 
-Changed in 5.2: through 5.1 an omitted `route` was refused — `warlock dev` and the production discovery pass threw `MissingRouteExportError`, naming the file. That error class is gone; the same file now resolves to a real, browsable URL.
+### The default export is required
+
+`route` is optional; the default export is not. A `*.page.tsx` that exports only named bindings is a **hard discovery/build failure naming the file**:
+
+```
+The page "src/web/contact.page.tsx" has no runtime default export. Every `*.page.tsx`
+file must default-export the React component it renders. For example:
+`export default function Page() { return <main />; }`
+```
+
+Two details worth knowing:
+
+- **`export { Page as default }` satisfies the rule** — the check is for a runtime default binding, not for the `export default` keyword form specifically.
+- **`export default interface Page {}` does not.** A type-only default is erased at compile time, so there is no component at runtime; it is treated as missing.
+
+A file that cannot be parsed reports separately — `Cannot inspect the default export of "<file>": the file could not be parsed (…). Fix the syntax error and discovery will continue.` — so a syntax error never masquerades as a missing export.
 
 ## Route declarations
 
@@ -192,6 +208,7 @@ export const route = "/products";
 export const route = {
   path: "/products/:id",
   name: "products.details",
+  cache: { public: true, maxAge: 60 },
 } as const;
 ```
 
@@ -201,26 +218,73 @@ Every segment of a page's URL is written down somewhere: `route.path` (or the de
 
 The build reads `route` without executing application code. Declare it directly with `export const` and literal strings. Variables, function calls, computed object keys, spreads, and `export { route }` are refused.
 
+## Page caching
+
+Page documents and their `x-warlock-data` representations are `no-store` by
+default. Opt a public page into shared caching on its route:
+
+```tsx
+export const route = {
+  path: "/products",
+  name: "products.index",
+  cache: { public: true, maxAge: 60 },
+} as const;
+```
+
+`maxAge` is seconds. Both keys are required: `cache: { public: true }` is a
+boot-time `InvalidPageCacheOptInError`, because the framework will not invent
+a freshness window. Remove `cache` entirely to keep the safe `no-store`
+default.
+
+The declaration is an opt-in, not an override of request safety. A response
+that sets or clears a cookie, or a request that used authenticated state,
+emits `Cache-Control: private, no-store`. If Warlock cannot determine whether
+the request used authenticated state, it revokes the opt-in and emits
+`Cache-Control: no-store`. Only a provably unauthenticated request with no
+`Set-Cookie` can emit `public, max-age=<maxAge>`.
+
+This decision is applied once after loaders finish, to both representations.
+Setting `Cache-Control` manually in a loader cannot bypass the floor.
+
 ## Filesystem routing
 
 Omit `route` and the URL comes from the page's own path beneath `src/web`:
 
 - Every directory contributes a segment, in order — `src/web/products/featured.page.tsx` derives `/products/featured`.
-- A `(group)` directory — parentheses, not braces — contributes nothing to the URL, only to organization: `src/web/(marketing)/pricing.page.tsx` derives `/pricing`.
+- A `(group)` directory — parentheses, not braces — contributes nothing to the URL, only to organization: `src/web/(marketing)/pricing.page.tsx` derives `/pricing`. Bracket syntax inside a group name is refused at boot because it can never contribute a dynamic segment; use `(marketing)/[id]/page.page.tsx`, not `(marketing[id])/page.page.tsx`.
 - `index.page.tsx` claims its own directory rather than adding a segment: `src/web/products/index.page.tsx` derives `/products`. This is the ONLY filename with special meaning — `home.page.tsx` is not magic and derives `/home`.
 - `[id]` becomes `:id`: `src/web/products/[id].page.tsx` derives `/products/:id`.
 - A layout `prefix` on the page's ancestry composes in front of the derived path exactly as it does for an explicit `route.path` ([use-layouts](../use-layouts/SKILL.md)).
 
 Two pages that derive (or declare) the same effective path is a build error naming both files.
 
+### Catch-all segments are refused
+
+There is no catch-all / rest-parameter form in filesystem routing. Only
+`[name]` — a plain identifier in square brackets — is recognized as a
+dynamic segment. `src/web/docs/[...slug].page.tsx` raises
+`PageFileSegmentNotSupportedError` at boot and names both the page file and
+the rejected segment.
+
+Until a catch-all exists, use the terminal wildcard with an explicit `route`:
+
+```tsx
+export const route = { path: "/docs/*", name: "docs.catchAll" } as const;
+```
+
 ## Page-route grammar
 
 Page routes deliberately accept less than API routes:
 
 - Supported: `/`, static segments, whole-segment params such as `/products/:id`, the exact wildcard `*`, and a terminal wildcard such as `/docs/*`.
-- Not supported: regex params, optional params, multiple params in one segment, params mixed with text, doubled or trailing slashes, and non-terminal wildcards.
+- Not supported: regex params, optional params, multiple params in one segment, params mixed with text, doubled or trailing slashes, non-terminal wildcards, and catch-all/rest segments (`[...slug]`).
 
 Write two pages for an optional segment. Validate a constrained parameter in the page instead of putting a regex in its path.
+
+An unsupported declared path is a boot-time
+`PageRoutePathNotSupportedError`, never a literal or normalized route.
+Examples that fail include `/users/:id?`, `/users/:id(\\d+)`,
+`/near/:lat-:lng`, `/a//b`, and `/users/`.
 
 ## Metadata
 
@@ -261,6 +325,10 @@ export default function ErrorPage({ error, status }: ErrorPageProps) {
 
 During SSR the component receives the real thrown value in `error`. After hydration it receives the JSON-safe `{ name, message, stack? }` shape instead — the original value does not survive the wire. `robots: noindex` is a framework default on this path that an app-supplied `metadata` cannot remove.
 
+Every unhandled error response is also forced to
+`Cache-Control: private, no-store` at the framework's shared error funnel.
+This includes page and API-route failures.
+
 If the failure happens before any page module could even load — a module-load or `register()` throw — there is no trustworthy server composition left to hydrate against, so Warlock renders a plain framework fallback (your `error.page.tsx` if it can still be loaded, otherwise a minimal built-in boundary) with no hydration script at all rather than risk hydrating client code against markup nothing can vouch for.
 
 ## The `register()` hook
@@ -286,9 +354,27 @@ The browser boundary is decided by the import graph, not by the file's location.
 
 Keep server-only repository and service reads inside `loader`. Do not read them from module-scope initializers or the default component.
 
+### `.client` does not isolate SSR
+
+A `.client.tsx` suffix is a naming convention, not an SSR-isolation boundary. A
+module statically imported by a page, layout, root, or any of their imports is
+still evaluated by the server. Top-level browser globals such as `window`
+therefore crash SSR boot. Warlock does not ship a client-only component
+primitive; code that requires browser globals at module scope cannot be part of
+the SSR page graph.
+
+### Static assets use `public/`
+
+The production server build does not support imported non-stylesheet assets. An
+import such as `import logo from "./logo.svg"` works under Vite in development
+but `warlock build` refuses it rather than emit a server URL that disagrees with
+the client bundle. Put the file in the application's `public/` directory and
+reference it by root URL: `public/logo.svg` is `/logo.svg`. Stylesheet imports
+are the exception and remain supported.
+
 ## Editing a page in development
 
-`warlock dev` decides Fast Refresh vs. a full reload by comparing the module's *skeleton* — its source with every component body masked out — across the edit. Everything outside a component body is part of the skeleton: imports, module-level declarations, and all server exports (`route`, `middleware`, `validation`, `loader`, `metadata`). The skeleton moving, with or without a simultaneous JSX change, forces a full reload; the skeleton holding still defers to Fast Refresh.
+`warlock dev` decides Fast Refresh vs. a full reload by comparing the module's _skeleton_ — its source with every component body masked out — across the edit. Everything outside a component body is part of the skeleton: imports, module-level declarations, and all server exports (`route`, `middleware`, `validation`, `loader`, `metadata`). The skeleton moving, with or without a simultaneous JSX change, forces a full reload; the skeleton holding still defers to Fast Refresh.
 
 - **A JSX-only edit hot-updates.** The skeleton is unchanged, so Vite's Fast Refresh applies the projected client code with no reload and no lost component state.
 - **A `metadata`-only edit reloads the document.** `metadata` sits outside the skeleton's masked region, so the edit moves it. Warlock sends a full reload, which re-runs SSR and rebuilds `<head>`. Component state is lost — that is the price of seeing the new `<title>` without touching the browser.
@@ -296,17 +382,20 @@ Keep server-only repository and service reads inside `loader`. Do not read them 
 - **A helper function used only by the JSX still reloads if it is declared at module level.** The rule does not try to prove which half of a shared declaration the edit was "really" for — it over-approximates deliberately, because a false reload only costs component state, while a missed one ships a stale `<head>` and calls it a hot update.
 - Creating, deleting, or renaming a page file, or editing its `route` export, is page-GRAPH churn, not a skeleton edit — see below, not Fast Refresh.
 
-Changed in 5.1: a metadata-only edit previously left a stale `<head>` until you refreshed the browser by hand. The current skeleton-comparison rule replaces that earlier, narrower "metadata-only" special case.
-
 ## Route-table changes in development
 
 Creating a page, deleting one, or editing its `route` export's path is a different kind of dev edit from the skeleton comparison above — it changes which URLs exist, not just how one already-registered URL renders. `warlock dev` re-registers the affected route(s) in the live route table, atomically and with no dev-server restart, so the new file (or new path) is reachable on the very next request with no manual restart.
 
-Changed in 5.2: through 5.1 the route table was built once at boot and never again. Creating a page 404'd forever; deleting one kept it reachable at its old URL; editing `route` served the OLD path from the old file and 404'd the new one — the running server silently disagreed with the source on disk. All three are now live.
-
 ## Gotchas
 
-- **A page with no `route` is not unreachable.** It derives a real URL from its file location — see [Filesystem routing](#filesystem-routing). Nothing about a route-less page is refused anymore.
+- **A page with no `route` is not unreachable.** It derives a real URL from its file location — see [Filesystem routing](#filesystem-routing).
+- **A page with no default export IS refused.** Named exports alone fail the build naming the file, instead of serving a blank 200.
+- **`.client.tsx` does not prevent SSR evaluation.** It is a naming convention, not a client-only component primitive.
+- **Imported static assets do not build.** Put them in `public/` and reference their root URL; CSS imports remain supported.
+- **`[...slug]` is not a catch-all.** It fails boot with
+  `PageFileSegmentNotSupportedError`; use an explicit terminal `*` route
+  instead — see [Catch-all segments are refused](#catch-all-segments-are-refused).
+- **`process.env` is refused in the client/universal graph, `PUBLIC_` prefix included.** Read env values in a loader and return them as page data; see [`load-page-data/SKILL.md`](../load-page-data/SKILL.md).
 - **Keep `route` literal.** A computed route cannot be discovered without executing app code and is refused.
 - **Do not annotate the loader with `: PageLoader`.** That erases the return type `PageProps` needs.
 - **Components receive data, not HTTP objects.** `request` and `response` belong to loaders; the component also renders in the browser.
@@ -325,12 +414,82 @@ Changed in 5.2: through 5.1 the route table was built once at boot and never aga
 
 ---
 name: load-page-data
-description: 'Load App, Layout, and Page data with `AppLoader`, `LayoutLoader`, and `PageLoader`; type component `data`, validate page input, short-circuit with the buffered response, and publish request-scoped browser-safe values through `shared`. Triggers: `PageLoader`, `LayoutLoader`, `AppLoader`, `PageProps`, `shared`, `useShared`, `validation`, `request.validated`; "load page data", "pass server data to React", "share request data", "redirect from a loader". Skip: page module basics — `@warlock.js/web/create-a-page/SKILL.md`; layouts — `@warlock.js/web/use-layouts/SKILL.md`; mutation follow-up — `@warlock.js/web/navigate-on-the-client/SKILL.md`; competing loaders Next data functions, Remix loaders, React Server Components.'
+description: 'Load App, Layout, and Page data with `AppLoader`, `LayoutLoader`, and `PageLoader`; type component `data`, validate page input, short-circuit with the buffered response, and publish request-scoped browser-safe values through `shared`. Triggers: `PageLoader`, `LayoutLoader`, `AppLoader`, `PageProps`, `shared`, `useShared`, `validation`, `request.validated`, `process.env`, `env("PUBLIC_...")`, `import.meta.env.PUBLIC_`; "load page data", "pass server data to React", "share request data", "redirect from a loader", "read an environment variable in a page", "process.env refused in the client build", "loader execution order", "return a Response from a loader". Skip: page module basics — `@warlock.js/web/create-a-page/SKILL.md`; layouts — `@warlock.js/web/use-layouts/SKILL.md`; mutation follow-up — `@warlock.js/web/navigate-on-the-client/SKILL.md`; competing loaders Next data functions, Remix loaders, React Server Components.'
 ---
 
 # Warlock — load page data
 
 Loaders run on the server and return serializable data to their own component level. Use the level-specific loader type with `satisfies`, then pass `typeof loader` to the matching props type.
+
+## Pass environment values through loader data
+
+**`process.env` is refused outright in the client/universal graph, and there is
+no `PUBLIC_` exception to it — static or computed.** `env("PUBLIC_X")` does not
+work client-side either. **The supported pattern is: read the value in a loader,
+which is server code, and return it as page data.**
+
+```tsx
+import { env } from "@warlock.js/core";
+import type { PageLoader, PageProps } from "@warlock.js/web";
+
+export const loader = (async () => ({
+  siteName: env("PUBLIC_SITE_NAME"),
+})) satisfies PageLoader;
+
+export default function HomePage({ data }: PageProps<typeof loader>) {
+  return <h1>{data.siteName}</h1>;
+}
+```
+
+Loaders are server-only and may read configuration normally. Their return is
+serialized to the browser, so include only values that are safe to expose.
+
+### What is refused, and where
+
+Every one of these fails the build when it is reachable from a default page or
+layout component, `register()`, or any helper they import:
+
+```tsx
+process.env.API_URL; // static key — refused
+process.env.PUBLIC_API_URL; // a PUBLIC_ prefix changes nothing — refused
+process.env[key]; // computed key — refused
+const { API_URL } = process.env; // bare value-read — refused
+const all = { ...process.env }; // bare value-read — refused
+Object.keys(process.env); // bare value-read — refused
+JSON.stringify(process.env); // bare value-read — refused
+env("PUBLIC_API_URL"); // pulls in @warlock.js/core, a server package — refused
+```
+
+Bare value-reads matter as much as keyed ones: `process` does not exist in a
+browser, so referencing the object at all — assigned, destructured, spread, or
+passed as an argument — is already broken, and passing the whole object to a
+component is how a server secret reaches a page in one line.
+
+**Enforcement covers dev SSR as well as the client bundle, and a violation
+fails the build.** It is not a production-only check you can discover late: the
+same refusal fires under `warlock dev`.
+
+Reads inside `loader`, `route`, `middleware`, `validation`, and `metadata` are
+never affected — those exports are stripped before the client graph is formed.
+Server-side code is unrestricted.
+
+### The one client-side escape hatch
+
+If a value genuinely has to be inlined into browser code rather than passed
+through loader data, the supported spelling is `import.meta.env.PUBLIC_*` with a
+**static** key:
+
+```tsx
+export default function HomePage() {
+  return <h1>{import.meta.env.PUBLIC_SITE_NAME}</h1>;
+}
+```
+
+`import.meta.env` is the Vite surface, not Node's, and only the `PUBLIC_` prefix
+(plus Vite's own `MODE`, `DEV`, `PROD`, `BASE_URL`, `SSR`) is allowed through. It
+is inlined at build time, so it cannot vary per request or per deployment of the
+same bundle — which is why loader data remains the default answer, and the only
+one for anything request-scoped.
 
 ## The shape
 
@@ -381,11 +540,11 @@ export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
 
 ## Three loader levels
 
-| Module | Contract | Component props |
-| --- | --- | --- |
-| `src/web/root.tsx` | `AppLoader` | `AppProps<typeof loader>` |
+| Module                  | Contract       | Component props              |
+| ----------------------- | -------------- | ---------------------------- |
+| `src/web/root.tsx`      | `AppLoader`    | `AppProps<typeof loader>`    |
 | positional `layout.tsx` | `LayoutLoader` | `LayoutProps<typeof loader>` |
-| `*.page.tsx` | `PageLoader` | `PageProps<typeof loader>` |
+| `*.page.tsx`            | `PageLoader`   | `PageProps<typeof loader>`   |
 
 All receive one context object with `request`, `response`, and `shared`. Page loaders add generics that connect their sibling `validation` and `route` exports to `request.validated()` and `request.input()`.
 
@@ -400,9 +559,17 @@ When `validating` is absent or empty, pages validate query + params, with params
 
 `request.validated()` uses the schema's output type, so fields with `.default(...)` are present. `request.input("id")` is narrowed from a literal route path when the loader uses `typeof route`.
 
+## Execution order
+
+Loaders run **sequentially, root to leaf, each one awaited before the next starts**: `root.tsx`'s `AppLoader`, then every matched `LayoutLoader` from outermost to innermost, then the page's `PageLoader`. The runtime has three top-level slots (`app`, `layout`, `page`), but the layout slot composes the full matched layout chain. A page may have only one _rendering_ layout; prefix-, middleware-, and loader-only layouts may still appear at multiple ancestry levels.
+
+**The first core `Response` a loader returns is terminal.** Returning a `Response` object stops the pipeline immediately: no lower loader starts, `metadata` is not resolved, and that response is sent as-is. It is more terminal than a short-circuit — because the response is returned whole, the buffered header/cookie writes made at that same level are discarded along with everything below it. Use `response.redirect()` / `response.notFound()` (which produce a `LoaderShortCircuit`, committing that level's buffer inclusively) when you want your buffered writes to survive; return a raw `Response` only when you mean "this exact response, nothing else."
+
+A loader that **throws** is also terminal: it stops lower loaders, discards its own level's buffer, and commits only the levels above it.
+
 ## Loader response surface
 
-Each loader gets its own buffered response because App, Layout, and Page loaders execute in parallel. The public loader methods are:
+Each loader gets its own buffered response — never the live one — so that a level discarded by a short-circuit or a throw cannot leak half-written headers onto a response it no longer owns. The public loader methods are:
 
 ```ts
 response.header("cache-control", "private, max-age=60");
@@ -467,7 +634,7 @@ The request pipeline is:
 
 1. App, layout, and page middleware run outermost first and write `shared`.
 2. `shared` is normalized, checked, and sealed.
-3. App, layout, and page loaders run in parallel and may only read it.
+3. App, layout, and page loaders run in order, root to leaf, and may only read it.
 4. Components receive a readonly snapshot through props or `useShared()`.
 
 Use `useShared()` in a deep component that is not already receiving level props:
@@ -484,12 +651,12 @@ export function LocaleLabel() {
 
 Only put browser-safe data in `shared`: scalars, arrays, plain objects, or values with a valid `toJSON()` contract. Functions, `Date`, `Map`, `Set`, and arbitrary class instances are rejected. Prefer a narrow Resource output over a model.
 
-## Parallelism rules
+## Level isolation rules
 
-- App, Layout, and Page loaders cannot read each other's return values.
+- App, Layout, and Page loaders cannot read each other's return values. They run in order, but no channel is provided between them — a lower loader is not handed what an upper one returned. Put anything a lower level needs into `shared` from middleware instead.
 - A loader may read `shared` because middleware completed and it was sealed first.
 - A loader must not write `shared`; a post-seal write throws.
-- Loader response mutations are buffered per level and settled deterministically.
+- Loader response mutations are buffered per level and settled deterministically, root to leaf.
 
 ## Gotchas
 
@@ -497,7 +664,9 @@ Only put browser-safe data in `shared`: scalars, arrays, plain objects, or value
 - **Return client-safe data.** Components render again in the browser; models and server handles do not survive the wire.
 - **Write `shared` in middleware only.** Loaders run after the seal.
 - **Required shared keys need unconditional writers.** The type is a promise for every request.
-- **Do not use loader return values as cross-level communication.** The loaders run in parallel.
+- **Do not use loader return values as cross-level communication.** Levels run in order but are not wired to each other; use `shared`, written in middleware.
+- **`404.page.tsx` never runs its own loader.** The not-found page's module is registered and rendered for real — `register()` and its middleware still run — but the page loader is omitted from the request in both dev and production, so a missing URL cannot trigger application data work or fail a second time. Its ancestry contributes nothing either: the 404 page renders with an empty layout chain by construction. **The root `AppLoader` in `root.tsx` still runs** for a 404 request, so keep it cheap and make sure it tolerates a request that matched nothing.
+- **`process.env` is refused in the client/universal graph, with no `PUBLIC_` exception.** Read it in a loader and return it as page data.
 - **Server actions are not supported.** POST to an ordinary Warlock API route and call `refresh()` after success.
 
 ## See also
@@ -518,7 +687,7 @@ description: 'Navigate hydrated pages with `<Link>`, resolve named URLs with `hr
 
 `<Link>` renders a real anchor for progressive enhancement and intercepts a plain in-app click after hydration. The server remains the only route matcher; client navigation fetches the page-data representation of the URL and swaps the Layout + Page tree.
 
-Every behaviour on this page requires 5.1 in an installed app. In 5.0.0–5.0.2 no client JavaScript executed at all — `react-dom/client` was served as raw CommonJS and hydration never mounted — so `<Link>` degraded to its underlying anchor and every click was a full page load. See [write-the-root](../write-the-root/SKILL.md#root-is-the-hydration-boundary).
+Every behaviour on this page depends on hydration having mounted. See [write-the-root](../write-the-root/SKILL.md#root-is-the-hydration-boundary).
 
 ## The shape
 
@@ -786,7 +955,9 @@ export default function ProductsPage() {
 }
 ```
 
-Recognized asset imports survive the page's client projection. The client boundary is determined by the import graph, not by the file living under `web/`.
+Recognized stylesheet imports survive the page's client projection. The client boundary is determined by the import graph, not by the file living under `web/`.
+
+That support is specific to stylesheets in the production page graph. An imported non-stylesheet asset such as `import logo from "./logo.svg"` works under Vite in development but is refused by `warlock build`. Put it in the application's `public/` directory and reference its root URL instead: `public/logo.svg` is `/logo.svg`.
 
 For each matched handler, Warlock builds one ordered CSS chain: `[root, ...matched layouts, page]`. A stylesheet imported directly by any member of that chain becomes a render-blocking link in the initial document in both development and production. Unrelated pages and layouts do not contribute CSS to this response.
 
@@ -939,7 +1110,7 @@ Non-rendering layouts may carry prefixes and middleware and may nest freely. Do 
 
 ## `404.page.tsx` never gets a layout
 
-A `404.page.tsx` renders with no layouts, even when it sits in a directory with a rendering `layout.tsx` above it. Discovery reports an empty layout chain for the not-found page only, and both the client hydration registry and the production route table read from that same chain — the server has always rendered it with no layout wrapper, so the client no longer hydrates one either. A page that exists to handle failure must not depend on app chrome that can itself throw or need data.
+A `404.page.tsx` renders with no layouts, even when it sits in a directory with a rendering `layout.tsx` above it. Discovery reports an empty layout chain for the not-found page only, and both the client hydration registry and the production route table read from that same chain — the server renders it with no layout wrapper, and the client hydrates it the same way, with no layout of its own. A page that exists to handle failure must not depend on app chrome that can itself throw or need data.
 
 This is scoped to the not-found page: an ordinary page in the same directory still gets its full layout chain, and nested-layout refusal on the 404's own path is still enforced exactly as it is for any other page.
 
@@ -953,7 +1124,7 @@ Client navigation rebuilds the Layout + Page element tree at the same `#root` po
 
 ## Loader data
 
-`LayoutLoader` receives the full `PageContext` and its return reaches `LayoutProps<typeof loader>["data"]`. Layout, App, and Page loaders run in parallel; a layout loader cannot read the page loader's result.
+`LayoutLoader` receives the full `PageContext` and its return reaches `LayoutProps<typeof loader>["data"]`. Loaders run sequentially as App, every matched layout from outermost to innermost, then Page. Each loader's return belongs only to its own component, so a layout loader still cannot read another loader's result.
 
 Use `shared` when multiple levels need one request-derived value, and write it in middleware before loaders run. See [load-page-data](../load-page-data/SKILL.md).
 
@@ -1027,8 +1198,6 @@ The browser hydrates `#root`, not the whole document. The client tree deliberate
 
 Because App is outside the hydrated subtree, put client state that must survive navigation in a layout or component beneath `#root`, not in the document root.
 
-**Requires 5.1 in an installed app.** In 5.0.0–5.0.2 the dev server handed the browser `react-dom/client` as raw CommonJS, so `hydrateRoot` was not there as a named export and the hydration entry died on import — no client JavaScript ran at all. The symptoms were a page that server-rendered correctly but had dead `useState`, no HMR, and `<Link>` doing full page loads. The fix pre-bundles React through Vite's `optimizeDeps`. If you are debugging this against a checkout of the framework itself, note that the defect never reproduced there: inside the monorepo the hydration entry resolves outside `node_modules` and React was always optimized normally.
-
 If `root.tsx` (or any module it needs) fails to load or its `register()` throws, there is no trustworthy Layout+Page composition left to hydrate — Warlock falls back to a plain document with no hydration script at all rather than hydrate the browser against markup nothing can vouch for. See [create-a-page](../create-a-page/SKILL.md) for the app's own `error.page.tsx` boundary, which is tried first.
 
 ## `<Head />`
@@ -1096,7 +1265,7 @@ export default function App({ data, children }: AppProps<typeof loader>) {
 }
 ```
 
-The App loader runs in parallel with layout and page loaders. Its return is for the App component; use `shared` for request data that multiple levels need.
+The App loader runs first and is awaited before the outermost layout loader starts; matched layout loaders then run outermost to innermost before the page loader. Its return is for the App component; use `shared` for request data that multiple levels need.
 
 ## Gotchas
 

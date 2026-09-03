@@ -16,7 +16,7 @@ This page is the concept home: how the locale is **actually** resolved (the prec
 import { t } from "@warlock.js/core";
 
 // In a controller — locale is already resolved from the request.
-export const showProduct: RequestHandler = async (request, response) => {
+export const showProduct: RequestHandler = async ({ request, response }) => {
   const product = await productsRepository.get(request.input("id"));
 
   if (!product) {
@@ -47,12 +47,12 @@ flowchart TD
 
 In precedence order:
 
-| # | Source | Example | Read by |
-| - | ------ | ------- | ------- |
-| 1 | **`translation-locale-code` header** | `translation-locale-code: ar` | `request.locale` getter (checked first) |
-| 2 | **`locale` header** | `locale: ar` | `request.localized` getter |
-| 3 | **`?locale` query param** | `?locale=ar` | `request.localized` getter |
-| 4 | **`app.localeCode` config** | defaults to `"en"` | `request.getLocaleCode()` |
+| #   | Source                               | Example                       | Read by                                 |
+| --- | ------------------------------------ | ----------------------------- | --------------------------------------- |
+| 1   | **`translation-locale-code` header** | `translation-locale-code: ar` | `request.locale` getter (checked first) |
+| 2   | **`locale` header**                  | `locale: ar`                  | `request.localized` getter              |
+| 3   | **`?locale` query param**            | `?locale=ar`                  | `request.localized` getter              |
+| 4   | **`app.localeCode` config**          | defaults to `"en"`            | `request.getLocaleCode()`               |
 
 The request resolves the locale like this:
 
@@ -91,10 +91,10 @@ export default {
 
 Two distinct keys, don't conflate them:
 
-| Config key | Type | Purpose |
-| ---------- | ---- | ------- |
-| `app.localeCode` | `string` (default `"en"`) | the **default** locale used by `getLocaleCode()` when the request resolves none |
-| `app.locales` | `string[]` | the **allowed** locale list; the app config handler preloads `dayjs` locale data for each non-English entry |
+| Config key       | Type                      | Purpose                                                                                                     |
+| ---------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `app.localeCode` | `string` (default `"en"`) | the **default** locale used by `getLocaleCode()` when the request resolves none                             |
+| `app.locales`    | `string[]`                | the **allowed** locale list; the app config handler preloads `dayjs` locale data for each non-English entry |
 
 Both fields are declared on the `AppConfigurations` type as `localeCode?` and `locales?`. The config handler at `src/config/config-handlers.ts` reads `config.locales` to load `dayjs/locale/<code>`; the request layer reads `app.localeCode` for the default.
 
@@ -125,10 +125,10 @@ The group name becomes the namespace: `t("products.notFound")` resolves `product
 
 ### Reading translations: `t()` vs `trans()`
 
-| Helper | Locale it uses | Use when |
-| ------ | -------------- | -------- |
-| `t(key, placeholders?)` | the **current request's** locale | inside a request (controllers, services, resources) |
-| `trans(key, placeholders?)` | the process-global "current locale" | outside a request, or when you've set the locale manually |
+| Helper                              | Locale it uses                                         | Use when                                                      |
+| ----------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------- |
+| `t(key, placeholders?)`             | the **current request's** locale                       | inside a request (controllers, services, resources)           |
+| `trans(key, placeholders?)`         | the process-global "current locale"                    | outside a request, or when you've set the locale manually     |
 | `request.trans(key, placeholders?)` | this request's resolved locale (bound at construction) | the same as `t()`, but called on an explicit request instance |
 
 Inside a request, prefer `t()`. The framework binds `request.trans`/`request.t` to `transFrom.bind(null, localeCode)` at request construction, and the core `t()` helper delegates to the current request's `trans` (falling back to the global `trans` when there is no request). You never pass the locale — the binding carries it.

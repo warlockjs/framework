@@ -45,7 +45,7 @@ The framework sets `fileUploadLimit` (in bytes) per-file via the multipart plugi
 import type { HttpConfigurations } from "@warlock.js/core";
 
 const httpConfigurations: HttpConfigurations = {
-  fileUploadLimit: 50 * 1024 * 1024,   // 50 MB per file
+  fileUploadLimit: 50 * 1024 * 1024, // 50 MB per file
   // ...
 };
 
@@ -59,8 +59,8 @@ This is a Fastify plugin limit — the multipart parser rejects bodies that exce
 Two readers on `Request`:
 
 ```ts
-const single = request.file("avatar");        // UploadedFile | undefined
-const many = request.files("attachments");    // UploadedFile[]
+const single = request.file("avatar"); // UploadedFile | undefined
+const many = request.files("attachments"); // UploadedFile[]
 ```
 
 Use `files(key)` when the multipart field is repeated (`<input name="files" multiple>`). It returns an array; `[]` if nothing arrived.
@@ -72,11 +72,11 @@ import { type Request, type RequestHandler } from "@warlock.js/core";
 import { type UploadSchema, uploadSchema } from "../schema";
 import { createUploadService } from "../services/create-upload.service";
 
-export const createUploadController: RequestHandler = async (
-  request: Request<UploadSchema>,
+export const createUploadController: RequestHandler<Request<UploadSchema>> = async ({
+  request,
   response,
-) => {
-  const { files } = request.validated();   // UploadedFile[] — already validated
+}) => {
+  const { files } = request.validated(); // UploadedFile[] — already validated
 
   const uploads = await Promise.all(
     files.map((file) =>
@@ -103,9 +103,13 @@ import { type UploadedFile } from "@warlock.js/core";
 import { v } from "@warlock.js/seal";
 
 const ALLOWED_MIME_TYPES = [
-  "image/jpeg", "image/png", "image/webp", "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
   "application/pdf",
-  "audio/mpeg", "audio/wav",
+  "audio/mpeg",
+  "audio/wav",
   "video/mp4",
 ];
 
@@ -126,17 +130,17 @@ The `UploadedFile` surface is split into properties, type-checks, transforms, an
 
 ### Properties
 
-| Property             | Type                           | Note                                            |
-| -------------------- | ------------------------------ | ----------------------------------------------- |
-| `file.name`          | `string`                       | sanitised filename                              |
-| `file.mimeType`      | `string`                       | e.g. `"image/jpeg"`, `"application/pdf"`        |
-| `file.extension`     | `string`                       | lowercase, no dot — `"jpg"`, `"pdf"`            |
-| `file.hash`          | `string`                       | SHA-256 hash, populated after `.save()`         |
-| `await file.size()`  | `Promise<number>`              | byte length (buffers content on first call)     |
-| `await file.buffer()`| `Promise<Buffer>`              | full content, cached after first call           |
-| `file.isImage`       | `boolean`                      | MIME starts with `"image"`                      |
-| `file.isVideo`       | `boolean`                      | MIME starts with `"video"`                      |
-| `file.isAudio`       | `boolean`                      | MIME starts with `"audio"`                      |
+| Property              | Type              | Note                                        |
+| --------------------- | ----------------- | ------------------------------------------- |
+| `file.name`           | `string`          | sanitised filename                          |
+| `file.mimeType`       | `string`          | e.g. `"image/jpeg"`, `"application/pdf"`    |
+| `file.extension`      | `string`          | lowercase, no dot — `"jpg"`, `"pdf"`        |
+| `file.hash`           | `string`          | SHA-256 hash, populated after `.save()`     |
+| `await file.size()`   | `Promise<number>` | byte length (buffers content on first call) |
+| `await file.buffer()` | `Promise<Buffer>` | full content, cached after first call       |
+| `file.isImage`        | `boolean`         | MIME starts with `"image"`                  |
+| `file.isVideo`        | `boolean`         | MIME starts with `"video"`                  |
+| `file.isAudio`        | `boolean`         | MIME starts with `"audio"`                  |
 
 Two more — both useful for resources / API responses:
 
@@ -154,7 +158,7 @@ const json = await file.toJSON();
 
 ```ts
 if (file.isImage) {
-  const dims = await file.dimensions();   // { width, height }
+  const dims = await file.dimensions(); // { width, height }
 }
 ```
 
@@ -182,11 +186,11 @@ Two methods: `save(directory, options?)` (automatic naming) and `saveAs(location
 
 The framework picks the filename based on `options.name` and the global uploads config:
 
-| Strategy       | Filename                                     |
-| -------------- | -------------------------------------------- |
-| `"random"`     | random alphanumeric (default; length from config) |
-| `"original"`   | sanitised original filename                  |
-| custom string  | uses your name, auto-appends extension       |
+| Strategy      | Filename                                          |
+| ------------- | ------------------------------------------------- |
+| `"random"`    | random alphanumeric (default; length from config) |
+| `"original"`  | sanitised original filename                       |
+| custom string | uses your name, auto-appends extension            |
 
 ```ts
 // random name (default)
@@ -296,12 +300,12 @@ For images, chain transforms before `save()`. Each method returns the file so yo
 
 ```ts
 await file
-  .resize(800, 600)        // width, height (height optional → aspect-preserving)
-  .quality(85)             // 1–100
-  .format("webp")          // jpeg | png | webp | avif | ...
-  .rotate(90)              // degrees clockwise
-  .blur(3)                 // sigma
-  .grayscale()             // black & white
+  .resize(800, 600) // width, height (height optional → aspect-preserving)
+  .quality(85) // 1–100
+  .format("webp") // jpeg | png | webp | avif | ...
+  .rotate(90) // degrees clockwise
+  .blur(3) // sigma
+  .grayscale() // black & white
   .save("avatars");
 ```
 
@@ -309,17 +313,12 @@ For full control, use `transform()` with either an options object or a callback:
 
 ```ts
 // options
-await file
-  .transform({ resize: { width: 800, fit: "inside" }, quality: 85 })
-  .save("images");
+await file.transform({ resize: { width: 800, fit: "inside" }, quality: 85 }).save("images");
 
 // callback — full Image API
 await file
   .transform((img) =>
-    img
-      .resize({ width: 800 })
-      .watermark("logo.png", { gravity: "southeast" })
-      .sharpen(),
+    img.resize({ width: 800 }).watermark("logo.png", { gravity: "southeast" }).sharpen(),
   )
   .save("products");
 ```
@@ -335,25 +334,25 @@ For deeper image work (chained operations, watermarks, frame extraction from vid
 The framework injects `v.file()` into seal via the `filePlugin` (auto-registered). The returned `FileValidator` chains:
 
 ```ts
-v.file()                           // required — must be an UploadedFile
-v.file().optional()                // optional file field
-v.file().image()                   // must be an image
-v.file().accept(["jpg", "png"])    // allowed extensions
-v.file().mimeType("application/pdf")              // single MIME
-v.file().mimeType(["image/png", "image/jpeg"])    // many MIMEs
-v.file().pdf()                     // shortcut for application/pdf
-v.file().excel()                   // .xls + .xlsx
-v.file().word()                    // .doc + .docx
+v.file(); // required — must be an UploadedFile
+v.file().optional(); // optional file field
+v.file().image(); // must be an image
+v.file().accept(["jpg", "png"]); // allowed extensions
+v.file().mimeType("application/pdf"); // single MIME
+v.file().mimeType(["image/png", "image/jpeg"]); // many MIMEs
+v.file().pdf(); // shortcut for application/pdf
+v.file().excel(); // .xls + .xlsx
+v.file().word(); // .doc + .docx
 
-v.file().minSize(1024)                          // bytes
-v.file().minSize({ size: 100, unit: "KB" })     // friendly units
-v.file().maxSize({ size: 50, unit: "MB" })
-v.file().min(1024)   // alias for minSize
-v.file().max(1024)   // alias for maxSize
+v.file().minSize(1024); // bytes
+v.file().minSize({ size: 100, unit: "KB" }); // friendly units
+v.file().maxSize({ size: 50, unit: "MB" });
+v.file().min(1024); // alias for minSize
+v.file().max(1024); // alias for maxSize
 
 // image-only
-v.file().image().minWidth(100).maxWidth(4000)
-v.file().image().minHeight(100).maxHeight(4000)
+v.file().image().minWidth(100).maxWidth(4000);
+v.file().image().minHeight(100).maxHeight(4000);
 ```
 
 Combine for full-fidelity rules:
@@ -370,7 +369,7 @@ v.file()
 For arrays of files:
 
 ```ts
-v.array(v.file().maxSize({ size: 50, unit: "MB" })).maxLength(5)
+v.array(v.file().maxSize({ size: 50, unit: "MB" })).maxLength(5);
 ```
 
 `v.file().saveTo("path/...")` is a built-in transformer that calls `.save()` after validation and replaces the file value with the resulting path. Handy for one-shot endpoints where the path is the only thing you persist — though most apps prefer to call `.save()` explicitly in a service so they can also store the hash, size, original name, etc.
@@ -386,7 +385,7 @@ const expiresAt = dayjs().add(1, "day").toDate();
 
 return Upload.create({
   // ...
-  entity_id: undefined,    // null — orphaned until attached
+  entity_id: undefined, // null — orphaned until attached
   expires_at: expiresAt,
 });
 ```

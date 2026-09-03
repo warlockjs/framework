@@ -77,19 +77,19 @@ guarded(() => {
 
 The RESTful chain expands to the five standard endpoints — all behind the `guarded(...)` wrapper from `app/shared/utils/router`, which applies your auth middleware:
 
-| Verb     | Path             | Controller                  |
-| -------- | ---------------- | --------------------------- |
-| `GET`    | `/products`      | `listProductsController`    |
-| `GET`    | `/products/:id`  | `getProductController`      |
-| `POST`   | `/products`      | `createProductController`   |
-| `PUT`    | `/products/:id`  | `updateProductController`   |
-| `DELETE` | `/products/:id`  | `deleteProductController`   |
+| Verb     | Path            | Controller                |
+| -------- | --------------- | ------------------------- |
+| `GET`    | `/products`     | `listProductsController`  |
+| `GET`    | `/products/:id` | `getProductController`    |
+| `POST`   | `/products`     | `createProductController` |
+| `PUT`    | `/products/:id` | `updateProductController` |
+| `DELETE` | `/products/:id` | `deleteProductController` |
 
 If you want this route public, swap `guarded(() => { ... })` for plain calls on `router` directly.
 
 ## Step 3 — Run the migration
 
-The scaffold *created* the migration file under `models/product/migrations/` but didn't apply it. Run it now:
+The scaffold _created_ the migration file under `models/product/migrations/` but didn't apply it. Run it now:
 
 ```bash
 pnpm warlock migrate
@@ -114,7 +114,7 @@ The list endpoint returns an empty paginated payload — no rows yet. Either see
 
 ## What got generated, briefly
 
-- **Controllers** — thin request handlers. Each is just a function with `(request, response) => …` and an optional `.validation` property attached.
+- **Controllers** — thin request handlers. Each is just a function with `({ request, response }) => …` and an optional `.validation` property attached.
 - **Services** — the business logic. Controllers delegate here so the same operation can be reused (e.g. from a CLI command or a background job).
 - **Repository** (`repositories/products.repository.ts`) — model-level data access. Exposes `list`, `get`, `create`, etc.
 - **Schemas** (`schema/`) — `@warlock.js/seal` validation. Each `.schema.ts` exports both the schema value AND its inferred type:
@@ -140,7 +140,7 @@ Open the generated list controller — it delegates to the service:
 import { type RequestHandler } from "@warlock.js/core";
 import { listProductsService } from "../services/list-products.service";
 
-export const listProductsController: RequestHandler = async (request, response) => {
+export const listProductsController: RequestHandler = async ({ request, response }) => {
   const { data, pagination } = await listProductsService(request.all());
 
   return response.success({ data, pagination });
@@ -157,7 +157,7 @@ const sampleProducts = [
   { id: 2, name: "Hoodie", price: 49.99 },
 ];
 
-export const listProductsController: RequestHandler = async (request, response) => {
+export const listProductsController: RequestHandler = async ({ request, response }) => {
   return response.success({ products: sampleProducts });
 };
 ```
@@ -173,7 +173,7 @@ No class to extend, no decorators, no DI container.
 
 ## Adding validation to a new controller
 
-The CRUD scaffold already wires `create-product` and `update-product` to their schemas. When you add a *new* controller outside that flow, attach a schema by hand.
+The CRUD scaffold already wires `create-product` and `update-product` to their schemas. When you add a _new_ controller outside that flow, attach a schema by hand.
 
 Create the schema:
 
@@ -191,15 +191,12 @@ Then on the controller — type its handler as `RequestHandler<Request<PublishPr
 
 ```ts title="src/app/products/controllers/publish-product.controller.ts"
 import type { Request, RequestHandler } from "@warlock.js/core";
-import {
-  type PublishProductSchema,
-  publishProductSchema,
-} from "../schema/publish-product.schema";
+import { type PublishProductSchema, publishProductSchema } from "../schema/publish-product.schema";
 
-export const publishProductController: RequestHandler<Request<PublishProductSchema>> = async (
+export const publishProductController: RequestHandler<Request<PublishProductSchema>> = async ({
   request,
   response,
-) => {
+}) => {
   const data = request.validated();
 
   // …mark product published, then:

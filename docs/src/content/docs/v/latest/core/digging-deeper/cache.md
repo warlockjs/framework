@@ -76,20 +76,20 @@ const cacheConfigurations: CacheConfigurations<"database"> = {
       port: env("REDIS_PORT"),
       url: env("REDIS_URL"),
     },
-    memory: { ttl: 3 * 60 * 60 },         // 3 hours default
-    memoryExtended: { ttl: 30 * 60 },     // 30 minutes default
+    memory: { ttl: 3 * 60 * 60 }, // 3 hours default
+    memoryExtended: { ttl: 30 * 60 }, // 30 minutes default
   },
 };
 
 export default cacheConfigurations;
 ```
 
-| Field      | Purpose                                                                          |
-| ---------- | -------------------------------------------------------------------------------- |
-| `default`  | Driver name to activate on boot                                                  |
-| `logging`  | Verbose logging from the cache manager — default `false`                         |
-| `drivers`  | Name → class map. Drivers are lazy-instantiated on first reference               |
-| `options`  | Per-driver constructor options. Indexed by driver name                           |
+| Field     | Purpose                                                            |
+| --------- | ------------------------------------------------------------------ |
+| `default` | Driver name to activate on boot                                    |
+| `logging` | Verbose logging from the cache manager — default `false`           |
+| `drivers` | Name → class map. Drivers are lazy-instantiated on first reference |
+| `options` | Per-driver constructor options. Indexed by driver name             |
 
 The `database` driver uses a `cache` table — it ships with the auth migrations bundle, or you can register your own `cache.migration.ts`. Without the table the first `set` throws on boot.
 
@@ -100,7 +100,7 @@ The `database` driver uses a `cache` table — it ships with the auth migrations
 | `memory`         | Local dev, ephemeral state, tests. Single-process.                                     |
 | `memoryExtended` | Like `memory` but with tags, SWR, locks, and similarity. Single-process.               |
 | `file`           | Local dev when you want persistence across restarts.                                   |
-| `redis`          | Production with multi-process / multi-instance apps. Strong stampede protection.        |
+| `redis`          | Production with multi-process / multi-instance apps. Strong stampede protection.       |
 | `database`       | Production without Redis — runs on your existing DB. Slower than Redis, fine for many. |
 | `pg`             | Production with Postgres-native locks / listen-notify integration.                     |
 | `mock` / `null`  | Tests. `null` is a no-op driver; `mock` collects calls for inspection.                 |
@@ -110,37 +110,38 @@ The `database` driver uses a `cache` table — it ships with the auth migrations
 ### Write
 
 ```ts
-await cache.set("key", value);                  // no TTL — driver default applies
-await cache.set("key", value, 3600);            // 3600 seconds
-await cache.set("key", value, "1h");            // duration string
-await cache.set("key", value, {                 // rich options
+await cache.set("key", value); // no TTL — driver default applies
+await cache.set("key", value, 3600); // 3600 seconds
+await cache.set("key", value, "1h"); // duration string
+await cache.set("key", value, {
+  // rich options
   ttl: "1h",
   tags: ["users", "active"],
-  onConflict: "create",                         // NX — set only if missing
+  onConflict: "create", // NX — set only if missing
 });
 ```
 
 Rich options:
 
-| Option       | Purpose                                                          |
-| ------------ | ---------------------------------------------------------------- |
-| `ttl`        | Seconds or duration string                                       |
-| `expiresAt`  | Absolute epoch ms or `Date` (mutually exclusive with `ttl`)      |
-| `tags`       | `string[]` — invalidate together via `cache.tags([...])`         |
-| `onConflict` | `"upsert"` (default), `"create"` (NX), `"update"` (XX)           |
-| `namespace`  | Per-call namespace override                                      |
-| `driver`     | Per-call driver override — route this one write somewhere else   |
-| `staleAt`    | Freshness deadline (epoch ms) — primarily used by `swr()`         |
+| Option       | Purpose                                                        |
+| ------------ | -------------------------------------------------------------- |
+| `ttl`        | Seconds or duration string                                     |
+| `expiresAt`  | Absolute epoch ms or `Date` (mutually exclusive with `ttl`)    |
+| `tags`       | `string[]` — invalidate together via `cache.tags([...])`       |
+| `onConflict` | `"upsert"` (default), `"create"` (NX), `"update"` (XX)         |
+| `namespace`  | Per-call namespace override                                    |
+| `driver`     | Per-call driver override — route this one write somewhere else |
+| `staleAt`    | Freshness deadline (epoch ms) — primarily used by `swr()`      |
 
 `onConflict: "create"` / `"update"` returns a `CacheSetResult` with `wasSet` and `existing` so callers can branch on the outcome.
 
 ### Read
 
 ```ts
-const value = await cache.get<User>("key");      // T | null
-const exists = await cache.has("key");           // boolean
-const value = await cache.pull("key");           // get-then-delete (atomic on drivers that support it)
-const many = await cache.many(["k1", "k2"]);     // any[] — null per missing key
+const value = await cache.get<User>("key"); // T | null
+const exists = await cache.has("key"); // boolean
+const value = await cache.pull("key"); // get-then-delete (atomic on drivers that support it)
+const many = await cache.many(["k1", "k2"]); // any[] — null per missing key
 ```
 
 `pull` is handy for one-shot tokens (verification codes, single-use idempotency keys) — fetch and remove in one call.
@@ -149,8 +150,8 @@ const many = await cache.many(["k1", "k2"]);     // any[] — null per missing k
 
 ```ts
 await cache.remove("key");
-await cache.removeNamespace("users");    // remove every key under namespace
-await cache.flush();                     // wipe everything on the current driver
+await cache.removeNamespace("users"); // remove every key under namespace
+await cache.flush(); // wipe everything on the current driver
 ```
 
 `flush` is the nuke option — useful in tests, dangerous in production. `removeNamespace` is the targeted invalidation you usually want.
@@ -168,17 +169,15 @@ The canonical caching pattern: read from cache, on miss run the callback, write 
 Rich form for tags or per-call driver override:
 
 ```ts
-const user = await cache.remember(
-  "user.42",
-  { ttl: "1h", tags: ["users"], driver: "redis" },
-  () => db.users.find(42),
+const user = await cache.remember("user.42", { ttl: "1h", tags: ["users"], driver: "redis" }, () =>
+  db.users.find(42),
 );
 ```
 
 ### `forever`
 
 ```ts
-await cache.forever("config.flags", flags);    // no expiration
+await cache.forever("config.flags", flags); // no expiration
 ```
 
 Use sparingly — without a TTL you're committing to manual invalidation. Good for things that genuinely never change at runtime (compiled config, build hashes).
@@ -186,10 +185,10 @@ Use sparingly — without a TTL you're committing to manual invalidation. Good f
 ### Counters
 
 ```ts
-await cache.increment("hits.daily");           // +1, returns new value
-await cache.increment("hits.daily", 5);        // +5
-await cache.decrement("inventory.42");         // -1
-await cache.decrement("inventory.42", 3);      // -3
+await cache.increment("hits.daily"); // +1, returns new value
+await cache.increment("hits.daily", 5); // +5
+await cache.decrement("inventory.42"); // -1
+await cache.decrement("inventory.42", 3); // -3
 ```
 
 Atomic on Redis. On memory drivers they're a read-modify-write under a per-key lock — still serialised within the process.
@@ -199,10 +198,8 @@ Atomic on Redis. On memory drivers they're a read-modify-write under a per-key l
 For hot reads where serving slightly-stale data beats blocking on a refresh:
 
 ```ts
-const product = await cache.swr(
-  "product.42",
-  { freshTtl: "1m", staleTtl: "1h" },
-  () => db.products.find(42),
+const product = await cache.swr("product.42", { freshTtl: "1m", staleTtl: "1h" }, () =>
+  db.products.find(42),
 );
 ```
 
@@ -217,11 +214,7 @@ If the background refresh fails, the stale entry is preserved and the error is l
 Honors the per-call `driver` override the same way `remember` does:
 
 ```ts
-await cache.swr(
-  "hot.value",
-  { freshTtl: "1m", staleTtl: "10m", driver: "redis" },
-  () => compute(),
-);
+await cache.swr("hot.value", { freshTtl: "1m", staleTtl: "10m", driver: "redis" }, () => compute());
 ```
 
 ## Distributed locks
@@ -248,10 +241,8 @@ The return value is a `LockOutcome` discriminated union. `outcome.acquired === t
 Rich options for owner labels and per-call driver:
 
 ```ts
-await cache.lock(
-  "lock.x",
-  { ttl: "1m", owner: "worker.jobs-2", driver: "redis" },
-  async () => doWork(),
+await cache.lock("lock.x", { ttl: "1m", owner: "worker.jobs-2", driver: "redis" }, async () =>
+  doWork(),
 );
 ```
 
@@ -264,13 +255,13 @@ Group related keys under a prefix:
 ```ts
 const chat = cache.namespace("chats.10", { ttl: "30d" });
 
-await chat.set("messages.1", msg);             // → "chats.10.messages.1", 30d default
-await chat.set("draft", d, { ttl: "1h" });     // per-call ttl wins
+await chat.set("messages.1", msg); // → "chats.10.messages.1", 30d default
+await chat.set("draft", d, { ttl: "1h" }); // per-call ttl wins
 
 const drafts = chat.namespace("typing", { ttl: "5s" });
-await drafts.set("user.42", true);             // → "chats.10.typing.user.42"
+await drafts.set("user.42", true); // → "chats.10.typing.user.42"
 
-await chat.clear();                            // wipe everything under "chats.10"
+await chat.clear(); // wipe everything under "chats.10"
 ```
 
 Scope defaults flow through writes; per-call options override. Tags merge additively. Nested scopes inherit and can override further.
@@ -286,8 +277,8 @@ await cache.set("user.42", user, { ttl: "1h", tags: ["users", "user.42"] });
 await cache.set("user.43", user2, { ttl: "1h", tags: ["users"] });
 await cache.set("session.abc", session, { ttl: "1h", tags: ["sessions", "user.42"] });
 
-await cache.tags(["users"]).invalidate();      // wipes user.42 and user.43
-await cache.tags(["user.42"]).invalidate();    // wipes user.42 and session.abc
+await cache.tags(["users"]).invalidate(); // wipes user.42 and user.43
+await cache.tags(["user.42"]).invalidate(); // wipes user.42 and session.abc
 ```
 
 Tag support depends on the driver. Redis and `memoryExtended` have it; the base `database` driver does not (call `cache.tags(...)` on a non-tagging driver throws `CacheUnsupportedError`).
@@ -300,7 +291,7 @@ Tag support depends on the driver. Redis and `memoryExtended` have it; the base 
 import type { RequestHandler } from "@warlock.js/core";
 import { usersRepository } from "../repositories/users.repository";
 
-export const getUsersController: RequestHandler = async (request, response) => {
+export const getUsersController: RequestHandler = async ({ request, response }) => {
   const users = await usersRepository.listCached({
     perform: (q) => q.where("status", "active"),
     limit: 50,
@@ -399,10 +390,8 @@ For namespaced caches, `cache.removeNamespace(`user.${id}`)` wipes everything pr
 Homepage data, dashboard counts, anything where staleness is tolerable but slow misses are visible:
 
 ```ts
-const homepage = await cache.swr(
-  "homepage.products",
-  { freshTtl: "1m", staleTtl: "10m" },
-  () => productsRepository.list({ featured: true }),
+const homepage = await cache.swr("homepage.products", { freshTtl: "1m", staleTtl: "10m" }, () =>
+  productsRepository.list({ featured: true }),
 );
 ```
 
@@ -426,7 +415,10 @@ Pair with a scheduler that fires the same job across N workers — only one runs
 ### Tenant-scoped cache
 
 ```ts
-const tenantCache = cache.namespace(`tenant.${tenantId}`, { ttl: "1h", tags: [`tenant.${tenantId}`] });
+const tenantCache = cache.namespace(`tenant.${tenantId}`, {
+  ttl: "1h",
+  tags: [`tenant.${tenantId}`],
+});
 
 await tenantCache.set("settings", settings);
 await tenantCache.set("plan", plan);
@@ -444,7 +436,7 @@ const code = generateOtp();
 await cache.set(`otp.${userId}`, code, { ttl: "10m", onConflict: "create" });
 
 // On verification:
-const stored = await cache.pull(`otp.${userId}`);   // get + delete atomically
+const stored = await cache.pull(`otp.${userId}`); // get + delete atomically
 if (stored !== submitted) {
   throw new BadRequestError("Invalid code");
 }
