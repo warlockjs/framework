@@ -15,7 +15,7 @@ import {
 } from "../../../src/generations/stubs";
 
 /**
- * Card 0f3d3127 — structural (AST) proof that every controller-handler
+ * Structural (AST) proof that every controller-handler
  * emission from the generator stubs uses the v5 single-context-object
  * parameter shape `({ request, response }) => ...` and never the v4
  * positional shape `(request, response) => ...` (`core/src/router/types.ts`:
@@ -44,8 +44,8 @@ import {
  * source files reachable) and another roughly 177s to compute diagnostics --
  * about 250s total for a single assignment. That does not belong as a
  * per-test compile inside `core`'s suite. A generated-output type-check gate
- * belongs folded into the existing skill-snippet compile gate (card
- * 292d9430), which already owns "compile a generated snippet against the
+ * belongs folded into the existing skill-snippet compile gate,
+ * which already owns "compile a generated snippet against the
  * shipped types" -- this is deliberately not built as a second, competing
  * gate.
  *
