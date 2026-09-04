@@ -116,6 +116,200 @@
   ],
   "releases": [
     {
+      "version": "5.3.1",
+      "id": "v5-3-1",
+      "date": "September 4, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "A republish of 5.3.0 as one complete set. The 5.3.0 publish left the family's reciprocal exact peer requirements unsatisfiable from a fresh registry install, so <code>npm create warlock@5.3.0</code> failed to resolve. <strong>5.3.1 is the same code</strong>, verified by scaffolding, building and booting a real app from the public registry.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>npm create warlock@5.3.1</code> resolves and runs. The 5.3.0 scaffolder could not install, because the family's reciprocal exact peer requirements were unsatisfiable from a fresh registry install."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Republished the complete family so a clean install resolves. The 5.3.0 publish left the family's reciprocal exact peer requirements unsatisfiable from a fresh registry install; 5.3.1 is the same code, published as one complete set."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Republished the complete family so a clean install resolves. Same code as 5.3.0, published as one complete set."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "5.3.0",
+      "id": "v5-3-0",
+      "date": "September 3, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "The silent-failure release. Routing now validates <strong>every</strong> page path it derives — a directory that owned a layout <code>prefix</code> was skipping classification, letting two pages resolve to the same URL — and a page's declared <code>route.path</code> is validated for the first time. Error responses gained a <code>no-store</code> floor, <code>warlock gen</code> emits handlers that actually compile against v5, and the web layer ships a real 404 page and request-bound localization.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 8,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 6
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "A standalone Warlock 404 page, styled and served by the web layer."
+            },
+            {
+              "type": "Added",
+              "html": "Request-bound web localization: the active locale travels with the request rather than being read from ambient state."
+            },
+            {
+              "type": "Fixed",
+              "html": "The 404 page's stylesheet was imported through a Vite-only <code>?url&amp;inline</code> query, which the release bundler could not resolve — the web package could not be built for publication at all. The stylesheet URL is now produced by a plain module, guarded by a test that keeps the emitted markup byte-exact against the CSS file."
+            },
+            {
+              "type": "Fixed",
+              "html": "A directory that owned a layout <code>prefix</code> was never classified, so bracket syntax inside a group name went unexamined and two different pages could derive the same route. Every directory name is now validated before the route decides whether it contributes."
+            },
+            {
+              "type": "Fixed",
+              "html": "A page's DECLARED <code>route.path</code> was never validated — the validator had zero callers."
+            },
+            {
+              "type": "Fixed",
+              "html": "Bracket syntax inside a group name is rejected instead of silently deriving a route."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>discover-pages</code> now composes paths through the same validated seam as the rest of routing, so the two can no longer disagree."
+            },
+            {
+              "type": "Fixed",
+              "html": "An unobservable auth mark revokes a cache opt-in: unproven now means revoked, not assumed safe."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            },
+            {
+              "type": "Removed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "A request is marked auth-derived the moment <code>user</code> or <code>decodedAccessToken</code> is assigned, so cacheability is decided by what the request actually read rather than by a separate declaration."
+            },
+            {
+              "type": "Fixed",
+              "html": "Every error response was cacheable. The <code>no-store</code> floor is now set at the single error funnel, so an error can no longer be served from a cache to a second request."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock gen</code> emitted controllers with v4 handler signatures — every generated controller failed to compile against the v5 contract. The generator now emits the v5 <code>ctx</code> object signature."
+            },
+            {
+              "type": "Fixed",
+              "html": "A validated file field was inferred as <code>unknown</code>; the sweep that found it found a second occurrence, and both are fixed."
+            },
+            {
+              "type": "Removed",
+              "html": "Five unreachable error branches that described a response the framework never sent."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "A browser gate for the freshly scaffolded starter, so the generated project is exercised in a real browser rather than assumed to work."
+            },
+            {
+              "type": "Changed",
+              "html": "The web starter template migrated to the current page contract, with a pinned home route identity so SSR and hydration agree on one route name."
+            },
+            {
+              "type": "Fixed",
+              "html": "The scaffolder no longer parses CSS as TypeScript."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.2.4",
       "id": "v5-2-4",
       "date": "September 2, 2026",

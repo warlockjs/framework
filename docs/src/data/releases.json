@@ -1,5 +1,23 @@
 {
   "_doc": "Release-level metadata for the unified changelog — the npm PUBLISH TIMESTAMP and the 'what shipped' SUMMARY for each version. Per-package change details (Added/Changed/Fixed/Removed) live in each package's CHANGELOG.md and are aggregated by scripts/generate-changelog.mjs; this file supplies release metadata that the per-package files don't carry. Hand-maintained: add one entry per release, keyed by the version string. `publishedAt` is the full ISO timestamp reported by npm for @warlock.js/core (e.g. \"2026-09-02T00:54:41.833Z\"); the generator derives the human UTC display date from it. Legacy entries may retain `date` as a display-string fallback. `summary` supports inline `code`, **bold**, and [links](url); `featured` (optional) is an array of package names floated to the top of that release's package list, in the listed order (the rest follow most-changed-first, then alphabetical). Keep the summary to ONE short headline — what shipped and which packages — not an API-by-API tour; the per-package list below it carries the detail.",
+  "5.3.1": {
+    "publishedAt": "2026-09-04T00:14:13.890Z",
+    "summary": "A republish of 5.3.0 as one complete set. The 5.3.0 publish left the family's reciprocal exact peer requirements unsatisfiable from a fresh registry install, so `npm create warlock@5.3.0` failed to resolve. **5.3.1 is the same code**, verified by scaffolding, building and booting a real app from the public registry.",
+    "featured": [
+      "create-warlock",
+      "@warlock.js/core",
+      "@warlock.js/web"
+    ]
+  },
+  "5.3.0": {
+    "publishedAt": "2026-09-03T22:18:56.738Z",
+    "summary": "The silent-failure release. Routing now validates **every** page path it derives — a directory that owned a layout `prefix` was skipping classification, letting two pages resolve to the same URL — and a page's declared `route.path` is validated for the first time. Error responses gained a `no-store` floor, `warlock gen` emits handlers that actually compile against v5, and the web layer ships a real 404 page and request-bound localization.",
+    "featured": [
+      "@warlock.js/web",
+      "@warlock.js/core",
+      "create-warlock"
+    ]
+  },
   "5.2.4": {
     "publishedAt": "2026-09-02T04:49:12.518Z",
     "summary": "**Web starter HMR repair.** `warlock add web` now isolates universal page registration in a stable sidecar so React Fast Refresh preserves component state while SSR and hydration keep the same lifecycle.",
