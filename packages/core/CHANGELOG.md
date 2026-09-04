@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.3.1 - 2026-09-04
+
+### Fixed
+
+- Republished the complete family so a clean install resolves. The 5.3.0 publish left the family's reciprocal exact peer requirements unsatisfiable from a fresh registry install; 5.3.1 is the same code, published as one complete set.
+
+## 5.3.0 - 2026-09-03
+
+### Fixed
+
+- Every error response was cacheable. The `no-store` floor is now set at the single error funnel, so an error can no longer be served from a cache to a second request.
+- `warlock gen` emitted controllers with v4 handler signatures — every generated controller failed to compile against the v5 contract. The generator now emits the v5 `ctx` object signature.
+- A validated file field was inferred as `unknown`; the sweep that found it found a second occurrence, and both are fixed.
+
+### Changed
+
+- A request is marked auth-derived the moment `user` or `decodedAccessToken` is assigned, so cacheability is decided by what the request actually read rather than by a separate declaration.
+
+### Removed
+
+- Five unreachable error branches that described a response the framework never sent.
+
 ## 5.2.4 - 2026-09-02
 
 ### Fixed
