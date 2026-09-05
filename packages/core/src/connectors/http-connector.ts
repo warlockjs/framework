@@ -22,6 +22,26 @@ import { BaseConnector } from "./base-connector";
 import { describeServerAddress } from "./describe-server-address";
 import { ConnectorLifecyclePhase, ConnectorPriority } from "./types";
 
+/**
+ * The port actually bound, read back from the address `listen()` resolved
+ * with — never the port that was asked for. See the call site in
+ * {@link HttpConnector.start} for why this matters (`http.port: 0`).
+ *
+ * `fallback` only fires if `boundAddress` turns out unparseable as a URL,
+ * which does not happen in practice — Fastify's resolved address is always a
+ * well-formed `http://host:port` (or `https://`) string with an explicit
+ * port — but a best-effort read of a socket address must never throw.
+ */
+function readBoundPort(boundAddress: string, fallback: number): number {
+  try {
+    const port = new URL(boundAddress).port;
+
+    return port ? Number(port) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function environmentColor(environment: Environment) {
   switch (environment) {
     case "development":
@@ -193,15 +213,19 @@ export class HttpConnector extends BaseConnector {
     // (`"03999"`, `" 3999"`, `"1e3"`) — `net.Server.listen({ port })` binds
     // all of those without complaint, silently, sometimes to the WRONG port
     // (`"1e3"` -> 1000). Every downstream use of the port — the preflight
-    // probe, `listen()` itself, and the value published to `warlock:ready` —
-    // must agree on the same resolved number.
-    const boundPort = resolveBindPort(httpConfig.port);
+    // probe and `listen()` itself — must agree on the same resolved number.
+    //
+    // This is still the port ASKED for, not the port BOUND — `port: 0` asks
+    // for "any free port" and this stays `0` for that case. What gets
+    // published to `warlock:ready` is read back from `listen()`'s resolved
+    // address further down, never this value.
+    const configuredPort = resolveBindPort(httpConfig.port);
 
-    if (!isCanonicalPortValue(httpConfig.port, boundPort)) {
+    if (!isCanonicalPortValue(httpConfig.port, configuredPort)) {
       log.info(
         "http",
         "connection",
-        `Configured http.port ${JSON.stringify(httpConfig.port)} normalised to ${boundPort}.`,
+        `Configured http.port ${JSON.stringify(httpConfig.port)} normalised to ${configuredPort}.`,
       );
     }
 
@@ -213,8 +237,8 @@ export class HttpConnector extends BaseConnector {
       // Port 0 is exempt: it asks the OS for a free port, so probing it binds
       // some unrelated ephemeral port and "passes" while proving nothing about
       // the port this server will actually take.
-      if (boundPort !== 0) {
-        await assertPortIsAvailable(boundPort, httpConfig.host || "localhost");
+      if (configuredPort !== 0) {
+        await assertPortIsAvailable(configuredPort, httpConfig.host || "localhost");
       }
 
       // `listen()` RESOLVES with the address it actually bound — which is the
@@ -222,9 +246,19 @@ export class HttpConnector extends BaseConnector {
       // announcing `app.baseUrl` here instead was a defect rather than a
       // shortcut.
       const boundAddress = await this.http.listen({
-        port: boundPort,
+        port: configuredPort,
         host: httpConfig.host || "localhost",
       });
+
+      // Read the ACTUALLY-bound port back out of what `listen()` resolved,
+      // rather than republishing `configuredPort`. With `http.port: 0` the OS
+      // picks the port, so `configuredPort` stays `0` forever — publishing it
+      // instead of the real port is exactly the "Server ready at a URL that
+      // gives connection refused" defect `describe-server-address.ts` already
+      // fixed for the display string. `boundAddress` always carries an
+      // explicit port (Fastify never omits one), so `configuredPort` is only
+      // a defensive fallback for an address this parse cannot make sense of.
+      const boundPort = readBoundPort(boundAddress, configuredPort);
 
       Application.setServedPort(boundPort);
 

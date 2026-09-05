@@ -5,6 +5,7 @@
  */
 
 import { config } from "../config";
+import { getHttpReadyReport } from "../http/ready-report";
 import { TEST_SERVER_PORT_ENV_KEY } from "./test-server-port-channel";
 
 /**
@@ -16,7 +17,21 @@ export function getTestServerUrl(): string {
   // without this a suite started on an explicit port would send every request to
   // the `.env` port instead of the one the server is listening on.
   const publishedPort = process.env[TEST_SERVER_PORT_ENV_KEY];
-  const port = publishedPort || config.key("http.port", 2031);
+
+  // Same-process fallback: a test that boots the HTTP connector directly
+  // (rather than through `startHttpTestServer`'s cross-process channel) never
+  // writes `TEST_SERVER_PORT_ENV_KEY`, so without this the next fallback —
+  // `config.key("http.port", 2031)` — was the only source left, and it holds
+  // the CONFIGURED port, not the bound one. For `http.port: 0` that is `0`,
+  // producing `http://host:0` even though `HttpConnector.start()` had already
+  // recorded the real bound port right here in `ready-report.ts`.
+  const boundPort = getHttpReadyReport()?.port;
+
+  // `config.key`'s default only substitutes for `undefined` — `0` is a
+  // defined configured value, not an absent one — so it cannot be trusted to
+  // paper over an unresolved port 0 either. `boundPort` is read first for
+  // that exact reason.
+  const port = publishedPort || boundPort || config.key("http.port", 2031);
   const host = config.key("http.host", "localhost");
   return `http://${host}:${port}`;
 }
@@ -85,7 +100,11 @@ export async function testPost(
   body?: unknown,
   options: RequestInit = {},
 ): Promise<Response> {
-  return sendRequest(path, { ...options, method: "POST", body: jsonBody(body) }, body !== undefined);
+  return sendRequest(
+    path,
+    { ...options, method: "POST", body: jsonBody(body) },
+    body !== undefined,
+  );
 }
 
 /**
@@ -114,7 +133,11 @@ export async function testPatch(
   body?: unknown,
   options: RequestInit = {},
 ): Promise<Response> {
-  return sendRequest(path, { ...options, method: "PATCH", body: jsonBody(body) }, body !== undefined);
+  return sendRequest(
+    path,
+    { ...options, method: "PATCH", body: jsonBody(body) },
+    body !== undefined,
+  );
 }
 
 /**
