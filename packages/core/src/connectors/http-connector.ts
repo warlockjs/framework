@@ -6,7 +6,13 @@ import { health } from "../http/health";
 import { assertPortIsAvailable } from "../http/port-preflight";
 import { registerHttpPlugins } from "../http/plugins";
 import { setHttpReadyReport } from "../http/ready-report";
-import { closeServerWithTimeout, type FastifyInstance, getHttpServer, startHttpServer } from "../http/server";
+import { isCanonicalPortValue, resolveBindPort } from "../http/resolve-bind-port";
+import {
+  closeServerWithTimeout,
+  type FastifyInstance,
+  getHttpServer,
+  startHttpServer,
+} from "../http/server";
 import { ensureFatalIsVisible } from "../logger/fatal-visibility";
 import { router } from "../router/router";
 import { type Environment } from "../utils";
@@ -182,22 +188,45 @@ export class HttpConnector extends BaseConnector {
       log.info("http", "routes", `${routeCount} route(s) registered`);
     }
 
+    // Resolved ONCE, here, at the top of the bind sequence: `httpConfig.port`
+    // may still be a string that round-tripped `env()`'s number coercion
+    // (`"03999"`, `" 3999"`, `"1e3"`) — `net.Server.listen({ port })` binds
+    // all of those without complaint, silently, sometimes to the WRONG port
+    // (`"1e3"` -> 1000). Every downstream use of the port — the preflight
+    // probe, `listen()` itself, and the value published to `warlock:ready` —
+    // must agree on the same resolved number.
+    const boundPort = resolveBindPort(httpConfig.port);
+
+    if (!isCanonicalPortValue(httpConfig.port, boundPort)) {
+      log.info(
+        "http",
+        "connection",
+        `Configured http.port ${JSON.stringify(httpConfig.port)} normalised to ${boundPort}.`,
+      );
+    }
+
     try {
       // Preflight the bind before `listen()` so a collision surfaces as the
       // instruction in `PortInUseError.message` (which names the port) instead
       // of a raw `EADDRINUSE` from deep inside Fastify/libuv.
-      await assertPortIsAvailable(httpConfig.port, httpConfig.host || "localhost");
+      //
+      // Port 0 is exempt: it asks the OS for a free port, so probing it binds
+      // some unrelated ephemeral port and "passes" while proving nothing about
+      // the port this server will actually take.
+      if (boundPort !== 0) {
+        await assertPortIsAvailable(boundPort, httpConfig.host || "localhost");
+      }
 
       // `listen()` RESOLVES with the address it actually bound — which is the
       // only address worth announcing. See `describe-server-address.ts` for why
       // announcing `app.baseUrl` here instead was a defect rather than a
       // shortcut.
       const boundAddress = await this.http.listen({
-        port: httpConfig.port,
+        port: boundPort,
         host: httpConfig.host || "localhost",
       });
 
-      Application.setServedPort(httpConfig.port);
+      Application.setServedPort(boundPort);
 
       const address = describeServerAddress(
         boundAddress,
@@ -215,7 +244,7 @@ export class HttpConnector extends BaseConnector {
         boundAddress: address.boundAddress,
         url: address.url,
         wildcardBind: address.wildcardBind,
-        port: httpConfig.port,
+        port: boundPort,
         routeCount,
         publicUrl: address.publicUrl,
       });

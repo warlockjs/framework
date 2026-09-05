@@ -1,5 +1,6 @@
 import config from "@mongez/config";
 import { assertPortIsAvailable, PortInUseError } from "./port-preflight";
+import { resolveBindPort } from "./resolve-bind-port";
 
 /**
  * Host used when `http.host` is unset — the same default `HttpConnector`
@@ -28,9 +29,27 @@ export async function assertConfiguredHttpPortIsFree(): Promise<void> {
     return;
   }
 
-  const port = Number(httpConfig.port);
+  // This runs BEFORE the connectors in the generated production entry, and
+  // `preflightConfiguredHttpPort()` below only exits on `PortInUseError` —
+  // any other throw is swallowed there. So a bad port must not throw HERE:
+  // it stays a no-op, exactly like the previous hand-rolled coercion, and
+  // `HttpConnector` (which now also calls `resolveBindPort`) is the one that
+  // reports it, a moment later, with a channel a developer will actually see.
+  let port: number;
 
-  if (!Number.isInteger(port) || port <= 0 || port > 65_535) {
+  try {
+    port = resolveBindPort(httpConfig.port);
+  } catch {
+    return;
+  }
+
+  // Port 0 asks the OS to pick a free one, so there is nothing to preflight:
+  // probing 0 binds SOME unrelated ephemeral port and "passes" without proving
+  // anything about the port this boot will end up on. The hand-rolled coercion
+  // this replaced skipped 0 by rejecting `port <= 0`; `resolveBindPort` accepts
+  // 0 as a legitimate TCP value, so the skip has to be stated here instead of
+  // falling out of a range check.
+  if (port === 0) {
     return;
   }
 

@@ -91,4 +91,18 @@ describe("port preflight", () => {
     expect(error.message).toContain(`Port ${port} is already in use`);
     expect(error.message).toContain("Stop the dev server");
   });
+
+  // `PortInUseError` takes `port: number`. Every caller now resolves the
+  // configured port through `resolveBindPort` before constructing this error,
+  // so `port + 1` is genuine arithmetic here — but nothing in this file's
+  // type signature stops a future caller from passing a string again, and
+  // `port + 1` on a string SILENTLY CONCATENATES instead of adding (e.g.
+  // `"03999" + 1` -> `"039991"`), turning the one actionable suggestion in
+  // this message into nonsense. This spec pins the arithmetic behaviour so
+  // that regression is caught here instead of being rediscovered in the wild.
+  it("computes the suggested port by arithmetic, not string concatenation", () => {
+    const error = new PortInUseError(3999, "localhost");
+
+    expect(error.message).toContain("port: 4000");
+  });
 });
