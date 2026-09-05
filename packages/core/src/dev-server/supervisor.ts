@@ -15,6 +15,18 @@ export const WORKER_ENV_FLAG = "WARLOCK_DEV_WORKER";
  */
 export const RESTART_EXIT_CODE = 75;
 
+/**
+ * Exit code a worker uses when it hit a startup precondition whose cause
+ * cannot change by trying again — a busy port, a rejected boot validator, an
+ * unusable configured value. Chosen as EX_CONFIG, whose conventional meaning
+ * ("configuration error") matches the class. The supervisor treats this as
+ * terminal: no restart, no crash-budget spend, and no extra banner — the
+ * worker has already printed a good message, and the whole point of this
+ * exit code is that the supervisor does not scroll it away with a
+ * "restarting" line and then reprint the same failure a moment later.
+ */
+export const BOOT_PRECONDITION_EXIT_CODE = 78;
+
 /** Signals the supervisor must hand to the worker rather than act on itself. */
 const FORWARDED_SIGNALS: NodeJS.Signals[] = ["SIGTERM", "SIGHUP"];
 
@@ -99,6 +111,15 @@ export function superviseDevServer(now: () => number = Date.now): Promise<never>
 
       if (code === RESTART_EXIT_CODE) {
         spawnWorker();
+        return;
+      }
+
+      // A boot precondition failure cannot be fixed by trying again — skip
+      // the crash-recovery path entirely (no uptime check, no crash-budget
+      // spend, no "restarting" banner) and mirror the exit code exactly, the
+      // same way a deliberate shutdown does just below.
+      if (code === BOOT_PRECONDITION_EXIT_CODE) {
+        process.exit(code);
         return;
       }
 

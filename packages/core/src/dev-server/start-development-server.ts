@@ -1,7 +1,9 @@
 import { colors } from "@mongez/copper";
+import { isBootPreconditionError } from "./boot-precondition-error";
 import { devLogError, devServeLog } from "./dev-logger";
 import { DevelopmentServer } from "./development-server";
 import { registerDevShortcuts } from "./register-dev-shortcuts";
+import { BOOT_PRECONDITION_EXIT_CODE } from "./supervisor";
 
 let handlersRegistered = false;
 
@@ -51,7 +53,13 @@ export async function startDevelopmentServer(
   } catch (error) {
     devLogError(`Failed to start Development Server: ${(error as Error).message}`);
     await safeShutdown(devServer);
-    process.exit(1);
+
+    // A boot-precondition failure (busy port, rejected validator, ...) has
+    // already printed a good message above — exit with the dedicated code so
+    // the supervisor treats it as terminal instead of restart-looping into
+    // the same failure. Every other error keeps exit 1, the ordinary
+    // restart-worthy path.
+    process.exit(isBootPreconditionError(error) ? BOOT_PRECONDITION_EXIT_CODE : 1);
   }
 
   // Only once the server is actually up — a half-started process has nothing

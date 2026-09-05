@@ -8,6 +8,7 @@ import { registerConfiguredConnectors } from "../connectors/register-configured-
 import { ConnectorLifecyclePhase } from "../connectors/types";
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
 import { isDevWorker } from "../dev-server/supervisor";
+import { preflightConfiguredHttpPort } from "../http/boot-port-preflight";
 import { manifestManager } from "../manifest/manifest-manager";
 import { appPath } from "../utils";
 import { loadEnvironmentFiles } from "../utils/load-environment";
@@ -29,9 +30,9 @@ import {
 } from "./cli-commands.utils";
 import { cliCommandsLoader } from "./commands-loader";
 import { frameworkCommands } from "./framework-cli-commands";
-import { CliOptionValueError, ParsedCliArgs, parseCliArgs } from "./parse-cli-args";
+import { CliOptionValueError, type ParsedCliArgs, parseCliArgs } from "./parse-cli-args";
 import { findSimilar } from "./string-similarity";
-import { CommandActionData, ResolvedCLICommandOption } from "../commands/types";
+import type { CommandActionData, ResolvedCLICommandOption } from "../commands/types";
 
 /**
  * Best-effort budget (ms) for draining stdout/stderr before a forced exit.
@@ -792,6 +793,16 @@ export class CLICommandsManager {
       // listing it in both is the duplicate this comment's route-name error
       // describes.
       registerConfiguredConnectors();
+
+      // Fail fast on a busy port BEFORE the early-phase connectors (database,
+      // cache, ...) connect. `http` itself is a LATE-phase connector, so its
+      // own preflight is not reached until after those early connectors are
+      // up and every app module has been imported — 7-13s of work discarded
+      // before anyone learns the port was taken. This is the dev-preload
+      // counterpart of the check the generated production entry runs at the
+      // same point in its own boot sequence (`production-builder.ts`, step
+      // 2.6) — a cheap bind-and-release probe, not a connector reorder.
+      await preflightConfiguredHttpPort();
 
       if (preloaders.connectors === true) {
         await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);

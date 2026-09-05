@@ -27,9 +27,8 @@ vi.mock("../../../src/http/port-preflight", async (importOriginal) => {
   };
 });
 
-const { assertConfiguredHttpPortIsFree, preflightConfiguredHttpPort } = await import(
-  "../../../src/http/boot-port-preflight"
-);
+const { assertConfiguredHttpPortIsFree, preflightConfiguredHttpPort } =
+  await import("../../../src/http/boot-port-preflight");
 
 describe("assertConfiguredHttpPortIsFree", () => {
   beforeEach(() => {
@@ -104,8 +103,9 @@ describe("preflightConfiguredHttpPort", () => {
     preflightMock.assertPortIsAvailable.mockImplementation(async () => {});
 
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    // The function calls `process.exit(1)` and has nothing after it; stubbing
-    // it to a no-op lets the body run out without killing the runner.
+    // The function calls `process.exit(78)` and has nothing after it;
+    // stubbing it to a no-op lets the body run out without killing the
+    // runner.
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
   });
 
@@ -114,7 +114,7 @@ describe("preflightConfiguredHttpPort", () => {
     vi.restoreAllMocks();
   });
 
-  it("names EADDRINUSE, the port and the host on stderr, then exits 1", async () => {
+  it("names EADDRINUSE, the port and the host on stderr, then exits 78 (EX_CONFIG)", async () => {
     config.set("http", { port: 3869, host: "0.0.0.0" });
 
     preflightMock.assertPortIsAvailable.mockImplementation(async () => {
@@ -130,7 +130,9 @@ describe("preflightConfiguredHttpPort", () => {
     expect(output).toContain("EADDRINUSE");
     expect(output).toContain("3869");
     expect(output).toContain("0.0.0.0");
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    // 78 (EX_CONFIG) is the boot-precondition exit code the dev supervisor
+    // (dev-server/supervisor.ts) treats as terminal — never a message string.
+    expect(exitSpy).toHaveBeenCalledWith(78);
   });
 
   it("hands over the command that names the owning process", async () => {

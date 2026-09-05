@@ -5,6 +5,7 @@ import { Application } from "../application";
 import { connectorsManager } from "../connectors/connectors-manager";
 import { ConnectorLifecyclePhase } from "../connectors/types";
 import { warlockConfigManager } from "../warlock-config";
+import { BootPreconditionError } from "./boot-precondition-error";
 import { devLogInfo, devLogSection, devLogWarn, devServeLog } from "./dev-logger";
 import { filesOrchestrator } from "./files-orchestrator";
 import { MANIFEST_PATH } from "./flags";
@@ -60,7 +61,16 @@ export class DevelopmentServer {
       // A rejecting validator (Application.onValidateBoot) must abort boot
       // before late-phase connectors bind a port — this is what makes the
       // hook actually prevent serving instead of merely being defined.
-      await Application.runStartupValidators();
+      //
+      // Wrapped and re-thrown as a BootPreconditionError: a rejected
+      // validator is, by definition, a precondition whose cause cannot
+      // change because the worker tried again — the supervisor must not
+      // restart into the same rejection. See boot-precondition-error.ts.
+      try {
+        await Application.runStartupValidators();
+      } catch (error) {
+        throw new BootPreconditionError((error as Error).message, { cause: error });
+      }
 
       // Late-phase connectors (http, socket) bind after app code has
       // registered routes/listeners.
@@ -230,7 +240,6 @@ export class DevelopmentServer {
     return this.running;
   }
 }
-
 
 function isEnvPath(path: string): boolean {
   const basename = path.split("/").pop() ?? path;

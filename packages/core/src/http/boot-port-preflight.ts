@@ -3,6 +3,15 @@ import { assertPortIsAvailable, PortInUseError } from "./port-preflight";
 import { resolveBindPort } from "./resolve-bind-port";
 
 /**
+ * Mirrors `dev-server/supervisor.ts`'s `BOOT_PRECONDITION_EXIT_CODE`. Kept as
+ * its own literal here (rather than imported) so this file — reached by both
+ * the dev-preload path and the generated, standalone production entry — never
+ * pulls dev-server's supervisor module (child_process, TTY handling, ...)
+ * into a production bundle that has no supervisor at all. EX_CONFIG.
+ */
+const BOOT_PRECONDITION_EXIT_CODE = 78;
+
+/**
  * Host used when `http.host` is unset — the same default `HttpConnector`
  * binds with, so the probe tests the address the server will actually take.
  */
@@ -92,7 +101,7 @@ export async function preflightConfiguredHttpPort(): Promise<void> {
 
     reportPortInUse(error);
 
-    process.exit(1);
+    process.exit(BOOT_PRECONDITION_EXIT_CODE);
   }
 }
 
