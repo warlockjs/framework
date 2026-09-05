@@ -116,6 +116,111 @@
   ],
   "releases": [
     {
+      "version": "5.3.2",
+      "id": "v5-3-2",
+      "date": "September 5, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "The release that made our own checks tell the truth. <code>prettier --check</code> had been reporting a clean workspace while checking four files, <code>web</code> had been failing 9 tests and its typecheck since before 5.3.0 with nothing saying so, and 57 interfaces imported as values were crashing the from-source boot. The release gate now runs every package’s own suite and refuses to pack a dirty one. Ports also stopped lying: a configured port is normalised before anything binds, the <strong>bound</strong> port is what gets reported, and a startup precondition that cannot clear itself stops instead of restart-looping forever. <code>npm create warlock</code> completes on a clean machine again.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 7
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "An <code>HTTP_PORT</code> that does not round-trip through <code>Number()</code> — <code>03999</code>, <code>\" 3999\"</code>, <code>+3999</code>, <code>1e3</code> — reached the HTTP boot path as a string. <code>1e3</code> bound port 1000 with no diagnostic anywhere, the port published to the ready signal was the raw configured value, and <code>PortInUseError</code>'s suggestion string-concatenated into <code>port: 039991</code>. A configured port is now resolved to a canonical integer before anything binds, logs or reports it, and a value that cannot become one fails naming it."
+            },
+            {
+              "type": "Fixed",
+              "html": "An ambient environment variable that overrode the app's own <code>.env</code> did so silently. The precedence is unchanged and deliberate — a checked-in <code>.env</code> is a default, an exported variable is the situational override — but the app now prints one line naming the variable, the value in effect, and that it came from the process environment. Keys that look like secrets are named with their values redacted."
+            },
+            {
+              "type": "Fixed",
+              "html": "The port reported to a supervisor, to <code>WARLOCK_TEST_SERVER_PORT</code> and to the ready report was the <strong>configured</strong> port rather than the one actually bound. It is now read back from the address <code>listen()</code> resolves with, so the two can no longer diverge — including under <code>http.port: 0</code>, where the configured value carries no information at all."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock dev</code> restart-looped forever on a startup precondition that could never clear itself, reprinting its own diagnostic every few seconds and then scrolling it away with the restart banner. A failed precondition now stops, prints once, and exits."
+            },
+            {
+              "type": "Fixed",
+              "html": "The port preflight ran after the database connected, so a busy port took 7–13 seconds to report on the <code>warlock dev</code> path. It now runs before the early-phase connectors, as it already did for a production build."
+            },
+            {
+              "type": "Fixed",
+              "html": "57 interfaces were imported as values across the package, each one crashing <code>warlock dev</code>'s from-source boot the moment its file reached the per-file transpiler — which has no type information and so cannot elide the import."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>localized()</code> lost its <code>StandardSchemaV1</code> typing in the published 5.3.0 and 5.3.1 tarballs. The typing is restored."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 4
+            },
+            {
+              "type": "Removed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>npm create warlock</code> could not complete on a clean machine. The starter's <code>prepare</code> script ran husky, which needs a git repository, and the scaffolder installs before it runs <code>git init</code> — so the install failed and the scaffolder aborted with an empty <code>node_modules</code>, with and without <code>--no-git</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "The first <code>pnpm install</code> in a fresh project failed with <code>ERR_PNPM_IGNORED_BUILDS</code>. pnpm writes <code>pnpm-workspace.yaml</code> with a literal <code>esbuild: set this to true or false</code> placeholder when it meets an ignored build script non-interactively, and then rejects that value on the next install. The template now ships a decided value, so pnpm never writes the placeholder."
+            },
+            {
+              "type": "Fixed",
+              "html": "A scaffolded app failed its own ESLint check on the first <code>warlock dev</code>. The <code>web</code> feature injected its connector import at the TOP of <code>warlock.config.ts</code>, ahead of the imports the template already had, and the generated app formats with <code>prettier-plugin-organize-imports</code> — so the injected line was out of order the moment it was written. It is now inserted in sorted position."
+            },
+            {
+              "type": "Fixed",
+              "html": "Running the scaffolder without a terminal — from CI, a script, or any non-interactive shell — died with <code>TTY initialization failed: uv_tty_init returned EBADF</code>, a libuv internal shown to a developer whose only mistake was not being at a keyboard. A missing terminal is no longer an error when the flags already answer every prompt; only a genuinely unanswerable question stops the run, and it names <code>--yes</code> and the flags that supply it."
+            },
+            {
+              "type": "Removed",
+              "html": "husky and its <code>prepare</code> script from the starter. Note what goes with it: the generated project ships no CI, so the format, lint, typecheck and test that ran on commit are gone with nothing yet replacing them. That gap is tracked separately."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "A page-file segment carrying a bracket but no complete group could reach the parameter-name read with nothing to read. Unreachable as the surrounding checks stand, and now stated as a guard rather than assumed, so a future narrowing of those checks fails here naming the segment instead of throwing further down."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.3.1",
       "id": "v5-3-1",
       "date": "September 4, 2026",
