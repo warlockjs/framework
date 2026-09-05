@@ -5,9 +5,9 @@ import {
   getFileAsync,
   putFileAsync,
 } from "@warlock.js/fs";
-import { CommandActionData } from "../../commands/types";
+import type { CommandActionData } from "../../commands/types";
 import { rootPath, srcPath } from "../../utils";
-import { FeatureDefinition } from "./types";
+import type { FeatureDefinition } from "./types";
 
 /**
  * The stylesheet entry, and the whole of Tailwind's configuration.

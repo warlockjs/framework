@@ -1,4 +1,4 @@
-import { FeatureDefinition } from "./types";
+import type { FeatureDefinition } from "./types";
 
 export const mongodbFeature: FeatureDefinition = {
   description: "Installs mongodb driver for database driver (Cascade Package)",

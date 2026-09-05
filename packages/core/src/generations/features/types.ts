@@ -1,4 +1,4 @@
-import { CommandActionData } from "../../commands/types";
+import type { CommandActionData } from "../../commands/types";
 
 /**
  * Internal placeholder for an @warlock.js dependency whose concrete version

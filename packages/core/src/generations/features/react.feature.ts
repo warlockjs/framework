@@ -1,4 +1,4 @@
-import { FeatureDefinition } from "./types";
+import type { FeatureDefinition } from "./types";
 
 export const reactFeature: FeatureDefinition = {
   description:

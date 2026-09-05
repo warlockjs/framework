@@ -1,5 +1,5 @@
 import { socketConfigStub } from "../stubs";
-import { FeatureDefinition } from "./types";
+import type { FeatureDefinition } from "./types";
 
 export const socketFeature: FeatureDefinition = {
   description: "Installs socket.io for the realtime socket server (Socket Connector)",

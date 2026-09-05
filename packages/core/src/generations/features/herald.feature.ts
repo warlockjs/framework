@@ -1,5 +1,5 @@
 import { communicatorsConfigStub } from "../stubs";
-import { FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
+import { type FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
 
 export const heraldFeature: FeatureDefinition = {
   description: "Installs herald for message broker (Herald Package)",

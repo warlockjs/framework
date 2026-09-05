@@ -1,5 +1,5 @@
 import { colors } from "@mongez/copper";
-import { Environment } from "../utils";
+import type { Environment } from "../utils";
 import { getWarlockVersion } from "../utils/framework-vesion";
 
 export function isMatchingCommandName(commandName: string, targetingCommandName: string) {

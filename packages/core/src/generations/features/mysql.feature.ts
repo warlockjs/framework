@@ -1,4 +1,4 @@
-import { FeatureDefinition } from "./types";
+import type { FeatureDefinition } from "./types";
 
 export const mysqlFeature: FeatureDefinition = {
   description: "Installs mysql2 for MySQL database driver (Cascade Package)",

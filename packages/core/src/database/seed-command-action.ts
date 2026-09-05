@@ -4,14 +4,14 @@ import {
   dataSourceRegistry,
   transaction as runInTransaction,
 } from "@warlock.js/cascade";
-import { CommandActionData } from "../commands/types";
+import type { CommandActionData } from "../commands/types";
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
 import { Path } from "../utils/normalized-path";
 import { getFilesFromDirectory } from "../dev-server/utils";
 import { srcPath } from "../utils";
-import { Seeder } from "./seeds/seeder";
+import type { Seeder } from "./seeds/seeder";
 import { SeedersManager } from "./seeds/seeders.manager";
-import { SeedClock, SeedRecordRef } from "./seeds/types";
+import type { SeedClock, SeedRecordRef } from "./seeds/types";
 import { seedRecordsTableName, seedsTableName } from "./seeds/utils";
 
 /**

@@ -25,7 +25,7 @@ import { shadcnFeature } from "./shadcn.feature";
 import { socketFeature } from "./socket.feature";
 import { tailwindFeature } from "./tailwind.feature";
 import { testFeature } from "./test.feature";
-import { FeatureDefinition } from "./types";
+import type { FeatureDefinition } from "./types";
 import { webFeature } from "./web.feature";
 
 export type { FeatureDefinition } from "./types";

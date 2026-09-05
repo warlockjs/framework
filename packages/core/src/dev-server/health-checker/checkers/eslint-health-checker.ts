@@ -2,8 +2,8 @@ import { colors } from "@mongez/copper";
 import { ESLint } from "eslint";
 import fs from "fs";
 import path from "path";
-import { FileManager } from "../../file-manager";
-import { FileHealthCheckerContract } from "../file-health-checker.contract";
+import type { FileManager } from "../../file-manager";
+import type { FileHealthCheckerContract } from "../file-health-checker.contract";
 import { FileHealthResult } from "../file-health-result";
 import { BaseHealthChecker } from "./base-health-checker";
 

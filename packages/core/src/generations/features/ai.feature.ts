@@ -1,5 +1,5 @@
 import { aiConfigStub } from "../stubs";
-import { FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
+import { type FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
 
 export const aiFeature: FeatureDefinition = {
   description: "Installs @warlock.js/ai — the core AI toolkit (agents, tools, workflows)",

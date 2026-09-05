@@ -6,7 +6,7 @@ import {
   putJsonFileAsync,
 } from "@warlock.js/fs";
 import { execSync } from "node:child_process";
-import { CommandActionData } from "../commands/types";
+import type { CommandActionData } from "../commands/types";
 import {
   detectPackageManager,
   getAddCommand,

@@ -1,8 +1,8 @@
 import { colors } from "@mongez/copper";
 import { ensureDirectoryAsync, fileExistsAsync, getFileAsync, putFileAsync } from "@warlock.js/fs";
-import { CommandActionData } from "../../commands/types";
+import type { CommandActionData } from "../../commands/types";
 import { rootPath, srcPath } from "../../utils";
-import { FeatureDefinition } from "./types";
+import type { FeatureDefinition } from "./types";
 
 /**
  * `warlock add shadcn` installs the PREREQUISITES for shadcn/ui. It does not

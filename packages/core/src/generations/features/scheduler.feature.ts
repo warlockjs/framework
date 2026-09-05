@@ -1,4 +1,4 @@
-import { FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
+import { type FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
 
 export const schedulerFeature: FeatureDefinition = {
   description: "Installs warlock scheduler for scheduling tasks",

@@ -5,7 +5,7 @@ import {
   getFileAsync,
   putFileAsync,
 } from "@warlock.js/fs";
-import { CommandActionData } from "../../commands/types";
+import type { CommandActionData } from "../../commands/types";
 import { rootPath, srcPath } from "../../utils";
 import {
   webContactControllerStub,
@@ -14,7 +14,7 @@ import {
   webHomeRegisterStub,
   webRootStub,
 } from "../stubs";
-import { FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
+import { type FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
 
 /**
  * Register the WebConnector in `warlock.config.ts`, and ONLY there.

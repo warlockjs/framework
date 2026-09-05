@@ -7,11 +7,11 @@ import {
   migrationRunner,
   transaction,
 } from "@warlock.js/cascade";
-import { Seeder } from "./seeder";
+import type { Seeder } from "./seeder";
 import { SeederDependencyCycleError, UnknownSeederDependencyError } from "./seeder.errors";
 import { SeedRecordsTableMigration } from "./seed-records-table-migration";
 import { SeedsTableMigration } from "./seeds-table-migration";
-import {
+import type {
   SeedClock,
   SeederMetadata,
   SeedRecordRef,

@@ -1,8 +1,8 @@
 import { colors } from "@mongez/copper";
 import { fileExistsAsync, putFileAsync } from "@warlock.js/fs";
-import { CommandActionData } from "../../commands/types";
+import type { CommandActionData } from "../../commands/types";
 import { rootPath, srcPath } from "../../utils";
-import { FeatureDefinition } from "./types";
+import type { FeatureDefinition } from "./types";
 
 async function completeTestInstallation(options: CommandActionData) {
   // Create test-global-setup.ts (runs once before all tests)

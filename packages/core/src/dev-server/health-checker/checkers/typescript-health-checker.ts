@@ -1,8 +1,8 @@
 import { colors } from "@mongez/copper";
 import ts from "typescript";
-import { FileManager } from "../../file-manager";
+import type { FileManager } from "../../file-manager";
 import { tsconfigManager } from "../../tsconfig-manager";
-import { FileHealthCheckerContract } from "../file-health-checker.contract";
+import type { FileHealthCheckerContract } from "../file-health-checker.contract";
 import { FileHealthResult } from "../file-health-result";
 import { BaseHealthChecker } from "./base-health-checker";
 

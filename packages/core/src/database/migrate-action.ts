@@ -11,7 +11,7 @@ import {
 } from "@warlock.js/cascade";
 import dayjs from "dayjs";
 import path from "path";
-import { CommandActionData } from "../commands/types";
+import type { CommandActionData } from "../commands/types";
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
 import { Path } from "../utils/normalized-path";
 import { getFilesFromDirectory } from "../dev-server/utils";

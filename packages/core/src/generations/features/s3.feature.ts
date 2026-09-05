@@ -1,4 +1,4 @@
-import { FeatureDefinition } from "./types";
+import type { FeatureDefinition } from "./types";
 
 export const s3Feature: FeatureDefinition = {
   description: "Installs AWS SDK for Cloud storage (Storage Package)",

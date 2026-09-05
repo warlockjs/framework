@@ -1,5 +1,5 @@
 import { linkAiPackageImport } from "./shared/link-ai-package-import";
-import { FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
+import { type FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
 
 export const aiPanopticFeature: FeatureDefinition = {
   description:

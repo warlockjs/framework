@@ -1,6 +1,6 @@
 import { colors } from "@mongez/copper";
 import { ensureDirectoryAsync, fileExistsAsync, putFileAsync } from "@warlock.js/fs";
-import { CommandActionData } from "../../commands/types";
+import type { CommandActionData } from "../../commands/types";
 import { srcPath } from "../../utils";
 import {
   notificationControllersStub,
@@ -10,7 +10,7 @@ import {
   notificationsConfigStub,
 } from "../stubs";
 import { migrationTimestamp } from "./shared/migration-timestamp";
-import { FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
+import { type FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
 
 async function completeNotificationsInstallation(_options: CommandActionData) {
   const modelPath = srcPath("app/notifications/notification.model.ts");

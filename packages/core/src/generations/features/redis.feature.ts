@@ -1,4 +1,4 @@
-import { FeatureDefinition } from "./types";
+import type { FeatureDefinition } from "./types";
 
 export const redisFeature: FeatureDefinition = {
   description: "Installs redis for Redis cache driver (Cache Package)",

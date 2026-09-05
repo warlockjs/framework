@@ -23,6 +23,13 @@
     "moduleResolution": "Bundler",
     "target": "ES2022",
     "noEmit": true,
+    // Guards the defect class this config exists to catch: esbuild's from-source
+    // boot transpiles TypeScript file-by-file (see bin/warlock.js's
+    // `bootFromSource`), so a plain `import { X }` where `X` is only ever a type
+    // survives the per-file transform and crashes Node at import time with
+    // "does not provide an export named 'X'". `verbatimModuleSyntax` turns that
+    // into a compile-time TS1484 here instead of a runtime crash in `warlock dev`.
+    "verbatimModuleSyntax": true,
     // `rootDir` only constrains emit, and this config emits nothing. Inheriting
     // `src` would reject every file under `tests/`, and sibling sources resolved
     // through `paths` live above this package — so the program root is the

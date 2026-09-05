@@ -1,4 +1,4 @@
-import { FeatureDefinition } from "./types";
+import type { FeatureDefinition } from "./types";
 
 export const sesFeature: FeatureDefinition = {
   description: "Installs AWS SES SDK for sending emails via Amazon SES",

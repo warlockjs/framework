@@ -11,7 +11,7 @@ import { FilesWatcher } from "./files-watcher";
 import { FILE_PROCESSING_BATCH_SIZE } from "./flags";
 import { EslintHealthChecker } from "./health-checker/checkers/eslint-health-checker";
 import { TypescriptHealthChecker } from "./health-checker/checkers/typescript-health-checker";
-import { FileHealthCheckerContract } from "./health-checker/file-health-checker.contract";
+import type { FileHealthCheckerContract } from "./health-checker/file-health-checker.contract";
 import { FilesHealthcareManager } from "./health-checker/files-healthcare.manager";
 import { buildTranspileInit } from "./loader/build-transpile-init.js";
 import { registerLoader } from "./loader/register-loader.js";
