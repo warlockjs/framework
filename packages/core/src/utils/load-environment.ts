@@ -1,6 +1,8 @@
 import { loadEnv, type EnvLoaderOptions } from "@mongez/dotenv";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { detectEnvironmentOverrides } from "./detect-environment-overrides";
+import { reportEnvironmentOverrides } from "./report-environment-overrides";
 
 /**
  * Core's env precedence policy, in one place because two callers load env:
@@ -45,6 +47,38 @@ function candidateEnvFiles(directory: string): string[] {
 
   if (process.env.NODE_ENV) {
     files.push(path.join(directory, `.env.${process.env.NODE_ENV}`));
+  }
+
+  return files;
+}
+
+/**
+ * The files `loadEnv()` will actually read, in its own read order.
+ *
+ * Differs from {@link candidateEnvFiles}, which lists every candidate to
+ * answer "is there anything to load at all". `loadEnv()` itself only ever
+ * reads `.env.shared` (if present) plus ONE of `.env.<NODE_ENV>` /
+ * `.env` — the NODE_ENV-specific file when it exists, `.env` otherwise —
+ * never both. Override detection has to mirror that exactly, or a key
+ * declared only in a file `loadEnv()` would not have touched could be
+ * reported as having "lost" a comparison it was never actually part of.
+ */
+function resolveLoadedEnvFiles(directory: string): string[] {
+  const files: string[] = [];
+  const sharedFile = path.join(directory, ".env.shared");
+
+  if (existsSync(sharedFile)) {
+    files.push(sharedFile);
+  }
+
+  const nodeEnvFile = process.env.NODE_ENV
+    ? path.join(directory, `.env.${process.env.NODE_ENV}`)
+    : undefined;
+  const derivedFile =
+    nodeEnvFile && existsSync(nodeEnvFile) ? nodeEnvFile : path.join(directory, ".env");
+
+  if (existsSync(derivedFile)) {
+    files.push(derivedFile);
   }
 
   return files;
@@ -98,6 +132,19 @@ export async function loadEnvironmentFiles(directory: string = process.cwd()): P
   }
 
   environmentLoaded = true;
+
+  // Snapshot BEFORE `loadEnv()` runs: the loader writes into `process.env` for
+  // every key its files supply, so a snapshot taken afterwards could no
+  // longer distinguish an ambient override from a value the loader itself
+  // just wrote — see `detectEnvironmentOverrides`.
+  const processEnvironmentSnapshot = { ...process.env };
+
+  // The precedence itself is correct (see `environmentLoaderOptions` above);
+  // the defect this guards against is the SILENCE — `.env` losing to an
+  // ambient value with no diagnostic at all.
+  reportEnvironmentOverrides(
+    detectEnvironmentOverrides(resolveLoadedEnvFiles(directory), processEnvironmentSnapshot),
+  );
 
   // `dir` has to be forwarded: `loadEnv()` defaults it to `process.cwd()`, so
   // without this the existence check above asks about `directory` while the
