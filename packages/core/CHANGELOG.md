@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.3.2
+
+### Fixed
+
+- An `HTTP_PORT` that does not round-trip through `Number()` — `03999`, `" 3999"`, `+3999`, `1e3` — reached the HTTP boot path as a string. `1e3` bound port 1000 with no diagnostic anywhere, the port published to the ready signal was the raw configured value, and `PortInUseError`'s suggestion string-concatenated into `port: 039991`. A configured port is now resolved to a canonical integer before anything binds, logs or reports it, and a value that cannot become one fails naming it.
+- An ambient environment variable that overrode the app's own `.env` did so silently. The precedence is unchanged and deliberate — a checked-in `.env` is a default, an exported variable is the situational override — but the app now prints one line naming the variable, the value in effect, and that it came from the process environment. Keys that look like secrets are named with their values redacted.
+- The port reported to a supervisor, to `WARLOCK_TEST_SERVER_PORT` and to the ready report was the **configured** port rather than the one actually bound. It is now read back from the address `listen()` resolves with, so the two can no longer diverge — including under `http.port: 0`, where the configured value carries no information at all.
+- `warlock dev` restart-looped forever on a startup precondition that could never clear itself, reprinting its own diagnostic every few seconds and then scrolling it away with the restart banner. A failed precondition now stops, prints once, and exits.
+- The port preflight ran after the database connected, so a busy port took 7–13 seconds to report on the `warlock dev` path. It now runs before the early-phase connectors, as it already did for a production build.
+- 57 interfaces were imported as values across the package, each one crashing `warlock dev`'s from-source boot the moment its file reached the per-file transpiler — which has no type information and so cannot elide the import.
+- `localized()` lost its `StandardSchemaV1` typing in the published 5.3.0 and 5.3.1 tarballs. The typing is restored.
+
 ## 5.3.1 - 2026-09-04
 
 ### Fixed

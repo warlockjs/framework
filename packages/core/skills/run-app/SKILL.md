@@ -309,7 +309,7 @@ The third line is conditional on the parent having actually seen child output. W
 
 That distinction is the point of the change: an unhelpful "see above" printed above an empty terminal used to be the entire diagnostic.
 
-**Port already in use.** The HTTP connector preflights the port immediately before `listen()`, so a collision is named rather than surfacing as a raw `EADDRINUSE` from inside Fastify:
+**Port already in use.** The port is preflighted twice: once **before the early-phase connectors**, so a collision is reported without waiting for the database to connect, and again in the HTTP connector immediately before `listen()`, because a port can be taken in the seconds between the two. Either way the collision is named rather than surfacing as a raw `EADDRINUSE` from inside Fastify:
 
 ```
 EADDRINUSE: Port 3000 is already in use on 127.0.0.1. Stop the dev server (or whatever
@@ -317,7 +317,15 @@ else is listening on port 3000) and run again, or start on a free port — e.g.
 startHttpTestServer({ port: 3001 }).
 ```
 
-The connector logs it fatally and exits `1`; the supervisor forwards that text and then prints the failure summary above it. `EACCES` on the port is treated the same way as `EADDRINUSE` (a privileged port you may not bind is also "not available"); anything else the probe throws is rethrown untouched.
+**The process exits `78` (`EX_CONFIG`), and `warlock dev`'s supervisor treats that as terminal — it prints once and stops rather than restarting.** That code is the counterpart of `75`, which a worker uses to ask for a fresh process. The distinction is the point: a code error is worth restarting, and a *startup precondition* — a port held by something else, a port value that is not a port, a boot validator that rejected — cannot change because we tried again six seconds later. Retrying one only reprints the diagnostic and then scrolls it away.
+
+`EACCES` on the port is treated the same way as `EADDRINUSE` (a privileged port you may not bind is also "not available"); anything else the probe throws is rethrown untouched.
+
+**A configured port is normalised before anything binds.** `env()` coerces a `.env` value to a number only when it round-trips exactly, so `HTTP_PORT=03999`, `" 3999"`, `+3999` and `1e3` all arrive as strings. They are resolved to a canonical integer first — used for the preflight, for `listen()`, and for the port reported to a supervisor — and a value that cannot become a usable port fails naming it. When the raw value was not already canonical, one line says so:
+
+```
+Configured http.port "03999" normalised to 3999.
+```
 
 ### How readiness is reported
 
