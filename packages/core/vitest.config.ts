@@ -42,7 +42,24 @@ export default defineConfig({
      */
     env: { NODE_ENV: "test" },
     environment: "node",
-    include: ["tests/{unit,integration}/**/*.test.ts"],
+    /**
+     * Card 7761af8f: this include glob used to be ONLY
+     * `tests/{unit,integration}/**\/*.test.ts`, so a spec written next to
+     * the code it tests (`src/**\/*.spec.ts`, the convention `auth`, `web`
+     * and `access` already run, and the shape `skills/code-standards`
+     * documents) silently never ran — it passed review, it was committed,
+     * and it reported nothing, forever.
+     *
+     * Widened to run BOTH shapes rather than migrating core's hundreds of
+     * `tests/**` files to be colocated: three sibling packages already run
+     * colocated specs and the project's own code-standards convention calls
+     * for colocated, but core has hundreds of files under `tests/` and a
+     * mass move immediately before a release buys nothing and risks a lot.
+     * This removes the silent-skip failure mode today; a later, deliberate
+     * consolidation can move files when nothing is in flight. (Decided by
+     * the lead on card 7761af8f, not drifted into.)
+     */
+    include: ["tests/{unit,integration}/**/*.test.ts", "src/**/*.spec.ts", "src/**/*.test.ts"],
     testTimeout: 10_000,
   },
 });
