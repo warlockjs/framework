@@ -168,7 +168,7 @@ describe("web starter stubs", () => {
     expect(webHomePageStub).toContain('from "@mongez/react-localization"');
     expect(webHomePageStub).toContain('from "@mongez/react-form"');
     expect(webHomePageStub).toContain('from "@mongez/http"');
-    expect(webHomePageStub).toContain("<Link href=\"/\" aria-current=\"page\">Home</Link>");
+    expect(webHomePageStub).toContain('<Link href="/" aria-current="page">');
     expect(webHomePageStub).toContain('http.post<{ message: string }>("/api/contact", values)');
     expect(webHomePageStub).toContain("schema={contactSchema}");
     expect(webHomePageStub).toContain("result.error.isValidationError");

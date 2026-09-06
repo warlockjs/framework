@@ -585,8 +585,8 @@ router.group({ prefix: "/notifications", middleware: [authMiddleware([])] }, () 
  * reference app (`v5/app/src/web/root.tsx`) is where to look for the fuller
  * shape: middleware, an app-level loader, locales, an ErrorBoundary.
  */
-export const webRootStub = `import { Head, Scripts } from "@warlock.js/web";
-import type { AppProps } from "@warlock.js/web";
+export const webRootStub = `import type { AppProps } from "@warlock.js/web";
+import { Head, Scripts } from "@warlock.js/web";
 
 /**
  * The application root.
@@ -652,7 +652,10 @@ export const contactSchema = v.object({
 export type ContactSchema = Infer.Output<typeof contactSchema>;
 
 /** POST /api/contact — validates the starter contact form. */
-export const contactController: RequestHandler<Request<ContactSchema>> = async ({ request, response }) => {
+export const contactController: RequestHandler<Request<ContactSchema>> = async ({
+  request,
+  response,
+}) => {
   const contact = request.validated();
 
   // Replace this with delivery/persistence for your app. Keeping the accepted
@@ -716,12 +719,12 @@ export function register() {
  * the moment this finishes.
  */
 export const webHomePageStub = `import { http } from "@mongez/http";
-import { Form, useFormControl, type FormControlProps } from "@mongez/react-form";
 import { setCurrentLocaleCode } from "@mongez/localization";
+import { Form, useFormControl, type FormControlProps } from "@mongez/react-form";
 import { transX } from "@mongez/react-localization";
 import { v } from "@warlock.js/seal";
-import { useState } from "react";
 import { Link, type PageProps } from "@warlock.js/web";
+import { useState } from "react";
 
 export { register } from "./index.register";
 
@@ -837,8 +840,12 @@ export default function HomePage(_props: PageProps) {
 
       <main className="wk-home" dir={locale === "ar" ? "rtl" : "ltr"}>
         <nav className="wk-links" aria-label="Starter links">
-          <a href="https://warlock.js.org" target="_blank" rel="noreferrer">Docs</a>
-          <Link href="/" aria-current="page">Home</Link>
+          <a href="https://warlock.js.org" target="_blank" rel="noreferrer">
+            Docs
+          </a>
+          <Link href="/" aria-current="page">
+            Home
+          </Link>
           <button
             className="wk-language"
             type="button"
@@ -855,7 +862,7 @@ export default function HomePage(_props: PageProps) {
         <section className="wk-check">
           <label>If this number goes up when you click, React is hydrated:</label>
           <strong>{count}</strong>
-          <button type="button" onClick={() => setCount(c => c + 1)}>
+          <button type="button" onClick={() => setCount((c) => c + 1)}>
             Count up
           </button>
         </section>
@@ -893,11 +900,24 @@ export default function HomePage(_props: PageProps) {
             }}
           >
             <TextInput name="name" label={transX("starter.name")} autoComplete="name" />
-            <TextInput name="email" label={transX("starter.email")} type="email" autoComplete="email" />
+            <TextInput
+              name="email"
+              label={transX("starter.email")}
+              type="email"
+              autoComplete="email"
+            />
             <ContactMessage />
             <button type="submit">{transX("starter.submit")}</button>
-            {submitError && <p className="wk-submit-error" role="alert">{submitError}</p>}
-            {submitted && <p className="wk-success" role="status">{transX("starter.sent")}</p>}
+            {submitError && (
+              <p className="wk-submit-error" role="alert">
+                {submitError}
+              </p>
+            )}
+            {submitted && (
+              <p className="wk-success" role="status">
+                {transX("starter.sent")}
+              </p>
+            )}
           </Form>
         </section>
       </main>
