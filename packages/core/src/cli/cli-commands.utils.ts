@@ -171,25 +171,43 @@ export function displayMissingCommand() {
 }
 
 /**
- * Display command success message
+ * Display command success message.
+ *
+ * Written to STDERR, not stdout. This banner is printed around EVERY command,
+ * including ones whose stdout is a machine payload a script is meant to parse —
+ * `warlock routes --json` is the clearest case. On stdout it produced this,
+ * which is not JSON and cannot be piped anywhere:
+ *
+ * ```
+ * []
+ *
+ *   ✔ routes completed successfully (696ms)
+ * ```
+ *
+ * stdout belongs to the command's output; status chrome belongs to stderr,
+ * where it stays visible to a person in a terminal and out of a pipe.
  */
 export function displayCommandSuccess(commandName: string, durationMs?: number) {
   const duration = durationMs ? colors.dim(` (${durationMs}ms)`) : "";
-  console.log();
-  console.log(
+  console.error();
+  console.error(
     `  ${colors.green("✔")} ${colors.bold(commandName)} completed successfully${duration}`,
   );
-  console.log();
+  console.error();
 }
 
 /**
- * Display command error message
+ * Display command error message.
+ *
+ * On stderr for the same reason as {@link displayCommandSuccess}, and one
+ * stronger: a failure interleaved into a machine payload corrupts the payload
+ * AND hides the failure from anyone reading stderr for it.
  */
 export function displayCommandError(commandName: string, error: Error) {
-  console.log();
-  console.log(`  ${colors.red("✖")} ${colors.bold(commandName)} failed`);
-  console.log(`  ${colors.dim(error.message)}`);
-  console.log();
+  console.error();
+  console.error(`  ${colors.red("✖")} ${colors.bold(commandName)} failed`);
+  console.error(`  ${colors.dim(error.message)}`);
+  console.error();
 }
 
 /**

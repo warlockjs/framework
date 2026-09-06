@@ -206,6 +206,15 @@ describe("CLICommandsManager — async failures that escape the command's own pr
       logs.push(args.join(" "));
     });
 
+    // Both streams, because these tests are about WHAT is reported and in what
+    // order, not which stream carries it. The success/failure banners live on
+    // stderr so they never contaminate a machine payload on stdout (see
+    // `displayCommandSuccess`); capturing only stdout here would make these
+    // assertions silently vacuous.
+    vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      logs.push(args.join(" "));
+    });
+
     // These tests reject on purpose. Vitest's own process-level listeners would
     // report that as a run-level failure, so they are parked for the duration
     // of each test and restored afterwards — the manager registers its own
