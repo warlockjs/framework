@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.4.0 - 2026-09-07
+
+### Fixed
+
+- `warlock routes --json` could not be parsed. The command's success banner shared stdout with the JSON payload, so the documented machine seam — "emit the routes as JSON for piping into scripts/CI" — produced output no consumer could read, and always had.
+- `warlock add react-email` failed on every freshly scaffolded app. It read the project `tsconfig.json` with `JSON.parse`, and the scaffold's own tsconfig carries `//` comments, so the command aborted pointing at the developer's file.
+- `warlock add web` produced an app whose homepage returned HTTP 500. `GET /` was registered twice — by the scaffold's own home route and by the generated page — and Fastify refused the duplicate. Affected both `warlock dev` and `warlock start`.
+- `warlock add web` generated code that failed the scaffold's own lint gate: twelve `prettier/prettier` errors in files the developer had not written.
+- `warlock add notifications` generated a controller that did not compile — seven `TS2345` errors from passing `request.user` where a `Notifiable | Id` was required.
+- Every `warlock` command opened a stdin handle at import time, through a module-level singleton whose constructor defaulted to `process.stdin`. Only `warlock dev` has any use for stdin.
+
+### Changed
+
+- **Command success and failure banners now write to stderr, not stdout.** stdout carries a command's output; status chrome carries no data. A script that captured only stdout to grep for `✔ … completed successfully` must now read stderr. Nothing could have depended on the previous behaviour for `--json`, whose payload was unparseable precisely because of it.
+- Feature generators that patch `tsconfig.json` now edit its text instead of parsing and rewriting it, so the file's comments survive.
+- `warlock add web` locates an existing `GET /` by scanning `src/app/**/routes.ts` rather than assuming one hardcoded path.
+
 ## 5.3.2 - 2026-09-05
 
 ### Fixed
