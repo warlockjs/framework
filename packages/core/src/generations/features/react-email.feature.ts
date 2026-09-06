@@ -1,21 +1,9 @@
 import { colors } from "@mongez/copper";
-import {
-  ensureDirectoryAsync,
-  fileExistsAsync,
-  getJsonFileAsync,
-  putFileAsync,
-  putJsonFileAsync,
-} from "@warlock.js/fs";
+import { ensureDirectoryAsync, fileExistsAsync, putFileAsync } from "@warlock.js/fs";
 import type { CommandActionData } from "../../commands/types";
 import { rootPath } from "../../utils";
+import { patchTsconfigInclude } from "./shared/patch-tsconfig-include";
 import type { FeatureDefinition } from "./types";
-
-/**
- * The part of a project `tsconfig.json` this action patches.
- */
-type ProjectTsConfig = {
-  include?: string[];
-};
 
 async function completeReactEmailInstallation(_options: CommandActionData) {
   // 1. Create emails/ folder with a sample component
@@ -61,19 +49,11 @@ export default function WelcomeEmail({ name }: WelcomeEmailProps) {
     console.log(`${colors.green("✓")} Created emails/welcome-email.tsx`);
   }
 
-  // 2. Patch tsconfig.json â€” add "emails" to include if missing
-  const tsconfigPath = rootPath("tsconfig.json");
-  const tsconfig = await getJsonFileAsync<ProjectTsConfig>(tsconfigPath);
-
-  if (!tsconfig.include) {
-    tsconfig.include = [];
-  }
-
-  if (!tsconfig.include.includes("emails")) {
-    tsconfig.include.push("emails");
-    await putJsonFileAsync(tsconfigPath, tsconfig);
-    console.log(`${colors.green("✓")} Added "emails" to tsconfig.json include`);
-  }
+  // 2. Patch tsconfig.json — add "emails" to include if missing.
+  await patchTsconfigInclude(
+    "emails",
+    "Without it, the email components under emails/ are outside the project and do not typecheck.",
+  );
 }
 
 export const reactEmailFeature: FeatureDefinition = {
