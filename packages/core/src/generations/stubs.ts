@@ -474,7 +474,7 @@ export default Migration.create(Notification, notificationColumns(Notification))
 `;
 
 export const notificationControllersStub = `import { type RequestHandler } from "@warlock.js/core";
-import { inApp } from "@warlock.js/notifications";
+import { inApp, type Id } from "@warlock.js/notifications";
 
 /**
  * The authenticated user's notification HTTP surface — thin wrappers over the
@@ -483,9 +483,28 @@ import { inApp } from "@warlock.js/notifications";
  * is no create. Trim or split these as your app grows.
  */
 
+/**
+ * Read \`id\` off \`request.user\` without assuming this app's \`RequestUser\`
+ * augmentation declares it — \`RequestUser\` is empty by default (see
+ * \`@warlock.js/core\`'s \`RequestUser\` docs), so a narrow runtime read survives
+ * any augmentation shape instead of assuming \`.id\` exists at the type level.
+ * \`inApp\` only ever needs the id (it reduces a \`Notifiable\` to one via
+ * \`recipient.id\` internally), so reading it here — rather than forwarding
+ * \`request.user\` itself — also skips a needless \`Notifiable\` cast.
+ */
+function recipientId(user: unknown): Id {
+  if (user && typeof user === "object" && "id" in user) {
+    const id = (user as { id?: unknown }).id;
+
+    if (typeof id === "string" || typeof id === "number") return id;
+  }
+
+  throw new Error("Authenticated request is missing a usable user id");
+}
+
 /** GET /notifications — list, most recent first (page / limit / type / unread via query). */
 export const listNotificationsController: RequestHandler = async ({ request, response }) => {
-  const { data, pagination } = await inApp.list(request.user!, request.all());
+  const { data, pagination } = await inApp.list(recipientId(request.user), request.all());
 
   return response.success({ notifications: data, pagination });
 };
@@ -497,7 +516,7 @@ export const unreadNotificationsCountController: RequestHandler = async ({
   request,
   response,
 }) => {
-  const count = await inApp.countUnread(request.user!);
+  const count = await inApp.countUnread(recipientId(request.user));
 
   return response.success({ count });
 };
@@ -507,9 +526,10 @@ unreadNotificationsCountController.description = "Unread notifications count";
 /** PATCH /notifications/:id/read — mark one read, return the updated row. */
 export const markNotificationReadController: RequestHandler = async ({ request, response }) => {
   const id = request.input("id");
+  const userId = recipientId(request.user);
 
-  await inApp.markAsRead(request.user!, id);
-  const notification = await inApp.find(request.user!, id);
+  await inApp.markAsRead(userId, id);
+  const notification = await inApp.find(userId, id);
 
   return response.success({ notification });
 };
@@ -521,7 +541,7 @@ export const markAllNotificationsReadController: RequestHandler = async ({
   request,
   response,
 }) => {
-  const count = await inApp.markAsRead(request.user!);
+  const count = await inApp.markAsRead(recipientId(request.user));
 
   return response.success({ count });
 };
@@ -530,7 +550,7 @@ markAllNotificationsReadController.description = "Mark all notifications read";
 
 /** DELETE /notifications — dismiss all for the user. */
 export const clearNotificationsController: RequestHandler = async ({ request, response }) => {
-  await inApp.dismiss(request.user!);
+  await inApp.dismiss(recipientId(request.user));
 
   return response.noContent();
 };
@@ -539,7 +559,7 @@ clearNotificationsController.description = "Clear notifications";
 
 /** DELETE /notifications/:id — dismiss one. */
 export const deleteNotificationController: RequestHandler = async ({ request, response }) => {
-  await inApp.dismiss(request.user!, request.input("id"));
+  await inApp.dismiss(recipientId(request.user), request.input("id"));
 
   return response.noContent();
 };
