@@ -36,15 +36,37 @@ export class DevServerShortcuts {
   private keypressListener?: (character: string, key: KeypressEvent) => void;
 
   /**
-   * @param input       The stream to read keys from. Defaults to the process's
-   *                    own stdin; tests pass a fake TTY instead.
-   * @param onInterrupt What `Ctrl+C` does once raw mode has taken it away from
-   *                    the terminal driver. Defaults to re-raising `SIGINT`.
+   * @param explicitInput The stream to read keys from. Tests pass a fake TTY;
+   *                      production code omits it and gets `process.stdin`,
+   *                      resolved lazily — see {@link input}.
+   * @param onInterrupt   What `Ctrl+C` does once raw mode has taken it away
+   *                      from the terminal driver. Defaults to re-raising
+   *                      `SIGINT`.
    */
   public constructor(
-    private readonly input: NodeJS.ReadStream = process.stdin,
+    private readonly explicitInput?: NodeJS.ReadStream,
     private readonly onInterrupt: () => void = raiseInterrupt,
   ) {}
+
+  /**
+   * The stream to read keys from, resolved on first USE rather than at
+   * construction.
+   *
+   * `devServerShortcuts` below is a process-wide singleton, and every CLI
+   * command loads it merely by importing `dev-server.command.ts` —
+   * `framework-cli-commands.ts` statically imports every command module up
+   * front, for `warlock add`/`migrate`/`routes`/etc. just as much as for
+   * `warlock dev`. A constructor-default of `process.stdin` used to run at
+   * THAT import, not at `register()`, so simply running any command touched
+   * `process.stdin` and made Node construct a real stdin handle nobody asked
+   * for — including one-shot commands that never call `register()` and have
+   * no terminal to manage. A getter defers the touch to the methods that
+   * actually need a stream (`isSupported`/`register`/`listen`/`release`),
+   * none of which run for a command that never offers a shortcut.
+   */
+  private get input(): NodeJS.ReadStream {
+    return this.explicitInput ?? process.stdin;
+  }
 
   /**
    * Whether the current terminal can deliver individual keypresses. False in
