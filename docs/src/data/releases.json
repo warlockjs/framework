@@ -1,5 +1,12 @@
 {
   "_doc": "Release-level metadata for the unified changelog — the npm PUBLISH TIMESTAMP and the 'what shipped' SUMMARY for each version. Per-package change details (Added/Changed/Fixed/Removed) live in each package's CHANGELOG.md and are aggregated by scripts/generate-changelog.mjs; this file supplies release metadata that the per-package files don't carry. Hand-maintained: add one entry per release, keyed by the version string. `publishedAt` is the full ISO timestamp reported by npm for @warlock.js/core (e.g. \"2026-09-02T00:54:41.833Z\"); the generator derives the human UTC display date from it. Legacy entries may retain `date` as a display-string fallback. `summary` supports inline `code`, **bold**, and [links](url); `featured` (optional) is an array of package names floated to the top of that release's package list, in the listed order (the rest follow most-changed-first, then alphabetical). Keep the summary to ONE short headline — what shipped and which packages — not an API-by-API tour; the per-package list below it carries the detail.",
+  "5.4.0": {
+    "publishedAt": "2026-09-07T00:18:02.431Z",
+    "summary": "The release the generator matrix caught. Every `warlock add <feature>` path now runs end to end in CI before a publish — and the first run found six defects a developer would have hit in their first hour: `warlock routes --json` printed its status banner into the JSON so the documented pipe could never work, `warlock add react-email` crashed on the scaffold’s own commented `tsconfig.json`, `warlock add web` shipped an app whose homepage returned **500** from a duplicate `GET /`, its generated code failed the scaffold’s own lint, and `warlock add notifications` generated a controller that did not compile.",
+    "featured": [
+      "@warlock.js/core"
+    ]
+  },
   "5.3.2": {
     "publishedAt": "2026-09-05T23:17:57.435Z",
     "summary": "The release that made our own checks tell the truth. `prettier --check` had been reporting a clean workspace while checking four files, `web` had been failing 9 tests and its typecheck since before 5.3.0 with nothing saying so, and 57 interfaces imported as values were crashing the from-source boot. The release gate now runs every package’s own suite and refuses to pack a dirty one. Ports also stopped lying: a configured port is normalised before anything binds, the **bound** port is what gets reported, and a startup precondition that cannot clear itself stops instead of restart-looping forever. `npm create warlock` completes on a clean machine again.",

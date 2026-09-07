@@ -116,6 +116,69 @@
   ],
   "releases": [
     {
+      "version": "5.4.0",
+      "id": "v5-4-0",
+      "date": "September 7, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "The release the generator matrix caught. Every <code>warlock add &lt;feature&gt;</code> path now runs end to end in CI before a publish — and the first run found six defects a developer would have hit in their first hour: <code>warlock routes --json</code> printed its status banner into the JSON so the documented pipe could never work, <code>warlock add react-email</code> crashed on the scaffold’s own commented <code>tsconfig.json</code>, <code>warlock add web</code> shipped an app whose homepage returned <strong>500</strong> from a duplicate <code>GET /</code>, its generated code failed the scaffold’s own lint, and <code>warlock add notifications</code> generated a controller that did not compile.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 9,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 6
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<strong>Command success and failure banners now write to stderr, not stdout.</strong> stdout carries a command's output; status chrome carries no data. A script that captured only stdout to grep for <code>✔ … completed successfully</code> must now read stderr. Nothing could have depended on the previous behaviour for <code>--json</code>, whose payload was unparseable precisely because of it."
+            },
+            {
+              "type": "Changed",
+              "html": "Feature generators that patch <code>tsconfig.json</code> now edit its text instead of parsing and rewriting it, so the file's comments survive."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock add web</code> locates an existing <code>GET /</code> by scanning <code>src/app/**/routes.ts</code> rather than assuming one hardcoded path."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock routes --json</code> could not be parsed. The command's success banner shared stdout with the JSON payload, so the documented machine seam — \"emit the routes as JSON for piping into scripts/CI\" — produced output no consumer could read, and always had."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock add react-email</code> failed on every freshly scaffolded app. It read the project <code>tsconfig.json</code> with <code>JSON.parse</code>, and the scaffold's own tsconfig carries <code>//</code> comments, so the command aborted pointing at the developer's file."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock add web</code> produced an app whose homepage returned HTTP 500. <code>GET /</code> was registered twice — by the scaffold's own home route and by the generated page — and Fastify refused the duplicate. Affected both <code>warlock dev</code> and <code>warlock start</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock add web</code> generated code that failed the scaffold's own lint gate: twelve <code>prettier/prettier</code> errors in files the developer had not written."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock add notifications</code> generated a controller that did not compile — seven <code>TS2345</code> errors from passing <code>request.user</code> where a <code>Notifiable | Id</code> was required."
+            },
+            {
+              "type": "Fixed",
+              "html": "Every <code>warlock</code> command opened a stdin handle at import time, through a module-level singleton whose constructor defaulted to <code>process.stdin</code>. Only <code>warlock dev</code> has any use for stdin."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.3.2",
       "id": "v5-3-2",
       "date": "September 5, 2026",
