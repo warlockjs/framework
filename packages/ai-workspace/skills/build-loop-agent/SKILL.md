@@ -37,7 +37,7 @@ A failing test isn't a tool error — it's a normal result with `exitCode !== 0`
 - the executable basename is allowed — `shell: { allow: ["npm", "node"] }`, and
 - the env can find it — `inheritEnv: ["PATH"]` (the workspace never inherits `process.env` wholesale).
 
-Override the base command per agent: `ws.tools.runTests({ command: "pnpm test" })`. A `pattern` the model supplies is appended as a filter (e.g. `pnpm test cart-total`).
+Override the base command per agent: `ws.tools.runTests({ command: "vitest run" })`. A `pattern` the model supplies is appended as a filter (e.g. `vitest run cart-total`).
 
 ## Least-privilege variants
 

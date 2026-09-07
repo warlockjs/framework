@@ -65,7 +65,7 @@ Each tool is a `ToolContract` ready for `ai.agent({ tools })`. The seven LLM-vis
 ws.tools.all();                              // all seven, canonical order
 ws.tools.pick("readFile", "grep", "glob");   // a least-privilege subset
 ws.tools.readFile({ name: "open" });          // one tool, optionally renamed
-ws.tools.runTests({ command: "pnpm test" });  // override the test base command
+ws.tools.runTests({ command: "vitest run" });  // override the test base command
 ```
 
 ### Human-facing — direct methods
