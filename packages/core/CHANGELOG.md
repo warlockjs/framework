@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.5.0 - 2026-09-07
+
+### Fixed
+
+- `warlock add web` silently overwrote an existing `src/app/contact` module. It guarded `src/web/root.tsx` against clobbering a human's work but wrote the contact route and controller unconditionally, destroying them without a word. Each file is now guarded on its own existence, and a skip reports the consequence — that the contact form's `POST /api/contact` endpoint is missing and the form will 404 until you wire it.
+- Documentation shipped in `skills/` told users to run `pnpm`-specific commands — including `pnpm warlock routes --json`, which cannot work under npm at all, since `pnpm <binary>` has no npm equivalent. Commands are now package-manager neutral.
+
 ## 5.4.0 - 2026-09-07
 
 ### Fixed
