@@ -11,13 +11,13 @@ Three commands move the app through its lifecycle: `dev` while you're editing, `
 
 ```bash
 # Local development
-pnpm warlock dev
+npx warlock dev
 
 # Production build
-pnpm warlock build
+npx warlock build
 
 # Run the built bundle
-pnpm warlock start
+npx warlock start
 ```
 
 `dev` and `start` are **persistent** (long-running, no auto-exit). `build` is one-shot — it exits when the bundle is written.
@@ -234,9 +234,9 @@ The three cases that reach it are: never built; a build that failed before promo
 ### Behavior
 
 ```bash
-pnpm warlock start                        # → spawns node --enable-source-maps dist/app.js
-pnpm warlock start --inspect              # → spawns node --enable-source-maps --inspect dist/app.js
-pnpm warlock start --max-old-space-size=4096  # → spawns node --enable-source-maps --max-old-space-size=4096 dist/app.js
+npx warlock start                        # → spawns node --enable-source-maps dist/app.js
+npx warlock start --inspect              # → spawns node --enable-source-maps --inspect dist/app.js
+npx warlock start --max-old-space-size=4096  # → spawns node --enable-source-maps --max-old-space-size=4096 dist/app.js
 ```
 
 Everything you pass after `start` is forwarded to the spawned Node process. Use this to attach a debugger (`--inspect`), tune memory (`--max-old-space-size`), or pass any other Node flag without editing the command.
@@ -288,7 +288,7 @@ The started banner prints **only** when the running application reports a comple
 
 ```bash
 # a CI gate can be this blunt, and it is now correct
-pnpm warlock start | grep -q "production server started"
+npx warlock start | grep -q "production server started"
 ```
 
 ### Reading a failed start (5.2)
@@ -371,17 +371,17 @@ If you need conditional behavior, branch on `Application.environment` (the ortho
 }
 ```
 
-Now `pnpm dev` / `pnpm build` / `pnpm start`. Standard Node hosting providers (Render, Fly, Railway, Heroku) recognize this layout.
+Now `npm run dev` / `npm run build` / `npm run start`. Standard Node hosting providers (Render, Fly, Railway, Heroku) recognize this layout.
 
 ### Production Dockerfile
 
 ```dockerfile
 FROM node:20-alpine AS build
 WORKDIR /app
-COPY package.json yarn.lock ./
-RUN pnpm install --frozen-lockfile
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY . .
-RUN pnpm warlock build
+RUN npx warlock build
 
 FROM node:20-alpine
 WORKDIR /app
@@ -390,7 +390,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./
 COPY --from=build /app/warlock.config.ts ./
 ENV NODE_ENV=production
-CMD ["yarn", "warlock", "start"]
+CMD ["npx", "warlock", "start"]
 ```
 
 Two-stage build trims `devDependencies` out of the runtime image. Keep `warlock.config.ts` in the runtime stage — `start` reads it to resolve the bundle path.
@@ -425,7 +425,7 @@ That is deliberate: `build` and `start` do **not** force `production`. Forcing i
 ### Skip type-gen on machines without write access
 
 ```bash
-pnpm warlock dev --skip-typings
+npx warlock dev --skip-typings
 ```
 
 Or persist it:
@@ -443,20 +443,20 @@ Useful in a containerized dev environment where `.warlock/typings.d.ts` is read-
 ### Memory-tune the production process
 
 ```bash
-pnpm warlock start --max-old-space-size=4096
+npx warlock start --max-old-space-size=4096
 ```
 
 Or via `NODE_OPTIONS` in the deployment env if you don't want to change the start invocation:
 
 ```bash
-NODE_OPTIONS=--max-old-space-size=4096 pnpm warlock start
+NODE_OPTIONS=--max-old-space-size=4096 npx warlock start
 ```
 
 ## Gotchas
 
 - **`warlock dev` is persistent — `Ctrl+C` to stop.** The framework's `persistent: true` flag keeps the process alive after `action` returns. Same for `start`.
 - **`--fresh` only deletes the manifest, not the transpile cache.** If you're chasing a stale-compile bug, `rm -rf .warlock/` clears everything. The manifest restoring is what `--fresh` solves.
-- **`warlock build` does NOT run migrations.** Production bundles ship the migration files but don't apply them. Run `pnpm warlock migrate` against the production DB separately.
+- **`warlock build` does NOT run migrations.** Production bundles ship the migration files but don't apply them. Run `npx warlock migrate` against the production DB separately.
 - **`warlock start` requires a build it can vouch for.** Since 5.2 it refuses any `outdir` without the `.warlock-build.json` success marker — a hand-assembled `dist/`, or one left behind by a build that failed, is rejected by that reason instead of being spawned and crashing halfway through boot. Run `warlock build` first.
 - **Do not add `.warlock-build.json` to `.gitignore`-driven artifact pruning.** Stripping it from a `dist/` you ship makes `warlock start` refuse the artifact on the target host. Copy `outdir` whole.
 - **`outdir` is the directory, `outFile` is the filename within it.** A common mistake is putting the full path in one and leaving the other default — you end up with `<full-path>/app.js` or `dist/<full-path>`. They concatenate.

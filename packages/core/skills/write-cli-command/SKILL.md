@@ -39,7 +39,7 @@ export default command({
 });
 ```
 
-Run it: `pnpm warlock users.promote --email=hasan@example.com` (or `pnpm warlock up -e hasan@example.com`).
+Run it: `npx warlock users.promote --email=hasan@example.com` (or `npx warlock up -e hasan@example.com`).
 
 ## `CLICommandOptions` — the factory input
 

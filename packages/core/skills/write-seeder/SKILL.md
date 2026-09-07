@@ -36,12 +36,12 @@ export default seeder({
 Run them:
 
 ```bash
-pnpm warlock seed                            # discover + run all
-pnpm warlock seed --list                     # show registry, don't run
-pnpm warlock seed --path=src/app/roles/seeds/default-roles.seed.ts  # one file
-pnpm warlock seed --fresh                    # truncate every table first, then run all
-pnpm warlock seed --drop                     # undo every tracked record, reset the log
-pnpm warlock seed --drop=default-roles       # undo just one seeder's records
+npx warlock seed                            # discover + run all
+npx warlock seed --list                     # show registry, don't run
+npx warlock seed --path=src/app/roles/seeds/default-roles.seed.ts  # one file
+npx warlock seed --fresh                    # truncate every table first, then run all
+npx warlock seed --drop                     # undo every tracked record, reset the log
+npx warlock seed --drop=default-roles       # undo just one seeder's records
 ```
 
 `--fresh` truncates **every** table in the DB (`datasource.driver.truncateTable(table, { cascade: true })`), including the `seeds` tracking table. After `--fresh`, `once: true` seeds will run again.
@@ -179,8 +179,8 @@ Every record you `track()` is written to a `seed_records` table (created on firs
 `warlock seed --drop` reads those refs and undoes the seed:
 
 ```bash
-pnpm warlock seed --drop                # undo every tracked record across all seeders
-pnpm warlock seed --drop=default-roles  # undo just one seeder's records
+npx warlock seed --drop                # undo every tracked record across all seeders
+npx warlock seed --drop=default-roles  # undo just one seeder's records
 ```
 
 What it does, inside a single transaction:

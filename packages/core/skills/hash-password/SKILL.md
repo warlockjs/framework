@@ -148,7 +148,7 @@ The "same error for missing user vs wrong password" pattern is deliberate — it
 `hashPassword` / `verifyPassword` need `bcryptjs`. Install it directly:
 
 ```bash
-pnpm add bcryptjs
+npm install bcryptjs
 ```
 
 If you skip the install, the first call throws with the framework's install hint:
@@ -157,14 +157,14 @@ If you skip the install, the first call throws with the framework's install hint
 Password encryption requires the bcryptjs package.
 Install it with:
 
-  pnpm add bcryptjs
+  npm install bcryptjs
 
 Or with your preferred package manager:
 
-  pnpm add bcryptjs
+  npm install bcryptjs
 ```
 
-There is no `warlock add` feature for password hashing — `bcryptjs` is a plain dependency, so install it directly with `pnpm add bcryptjs`.
+There is no `warlock add` feature for password hashing — `bcryptjs` is a plain dependency, so install it directly with `npm install bcryptjs`.
 
 ## Gotchas
 
