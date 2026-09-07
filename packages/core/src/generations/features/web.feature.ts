@@ -3,6 +3,7 @@ import { ensureDirectoryAsync, fileExistsAsync, getFileAsync, putFileAsync } fro
 import type { CommandActionData } from "../../commands/types";
 import { rootPath, srcPath } from "../../utils";
 import { relocateConflictingHomeRoute } from "./shared/relocate-conflicting-home-route";
+import { resolveContactScaffold } from "./shared/resolve-contact-scaffold";
 import {
   webContactControllerStub,
   webContactRoutesStub,
@@ -126,14 +127,38 @@ async function completeWebInstallation(_options: CommandActionData) {
     } else {
       await putFileAsync(srcPath("web/index.page.tsx"), webHomePageStub);
       await putFileAsync(srcPath("web/index.register.ts"), webHomeRegisterStub);
-      await ensureDirectoryAsync(srcPath("app/contact/controllers"));
-      await putFileAsync(
-        srcPath("app/contact/controllers/contact.controller.ts"),
-        webContactControllerStub,
-      );
-      await putFileAsync(srcPath("app/contact/routes.ts"), webContactRoutesStub);
+
+      // Unlike root.tsx above, the contact controller and its routes file are
+      // ordinary application files a project can already have — independently
+      // of ever having run `warlock add web`. Each is guarded on its OWN
+      // existence, not on the (already-consumed) root.tsx sentinel, so an
+      // existing `contact` module is skipped rather than clobbered. See
+      // resolveContactScaffold's doc comment for why.
+      const contactPlan = resolveContactScaffold({
+        controllerExists: await fileExistsAsync(
+          srcPath("app/contact/controllers/contact.controller.ts"),
+        ),
+        routesExists: await fileExistsAsync(srcPath("app/contact/routes.ts")),
+      });
+
+      if (contactPlan.writeController) {
+        await ensureDirectoryAsync(srcPath("app/contact/controllers"));
+        await putFileAsync(
+          srcPath("app/contact/controllers/contact.controller.ts"),
+          webContactControllerStub,
+        );
+      }
+
+      if (contactPlan.writeRoutes) {
+        await ensureDirectoryAsync(srcPath("app/contact"));
+        await putFileAsync(srcPath("app/contact/routes.ts"), webContactRoutesStub);
+      }
+
       console.log(`${colors.green("✓")} Created src/web/index.page.tsx`);
-      console.log(`${colors.green("✓")} Created POST /api/contact starter route`);
+
+      for (const message of contactPlan.messages) {
+        console.log(message);
+      }
     }
   }
 
