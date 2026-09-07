@@ -1,5 +1,12 @@
 {
   "_doc": "Release-level metadata for the unified changelog — the npm PUBLISH TIMESTAMP and the 'what shipped' SUMMARY for each version. Per-package change details (Added/Changed/Fixed/Removed) live in each package's CHANGELOG.md and are aggregated by scripts/generate-changelog.mjs; this file supplies release metadata that the per-package files don't carry. Hand-maintained: add one entry per release, keyed by the version string. `publishedAt` is the full ISO timestamp reported by npm for @warlock.js/core (e.g. \"2026-09-02T00:54:41.833Z\"); the generator derives the human UTC display date from it. Legacy entries may retain `date` as a display-string fallback. `summary` supports inline `code`, **bold**, and [links](url); `featured` (optional) is an array of package names floated to the top of that release's package list, in the listed order (the rest follow most-changed-first, then alphabetical). Keep the summary to ONE short headline — what shipped and which packages — not an API-by-API tour; the per-package list below it carries the detail.",
+  "5.5.0": {
+    "publishedAt": "2026-09-07T02:06:35.176Z",
+    "summary": "Two fixes for things that damaged or misled you. `warlock add web` **silently overwrote an existing `src/app/contact` module** — it protected `src/web/root.tsx` from clobbering your work but wrote the contact route and controller unconditionally; each file is now guarded on its own, and a skip tells you the contact form’s endpoint is missing rather than just naming a file. And the documentation shipped inside every package told you to run `pnpm`-specific commands — including `pnpm warlock routes --json`, which **cannot work under npm at all** — so 188 of them across 281 files are now package-manager neutral, with a check that keeps them that way.",
+    "featured": [
+      "@warlock.js/core"
+    ]
+  },
   "5.4.0": {
     "publishedAt": "2026-09-07T00:18:02.431Z",
     "summary": "The release the generator matrix caught. Every `warlock add <feature>` path now runs end to end in CI before a publish — and the first run found six defects a developer would have hit in their first hour: `warlock routes --json` printed its status banner into the JSON so the documented pipe could never work, `warlock add react-email` crashed on the scaffold’s own commented `tsconfig.json`, `warlock add web` shipped an app whose homepage returned **500** from a duplicate `GET /`, its generated code failed the scaffold’s own lint, and `warlock add notifications` generated a controller that did not compile.",

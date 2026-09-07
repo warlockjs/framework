@@ -116,6 +116,241 @@
   ],
   "releases": [
     {
+      "version": "5.5.0",
+      "id": "v5-5-0",
+      "date": "September 7, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "Two fixes for things that damaged or misled you. <code>warlock add web</code> <strong>silently overwrote an existing <code>src/app/contact</code> module</strong> — it protected <code>src/web/root.tsx</code> from clobbering your work but wrote the contact route and controller unconditionally; each file is now guarded on its own, and a skip tells you the contact form’s endpoint is missing rather than just naming a file. And the documentation shipped inside every package told you to run <code>pnpm</code>-specific commands — including <code>pnpm warlock routes --json</code>, which <strong>cannot work under npm at all</strong> — so 188 of them across 281 files are now package-manager neutral, with a check that keeps them that way.",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>warlock add web</code> silently overwrote an existing <code>src/app/contact</code> module. It guarded <code>src/web/root.tsx</code> against clobbering a human's work but wrote the contact route and controller unconditionally, destroying them without a word. Each file is now guarded on its own existence, and a skip reports the consequence — that the contact form's <code>POST /api/contact</code> endpoint is missing and the form will 404 until you wire it."
+            },
+            {
+              "type": "Fixed",
+              "html": "Documentation shipped in <code>skills/</code> told users to run <code>pnpm</code>-specific commands — including <code>pnpm warlock routes --json</code>, which cannot work under npm at all, since <code>pnpm &lt;binary&gt;</code> has no npm equivalent. Commands are now package-manager neutral."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Documentation shipped in this package's <code>skills/</code> told users to run <code>pnpm</code>-specific commands. <code>pnpm &lt;binary&gt;</code> has no npm equivalent, so those instructions failed outright for anyone not using pnpm. Commands are now package-manager neutral."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Documentation shipped in this package's <code>skills/</code> told users to run <code>pnpm</code>-specific commands. <code>pnpm &lt;binary&gt;</code> has no npm equivalent, so those instructions failed outright for anyone not using pnpm. Commands are now package-manager neutral."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Documentation shipped in this package's <code>skills/</code> told users to run <code>pnpm</code>-specific commands. <code>pnpm &lt;binary&gt;</code> has no npm equivalent, so those instructions failed outright for anyone not using pnpm. Commands are now package-manager neutral."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Documentation shipped in this package's <code>skills/</code> told users to run <code>pnpm</code>-specific commands. <code>pnpm &lt;binary&gt;</code> has no npm equivalent, so those instructions failed outright for anyone not using pnpm. Commands are now package-manager neutral."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Documentation shipped in this package's <code>skills/</code> told users to run <code>pnpm</code>-specific commands. <code>pnpm &lt;binary&gt;</code> has no npm equivalent, so those instructions failed outright for anyone not using pnpm. Commands are now package-manager neutral."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Documentation shipped in this package's <code>skills/</code> told users to run <code>pnpm</code>-specific commands. <code>pnpm &lt;binary&gt;</code> has no npm equivalent, so those instructions failed outright for anyone not using pnpm. Commands are now package-manager neutral."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Documentation shipped in this package's <code>skills/</code> told users to run <code>pnpm</code>-specific commands. <code>pnpm &lt;binary&gt;</code> has no npm equivalent, so those instructions failed outright for anyone not using pnpm. Commands are now package-manager neutral."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Documentation shipped in this package's <code>skills/</code> told users to run <code>pnpm</code>-specific commands. <code>pnpm &lt;binary&gt;</code> has no npm equivalent, so those instructions failed outright for anyone not using pnpm. Commands are now package-manager neutral."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Documentation shipped in this package's <code>skills/</code> told users to run <code>pnpm</code>-specific commands. <code>pnpm &lt;binary&gt;</code> has no npm equivalent, so those instructions failed outright for anyone not using pnpm. Commands are now package-manager neutral."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Documentation shipped in this package's <code>skills/</code> told users to run <code>pnpm</code>-specific commands. <code>pnpm &lt;binary&gt;</code> has no npm equivalent, so those instructions failed outright for anyone not using pnpm. Commands are now package-manager neutral."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Documentation shipped in this package's <code>skills/</code> told users to run <code>pnpm</code>-specific commands. <code>pnpm &lt;binary&gt;</code> has no npm equivalent, so those instructions failed outright for anyone not using pnpm. Commands are now package-manager neutral."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Documentation shipped in this package's <code>skills/</code> told users to run <code>pnpm</code>-specific commands. <code>pnpm &lt;binary&gt;</code> has no npm equivalent, so those instructions failed outright for anyone not using pnpm. Commands are now package-manager neutral."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.4.0",
       "id": "v5-4-0",
       "date": "September 7, 2026",
