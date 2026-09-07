@@ -12,7 +12,7 @@ Multi-channel structured logger for Node.js. Four built-in channels (`ConsoleLog
 ## Install
 
 ```bash
-pnpm add @warlock.js/logger
+npm install @warlock.js/logger
 ```
 
 ## Foundations
