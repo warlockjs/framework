@@ -16,7 +16,7 @@
     "@warlock.js/logger": "workspace:^"
   },
   "optionalDependencies": {
-    "@warlock.js/herald": "5.5.0"
+    "@warlock.js/herald": "5.6.0"
   },
   "scripts": {
     "test": "vitest",
