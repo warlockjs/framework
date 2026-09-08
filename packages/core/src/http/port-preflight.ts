@@ -41,10 +41,7 @@ export class PortInUseError extends Error {
  * process is not allowed to bind it. Any other bind failure is re-thrown —
  * an unreadable network error must not be reported as "port in use".
  */
-export function isPortAvailable(
-  port: number,
-  host: string = DEFAULT_PROBE_HOST,
-): Promise<boolean> {
+export function isPortAvailable(port: number, host: string = DEFAULT_PROBE_HOST): Promise<boolean> {
   return new Promise((resolve, reject) => {
     const probe = createServer();
 

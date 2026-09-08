@@ -130,9 +130,7 @@ export async function load(
   // marker goes AFTER that line: a trailing comment can't shift earlier
   // generated lines, so the inline map (and therefore stack-frame line
   // numbers) stays exact. A leading marker would desync it by one line.
-  const code = label
-    ? `${result.code}\n// @source ${absolutePath}\n`
-    : result.code;
+  const code = label ? `${result.code}\n// @source ${absolutePath}\n` : result.code;
 
   cache.put(key, { code, map: "" }, label);
 

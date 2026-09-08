@@ -77,11 +77,10 @@ export function concurrencyLimitMiddleware(
       response.header("Retry-After", 1);
 
       return response.tooManyRequests({
-          error: options.errorMessage || t("http.concurrencyLimitReached"),
-          errorCode: HttpErrorCodes.ConcurrencyLimitReached,
-          limit: max,
-        },
-      );
+        error: options.errorMessage || t("http.concurrencyLimitReached"),
+        errorCode: HttpErrorCodes.ConcurrencyLimitReached,
+        limit: max,
+      });
     }
 
     counters.set(key, current + 1);

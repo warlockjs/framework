@@ -40,10 +40,7 @@ export type TestTimeoutHandle = {
  *
  * @internal
  */
-export type TestTimeoutScheduler = (
-  timeout: number,
-  onExpiry: () => void,
-) => TestTimeoutHandle;
+export type TestTimeoutScheduler = (timeout: number, onExpiry: () => void) => TestTimeoutHandle;
 
 /**
  * The real scheduler.

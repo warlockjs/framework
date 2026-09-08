@@ -100,9 +100,7 @@ export type ResourceFieldBuilderDateOutputOptions =
  * - [ResourceConstructor] (tuple) for an array of a nested resource
  */
 export type ResponseBodyValue =
-  | ResourceOutputValueCastType
-  | ResourceConstructor
-  | [ResourceConstructor];
+  ResourceOutputValueCastType | ResourceConstructor | [ResourceConstructor];
 
 /**
  * Response schema for a controller — used for documentation / OpenAPI generation.

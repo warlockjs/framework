@@ -63,8 +63,7 @@ export function maintenanceMiddleware(options: MaintenanceOptions = {}): Middlew
 
     if (!enabled) return;
 
-    const allowlist =
-      options.allowlist || config.get("http.maintenance.allowlist", ["/health"]);
+    const allowlist = options.allowlist || config.get("http.maintenance.allowlist", ["/health"]);
 
     // `request.path` includes the query string, but allowlist entries are
     // path-only ("/webhooks/stripe"), so strip the query before matching —
@@ -73,8 +72,7 @@ export function maintenanceMiddleware(options: MaintenanceOptions = {}): Middlew
 
     if (isAllowlisted(pathname, allowlist)) return;
 
-    const retryAfter =
-      options.retryAfter || config.get("http.maintenance.retryAfter", 60);
+    const retryAfter = options.retryAfter || config.get("http.maintenance.retryAfter", 60);
 
     response.header("Retry-After", retryAfter);
 

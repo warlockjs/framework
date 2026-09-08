@@ -624,9 +624,7 @@ export abstract class CloudDriver<
         );
       }
 
-      continuationToken = listResult.IsTruncated
-        ? listResult.NextContinuationToken
-        : undefined;
+      continuationToken = listResult.IsTruncated ? listResult.NextContinuationToken : undefined;
     } while (continuationToken);
 
     return true;

@@ -1,10 +1,5 @@
 import { colors } from "@mongez/copper";
-import {
-  ensureDirectoryAsync,
-  fileExistsAsync,
-  getFileAsync,
-  putFileAsync,
-} from "@warlock.js/fs";
+import { ensureDirectoryAsync, fileExistsAsync, getFileAsync, putFileAsync } from "@warlock.js/fs";
 import type { CommandActionData } from "../../commands/types";
 import { srcPath } from "../../utils";
 import {
@@ -66,7 +61,9 @@ async function registerAccessLocale() {
     `import { groupedTranslations } from "@warlock.js/core";\n\n${accessLocale}`,
   );
 
-  console.log(`${colors.green("✓")} Created src/app/shared/utils/locales.ts with the access locale`);
+  console.log(
+    `${colors.green("✓")} Created src/app/shared/utils/locales.ts with the access locale`,
+  );
 }
 
 async function scaffoldAccessFiles() {
@@ -115,10 +112,7 @@ async function scaffoldAccessFiles() {
     srcPath("app/access/models/user-role/user-role.model.ts"),
     accessUserRoleModelStub,
   );
-  await putFileAsync(
-    srcPath("app/access/models/user-role/index.ts"),
-    accessUserRoleModelIndexStub,
-  );
+  await putFileAsync(srcPath("app/access/models/user-role/index.ts"), accessUserRoleModelIndexStub);
   console.log(`${colors.green("✓")} Created src/app/access/models/user-role`);
 
   await ensureDirectoryAsync(srcPath("app/access/models/user-role/migrations"));

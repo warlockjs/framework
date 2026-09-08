@@ -1,10 +1,5 @@
 import { colors } from "@mongez/copper";
-import {
-  ensureDirectoryAsync,
-  fileExistsAsync,
-  getFileAsync,
-  putFileAsync,
-} from "@warlock.js/fs";
+import { ensureDirectoryAsync, fileExistsAsync, getFileAsync, putFileAsync } from "@warlock.js/fs";
 import type { CommandActionData } from "../../commands/types";
 import { rootPath, srcPath } from "../../utils";
 import type { FeatureDefinition } from "./types";

@@ -48,11 +48,10 @@ export function maxBodySizeMiddleware(limit: string | number): Middleware {
     response.header("Connection", "close");
 
     return response.contentTooLarge({
-        error: t("http.bodyTooLarge"),
-        errorCode: HttpErrorCodes.BodyTooLarge,
-        limit: limitBytes,
-        received: contentLength,
-      },
-    );
+      error: t("http.bodyTooLarge"),
+      errorCode: HttpErrorCodes.BodyTooLarge,
+      limit: limitBytes,
+      received: contentLength,
+    });
   };
 }

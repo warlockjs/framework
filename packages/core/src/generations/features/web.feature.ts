@@ -104,7 +104,8 @@ async function completeWebInstallation(_options: CommandActionData) {
     // another handler holds `/` produces a homepage that 500s on first request,
     // which is precisely the outcome a scaffolder must never hand back.
     if (collision.outcome === "conflict" || collision.outcome === "failed") {
-      const verb = collision.outcome === "failed" ? colors.redBright("✗") : colors.yellowBright("!");
+      const verb =
+        collision.outcome === "failed" ? colors.redBright("✗") : colors.yellowBright("!");
 
       console.log(
         `${verb} Did not create src/web/index.page.tsx: ${collision.reason}.\n` +

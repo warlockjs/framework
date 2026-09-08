@@ -27,9 +27,7 @@ type ProjectManifest = {
  * Returns `undefined` when no version heading is present.
  */
 function parseTopHeading(changelog: string): ChangelogHeading | undefined {
-  const match = changelog.match(
-    /^##\s+(\d+)\.(\d+)\.(\d+)(?:\s*[-–]\s*(\d{4}-\d{2}-\d{2}))?\s*$/m,
-  );
+  const match = changelog.match(/^##\s+(\d+)\.(\d+)\.(\d+)(?:\s*[-–]\s*(\d{4}-\d{2}-\d{2}))?\s*$/m);
 
   if (!match) {
     return undefined;

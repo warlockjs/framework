@@ -92,7 +92,10 @@ export function formatRoutesTableLines(rows: RouteRow[]): string[] {
   const widths = columnWidths(rows);
 
   const renderRow = (cells: string[]) =>
-    cells.map((text, index) => text.padEnd(widths[index])).join(GAP).trimEnd();
+    cells
+      .map((text, index) => text.padEnd(widths[index]))
+      .join(GAP)
+      .trimEnd();
 
   const lines = [renderRow(COLUMNS.map((column) => column.header))];
 

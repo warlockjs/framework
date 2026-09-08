@@ -15,10 +15,7 @@
  * per thread for a thread worker, never shared between distinct workers — which
  * is exactly the boundary the resources themselves live inside.
  */
-import type {
-  RequestedTestConnectors,
-  TestConnectorsSelection,
-} from "./test-connectors-selection";
+import type { RequestedTestConnectors, TestConnectorsSelection } from "./test-connectors-selection";
 import type { TestTimeoutScheduler } from "./test-setup-timeout";
 
 /**

@@ -24,10 +24,7 @@ export type CacheMiddlewareOptions = {
   /**
    * Cache key
    */
-  cacheKey:
-    | string
-    | ((request: Request) => string)
-    | ((request: Request) => Promise<string>);
+  cacheKey: string | ((request: Request) => string) | ((request: Request) => Promise<string>);
   /**
    * If true, then the response will be cached based on the current locale code
    * This is useful when you have a multi-language website, and you want to cache the response based on the current locale
@@ -62,10 +59,7 @@ type ParsedCacheOptions = Required<CacheMiddlewareOptions> & {
   cacheKey: string;
 };
 
-async function parseCacheOptions(
-  cacheOptions: CacheMiddlewareOptions | string,
-  request: Request,
-) {
+async function parseCacheOptions(cacheOptions: CacheMiddlewareOptions | string, request: Request) {
   if (typeof cacheOptions === "string") {
     cacheOptions = {
       cacheKey: cacheOptions,
@@ -94,17 +88,12 @@ async function parseCacheOptions(
   return finalCacheOptions;
 }
 
-export function cacheMiddleware(
-  responseCacheOptions: CacheMiddlewareOptions | string,
-): Middleware {
+export function cacheMiddleware(responseCacheOptions: CacheMiddlewareOptions | string): Middleware {
   // The `Middleware` return annotation is load-bearing: without it, tsc never
   // checks this factory's calling convention, which is how the positional v4
   // shape survived an earlier refactor unnoticed.
   return async function ({ request, response }) {
-    const { ttl, omit, cacheKey, driver } = await parseCacheOptions(
-      responseCacheOptions,
-      request,
-    );
+    const { ttl, omit, cacheKey, driver } = await parseCacheOptions(responseCacheOptions, request);
     const cacheDriver = driver ? await cache.use(driver) : cache;
 
     const content = (await cacheDriver.get(cacheKey)) as CachedResponsePayload | null;

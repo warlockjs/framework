@@ -34,10 +34,7 @@ import {
   readRequestedConnectors,
   resolveEffectiveConnectors,
 } from "./test-connectors-selection";
-import type {
-  RequestedTestConnectors,
-  TestConnectorsSelection,
-} from "./test-connectors-selection";
+import type { RequestedTestConnectors, TestConnectorsSelection } from "./test-connectors-selection";
 import { getTestLifecycleRegistry } from "./test-lifecycle-state";
 import type { TestLifecycleRegistry, TestSetupAttempt } from "./test-lifecycle-state";
 import {

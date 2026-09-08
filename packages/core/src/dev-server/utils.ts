@@ -17,7 +17,7 @@ export async function ensureWarlockDirectory() {
  */
 export async function getFilesFromDirectory(directoryPath = srcPath(), pattern = "**/*.{ts,tsx}") {
   const files = await glob(`${Path.normalize(directoryPath)}/${pattern}`, { absolute: true });
-  return files.map(file => Path.normalize(file));
+  return files.map((file) => Path.normalize(file));
 }
 
 export async function getCertainFilesFromDirectory(directoryPath: string, filesNames: string[]) {

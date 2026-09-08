@@ -24,10 +24,9 @@ export function resolveWithinRoot(root: string, location: string): string {
   const rel = path.relative(root, resolved);
 
   if (rel !== "" && (rel.startsWith("..") || path.isAbsolute(rel))) {
-    throw new StorageError(
-      `Storage location escapes the storage root: "${location}"`,
-      { context: { location, root } },
-    );
+    throw new StorageError(`Storage location escapes the storage root: "${location}"`, {
+      context: { location, root },
+    });
   }
 
   return resolved;

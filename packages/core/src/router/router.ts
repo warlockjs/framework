@@ -1078,9 +1078,9 @@ export class Router {
       */
       const result = await logRequestLifecycle(
         {
-          info: entry => log.info(entry),
-          warn: entry => log.warn(entry),
-          error: entry => log.error(entry),
+          info: (entry) => log.info(entry),
+          warn: (entry) => log.warn(entry),
+          error: (entry) => log.error(entry),
           now: () => performance.now(),
         },
         {

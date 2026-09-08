@@ -1,8 +1,4 @@
-import type {
-  Connector,
-  ConnectorBuildContext,
-  ConnectorEsbuildPatch,
-} from "../connectors/types";
+import type { Connector, ConnectorBuildContext, ConnectorEsbuildPatch } from "../connectors/types";
 
 /**
  * `Error` with the `cause` option typed. Same shim as

@@ -50,7 +50,7 @@ export function requestMemo<T>(key: string, fn: () => Promise<T>): Promise<T> {
 
   if (cached) return cached;
 
-  const promise = (async () => fn())().catch(error => {
+  const promise = (async () => fn())().catch((error) => {
     entries!.delete(key);
     throw error;
   });

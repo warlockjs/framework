@@ -38,7 +38,7 @@ export function formatErrorStack(stack: string): string {
 
   return stack
     .split("\n")
-    .map(line => {
+    .map((line) => {
       const withFn = line.match(frame);
       const bare = line.match(bareFrame);
 
@@ -144,7 +144,7 @@ export function formatModuleNotFoundError(error: Error, suggestions?: string[]):
   if (suggestions && suggestions.length > 0) {
     lines.push("");
     lines.push(`${colors.dim("Did you mean?")}`);
-    suggestions.forEach(s => lines.push(`  ${colors.cyan("→")} ${colors.green(s)}`));
+    suggestions.forEach((s) => lines.push(`  ${colors.cyan("→")} ${colors.green(s)}`));
   }
 
   lines.push("");

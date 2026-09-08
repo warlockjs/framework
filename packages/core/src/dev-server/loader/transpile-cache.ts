@@ -89,7 +89,7 @@ function stableStringify(value: unknown): string {
 
   const entries = Object.keys(value as Record<string, unknown>)
     .sort()
-    .map(key => {
+    .map((key) => {
       const child = stableStringify((value as Record<string, unknown>)[key]);
       return `${JSON.stringify(key)}:${child}`;
     });
@@ -116,11 +116,7 @@ export function computeFingerprint(parts: FingerprintParts): string {
  * `sourceText` and `fingerprint` unambiguous (no concatenation collision).
  */
 export function cacheKey(sourceText: string, fingerprint: string): string {
-  return createHash("sha256")
-    .update(sourceText)
-    .update("\0")
-    .update(fingerprint)
-    .digest("hex");
+  return createHash("sha256").update(sourceText).update("\0").update(fingerprint).digest("hex");
 }
 
 /** Options for {@link TranspileCache.gc}. */
@@ -215,8 +211,7 @@ export class TranspileCache {
       // valid commit only when it contains the exact bytes we meant to store;
       // otherwise preserve the original error instead of accepting corruption.
       const code = (error as NodeJS.ErrnoException).code;
-      const mayBeConcurrentCommit =
-        code === "EEXIST" || code === "EPERM" || code === "EACCES";
+      const mayBeConcurrentCommit = code === "EEXIST" || code === "EPERM" || code === "EACCES";
 
       if (!mayBeConcurrentCommit || !this.hasCommittedContent(filePath, content)) {
         throw error;

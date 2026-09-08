@@ -30,7 +30,7 @@ export const resolveExternalsFromCore: Plugin = {
   setup(build) {
     // The filter is deliberately loose — anything not starting `.` or `/` —
     // so the guards below carry the real logic.
-    build.onResolve({ filter: /^[^./]/ }, args => {
+    build.onResolve({ filter: /^[^./]/ }, (args) => {
       // The entry point comes through here too, and on Windows its absolute
       // path ("D:\\…") is not `.` or `/`. Marking it external fails the build.
       if (args.kind === "entry-point" || path.isAbsolute(args.path)) {
@@ -84,18 +84,13 @@ export const resolveExternalsFromCore: Plugin = {
  * // Later, when a file changes:
  * port.postMessage({ type: "bump", absolutePath: "/abs/path/to/user.model.ts" });
  */
-export async function registerLoader(
-  transpile: TranspileInit,
-): Promise<MessagePort> {
+export async function registerLoader(transpile: TranspileInit): Promise<MessagePort> {
   const { port1, port2 } = new MessageChannel();
 
   // hook-thread is a sibling module, so it shares THIS file's extension:
   // `.ts` when core runs from source (tsx), `.mjs` when published.
   const selfPath = fileURLToPath(import.meta.url);
-  const hookThreadPath = path.join(
-    path.dirname(selfPath),
-    `hook-thread${path.extname(selfPath)}`,
-  );
+  const hookThreadPath = path.join(path.dirname(selfPath), `hook-thread${path.extname(selfPath)}`);
 
   const bundleResult = await build({
     entryPoints: [hookThreadPath],

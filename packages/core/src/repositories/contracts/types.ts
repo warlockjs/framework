@@ -199,10 +199,7 @@ export type FilterFunction<M, Q = QueryBuilderContract<M>> = (
  * - An array with operator and optional column name(s)
  */
 export type FilterRule<Q = QueryBuilderContract<any>> =
-  | FilterOperator
-  | FilterFunction<Q>
-  | [FilterOperator]
-  | [FilterOperator, string | string[]];
+  FilterOperator | FilterFunction<Q> | [FilterOperator] | [FilterOperator, string | string[]];
 
 /**
  * Filter rules mapping filter keys to their rules

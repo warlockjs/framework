@@ -1,12 +1,5 @@
 export type FileType =
-  | "main"
-  | "config"
-  | "event"
-  | "route"
-  | "controller"
-  | "service"
-  | "model"
-  | "other";
+  "main" | "config" | "event" | "route" | "controller" | "service" | "model" | "other";
 
 export type FileManifest = {
   absolutePath: string;

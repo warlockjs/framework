@@ -9,9 +9,5 @@ export function internalWarlockConfigPath() {
 }
 
 export function warlockCorePackagePath(additionalPath = "") {
-  return path.resolve(
-    process.cwd(),
-    "node_modules/@warlock.js/core",
-    additionalPath,
-  );
+  return path.resolve(process.cwd(), "node_modules/@warlock.js/core", additionalPath);
 }

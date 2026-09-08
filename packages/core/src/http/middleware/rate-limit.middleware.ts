@@ -103,10 +103,9 @@ export function rateLimitMiddleware(options: RateLimitOptions): Middleware {
       response.header("Retry-After", retryAfter);
 
       return response.tooManyRequests({
-          error: options.errorMessage || t("http.rateLimitExceeded"),
-          errorCode: HttpErrorCodes.RateLimitExceeded,
-        },
-      );
+        error: options.errorMessage || t("http.rateLimitExceeded"),
+        errorCode: HttpErrorCodes.RateLimitExceeded,
+      });
     }
   };
 }

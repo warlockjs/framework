@@ -125,7 +125,10 @@ function resolveReactModules() {
     try {
       const require = createRequire(import.meta.url);
       react = requireModule<typeof import("react")>(require, "react");
-      reactDomServer = requireModule<typeof import("react-dom/server")>(require, "react-dom/server");
+      reactDomServer = requireModule<typeof import("react-dom/server")>(
+        require,
+        "react-dom/server",
+      );
     } catch (error) {
       react = null;
       reactDomServer = null;

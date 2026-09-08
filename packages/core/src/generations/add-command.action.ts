@@ -1,10 +1,5 @@
 import { colors } from "@mongez/copper";
-import {
-  fileExistsAsync,
-  getJsonFileAsync,
-  putFileAsync,
-  putJsonFileAsync,
-} from "@warlock.js/fs";
+import { fileExistsAsync, getJsonFileAsync, putFileAsync, putJsonFileAsync } from "@warlock.js/fs";
 import { execSync } from "node:child_process";
 import type { CommandActionData } from "../commands/types";
 import {
@@ -142,7 +137,11 @@ export async function addCommandAction(options: CommandActionData) {
   if (noInstall) {
     await recordDependencies(dependencies, devDependencies);
   } else {
-    await installDependencies(packageManager as PackageManager | undefined, dependencies, devDependencies);
+    await installDependencies(
+      packageManager as PackageManager | undefined,
+      dependencies,
+      devDependencies,
+    );
   }
 
   for (const [name, config] of Object.entries(ejectConfigs)) {
@@ -191,10 +190,7 @@ export async function installDependencies(
   const packageManagerCommand = getAddCommand(resolvedPackageManager);
   const exactPackageManagerCommand = getExactAddCommand(resolvedPackageManager);
 
-  const installDependencySet = (
-    dependencySet: Record<string, string>,
-    development: boolean,
-  ) => {
+  const installDependencySet = (dependencySet: Record<string, string>, development: boolean) => {
     const regularSpecs: string[] = [];
     const exactWarlockSpecs: string[] = [];
 

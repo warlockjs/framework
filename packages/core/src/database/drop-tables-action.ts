@@ -9,11 +9,7 @@ export async function dropTablesAction(command: CommandActionData) {
 
   if (force) {
     const { dropped } = await dropAllTables();
-    log.success(
-      "database",
-      "drop",
-      `Dropped ${colors.yellowBright(dropped)} tables successfully.`,
-    );
+    log.success("database", "drop", `Dropped ${colors.yellowBright(dropped)} tables successfully.`);
     return;
   }
 
@@ -46,9 +42,5 @@ export async function dropTablesAction(command: CommandActionData) {
 
   const { dropped } = await dropAllTables();
 
-  log.success(
-    "database",
-    "drop",
-    `Dropped ${colors.yellowBright(dropped)} tables successfully.`,
-  );
+  log.success("database", "drop", `Dropped ${colors.yellowBright(dropped)} tables successfully.`);
 }

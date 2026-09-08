@@ -43,16 +43,7 @@ export type RouteFilter = {
  * Display order of HTTP methods — used to rank rows within a path and to order
  * the per-method breakdown in the summary line.
  */
-export const METHOD_ORDER = [
-  "GET",
-  "POST",
-  "PUT",
-  "PATCH",
-  "DELETE",
-  "OPTIONS",
-  "HEAD",
-  "ALL",
-];
+export const METHOD_ORDER = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD", "ALL"];
 
 /**
  * Rank of a method for sorting. Unknown methods sort last (stable among

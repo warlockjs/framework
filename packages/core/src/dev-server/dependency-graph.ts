@@ -366,7 +366,11 @@ export class DependencyGraph {
       console.log("");
       console.log(colors.dim(`     import { lazy } from "@warlock.js/cascade";`));
       console.log(colors.dim(`     // inside ${fileB}:`));
-      console.log(colors.dim(`     other: lazy(() => ${kind === "resource" ? "OtherResource" : "OtherModel"})`));
+      console.log(
+        colors.dim(
+          `     other: lazy(() => ${kind === "resource" ? "OtherResource" : "OtherModel"})`,
+        ),
+      );
       console.log("");
     } else {
       // Generic cycle — dynamic import is the most common reliable fix.
@@ -374,15 +378,15 @@ export class DependencyGraph {
       console.log(colors.dim(`   In ${fileB}, change:`));
       console.log(colors.dim(`     import { SomeClass } from "./${stripExt(fileA)}";`));
       console.log(colors.dim(`   To:`));
-      console.log(
-        colors.dim(`     const { SomeClass } = await import("./${stripExt(fileA)}");`),
-      );
+      console.log(colors.dim(`     const { SomeClass } = await import("./${stripExt(fileA)}");`));
       console.log("");
     }
 
     console.log(colors.dim("  Other options:"));
     console.log(colors.dim("    • Extract the shared symbols into a third file both can import."));
-    console.log(colors.dim("    • Pass the dependency as a constructor/function parameter instead."));
+    console.log(
+      colors.dim("    • Pass the dependency as a constructor/function parameter instead."),
+    );
     console.log("");
 
     console.log(colors.dim("━".repeat(60)));
@@ -435,10 +439,10 @@ export class DependencyGraph {
  */
 function classifyCycle(cycle: string[]): "resource" | "model" | "generic" {
   const files = cycle.slice(0, -1); // last entry repeats the first
-  if (files.every(file => file.endsWith(".resource.ts") || file.endsWith(".resource.tsx"))) {
+  if (files.every((file) => file.endsWith(".resource.ts") || file.endsWith(".resource.tsx"))) {
     return "resource";
   }
-  if (files.every(file => file.endsWith(".model.ts") || file.endsWith(".model.tsx"))) {
+  if (files.every((file) => file.endsWith(".model.ts") || file.endsWith(".model.tsx"))) {
     return "model";
   }
   return "generic";

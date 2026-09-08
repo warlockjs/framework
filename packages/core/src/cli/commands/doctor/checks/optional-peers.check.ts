@@ -58,7 +58,9 @@ function databasePeer(): RequiredPeer | undefined {
           ? "mysql2"
           : undefined;
 
-  return packageName ? { package: packageName, because: `database.driver = "${driver}"` } : undefined;
+  return packageName
+    ? { package: packageName, because: `database.driver = "${driver}"` }
+    : undefined;
 }
 
 /**

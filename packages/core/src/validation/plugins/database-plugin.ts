@@ -32,7 +32,8 @@ import type {
 export const databasePlugin: SealPlugin = {
   name: "database",
   version: "1.0.0",
-  description: "Adds request-aware database validation methods (except-current-user/id) to validators",
+  description:
+    "Adds request-aware database validation methods (except-current-user/id) to validators",
 
   install() {
     Object.assign(ScalarValidator.prototype, {

@@ -4,9 +4,7 @@ import { rootPath } from "../../../utils";
 
 /** What {@link insertIncludeEntry} did, or could not do, to the source it was given. */
 export type IncludeInsertion =
-  | { status: "added"; next: string }
-  | { status: "already-present" }
-  | { status: "unrecognised" };
+  { status: "added"; next: string } | { status: "already-present" } | { status: "unrecognised" };
 
 /**
  * Insert one entry into the `include` array of a tsconfig's SOURCE TEXT.

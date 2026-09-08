@@ -187,8 +187,7 @@ export class ScopedStorage implements ScopedStorageContract {
     location: string,
     options?: PutFromUrlOptions,
   ): Promise<StorageFile> {
-    const { allowPrivateHosts, maxBytes, timeoutMs, allowedSchemes, ...putOptions } =
-      options ?? {};
+    const { allowPrivateHosts, maxBytes, timeoutMs, allowedSchemes, ...putOptions } = options ?? {};
 
     const result = await safeFetchToBuffer(url, {
       allowPrivateHosts,

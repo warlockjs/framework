@@ -5,11 +5,7 @@ import type { Middleware } from "../../router";
 import { HttpErrorCodes } from "../error-codes";
 import type { Response } from "../response";
 import { t } from "./inject-request-context";
-import {
-  buildIdempotencyCacheKey,
-  hashBody,
-  isValidIdempotencyKey,
-} from "./utils/idempotency-key";
+import { buildIdempotencyCacheKey, hashBody, isValidIdempotencyKey } from "./utils/idempotency-key";
 
 /**
  * Options for the idempotency middleware.
@@ -79,10 +75,8 @@ const DEFAULT_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
 export function idempotencyMiddleware(options: IdempotencyOptions = {}): Middleware {
   return async ({ request, response }) => {
     const headerName =
-      options.headerName ||
-      config.get("http.idempotency.headerName", "Idempotency-Key");
-    const methods =
-      options.methods || config.get("http.idempotency.methods", DEFAULT_METHODS);
+      options.headerName || config.get("http.idempotency.headerName", "Idempotency-Key");
+    const methods = options.methods || config.get("http.idempotency.methods", DEFAULT_METHODS);
     const ttl = options.ttl || config.get("http.idempotency.ttl", 86400);
     const driverName = options.driver || config.get("http.idempotency.driver");
 

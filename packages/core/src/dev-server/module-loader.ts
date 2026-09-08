@@ -81,10 +81,7 @@ export class ModuleLoader {
    * Import a file through the loader hook. For routes, scopes the import in
    * `router.withSourceFile()` so the added routes carry their origin.
    */
-  public async loadModule<T = unknown>(
-    file: FileManager,
-    type: string,
-  ): Promise<T | undefined> {
+  public async loadModule<T = unknown>(file: FileManager, type: string): Promise<T | undefined> {
     if (file.relativePath.endsWith(".env")) return undefined;
 
     globalThis.__currentModuleFile = file;
@@ -99,9 +96,7 @@ export class ModuleLoader {
         return module as T;
       };
 
-      return type === "route"
-        ? await router.withSourceFile(file.relativePath, load)
-        : await load();
+      return type === "route" ? await router.withSourceFile(file.relativePath, load) : await load();
     } catch (error: any) {
       if (error.code === "ERR_MODULE_NOT_FOUND") {
         devLogError(formatModuleNotFoundError(error));
@@ -155,7 +150,10 @@ export class ModuleLoader {
       try {
         if (typeof hook === "function") {
           hook();
-        } else if (hook && typeof (hook as { unsubscribe?: () => void }).unsubscribe === "function") {
+        } else if (
+          hook &&
+          typeof (hook as { unsubscribe?: () => void }).unsubscribe === "function"
+        ) {
           (hook as { unsubscribe: () => void }).unsubscribe();
         }
       } catch {

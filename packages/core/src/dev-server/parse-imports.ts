@@ -141,7 +141,10 @@ function hasRuntimeImports(line: string): boolean {
     return true;
   }
 
-  const items = specifiersMatch[1].split(",").map((s) => s.trim()).filter(Boolean);
+  const items = specifiersMatch[1]
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   return !items.every((item) => /^type\s+\w+/.test(item));
 }
@@ -164,7 +167,10 @@ function isExportTypeOnlyStatement(line: string): boolean {
     return false;
   }
 
-  const items = specifiersMatch[1].split(",").map((s) => s.trim()).filter(Boolean);
+  const items = specifiersMatch[1]
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   return items.every((item) => /^type\s+\w+/.test(item));
 }

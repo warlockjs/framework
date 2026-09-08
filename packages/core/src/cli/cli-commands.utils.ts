@@ -82,10 +82,7 @@ export async function displayProductionReadyBanner({
  * when nothing was ever captured sends the developer looking for output
  * that doesn't exist, which is worse than admitting the gap.
  */
-export function displayProductionStartFailure(
-  exitCode: number,
-  causeWasCaptured: boolean,
-) {
+export function displayProductionStartFailure(exitCode: number, causeWasCaptured: boolean) {
   const causeLine = causeWasCaptured
     ? `  ${colors.dim("the cause is printed above, in the application's own output")}`
     : `  ${colors.dim("no output was captured from the application process — its cause did not reach this terminal")}`;
@@ -121,7 +118,9 @@ export function displayMissingReadinessNotice(waitedMs: number) {
   console.error(
     `  ${colors.yellow("!")} still running after ${Math.round(waitedMs / 1000)}s with no readiness signal`,
   );
-  console.error(`  ${colors.dim("either the boot is still in progress, or this bundle was built")}`);
+  console.error(
+    `  ${colors.dim("either the boot is still in progress, or this bundle was built")}`,
+  );
   console.error(
     `  ${colors.dim("before readiness reporting — re-run")} ${colors.cyan("warlock build")} ${colors.dim("if the banner never appears")}`,
   );

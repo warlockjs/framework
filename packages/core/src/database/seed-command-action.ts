@@ -90,9 +90,7 @@ export async function dropSeedRecords(
     }
 
     // Reset the seeds-log rows so `once: true` seeds re-run.
-    const seederNames = seederName
-      ? [seederName]
-      : [...new Set(ordered.map((row) => row.seeder))];
+    const seederNames = seederName ? [seederName] : [...new Set(ordered.map((row) => row.seeder))];
 
     for (const name of seederNames) {
       await driver.deleteMany(seedsTableName, { name });

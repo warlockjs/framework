@@ -125,9 +125,7 @@ export type DoctorCheck = {
   name: string;
 
   /** Performs the probe and returns its verdict, or `undefined` if N/A. */
-  run: (
-    context: DoctorBootContext,
-  ) => CheckResult | undefined | Promise<CheckResult | undefined>;
+  run: (context: DoctorBootContext) => CheckResult | undefined | Promise<CheckResult | undefined>;
 };
 
 /**

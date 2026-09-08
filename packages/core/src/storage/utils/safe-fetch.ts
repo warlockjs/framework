@@ -186,10 +186,9 @@ function stripBrackets(host: string): string {
 async function assertHostNotPrivate(host: string, rawUrl: string): Promise<void> {
   if (isIP(host) !== 0) {
     if (isPrivateOrReservedIp(host)) {
-      throw new StorageError(
-        `outbound request blocked — "${host}" is a private/reserved address`,
-        { context: { url: rawUrl, address: host } },
-      );
+      throw new StorageError(`outbound request blocked — "${host}" is a private/reserved address`, {
+        context: { url: rawUrl, address: host },
+      });
     }
     return;
   }
@@ -317,9 +316,12 @@ export async function safeFetchToBuffer(
       try {
         target = new URL(location, url);
       } catch {
-        throw new StorageError(`outbound request blocked — invalid redirect Location: ${location}`, {
-          context: { url: url.toString(), location },
-        });
+        throw new StorageError(
+          `outbound request blocked — invalid redirect Location: ${location}`,
+          {
+            context: { url: url.toString(), location },
+          },
+        );
       }
 
       // Discard the interim body so the connection can be reused.
@@ -369,10 +371,9 @@ async function readBodyCapped(
   if (!response.body) {
     const arrayBuffer = await response.arrayBuffer();
     if (arrayBuffer.byteLength > maxBytes) {
-      throw new StorageError(
-        `outbound response body exceeded the ${maxBytes}-byte cap`,
-        { context: { url: rawUrl, maxBytes } },
-      );
+      throw new StorageError(`outbound response body exceeded the ${maxBytes}-byte cap`, {
+        context: { url: rawUrl, maxBytes },
+      });
     }
     return Buffer.from(arrayBuffer);
   }
@@ -393,10 +394,9 @@ async function readBodyCapped(
     total += value.byteLength;
     if (total > maxBytes) {
       await reader.cancel();
-      throw new StorageError(
-        `outbound response body exceeded the ${maxBytes}-byte cap`,
-        { context: { url: rawUrl, maxBytes } },
-      );
+      throw new StorageError(`outbound response body exceeded the ${maxBytes}-byte cap`, {
+        context: { url: rawUrl, maxBytes },
+      });
     }
     chunks.push(value);
   }

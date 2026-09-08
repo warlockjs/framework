@@ -41,9 +41,7 @@ async function completeNotificationsInstallation(_options: CommandActionData) {
     srcPath("app/notifications/migrations", migrationFile),
     notificationMigrationStub,
   );
-  console.log(
-    `${colors.green("✓")} Created src/app/notifications/migrations/${migrationFile}`,
-  );
+  console.log(`${colors.green("✓")} Created src/app/notifications/migrations/${migrationFile}`);
 
   // 3. HTTP surface — the in-app read/dismiss endpoints (routes + controllers),
   //    gated by authMiddleware. Delete if the app exposes notifications another way.

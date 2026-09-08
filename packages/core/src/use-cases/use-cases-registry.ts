@@ -16,11 +16,7 @@ export function $registerUseCase<Output, Input>(
   useCase: RegisteredUseCase<Output, Input>,
 ) {
   if (useCaseRegister.has(name) && process.env.NODE_ENV !== "production") {
-    log.warn(
-      "use-cases",
-      "registering",
-      `Use case "${name}" is already registered. Overwriting.`,
-    );
+    log.warn("use-cases", "registering", `Use case "${name}" is already registered. Overwriting.`);
   }
 
   useCaseRegister.set(name, useCase);

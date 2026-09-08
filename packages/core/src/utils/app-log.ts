@@ -5,6 +5,5 @@ export const appLog = {
   error: (module: string, message: string) => log.error("app", module, message),
   warn: (module: string, message: string) => log.warn("app", module, message),
   debug: (module: string, message: string) => log.debug("app", module, message),
-  success: (module: string, message: string) =>
-    log.success("app", module, message),
+  success: (module: string, message: string) => log.success("app", module, message),
 };

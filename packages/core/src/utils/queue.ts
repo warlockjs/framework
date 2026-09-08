@@ -96,7 +96,7 @@ export class Queue<T> {
     if (this.batchSize) {
       const itemsToProcess = this.items.splice(0, this.batchSize);
       if (this.executeInParallel) {
-        await Promise.all(itemsToProcess.map(item => this.executeFn([item])));
+        await Promise.all(itemsToProcess.map((item) => this.executeFn([item])));
       } else {
         for (const item of itemsToProcess) {
           await this.executeFn([item]);

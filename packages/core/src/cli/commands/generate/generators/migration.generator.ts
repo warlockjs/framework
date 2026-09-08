@@ -13,7 +13,11 @@ import { ensureDirectoryAsync, putFileAsync, setDryRun } from "../utils/writer";
 /**
  * Create a migration file for a model
  */
-export async function createMigrationFile(moduleName: string, entityName: string, options: any = {}) {
+export async function createMigrationFile(
+  moduleName: string,
+  entityName: string,
+  options: any = {},
+) {
   const entity = parseName(entityName);
 
   // Generate timestamp: MM-DD-YYYY_HH-MM-SS
@@ -37,7 +41,7 @@ export async function createMigrationFile(moduleName: string, entityName: string
     // Generate alter stub
     const parsedAdd = parseColumnDsl(addParams || "");
     const helpersSet = new Set<string>();
-    
+
     const addLines = parsedAdd.map((col) => {
       helpersSet.add(col.helper);
       return `    ${col.name}: ${col.helper}()${col.modifiers.join("")},`;
@@ -51,11 +55,14 @@ export async function createMigrationFile(moduleName: string, entityName: string
     let formattedRename: string | undefined = undefined;
     if (renameParams) {
       const obj: Record<string, string> = {};
-      renameParams.split(",").map((s) => s.trim()).forEach((p) => {
-        const [oldN, newN] = p.split(":").map((s) => s.trim());
-        if (oldN && newN) obj[oldN] = newN;
-      });
-      formattedRename = JSON.stringify(obj, null, 2).replace(/\n/g, '\n  ');
+      renameParams
+        .split(",")
+        .map((s) => s.trim())
+        .forEach((p) => {
+          const [oldN, newN] = p.split(":").map((s) => s.trim());
+          if (oldN && newN) obj[oldN] = newN;
+        });
+      formattedRename = JSON.stringify(obj, null, 2).replace(/\n/g, "\n  ");
     }
 
     migrationContent = migrationAlterStub(entity, {

@@ -741,56 +741,54 @@ bootstrap();
       );
     }
 
-
     try {
-      
-    await esbuild.build({
-      platform: "node",
-      entryPoints: [entryPoint],
-      bundle: true,
-      // Both are DEFAULTS the user can override — they sit before the
-      // `...this.options` spread deliberately. `singleBundle` moves them,
-      // an explicit `splitting`/`packages` in warlock.config.ts beats both.
-      //
-      // Phase ordering does not depend on `splitting`: it comes from the
-      // generated app.ts using dynamic `await import(...)` (see
-      // generateAppEntry above), which esbuild defers to the call site in
-      // either mode. Splitting only decides one file vs chunks.
-      splitting: !singleBundle,
-      packages: singleBundle ? "bundle" : "external",
-      minify: this.options!.minify,
-      sourcemap: this.options!.sourcemap === true ? "linked" : this.options!.sourcemap,
-      format: "esm",
-      // Targeting a concrete Node version (not "esnext") so esbuild
-      // transpiles TC39 stage 3 decorators into helpers â€” Node does not
-      // implement them natively yet.
-      target: ["node22"],
-      entryNames: entryName,
-      alias,
-      plugins: [nativeNodeModulesPlugin],
-      // Between the defaults and the user spread — the ruled precedence.
-      ...contributedOptions,
-      ...(this.options as any),
-      // AFTER the spread, and NOT overridable: `this.options.outdir` rides
-      // that spread carrying the FINAL destination, which is exactly where
-      // this build must not write yet. The final path is the user's setting
-      // and stays authoritative for everyone reading the config — it is only
-      // this one esbuild call that is redirected, and only until promotion
-      // moves the result onto that very path.
-      outdir: writeOutDir,
-      // AFTER the spread for the same reason `banner` is: a spread replaces
-      // these objects instead of merging them, so the merged values are
-      // re-applied here. The user still wins — they were merged in last.
-      ...(define ? { define } : {}),
-      ...(external ? { external } : {}),
-      ...(loader ? { loader } : {}),
-      // AFTER the spread, and intentionally so: `banner` is an object, and
-      // both the config merge and this spread REPLACE it wholesale rather
-      // than merging. Left as a default above, any user banner would delete
-      // the shim; left to the spread, the shim would delete theirs. The
-      // merge is the only form that keeps both.
-      ...(banner ? { banner } : {}),
-    });
+      await esbuild.build({
+        platform: "node",
+        entryPoints: [entryPoint],
+        bundle: true,
+        // Both are DEFAULTS the user can override — they sit before the
+        // `...this.options` spread deliberately. `singleBundle` moves them,
+        // an explicit `splitting`/`packages` in warlock.config.ts beats both.
+        //
+        // Phase ordering does not depend on `splitting`: it comes from the
+        // generated app.ts using dynamic `await import(...)` (see
+        // generateAppEntry above), which esbuild defers to the call site in
+        // either mode. Splitting only decides one file vs chunks.
+        splitting: !singleBundle,
+        packages: singleBundle ? "bundle" : "external",
+        minify: this.options!.minify,
+        sourcemap: this.options!.sourcemap === true ? "linked" : this.options!.sourcemap,
+        format: "esm",
+        // Targeting a concrete Node version (not "esnext") so esbuild
+        // transpiles TC39 stage 3 decorators into helpers â€” Node does not
+        // implement them natively yet.
+        target: ["node22"],
+        entryNames: entryName,
+        alias,
+        plugins: [nativeNodeModulesPlugin],
+        // Between the defaults and the user spread — the ruled precedence.
+        ...contributedOptions,
+        ...(this.options as any),
+        // AFTER the spread, and NOT overridable: `this.options.outdir` rides
+        // that spread carrying the FINAL destination, which is exactly where
+        // this build must not write yet. The final path is the user's setting
+        // and stays authoritative for everyone reading the config — it is only
+        // this one esbuild call that is redirected, and only until promotion
+        // moves the result onto that very path.
+        outdir: writeOutDir,
+        // AFTER the spread for the same reason `banner` is: a spread replaces
+        // these objects instead of merging them, so the merged values are
+        // re-applied here. The user still wins — they were merged in last.
+        ...(define ? { define } : {}),
+        ...(external ? { external } : {}),
+        ...(loader ? { loader } : {}),
+        // AFTER the spread, and intentionally so: `banner` is an object, and
+        // both the config merge and this spread REPLACE it wholesale rather
+        // than merging. Left as a default above, any user banner would delete
+        // the shim; left to the spread, the shim would delete theirs. The
+        // merge is the only form that keeps both.
+        ...(banner ? { banner } : {}),
+      });
     } catch (e) {
       console.log(e);
       throw e;

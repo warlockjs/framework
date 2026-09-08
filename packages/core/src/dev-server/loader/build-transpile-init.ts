@@ -26,10 +26,7 @@ const TRANSPILE_TARGET = "node22";
  * @param debugNames - `devServer.transpileCacheDebug` — cosmetic readable
  *   cache filenames. Default off.
  */
-export function buildTranspileInit(
-  compilerOptions: unknown,
-  debugNames: boolean,
-): TranspileInit {
+export function buildTranspileInit(compilerOptions: unknown, debugNames: boolean): TranspileInit {
   const fingerprint = computeFingerprint({
     esbuildVersion,
     cacheEpoch: CACHE_EPOCH,

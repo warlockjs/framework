@@ -79,20 +79,14 @@ export async function resolve(
   context: ResolveContext,
   nextResolve: NextResolve,
 ): Promise<ResolveResult> {
-  const cleanContext =
-    context.parentURL?.includes("?v=")
-      ? { ...context, parentURL: context.parentURL.replace(/\?v=\d+$/, "") }
-      : context;
+  const cleanContext = context.parentURL?.includes("?v=")
+    ? { ...context, parentURL: context.parentURL.replace(/\?v=\d+$/, "") }
+    : context;
 
   // The framework's own resolver owns tsconfig `paths` + TS
   // extension/index probing. Anything it returns `null` for (bare npm,
   // `node:`, `file:`) falls through to Node default via `nextResolve`.
-  const owned = ownResolve(
-    specifier,
-    cleanContext.parentURL,
-    getPathsMatcher(),
-    existsSync,
-  );
+  const owned = ownResolve(specifier, cleanContext.parentURL, getPathsMatcher(), existsSync);
   // When we produced the URL ourselves we did NOT call nextResolve, so the
   // result must short-circuit the loader chain or Node throws
   // ERR_LOADER_CHAIN_INCOMPLETE (e.g. for @warlock.js/* .ts that resolve

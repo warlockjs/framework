@@ -100,7 +100,7 @@ export class LayerExecutor {
   private async restartAffectedConnectors(affectedFiles: string[]): Promise<void> {
     const toRestart = connectorsManager
       .list()
-      .filter(connector => connector.shouldRestart(affectedFiles));
+      .filter((connector) => connector.shouldRestart(affectedFiles));
 
     for (const connector of toRestart) {
       await connector.restart();
@@ -137,7 +137,7 @@ export class LayerExecutor {
     // registers once; the transitive route import then hits the cached ?v=N
     // and does not double-register.
     const affectedModels = chain
-      .map(path => filesMap.get(path))
+      .map((path) => filesMap.get(path))
       .filter((file): file is FileManager => !!file && file.type === "model");
 
     for (const file of affectedModels) {
@@ -147,7 +147,7 @@ export class LayerExecutor {
     const collector = this.specialFilesCollector;
     const affectedConfigs = collector
       .getFilesByType("config")
-      .filter(file => (isEnvAffected ? true : isAffected(file)));
+      .filter((file) => (isEnvAffected ? true : isAffected(file)));
     const affectedMains = collector.getFilesByType("main").filter(isAffected);
     const affectedRoutes = collector.getFilesByType("route").filter(isAffected);
     const affectedEvents = collector.getFilesByType("event").filter(isAffected);

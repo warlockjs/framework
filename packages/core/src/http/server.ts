@@ -48,9 +48,7 @@ function normalizeRequestUrl(url: string): string {
   return normalizeRequestPath(url.slice(0, queryIndex)) + url.slice(queryIndex);
 }
 
-export function startHttpServer(
-  options?: FastifyServerOptions,
-): FastifyInstance {
+export function startHttpServer(options?: FastifyServerOptions): FastifyInstance {
   // `config.set(key, undefined)` stores null rather than unsetting, so an app
   // that clears a key is treated the same as an app that never configured it.
   const trustProxy = resolveTrustProxy(config.get("http.trustProxy", false));
@@ -76,10 +74,7 @@ export function startHttpServer(
     // Close idle keep-alive connections on shutdown while letting in-flight
     // requests finish — the basis for graceful draining. Override via
     // `http.gracefulShutdown.forceCloseConnections`.
-    forceCloseConnections: config.get(
-      "http.gracefulShutdown.forceCloseConnections",
-      "idle",
-    ),
+    forceCloseConnections: config.get("http.gracefulShutdown.forceCloseConnections", "idle"),
     ...options,
     // Fastify calls this before route matching in both production `scan()` and
     // the development wildcard dispatcher. Compose an app-supplied rewrite

@@ -106,10 +106,9 @@ function resolveSharp(): typeof sharp {
         // for another platform. Its own error names the runtime and the fix, so
         // it is inlined *and* chained: a terminal that never prints `cause`
         // must still show the text that actually helps.
-        sharpLoadError = new ErrorWithCause(
-          `Failed to load "sharp": ${(error as Error).message}`,
-          { cause: error },
-        );
+        sharpLoadError = new ErrorWithCause(`Failed to load "sharp": ${(error as Error).message}`, {
+          cause: error,
+        });
       }
     }
   }

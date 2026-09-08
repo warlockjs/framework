@@ -433,11 +433,7 @@ export type TemporaryTokenPayload = {
  * Validation error types
  */
 export type TemporaryTokenError =
-  | "expired"
-  | "invalid_signature"
-  | "invalid_token"
-  | "missing_key"
-  | "file_not_found";
+  "expired" | "invalid_signature" | "invalid_token" | "missing_key" | "file_not_found";
 
 /**
  * Result of validating a temporary URL token

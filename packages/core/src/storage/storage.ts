@@ -526,8 +526,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
     location: string,
     options?: PutFromUrlOptions,
   ): Promise<StorageFile> {
-    const { allowPrivateHosts, maxBytes, timeoutMs, allowedSchemes, ...putOptions } =
-      options ?? {};
+    const { allowPrivateHosts, maxBytes, timeoutMs, allowedSchemes, ...putOptions } = options ?? {};
 
     const result = await safeFetchToBuffer(url, {
       allowPrivateHosts,

@@ -58,12 +58,12 @@ export class FileEventHandler {
     // never enter the dep graph, only ride along in the batch event so the
     // dev server can react (config reload / restart warning).
     const externalChanges = changes.filter(isExternalPath);
-    const codeChanges = changes.filter(p => !isExternalPath(p));
-    const codeAdds = adds.filter(p => !isExternalPath(p));
+    const codeChanges = changes.filter((p) => !isExternalPath(p));
+    const codeAdds = adds.filter((p) => !isExternalPath(p));
 
     // Multi-file batches can race the filesystem on Windows.
     if (codeAdds.length + codeChanges.length > 1) {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
       clearFileExistsCache();
     }
 
@@ -98,7 +98,7 @@ export class FileEventHandler {
    */
   private async processBatchChanges(relativePaths: string[]): Promise<string[]> {
     const changed: string[] = [];
-    await runInBatches(relativePaths, FILE_PROCESSING_BATCH_SIZE, async path => {
+    await runInBatches(relativePaths, FILE_PROCESSING_BATCH_SIZE, async (path) => {
       if (await this.fileOperations.updateFile(path)) {
         changed.push(path);
       }
@@ -107,7 +107,7 @@ export class FileEventHandler {
   }
 
   private async processBatchAdds(relativePaths: string[]): Promise<void> {
-    await runInBatches(relativePaths, FILE_PROCESSING_BATCH_SIZE, async path => {
+    await runInBatches(relativePaths, FILE_PROCESSING_BATCH_SIZE, async (path) => {
       try {
         await this.fileOperations.addFile(path);
         devLogSuccess(`Added file: ${path}`);

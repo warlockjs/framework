@@ -17,7 +17,9 @@ export async function downloadFileFromUrl(
   });
 
   if (error || !data) {
-    throw new Error(`Failed to download file from "${fileUrl}": ${error?.message ?? "Unknown error"}`);
+    throw new Error(
+      `Failed to download file from "${fileUrl}": ${error?.message ?? "Unknown error"}`,
+    );
   }
 
   await writeFile(filePath, Buffer.from(data));

@@ -105,9 +105,7 @@ async function applyTestServerPort(port?: number): Promise<void> {
  * // run this suite on its own port, whatever `.env` says
  * await startHttpTestServer({ port: 3999 });
  */
-export async function startHttpTestServer(
-  options: StartHttpTestServerOptions = {},
-): Promise<void> {
+export async function startHttpTestServer(options: StartHttpTestServerOptions = {}): Promise<void> {
   if (isServerRunning) {
     console.log("[test-server] Server already running, skipping start");
     return;

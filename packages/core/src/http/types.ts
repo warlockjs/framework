@@ -5,10 +5,7 @@ import type { Middleware } from "../router";
 import type { Response } from "./response";
 
 export type RequestEvent =
-  | "executingMiddleware"
-  | "executedMiddleware"
-  | "executingAction"
-  | "executedAction";
+  "executingMiddleware" | "executedMiddleware" | "executingAction" | "executedAction";
 
 /**
  * Private, server-only, per-request data bag — `request.locals`.
@@ -245,8 +242,7 @@ export interface HttpConfigurations {
    *
    * @default false
    */
-  trustProxy?:
-    boolean | string | string[] | ((address: string, hop: number) => boolean);
+  trustProxy?: boolean | string | string[] | ((address: string, hop: number) => boolean);
   cookies?: {
     /**
      * Secret key for signed cookies

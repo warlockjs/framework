@@ -1,6 +1,6 @@
 export type ParsedColumn = {
   name: string;
-  helper: string;      // e.g. "text", "boolCol", "decimal"
+  helper: string; // e.g. "text", "boolCol", "decimal"
   modifiers: string[]; // e.g. [".nullable()", ".unsigned()"]
 };
 
@@ -33,8 +33,11 @@ const typeMapping: Record<string, string> = {
 export function parseColumnDsl(input: string): ParsedColumn[] {
   if (!input) return [];
 
-  const columns = input.split(",").map((c) => c.trim()).filter(Boolean);
-  
+  const columns = input
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean);
+
   return columns.map((colStr) => {
     const parts = colStr.split(":").map((p) => p.trim());
     const name = parts[0];

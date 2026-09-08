@@ -102,11 +102,10 @@ export function superviseProductionProcess({
     // than paper over.
     let sawChildOutput = false;
 
-    const forwardChildOutput =
-      (target: NodeJS.WritableStream) => (chunk: Buffer) => {
-        sawChildOutput = true;
-        target.write(chunk);
-      };
+    const forwardChildOutput = (target: NodeJS.WritableStream) => (chunk: Buffer) => {
+      sawChildOutput = true;
+      target.write(chunk);
+    };
 
     child.stdout?.on("data", forwardChildOutput(process.stdout));
     child.stderr?.on("data", forwardChildOutput(process.stderr));

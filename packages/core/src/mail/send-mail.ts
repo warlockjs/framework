@@ -278,11 +278,7 @@ export async function sendMail(options: MailOptions): Promise<MailResult> {
 
   // If any returns false, cancel sending
   if (beforeResult === false || globalBeforeResults.some((r) => r === false)) {
-    log.info(
-      `mail.${driver}`,
-      "cancelled",
-      "Mail sending cancelled by beforeSending event",
-    );
+    log.info(`mail.${driver}`, "cancelled", "Mail sending cancelled by beforeSending event");
 
     const result: MailResult = {
       success: false,
@@ -296,11 +292,7 @@ export async function sendMail(options: MailOptions): Promise<MailResult> {
 
   // Test mode - capture without sending
   if (isTestMode()) {
-    log.info(
-      `mail.${driver}`,
-      "test",
-      `[TEST MODE] Captured mail to: ${normalized.to.join(", ")}`,
-    );
+    log.info(`mail.${driver}`, "test", `[TEST MODE] Captured mail to: ${normalized.to.join(", ")}`);
 
     const result: MailResult = {
       success: true,
@@ -329,19 +321,11 @@ export async function sendMail(options: MailOptions): Promise<MailResult> {
 
   // Development mode - log without sending
   if (isDevelopmentMode()) {
-    log.info(
-      `mail.${driver}`,
-      "dev",
-      `[DEV MODE] Would send mail to: ${normalized.to.join(", ")}`,
-    );
+    log.info(`mail.${driver}`, "dev", `[DEV MODE] Would send mail to: ${normalized.to.join(", ")}`);
     log.info(`mail.${driver}`, "dev", `Subject: ${normalized.subject}`);
 
     if (normalized.html) {
-      log.info(
-        `mail.${driver}`,
-        "dev",
-        `HTML length: ${normalized.html.length} chars`,
-      );
+      log.info(`mail.${driver}`, "dev", `HTML length: ${normalized.html.length} chars`);
     }
 
     const result: MailResult = {
@@ -366,11 +350,7 @@ export async function sendMail(options: MailOptions): Promise<MailResult> {
     const mailer = await getMailer(config);
     const nodemailerOptions = await buildNodemailerOptions(normalized);
 
-    log.info(
-      `mail.${driver}`,
-      "send",
-      `Sending mail to: ${normalized.to.join(", ")}`,
-    );
+    log.info(`mail.${driver}`, "send", `Sending mail to: ${normalized.to.join(", ")}`);
 
     const output = await mailer.sendMail(nodemailerOptions);
 
@@ -387,19 +367,11 @@ export async function sendMail(options: MailOptions): Promise<MailResult> {
     };
 
     if (result.success) {
-      log.success(
-        `mail.${driver}`,
-        "sent",
-        `Mail sent successfully (ID: ${result.messageId})`,
-      );
+      log.success(`mail.${driver}`, "sent", `Mail sent successfully (ID: ${result.messageId})`);
       await runMailEvent(options.onSuccess, options, result);
       await triggerEvents(mailId, "success", options, result);
     } else {
-      log.warn(
-        `mail.${driver}`,
-        "partial",
-        `Mail partially rejected: ${rejected.join(", ")}`,
-      );
+      log.warn(`mail.${driver}`, "partial", `Mail partially rejected: ${rejected.join(", ")}`);
     }
 
     await runMailEvent(options.onSent, options, result, null);

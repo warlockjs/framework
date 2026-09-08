@@ -189,14 +189,7 @@ export interface RouteOptions {
 }
 
 export type RequestMethod =
-  | "GET"
-  | "POST"
-  | "PUT"
-  | "DELETE"
-  | "PATCH"
-  | "OPTIONS"
-  | "HEAD"
-  | "all";
+  "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "OPTIONS" | "HEAD" | "all";
 
 /**
  * Route Object
