@@ -1016,6 +1016,29 @@ export class Response {
   }
 
   /**
+   * Clear every cookie NAME the current request sent — best-effort, not
+   * exhaustive: HTTP gives the server no way to discover a cookie's `Path`
+   * or `Domain`, only the name, so a cookie originally set on a `path` or
+   * `domain` other than the one this call targets (the framework default,
+   * or whatever is passed here / configured via `http.cookies.options`)
+   * will NOT be deleted, and nothing will report that — the browser just
+   * silently ignores a `Set-Cookie` whose scope doesn't match. Pass an
+   * explicit `path` / `domain` for cookies the app knows it owns on a
+   * non-default scope; call `clearCookie()` per name for anything else.
+   *
+   * @example
+   * response.clearCookies();
+   * response.clearCookies({ path: '/admin' });
+   */
+  public clearCookies(options?: CookieSerializeOptions) {
+    for (const name of Object.keys(this.request.cookies)) {
+      this.clearCookie(name, options);
+    }
+
+    return this;
+  }
+
+  /**
    * Alias to header method
    */
   public setHeader(key: string, value: any) {
