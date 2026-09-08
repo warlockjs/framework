@@ -14,6 +14,8 @@ import path from "path";
 import type React from "react";
 import { type ReactNode } from "react";
 import { Application } from "../application/application";
+import { LOCALE_COOKIE_NAME, resolveLocaleConfiguration } from "../config/locale-configuration";
+import { UnknownLocaleError } from "../errors/unknown-locale-error";
 import type { Route } from "../router";
 import { StorageFile } from "../storage";
 import { renderReact } from "./../react";
@@ -964,6 +966,40 @@ export class Response {
     });
 
     return this;
+  }
+
+  /**
+   * Set the active locale for subsequent requests.
+   *
+   * Writes the SAME cookie `request.locale` reads (`LOCALE_COOKIE_NAME`,
+   * owned by the framework, never a string an app hardcodes) — the two sides
+   * are read from one shared constant so they cannot name the cookie
+   * differently. Written raw (no JSON quoting), matching how
+   * `Request.resolveLocale()` reads it back.
+   *
+   * Any `Set-Cookie` this emits revokes public cacheability for the response,
+   * including a page that opted into `public, max-age` — a per-visitor
+   * locale cookie replayed from a shared cache would hand visitor A's locale
+   * to visitor B.
+   *
+   * @throws {UnknownLocaleError} when `locale` is outside the app's
+   * configured `app.localeCodes` allow-list. Silently accepting an
+   * unconfigured locale would set a cookie the app can never actually serve.
+   *
+   * @example
+   * response.setLocale("ar");
+   */
+  public setLocale(locale: string) {
+    const { localeCodes } = resolveLocaleConfiguration(
+      config.get("app.localeCode"),
+      config.get("app.localeCodes"),
+    );
+
+    if (localeCodes !== undefined && !localeCodes.includes(locale)) {
+      throw new UnknownLocaleError(locale, localeCodes);
+    }
+
+    return this.cookie(LOCALE_COOKIE_NAME, locale, { raw: true });
   }
 
   /**

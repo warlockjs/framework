@@ -1,15 +1,7 @@
 import { colors } from "@mongez/copper";
 import events from "@mongez/events";
 import { trans, transFrom } from "@mongez/localization";
-import {
-  Random,
-  except,
-  get,
-  only,
-  rtrim,
-  set,
-  unset,
-} from "@mongez/reinforcements";
+import { Random, except, get, only, rtrim, set, unset } from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
 import type { LogLevel } from "@warlock.js/logger";
 import { log } from "@warlock.js/logger";
@@ -18,7 +10,7 @@ import type { FastifyRequest } from "fastify";
 import { randomBytes } from "node:crypto";
 import { type IncomingHttpHeaders } from "node:http2";
 import { config } from "../config/config-getter";
-import { resolveLocaleConfiguration } from "../config/locale-configuration";
+import { LOCALE_COOKIE_NAME, resolveLocaleConfiguration } from "../config/locale-configuration";
 import type { Middleware, Route } from "../router";
 import { validateAll } from "../validation/validateAll";
 import { createRequestStore } from "./middleware/inject-request-context";
@@ -30,11 +22,7 @@ type StandardHeaders = {
   // copy every declared property from http.IncomingHttpHeaders
   // but remove index signatures
   [
-    K in keyof IncomingHttpHeaders as string extends K
-      ? never
-      : number extends K
-        ? never
-        : K
+    K in keyof IncomingHttpHeaders as string extends K ? never : number extends K ? never : K
   ]: IncomingHttpHeaders[K];
 };
 
@@ -351,14 +339,10 @@ export class Request<RequestValidation = any> {
       config.key("app.localeCodes"),
     );
 
-    const requested =
-      typeof candidate === "string" && candidate.length > 0
-        ? candidate
-        : undefined;
+    const requested = typeof candidate === "string" && candidate.length > 0 ? candidate : undefined;
 
     this._locale =
-      requested !== undefined &&
-      (localeCodes === undefined || localeCodes.includes(requested))
+      requested !== undefined && (localeCodes === undefined || localeCodes.includes(requested))
         ? requested
         : defaultLocaleCode;
 
@@ -372,7 +356,7 @@ export class Request<RequestValidation = any> {
   protected resolveLocale(): string {
     const candidate = [
       this.query["locale"],
-      this.cookies["locale"],
+      this.cookies[LOCALE_COOKIE_NAME],
       this.header("locale"),
     ].find((value) => typeof value === "string" && value.length > 0);
 
@@ -424,10 +408,7 @@ export class Request<RequestValidation = any> {
    * Validate the given validation schema
    */
   public async validate(validation: BaseValidator, selectedInputs?: string[]) {
-    return await v.validate(
-      validation,
-      selectedInputs ? this.only(selectedInputs) : this.all(),
-    );
+    return await v.validate(validation, selectedInputs ? this.only(selectedInputs) : this.all());
   }
 
   /**
@@ -570,11 +551,7 @@ export class Request<RequestValidation = any> {
    * occurrences means one selected filter is a string and two are an array —
    * a shape that changes under the user's hands.
    */
-  protected arrayValueFor(
-    value: any,
-    isArrayKey: boolean,
-    parse: (value: any) => any,
-  ) {
+  protected arrayValueFor(value: any, isArrayKey: boolean, parse: (value: any) => any) {
     if (Array.isArray(value)) return value.map(parse);
 
     return isArrayKey ? [parse(value)] : parse(value);
@@ -651,11 +628,7 @@ export class Request<RequestValidation = any> {
               set(
                 body,
                 this.bracketKeyToPath(key),
-                this.arrayValueFor(
-                  value,
-                  isArrayKey,
-                  this.parseValue.bind(this),
-                ),
+                this.arrayValueFor(value, isArrayKey, this.parseValue.bind(this)),
               );
 
               continue;
@@ -673,8 +646,7 @@ export class Request<RequestValidation = any> {
             const keyNameParts2 = keyParts[2].split("]");
             const keyName2 = keyNameParts2[0];
 
-            arrayOfObjectValues[keyName][index][keyName2] =
-              this.parseValue(value);
+            arrayOfObjectValues[keyName][index][keyName2] = this.parseValue(value);
 
             continue;
           }
@@ -788,11 +760,7 @@ export class Request<RequestValidation = any> {
 
     log.log({
       module: "request",
-      action:
-        this.route.method +
-        " " +
-        this.route.path.replace("/*", "") +
-        `:${this.id}`,
+      action: this.route.method + " " + this.route.path.replace("/*", "") + `:${this.id}`,
       message,
       type: level,
       context: {
@@ -847,11 +815,7 @@ export class Request<RequestValidation = any> {
     if (!handler.validation) return;
 
     // 👇🏻 check for validation using validateAll helper function
-    const validationOutput = await validateAll(
-      handler.validation,
-      this,
-      this.response,
-    );
+    const validationOutput = await validateAll(handler.validation, this, this.response);
 
     return validationOutput;
   }
@@ -869,9 +833,7 @@ export class Request<RequestValidation = any> {
    * Get inputs that has been validated only
    * You can also pass an array of inputs to get only the validated inputs
    */
-  public validated<Output = RequestValidation>(
-    inputs?: (keyof Output | (string & {}))[],
-  ): Output {
+  public validated<Output = RequestValidation>(inputs?: (keyof Output | (string & {}))[]): Output {
     if (this.validatedData) {
       return inputs
         ? only(this.validatedData as Output, inputs as string[])
@@ -940,15 +902,11 @@ export class Request<RequestValidation = any> {
         request: this,
         response: this.response,
       });
-      this.log(
-        "Executed middleware " + colors.yellowBright(middleware.name),
-        "success",
-      );
+      this.log("Executed middleware " + colors.yellowBright(middleware.name), "success");
 
       if (output !== undefined) {
         this.log(
-          colors.yellow("request intercepted by middleware ") +
-            colors.cyanBright(middleware.name),
+          colors.yellow("request intercepted by middleware ") + colors.cyanBright(middleware.name),
           "warn",
         );
 

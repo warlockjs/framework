@@ -1,3 +1,14 @@
+/**
+ * The name of the cookie the framework uses to persist a request's locale
+ * across requests.
+ *
+ * The ONE place this string is written. `Request.resolveLocale()` reads it,
+ * `Response.setLocale()` writes it; neither hardcodes the literal. Changing
+ * this constant changes both sides together instead of requiring two edits
+ * that can silently fall out of sync.
+ */
+export const LOCALE_COOKIE_NAME = "locale";
+
 export type LocaleConfiguration = {
   defaultLocaleCode: string;
   /**
@@ -48,10 +59,7 @@ export function resolveLocaleConfiguration(
  * configuration loading must stop before the application can accept requests.
  */
 export function assertLocaleConfiguration(config: AppLocaleConfiguration): void {
-  const { defaultLocaleCode } = resolveLocaleConfiguration(
-    config.localeCode,
-    config.localeCodes,
-  );
+  const { defaultLocaleCode } = resolveLocaleConfiguration(config.localeCode, config.localeCodes);
 
   if (
     isNonEmptyStringArray(config.localeCodes) &&
