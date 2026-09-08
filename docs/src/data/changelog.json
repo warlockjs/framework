@@ -116,6 +116,153 @@
   ],
   "releases": [
     {
+      "version": "5.6.0",
+      "id": "v5-6-0",
+      "date": "September 8, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>A built app could not boot under a strict pnpm tree.</strong> <code>warlock build</code> reported success and <code>warlock start</code> died with <code>ERR_MODULE_NOT_FOUND</code> for <code>@fastify/http-proxy</code> — the bundler left every bare specifier for the *app* to resolve, the framework's own dependencies included, and those resolve by accident under npm/yarn hoisting but cannot resolve under pnpm. Externality is now decided per import edge. Wildcard <code>paths</code> in your <code>tsconfig.json</code> (<code>app/*</code>, <code>web/*</code>) were resolved by nothing and reached the artifact as bare specifiers; they resolve now, and one that matches no file is a build error rather than a silent external. In <code>@warlock.js/web</code>: every rendered page returned 500 in <code>warlock dev</code> because the client boundary was decided by file location instead of the import graph, page files were discovered and ignored in silence, and a page can now declare its own input contract through <code>route.validate</code> and <code>route.middleware</code>.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<code>response.clearCookies()</code> documents what it cannot do, in its first sentence: a cookie set on one path is not cleared by a call made from another. The behaviour is unchanged — the promise it appeared to make was never one it could keep."
+            },
+            {
+              "type": "Changed",
+              "html": "The router folds its own route prefixes through the same normaliser the rest of the framework uses, so a prefix cannot be normalised two different ways."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>A production build asked the APP to resolve packages only the framework declares, so a built app could not boot under a strict pnpm tree.</strong> Every bare specifier was left external, including the <code>@fastify/*</code>, <code>find-my-way</code>, <code>fast-jwt</code> and <code>@mongez/*</code> imports that reach the bundle through the framework's own code — none of which an app has any reason to declare. Under npm/yarn hoisting they resolved by accident; under pnpm the app died with <code>ERR_MODULE_NOT_FOUND</code> at startup, after a build that reported success. Externality is now decided per import edge: a bare specifier stays external unless the importer is not the app's own code AND the specifier names a package that importer's own <code>dependencies</code> declare."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>An optional peer still stays external, and now by construction rather than by a list.</strong> <code>nodemailer</code>, <code>socket.io</code>, <code>mongodb</code>, <code>vite</code>, <code>redis</code>, <code>pg</code>, the AI SDKs and <code>@aws-sdk/*</code> are declared as peer dependencies, never dependencies, so the rule above leaves every one of them alone without anyone having to maintain a list of their names."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Wildcard <code>paths</code> in <code>tsconfig.json</code> were resolved by nothing.</strong> <code>app/*</code> and <code>web/*</code> — the aliases an app uses to refer to its own source — were skipped because esbuild's <code>alias</code> option cannot express a wildcard, and nothing took over. <code>import { User } from \"app/users/models/user.model\"</code> survived into the artifact as a bare specifier and <code>warlock start</code> failed with <code>Cannot find package 'app'</code>. They now resolve, and a wildcard that matches a declared alias but resolves to no file is a build error rather than a silent external."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>response.setLocale()</code> wrote the locale cookie under a name spelled independently of the one <code>request</code> read it back under. One constant now owns that name at both ends, with a test that reads back whatever the writer emitted rather than naming the cookie itself."
+            },
+            {
+              "type": "Fixed",
+              "html": "A container lookup that missed reported only that the key was not bound. When more than one copy of <code>@warlock.js/core</code> is loaded — which a source checkout or a mixed install can produce — that message described a real condition as if it were a wiring mistake. The failure now names the duplicate-instance condition and how many copies it found, on the failure path only."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 13,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 4
+            },
+            {
+              "type": "Fixed",
+              "n": 7
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong>A page can declare its input contract on its <code>route</code> export.</strong> The export now accepts an object as well as a string: <code>{ path, name?, cache?, validate?, middleware? }</code>. <code>validate</code> is a Seal schema over <code>{ params, query }</code> — kept separate, never merged — and the validated value reaches the loader typed from the schema. A failure renders the <strong>error page at 400</strong> carrying the failure, and travels the same way over the client-navigation wire. Layout middleware runs outermost-first with the page's own last, so a layout's auth gate cannot be bypassed by a page that declares its own."
+            },
+            {
+              "type": "Added",
+              "html": "<code>useQueryString(key)</code> — a subscription to one query-string parameter that re-renders on client navigation. Wiring it up exposed that <code>routerEvents</code> was only ever fired by <code>refresh()</code>: <code>&lt;Link&gt;</code> and browser back/forward emitted nothing, so anything subscribed to navigation silently never updated. Navigation now emits its events on every path."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>The dev and production page installers now share their composition rules</strong> — layout-level selection, loader folding, route identity, and the duplicate-route message — instead of implementing them twice. A route collision reported in dev used to quote a dev-only file path in a message production also raises."
+            },
+            {
+              "type": "Changed",
+              "html": "The published <code>./vite</code> subpath is a barrel again: the connector no longer authors Vite plugins, so importing the runtime never drags the build tooling in behind it."
+            },
+            {
+              "type": "Changed",
+              "html": "Importing the metadata linter no longer pulls 4544 modules and 18 MB into a build-tool module for the sake of one function; it now costs 17 modules."
+            },
+            {
+              "type": "Changed",
+              "html": "One name for one thing: \"runtime\" everywhere, <code>hydration/</code> renamed to <code>entry/</code>, and four files renamed to match what they contain."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Every rendered page returned 500 in <code>warlock dev</code>.</strong> The dev server decided the client/server boundary by FILE LOCATION — anything under <code>src/web/**</code> was treated as inherently client-safe — which contradicts the rule the production build applies and made a server-only import reachable from the client graph. Dev now decides the boundary by the import graph, exactly as production does."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>A page route could not be served at all in <code>warlock dev</code>.</strong> The handler read the Fastify instance from the container while running inside Vite's SSR module graph, where that lookup can never hit. The instance is now resolved on the Node side and handed in."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Page files were ignored in silence.</strong> A <code>*.page.tsx</code> or a layout under <code>src/app/<strong>/web/</strong></code> was discovered by nothing and reported by nothing — an app with seven pages served zero. Discovery now NAMES every file it ignores, at boot, and for a layout it says what was lost: its <code>prefix</code>, <code>middleware</code> and <code>loader</code> apply to no page, so a guard a page relied on is silently absent."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>A file added to <code>public/</code> after the last build 404'd in production with no diagnostic.</strong> The build-time snapshot is deliberate and stays — but production now names the files its snapshot missed instead of failing them wordlessly."
+            },
+            {
+              "type": "Fixed",
+              "html": "One page that fails to import no longer takes the whole dev boot down with it."
+            },
+            {
+              "type": "Fixed",
+              "html": "Writing to <code>shared</code> from the browser failed with a message that read as a fixable wiring bug — \"the server bootstrap must call <code>connectSharedStore(...)</code>\". It now names the value, explains that what the client holds is a dead server-render snapshot that can never be written to, and says what to use instead."
+            },
+            {
+              "type": "Fixed",
+              "html": "The <code>public/</code> staleness check runs on every client build rather than only some."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<strong><code>warlock build</code> and <code>warlock start</code> died inside Seal before any application code ran</strong>, with a <code>ReferenceError</code> from <code>array-validator.ts</code> extending <code>BaseValidator</code> before <code>base-validator.ts</code> had finished evaluating. The cause was one inline <code>type</code> import: under <code>verbatimModuleSyntax</code>, <code>import { type ValidateOptions } from \"./validators\"</code> is emitted as a real side-effect import, which closed an import cycle that a type-only import would never have created. Written as <code>import type { ... }</code>, the module is not pulled into evaluation at all. Nothing about the validators changed — only which modules load, and when."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.5.0",
       "id": "v5-5-0",
       "date": "September 7, 2026",
