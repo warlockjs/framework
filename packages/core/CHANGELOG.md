@@ -6,8 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
-## 5.6.0
-
+## 5.6.0 - 2026-09-08
 ### Fixed
 
 - **A production build asked the APP to resolve packages only the framework declares, so a built app could not boot under a strict pnpm tree.** Every bare specifier was left external, including the `@fastify/*`, `find-my-way`, `fast-jwt` and `@mongez/*` imports that reach the bundle through the framework's own code — none of which an app has any reason to declare. Under npm/yarn hoisting they resolved by accident; under pnpm the app died with `ERR_MODULE_NOT_FOUND` at startup, after a build that reported success. Externality is now decided per import edge: a bare specifier stays external unless the importer is not the app's own code AND the specifier names a package that importer's own `dependencies` declare.
