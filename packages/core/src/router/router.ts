@@ -1,6 +1,5 @@
 import proxy, { type FastifyHttpProxyOptions } from "@fastify/http-proxy";
 import fastifyStatic, { type FastifyStaticOptions } from "@fastify/static";
-import concatRoute from "@mongez/concat-route";
 import { ltrim, merge, toCamelCase, trim } from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
 import { log } from "@warlock.js/logger";
@@ -306,7 +305,7 @@ export class Router {
     }
 
     const prefix = this.stacks.prefix.reduce((path, prefix) => {
-      return concatRoute(path, prefix);
+      return normalizeRoutePath(path, prefix);
     }, "");
 
     const name = this.stacks.name.reduceRight(
