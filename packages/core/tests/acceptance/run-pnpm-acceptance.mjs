@@ -105,6 +105,25 @@ const acceptanceUrl = `http://localhost:${acceptancePort}/acceptance`;
  */
 const ACCEPTANCE_ENV = { NODE_ENV: "production" };
 
+/**
+ * Ambient variables that would retarget the fixture's own port, deleted from
+ * every child's environment.
+ *
+ * `NODE_ENV` above is the same lesson from the other direction — there the
+ * operator's shell decided what the gate tested; here it decides where the
+ * gate listens. The fixture pins `HTTP_PORT=3711` in its `.env` and this
+ * harness polls {@link acceptanceUrl} on that number, but an exported
+ * `HTTP_PORT` legitimately overrides `.env` (that precedence is deliberate and
+ * documented in core 5.3.2), so the app bound a completely different port and
+ * the run died with `EADDRINUSE` on somebody else's service. Measured: this
+ * machine exports `HTTP_PORT=41900` for a daemon that has nothing to do with
+ * the gate, and the failure named that port rather than 3711.
+ *
+ * `undefined` is what `child_process` treats as "not set"; an empty string
+ * would be inherited as a real, empty value.
+ */
+const PORT_VARIABLES_TO_CLEAR = { HTTP_PORT: undefined, PORT: undefined };
+
 const log = (message) => console.log(`\n▸ ${message}`);
 
 /**
@@ -172,7 +191,7 @@ function run(command, args, options = {}) {
       // what makes a deliberate negative test possible. Do not tighten this
       // spread to "fix" it; doing so removes the only way to exercise the
       // failure path and buys nothing the assertion doesn't already give.
-      env: { ...process.env, ...ACCEPTANCE_ENV, ...options.env },
+      env: { ...process.env, ...PORT_VARIABLES_TO_CLEAR, ...ACCEPTANCE_ENV, ...options.env },
       stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit",
       // Windows needs a shell to find `npx`/`pnpm`, which are `.CMD` shims.
       // A caller launching an absolute executable must pass `shell: false`:
@@ -285,6 +304,73 @@ function assertArtifactContainsItsEntryPoints(artifactDirectory, name) {
   }
   collectEntries(artifactDirectory);
   assertEntries(manifest, entries, name);
+}
+
+/**
+ * pkgist's CLI entry, as a PATH — never a binary name handed to a launcher.
+ *
+ * Canon `50608334`: a run on 2026-08-26 reported "0 errors" purely because
+ * `npx` failed to resolve the binary and the harness read the launcher's exit
+ * code as the build's verdict.
+ *
+ * Resolved from `builder/`, which is where `@mongez/pkgist` is a dependency —
+ * this file lives in `core`, and neither `import.meta.resolve` nor
+ * `require.resolve` can see it from here (`ERR_MODULE_NOT_FOUND`). The
+ * existence check is what makes the failure say so, instead of spawning a path
+ * that is not there and reporting whatever `node` exits with.
+ */
+function resolvePkgistCli() {
+  const cli = path.join(builderDirectory, "node_modules", "@mongez", "pkgist", "esm", "cli.mjs");
+
+  if (!existsSync(cli)) {
+    throw new Error(
+      `pkgist's CLI is not installed at ${cli} — run the install in builder/ before this gate.`,
+    );
+  }
+
+  return cli;
+}
+
+/**
+ * The publishable family, derived from the workspace's own manifests.
+ *
+ * Built ONE MEMBER PER PROCESS, which is not a style choice. `build:family`
+ * exits **134** at the same ~4085MB ceiling at every concurrency — 1 included,
+ * so it is retention, not parallelism (canon `ccd02104`). This gate therefore
+ * could never complete: it died partway through the family every time, and
+ * the app under test was never installed, built or booted at all. The packages
+ * it dies on compile in ~2s each in a fresh process.
+ *
+ * Names are ASSERTED, never counted. `create-warlock` is UNSCOPED and a full
+ * lockstep member; a list built by scanning for `@warlock.js/*` omits it
+ * silently, which is exactly how the v5.2 release broke.
+ */
+function publishableFamilyMembers() {
+  const members = [];
+
+  for (const entry of readdirSync(warlockRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+
+    const manifestPath = path.join(warlockRoot, entry.name, "package.json");
+    if (!existsSync(manifestPath)) continue;
+
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+
+    if (manifest.private) continue;
+    if (typeof manifest.name !== "string") continue;
+    if (!/^(@warlock\.js\/|create-warlock$)/.test(manifest.name)) continue;
+
+    members.push(manifest.name);
+  }
+
+  if (!members.includes("create-warlock")) {
+    throw new Error(
+      "create-warlock is missing from the derived family — it is unscoped and easy to lose, " +
+        "and a family without it scaffolds new apps against the OLD version forever.",
+    );
+  }
+
+  return members.sort();
 }
 
 async function packFramework() {
@@ -544,7 +630,7 @@ function startAndRequest({ command, args, readiness = "banner" } = {}) {
       cwd: appDirectory,
       // The app under test. Same rule as `run()`: the environment the verdict
       // depends on is set here, not inherited from the operator.
-      env: { ...process.env, ...ACCEPTANCE_ENV },
+      env: { ...process.env, ...PORT_VARIABLES_TO_CLEAR, ...ACCEPTANCE_ENV },
       // stdin is closed, never inherited: `pnpm approve-builds` and friends are
       // interactive, and a child waiting on a tty that will never answer blocks
       // forever without printing why.
@@ -1030,20 +1116,29 @@ async function main() {
   }
 
   if (!skipFrameworkBuild) {
-    log(`Building the framework at ${targetVersion} (no publish, no git)`);
-    await run(
-      "npx",
-      [
-        "pkgist",
-        "build:family",
-        "warlock",
-        "--no-publish",
-        "--no-git",
-        "--bump",
-        targetVersion,
-      ],
-      { cwd: builderDirectory },
+    const members = publishableFamilyMembers();
+
+    log(
+      `Building ${members.length} family members at ${targetVersion}, one fresh process each (no publish, no git)`,
     );
+
+    for (const [index, member] of members.entries()) {
+      console.log(`  [${index + 1}/${members.length}] ${member}`);
+
+      await run(
+        process.execPath,
+        [
+          resolvePkgistCli(),
+          "build",
+          member,
+          "--no-publish",
+          "--no-git",
+          "--bump",
+          targetVersion,
+        ],
+        { cwd: builderDirectory },
+      );
+    }
   }
 
   if (skipFrameworkBuild) {

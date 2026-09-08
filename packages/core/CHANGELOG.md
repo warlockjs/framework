@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.6.0
+
+### Fixed
+
+- **A production build asked the APP to resolve packages only the framework declares, so a built app could not boot under a strict pnpm tree.** Every bare specifier was left external, including the `@fastify/*`, `find-my-way`, `fast-jwt` and `@mongez/*` imports that reach the bundle through the framework's own code — none of which an app has any reason to declare. Under npm/yarn hoisting they resolved by accident; under pnpm the app died with `ERR_MODULE_NOT_FOUND` at startup, after a build that reported success. Externality is now decided per import edge: a bare specifier stays external unless the importer is not the app's own code AND the specifier names a package that importer's own `dependencies` declare.
+- **An optional peer still stays external, and now by construction rather than by a list.** `nodemailer`, `socket.io`, `mongodb`, `vite`, `redis`, `pg`, the AI SDKs and `@aws-sdk/*` are declared as peer dependencies, never dependencies, so the rule above leaves every one of them alone without anyone having to maintain a list of their names.
+- **Wildcard `paths` in `tsconfig.json` were resolved by nothing.** `app/*` and `web/*` — the aliases an app uses to refer to its own source — were skipped because esbuild's `alias` option cannot express a wildcard, and nothing took over. `import { User } from "app/users/models/user.model"` survived into the artifact as a bare specifier and `warlock start` failed with `Cannot find package 'app'`. They now resolve, and a wildcard that matches a declared alias but resolves to no file is a build error rather than a silent external.
+- `response.setLocale()` wrote the locale cookie under a name spelled independently of the one `request` read it back under. One constant now owns that name at both ends, with a test that reads back whatever the writer emitted rather than naming the cookie itself.
+- A container lookup that missed reported only that the key was not bound. When more than one copy of `@warlock.js/core` is loaded — which a source checkout or a mixed install can produce — that message described a real condition as if it were a wiring mistake. The failure now names the duplicate-instance condition and how many copies it found, on the failure path only.
+
+### Changed
+
+- `response.clearCookies()` documents what it cannot do, in its first sentence: a cookie set on one path is not cleared by a call made from another. The behaviour is unchanged — the promise it appeared to make was never one it could keep.
+- The router folds its own route prefixes through the same normaliser the rest of the framework uses, so a prefix cannot be normalised two different ways.
+
 ## 5.5.0 - 2026-09-07
 
 ### Fixed

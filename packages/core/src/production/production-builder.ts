@@ -17,6 +17,7 @@ import { tsconfigManager } from "../dev-server/tsconfig-manager";
 import { appPath, rootPath, warlockPath } from "../utils";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 import { assertGeneratedImportsAreDeclared } from "./assert-generated-imports";
+import { bundleFrameworkDependencies } from "./bundle-framework-dependencies";
 import { dedupe, runEmitContributions, runGenerateContributions } from "./build-contributions";
 import { writeDistBuildManifestAsync } from "./dist-build-manifest";
 import { nativeNodeModulesPlugin } from "./esbuild-plugins";
@@ -28,6 +29,7 @@ import {
   type StagedDist,
 } from "./promote-dist";
 import { resolveBuildConfig, type ResolvedBuildConfig } from "./resolve-build-config";
+import { tsconfigPathAliases } from "./tsconfig-path-aliases";
 import { toCamelCase, toKebabCase } from "@mongez/reinforcements";
 
 /**
@@ -692,6 +694,17 @@ bootstrap();
 
     const alias = this.buildAliasMapFromTsconfig();
 
+    // Whether this build decides externality per import EDGE
+    // (`bundle-framework-dependencies.ts`, which explains the rule at
+    // length) or keeps the blunt `packages: "external"`.
+    //
+    // Not in `singleBundle` mode: that bundles everything by definition, and
+    // a plugin that can only ever ADD an external would silently narrow it.
+    // Not when the user set `packages` themselves: their value has always
+    // won over the default below, and it must keep winning — the plugin is
+    // the default's implementation, not a new policy layered on top.
+    const perEdgeExternals = !singleBundle && (this.options as any).packages === undefined;
+
     // The user can override `format`, so gate the shim on the EFFECTIVE
     // format rather than on the default below. A CJS build already has
     // `require` and friends; injecting them there would be a redefinition.
@@ -755,7 +768,12 @@ bootstrap();
         // generateAppEntry above), which esbuild defers to the call site in
         // either mode. Splitting only decides one file vs chunks.
         splitting: !singleBundle,
-        packages: singleBundle ? "bundle" : "external",
+        // `"bundle"` under `perEdgeExternals` is not "bundle everything":
+        // the plugin below returns `external: true` for every bare specifier
+        // this build must not bundle, which is all of them bar the framework's
+        // own declared dependencies. Saying `"external"` here instead would
+        // externalise them before the plugin could rule.
+        packages: singleBundle || perEdgeExternals ? "bundle" : "external",
         minify: this.options!.minify,
         sourcemap: this.options!.sourcemap === true ? "linked" : this.options!.sourcemap,
         format: "esm",
@@ -765,7 +783,17 @@ bootstrap();
         target: ["node22"],
         entryNames: entryName,
         alias,
-        plugins: [nativeNodeModulesPlugin],
+        plugins: [
+          nativeNodeModulesPlugin,
+          // BEFORE the framework-dependency plugin, and the order is
+          // load-bearing: the first `onResolve` callback to answer wins, and
+          // `app/users/...` is a bare specifier the other one would rule
+          // external.
+          tsconfigPathAliases(this.tsconfigPathAliasConfig()),
+          ...(perEdgeExternals
+            ? [bundleFrameworkDependencies({ appRoot: rootPath(), aliasKeys: Object.keys(alias) })]
+            : []),
+        ],
         // Between the defaults and the user spread — the ruled precedence.
         ...contributedOptions,
         ...(this.options as any),
@@ -796,6 +824,23 @@ bootstrap();
   }
 
   /**
+   * The WILDCARD half of the same tsconfig `paths` map that
+   * {@link ProductionBuilder.buildAliasMapFromTsconfig} reads the exact half
+   * of. `tsconfig-path-aliases.ts` explains why the two halves need different
+   * mechanisms — in short, esbuild's `alias` option cannot express a wildcard,
+   * so the entries it skips have to be resolved by a plugin instead of being
+   * left to no one.
+   */
+  private tsconfigPathAliasConfig(): { baseUrl: string; paths: Record<string, string[]> } {
+    tsconfigManager.init();
+
+    return {
+      baseUrl: path.resolve(process.cwd(), tsconfigManager.baseUrl),
+      paths: tsconfigManager.aliases as Record<string, string[]>,
+    };
+  }
+
+  /**
    * Build an alias map from tsconfig `paths` so esbuild resolves local
    * source aliases (e.g. `@warlock.js/cascade`) to their on-disk source
    * folders during bundling. Without this, `packages: "external"` would
@@ -803,7 +848,9 @@ bootstrap();
    * resolve them at runtime (they aren't installed in node_modules).
    *
    * Only exact (non-wildcard) aliases are included â€” esbuild's `alias`
-   * option doesn't support glob-style mappings.
+   * option doesn't support glob-style mappings. The wildcard half is not
+   * dropped, it is handled elsewhere: see
+   * {@link ProductionBuilder.tsconfigPathAliasConfig}.
    */
   private buildAliasMapFromTsconfig(): Record<string, string> {
     tsconfigManager.init();
