@@ -211,6 +211,19 @@ const releaseDateFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
 });
 
+/**
+ * The generator-matrix scope a release ran, or `null` when the entry does not
+ * say.
+ *
+ * An unrecognised value is `null` rather than passed through: this reaches a
+ * published page as a claim about how a version was verified, and a typo that
+ * renders as-is would be a claim nobody checked. `null` renders as "not
+ * recorded", which is the true statement in both cases.
+ */
+function normaliseMatrixScope(value) {
+  return value === "full" || value === "subset" || value === "none" ? value : null;
+}
+
 function formatPublishedAt(publishedAt) {
   if (typeof publishedAt !== "string" || !publishedAt.trim()) return null;
   const date = new Date(publishedAt);
@@ -397,6 +410,13 @@ async function main() {
       date,
       isUnreleased: /unreleased/i.test(version),
       summaryHtml,
+      // How this version was verified. Carried through to the page because a
+      // scope stated only in a JSON file nobody renders is not a public record
+      // — and the record is the entire safeguard that replaced the mandatory
+      // generator gate (canon e00fb7b8). Absent on releases published before
+      // the field existed, which is honest: nothing knows what they ran.
+      matrix: normaliseMatrixScope(m.matrix),
+      matrixRows: Array.isArray(m.matrixRows) ? m.matrixRows : null,
       mode,
       packages: pkgBlocks,
     };

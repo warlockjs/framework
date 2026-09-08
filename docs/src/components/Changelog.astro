@@ -89,6 +89,25 @@ const hasContent = releases.length > 0;
           <div class="cl-rel-body">
             {rel.summaryHtml && <p class="cl-rel-summary" set:html={rel.summaryHtml} />}
 
+            {/*
+              How this version was verified before it shipped. The generator
+              matrix is the only check that answers "does what we publish
+              actually work?", it is opt-in, and every release states the scope
+              it ran (canon e00fb7b8). Stating it only in a JSON file nobody
+              renders would not be a public record, so it is rendered here.
+              Absent on releases published before the field existed.
+            */}
+            {rel.matrix && (
+              <p class="cl-rel-matrix" data-matrix={rel.matrix}>
+                <strong>Generator matrix:</strong>{" "}
+                {rel.matrix === "none"
+                  ? "not run for this release."
+                  : rel.matrix === "full"
+                    ? "all rows ran against the staged candidate."
+                    : `selected rows ran against the staged candidate${rel.matrixRows?.length ? ` — ${rel.matrixRows.join(", ")}` : ""}.`}
+              </p>
+            )}
+
             {rel.mode === "detail" &&
               rel.packages.map((pkg) => {
                 const slash = pkg.name.lastIndexOf("/");
@@ -444,6 +463,32 @@ const hasContent = releases.length > 0;
     font-size: 0.98rem;
     line-height: 1.7;
     max-width: 44rem;
+  }
+  /* The lede's hairline marks where the bullet stream begins, so when a matrix
+     line follows the summary it is the matrix line that carries the divider —
+     otherwise the rule would cut the lede off from a sentence that belongs
+     with it. */
+  .cl-rel-summary:has(+ .cl-rel-matrix) {
+    padding-bottom: 0.9rem;
+    border-bottom: 0;
+  }
+  .cl-rel-matrix {
+    margin: 0;
+    padding-bottom: 1.6rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
+    color: var(--sl-color-gray-3);
+    font-size: 0.9rem;
+    line-height: 1.7;
+    max-width: 44rem;
+  }
+  .cl-rel-matrix strong {
+    color: var(--sl-color-gray-2);
+    font-weight: 600;
+  }
+  /* "Not run" is the one value a reader should not skim past — it says this
+     version shipped without the check that answers whether it works. */
+  .cl-rel-matrix[data-matrix="none"] strong {
+    color: var(--sl-color-white);
   }
   .cl-rel-summary :global(code) {
     font-family: var(--sl-font-mono);
