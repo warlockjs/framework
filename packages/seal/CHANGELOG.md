@@ -4,8 +4,7 @@ All notable changes to `@warlock.js/seal` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
-## 5.6.0
-
+## 5.6.0 - 2026-09-08
 ### Fixed
 
 - **`warlock build` and `warlock start` died inside Seal before any application code ran**, with a `ReferenceError` from `array-validator.ts` extending `BaseValidator` before `base-validator.ts` had finished evaluating. The cause was one inline `type` import: under `verbatimModuleSyntax`, `import { type ValidateOptions } from "./validators"` is emitted as a real side-effect import, which closed an import cycle that a type-only import would never have created. Written as `import type { ... }`, the module is not pulled into evaluation at all. Nothing about the validators changed — only which modules load, and when.
