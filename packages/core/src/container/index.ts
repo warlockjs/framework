@@ -1,9 +1,16 @@
 import { type DataSource } from "@warlock.js/cascade";
 import { type FastifyInstance } from "fastify";
 import { type Server } from "socket.io";
+import { ContainerKeyMissingError } from "../errors/container-key-missing-error";
 import { type Router } from "../router";
+import {
+  getRegisteredContainerInstances,
+  registerContainerInstance,
+} from "./container-instance-registry";
 
 const containerMap: Map<string, any> = new Map();
+
+registerContainerInstance();
 
 /**
  * Known container types for better IDE support
@@ -42,6 +49,26 @@ class Container {
    */
   public has(key: ContainerKeys) {
     return containerMap.has(key);
+  }
+
+  /**
+   * Get a value from the container, or throw if `key` is not registered.
+   *
+   * Behaves exactly like an ordinary "not registered" error when only one
+   * copy of this module is loaded. When {@link getRegisteredContainerInstances}
+   * shows more than one, the thrown error additionally names that count, so
+   * a duplicate-instance dev-path miss is never indistinguishable from a
+   * genuine missing registration.
+   */
+  public getOrFail<K extends keyof ContainerTypes>(key: K): ContainerTypes[K];
+  public getOrFail<T = any>(key: string): T;
+  public getOrFail(key: any): any {
+    if (!containerMap.has(key)) {
+      const instanceCount = getRegisteredContainerInstances().length;
+      throw new ContainerKeyMissingError(key, instanceCount);
+    }
+
+    return containerMap.get(key);
   }
 
   /**

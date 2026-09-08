@@ -28,9 +28,15 @@ export const app: RuntimeApplication = {
   },
   /**
    * Router Instance
+   *
+   * Unlike `socket`/`database`, the router is set unconditionally at
+   * `router.ts` module load (there is no "no router configured" case), so a
+   * miss here is never a legitimate absence — it means either a genuine bug
+   * or a duplicate-instance dev-path read. `getOrFail` surfaces that instead
+   * of silently returning `undefined`.
    */
   get router() {
-    return container.get("router");
+    return container.getOrFail("router");
   },
   /**
    * Database Instance
