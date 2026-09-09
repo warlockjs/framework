@@ -103,9 +103,9 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
 
     // Clone schema with deep copy of validators
     const newSchema = {} as TSchema;
-    for (const key in this.schema) {
+    for (const [key, validator] of Object.entries(this.schema)) {
       if (keys && !keys.includes(key)) continue;
-      (newSchema as any)[key] = this.schema[key].clone();
+      (newSchema as Schema)[key] = validator.clone();
     }
 
     cloned.schema = newSchema;
@@ -172,8 +172,8 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
       schemaOrValidator instanceof ObjectValidator ? schemaOrValidator.schema : schemaOrValidator;
 
     // Merge schemas with cloned validators (later fields override earlier ones)
-    for (const key in schemaToAdd) {
-      extended.schema[key] = schemaToAdd[key].clone();
+    for (const [key, validator] of Object.entries(schemaToAdd)) {
+      (extended.schema as Schema)[key] = validator.clone();
     }
 
     return extended as ObjectValidator<TSchema & TExtension>;
@@ -215,8 +215,8 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
     const merged = this.clone() as any;
 
     // Merge schemas with cloned validators (later fields override earlier ones)
-    for (const key in validator.schema) {
-      merged.schema[key] = validator.schema[key].clone();
+    for (const [key, schemaValidator] of Object.entries(validator.schema)) {
+      (merged.schema as Schema)[key] = schemaValidator.clone();
     }
 
     // Override configuration with other validator's config
@@ -297,8 +297,10 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
       keys = Object.keys(validationSchema.schema) as K[];
     }
 
-    for (const key of keys) {
-      validationSchema.schema[key] = validationSchema.schema[key].optional();
+    for (const [key, validator] of Object.entries(validationSchema.schema)) {
+      if (keys.length === 0 || keys.includes(key as K)) {
+        (validationSchema.schema as Schema)[key] = validator.optional();
+      }
     }
 
     return validationSchema;
@@ -314,8 +316,10 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
       keys = Object.keys(validationSchema.schema) as K[];
     }
 
-    for (const key of keys) {
-      validationSchema.schema[key] = validationSchema.schema[key].required();
+    for (const [key, validator] of Object.entries(validationSchema.schema)) {
+      if (keys.length === 0 || keys.includes(key as K)) {
+        (validationSchema.schema as Schema)[key] = validator.required();
+      }
     }
 
     return validationSchema;
@@ -406,12 +410,11 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
     const errors: ValidationResult["errors"] = [];
     const validatedData: any = {};
 
-    const userInputKeys = Object.keys(this.schema).filter(
-      (key) => !this.isComputedValidator(this.schema[key]),
+    const userInputEntries = Object.entries(this.schema).filter(
+      ([, validator]) => !this.isComputedValidator(validator),
     );
 
-    const validationPromises = userInputKeys.map(async (key) => {
-      const validator = this.schema[key];
+    const validationPromises = userInputEntries.map(async ([key, validator]) => {
       const value =
         mutatedData?.[key] !== undefined ? mutatedData[key] : validator.getDefaultValue();
 
@@ -451,8 +454,7 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
     // ═══════════════════════════════════════════════════════════
     const computedFields = this.getComputedFields();
 
-    const computedPromises = Object.keys(computedFields).map(async (key) => {
-      const validator = computedFields[key];
+    const computedPromises = Object.entries(computedFields).map(async ([key, validator]) => {
 
       const childContext: SchemaContext = {
         ...context,
@@ -516,7 +518,7 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
    * Get all computed/managed fields from the schema
    */
   private getComputedFields(): Record<string, ComputedValidator> {
-    const computed: Record<string, any> = {};
+    const computed: Record<string, ComputedValidator> = {};
 
     for (const [key, validator] of Object.entries(this.schema)) {
       if (validator instanceof ComputedValidator) {

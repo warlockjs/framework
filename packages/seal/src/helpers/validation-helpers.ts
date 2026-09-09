@@ -66,6 +66,12 @@ export const invalidRule = (rule: ContextualSchemaRule, context: SchemaContext):
       resolveAttribute({ key, rawValue, rule, context }),
     ]),
   );
+  const input = resolveAttribute({
+    key: "input",
+    rawValue: translatableWithInput.input ?? "schema",
+    rule,
+    context,
+  });
 
   const attributes: RuleTranslation["attributes"] = {
     path: context.path,
@@ -76,7 +82,7 @@ export const invalidRule = (rule: ContextualSchemaRule, context: SchemaContext):
     // Translated placeholders (:input, :field, etc.) — override raws if key collides
     ...resolvedParams,
     // Satisfy TypeScript's required field (always present via resolvedParams)
-    input: resolvedParams.input,
+    input,
   };
 
   const rawError =

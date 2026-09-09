@@ -335,10 +335,16 @@ export const betweenTimesRule: SchemaRule<{
 
     // Parse start time
     const [startHour, startMinute] = startTime.split(":").map(Number);
+    if (startHour === undefined || startMinute === undefined) {
+      return invalidRule(this, context);
+    }
     const startTimeInMinutes = startHour * 60 + startMinute;
 
     // Parse end time
     const [endHour, endMinute] = endTime.split(":").map(Number);
+    if (endHour === undefined || endMinute === undefined) {
+      return invalidRule(this, context);
+    }
     const endTimeInMinutes = endHour * 60 + endMinute;
 
     if (inputTimeInMinutes >= startTimeInMinutes && inputTimeInMinutes <= endTimeInMinutes) {

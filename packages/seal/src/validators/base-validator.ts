@@ -277,8 +277,8 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
    */
   public attributes(attributes: Record<string, string | Record<string, string>>) {
     const instance = this.instance;
-    for (const key in attributes) {
-      instance.attributesText[key] = attributes[key];
+    for (const [key, value] of Object.entries(attributes)) {
+      instance.attributesText[key] = value;
     }
 
     return instance;
@@ -289,8 +289,8 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
    */
   public transAttributes(attributes: Record<string, string>) {
     const instance = this.instance;
-    for (const key in attributes) {
-      instance.translatedAttributes[key] = attributes[key];
+    for (const [key, value] of Object.entries(attributes)) {
+      instance.translatedAttributes[key] = value;
     }
 
     return instance;
