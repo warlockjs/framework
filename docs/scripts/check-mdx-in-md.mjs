@@ -37,7 +37,7 @@ function collectMarkdownFiles(dir) {
 }
 
 /** Blank out the leading YAML frontmatter block (--- ... ---), keeping line count intact. */
-function stripFrontmatter(text) {
+function stripFrontmatter(/** @type {string} */ text) {
   const lines = text.split("\n");
   if (lines[0] !== "---") return text;
   for (let i = 1; i < lines.length; i++) {
@@ -51,7 +51,7 @@ function stripFrontmatter(text) {
 }
 
 /** Blank out fenced code blocks (``` or ~~~) line-by-line, keeping line count intact. */
-function stripFencedCode(text) {
+function stripFencedCode(/** @type {string} */ text) {
   const lines = text.split("\n");
   let inFence = false;
   let fenceChar = "";
@@ -75,10 +75,10 @@ function stripFencedCode(text) {
 }
 
 /** Blank out inline code spans (`...`) on each line, keeping length/line count intact. */
-function stripInlineCode(text) {
+function stripInlineCode(/** @type {string} */ text) {
   return text
     .split("\n")
-    .map((line) => line.replace(/`[^`\n]*`/g, (m) => " ".repeat(m.length)))
+    .map((/** @type {string} */ line) => line.replace(/`[^`\n]*`/g, (/** @type {string} */ m) => " ".repeat(m.length)))
     .join("\n");
 }
 

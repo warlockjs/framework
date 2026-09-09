@@ -15,8 +15,12 @@ delete process.env.BASE_URL;
 // package has a full Diátaxis tree the items array expands to the five
 // canonical sections per the blueprint.
 
-function pkgTopic({ label, slug, sections = [] }, version) {
-  const items = [{ label: "Overview", link: `/v/${version}/${slug}/` }];
+/** @typedef {{ label: string, dir: string, collapsed?: boolean }} Section */
+/** @typedef {{ label: string, slug: string, sections?: Section[] }} PackageTopicSpec */
+/** @typedef {{ label: string, link?: string, collapsed?: boolean, items?: { autogenerate: { directory: string } }[] }} TopicItem */
+
+function pkgTopic(/** @type {PackageTopicSpec} */ { label, slug, sections = [] }, /** @type {string} */ version) {
+  /** @type {TopicItem[]} */ const items = [{ label: "Overview", link: `/v/${version}/${slug}/` }];
 
   for (const section of sections) {
     items.push({
@@ -163,7 +167,7 @@ const aiBestPracticesGroup = {
 // AI Recipes — hand-curated, grouped by task area. Each entry points to a
 // real page under v/latest/ai/recipes/<file>/. Labels mirror each page's
 // own sidebar label; order within a group is curated (easiest first).
-function recipe(label, name) {
+function recipe(/** @type {string} */ label, /** @type {string} */ name) {
   return { label, slug: `v/latest/ai/recipes/${name}` };
 }
 
@@ -271,7 +275,7 @@ const contextSections = fullSections.filter((s) => s.dir !== "recipes");
 // /v/latest/cache/<file>/ (see each page's `slug:` frontmatter), so groups
 // can mix pages from any physical folder without moving files. Order here IS
 // the order in the sidebar.
-function cacheItem(label, name) {
+function cacheItem(/** @type {string} */ label, /** @type {string} */ name) {
   const slug = name ? `v/latest/cache/${name}` : "v/latest/cache";
   return { label, slug };
 }
@@ -472,7 +476,7 @@ const topics = [
   },
 ];
 
-function buildTopics(version) {
+function buildTopics(/** @type {string} */ version) {
   // Hand-curated topics above retain their exact latest shape. Clone and
   // retarget every path only when building a frozen version's sidebar.
   const topicsForVersion =
@@ -482,7 +486,7 @@ function buildTopics(version) {
       ? topicsForVersion
       : JSON.parse(JSON.stringify(topicsForVersion).replaceAll("v/latest", `v/${version}`));
 
-  return versionedTopics.map((topic) => ({
+  return versionedTopics.map((/** @type {{ link: string, label: string, items: unknown[] }} */ topic) => ({
     ...topic,
     items:
       version === "latest" && topic.label === "Core"

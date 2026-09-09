@@ -19,8 +19,16 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { compareSemverAsc } from "./generate-changelog.mjs";
 
+/** @typedef {{ status: number, statusText: string, ok: boolean, json: () => Promise<unknown> }} RegistryResponse */
+/** @typedef {(input: string, init: RequestInit) => Promise<RegistryResponse>} RegistryFetch */
+
+/** @param {unknown} error */
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /** True when `version` parses as valid SemVer per the shared comparator. */
-function isValidSemver(version) {
+function isValidSemver(/** @type {string} */ version) {
   try {
     compareSemverAsc(version, version);
     return true;
@@ -47,7 +55,7 @@ export class FreshnessDataError extends Error {}
 export class FreshnessUnreachableError extends Error {}
 
 /** Parse `--changelog <path>` / `--changelog=<path>` out of argv. */
-export function parseArgs(argv) {
+export function parseArgs(/** @type {string[]} */ argv) {
   let changelogPath = null;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -62,18 +70,18 @@ export function parseArgs(argv) {
 }
 
 /** Resolve a `--changelog` CLI value (relative to CWD) or fall back to src/data/changelog.json. */
-export function resolveChangelogPath(changelogPath) {
+export function resolveChangelogPath(/** @type {string | null} */ changelogPath) {
   return changelogPath ? resolve(process.cwd(), changelogPath) : DEFAULT_CHANGELOG_PATH;
 }
 
 /** Read the local changelog.json and return its highest published (non-"Unreleased") SemVer version. */
-export async function getLocalNewestVersion(changelogPath) {
+export async function getLocalNewestVersion(/** @type {string} */ changelogPath) {
   let raw;
   try {
     raw = await readFile(changelogPath, "utf8");
   } catch (err) {
     throw new FreshnessDataError(
-      `local changelog not found or unreadable at ${changelogPath}: ${err.message}`,
+      `local changelog not found or unreadable at ${changelogPath}: ${errorMessage(err)}`,
     );
   }
 
@@ -82,7 +90,7 @@ export async function getLocalNewestVersion(changelogPath) {
     data = JSON.parse(raw);
   } catch (err) {
     throw new FreshnessDataError(
-      `local changelog at ${changelogPath} is not valid JSON: ${err.message}`,
+      `local changelog at ${changelogPath} is not valid JSON: ${errorMessage(err)}`,
     );
   }
 
@@ -117,7 +125,7 @@ export async function getLocalNewestVersion(changelogPath) {
 }
 
 /** Fetch the @warlock.js/core packument directly from the registry and return its highest valid SemVer version. */
-export async function getRegistryNewestVersion(fetchImpl = fetch) {
+export async function getRegistryNewestVersion(/** @type {RegistryFetch} */ fetchImpl = fetch) {
   let response;
   try {
     response = await fetchImpl(REGISTRY_URL, {
@@ -128,7 +136,7 @@ export async function getRegistryNewestVersion(fetchImpl = fetch) {
     });
   } catch (err) {
     throw new FreshnessUnreachableError(
-      `could not reach the npm registry at ${REGISTRY_URL}: ${err.message}`,
+      `could not reach the npm registry at ${REGISTRY_URL}: ${errorMessage(err)}`,
     );
   }
 
@@ -148,12 +156,13 @@ export async function getRegistryNewestVersion(fetchImpl = fetch) {
     packument = await response.json();
   } catch (err) {
     throw new FreshnessDataError(
-      `npm registry response for ${PACKAGE_NAME} is not valid JSON: ${err.message}`,
+      `npm registry response for ${PACKAGE_NAME} is not valid JSON: ${errorMessage(err)}`,
     );
   }
 
   const versions =
-    packument && typeof packument.versions === "object" && packument.versions !== null
+    packument && typeof packument === "object" && "versions" in packument &&
+      typeof packument.versions === "object" && packument.versions !== null
       ? Object.keys(packument.versions)
       : null;
   if (!versions || versions.length === 0) {
@@ -178,7 +187,7 @@ export async function getRegistryNewestVersion(fetchImpl = fetch) {
 }
 
 /** Pure comparison: is the local newest release behind the registry's newest published version? */
-export function evaluateFreshness(localVersion, registryVersion) {
+export function evaluateFreshness(/** @type {string} */ localVersion, /** @type {string} */ registryVersion) {
   const diff = compareSemverAsc(localVersion, registryVersion);
   if (diff < 0) {
     return {
@@ -197,7 +206,10 @@ export function evaluateFreshness(localVersion, registryVersion) {
 }
 
 /** Run the full gate: local newest vs. registry newest, honoring the unreachability escape hatch. */
-export async function main(argv = process.argv.slice(2), { fetchImpl = fetch } = {}) {
+export async function main(
+  /** @type {string[]} */ argv = process.argv.slice(2),
+  /** @type {{ fetchImpl?: RegistryFetch }} */ { fetchImpl = fetch } = {},
+) {
   const { changelogPath: changelogArg } = parseArgs(argv);
   const changelogPath = resolveChangelogPath(changelogArg);
 
@@ -210,13 +222,13 @@ export async function main(argv = process.argv.slice(2), { fetchImpl = fetch } =
     if (err instanceof FreshnessUnreachableError) {
       if (process.env[ALLOW_UNREACHABLE_ENV] === "1") {
         const message =
-          `WARNING: changelog freshness check could not reach the npm registry (${err.message}). ` +
+          `WARNING: changelog freshness check could not reach the npm registry (${errorMessage(err)}). ` +
           `Proceeding because ${ALLOW_UNREACHABLE_ENV}=1 is set — ${ALLOW_UNREACHABLE_NOTE}`;
         console.warn(message);
         return { status: "unreachable-allowed", message };
       }
       throw new Error(
-        `changelog freshness check could not reach the npm registry: ${err.message}. Set ` +
+        `changelog freshness check could not reach the npm registry: ${errorMessage(err)}. Set ` +
           `${ALLOW_UNREACHABLE_ENV}=1 to proceed anyway — ${ALLOW_UNREACHABLE_NOTE}`,
       );
     }
@@ -238,7 +250,7 @@ const isDirectExecution =
   process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isDirectExecution) {
   main().catch((err) => {
-    console.error("check-changelog-freshness failed:", err.message);
+    console.error("check-changelog-freshness failed:", errorMessage(err));
     // Let fetch/AbortSignal resources close naturally. An immediate process.exit()
     // can trip a libuv handle-closing assertion on Windows after a registry request.
     process.exitCode = 1;

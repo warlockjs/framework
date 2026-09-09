@@ -22,7 +22,12 @@ import {
 
 const ALLOW_UNREACHABLE_ENV = "WARLOCK_DOCS_ALLOW_REGISTRY_UNREACHABLE";
 
-async function withChangelogFixture(releases, fn) {
+/** @typedef {{ version?: unknown, [key: string]: unknown }} ReleaseFixture */
+
+async function withChangelogFixture(
+  /** @type {ReleaseFixture[] | undefined} */ releases,
+  /** @type {(path: string) => Promise<void>} */ fn,
+) {
   const dir = await mkdtemp(join(tmpdir(), "warlock-docs-changelog-"));
   const path = join(dir, "changelog.json");
   await writeFile(path, JSON.stringify({ releases }, null, 2), "utf8");
@@ -33,7 +38,7 @@ async function withChangelogFixture(releases, fn) {
   }
 }
 
-function jsonResponse(status, body) {
+function jsonResponse(/** @type {number} */ status, /** @type {unknown} */ body) {
   return {
     status,
     statusText: `status-${status}`,
@@ -193,19 +198,20 @@ test("getRegistryNewestVersion throws FreshnessDataError when no version key is 
 });
 
 test("getRegistryNewestVersion requests a bounded, non-redirecting, non-cached fetch", async () => {
-  let capturedUrl;
-  let capturedOptions;
-  const fetchImpl = async (url, options) => {
+  /** @type {string | undefined} */ let capturedUrl;
+  /** @type {RequestInit | undefined} */ let capturedOptions;
+  const fetchImpl = async (/** @type {string} */ url, /** @type {RequestInit} */ options) => {
     capturedUrl = url;
     capturedOptions = options;
     return jsonResponse(200, { versions: { "5.2.4": {} } });
   };
   await getRegistryNewestVersion(fetchImpl);
   assert.equal(capturedUrl, "https://registry.npmjs.org/@warlock.js%2Fcore");
+  assert.ok(capturedOptions);
   assert.equal(capturedOptions.cache, "no-store");
   assert.equal(capturedOptions.redirect, "manual");
   assert.ok(capturedOptions.signal instanceof AbortSignal);
-  assert.equal(capturedOptions.headers["Cache-Control"], "no-cache");
+  assert.deepEqual(capturedOptions.headers, { "Cache-Control": "no-cache", Accept: "application/json" });
 });
 
 test("getRegistryNewestVersion treats an opaque (manual) redirect response as a data error", async () => {
@@ -251,7 +257,8 @@ test("main() passes when local is current with the registry", async () => {
 test("main() throws naming both versions when local is stale", async () => {
   await withChangelogFixture([{ version: "5.2.3" }], async (path) => {
     const fetchImpl = async () => jsonResponse(200, { versions: { "5.2.3": {}, "5.2.4": {} } });
-    await assert.rejects(main(["--changelog", path], { fetchImpl }), (err) => {
+    await assert.rejects(main(["--changelog", path], { fetchImpl }), (/** @type {unknown} */ err) => {
+      assert.ok(err instanceof Error);
       assert.match(err.message, /5\.2\.3/);
       assert.match(err.message, /5\.2\.4/);
       return true;
@@ -265,7 +272,8 @@ test("main() throws on registry unreachability by default, naming the escape env
       throw new Error("ECONNRESET");
     };
     delete process.env[ALLOW_UNREACHABLE_ENV];
-    await assert.rejects(main(["--changelog", path], { fetchImpl }), (err) => {
+    await assert.rejects(main(["--changelog", path], { fetchImpl }), (/** @type {unknown} */ err) => {
+      assert.ok(err instanceof Error);
       assert.match(err.message, new RegExp(ALLOW_UNREACHABLE_ENV));
       return true;
     });
@@ -319,7 +327,8 @@ test("main() never honors the escape env var to bypass a measured stale version"
     const fetchImpl = async () => jsonResponse(200, { versions: { "5.2.3": {}, "5.2.4": {} } });
     process.env[ALLOW_UNREACHABLE_ENV] = "1";
     try {
-      await assert.rejects(main(["--changelog", path], { fetchImpl }), (err) => {
+      await assert.rejects(main(["--changelog", path], { fetchImpl }), (/** @type {unknown} */ err) => {
+        assert.ok(err instanceof Error);
         assert.match(err.message, /5\.2\.3/);
         assert.match(err.message, /5\.2\.4/);
         return true;

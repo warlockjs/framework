@@ -48,17 +48,30 @@ const TYPE_ORDER = [
   "Dependencies",
 ];
 
-function slugOf(name) {
+/** @typedef {{ title: string | null, items: string[] }} ChangeCategory */
+/** @typedef {{ version: string, date: string | null, categories: ChangeCategory[] }} ChangelogVersion */
+/** @typedef {{ publishedAt?: unknown, date?: string, summary?: string, featured?: string[], matrix?: unknown, matrixRows?: unknown }} ReleaseMeta */
+/** @typedef {Record<string, ReleaseMeta>} ReleaseMetaMap */
+/** @typedef {{ name: string, slug: string, byType: Map<string, string[]> }} PackageBucket */
+/** @typedef {{ date: string | null, pkgs: Map<string, PackageBucket>, present: { name: string, slug: string }[] }} VersionBucket */
+/** @typedef {{ workspaces?: string[] | { packages?: string[] } }} WorkspacePackage */
+
+/** @param {unknown} error */
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function slugOf(/** @type {string} */ name) {
   const i = name.lastIndexOf("/");
   return i === -1 ? name : name.slice(i + 1);
 }
 
-function escapeHtml(s) {
+function escapeHtml(/** @type {string} */ s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /** Minimal, controlled inline-markdown → HTML (inline code, links, bold). */
-function renderInline(md) {
+function renderInline(/** @type {string} */ md) {
   let s = escapeHtml(md.trim());
   s = s.replace(/`([^`]+)`/g, (_m, code) => `<code>${code}</code>`);
   s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, text, url) => `<a href="${url}">${text}</a>`);
@@ -66,7 +79,7 @@ function renderInline(md) {
   return s;
 }
 
-function parseVersionHeading(raw) {
+function parseVersionHeading(/** @type {string} */ raw) {
   let text = raw.trim();
   let version = text;
   let date = null;
@@ -80,11 +93,11 @@ function parseVersionHeading(raw) {
 }
 
 /** Parse one CHANGELOG.md into ordered version blocks. */
-function parseChangelog(md) {
+function parseChangelog(/** @type {string} */ md) {
   const lines = md.split(/\r?\n/);
-  const versions = [];
-  let cur = null;
-  let curCat = null;
+  /** @type {ChangelogVersion[]} */ const versions = [];
+  /** @type {ChangelogVersion | null} */ let cur = null;
+  /** @type {ChangeCategory | null} */ let curCat = null;
   let inItem = false;
 
   for (const line of lines) {
@@ -137,7 +150,7 @@ const SEMVER_RE =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
 
 /** Parse a SemVer string, throwing a clear error on anything malformed. */
-function parseSemver(version) {
+function parseSemver(/** @type {string} */ version) {
   const m = typeof version === "string" ? SEMVER_RE.exec(version) : null;
   if (!m) {
     throw new Error(`Invalid SemVer version: ${JSON.stringify(version)}`);
@@ -151,19 +164,19 @@ function parseSemver(version) {
 // numbers can't lose precision: same-length decimal strings compare in the
 // same order numerically as they do lexically, so length is the only thing
 // that has to be checked first.
-function compareNumericCore(a, b) {
+function compareNumericCore(/** @type {string} */ a, /** @type {string} */ b) {
   if (a.length !== b.length) return a.length - b.length;
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-function isNumericIdentifier(id) {
+function isNumericIdentifier(/** @type {string} */ id) {
   return /^\d+$/.test(id);
 }
 
 // Per the SemVer spec: numeric identifiers compare numerically; identifiers
 // with letters/hyphens compare by ASCII order; numeric identifiers always
 // sort below alphanumeric ones.
-function compareIdentifier(x, y) {
+function compareIdentifier(/** @type {string} */ x, /** @type {string} */ y) {
   const xNum = isNumericIdentifier(x);
   const yNum = isNumericIdentifier(y);
   if (xNum && yNum) return compareNumericCore(x, y);
@@ -173,7 +186,7 @@ function compareIdentifier(x, y) {
 
 // A release outranks its own prerelease; when both have a prerelease, compare
 // dot-separated identifiers left to right, and a shorter equal-prefix loses.
-function comparePrerelease(a, b) {
+function comparePrerelease(/** @type {string | undefined} */ a, /** @type {string | undefined} */ b) {
   if (a === undefined && b === undefined) return 0;
   if (a === undefined) return 1;
   if (b === undefined) return -1;
@@ -189,7 +202,7 @@ function comparePrerelease(a, b) {
 }
 
 /** Ascending SemVer 2.0.0 precedence comparator; build metadata is ignored. */
-export function compareSemverAsc(a, b) {
+export function compareSemverAsc(/** @type {string} */ a, /** @type {string} */ b) {
   const pa = parseSemver(a);
   const pb = parseSemver(b);
   return (
@@ -200,7 +213,7 @@ export function compareSemverAsc(a, b) {
   );
 }
 
-export function cmpVersionDesc(a, b) {
+export function cmpVersionDesc(/** @type {string} */ a, /** @type {string} */ b) {
   return -compareSemverAsc(a, b);
 }
 
@@ -220,37 +233,38 @@ const releaseDateFormatter = new Intl.DateTimeFormat("en-US", {
  * renders as-is would be a claim nobody checked. `null` renders as "not
  * recorded", which is the true statement in both cases.
  */
-function normaliseMatrixScope(value) {
+function normaliseMatrixScope(/** @type {unknown} */ value) {
   return value === "full" || value === "subset" || value === "none" ? value : null;
 }
 
-function formatPublishedAt(publishedAt) {
+function formatPublishedAt(/** @type {unknown} */ publishedAt) {
   if (typeof publishedAt !== "string" || !publishedAt.trim()) return null;
   const date = new Date(publishedAt);
   return Number.isNaN(date.getTime()) ? null : releaseDateFormatter.format(date);
 }
 
-function versionId(v) {
+function versionId(/** @type {string} */ v) {
   if (/unreleased/i.test(v)) return "unreleased";
   return "v" + v.replace(/[^\w.]/g, "").replace(/\./g, "-");
 }
 
 async function loadReleaseMeta() {
-  if (!existsSync(RELEASES_META)) return {};
+  /** @type {ReleaseMetaMap} */ const out = {};
+  if (!existsSync(RELEASES_META)) return out;
   try {
-    const raw = JSON.parse(await readFile(RELEASES_META, "utf8"));
-    const out = {};
+    /** @type {unknown} */ const raw = JSON.parse(await readFile(RELEASES_META, "utf8"));
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
     for (const [version, meta] of Object.entries(raw)) {
-      if (!version.startsWith("_")) out[version] = meta;
+      if (!version.startsWith("_") && meta && typeof meta === "object" && !Array.isArray(meta)) out[version] = meta;
     }
     return out;
   } catch (err) {
-    console.warn("releases.json could not be parsed — continuing without it:", err.message);
-    return {};
+    console.warn("releases.json could not be parsed — continuing without it:", errorMessage(err));
+    return out;
   }
 }
 
-async function loadWorkspaceEntries(rootPkg) {
+async function loadWorkspaceEntries(/** @type {WorkspacePackage} */ rootPkg) {
   const packageJsonEntries = Array.isArray(rootPkg.workspaces)
     ? rootPkg.workspaces
     : rootPkg.workspaces?.packages;
@@ -258,7 +272,7 @@ async function loadWorkspaceEntries(rootPkg) {
   if (!existsSync(PNPM_WORKSPACE)) return [];
 
   const yaml = await readFile(PNPM_WORKSPACE, "utf8");
-  const entries = [];
+  /** @type {string[]} */ const entries = [];
   let inPackages = false;
   for (const line of yaml.split(/\r?\n/)) {
     if (/^packages:\s*$/.test(line)) {
@@ -288,23 +302,25 @@ async function main() {
     return;
   }
 
-  const rootPkg = JSON.parse(await readFile(rootPkgPath, "utf8"));
+  /** @type {WorkspacePackage} */ const rootPkg = JSON.parse(await readFile(rootPkgPath, "utf8"));
   const entries = await loadWorkspaceEntries(rootPkg);
   const meta = await loadReleaseMeta();
 
   // version -> { date, typed: Map<type, [{package,slug,html}]>, present: [{name,slug}] }
-  const byVersion = new Map();
-  const seenPackages = new Map();
-  const scanned = [];
+  /** @type {Map<string, VersionBucket>} */ const byVersion = new Map();
+  /** @type {Map<string, string>} */ const seenPackages = new Map();
+  /** @type {string[]} */ const scanned = [];
 
   // Each version bucket groups changes BY PACKAGE: pkgs is a Map<slug, {name,
   // slug, byType: Map<type, html[]>}>. order preserves first-seen package order
   // for stable output.
-  const bucketFor = (version) => {
+  const bucketFor = (/** @type {string} */ version) => {
     if (!byVersion.has(version)) {
       byVersion.set(version, { date: null, pkgs: new Map(), present: [] });
     }
-    return byVersion.get(version);
+    const bucket = byVersion.get(version);
+    if (!bucket) throw new Error(`Could not create changelog bucket for ${version}`);
+    return bucket;
   };
 
   for (const entry of entries) {
@@ -312,7 +328,7 @@ async function main() {
     const pkgPath = resolve(dir, "package.json");
     if (!existsSync(pkgPath)) continue;
 
-    const pkg = JSON.parse(await readFile(pkgPath, "utf8"));
+    /** @type {{ private?: boolean, name?: string }} */ const pkg = JSON.parse(await readFile(pkgPath, "utf8"));
     if (pkg.private || !pkg.name) continue;
 
     const clPath = resolve(dir, "CHANGELOG.md");
@@ -339,9 +355,11 @@ async function main() {
         if (!bucket.pkgs.has(slug)) {
           bucket.pkgs.set(slug, { name: pkg.name, slug, byType: new Map() });
         }
-        const byType = bucket.pkgs.get(slug).byType;
+        const byType = bucket.pkgs.get(slug)?.byType;
+        if (!byType) continue;
         if (!byType.has(cat.title)) byType.set(cat.title, []);
         const arr = byType.get(cat.title);
+        if (!arr) continue;
         for (const item of cat.items) arr.push(renderInline(item));
       }
     }
@@ -365,10 +383,11 @@ async function main() {
     .filter((v) => !latestPublishedVersion || cmpVersionDesc(v, latestPublishedVersion) >= 0)
     .sort(cmpVersionDesc);
 
-  const shownSlugs = new Set();
+  /** @type {Set<string>} */ const shownSlugs = new Set();
 
   const releases = versionKeys.map((version) => {
     const bucket = byVersion.get(version);
+    if (!bucket) throw new Error(`Missing changelog bucket for ${version}`);
     const m = meta[version] || {};
     const date = formatPublishedAt(m.publishedAt) || m.date || bucket.date || null;
     const summaryHtml = m.summary ? renderInline(m.summary) : null;
@@ -376,8 +395,8 @@ async function main() {
     // Group BY PACKAGE: one block per package, with per-type counts + a
     // type-tagged item list (ordered by TYPE_ORDER within the package).
     const pkgBlocks = [...bucket.pkgs.values()].map((p) => {
-      const counts = [];
-      const items = [];
+      /** @type {{ type: string, n: number }[]} */ const counts = [];
+      /** @type {{ type: string, html: string }[]} */ const items = [];
       for (const type of TYPE_ORDER) {
         const arr = p.byType.get(type);
         if (!arr || !arr.length) continue;
@@ -391,7 +410,7 @@ async function main() {
     // Featured packages (per-release `featured` in releases.json) float to the
     // top in the listed order; the rest follow most-changed-first, then alpha.
     const featured = Array.isArray(m.featured) ? m.featured : [];
-    const featuredRank = (name) => {
+    const featuredRank = (/** @type {string} */ name) => {
       const i = featured.indexOf(name);
       return i === -1 ? Number.MAX_SAFE_INTEGER : i;
     };
