@@ -266,7 +266,7 @@ export class FilesOrchestrator {
   }
 
   public async watchFiles() {
-    devLogSuccess("watching for file changes");
+    devLogSuccess("watching for file changes (not serving yet)");
 
     this.filesWatcher.onFileChange((p) => this.eventHandler.handleFileChange(p));
     this.filesWatcher.onFileAdd((p) => this.eventHandler.handleFileAdd(p));

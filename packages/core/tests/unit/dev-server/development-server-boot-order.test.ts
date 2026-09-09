@@ -14,6 +14,7 @@ const loadAll = vi.hoisted(() => vi.fn(async () => undefined));
 const startPhase = vi.hoisted(() => vi.fn(async () => undefined));
 const runStartupValidators = vi.hoisted(() => vi.fn(async () => undefined));
 const markBooted = vi.hoisted(() => vi.fn());
+const printReadyBlock = vi.hoisted(() => vi.fn());
 
 vi.mock("@mongez/events", () => ({ default: { on: vi.fn(), emit: vi.fn() } }));
 
@@ -46,9 +47,12 @@ vi.mock("../../../src/dev-server/dev-logger", () => ({
   devLogInfo: vi.fn(),
   devLogReady: vi.fn(),
   devLogSection: vi.fn(),
+  devLogSuccess: vi.fn(),
   devLogWarn: vi.fn(),
   devServeLog: vi.fn(),
 }));
+
+vi.mock("../../../src/dev-server/ready-block", () => ({ printReadyBlock }));
 
 vi.mock("../../../src/dev-server/files-orchestrator", () => ({
   filesOrchestrator: {
@@ -110,6 +114,21 @@ describe("DevelopmentServer.start() — D7 boot-order wiring", () => {
 
     expect(loadAllOrder).toBeLessThan(validatorsOrder);
     expect(validatorsOrder).toBeLessThan(lateOrder);
+  });
+
+  it("does not emit the ready block until the late phase has completed its bind", async () => {
+    startPhase.mockImplementationOnce(async () => {
+      expect(printReadyBlock).not.toHaveBeenCalled();
+    });
+
+    const server = new DevelopmentServer({ generateTypings: false, healthCheckers: false });
+
+    await server.start();
+
+    expect(printReadyBlock).toHaveBeenCalledOnce();
+    expect(startPhase.mock.invocationCallOrder[0]).toBeLessThan(
+      printReadyBlock.mock.invocationCallOrder[0],
+    );
   });
 
   it("a rejecting validator stops the late connector phase from ever starting and propagates out of start()", async () => {
