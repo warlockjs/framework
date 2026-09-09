@@ -11,7 +11,7 @@ const DEFAULT_PATTERN = "./migrations/**/*.{ts,js,mjs,cjs}";
  * `_migration` suffix.
  */
 function inferNameFromFile(file: string): string {
-  const basename = path.basename(file).split(".")[0];
+  const basename = path.basename(file).split(".")[0] ?? "";
 
   return basename.replace(/-migration$/, "").replace(/_migration$/, "");
 }

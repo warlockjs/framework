@@ -269,6 +269,9 @@ export class MongoMigrationDriver implements MigrationDriverContract {
     const indexSpec: IndexDescription["key"] = {};
     for (let i = 0; i < index.columns.length; i++) {
       const column = index.columns[i];
+      if (column === undefined) {
+        continue;
+      }
       const direction = index.directions?.[i] === "desc" ? -1 : 1;
       indexSpec[column] = direction;
     }

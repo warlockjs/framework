@@ -165,12 +165,23 @@ export class QueryBuilder<T = unknown> {
    */
   public getOps(...types: string[]): Op[] {
     if (types.length === 1) {
-      return (this.opIndex.get(types[0]) ?? []).map((i) => this.operations[i]);
+      const type = types[0];
+      if (type === undefined) {
+        return [];
+      }
+
+      return (this.opIndex.get(type) ?? []).flatMap((index) => {
+        const operation = this.operations[index];
+        return operation === undefined ? [] : [operation];
+      });
     }
     const result: Array<{ idx: number; op: Op }> = [];
     for (const type of types) {
       for (const idx of this.opIndex.get(type) ?? []) {
-        result.push({ idx, op: this.operations[idx] });
+        const operation = this.operations[idx];
+        if (operation !== undefined) {
+          result.push({ idx, op: operation });
+        }
       }
     }
     return result.sort((a, b) => a.idx - b.idx).map((r) => r.op);
@@ -185,7 +196,12 @@ export class QueryBuilder<T = unknown> {
   public rebuildIndex(): void {
     this.opIndex = new Map();
     for (let i = 0; i < this.operations.length; i++) {
-      const type = this.operations[i].type;
+      const operation = this.operations[i];
+      if (operation === undefined) {
+        continue;
+      }
+
+      const type = operation.type;
       const list = this.opIndex.get(type);
       if (list) {
         list.push(i);
@@ -1064,7 +1080,14 @@ export class QueryBuilder<T = unknown> {
       return { relation: trimmed, alias: `${trimmed}Count` };
     }
 
-    return { relation: match[1].trim(), alias: match[2].trim() };
+    const relation = match[1];
+    const alias = match[2];
+
+    if (relation === undefined || alias === undefined) {
+      return { relation: trimmed, alias: `${trimmed}Count` };
+    }
+
+    return { relation: relation.trim(), alias: alias.trim() };
   }
 
   /**
@@ -1230,7 +1253,7 @@ export class QueryBuilder<T = unknown> {
   /** JSON path extraction as a projected field. */
   public selectJson(path: string, alias?: string): this {
     const parts = path.split("->");
-    const column = parts[0];
+    const column = parts[0] ?? "";
     const jsonPath = parts.slice(1).join("->");
     const expr = jsonPath ? `${column}->>'${jsonPath}'` : column;
     return alias ? this.selectAs(expr, alias) : this.selectRaw(expr);

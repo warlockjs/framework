@@ -22,7 +22,11 @@ export function isValidDateValue(value: unknown): boolean {
 
   // 🔥 Critical step: prevent JS auto-correction
   // Example: "2023-02-31" → March 3 (WRONG but "valid")
-  const [y, m, d] = value.split("T")[0].split("-").map(Number);
+  const datePart = value.split("T")[0];
+  if (datePart === undefined) return false;
+
+  const [y, m, d] = datePart.split("-").map(Number);
+  if (y === undefined || m === undefined || d === undefined) return false;
 
   return date.getUTCFullYear() === y && date.getUTCMonth() + 1 === m && date.getUTCDate() === d;
 }

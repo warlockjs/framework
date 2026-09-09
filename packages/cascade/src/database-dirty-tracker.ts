@@ -399,7 +399,12 @@ export class DatabaseDirtyTracker {
         return;
       }
 
-      container = this.resolveSegment(container, segments[index]);
+      const segment = segments[index];
+      if (segment === undefined) {
+        return;
+      }
+
+      container = this.resolveSegment(container, segment);
     }
 
     if (container === undefined || container === null) {
@@ -407,6 +412,9 @@ export class DatabaseDirtyTracker {
     }
 
     const lastSegment = segments[segments.length - 1];
+    if (lastSegment === undefined) {
+      return;
+    }
     if (Array.isArray(container)) {
       const numericIndex = Number(lastSegment);
       if (!Number.isNaN(numericIndex)) {
