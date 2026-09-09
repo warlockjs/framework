@@ -41,7 +41,7 @@
     },
     "doctor": {
       "source": "framework",
-      "description": "Run read-only health checks (routes, config, connectors, optional peers, health endpoints, release hygiene) and print a pass/warn/fail report"
+      "description": "Boot the app read-only (no connections, no port) and report on its routes, config, connectors, drivers and health endpoints"
     },
     "routes": {
       "source": "framework",
@@ -516,6 +516,10 @@
           "alias": "c"
         }
       ]
+    },
+    "routes:diff": {
+      "source": "framework",
+      "description": "Compare live page routes with the last successful production build"
     }
   }
 }
