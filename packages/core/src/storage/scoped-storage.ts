@@ -238,6 +238,11 @@ export class ScopedStorage implements ScopedStorageContract {
     }
 
     const [, mimeType, base64Data] = matches;
+
+    if (mimeType === undefined || base64Data === undefined) {
+      throw new Error("Invalid base64 data URL format. Expected: data:mime/type;base64,<data>");
+    }
+
     const buffer = Buffer.from(base64Data, "base64");
 
     return this.put(buffer, location, {

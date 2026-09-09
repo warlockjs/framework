@@ -22,7 +22,16 @@ type ParsedVersion = {
 function parseVersion(version: string): ParsedVersion | undefined {
   const cleaned = version.trim().replace(/^v/i, "");
   const [coreAndPrerelease] = cleaned.split("+"); // drop build metadata
+
+  if (!coreAndPrerelease) {
+    return undefined;
+  }
+
   const [core, ...prereleaseParts] = coreAndPrerelease.split("-");
+
+  if (!core) {
+    return undefined;
+  }
   const segments = core.split(".");
 
   if (segments.length !== 3) {
@@ -37,8 +46,14 @@ function parseVersion(version: string): ParsedVersion | undefined {
 
   const prerelease = prereleaseParts.length > 0 ? prereleaseParts.join("-").split(".") : [];
 
+  const [major, minor, patch] = numbers;
+
+  if (major === undefined || minor === undefined || patch === undefined) {
+    return undefined;
+  }
+
   return {
-    core: [numbers[0], numbers[1], numbers[2]],
+    core: [major, minor, patch],
     prerelease,
   };
 }

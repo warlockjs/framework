@@ -66,6 +66,12 @@ export class ConfigLoader {
       throw new Error(`Invalid config file path: ${relativePath}`);
     }
 
-    return match[1];
+    const configName = match[1];
+
+    if (!configName) {
+      throw new Error(`Invalid config file path: ${relativePath}`);
+    }
+
+    return configName;
   }
 }

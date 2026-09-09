@@ -98,6 +98,10 @@ export function decrypt(cipherText: string): string {
 
     const [ivHex, encryptedHex, authTagHex] = parts;
 
+    if (ivHex === undefined || encryptedHex === undefined || authTagHex === undefined) {
+      throw new Error("Invalid encrypted format. Expected iv:ciphertext:authTag");
+    }
+
     const decipher = crypto.createDecipheriv(algorithm, keyBuffer, Buffer.from(ivHex, "hex"));
 
     (decipher as crypto.DecipherGCM).setAuthTag(Buffer.from(authTagHex, "hex"));

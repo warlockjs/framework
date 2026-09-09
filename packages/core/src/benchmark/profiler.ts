@@ -94,9 +94,11 @@ export class BenchmarkProfiler {
     const latencies = [...entry.latencies].sort((a, b) => a - b);
     const count = latencies.length;
 
+    if (count === 0) return undefined;
+
     const getP = (percentile: number) => {
       const index = Math.min(count - 1, Math.floor(count * percentile));
-      return latencies[index];
+      return latencies[index] ?? 0;
     };
 
     return {
@@ -105,8 +107,8 @@ export class BenchmarkProfiler {
       p95: getP(0.95),
       p99: getP(0.99),
       avg: Math.round((entry.sum / count) * 100) / 100,
-      min: latencies[0],
-      max: latencies[count - 1],
+      min: latencies[0] ?? 0,
+      max: latencies[count - 1] ?? 0,
       count: entry.total,
       errors: entry.errors,
       errorRate: Math.round((entry.errors / entry.total) * 100) / 100,

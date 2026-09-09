@@ -72,7 +72,7 @@ export class RouteRegistry {
     url: string,
   ): { route: Route; params: Record<string, string> } | null {
     // Strip query string from URL (find-my-way expects just the path)
-    const path = normalizeRequestPath(url.split("?")[0]);
+    const path = normalizeRequestPath(url.split("?")[0] ?? "/");
 
     const match = this.router.find(method as HTTPMethod, path);
 

@@ -46,6 +46,11 @@ export function ipMatches(ip: string, pattern: string): boolean {
   }
 
   const [base, bitsRaw] = pattern.split("/");
+
+  if (base === undefined || bitsRaw === undefined) {
+    return false;
+  }
+
   const bits = Number(bitsRaw);
 
   if (!Number.isInteger(bits) || bits < 0 || bits > 32) {

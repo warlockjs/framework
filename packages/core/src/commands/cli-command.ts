@@ -186,14 +186,23 @@ export class CLICommand {
 
     let name = "";
     let alias = "";
+    const firstPart = parts[0];
+
+    if (!firstPart) {
+      throw new Error("Command option text cannot be empty");
+    }
 
     if (parts.length === 1) {
       // Single option: "--port" or "-p"
-      name = this.extractOptionName(parts[0]);
+      name = this.extractOptionName(firstPart);
     } else if (parts.length === 2) {
       // Two options: "--port, -p" or "-p, --port"
-      const first = parts[0];
+      const first = firstPart;
       const second = parts[1];
+
+      if (!second) {
+        throw new Error("Command option alias cannot be empty");
+      }
 
       // Determine which is the long form (name) and which is short (alias)
       if (first.startsWith("--")) {

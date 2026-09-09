@@ -163,7 +163,11 @@ function readParameterList(handler: Function): string[] | undefined {
   // A single parameter needs no parentheses: `ctx => …`, `async ctx => …`.
   const bareArrow = source.match(/^\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*=>/);
 
-  if (bareArrow) return [bareArrow[1]];
+  if (bareArrow) {
+    const parameter = bareArrow[1];
+
+    return parameter === undefined ? undefined : [parameter];
+  }
 
   const openIndex = source.indexOf("(");
 
@@ -220,7 +224,9 @@ export function looksLikePositionalHandler(handler: unknown): boolean {
   const parameters = readParameterList(handler);
 
   if (parameters) {
-    return parameters.length >= 2 && !isDestructured(parameters[0]);
+    const firstParameter = parameters[0];
+
+    return parameters.length >= 2 && firstParameter !== undefined && !isDestructured(firstParameter);
   }
 
   return handler.length >= 2;
@@ -277,7 +283,9 @@ export function listPositionalHandlerSuspects(): readonly PositionalHandlerSuspe
  */
 export function forgetPositionalHandlerSuspects(sourceFile: string) {
   for (let index = suspects.length - 1; index >= 0; index--) {
-    if (suspects[index].sourceFile === sourceFile) {
+    const suspect = suspects[index];
+
+    if (suspect?.sourceFile === sourceFile) {
       suspects.splice(index, 1);
     }
   }

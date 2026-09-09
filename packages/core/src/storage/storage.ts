@@ -581,8 +581,13 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
     if (base64.startsWith("data:")) {
       const match = base64.match(/^data:([^;]+);base64,(.+)$/);
       if (match) {
-        mimeType = mimeType || match[1];
-        data = match[2];
+        const matchedMimeType = match[1];
+        const matchedData = match[2];
+
+        if (matchedMimeType !== undefined && matchedData !== undefined) {
+          mimeType = mimeType || matchedMimeType;
+          data = matchedData;
+        }
       }
     }
 

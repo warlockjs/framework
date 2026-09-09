@@ -68,7 +68,7 @@ export function maintenanceMiddleware(options: MaintenanceOptions = {}): Middlew
     // `request.path` includes the query string, but allowlist entries are
     // path-only ("/webhooks/stripe"), so strip the query before matching —
     // otherwise "/webhooks/stripe?sig=..." never matches its exact entry.
-    const pathname = request.path.split("?")[0];
+    const pathname = request.path.split("?")[0] ?? "/";
 
     if (isAllowlisted(pathname, allowlist)) return;
 
