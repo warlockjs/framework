@@ -55,7 +55,23 @@ const WARLOCK_BIN = path.join(CORE_ROOT, "bin", "warlock.js");
  * defect held the process open for 67 MINUTES with zero CPU, so any sane
  * bound below that distinguishes "works" from "the bug is back".
  */
-const CHILD_TIMEOUT_MS = 30_000;
+const CHILD_TIMEOUT_MS = 180_000;
+
+/*
+ * Why 180s and not 30s: MEASURED on 2026-09-11, on an idle machine, this exact
+ * spawn prints nothing for ~10s (cold compile of `src/cli/start.ts`'s graph),
+ * then completes in 10-50ms and exits 0 — twice: firstOutput 9919ms/10406ms,
+ * exit 10003ms/10587ms. The old 30s bound was ~3x a cost that is CPU-BOUND and
+ * runs while this file's own suite saturates every core, so a full-suite run
+ * timed out with EMPTY stdout — the child never reached its first byte. That
+ * reads as "the process did not exit" and is indistinguishable, at the
+ * assertion, from the defect above.
+ *
+ * Raising it does not weaken the guard: the defect held the process open for
+ * 67 MINUTES at zero CPU, so 180s separates "slow cold boot under load" from
+ * "the handle is back" just as well as 30s did — and unlike 30s, it does not
+ * fire on the innocent case. Card 7d27d05d.
+ */
 
 let fixtureDir: string;
 
