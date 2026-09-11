@@ -202,6 +202,13 @@ export class MongoQueryParser {
   ): void {
     if (stage === "$group") {
       const op = operations[0];
+
+      // A `$group` stage with no operations has nothing to track. Returning is
+      // the same outcome the `if` chain below already produces for an
+      // unrecognised type — stated explicitly so the reads that follow are not
+      // guesses about whether the array can be empty.
+      if (op === undefined) return;
+
       if (op.type === "groupByWithAggregates" && op.data.fields) {
         const fieldNames = this.extractGroupFieldNames(op.data.fields);
         if (fieldNames) {
@@ -334,7 +341,10 @@ export class MongoQueryParser {
     output += "═".repeat(50) + "\n";
 
     pipeline.forEach((stage, index) => {
-      const stageName = Object.keys(stage)[0];
+      // Debug formatting only. A stage object with no keys is malformed rather
+      // than impossible, and printing "<empty stage>" beats throwing out of a
+      // function whose entire job is to help someone read a pipeline.
+      const stageName = Object.keys(stage)[0] ?? "<empty stage>";
       const stageData = stage[stageName];
 
       if (index > 0) {
@@ -419,14 +429,28 @@ export class MongoQueryParser {
         return this.buildGroupStage(operations);
       case "$lookup":
         return this.buildLookupStage(operations);
-      case "$limit":
-        return { $limit: operations[0].data.value };
-      case "$skip":
-        return { $skip: operations[0].data.value };
-      case "$setWindowFields":
-        return {
-          $setWindowFields: operations[0].data.spec,
-        };
+      // These three read operations[0] directly. `?? null` rather than an
+      // assertion because this function is documented to return "the built
+      // pipeline stage or null if no stage should be added", and no operations
+      // IS no stage — the same answer `default` gives. Asserting instead would
+      // turn an empty group into `{ $limit: undefined }`, and a $limit stage
+      // with an undefined value is a query Mongo rejects at execution time,
+      // far from the code that built it.
+      case "$limit": {
+        const [first] = operations;
+
+        return first === undefined ? null : { $limit: first.data.value };
+      }
+      case "$skip": {
+        const [first] = operations;
+
+        return first === undefined ? null : { $skip: first.data.value };
+      }
+      case "$setWindowFields": {
+        const [first] = operations;
+
+        return first === undefined ? null : { $setWindowFields: first.data.spec };
+      }
       default:
         return null;
     }
@@ -1392,7 +1416,13 @@ export class MongoQueryParser {
   private inferJsonAlias(path: string): string {
     const normalized = this.normalizePath(path);
     const segments = normalized.split(".");
-    return segments[segments.length - 1];
+
+    // `String.split` never returns an empty array — the empty string yields
+    // [""] — so the last element always exists. Falling back to `normalized`
+    // rather than asserting keeps the alias a real string in every case,
+    // including the one the compiler is worried about, and an alias is a NAME:
+    // `undefined` reaching here would produce a projection key of "undefined".
+    return segments[segments.length - 1] ?? normalized;
   }
 
   private buildConcatExpression(values: Array<string | RawExpression>): any {
@@ -1569,6 +1599,12 @@ export class MongoQueryParser {
    */
   private buildGroupStage(operations: Operation[]): any {
     const op = operations[0];
+
+    // Documented to return "the $group stage or null", and no operations means
+    // no stage. Every `case` below reads off `op`, so without this the empty
+    // array would throw a TypeError out of query construction rather than
+    // producing the null the caller already handles.
+    if (op === undefined) return null;
 
     switch (op.type) {
       case "groupBy": {
@@ -1904,6 +1940,14 @@ export class MongoQueryParser {
    */
   private buildLookupStage(operations: Operation[]): any {
     const op = operations[0];
+
+    // Documented "or null", and no join operations means no $lookup — the
+    // same shape as buildGroupStage above. Without this an empty group built
+    // a $lookup whose `from`, `localField` and `foreignField` were all
+    // undefined, which Mongo rejects at execution time with an error that
+    // points at the query rather than at the code that assembled it.
+    if (op === undefined) return null;
+
     const options = op.data;
 
     return {
