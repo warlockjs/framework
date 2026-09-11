@@ -1,4 +1,14 @@
 {
+  // Inherits the workspace strictness contract (`strict`,
+  // `noUncheckedIndexedAccess`, `forceConsistentCasingInFileNames`).
+  //
+  // Workspace packages are consumed as TypeScript SOURCE through the `exports`
+  // map (canon `0a3227cc`), so this package's own `tsc -p` compiles its whole
+  // dependency closure. Adoption was blocked until ai-openai and cache were
+  // clean at source; neither needed a change here.
+  //
+  // A package may ADD to this contract. It must never subtract.
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2020",
     // Raised from the ES2020 default because the shared source in sibling packages
