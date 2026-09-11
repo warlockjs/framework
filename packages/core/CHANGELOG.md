@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.7.0
+
+### Security
+
+- **The SSRF guard now fails closed on an address it cannot classify.** An unclassifiable IP was previously treated as public, so an outbound request could reach an internal address the guard exists to block.
+
+### Fixed
+
+- **The dev server no longer says it is watching for changes before it is serving.** On a slow boot that line could arrive minutes before the port was bound.
+- The dev-server error formatter can no longer throw while formatting an error, which replaced the developer's real error with its own crash.
+- `warlock add` with an unknown feature now names it, instead of dying with `Cannot read properties of undefined`.
+- Bracket-notation request bodies (`items[0][name]`) no longer silently drop values.
+- `warlock routes` and the circular-import report degrade to unaligned output instead of throwing on an unexpected shape.
+
+### Changed
+
+- Internal type-safety hardening across the CLI, dev server and request handling; no other behaviour change.
+
 ## 5.6.0 - 2026-09-08
 ### Fixed
 
