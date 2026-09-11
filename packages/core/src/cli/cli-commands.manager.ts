@@ -141,7 +141,11 @@ export class CLICommandsManager {
     this.commands.push(...commands);
 
     commands.forEach((command) => {
-      const commandKey = command.name.split(" ")[0];
+      // `split` always yields a first element, so this holds. Falling back to
+      // the whole name rather than asserting keeps the map keyed by a REAL
+      // command name — a key of `undefined` would register the command under
+      // the literal string "undefined" and make it unreachable by its own name.
+      const commandKey = command.name.split(" ")[0] ?? command.name;
 
       manifestManager.addCommandToList(command.name, {
         relativePath: command.commandRelativePath,
@@ -198,12 +202,20 @@ export class CLICommandsManager {
 
     // Also include cached commands from manifest
     const manifestCommands = manifestManager.commandsJson?.commands || {};
-    for (const name of Object.keys(manifestCommands)) {
-      const baseName = name.split(" ")[0];
+    // `Object.entries` rather than keys + index: the index read is
+    // `T | undefined` under the strictness contract even for a key that came
+    // from the object itself, and these names feed the CLI's "did you mean?"
+    // suggestions — a literal "undefined" in that list is a suggestion no
+    // operator can act on.
+    for (const [name, meta] of Object.entries(manifestCommands)) {
+      const baseName = name.split(" ")[0] ?? name;
+
       if (!names.includes(baseName)) {
         names.push(baseName);
       }
-      const alias = manifestCommands[name].alias;
+
+      const alias = meta?.alias;
+
       if (alias && !names.includes(alias)) {
         names.push(alias);
       }
@@ -455,8 +467,10 @@ export class CLICommandsManager {
 
     if (jsonCommandsFile) {
       // Check by name or alias
-      for (const fullCommandName in jsonCommandsFile.commands) {
-        const cmdMeta = jsonCommandsFile.commands[fullCommandName];
+      // `Object.entries` hands the metadata over already narrowed; a `for...in`
+      // index read is `T | undefined` and every field below is read off it.
+      for (const [fullCommandName, cmdMeta] of Object.entries(jsonCommandsFile.commands)) {
+        if (cmdMeta === undefined) continue;
 
         // Match by name or alias
         if (isMatchingCommandName(fullCommandName, name) || cmdMeta.alias === name) {
@@ -531,7 +545,17 @@ export class CLICommandsManager {
         result[opt.alias] !== undefined &&
         result[opt.name] === undefined
       ) {
-        result[opt.name] = result[opt.alias];
+        // The `!== undefined` guard on the line above already proves this read
+        // is defined, but the compiler does not carry a guard on one index
+        // expression to a second, textually identical one. Reading it into a
+        // local makes the narrowing survive, WITHOUT weakening the check — an
+        // `?? ` fallback here would resurrect exactly the bug the comment above
+        // describes, turning an explicit `-r=false` into a default.
+        const aliasValue = result[opt.alias];
+
+        if (aliasValue !== undefined) {
+          result[opt.name] = aliasValue;
+        }
       }
     });
 

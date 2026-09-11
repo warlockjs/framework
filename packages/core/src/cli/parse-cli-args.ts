@@ -126,6 +126,14 @@ export function parseCliArgs(argv: string[], schema: CliOptionSchema[] = []): Pa
   for (let i = startIndex; i < argv.length; i++) {
     const arg = argv[i];
 
+    // `i < argv.length` bounds this, but the compiler does not narrow an index
+    // read from a loop condition. Skipping rather than coercing: this file
+    // already refuses to guess about an operator's input (see
+    // `CliOptionValueError` above), and an `?? ""` here would silently push an
+    // empty POSITIONAL onto `args` — which for a command that takes a file or
+    // a table name is a scope the operator never typed.
+    if (arg === undefined) continue;
+
     if (arg.startsWith("--")) {
       // Long option: --key or --key=value
       const withoutDashes = arg.slice(2);
