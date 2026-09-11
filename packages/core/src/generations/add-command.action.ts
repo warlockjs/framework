@@ -56,6 +56,14 @@ function resolveFeatures(features: string[], visited = new Set<string>()): strin
 
     const def = featuresMap[feature];
 
+    // `addCommandAction` runs `validateFeatures()` before calling this, and the
+    // recursive calls below pass `requires` entries that come out of the map
+    // itself — so every lookup resolves. Skipping an unresolvable one keeps a
+    // typo from crashing the command with `Cannot read properties of
+    // undefined`, which names neither the feature nor the fact that it was the
+    // ARGUMENT that was wrong.
+    if (def === undefined) continue;
+
     if (def.requires?.length) {
       resolved.push(...resolveFeatures(def.requires, visited));
     }
@@ -74,8 +82,13 @@ export async function addCommandAction(options: CommandActionData) {
     console.log("Available Features:");
 
     for (const feature of allowedFeatures) {
+      const definition = featuresMap[feature];
+
+      // `allowedFeatures` is derived from this same map, so this resolves.
+      if (definition === undefined) continue;
+
       console.log(
-        `- ${colors.yellowBright(feature)}: ${colors.green(featuresMap[feature].description)}`,
+        `- ${colors.yellowBright(feature)}: ${colors.green(definition.description)}`,
       );
     }
 
@@ -93,6 +106,10 @@ export async function addCommandAction(options: CommandActionData) {
 
   for (const feature of resolvedFeatures) {
     const featurePackages = featuresMap[feature as keyof typeof featuresMap];
+
+    // Validated upstream; see the note in resolveFeatures above.
+    if (featurePackages === undefined) continue;
+
     Object.assign(dependencies, featurePackages.dependencies);
     if (featurePackages.devDependencies) {
       Object.assign(devDependencies, featurePackages.devDependencies);
@@ -160,7 +177,8 @@ export async function addCommandAction(options: CommandActionData) {
   // now loop again over features to execute onExecuting
   for (const feature of resolvedFeatures) {
     const featurePackages = featuresMap[feature as keyof typeof featuresMap];
-    if (featurePackages.onExecuting) {
+
+    if (featurePackages?.onExecuting) {
       await featurePackages.onExecuting(options);
     }
   }

@@ -50,10 +50,17 @@ export function formatErrorStack(stack: string): string {
 
       headerDone = true;
 
-      const fn = withFn ? withFn[2] : "";
-      const file = withFn ? withFn[3] : bare![2];
-      const lineNo = withFn ? withFn[4] : bare![3];
-      const col = withFn ? withFn[5] : bare![4];
+      // Every read here is defaulted rather than asserted, and the reason is
+      // what this function IS: a stack-trace formatter. If it throws while
+      // formatting, it throws INSIDE error reporting — and what the developer
+      // then sees is this function's failure instead of the error they were
+      // actually chasing. An unreadable frame should degrade to a blank field,
+      // never take the report down with it (canon `8d3c13a8`: every fatal
+      // needs an unconditional floor).
+      const fn = (withFn ? withFn[2] : "") ?? "";
+      const file = (withFn ? withFn[3] : bare?.[2]) ?? "";
+      const lineNo = (withFn ? withFn[4] : bare?.[3]) ?? "";
+      const col = (withFn ? withFn[5] : bare?.[4]) ?? "";
 
       const isNodeInternal = file.startsWith("node:");
       const isDep = file.includes("node_modules");
@@ -130,7 +137,12 @@ export function formatModuleNotFoundError(error: Error, suggestions?: string[]):
   const match = error.message.match(/Cannot find module '([^']+)' imported from '([^']+)'/);
   if (!match) return error.message;
 
-  const [, modulePath, importerPath] = match;
+  // Same rule as the frame formatter above: this renders a MODULE NOT FOUND
+  // report, so a missing capture must degrade the message, not replace the
+  // user's error with a crash inside the reporter.
+  const [, rawModulePath, rawImporterPath] = match;
+  const modulePath = rawModulePath ?? "";
+  const importerPath = rawImporterPath ?? "";
   const lines: string[] = [
     "",
     `${colors.red("❌ MODULE NOT FOUND")}`,
