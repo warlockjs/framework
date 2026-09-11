@@ -118,7 +118,12 @@ export class PostgresSyncAdapter implements SyncAdapterContract {
       if (path.includes(".")) {
         // JSONB path update: "column.nested.field" -> jsonb_set
         const [column, ...pathParts] = path.split(".");
-        const quotedColumn = this.driver.dialect.quoteIdentifier(column);
+
+        // The `includes(".")` check above guarantees a non-empty first segment,
+        // but the compiler does not carry it here. Falling back to the whole
+        // path keeps a REAL identifier in the SQL — quoting `undefined` would
+        // emit a valid query against a column that does not exist.
+        const quotedColumn = this.driver.dialect.quoteIdentifier(column ?? path);
         const jsonPath = `{${pathParts.join(",")}}`;
         const placeholder = this.driver.dialect.placeholder(paramIndex++);
         params.push(JSON.stringify(value));
@@ -143,7 +148,10 @@ export class PostgresSyncAdapter implements SyncAdapterContract {
         // JSONB path filter: intermediate segments use -> (jsonb), final uses ->> (text).
         // e.g. "column.a" → "column"->>'a', "column.a.b" → "column"->'a'->>'b'
         const [column, ...pathParts] = key.split(".");
-        const quotedColumn = this.driver.dialect.quoteIdentifier(column);
+
+        // Same reasoning as the jsonb_set path above: fall back to the whole
+        // key so the emitted SQL always names a real column.
+        const quotedColumn = this.driver.dialect.quoteIdentifier(column ?? key);
         const intermediateExpr = pathParts
           .slice(0, -1)
           .map((p) => `->'${p}'`)

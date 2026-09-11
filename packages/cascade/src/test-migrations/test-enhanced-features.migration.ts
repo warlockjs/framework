@@ -6,7 +6,7 @@ import { Migration } from "../migration/migration";
  * - default() with raw SQL
  * - defaultString() for literal strings
  * - timestamps() driver delegation
- * - statement() for raw SQL (queued operations)
+ * - raw() for raw SQL (queued operations)
  */
 export default class TestEnhancedMigrationFeatures extends Migration {
   public table = "test_enhanced_features";
@@ -22,10 +22,10 @@ export default class TestEnhancedMigrationFeatures extends Migration {
     this.timestamps(); // Driver-delegated timestamp creation
 
     // Raw SQL statements (queued, not immediate)
-    this.statement(
+    this.raw(
       "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_test_name ON test_enhanced_features (name)",
     );
-    this.statement('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
+    this.raw('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
   }
 
   public async down() {

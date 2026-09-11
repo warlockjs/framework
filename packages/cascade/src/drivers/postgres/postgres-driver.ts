@@ -526,7 +526,12 @@ export class PostgresDriver implements DriverContract {
         let isNumericVector = parts.length > 0;
 
         for (let i = 0; i < parts.length; i++) {
-          const n = +parts[i]; // unary + is the fastest string-to-number coercion
+          // `parts[i]` is `string | undefined` under noUncheckedIndexedAccess even
+          // though `i < parts.length`. `+undefined` is NaN, which the finite check
+          // below already rejects — so `?? ""` keeps the coercion total without
+          // changing which inputs count as a numeric vector (+"" is 0, but an
+          // empty segment cannot occur for i < length).
+          const n = +(parts[i] ?? ""); // unary + is the fastest string-to-number coercion
           if (!Number.isFinite(n)) {
             isNumericVector = false;
             break; // early-exit — not a numeric vector, leave value untouched

@@ -213,6 +213,17 @@ export class RelationLoader<TModel extends Model = Model> {
     const path = this.parseNestedRelation(name);
     const rootRelation = path[0];
 
+    // An empty parse would otherwise reach `getRelationDefinition(undefined)`
+    // and fail as `Relation "undefined" is not defined on model "X"` — a
+    // message that sends the reader looking for a relation they never wrote,
+    // instead of at the name they passed. Same failure, named correctly.
+    if (rootRelation === undefined) {
+      throw new Error(
+        `Relation name "${name}" could not be parsed into a relation path on model ` +
+          `"${this.modelClass.name}".`,
+      );
+    }
+
     // Get the relation definition from the model class
     const definition = this.getRelationDefinition(rootRelation);
 

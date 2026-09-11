@@ -1938,7 +1938,12 @@ export class MongoQueryBuilder<T = unknown>
    */
   public async first<Output = T>(): Promise<Output | null> {
     const results = await this.limit(1).get<Output>();
-    return results.length > 0 ? results[0] : null;
+
+    // `?? null` rather than a length test: under `noUncheckedIndexedAccess`
+    // the index read is `Output | undefined` and the length check does not
+    // narrow it. Both spellings answer null for an empty result, which is what
+    // this method promises.
+    return results[0] ?? null;
   }
 
   /**
@@ -1978,7 +1983,9 @@ export class MongoQueryBuilder<T = unknown>
 
     const results = await this.execute<{ total: number }>(pipeline);
 
-    return results.length > 0 ? results[0].total : 0;
+    // Same shape as `first()`: the length test does not narrow the index read.
+    // Zero is already the answer for "no documents matched".
+    return results[0]?.total ?? 0;
   }
 
   /**

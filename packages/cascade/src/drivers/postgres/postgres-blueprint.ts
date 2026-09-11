@@ -79,9 +79,13 @@ export class PostgresBlueprint implements DriverBlueprintContract {
 
       // Extract columns from indexdef
       const columnsMatch = row.indexdef.match(/\(([^)]+)\)/);
-      const columns = columnsMatch
-        ? columnsMatch[1].split(",").map((c) => c.trim().replace(/"/g, ""))
-        : [];
+      // Capture group 1 is present whenever the pattern matched, but that is a
+      // property of the regex literal rather than of this expression. `?? ""`
+      // yields the empty column list the `: []` branch already gives.
+      const columns = (columnsMatch?.[1] ?? "")
+        .split(",")
+        .map((c) => c.trim().replace(/"/g, ""))
+        .filter(Boolean);
 
       // Determine index type
       let type = "btree"; // default

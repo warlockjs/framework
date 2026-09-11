@@ -234,7 +234,9 @@ export class PostgresSQLSerializer extends SQLSerializer {
       return ["CREATE EXTENSION IF NOT EXISTS vector", ...statements];
     }
 
-    return statements.length === 1 ? statements[0] : statements;
+    // The length test does not narrow the index read. `?? statements` keeps
+    // the same two outcomes: the single statement, or the list.
+    return statements.length === 1 ? (statements[0] ?? statements) : statements;
   }
 
   private dropColumn(table: string, column: string): string {

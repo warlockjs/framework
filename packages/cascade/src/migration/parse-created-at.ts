@@ -18,6 +18,23 @@ export function parseCreatedAt(createdAt: string): Date | undefined {
 
   if (match) {
     const [, first, second, year, hour, minute, second_time] = match;
+
+    // All six groups are present whenever the pattern matched — but that is a
+    // property of the regex literal above, not something the compiler carries
+    // to here, so each is `string | undefined`. Returning `undefined` is
+    // exactly this function's documented answer for a stamp it cannot use, so
+    // the guard costs nothing and removes six assertions.
+    if (
+      first === undefined ||
+      second === undefined ||
+      year === undefined ||
+      hour === undefined ||
+      minute === undefined ||
+      second_time === undefined
+    ) {
+      return undefined;
+    }
+
     const firstNum = parseInt(first);
     const secondNum = parseInt(second);
 
