@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/logger` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.7.0
+
+### Fixed
+
+- `redact()` could leave a field un-redacted — writing to the literal key `"undefined"` instead of the intended path segment — when a configured redaction path had an empty segment.
+
+### Changed
+
+- Internal type-safety hardening in the file-log and JSON file-log channels; no behaviour change.
+
 ## 5.5.0 - 2026-09-07
 
 ### Fixed
