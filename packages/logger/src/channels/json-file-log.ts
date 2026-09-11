@@ -27,7 +27,12 @@ export class JSONFileLog extends FileLog implements LogContract {
 
     if (this.messagedShouldBeGrouped) {
       this.prepareGroupedMessages();
-      for (const key in this.groupedMessages) {
+      // `Object.entries` rather than `for...in` + index: under
+      // `noUncheckedIndexedAccess` the index read is `LogMessage[] |
+      // undefined`, and spreading that into `push` is a type error rather than
+      // a runtime one only because the key demonstrably exists. Entries says so
+      // to the compiler instead of asserting it.
+      for (const [key, groupMessages] of Object.entries(this.groupedMessages)) {
         const directoryPath = path.join(this.storagePath, key);
         fs.mkdirSync(directoryPath, { recursive: true });
         const filePath = path.join(directoryPath, `${this.fileName}.${this.extension}`);
@@ -41,7 +46,7 @@ export class JSONFileLog extends FileLog implements LogContract {
             fileContents = { messages: [] };
           }
         }
-        fileContents.messages.push(...this.groupedMessages[key]);
+        fileContents.messages.push(...groupMessages);
         fs.writeFileSync(filePath, safeJsonStringify(fileContents, 2));
       }
     } else {
@@ -143,7 +148,7 @@ export class JSONFileLog extends FileLog implements LogContract {
     this.prepareGroupedMessages();
 
     // now each key in the grouped messages, represents the directory path that should extend the storage path
-    for (const key in this.groupedMessages) {
+    for (const [key, groupMessages] of Object.entries(this.groupedMessages)) {
       const directoryPath = path.join(this.storagePath, key);
 
       await ensureDirectoryAsync(directoryPath);
@@ -164,7 +169,7 @@ export class JSONFileLog extends FileLog implements LogContract {
         fileContents = { messages: [] };
       }
 
-      fileContents.messages.push(...this.groupedMessages[key]);
+      fileContents.messages.push(...groupMessages);
 
       try {
         await fs.promises.writeFile(filePath, safeJsonStringify(fileContents, 2));

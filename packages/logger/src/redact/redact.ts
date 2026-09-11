@@ -227,6 +227,21 @@ function redactAtPath(
 
   const [head, ...rest] = segments;
 
+  if (head === undefined) {
+    // The `segments.length === 0` guard above already makes this unreachable,
+    // but the compiler cannot narrow a DESTRUCTURED element from a length
+    // check, so under `noUncheckedIndexedAccess` `head` is `string |
+    // undefined` and every use of it below inherits that.
+    //
+    // Stated rather than asserted away with `!`, because of what this function
+    // is: if `head` were ever undefined, `keysToVisit` would carry an
+    // `undefined` key, `target[key]` would read and WRITE the literal property
+    // "undefined", and the field that was supposed to be censored would be
+    // left in the log untouched. A redaction path is the wrong place to be
+    // approximately right.
+    return;
+  }
+
   if (head === "**") {
     // Try matching `rest` at the current level (the zero-segment match
     // case), then recurse into every child carrying the `**` forward so

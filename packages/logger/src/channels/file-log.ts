@@ -280,11 +280,15 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
 
     if (this.messagedShouldBeGrouped) {
       this.prepareGroupedMessages();
-      for (const key in this.groupedMessages) {
+      // `Object.entries` rather than `for...in` + index: under
+      // `noUncheckedIndexedAccess` an index read is `LogMessage[] | undefined`
+      // even when the key came from the object itself, and entries hands over
+      // the value already narrowed. Same iteration, no assertion.
+      for (const [key, groupMessages] of Object.entries(this.groupedMessages)) {
         const directoryPath = path.join(this.storagePath, key);
         fs.mkdirSync(directoryPath, { recursive: true });
         const filePath = path.join(directoryPath, `${this.fileName}.${this.extension}`);
-        const content = this.groupedMessages[key].map((message) => message.content).join(EOL) + EOL;
+        const content = groupMessages.map((message) => message.content).join(EOL) + EOL;
         fs.appendFileSync(filePath, content);
       }
     } else {
@@ -417,7 +421,7 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
     this.prepareGroupedMessages();
 
     // now each key in the grouped messages, represents the directory path that should extend the storage path
-    for (const key in this.groupedMessages) {
+    for (const [key, groupMessages] of Object.entries(this.groupedMessages)) {
       const directoryPath = path.join(this.storagePath, key);
 
       await ensureDirectoryAsync(directoryPath);
@@ -426,7 +430,7 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
 
       await this.checkAndRotateFile(filePath); // Ensure we check file size before writing
 
-      const content = this.groupedMessages[key].map((message) => message.content).join(EOL) + EOL;
+      const content = groupMessages.map((message) => message.content).join(EOL) + EOL;
 
       try {
         await this.write(filePath, content);
