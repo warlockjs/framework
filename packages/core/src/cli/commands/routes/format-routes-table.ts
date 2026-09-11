@@ -91,9 +91,13 @@ export function formatRoutesTableLines(rows: RouteRow[]): string[] {
 
   const widths = columnWidths(rows);
 
+  // `widths` is built from these same columns, so every index resolves. `?? 0`
+  // rather than an assertion: 0 is padEnd's no-op, so an unreadable width
+  // produces an UNALIGNED table rather than a crash — this renders `warlock
+  // routes`, and a table that throws tells the operator nothing about routes.
   const renderRow = (cells: string[]) =>
     cells
-      .map((text, index) => text.padEnd(widths[index]))
+      .map((text, index) => text.padEnd(widths[index] ?? 0))
       .join(GAP)
       .trimEnd();
 
@@ -153,7 +157,7 @@ export function printRoutesTable(rows: RouteRow[]): void {
 
   const widths = columnWidths(rows);
 
-  const headerLine = COLUMNS.map((column, index) => column.header.padEnd(widths[index]))
+  const headerLine = COLUMNS.map((column, index) => column.header.padEnd(widths[index] ?? 0))
     .join(GAP)
     .trimEnd();
 
@@ -162,10 +166,10 @@ export function printRoutesTable(rows: RouteRow[]): void {
   for (const row of rows) {
     const cells = COLUMNS.map((column, index) => {
       if (column.key === "method") {
-        return colorizeMethodCell(row.method, widths[index]);
+        return colorizeMethodCell(row.method, widths[index] ?? 0);
       }
 
-      return cellText(row, column.key).padEnd(widths[index]);
+      return cellText(row, column.key).padEnd(widths[index] ?? 0);
     });
 
     console.log(cells.join(GAP).trimEnd());

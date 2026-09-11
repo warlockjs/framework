@@ -53,6 +53,13 @@ export function lowerStage3Decorators(): DecoratorLoweringPlugin {
     async transform(code, id) {
       const [filepath] = id.split("?");
 
+      // `split` always yields a first element, so this holds. Returning `null`
+      // — the plugin's own "not my file" answer — rather than defaulting:
+      // `?? ""` would fail the `.tsx?` test and reach the same outcome by
+      // accident, and a transform plugin that guesses at a module id is how a
+      // file silently skips decorator lowering and fails at runtime instead.
+      if (filepath === undefined) return null;
+
       if (!/\.tsx?$/.test(filepath) || filepath.includes("/node_modules/")) {
         return null;
       }

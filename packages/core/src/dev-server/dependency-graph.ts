@@ -286,6 +286,13 @@ export class DependencyGraph {
       const from = cycle[index];
       const to = cycle[index + 1];
 
+      // `index < cycle.length - 1` bounds both reads. Skipping an unreadable
+      // edge rather than defaulting: this decides whether a cycle is
+      // TYPE-ONLY, and a `?? ""` would ask `isEdgeTypeOnly("", "")`, whose
+      // answer is about a pair of edges that do not exist. A cycle wrongly
+      // classified as type-only is a real circular import reported as harmless.
+      if (from === undefined || to === undefined) continue;
+
       if (this.isEdgeTypeOnly(from, to)) {
         return false;
       }
@@ -346,7 +353,11 @@ export class DependencyGraph {
     console.log(colors.yellow("💡 How to Fix:"));
     console.log("");
 
-    const exampleCycle = cycles[0];
+    // This whole block prints "How to Fix" advice for a cycle that was just
+    // reported, so there is always one — but this is diagnostic OUTPUT, and a
+    // formatter that throws while explaining a problem replaces the problem
+    // with itself. An empty list simply has no example to show.
+    const exampleCycle = cycles[0] ?? [];
     const fileA = exampleCycle[0]?.split("/").pop() || "fileA.ts";
     const fileB = exampleCycle[1]?.split("/").pop() || "fileB.ts";
     const stripExt = (file: string) => file.replace(/\.tsx?$/, "");

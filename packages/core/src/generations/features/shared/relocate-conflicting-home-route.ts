@@ -77,7 +77,17 @@ export function resolveHomeRouteCollision(files: RoutesFileSource[]): HomeRouteR
     };
   }
 
-  const [{ file, matches }] = claimants;
+  const claimant = claimants[0];
+
+  // The two guards above establish exactly one claimant, but the compiler does
+  // not narrow a destructured element from a length check. Reporting "absent"
+  // is the same answer the empty case gives, and the honest one: with no
+  // claimant there is no conflicting home route to relocate.
+  if (claimant === undefined) {
+    return { collision: { outcome: "absent" }, rewrites: [] };
+  }
+
+  const { file, matches } = claimant;
 
   if (matches.length > 1) {
     return {
@@ -99,7 +109,7 @@ export function resolveHomeRouteCollision(files: RoutesFileSource[]): HomeRouteR
     };
   }
 
-  const next = file.source.replace(TOP_LEVEL_ROOT_GET, (match, quote: string) =>
+  const next = file.source.replace(TOP_LEVEL_ROOT_GET, (match: string, quote: string) =>
     match.replace(`${quote}/${quote}`, `${quote}/welcome${quote}`),
   );
 
