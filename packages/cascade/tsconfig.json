@@ -1,4 +1,14 @@
 {
+  // Inherits the workspace strictness contract (`strict`,
+  // `noUncheckedIndexedAccess`, `forceConsistentCasingInFileNames`).
+  //
+  // Workspace packages are consumed as TypeScript SOURCE through the `exports`
+  // map (canon `0a3227cc`), so consumers compile this source under THEIR
+  // options. All 61 diagnostics this package once owned were in shipped
+  // source, which means every one of them reached a consumer.
+  //
+  // A package may ADD to this contract. It must never subtract.
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
