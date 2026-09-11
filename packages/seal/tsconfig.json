@@ -1,4 +1,18 @@
 {
+  // Inherits the workspace strictness contract (`strict`,
+  // `noUncheckedIndexedAccess`, `forceConsistentCasingInFileNames`).
+  //
+  // This matters because workspace packages are consumed as TypeScript SOURCE
+  // through the `exports` map (canon `0a3227cc`), so every consumer compiles
+  // this package's source under the CONSUMER's options. Before this line, seal
+  // graded itself with `strict` alone while its consumers compiled it with
+  // more — so seal's own green was an opinion about seal, not a statement
+  // about what its consumers would see.
+  //
+  // A package may ADD to this contract. It must never subtract: doing so hides
+  // consumer-facing diagnostics until some downstream package happens to
+  // compile the same source and discovers them.
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2020",
     // Raised from the ES2020 default because the shared source in sibling packages
