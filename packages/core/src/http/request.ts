@@ -601,8 +601,36 @@ export class Request<RequestValidation = any> {
             const keyParts = key.split("[");
 
             const keyName = keyParts[0];
+            const firstBracket = keyParts[1];
+            const secondBracket = keyParts[2];
 
-            const keyNameParts = keyParts[1].split("]");
+            /*
+              `key.includes("][")` guarantees all three segments — but that is a
+              property of the string test above, not of these reads, so each is
+              `string | undefined`.
+
+              When the shape is not what this branch assumes, fall through to
+              the generic bracket path rather than skipping the key. That is the
+              same choice the NaN branch below makes, and for the same reason
+              spelled out there: the failure this code has already been bitten
+              by is answering with a shape the caller did not send. Dropping the
+              pair silently would be that bug again, in a new place.
+            */
+            if (
+              keyName === undefined ||
+              firstBracket === undefined ||
+              secondBracket === undefined
+            ) {
+              set(
+                body,
+                this.bracketKeyToPath(key),
+                this.arrayValueFor(value, isArrayKey, this.parseValue.bind(this)),
+              );
+
+              continue;
+            }
+
+            const keyNameParts = firstBracket.split("]");
 
             const index = Number(keyNameParts[0]);
 
@@ -634,26 +662,32 @@ export class Request<RequestValidation = any> {
               continue;
             }
 
-            if (!arrayOfObjectValues[keyName]) {
-              arrayOfObjectValues[keyName] = [];
-            }
+            const bucket = (arrayOfObjectValues[keyName] ??= []);
 
-            if (!arrayOfObjectValues[keyName][index]) {
-              arrayOfObjectValues[keyName][index] = {};
-            }
+            const entry = (bucket[index] ??= {});
 
             // now get the key after the index
-            const keyNameParts2 = keyParts[2].split("]");
+            const keyNameParts2 = secondBracket.split("]");
             const keyName2 = keyNameParts2[0];
 
-            arrayOfObjectValues[keyName][index][keyName2] = this.parseValue(value);
+            // `split` always yields a first element, so this holds — but an
+            // undefined key here would write a property literally named
+            // "undefined" onto the entry, which is the same silent-wrong-shape
+            // outcome the comment above describes.
+            if (keyName2 === undefined) continue;
+
+            entry[keyName2] = this.parseValue(value);
 
             continue;
           }
 
           const keyParts = key.split("[");
           const keyName = keyParts[0];
-          const keyNameParts = keyParts[1].split("]");
+          // `key.includes("[")` puts at least two segments here. Falling back
+          // to the whole key rather than asserting keeps the parse total: an
+          // undefined segment would make `keyNameParts[0]` undefined too, and
+          // this branch writes that straight into the body shape.
+          const keyNameParts = (keyParts[1] ?? key).split("]");
 
           /*
             `isArrayKey` is honoured HERE, and used not to be. `filter[tags][]=a`
@@ -1288,7 +1322,12 @@ export class Request<RequestValidation = any> {
       const realIp = this.header("x-real-ip");
 
       if (realIp) {
-        const address = String(realIp).split(",")[0].trim();
+        // `split` always yields a first element, so `?? ""` changes nothing —
+        // and an empty address is already falsy, so it falls through to the
+        // next source exactly as a blank header does. This is the CLIENT IP
+        // used for rate limiting and logging; it must never become the string
+        // "undefined".
+        const address = (String(realIp).split(",")[0] ?? "").trim();
 
         if (address) return address;
       }

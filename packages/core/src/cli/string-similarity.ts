@@ -24,18 +24,39 @@ export function levenshteinDistance(str1: string, str2: string): number {
   );
 
   // Fill matrix
+  //
+  // Every index below is in bounds by construction — the matrix is built
+  // `len1 + 1` by `len2 + 1` immediately above. Under
+  // `noUncheckedIndexedAccess` the compiler still types each read as possibly
+  // undefined, and the rows are hoisted rather than defaulted: a `?? 0` in the
+  // middle of a distance calculation would not fail, it would quietly return a
+  // SHORTER distance and change which command the CLI suggests.
   for (let i = 1; i <= len1; i++) {
+    const previousRow = matrix[i - 1];
+    const currentRow = matrix[i];
+
+    if (previousRow === undefined || currentRow === undefined) continue;
+
     for (let j = 1; j <= len2; j++) {
+      const deletion = previousRow[j];
+      const insertion = currentRow[j - 1];
+      const substitution = previousRow[j - 1];
+
+      if (deletion === undefined || insertion === undefined || substitution === undefined) {
+        continue;
+      }
+
       const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
-      matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1, // deletion
-        matrix[i][j - 1] + 1, // insertion
-        matrix[i - 1][j - 1] + cost, // substitution
-      );
+
+      currentRow[j] = Math.min(deletion + 1, insertion + 1, substitution + cost);
     }
   }
 
-  return matrix[len1][len2];
+  // `len1`/`len2` index the last row and column, both allocated above. Falling
+  // back to the worst-case distance (the longer string's length) rather than 0
+  // keeps an unreadable result looking MAXIMALLY dissimilar — a 0 would make
+  // it look like a perfect match and promote it to the top suggestion.
+  return matrix[len1]?.[len2] ?? Math.max(len1, len2);
 }
 
 /**

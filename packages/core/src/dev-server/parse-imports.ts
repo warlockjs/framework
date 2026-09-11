@@ -80,7 +80,10 @@ export function isTypeOnlyFile(source: string): boolean {
             // Extract the specifiers
             const specifiersMatch = match.match(/export\s+\{([^}]*)\}/);
             if (specifiersMatch) {
-              const specifiers = specifiersMatch[1];
+              // Capture group 1 exists whenever the pattern matched. `?? ""`
+              // yields an empty specifier list, which `some()` below reads as
+              // "no runtime specifier" — the same answer an empty `{}` gives.
+              const specifiers = specifiersMatch[1] ?? "";
               const items = specifiers
                 .split(",")
                 .map((s) => s.trim())
@@ -141,7 +144,7 @@ function hasRuntimeImports(line: string): boolean {
     return true;
   }
 
-  const items = specifiersMatch[1]
+  const items = (specifiersMatch[1] ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
@@ -167,7 +170,7 @@ function isExportTypeOnlyStatement(line: string): boolean {
     return false;
   }
 
-  const items = specifiersMatch[1]
+  const items = (specifiersMatch[1] ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
@@ -207,7 +210,11 @@ function extractImportPathsWithRegex(
     }
 
     if (!isTypeOnly) {
-      imports[existingIndex].isTypeOnly = false;
+      const existing = imports[existingIndex];
+
+      // `existingIndex` came from findIndex on this same array, so it is in
+      // range; the compiler does not carry that here.
+      if (existing) existing.isTypeOnly = false;
     }
   };
 
@@ -221,6 +228,14 @@ function extractImportPathsWithRegex(
   while ((match = importRegex.exec(source)) !== null) {
     const fullMatch = match[0];
     const importPath = match[2];
+
+    // Each pattern here captures its path in a group, so a match always carries
+    // one. Skipping rather than recording keeps a malformed match out of the
+    // dependency graph entirely — recording `undefined` would add an import
+    // edge to a module named "undefined", which the dev server would then
+    // watch, fail to resolve, and report against the wrong file.
+    if (importPath === undefined) continue;
+
     const isTypeOnly = !hasRuntimeImports(fullMatch);
 
     record(importPath, fullMatch, isTypeOnly);
@@ -230,14 +245,22 @@ function extractImportPathsWithRegex(
   const sideEffectRegex = /import\s+['"]([^'"]+)['"]/g;
 
   while ((match = sideEffectRegex.exec(source)) !== null) {
-    record(match[1], match[0], false);
+    const sideEffectPath = match[1];
+
+    if (sideEffectPath === undefined) continue;
+
+    record(sideEffectPath, match[0], false);
   }
 
   // Pattern 2: Dynamic imports - import("path") â€” always runtime
   const dynamicImportPattern = /import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 
   while ((match = dynamicImportPattern.exec(source)) !== null) {
-    record(match[1], match[0], false);
+    const dynamicPath = match[1];
+
+    if (dynamicPath === undefined) continue;
+
+    record(dynamicPath, match[0], false);
   }
 
   // Pattern 3: Export from - export ... from "path"
@@ -245,8 +268,11 @@ function extractImportPathsWithRegex(
 
   while ((match = exportFromPattern.exec(source)) !== null) {
     const fullMatch = match[0];
+    const exportPath = match[1];
 
-    record(match[1], fullMatch, isExportTypeOnlyStatement(fullMatch));
+    if (exportPath === undefined) continue;
+
+    record(exportPath, fullMatch, isExportTypeOnlyStatement(fullMatch));
   }
 
   return imports;
@@ -588,6 +614,9 @@ function isNodeBuiltin(importPath: string): boolean {
   // Check for node: prefix or direct builtin name
   if (importPath.startsWith("node:")) return true;
 
-  const moduleName = importPath.split("/")[0];
+  // `split` always yields a first element. Falling back to the whole path
+  // keeps the builtin check answering about a real name rather than undefined.
+  const moduleName = importPath.split("/")[0] ?? importPath;
+
   return builtins.includes(moduleName);
 }
