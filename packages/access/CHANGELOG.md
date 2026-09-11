@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/access` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.7.0
+
+### Fixed
+
+- `resolvePermissions` could push `undefined` into a role's permission list when the role's stored value was missing, instead of granting that role no permissions. A role that cannot be read now grants nothing, rather than risking an `undefined` entry reaching a permission check downstream.
+
 ## 5.2.3 - 2026-09-02
 
 ### Fixed
