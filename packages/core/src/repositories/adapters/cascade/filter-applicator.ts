@@ -23,11 +23,15 @@ export class FilterApplicator {
     data: any,
     options: FilterOptions,
   ): void {
-    for (const key in filters) {
+    // `Object.entries` hands the rule over already narrowed; a `for...in` index
+    // read is `FilterRule | undefined` under the strictness contract.
+    for (const [key, filterRule] of Object.entries(filters)) {
       const value = data[key];
-      if (value === undefined) continue;
 
-      const rule = this.parseFilterRule(key, filters[key]);
+      if (value === undefined) continue;
+      if (filterRule === undefined) continue;
+
+      const rule = this.parseFilterRule(key, filterRule);
       this.applyFilterRule(query, rule, value, data, options);
     }
   }
@@ -647,6 +651,14 @@ export class FilterApplicator {
   ) {
     if (!Array.isArray(value) || value.length !== 2) return;
     const [start, end] = value.map((v: any) => this.parseDate(v, options?.dateFormat));
+
+    // `value.length === 2` is checked above, so both exist — but the compiler
+    // does not narrow destructured elements from a length test. Returning
+    // rather than defaulting: this builds a date RANGE for a query, and a
+    // half-formed range would silently filter on a boundary the caller never
+    // asked for.
+    if (start === undefined || end === undefined) return;
+
     if (column) {
       query.whereDateBetween(column, [start, end]);
     } else if (columns) {

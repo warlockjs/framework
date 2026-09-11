@@ -124,11 +124,28 @@ function isPrivateIpv4(ip: string): boolean {
 function isPrivateIpv6(ip: string): boolean {
   const normalized = ip.toLowerCase().split("%")[0]; // drop zone id
 
+  // EVERY fallback in this function returns `true`, and that direction is the
+  // whole point: this is an SSRF guard, and `true` means "private — refuse".
+  //
+  // `split` on a non-empty string always yields a first element, so none of
+  // these is reachable today. But the safe answer for an address we could not
+  // classify is to REFUSE it, not to let it through. A `?? ""` here would fall
+  // past every check below and return `false` — reporting an unparseable
+  // address as public, which is a fail-OPEN in the one function whose job is
+  // to keep requests off the internal network.
+  if (normalized === undefined) {
+    return true;
+  }
+
   // IPv4-mapped / -embedded (::ffff:a.b.c.d, ::a.b.c.d) — defer to the v4
   // check on the trailing dotted-quad so an inward-mapped address is caught.
   const v4 = normalized.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
   if (v4) {
-    return isPrivateIpv4(v4[1]);
+    const dottedQuad = v4[1];
+
+    // Capture group 1 exists whenever this pattern matched. Refusing rather
+    // than defaulting, for the reason above.
+    return dottedQuad === undefined ? true : isPrivateIpv4(dottedQuad);
   }
 
   if (normalized === "::1" || normalized === "::") {
@@ -137,6 +154,11 @@ function isPrivateIpv6(ip: string): boolean {
 
   // Expand only the leading group enough to classify the reserved blocks.
   const firstGroup = normalized.split(":")[0];
+
+  if (firstGroup === undefined) {
+    return true;
+  }
+
   const head = firstGroup === "" ? 0 : Number.parseInt(firstGroup, 16);
 
   // fc00::/7 unique-local (fc.. / fd..)

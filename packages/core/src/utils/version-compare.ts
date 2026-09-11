@@ -120,8 +120,16 @@ export function isNewerVersion(latest: string, current: string): boolean {
   }
 
   for (let index = 0; index < 3; index++) {
-    if (latestParsed.core[index] !== currentParsed.core[index]) {
-      return latestParsed.core[index] > currentParsed.core[index];
+    const latestPart = latestParsed.core[index];
+    const currentPart = currentParsed.core[index];
+
+    // A parsed semver core is always three numbers, so both reads hold. Treating
+    // a missing part as 0 rather than asserting: this decides whether to tell
+    // the user a NEWER VERSION EXISTS, and `undefined > undefined` is `false` —
+    // so an assertion would silently answer "not newer" and suppress the
+    // notice, which is the failure nobody would ever notice happening.
+    if (latestPart !== currentPart) {
+      return (latestPart ?? 0) > (currentPart ?? 0);
     }
   }
 
