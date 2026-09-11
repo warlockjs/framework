@@ -39,10 +39,18 @@ export class DefaultAccessResolver implements AccessResolver {
 
     // Guard against a role named `__proto__` / `constructor` resolving to an
     // inherited (non-array) value.
-    return roles.flatMap((role) =>
-      Object.prototype.hasOwnProperty.call(this.roles, role)
-        ? this.roles[role]
-        : [],
-    );
+    return roles.flatMap((role) => {
+      if (!Object.prototype.hasOwnProperty.call(this.roles, role)) {
+        return [];
+      }
+
+      // `hasOwnProperty` proves the KEY is present; it says nothing about the
+      // value, which under `noUncheckedIndexedAccess` is `string[] |
+      // undefined`. Falling back to NO permissions is the only safe direction
+      // here: this function's result is what the caller checks before granting
+      // access, so an unreadable role must grant nothing rather than be
+      // asserted into something.
+      return this.roles[role] ?? [];
+    });
   }
 }
