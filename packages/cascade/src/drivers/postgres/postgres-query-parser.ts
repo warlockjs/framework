@@ -1030,6 +1030,16 @@ export class PostgresQueryParser {
       // Two parts: could be "table.column" or "jsonbColumn.key"
       const [first, second] = parts;
 
+      // `parts.length === 2` above guarantees both, but the compiler does not
+      // narrow a destructured element from a length check. Throwing rather
+      // than defaulting to "": every branch below feeds `quoteIdentifier` or a
+      // JSONB path, so an empty segment would emit SYNTACTICALLY VALID SQL
+      // against the wrong identifier — a query that silently returns the wrong
+      // rows is far worse than one that refuses to build.
+      if (first === undefined || second === undefined) {
+        throw new Error(`Cannot parse field path "${field}": expected two non-empty segments.`);
+      }
+
       if (this.isTableReference(first)) {
         // It's table.column - regular column reference
         expression = `${this.dialect.quoteIdentifier(first)}.${this.dialect.quoteIdentifier(second)}`;
@@ -1040,6 +1050,15 @@ export class PostgresQueryParser {
     } else {
       // Three or more parts: "table.jsonbColumn.key..." or "jsonbColumn.key1.key2..."
       const [first, second, ...rest] = parts;
+
+      // Same reasoning as the two-part branch: this arm runs only for three or
+      // more parts, so both exist — and an empty identifier reaching the SQL
+      // is a wrong-rows bug, not a crash.
+      if (first === undefined || second === undefined) {
+        throw new Error(
+          `Cannot parse field path "${field}": expected at least three non-empty segments.`,
+        );
+      }
 
       if (this.isTableReference(first)) {
         // First part is table: "posts.createdBy.id" → table is "posts", JSONB is "createdBy.id"

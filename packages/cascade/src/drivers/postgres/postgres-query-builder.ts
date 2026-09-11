@@ -577,8 +577,12 @@ export class PostgresQueryBuilder<T = unknown>
       let currentModel: unknown = this.modelClass;
       let currentPath = "";
 
-      for (let i = 0; i < segments.length; i++) {
-        const rawSeg = segments[i];
+      // `entries()` rather than an index loop: the loop still needs `i` for the
+      // deepest-segment check below, and this hands over the segment already
+      // narrowed. Under `noUncheckedIndexedAccess` `segments[i]` is `string |
+      // undefined`, and every derived value here — `segName`, `currentPath`,
+      // the relation lookup key — inherited that.
+      for (const [i, rawSeg] of segments.entries()) {
         // String shorthand: "relName:col1,col2"
         const colonIdx = rawSeg.indexOf(":");
         const segName = colonIdx === -1 ? rawSeg : rawSeg.slice(0, colonIdx);
@@ -825,7 +829,14 @@ export class PostgresQueryBuilder<T = unknown>
     this.hydrateCallback = undefined;
     this.distinctValues(field);
     const results = await this.get<{ [key: string]: TResult }>();
-    return results.map((row) => row[field]);
+
+    // A row that lacks the selected column would be a driver-level mismatch
+    // between the SQL alias and the field name, not data. Dropping it keeps the
+    // promised TResult[] honest — putting `undefined` into a list of DISTINCT
+    // VALUES would hand the caller a value that was never in the column.
+    return results
+      .map((row) => row[field])
+      .filter((value): value is TResult => value !== undefined);
   }
 
   /** Get array of all values for a single field. */
@@ -1161,7 +1172,12 @@ export class PostgresQueryBuilder<T = unknown>
   /** Pluck scalar values for a single field (alias for pluck). */
   public async pluckOne<TResult = unknown>(field: string): Promise<TResult[]> {
     const results = await this.select([field]).get<Record<string, TResult>>();
-    return results.map((row) => row[field]);
+
+    // Same reasoning as `distinct`: a row missing the selected column is an
+    // alias mismatch, and `undefined` has no place in a plucked value list.
+    return results
+      .map((row) => row[field])
+      .filter((value): value is TResult => value !== undefined);
   }
 
   // ============================================================================
@@ -1709,7 +1725,11 @@ export class PostgresQueryBuilder<T = unknown>
       return { fragment: "", bindings: [] };
     }
 
-    const fragment = match[1].replace(/\$\d+/g, "?");
+    // Capture group 1 exists whenever `match` is truthy — but only because the
+    // pattern has a group, which is a property of a regex literal elsewhere in
+    // this file rather than of this line. `?? ""` gives the same answer the
+    // `!match` branch above already returns for "nothing usable here".
+    const fragment = (match[1] ?? "").replace(/\$\d+/g, "?");
 
     return { fragment, bindings: bindings ?? [] };
   }
@@ -1880,7 +1900,13 @@ export class PostgresQueryBuilder<T = unknown>
 
         const childKeys = Array.from(this.joinRelations.keys())
           .filter((p) => p.startsWith(`${path}.`))
-          .map((p) => p.split(".")[path.split(".").length]);
+          .map((p) => p.split(".")[path.split(".").length])
+          // The `startsWith` filter means the segment at this depth always
+          // exists, so the predicate drops nothing today. It is here so the
+          // keys stay `string[]`: these are used as `delete rowData[key]`, and
+          // an undefined key would delete the literal property "undefined"
+          // while leaving the real child column in the hydrated row.
+          .filter((segment): segment is string => segment !== undefined);
 
         if (config.type === "hasMany") {
           const rows = Array.isArray(data) ? data : [];
