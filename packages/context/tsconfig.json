@@ -1,4 +1,15 @@
 {
+  // Inherits the workspace strictness contract (`strict`,
+  // `noUncheckedIndexedAccess`, `forceConsistentCasingInFileNames`).
+  //
+  // Workspace packages are consumed as TypeScript SOURCE through the `exports`
+  // map (canon `0a3227cc`), so every consumer compiles this source under the
+  // CONSUMER's options. Without this line the package grades itself more
+  // leniently than its consumers do, and its green is an opinion rather than a
+  // statement about what a consumer will see.
+  //
+  // A package may ADD to this contract. It must never subtract.
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2020",
     // Raised from the ES2020 default because the shared source in sibling packages
