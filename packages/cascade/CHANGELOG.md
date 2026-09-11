@@ -4,6 +4,19 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.7.0
+
+### Fixed
+
+- The Postgres query builder could quote a malformed or empty field path straight into generated SQL, producing a syntactically valid query against the wrong identifier; it now throws naming the offending field path instead.
+- The MongoDB pipeline builder could build `$group`, `$lookup`, `$limit`/`$skip`/`$setWindowFields` stages from an empty operation group, producing malformed stages (e.g. `{ $limit: undefined }`, a `$lookup` with no `from`/`localField`/`foreignField`) that MongoDB rejected only at query execution. These now resolve to the documented safe defaults (`null`/skip) instead.
+- The dirty-change tracker and the MongoDB migration driver could write or delete the literal key `"undefined"` on a document when a dirty-path segment was missing, instead of leaving the real field untouched.
+- The query builder's count and JSON-projection handling could dereference an absent regex capture and throw, instead of falling back to the same empty result its other branches already return.
+
+### Changed
+
+- Internal type-safety hardening elsewhere; no other behaviour change.
+
 ## 5.5.0 - 2026-09-07
 
 ### Fixed
