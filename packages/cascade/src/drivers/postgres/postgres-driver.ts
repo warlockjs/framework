@@ -50,6 +50,41 @@ type PgPoolClient = import("pg").PoolClient;
 type PgPoolConfig = import("pg").PoolConfig;
 
 /**
+ * Build pg's `PoolConfig` from cascade's `PostgresPoolConfig`, coercing the
+ * string-typed connection fields.
+ *
+ * `env()` (@mongez/dotenv) coerces a numeric-looking value to a number, so a
+ * `DB_NAME` / `DB_USERNAME` / `DB_PASSWORD` like "12345" arrives here as a
+ * number. pg's connection fields must be strings — a number reaches deep into
+ * the driver and crashes with an inscrutable Buffer error rather than a
+ * legible "database does not exist" (finding 51639bf8). So `host`, `database`,
+ * `user` and `password` are coerced to strings; `port` is a real number and
+ * `undefined` is left untouched so pg's own defaults still apply.
+ *
+ * Exported (not inlined into `connect()`) so the coercion is unit-testable
+ * without a live database.
+ */
+export function buildPostgresPoolConfig(config: PostgresPoolConfig): PgPoolConfig {
+  const asString = (value: unknown): string | undefined =>
+    typeof value === "number" ? String(value) : (value as string | undefined);
+
+  return {
+    host: asString(config.host) ?? "localhost",
+    port: config.port ?? 5432,
+    database: asString(config.database),
+    user: asString(config.user),
+    password: asString(config.password),
+    connectionString: config.connectionString,
+    max: config.max ?? 10,
+    min: config.min ?? 0,
+    idleTimeoutMillis: config.idleTimeoutMillis ?? 30000,
+    connectionTimeoutMillis: config.connectionTimeoutMillis ?? 2000,
+    application_name: config.application_name ?? "cascade",
+    ssl: config.ssl,
+  };
+}
+
+/**
  * Cached pg module reference.
  */
 let pgModule: typeof import("pg") | undefined;
@@ -242,25 +277,12 @@ export class PostgresDriver implements DriverContract {
     const pg = await loadPg();
 
     try {
-      const poolConfig: PgPoolConfig = {
-        host: this.config.host ?? "localhost",
-        port: this.config.port ?? 5432,
-        database: this.config.database,
-        user: this.config.user,
-        password: this.config.password,
-        connectionString: this.config.connectionString,
-        max: this.config.max ?? 10,
-        min: this.config.min ?? 0,
-        idleTimeoutMillis: this.config.idleTimeoutMillis ?? 30000,
-        connectionTimeoutMillis: this.config.connectionTimeoutMillis ?? 2000,
-        application_name: this.config.application_name ?? "cascade",
-        ssl: this.config.ssl,
-      };
+      const poolConfig = buildPostgresPoolConfig(this.config);
 
       log.info(
         "database.postgres",
         "connection",
-        `Connecting to database ${colors.bold(colors.yellowBright(this.config.database))}`,
+        `Connecting to database ${colors.bold(colors.yellowBright(poolConfig.database ?? ""))}`,
       );
 
       this._pool = new pg.Pool(poolConfig);

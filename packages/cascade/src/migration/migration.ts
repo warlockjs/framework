@@ -234,6 +234,15 @@ export interface MigrationContract {
   bigInt(column: string): ColumnBuilder;
 
   /**
+   * Add a foreign-key id column whose TYPE matches the DataSource's default
+   * primary key (`migrationDefaults.primaryKey`), so a reference to a
+   * default-PK model is always type-compatible with that model's `id`. Use it
+   * for plain (non-`.references()`) FK id columns — e.g. a polymorphic
+   * `user_id` paired with a `user_type` — instead of hardcoding one type.
+   */
+  foreignId(column: string): ColumnBuilder;
+
+  /**
    * Add a float column.
    */
   float(column: string): ColumnBuilder;
@@ -2263,6 +2272,33 @@ export abstract class Migration implements MigrationContract {
     }
 
     return builder;
+  }
+
+  /**
+   * Add a foreign-key id column whose TYPE matches the DataSource's default
+   * primary key (`migrationDefaults.primaryKey`), resolved EXACTLY as the auto
+   * primary key resolves it: `migrationDefaults.primaryKey` → `"int"`.
+   *
+   * This is the column to use for a plain FK id — notably a polymorphic
+   * `user_id` paired with a `user_type` — because hardcoding a single type
+   * silently breaks every app whose models use another: an integer id written
+   * into a `uuid` column throws at insert time, and the failure surfaces as an
+   * opaque 500 (finding 5e47bdb3). Deriving the column type from the same
+   * config the model's PK derives from keeps the two in lockstep for every app.
+   *
+   * `false` (no auto PK) is treated as `"int"` here: a referencing column still
+   * needs a concrete type, and integer is the framework default.
+   *
+   * @param name - Column name
+   * @returns Column builder for chaining modifiers (`.index()`, `.nullable()`, …)
+   */
+  public foreignId(name: string): ColumnBuilder {
+    const pkType = this._migrationDefaults?.primaryKey ?? "int";
+
+    if (pkType === "uuid") return this.uuid(name);
+    if (pkType === "bigInt") return this.bigInteger(name);
+
+    return this.integer(name);
   }
 
   /**
