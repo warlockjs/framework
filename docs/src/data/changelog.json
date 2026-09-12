@@ -116,6 +116,398 @@
   ],
   "releases": [
     {
+      "version": "5.7.0",
+      "id": "v5-7-0",
+      "date": "September 12, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>A fresh project installs again on Node 22</strong>, <strong>the SSRF guard now fails closed</strong> on an address it cannot classify, and <code>@warlock.js/web</code> withdraws the 5.6.0-added <code>route.validate</code> / <code>route.middleware</code> — a page still declaring either refuses to boot. Fixes across <code>core</code>, <code>web</code>, <code>ai</code>, <code>cascade</code>, <code>cache</code>, <code>logger</code>, <code>access</code>, <code>ai-openai</code> and <code>create-warlock</code>.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 4
+            },
+            {
+              "type": "Removed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The dev and production page installers now agree on the layout <strong>chain</strong>, the layout <strong>level</strong>, and the hydration entry URL by construction rather than by inspection, each gated with a red control. The three places they still differ — live <code>public/</code> serving, its cache header, and hashed-asset caching — are deliberate and are now declared in the code that implements them."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>Dev and production agree about stylesheets.</strong> A stylesheet reached only through a component import was collected by production's bundler-graph walk and was structurally invisible to dev's scan of the page file — so a page rendered unstyled in development and correct in production. Both sides now end in one traversal, gated by a fixture built through <strong>both</strong> pipelines with the outputs diffed."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>A client navigation whose data payload is incomplete now loads the page normally instead of rendering it blank.</strong> Navigation carried its own copy of the payload rule and checked two of the six required keys, so a payload that could not render a page was accepted and handed to React anyway; the failure surfaced later, somewhere else, pointing at nothing. It now falls back to a full page load — slower for that one click, and the page arrives."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>The dev server no longer says it is watching for changes while it is not yet serving.</strong> On a slow boot that line arrived up to three minutes before the port was bound; every word of it was true and the impression it left was false."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>The <code>create-a-page</code> skill and <code>llms-full.txt</code> taught <code>route.validate</code> and <code>route.middleware</code></strong> — with a complete worked example — after both were withdrawn. Following our own documentation produced an app that would not start."
+            },
+            {
+              "type": "Removed",
+              "html": "<strong><code>route.validate</code> and <code>route.middleware</code> are withdrawn, one release after 5.6.0 added them.</strong> They were a second way to say what the top-level <code>validation</code> and <code>middleware</code> exports already said, on the same file — and the two validation surfaces disagreed about the status code. <strong>Migration is a move, not a rewrite:</strong> the schema shape is unchanged (<code>params</code> and <code>query</code> stay separate, never merged) and the failure is still 400."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 5
+            },
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Internal type-safety hardening across the CLI, dev server and request handling; no other behaviour change."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>The dev server no longer says it is watching for changes before it is serving.</strong> On a slow boot that line could arrive minutes before the port was bound."
+            },
+            {
+              "type": "Fixed",
+              "html": "The dev-server error formatter can no longer throw while formatting an error, which replaced the developer's real error with its own crash."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock add</code> with an unknown feature now names it, instead of dying with <code>Cannot read properties of undefined</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Bracket-notation request bodies (<code>items[0][name]</code>) no longer silently drop values."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock routes</code> and the circular-import report degrade to unaligned output instead of throwing on an unexpected shape."
+            },
+            {
+              "type": "Security",
+              "html": "<strong>The SSRF guard now fails closed on an address it cannot classify.</strong> An unclassifiable IP was previously treated as public, so an outbound request could reach an internal address the guard exists to block."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Internal type-safety hardening elsewhere; no other behaviour change."
+            },
+            {
+              "type": "Fixed",
+              "html": "The Postgres query builder could quote a malformed or empty field path straight into generated SQL, producing a syntactically valid query against the wrong identifier; it now throws naming the offending field path instead."
+            },
+            {
+              "type": "Fixed",
+              "html": "The MongoDB pipeline builder could build <code>$group</code>, <code>$lookup</code>, <code>$limit</code>/<code>$skip</code>/<code>$setWindowFields</code> stages from an empty operation group, producing malformed stages (e.g. <code>{ $limit: undefined }</code>, a <code>$lookup</code> with no <code>from</code>/<code>localField</code>/<code>foreignField</code>) that MongoDB rejected only at query execution. These now resolve to the documented safe defaults (<code>null</code>/skip) instead."
+            },
+            {
+              "type": "Fixed",
+              "html": "The dirty-change tracker and the MongoDB migration driver could write or delete the literal key <code>\"undefined\"</code> on a document when a dirty-path segment was missing, instead of leaving the real field untouched."
+            },
+            {
+              "type": "Fixed",
+              "html": "The query builder's count and JSON-projection handling could dereference an absent regex capture and throw, instead of falling back to the same empty result its other branches already return."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<strong>Breaking:</strong> indexing (<code>rag</code> and the skills catalogue) now throws <code>EmbeddingVectorCountMismatchError</code> when an embedding provider returns fewer vectors than records, instead of silently storing/scoring a record with no vector. Previously the run reported success while a document was left out of the index entirely."
+            },
+            {
+              "type": "Changed",
+              "html": "Internal type-safety hardening; no other behaviour change."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>embed()</code> on a provider response with an empty <code>data</code> array now throws <code>EmbeddingVectorCountMismatchError</code> naming the provider and expected/received counts, instead of a bare <code>TypeError: Cannot read properties of undefined (reading 'embedding')</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Chat completions on a provider response with an empty <code>choices</code> array now throw a <code>ProviderError</code> naming the provider, model, and choice count, instead of a bare <code>TypeError</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Internal type-safety hardening elsewhere (similarity scoring, percentile calculation); no behaviour change."
+            },
+            {
+              "type": "Fixed",
+              "html": "The in-memory cache driver's expiry sweep iterated <code>for...in</code> while deleting entries from the same object it was iterating, which could skip not-yet-visited keys and leave them cached past their TTL. It now snapshots entries first."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Internal type-safety hardening in the file-log and JSON file-log channels; no behaviour change."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>redact()</code> could leave a field un-redacted — writing to the literal key <code>\"undefined\"</code> instead of the intended path segment — when a configured redaction path had an empty segment."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "A freshly scaffolded project could fail <code>npm install</code> outright on Node 22, crashing inside npm 10.9.x's Arborist peer resolver with <code>Cannot read properties of null (reading 'edgesOut')</code> while resolving the template's vitest dependency. The template now pins vitest to 4.0.5."
+            },
+            {
+              "type": "Fixed",
+              "html": "When the generated project's install failed, the scaffolder told the user to \"fix the error above, then run the install again\" — advice that could not be followed for an npm-internal crash. It now recognizes the npm 10.9.x Arborist crash and points to concrete next steps (npm 11, pnpm, or yarn) instead."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>resolvePermissions</code> could push <code>undefined</code> into a role's permission list when the role's stored value was missing, instead of granting that role no permissions. A role that cannot be read now grants nothing, rather than risking an <code>undefined</code> entry reaching a permission check downstream."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Internal type-safety hardening; no behaviour change."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Internal type-safety hardening; no behaviour change."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Internal type-safety hardening; no behaviour change."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Internal type-safety hardening; no behaviour change."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Internal type-safety hardening; no behaviour change."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Internal type-safety hardening; no behaviour change."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Internal type-safety hardening; no behaviour change."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.6.0",
       "id": "v5-6-0",
       "date": "September 8, 2026",
