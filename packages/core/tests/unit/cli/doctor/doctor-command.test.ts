@@ -49,6 +49,7 @@ describe("default doctor check set", () => {
       "config",
       "connectors",
       "optional-peers",
+      "jwt-secret",
       "health",
       "release-hygiene",
     ]);

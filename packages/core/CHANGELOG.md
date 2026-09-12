@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.8.0 - 2026-09-13
+
+### Added
+
+- `doctor` gains a `jwt-secret` check: it fails when `auth.userType` is configured but no JWT signing secret is set — the pre-flight form of the silent first-login 500 the lazy secret resolution would otherwise throw.
+
+### Fixed
+
+- CLI command modules now resolve the `app/*` path alias and `.ts` siblings the way controllers and pages do. The ESM loader hook is registered before a command module is imported, so a `warlock <command>` file that imports `app/*` no longer dies with `ERR_MODULE_NOT_FOUND`.
+- `warlock generate.*` error hints point at `generate`, not the removed `create.*` command.
+- A generated CRUD repository imports every `@warlock.js/core` type it references, and a generated seed stub ships disabled so an unfilled stub cannot abort the whole `warlock seed` run.
+- The HTTP-port preflight runs only for a boot that actually starts the http connector, so a scoped data command (`warlock seed`, `migrate`) no longer probes — and collides with — a port it never binds.
+- A port-in-use error now names the `HTTP_PORT` environment variable and tells you to unset it when an ambient value is the cause, instead of advising a `src/config/http.ts` edit that the environment variable would just override.
+
+### Changed
+
+- The emitted generator and starter templates no longer carry a redundant `.required()` — `@warlock.js/seal` fields are required by default, so the call was a no-op that taught the opposite of the truth. `.required()` still exists for setting a custom message.
+
 ## 5.7.0 - 2026-09-11
 
 ### Security

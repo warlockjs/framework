@@ -3,6 +3,7 @@ import { configCheck } from "./config.check";
 import { connectorsCheck } from "./connectors.check";
 import { handlerSignatureCheck } from "./handler-signature.check";
 import { healthCheck } from "./health.check";
+import { jwtSecretCheck } from "./jwt-secret.check";
 import { optionalPeersCheck } from "./optional-peers.check";
 import { releaseHygieneCheck } from "./release-hygiene.check";
 import { routesCheck } from "./routes.check";
@@ -23,6 +24,7 @@ export const defaultDoctorChecks: DoctorCheck[] = [
   configCheck,
   connectorsCheck,
   optionalPeersCheck,
+  jwtSecretCheck,
   healthCheck,
   releaseHygieneCheck,
 ];

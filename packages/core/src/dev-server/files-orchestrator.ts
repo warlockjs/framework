@@ -91,6 +91,23 @@ export class FilesOrchestrator {
   }
 
   public async load<T>(relativePath: string, type = "other") {
+    // Guarantee the ESM loader hook is registered before we import anything.
+    // `load()` is the dynamic-import entrypoint, so it is the one place that
+    // must satisfy `init()`'s documented precondition ("Must be called before
+    // any user src/ module is dynamically imported") on its own — it cannot
+    // assume a caller ran `init()` first.
+    //
+    // The CLI command-resolution path proves why: `cliCommandsLoader.load()`
+    // imports a project command module during command *lookup* (before the
+    // command's own `execute()` runs), whereas `loadPreloaders()` only calls
+    // `init()` from *inside* `execute()`. So a `warlock <command>` whose
+    // command file imports an `app/*` alias or a `.ts` sibling was imported
+    // with no hook registered and died on `ERR_MODULE_NOT_FOUND` (f9d8f99f).
+    //
+    // `init()` is idempotent (guarded by `isInitialized`), so this is a no-op
+    // on the dev-server path, which already calls it explicitly at startup.
+    await this.init();
+
     const fileManager = await this.add(relativePath);
     return this.moduleLoader.loadModule<T>(fileManager, fileManager.type || type);
   }

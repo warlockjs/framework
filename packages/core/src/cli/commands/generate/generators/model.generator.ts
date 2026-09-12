@@ -11,8 +11,8 @@ export async function generateModel(data: CommandActionData): Promise<void> {
 
   if (!input) {
     console.log(colors.red("Error: Model name is required"));
-    console.log(colors.yellow("Usage: warlock create.model <module>/<name>"));
-    console.log(colors.yellow("Example: warlock create.model users/user"));
+    console.log(colors.yellow("Usage: warlock generate.model <module>/<name>"));
+    console.log(colors.yellow("Example: warlock generate.model users/user"));
     process.exit(1);
   }
 
@@ -20,14 +20,14 @@ export async function generateModel(data: CommandActionData): Promise<void> {
 
   if (!module) {
     console.log(colors.red("Error: Module name is required"));
-    console.log(colors.yellow("Usage: warlock create.model <module>/<name>"));
+    console.log(colors.yellow("Usage: warlock generate.model <module>/<name>"));
     process.exit(1);
   }
 
   // Check if module exists
   if (!(await moduleExists(module))) {
     console.log(colors.red(`Error: Module "${module}" does not exist`));
-    console.log(colors.yellow(`Run: warlock create.module ${module}`));
+    console.log(colors.yellow(`Run: warlock generate.module ${module}`));
     process.exit(1);
   }
 

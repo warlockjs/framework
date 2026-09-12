@@ -1,6 +1,15 @@
 import config from "@mongez/config";
+import { getRecordedEnvironmentOverride } from "../utils/recorded-environment-overrides";
 import { assertPortIsAvailable, PortInUseError } from "./port-preflight";
 import { resolveBindPort } from "./resolve-bind-port";
+
+/**
+ * The env var whose value `src/config/http.ts` reads for `http.port`
+ * (`port: env("HTTP_PORT", …)`). When an ambient value for it beats `.env`,
+ * `http.port` resolves to the ambient value and editing the config literal
+ * changes nothing — the whole point of the provenance branch below.
+ */
+const HTTP_PORT_ENV_KEY = "HTTP_PORT";
 
 /**
  * Mirrors `dev-server/supervisor.ts`'s `BOOT_PRECONDITION_EXIT_CODE`. Kept as
@@ -16,6 +25,23 @@ const BOOT_PRECONDITION_EXIT_CODE = 78;
  * binds with, so the probe tests the address the server will actually take.
  */
 const DEFAULT_BIND_HOST = "localhost";
+
+/**
+ * Whether the HTTP-port preflight should run for a command's `connectors`
+ * preload.
+ *
+ * The bind-and-release probe is only meaningful when this boot will actually
+ * start the http connector: `true` (a full boot — http starts in its late
+ * phase) or an explicit list that names `"http"`. A scoped list WITHOUT http —
+ * e.g. `warlock seed`'s `["database", "cache", "logger"]`, or `migrate` — never
+ * binds the port, so probing it is pointless and actively harmful: the probe
+ * collides with a dev server already listening on that port (and inherits a
+ * stray `HTTP_PORT`), so a read-only data command fails on a port it was never
+ * going to use. Finding f9ace89e.
+ */
+export function shouldPreflightHttpPort(connectors: readonly string[] | true): boolean {
+  return connectors === true || connectors.includes("http");
+}
 
 /**
  * Probe the port declared in `src/config/http.ts`, if there is one.
@@ -110,6 +136,13 @@ export async function preflightConfiguredHttpPort(): Promise<void> {
  * grep for, the port and host by name, and the command that names the process
  * holding it — the supervisor cannot discover the owning PID for them, but it
  * can hand them the one line that will.
+ *
+ * The remedy is chosen by PROVENANCE, never appended as a menu. When the
+ * colliding port came from an ambient `HTTP_PORT` that beat `.env` (the exact
+ * two-rebuild trap of finding 8782b840), "edit src/config/http.ts and rebuild"
+ * is actively wrong — the env var wins, so the rebuild changes nothing. In that
+ * case name the variable and give the remedy that works (unset it); only when
+ * the port genuinely came from config do we point at the config file.
  */
 function reportPortInUse(error: PortInUseError): void {
   const ownerCommand =
@@ -122,11 +155,41 @@ function reportPortInUse(error: PortInUseError): void {
     `  ✖ EADDRINUSE: port ${error.port} is already in use on ${error.host}`,
     `  the application cannot start because something else is already listening there.`,
     `  find the owning process: ${ownerCommand}`,
-    `  then stop it, or change http.port in src/config/http.ts and rebuild.`,
+    ...remedyLines(error.port),
     "",
   ];
 
   for (const line of lines) {
     console.error(line);
   }
+}
+
+/**
+ * The remedy lines, chosen by where `http.port` actually came from.
+ *
+ * The provenance is the detector's own finding from env-load, carried here via
+ * {@link getRecordedEnvironmentOverride} rather than recomputed — so this asks
+ * "did an ambient HTTP_PORT beat .env, and is that the value now colliding?"
+ * and, only when the answer is yes, replaces the config-edit advice with the
+ * one that will actually free the port.
+ */
+export function remedyLines(collidingPort: number): string[] {
+  const httpPortOverride = getRecordedEnvironmentOverride(HTTP_PORT_ENV_KEY);
+
+  // Only claim the environment is the source when the ambient value is the one
+  // that is actually colliding — an HTTP_PORT override of an UNRELATED port
+  // must not misdirect the reader away from their real (config) port.
+  const cameFromEnvironment =
+    httpPortOverride !== undefined &&
+    Number(String(httpPortOverride.effectiveValue).trim()) === collidingPort;
+
+  if (cameFromEnvironment) {
+    return [
+      `  this port came from the ${HTTP_PORT_ENV_KEY} environment variable (=${httpPortOverride!.effectiveValue}), which overrode .env's ${HTTP_PORT_ENV_KEY}=${httpPortOverride!.fileValue}.`,
+      `  editing src/config/http.ts and rebuilding will NOT change it — the environment variable wins.`,
+      `  then stop the process above, or unset ${HTTP_PORT_ENV_KEY} and run again.`,
+    ];
+  }
+
+  return [`  then stop it, or change http.port in src/config/http.ts and rebuild.`];
 }

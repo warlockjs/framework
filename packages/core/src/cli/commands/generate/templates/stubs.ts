@@ -237,7 +237,7 @@ export const ${entity.pascal}Resource = defineResource({
 export function crudRepositoryStub(entity: Name): string {
   const moduleSingularName = entity.singular;
   const modulePluralName = entity.plural;
-  return `import type { FilterRules, TypedRepositoryOptions } from "@warlock.js/core";
+  return `import type { FilterRules, RepositoryOptions, TypedRepositoryOptions } from "@warlock.js/core";
 import { RepositoryManager } from "@warlock.js/core";
 import { ${moduleSingularName.pascal} } from "../models/${moduleSingularName.kebab}";
 
@@ -360,13 +360,16 @@ import { ${entity.singular.pascal} } from "../models/${entity.singular.kebab}";
 export default seeder({
   name: "Seed ${entity.plural.pascal}",
   once: true,
-  enabled: true,
+  // Disabled until you fill in the fields below. A generated stub calls
+  // create({}) with no data, which fails required-field validation and would
+  // abort the whole \`warlock seed\` run. Add the fields, then set this to true.
+  enabled: false,
   run: async ({ track }) => {
     const total = 10;
     for (let i = 0; i < total; i++) {
       track(
         await ${entity.singular.pascal}.create({
-          // TODO: Add more fields
+          // TODO: Add the model's required fields here, then set enabled: true above.
         }),
       );
     }

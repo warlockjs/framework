@@ -28,6 +28,15 @@ import { DevServerShortcuts } from "../../../src/dev-server/shortcuts";
  * on source code could not: it observes the REAL `process.stdin` getter
  * being invoked (or not), not a description of the code that would invoke
  * it.
+ *
+ * This is THE guard for that exit-hang defect (finding 10a8ea45), and it has a
+ * LIVE red control: reintroduce the constructor default (`explicitInput:
+ * NodeJS.ReadStream = process.stdin`) and this test fails immediately. The
+ * spawn-based `tests/integration/cli/add-command-process-exit.test.ts` used to
+ * claim this role, but on Node 25.9.0 an un-unref'd stdin handle no longer
+ * keeps the loop alive, so it stays GREEN with the defect present — it can no
+ * longer fail from this regression. The direct assertion here replaces that
+ * dead timeout-based control (canon 4a7f3259).
  */
 describe("DevServerShortcuts", () => {
   it("does not read process.stdin merely by being constructed with no explicit input", () => {

@@ -2,6 +2,7 @@ import { loadEnv, type EnvLoaderOptions } from "@mongez/dotenv";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { detectEnvironmentOverrides } from "./detect-environment-overrides";
+import { recordEnvironmentOverrides } from "./recorded-environment-overrides";
 import { reportEnvironmentOverrides } from "./report-environment-overrides";
 
 /**
@@ -142,9 +143,17 @@ export async function loadEnvironmentFiles(directory: string = process.cwd()): P
   // The precedence itself is correct (see `environmentLoaderOptions` above);
   // the defect this guards against is the SILENCE — `.env` losing to an
   // ambient value with no diagnostic at all.
-  reportEnvironmentOverrides(
-    detectEnvironmentOverrides(resolveLoadedEnvFiles(directory), processEnvironmentSnapshot),
+  const overrides = detectEnvironmentOverrides(
+    resolveLoadedEnvFiles(directory),
+    processEnvironmentSnapshot,
   );
+
+  // Print the overrides here AND retain them: a later point in the boot (the
+  // port-collision reporter) needs to know an ambient `HTTP_PORT` beat `.env`
+  // to avoid advising a rebuild that the env var would just override again —
+  // see `recorded-environment-overrides.ts` (finding 8782b840).
+  recordEnvironmentOverrides(overrides);
+  reportEnvironmentOverrides(overrides);
 
   // `dir` has to be forwarded: `loadEnv()` defaults it to `process.cwd()`, so
   // without this the existence check above asks about `directory` while the

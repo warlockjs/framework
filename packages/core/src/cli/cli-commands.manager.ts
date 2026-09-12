@@ -8,7 +8,7 @@ import { registerConfiguredConnectors } from "../connectors/register-configured-
 import { ConnectorLifecyclePhase } from "../connectors/types";
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
 import { isDevWorker } from "../dev-server/supervisor";
-import { preflightConfiguredHttpPort } from "../http/boot-port-preflight";
+import { preflightConfiguredHttpPort, shouldPreflightHttpPort } from "../http/boot-port-preflight";
 import { manifestManager } from "../manifest/manifest-manager";
 import { appPath } from "../utils";
 import { loadEnvironmentFiles } from "../utils/load-environment";
@@ -826,7 +826,12 @@ export class CLICommandsManager {
       // counterpart of the check the generated production entry runs at the
       // same point in its own boot sequence (`production-builder.ts`, step
       // 2.6) — a cheap bind-and-release probe, not a connector reorder.
-      await preflightConfiguredHttpPort();
+      // Only when this boot will actually start http: a scoped list without
+      // "http" (seed, migrate, …) never binds the port, so probing it would
+      // collide with a running dev server on a port it never uses (f9ace89e).
+      if (shouldPreflightHttpPort(preloaders.connectors)) {
+        await preflightConfiguredHttpPort();
+      }
 
       if (preloaders.connectors === true) {
         await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);

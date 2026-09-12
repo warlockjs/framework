@@ -5,42 +5,48 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 /**
- * `warlock add <feature> --no-install` finishes its work and then never
- * exits — captured by the release gate (`release/5.4-findings.md` §12):
+ * End-to-end: `warlock add <feature> --no-install` completes its work AND the
+ * real CLI process exits 0 on its own, within a bound — spawned exactly the way
+ * the release gate spawns a child.
  *
- *   warlock add react exited 4294967295:
- *     ✔ add <features...> completed successfully (13ms)
+ * ─── What this test proves, and what it does NOT (finding 10a8ea45) ─────────
  *
- * The command printed success in 13ms and then sat at ZERO CPU for 67
- * minutes until the gate killed it. `stdin` was `ignore`, so nothing was
- * waiting on input — something kept the Node event loop alive after the
- * action returned.
+ * The ORIGINAL defect (release gate `release/5.4-findings.md` §12): `warlock
+ * add react` printed "completed successfully" in 13ms, then sat at ZERO CPU
+ * for 67 minutes until the gate killed it. Root cause: `dev-server/shortcuts.ts`
+ * exported a process-wide `DevServerShortcuts` singleton whose constructor
+ * DEFAULTED `input` to `process.stdin`. Default params evaluate at call time,
+ * so merely constructing that singleton — which `framework-cli-commands.ts`
+ * does on EVERY `warlock` invocation, `add` included, by statically importing
+ * every command module — touched `process.stdin` and made Node allocate a real
+ * stdin handle nobody asked for. The fix resolves `process.stdin` lazily from a
+ * getter, only when a caller actually offers a shortcut, never at construction.
  *
- * Root cause: `dev-server/shortcuts.ts` exported a process-wide
- * `DevServerShortcuts` singleton whose constructor DEFAULTED its `input`
- * parameter to `process.stdin`. Default parameters evaluate at call time,
- * so merely constructing that singleton touched `process.stdin` and made
- * Node allocate a real stdin handle. `cli/framework-cli-commands.ts`
- * statically imports every command module — `dev-server.command.ts`
- * included — so that singleton (and the `process.stdin` touch) was
- * constructed on EVERY `warlock` invocation, `add` included, regardless of
- * whether the command has anything to do with the dev server. Under
- * `stdio: ["ignore", "pipe", "pipe"]` (exactly how the gate spawns a child,
- * and how this test spawns the CLI below) that handle could keep the loop
- * alive well past `exitAfterFlush`'s own safety margin.
+ * This test used to be sold as THE guard for that defect, on the theory that a
+ * reintroduced un-unref'd stdin handle would make the child time out here. That
+ * is NO LONGER TRUE: on Node 25.9.0 an un-unref'd `process.stdin` handle under
+ * `stdio: ["ignore", ...]` does not keep the loop alive, so reintroducing the
+ * exact constructor-default defect leaves this test GREEN (verified 2026-09-13:
+ * defect reintroduced → child still exits 0 in ~12s). A red-first control on
+ * this test therefore does not go red — it cannot honestly claim to guard the
+ * stdin-handle regression (canon 4a7f3259).
  *
- * The fix (`dev-server/shortcuts.ts`) resolves `process.stdin` lazily, from
- * a getter, only when a caller that actually offers a shortcut touches it
- * (`isSupported`/`register`/`listen`/`release`) — never at construction.
+ * The stdin-handle regression is guarded DIRECTLY, with a LIVE red control, by
+ * `tests/unit/dev-server/shortcuts-lazy-stdin.test.ts`: it wraps the real
+ * `process.stdin` getter and asserts constructing `DevServerShortcuts` never
+ * reads it. Reintroduce the constructor default and THAT test fails immediately
+ * — the honest guard for this defect.
  *
- * This is the honest form of guard for "the process didn't exit": it spawns
- * the REAL CLI (`bin/warlock.js`, which falls back to compiling
- * `src/cli/start.ts` from source when no `esm/` build exists next to it —
- * exactly this checkout's own layout) against a throwaway fixture app, with
- * the same stdio shape the release gate uses, and asserts the child process
- * terminates ON ITS OWN within a bound. A regression that reintroduces an
- * un-unref'd handle on this path makes this test time out, not merely read
- * a wrong value — a text-matching assertion cannot fail this way.
+ * What THIS test still legitimately proves, and why it is kept: the real CLI
+ * path for `add --no-install` runs to completion and the process terminates 0
+ * on its own within a bound. It spawns `bin/warlock.js` (which compiles
+ * `src/cli/start.ts` from source when no `esm/` build sits beside it — this
+ * checkout's layout) against a throwaway fixture, with the release gate's stdio
+ * shape. It still catches add-path breakage (a crash, a non-zero exit, work
+ * that never finishes) AND any FUTURE handle leak that DOES keep the Node 25.9
+ * loop alive (a timer, a socket, a listening server) — the class of regression
+ * a text-matching assertion cannot catch. It is a boot/exit smoke test, not the
+ * stdin-handle guard.
  */
 
 const CORE_ROOT = path.resolve(__dirname, "../../..");
@@ -92,9 +98,9 @@ afterEach(async () => {
   await rm(fixtureDir, { recursive: true, force: true });
 });
 
-describe("warlock add <feature> --no-install exits on its own", () => {
+describe("warlock add <feature> --no-install completes and the CLI exits 0 on its own (boot/exit smoke test; NOT the stdin-handle guard — see shortcuts-lazy-stdin.test.ts)", () => {
   it(
-    "the child process terminates without being killed, within the timeout bound",
+    "completes the add and the child process terminates 0 without being killed, within the timeout bound",
     async () => {
       const exitInfo = await new Promise<{ code: number | null; signal: NodeJS.Signals | null; timedOut: boolean; stdout: string }>(
         (resolve) => {

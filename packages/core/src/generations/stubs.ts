@@ -664,9 +664,9 @@ export const webContactControllerStub = `import { type Request, type RequestHand
 import { type Infer, v } from "@warlock.js/seal";
 
 export const contactSchema = v.object({
-  name: v.string().min(2).required(),
-  email: v.email().required(),
-  message: v.string().min(10).required(),
+  name: v.string().min(2),
+  email: v.email(),
+  message: v.string().min(10),
 });
 
 export type ContactSchema = Infer.Output<typeof contactSchema>;
@@ -762,9 +762,9 @@ export const route = { path: "/", name: "index" } as const;
 export const metadata = { title: "Home" };
 
 const contactSchema = v.object({
-  name: v.string().min(2).required(),
-  email: v.email().required(),
-  message: v.string().min(10).required(),
+  name: v.string().min(2),
+  email: v.email(),
+  message: v.string().min(10),
 });
 
 function TextInput({ label, ...controlProps }: FormControlProps & { label: string }) {
