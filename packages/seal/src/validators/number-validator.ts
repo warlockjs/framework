@@ -1,4 +1,11 @@
-import { absMutator, ceilMutator, floorMutator, roundMutator, toFixedMutator } from "../mutators";
+import {
+  absMutator,
+  ceilMutator,
+  floorMutator,
+  numericMutator,
+  roundMutator,
+  toFixedMutator,
+} from "../mutators";
 import {
   betweenNumbersRule,
   evenRule,
@@ -285,6 +292,27 @@ export class NumberValidator extends PrimitiveValidator {
    */
   public toFixed(decimals = 2) {
     return this.addMutator(toFixedMutator, { decimals });
+  }
+
+  /**
+   * Opt in to coercion: a numeric-shaped string is converted to a number
+   * **before** the type rules run; any other value passes through unchanged
+   * so bad input still fails the type rule.
+   *
+   * Strictness is preserved — coercion only fixes the string *representation*,
+   * not the value's shape. `v.int().coerce()` turns `"5"` into `5` (valid) but
+   * `"5.5"` into `5.5`, which still fails the integer rule. Number validators
+   * do **not** coerce by default; this only takes effect when explicitly chained.
+   *
+   * The output type is unchanged (`Infer<>` keys off the validator class), so
+   * `v.int().coerce()` still infers `number`.
+   *
+   * @example
+   * v.int().coerce()      // "5" → 5 (valid); "5.5" → 5.5 (invalid); "abc" → invalid
+   * v.number().coerce()   // "5.5" → 5.5 (valid)
+   */
+  public coerce() {
+    return this.addMutator(numericMutator) as this & { isCoerced: true };
   }
 
   /**

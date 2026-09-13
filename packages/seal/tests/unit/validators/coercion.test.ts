@@ -34,6 +34,43 @@ describe("coercion behavior", () => {
     });
   });
 
+  describe("v.int().coerce()", () => {
+    it("coerces a numeric string to a number in the output data", async () => {
+      const result = await validate(v.object({ n: v.int().coerce() }), { n: "5" });
+      expect(result.isValid).toBe(true);
+      expect(result.data.n).toBe(5);
+    });
+
+    it("preserves int strictness after coercion (a fractional string still fails)", async () => {
+      const result = await validate(v.object({ n: v.int().coerce() }), { n: "5.5" });
+      expect(result.isValid).toBe(false);
+    });
+
+    it("rejects a non-numeric string (passes through unchanged, fails the type rule)", async () => {
+      const result = await validate(v.object({ n: v.int().coerce() }), { n: "abc" });
+      expect(result.isValid).toBe(false);
+    });
+
+    it("does not affect bare v.int() — the no-coercion guarantee stays intact", async () => {
+      const result = await validate(v.object({ n: v.int() }), { n: "5" });
+      expect(result.isValid).toBe(false);
+    });
+  });
+
+  describe("v.number().coerce() / v.float().coerce()", () => {
+    it("v.number().coerce() coerces a fractional string to a number", async () => {
+      const result = await validate(v.object({ n: v.number().coerce() }), { n: "5.5" });
+      expect(result.isValid).toBe(true);
+      expect(result.data.n).toBe(5.5);
+    });
+
+    it("v.float().coerce() coerces a fractional string to a number", async () => {
+      const result = await validate(v.object({ n: v.float().coerce() }), { n: "5.5" });
+      expect(result.isValid).toBe(true);
+      expect(result.data.n).toBe(5.5);
+    });
+  });
+
   describe("v.scalar() coercion mutators", () => {
     it("asNumber coerces to number", async () => {
       const result = await validate(v.object({ n: v.scalar().asNumber() }), { n: "5" });
