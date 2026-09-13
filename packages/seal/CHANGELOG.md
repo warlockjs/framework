@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/seal` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.9.0 - 2026-09-13
+
+### Added
+
+- `.coerce()` modifier on the number validators (`int` / `number` / `float` / `numeric`): opt into parsing a numeric-shaped string (e.g. a query-string param) into a number while the type rule stays strict. `v.int()` is unchanged by default; chain `.coerce()` to accept `"2"` as `2`. The inferred output type is unaffected.
+
 ## 5.7.0 - 2026-09-11
 
 ### Changed
