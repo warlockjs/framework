@@ -116,6 +116,138 @@
   ],
   "releases": [
     {
+      "version": "5.8.0",
+      "id": "v5-8-0",
+      "date": "September 13, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Auth token migrations now match your user model's primary key</strong> (integer or uuid), fixing a fresh app's first login, and a guarded page can redirect a logged-out browser to a login route (opt-in <code>auth.pageAuth</code>). Custom <code>warlock &lt;command&gt;</code> files resolve the <code>app/*</code> alias, <code>--db=postgres</code> scaffolds a real Postgres <code>config/database.ts</code>, and dev SSR no longer flashes unstyled. Fixes across <code>core</code>, <code>auth</code>, <code>web</code>, <code>cascade</code> and <code>create-warlock</code>.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Guarded page routes can redirect a logged-out browser to a configurable login path instead of returning a raw JSON 401 — opt-in via <code>auth.pageAuth.loginPath</code> (API routes still return the JSON 401)."
+            },
+            {
+              "type": "Fixed",
+              "html": "The <code>access_tokens</code> / <code>refresh_tokens</code> migrations now derive the <code>user_id</code> column type from the user model's primary key (via <code>foreignId</code>), so a fresh app with an integer-PK user can log in — the hardcoded <code>uuid</code> <code>user_id</code> previously failed the first login with no diagnostic."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>doctor</code> gains a <code>jwt-secret</code> check: it fails when <code>auth.userType</code> is configured but no JWT signing secret is set — the pre-flight form of the silent first-login 500 the lazy secret resolution would otherwise throw."
+            },
+            {
+              "type": "Changed",
+              "html": "The emitted generator and starter templates no longer carry a redundant <code>.required()</code> — <code>@warlock.js/seal</code> fields are required by default, so the call was a no-op that taught the opposite of the truth. <code>.required()</code> still exists for setting a custom message."
+            },
+            {
+              "type": "Fixed",
+              "html": "CLI command modules now resolve the <code>app/*</code> path alias and <code>.ts</code> siblings the way controllers and pages do. The ESM loader hook is registered before a command module is imported, so a <code>warlock &lt;command&gt;</code> file that imports <code>app/*</code> no longer dies with <code>ERR_MODULE_NOT_FOUND</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock generate.*</code> error hints point at <code>generate</code>, not the removed <code>create.*</code> command."
+            },
+            {
+              "type": "Fixed",
+              "html": "A generated CRUD repository imports every <code>@warlock.js/core</code> type it references, and a generated seed stub ships disabled so an unfilled stub cannot abort the whole <code>warlock seed</code> run."
+            },
+            {
+              "type": "Fixed",
+              "html": "The HTTP-port preflight runs only for a boot that actually starts the http connector, so a scoped data command (<code>warlock seed</code>, <code>migrate</code>) no longer probes — and collides with — a port it never binds."
+            },
+            {
+              "type": "Fixed",
+              "html": "A port-in-use error now names the <code>HTTP_PORT</code> environment variable and tells you to unset it when an ambient value is the cause, instead of advising a <code>src/config/http.ts</code> edit that the environment variable would just override."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>Migration.foreignId(name)</code> derives a foreign-key column's type from <code>migrationDefaults.primaryKey</code>, so FK columns match the app's chosen primary-key type (integer / bigInteger / uuid)."
+            },
+            {
+              "type": "Fixed",
+              "html": "Numeric-looking Postgres connection config (e.g. a numeric <code>DB_NAME</code>) is coerced to a string via <code>buildPostgresPoolConfig</code>, instead of crashing the driver with an inscrutable buffer error."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Dev SSR now emits the page's stylesheet <code>&lt;link&gt;</code> in <code>&lt;head&gt;</code>, fixing a cold module-graph flash-of-unstyled-content — the first paint of a page whose CSS is reached only through the module graph is now styled in development, as it already was in production."
+            },
+            {
+              "type": "Fixed",
+              "html": "A dev-mode SSR render error now reaches an unconditional stderr floor with a real diagnostic, instead of a diagnostic-free generic 500."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.7.0",
       "id": "v5-7-0",
       "date": "September 12, 2026",
