@@ -8,7 +8,7 @@
 
 ---
 name: create-a-warlock-project
-description: 'Scaffold a brand-new Warlock.js project with `create-warlock` — the interactive wizard and its non-interactive flag set. A single `--yes` command scaffolds the entire app from flags. Every flag (`--name`, `--db`, `--pm`, `--features`, `--ai`, `--git/--no-git`, `--jwt/--no-jwt`, `--no-db`, `--yes`), every valid database-driver / feature / AI-provider key, opting out of a database (`--db=none` / `--no-db`, which removes `src/config/database.ts`), and the directory tree the template emits. Triggers: `create-warlock`, `yarn create warlock`, `npm create warlock`, `npx create-warlock`; "scaffold a warlock app", "start a new warlock project", "create-warlock flags", "non-interactive warlock scaffold", "scaffold without a database", "which features can I pass to create-warlock". Skip: running an already-created project (`@warlock.js/core/run-app/SKILL.md`); adding a feature to an existing project (`warlock add`, `@warlock.js/core/add-connector/SKILL.md`); generating a module inside a project (`@warlock.js/core/create-module/SKILL.md`).'
+description: 'Scaffold a brand-new Warlock.js project with `create-warlock` — the interactive wizard and its non-interactive flag set. A single `--yes` command scaffolds the entire app from flags. Every flag (`--name`, `--db`, `--pm`, `--features`, `--ai`, `--git/--no-git`, `--jwt/--no-jwt`, `--no-db`, `--yes`), every valid database-driver / feature / AI-provider key, opting out of a database (`--db=none` / `--no-db`, which removes `src/config/database.ts`), and the directory tree the template emits. Triggers: `create-warlock`, `npm create warlock`, `npx create-warlock`; "scaffold a warlock app", "start a new warlock project", "create-warlock flags", "non-interactive warlock scaffold", "scaffold without a database", "which features can I pass to create-warlock". Skip: running an already-created project (`@warlock.js/core/run-app/SKILL.md`); adding a feature to an existing project (`warlock add`, `@warlock.js/core/add-connector/SKILL.md`); generating a module inside a project (`@warlock.js/core/create-module/SKILL.md`).'
 ---
 
 # create-warlock — scaffold a new project
@@ -19,8 +19,8 @@ description: 'Scaffold a brand-new Warlock.js project with `create-warlock` — 
 
 ```bash
 # Interactive wizard (recommended for humans)
-yarn create warlock
-# or: npm create warlock@latest / pnpm create warlock / npx create-warlock
+npm create warlock@latest
+# or: npx create-warlock
 
 # Non-interactive (CI, agents, reproducible setups) — one command scaffolds the whole app
 npx create-warlock my-app --yes --db=postgres --features=test,redis --ai=ai-openai
@@ -46,6 +46,20 @@ The wizard asks, in order:
 ## Non-interactive flags
 
 Pass `--yes` (or `-y`) to skip every prompt and build from flags with defaults.
+
+**Without a terminal, `--yes` is not required.** When stdin is not a TTY — CI, a
+script, a container, an agent harness — the scaffolder does not try to prompt.
+If the flags already answer everything it needs, it simply scaffolds. Prompting
+is the fallback, not the precondition.
+
+Only a question that genuinely cannot be answered stops the run, and in practice
+that is just the project name, the one prompt with no default:
+
+```
+A project name is required and no terminal is available to ask for one. Pass it as
+the first argument or --name=<name>. Non-interactive flags: --yes, --pm=<npm|yarn|pnpm>,
+--db=<driver>|--no-db, --features=<list>, --ai=<list>, --git|--no-git, --jwt|--no-jwt.
+```
 
 | Flag                     | Takes value | Default        | Purpose                                                              |
 | ------------------------ | ----------- | -------------- | ------------------------------------------------------------------- |

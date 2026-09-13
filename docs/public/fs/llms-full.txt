@@ -379,7 +379,7 @@ Thin, opinionated wrapper around `node:fs` and `node:fs/promises`. Two-suffix co
 ## Install
 
 ```bash
-yarn add @warlock.js/fs
+npm install @warlock.js/fs
 ```
 
 ## Read

@@ -18,7 +18,7 @@ description: 'Install the SSR page layer with `warlock add web`: add React/Vite 
 ## The shape
 
 ```bash
-pnpm warlock add web
+npx warlock add web
 ```
 
 On the ordinary path it leaves this application-owned shape:
@@ -91,8 +91,8 @@ On the refusal path, free `/` yourself and create a page with either `route = { 
 Read the files rather than assuming the command could patch every application shape:
 
 ```bash
-pnpm warlock routes --method GET --path /
-pnpm warlock routes --method GET --path /welcome
+npx warlock routes --method GET --path /
+npx warlock routes --method GET --path /welcome
 ```
 
 The desired result is one page route at `/` and, when the stock JSON route existed, one API route at `/welcome`.
@@ -116,7 +116,7 @@ The desired result is one page route at `/` and, when the stock JSON route exist
 
 ---
 name: create-a-page
-description: 'Create an SSR React page under `src/web/**`, with either a literal `route` or a filesystem-derived one, an explicit public-cache opt-in, a default component, an optional typed `loader`, page `metadata`, the `error.page.tsx` boundary, and the universal `register()` hook. Triggers: `*.page.tsx`, `route`, `route.cache`, `maxAge`, `PageLoader`, `PageProps`, `PageMetadata`, `error.page.tsx`, `register`, `[...slug]`; "create a page", "cache a public page", "add an SSR route", "make a React page", "type page loader data", "add an error boundary", "catch-all route", "page renders blank 200", "page has no default export"; typical import `import type { PageLoader, PageProps } from "@warlock.js/web"`. Skip: root document shell — `@warlock.js/web/write-the-root/SKILL.md`; layout wrappers and prefixes — `@warlock.js/web/use-layouts/SKILL.md`; loader lifecycle and `shared` — `@warlock.js/web/load-page-data/SKILL.md`; competing frameworks `next`, `remix`, `react-router` file routes.'
+description: 'Create an SSR React page under `src/web/**`, with either a literal `route` or a filesystem-derived one, an explicit public-cache opt-in, a `validation` schema and `middleware` guards, a default component, an optional typed `loader`, page `metadata`, the `error.page.tsx` boundary, and the universal `register()` hook. Triggers: `*.page.tsx`, `route`, `route.cache`, `maxAge`, `validation`, `middleware`, `route.validate`, `route.middleware`, `PageLoader`, `PageProps`, `PageMetadata`, `error.page.tsx`, `register`, `[...slug]`; "create a page", "cache a public page", "add an SSR route", "make a React page", "type page loader data", "add an error boundary", "catch-all route", "page renders blank 200", "page has no default export", "validate route params and query", "page-level middleware"; typical import `import type { PageLoader, PageProps } from "@warlock.js/web"`. Skip: root document shell — `@warlock.js/web/write-the-root/SKILL.md`; layout wrappers and prefixes — `@warlock.js/web/use-layouts/SKILL.md`; loader lifecycle and `shared` — `@warlock.js/web/load-page-data/SKILL.md`; competing frameworks `next`, `remix`, `react-router` file routes.'
 ---
 
 # Warlock — create a page
@@ -217,6 +217,65 @@ Prefer an explicit stable `name` for links. Without one, Warlock derives a name 
 Every segment of a page's URL is written down somewhere: `route.path` (or the derived filesystem path), prefixed by the literal `prefix` exports of the positional layouts above it ([use-layouts](../use-layouts/SKILL.md)). Where the file sits always decides which layouts are above it, and — only when `route` is absent — the path segments too.
 
 The build reads `route` without executing application code. Declare it directly with `export const` and literal strings. Variables, function calls, computed object keys, spreads, and `export { route }` are refused.
+
+### Validate the page's input — the `validation` export
+
+Declare `validation` as its own top-level export: a [Seal](https://www.npmjs.com/package/@warlock.js/seal) schema per source, `params` and `query` kept as two separate keys — never merged into one bag, so a `:id` path segment and a `?id=` query key can never collide or silently shadow one another:
+
+> **Withdrawn after 5.6.0: `route.validate`.** A page that still declares it does not silently lose its validation — the app **refuses to boot** and names the file. Move the schema to the `validation` export shown below; the shape and the 400 are unchanged.
+
+```tsx title="src/web/products/product-details.page.tsx"
+import { v } from "@warlock.js/seal";
+import type { PageLoader, PageProps } from "@warlock.js/web";
+
+export const route = {
+  path: "/products/:id",
+  name: "products.details",
+} as const;
+
+export const validation = {
+  params: v.object({ id: v.string().minLength(2) }),
+  query: v.object({ tab: v.string().optional() }),
+};
+
+export const loader = (async ({ request }) => {
+  const { params, query } = request.validated();
+
+  return { id: params.id, tab: query.tab };
+}) satisfies PageLoader<undefined, typeof route>;
+
+export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
+  return <h1>Product {data.id}</h1>;
+}
+```
+
+`request.validated()` types `params` and `query` from the schema — never a flattened merge of the two. There is exactly ONE validation surface on a page; see [load-page-data](../load-page-data/SKILL.md) for how the validated data reaches the loader.
+
+Rejected input never reaches the loader. It renders the application's `error.page.tsx` boundary at status 400 carrying the failure — a page is a document, not an API endpoint, so invalid input never gets a raw JSON body. The same 400 travels the same way over the `_loader` client-navigation wire.
+
+### `middleware` — a page's own guard, run last
+
+Declare `middleware` as its own top-level export: an array of `(ctx) => unknown | Promise<unknown>` guards on the page itself, alongside any layout `middleware` above it ([use-layouts](../use-layouts/SKILL.md)). Ordering is fixed pipeline-wide: every layout on the chain runs outermost-first, and the page's own `middleware` runs LAST, closest to the loader — **a layout's auth gate can never be bypassed by a page declaring its own middleware.**
+
+> **Withdrawn after 5.6.0: `route.middleware`.** As with `route.validate`, a page still declaring it **refuses to boot** rather than quietly running without its guards — which for an auth guard is the difference between a broken deploy and an open door.
+
+```tsx
+export const route = {
+  path: "/account",
+} as const;
+
+export const middleware = [
+  async ({ request, response }) => {
+    if (!request.header("authorization")) {
+      response.setStatusCode(401);
+
+      return { error: "Unauthorized" };
+    }
+  },
+];
+```
+
+Returning anything other than `undefined` from a middleware short-circuits the request with that value, exactly as an app or layout middleware does.
 
 ## Page caching
 
@@ -680,7 +739,7 @@ Only put browser-safe data in `shared`: scalars, arrays, plain objects, or value
 
 ---
 name: navigate-on-the-client
-description: 'Navigate hydrated pages with `<Link>`, resolve named URLs with `href()`, use `navigateTo` / `navigateBack`, prefetch on interaction, inspect the server match with `currentRoute()`, and re-fetch loaders after a mutation with `refresh()`. Triggers: `Link`, `href`, `navigateTo`, `navigateBack`, `refresh`, `currentRoute`, `previousRoute`; "navigate without a reload", "link to a named route", "refresh page data", "revalidate loaders", "client-side back"; typical import `import { Link, refresh } from "@warlock.js/web"`. Skip: define a page route — `@warlock.js/web/create-a-page/SKILL.md`; loader mechanics — `@warlock.js/web/load-page-data/SKILL.md`; root hydration boundary — `@warlock.js/web/write-the-root/SKILL.md`; competing routers `@mongez/react-router`, `react-router-dom`, Next navigation.'
+description: 'Navigate hydrated pages with `<Link>`, resolve named URLs with `href()`, use `navigateTo` / `navigateBack`, prefetch on interaction, inspect the server match with `currentRoute()`, re-fetch loaders after a mutation with `refresh()`, and read one query-string key live with `useQueryString`. Triggers: `Link`, `href`, `navigateTo`, `navigateBack`, `refresh`, `currentRoute`, `previousRoute`, `useQueryString`; "navigate without a reload", "link to a named route", "refresh page data", "revalidate loaders", "client-side back", "read query string in a component", "query string stale after Link navigation"; typical import `import { Link, refresh, useQueryString } from "@warlock.js/web"`. Skip: define a page route — `@warlock.js/web/create-a-page/SKILL.md`; loader mechanics — `@warlock.js/web/load-page-data/SKILL.md`; root hydration boundary — `@warlock.js/web/write-the-root/SKILL.md`; competing routers `@mongez/react-router`, `react-router-dom`, Next navigation.'
 ---
 
 # Warlock — navigate on the client
@@ -696,12 +755,7 @@ import { Link } from "@warlock.js/web";
 
 export function ProductLink({ id }: { id: string }) {
   return (
-    <Link
-      to="products.details"
-      params={{ id }}
-      query={{ tab: "specifications" }}
-      prefetch
-    >
+    <Link to="products.details" params={{ id }} query={{ tab: "specifications" }} prefetch>
       View product
     </Link>
   );
@@ -722,7 +776,9 @@ export function NavigationLinks() {
     <nav>
       <Link to="products.index">Products</Link>
       <Link href="/pricing">Pricing</Link>
-      <Link href="https://example.com/docs" newTab>External docs</Link>
+      <Link href="https://example.com/docs" newTab>
+        External docs
+      </Link>
       <Link email="sales@example.com">Email sales</Link>
       <Link tel="+201000000000">Call sales</Link>
     </nav>
@@ -773,8 +829,12 @@ export function CheckoutButtons() {
 
   return (
     <div>
-      <button type="button" onClick={navigateBack}>Back</button>
-      <button type="button" onClick={openCheckout}>Checkout</button>
+      <button type="button" onClick={navigateBack}>
+        Back
+      </button>
+      <button type="button" onClick={openCheckout}>
+        Checkout
+      </button>
     </div>
   );
 }
@@ -806,13 +866,40 @@ export function DeleteProductButton({ id }: { id: string }) {
     }
   };
 
-  return <button type="button" onClick={deleteProduct}>Delete product</button>;
+  return (
+    <button type="button" onClick={deleteProduct}>
+      Delete product
+    </button>
+  );
 }
 ```
 
 `refresh()` re-fetches the current URL's App, Layout, and Page loaders and swaps fresh data without pushing history. It returns `true` only when fresh data reached the screen. On network/build failure it returns `false` and leaves the current page intact.
 
 This is an ordinary API mutation followed by a re-fetch. Server actions are not supported.
+
+## Read the query string live — `useQueryString`
+
+```tsx title="src/web/products/product-list-filters.tsx"
+import { useQueryString } from "@warlock.js/web";
+
+export function ProductListFilters() {
+  const tab = useQueryString("tab");
+  // Narrow before rendering: anyone can type `?tab[]=a` or `?tab[x]=1`, so the
+  // hook's type says the value may not be a string.
+  const active = typeof tab === "string" ? tab : "all";
+
+  return <p>Tab: {active}</p>;
+}
+```
+
+`useQueryString(key)` returns the decoded value at `key` from the current query string — a string, an array (`key[]`), or a one-level bag (`key[sub]`). **A missing key returns `undefined`, never `""`**: an absent key and a present-but-empty one (`?q=`, which parses to `""`) are different values, and there is no default-value parameter — the caller decides what "absent" means for its own UI.
+
+**The return type is a union, and you have to narrow it.** `QueryStringValue | undefined` is not a `ReactNode`, so putting the raw value in JSX does not compile — deliberately. The URL is user input: a page expecting `?tab=specs` can be handed `?tab[]=a&tab[]=b` by anyone with an address bar, and the compiler makes you decide what that means instead of rendering `[object Object]`. Narrow with `typeof value === "string"`; do not cast it away.
+
+It re-renders the calling component after a client navigation completes — `<Link>`, `navigateTo()`, or Back/Forward — and the value it reads changed. A `<Link>` navigation moves the URL with `pushState`/`replaceState` directly rather than firing `popstate`, so a component that only read `location.search` once would render a stale value the moment a link changed just the query string; this hook exists because of that gap.
+
+Safe to call during SSR: it reads the search string of the request being rendered rather than returning empty, so the server's answer matches the first client render and hydration does not mismatch.
 
 ## Current and previous routes
 
@@ -919,6 +1006,7 @@ Use a bare side-effect import in `root.tsx`. In development the server parses th
 
 Development has no client manifest, so Warlock reads `root.tsx`, finds bare stylesheet imports, resolves them relative to the root file, and emits a link before `</head>`:
 
+<!-- prettier-ignore -->
 ```html
 <link rel="stylesheet" href="/src/web/app.css?direct">
 ```
@@ -1039,14 +1127,11 @@ export const loader = (async () => {
   };
 }) satisfies LayoutLoader;
 
-export default function ProductsLayout({
-  data,
-  children,
-}: LayoutProps<typeof loader>) {
+export default function ProductsLayout({ data, children }: LayoutProps<typeof loader>) {
   return (
     <section>
       <nav aria-label="Products">
-        {data.navigation.map(item => (
+        {data.navigation.map((item) => (
           <a key={item.href} href={item.href}>
             {item.label}
           </a>
