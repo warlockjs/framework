@@ -44,7 +44,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { assertArtifactContainsItsEntryPoints as assertEntries } from "../../../builder/scripts/artifact-entry-points.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -1025,6 +1025,244 @@ function assertArtifactIsNotStale(version) {
 }
 
 /**
+ * Refuse an artifact whose manifest promises files it does not actually ship.
+ *
+ * The staleness check above compares MTIMES only: a "hollow" directory — a
+ * `package.json` and `README` with no `esm/`, produced by an interrupted build —
+ * has a freshly written manifest that is *newer* than source, so it passes.
+ * Nineteen such directories once existed in this tree and nothing we owned
+ * noticed. Mtimes prove when a directory was touched, never what is in it.
+ *
+ * The manifest is the specification. Every DECLARED entry-point target names a
+ * file the package promises consumers can resolve, so we resolve each against
+ * the artifact directory and require it to EXIST and be NON-EMPTY. A zero-byte
+ * `index.mjs` is exactly this defect class — it exists, resolves, and imports as
+ * nothing — so existence alone is not enough; size must be > 0.
+ *
+ * Covered manifest keys:
+ *   - `main`, `module`, `types`, `typings`
+ *   - `bin` (string or map; targets that lack a leading `./` are normalized,
+ *     e.g. `"warlock": "bin/warlock.js"`)
+ *   - `exports`: string shorthand, the `.` entry, subpath entries, and every
+ *     string leaf reached by traversing nested condition objects
+ *     (`import`/`require`/`default`/`types`).
+ *
+ * Locked decisions:
+ *   1. `exports` glob targets (containing `*`) are EXCLUDED — a glob names a set,
+ *      not a file, and asserting one file is wrong. They are reported as skipped
+ *      so the guard never claims coverage it does not have.
+ *   2. Size > 0, not mere existence (see above).
+ *   3. The artifact DIRECTORY only — the published tarball is a separate check.
+ *   4. `exports` ARRAY fallbacks are a GROUP: Node uses the first that resolves,
+ *      so the group fails only when EVERY entry is missing/empty.
+ *   5. A condition set to `null` blocks a subpath deliberately — SKIP it.
+ *   6. A failure names the exact manifest key AND the unresolved/empty target.
+ *
+ * @param artifactDirectory built package directory, containing its package.json
+ * @param name package name, for the failure message
+ * @returns the number of declared targets (single targets + fallback groups) that resolved
+ */
+export function assertArtifactResolves(artifactDirectory, name = path.basename(artifactDirectory)) {
+  const manifestPath = path.join(artifactDirectory, "package.json");
+
+  if (!existsSync(manifestPath)) {
+    throw new Error(`${name}: no package.json in ${artifactDirectory} — nothing was built.`);
+  }
+
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+
+  /** Single targets that must each resolve: { key, target }. */
+  const singles = [];
+  /** Fallback groups where at least one must resolve: { key, targets }. */
+  const groups = [];
+  /** Glob targets deliberately not checked: { key, target }. */
+  const skippedGlobs = [];
+
+  const addSingle = (key, value) => {
+    if (typeof value !== "string") {
+      return;
+    }
+
+    if (value.includes("*")) {
+      skippedGlobs.push({ key, target: value });
+
+      return;
+    }
+
+    singles.push({ key, target: value });
+  };
+
+  if (typeof manifest.main === "string") {
+    addSingle("main", manifest.main);
+  }
+
+  if (typeof manifest.module === "string") {
+    addSingle("module", manifest.module);
+  }
+
+  if (typeof manifest.types === "string") {
+    addSingle("types", manifest.types);
+  }
+
+  if (typeof manifest.typings === "string") {
+    addSingle("typings", manifest.typings);
+  }
+
+  if (typeof manifest.bin === "string") {
+    addSingle("bin", manifest.bin);
+  } else if (manifest.bin && typeof manifest.bin === "object") {
+    for (const [binName, target] of Object.entries(manifest.bin)) {
+      addSingle(`bin.${binName}`, target);
+    }
+  }
+
+  // Flatten a value (which may nest conditions/arrays) to its string leaves,
+  // dropping `null` conditions (rule 5) and separating out glob targets.
+  const collectLeaves = (value, leaves, globs) => {
+    if (value === null || value === undefined) {
+      return;
+    }
+
+    if (typeof value === "string") {
+      if (value.includes("*")) {
+        globs.push(value);
+      } else {
+        leaves.push(value);
+      }
+
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        collectLeaves(item, leaves, globs);
+      }
+
+      return;
+    }
+
+    if (typeof value === "object") {
+      for (const item of Object.values(value)) {
+        collectLeaves(item, leaves, globs);
+      }
+    }
+  };
+
+  const walkExports = (value, key) => {
+    if (value === null || value === undefined) {
+      return;
+    }
+
+    if (typeof value === "string") {
+      addSingle(key, value);
+
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      // A GROUP: Node resolves the first entry that works, so this fails only
+      // when none of them do (rule 4).
+      const leaves = [];
+      const globs = [];
+      collectLeaves(value, leaves, globs);
+
+      for (const glob of globs) {
+        skippedGlobs.push({ key, target: glob });
+      }
+
+      if (leaves.length > 0) {
+        groups.push({ key, targets: leaves });
+      }
+
+      return;
+    }
+
+    if (typeof value === "object") {
+      for (const [condition, sub] of Object.entries(value)) {
+        walkExports(sub, `${key} > ${condition}`);
+      }
+    }
+  };
+
+  if (typeof manifest.exports === "string") {
+    addSingle("exports", manifest.exports);
+  } else if (manifest.exports && typeof manifest.exports === "object") {
+    for (const [subpath, value] of Object.entries(manifest.exports)) {
+      walkExports(value, `exports["${subpath}"]`);
+    }
+  }
+
+  if (singles.length === 0 && groups.length === 0) {
+    throw new Error(
+      `${name}: its package.json declares no resolvable main, module, types, typings, bin or exports target, ` +
+        "so there is nothing to verify. A published package that names no entry point cannot be imported.",
+    );
+  }
+
+  const resolve = (target) => {
+    const relative = target.replace(/^\.\//, "");
+    const absolute = path.join(artifactDirectory, relative);
+
+    if (!existsSync(absolute)) {
+      return { ok: false, reason: "does not exist" };
+    }
+
+    const { size } = statSync(absolute);
+
+    if (size <= 0) {
+      return { ok: false, reason: "is zero bytes" };
+    }
+
+    return { ok: true };
+  };
+
+  const failures = [];
+
+  for (const { key, target } of singles) {
+    const result = resolve(target);
+
+    if (!result.ok) {
+      failures.push(`  ${key} → ${target} (${result.reason})`);
+    }
+  }
+
+  for (const { key, targets } of groups) {
+    const results = targets.map((target) => resolve(target));
+
+    if (results.every((result) => !result.ok)) {
+      failures.push(
+        `  ${key} → none of the fallback targets resolve: ${targets.join(", ")}`,
+      );
+    }
+  }
+
+  const skippedNote =
+    skippedGlobs.length > 0
+      ? ` (${skippedGlobs.length} glob target(s) were SKIPPED, not checked: ${skippedGlobs
+          .map(({ key, target }) => `${key} → ${target}`)
+          .join(", ")})`
+      : " (no glob targets to skip)";
+
+  if (failures.length > 0) {
+    throw new Error(
+      [
+        `${name}: the artifact at ${artifactDirectory} declares entry points it does not contain.`,
+        "The package.json is the promise; these targets break it:",
+        ...failures,
+        "",
+        `A build that leaves a hollow or truncated artifact passes an mtime check and fails here.${skippedNote}`,
+      ].join("\n"),
+    );
+  }
+
+  const checked = singles.length + groups.length;
+
+  console.log(`  ${checked} declared target(s) resolve to non-empty files${skippedNote}`);
+
+  return checked;
+}
+
+/**
  * Build the fixture with `singleBundle: true` and RUN the result.
  *
  * The defect this covers is specifically a build that SUCCEEDS and a process
@@ -1147,6 +1385,19 @@ async function main() {
     console.log("  artifact is newer than every file in core/src");
   }
 
+  // Runs on EVERY path, not only behind the reuse flag. The hollow-artifact
+  // defect this closes was produced by an ordinary interrupted build — not by
+  // reuse — so gating it behind `skipFrameworkBuild` (as the mtime staleness
+  // check is) would miss the only case that has actually occurred. Placed
+  // before `packFramework`: there is no point packing and installing an
+  // artifact that does not contain what its manifest promises, and both the
+  // normal and reuse paths converge here having just located the core build.
+  log("Verifying the built core artifact resolves every entry point its manifest declares");
+  assertArtifactResolves(
+    path.join(coreBuildsDirectory, latestCoreVersion()),
+    "@warlock.js/core",
+  );
+
   const version = await packFramework();
 
   log("Verifying the lockstep pins the overrides would otherwise mask");
@@ -1208,7 +1459,12 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  console.error(`\n✖ ACCEPTANCE FAILED: ${error.message}`);
-  process.exit(1);
-});
+// Only kick off the full acceptance run when this file is the entry point.
+// Importing it (e.g. from a focused spec exercising assertArtifactResolves)
+// must not trigger a family build.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(`\n✖ ACCEPTANCE FAILED: ${error.message}`);
+    process.exit(1);
+  });
+}
