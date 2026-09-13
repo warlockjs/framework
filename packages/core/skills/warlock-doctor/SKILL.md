@@ -32,8 +32,11 @@ The default set is `defaultDoctorChecks` (in registration order — runtime-surf
 | `config` | required sections (`app`, `http`) present | — | a required section is missing |
 | `connectors` | manager enumerable; reports registered + active set | — | (only if the probe itself throws) |
 | `optional-peers` | every known optional peer installed | a peer is missing → its feature is unavailable | — |
+| `jwt-secret` | `auth.userType` configured and a JWT signing secret set | — | `auth.userType` is configured but no signing secret (`auth.accessToken.secret` / `auth.jwt.secret`) is set |
 | `health` | `/health` + `/ready` will be exposed | `http.health.enabled = false` (probes off) | — |
 | `release-hygiene` | `package.json` version matches the top `## x.y.z` CHANGELOG heading | no `CHANGELOG.md`, or no parseable heading | version ≠ top heading |
+
+`jwt-secret` is the pre-flight form of the silent first-login 500: when `auth.userType` is set but no signing secret is, every login and token operation fails with a generic 500 at runtime — `doctor` turns that into a `fail` before you ship. It resolves the secret from both the current key (`auth.accessToken.secret`) and the legacy `auth.jwt.secret`, so a project on the older-but-supported shape doesn't trip it. When `auth.userType` isn't configured at all (no auth), the check emits **no line** — it's skipped, not a pass — so it never nags a project that isn't doing auth.
 
 Optional peers are resolved from the **consuming app's** `node_modules` (via `createRequire(process.cwd())`), so the report reflects what *your* project has installed, not core's own deps.
 
