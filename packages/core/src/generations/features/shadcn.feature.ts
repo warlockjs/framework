@@ -418,6 +418,9 @@ function printNextStep(): void {
       `  ${colors.yellowBright("npx shadcn@latest add button card")}\n` +
       "  Skip `shadcn init` — this feature did its job, and running it would rewrite components.json\n" +
       "  and replace the theme tokens with an `@theme inline` block that resolves to nothing here.\n" +
+      `  Since shadcn's September 2026 change, ${colors.yellowBright("shadcn add")} installs the ${colors.yellowBright("cn")} package and its generated\n` +
+      `  components import ${colors.yellowBright("cn")} from ${colors.yellowBright('"cn"')}, not from the src/web/lib/utils.ts written here.\n` +
+      "  That file stays as a working local `cn` for your own imports; new shadcn components no longer route through it.\n" +
       `  ${colors.yellowBright("class-variance-authority")} and ${colors.yellowBright("lucide-react")} are already installed: shadcn declares\n` +
       "  them on the style index that only `init` reads, so `add` would never install them for you.\n" +
       `  ${colors.yellowBright("radix-ui")} (the unified package, not @radix-ui/react-*) IS declared per component,\n` +
