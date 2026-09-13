@@ -520,7 +520,21 @@ async function cachedFileExists(filePath: string): Promise<boolean> {
     return fileExistsCache.get(filePath)!;
   }
   const exists = (await fileExistsAsync(filePath)) as boolean;
-  fileExistsCache.set(filePath, exists);
+
+  // Cache ONLY positive results. A negative ("does not exist") answer is the
+  // exact case that flips moments later: the "add a new controller/route" flow
+  // references a file, then creates it. Caching that negative for the whole
+  // process lifetime (it was cleared only on a multi-file watcher batch) left
+  // a routes.ts import unresolvable after its target was created — the dep
+  // edge never formed and the route module import failed, so the new API route
+  // 404'd until an unrelated multi-file batch cleared the cache. That is
+  // finding 60721e35 ("backend route HMR needs a second edit"). A file that
+  // exists does not stop existing mid-resolve, so caching the hit is safe;
+  // re-probing a still-missing path costs only a handful of stat calls.
+  if (exists) {
+    fileExistsCache.set(filePath, exists);
+  }
+
   return exists;
 }
 
