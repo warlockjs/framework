@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.8.0 - 2026-09-13
+
+### Added
+
+- `Migration.foreignId(name)` derives a foreign-key column's type from `migrationDefaults.primaryKey`, so FK columns match the app's chosen primary-key type (integer / bigInteger / uuid).
+
+### Fixed
+
+- Numeric-looking Postgres connection config (e.g. a numeric `DB_NAME`) is coerced to a string via `buildPostgresPoolConfig`, instead of crashing the driver with an inscrutable buffer error.
+
 ## 5.7.0 - 2026-09-11
 
 ### Fixed
