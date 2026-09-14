@@ -41,6 +41,8 @@ v.string().min(3).trim()
 // "  Hi  " → rules see "  Hi  " (length 6, passes) → trim → result.data = "Hi"
 ```
 
+The number family ships a built-in numeric-string mutator behind **`.coerce()`** (5.9+): `v.int().coerce()` parses a numeric-shaped string to a number *before* the type rule runs, so `"3"` passes while `v.int()` stays strict by default. See [Coerce query params](../recipes/coerce-query-params.md).
+
 ## `.optional()` / `.required()` / `.present()`
 
 ```ts

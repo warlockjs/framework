@@ -39,6 +39,26 @@ await validate(v.object({ page: v.numeric() }), { page: "3" });
 
 Rule of thumb: **`v.numeric()` for anything that arrives as text** (query, form, headers), **`v.int()` / `v.number()` for JSON bodies** where the client already sent a real number.
 
+### Keep integer/number strictness — `.coerce()` (5.9+)
+
+`v.numeric()` accepts *any* numeric string, so `"3.5"` passes as `3.5`. When the **type** matters — you want a strict integer from a query string, so `"3"` is accepted but `"3.5"` is rejected — chain `.coerce()` on the number validator instead:
+
+```ts
+const listQuery = v.object({
+  page: v.int().coerce().min(1).default(1),
+});
+
+await validate(listQuery, { page: "3" });
+// → { page: 3 }  — the numeric string is parsed, then the int rule passes.
+
+await validate(listQuery, { page: "3.5" });
+// → ERROR — coercion parses "3.5" to 3.5, and the int rule still rejects it.
+```
+
+`.coerce()` is available on the whole number family (`int`, `number`, `float`, `numeric`). It is **opt-in and only reshapes a numeric-shaped string into a number** — anything non-numeric passes through untouched so it still fails the type rule, and `v.int()` stays strict everywhere you don't add it. The inferred output type is unchanged (`v.int().coerce()` is still `number`).
+
+Use `.coerce()` when the *type* matters (a strict `int` / `float` from text); reach for `v.numeric()` when you just want "a number from text".
+
 ## Enums — `.in()` reads strings directly
 
 Enum-style params are already strings, so a plain `v.string().in([...])` works — no coercion needed. Add `.default()` to make the param optional with a sensible fallback:
