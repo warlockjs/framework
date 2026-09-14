@@ -1569,6 +1569,24 @@ The "accepted" rules treat `true`, `"yes"`, `"on"`, `1`, `"1"`, `"true"` as acce
 | `.accepted(msg?)` | value must be accepted |
 | `.declined(msg?)` | value must be declined |
 
+## Query-string coercion — `.coerce()`
+
+`.coerce()` (5.10+) is the opt-in for query-string flags: `?active=true` arrives as the
+string `"true"`, and bare `v.boolean()` is strict by default — it rejects that string. Add
+`.coerce()` when a schema validates `request.query`:
+
+```ts
+v.object({ active: v.boolean().coerce() })   // "true" → true, passes
+```
+
+It converts *exactly* `"true"` / `"1"` / `1` → `true` and `"false"` / `"0"` / `0` → `false`.
+Case-sensitive, no trimming — anything else (`"yes"`, `"on"`, `"TRUE"`, `""`, `2`) passes
+through unchanged and still fails the type rule. That's the line between this and
+`accepted()`/`declined()` below: `.coerce()` is for the narrow, exact query-string
+serialization; `accepted()`/`declined()` are for broader form-style truthy strings like
+`"yes"`/`"on"`. `v.boolean()` does not coerce by default; the output type is unaffected
+(`v.boolean().coerce()` still infers `boolean`).
+
 ## Conditional variants — accepted
 
 | Method | Args | Effect |
@@ -1596,6 +1614,7 @@ All conditional variants only run inside `v.object` — sibling resolution silen
 - `v.boolean()` → `{ type: "boolean" }`
 - `.mustBeTrue()` / `.mustBeFalse()` — not currently emitted (could add `const: true/false` in the future)
 - `.accepted()` / `.declined()` and their conditional variants — runtime coercion concerns, not representable
+- `.coerce()` — a pre-validation mutator, not representable; the schema still emits `{ type: "boolean" }`
 
 ## Common chains
 
@@ -1616,6 +1635,11 @@ v.object({
 v.object({
   region: v.string(),
   marketingOptIn: v.boolean().declinedUnless("region", "US"),
+})
+
+// Query-string flag — ?active=true
+v.object({
+  active: v.boolean().coerce(),
 })
 ```
 

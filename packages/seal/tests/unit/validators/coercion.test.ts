@@ -71,6 +71,89 @@ describe("coercion behavior", () => {
     });
   });
 
+  describe("v.boolean().coerce()", () => {
+    it('coerces the string "true" to true', async () => {
+      const result = await validate(v.object({ flag: v.boolean().coerce() }), { flag: "true" });
+      expect(result.isValid).toBe(true);
+      expect(result.data.flag).toBe(true);
+    });
+
+    it('coerces the string "1" to true', async () => {
+      const result = await validate(v.object({ flag: v.boolean().coerce() }), { flag: "1" });
+      expect(result.isValid).toBe(true);
+      expect(result.data.flag).toBe(true);
+    });
+
+    it("coerces the number 1 to true", async () => {
+      const result = await validate(v.object({ flag: v.boolean().coerce() }), { flag: 1 });
+      expect(result.isValid).toBe(true);
+      expect(result.data.flag).toBe(true);
+    });
+
+    it('coerces the string "false" to false', async () => {
+      const result = await validate(v.object({ flag: v.boolean().coerce() }), { flag: "false" });
+      expect(result.isValid).toBe(true);
+      expect(result.data.flag).toBe(false);
+    });
+
+    it('coerces the string "0" to false', async () => {
+      const result = await validate(v.object({ flag: v.boolean().coerce() }), { flag: "0" });
+      expect(result.isValid).toBe(true);
+      expect(result.data.flag).toBe(false);
+    });
+
+    it("coerces the number 0 to false", async () => {
+      const result = await validate(v.object({ flag: v.boolean().coerce() }), { flag: 0 });
+      expect(result.isValid).toBe(true);
+      expect(result.data.flag).toBe(false);
+    });
+
+    it('rejects "yes" (not one of the exact coercible forms)', async () => {
+      const result = await validate(v.object({ flag: v.boolean().coerce() }), { flag: "yes" });
+      expect(result.isValid).toBe(false);
+    });
+
+    it('rejects "on" (not one of the exact coercible forms)', async () => {
+      const result = await validate(v.object({ flag: v.boolean().coerce() }), { flag: "on" });
+      expect(result.isValid).toBe(false);
+    });
+
+    it('rejects "TRUE" (case-sensitive)', async () => {
+      const result = await validate(v.object({ flag: v.boolean().coerce() }), { flag: "TRUE" });
+      expect(result.isValid).toBe(false);
+    });
+
+    it("rejects an empty string", async () => {
+      const result = await validate(v.object({ flag: v.boolean().coerce() }), { flag: "" });
+      expect(result.isValid).toBe(false);
+    });
+
+    it("rejects the number 2", async () => {
+      const result = await validate(v.object({ flag: v.boolean().coerce() }), { flag: 2 });
+      expect(result.isValid).toBe(false);
+    });
+
+    it("rejects null", async () => {
+      const result = await validate(v.object({ flag: v.boolean().coerce() }), { flag: null });
+      expect(result.isValid).toBe(false);
+    });
+
+    it('does not affect bare v.boolean() — still rejects the string "true"', async () => {
+      const result = await validate(v.object({ flag: v.boolean() }), { flag: "true" });
+      expect(result.isValid).toBe(false);
+    });
+
+    it("validates a query-string-shaped object with a coerced boolean flag", async () => {
+      const schema = v.object({
+        active: v.boolean().coerce(),
+        page: v.int().coerce(),
+      });
+      const result = await validate(schema, { active: "true", page: "2" });
+      expect(result.isValid).toBe(true);
+      expect(result.data).toEqual({ active: true, page: 2 });
+    });
+  });
+
   describe("v.scalar() coercion mutators", () => {
     it("asNumber coerces to number", async () => {
       const result = await validate(v.object({ n: v.scalar().asNumber() }), { n: "5" });
@@ -108,7 +191,10 @@ describe("coercion behavior", () => {
     it("a pre-validation mutator is visible to subsequent rules", async () => {
       // trim is a transformer (post-validation); addMutator runs pre-validation.
       const schema = v.object({
-        code: v.string().addMutator((value: string) => value.trim()).min(3),
+        code: v
+          .string()
+          .addMutator((value: string) => value.trim())
+          .min(3),
       });
 
       // "  ab  " trims to "ab" (length 2) → fails min(3)

@@ -1,3 +1,4 @@
+import { booleanCoerceMutator } from "../mutators/boolean-mutators";
 import {
   acceptedIfPresentRule,
   acceptedIfRequiredRule,
@@ -99,6 +100,30 @@ export class BooleanValidator extends PrimitiveValidator {
   /** Value must be declined if another field is missing */
   public declinedWithout(field: string, errorMessage?: string) {
     return this.addRule(declinedWithoutRule, errorMessage, { field });
+  }
+
+  // ==================== Coercion ====================
+
+  /**
+   * Opt in to coercion: an exact query-string-shaped boolean is converted to a
+   * real boolean **before** the type rules run; any other value passes through
+   * unchanged so bad input still fails the type rule.
+   *
+   * Converts exactly `"true"` / `"1"` / `1` → `true` and `"false"` / `"0"` / `0`
+   * → `false`. Case-sensitive, no trimming — `"TRUE"`, `"yes"`, `"on"`, `""`, and
+   * `2` all pass through unchanged and fail the type rule. `v.boolean()` does
+   * **not** coerce by default; this only takes effect when explicitly chained.
+   * For form-style truthy strings like `"yes"` / `"on"`, use `.accepted()` /
+   * `.declined()` instead — those are separate pass/fail rules, not coercion.
+   *
+   * The output type is unchanged (`Infer<>` keys off the validator class), so
+   * `v.boolean().coerce()` still infers `boolean`.
+   *
+   * @example
+   * v.boolean().coerce()   // "true" → true; "1" → true; "0" → false; "yes" → invalid
+   */
+  public coerce() {
+    return this.addMutator(booleanCoerceMutator) as this & { isCoerced: true };
   }
 
   // ==================== Strict boolean checks ====================

@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/seal` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.10.0
+
+### Added
+
+- `.coerce()` on `v.boolean()` — opt-in query-string coercion (`"true"`/`"1"` → `true`, `"false"`/`"0"` → `false`).
+
 ## 5.9.0 - 2026-09-13
 
 ### Added
@@ -17,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Internal type-safety hardening; no behaviour change.
 
 ## 5.6.0 - 2026-09-08
+
 ### Fixed
 
 - **`warlock build` and `warlock start` died inside Seal before any application code ran**, with a `ReferenceError` from `array-validator.ts` extending `BaseValidator` before `base-validator.ts` had finished evaluating. The cause was one inline `type` import: under `verbatimModuleSyntax`, `import { type ValidateOptions } from "./validators"` is emitted as a real side-effect import, which closed an import cycle that a type-only import would never have created. Written as `import type { ... }`, the module is not pulled into evaluation at all. Nothing about the validators changed — only which modules load, and when.
@@ -92,7 +99,7 @@ changelogs.
 - `v.literal("")` could never pass. Every validator is required by default and `required` rejects anything the empty-value check calls empty — which includes `""` — so a schema demanding an exact empty string reported "is required" for a field that was present. A literal set containing an empty value now uses `present` (the key must exist) instead of `required`, leaving the literal set to judge the value. Only the empty string was affected; `v.literal(0)` and `v.literal(false)` always worked
 - `v.literal("").optional()` silently disabled the literal check rather than fixing it, accepting `""`, `null` **and** a missing key alike. The literal rule now runs on empty values (`requiresValue: false`) while treating absence as the required/present rule's question, so `.optional()` means optional again and a present value must still match
 - a **failed** validation no longer returns the input it rejected. `object` returned the raw input — including the unknown keys it had just complained about — while `discriminatedUnion` returned `undefined`; the same call shape had two contracts. Validating an outbound DTO to keep internal fields out of a response, then reading `data` without branching on `isValid`, shipped every field the schema existed to exclude. `data` is now `undefined` whenever `isValid` is `false`
-- `v.number().toFixed(n)` could never produce a valid result — the mutator returned `Number(value).toFixed(n)`, a *string*, which the validator's own `number` type rule then rejected. It now yields a number (`3.14159` → `3.14`), so the method works where it lives. No working code can have depended on the old output, since every such validation failed; for a fixed-point *string*, format at the presentation edge rather than asking a number schema to emit one
+- `v.number().toFixed(n)` could never produce a valid result — the mutator returned `Number(value).toFixed(n)`, a _string_, which the validator's own `number` type rule then rejected. It now yields a number (`3.14159` → `3.14`), so the method works where it lives. No working code can have depended on the old output, since every such validation failed; for a fixed-point _string_, format at the presentation edge rather than asking a number schema to emit one
 
 ## 4.2.11
 
