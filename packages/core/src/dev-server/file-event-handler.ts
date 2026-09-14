@@ -58,6 +58,7 @@ export class FileEventHandler {
     // never enter the dep graph, only ride along in the batch event so the
     // dev server can react (config reload / restart warning).
     const externalChanges = changes.filter(isExternalPath);
+    const externalAdds = adds.filter(isExternalPath);
     const codeChanges = changes.filter((p) => !isExternalPath(p));
     const codeAdds = adds.filter((p) => !isExternalPath(p));
 
@@ -67,7 +68,7 @@ export class FileEventHandler {
       clearFileExistsCache();
     }
 
-    await this.processBatchAdds(codeAdds);
+    const { added: addedCodePaths, vanished } = await this.processBatchAdds(codeAdds);
     const changedCodePaths = await this.processBatchChanges(codeChanges);
     await this.processBatchDeletes(deletes);
 
@@ -81,11 +82,14 @@ export class FileEventHandler {
     // downstream is impossible: the source has already been overwritten, so a
     // content compare always looks unchanged — which is exactly why emptying a
     // file used to silently skip HMR.) External paths (.env / warlock.config.ts)
-    // ride along untouched so the dev server can still react to them.
+    // ride along untouched so the dev server can still react to them. Paths
+    // that vanished between the add event and their read/stat (a rename or
+    // move racing the filesystem) are folded into `deleted` instead of
+    // `added` — they were already unwound as deletions in processBatchAdds.
     events.trigger("dev-server:batch-complete", {
-      added: adds,
+      added: [...externalAdds, ...addedCodePaths],
       changed: [...externalChanges, ...changedCodePaths],
-      deleted: deletes,
+      deleted: [...deletes, ...vanished],
     });
   }
 
@@ -106,15 +110,37 @@ export class FileEventHandler {
     return changed;
   }
 
-  private async processBatchAdds(relativePaths: string[]): Promise<void> {
+  /**
+   * Process pending add events. Returns the paths that genuinely became
+   * available (`added`) separately from paths that no longer existed by the
+   * time they were read/stat'd (`vanished`) — the latter is a rename or move
+   * racing the filesystem, not a failure, so it is unwound as a deletion
+   * instead of being logged as an error.
+   */
+  private async processBatchAdds(
+    relativePaths: string[],
+  ): Promise<{ added: string[]; vanished: string[] }> {
+    const added: string[] = [];
+    const vanished: string[] = [];
+
     await runInBatches(relativePaths, FILE_PROCESSING_BATCH_SIZE, async (path) => {
       try {
-        await this.fileOperations.addFile(path);
+        const fileManager = await this.fileOperations.addFile(path);
+
+        if (fileManager.state === "deleted") {
+          await this.fileOperations.deleteFile(path);
+          vanished.push(path);
+          return;
+        }
+
+        added.push(path);
         devLogSuccess(`Added file: ${path}`);
       } catch (error) {
         console.error(`Failed to add file ${path}:`, error);
       }
     });
+
+    return { added, vanished };
   }
 
   private async processBatchDeletes(relativePaths: string[]): Promise<void> {

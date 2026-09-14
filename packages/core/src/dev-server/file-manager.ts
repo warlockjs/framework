@@ -10,6 +10,21 @@ import type { FileManifest, FileState, FileType } from "./types";
 export type CleanupFunction = () => void;
 
 /**
+ * Whether `error` is a Node `ENOENT` (path does not exist) error. Used to
+ * distinguish a file that has genuinely vanished between the watcher event
+ * and its read/stat (a rename or move racing the filesystem) from a real
+ * failure such as `EACCES` or a parse error, which must still surface.
+ */
+function isEnoentError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as NodeJS.ErrnoException).code === "ENOENT"
+  );
+}
+
+/**
  * FileManager â€” per-file metadata for the dependency graph.
  *
  * The loader hook transpiles and caches on-demand at import time, so this
@@ -83,6 +98,14 @@ export class FileManager {
    * Read source, hash, parse imports, emit ready. The only file-system
    * touch happens here; transpilation is the loader hook's job.
    *
+   * Both the read and the stat happen up front, before anything on this
+   * instance is mutated. A path that disappears between the watcher event
+   * and either of those calls (`ENOENT`) — typically a rename or move
+   * racing the filesystem — is treated as a deletion rather than a thrown
+   * error, and never leaves `source`/`hash` pointing at content that then
+   * vanished. A real failure (`EACCES`, a permissions error, etc.) still
+   * throws.
+   *
    * @param force - re-parse even when the hash matches.
    * @returns true if the file was (re)parsed.
    */
@@ -93,12 +116,18 @@ export class FileManager {
     this.state = "loading";
 
     let newSource: string;
+    let modifiedTime: Date;
 
     try {
       newSource = await getFileAsync(this.absolutePath);
-    } catch {
-      this.state = "deleted";
-      return false;
+      modifiedTime = await lastModifiedAsync(this.absolutePath);
+    } catch (error) {
+      if (isEnoentError(error)) {
+        this.state = "deleted";
+        return false;
+      }
+
+      throw error;
     }
 
     const newHash = crypto.createHash("sha256").update(newSource).digest("hex");
@@ -110,7 +139,7 @@ export class FileManager {
 
     this.source = newSource;
     this.hash = newHash;
-    this.lastModified = (await lastModifiedAsync(this.absolutePath)).getTime();
+    this.lastModified = modifiedTime.getTime();
 
     await this.rebuildImportMetadata();
     this.isTypeOnlyFile = isTypeOnlyFile(this.source);
