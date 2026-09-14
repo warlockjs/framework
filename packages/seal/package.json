@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/seal",
-  "version": "5.9.0",
+  "version": "5.10.0",
   "type": "module",
   "description": "Comprehensive Validation library",
   "main": "./src/index.ts",
