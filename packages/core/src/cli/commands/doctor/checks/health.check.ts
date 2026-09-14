@@ -13,7 +13,7 @@ import type { DoctorCheck } from "../check.types";
  * verdict from the config flag it is meant to be verifying.
  */
 function fastifyHasGet(path: string): boolean | undefined {
-  const http = container.has("http.server") ? container.get<any>("http.server") : undefined;
+  const http = container.tryGet<any>("http.server");
 
   if (!http || typeof http.hasRoute !== "function") return undefined;
 

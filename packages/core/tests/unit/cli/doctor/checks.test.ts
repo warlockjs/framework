@@ -218,6 +218,7 @@ describe("healthCheck", () => {
       container: {
         has: () => options.hasServer === true,
         get: () => undefined,
+        tryGet: () => undefined,
       },
     }));
 

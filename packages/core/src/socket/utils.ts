@@ -5,9 +5,5 @@ import { container } from "../container";
  * Get socket server instance
  */
 export function getSocketServer(): Server | null {
-  if (container.has("socket")) {
-    return container.get("socket");
-  }
-
-  return null;
+  return container.tryGet("socket") ?? null;
 }

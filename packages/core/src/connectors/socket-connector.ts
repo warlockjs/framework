@@ -75,8 +75,8 @@ export class SocketConnector extends BaseConnector {
     // 1. http is used, then use it (shared — the HTTP connector owns it)
     // 2. http is not used, then create a new server (we own it)
     let server;
-    if (container.has("http.server")) {
-      const fastify = container.get("http.server");
+    const fastify = container.tryGet("http.server");
+    if (fastify) {
       server = fastify.server;
       this.ownsRawServer = false;
     } else {
@@ -136,8 +136,8 @@ export class SocketConnector extends BaseConnector {
       return;
     }
 
-    if (container.has("socket")) {
-      const socket = container.get("socket");
+    const socket = container.tryGet("socket");
+    if (socket) {
       // socket.io's close() takes a callback — await it so shutdown doesn't
       // report done while sockets are still draining.
       await new Promise<void>((resolve) => {
@@ -145,10 +145,10 @@ export class SocketConnector extends BaseConnector {
       });
     }
 
-    if (this.ownsRawServer && container.has("socket.rawServer")) {
-      const server = container.get("socket.rawServer");
+    const rawServer = this.ownsRawServer ? container.tryGet("socket.rawServer") : undefined;
+    if (rawServer) {
       await new Promise<void>((resolve, reject) => {
-        server.close((error?: Error) => {
+        rawServer.close((error?: Error) => {
           if (error) {
             reject(error);
           } else {

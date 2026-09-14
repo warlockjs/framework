@@ -6,7 +6,7 @@ import {
   resetContainerInstanceRegistryForTests,
 } from "./container-instance-registry";
 
-describe("container.getOrFail", () => {
+describe("container.get", () => {
   beforeEach(() => {
     resetContainerInstanceRegistryForTests();
     registerContainerInstance();
@@ -17,14 +17,36 @@ describe("container.getOrFail", () => {
     registerContainerInstance();
   });
 
-  it("behaves like an ordinary miss when exactly one instance is registered", () => {
-    expect(() => container.getOrFail("does-not-exist")).toThrow(ContainerKeyMissingError);
+  it("returns the value for a registered key", () => {
+    container.set("http.baseUrl", "https://example.test");
+
+    expect(container.get("http.baseUrl")).toBe("https://example.test");
+
+    container.delete("http.baseUrl");
+  });
+
+  it("throws a named error naming the missing key, behaving like an ordinary miss when exactly one instance is registered", () => {
+    expect(() => container.get("does-not-exist")).toThrow(ContainerKeyMissingError);
 
     try {
-      container.getOrFail("does-not-exist");
+      container.get("does-not-exist");
     } catch (error) {
-      expect((error as Error).message).toBe('Container key "does-not-exist" is not registered.');
-      expect((error as Error).message).not.toMatch(/instance/i);
+      expect((error as Error).message).toMatch(/^Container key "does-not-exist" is not registered\./);
+      expect((error as Error).message).not.toMatch(/separate copies/i);
+    }
+  });
+
+  it("lists the currently registered keys, bounded, in the thrown message", () => {
+    container.set("http.baseUrl", "https://example.test");
+
+    try {
+      container.get("does-not-exist");
+      throw new Error("expected get to throw");
+    } catch (error) {
+      expect((error as Error).message).toMatch(/Registered keys:/);
+      expect((error as Error).message).toContain('"http.baseUrl"');
+    } finally {
+      container.delete("http.baseUrl");
     }
   });
 
@@ -32,20 +54,47 @@ describe("container.getOrFail", () => {
     registerContainerInstance();
 
     try {
-      container.getOrFail("does-not-exist");
-      throw new Error("expected getOrFail to throw");
+      container.get("does-not-exist");
+      throw new Error("expected get to throw");
     } catch (error) {
       expect(error).toBeInstanceOf(ContainerKeyMissingError);
       expect((error as Error).message).toMatch(/2 separate copies/);
       expect((error as Error).message).toMatch(/published install/);
     }
   });
+});
 
-  it("returns the value on a hit regardless of instance count", () => {
+describe("container.tryGet", () => {
+  beforeEach(() => {
+    resetContainerInstanceRegistryForTests();
     registerContainerInstance();
+  });
+
+  afterEach(() => {
+    resetContainerInstanceRegistryForTests();
+    registerContainerInstance();
+  });
+
+  it("returns undefined for a missing key instead of throwing", () => {
+    expect(container.tryGet("does-not-exist")).toBeUndefined();
+  });
+
+  it("returns the value for a registered key", () => {
     container.set("http.baseUrl", "https://example.test");
 
-    expect(container.getOrFail("http.baseUrl")).toBe("https://example.test");
+    expect(container.tryGet("http.baseUrl")).toBe("https://example.test");
+
+    container.delete("http.baseUrl");
+  });
+});
+
+describe("container.has", () => {
+  it("reports whether a key is registered without throwing", () => {
+    expect(container.has("does-not-exist")).toBe(false);
+
+    container.set("http.baseUrl", "https://example.test");
+
+    expect(container.has("http.baseUrl")).toBe(true);
 
     container.delete("http.baseUrl");
   });

@@ -225,7 +225,7 @@ See the [Registering a connector](#registering-a-connector) section above for th
 
 - **Set `this.active = true` only on success.** If `start()` throws partway, leaving `active` true means `shutdown()` thinks it has work to do and may double-close half-initialized resources.
 - **`shutdown()` must be idempotent.** SIGINT can fire twice on Windows. The manager guards re-entry with its own flag, but individual connectors get called once per shutdown loop — guard with `if (!this.active) return`.
-- **Don't reach across connector boundaries in `start()`.** The manager's `start()` loop runs all `boot()`s first, then all `start()`s — wiring across connectors goes through the `container` (`container.get("http.server")`), not through imports.
+- **Don't reach across connector boundaries in `start()`.** The manager's `start()` loop runs all `boot()`s first, then all `start()`s — wiring across connectors goes through the `container`, not through imports. Use `container.tryGet("http.server")` when the other connector is genuinely optional (e.g. socket falls back to its own raw server when HTTP isn't configured); use `container.get("http.server")` when its absence would be a bug — it throws a named `ContainerKeyMissingError` instead of handing back `undefined`.
 - **Production build still needs config registration.** Placing the connector under `src/connectors/<name>.ts` does not auto-register it. Put the same instance in `warlock.config.ts > connectors`; that array is what build-time contribution discovery and runtime boot share.
 - **`watchedFiles` is restart-trigger, not dependency.** It says "I want to restart when this file changes." It does *not* mean the framework reloads that file first — that's the file orchestrator's job.
 

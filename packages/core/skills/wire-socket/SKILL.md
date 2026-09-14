@@ -71,7 +71,7 @@ const socketOptions: SocketOptions = {
 Two ways to get the `socket.io` `Server` instance:
 
 ```ts
-// 1. Via the app runtime accessor — reads container.get("socket")
+// 1. Via the app runtime accessor — reads container.tryGet("socket")
 import { app } from "@warlock.js/core";
 
 const io = app.socket;            // → Server, or undefined before the socket connector boots
@@ -82,7 +82,7 @@ import { getSocketServer } from "@warlock.js/core";
 const io = getSocketServer();     // → Server | null
 ```
 
-Both read the same DI container slot. `app.socket` is a getter that returns `container.get("socket")` — that's `undefined` (it does **not** throw) until the socket connector has booted. `getSocketServer()` checks `container.has("socket")` and returns `null` if absent. Prefer `getSocketServer()` plus a null-guard at any call site that *might* run before the connector boots (module-load code, `main.ts` top level, scripts that skip bootstrap). From a controller, a service, a job — anything downstream of a completed bootstrap — `app.socket` is populated and safe to read directly.
+Both read the same DI container slot. `app.socket` is a getter that returns `container.tryGet("socket")` — that's `undefined` (it does **not** throw) until the socket connector has booted. `getSocketServer()` reads the same `container.tryGet("socket")` and returns `null` if absent. Prefer `getSocketServer()` plus a null-guard at any call site that *might* run before the connector boots (module-load code, `main.ts` top level, scripts that skip bootstrap). From a controller, a service, a job — anything downstream of a completed bootstrap — `app.socket` is populated and safe to read directly.
 
 ## Wiring `connection` handlers
 
