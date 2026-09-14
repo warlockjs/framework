@@ -170,6 +170,19 @@ const uploadAvatarSchema = v.object({
 
 Full file chain: `.image()`, `.accept(extensions)`, `.mimeType(types)`, `.pdf()`, `.excel()`, `.word()`, `.minSize(n)`, `.maxSize(n)`, `.minWidth(px)`, `.maxWidth(px)`, `.minHeight(px)`, `.maxHeight(px)`. See [`upload-file`](../upload-file/SKILL.md) for the full upload flow.
 
+### Optional file field
+
+`.optional()` composes with `v.file()` the same as any other validator — no need to hand-roll an "if a file was sent" guard in the controller:
+
+```ts
+const updateAvatarSchema = v.object({
+  avatar: v.file().optional().image(),
+});
+```
+
+- Key absent (or `null`) → valid, `avatar` comes back `undefined`.
+- Key present but not a file (e.g. a stray string) → invalid, with a normal `avatar` error in the response — it never throws.
+
 ## What the framework sends on failure
 
 The framework calls `response.failedSchema(result)` which sends `400` with the shape configured under `validation.response` (defaults shown):

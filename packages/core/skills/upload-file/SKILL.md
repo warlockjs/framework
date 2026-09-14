@@ -210,6 +210,18 @@ v.file()                                          // must be UploadedFile
 
 Size accepts either bytes (`.maxSize(5_242_880)`) or `{ unit, size }` (`{ unit: "MB", size: 5 }`). See [`validate-input`](../validate-input/SKILL.md) for the full validation pattern.
 
+### Optional file field
+
+Chain `.optional()` in front of the file rules for a field the caller may or may not send — no hand-rolled "was a file attached" check needed:
+
+```ts
+const updateAvatarSchema = v.object({
+  avatar: v.file().optional().image(),
+});
+```
+
+An absent (or `null`) `avatar` key passes validation with `avatar` coming back `undefined`. A present `avatar` value that isn't a file fails with a normal, structured `avatar` error — the framework never throws for it.
+
 For ad-hoc validation outside a schema:
 
 ```ts
