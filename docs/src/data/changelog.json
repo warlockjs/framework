@@ -116,6 +116,52 @@
   ],
   "releases": [
     {
+      "version": "5.9.0",
+      "id": "v5-9-0",
+      "date": "September 14, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong><code>@warlock.js/seal</code> adds opt-in query-string coercion</strong> — <code>v.int().coerce()</code> (and the number family) parse a numeric-shaped string into a number while strict validation stays the default. <code>@warlock.js/web</code> now warns when a <code>.client</code> module is reached from the server import graph (the suffix is a developer marker, not enforced isolation) and pins dev/prod route-table parity as an always-on gate; <code>@warlock.js/auth</code> documents one app-owned optional-auth middleware as the sanctioned pattern, with <code>auth.pageAuth</code> as its adapter. Lockstep release across all 28 packages.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>.coerce()</code> modifier on the number validators (<code>int</code> / <code>number</code> / <code>float</code> / <code>numeric</code>): opt into parsing a numeric-shaped string (e.g. a query-string param) into a number while the type rule stays strict. <code>v.int()</code> is unchanged by default; chain <code>.coerce()</code> to accept <code>\"2\"</code> as <code>2</code>. The inferred output type is unaffected."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Dev diagnostic when a <code>.client</code> module is reached from the <strong>server</strong> import graph. The <code>.client</code> suffix is a developer marker, not enforced isolation (the import graph decides where code runs); this emits a named, non-fatal warning identifying the offending edge instead of silently over-promising."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.8.0",
       "id": "v5-8-0",
       "date": "September 13, 2026",

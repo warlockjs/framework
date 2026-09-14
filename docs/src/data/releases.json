@@ -1,5 +1,14 @@
 {
   "_doc": "Release-level metadata for the unified changelog — the npm PUBLISH TIMESTAMP and the 'what shipped' SUMMARY for each version. Per-package change details (Added/Changed/Fixed/Removed) live in each package's CHANGELOG.md and are aggregated by scripts/generate-changelog.mjs; this file supplies release metadata that the per-package files don't carry. Hand-maintained: add one entry per release, keyed by the version string. `publishedAt` is the full ISO timestamp reported by npm for @warlock.js/core (e.g. \"2026-09-02T00:54:41.833Z\"); the generator derives the human UTC display date from it. Legacy entries may retain `date` as a display-string fallback. `summary` supports inline `code`, **bold**, and [links](url); `featured` (optional) is an array of package names floated to the top of that release's package list, in the listed order (the rest follow most-changed-first, then alphabetical). Keep the summary to ONE short headline — what shipped and which packages — not an API-by-API tour; the per-package list below it carries the detail. `matrix` states the zero-edit generator-matrix scope that release ran — \"none\", \"subset\" or \"full\" — and is REQUIRED on every release from 5.6.0 onward (canon e00fb7b8: the matrix is opt-in, and the record is what keeps that from degrading silently; a release whose scope is not stated must not ship). For \"subset\", `matrixRows` lists the rows that ran. Entries from before 5.6.0 carry neither, and render as nothing rather than as a claim nobody checked.",
+  "5.9.0": {
+    "publishedAt": "2026-09-14T10:34:51.745Z",
+    "matrix": "none",
+    "summary": "**`@warlock.js/seal` adds opt-in query-string coercion** — `v.int().coerce()` (and the number family) parse a numeric-shaped string into a number while strict validation stays the default. `@warlock.js/web` now warns when a `.client` module is reached from the server import graph (the suffix is a developer marker, not enforced isolation) and pins dev/prod route-table parity as an always-on gate; `@warlock.js/auth` documents one app-owned optional-auth middleware as the sanctioned pattern, with `auth.pageAuth` as its adapter. Lockstep release across all 28 packages.",
+    "featured": [
+      "@warlock.js/seal",
+      "@warlock.js/web"
+    ]
+  },
   "5.8.0": {
     "publishedAt": "2026-09-13T03:49:30.126Z",
     "matrix": "none",
