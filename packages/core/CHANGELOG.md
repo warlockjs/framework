@@ -12,6 +12,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Tests and documentation for optional file fields: `v.file().optional()` skips an absent upload and reports a present non-file value as a normal validation error.
 
+### Fixed
+
+- `warlock dev` printed `hmr update` for a backend file before the new code was live, so a request made right after the line could still get the old response. The line now prints once the reload has finished and shows how long it took.
+
+### Changed
+
+- Backend file changes are picked up sooner in `warlock dev` (event debounce 150ms → 50ms).
+
 ## 5.10.0 - 2026-09-14
 
 _Released in lockstep with the `@warlock.js/*` family; no package-specific changes in 5.10.0._

@@ -19,7 +19,7 @@ export class FileEventHandler {
   private pendingAdds = new Set<string>();
   private pendingDeletes = new Set<string>();
 
-  private readonly processPendingEvents = debounce(() => this.processBatch(), 150);
+  private readonly processPendingEvents = debounce(() => this.processBatch(), 50);
 
   constructor(
     private readonly fileOperations: FileOperations,

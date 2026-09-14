@@ -64,14 +64,16 @@ export class LayerExecutor {
     }
 
     const invalidationChain = new Set<string>();
+    const pendingHmrLogs: { path: string; dependents: number }[] = [];
     for (const path of changedPaths) {
       for (const file of this.dependencyGraph.getInvalidationChain(path)) {
         invalidationChain.add(file);
       }
-      devLogHMR(path, invalidationChain.size - 1);
+      pendingHmrLogs.push({ path, dependents: invalidationChain.size - 1 });
     }
 
     const chain = Array.from(invalidationChain);
+    const reloadStartedAt = Date.now();
 
     // Step 1: bump version counters so the next import() is fresh.
     for (const relativePath of chain) {
@@ -95,6 +97,16 @@ export class LayerExecutor {
       ...deletedFiles,
       ...affectedConfigPaths,
     ]);
+
+    // The log only fires here, once re-import and connector restarts have
+    // actually completed — not before the work starts. Printed earlier, the
+    // line claims the change is live while a request could still hit the old
+    // code (and, thrown from any step above, this line is never reached at
+    // all — the caller's error path is the only report a failed reload gets).
+    const elapsedMs = Date.now() - reloadStartedAt;
+    for (const { path, dependents } of pendingHmrLogs) {
+      devLogHMR(path, dependents, elapsedMs);
+    }
   }
 
   private async restartAffectedConnectors(affectedFiles: string[]): Promise<void> {

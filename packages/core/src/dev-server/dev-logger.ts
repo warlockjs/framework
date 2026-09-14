@@ -101,13 +101,14 @@ export function devLogDim(message: string) {
   console.log(`${timestamp()} ${colors.dim(message)}`);
 }
 
-export function devLogHMR(file: string, dependents?: number) {
+export function devLogHMR(file: string, dependents?: number, durationMs?: number) {
   const relativePath = Path.toRelative(file);
   const depInfo = dependents
     ? colors.dim(` +${dependents} module${dependents > 1 ? "s" : ""}`)
     : "";
+  const durationInfo = durationMs !== undefined ? colors.dim(` (${durationMs}ms)`) : "";
   console.log(
-    `${timestamp()} 🔥 ${colors.green("hmr update")} ${colors.dim(relativePath)}${depInfo}`,
+    `${timestamp()} 🔥 ${colors.green("hmr update")} ${colors.dim(relativePath)}${depInfo}${durationInfo}`,
   );
 }
 
