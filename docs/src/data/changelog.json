@@ -116,6 +116,123 @@
   ],
   "releases": [
     {
+      "version": "5.11.0",
+      "id": "v5-11-0",
+      "date": "September 14, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>A page load that fails <code>validation</code> now renders your error page with status 400</strong> instead of a blank page (<code>@warlock.js/web</code>), <code>v.boolean().accepted()</code> / <code>.declined()</code> now accept the form strings they advertise (<code>@warlock.js/seal</code>), and <code>@warlock.js/cascade</code>'s <code>pg</code> / <code>mongodb</code> drivers are optional peers so a no-database project installs cleanly. <code>warlock dev</code> reloads backend files sooner and prints <code>hmr update</code> only once the change is live; <code>create-warlock</code> drops the misleading <code>guardedAdmin()</code> helper. Lockstep release across all 28 packages.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<strong>A page load that fails <code>validation</code> now renders your <code>error.page.tsx</code> with status 400</strong> and the validation errors, instead of a blank 400 response. Client navigations are unchanged. If you relied on the empty body, check your error page handles a 400."
+            },
+            {
+              "type": "Changed",
+              "html": "The dev and production page installers now compose a layout level's middleware and loaders through one shared rule, and a parity check covers middleware and loaders as well as rendering and prefixes."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>v.boolean().accepted()</code> / <code>.declined()</code> (and their conditional variants) rejected every string form they advertised — <code>\"yes\"</code>, <code>\"on\"</code>, <code>\"1\"</code> — because the boolean type rule ran first. They now parse those form values into a real boolean."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "A project that uses no database — or only one of PostgreSQL / MongoDB — no longer fails <code>npm ls</code> with missing <code>pg</code> / <code>mongodb</code> peers; both drivers are now optional peers, and you install the one you use."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Tests and documentation for optional file fields: <code>v.file().optional()</code> skips an absent upload and reports a present non-file value as a normal validation error."
+            },
+            {
+              "type": "Changed",
+              "html": "Backend file changes are picked up sooner in <code>warlock dev</code> (event debounce 150ms → 50ms)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock dev</code> printed <code>hmr update</code> for a backend file before the new code was live, so a request made right after the line could still get the old response. The line now prints once the reload has finished and shows how long it took."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Removed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Removed",
+              "html": "The generated <code>guardedAdmin()</code> router helper. It only checked that the user was signed in — any user type — while its name and <code>/admin</code> prefix implied an admin-only area. New projects get <code>guarded()</code> (any authenticated user) and a documented example for restricting a group to a user type. Existing projects keep their own copy of the file; review it if you used <code>guardedAdmin</code>."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.10.0",
       "id": "v5-10-0",
       "date": "September 14, 2026",

@@ -91,7 +91,7 @@ await validate(filterQuery, { active: "1" });      // → { active: true }
 await validate(filterQuery, { active: "0" });      // → { active: false }
 ```
 
-`.coerce()` converts *exactly* `"true"` / `"1"` / `1` → `true` and `"false"` / `"0"` / `0` → `false`. Case-sensitive, no trimming — anything else (`"yes"`, `"on"`, `"TRUE"`, `""`) passes through unchanged and still fails the type rule. `v.boolean()` does not coerce by default; the inferred output type is unchanged (`v.boolean().coerce()` is still `boolean`). Form-style truthy strings like `"yes"` / `"on"` are a different concern — use `v.scalar().accepted()` / `.declined()` instead (see [pick the right primitive](../guides/pick-the-right-primitive.md)).
+`.coerce()` converts *exactly* `"true"` / `"1"` / `1` → `true` and `"false"` / `"0"` / `0` → `false`. Case-sensitive, no trimming — anything else (`"yes"`, `"on"`, `"TRUE"`, `""`) passes through unchanged and still fails the type rule. `v.boolean()` does not coerce by default; the inferred output type is unchanged (`v.boolean().coerce()` is still `boolean`). Form-style truthy strings like `"yes"` / `"on"` are a different concern — use `v.boolean().accepted()` / `.declined()` instead (see [pick the right primitive](../guides/pick-the-right-primitive.md)).
 
 ## Dates — `v.date()` already normalizes
 
@@ -133,5 +133,5 @@ if (result.isValid) {
 ## Related
 
 - [Validate a request body](./validate-request-body.md) — the JSON-body counterpart
-- [Pick the right primitive](../guides/pick-the-right-primitive.md) — `v.numeric` vs `v.int`, `v.scalar().accepted()` for form booleans
+- [Pick the right primitive](../guides/pick-the-right-primitive.md) — `v.numeric` vs `v.int`, `v.boolean().accepted()` for form booleans
 - [Essentials → Modifiers](../essentials/02-modifiers.md) — where mutators sit in the pipeline

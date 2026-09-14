@@ -549,19 +549,9 @@ export function guarded(callback: () => void) {
     callback,
   );
 }
-
-export function guardedAdmin(callback: () => void) {
-  router.group(
-    {
-      prefix: "/admin",
-      middleware: [authMiddleware()],
-    },
-    callback,
-  );
-}
 ```
 
-This is the convention every Warlock module follows — `guarded(...)` for routes that need a logged-in user, `guardedAdmin(...)` for routes that also need the `/admin` prefix.
+This is the convention every Warlock module follows — `guarded(...)` for routes that need a logged-in user. For a role-restricted block, don't wrap `authMiddleware([])` (an empty allow-list, which accepts any authenticated user type) in a helper named after a role — register the role as a user type and call `authMiddleware(["admin"])` (or the relevant type) directly, so the check the name implies is the check that actually runs.
 
 ## Gotchas
 

@@ -355,6 +355,19 @@ v.file().image().minWidth(100).maxWidth(4000);
 v.file().image().minHeight(100).maxHeight(4000);
 ```
 
+### Optional file field
+
+`.optional()` composes with `v.file()` like any other validator, so an "attach a file, or don't" endpoint doesn't need a hand-rolled multipart guard:
+
+```ts
+const updateAvatarSchema = v.object({
+  avatar: v.file().optional().image(),
+});
+```
+
+- Absent key (or `null`) → valid; `avatar` comes back `undefined`.
+- Present but not a file (a stray string, an empty `""` from a form field) → invalid, with a normal structured `avatar` error — it never throws.
+
 Combine for full-fidelity rules:
 
 ```ts

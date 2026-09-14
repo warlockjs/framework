@@ -176,7 +176,7 @@ router.prefix("/auth", () => {
 });
 ```
 
-A single line — `guarded(() => { ... })` — communicates "everything in this block needs a valid user token." Pair with a `guardedAdmin(...)` variant for admin-only blocks. The pattern keeps `routes.ts` clean of middleware repetition.
+A single line — `guarded(() => { ... })` — communicates "everything in this block needs a valid user token." For an admin-only block, register an `admin` user type and use `authMiddleware(["admin"])` directly rather than wrapping an empty-array `authMiddleware([])` call in a helper named `...Admin` — an empty allow-list accepts any authenticated user type, so a name like that would promise a boundary it doesn't enforce. The pattern keeps `routes.ts` clean of middleware repetition.
 
 ## RESTful resource chain
 

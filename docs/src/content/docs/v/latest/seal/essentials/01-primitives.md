@@ -64,7 +64,7 @@ All four share the same chain surface — `.min(0)`, `.max(100)`, `.between(0, 1
 
 ```ts
 v.boolean()             // strict true / false
-v.scalar().accepted()   // accepts truthy form values ("on", "yes", "1", true, 1)
+v.boolean().accepted()  // accepts truthy form values ("on", "yes", "1", true, 1) → true
 v.boolean().declined()  // opposite
 v.boolean().coerce()    // "true"/"1"/1 → true, "false"/"0"/0 → false (query strings)
 ```

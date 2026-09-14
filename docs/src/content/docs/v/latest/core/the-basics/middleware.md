@@ -134,16 +134,6 @@ export function publicRoutes(callback: () => void) {
   router.group({ prefix: "/" }, callback);
 }
 
-export function guardedAdmin(callback: () => void) {
-  router.group(
-    {
-      prefix: "/admin",
-      middleware: [authMiddleware()],
-    },
-    callback,
-  );
-}
-
 export function guarded(callback: () => void) {
   router.group(
     {
@@ -153,6 +143,8 @@ export function guarded(callback: () => void) {
   );
 }
 ```
+
+To restrict a group to a specific role — say an admin-only area — register that user type in `src/config/auth.ts` and pass it explicitly: `authMiddleware(["admin"])`. Avoid naming a helper `guardedAdmin` (or similar) around an empty-array `authMiddleware([])` call — an empty allow-list accepts any authenticated user type, so the name plus an `/admin` prefix would promise a boundary the middleware never checks.
 
 Routes use them like this:
 

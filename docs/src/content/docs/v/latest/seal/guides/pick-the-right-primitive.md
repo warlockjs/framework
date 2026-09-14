@@ -84,7 +84,7 @@ Reach for `v.instanceof(Date)` only when you specifically need strict instance i
 
 ```ts
 v.boolean()             // strict true / false only
-v.scalar().accepted()   // accepts "on", "yes", "1", true, 1, "true"
+v.boolean().accepted()  // accepts "on", "yes", "1", true, 1, "true" → real boolean true
 v.boolean().declined()  // opposite
 v.boolean().coerce()    // "true"/"1"/1 → true, "false"/"0"/0 → false, exact query-string form
 ```

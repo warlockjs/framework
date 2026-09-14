@@ -104,16 +104,18 @@ export function publicRoutes(callback: () => void) {
   );
 }
 
-export function guardedAdmin(callback: () => void) {
-  router.group(
-    {
-      prefix: "/admin",
-      middleware: [authMiddleware()],
-    },
-    callback,
-  );
-}
-
+/**
+ * Require an authenticated user of the default `user` type. A fresh project
+ * registers only that one type, so this effectively guards a block for any
+ * authenticated user.
+ *
+ * To restrict a group to a specific user type — for example an admin-only
+ * area — register that type in `src/config/auth.ts` and pass it explicitly
+ * to `authMiddleware`:
+ *
+ * @example
+ * router.group({ prefix: "/admin", middleware: [authMiddleware(["admin"])] }, callback);
+ */
 export function guarded(callback: () => void) {
   router.group(
     {
@@ -124,13 +126,12 @@ export function guarded(callback: () => void) {
 }
 ```
 
-Three helpers, three patterns:
+Two helpers, two patterns:
 
 - **`publicRoutes`** — no middleware. Pure sugar for grouping public routes at the root.
 - **`guarded`** — `authMiddleware("user")`. The default for user-facing endpoints.
-- **`guardedAdmin`** — `authMiddleware()` (any authenticated user) plus an `/admin` prefix.
 
-You can extend with `guardedManager`, `guardedSupport`, etc. — same shape, different role and prefix.
+Do **not** name a wrapper `guardedAdmin` (or similar) around an empty-array `authMiddleware([])` call — an empty allow-list accepts *any* authenticated user type, so a name plus an `/admin` prefix would promise an admin-only boundary the middleware never enforces. Restrict a group to a role by registering that user type and passing it explicitly, e.g. `authMiddleware(["admin"])`. You can extend with `guardedManager`, `guardedSupport`, etc. — same shape, different role and prefix, each backed by a real type check.
 
 ## Step 4 — Use the helpers in `routes.ts`
 

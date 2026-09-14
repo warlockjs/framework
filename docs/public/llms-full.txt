@@ -5893,6 +5893,18 @@ v.file()                                          // must be UploadedFile
 
 Size accepts either bytes (`.maxSize(5_242_880)`) or `{ unit, size }` (`{ unit: "MB", size: 5 }`). See [`validate-input`](../validate-input/SKILL.md) for the full validation pattern.
 
+### Optional file field
+
+Chain `.optional()` in front of the file rules for a field the caller may or may not send — no hand-rolled "was a file attached" check needed:
+
+```ts
+const updateAvatarSchema = v.object({
+  avatar: v.file().optional().image(),
+});
+```
+
+An absent (or `null`) `avatar` key passes validation with `avatar` coming back `undefined`. A present `avatar` value that isn't a file fails with a normal, structured `avatar` error — the framework never throws for it.
+
 For ad-hoc validation outside a schema:
 
 ```ts
@@ -7841,6 +7853,19 @@ const uploadAvatarSchema = v.object({
 ```
 
 Full file chain: `.image()`, `.accept(extensions)`, `.mimeType(types)`, `.pdf()`, `.excel()`, `.word()`, `.minSize(n)`, `.maxSize(n)`, `.minWidth(px)`, `.maxWidth(px)`, `.minHeight(px)`, `.maxHeight(px)`. See [`upload-file`](../upload-file/SKILL.md) for the full upload flow.
+
+### Optional file field
+
+`.optional()` composes with `v.file()` the same as any other validator — no need to hand-roll an "if a file was sent" guard in the controller:
+
+```ts
+const updateAvatarSchema = v.object({
+  avatar: v.file().optional().image(),
+});
+```
+
+- Key absent (or `null`) → valid, `avatar` comes back `undefined`.
+- Key present but not a file (e.g. a stray string) → invalid, with a normal `avatar` error in the response — it never throws.
 
 ## What the framework sends on failure
 
@@ -10589,6 +10614,8 @@ Server-only: `package.json` declares `"warlock": { "environment": "server" }`. `
 ```bash
 npm install @warlock.js/cascade @warlock.js/seal
 ```
+
+`pg` and `mongodb` are optional peer dependencies — install whichever driver your app actually uses (`npm install pg` for Postgres, `npm install mongodb` for MongoDB); a project that uses neither, or only one, installs no extra driver package.
 
 ## Foundations
 
@@ -14296,19 +14323,28 @@ Picking guide is in [`@warlock.js/seal/pick-seal-primitive/SKILL.md`](@warlock.j
 
 ## Strict equality
 
-| Method | Effect |
-|---|---|
-| `.mustBeTrue(msg?)` | strictly `=== true` (rejects `"yes"`, `1`, `"on"`) |
-| `.mustBeFalse(msg?)` | strictly `=== false` |
+| Method               | Effect                                             |
+| -------------------- | -------------------------------------------------- |
+| `.mustBeTrue(msg?)`  | strictly `=== true` (rejects `"yes"`, `1`, `"on"`) |
+| `.mustBeFalse(msg?)` | strictly `=== false`                               |
 
 Use these when the field is a real boolean checkbox value — e.g. "agree to terms" must be exactly `true`, not a truthy string.
 
 ## Form-style coercion — `accepted` / `declined`
 
-The "accepted" rules treat `true`, `"yes"`, `"on"`, `1`, `"1"`, `"true"` as accepted. "Declined" treats their counterparts (`false`, `"no"`, `"off"`, `0`, etc.) as declined. Designed for form inputs where a checkbox/radio arrives as a string.
+Calling `.accepted()`/`.declined()` (or any conditional variant) opts `v.boolean()` into
+form-boolean parsing: a mutator runs before the type rule and converts the accepted set
+(`1`, `"1"`, `true`, `"true"`, `"yes"`, `"y"`, `"on"`, `"Yes"`, `"Y"`, `"On"`) to `true` and
+the declined set (`0`, `"0"`, `false`, `"false"`, `"no"`, `"n"`, `"off"`, `"No"`, `"N"`,
+`"Off"`) to `false`; any other value passes through unchanged and still fails the type rule.
+So `v.boolean().accepted()` given `"yes"` is valid **and its output is the real boolean
+`true`** — not the original string. Designed for form inputs where a checkbox/radio arrives
+as a string. `v.scalar().accepted()` runs the same accepted/declined rule but keeps the raw
+value untouched (no boolean type rule, no parsing mutator) — use it when you want the
+pass/fail check without normalizing the output.
 
-| Method | Effect |
-|---|---|
+| Method            | Effect                 |
+| ----------------- | ---------------------- |
 | `.accepted(msg?)` | value must be accepted |
 | `.declined(msg?)` | value must be declined |
 
@@ -14319,10 +14355,10 @@ string `"true"`, and bare `v.boolean()` is strict by default — it rejects that
 `.coerce()` when a schema validates `request.query`:
 
 ```ts
-v.object({ active: v.boolean().coerce() })   // "true" → true, passes
+v.object({ active: v.boolean().coerce() }); // "true" → true, passes
 ```
 
-It converts *exactly* `"true"` / `"1"` / `1` → `true` and `"false"` / `"0"` / `0` → `false`.
+It converts _exactly_ `"true"` / `"1"` / `1` → `true` and `"false"` / `"0"` / `0` → `false`.
 Case-sensitive, no trimming — anything else (`"yes"`, `"on"`, `"TRUE"`, `""`, `2`) passes
 through unchanged and still fails the type rule. That's the line between this and
 `accepted()`/`declined()` below: `.coerce()` is for the narrow, exact query-string
@@ -14332,23 +14368,23 @@ serialization; `accepted()`/`declined()` are for broader form-style truthy strin
 
 ## Conditional variants — accepted
 
-| Method | Args | Effect |
-|---|---|---|
-| `.acceptedIf(field, value, msg?)` | sibling field equals value | must be accepted in that case |
+| Method                                | Args                       | Effect                              |
+| ------------------------------------- | -------------------------- | ----------------------------------- |
+| `.acceptedIf(field, value, msg?)`     | sibling field equals value | must be accepted in that case       |
 | `.acceptedUnless(field, value, msg?)` | sibling field equals value | must be accepted unless that's true |
-| `.acceptedIfRequired(field, msg?)` | sibling field is required | — |
-| `.acceptedIfPresent(field, msg?)` | sibling field is present | — |
-| `.acceptedWithout(field, msg?)` | sibling field is absent | — |
+| `.acceptedIfRequired(field, msg?)`    | sibling field is required  | —                                   |
+| `.acceptedIfPresent(field, msg?)`     | sibling field is present   | —                                   |
+| `.acceptedWithout(field, msg?)`       | sibling field is absent    | —                                   |
 
 ## Conditional variants — declined
 
-| Method | Args | Effect |
-|---|---|---|
-| `.declinedIf(field, value, msg?)` | sibling field equals value | must be declined in that case |
+| Method                                | Args                       | Effect                              |
+| ------------------------------------- | -------------------------- | ----------------------------------- |
+| `.declinedIf(field, value, msg?)`     | sibling field equals value | must be declined in that case       |
 | `.declinedUnless(field, value, msg?)` | sibling field equals value | must be declined unless that's true |
-| `.declinedIfRequired(field, msg?)` | — | — |
-| `.declinedIfPresent(field, msg?)` | — | — |
-| `.declinedWithout(field, msg?)` | — | — |
+| `.declinedIfRequired(field, msg?)`    | —                          | —                                   |
+| `.declinedIfPresent(field, msg?)`     | —                          | —                                   |
+| `.declinedWithout(field, msg?)`       | —                          | —                                   |
 
 All conditional variants only run inside `v.object` — sibling resolution silently passes otherwise.
 
@@ -14363,27 +14399,27 @@ All conditional variants only run inside `v.object` — sibling resolution silen
 
 ```ts
 // Strict consent checkbox
-v.boolean().mustBeTrue("You must accept the terms")
+v.boolean().mustBeTrue("You must accept the terms");
 
 // Form-style "remember me" — accepts "on" / true / 1
-v.boolean().accepted().optional()
+v.boolean().accepted().optional();
 
 // Cross-field — newsletter must be accepted if subscriptionType = "premium"
 v.object({
   subscriptionType: v.string().oneOf(["free", "premium"]),
   newsletter: v.boolean().acceptedIf("subscriptionType", "premium"),
-})
+});
 
 // Marketing opt-in — declined unless region is GDPR-exempt
 v.object({
   region: v.string(),
   marketingOptIn: v.boolean().declinedUnless("region", "US"),
-})
+});
 
 // Query-string flag — ?active=true
 v.object({
   active: v.boolean().coerce(),
-})
+});
 ```
 
 
@@ -24365,7 +24401,7 @@ export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
 
 `request.validated()` types `params` and `query` from the schema — never a flattened merge of the two. There is exactly ONE validation surface on a page; see [load-page-data](../load-page-data/SKILL.md) for how the validated data reaches the loader.
 
-Rejected input never reaches the loader. It renders the application's `error.page.tsx` boundary at status 400 carrying the failure — a page is a document, not an API endpoint, so invalid input never gets a raw JSON body. The same 400 travels the same way over the `_loader` client-navigation wire.
+Rejected input never reaches the loader. A full page load renders the application's `error.page.tsx` boundary at status 400, and the error it receives carries the validation issues (read them off `(error as { errors?: unknown }).errors` — see [load-page-data](../load-page-data/SKILL.md#validation) for the full shape) — a page is a document, not an API endpoint, so invalid input never gets a raw JSON body. A client navigation to the same URL gets the same 400 status, with no document to render.
 
 ### `middleware` — a page's own guard, run last
 
@@ -24734,7 +24770,29 @@ export const validation = {
 
 A legacy `{ schema, validating }` shape is still accepted — `schema` a single Seal validator, `validating` any ordered subset of `"body"`, `"query"`, `"params"`, and `"headers"` (defaulting to query + params, with params winning a duplicate key) — but `{ params, query }` is the shape new pages should declare. See [create-a-page](../create-a-page/SKILL.md#validate-the-pages-input--the-validation-export) for the full example.
 
-Either shape builds one schema and runs ONE validation pass before loaders. A failure short-circuits with status **400**, never 422 — a page is a document, not an API endpoint, so rejected input renders the application's `error.page.tsx` boundary rather than a raw JSON body. A data (`_loader`) request instead gets that same 400 serialized as a JSON body carrying the errors.
+Either shape builds one schema and runs ONE validation pass before loaders. A failure short-circuits with status **400**, never 422 — a page is a document, not an API endpoint. A full page load renders the application's `error.page.tsx` with status 400, exactly as an ordinary loader throw with its own `statusCode` already does; the error it receives carries the validation issues:
+
+```tsx title="src/web/error.page.tsx"
+import type { ErrorPageProps } from "@warlock.js/web";
+
+export default function ErrorPage({ error, status }: ErrorPageProps) {
+  const validationErrors = (error as { errors?: { input: string; error: string }[] })?.errors;
+
+  return (
+    <main>
+      <h1>Something went wrong</h1>
+      <p>Status: {status}</p>
+      {validationErrors?.map((issue) => (
+        <p key={issue.input}>
+          {issue.input}: {issue.error}
+        </p>
+      ))}
+    </main>
+  );
+}
+```
+
+A client navigation to the same URL still receives that same 400 status, with no document to render — nothing here changes the data representation's contract.
 
 `request.validated()` uses the schema's output type, so fields with `.default(...)` are present. `request.input("id")` is narrowed from a literal route path when the loader uses `typeof route`.
 

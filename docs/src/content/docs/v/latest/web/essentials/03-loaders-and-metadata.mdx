@@ -53,6 +53,50 @@ applies its final cache floor after loader buffers commit, so a loader-written
 `Cache-Control` header cannot override the `no-store`, authentication, or
 cookie rules. [Read the complete cache policy →](/v/latest/web/essentials/routing/#cache-public-pages-explicitly)
 
+## Validate page input
+
+A page's `validation` export declares a Seal schema per source. `params` and
+`query` stay separate keys; they are never merged:
+
+```tsx title="src/web/products/[id].page.tsx"
+import { v } from "@warlock.js/seal";
+
+export const validation = {
+  params: v.object({ id: v.int().coerce() }),
+  query: v.object({ tab: v.string().optional() }),
+};
+```
+
+Validation runs once, before any loader. When it fails, the response status is
+**400**, and every failing field is reported together.
+
+- **A full page load** renders your `error.page.tsx` with status 400. The error
+  it receives carries the validation issues, so the page can show them:
+
+  ```tsx title="src/web/error.page.tsx"
+  import type { ErrorPageProps } from "@warlock.js/web";
+
+  export default function ErrorPage({ error, status }: ErrorPageProps) {
+    const issues = (error as { errors?: { input: string; error: string }[] })?.errors;
+
+    return (
+      <main>
+        <p>Status: {status}</p>
+        {issues?.map((issue) => (
+          <p key={issue.input}>
+            {issue.input}: {issue.error}
+          </p>
+        ))}
+      </main>
+    );
+  }
+  ```
+
+- **A client navigation** to the same URL receives the same 400.
+
+Before 5.11, a full page load that failed validation returned an empty 400
+body, so the browser showed a blank page.
+
 ## Execution order
 
 Loaders run sequentially and are awaited root to leaf:
