@@ -706,6 +706,8 @@ Server-only: `package.json` declares `"warlock": { "environment": "server" }`. `
 npm install @warlock.js/cascade @warlock.js/seal
 ```
 
+`pg` and `mongodb` are optional peer dependencies — install whichever driver your app actually uses (`npm install pg` for Postgres, `npm install mongodb` for MongoDB); a project that uses neither, or only one, installs no extra driver package.
+
 ## Foundations
 
 The 10 things that are true in every cascade use:
