@@ -11,6 +11,7 @@ import { contextManager } from "@warlock.js/context";
 import config from "@mongez/config";
 import { environment } from "../../utils";
 import { requestContext as requestContextInstance } from "../context/request-context";
+import { applyCspHeader } from "../csp";
 import { HttpError } from "../errors";
 import { type Request } from "../request";
 import { type Response } from "../response";
@@ -45,6 +46,13 @@ export function createRequestStore(
   response: Response,
 ): Promise<ReturnedResponse> {
   stampRequestIdHeader(request, response);
+
+  // Stamped this early — before any middleware or handler runs — so the
+  // header carries the SAME nonce the web layer later reads off
+  // `request.nonce` for its `<script>` tags: `request.nonce` caches on first
+  // read, and this is deliberately the first read. A no-op when the app
+  // hasn't opted into `http.csp` (see `csp.ts`).
+  applyCspHeader(request, response);
 
   // Build all context stores using the immutable API
   // Each context defines its own store initialization via buildStore()

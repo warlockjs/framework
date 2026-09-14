@@ -206,6 +206,22 @@ These are the flags whose absence never fails a test and is fatal in production:
 
 These mutate the response in place; chain or call before the final `return response.<helper>()`.
 
+### `Content-Security-Policy` (5.12.0)
+
+Opt in via `http.csp.enabled` in `src/config/http.ts` (see
+[`configure-app/SKILL.md`](../configure-app/SKILL.md) for the full shape).
+When enabled, every response through the shared request funnel
+(`http/middleware/inject-request-context.ts`, the same seam that stamps
+`X-Request-Id`) gets a `Content-Security-Policy` header — `-Report-Only`
+instead when `reportOnly: true` — built from the framework's default policy
+merged with your `directives`, with the current request's CSP nonce always
+appended to `script-src`. It is a no-op, and adds no header, while `http.csp`
+is unset — every existing app is unaffected until it opts in.
+
+A route can still override it — call `response.header("Content-Security-Policy", ...)`
+from a controller or middleware that runs after the funnel, and your value
+wins, same as any other header.
+
 ## Common patterns
 
 ### Localized error

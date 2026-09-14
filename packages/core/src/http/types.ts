@@ -2,6 +2,7 @@ import type { CookieSerializeOptions } from "@fastify/cookie";
 import type { FastifyCorsOptions } from "@fastify/cors";
 import type React from "react";
 import type { Middleware } from "../router";
+import type { CspConfig } from "./csp";
 import type { Response } from "./response";
 
 export type RequestEvent =
@@ -253,6 +254,16 @@ export interface HttpConfigurations {
      */
     options?: CookieSerializeOptions;
   };
+  /**
+   * Opt-in `Content-Security-Policy` header, built per-request from a
+   * documented default policy merged with these directives, plus the
+   * framework's own per-request CSP nonce on `script-src`.
+   *
+   * Disabled by default — no header, no behaviour change — until `enabled`
+   * is set `true`. See `csp.ts` for the default policy and merge rules, and
+   * the `configure-app` / `send-response` skills for usage.
+   */
+  csp?: CspConfig;
   /**
    * Rate limit
    */

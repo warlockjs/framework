@@ -3,10 +3,16 @@ import { log } from "@warlock.js/logger";
 import { router } from "../router";
 import { setBaseUrl } from "../utils/urls";
 import { httpConfig } from "./config";
+import { validateCspConfigAtBoot } from "./csp";
 import { registerHttpPlugins } from "./plugins";
 import { getHttpServer, startHttpServer } from "./server";
 
 export async function createHttpApplication() {
+  // Fail loudly, before the server ever binds a port, when `http.csp` is
+  // enabled with a malformed directive — never silently repair it and never
+  // wait for the first request to discover it.
+  validateCspConfigAtBoot();
+
   const server = startHttpServer();
 
   await registerHttpPlugins(server);

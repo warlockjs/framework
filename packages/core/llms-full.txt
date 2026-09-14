@@ -233,7 +233,7 @@ See the [Registering a connector](#registering-a-connector) section above for th
 
 - **Set `this.active = true` only on success.** If `start()` throws partway, leaving `active` true means `shutdown()` thinks it has work to do and may double-close half-initialized resources.
 - **`shutdown()` must be idempotent.** SIGINT can fire twice on Windows. The manager guards re-entry with its own flag, but individual connectors get called once per shutdown loop — guard with `if (!this.active) return`.
-- **Don't reach across connector boundaries in `start()`.** The manager's `start()` loop runs all `boot()`s first, then all `start()`s — wiring across connectors goes through the `container` (`container.get("http.server")`), not through imports.
+- **Don't reach across connector boundaries in `start()`.** The manager's `start()` loop runs all `boot()`s first, then all `start()`s — wiring across connectors goes through the `container`, not through imports. Use `container.tryGet("http.server")` when the other connector is genuinely optional (e.g. socket falls back to its own raw server when HTTP isn't configured); use `container.get("http.server")` when its absence would be a bug — it throws a named `ContainerKeyMissingError` instead of handing back `undefined`.
 - **Production build still needs config registration.** Placing the connector under `src/connectors/<name>.ts` does not auto-register it. Put the same instance in `warlock.config.ts > connectors`; that array is what build-time contribution discovery and runtime boot share.
 - **`watchedFiles` is restart-trigger, not dependency.** It says "I want to restart when this file changes." It does *not* mean the framework reloads that file first — that's the file orchestrator's job.
 
@@ -1023,10 +1023,41 @@ const httpConfigurations: HttpConfigurations = {
       path: "/",
     },
   },
+  csp: {
+    enabled: true,
+    directives: {
+      "img-src": ["'self'", "data:", "https://cdn.example.com"],
+    },
+  },
 };
 
 export default httpConfigurations;
 ```
+
+### `csp` — Content-Security-Policy (5.12.0)
+
+Opt-in (`enabled: true`) `Content-Security-Policy` header, built per-request
+from a documented default policy plus your `directives`, with the
+framework's own per-request nonce always added to `script-src`:
+
+```
+default-src 'self'; script-src 'self' 'nonce-<request nonce>'; style-src 'self';
+img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'
+```
+
+A directive you name under `directives` **replaces** the default list for
+that directive (never merged element-wise) — declare the full value list you
+want. Set `reportOnly: true` to emit `Content-Security-Policy-Report-Only`
+instead while you observe violations without blocking anything. Absent or
+`enabled: false` (the default) emits no header at all — no behaviour change
+for apps that don't opt in.
+
+A malformed directive value (containing `;`, or with an unbalanced `'`
+count) throws `InvalidCspDirectiveError` at boot, not silently — fix the
+value in `src/config/http.ts` rather than expecting the framework to repair
+it. See [`send-response/SKILL.md`](../send-response/SKILL.md) for how the
+header lands on the response, and `@warlock.js/web`'s docs for how the
+same nonce reaches the page's `<script>` tags.
 
 ## Which layer holds what
 
@@ -4337,6 +4368,22 @@ These are the flags whose absence never fails a test and is fatal in production:
 
 These mutate the response in place; chain or call before the final `return response.<helper>()`.
 
+### `Content-Security-Policy` (5.12.0)
+
+Opt in via `http.csp.enabled` in `src/config/http.ts` (see
+[`configure-app/SKILL.md`](../configure-app/SKILL.md) for the full shape).
+When enabled, every response through the shared request funnel
+(`http/middleware/inject-request-context.ts`, the same seam that stamps
+`X-Request-Id`) gets a `Content-Security-Policy` header — `-Report-Only`
+instead when `reportOnly: true` — built from the framework's default policy
+merged with your `directives`, with the current request's CSP nonce always
+appended to `script-src`. It is a no-op, and adds no header, while `http.csp`
+is unset — every existing app is unaffected until it opts in.
+
+A route can still override it — call `response.header("Content-Security-Policy", ...)`
+from a controller or middleware that runs after the funnel, and your value
+wins, same as any other header.
+
 ## Common patterns
 
 ### Localized error
@@ -6170,7 +6217,7 @@ app.router      // the Router singleton
 app.database    // Cascade's DataSource
 ```
 
-Each property is a getter backed by the framework's DI container (`container.get("http.server")` etc.). The container is populated by connectors during their `boot()`/`start()` phase — read these accessors only after the relevant connector has run. Every getter is a thin `container.get(...)`, so before the connector boots it returns `undefined` (it does **not** throw); chaining off an `undefined` accessor is what blows up. `http` and `socket` are *late*-phase connectors — they boot **after** app code is imported, so these accessors are not populated at the top level of a module's `main.ts`. From inside controllers, services, use-cases, or any code that runs while a request is in flight, every accessor is safe.
+Each property is a getter backed by the framework's DI container (`container.tryGet("http.server")` etc. — `router` uses `container.get(...)`, which throws instead, since it is never legitimately absent). The container is populated by connectors during their `boot()`/`start()` phase — read these accessors only after the relevant connector has run. `http`, `socket`, and `database` are thin `container.tryGet(...)` reads, so before the connector boots they return `undefined` (they do **not** throw); chaining off an `undefined` accessor is what blows up. `http` and `socket` are *late*-phase connectors — they boot **after** app code is imported, so these accessors are not populated at the top level of a module's `main.ts`. From inside controllers, services, use-cases, or any code that runs while a request is in flight, every accessor is safe.
 
 Typical uses (note: from runtime code, after bootstrap — not at module-import time):
 
@@ -6277,7 +6324,7 @@ cors: {
 
 - **`version` is `null` until the first `await`.** The version loader is async (it reads `package.json`). On a cold start before any framework code has run `getWarlockVersion()`, `Application.version` returns `null`. The framework does load it during bootstrap, so anywhere downstream of bootstrap is fine — controllers, services, connectors after `start()`. CLI commands without `preload.bootstrap` may see `null`.
 - **`Application` is static, not a DI registration.** Don't try to inject it. There's nothing to inject — it's a class with only static members.
-- **`app.*` accessors return `undefined` before their connector boots — they don't throw.** `app.socket` / `app.database` / `app.http` are populated by their respective connectors during boot; until then each getter returns `undefined` (a bare `container.get(...)`). Reading them earlier (eager module-load code, the top level of a `main.ts` for the late-phase `http`/`socket`, certain CLI commands without the right `preload.connectors`) hands you `undefined`, and chaining off it throws. Safe everywhere downstream of bootstrap — including inside `Application.onceBooted(...)`.
+- **`app.*` accessors return `undefined` before their connector boots — they don't throw.** `app.socket` / `app.database` / `app.http` are populated by their respective connectors during boot; until then each getter returns `undefined` (a bare `container.tryGet(...)`). Reading them earlier (eager module-load code, the top level of a `main.ts` for the late-phase `http`/`socket`, certain CLI commands without the right `preload.connectors`) hands you `undefined`, and chaining off it throws. Safe everywhere downstream of bootstrap — including inside `Application.onceBooted(...)`. `app.router` is the exception: it reads via `container.get(...)`, which throws a named `ContainerKeyMissingError` instead of handing back `undefined`, because the router is never a legitimate absence.
 - **`onceBooted` is a latch, not `events.on`.** A callback registered *after* boot completed still runs (next microtask) instead of silently missing the signal — so register it wherever it reads best, including module top-level in `main.ts`. A listener that throws is caught and logged; it can't break boot or the other listeners.
 - **`onShutdown` runs before connectors close, not after.** That ordering is deliberate so cleanup can still use db/cache/http — but it means a hook that hangs delays connector teardown (bounded only by your process manager's kill timeout). Keep teardown fast; for HTTP draining the framework already bounds it via `http.gracefulShutdown.timeout`.
 
@@ -8468,7 +8515,7 @@ const socketOptions: SocketOptions = {
 Two ways to get the `socket.io` `Server` instance:
 
 ```ts
-// 1. Via the app runtime accessor — reads container.get("socket")
+// 1. Via the app runtime accessor — reads container.tryGet("socket")
 import { app } from "@warlock.js/core";
 
 const io = app.socket;            // → Server, or undefined before the socket connector boots
@@ -8479,7 +8526,7 @@ import { getSocketServer } from "@warlock.js/core";
 const io = getSocketServer();     // → Server | null
 ```
 
-Both read the same DI container slot. `app.socket` is a getter that returns `container.get("socket")` — that's `undefined` (it does **not** throw) until the socket connector has booted. `getSocketServer()` checks `container.has("socket")` and returns `null` if absent. Prefer `getSocketServer()` plus a null-guard at any call site that *might* run before the connector boots (module-load code, `main.ts` top level, scripts that skip bootstrap). From a controller, a service, a job — anything downstream of a completed bootstrap — `app.socket` is populated and safe to read directly.
+Both read the same DI container slot. `app.socket` is a getter that returns `container.tryGet("socket")` — that's `undefined` (it does **not** throw) until the socket connector has booted. `getSocketServer()` reads the same `container.tryGet("socket")` and returns `null` if absent. Prefer `getSocketServer()` plus a null-guard at any call site that *might* run before the connector boots (module-load code, `main.ts` top level, scripts that skip bootstrap). From a controller, a service, a job — anything downstream of a completed bootstrap — `app.socket` is populated and safe to read directly.
 
 ## Wiring `connection` handlers
 

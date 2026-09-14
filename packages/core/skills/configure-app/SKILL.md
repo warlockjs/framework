@@ -59,10 +59,41 @@ const httpConfigurations: HttpConfigurations = {
       path: "/",
     },
   },
+  csp: {
+    enabled: true,
+    directives: {
+      "img-src": ["'self'", "data:", "https://cdn.example.com"],
+    },
+  },
 };
 
 export default httpConfigurations;
 ```
+
+### `csp` — Content-Security-Policy (5.12.0)
+
+Opt-in (`enabled: true`) `Content-Security-Policy` header, built per-request
+from a documented default policy plus your `directives`, with the
+framework's own per-request nonce always added to `script-src`:
+
+```
+default-src 'self'; script-src 'self' 'nonce-<request nonce>'; style-src 'self';
+img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'
+```
+
+A directive you name under `directives` **replaces** the default list for
+that directive (never merged element-wise) — declare the full value list you
+want. Set `reportOnly: true` to emit `Content-Security-Policy-Report-Only`
+instead while you observe violations without blocking anything. Absent or
+`enabled: false` (the default) emits no header at all — no behaviour change
+for apps that don't opt in.
+
+A malformed directive value (containing `;`, or with an unbalanced `'`
+count) throws `InvalidCspDirectiveError` at boot, not silently — fix the
+value in `src/config/http.ts` rather than expecting the framework to repair
+it. See [`send-response/SKILL.md`](../send-response/SKILL.md) for how the
+header lands on the response, and `@warlock.js/web`'s docs for how the
+same nonce reaches the page's `<script>` tags.
 
 ## Which layer holds what
 
