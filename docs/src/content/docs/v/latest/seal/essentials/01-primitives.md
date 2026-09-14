@@ -64,11 +64,12 @@ All four share the same chain surface — `.min(0)`, `.max(100)`, `.between(0, 1
 
 ```ts
 v.boolean()             // strict true / false
-v.boolean().accepted()  // accepts truthy form values ("on", "yes", "1", true, 1)
+v.scalar().accepted()   // accepts truthy form values ("on", "yes", "1", true, 1)
 v.boolean().declined()  // opposite
+v.boolean().coerce()    // "true"/"1"/1 → true, "false"/"0"/0 → false (query strings)
 ```
 
-`.accepted()` / `.declined()` exist for form-style inputs where the wire format is a string. For JSON APIs where the client sends a real boolean, plain `v.boolean()` is enough.
+`.accepted()` / `.declined()` exist for form-style inputs where the wire format is a string. For JSON APIs where the client sends a real boolean, plain `v.boolean()` is enough. `.coerce()` is the narrower, opt-in fix for the exact query-string form (`"true"`/`"1"`/`"false"`/`"0"`) — anything else still fails the type rule.
 
 ## Scalars
 

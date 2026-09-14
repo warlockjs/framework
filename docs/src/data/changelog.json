@@ -116,6 +116,77 @@
   ],
   "releases": [
     {
+      "version": "5.10.0",
+      "id": "v5-10-0",
+      "date": "September 14, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong><code>@warlock.js/seal</code> adds <code>v.boolean().coerce()</code></strong> for query-string booleans (<code>\"true\"</code>/<code>\"1\"</code> → <code>true</code>, <code>\"false\"</code>/<code>\"0\"</code> → <code>false</code>), strict by default. <code>@warlock.js/web</code> pins one 400 for a page whose <code>validation = { params, query }</code> fails in both parts and corrects the <code>load-page-data</code> skill; <code>create-warlock</code> ships a formatted postgres template. Lockstep release across all 28 packages.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>.coerce()</code> on <code>v.boolean()</code> — opt-in query-string coercion (<code>\"true\"</code>/<code>\"1\"</code> → <code>true</code>, <code>\"false\"</code>/<code>\"0\"</code> → <code>false</code>)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            },
+            {
+              "type": "Removed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "The <code>load-page-data</code> skill described the withdrawn <code>{ schema }</code>-only validation shape and a 422 status; it now documents <code>validation = { params, query }</code> and its single 400."
+            },
+            {
+              "type": "Removed",
+              "html": "Unused internal <code>RouteValidationError</code>."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "A postgres scaffold shipped <code>src/config/database.postgres.ts</code> unformatted, so a new project's first dev run flagged it. The template is formatted, and the template-format check now runs as part of <code>create-warlock</code>'s own test suite."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.9.0",
       "id": "v5-9-0",
       "date": "September 14, 2026",
@@ -4730,7 +4801,7 @@
             },
             {
               "type": "Fixed",
-              "html": "<code>v.number().toFixed(n)</code> could never produce a valid result — the mutator returned <code>Number(value).toFixed(n)</code>, a *string*, which the validator's own <code>number</code> type rule then rejected. It now yields a number (<code>3.14159</code> → <code>3.14</code>), so the method works where it lives. No working code can have depended on the old output, since every such validation failed; for a fixed-point *string*, format at the presentation edge rather than asking a number schema to emit one"
+              "html": "<code>v.number().toFixed(n)</code> could never produce a valid result — the mutator returned <code>Number(value).toFixed(n)</code>, a _string_, which the validator's own <code>number</code> type rule then rejected. It now yields a number (<code>3.14159</code> → <code>3.14</code>), so the method works where it lives. No working code can have depended on the old output, since every such validation failed; for a fixed-point _string_, format at the presentation edge rather than asking a number schema to emit one"
             }
           ]
         },

@@ -76,24 +76,22 @@ await validate(sortQuery, { sort: "sideways" });
 
 Want the inferred type to narrow to `"asc" | "desc"` instead of `string`? Use `v.literal("asc", "desc")` instead of `.in([...])` — the literal carries the union into `Infer<>`.
 
-## Booleans — coerce with a mutator
+## Booleans — `.coerce()` (5.10+)
 
-A checkbox or flag arrives as `"true"` / `"false"` (or `"1"` / `"0"`). `v.boolean()` only accepts real booleans, so attach a small mutator to reshape the string *before* the boolean rule runs:
+A flag arrives as `?active=true`, i.e. the string `"true"` — `v.boolean()` only accepts real booleans by default and rejects it. Chain `.coerce()` to reshape the value *before* the boolean type rule runs:
 
 ```ts
-const flag = v.boolean().addMutator((value) =>
-  value === "true" ? true : value === "false" ? false : value,
-);
-
 const filterQuery = v.object({
-  active: flag.default(true),
+  active: v.boolean().coerce().default(true),
 });
 
 await validate(filterQuery, { active: "false" });  // → { active: false }
 await validate(filterQuery, { active: "true" });   // → { active: true }
+await validate(filterQuery, { active: "1" });      // → { active: true }
+await validate(filterQuery, { active: "0" });      // → { active: false }
 ```
 
-`.addMutator()` runs in the **pre-validation** stage, so the boolean type rule sees the already-coerced value. (Form-style truthy strings like `"yes"` / `"on"` are better handled with `v.scalar().accepted()` — see [pick the right primitive](../guides/pick-the-right-primitive.md).)
+`.coerce()` converts *exactly* `"true"` / `"1"` / `1` → `true` and `"false"` / `"0"` / `0` → `false`. Case-sensitive, no trimming — anything else (`"yes"`, `"on"`, `"TRUE"`, `""`) passes through unchanged and still fails the type rule. `v.boolean()` does not coerce by default; the inferred output type is unchanged (`v.boolean().coerce()` is still `boolean`). Form-style truthy strings like `"yes"` / `"on"` are a different concern — use `v.scalar().accepted()` / `.declined()` instead (see [pick the right primitive](../guides/pick-the-right-primitive.md)).
 
 ## Dates — `v.date()` already normalizes
 
@@ -118,9 +116,7 @@ const productsQuery = v.object({
   page: v.numeric().min(1).default(1),
   perPage: v.numeric().min(1).max(100).default(24),
   sort: v.string().in(["price", "name", "newest"]).default("newest"),
-  inStock: v.boolean()
-    .addMutator((value) => value === "true" ? true : value === "false" ? false : value)
-    .optional(),
+  inStock: v.boolean().coerce().optional(),
   category: v.string().optional(),
 });
 

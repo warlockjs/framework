@@ -109,7 +109,8 @@ v.numeric().min(0)  // accepts "42" and 42
 
 ```ts
 v.boolean()
-v.boolean().accepted()  // for "on" / "yes" / "1" form values
+v.scalar().accepted()   // for "on" / "yes" / "1" form values
+v.boolean().coerce()    // "true"/"1"/1 → true, "false"/"0"/0 → false (query strings)
 ```
 
 ### `v.scalar(errorMessage?)`

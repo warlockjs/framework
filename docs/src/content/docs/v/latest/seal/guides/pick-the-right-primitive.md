@@ -84,11 +84,12 @@ Reach for `v.instanceof(Date)` only when you specifically need strict instance i
 
 ```ts
 v.boolean()             // strict true / false only
-v.boolean().accepted()  // accepts "on", "yes", "1", true, 1, "true"
+v.scalar().accepted()   // accepts "on", "yes", "1", true, 1, "true"
 v.boolean().declined()  // opposite
+v.boolean().coerce()    // "true"/"1"/1 → true, "false"/"0"/0 → false, exact query-string form
 ```
 
-For JSON APIs where the wire format is a real boolean, plain `v.boolean()` is enough. For HTML form submissions where a checkbox produces `"on"` or `"1"` as a string, `.accepted()` / `.declined()` handle the coercion.
+For JSON APIs where the wire format is a real boolean, plain `v.boolean()` is enough. For HTML form submissions where a checkbox produces `"on"` or `"1"` as a string, `.accepted()` / `.declined()` handle the coercion. For a query-string flag like `?active=true` where only the exact `"true"`/`"1"`/`"false"`/`"0"` forms are expected, `.coerce()` is the narrower, opt-in fix — anything else (`"yes"`, `"on"`) still fails the type rule.
 
 There's also conditional sugar:
 
