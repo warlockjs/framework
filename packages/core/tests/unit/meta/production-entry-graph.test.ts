@@ -80,7 +80,10 @@ function findImporters(graph: GraphInput[], target: string): string[] {
 }
 
 describe("the production entry's module graph", () => {
-  it("does not statically reach dev-only tooling", async () => {
+  // Reads and walks the whole production module graph; give it headroom so it
+  // is not killed by the 10s default when the release gate loads the machine
+  // by building all 28 packages at once (it completes in ~4s unloaded).
+  it("does not statically reach dev-only tooling", { timeout: 60_000 }, async () => {
     const graph = await readProductionGraph();
 
     const offenders = graph.filter((entry) =>
