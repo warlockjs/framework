@@ -2,8 +2,27 @@ import { getFieldValue, invalidRule, VALID_RULE } from "../../helpers";
 import { isEmptyValue } from "../../helpers/is-empty-value";
 import type { SchemaRule } from "../../types";
 
+/**
+ * The full set of values treated as "accepted" by `acceptedRule` and its
+ * conditional variants. Shared with `formBooleanMutator` (see
+ * `../../mutators/boolean-mutators`) so `v.boolean().accepted()` recognizes
+ * exactly this list — single source of truth, no duplicated literals.
+ */
+export const ACCEPTED_VALUES: readonly unknown[] = [
+  "1",
+  "true",
+  "yes",
+  "y",
+  "on",
+  1,
+  true,
+  "Yes",
+  "Y",
+  "On",
+];
+
 const isAcceptedValue = (value: any) => {
-  return ["1", "true", "yes", "y", "on", 1, true, "Yes", "Y", "On"].includes(value);
+  return ACCEPTED_VALUES.includes(value);
 };
 
 /**

@@ -2,8 +2,27 @@ import { getFieldValue, invalidRule, VALID_RULE } from "../../helpers";
 import { isEmptyValue } from "../../helpers/is-empty-value";
 import type { SchemaRule } from "../../types";
 
+/**
+ * The full set of values treated as "declined" by `declinedRule` and its
+ * conditional variants. Shared with `formBooleanMutator` (see
+ * `../../mutators/boolean-mutators`) so `v.boolean().declined()` recognizes
+ * exactly this list — single source of truth, no duplicated literals.
+ */
+export const DECLINED_VALUES: readonly unknown[] = [
+  "0",
+  "false",
+  "no",
+  "n",
+  "off",
+  0,
+  false,
+  "No",
+  "N",
+  "Off",
+];
+
 const isDeclinedValue = (value: any) => {
-  return ["0", "false", "no", "n", "off", 0, false, "No", "N", "Off"].includes(value);
+  return DECLINED_VALUES.includes(value);
 };
 
 /**

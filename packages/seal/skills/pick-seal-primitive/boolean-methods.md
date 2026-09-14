@@ -13,7 +13,16 @@ Use these when the field is a real boolean checkbox value — e.g. "agree to ter
 
 ## Form-style coercion — `accepted` / `declined`
 
-The "accepted" rules treat `true`, `"yes"`, `"on"`, `1`, `"1"`, `"true"` as accepted. "Declined" treats their counterparts (`false`, `"no"`, `"off"`, `0`, etc.) as declined. Designed for form inputs where a checkbox/radio arrives as a string.
+Calling `.accepted()`/`.declined()` (or any conditional variant) opts `v.boolean()` into
+form-boolean parsing: a mutator runs before the type rule and converts the accepted set
+(`1`, `"1"`, `true`, `"true"`, `"yes"`, `"y"`, `"on"`, `"Yes"`, `"Y"`, `"On"`) to `true` and
+the declined set (`0`, `"0"`, `false`, `"false"`, `"no"`, `"n"`, `"off"`, `"No"`, `"N"`,
+`"Off"`) to `false`; any other value passes through unchanged and still fails the type rule.
+So `v.boolean().accepted()` given `"yes"` is valid **and its output is the real boolean
+`true`** — not the original string. Designed for form inputs where a checkbox/radio arrives
+as a string. `v.scalar().accepted()` runs the same accepted/declined rule but keeps the raw
+value untouched (no boolean type rule, no parsing mutator) — use it when you want the
+pass/fail check without normalizing the output.
 
 | Method            | Effect                 |
 | ----------------- | ---------------------- |
