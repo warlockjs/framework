@@ -1,6 +1,9 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { renameWithRetry } from "./retry-rename";
+
+export { AtomicWriteError } from "./atomic-write-error";
 
 /**
  * Write a file atomically.
@@ -9,6 +12,13 @@ import path from "node:path";
  * the target. Readers either see the old content or the complete new
  * content — never a half-written file. If anything fails mid-write the
  * temp file is cleaned up.
+ *
+ * The rename step retries with bounded backoff on transient Windows locks
+ * (`EPERM` / `EBUSY` / `EACCES` — antivirus or the search indexer briefly
+ * holding the target); see {@link renameWithRetry}. It still never falls
+ * back to a non-atomic direct write — if every retry fails, it throws
+ * {@link AtomicWriteError} naming the target, the attempt count, and the
+ * last OS error as `cause`.
  *
  * Parent directories are created if missing.
  *
@@ -20,11 +30,14 @@ export async function atomicWriteAsync(filePath: string, content: string | Buffe
   await mkdir(dir, { recursive: true });
 
   // Random suffix so concurrent writers don't fight over the same temp file.
-  const tempPath = path.join(dir, `.${path.basename(filePath)}.${randomBytes(6).toString("hex")}.tmp`);
+  const tempPath = path.join(
+    dir,
+    `.${path.basename(filePath)}.${randomBytes(6).toString("hex")}.tmp`,
+  );
 
   try {
     await writeFile(tempPath, content);
-    await rename(tempPath, filePath);
+    await renameWithRetry(tempPath, filePath);
   } catch (error) {
     await unlink(tempPath).catch(() => undefined);
     throw error;
