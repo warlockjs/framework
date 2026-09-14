@@ -679,16 +679,24 @@ bootstrap();
     // resolve-build-config.ts documents that widening them pushed a lie downstream
     // into start-production.command.ts, which then could not trust its own config.
     // This is the one place they must be absent - the object is spread into esbuild's
-    // call verbatim and esbuild throws on unknown keys. Strip them through a local
-    // optional view rather than weakening the type every other caller relies on; both
-    // were already read into locals above.
-    const strippable = this.options as Partial<ResolvedBuildConfig>;
+    // call verbatim and esbuild throws on unknown keys.
+    //
+    // Stripped off a LOCAL COPY of `this.options`, never off `this.options`
+    // itself: `buildContext()` hands `this.options` to every `generate`/`emit`
+    // contribution hook, including the `emit` pass that runs AFTER this method
+    // returns (`build()` step 5.6). Deleting these keys from the shared object
+    // used to leave those hooks reading `undefined` for `outFile`, `entryPath`,
+    // `singleBundle`, `esmShim` and `banner` even though `ConnectorBuildContext`
+    // types them as present. A shallow copy is enough — every field this method
+    // reads off it is either scalar or already re-merged below (`define`,
+    // `external`, `loader`, `banner`), so nothing here needs a deep clone.
+    const esbuildOptions: Partial<ResolvedBuildConfig> = { ...this.options };
 
-    delete strippable.outFile;
-    delete strippable.entryPath;
-    delete this.options.singleBundle;
-    delete this.options.esmShim;
-    delete this.options.banner;
+    delete esbuildOptions.outFile;
+    delete esbuildOptions.entryPath;
+    delete esbuildOptions.singleBundle;
+    delete esbuildOptions.esmShim;
+    delete esbuildOptions.banner;
 
     await ensureDirectoryAsync(writeOutDir);
 
@@ -703,12 +711,12 @@ bootstrap();
     // Not when the user set `packages` themselves: their value has always
     // won over the default below, and it must keep winning — the plugin is
     // the default's implementation, not a new policy layered on top.
-    const perEdgeExternals = !singleBundle && (this.options as any).packages === undefined;
+    const perEdgeExternals = !singleBundle && (esbuildOptions as any).packages === undefined;
 
     // The user can override `format`, so gate the shim on the EFFECTIVE
     // format rather than on the default below. A CJS build already has
     // `require` and friends; injecting them there would be a redefinition.
-    const isEsm = (this.options.format ?? "esm") === "esm";
+    const isEsm = (esbuildOptions.format ?? "esm") === "esm";
     const banner = mergeBanner(userBanner, esmShim && isEsm ? ESM_INTEROP_SHIM : undefined);
 
     // Contributor patch, split into the part that can ride the spread order
@@ -729,9 +737,9 @@ bootstrap();
       ...contributedOptions
     } = this.contributedEsbuild;
 
-    const userDefine: Record<string, string> | undefined = this.options.define;
-    const userExternal: string[] | undefined = this.options.external;
-    const userLoader: ConnectorEsbuildPatch["loader"] = this.options.loader;
+    const userDefine: Record<string, string> | undefined = esbuildOptions.define;
+    const userExternal: string[] | undefined = esbuildOptions.external;
+    const userLoader: ConnectorEsbuildPatch["loader"] = esbuildOptions.loader;
 
     const define =
       contributedDefine || userDefine ? { ...contributedDefine, ...userDefine } : undefined;
@@ -760,7 +768,7 @@ bootstrap();
         entryPoints: [entryPoint],
         bundle: true,
         // Both are DEFAULTS the user can override — they sit before the
-        // `...this.options` spread deliberately. `singleBundle` moves them,
+        // `...esbuildOptions` spread deliberately. `singleBundle` moves them,
         // an explicit `splitting`/`packages` in warlock.config.ts beats both.
         //
         // Phase ordering does not depend on `splitting`: it comes from the
@@ -774,8 +782,8 @@ bootstrap();
         // own declared dependencies. Saying `"external"` here instead would
         // externalise them before the plugin could rule.
         packages: singleBundle || perEdgeExternals ? "bundle" : "external",
-        minify: this.options!.minify,
-        sourcemap: this.options!.sourcemap === true ? "linked" : this.options!.sourcemap,
+        minify: esbuildOptions.minify,
+        sourcemap: esbuildOptions.sourcemap === true ? "linked" : esbuildOptions.sourcemap,
         format: "esm",
         // Targeting a concrete Node version (not "esnext") so esbuild
         // transpiles TC39 stage 3 decorators into helpers â€” Node does not
@@ -796,8 +804,8 @@ bootstrap();
         ],
         // Between the defaults and the user spread — the ruled precedence.
         ...contributedOptions,
-        ...(this.options as any),
-        // AFTER the spread, and NOT overridable: `this.options.outdir` rides
+        ...(esbuildOptions as any),
+        // AFTER the spread, and NOT overridable: `esbuildOptions.outdir` rides
         // that spread carrying the FINAL destination, which is exactly where
         // this build must not write yet. The final path is the user's setting
         // and stays authoritative for everyone reading the config — it is only

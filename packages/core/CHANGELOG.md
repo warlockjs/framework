@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.12.0
+
+### Added
+
+- Opt-in `Content-Security-Policy` header (`http.csp`), using the per-request nonce the framework already generates; report-only mode supported.
+
+### Fixed
+
+- Renaming or moving a file under `warlock dev` no longer prints a false `ENOENT` failure before the route is rewired.
+- Production build contribution hooks (`generate` / `emit`) saw `outFile`, `entryPath`, `singleBundle`, `esmShim` and `banner` as `undefined`, because bundling deleted them from the shared build options. The bundler now works on its own copy.
+
+### Changed
+
+- **`container.get(key)` now throws a named error when the key is not registered**, instead of returning `undefined` while typed as present. Use `container.tryGet(key)` where the value is genuinely optional.
+
 ## 5.11.0 - 2026-09-14
 
 ### Added
