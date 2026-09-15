@@ -1,6 +1,6 @@
 ---
 name: overview
-description: 'Front-door for `@warlock.js/access` — authorization (RBAC + ABAC) for Warlock apps: `can` / `authorize` / `gate` permission checks, `definePolicy` attribute conditions, role management, and a pluggable `AccessResolver` that connects the engine to however you store roles. Depends on `@warlock.js/auth` (reads `request.user`). TRIGGER when: importing from `@warlock.js/access`; "permissions in Warlock", "RBAC", "can this user do X", "protect a route by permission", "role-based access", "ownership / policy check". Skip: authentication / login (that is `@warlock.js/auth`); a known task — load the matching skill (`check-permissions`, `define-policies`, `manage-roles`, `implement-resolver`, `configure-access`).'
+description: 'Front-door for `@warlock.js/access` — authorization (RBAC + ABAC) for Warlock apps: `can` / `authorize` / `gate` permission checks, `definePolicy` attribute conditions, role management, and a pluggable `AccessResolver` that connects the engine to however you store roles. Depends on `@warlock.js/auth` (reads `request.locals.user`). TRIGGER when: importing from `@warlock.js/access`; "permissions in Warlock", "RBAC", "can this user do X", "protect a route by permission", "role-based access", "ownership / policy check". Skip: authentication / login (that is `@warlock.js/auth`); a known task — load the matching skill (`check-permissions`, `define-policies`, `manage-roles`, `implement-resolver`, `configure-access`).'
 ---
 
 # `@warlock.js/access` — overview
@@ -36,7 +36,7 @@ Skip if you only need "is the user an admin" — `authMiddleware("admin")` from 
 
 ## What it deliberately doesn't do
 
-- **Authentication.** Use `@warlock.js/auth`; `access` reads `request.user`.
+- **Authentication.** Use `@warlock.js/auth`; `access` reads `request.locals.user`.
 - **Ship a permission admin UI.** The engine reads permission strings; whether the catalog is code-defined (`DefaultAccessResolver`) or DB-managed (the ejected `DatabaseAccessResolver`) is your resolver's choice — the package ships no admin screens.
 - **ReBAC graphs / row-level query scoping.** Use a policy for "own resource"; graph-scale relationships are out of scope.
 

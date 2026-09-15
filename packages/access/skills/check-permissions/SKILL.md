@@ -7,7 +7,7 @@ description: 'Check permissions in `@warlock.js/access` — `can` / `cannot` / `
 
 ## In a route — class-level gate
 
-Stack it AFTER `authMiddleware` (which sets `request.user`):
+Stack it AFTER `authMiddleware` (which sets `request.locals.user`):
 
 ```ts
 import { authMiddleware } from "@warlock.js/auth";
@@ -62,7 +62,7 @@ await authorize(user, "orders.update", { resource: order, tenant }); // grant AN
 ## Gotchas
 
 - **Fails closed, but config errors are loud.** A resolver or policy that throws → denied and logged (a user with no roles is denied, never allowed by accident). The one exception: `AccessConfigError` (e.g. no resolver configured) is **re-thrown**, not denied — a misconfig must surface, not hide. A cache outage is different again: it degrades to the resolver (the cache fails *open*; the decision still fails closed).
-- Stack `gate` **after** `authMiddleware` — it reads `request.user`; without an authenticated user it `403`s.
+- Stack `gate` **after** `authMiddleware` — it reads `request.locals.user`; without an authenticated user it `403`s.
 - The boolean `can*` family never throws; the `authorize*` family throws `ForbiddenError`. Pick per layer (controllers gate with middleware, services assert with `authorize`).
 
 ## See also
