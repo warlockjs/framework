@@ -37,12 +37,9 @@ const S3_INSTALL_INSTRUCTIONS = `
 Cloud storage requires the AWS S3 SDK packages.
 Install them with:
 
-  npm install @aws-sdk/client-s3 @aws-sdk/lib-storage @aws-sdk/s3-request-presigner
+  warlock add s3
 
-Or with your preferred package manager:
-
-  pnpm add @aws-sdk/client-s3 @aws-sdk/lib-storage @aws-sdk/s3-request-presigner
-  yarn add @aws-sdk/client-s3 @aws-sdk/lib-storage @aws-sdk/s3-request-presigner
+(raw packages: @aws-sdk/client-s3, @aws-sdk/lib-storage, @aws-sdk/s3-request-presigner)
 `.trim();
 
 /**
