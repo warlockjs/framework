@@ -19,7 +19,10 @@ import { makeCtx } from "./test-support/make-ctx";
 
 function context(user?: unknown) {
   const forbidden = vi.fn();
-  const { request, response } = makeCtx({ request: { user }, response: { forbidden } });
+  const { request, response } = makeCtx({
+    request: { locals: { user } },
+    response: { forbidden },
+  });
 
   return { request, response, forbidden };
 }
