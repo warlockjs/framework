@@ -2,11 +2,18 @@ import { loadEnv } from "@mongez/dotenv";
 import { configManager } from "../config/config-manager";
 import { connectorsManager } from "../connectors/connectors-manager";
 import type { DependencyGraph } from "./dependency-graph";
-import { devLogHMR } from "./dev-logger";
+import { devLogHMR, devLogTimings } from "./dev-logger";
 import { FileManager } from "./file-manager";
+import { isTimingsEnabled } from "./flags";
 import type { ModuleLoader } from "./module-loader";
 import type { SpecialFilesCollector } from "./special-files-collector";
 import { environmentLoaderOptions } from "../utils/load-environment";
+
+/** Watcher-observed timings for the batch that triggered this reload — see `FileEventHandler`. */
+export type IncomingReloadTimings = {
+  watcherSettleMs: number;
+  debounceWaitMs: number;
+};
 
 /**
  * Decides what to reload when a batch of files changes.
@@ -32,12 +39,15 @@ export class LayerExecutor {
    * @param filesMap - all tracked files (relativePath → FileManager)
    * @param deletedFiles - paths that were removed from disk
    * @param allChangedPaths - includes .env so we can detect config reloads
+   * @param incomingTimings - watcher-settle/debounce-wait timings observed
+   *   upstream in `FileEventHandler`, folded into the printed phase line
    */
   public async executeBatchReload(
     changedPaths: string[],
     filesMap: Map<string, FileManager>,
     deletedFiles: string[],
     allChangedPaths?: string[],
+    incomingTimings?: IncomingReloadTimings,
   ): Promise<void> {
     const envFilesChanged = (allChangedPaths ?? []).some(isEnvPath);
 
@@ -74,8 +84,10 @@ export class LayerExecutor {
 
     const chain = Array.from(invalidationChain);
     const reloadStartedAt = Date.now();
+    const timingsEnabled = isTimingsEnabled();
 
     // Step 1: bump version counters so the next import() is fresh.
+    const moduleGraphStartedAt = timingsEnabled ? performance.now() : 0;
     for (const relativePath of chain) {
       const file = filesMap.get(relativePath);
       if (!file) continue;
@@ -83,20 +95,24 @@ export class LayerExecutor {
       this.bumpVersion(file.absolutePath);
       await file.process({ force: true });
     }
+    const moduleGraphInvalidationMs = timingsEnabled ? performance.now() - moduleGraphStartedAt : 0;
 
     // Step 2: wait for the hook worker to ack every bump.
     // Without this, resolve() may still return the old ?v=N URL.
-    await this.flushVersionBumps();
-
     // Step 3: re-import affected special files.
+    const reimportStartedAt = timingsEnabled ? performance.now() : 0;
+    await this.flushVersionBumps();
     const affectedConfigPaths = await this.reloadAffectedModules(chain, filesMap);
+    const reimportMs = timingsEnabled ? performance.now() - reimportStartedAt : 0;
 
     // Step 4: restart any connector whose watched-files overlap the chain.
+    const connectorRestartStartedAt = timingsEnabled ? performance.now() : 0;
     await this.restartAffectedConnectors([
       ...changedPaths,
       ...deletedFiles,
       ...affectedConfigPaths,
     ]);
+    const connectorRestartMs = timingsEnabled ? performance.now() - connectorRestartStartedAt : 0;
 
     // The log only fires here, once re-import and connector restarts have
     // actually completed — not before the work starts. Printed earlier, the
@@ -106,6 +122,16 @@ export class LayerExecutor {
     const elapsedMs = Date.now() - reloadStartedAt;
     for (const { path, dependents } of pendingHmrLogs) {
       devLogHMR(path, dependents, elapsedMs);
+    }
+
+    if (timingsEnabled) {
+      devLogTimings({
+        watcherSettleMs: incomingTimings?.watcherSettleMs ?? 0,
+        debounceWaitMs: incomingTimings?.debounceWaitMs ?? 0,
+        moduleGraphInvalidationMs,
+        reimportMs,
+        connectorRestartMs,
+      });
     }
   }
 

@@ -7,9 +7,9 @@ import { Path } from "../utils/normalized-path";
 
 type FileWatcherEvent = "change" | "delete" | "add" | "error" | "addDir" | "unlinkDir";
 
-type FileChangeCallback = (filePath: string) => void;
-type FileDeleteCallback = (filePath: string) => void;
-type FileAddCallback = (filePath: string) => void;
+type FileChangeCallback = (filePath: string, settleMs?: number) => void;
+type FileDeleteCallback = (filePath: string, settleMs?: number) => void;
+type FileAddCallback = (filePath: string, settleMs?: number) => void;
 type FileErrorCallback = (filePath: string, error: Error) => void;
 type FileAddDirCallback = (filePath: string) => void;
 type FileUnlinkDirCallback = (filePath: string) => void;
@@ -61,6 +61,16 @@ export class FilesWatcher {
   private id = Random.string();
 
   /**
+   * First-seen timestamp per path from chokidar's `raw` event, which fires
+   * BEFORE `awaitWriteFinish` stabilises the change. Diffing it against the
+   * stabilised `add`/`change` timestamp gives the actual watcher-settle
+   * duration for the phase-timing line. Only populated when
+   * `devServer.timings` is on — see `watch()` — so a disabled flag costs
+   * nothing here beyond the `undefined` checks below.
+   */
+  private readonly rawEventTimestamps = new Map<string, number>();
+
+  /**
    * Watch for files changes
    * @param config Optional watch configuration
    */
@@ -87,6 +97,8 @@ export class FilesWatcher {
       ...(config?.exclude || []),
     ];
 
+    const timingsEnabled = devServerConfig?.timings === true;
+
     const watcher = chokidar.watch(paths, {
       ignoreInitial: true,
       ignored,
@@ -101,6 +113,15 @@ export class FilesWatcher {
       // On Windows, explicitly enable recursive watching
       depth: 99,
     });
+
+    if (timingsEnabled) {
+      watcher.on("raw", (_event, path) => {
+        const normalized = Path.normalize(path);
+        if (!this.rawEventTimestamps.has(normalized)) {
+          this.rawEventTimestamps.set(normalized, performance.now());
+        }
+      });
+    }
 
     watcher.on("add", (filePath) => this.triggerEvent("add", filePath));
     watcher.on("change", (filePath) => this.triggerEvent("change", filePath));
@@ -122,7 +143,16 @@ export class FilesWatcher {
    * Debouncing is handled at the orchestrator level for batch processing
    */
   private triggerEvent(event: FileWatcherEvent, filePath: string, error?: Error) {
-    events.trigger(`file-watcher.${this.id}.${event}`, Path.normalize(filePath), error);
+    const normalized = Path.normalize(filePath);
+    const rawEventAt = this.rawEventTimestamps.get(normalized);
+    let settleMs: number | undefined;
+
+    if (rawEventAt !== undefined) {
+      settleMs = performance.now() - rawEventAt;
+      this.rawEventTimestamps.delete(normalized);
+    }
+
+    events.trigger(`file-watcher.${this.id}.${event}`, normalized, error, settleMs);
   }
 
   /**

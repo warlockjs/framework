@@ -285,9 +285,9 @@ export class FilesOrchestrator {
   public async watchFiles() {
     devLogSuccess("watching for file changes (not serving yet)");
 
-    this.filesWatcher.onFileChange((p) => this.eventHandler.handleFileChange(p));
-    this.filesWatcher.onFileAdd((p) => this.eventHandler.handleFileAdd(p));
-    this.filesWatcher.onFileDelete((p) => this.eventHandler.handleFileDelete(p));
+    this.filesWatcher.onFileChange((p, settleMs) => this.eventHandler.handleFileChange(p, settleMs));
+    this.filesWatcher.onFileAdd((p, settleMs) => this.eventHandler.handleFileAdd(p, settleMs));
+    this.filesWatcher.onFileDelete((p, settleMs) => this.eventHandler.handleFileDelete(p, settleMs));
 
     const watchConfig = warlockConfigManager.get("devServer")?.watch;
     await this.filesWatcher.watch(watchConfig);

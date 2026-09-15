@@ -9,6 +9,7 @@ import { BootPreconditionError } from "./boot-precondition-error";
 import { devLogInfo, devLogSection, devLogWarn, devServeLog } from "./dev-logger";
 import { filesOrchestrator } from "./files-orchestrator";
 import { MANIFEST_PATH } from "./flags";
+import type { IncomingReloadTimings } from "./layer-executor";
 import { LayerExecutor } from "./layer-executor";
 import { printReadyBlock } from "./ready-block";
 import { restartDevServer } from "./restart-dev-server";
@@ -16,7 +17,12 @@ import { devServerShortcuts } from "./shortcuts";
 import type { StartDevServerOptions } from "./start-development-server";
 import { typeGenerator } from "./type-generator";
 
-type Batch = { added: string[]; changed: string[]; deleted: string[] };
+type Batch = {
+  added: string[];
+  changed: string[];
+  deleted: string[];
+  timings?: IncomingReloadTimings;
+};
 
 /**
  * Top-level coordinator for `warlock dev`. Wires the file orchestrator, the
@@ -175,6 +181,7 @@ export class DevelopmentServer {
         filesOrchestrator.getFiles(),
         batch.deleted,
         batch.changed,
+        batch.timings,
       );
 
       typeGenerator.executeTypingsGenerator([...batch.added, ...batch.changed]);

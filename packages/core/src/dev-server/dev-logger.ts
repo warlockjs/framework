@@ -112,6 +112,33 @@ export function devLogHMR(file: string, dependents?: number, durationMs?: number
   );
 }
 
+/**
+ * Per-phase breakdown for one hot reload, printed only when
+ * `devServer.timings` is on. Phases run in this order: the watcher's
+ * `awaitWriteFinish` settle wait, this handler's own debounce wait,
+ * module-graph invalidation (version bumps), re-import of the changed
+ * modules, and connector restart/rebind.
+ */
+export type ReloadPhaseTimings = {
+  watcherSettleMs: number;
+  debounceWaitMs: number;
+  moduleGraphInvalidationMs: number;
+  reimportMs: number;
+  connectorRestartMs: number;
+};
+
+export function devLogTimings(timings: ReloadPhaseTimings) {
+  const phase = (label: string, ms: number) => `${colors.dim(label)} ${colors.dim(`${Math.round(ms)}ms`)}`;
+  const line = [
+    phase("watcher", timings.watcherSettleMs),
+    phase("debounce", timings.debounceWaitMs),
+    phase("graph", timings.moduleGraphInvalidationMs),
+    phase("reimport", timings.reimportMs),
+    phase("connectors", timings.connectorRestartMs),
+  ].join(colors.dim(" · "));
+  console.log(`${timestamp()}   ${colors.dim("⏱")} ${line}`);
+}
+
 export function devLogConfig(file: string, connectors?: string[]) {
   const relativePath = Path.toRelative(file);
   const connectorInfo =

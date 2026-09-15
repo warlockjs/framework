@@ -4,7 +4,7 @@ import type { DependencyGraph } from "./dependency-graph";
 import { devLogSuccess } from "./dev-logger";
 import type { FileManager } from "./file-manager";
 import type { FileOperations } from "./file-operations";
-import { FILE_PROCESSING_BATCH_SIZE } from "./flags";
+import { FILE_PROCESSING_BATCH_SIZE, isTimingsEnabled } from "./flags";
 import type { ManifestManager } from "./manifest-manager";
 import { clearFileExistsCache } from "./parse-imports";
 import { Path } from "../utils/normalized-path";
@@ -19,6 +19,12 @@ export class FileEventHandler {
   private pendingAdds = new Set<string>();
   private pendingDeletes = new Set<string>();
 
+  /** When this batch's first watcher event arrived — the debounce-wait phase start. */
+  private batchStartedAt?: number;
+
+  /** Slowest watcher-settle duration seen so far this batch, when `devServer.timings` is on. */
+  private watcherSettleMs?: number;
+
   private readonly processPendingEvents = debounce(() => this.processBatch(), 50);
 
   constructor(
@@ -28,19 +34,39 @@ export class FileEventHandler {
     private readonly files: Map<string, FileManager>,
   ) {}
 
-  public handleFileChange(absolutePath: string): void {
+  public handleFileChange(absolutePath: string, settleMs?: number): void {
+    this.recordTimingStart(settleMs);
     this.pendingChanges.add(Path.toRelative(absolutePath));
     this.processPendingEvents();
   }
 
-  public handleFileAdd(absolutePath: string): void {
+  public handleFileAdd(absolutePath: string, settleMs?: number): void {
+    this.recordTimingStart(settleMs);
     this.pendingAdds.add(Path.toRelative(absolutePath));
     this.processPendingEvents();
   }
 
-  public handleFileDelete(absolutePath: string): void {
+  public handleFileDelete(absolutePath: string, settleMs?: number): void {
+    this.recordTimingStart(settleMs);
     this.pendingDeletes.add(Path.toRelative(absolutePath));
     this.processPendingEvents();
+  }
+
+  /**
+   * Mark the debounce-wait phase start on the first event of a batch, and
+   * track the slowest watcher-settle duration seen this batch. `settleMs`
+   * only arrives when `devServer.timings` is on (see `FilesWatcher`), so
+   * this is a no-op past the cheap `performance.now()` call when it's off.
+   */
+  private recordTimingStart(settleMs?: number): void {
+    if (this.batchStartedAt === undefined) {
+      this.batchStartedAt = performance.now();
+    }
+
+    if (settleMs === undefined) return;
+
+    this.watcherSettleMs =
+      this.watcherSettleMs === undefined ? settleMs : Math.max(this.watcherSettleMs, settleMs);
   }
 
   private async processBatch(): Promise<void> {
@@ -51,6 +77,12 @@ export class FileEventHandler {
     this.pendingChanges.clear();
     this.pendingAdds.clear();
     this.pendingDeletes.clear();
+
+    const debounceWaitMs =
+      this.batchStartedAt !== undefined ? performance.now() - this.batchStartedAt : undefined;
+    const watcherSettleMs = this.watcherSettleMs;
+    this.batchStartedAt = undefined;
+    this.watcherSettleMs = undefined;
 
     if (changes.length === 0 && adds.length === 0 && deletes.length === 0) return;
 
@@ -90,6 +122,9 @@ export class FileEventHandler {
       added: [...externalAdds, ...addedCodePaths],
       changed: [...externalChanges, ...changedCodePaths],
       deleted: [...deletes, ...vanished],
+      timings: isTimingsEnabled()
+        ? { watcherSettleMs: watcherSettleMs ?? 0, debounceWaitMs: debounceWaitMs ?? 0 }
+        : undefined,
     });
   }
 

@@ -8,8 +8,15 @@ import type { FileManager } from "./file-manager";
  * reload has actually finished, and the line must carry how long that took.
  */
 const devLogHMRMock = vi.fn();
+const devLogTimingsMock = vi.fn();
 vi.mock("./dev-logger", () => ({
   devLogHMR: (...args: unknown[]) => devLogHMRMock(...args),
+  devLogTimings: (...args: unknown[]) => devLogTimingsMock(...args),
+}));
+
+const isTimingsEnabledMock = vi.fn(() => false);
+vi.mock("./flags", () => ({
+  isTimingsEnabled: () => isTimingsEnabledMock(),
 }));
 
 vi.mock("../connectors/connectors-manager", () => ({
@@ -55,6 +62,8 @@ describe("LayerExecutor.executeBatchReload — hmr log fires after reload finish
   afterEach(() => {
     vi.restoreAllMocks();
     devLogHMRMock.mockClear();
+    devLogTimingsMock.mockClear();
+    isTimingsEnabledMock.mockReturnValue(false);
   });
 
   it("re-imports the affected module before logging, and the log carries a duration", async () => {
@@ -91,5 +100,46 @@ describe("LayerExecutor.executeBatchReload — hmr log fires after reload finish
     );
 
     expect(devLogHMRMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("LayerExecutor.executeBatchReload — opt-in per-phase reload timings", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    devLogHMRMock.mockClear();
+    devLogTimingsMock.mockClear();
+    isTimingsEnabledMock.mockReturnValue(false);
+  });
+
+  it("prints no timings line when devServer.timings is off (default)", async () => {
+    const file = fakeFile("src/app/x.ts");
+    const filesMap = new Map([[file.relativePath, file]]);
+    const executor = buildExecutor(file, vi.fn().mockResolvedValue(undefined));
+
+    await executor.executeBatchReload([file.relativePath], filesMap, []);
+
+    expect(devLogTimingsMock).not.toHaveBeenCalled();
+    expect(devLogHMRMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("prints all five reload phases as numbers when devServer.timings is on", async () => {
+    isTimingsEnabledMock.mockReturnValue(true);
+    const file = fakeFile("src/app/x.ts");
+    const filesMap = new Map([[file.relativePath, file]]);
+    const executor = buildExecutor(file, vi.fn().mockResolvedValue(undefined));
+
+    await executor.executeBatchReload([file.relativePath], filesMap, [], undefined, {
+      watcherSettleMs: 12,
+      debounceWaitMs: 50,
+    });
+
+    expect(devLogTimingsMock).toHaveBeenCalledTimes(1);
+    const [timings] = devLogTimingsMock.mock.calls[0] as [Record<string, number>];
+
+    expect(timings.watcherSettleMs).toBe(12);
+    expect(timings.debounceWaitMs).toBe(50);
+    expect(typeof timings.moduleGraphInvalidationMs).toBe("number");
+    expect(typeof timings.reimportMs).toBe("number");
+    expect(typeof timings.connectorRestartMs).toBe("number");
   });
 });

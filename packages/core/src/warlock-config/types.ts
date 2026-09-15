@@ -192,6 +192,18 @@ export type WarlockConfig = {
      * @default false
      */
     transpileCacheDebug?: boolean;
+    /**
+     * Print a one-line, per-phase timing breakdown next to the existing
+     * `hmr update` line on every hot reload: watcher settle (chokidar's
+     * `awaitWriteFinish`), debounce wait, module-graph invalidation,
+     * re-import, and connector restart. Opt-in and off by default — the
+     * marks themselves are cheap `performance.now()` calls, but the
+     * raw-fs-event bookkeeping behind the watcher-settle phase is skipped
+     * entirely unless this is on, so a disabled flag costs nothing beyond
+     * one boolean check per reload.
+     * @default false
+     */
+    timings?: boolean;
   };
 
   /**
