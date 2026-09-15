@@ -13,7 +13,13 @@ import { ConnectorLifecyclePhase, type Connector } from "../connectors/types";
 const esbuildBuildMock = vi.fn(async (..._args: unknown[]) => undefined);
 
 vi.mock("esbuild", () => ({
-  default: { build: (...args: unknown[]) => esbuildBuildMock(...args) },
+  default: {
+    build: (...args: unknown[]) => esbuildBuildMock(...args),
+    // The build's esbuild-binary preflight calls this before bundling starts;
+    // a healthy no-op keeps this spec about the emit-contribution options,
+    // not about exercising the preflight itself (see esbuild-preflight.spec.ts).
+    transformSync: () => ({ code: "" }),
+  },
 }));
 
 // `tsconfigManager.init()` reads a real tsconfig.json off disk; the fixture

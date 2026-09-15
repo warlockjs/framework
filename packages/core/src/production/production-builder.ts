@@ -21,6 +21,7 @@ import { bundleFrameworkDependencies } from "./bundle-framework-dependencies";
 import { dedupe, runEmitContributions, runGenerateContributions } from "./build-contributions";
 import { writeDistBuildManifestAsync } from "./dist-build-manifest";
 import { nativeNodeModulesPlugin } from "./esbuild-plugins";
+import { assertEsbuildBinaryIsLinked } from "./esbuild-preflight";
 import {
   commitDistAsync,
   createTempOutputDir,
@@ -147,6 +148,12 @@ export class ProductionBuilder {
    */
   public async build(): Promise<void> {
     console.log(colors.cyan("Building for production...\n"));
+
+    // Step 0: Fail fast when esbuild's native binary never got linked (the
+    // state pnpm leaves a project in when its build-script approval gate
+    // blocked esbuild's postinstall) rather than let bundling die on esbuild's
+    // own cryptic "package could not be found" error several steps from now.
+    assertEsbuildBinaryIsLinked();
 
     // Step 1: Initialize options from config
     await this.initializeOptions();
