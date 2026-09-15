@@ -10,25 +10,29 @@ import { AccessErrorCodes } from "../utils/access-error-codes";
  * `interface RequestUser extends Auth<ModelSchema>` PRE-CLAIMS the one
  * extends slot every app needs for its own model — the app's
  * `interface RequestUser extends User {}` then fails with TS2320, and the
- * app can never see its own auth model on `request.user`. (Core documents
- * the same hazard for member-level augmentation in
+ * app can never see its own auth model on `request.locals.user`. (Core
+ * documents the same hazard for member-level augmentation in
  * `http/middleware/utils/idempotency-key.ts`.)
  *
- * The contract instead: an app using gates augments `RequestUser` to its
- * OWN `Auth`-derived model; `authUserOf` below is the single boundary where
- * access asserts that contract to satisfy `can()`'s parameter type.
+ * The contract instead: an app using gates augments `RequestUser` (declared
+ * by `@warlock.js/auth`, which also augments core's `RequestLocals` with the
+ * `user` key) to its OWN `Auth`-derived model; `authUserOf` below is the
+ * single boundary where access asserts that contract to satisfy `can()`'s
+ * parameter type.
  */
 
 /**
- * The one place access bridges `request.user` (app-augmented, empty by
- * default) to the `Auth<ModelSchema>` that `can()`/`canAny()`/`canAll()`
- * require. The assertion is the contract boundary, not a shortcut: the app's
- * `RequestUser` augmentation promises an `Auth`-derived model, and the auth
- * middleware placed exactly that instance here at runtime. Kept to this single
- * accessor so the promise is asserted once, visibly, instead of scattered.
+ * The one place access bridges `request.locals.user` (app-augmented via
+ * `@warlock.js/auth`'s `RequestUser`, empty by default) to the
+ * `Auth<ModelSchema>` that `can()`/`canAny()`/`canAll()` require. The
+ * assertion is the contract boundary, not a shortcut: the app's `RequestUser`
+ * augmentation promises an `Auth`-derived model, and the auth middleware
+ * placed exactly that instance at `request.locals.user` at runtime. Kept to
+ * this single accessor so the promise is asserted once, visibly, instead of
+ * scattered.
  */
 function authUserOf(request: HttpContext["request"]): Auth<ModelSchema> | undefined {
-  return request.user as unknown as Auth<ModelSchema> | undefined;
+  return request.locals.user as unknown as Auth<ModelSchema> | undefined;
 }
 
 function deny(response: Response) {
@@ -40,7 +44,7 @@ function deny(response: Response) {
 
 /**
  * Gate a route on a single permission (class-level). Stack it AFTER
- * `authMiddleware`, which sets `request.user`.
+ * `authMiddleware`, which sets `request.locals.user`.
  *
  * @example
  * router.post("/orders", createOrder, {
