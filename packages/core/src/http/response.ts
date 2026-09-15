@@ -1,4 +1,5 @@
 import type { CookieSerializeOptions } from "@fastify/cookie";
+import type { OutgoingHttpHeaders } from "node:http";
 import config from "@mongez/config";
 import type { EventSubscription } from "@mongez/events";
 import events from "@mongez/events";
@@ -20,6 +21,7 @@ import type { Route } from "../router";
 import { StorageFile } from "../storage";
 import { renderReact } from "./../react";
 import type { Request } from "./request";
+import { streamReactResponse, type PipeableReactStream } from "./stream-react-response";
 import type { ResponseEvent, ResponseSSEController, ResponseStreamController } from "./types";
 
 type CookieValue = string | number | boolean | Record<string, any> | Array<any>;
@@ -692,6 +694,45 @@ export class Response {
         return isEnded;
       },
     };
+  }
+
+  /**
+   * Pipe a React server stream (`renderToPipeableStream`) onto this
+   * response — the Stage 1 streaming SSR seam. Writes the already-committed
+   * status and headers, then pipes; aborts the React render if the client
+   * disconnects before the stream finishes.
+   *
+   * This is the ONLY sanctioned way for `@warlock.js/web` to put a React
+   * stream on the wire: it never touches `response.raw` itself, it calls
+   * this method, which does (`stream-react-response.ts`).
+   *
+   * @example
+   * ```ts
+   * const pipeableStream = await renderPageToPipeableStream(element);
+   * await response.streamReact(pipeableStream);
+   * ```
+   */
+  public streamReact(pipeableStream: PipeableReactStream): Promise<void> {
+    Response.trigger("sending", this);
+    for (const callback of this.events.get("sending") || []) {
+      callback(this);
+    }
+
+    return streamReactResponse({
+      raw: this.baseResponse.raw,
+      statusCode: this.statusCode,
+      headers: this.getHeaders() as OutgoingHttpHeaders,
+      pipeableStream,
+    }).then(() => {
+      Response.trigger("sent", this);
+      for (const callback of this.events.get("sent") || []) {
+        callback(this);
+      }
+
+      if (this.isOk) {
+        Response.trigger("success", this);
+      }
+    });
   }
 
   /**
