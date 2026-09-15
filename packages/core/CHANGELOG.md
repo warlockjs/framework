@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Opt-in request tracing (`http.tracing`): vendor-neutral `onRequestStart` / `onRequestEnd` / `onPhase` hooks fired around `route.match`, `middleware`, `validation`, `handler`, and `response.write`, with the trace id derived from an inbound W3C `traceparent` header (falling back to `request.id`). Off by default and zero-overhead when disabled; a throwing hook is caught and reported once, never breaking the request. No new response header — apps still correlate through the existing `X-Request-Id` echo. See the `request-tracing` skill.
 - Opt-in `Content-Security-Policy` header (`http.csp`), using the per-request nonce the framework already generates; report-only mode supported.
 - `Response.streamReact()` and the underlying `streamReactResponse()` helper (`@warlock.js/core`'s Stage 1 streaming SSR seam): pipe a React server stream (`renderToPipeableStream`) onto the raw response after writing the already-committed status and headers, aborting the render if the client disconnects. `@warlock.js/web` uses this exclusively to stream a page document — it never touches the raw response itself.
 
