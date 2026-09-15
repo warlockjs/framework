@@ -37,7 +37,7 @@ export const uploadAvatarController: GuardedRequestHandler<UploadAvatarSchema> =
     .resize(400, 400)
     .format("webp")
     .quality(85)
-    .save(`avatars/${request.user.id}`);
+    .save(`avatars/${request.locals.user.id}`);
 
   return response.successCreate({ path: file.path, url: file.url });
 };
@@ -255,7 +255,7 @@ export const createUploadController: RequestHandler = async ({ request, response
 
   const saved = await Promise.all(
     files.map((file) =>
-      file.save(`uploads/${request.user.organizationId}`, {
+      file.save(`uploads/${request.locals.user.organizationId}`, {
         prefix: { as: "directory", format: "DD-MM-YYYY" },
       }),
     ),

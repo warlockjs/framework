@@ -751,8 +751,8 @@ class OrdersRestful extends Restful<Order> {
   protected recordName = "order";
 
   protected async beforeCreate(request, response, order) {
-    order.set("organization_id", request.user.organizationId);
-    order.set("created_by", request.user.id);
+    order.set("organization_id", request.locals.user.organizationId);
+    order.set("created_by", request.locals.user.id);
   }
 }
 
@@ -1275,7 +1275,7 @@ Scaffold with: `npx warlock generate.controller <module>/<action>` (add `--with-
 | `request.input("key", default?)`  | one field                                        | reading a single param/body field by name           |
 | `request.all()`                   | full input object                                | passing the whole input straight to a service       |
 | `request.validated()`             | schema-typed object (only after schema attached) | controllers with a schema — preferred over `.all()` |
-| `request.user`                    | authenticated user                               | guarded routes (see "Typing a guarded handler")     |
+| `request.locals.user`             | authenticated user                               | guarded routes (see "Typing a guarded handler")     |
 | `request.file("key")`             | `UploadedFile`                                   | multipart uploads                                   |
 | `request.header("X-Foo")`         | header value                                     | reading request metadata                            |
 | `request.ip`, `request.userAgent` | strings                                          | logging, device info                                |
@@ -1331,7 +1331,7 @@ If validation fails, the framework returns a 400 with an `errors` payload and yo
 
 ### Typing a guarded handler
 
-Routes behind `authMiddleware` need `request.user` typed. Project conventions add a `GuardedRequest<TSchema>` (adding `user: User`) and a paired `GuardedRequestHandler<TSchema>` alias in `app/auth/requests/guarded.request`:
+Routes behind `authMiddleware` need `request.locals.user` typed. Project conventions add a `GuardedRequest<TSchema>` (overriding `locals` to `RequestLocals & { user: User }`) and a paired `GuardedRequestHandler<TSchema>` alias in `app/auth/requests/guarded.request`:
 
 ```ts
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
@@ -1341,7 +1341,7 @@ export const createProductController: GuardedRequestHandler<CreateProductSchema>
   request,
   response,
 }) => {
-  // request.user is typed
+  // request.locals.user is typed
   const product = await createProductService(request.validated());
   return response.successCreate({ product });
 };
@@ -1390,7 +1390,7 @@ import { listProductsService } from "../services/list-products.service";
 export const listProductsController: RequestHandler = async ({ request, response }) => {
   const { data: products, pagination } = await listProductsService({
     ...request.all(),
-    organization_id: request.user.organizationId,
+    organization_id: request.locals.user.organizationId,
   });
 
   return response.success({ products, pagination });
@@ -4815,7 +4815,7 @@ export const uploadAvatarController: GuardedRequestHandler = async ({ request, r
     return response.badRequest({ error: "missing file" });
   }
 
-  const file = await storage.put(upload, `avatars/${request.user.id}/${upload.name}`);
+  const file = await storage.put(upload, `avatars/${request.locals.user.id}/${upload.name}`);
 
   return response.successCreate({ url: file.url, hash: file.hash });
 };
@@ -5758,7 +5758,7 @@ export const uploadAvatarController: GuardedRequestHandler<UploadAvatarSchema> =
     .resize(400, 400)
     .format("webp")
     .quality(85)
-    .save(`avatars/${request.user.id}`);
+    .save(`avatars/${request.locals.user.id}`);
 
   return response.successCreate({ path: file.path, url: file.url });
 };
@@ -5976,7 +5976,7 @@ export const createUploadController: RequestHandler = async ({ request, response
 
   const saved = await Promise.all(
     files.map((file) =>
-      file.save(`uploads/${request.user.organizationId}`, {
+      file.save(`uploads/${request.locals.user.organizationId}`, {
         prefix: { as: "directory", format: "DD-MM-YYYY" },
       }),
     ),
@@ -6698,7 +6698,7 @@ router.post("/ai/summarize", summarizeController, {
 
 ## `idempotency` — must run after auth
 
-The cache key is `idem:{userType}:{userId|ip}:{key}` so user A can't replay user B's key. That requires `request.user` to be populated, so order it **after** `authMiddleware`:
+The cache key is `idem:{userType}:{userId|ip}:{key}` so user A can't replay user B's key. That requires `request.locals.user` to be populated, so order it **after** `authMiddleware`:
 
 ```ts
 import { authMiddleware } from "@warlock.js/auth";
@@ -6874,7 +6874,7 @@ export default {
 ## Gotchas
 
 - **Bare factory names are not exported.** Always reach for them via `middleware` (`middleware.rateLimit`, not `rateLimitMiddleware`). The internal `*Middleware`-suffixed names are an in-package code-organization detail.
-- **Idempotency must run after auth.** The cache key includes `request.user` for scope-isolation. Putting it before auth silently falls back to IP-scope for every request.
+- **Idempotency must run after auth.** The cache key includes `request.locals.user` for scope-isolation. Putting it before auth silently falls back to IP-scope for every request.
 - **In-process counters lose state on restart.** `middleware.rateLimit` and `middleware.concurrencyLimit` use module-scoped `Map`s. A redeploy resets every window/counter. For globally-shared limits, use `@fastify/rate-limit` with a Redis store.
 - **Idempotency clients must reuse the key across retries.** If your client generates a new UUID on every attempt, idempotency is a no-op. Generate once at "intent" time.
 - **`ipFilter` fail-closed.** Empty / unparseable IP = denied. Internal callers (Unix sockets, local processes) need explicit allowlisting.
@@ -7399,7 +7399,7 @@ import { listFaqsService } from "../services/list-faqs.service";
 export const listFaqsController: GuardedRequestHandler = async ({ request, response }) => {
   const { data, pagination } = await listFaqsService({
     ...request.all(),
-    organization_id: request.user.organizationId,
+    organization_id: request.locals.user.organizationId,
   });
 
   return response.success({ data, pagination });
@@ -8571,7 +8571,7 @@ import type { GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { notifyUserService } from "../services/notify-user.service";
 
 export const sendNotificationController: GuardedRequestHandler = async ({ request, response }) => {
-  await notifyUserService(request.user, request.input("payload"));
+  await notifyUserService(request.locals.user, request.input("payload"));
   return response.success({ delivered: true });
 };
 ```
@@ -9104,7 +9104,8 @@ If you short-circuit, the controller never runs. The response helper you pick (`
 You can attach arbitrary fields to `request` from a middleware, and they survive into the controller. The cleanest pattern is to extend `Request` via module augmentation in a `.d.ts` and assign in the middleware:
 
 ```ts title="src/app/feature-flags/middleware/load-feature-flag.middleware.ts"
-import type { Middleware, Request, RequestUser } from "@warlock.js/core";
+import type { Middleware, Request } from "@warlock.js/core";
+import type { RequestUser } from "@warlock.js/auth";
 import { FeatureFlag } from "../models/feature-flag";
 
 declare module "@warlock.js/core" {
@@ -9113,12 +9114,17 @@ declare module "@warlock.js/core" {
   }
 }
 
-export const loadFeatureFlag: Middleware<Request & { user: RequestUser }> = async ({ request }) => {
-  request.featureFlag = await FeatureFlag.findBy("organization_id", request.user.organizationId);
+export const loadFeatureFlag: Middleware<Request & { locals: { user: RequestUser } }> = async ({
+  request,
+}) => {
+  request.featureFlag = await FeatureFlag.findBy(
+    "organization_id",
+    request.locals.user.organizationId,
+  );
 };
 ```
 
-After this middleware runs, `request.featureFlag` is typed inside any downstream middleware or controller. The same pattern is how `@warlock.js/auth`'s `authMiddleware` attaches `request.user` and `request.decodedAccessToken`.
+After this middleware runs, `request.featureFlag` is typed inside any downstream middleware or controller. The same pattern is how `@warlock.js/auth`'s `authMiddleware` attaches `request.locals.user` and `request.decodedAccessToken`.
 
 ## Registration — three scopes
 
@@ -9259,7 +9265,7 @@ export const optionalAuth: Middleware = async ({ request, response }) => {
 
 - [`use-middleware/SKILL.md`](../use-middleware/SKILL.md) — the built-in middleware catalog (`rateLimit`, `idempotency`, `maxBodySize`, etc.) + request-id correlation.
 - [`register-route/SKILL.md`](../register-route/SKILL.md) — where middleware attaches: `router.group` and route-options.
-- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — how the controller picks up `request.user`, `request.validated()`, etc., set by upstream middleware.
+- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — how the controller picks up `request.locals.user`, `request.validated()`, etc., set by upstream middleware.
 - [`send-response/SKILL.md`](../send-response/SKILL.md) — the response helpers used to short-circuit.
 - [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — the `guarded()` / `guardedAdmin()` / `publicRoutes()` convention.
 
@@ -9841,7 +9847,7 @@ Populate `ctx` from a controller via runtime options:
 ```ts
 await cancelOrderUseCase(
   { orderId: request.input("id") },
-  { ctx: { currentUser: request.user } },
+  { ctx: { currentUser: request.locals.user } },
 );
 ```
 

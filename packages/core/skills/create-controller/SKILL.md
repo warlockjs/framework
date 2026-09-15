@@ -34,7 +34,7 @@ Scaffold with: `npx warlock generate.controller <module>/<action>` (add `--with-
 | `request.input("key", default?)`  | one field                                        | reading a single param/body field by name           |
 | `request.all()`                   | full input object                                | passing the whole input straight to a service       |
 | `request.validated()`             | schema-typed object (only after schema attached) | controllers with a schema — preferred over `.all()` |
-| `request.user`                    | authenticated user                               | guarded routes (see "Typing a guarded handler")     |
+| `request.locals.user`             | authenticated user                               | guarded routes (see "Typing a guarded handler")     |
 | `request.file("key")`             | `UploadedFile`                                   | multipart uploads                                   |
 | `request.header("X-Foo")`         | header value                                     | reading request metadata                            |
 | `request.ip`, `request.userAgent` | strings                                          | logging, device info                                |
@@ -90,7 +90,7 @@ If validation fails, the framework returns a 400 with an `errors` payload and yo
 
 ### Typing a guarded handler
 
-Routes behind `authMiddleware` need `request.user` typed. Project conventions add a `GuardedRequest<TSchema>` (adding `user: User`) and a paired `GuardedRequestHandler<TSchema>` alias in `app/auth/requests/guarded.request`:
+Routes behind `authMiddleware` need `request.locals.user` typed. Project conventions add a `GuardedRequest<TSchema>` (overriding `locals` to `RequestLocals & { user: User }`) and a paired `GuardedRequestHandler<TSchema>` alias in `app/auth/requests/guarded.request`:
 
 ```ts
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
@@ -100,7 +100,7 @@ export const createProductController: GuardedRequestHandler<CreateProductSchema>
   request,
   response,
 }) => {
-  // request.user is typed
+  // request.locals.user is typed
   const product = await createProductService(request.validated());
   return response.successCreate({ product });
 };
@@ -149,7 +149,7 @@ import { listProductsService } from "../services/list-products.service";
 export const listProductsController: RequestHandler = async ({ request, response }) => {
   const { data: products, pagination } = await listProductsService({
     ...request.all(),
-    organization_id: request.user.organizationId,
+    organization_id: request.locals.user.organizationId,
   });
 
   return response.success({ products, pagination });

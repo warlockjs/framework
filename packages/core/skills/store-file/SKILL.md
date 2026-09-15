@@ -355,7 +355,7 @@ export const uploadAvatarController: GuardedRequestHandler = async ({ request, r
     return response.badRequest({ error: "missing file" });
   }
 
-  const file = await storage.put(upload, `avatars/${request.user.id}/${upload.name}`);
+  const file = await storage.put(upload, `avatars/${request.locals.user.id}/${upload.name}`);
 
   return response.successCreate({ url: file.url, hash: file.hash });
 };

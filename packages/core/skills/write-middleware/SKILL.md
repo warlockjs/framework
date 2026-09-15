@@ -58,7 +58,8 @@ If you short-circuit, the controller never runs. The response helper you pick (`
 You can attach arbitrary fields to `request` from a middleware, and they survive into the controller. The cleanest pattern is to extend `Request` via module augmentation in a `.d.ts` and assign in the middleware:
 
 ```ts title="src/app/feature-flags/middleware/load-feature-flag.middleware.ts"
-import type { Middleware, Request, RequestUser } from "@warlock.js/core";
+import type { Middleware, Request } from "@warlock.js/core";
+import type { RequestUser } from "@warlock.js/auth";
 import { FeatureFlag } from "../models/feature-flag";
 
 declare module "@warlock.js/core" {
@@ -67,12 +68,17 @@ declare module "@warlock.js/core" {
   }
 }
 
-export const loadFeatureFlag: Middleware<Request & { user: RequestUser }> = async ({ request }) => {
-  request.featureFlag = await FeatureFlag.findBy("organization_id", request.user.organizationId);
+export const loadFeatureFlag: Middleware<Request & { locals: { user: RequestUser } }> = async ({
+  request,
+}) => {
+  request.featureFlag = await FeatureFlag.findBy(
+    "organization_id",
+    request.locals.user.organizationId,
+  );
 };
 ```
 
-After this middleware runs, `request.featureFlag` is typed inside any downstream middleware or controller. The same pattern is how `@warlock.js/auth`'s `authMiddleware` attaches `request.user` and `request.decodedAccessToken`.
+After this middleware runs, `request.featureFlag` is typed inside any downstream middleware or controller. The same pattern is how `@warlock.js/auth`'s `authMiddleware` attaches `request.locals.user` and `request.decodedAccessToken`.
 
 ## Registration — three scopes
 
@@ -213,6 +219,6 @@ export const optionalAuth: Middleware = async ({ request, response }) => {
 
 - [`use-middleware/SKILL.md`](../use-middleware/SKILL.md) — the built-in middleware catalog (`rateLimit`, `idempotency`, `maxBodySize`, etc.) + request-id correlation.
 - [`register-route/SKILL.md`](../register-route/SKILL.md) — where middleware attaches: `router.group` and route-options.
-- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — how the controller picks up `request.user`, `request.validated()`, etc., set by upstream middleware.
+- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — how the controller picks up `request.locals.user`, `request.validated()`, etc., set by upstream middleware.
 - [`send-response/SKILL.md`](../send-response/SKILL.md) — the response helpers used to short-circuit.
 - [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — the `guarded()` / `guardedAdmin()` / `publicRoutes()` convention.

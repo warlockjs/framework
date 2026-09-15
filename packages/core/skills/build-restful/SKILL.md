@@ -243,8 +243,8 @@ class OrdersRestful extends Restful<Order> {
   protected recordName = "order";
 
   protected async beforeCreate(request, response, order) {
-    order.set("organization_id", request.user.organizationId);
-    order.set("created_by", request.user.id);
+    order.set("organization_id", request.locals.user.organizationId);
+    order.set("created_by", request.locals.user.id);
   }
 }
 

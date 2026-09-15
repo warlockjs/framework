@@ -192,7 +192,7 @@ Populate `ctx` from a controller via runtime options:
 ```ts
 await cancelOrderUseCase(
   { orderId: request.input("id") },
-  { ctx: { currentUser: request.user } },
+  { ctx: { currentUser: request.locals.user } },
 );
 ```
 

@@ -127,7 +127,7 @@ import type { GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { notifyUserService } from "../services/notify-user.service";
 
 export const sendNotificationController: GuardedRequestHandler = async ({ request, response }) => {
-  await notifyUserService(request.user, request.input("payload"));
+  await notifyUserService(request.locals.user, request.input("payload"));
   return response.success({ delivered: true });
 };
 ```

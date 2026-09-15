@@ -54,7 +54,7 @@ router.post("/ai/summarize", summarizeController, {
 
 ## `idempotency` — must run after auth
 
-The cache key is `idem:{userType}:{userId|ip}:{key}` so user A can't replay user B's key. That requires `request.user` to be populated, so order it **after** `authMiddleware`:
+The cache key is `idem:{userType}:{userId|ip}:{key}` so user A can't replay user B's key. That requires `request.locals.user` to be populated, so order it **after** `authMiddleware`:
 
 ```ts
 import { authMiddleware } from "@warlock.js/auth";
@@ -230,7 +230,7 @@ export default {
 ## Gotchas
 
 - **Bare factory names are not exported.** Always reach for them via `middleware` (`middleware.rateLimit`, not `rateLimitMiddleware`). The internal `*Middleware`-suffixed names are an in-package code-organization detail.
-- **Idempotency must run after auth.** The cache key includes `request.user` for scope-isolation. Putting it before auth silently falls back to IP-scope for every request.
+- **Idempotency must run after auth.** The cache key includes `request.locals.user` for scope-isolation. Putting it before auth silently falls back to IP-scope for every request.
 - **In-process counters lose state on restart.** `middleware.rateLimit` and `middleware.concurrencyLimit` use module-scoped `Map`s. A redeploy resets every window/counter. For globally-shared limits, use `@fastify/rate-limit` with a Redis store.
 - **Idempotency clients must reuse the key across retries.** If your client generates a new UUID on every attempt, idempotency is a no-op. Generate once at "intent" time.
 - **`ipFilter` fail-closed.** Empty / unparseable IP = denied. Internal callers (Unix sockets, local processes) need explicit allowlisting.
