@@ -25,6 +25,23 @@ function fakePipeableStream(): PipeableReactStream & { pipe: ReturnType<typeof v
   };
 }
 
+/**
+ * A mock's `invocationCallOrder[0]` is typed `number | undefined` under
+ * `noUncheckedIndexedAccess` even though the mock was just asserted to have
+ * been called — narrows it for the ordering comparison below, throwing
+ * (rather than silently comparing against `undefined`) if the call was never
+ * recorded.
+ */
+function firstCallOrder(mockFn: { mock: { invocationCallOrder: number[] } }): number {
+  const order = mockFn.mock.invocationCallOrder[0];
+
+  if (order === undefined) {
+    throw new Error("expected the mock to have recorded at least one call order");
+  }
+
+  return order;
+}
+
 describe("streamReactResponse", () => {
   it("writes the committed status and headers before piping", async () => {
     const raw = new FakeRawResponse();
@@ -43,9 +60,7 @@ describe("streamReactResponse", () => {
     });
     expect(pipeableStream.pipe).toHaveBeenCalledWith(raw);
     // `writeHead` must land before `pipe` starts writing bytes — assert call order.
-    expect(raw.writeHead.mock.invocationCallOrder[0]).toBeLessThan(
-      pipeableStream.pipe.mock.invocationCallOrder[0],
-    );
+    expect(firstCallOrder(raw.writeHead)).toBeLessThan(firstCallOrder(pipeableStream.pipe));
 
     raw.finish();
     await pending;
