@@ -871,7 +871,13 @@ bootstrap();
         continue;
       }
 
-      alias[from] = path.resolve(baseUrl, to[0]);
+      const target = to[0];
+
+      if (target === undefined) {
+        continue;
+      }
+
+      alias[from] = path.resolve(baseUrl, target);
     }
 
     return alias;

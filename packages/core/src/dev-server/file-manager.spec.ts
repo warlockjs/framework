@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FileManager } from "./file-manager";
 
 const getFileAsync = vi.fn();
 const lastModifiedAsync = vi.fn();
@@ -7,8 +8,6 @@ vi.mock("@warlock.js/fs", () => ({
   getFileAsync: (...args: unknown[]) => getFileAsync(...args),
   lastModifiedAsync: (...args: unknown[]) => lastModifiedAsync(...args),
 }));
-
-const { FileManager } = await import("./file-manager");
 
 /**
  * `FileManager.process()` reads a file's source and then stats it in a
