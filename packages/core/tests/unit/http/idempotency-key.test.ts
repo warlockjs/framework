@@ -11,8 +11,9 @@ import {
 /**
  * Pure helpers behind the idempotency middleware. Source:
  * core/src/http/middleware/utils/idempotency-key.ts. `buildIdempotencyCacheKey`
- * reads `request.decodedAccessToken` / `request.user` / `request.detectIp()`,
- * all of which we seed directly so no Fastify server is needed.
+ * reads `request.decodedAccessToken` / `request.locals.user` (written by
+ * `@warlock.js/auth`'s middleware) / `request.detectIp()`, all of which we
+ * seed directly so no Fastify server is needed.
  */
 describe("isValidIdempotencyKey", () => {
   it("accepts a printable ASCII string within length bounds", () => {
@@ -83,7 +84,11 @@ describe("buildIdempotencyCacheKey", () => {
     } as unknown as FastifyRequest);
 
     if (seed.user !== undefined) {
-      request.user = seed.user as never;
+      // Core does not declare a `user` key on `RequestLocals` — that
+      // augmentation belongs to `@warlock.js/auth` — so this test seeds it
+      // through an untyped bag, exactly as `buildIdempotencyCacheKey` itself
+      // reads it back.
+      (request.locals as Record<string, unknown>).user = seed.user;
     }
 
     if (seed.decodedAccessToken !== undefined) {

@@ -62,7 +62,7 @@ function makeRequest(seed: {
     body: seed.body ?? { amount: 100 },
     header: (name: string) => headers[name.toLowerCase()],
     detectIp: () => seed.ip ?? "127.0.0.1",
-    user: undefined,
+    locals: { user: undefined },
     decodedAccessToken: undefined,
   };
 }

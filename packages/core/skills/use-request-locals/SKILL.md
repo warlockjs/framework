@@ -150,7 +150,7 @@ Writing `request.locals.organization` does not affect `request.all()`, `request.
 - Use `request.locals` for per-request data written by middleware and read downstream.
 - Use `requestMemo(key, fn)` for lazily computed, single-flight work scoped to the active request.
 - Augment `Request` itself only for a genuine new typed member that also has a runtime implementation.
-- Augment `RequestUser` for the authenticated `request.user` shape; do not duplicate it under locals merely to work around typing.
+- The authenticated user itself already lives at `request.locals.user` — `@warlock.js/auth` augments `RequestLocals` with a `user?: RequestUser` key and its middleware writes it. Core's own `request.user` was removed in 5.12.0; do not re-add a separate `user` local outside that key.
 
 ## Gotchas
 

@@ -33,33 +33,20 @@ export type RequestEvent =
  */
 export interface RequestLocals {
   /**
-   * Whether this request has, at any point, been assigned a `user` or a
-   * `decodedAccessToken` — set by their accessors in `request.ts`, never by
+   * Whether this request has, at any point, been assigned a
+   * `decodedAccessToken` — set by its accessor in `request.ts`, never by
    * anything else, and never cleared once set. Absent (not `false`) on a
    * request that never touched auth state; a later stage reads this to
    * decide cache headers, but that stage is not this one.
+   *
+   * `@warlock.js/auth` writes the authenticated user to `locals.user` (a key
+   * it augments onto this interface — see `RequestUser` in that package) but
+   * does not set `authDerived` when doing so; only `decodedAccessToken`
+   * marks this flag. Core intentionally does not restore a user-triggered
+   * cache mark here (see the 5.12.0 CHANGELOG for the design ruling).
    */
   authDerived?: boolean;
 }
-
-/**
- * The authenticated user attached to the current request — `request.user`.
- *
- * Empty by default so any shape is assignable at the declaration site;
- * apps/packages narrow it via module augmentation instead of the v4
- * `GuardedRequest` intersection type (`Request<T> & { user: User }`,
- * hand-declared per app):
- *
- * @example
- * ```typescript
- * declare module "@warlock.js/core" {
- *   interface RequestUser {
- *     id: string | number;
- *   }
- * }
- * ```
- */
-export interface RequestUser {}
 
 /**
  * Decoded access-token claims attached to the current request —

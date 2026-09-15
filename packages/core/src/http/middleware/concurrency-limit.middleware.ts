@@ -14,7 +14,7 @@ export type ConcurrencyLimitOptions = {
    * or per-tenant.
    *
    * @example
-   * keyGenerator: (request) => `${request.route.path}:${request.user?.id ?? request.ip}`,
+   * keyGenerator: (request) => `${request.route.path}:${request.locals.user?.id ?? request.ip}`,
    */
   keyGenerator?: (request: Request) => string;
   /**
@@ -60,7 +60,7 @@ function release(key: string) {
  * router.post("/ai/summarize", summarizeController, {
  *   middleware: [
  *     middleware.concurrencyLimit(10, {
- *       keyGenerator: (request) => `ai:${request.user?.id ?? request.ip}`,
+ *       keyGenerator: (request) => `ai:${request.locals.user?.id ?? request.ip}`,
  *     }),
  *   ],
  * });

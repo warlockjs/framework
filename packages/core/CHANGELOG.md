@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Opt-in `Content-Security-Policy` header (`http.csp`), using the per-request nonce the framework already generates; report-only mode supported.
+- `Response.streamReact()` and the underlying `streamReactResponse()` helper (`@warlock.js/core`'s Stage 1 streaming SSR seam): pipe a React server stream (`renderToPipeableStream`) onto the raw response after writing the already-committed status and headers, aborting the render if the client disconnects. `@warlock.js/web` uses this exclusively to stream a page document — it never touches the raw response itself.
 
 ### Fixed
 
@@ -20,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - **`container.get(key)` now throws a named error when the key is not registered**, instead of returning `undefined` while typed as present. Use `container.tryGet(key)` where the value is genuinely optional.
+- **BREAKING:** `request.user` and `clearCurrentUser()` removed from the HTTP request; `RequestUser` moved to `@warlock.js/auth`. The authenticated user now lives at `request.locals.user`, a key `@warlock.js/auth` declares via module augmentation on `RequestLocals` and writes from its middleware. Reading `request.user` in development throws a new `RequestUserMovedError` naming `request.locals.user` (kept for one release as a migration diagnostic; removal is documented, not silent). `decodedAccessToken` and its cache-mark behavior (`request.locals.authDerived`) are unchanged. `useCurrentUser()` / `requestContext.getUser()` now read `request.locals.user` and return `unknown`/the caller's generic instead of the removed `RequestUser` type — see `@warlock.js/auth`'s `currentUser()` for a typed wrapper.
 
 ## 5.11.0 - 2026-09-14
 

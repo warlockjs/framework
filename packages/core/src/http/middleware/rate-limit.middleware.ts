@@ -20,7 +20,7 @@ export type RateLimitOptions = {
    * per-organization, per-tenant, etc.
    *
    * @example
-   * keyGenerator: (request) => request.user?.id ?? request.ip,
+   * keyGenerator: (request) => request.locals.user?.id ?? request.ip,
    */
   keyGenerator?: (request: Request) => string;
   /**

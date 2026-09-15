@@ -10,9 +10,12 @@ import { notificationControllersStub } from "../../../src/generations/stubs";
  * `notificationControllersStub` (`src/generations/stubs.ts`). The release
  * gate's own acceptance run — scaffold a fresh app, `warlock add
  * notifications`, `tsc --noEmit` — found the generated file does NOT
- * compile: `request.user!` (typed `RequestUser`, empty by default —
- * `src/http/types.ts`) is not assignable to `Notifiable | Id`
- * (`@warlock.js/notifications`'s `src/types.ts`), 7 times over.
+ * compile when the raw `request.locals.user` value (untyped from core's own
+ * perspective — see the 5.12.0 CHANGELOG: `RequestUser` moved out of core to
+ * `@warlock.js/auth`) is forwarded straight into `inApp` instead of narrowed
+ * to an id first. `notificationControllersStub`'s own `recipientId()` helper
+ * exists to do that narrowing; this test pins that skipping it is a compile
+ * error, not merely a style choice.
  *
  * `stub-handler-signature.test.ts` (this same directory's sibling under
  * `tests/unit/generations/`) documents an EARLIER attempt at exactly this
@@ -44,10 +47,8 @@ const TSCONFIG_TYPECHECK_PATH = path.join(CORE_DIR, "tsconfig.typecheck.json");
 const FIXED_STUB_FILE = `${CORE_DIR}/__generated-notifications-stub-types-test__/fixed.ts`;
 
 /**
- * Virtual file holding the pre-fix shape: `request.user!` forwarded directly
- * to `inApp`, the exact call-site pattern the release gate's `tsc` run
- * reported 7 times (one call site reproduced here is representative of all
- * 7 — same argument, same target type, same error).
+ * Virtual file holding the broken shape: `request.locals.user` forwarded
+ * directly to `inApp`, skipping the stub's own `recipientId()` narrowing.
  */
 const BROKEN_STUB_FILE = `${CORE_DIR}/__generated-notifications-stub-types-test__/broken.ts`;
 
@@ -55,7 +56,7 @@ const BROKEN_SNIPPET = `import { type RequestHandler } from "@warlock.js/core";
 import { inApp } from "@warlock.js/notifications";
 
 export const listNotificationsController: RequestHandler = async ({ request, response }) => {
-  const { data, pagination } = await inApp.list(request.user!, request.all());
+  const { data, pagination } = await inApp.list(request.locals.user, request.all());
 
   return response.success({ notifications: data, pagination });
 };
@@ -127,7 +128,7 @@ function compileVirtualFiles(files: Record<string, string>): Record<string, stri
 
 describe("notificationControllersStub type-checks against the real @warlock.js/core + @warlock.js/notifications declarations", () => {
   it(
-    "compiles clean, and RED-CONTROL fails the pre-fix request.user! shape with the exact reported TS2345",
+    "compiles clean, and RED-CONTROL fails the un-narrowed request.locals.user shape",
     () => {
       const results = compileVirtualFiles({
         [FIXED_STUB_FILE]: notificationControllersStub,
@@ -138,12 +139,12 @@ describe("notificationControllersStub type-checks against the real @warlock.js/c
       // compile errors against the real declarations.
       expect(results[FIXED_STUB_FILE]).toEqual([]);
 
-      // RED CONTROL: the pre-fix shape (`request.user!` forwarded straight
-      // into `inApp`) fails, with the compiler's OWN message — the exact
-      // text the release gate's `tsc` run reported.
+      // RED CONTROL: forwarding `request.locals.user` straight into `inApp`
+      // (skipping the stub's own `recipientId()` narrowing) fails, with the
+      // compiler's OWN message.
       expect(results[BROKEN_STUB_FILE]).toHaveLength(1);
       expect(results[BROKEN_STUB_FILE][0]).toContain(
-        "Argument of type 'RequestUser' is not assignable to parameter of type 'Notifiable | Id'",
+        "is not assignable to parameter of type 'Notifiable | Id'",
       );
     },
     // Building the ~3000-file @warlock.js/* transitive graph from source is

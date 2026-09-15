@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import type { Request } from "../../request";
-import type { RequestUser } from "../../types";
 
 /**
  * Idempotency-key validation rules.
@@ -46,26 +45,25 @@ export function hashBody(body: unknown): string {
  * user B used a guessable value — while still letting the primitive work on
  * public endpoints.
  *
- * Idempotency middleware must run **after** `authMiddleware` so `request.user`
- * and `request.decodedAccessToken` are populated.
+ * Idempotency middleware must run **after** `authMiddleware` so
+ * `request.locals.user` (written by `@warlock.js/auth`) and
+ * `request.decodedAccessToken` are populated.
  *
  * @example
  * buildIdempotencyCacheKey(request, "01J9XZQ-ABC"); // "idem:client:user_123:01J9XZQ-ABC"
  */
 /**
- * Read `id` off `request.user` without assuming every app's `RequestUser`
- * augmentation declares it.
+ * Read `id` off `request.locals.user` without assuming any app's
+ * `RequestUser` augmentation (declared by `@warlock.js/auth`, which core
+ * cannot import) declares it, and without assuming `@warlock.js/auth` is
+ * even installed — hence the untyped `unknown` read here rather than a
+ * typed `RequestLocals["user"]` access.
  *
- * `RequestUser` (`core/src/http/types.ts`) is empty by default — apps narrow
- * it to their own model shape. Adding `id` directly to `RequestUser` here
- * would force that exact field (and type) onto every app: TypeScript
- * interface merging requires all declarations of a shared member to have an
- * identical type, so an app augmenting `RequestUser` with, say, `id: string`
- * only would conflict with a core-declared `id?: string | number`. A local,
- * narrow read survives any augmentation shape (eed20184 step (b) —
- * `implementation/2026-08-20-A2-request-locals.md` §6.2) — no `as any`.
+ * A local, narrow runtime read survives any augmentation shape (eed20184
+ * step (b) — `implementation/2026-08-20-A2-request-locals.md` §6.2) — no
+ * `as any`.
  */
-function readUserId(user: RequestUser | undefined): string | number | undefined {
+function readUserId(user: unknown): string | number | undefined {
   if (!user || typeof user !== "object" || !("id" in user)) return undefined;
 
   const id = (user as { id?: unknown }).id;
@@ -75,7 +73,8 @@ function readUserId(user: RequestUser | undefined): string | number | undefined 
 
 export function buildIdempotencyCacheKey(request: Request, idempotencyKey: string): string {
   const userType = request.decodedAccessToken?.userType || "anonymous";
-  const userId = readUserId(request.user) || request.detectIp() || "unknown";
+  const locals = request.locals as Record<string, unknown>;
+  const userId = readUserId(locals.user) || request.detectIp() || "unknown";
 
   return `idem:${userType}:${userId}:${idempotencyKey}`;
 }

@@ -9,13 +9,15 @@ import { BaseValidator, v } from "@warlock.js/seal";
 import type { FastifyRequest } from "fastify";
 import { randomBytes } from "node:crypto";
 import { type IncomingHttpHeaders } from "node:http2";
+import { Application } from "../application/application";
 import { config } from "../config/config-getter";
 import { LOCALE_COOKIE_NAME, resolveLocaleConfiguration } from "../config/locale-configuration";
 import type { Middleware, Route } from "../router";
 import { validateAll } from "../validation/validateAll";
+import { RequestUserMovedError } from "./errors";
 import { createRequestStore } from "./middleware/inject-request-context";
 import { Response } from "./response";
-import type { DecodedAccessToken, RequestEvent, RequestLocals, RequestUser } from "./types";
+import type { DecodedAccessToken, RequestEvent, RequestLocals } from "./types";
 import { UploadedFile } from "./uploaded-file";
 
 type StandardHeaders = {
@@ -35,7 +37,8 @@ export class Request<RequestValidation = any> {
    *
    * **Prefer framework methods first**: `request.input()`, `request.header()`,
    * `request.body`, `request.query`, `request.params`, `request.file()`,
-   * `request.user`, `request.detectIp()`, etc. They handle locale, parsing,
+   * `request.locals.user` (set by `@warlock.js/auth`), `request.detectIp()`,
+   * etc. They handle locale, parsing,
    * trust-proxy, and validation pipeline integration correctly.
    *
    * **Reach for `baseRequest` only** when the framework genuinely lacks a
@@ -83,44 +86,28 @@ export class Request<RequestValidation = any> {
   }
 
   /**
-   * Backing field for `user` — see the accessor below.
+   * REMOVED in 5.12.0 — the authenticated user now lives at
+   * `request.locals.user`, a key `@warlock.js/auth` declares via module
+   * augmentation on `RequestLocals` and writes from its middleware after a
+   * successful token resolution. `RequestUser` moved out of core to
+   * `@warlock.js/auth` alongside it.
+   *
+   * This getter is a development-time diagnostic only, kept for one release
+   * so a call site that still reads `request.user` fails loudly at runtime
+   * instead of silently reading `undefined`. It is typed `never` so it
+   * cannot reintroduce an auth-shaped type into core, and it throws
+   * unconditionally outside production so the failure is impossible to miss
+   * in local dev — see `RequestUserMovedError`.
+   *
+   * There is no setter: nothing in core or downstream packages should ever
+   * assign to `request.user` again.
    */
-  private _user?: RequestUser;
+  public get user(): never {
+    if (Application.isDevelopment) {
+      throw new RequestUserMovedError();
+    }
 
-  /**
-   * The authenticated user attached to this request, if any.
-   *
-   * `RequestUser` is empty by default, so ANY shape is assignable here at the
-   * declaration site — the app or auth package declares its real fields via
-   * module augmentation:
-   *
-   * ```typescript
-   * declare module "@warlock.js/core" {
-   *   interface RequestUser {
-   *     id: string | number;
-   *   }
-   * }
-   * ```
-   *
-   * Replaces the v4 `GuardedRequest` convention
-   * (`create-warlock/.../guarded.request.ts` — `Request<T> & { user: User }`,
-   * an intersection type hand-declared per app) with a property core itself
-   * declares and types. `clearCurrentUser()` below is the one place core
-   * writes it directly; auth middleware writes it after a successful token
-   * resolution.
-   *
-   * A prototype accessor, not a plain field: the setter also marks the
-   * request `authDerived` (see below), so `clearCurrentUser()`'s
-   * `this.user = undefined` still counts as touching auth state rather than
-   * un-marking it.
-   */
-  public get user(): RequestUser | undefined {
-    return this._user;
-  }
-
-  public set user(value: RequestUser | undefined) {
-    this._user = value;
-    this.locals.authDerived = true;
+    return undefined as never;
   }
 
   /**
@@ -152,21 +139,6 @@ export class Request<RequestValidation = any> {
    * a prior one.
    */
   public locals: RequestLocals = {};
-
-  /**
-   * Forget the authenticated user for this request.
-   *
-   * The `user` documentation above already names this as "the one place core
-   * writes it directly", and `@warlock.js/auth`'s middleware already calls it when
-   * a token is forged, malformed, expired, or of the wrong type. It was designed,
-   * documented and called — just never written, so `auth` could not typecheck.
-   *
-   * Clearing rather than leaving a stale value matters: a request that failed
-   * authentication must not carry the identity of whoever this object last held.
-   */
-  public clearCurrentUser(): void {
-    this.user = undefined;
-  }
 
   /**
    * Backing field for the lazily-generated CSP nonce. Left `undefined` until
