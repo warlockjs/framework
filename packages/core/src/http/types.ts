@@ -4,6 +4,7 @@ import type React from "react";
 import type { Middleware } from "../router";
 import type { CspConfig } from "./csp";
 import type { Response } from "./response";
+import type { HttpTracingConfig } from "./tracing/tracing.type";
 
 export type RequestEvent =
   "executingMiddleware" | "executedMiddleware" | "executingAction" | "executedAction";
@@ -412,6 +413,12 @@ export interface HttpConfigurations {
      */
     except?: PartialMiddleware;
   };
+  /**
+   * Opt-in request tracing hooks (card 71622e4a). OFF by default; resolved
+   * once at boot, not per request — see `resolveTracingConfig` in
+   * `./tracing/tracing-dispatcher.ts`.
+   */
+  tracing?: HttpTracingConfig;
 }
 
 export type ResponseStreamController = {

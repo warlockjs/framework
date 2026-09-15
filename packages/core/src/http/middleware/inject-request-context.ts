@@ -15,6 +15,7 @@ import { applyCspHeader } from "../csp";
 import { HttpError } from "../errors";
 import { type Request } from "../request";
 import { type Response } from "../response";
+import { buildTracingContext, dispatchPhase, isTracingEnabled } from "../tracing";
 import { type ReturnedResponse } from "./../types";
 
 // Contexts are now registered in core/context/init-contexts.ts via initializeContexts()
@@ -75,7 +76,17 @@ export function createRequestStore(
 
       request.log("Executing Handler", "info");
 
+      const tracingEnabled = isTracingEnabled();
+      const handlerStartedAt = tracingEnabled ? performance.now() : 0;
+
       const output = await handler({ request, response });
+
+      if (tracingEnabled) {
+        dispatchPhase(buildTracingContext(request), {
+          name: "handler",
+          durationMs: performance.now() - handlerStartedAt,
+        });
+      }
 
       request.log("Handler Executed Successfully", "success");
 

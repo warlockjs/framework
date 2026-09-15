@@ -30,6 +30,8 @@ export * from "./stream-react-response";
 export * from "./server";
 // types
 export * from "./types";
+// tracing: opt-in request tracing hooks (card 71622e4a)
+export * from "./tracing";
 
 // contexts
 export * from "./context/request-context";

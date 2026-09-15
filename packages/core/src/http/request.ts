@@ -17,6 +17,7 @@ import { validateAll } from "../validation/validateAll";
 import { RequestUserMovedError } from "./errors";
 import { createRequestStore } from "./middleware/inject-request-context";
 import { Response } from "./response";
+import { buildTracingContext, deriveTraceId, dispatchPhase, isTracingEnabled } from "./tracing";
 import type { DecodedAccessToken, RequestEvent, RequestLocals } from "./types";
 import { UploadedFile } from "./uploaded-file";
 
@@ -218,6 +219,13 @@ export class Request<RequestValidation = any> {
   public id = Random.string(32);
 
   /**
+   * Trace id (card 71622e4a). The inbound `traceparent` header's trace id
+   * when valid, otherwise `id`. Resolved once in `setRequest`, alongside
+   * `id` itself — see `resolveTraceId`.
+   */
+  public traceId = "";
+
+  /**
    * Start Time
    */
   public startTime = Date.now();
@@ -234,6 +242,8 @@ export class Request<RequestValidation = any> {
     this.baseRequest = request;
 
     this.resolveRequestId();
+
+    this.resolveTraceId();
 
     this.parsePayload();
 
@@ -274,6 +284,20 @@ export class Request<RequestValidation = any> {
     if (typeof requestIdConfig.generator === "function") {
       this.id = requestIdConfig.generator();
     }
+  }
+
+  /**
+   * Derive `traceId` (card 71622e4a, Lead decision §3): the inbound
+   * `traceparent` header's trace id when it is a valid W3C traceparent,
+   * otherwise `id`. Always runs — unlike request-id inheritance this has no
+   * `enabled: false` escape hatch, since `traceId` is only ever read when
+   * tracing hooks are enabled (see `./tracing`).
+   */
+  protected resolveTraceId() {
+    const header = this.baseRequest.headers.traceparent;
+    const traceparent = Array.isArray(header) ? header[0] : header;
+
+    this.traceId = deriveTraceId(traceparent, this.id);
   }
 
   /**
@@ -820,8 +844,20 @@ export class Request<RequestValidation = any> {
 
     if (!handler.validation) return;
 
-    // 👇🏻 check for validation using validateAll helper function
+    // 👇🏻 check for validation using validateAll helper function — timed as
+    // the "validation" tracing phase (card 71622e4a §2.3) when tracing is
+    // enabled; a single boolean check and zero allocation otherwise.
+    const tracingEnabled = isTracingEnabled();
+    const validationStartedAt = tracingEnabled ? performance.now() : 0;
+
     const validationOutput = await validateAll(handler.validation, this, this.response);
+
+    if (tracingEnabled) {
+      dispatchPhase(buildTracingContext(this), {
+        name: "validation",
+        durationMs: performance.now() - validationStartedAt,
+      });
+    }
 
     return validationOutput;
   }
@@ -902,12 +938,26 @@ export class Request<RequestValidation = any> {
     // trigger the executingMiddleware event
     this.trigger("executingMiddleware", middlewares, this.route);
 
-    for (const middleware of middlewares) {
+    const tracingEnabled = isTracingEnabled();
+
+    for (const [index, middleware] of middlewares.entries()) {
       this.log("Executing middleware " + colors.yellowBright(middleware.name));
+
+      const middlewareStartedAt = tracingEnabled ? performance.now() : 0;
+
       const output = await middleware({
         request: this,
         response: this.response,
       });
+
+      if (tracingEnabled) {
+        dispatchPhase(buildTracingContext(this), {
+          name: "middleware",
+          durationMs: performance.now() - middlewareStartedAt,
+          attrs: { name: middleware.name, index },
+        });
+      }
+
       this.log("Executed middleware " + colors.yellowBright(middleware.name), "success");
 
       if (output !== undefined) {

@@ -26,7 +26,19 @@
  * The behaviour worth pinning down is *which lines come out, in which order,
  * at which level, when the run throws*. Injecting the sink and the clock makes
  * that assertable without a server, a socket or a fake timer.
+ *
+ * ## Tracing (card 71622e4a)
+ *
+ * This function is the single funnel for both the success and throw paths
+ * (the try/catch below), and it already reads the settled status via
+ * `descriptor.statusCode()` after the run settles — the natural place to
+ * fire `onRequestStart` / `onRequestEnd` (the "response.write" phase in the
+ * design note). Gated on `isTracingEnabled()` before building any context
+ * object, so a disabled app pays one boolean check and allocates nothing
+ * extra.
  */
+import type { Request } from "../http/request";
+import { buildTracingContext, dispatchRequestEnd, dispatchRequestStart, isTracingEnabled } from "../http/tracing";
 
 export type RequestLogEntry = {
   module: string;
@@ -65,6 +77,13 @@ export type RequestLogDescriptor = {
    * capturing it up front would report the default on every entry.
    */
   statusCode(): number | undefined;
+  /**
+   * The `Request` instance, when tracing needs it (card 71622e4a) to build
+   * the `TracingContext` for `onRequestStart` / `onRequestEnd`. Optional —
+   * absent, tracing dispatch for this request is skipped, which is correct
+   * for any non-HTTP caller of this same lifecycle wrapper.
+   */
+  request?: Request;
 };
 
 type Level = "info" | "warn" | "error";
@@ -87,6 +106,7 @@ export async function logRequestLifecycle<TResult>(
   run: () => Promise<TResult>,
 ): Promise<TResult> {
   const startedAt = ports.now();
+  const tracingEnabled = isTracingEnabled();
 
   ports.info({
     module: descriptor.module,
@@ -95,7 +115,11 @@ export async function logRequestLifecycle<TResult>(
     context: descriptor.context,
   });
 
-  const finish = (level: Level, outcome: string): void => {
+  if (tracingEnabled && descriptor.request) {
+    dispatchRequestStart(buildTracingContext(descriptor.request));
+  }
+
+  const finish = (level: Level, outcome: string, error?: unknown): void => {
     const duration = Math.round(ports.now() - startedAt);
 
     ports[level]({
@@ -104,6 +128,14 @@ export async function logRequestLifecycle<TResult>(
       message: `Completed Request: ${descriptor.requestId} — ${outcome} in ${duration}ms`,
       context: descriptor.context,
     });
+
+    if (tracingEnabled && descriptor.request) {
+      dispatchRequestEnd(buildTracingContext(descriptor.request), {
+        status: descriptor.statusCode(),
+        durationMs: duration,
+        error,
+      });
+    }
   };
 
   try {
@@ -117,7 +149,7 @@ export async function logRequestLifecycle<TResult>(
   } catch (error) {
     // The throw is reported and then re-thrown untouched: this function
     // observes the request, it does not own its error handling.
-    finish("error", `threw ${error instanceof Error ? error.name : typeof error}`);
+    finish("error", `threw ${error instanceof Error ? error.name : typeof error}`, error);
 
     throw error;
   }

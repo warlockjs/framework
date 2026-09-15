@@ -8,6 +8,7 @@ import { container } from "../container";
 import { Request } from "../http/request";
 import { Response } from "../http/response";
 import { type FastifyInstance } from "../http/server";
+import { buildTracingContext, dispatchPhase, isTracingEnabled } from "../http/tracing";
 import { describeRouteForLog } from "./describe-route-for-log";
 import { logRequestLifecycle } from "./log-request-lifecycle";
 import {
@@ -1067,7 +1068,24 @@ export class Router {
 
       response.request = request;
 
+      // "route.match" tracing phase (card 71622e4a §2.1): the pattern is
+      // already known here (`route.path`), so this brackets the cost of
+      // stamping the request/route onto the `Request` instance rather than
+      // route-registry matching itself, which happens upstream of this
+      // function for both the production `scan()` path and the dev wildcard
+      // dispatcher (both funnel into `handleRoute`).
+      const tracingEnabled = isTracingEnabled();
+      const routeMatchStartedAt = tracingEnabled ? performance.now() : 0;
+
       request.setRequest(fastifyRequest).setRoute(route);
+
+      if (tracingEnabled) {
+        dispatchPhase(buildTracingContext(request), {
+          name: "route.match",
+          durationMs: performance.now() - routeMatchStartedAt,
+          attrs: { route: route.path },
+        });
+      }
 
       /*
         Both ends of the entry, not just the start — see
@@ -1087,6 +1105,7 @@ export class Router {
           action: describeRouteForLog(route.method, route.path),
           requestId: request.id,
           context: { request, response },
+          request,
           // Read after the run: the status is decided during the request.
           statusCode: () => fastifyResponse.statusCode,
         },
