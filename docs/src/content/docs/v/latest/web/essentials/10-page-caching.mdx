@@ -1,0 +1,130 @@
+---
+title: Server-side page caching
+slug: v/latest/web/essentials/page-caching
+description: Opt a route into a tagged, server-held cache that serves a HIT without re-running loaders or rendering.
+sidebar:
+  order: 10
+  label: Page caching
+---
+
+The server-side page cache is new in `@warlock.js/web` 5.12. It is a second,
+independent opt-in on `route.cache` — separate from `public`/`maxAge`, which
+only decide the `Cache-Control` header a downstream CDN/proxy should honour.
+`serverCache` has the framework itself hold the resolved bytes and serve a
+HIT without re-running loaders or rendering at all.
+
+## Opt in with `serverCache` and `tags`
+
+```tsx title="src/web/products/index.page.tsx"
+export const route = {
+  path: "/products",
+  name: "products.index",
+  cache: {
+    public: true,
+    maxAge: 60,
+    serverCache: true,
+    tags: ["products"],
+    // or: tags: (data) => [`product:${data.id}`],
+    ttl: 300, // optional — defaults to maxAge
+  },
+} as const;
+```
+
+- `serverCache` requires `public: true` — like every `cache` opt-in — **and**
+  `tags`. A stored entry with no tags could never be invalidated early, so
+  `serverCache: true` with no `tags` is a boot-time `InvalidPageCacheOptInError`.
+- `tags` is a static array, or a function of the resolved page data —
+  `(data) => string[]` — called right before the entry is stored.
+- `ttl` is the server cache's own freshness window in seconds, independent of
+  the CDN-facing `maxAge`. Omit it to reuse `maxAge`.
+
+## What gets cached
+
+Storage is checked once per render and requires all of:
+
+- `GET` only — a mutating method is never cached.
+- `status === 200`.
+- No `Set-Cookie` on the response.
+- A provably unauthenticated request — the same fail-closed rule that governs
+  `Cache-Control`. If Warlock cannot determine whether the request used
+  authenticated state, it refuses to store, exactly as it refuses to emit a
+  public `Cache-Control`.
+
+**Bypass happens earlier, before storage is even considered.** A request
+carrying an `Authorization` header or the configured auth cookie
+(`auth.cookie.name`, default `access_token`) never consults the cache at
+all — that check runs before any loader, so a credentialed visitor is never
+handed a stale guest page.
+
+## The cache key
+
+```
+(normalised path) + "?" + (sorted query) + "|" + locale + "|" + variant
+```
+
+- The path is normalised: lower-cased, trailing slash stripped (except the
+  root `/`).
+- The query string is re-serialized with its keys sorted, so `?a=1&b=2` and
+  `?b=2&a=1` resolve to the same entry.
+- `locale` is the resolved locale for the request.
+- `variant` is `html` for a document request or `json` for the
+  `x-warlock-data` representation. A request for the NDJSON representation on
+  a `serverCache` route never streams: the values are fully resolved and
+  stored/served as the `json` variant instead, since there is nothing left to
+  defer.
+
+## Pages that use `defer()`
+
+A page using [`defer()`](/v/latest/web/essentials/streaming-and-defer/) is
+stored fully resolved — every deferred value is awaited before the entry is
+written, exactly as a detected crawler's render is. A HIT is then served
+buffered, not streamed.
+
+## Invalidating stored entries
+
+```ts
+import { invalidatePageCache } from "@warlock.js/web";
+
+await invalidatePageCache(["products"]);
+```
+
+Evicts every stored entry under any of the given tags, through
+`@warlock.js/cache`'s tag index.
+
+## The `x-warlock-cache` header
+
+Every response from a `serverCache` route carries `x-warlock-cache: hit`,
+`miss`, or `bypass`, alongside the usual `Cache-Control`.
+
+## `@warlock.js/cache` is an optional peer
+
+`@warlock.js/cache` is only loaded, via a lazy `await import(...)`, the first
+time some route with `serverCache: true` actually needs the store — an
+application that never opts in is never forced to install it. Enabling
+`serverCache` without the package installed fails loudly, naming the package:
+
+```
+A route declares `route.cache.serverCache: true`, but "@warlock.js/cache" could not be
+loaded. Install it as a dependency of your application — it is an optional peer of
+@warlock.js/web and is only required when a route opts into the server-side page cache.
+```
+
+## Cluster behavior
+
+Cross-worker reach depends on the configured `@warlock.js/cache` driver:
+
+- A **shared driver** (redis, pg) removes the entry for every worker on their
+  next read — `invalidatePageCache` reaches the whole cluster.
+- The **memory** driver (and other in-process drivers such as LRU or
+  memory-extended) only clears the calling worker's own heap. Every other
+  worker keeps serving its stale entry until `ttl`/`maxAge` expires. Enabling
+  `serverCache` with an in-process driver in a clustered deployment logs a
+  one-time startup warning; use a shared driver for cluster-wide invalidation.
+
+## See also
+
+- [Streaming SSR and defer()](/v/latest/web/essentials/streaming-and-defer/) —
+  the deferred-value contract a `serverCache` route resolves fully before
+  storing.
+- [Crawler mode](/v/latest/web/essentials/crawler-mode/) — the other path that
+  stores/serves a fully resolved render.
