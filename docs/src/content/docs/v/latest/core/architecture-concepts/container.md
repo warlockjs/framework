@@ -25,7 +25,7 @@ app.router;      // the router (always present)
 app.database;    // the cascade DataSource (when database config exists)
 ```
 
-`app` is a plain object of getters. Each getter reads one key out of the container the moment you access it. There's no `new`, no class to instantiate — `app.http` is literally `container.get("http.server")` evaluated on demand.
+`app` is a plain object of getters. Each getter reads one key out of the container the moment you access it. There's no `new`, no class to instantiate — `app.http` is literally `container.tryGet("http.server")` evaluated on demand. `app`'s getters use `tryGet`, not `get`, specifically so that `app.socket` / `app.http` / `app.database` keep returning `undefined` — not throwing — when their config file is absent; see [`get` throws for a missing key](#get-throws-for-a-missing-key--new-in-512) below.
 
 If you need a key that `app` doesn't expose, drop down to the container:
 
@@ -39,14 +39,36 @@ container.has("socket"); // boolean — is the socket server up?
 
 ## The container
 
-`container` is a singleton instance with four methods:
+`container` is a singleton instance with five methods:
 
-| Method                 | What it does                                              |
-| ---------------------- | -------------------------------------------------------- |
-| `container.set(key, v)`| Store a value under `key`.                               |
-| `container.get(key)`   | Read the value back. Returns `undefined` if unset.       |
-| `container.has(key)`   | `true` if the key has been set.                          |
-| `container.delete(key)`| Remove the key.                                          |
+| Method                  | What it does                                                    |
+| ----------------------- | ---------------------------------------------------------------- |
+| `container.set(key, v)` | Store a value under `key`.                                       |
+| `container.get(key)`    | Read the value back, or **throw** if `key` isn't registered.     |
+| `container.tryGet(key)` | Read the value back, or `undefined` if `key` isn't registered.   |
+| `container.has(key)`    | `true` if the key has been set.                                  |
+| `container.delete(key)` | Remove the key.                                                  |
+
+### `get` throws for a missing key — new in 5.12
+
+**Since 5.12, `container.get(key)` throws a `ContainerKeyMissingError` when `key` was never `set`,** instead of silently returning `undefined` while still typed as the real value. The old behavior let a missed registration surface as a confusing downstream crash (`Cannot read property 'x' of undefined`) far from the actual bug. Now the container fails at the point of the mistake, with a message naming the missing key and (bounded to 20) the keys that ARE registered:
+
+```ts
+import { container } from "@warlock.js/core";
+
+container.get("does-not-exist");
+// ContainerKeyMissingError: Container key "does-not-exist" is not registered.
+// Registered keys: "router", "http.server", ...
+```
+
+**Use `container.tryGet(key)` instead when the value is genuinely optional** — where your own code already has a fallback for an absent value:
+
+```ts
+const io = container.tryGet("socket"); // Server | undefined — no throw
+if (io) io.emit("notice", "…");
+```
+
+Prefer `get` for everything else: a hole in the container should fail loudly, not hand back `undefined` typed as present. `getOrFail` still exists as a deprecated alias of `get` (identical behavior) for code written before this change.
 
 Under the hood it's a module-level `Map<string, any>` — global to the process, no scoping, no lifecycle of its own. Whatever you `set` stays set until you `delete` it or the process ends.
 
@@ -176,7 +198,7 @@ Rule of thumb: in normal app code prefer `app.*`; if you need the explicit `null
 - **`app.socket` / `app.http` / `app.database` are `undefined` without their config.** Presence of the config file (`src/config/socket.ts`, etc.) is what activates the subsystem and fills the container key. No config → no key → `undefined`. Guard the optional ones, or use `getSocketServer()` for the null-safe read.
 - **`getHttpServer()` and `app.http` aren't backed by the same storage.** `app.http` reads the container's `"http.server"` key; `getHttpServer()` returns a module-level variable set by `startHttpServer()`. In a normally-booted app both point at the same Fastify instance, but they're separate references — don't assume mutating one rebinds the other.
 - **`getSocketServer()` returns `null`, `app.socket` returns `undefined`** when sockets aren't configured. Same "not available" condition, two different empty values — check accordingly.
-- **`"http.baseUrl"` is declared but not populated.** It appears in `ContainerTypes` for typing, but no runtime code calls `container.set("http.baseUrl", …)`. The HTTP connector tracks the base URL through a separate module variable (`setBaseUrl`/`url`), not this key. Treat `"http.baseUrl"` as reserved — `container.get("http.baseUrl")` is `undefined` today. To build URLs, use the `url()` helper instead.
+- **`"http.baseUrl"` is declared but not populated.** It appears in `ContainerTypes` for typing, but no runtime code calls `container.set("http.baseUrl", …)`. The HTTP connector tracks the base URL through a separate module variable (`setBaseUrl`/`url`), not this key. Treat `"http.baseUrl"` as reserved — **since 5.12, `container.get("http.baseUrl")` throws** `ContainerKeyMissingError` (it did return `undefined` before 5.12); use `container.tryGet("http.baseUrl")` if you need a non-throwing read of this specific key. To build URLs, use the `url()` helper instead.
 - **The container is global and unscoped.** Everything you `set` lives for the life of the process and is visible everywhere. It's a registry of singletons, not a per-request DI scope — don't stash request-specific state in it.
 - **Editing `src/config/socket.ts` in dev doesn't fully re-apply socket options.** The socket connector builds its server in `boot()`, but a watched-file change triggers `restart()` (= `shutdown()` + `start()`), which never re-runs `boot()`. The old server is torn down; a fresh one with the new options only stands up on a full dev-server restart.
 

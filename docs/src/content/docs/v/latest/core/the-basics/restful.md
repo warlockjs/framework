@@ -294,7 +294,7 @@ class ProductsRestful extends Restful<Product> {
   protected repository = productsRepository;
 
   protected async beforeCreate(request: Request, response: Response, product: Product) {
-    product.set("createdBy", request.user.id);
+    product.set("createdBy", request.locals.user.id);
   }
 
   protected async onCreate(request: Request, response: Response, product: Product) {

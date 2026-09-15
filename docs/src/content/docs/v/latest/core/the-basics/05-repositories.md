@@ -320,7 +320,7 @@ import { listFaqsService } from "../services/list-faqs.service";
 export const listFaqsController: RequestHandler = async ({ request, response }) => {
   const { data: faqs, pagination } = await listFaqsService({
     ...request.all(),
-    organization_id: request.user.organizationId,
+    organization_id: request.locals.user.organizationId,
   });
 
   return response.success({ faqs, pagination });

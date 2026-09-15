@@ -110,7 +110,7 @@ import type { RequestHandler } from "@warlock.js/core";
 
 export const logoutController: RequestHandler = async ({ request, response }) => {
   await authService.logout(
-    request.user!,
+    request.locals.user!,
     request.authorizationValue,
     request.input("refreshToken"),
   );
@@ -129,7 +129,7 @@ The contract:
 
 The `revoke-all` default is right for most apps. If the client lost track of the refresh token, logout still works; the user has to log back in everywhere.
 
-The route itself needs `authMiddleware([])` or `authMiddleware("user")` so `request.user` is hydrated:
+The route itself needs `authMiddleware([])` or `authMiddleware("user")` so `request.locals.user` is hydrated:
 
 ```ts title="src/app/users/routes.ts"
 router.post("/logout", logoutController, { middleware: [authMiddleware([])] });
@@ -146,6 +146,50 @@ await user.revokeAllTokens();
 Revokes every refresh token + deletes every access token for this user. Fires `token.revoked` per token + `logout.all` once.
 
 This is the "kick all my sessions" button.
+
+## Cookie-based sessions — `setAuthCookie` / `clearAuthCookie`
+
+**New in 5.12.** Sessions aren't limited to a bearer token your client stashes and replays by hand. `authMiddleware([], "cookie:<name>")` has read a named cookie as its credential source since 5.0.0 — 5.12 adds the write side: `authService.setAuthCookie` and `authService.clearAuthCookie`.
+
+```ts title="src/app/users/controllers/login.controller.ts"
+import { authService } from "@warlock.js/auth";
+import type { RequestHandler } from "@warlock.js/core";
+import { User } from "../models/user.model";
+
+export const loginController: RequestHandler = async ({ request, response }) => {
+  const result = await authService.login(User, {
+    email: request.input("email"),
+    password: request.input("password"),
+  });
+
+  if (!result) {
+    return response.unauthorized({ error: "Invalid credentials" });
+  }
+
+  // Write the access token as a cookie instead of (or alongside) the JSON body.
+  authService.setAuthCookie(response, result.tokens.accessToken);
+
+  return response.success({ user: result.user });
+};
+```
+
+```ts title="src/app/users/controllers/logout.controller.ts"
+export const logoutController: RequestHandler = async ({ request, response }) => {
+  await authService.logout(request.locals.user!, request.authorizationValue);
+
+  authService.clearAuthCookie(response);
+
+  return response.success({ message: "Logged out" });
+};
+```
+
+`setAuthCookie(response, token, options?)` accepts either a raw token string or the `AccessTokenOutput` object `login`/`createTokenPair` return — passing the object derives `Max-Age` from its `expiresAt` automatically, so you don't compute it by hand. A bare string with no `options.maxAge` produces a session cookie instead. `clearAuthCookie(response, options?)` clears it; `options.path` must match whatever the cookie was set with, or the browser silently ignores the clear.
+
+Both calls are **explicit** — `login`/`logout` never set or clear cookies on their own, so upgrading to 5.12 never starts an existing bearer-only app emitting `Set-Cookie`.
+
+Cookie name/path default to `"access_token"` / `"/"`, configurable via `auth.cookie.name` / `auth.cookie.path` (see [Configuration](../getting-started/03-configuration.mdx#cookiename--cookiepath--new-in-512)); per-call `options.name`/`options.path` override the config. Attribute flags — `HttpOnly`, `SameSite=Lax`, `Secure` outside development — are not configurable per call; they come from core's shared `secureCookieDefaults()` floor.
+
+Pair a cookie-sourced route with `authMiddleware([], "cookie:access_token")` (matching the cookie name) — see [Protect routes → Cookie-sourced credentials](./protect-routes.md#cookie-sourced-credentials). A cookie-authenticated route also gets the automatic [CSRF Origin check](./protect-routes.md#csrf-origin-check-for-cookie-auth) on unsafe methods; a header-token route is unaffected.
 
 ## Refresh tokens — `authService.refreshTokens(refreshTokenString, deviceInfo?)`
 
@@ -193,7 +237,7 @@ The `login.failed` event is the brute-force signal — wire it to a rate limiter
 
 - **`authService.login(User, { password })` with no other key.** The non-password fields are the lookup; a password-only login is undefined behavior.
 - **Returning the password hash.** Set `toJsonColumns` on your model.
-- **Refresh token in `localStorage`.** Use an httpOnly secure cookie. Access token can sit in memory.
+- **Refresh token in `localStorage`.** Use an httpOnly secure cookie — `authService.setAuthCookie` (see [Cookie-based sessions](#cookie-based-sessions--setauthcookie--clearauthcookie) above) writes one for you. Access token can sit in memory.
 - **Bypassing `refreshTokens` on a "manual" refresh.** You'd skip the rotation revoke, the family check, the events.
 
 ## Related

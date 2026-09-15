@@ -137,11 +137,11 @@ export const loginController: RequestHandler = async ({ request, response }) => 
 import type { RequestHandler } from "@warlock.js/core";
 
 export const meController: RequestHandler = async ({ request, response }) => {
-  return response.success({ user: request.user });
+  return response.success({ user: request.locals.user });
 };
 ```
 
-`request.user` is hydrated by the middleware before this controller runs. No manual decoding, no extra DB roundtrip in your code.
+`request.locals.user` is hydrated by the middleware before this controller runs. No manual decoding, no extra DB roundtrip in your code.
 
 ## 5. Wire the routes
 

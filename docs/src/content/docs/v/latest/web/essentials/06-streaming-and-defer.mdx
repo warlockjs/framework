@@ -1,0 +1,171 @@
+---
+title: Streaming SSR and defer()
+slug: v/latest/web/essentials/streaming-and-defer
+description: Stream a slow page-loader value in after the shell with defer() and React's use().
+sidebar:
+  order: 6
+  label: Streaming and defer()
+---
+
+`defer()` is new in `@warlock.js/web` 5.12. Pages already render with React's
+streaming renderer — the response still waits for middleware, validation, and
+every loader before the first byte, so status codes, headers, and cookies are
+unchanged. `defer()` goes one step further: it lets a **page** loader mark one
+of its own top-level keys as "send the shell now, stream this key in after,"
+so one slow value no longer holds up everything else.
+
+## Mark a key as deferred
+
+```tsx title="src/web/products/product-details.page.tsx"
+import { use, Suspense } from "react";
+import { defer } from "@warlock.js/web";
+import type { PageLoader, PageProps } from "@warlock.js/web";
+
+export const loader = (async ({ request }) => {
+  const { id } = request.validated();
+
+  return defer({
+    product: await getProduct(id), // resolved before the shell — unchanged
+    reviews: getReviews(id), // a Promise — streamed in after the shell
+  });
+}) satisfies PageLoader;
+
+function Reviews({ reviews }: { reviews: Promise<Review[]> }) {
+  const list = use(reviews);
+
+  return (
+    <ul>
+      {list.map((review) => (
+        <li key={review.id}>{review.text}</li>
+      ))}
+    </ul>
+  );
+}
+
+export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
+  return (
+    <article>
+      <h1>{data.product.name}</h1>
+      <Suspense fallback={<p>Loading reviews…</p>}>
+        <Reviews reviews={data.reviews} />
+      </Suspense>
+    </article>
+  );
+}
+```
+
+- `defer(data)` takes the same object shape a loader always returned. Any
+  **top-level** key whose value is a `Promise` streams in after the shell;
+  every other key reaches `data` exactly as before.
+- Only top-level keys may be promises — a promise nested inside a resolved
+  key's own value throws `NestedDeferredValueError`, naming the path. Move it
+  to its own top-level key instead.
+- `data.reviews` types as `Promise<Review[]>`, exactly what the loader
+  declared.
+- Read a deferred key with React's own `use()`, inside a `<Suspense>`
+  boundary. `use()` is plain React, imported from `"react"`, not a Warlock
+  export.
+- `defer()` is **page**-loader-only. An app or layout loader that returns one
+  throws `DeferredInNonPageLoaderError` — those levels compose every page
+  beneath them, including pages with no `<Suspense>` boundary at all.
+
+## Errors reach the nearest boundary — status 200 already sent
+
+By the time a deferred value settles, the shell has already flushed: status
+code, headers, and cookies were decided before the first byte went out, so a
+rejected deferred value can never change the response's HTTP status. Instead
+it resolves to the nearest **`<Suspense>`**'s enclosing React error boundary,
+exactly the way a synchronous render throw would, while the document (or the
+client-navigation stream) it arrived on stays a 200.
+
+`use()` throws one of:
+
+- **`DeferredValueError`** — the loader's own promise rejected.
+- **`DeferTimeoutError`** — the promise did not settle within
+  `web.streaming.deferTimeout`. Treated exactly like a rejection.
+- **`DeferredStreamClosedError`** — the connection closed, or the page
+  navigated away, while the key was still pending.
+
+Wrap the `<Suspense>` boundary (or an ancestor of it) in an error boundary
+when a deferred failure should degrade gracefully instead of bubbling to the
+page's own `error.page.tsx`:
+
+```tsx title="src/web/products/reviews-boundary.tsx"
+import { Component, type ReactNode } from "react";
+
+export class ReviewsBoundary extends Component<
+  { children: ReactNode },
+  { error?: unknown }
+> {
+  state: { error?: unknown } = {};
+
+  static getDerivedStateFromError(error: unknown) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) return <p>Reviews are unavailable right now.</p>;
+    return this.props.children;
+  }
+}
+```
+
+## `web.streaming.deferTimeout`
+
+```ts title="warlock.config.ts"
+export default {
+  web: {
+    streaming: {
+      deferTimeout: 15_000, // milliseconds; default 10000
+    },
+  },
+};
+```
+
+The budget applies **per deferred key**, not per request — three deferred
+keys on one page each get their own timer.
+
+## `metadata()` may only read resolved keys
+
+`metadata()` runs before the shell flushes; a deferred key resolves only
+after. Reading one throws `DeferredKeyInMetadataError`, naming the key and
+the page, in dev **and** in production:
+
+```tsx
+export const loader = (async () =>
+  defer({ product: await getProduct(id), reviews: getReviews(id) })
+) satisfies PageLoader;
+
+// Wrong — "reviews" is deferred:
+export const metadata = (({ data }) => ({
+  title: `${data.reviews.length} reviews`, // throws DeferredKeyInMetadataError
+})) satisfies PageMetadata<typeof loader>;
+
+// Right — describe the page from what's already resolved:
+export const metadata = (({ data }) => ({
+  title: data.product.name,
+})) satisfies PageMetadata<typeof loader>;
+```
+
+There is no way to make `metadata()` wait for a deferred value. If the
+document `<head>` genuinely needs it, resolve it inside the loader instead of
+deferring it.
+
+## Client navigation is handled automatically
+
+A `<Link>`, `navigateTo()`, or `refresh()` navigation fetches page data
+instead of a document. When the browser's data request can speak NDJSON, the
+response streams the same way: the first line is the complete payload
+(including which keys are still pending), then one line per resolved
+deferred key as it settles. The same `use(data.reviews)` call in your
+component reads the wire promise on both the initial document and every
+later client navigation — nothing in a page component or loader needs to
+know which one is happening. A client that cannot speak NDJSON gets every
+deferred value awaited and inlined into one JSON response instead.
+
+## See also
+
+- [Crawler mode](/v/latest/web/essentials/crawler-mode/) — how a detected bot
+  receives the fully resolved document instead of a stream.
+- [Loaders and metadata](/v/latest/web/essentials/loaders-and-metadata/) —
+  the loader contract `defer()` builds on, and what survives the wire.

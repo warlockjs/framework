@@ -14,6 +14,76 @@ The current 5.2 model is compact but specific:
 
 For the upgrade itself, move the `@warlock.js/*` packages you use to v5 together, then make the edits below.
 
+## Upgrading within v5: 5.11 → 5.12
+
+5.12.0 ships four changes worth reading before you bump the version, one of them breaking. This section is scoped to that one minor bump; the rest of this page (below) covers the original v4 → v5.0 migration and still applies if you're coming from further back.
+
+### `request.user` moved to `request.locals.user` (BREAKING)
+
+The authenticated user no longer lives at `request.user`. It's now `request.locals.user`, written by `@warlock.js/auth`'s middleware — `RequestUser`, the augmentable interface your app narrows to its own model, moved from `@warlock.js/core` into `@warlock.js/auth` alongside it. In development, reading `request.user` throws a new `RequestUserMovedError` naming the new location (kept for one release as a migration diagnostic — not silent, but not present forever either); `request.clearCurrentUser()` is removed with no direct replacement.
+
+**Before (removed)**
+
+```ts
+declare module "@warlock.js/core" {
+  interface RequestUser {
+    id: string | number;
+  }
+}
+
+const user = request.user;
+```
+
+**After**
+
+```ts
+declare module "@warlock.js/auth" {
+  interface RequestUser {
+    id: string | number;
+  }
+}
+
+const user = request.locals.user;
+```
+
+`useCurrentUser()` / `requestContext.getUser()` still work, but now read `request.locals.user` and return `unknown` (or your generic) instead of the removed `RequestUser` type. `@warlock.js/auth` also exports a typed `currentUser<UserType extends Auth>()` wrapper for callers that want `Auth`-derived typing without repeating the cast at every call site.
+
+Search your codebase for `request.user` (careful: not `request.userAgent`) and update every hit to `request.locals.user`, and move any `declare module "@warlock.js/core" { interface RequestUser ... }` augmentation to `declare module "@warlock.js/auth"`.
+
+### `container.get()` now throws for a missing key
+
+`container.get(key)` throws a `ContainerKeyMissingError` when `key` was never registered, instead of silently returning `undefined` typed as the real value. If you relied on the old `undefined`-on-miss behavior anywhere, switch that call to `container.tryGet(key)`, which keeps returning `undefined`. See [Container & runtime accessors](/v/latest/core/architecture-concepts/container/#get-throws-for-a-missing-key--new-in-512).
+
+### Page data is now devalue, not plain JSON (`@warlock.js/web`)
+
+`appData`/`layoutData`/`pageData` (and a `defer()`red value's settlement) now travel the browser wire serialized with [`devalue`](https://www.npmjs.com/package/devalue) instead of plain `JSON`. Concretely, `Date`, `Map`, `Set`, `BigInt`, `undefined` inside an object, repeated references, and cyclic structures now arrive on the client exactly as the loader returned them — they previously arrived flattened to strings or silently dropped.
+
+Two things to check before you deploy this:
+
+- **Deploy the client and server bundles together.** The wire format changed, so a server on 5.12 paired with a stale, pre-5.12 client bundle (or vice versa) can fail to deserialize page data. Don't roll this out as a server-only or client-only partial deploy.
+- **A loader value devalue cannot serialize now fails loudly instead of silently.** A class instance devalue doesn't recognize, a function, or a symbol throws `PageDataSerializationError` at build/render time, naming the loader level (`app`/`layout`/`page`), the key path, and the page route. If a loader you own returns something like that, give it a `resource` or a `toJSON()` method — this was already the standing rule for what a loader is allowed to return; devalue just enforces it loudly where JSON silently dropped or mangled the value before. `shared` is unaffected — it keeps its own, stricter gate.
+
+### CSRF Origin check for cookie auth (`@warlock.js/auth`)
+
+If any route uses `authMiddleware(userType, "cookie:<name>")`, an unsafe-method request (`POST`/`PUT`/`PATCH`/`DELETE`) on it is now also checked against `Origin`/`Referer`: it must name the request's own origin or an entry in the new `auth.csrf.allowedOrigins` config (default `[]`), and a request with neither header is rejected. A mismatch is a new `403` (`AuthErrorCodes.CsrfOriginMismatch`, `EC006`) instead of reaching your handler.
+
+Header-token auth and safe methods (`GET`/`HEAD`/`OPTIONS`) are completely unaffected — this only changes behavior for apps already using the cookie token source. If your cross-origin frontend legitimately calls a cookie-authenticated write endpoint, add its origin to `auth.csrf.allowedOrigins`:
+
+```ts title="src/config/auth.ts"
+export default {
+  // ...
+  csrf: {
+    allowedOrigins: ["https://admin.example.com"],
+  },
+};
+```
+
+See [Protect routes → CSRF Origin check](/v/latest/auth/guides/protect-routes/#csrf-origin-check-for-cookie-auth) for the full mechanics.
+
+### New, not breaking
+
+Also new in 5.12, none of it requiring a migration: `authService.setAuthCookie`/`clearAuthCookie` (the write side of cookie-sourced sessions), the opt-in `http.csp` header, opt-in `http.tracing` request-tracing hooks, `devServer.timings`, and a `warlock build` preflight that fails fast when esbuild's native binary isn't linked.
+
 ## Required changes
 
 ### Route handlers and middleware receive one context object

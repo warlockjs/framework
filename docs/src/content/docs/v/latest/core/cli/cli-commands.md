@@ -112,6 +112,24 @@ The shortcut needs an interactive terminal. Without one (CI, piped stdin, a proc
 
 The check itself is best-effort and non-blocking: it never delays or breaks startup, stays silent when npm is unreachable, and is automatically skipped in CI and non-interactive (non-TTY) shells. The answer is cached for 24 hours in `.warlock/update-check.json`, so a day of restarts costs one lookup — failed lookups are never cached, and the entry is dropped once an update is applied. Turn the whole thing off with `devServer.checkForUpdates: false` in `warlock.config.ts`.
 
+#### Per-phase reload timings — new in 5.12
+
+Set `devServer.timings: true` in `warlock.config.ts` to print a one-line, per-phase breakdown next to the existing `hmr update` line on every hot reload:
+
+```ts title="warlock.config.ts"
+export default {
+  devServer: {
+    timings: true, // default false
+  },
+};
+```
+
+```
+14:22:07   ⏱ watcher 4ms · debounce 20ms · graph 1ms · reimport 3ms · connectors 0ms
+```
+
+The five phases, in order: the watcher's `awaitWriteFinish` settle wait (chokidar), this handler's own debounce wait, module-graph invalidation (version bumps), re-import of the changed modules, and connector restart/rebind. Opt-in and off by default — the marks themselves are cheap `performance.now()` calls, but the raw-fs-event bookkeeping behind the watcher-settle phase is skipped entirely unless this is on, so a disabled flag costs nothing beyond one boolean check per reload.
+
 ### `generate.typings`
 
 Regenerate the TypeScript ambient types in `.warlock/typings/` from your config files.
@@ -142,6 +160,22 @@ warlock build
 No flags. Output lands in `dist/` (or wherever `warlock.config.ts > build.outDir` points). See [How it works](../architecture-concepts/how-it-works.md) for the bundler story.
 
 The build is all-or-nothing: it writes into a hidden sibling temp directory and promotes it into `outdir` with a rename only on success. A successful build therefore leaves no stale files from a previous one, and a failed build leaves `outdir` untouched rather than half-written. The promoted directory carries a `.warlock-build.json` success marker that `start` checks. See [Deployment](../digging-deeper/deployment).
+
+**New in 5.12 — esbuild native-binary preflight.** Before bundling, `warlock build` runs one trivial esbuild call to confirm esbuild's platform-specific native binary (e.g. `@esbuild/win32-x64`) is actually linked. A healthy install is a no-op — the check adds no measurable delay. When pnpm's build-script approval gate blocked esbuild's postinstall script (so the binary never got linked), the build now fails immediately with a message naming the cause and the fix, instead of esbuild's own opaque "could not be found" error:
+
+```
+esbuild's native binary is not installed for this platform, so `warlock build` cannot bundle.
+
+This usually happens when pnpm's build-script approval gate blocked esbuild's postinstall
+script, so the platform binary was never linked. Fix it with:
+
+  pnpm approve-builds
+
+then reinstall, or reinstall dependencies with build scripts enabled if esbuild was excluded
+on purpose.
+```
+
+Any other esbuild failure (a real syntax error, a genuine platform mismatch) is rethrown unchanged — the preflight only owns this one known failure mode. It only runs on the production build path; `warlock dev` is unaffected.
 
 ### `start`
 

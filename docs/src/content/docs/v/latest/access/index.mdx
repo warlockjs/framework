@@ -56,7 +56,7 @@ export default access;
 - **A pluggable resolver** — connect the engine to any storage: a user column, a pivot table, a token claim, an external directory.
 - **Multi-tenancy + caching** — tenant-scoped resolution, cached per user, best-effort cache with a fail-closed decision.
 
-> Requires `@warlock.js/auth` — `access` reads `request.user`. It does **not** do authentication, OAuth, or a runtime permission admin UI.
+> Requires `@warlock.js/auth` — `access` reads `request.locals.user`. It does **not** do authentication, OAuth, or a runtime permission admin UI.
 
 ---
 

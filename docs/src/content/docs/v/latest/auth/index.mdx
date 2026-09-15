@@ -12,13 +12,13 @@ depends on `@warlock.js/core` for HTTP and module conventions.
 
 Upgrading from v4? Review the [Auth migration notes](/v/latest/core/upgrade-to-v5/#auth).
 
-Gate any route with one middleware — `request.user` arrives hydrated, no token decoding in your handler:
+Gate any route with one middleware — `request.locals.user` arrives hydrated, no token decoding in your handler:
 
 ```ts
 import { authMiddleware } from "@warlock.js/auth";
 import { router } from "@warlock.js/core";
 
-router.get("/me", (request, response) => response.success({ user: request.user }), {
+router.get("/me", (request, response) => response.success({ user: request.locals.user }), {
   middleware: [authMiddleware("user")],
 });
 ```

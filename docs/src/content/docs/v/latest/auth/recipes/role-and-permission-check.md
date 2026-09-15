@@ -8,7 +8,7 @@ sidebar:
 
 `authMiddleware` answers **"who are you?"** and gates by user _type_ (user vs admin vs vendor — usually separate tables). It does **not** do fine-grained roles or permissions. When the distinction is a role _within_ one user shape — an `admin` user who is also a `super-admin`, an `editor` vs a `viewer` — you build that on top.
 
-The pattern: a `role` (or `permissions`) column on the user model, plus a small guard middleware that runs **after** `authMiddleware` (so `request.user` is already hydrated).
+The pattern: a `role` (or `permissions`) column on the user model, plus a small guard middleware that runs **after** `authMiddleware` (so `request.locals.user` is already hydrated).
 
 ## 1. Put the role on the model
 
@@ -51,7 +51,7 @@ Adding `role` / `hasRole` / `hasPermission` as model accessors keeps the check i
 
 ## 2. A reusable role guard
 
-A guard is just a middleware. It runs after `authMiddleware`, reads the already-hydrated `request.user`, and short-circuits with `403` when the role doesn't match.
+A guard is just a middleware. It runs after `authMiddleware`, reads the already-hydrated `request.locals.user`, and short-circuits with `403` when the role doesn't match.
 
 ```ts title="src/app/users/middleware/has-role.middleware.ts"
 import type { Middleware } from "@warlock.js/core";
@@ -60,7 +60,7 @@ import type { User } from "../models/user.model";
 /**
  * Build a guard that requires the authenticated user to hold one of the
  * given roles. Always pair it AFTER `authMiddleware` — it relies on
- * `request.user` being populated.
+ * `request.locals.user` being populated.
  *
  * @example
  * router.post("/posts", createPostController, {
@@ -69,7 +69,7 @@ import type { User } from "../models/user.model";
  */
 export function hasRole(...roles: string[]): Middleware {
   return ({ request, response }) => {
-    const user = request.user as User | undefined;
+    const user = request.locals.user as User | undefined;
 
     if (!user || !roles.includes(user.role)) {
       return response.forbidden({ error: "Insufficient role" });
@@ -82,7 +82,7 @@ Returning a response short-circuits the request; returning nothing lets it fall 
 
 ## 3. Wire it onto a route
 
-Order matters: `authMiddleware` first (it hydrates `request.user`), then the role guard.
+Order matters: `authMiddleware` first (it hydrates `request.locals.user`), then the role guard.
 
 ```ts title="src/app/posts/routes.ts"
 import { authMiddleware } from "@warlock.js/auth";
@@ -114,7 +114,7 @@ import type { User } from "@/app/users/models/user.model";
 import { Post } from "../models/post.model";
 
 export const updatePostController: RequestHandler = async ({ request, response }) => {
-  const user = request.user as User;
+  const user = request.locals.user as User;
   const post = await Post.find(request.input("id"));
 
   if (!post) {

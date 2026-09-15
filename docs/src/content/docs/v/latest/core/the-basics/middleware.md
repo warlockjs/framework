@@ -160,7 +160,7 @@ guarded(() => {
 });
 ```
 
-Two lines of intent. Every controller inside the `guarded` block can trust `request.user` is set.
+Two lines of intent. Every controller inside the `guarded` block can trust `request.locals.user` is set.
 
 ### Group order
 
@@ -276,7 +276,7 @@ import type { Middleware } from "@warlock.js/core";
 
 export function requireFeatureFlag(flag: string): Middleware {
   return async ({ request, response }) => {
-    const flags = request.user?.featureFlags ?? [];
+    const flags = request.locals.user?.featureFlags ?? [];
 
     if (!flags.includes(flag)) {
       return response.forbidden({
@@ -347,8 +347,8 @@ export function authMiddleware(allowedUserType?: string | string[]) {
       return response.unauthorized({ error: t("auth.errors.unauthorized") });
     }
 
-    // 5. Enrich request — controller can trust request.user
-    request.user = await UserModel.find(decoded.id);
+    // 5. Enrich request — controller can trust request.locals.user
+    request.locals.user = await UserModel.find(decoded.id);
   };
 }
 ```
@@ -378,7 +378,7 @@ Any middleware can short-circuit by returning a response — everything after it
 - **Returning a plain object means "send this as the body".** If you accidentally `return { foo: "bar" }` from a middleware, the controller is skipped and `{ foo: "bar" }` is sent as a 200. Don't return from middleware unless you mean to short-circuit.
 - **Middleware factories vs middleware functions.** A factory takes config and returns a middleware. A middleware is the function the router calls. `authMiddleware()` is a factory — `authMiddleware("user")` returns the middleware that the router wires up.
 - **Group middleware composes; route middleware doesn't override.** A group sets `[A, B]`, a route adds `[C]` — you get `[A, B, C]` (with default precedence). If you want the route to skip group middleware entirely, declare the route outside the group.
-- **`request.user` is set by the auth middleware, not the framework.** On routes outside a guarded group, `request.user` is `undefined`. Always narrow before reading it on public routes.
+- **`request.locals.user` is set by the auth middleware, not the framework.** On routes outside a guarded group, `request.locals.user` is `undefined`. Always narrow before reading it on public routes.
 
 ## See also
 

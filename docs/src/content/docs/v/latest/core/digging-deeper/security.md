@@ -175,6 +175,40 @@ Inherited values are validated before use — non-empty printable ASCII, max 128
 | `generator` | random 32-char   | Override the id generator.                                                                        |
 | `enabled`   | `true`           | Set `false` to stop echoing and inheriting. `request.id` is still generated for internal logging. |
 
+### Content-Security-Policy — new in 5.12
+
+`http.csp` is an opt-in `Content-Security-Policy` header, disabled by default — an app that never sets it (or sets `enabled: false`) sees no behavior change:
+
+```ts title="src/config/http.ts"
+export default {
+  csp: {
+    enabled: true,
+    // reportOnly: true, // emit Content-Security-Policy-Report-Only instead — observe before enforcing
+    directives: {
+      "img-src": ["'self'", "data:", "https://cdn.example.com"],
+    },
+  },
+};
+```
+
+The framework starts from a conservative default policy and lets an app override it one directive at a time — a directive named in `directives` **replaces** the framework default for that directive entirely (never merged element-wise), so declare the full list of values you want:
+
+```ts
+{
+  "default-src": ["'self'"],
+  "script-src": ["'self'"],
+  "style-src": ["'self'"],
+  "img-src": ["'self'", "data:"],
+  "object-src": ["'none'"],
+  "base-uri": ["'self'"],
+  "frame-ancestors": ["'self'"],
+}
+```
+
+`script-src` is special-cased regardless of whether it's declared: the **current request's CSP nonce** — the same per-request nonce the framework already generates and that `request.nonce` exposes to the web layer's `<script>` tags — is always appended to it (`'nonce-<value>'`), so the framework's own inline/module scripts keep working even under a strict policy.
+
+Malformed directive values fail the boot, not a random request: a value containing `;` (would truncate the directive) or with an odd number of `'` characters (a truncated/malformed keyword like `'self`) throws `InvalidCspDirectiveError` when the server starts, naming the offending directive and value.
+
 ### `trustProxy` shapes
 
 `http.trustProxy` is passed to Fastify untouched, and `request.detectIp()` (and its `realIp` alias) reads the resolved client off `request.ip` — so both agree.
@@ -233,6 +267,7 @@ Concrete, verified-against-the-code steps. Only knobs that actually exist are li
 - **Encrypt recoverable secrets, fingerprint them with `hmacHash` for lookup.** Look up by fingerprint; decrypt only at the moment of use. Never log a decrypted value.
 - **Lock down CORS** via `http.cors`. **Since 4.13.0 your configuration wins** — in 4.12.0 and earlier it was silently overridden by the permissive default.
 - **Sign cookies** by setting `http.cookies.secret` whenever a cookie value must not be client-forgeable.
+- **Consider `http.csp` (new in 5.12)** — opt-in `Content-Security-Policy`, off by default. Start with `reportOnly: true` to observe violations before enforcing.
 - **Check `http.bodyLimit`** — **since 4.13.0 it defaults to Fastify's own 1 MB** rather than the previous 200 GB — and add `middleware.maxBodySize()` on routes that accept user payloads.
 - **Add `middleware.rateLimit()`** to login, OTP, password-reset, and other abuse-prone endpoints — tighter than the global `http.rateLimit` backstop. Use a Redis store via `http.rateLimit` if you run multiple replicas and need a shared cap.
 - **Add `middleware.concurrencyLimit()`** to unbounded-cost endpoints (report generation, AI completions, image processing).
@@ -247,3 +282,4 @@ Concrete, verified-against-the-code steps. Only knobs that actually exist are li
 - **[Error handling](./error-handling.md)** — the full `HttpErrorCodes` catalog and how rejections are shaped.
 - **[Validation](../the-basics/validation.md)** — authoring seal schemas, database-aware rules, and ad-hoc validation.
 - **[Configuration](../getting-started/03-configuration.md)** — `env()`, the config-file layout, and where `src/config/http.ts` / `src/config/encryption.ts` plug in.
+- **[Request tracing](./request-tracing.md)** — the opt-in `http.tracing` hooks, new in 5.12.

@@ -574,7 +574,7 @@ The full `generate.module products` scaffold generates everything in one shot. T
 
 A few drift notes worth flagging if you compare the generator output to the canonical `src/app/faqs/` module:
 
-- **`organization_id` and `created_by`/`updated_by` columns.** The faqs module stamps these from `request.user` inside the service. The generator doesn't know about your auth model — add the columns and the stamping yourself.
+- **`organization_id` and `created_by`/`updated_by` columns.** The faqs module stamps these from `request.locals.user` inside the service. The generator doesn't know about your auth model — add the columns and the stamping yourself.
 - **`schema/create-*.schema.ts` vs `schema/update-*.schema.ts`.** Both can derive from the model's schema via `.without(...)` or `.partial()`. The generator emits standalone `v.object({...})` stubs because it can't see your model yet.
 - **Module folder is `schema/`, not `validation/`.** Older modules in this codebase use `validation/` — that's historical. New modules use `schema/`, which is what the generator and the `warlock-conventions` skill assume.
 

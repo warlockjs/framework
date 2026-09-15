@@ -174,7 +174,7 @@ export const createProductController: RequestHandler<Request<CreateProductSchema
 };
 ```
 
-For routes behind `authMiddleware`, swap the annotation to `GuardedRequestHandler<TSchema>` from `app/auth/types/guarded-request.type` — `request.user` becomes typed in the body:
+For routes behind `authMiddleware`, swap the annotation to `GuardedRequestHandler<TSchema>` from `app/auth/types/guarded-request.type` — `request.locals.user` becomes typed in the body:
 
 ```ts title="src/app/leads/controllers/create-lead.controller.ts"
 import { type GuardedRequestHandler } from "app/auth/types/guarded-request.type";
@@ -185,7 +185,7 @@ export const createLeadController: GuardedRequestHandler<CreateLeadSchema> = asy
   response,
 }) => {
   const data = request.validated();
-  // request.user is typed too
+  // request.locals.user is typed too
 };
 ```
 
@@ -334,7 +334,7 @@ v.email().uniqueExceptCurrentId(User);
 // excludes WHERE id = request.input("id")
 
 v.email().uniqueExceptCurrentUser(User);
-// excludes WHERE id = request.user.id
+// excludes WHERE id = request.locals.user.id
 
 v.string().existsExceptCurrentId(Category);
 v.string().existsExceptCurrentUser(Organization);
@@ -513,7 +513,7 @@ The framework reads the `type` field and validates against the matching branch.
 - **`request.validated()` returns `{}` if no schema ran.** It's only safe to call when the controller has `.validation = { schema }` attached. Otherwise, use `request.all()` or `request.input()`.
 - **By default, schemas validate body + query, not params.** Route params are already validated by the route matcher. If you need to validate them too (e.g. coerce `:id` to a number), add `"params"` to `validating`.
 - **`unique` / `exists` need the model registered.** Pass the imported model class (`User`), not its name as a string — string forms work only for models registered via `@RegisterModel()`.
-- **`uniqueExceptCurrentUser` / etc. only work inside an HTTP request.** They read `request.user` from the context store. For background jobs, use the base `unique` with an explicit `query` callback.
+- **`uniqueExceptCurrentUser` / etc. only work inside an HTTP request.** They read `request.locals.user` from the context store. For background jobs, use the base `unique` with an explicit `query` callback.
 - **Validation failures are 400 by default, but they short-circuit before the handler runs.** Branching on "did the schema pass?" inside the controller is impossible — the controller only runs if validation succeeded.
 - **`Infer<>` follows `.optional()` / `.nullable()`.** `v.string().optional()` infers as `string | undefined`. If a field is `.optional().default("x")`, `Infer` keeps it `string | undefined` at the type level even though the runtime value is always a string. Use `.required().default("x")` if you want the type to drop the `undefined`.
 

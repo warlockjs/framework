@@ -6,7 +6,7 @@ sidebar:
   label: "Introduction"
 ---
 
-`@warlock.js/access` is the authorization layer for Warlock apps. `@warlock.js/auth` gets you a logged-in `request.user`; `access` decides what that user is allowed to do.
+`@warlock.js/access` is the authorization layer for Warlock apps. `@warlock.js/auth` gets you a logged-in user at `request.locals.user`; `access` decides what that user is allowed to do.
 
 ## The mental model in one paragraph
 
@@ -34,7 +34,7 @@ A route gate is class-level; the per-record rule lives in the service. Keep them
 
 ## What it does NOT do
 
-- **Authentication.** That's `@warlock.js/auth`; `access` reads `request.user`.
+- **Authentication.** That's `@warlock.js/auth`; `access` reads `request.locals.user`.
 - **An admin UI.** The DB-backed resolver makes the role→permission catalog runtime-editable (it's the ejected `Role` table), but the screens to manage it are yours to build.
 - **ReBAC graphs or row-level query scoping.** A policy covers the common "own resource" case; graph-scale relationships are out of scope.
 

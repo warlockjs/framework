@@ -117,6 +117,27 @@ The default is right for most apps. If the client lost the refresh token, logout
 
 Default: `12`. The bcrypt cost factor for `hashPassword`. Higher = more secure but slower per login. The default is a sane balance for 2026 hardware.
 
+### `cookie.name` / `cookie.path` — New in 5.12
+
+```ts
+cookie: {
+  name: "access_token", // default
+  path: "/",            // default
+}
+```
+
+The cookie name and `Path` attribute `authService.setAuthCookie` / `clearAuthCookie` use by default (a per-call `options.name` / `options.path` overrides either). `HttpOnly`, `SameSite=Lax`, and `Secure` outside development are not configurable here — they come from core's `secureCookieDefaults()` floor. See [Handle login and logout](../guides/handle-login-and-logout.md#cookie-based-sessions--setauthcookie--clearauthcookie).
+
+### `csrf.allowedOrigins` — New in 5.12
+
+```ts
+csrf: {
+  allowedOrigins: [], // default
+}
+```
+
+Extra origins allowed on a cookie-authenticated unsafe-method (`POST`/`PUT`/`PATCH`/`DELETE`) request, on top of the request's own origin. Only relevant when a route uses `authMiddleware([], "cookie:<name>")` — header-token auth and safe methods are never checked. See [Protect routes → CSRF Origin check](../guides/protect-routes.md#csrf-origin-check-for-cookie-auth).
+
 ## Reading config at runtime
 
 Auth reads its config via `@warlock.js/core`'s `config.key("auth...")`. You don't usually need to read it directly — but if you do:

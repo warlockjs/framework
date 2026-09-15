@@ -12,7 +12,7 @@ This is the picture before the parts. Every other essentials and guides page zoo
 
 - **`User` model** — your Cascade model, extends `Auth`, registered in `config.auth.userType`.
 - **`authService`** — the orchestrator. Singleton exported from the package; holds no instance state.
-- **`authMiddleware`** — the route gate. Hydrates `request.user` + `request.decodedAccessToken`.
+- **`authMiddleware`** — the route gate. Hydrates `request.locals.user` + `request.decodedAccessToken`.
 - **`AccessToken` + `RefreshToken`** — Cascade models. Every token issued writes a row; verification checks the row; revocation deletes or stamps `revoked_at`.
 - **`authEvents`** — type-safe event bus. Every meaningful moment fires here so you can wire audit logging, metrics, side effects.
 
@@ -58,13 +58,16 @@ Authorization: Bearer <accessToken.token>
 
 `authMiddleware("user")` runs before the controller:
 
-1. Read `request.authorizationValue`. No header → 401 `MissingAccessToken`.
-2. Verify the JWT signature via `jwt.verify(authorizationValue)`. Failure → catch → 401 `InvalidAccessToken`.
-3. Look up the row in `access_tokens` by token string. Not found → 401 `InvalidAccessToken`.
-4. Check the token's `userType` is in the allowed list (if the middleware was called with one). Not allowed → 401 `Unauthorized`.
-5. Resolve the model class from `config.auth.userType[userType]`. Call `UserModel.find(decoded.id)`.
-6. User missing (deleted account) → destroy the access-token row, 401 `InvalidAccessToken`.
-7. Set `request.user` + `request.decodedAccessToken`. Continue to your controller.
+1. Read the credential — `request.authorizationValue` by default, or a named cookie when the route uses `authMiddleware(userType, "cookie:<name>")` (new in 5.12; see [Protect routes](../guides/protect-routes.md#cookie-sourced-credentials)). Missing → 401 `MissingAccessToken`.
+2. **Cookie-sourced credential on an unsafe method only:** run the CSRF Origin check (new in 5.12). `Origin`/`Referer` must name the request's own origin or an entry in `auth.csrf.allowedOrigins` — otherwise 403 `CsrfOriginMismatch`. Header tokens and safe methods skip this step entirely. See [Protect routes → CSRF Origin check](../guides/protect-routes.md#csrf-origin-check-for-cookie-auth).
+3. Verify the JWT signature via `jwt.verify(authorizationValue)`. Failure → catch → 401 `InvalidAccessToken`.
+4. Look up the row in `access_tokens` by token string. Not found → 401 `InvalidAccessToken`.
+5. Check the token's `userType` is in the allowed list (if the middleware was called with one). Not allowed → 401 `Unauthorized`.
+6. Resolve the model class from `config.auth.userType[userType]`. Call `UserModel.find(decoded.id)`.
+7. User missing (deleted account) → destroy the access-token row, 401 `InvalidAccessToken`.
+8. Set `request.locals.user` + `request.decodedAccessToken`. Continue to your controller.
+
+Sessions aren't bearer-token-only — a browser client can authenticate via a cookie instead of an `Authorization` header; see [Handle login and logout → Cookie-based sessions](../guides/handle-login-and-logout.md#cookie-based-sessions--setauthcookie--clearauthcookie).
 
 ### 4. Refresh
 

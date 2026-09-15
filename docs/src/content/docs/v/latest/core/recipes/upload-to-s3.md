@@ -227,14 +227,14 @@ guarded(() => {
 });
 ```
 
-`guarded(...)` requires auth — `request.user` is populated, so you can include the user ID in the path:
+`guarded(...)` requires auth — `request.locals.user` is populated, so you can include the user ID in the path:
 
 ```ts
 const file = await avatar
   .resize(400, 400)
   .format("webp")
   .use("s3")
-  .save(`avatars/${request.user.id}`);
+  .save(`avatars/${request.locals.user.id}`);
 ```
 
 ## Step 8 — Hit it from curl
@@ -349,7 +349,7 @@ export const uploadGalleryController: RequestHandler<UploadGalleryRequest> = asy
   const { images } = request.validated();
 
   const files = await Promise.all(
-    images.map((image) => image.use("s3").save(`gallery/${request.user.id}`)),
+    images.map((image) => image.use("s3").save(`gallery/${request.locals.user.id}`)),
   );
 
   return response.successCreate({

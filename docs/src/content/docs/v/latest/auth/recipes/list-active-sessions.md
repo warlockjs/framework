@@ -18,7 +18,7 @@ import { authService } from "@warlock.js/auth";
 import type { RequestHandler } from "@warlock.js/core";
 
 export const listSessionsController: RequestHandler = async ({ request, response }) => {
-  const sessions = await authService.getActiveSessions(request.user!);
+  const sessions = await authService.getActiveSessions(request.locals.user!);
 
   return response.success({
     sessions: sessions.map((session) => ({
@@ -34,7 +34,7 @@ export const listSessionsController: RequestHandler = async ({ request, response
 
 `getActiveSessions` returns the non-revoked, non-expired `RefreshToken` instances for the user, newest first. `device_info` is whatever you passed to `createTokenPair(user, deviceInfo)` at login — typically `{ userAgent, ip, deviceId }`.
 
-The instance-method form is `request.user!.activeSessions()`.
+The instance-method form is `request.locals.user!.activeSessions()`.
 
 ## Revoke one
 
@@ -43,7 +43,7 @@ import { RefreshToken } from "@warlock.js/auth";
 import type { RequestHandler } from "@warlock.js/core";
 
 export const revokeSessionController: RequestHandler = async ({ request, response }) => {
-  const user = request.user!;
+  const user = request.locals.user!;
   const sessionId = request.input("id");
 
   const session = await RefreshToken.first({

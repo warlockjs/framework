@@ -1,0 +1,143 @@
+---
+title: Localization
+slug: v/latest/web/essentials/localization
+description: Read the request locale, derive text direction, translate, and switch locale without a reload.
+sidebar:
+  order: 9
+  label: Localization
+---
+
+`@warlock.js/web` binds every render to one locale — the one the request
+resolved — and exposes it through `useLocale()`. `localeDirection()`,
+`useTextDirection()`, and `changeLocaleCode()` are new in 5.12.
+
+## Read the current locale
+
+```tsx title="src/web/components/locale-badge.tsx"
+import { useLocale } from "@warlock.js/web";
+
+export function LocaleBadge() {
+  const locale = useLocale();
+
+  return <span>{locale}</span>;
+}
+```
+
+`useLocale()` throws when called outside Warlock's `LocaleProvider` — render
+the component through the normal page pipeline.
+
+## Translate with `useTrans()`
+
+```tsx title="src/web/components/greeting.tsx"
+import { useTrans } from "@warlock.js/web";
+
+export function Greeting() {
+  const trans = useTrans();
+
+  return <p>{trans("welcome")}</p>;
+}
+```
+
+`useTrans()` translates against the current request/page locale directly,
+without consulting any process-global locale.
+
+## `lang` and `dir` on `<html>` — new in 5.12
+
+The root document owns `<html>`, so it also owns `lang` and `dir`. Derive the
+writing direction from the current locale with `useTextDirection()`:
+
+```tsx title="src/web/root.tsx"
+import { Head, Scripts, useLocale, useTextDirection } from "@warlock.js/web";
+import type { AppProps } from "@warlock.js/web";
+
+export default function App({ children }: AppProps) {
+  const locale = useLocale();
+
+  return (
+    <html lang={locale} dir={useTextDirection()}>
+      <head>
+        <Head />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+```
+
+`useTextDirection()` derives `"rtl"` or `"ltr"` from the same locale
+`useLocale()` exposes, via `localeDirection()` — a pure function safe to call
+on the server or the client. No hydration payload change is involved: the
+direction is computed from the locale that already made the trip, not
+carried separately.
+
+### `localeDirection(locale)`
+
+```ts
+import { localeDirection } from "@warlock.js/web";
+
+localeDirection("ar"); // "rtl"
+localeDirection("en"); // "ltr"
+localeDirection("az-Arab"); // "rtl" — an explicit script subtag wins over the base language
+```
+
+Call it directly when you need a direction outside a component (for example,
+in a loader). It never throws — an unparseable locale resolves to `"ltr"`.
+
+## Switch locale without a reload — `changeLocaleCode()`
+
+```tsx title="src/web/components/locale-switcher.tsx"
+import { changeLocaleCode, useLocale } from "@warlock.js/web";
+
+export function LocaleSwitcher() {
+  const locale = useLocale();
+
+  const switchTo = async (code: string) => {
+    try {
+      await changeLocaleCode(code);
+    } catch {
+      window.location.reload();
+    }
+  };
+
+  return (
+    <select value={locale} onChange={(event) => switchTo(event.target.value)}>
+      <option value="en">English</option>
+      <option value="ar">العربية</option>
+    </select>
+  );
+}
+```
+
+`changeLocaleCode(code)` re-fetches the current route's data with
+`?locale=code` on the request only — the visible address bar is left alone —
+and swaps in the fresh page, the same way `refresh()` swaps in fresh data.
+`useLocale()`, `useTextDirection()`, and the root `<html lang dir>` all
+follow from the new payload in that same render.
+
+**The server persists the choice.** The server resolves a request's locale
+as the first present of a `?locale=` query param, its `locale` cookie, or a
+`locale` header. `changeLocaleCode()` sends `?locale=` on that one request,
+and the server writes the `locale` cookie in response — so the next full page
+load agrees without the client ever writing a cookie itself.
+
+Calling it with the already-active locale is a no-op — no request is made.
+On failure (network error, or the fresh page could not be built), the
+promise rejects and the active locale and any cookie are left exactly as
+they were.
+
+## Gotchas
+
+- **`useLocale()` requires the page pipeline.** It throws outside
+  `LocaleProvider`.
+- **`localeDirection()` is pure.** It never reads ambient state and never
+  throws; an unparseable locale resolves to `"ltr"`.
+- **`changeLocaleCode()` does not change the URL.** Only the response
+  cookie changes; the current path stays the same.
+
+## See also
+
+- [Loaders and metadata](/v/latest/web/essentials/loaders-and-metadata/) —
+  reading request-scoped values, including locale, through `shared`.

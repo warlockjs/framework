@@ -521,7 +521,7 @@ import { storage } from "@warlock.js/core";
 
 export const uploadAvatarController: RequestHandler = async ({ request, response }) => {
   const upload = request.file("avatar")!;
-  const file = await storage.put(upload, `avatars/${request.user!.uuid}/${upload.fileName}`);
+  const file = await storage.put(upload, `avatars/${request.locals.user!.uuid}/${upload.fileName}`);
 
   return response.successCreate({
     url: file.url,

@@ -13,7 +13,7 @@ import { authService } from "@warlock.js/auth";
 import type { RequestHandler } from "@warlock.js/core";
 
 export const logoutEverywhereController: RequestHandler = async ({ request, response }) => {
-  await authService.revokeAllTokens(request.user!);
+  await authService.revokeAllTokens(request.locals.user!);
 
   return response.success({ message: "Logged out from every device" });
 };
@@ -49,7 +49,7 @@ If the button isn't behind a recent-login window, gate it with a password confir
 import type { RequestHandler } from "@warlock.js/core";
 
 const logoutEverywhereController: RequestHandler = async ({ request, response }) => {
-  const user = request.user!;
+  const user = request.locals.user!;
   const ok = await user.confirmPassword(request.input("currentPassword"));
 
   if (!ok) {

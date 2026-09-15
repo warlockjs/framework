@@ -10,7 +10,7 @@ Most APIs need a "you must be logged in" boundary somewhere. Warlock's `@warlock
 
 ## What you get from `@warlock.js/auth`
 
-- **`authMiddleware(userType?)`** — a factory that returns a Warlock middleware. Verifies the `Authorization: Bearer <jwt>` header, loads the user model from the DB, and attaches it to `request.user`.
+- **`authMiddleware(userType?)`** — a factory that returns a Warlock middleware. Verifies the `Authorization: Bearer <jwt>` header, loads the user model from the DB, and attaches it to `request.locals.user`.
 - **`authService`** — login/register/refresh/logout primitives on top of `AccessToken` and `RefreshToken` Cascade models.
 - **`registerJWTSecretGeneratorCommand()`** + **`registerAuthCleanupCommand()`** — CLI factories you wire into `warlock.config.ts > cli.commands` for `warlock jwt.generate` and `warlock auth.cleanup`.
 
@@ -72,7 +72,7 @@ What the factory does:
 2. Verifies the JWT (signature + expiry).
 3. Looks up the matching `AccessToken` row in the DB. If the token was revoked (e.g. via `auth.cleanup`), it's gone.
 4. Resolves the user-type model class from `auth.userType.<type>` config and loads the user by `id`.
-5. Attaches the model to `request.user`.
+5. Attaches the model to `request.locals.user`.
 
 If any step fails, the middleware returns `401` with an `errorCode` and a translated message — the controller never runs.
 
@@ -80,7 +80,7 @@ The `userType` argument is a string or string array. Common values:
 
 | Argument                            | Effect                                                                                                                                                                              |
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `authMiddleware()`                  | Optional auth — populates `request.user` if a token is present, but doesn't `401` when missing. Useful for endpoints that change behavior based on whether the caller is logged in. |
+| `authMiddleware()`                  | Optional auth — populates `request.locals.user` if a token is present, but doesn't `401` when missing. Useful for endpoints that change behavior based on whether the caller is logged in. |
 | `authMiddleware("user")`            | Requires a valid `user`-type token.                                                                                                                                                 |
 | `authMiddleware("admin")`           | Requires a valid `admin`-type token.                                                                                                                                                |
 | `authMiddleware(["user", "admin"])` | Either user type is accepted.                                                                                                                                                       |
@@ -190,7 +190,7 @@ guarded(() => {
 
 ## Step 5 — Read the user inside the controller
 
-Once auth middleware runs, `request.user` holds the resolved model instance. The auth middleware sets it via `request.user = currentUser` after loading from the DB. Type it via the `GuardedRequest` alias in the project — most apps have one in `src/app/auth/types/guarded-request.type.ts`:
+Once auth middleware runs, `request.locals.user` holds the resolved model instance. The auth middleware sets it via `request.locals.user = currentUser` after loading from the DB. Type it via the `GuardedRequest` alias in the project — most apps have one in `src/app/auth/types/guarded-request.type.ts`:
 
 ```ts title="src/app/auth/types/guarded-request.type.ts"
 import type { Request, RequestHandler } from "@warlock.js/core";
@@ -212,12 +212,12 @@ import { type GuardedRequestHandler } from "../types/guarded-request.type";
 
 export const me: GuardedRequestHandler = async ({ request, response }) => {
   return response.success({
-    user: request.user,
+    user: request.locals.user,
   });
 };
 ```
 
-`request.user` is the full Cascade model — call `request.user.get("email")` for typed access, or just rely on the model's own getters (`request.user.email`).
+`request.locals.user` is the full Cascade model — call `request.locals.user.get("email")` for typed access, or just rely on the model's own getters (`request.locals.user.email`).
 
 ## Step 6 — Per-route middleware (not just groups)
 
@@ -257,7 +257,7 @@ export const updatePostController: GuardedRequestHandler<UpdatePostSchema> = asy
     throw new ResourceNotFoundError("Post not found");
   }
 
-  if (post.get("author_id") !== request.user.id) {
+  if (post.get("author_id") !== request.locals.user.id) {
     return response.forbidden({ error: "You can only edit your own posts" });
   }
 
@@ -279,7 +279,7 @@ Two things to notice:
 For richer role logic (admin-only fields, scope-based access), the same pattern scales:
 
 ```ts
-if (!request.user.hasRole("editor") && !post.get("author_id") === request.user.id) {
+if (!request.locals.user.hasRole("editor") && !post.get("author_id") === request.locals.user.id) {
   return response.forbidden({ error: "Editors only" });
 }
 ```
@@ -315,16 +315,16 @@ export const showProductController: RequestHandler = async ({ request, response 
     return response.notFound({ error: "Product not found" });
   }
 
-  // request.user is User | undefined here
-  if (request.user) {
-    await trackProductView(product.id, request.user.id);
+  // request.locals.user is User | undefined here
+  if (request.locals.user) {
+    await trackProductView(product.id, request.locals.user.id);
   }
 
   return response.success({ product });
 };
 ```
 
-The middleware short-circuits when no token is present (no `401`), but populates `request.user` when one is.
+The middleware short-circuits when no token is present (no `401`), but populates `request.locals.user` when one is.
 
 ## 401 vs 403 — the rule
 
@@ -338,10 +338,10 @@ Don't conflate the two. A client receiving `401` knows to refresh the token or r
 ## Gotchas
 
 - **Auth tokens are checked against the DB on every request.** Logging out (`/auth/logout`) deletes the row from `access_tokens`; the next request with that token gets `401`. This is by design — stateless JWT can't be revoked, but Warlock revokes the DB record.
-- **`request.user` is `undefined` outside guarded routes.** Even with the `GuardedRequest` type, it's a type-only narrowing — the actual property doesn't exist until the middleware runs. Don't access it on public routes.
-- **`request.clearCurrentUser()` exists.** The middleware calls it internally if token verification throws. You probably never call it yourself — just be aware it nukes `request.user`.
+- **`request.locals.user` is `undefined` outside guarded routes.** Even with the `GuardedRequest` type, it's a type-only narrowing — the actual property doesn't exist until the middleware runs. Don't access it on public routes.
+- **`request.user` is gone; `request.clearCurrentUser()` was removed with it (5.12, breaking).** The authenticated user now lives at `request.locals.user`, written by `@warlock.js/auth`'s middleware — `request.user` throws `RequestUserMovedError` in development if anything still reads it (a silent `undefined` in production for one release), and there's no `request.locals.user` setter to guard against on core's side. `request.locals.user` is otherwise just a locals key, so nothing in core clears it for you.
 - **Don't put `authMiddleware` after a heavy middleware.** Middleware runs in array order; an auth check that runs after rate-limiting wastes rate-limit budget on unauthenticated requests. Auth first.
-- **Per-user rate limiting requires the user to be loaded.** If you stack `[authMiddleware("user"), rateLimitMiddleware]`, the limiter can read `request.user.id`. The reverse stacks the wrong direction.
+- **Per-user rate limiting requires the user to be loaded.** If you stack `[authMiddleware("user"), rateLimitMiddleware]`, the limiter can read `request.locals.user.id`. The reverse stacks the wrong direction.
 
 ## See also
 

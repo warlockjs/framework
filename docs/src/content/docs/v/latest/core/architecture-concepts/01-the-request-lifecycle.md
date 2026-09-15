@@ -110,7 +110,7 @@ const authMiddleware: Middleware = async ({ request, response }) => {
     return response.unauthorized({ error: "auth.tokenRequired" });
   }
 
-  request.user = await loadUserFromToken(token);
+  request.locals.user = await loadUserFromToken(token);
   // returning nothing → continue to next middleware
 };
 ```
@@ -150,8 +150,8 @@ export const createFaqController: RequestHandler<CreateFaqRequest> = async ({
 }) => {
   const faq = await createFaqService({
     ...request.validated(),
-    organization_id: request.user.organizationId,
-    created_by: request.user.uuid,
+    organization_id: request.locals.user.organizationId,
+    created_by: request.locals.user.uuid,
   });
 
   return response.success({ faq });
@@ -268,7 +268,7 @@ Translation happens at the controller or response layer, never in repositories o
 
 A quick cheat-sheet of which properties are available where:
 
-| Step              | `request.user` | `request.validated()` | `request.params` | `ctx` (use-case) |
+| Step              | `request.locals.user` | `request.validated()` | `request.params` | `ctx` (use-case) |
 | ----------------- | -------------- | --------------------- | ---------------- | ---------------- |
 | Middleware        | maybe          | not yet               | yes              | n/a              |
 | Schema validation | yes (if auth)  | not yet               | yes              | n/a              |
@@ -276,7 +276,7 @@ A quick cheat-sheet of which properties are available where:
 | Use-case guard    | n/a            | data is `Readonly`    | n/a              | yes (empty)      |
 | Use-case handler  | n/a            | data is validated     | n/a              | yes (enriched)   |
 
-`request.user` is populated by `authMiddleware` — without that middleware on the route, it's undefined.
+`request.locals.user` is populated by `authMiddleware` — without that middleware on the route, it's undefined.
 
 ## See also
 

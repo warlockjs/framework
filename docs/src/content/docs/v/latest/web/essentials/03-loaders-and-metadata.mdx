@@ -137,6 +137,43 @@ Unknown metadata fields fail the build with the field name, source line, and a
 nearby suggestion when one exists. This catches typos such as `tittle` even
 when the export has no explicit TypeScript annotation.
 
+## What survives the wire
+
+App, layout, and page loader data travels the browser wire serialized with
+[`devalue`](https://www.npmjs.com/package/devalue), not plain `JSON` — this
+changed in 5.12. Concretely, this now arrives in the browser exactly as the
+loader returned it:
+
+- `Date`, `Map`, `Set`, `BigInt`
+- `undefined` as an object property's value (not just at the top level)
+- a repeated reference to the same object (two properties pointing at the
+  same object hydrate as the same object, not two independent copies)
+- a cyclic structure (an object that, transitively, references itself)
+
+A class instance devalue does not recognize, a function, or a symbol is
+still refused — loudly. The build throws a `PageDataSerializationError`
+naming the loader level (`app`/`layout`/`page`), the key path, and the page
+route, in both dev and production. The fix is always the same: give the
+offending value a `resource` or a `toJSON()` method so it reaches the wire
+as a plain value devalue already knows how to serialize — a `resource` or a
+`toJSON()` is the serialization gate, never the wire format itself.
+
+This applies to `appData`/`layoutData`/`pageData` and to a
+[`defer()`](/v/latest/web/essentials/streaming-and-defer/)-ed value's
+eventual settlement. It does **not** change `shared`, which keeps its own,
+stricter gate: scalars, arrays, plain objects, or values with a `toJSON()` —
+`Date`, `Map`, `Set`, functions, and arbitrary class instances are rejected
+there regardless.
+
+## Page tracing phases
+
+When request tracing is enabled (`http.tracing`, off by default — see
+core's [request tracing](/v/latest/core/digging-deeper/request-tracing/)
+page), a page request reports three additional phases through the same
+vendor-neutral hooks: `loader` (per loader level — app, layout, page),
+`render.shell`, and `stream.end`. No extra configuration is needed on the
+web side beyond enabling `http.tracing` in `warlock.config.ts`.
+
 ## Environment values
 
 Read deployment or request-scoped values in the loader and return only what is

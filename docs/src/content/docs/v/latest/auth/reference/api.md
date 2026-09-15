@@ -93,9 +93,24 @@ getActiveSessions(user): Promise<RefreshToken[]>;
 hashPassword(password): Promise<string>;
 verifyPassword(plain, hash): Promise<boolean>;
 buildAccessTokenPayload(user): { id, userType, created_at };
+
+setAuthCookie(response, token, options?): void;
+clearAuthCookie(response, options?): void;
 ```
 
+**New in 5.12** — `setAuthCookie` / `clearAuthCookie` are the write side of the `cookie:<name>` token source `authMiddleware` has accepted since 5.0.0. See [Handle login and logout](../guides/handle-login-and-logout.md#cookie-based-sessions--setauthcookie--clearauthcookie).
+
 Source: `@warlock.js/auth/src/services/auth.service.ts`.
+
+### `currentUser`
+
+```ts
+function currentUser<UserType extends Auth = Auth>(): UserType | undefined;
+```
+
+**New in 5.12** — a typed wrapper over core's `useCurrentUser()`, narrowed to `Auth`-derived types, so callers read `request.locals.user` without repeating the cast at every call site.
+
+Source: `@warlock.js/auth/src/services/current-user.ts`.
 
 ### `jwt`
 
@@ -144,16 +159,24 @@ Source: `@warlock.js/auth/src/services/generate-jwt-secret.ts`.
 ### `authMiddleware`
 
 ```ts
-function authMiddleware(allowedUserType: string | string[]): Middleware;
+function authMiddleware(
+  allowedUserType: string | string[],
+  tokenFrom?: "header" | `cookie:${string}`, // default: "header"
+): Middleware;
 ```
 
-Route gate. The argument is required and a valid token is always required (no anonymous mode). Empty array = any authenticated user. String / array = restricted to the listed user types. Public routes omit the middleware.
+Route gate. `allowedUserType` is required and a valid token is always required (no anonymous mode). Empty array = any authenticated user. String / array = restricted to the listed user types. Public routes omit the middleware.
+
+`tokenFrom` selects the credential source: the default `"header"` reads `Authorization: Bearer <token>`; `` `cookie:${name}` `` reads a named cookie instead (pair it with `authService.setAuthCookie`/`clearAuthCookie` — see [Handle login and logout](../guides/handle-login-and-logout.md#cookie-based-sessions--setauthcookie--clearauthcookie)).
 
 ```ts
 router.get("/account",    accountController, { middleware: [authMiddleware([])] });
 router.get("/admin",      adminController,   { middleware: [authMiddleware("admin")] });
 router.get("/staff-area", staffController,   { middleware: [authMiddleware(["staff", "admin"])] });
+router.get("/browser-account", browserController, { middleware: [authMiddleware([], "cookie:access_token")] });
 ```
+
+**New in 5.12** — a `cookie:`-sourced credential on an unsafe method (`POST`/`PUT`/`PATCH`/`DELETE`) is additionally subject to the CSRF Origin check; see [Protect routes → CSRF Origin check](../guides/protect-routes.md#csrf-origin-check-for-cookie-auth).
 
 Source: `@warlock.js/auth/src/middleware/auth.middleware.ts`.
 
@@ -274,10 +297,13 @@ enum AuthErrorCodes {
   MissingAccessToken = "EC001",
   InvalidAccessToken = "EC002",
   Unauthorized = "EC003",
+  TooManyAttempts = "EC004",
+  InvalidTokenType = "EC005",
+  CsrfOriginMismatch = "EC006", // New in 5.12
 }
 ```
 
-The error-code values the middleware returns alongside the localized message. Switch on these on the client.
+The error-code values the middleware (and the login-throttle guard) return alongside the localized message. Switch on these on the client. `CsrfOriginMismatch` (`EC006`) is new in 5.12 — see [Protect routes → CSRF Origin check](../guides/protect-routes.md#csrf-origin-check-for-cookie-auth).
 
 Source: `@warlock.js/auth/src/utils/auth-error-codes.ts`.
 

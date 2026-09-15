@@ -170,7 +170,7 @@ io.use((socket, next) => {
 });
 ```
 
-The container guarantees you get the same instance on every call — `getSocketServer()` is just a `container.get("socket")` underneath.
+The container guarantees you get the same instance on every call — `getSocketServer()` is just a `container.tryGet("socket") ?? null` underneath, which is why it returns `null` (not a throw) when sockets aren't configured, unlike `container.get`'s throwing behavior since 5.12 (see [Container & runtime accessors](../architecture-concepts/container.md#get-throws-for-a-missing-key--new-in-512)).
 
 ## Connecting a client
 

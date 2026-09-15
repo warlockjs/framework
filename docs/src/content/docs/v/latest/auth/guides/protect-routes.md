@@ -6,7 +6,9 @@ sidebar:
   label: "Protect routes"
 ---
 
-`authMiddleware(allowedUserType: string | string[])` returns a Warlock middleware. Attach it to routes or route groups. The argument is **required** — there is no optional/anonymous mode. A request without a valid access token is always rejected with `401`; routes that should be public simply omit the middleware.
+`authMiddleware(allowedUserType: string | string[], tokenFrom?)` returns a Warlock middleware. Attach it to routes or route groups. `allowedUserType` is **required** — there is no optional/anonymous mode. A request without a valid access token is always rejected with `401`; routes that should be public simply omit the middleware.
+
+Sessions are not bearer-token-only: `tokenFrom` selects where the credential is read from — the default `"header"` reads `Authorization: Bearer <token>`, and `` `cookie:${name}` `` reads a named cookie instead, for browser clients that can't stash a token in JS-readable storage. See [Cookie-sourced credentials](#cookie-sourced-credentials) below.
 
 ## The two modes
 
@@ -35,7 +37,7 @@ The user-type slug must match a key in `config.auth.userType.<slug>` — see [Cu
 Before your controller runs:
 
 ```ts
-request.user = <hydrated user model instance>;
+request.locals.user = <hydrated user model instance>;
 request.decodedAccessToken = <decoded JWT payload>;
 ```
 
@@ -63,7 +65,7 @@ The error code is from the `AuthErrorCodes` enum — handy for the frontend to s
 import type { RequestHandler } from "@warlock.js/core";
 
 const accountController: RequestHandler = async ({ request, response }) => {
-  const user = request.user!;
+  const user = request.locals.user!;
 
   return response.success({
     id: user.id,
@@ -72,7 +74,7 @@ const accountController: RequestHandler = async ({ request, response }) => {
 };
 ```
 
-Because the middleware always requires a valid token, `request.user` is guaranteed inside any gated controller (the middleware would have 401'd otherwise). The `!` is safe here.
+Because the middleware always requires a valid token, `request.locals.user` is guaranteed inside any gated controller (the middleware would have 401'd otherwise). The `!` is safe here.
 
 A public route that wants _soft_ personalization simply omits the middleware and reads the token itself:
 
@@ -102,9 +104,53 @@ router.group({ prefix: "/admin", middleware: [authMiddleware("admin")] }, () => 
 
 Every route inside the group is gated — the group's `middleware` array applies to each route in the callback. Cleaner than repeating the middleware per route.
 
+## Cookie-sourced credentials
+
+**New in 5.12.** Pass `` `cookie:${name}` `` as the second argument to read the credential from a cookie instead of the `Authorization` header:
+
+```ts
+router.get("/account", accountController, {
+  middleware: [authMiddleware([], "cookie:access_token")],
+});
+```
+
+Nothing writes that cookie for you implicitly — pair it with `authService.setAuthCookie` / `clearAuthCookie` in your login/logout controllers (see [Handle login and logout](./handle-login-and-logout.md#cookie-based-sessions--setauthcookie--clearauthcookie)). Upgrading never starts a bearer-only app emitting `Set-Cookie` on its own.
+
+## CSRF Origin check for cookie auth
+
+**New in 5.12.** A cookie-sourced credential can be silently replayed cross-site by a browser (a same-site `GET` redirect chain, or a client that ignores `SameSite`) in a way a header token cannot — nothing but your own JS can attach an `Authorization` header, but a browser attaches cookies automatically. To close that gap, `authMiddleware` automatically runs a CSRF Origin check whenever **both** are true:
+
+- the credential came from a `cookie:` source (not `"header"`), and
+- the request method is unsafe (`POST` / `PUT` / `PATCH` / `DELETE`).
+
+`GET` / `HEAD` / `OPTIONS` and header-token auth are never checked — only the cookie + unsafe-method combination is in scope.
+
+The check passes when `Origin` — or, if `Origin` is absent, `Referer` — names the request's own origin (scheme + host) or an entry in `auth.csrf.allowedOrigins` (default `[]`, configured in [`src/config/auth.ts`](../getting-started/03-configuration.mdx#csrfallowedorigins--new-in-512)). A request that carries **neither** header is rejected too — the check fails closed, not open.
+
+A failure is a `403` with `AuthErrorCodes.CsrfOriginMismatch` (`EC006`):
+
+```json
+{ "error": "...localized message...", "errorCode": "EC006" }
+```
+
+```ts title="src/config/auth.ts"
+import type { AuthConfigurations } from "@warlock.js/auth";
+
+const authConfig: AuthConfigurations = {
+  // ...
+  csrf: {
+    allowedOrigins: ["https://admin.example.com"],
+  },
+};
+
+export default authConfig;
+```
+
+This closes the residual CSRF gap that `SameSite=Lax` alone leaves open for cookie auth. It's not a full double-submit-token mechanism — that's deferred to a later release — but it stops the common cross-site cookie-replay case outright, and it costs nothing on header-token routes.
+
 ## No optional / fallthrough auth
 
-There is no "hydrate `request.user` if a token is present, otherwise continue" mode. `authMiddleware` always requires a valid token. Public routes leave the middleware off entirely; protected groups apply it once:
+There is no "hydrate `request.locals.user` if a token is present, otherwise continue" mode. `authMiddleware` always requires a valid token. Public routes leave the middleware off entirely; protected groups apply it once:
 
 ```ts
 // Public — no middleware
@@ -138,7 +184,7 @@ The decoded payload is exactly what was passed to `jwt.generate`. The default sh
 
 - **Calling `authMiddleware` inside the handler.** It returns a middleware function — call it once per route at registration. Calling it per-request creates a fresh `allowedTypes` array each hit.
 - **Manually decoding JWTs.** The middleware did it; the result is on `request.decodedAccessToken`.
-- **Trusting client-set `request.user`.** The middleware is the only thing that writes that slot server-side. Client headers don't reach it.
+- **Trusting client-set `request.locals.user`.** The middleware is the only thing that writes that slot server-side. Client headers don't reach it.
 - **Passing an unknown user-type.** `authMiddleware("typo")` 401s every request because the config lookup fails. Smoke-test the wire-up with a real token of each user type.
 
 ## Related

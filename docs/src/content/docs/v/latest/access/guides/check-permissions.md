@@ -22,7 +22,7 @@ router.get("/reports", viewReports, {
 });
 ```
 
-Always stack these **after** `authMiddleware` — they read `request.user`. A denied check returns `403` before the controller runs.
+Always stack these **after** `authMiddleware` — they read `request.locals.user`. A denied check returns `403` before the controller runs.
 
 ## Booleans
 

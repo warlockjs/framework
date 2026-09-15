@@ -111,7 +111,7 @@ The `confirmPassword(plaintext)` instance method checks the plaintext against th
 import type { RequestHandler } from "@warlock.js/core";
 
 const changeEmailController: RequestHandler = async ({ request, response }) => {
-  const user = request.user!;
+  const user = request.locals.user!;
   const valid = await user.confirmPassword(request.input("currentPassword"));
 
   if (!valid) {

@@ -64,7 +64,7 @@ import { requestLogger } from "../request-logger";
 export function handleRequest(request, response) {
   const requestLog = requestLogger({
     requestId: request.headers["x-request-id"] ?? randomUUID(),
-    userId: request.user?.id,
+    userId: request.locals.user?.id,
     method: request.method,
     path: request.url,
   });
@@ -76,6 +76,8 @@ export function handleRequest(request, response) {
   return runHandler(request, response, requestLog);
 }
 ```
+
+If you've enabled `http.tracing`, add `traceId` to the same base object — it's `ctx.traceId` from an `onRequestStart` hook (falls back to `requestId` when there's no inbound `traceparent`; see [Request tracing](../../core/digging-deeper/request-tracing/)) — so a log line correlates with both your own request id and a distributed trace.
 
 Now a single `requestId` filter in your log viewer surfaces the entire request.
 

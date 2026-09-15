@@ -9,7 +9,7 @@ sidebar:
 Your `/login` route is getting hammered, but `/health` isn't. Your authed customers should get a higher quota than anonymous IPs. Your monitoring server shouldn't count against anyone's bucket. This recipe walks the rate-limiting story Warlock ships with — project-wide defaults via `src/config/http.ts`, per-route overrides, plus a small custom middleware for the per-user-bucket case the framework's built-in surface doesn't cover.
 
 :::tip Built-in `middleware.rateLimit()`
-As of the HTTP middleware suite, `@warlock.js/core` ships a `middleware.rateLimit({ max, duration, keyGenerator })` factory that covers most of what the custom middleware in Step 3 below was for — including per-user keying via `keyGenerator: (request) => request.user?.id ?? request.ip`. The custom recipe still works (and is useful when you want cache-backed distributed limits), but for in-process per-route caps reach for the built-in first. See the [middleware guide](../the-basics/middleware.md#built-in-middleware) for the catalog.
+As of the HTTP middleware suite, `@warlock.js/core` ships a `middleware.rateLimit({ max, duration, keyGenerator })` factory that covers most of what the custom middleware in Step 3 below was for — including per-user keying via `keyGenerator: (request) => request.locals.user?.id ?? request.ip`. The custom recipe still works (and is useful when you want cache-backed distributed limits), but for in-process per-route caps reach for the built-in first. See the [middleware guide](../the-basics/middleware.md#built-in-middleware) for the catalog.
 :::
 
 By the end you'll have sensible global limits, a tight cap on `/login`, a higher quota for authed users than anonymous, and a localized 429 response that tells the client when to come back.
@@ -178,7 +178,7 @@ type UserRateLimitOptions = {
 
 export function userRateLimit(options: UserRateLimitOptions): Middleware {
   return async ({ request, response }) => {
-    const userId = request.user?.id;
+    const userId = request.locals.user?.id;
 
     if (!userId) {
       return;
@@ -202,7 +202,7 @@ export function userRateLimit(options: UserRateLimitOptions): Middleware {
 
 What this does:
 
-- Reads the current user from `request.user` (populated by `authMiddleware` from `@warlock.js/auth`).
+- Reads the current user from `request.locals.user` (populated by `authMiddleware` from `@warlock.js/auth`).
 - Builds a cache key per-user-per-route.
 - Increments the count; rejects when it exceeds `max` within `windowSeconds`.
 - Uses the cache singleton's TTL — the key auto-expires when the window closes.
@@ -292,7 +292,7 @@ Admins shouldn't trip rate limits aimed at preventing abuse from normal users. A
 ```ts title="src/app/shared/middleware/user-rate-limit.middleware.ts (excerpt)"
 export function userRateLimit(options: UserRateLimitOptions): Middleware {
   return async ({ request, response }) => {
-    const user = request.user;
+    const user = request.locals.user;
 
     if (!user) {
       return;
@@ -410,7 +410,7 @@ Don't try to do everything in one layer. The global IP limit catches scrapers; p
 - **The plugin's bucket is in-process by default.** Two workers = two independent IP buckets. Configure the plugin's `redis` option (requires extending the framework's `registerHttpPlugins` call) for distributed rate limiting, or rely on per-user middleware backed by the Redis cache driver.
 - **`request.ip` honors `X-Forwarded-For` only if `http.trustProxy` is set.** Behind a load balancer without it, every IP looks like your LB's. Set `http.trustProxy` to the narrowest shape your topology allows — a trusted-proxy list or a predicate, not bare `true` — otherwise your "per-IP" limit can become "per-client-chosen-IP" instead of "per-load-balancer". A hop count (`2`) is **not** a valid shape and throws at boot since 5.2. See [Security → `trustProxy` shapes](../digging-deeper/security.md#trustproxy-shapes).
 - **The route-level `errorMessage` is a fixed string.** No placeholders, no locale. Use a custom middleware (Step 5) when you need anything dynamic.
-- **Per-user middleware needs `authMiddleware()` before it.** Without an authenticated `request.user`, your per-user limiter is a no-op. Order matters: auth, then rate limit.
+- **Per-user middleware needs `authMiddleware()` before it.** Without an authenticated `request.locals.user`, your per-user limiter is a no-op. Order matters: auth, then rate limit.
 - **Don't apply rate limits to `OPTIONS` preflights.** CORS preflights count against the user's bucket and aren't worth blocking. Either give them their own loose limit or skip them in your custom middleware.
 
 ## Going further

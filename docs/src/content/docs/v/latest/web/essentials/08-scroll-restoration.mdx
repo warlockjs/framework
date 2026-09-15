@@ -1,0 +1,31 @@
+---
+title: Scroll restoration
+slug: v/latest/web/essentials/scroll-restoration
+description: Scroll position on back/forward navigation is restored automatically.
+sidebar:
+  order: 8
+  label: Scroll restoration
+---
+
+Scroll restoration is new in `@warlock.js/web` 5.12 and requires no setup —
+there is no hook or component to opt in with.
+
+## What happens automatically
+
+- **A new navigation** (`<Link>`, `navigateTo()`, or any push-style
+  navigation) scrolls to the top of the page, or to the element matching the
+  URL's hash fragment when there is one.
+- **Back/forward navigation** restores the scroll position the page had when
+  the user left it.
+
+The position is keyed per history entry and persisted to `sessionStorage`, so
+it survives a full reload of the tab and is restored on the same entry when
+the user returns to it.
+
+## Nothing to configure
+
+There is no public API surface for this feature — it applies to every page
+automatically. If a page needs different scroll behavior for a specific
+interaction (for example, scrolling to a freshly-added item after a
+mutation), do that scrolling yourself in the component — this feature only
+governs the navigation-triggered restore.

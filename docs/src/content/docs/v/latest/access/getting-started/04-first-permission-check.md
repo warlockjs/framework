@@ -10,7 +10,7 @@ Two checks, one for each stage of the model.
 
 ## 1. Gate a route (class-level)
 
-Stack `gate` after `authMiddleware` — the auth middleware hydrates `request.user`, then the access middleware checks the grant:
+Stack `gate` after `authMiddleware` — the auth middleware hydrates `request.locals.user`, then the access middleware checks the grant:
 
 ```ts title="src/app/orders/routes.ts"
 import { authMiddleware } from "@warlock.js/auth";

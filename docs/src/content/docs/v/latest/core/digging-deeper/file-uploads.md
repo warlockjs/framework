@@ -82,8 +82,8 @@ export const createUploadController: RequestHandler<Request<UploadSchema>> = asy
     files.map((file) =>
       createUploadService({
         file,
-        organizationId: request.user?.organizationId!,
-        uploadedBy: request.user?.uuid,
+        organizationId: request.locals.user?.organizationId!,
+        uploadedBy: request.locals.user?.uuid,
       }),
     ),
   );

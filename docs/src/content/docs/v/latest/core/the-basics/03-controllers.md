@@ -60,7 +60,7 @@ The `Request` object exposes everything you need to pull data off the wire. The 
 | `request.input("key", default?)`   | one field from query, params, or body           | reading a single param/body field                            |
 | `request.all()`                    | full merged input map (query + body + params)   | passing the whole thing to a service                         |
 | `request.validated()`              | schema-typed object (only when schema attached) | controllers with validation — always preferred over `.all()` |
-| `request.user`                     | authenticated user (after `authMiddleware`)     | guarded routes                                               |
+| `request.locals.user`                     | authenticated user (after `authMiddleware`)     | guarded routes                                               |
 | `request.file("key")`              | `UploadedFile` instance                         | multipart uploads (single file)                              |
 | `request.files("key")`             | `UploadedFile[]`                                | multipart uploads (many files)                               |
 | `request.header("X-Foo")`          | header value                                    | reading request metadata                                     |
@@ -161,7 +161,7 @@ createProductController.validation = {
 };
 ```
 
-The controller's `RequestHandler<Request<CreateProductSchema>>` annotation types `request.validated()` straight off the schema. For routes behind `authMiddleware`, use `GuardedRequestHandler<CreateProductSchema>` (from `app/auth/types/guarded-request.type`) so `request.user` is also typed.
+The controller's `RequestHandler<Request<CreateProductSchema>>` annotation types `request.validated()` straight off the schema. For routes behind `authMiddleware`, use `GuardedRequestHandler<CreateProductSchema>` (from `app/auth/types/guarded-request.type`) so `request.locals.user` is also typed.
 
 `createProductController.validation = { schema }` is the wiring. The framework reads the property when registering the route. If validation fails, the framework returns a 400 with an `errors` payload and your handler **never runs**:
 

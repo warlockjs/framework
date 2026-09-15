@@ -22,7 +22,7 @@ sidebar:
 You're building a Warlock backend and you want any of:
 
 - Email-and-password login that returns a JWT pair.
-- A route gate that hydrates `request.user` from an `Authorization: Bearer ...` header.
+- A route gate that hydrates `request.locals.user` from an `Authorization: Bearer ...` header — or, since 5.12, from a named cookie (`authMiddleware([], "cookie:<name>")`), with an automatic CSRF Origin check on cookie-authenticated unsafe methods.
 - Refresh-token rotation with replay detection out of the box.
 - Separate login flows for end-users vs admins, on different tables, in the same app.
 - "Logout everywhere", active-session listing, or family-wide token revocation.
@@ -39,11 +39,11 @@ import { router, type RequestHandler } from "@warlock.js/core";
 
 // `authMiddleware([])` = a valid token is required; any user type passes.
 // Attach it via the route's `middleware` array (the third argument).
-// On success the middleware has already hydrated `request.user` for you.
+// On success the middleware has already hydrated `request.locals.user` for you.
 router.get(
   "/me",
   (({ request, response }) => {
-    const user = request.user!;
+    const user = request.locals.user!;
 
     return response.success({ id: user.id, email: user.get("email") });
   }) satisfies RequestHandler,
@@ -51,7 +51,7 @@ router.get(
 );
 ```
 
-No token on the request? The middleware short-circuits with `401` before your handler runs — so inside the handler `request.user` is always there. That's the core loop. The rest of these docs is everything around it: issuing the token in the first place, refreshing it, revoking it, and gating by user type.
+No token on the request? The middleware short-circuits with `401` before your handler runs — so inside the handler `request.locals.user` is always there. That's the core loop. The rest of these docs is everything around it: issuing the token in the first place, refreshing it, revoking it, and gating by user type.
 
 ## What it does NOT do
 

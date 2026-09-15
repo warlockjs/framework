@@ -213,7 +213,7 @@ Two things to notice:
 1. `request.validated()` returns the schema-typed object (`PublishProductSchema`). If the request fails validation, the controller never runs — Warlock returns a 400 with an `errors` payload before invoking the handler.
 2. `controller.validation = { schema }` is the wiring. The handler is a function; the schema is metadata on it. No decorators required.
 
-For routes behind `authMiddleware`, swap the annotation to `GuardedRequestHandler<PublishProductSchema>` (from `app/auth/types/guarded-request.type`) — `request.user` becomes typed in the body.
+For routes behind `authMiddleware`, swap the annotation to `GuardedRequestHandler<PublishProductSchema>` (from `app/auth/types/guarded-request.type`) — `request.locals.user` becomes typed in the body.
 
 ## What you've learned
 

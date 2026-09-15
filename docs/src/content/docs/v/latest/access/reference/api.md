@@ -50,7 +50,7 @@ Role assignment is **not** in the package — it lives on the ejected `UserRole`
 | `gateAny` | `(permissions[]) => Middleware` | passes on any |
 | `gateAll` | `(permissions[]) => Middleware` | passes on all |
 
-Stack these after `authMiddleware` (they read `request.user`).
+Stack these after `authMiddleware` (they read `request.locals.user`).
 
 ## Resolvers
 

@@ -15,7 +15,7 @@ This page is the complete surface, grouped by what you're trying to do. Reach fo
 A `Request` wraps one HTTP request for its full lifetime. It carries:
 
 - The **payload** — query string, route params, parsed body — already normalised into one merged map and individual buckets you can read.
-- A **handle to the user** (`request.user`) once `authMiddleware` has run.
+- A **handle to the user** (`request.locals.user`) once `authMiddleware` has run.
 - The **route** that matched and the **response** the controller will eventually use.
 - **Locale-aware translation** via `request.t(...)`.
 - An **identity dictionary** — `request.id`, `request.ip`, `request.userAgent`.
@@ -27,7 +27,7 @@ import type { RequestHandler } from "@warlock.js/core";
 
 export const listProductsController: RequestHandler = async ({ request, response }) => {
   const filters = request.all();
-  const userId = request.user.id;
+  const userId = request.locals.user.id;
 
   return response.success({ filters, userId });
 };
@@ -107,7 +107,7 @@ import { listFaqsService } from "../services/list-faqs.service";
 export const listFaqsController: RequestHandler = async ({ request, response }) => {
   const { data: faqs, pagination } = await listFaqsService({
     ...request.all(),
-    organization_id: request.user.organizationId,
+    organization_id: request.locals.user.organizationId,
   });
 
   return response.success({ faqs, pagination });
@@ -163,7 +163,7 @@ request.params; // route params only
 You can also mutate them (rare, but useful in middleware that needs to inject defaults):
 
 ```ts
-request.setBody("organization_id", request.user.organizationId);
+request.setBody("organization_id", request.locals.user.organizationId);
 request.setQuery("status", request.input("status", "active"));
 request.setParam("id", String(canonicalId));
 ```
@@ -179,7 +179,7 @@ if (!request.has("status")) {
   request.setDefault("status", "active");
 }
 
-request.set("audited_by", request.user.id);
+request.set("audited_by", request.locals.user.id);
 request.unset("password", "passwordConfirmation");
 ```
 
@@ -208,8 +208,8 @@ export const createUploadController: RequestHandler = async ({ request, response
     files.map((file) =>
       createUploadService({
         file,
-        organizationId: request.user?.organizationId!,
-        uploadedBy: request.user?.uuid,
+        organizationId: request.locals.user?.organizationId!,
+        uploadedBy: request.locals.user?.uuid,
       }),
     ),
   );
@@ -244,7 +244,7 @@ Helpers for "who is this request":
 
 | Property                       | Type                  | Note                                                       |
 | ------------------------------ | --------------------- | ---------------------------------------------------------- |
-| `request.user`                 | your user model       | populated by `authMiddleware`; `undefined` on guest routes |
+| `request.locals.user`                 | your user model       | populated by `authMiddleware`; `undefined` on guest routes |
 | `request.id`                   | `string`              | 32-char request id, regenerated per request                |
 | `request.ip`                   | `string`              | client IP (Fastify's parsed value)                         |
 | `request.realIp`               | `string`              | proxy-aware (`x-real-ip` → `x-forwarded-for` → `ip`)       |
@@ -259,15 +259,15 @@ Helpers for "who is this request":
 | `request.domain` / `.hostname` | `string`              | hostname (no `www.`)                                       |
 | `request.route`                | `Route`               | the matched route object                                   |
 
-`request.user` is only present after an auth middleware sets it. On guarded routes you can trust it; on public routes, you have to narrow:
+`request.locals.user` is only present after an auth middleware sets it. On guarded routes you can trust it; on public routes, you have to narrow:
 
 ```ts
-if (request.user) {
+if (request.locals.user) {
   // safe
 }
 ```
 
-Or use the `guarded()` helper from `src/app/shared/utils/router.ts` so every controller in the group can assume `request.user` is set:
+Or use the `guarded()` helper from `src/app/shared/utils/router.ts` so every controller in the group can assume `request.locals.user` is set:
 
 ```ts title="src/app/shared/utils/router.ts"
 import { authMiddleware } from "@warlock.js/auth";
@@ -280,7 +280,7 @@ export function guarded(callback: () => void) {
 
 ```ts
 guarded(() => {
-  router.get("/me", meController); // request.user is guaranteed
+  router.get("/me", meController); // request.locals.user is guaranteed
 });
 ```
 
@@ -291,7 +291,7 @@ The user model is your project's class — typically `User` from `src/app/users/
 Every request carries a locale-bound translator. Reach it via `request.t(...)` (alias of `request.trans(...)`):
 
 ```ts
-const message = request.t("welcome.greeting", { name: request.user.firstName });
+const message = request.t("welcome.greeting", { name: request.locals.user.firstName });
 ```
 
 The locale is resolved from (in order):
@@ -373,8 +373,8 @@ const data = request.validated();
 ### Reading user identity on a guarded route
 
 ```ts
-const userId = request.user.id;
-const orgId = request.user.organizationId;
+const userId = request.locals.user.id;
+const orgId = request.locals.user.organizationId;
 ```
 
 ### Mixing validated + extra
@@ -391,7 +391,7 @@ const result = await listService({ ...data, sort });
 ```ts
 const result = await listService({
   ...request.all(),
-  organization_id: request.user.organizationId,
+  organization_id: request.locals.user.organizationId,
 });
 ```
 
@@ -415,7 +415,7 @@ const id = request.idParam; // typed number
 
 - **Prefer `validated()` over `all()` whenever a schema is attached.** `validated()` is typed, validated, and reflects the schema's transforms (trimmed strings, coerced numbers). `all()` is `any` and skips validation entirely.
 - **`input()` returns `any`.** Cast or pipe it through validation if you need a strict type. Untyped inputs are how `undefined` slips into service calls.
-- **`request.user` is undefined on guest routes.** Always narrow before reading or use the `guarded()` group helper so every route inside the group has it.
+- **`request.locals.user` is undefined on guest routes.** Always narrow before reading or use the `guarded()` group helper so every route inside the group has it.
 - **Default values fire on missing keys, not empty values.** `request.input("name", "John")` returns `""` for an empty string body field, not `"John"`. Handle empty strings explicitly if they matter.
 - **`request.body` is the **parsed** body, not the raw one.** Don't `JSON.parse` it again — Fastify and the framework's parser already did. Use `all()` / `validated()` for normal field access.
 - **Path-param names must match the URL pattern.** `router.get("/:id", ...)` exposes `request.input("id")` and `request.idParam`. A typo in the controller (`request.input("Id")`) silently returns `undefined`.
