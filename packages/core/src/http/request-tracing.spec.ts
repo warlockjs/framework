@@ -1,5 +1,5 @@
 /**
- * Card 71622e4a — tracing phases wired into `Request`: "middleware" (one per
+ * Tracing phases wired into `Request`: "middleware" (one per
  * middleware) and "validation".
  *
  * No running Fastify server: a bare `Request`/`Response` pair plus a fake

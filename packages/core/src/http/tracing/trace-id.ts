@@ -1,5 +1,5 @@
 /**
- * W3C `traceparent` trace-id extraction (card 71622e4a, Lead decision §3).
+ * W3C `traceparent` trace-id extraction.
  *
  * Format: `version-traceid-parentid-flags`, e.g.
  * `00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01`. Only version
@@ -32,7 +32,7 @@ export function parseTraceparentTraceId(header: string | undefined): string | un
 
 /**
  * Resolve the trace id to carry for a request: the inbound `traceparent`'s
- * trace id when valid, otherwise `requestId` (per Lead decision §3).
+ * trace id when valid, otherwise `requestId`.
  */
 export function deriveTraceId(traceparentHeader: string | undefined, requestId: string): string {
   return parseTraceparentTraceId(traceparentHeader) ?? requestId;

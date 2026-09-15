@@ -1,10 +1,12 @@
 /**
- * Vendor-neutral request-tracing hook surface (card 71622e4a).
+ * Vendor-neutral request-tracing hook surface.
  *
  * `core` exposes this four-verb shape and stays framework-agnostic — no
- * `@opentelemetry/api` dependency here, ever, in or out of 5.12 (see
- * `releases/v5.12-tracing-design-note.md` §1). An OTel (or any other vendor)
- * bridge is a separate, optional package that subscribes to these hooks.
+ * `@opentelemetry/api` dependency here, ever. Introducing a hard OTel
+ * dependency in `core` would push it onto every consumer of the framework,
+ * including apps that use a different tracer or none. An OTel (or any other
+ * vendor) bridge is a separate, optional package that subscribes to these
+ * hooks instead.
  */
 
 /**
@@ -46,8 +48,7 @@ export type TracingRequestEndInfo = {
  * about phase spans need not implement `onRequestStart`/`onRequestEnd`.
  *
  * A throwing hook never breaks the request: the dispatcher catches it and
- * reports it once per hook per process to the error sink (canon 8d3c13a8),
- * then continues.
+ * reports it once per hook per process to the error sink, then continues.
  */
 export type TracingHooks = {
   onRequestStart?(ctx: TracingContext): void;

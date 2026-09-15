@@ -1,12 +1,11 @@
 /**
- * Tracing hook dispatch (card 71622e4a).
+ * Tracing hook dispatch.
  *
  * `http.tracing` is resolved once — lazily, on first read, then cached for
  * the life of the process — never per request. Every call site gates on
  * `isTracingEnabled()` BEFORE doing anything else (building a context
  * object, calling `performance.now()`), so a disabled app pays exactly one
  * boolean check per call site and never allocates the attrs/context payload.
- * See `releases/v5.12-tracing-design-note.md` §3.
  */
 import config from "@mongez/config";
 import { log } from "@warlock.js/logger";
@@ -97,9 +96,9 @@ function reportHookErrorOnce(hook: TracingHooks, verb: string, error: unknown): 
 
   reportedVerbs.add(verb);
 
-  // Never swallow the only copy of an error (65e476ee) — but a throwing hook
-  // must never break the request it was only meant to observe (canon
-  // 8d3c13a8), so this is reported, not re-thrown.
+  // Never swallow the only copy of an error — but a throwing hook must never
+  // break the request it was only meant to observe, so this is reported, not
+  // re-thrown.
   log.error("http", "tracing-hook", error, { hook: verb });
 }
 

@@ -27,7 +27,7 @@
  * at which level, when the run throws*. Injecting the sink and the clock makes
  * that assertable without a server, a socket or a fake timer.
  *
- * ## Tracing (card 71622e4a)
+ * ## Tracing
  *
  * This function is the single funnel for both the success and throw paths
  * (the try/catch below), and it already reads the settled status via
@@ -78,7 +78,7 @@ export type RequestLogDescriptor = {
    */
   statusCode(): number | undefined;
   /**
-   * The `Request` instance, when tracing needs it (card 71622e4a) to build
+   * The `Request` instance, when tracing needs it to build
    * the `TracingContext` for `onRequestStart` / `onRequestEnd`. Optional —
    * absent, tracing dispatch for this request is skipped, which is correct
    * for any non-HTTP caller of this same lifecycle wrapper.

@@ -1,5 +1,5 @@
 /**
- * Card 71622e4a — tracing hook dispatch.
+ * Tracing hook dispatch.
  *
  * These specs exercise `resolveTracingConfig`/`dispatch*` directly, the same
  * way `log-request-lifecycle.ts` is tested elsewhere via injected ports: no

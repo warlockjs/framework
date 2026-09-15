@@ -11,7 +11,7 @@ vi.mock("esbuild", () => ({
 }));
 
 /**
- * Card 07c4775f item 2 — `warlock build` must fail fast, with a clear
+ * `warlock build` must fail fast, with a clear
  * message, when esbuild's native binary was never linked (the state pnpm
  * leaves a project in when its build-script approval gate blocks esbuild's
  * postinstall), instead of letting esbuild's own cryptic error surface mid

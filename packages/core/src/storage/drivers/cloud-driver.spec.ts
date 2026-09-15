@@ -50,7 +50,7 @@ vi.mock("module", async (importOriginal) => {
 });
 
 /**
- * Card 07c4775f item 1 — when the S3 SDK is missing, the constructor's error
+ * When the S3 SDK is missing, the constructor's error
  * must lead with `warlock add s3` (the framework's own installer) and keep
  * the raw package names only as a secondary hint, instead of telling users
  * to run a raw `npm install` first.

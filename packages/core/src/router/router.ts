@@ -1068,7 +1068,7 @@ export class Router {
 
       response.request = request;
 
-      // "route.match" tracing phase (card 71622e4a §2.1): the pattern is
+      // "route.match" tracing phase: the pattern is
       // already known here (`route.path`), so this brackets the cost of
       // stamping the request/route onto the `Request` instance rather than
       // route-registry matching itself, which happens upstream of this

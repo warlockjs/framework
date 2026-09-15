@@ -1,5 +1,5 @@
 /**
- * Card 71622e4a — `logRequestLifecycle` is the single funnel for
+ * `logRequestLifecycle` is the single funnel for
  * `onRequestStart` / `onRequestEnd` (the "response.write" tracing phase),
  * on both the success and throw paths.
  */

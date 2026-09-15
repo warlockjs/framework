@@ -59,8 +59,7 @@ export function hashBody(body: unknown): string {
  * even installed — hence the untyped `unknown` read here rather than a
  * typed `RequestLocals["user"]` access.
  *
- * A local, narrow runtime read survives any augmentation shape (eed20184
- * step (b) — `implementation/2026-08-20-A2-request-locals.md` §6.2) — no
+ * A local, narrow runtime read survives any augmentation shape — no
  * `as any`.
  */
 function readUserId(user: unknown): string | number | undefined {

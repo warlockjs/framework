@@ -1,5 +1,5 @@
 /**
- * Card 71622e4a, Lead decision §3 — trace id derivation: a valid W3C
+ * Trace id derivation: a valid W3C
  * `traceparent` gives the trace id; otherwise fall back to `request.id`.
  */
 import { describe, expect, it } from "vitest";

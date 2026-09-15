@@ -219,7 +219,7 @@ export class Request<RequestValidation = any> {
   public id = Random.string(32);
 
   /**
-   * Trace id (card 71622e4a). The inbound `traceparent` header's trace id
+   * Trace id. The inbound `traceparent` header's trace id
    * when valid, otherwise `id`. Resolved once in `setRequest`, alongside
    * `id` itself — see `resolveTraceId`.
    */
@@ -287,7 +287,7 @@ export class Request<RequestValidation = any> {
   }
 
   /**
-   * Derive `traceId` (card 71622e4a, Lead decision §3): the inbound
+   * Derive `traceId`: the inbound
    * `traceparent` header's trace id when it is a valid W3C traceparent,
    * otherwise `id`. Always runs — unlike request-id inheritance this has no
    * `enabled: false` escape hatch, since `traceId` is only ever read when
@@ -845,7 +845,7 @@ export class Request<RequestValidation = any> {
     if (!handler.validation) return;
 
     // 👇🏻 check for validation using validateAll helper function — timed as
-    // the "validation" tracing phase (card 71622e4a §2.3) when tracing is
+    // the "validation" tracing phase when tracing is
     // enabled; a single boolean check and zero allocation otherwise.
     const tracingEnabled = isTracingEnabled();
     const validationStartedAt = tracingEnabled ? performance.now() : 0;

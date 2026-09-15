@@ -44,9 +44,8 @@ class RequestContext<User extends Model = Model> extends Context<RequestContextS
    * `unknown`, not the `User` generic above: that generic actually binds
    * `Request<User>`'s `RequestValidation` parameter (see
    * `RequestContextStore`), not "the user type" — there is no `Request`
-   * generic for the user today, so returning it as `User` was never sound
-   * (eed20184 step (b) inventory, `implementation/2026-08-20-A2-request-locals.md`
-   * §6.1). Callers that need a concrete model type — e.g.
+   * generic for the user today, so returning it as `User` was never sound.
+   * Callers that need a concrete model type — e.g.
    * `useCurrentUser<MyUserModel>()` — cast at the call site; the app owns
    * that shape via `@warlock.js/auth`'s `RequestUser` augmentation.
    */

@@ -55,8 +55,8 @@ export function formatErrorStack(stack: string): string {
       // formatting, it throws INSIDE error reporting — and what the developer
       // then sees is this function's failure instead of the error they were
       // actually chasing. An unreadable frame should degrade to a blank field,
-      // never take the report down with it (canon `8d3c13a8`: every fatal
-      // needs an unconditional floor).
+      // never take the report down with it — every fatal needs an
+      // unconditional floor.
       const fn = (withFn ? withFn[2] : "") ?? "";
       const file = (withFn ? withFn[3] : bare?.[2]) ?? "";
       const lineNo = (withFn ? withFn[4] : bare?.[3]) ?? "";

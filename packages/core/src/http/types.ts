@@ -414,7 +414,7 @@ export interface HttpConfigurations {
     except?: PartialMiddleware;
   };
   /**
-   * Opt-in request tracing hooks (card 71622e4a). OFF by default; resolved
+   * Opt-in request tracing hooks. OFF by default; resolved
    * once at boot, not per request — see `resolveTracingConfig` in
    * `./tracing/tracing-dispatcher.ts`.
    */
