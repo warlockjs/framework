@@ -60,7 +60,7 @@ describe("CloudDriver missing S3 SDK message (07c4775f/1)", () => {
     const { CloudDriver } = await import("./cloud-driver");
 
     class TestCloudDriver extends CloudDriver<CloudStorageDriverOptions> {
-      public readonly name = "test";
+      public readonly name = "s3";
 
       public url(location: string): string {
         return location;
