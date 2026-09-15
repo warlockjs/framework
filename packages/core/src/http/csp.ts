@@ -182,10 +182,18 @@ export function mergeCspDirectives(
     }
   }
 
+  // `merged["script-src"]` is always populated by the loop above —
+  // `DEFAULT_CSP_DIRECTIVES` (:59-67) declares a `script-src` entry, and every
+  // one of its keys is copied into `merged` unconditionally — but its type is
+  // `Record<string, string[]>`, so `noUncheckedIndexedAccess` still widens the
+  // read to `string[] | undefined`. Narrowed once, locally, rather than
+  // asserted away.
+  const scriptSrc = merged["script-src"] ?? [];
   const nonceSource = `'nonce-${nonce}'`;
-  if (!merged["script-src"].includes(nonceSource)) {
-    merged["script-src"] = [...merged["script-src"], nonceSource];
-  }
+
+  merged["script-src"] = scriptSrc.includes(nonceSource)
+    ? scriptSrc
+    : [...scriptSrc, nonceSource];
 
   return merged;
 }
