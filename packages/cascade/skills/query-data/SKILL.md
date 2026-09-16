@@ -1,6 +1,6 @@
 ---
 name: query-data
-description: 'Query records via the model — `.where(field, value)` / `.where(field, op, value)`, `.find(id)` / `.first` / `.all`, `.orderBy`, `.count` / `.exists`, plus `.whereIn` / `.whereBetween` / `.whereLike` / `.pluck` / `.firstOrFail` / scopes via `addScope`. Covers filter safety: `where()` rejects `$`-prefixed keys (`UnsafeFilterError`), `whereRaw()` string form rejects `$where`/`$function`/`$accumulator` (`UnsafeRawExpressionError`), and `whereLike`/`whereStartsWith`/`whereEndsWith`/`whereSearch` match string arguments literally (pass a `RegExp` for pattern semantics). Triggers: `.where`, `.find`, `.first`, `.firstOrFail`, `.all`, `.get`, `.orderBy`, `.exists`, `.whereIn`, `.whereBetween`, `.whereLike`, `.whereRaw`, `addScope`, `escapeRegex`, `likePatternToRegexSource`, `UnsafeFilterError`, `UnsafeRawExpressionError`; "filter by status", "find by id", "fetch active users", "check existence", "search box query", "is where() safe from injection"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: pagination — `@warlock.js/cascade/paginate-results/SKILL.md`; aggregates — `@warlock.js/cascade/aggregate-data/SKILL.md`.'
+description: 'Query records via the model — `.where(field, value)` / `.where(field, op, value)`, `.find(id)` / `.first` / `.all`, `.orderBy`, `.count` / `.exists`, `.lean()` plain-object reads, plus `.whereIn` / `.whereBetween` / `.whereLike` / `.pluck` / `.firstOrFail` / scopes via `addScope`. Covers filter safety: `where()` rejects `$`-prefixed keys (`UnsafeFilterError`), `whereRaw()` string form rejects `$where`/`$function`/`$accumulator` (`UnsafeRawExpressionError`), and `whereLike`/`whereStartsWith`/`whereEndsWith`/`whereSearch` match string arguments literally (pass a `RegExp` for pattern semantics). Triggers: `.where`, `.find`, `.first`, `.firstOrFail`, `.all`, `.get`, `.orderBy`, `.exists`, `.whereIn`, `.whereBetween`, `.whereLike`, `.whereRaw`, `.lean`, `UnsupportedLeanOperationError`, `addScope`, `escapeRegex`, `likePatternToRegexSource`, `UnsafeFilterError`, `UnsafeRawExpressionError`; "filter by status", "find by id", "fetch active users", "check existence", "search box query", "is where() safe from injection"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: pagination — `@warlock.js/cascade/paginate-results/SKILL.md`; aggregates — `@warlock.js/cascade/aggregate-data/SKILL.md`.'
 ---
 
 # Query data
@@ -103,6 +103,15 @@ const newest = await User
 `.orderBy(field, "asc" | "desc")` sorts. Default direction is `"asc"`. Chain multiple `.orderBy()` for tiebreakers.
 
 For pagination see [`@warlock.js/cascade/paginate-results/SKILL.md`](@warlock.js/cascade/paginate-results/SKILL.md).
+
+## Plain objects — `.lean()`
+
+```ts
+const rows = await User.query().where("status", "active").lean().orderBy("id").get();
+rows[0].name; // typed as UserSchema, not a User instance
+```
+
+`.lean()` (anywhere before the terminator) returns the rows as the driver sent them: no `User` instances, no driver casting (a date string stays a string, Mongo `_id` stays an `ObjectId`), no `onFetched` / model `fetched` event. Use it for read-only lists and exports. It still strips `static hidden` fields. `where` / `select` / `orderBy` / `limit` / `first` / `paginate` behave as usual. Adding `.with()` or `.joinWith()` throws `UnsupportedLeanOperationError`: load relations with a second lean query, or drop `.lean()`. About 1.9x faster than a hydrated read for 10k Mongo documents (one run on a busy machine).
 
 ## Count and existence
 

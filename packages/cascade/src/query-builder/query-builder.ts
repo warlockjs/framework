@@ -31,6 +31,7 @@ import type {
   GroupByInput,
   HavingInput,
   JoinOptions,
+  LeanDocument,
   LockForUpdateOptions,
   OrderDirection,
   RawExpression,
@@ -136,6 +137,13 @@ export class QueryBuilder<T = unknown> {
   public relationDefinitions?: Record<string, any>;
   /** The Model class reference, required for relation resolution. */
   public modelClass?: any;
+
+  // ════════════════════════════════════════════════════════
+  // READ MODE
+  // ════════════════════════════════════════════════════════
+
+  /** True once `lean()` was called — execution skips Model hydration. */
+  public isLean = false;
 
   // ════════════════════════════════════════════════════════
   // CORE INTERNALS
@@ -246,7 +254,22 @@ export class QueryBuilder<T = unknown> {
     cloned.countRelations = new Map(this.countRelations);
     cloned.relationDefinitions = this.relationDefinitions;
     cloned.modelClass = this.modelClass;
+    cloned.isLean = this.isLean;
     return cloned;
+  }
+
+  /**
+   * Switch to lean read mode: execution returns the plain driver rows — no
+   * Model hydration, no driver deserialization, no hydrating/fetched
+   * callbacks. The model's `static hidden` fields are still stripped.
+   * Eager-loading relations in lean mode throws `UnsupportedLeanOperationError`.
+   *
+   * @example
+   * const rows = await User.query().where("isActive", true).lean().get();
+   */
+  public lean(): QueryBuilder<LeanDocument<T>> {
+    this.isLean = true;
+    return this as unknown as QueryBuilder<LeanDocument<T>>;
   }
 
   // ════════════════════════════════════════════════════════

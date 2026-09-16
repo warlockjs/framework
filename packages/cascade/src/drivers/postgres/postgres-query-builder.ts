@@ -14,6 +14,7 @@ import type {
   CursorPaginationResult,
   DriverQuery,
   GroupByInput,
+  LeanDocument,
   PaginationOptions,
   PaginationResult,
   QueryBuilderContract,
@@ -24,6 +25,7 @@ import { dataSourceRegistry } from "../../data-source/data-source-registry";
 import { isAggregateExpression } from "../../expressions";
 import type { GlobalScopeDefinition } from "../../model/model";
 import { resolveModelClass, tryResolveModelClass, type ModelRef } from "../../model/register-model";
+import { assertLeanCompatible, stripHiddenFromLeanRecords } from "../../query-builder/lean-records";
 import { QueryBuilder, type Op } from "../../query-builder/query-builder";
 import {
   inferBelongsToForeignKey,
@@ -170,6 +172,18 @@ export class PostgresQueryBuilder<T = unknown>
   }
 
   // ──────────────────────────────────────────────────────────────
+  // READ MODE
+  // ──────────────────────────────────────────────────────────────
+
+  /**
+   * Switch to lean read mode — see `QueryBuilderContract.lean()`.
+   */
+  public override lean(): PostgresQueryBuilder<LeanDocument<T>> {
+    super.lean();
+    return this as unknown as PostgresQueryBuilder<LeanDocument<T>>;
+  }
+
+  // ──────────────────────────────────────────────────────────────
   // CLONE
   // ──────────────────────────────────────────────────────────────
 
@@ -186,6 +200,7 @@ export class PostgresQueryBuilder<T = unknown>
     cloned.countRelations = new Map(this.countRelations);
     cloned.relationDefinitions = this.relationDefinitions;
     cloned.modelClass = this.modelClass;
+    cloned.isLean = this.isLean;
 
     // Copy PG-specific state
     cloned.hydrateCallback = this.hydrateCallback;
@@ -687,6 +702,10 @@ export class PostgresQueryBuilder<T = unknown>
     this.applyCountRelations();
     this.applyGroupByAggregates();
 
+    if (this.isLean) {
+      assertLeanCompatible(this);
+    }
+
     if (this.fetchingCallback) {
       await this.fetchingCallback(this);
     }
@@ -701,6 +720,11 @@ export class PostgresQueryBuilder<T = unknown>
     try {
       const result = await this.driver.query<TResult>(query, bindings);
       let records = result.rows;
+
+      if (this.isLean) {
+        this.operations = [];
+        return stripHiddenFromLeanRecords(records, this.modelClass);
+      }
 
       const joinedData = this.extractJoinedRelationData(records);
 

@@ -185,6 +185,18 @@ export type DriverQuery = {
 };
 
 /**
+ * Row type of a query in lean read mode (`.lean()`).
+ *
+ * A Model result (anything carrying its row under `data`) becomes that plain
+ * schema shape; any other row type is left as it is.
+ *
+ * @example
+ * LeanDocument<User>                 // User's TSchema
+ * LeanDocument<{ id: number }>       // { id: number }
+ */
+export type LeanDocument<T> = T extends { data: infer TSchema } ? TSchema : T;
+
+/**
  * Contract that all query builders must implement for building queries in a
  * database-agnostic way. This interface provides a fluent, chainable API
  * for constructing complex database queries.
@@ -222,6 +234,27 @@ export interface QueryBuilderContract<T = unknown> {
    * @returns Unsubscribe function to remove the callback
    */
   onFetched(callback: (records: any[], context: any) => void | Promise<void>): () => void;
+
+  /**
+   * Switch this query to lean read mode: results are the plain objects the
+   * driver returned — no Model hydration, no driver deserialization/casting,
+   * no `onHydrating` / `onFetched` callbacks (so no model `fetched` event).
+   *
+   * The model's `static hidden` fields are still stripped from every row.
+   * Chainable anywhere before execution; `where` / `select` / `orderBy` /
+   * `limit` / pagination behave as usual. Eager-loading relations (`with`,
+   * `joinWith`) throws `UnsupportedLeanOperationError` at execution.
+   *
+   * @example
+   * const rows = await User.query().where("isActive", true).lean().get();
+   * rows[0].name; // plain schema field, not a User instance
+   */
+  lean(): QueryBuilderContract<LeanDocument<T>>;
+
+  /**
+   * Whether `lean()` was called on this builder.
+   */
+  isLean?: boolean;
 
   // ============================================================================
   // SCOPES

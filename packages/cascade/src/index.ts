@@ -21,6 +21,7 @@ export * from "./errors/missing-data-source.error";
 export * from "./errors/transaction-rollback.error";
 export * from "./errors/unsafe-filter.error";
 export * from "./errors/unsafe-raw-expression.error";
+export * from "./errors/unsupported-lean-operation.error";
 export * from "./errors/unsupported-update-operation.error";
 
 // Core Services

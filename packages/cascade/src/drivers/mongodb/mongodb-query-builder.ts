@@ -9,6 +9,7 @@ import type {
   GroupByInput,
   HavingInput,
   JoinOptions,
+  LeanDocument,
   OrderDirection,
   PaginationOptions,
   PaginationResult,
@@ -20,6 +21,7 @@ import type {
 } from "../../contracts";
 import { type DataSource } from "../../data-source/data-source";
 import { dataSourceRegistry } from "../../data-source/data-source-registry";
+import { assertLeanCompatible, stripHiddenFromLeanRecords } from "../../query-builder/lean-records";
 import { QueryBuilder } from "../../query-builder/query-builder";
 import { RelationLoader } from "../../relations/relation-loader";
 import { sanitizeFilter, sanitizeFilterValue } from "../../utils/sanitize-filter";
@@ -1795,6 +1797,10 @@ export class MongoQueryBuilder<T = unknown>
     cloned.fetchingCallback = this.fetchingCallback?.bind(cloned);
     cloned.hydratingCallback = this.hydratingCallback?.bind(cloned);
     cloned.fetchedCallback = this.fetchedCallback?.bind(cloned);
+    cloned.isLean = this.isLean;
+    // Lean rows are stripped of the model's hidden fields — a clone (e.g. the
+    // page query inside paginate()) must still know which model that is.
+    cloned.modelClass = this.modelClass;
 
     // Copy scope state
     cloned.pendingGlobalScopes = this.pendingGlobalScopes;
@@ -1804,6 +1810,14 @@ export class MongoQueryBuilder<T = unknown>
 
     (cloned as any).__operationsHelper = (this as any).__operationsHelper;
     return cloned;
+  }
+
+  /**
+   * Switch to lean read mode — see `QueryBuilderContract.lean()`.
+   */
+  public override lean(): MongoQueryBuilder<LeanDocument<T>> {
+    super.lean();
+    return this as unknown as MongoQueryBuilder<LeanDocument<T>>;
   }
 
   /**
@@ -1864,6 +1878,14 @@ export class MongoQueryBuilder<T = unknown>
     // Emit onFetching event
     if (this.fetchingCallback) {
       await this.fetchingCallback(this);
+    }
+
+    if (this.isLean) {
+      assertLeanCompatible(this);
+
+      const leanRecords = await this.execute<Output>();
+
+      return stripHiddenFromLeanRecords(leanRecords, this.modelClass);
     }
 
     // Execute query and get raw records

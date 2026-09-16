@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `trustedFilter: true` lets a code-authored conditional filter (`{ used: { $lt: 10 } }`) through the operator-injection check on these statics. Filters are still checked by default.
 - Postgres upsert runs as `INSERT … ON CONFLICT … DO UPDATE … RETURNING *`. The conflict target is the primary key or a unique index whose columns are all equality keys of the filter.
 - `UnsupportedUpdateOperationError` (`operation`, `driver`): what a driver throws when it cannot run part of an update.
+- `.lean()` on the query builder: `get` / `first` / `paginate` / `chunk` return plain objects typed as the model schema (`LeanDocument<T>`), with no Model hydration, no driver casting and no `fetched` event. `static hidden` fields are still removed. With `with()` / `joinWith()` it throws `UnsupportedLeanOperationError`. About 1.9x faster than a hydrated read for 10k MongoDB documents.
 
 ### Changed
 
