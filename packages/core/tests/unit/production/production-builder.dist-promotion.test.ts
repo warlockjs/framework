@@ -54,7 +54,15 @@ vi.mock("@warlock.js/fs", () => ({
   removeDirectoryAsync,
 }));
 
-vi.mock("esbuild", () => ({ default: { build: esbuildBuild } }));
+vi.mock("esbuild", () => ({
+  default: {
+    build: esbuildBuild,
+    // The build's esbuild-binary preflight calls this before bundling starts;
+    // a healthy no-op keeps this spec about dist promotion, not about
+    // exercising the preflight itself (see esbuild-preflight.spec.ts).
+    transformSync: () => ({ code: "" }),
+  },
+}));
 
 vi.mock("fast-glob", () => ({ default: vi.fn(async () => []) }));
 
