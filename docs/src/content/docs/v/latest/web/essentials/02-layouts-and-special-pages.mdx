@@ -37,6 +37,47 @@ export default function StoreLayout({ children }: LayoutProps) {
 }
 ```
 
+## Page middleware return values
+
+**Fixed in 5.12.** A layout or page `middleware` export runs as part of the
+same composed chain described above — outermost layout first, the page's own
+`middleware` last. What a middleware function returns decides what happens
+next:
+
+- **Returns nothing (`undefined`).** The chain continues to the next
+  middleware, then to validation and the loader — an ordinary pass-through
+  guard.
+- **Already wrote the real reply itself** — `response.redirect(...)`,
+  `response.forbidden(...)`, or any other call that reaches
+  `response.send()` — the client already has the real answer. Whatever the
+  function also `return`s is ignored; nothing re-renders on top of it.
+- **Returns a value with a status `>= 400` without writing the reply itself**
+  — for example `response.setStatusCode(403); return { error };` — renders
+  your `error.page.tsx` boundary with that status, with the returned value
+  attached to the error.
+- **Returns a value with a 2xx status without writing the reply itself** — a
+  plain `return { message }` (status stays at the default 200) — sends that
+  value as the response body, unchanged (JSON-stringified when it's an
+  object). A page middleware returning 2xx content **replaces the page**; no
+  loader or render runs.
+
+```tsx title="src/web/account/layout.tsx"
+export const middleware = [
+  ({ request, response }) => {
+    if (!request.locals.user) {
+      response.setStatusCode(403);
+      return { error: "Sign in required" }; // >= 400 → error.page.tsx boundary
+    }
+  },
+];
+```
+
+Before this fix, a middleware that returned a value without writing the reply
+itself produced a blank document at that status — the returned value was
+recorded but never used. Client navigations (data requests) were and are
+unaffected either way: their `{ html: "", status, ... }` contract doesn't
+change.
+
 ## The not-found page
 
 `404.page.tsx` is the application-owned not-found page. It has no browsable

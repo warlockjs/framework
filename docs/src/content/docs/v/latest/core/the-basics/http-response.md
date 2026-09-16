@@ -291,6 +291,52 @@ for await (const event of run.events) {
 
 See `@warlock.js/ai/skills/subskills/agent.md` for the agent's event surface.
 
+## Streaming React (`streamReact`)
+
+**New in 5.12.** `response.streamReact(pipeableStream)` pipes a React server
+stream — the `PipeableStream` returned by React's
+`renderToPipeableStream` — onto the raw response. It's the framework's Stage 1
+streaming SSR seam: `@warlock.js/web` uses it exclusively to stream a page
+document, and it never touches the raw response itself.
+
+Reach for it when you're writing a **custom, non-page route** (an API
+controller, not a `.page.tsx` file) that needs to stream a React tree instead
+of buffering a full HTML string first — a hand-rolled SSR endpoint outside the
+`web` page pipeline.
+
+```tsx
+import { renderToPipeableStream } from "react-dom/server";
+import type { PipeableReactStream, RequestHandler } from "@warlock.js/core";
+import { Widget } from "./widget";
+
+export const renderWidget: RequestHandler = async ({ response }) => {
+  const pipeableStream = await new Promise<PipeableReactStream>((resolve, reject) => {
+    const stream = renderToPipeableStream(<Widget />, {
+      onShellReady: () => resolve(stream),
+      onShellError: reject,
+    });
+  });
+
+  response.header("Content-Type", "text/html");
+
+  await response.streamReact(pipeableStream);
+};
+```
+
+Two guarantees:
+
+- **Status and headers are written before the first byte.** `streamReact`
+  calls the raw response's `writeHead(statusCode, headers)` with whatever
+  status and headers were already committed on `response` before piping
+  starts — decide those first, then call `streamReact`.
+- **A client disconnect aborts the render.** If the connection closes before
+  the stream finishes, the underlying React stream's `abort()` is called, so a
+  dropped connection doesn't leave the render running to completion for
+  nobody.
+
+`streamReact` returns a `Promise<void>` that resolves once the response has
+finished sending, and rejects if the raw response errors while writing.
+
 ## Cookies
 
 ```ts
