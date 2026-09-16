@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Renaming or moving a file under `warlock dev` no longer prints a false `ENOENT` failure before the route is rewired.
+- `warlock routes --json` now prints only JSON on stdout. The `› Running <command>...` header moved to stderr, like the completion banner.
 - Production build contribution hooks (`generate` / `emit`) saw `outFile`, `entryPath`, `singleBundle`, `esmShim` and `banner` as `undefined`, because bundling deleted them from the shared build options. The bundler now works on its own copy.
 
 ### Changed

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   displayCommandError,
   displayCommandSuccess,
+  displayExecutingCommand,
 } from "../../../src/cli/cli-commands.utils";
 
 /**
@@ -52,10 +53,19 @@ describe("command banners never contaminate stdout, because stdout is where a ma
     expect(stderr.join("\n")).toContain("boom");
   });
 
-  it("leaves a JSON payload on stdout parseable after a banner is printed alongside it", () => {
-    // The exact interleaving `warlock routes --json` produces: the command
-    // writes its payload to stdout, the manager writes the banner afterwards.
-    // Parsing stdout must not see the banner at all.
+  it("writes the running header to stderr and NOTHING to stdout", () => {
+    displayExecutingCommand("routes");
+
+    expect(stdout).toEqual([]);
+    expect(stderr.join("\n")).toContain("Running");
+    expect(stderr.join("\n")).toContain("routes");
+  });
+
+  it("leaves a JSON payload on stdout parseable after banners are printed around it", () => {
+    // The exact interleaving `warlock routes --json` produces: the manager
+    // prints the running header, the command writes its payload to stdout, the
+    // manager writes the completion banner. Parsing stdout must see neither.
+    displayExecutingCommand("routes");
     console.log(JSON.stringify([{ method: "GET", path: "/" }]));
     displayCommandSuccess("routes", 12);
 

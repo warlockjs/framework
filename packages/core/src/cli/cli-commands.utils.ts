@@ -128,11 +128,15 @@ export function displayMissingReadinessNotice(waitedMs: number) {
 }
 
 /**
- * Display command execution header
+ * Display command execution header.
+ *
+ * On stderr for the same reason as {@link displayCommandSuccess}: it prints
+ * before every command, so on stdout it prefixed `warlock routes --json` with
+ * `› Running routes...` and the payload no longer parsed.
  */
 export function displayExecutingCommand(commandName: string) {
-  console.log(`  ${colors.cyan("›")} Running ${colors.bold(colors.white(commandName))}...`);
-  console.log();
+  console.error(`  ${colors.cyan("›")} Running ${colors.bold(colors.white(commandName))}...`);
+  console.error();
 }
 
 /**

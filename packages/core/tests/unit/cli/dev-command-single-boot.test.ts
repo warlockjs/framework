@@ -77,9 +77,13 @@ describe("`warlock dev` — the header prints once per invocation, not once per 
 
   beforeEach(() => {
     logged = [];
-    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+    // The header is status chrome and goes to stderr; capture both streams so
+    // the count asserts what a person in the terminal sees.
+    const capture = (...args: unknown[]) => {
       logged.push(args.join(" "));
-    });
+    };
+    vi.spyOn(console, "log").mockImplementation(capture);
+    vi.spyOn(console, "error").mockImplementation(capture);
   });
 
   afterEach(() => {
