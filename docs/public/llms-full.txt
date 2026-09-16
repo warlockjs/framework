@@ -242,7 +242,7 @@ See the [Registering a connector](#registering-a-connector) section above for th
 
 - **Set `this.active = true` only on success.** If `start()` throws partway, leaving `active` true means `shutdown()` thinks it has work to do and may double-close half-initialized resources.
 - **`shutdown()` must be idempotent.** SIGINT can fire twice on Windows. The manager guards re-entry with its own flag, but individual connectors get called once per shutdown loop — guard with `if (!this.active) return`.
-- **Don't reach across connector boundaries in `start()`.** The manager's `start()` loop runs all `boot()`s first, then all `start()`s — wiring across connectors goes through the `container` (`container.get("http.server")`), not through imports.
+- **Don't reach across connector boundaries in `start()`.** The manager's `start()` loop runs all `boot()`s first, then all `start()`s — wiring across connectors goes through the `container`, not through imports. Use `container.tryGet("http.server")` when the other connector is genuinely optional (e.g. socket falls back to its own raw server when HTTP isn't configured); use `container.get("http.server")` when its absence would be a bug — it throws a named `ContainerKeyMissingError` instead of handing back `undefined`.
 - **Production build still needs config registration.** Placing the connector under `src/connectors/<name>.ts` does not auto-register it. Put the same instance in `warlock.config.ts > connectors`; that array is what build-time contribution discovery and runtime boot share.
 - **`watchedFiles` is restart-trigger, not dependency.** It says "I want to restart when this file changes." It does *not* mean the framework reloads that file first — that's the file orchestrator's job.
 
@@ -760,8 +760,8 @@ class OrdersRestful extends Restful<Order> {
   protected recordName = "order";
 
   protected async beforeCreate(request, response, order) {
-    order.set("organization_id", request.user.organizationId);
-    order.set("created_by", request.user.id);
+    order.set("organization_id", request.locals.user.organizationId);
+    order.set("created_by", request.locals.user.id);
   }
 }
 
@@ -1032,10 +1032,41 @@ const httpConfigurations: HttpConfigurations = {
       path: "/",
     },
   },
+  csp: {
+    enabled: true,
+    directives: {
+      "img-src": ["'self'", "data:", "https://cdn.example.com"],
+    },
+  },
 };
 
 export default httpConfigurations;
 ```
+
+### `csp` — Content-Security-Policy (5.12.0)
+
+Opt-in (`enabled: true`) `Content-Security-Policy` header, built per-request
+from a documented default policy plus your `directives`, with the
+framework's own per-request nonce always added to `script-src`:
+
+```
+default-src 'self'; script-src 'self' 'nonce-<request nonce>'; style-src 'self';
+img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'
+```
+
+A directive you name under `directives` **replaces** the default list for
+that directive (never merged element-wise) — declare the full value list you
+want. Set `reportOnly: true` to emit `Content-Security-Policy-Report-Only`
+instead while you observe violations without blocking anything. Absent or
+`enabled: false` (the default) emits no header at all — no behaviour change
+for apps that don't opt in.
+
+A malformed directive value (containing `;`, or with an unbalanced `'`
+count) throws `InvalidCspDirectiveError` at boot, not silently — fix the
+value in `src/config/http.ts` rather than expecting the framework to repair
+it. See [`send-response/SKILL.md`](../send-response/SKILL.md) for how the
+header lands on the response, and `@warlock.js/web`'s docs for how the
+same nonce reaches the page's `<script>` tags.
 
 ## Which layer holds what
 
@@ -1253,7 +1284,7 @@ Scaffold with: `npx warlock generate.controller <module>/<action>` (add `--with-
 | `request.input("key", default?)`  | one field                                        | reading a single param/body field by name           |
 | `request.all()`                   | full input object                                | passing the whole input straight to a service       |
 | `request.validated()`             | schema-typed object (only after schema attached) | controllers with a schema — preferred over `.all()` |
-| `request.user`                    | authenticated user                               | guarded routes (see "Typing a guarded handler")     |
+| `request.locals.user`             | authenticated user                               | guarded routes (see "Typing a guarded handler")     |
 | `request.file("key")`             | `UploadedFile`                                   | multipart uploads                                   |
 | `request.header("X-Foo")`         | header value                                     | reading request metadata                            |
 | `request.ip`, `request.userAgent` | strings                                          | logging, device info                                |
@@ -1309,7 +1340,7 @@ If validation fails, the framework returns a 400 with an `errors` payload and yo
 
 ### Typing a guarded handler
 
-Routes behind `authMiddleware` need `request.user` typed. Project conventions add a `GuardedRequest<TSchema>` (adding `user: User`) and a paired `GuardedRequestHandler<TSchema>` alias in `app/auth/requests/guarded.request`:
+Routes behind `authMiddleware` need `request.locals.user` typed. Project conventions add a `GuardedRequest<TSchema>` (overriding `locals` to `RequestLocals & { user: User }`) and a paired `GuardedRequestHandler<TSchema>` alias in `app/auth/requests/guarded.request`:
 
 ```ts
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
@@ -1319,7 +1350,7 @@ export const createProductController: GuardedRequestHandler<CreateProductSchema>
   request,
   response,
 }) => {
-  // request.user is typed
+  // request.locals.user is typed
   const product = await createProductService(request.validated());
   return response.successCreate({ product });
 };
@@ -1368,7 +1399,7 @@ import { listProductsService } from "../services/list-products.service";
 export const listProductsController: RequestHandler = async ({ request, response }) => {
   const { data: products, pagination } = await listProductsService({
     ...request.all(),
-    organization_id: request.user.organizationId,
+    organization_id: request.locals.user.organizationId,
   });
 
   return response.success({ products, pagination });
@@ -2995,6 +3026,218 @@ Reusing one key for different result types is a caller bug: TypeScript cannot co
 - [`create-controller/SKILL.md`](../create-controller/SKILL.md) — consuming request-scoped values from controllers.
 
 
+## request-tracing  `@warlock.js/core/request-tracing/SKILL.md`
+
+---
+name: request-tracing
+description: 'Vendor-neutral request tracing hooks (`http.tracing`) — observe request start/end and named phase spans (`route.match`, `middleware`, `validation`, `handler`, `response.write`) without adopting an OTel/vendor dependency in `core`. Covers the `TracingHooks` shape, trace id derivation from an inbound W3C `traceparent` vs `request.id`, that a throwing hook is caught and reported once (never breaks the request), and zero overhead when disabled. Triggers: `http.tracing`, `TracingHooks`, `onRequestStart`, `onRequestEnd`, `onPhase`, `traceparent`, `traceId`, `dispatchPhase`, "instrument requests", "trace a request", "slow phase logging", "APM / OTel bridge for Warlock". Skip: request-id header echo/inheritance (`X-Request-Id`) — `@warlock.js/core/use-middleware/SKILL.md`; app-level structured logging — `@warlock.js/logger/logger-basics/SKILL.md`; competing libs `@opentelemetry/api` direct instrumentation, `express-request-id`, hand-rolled `X-Trace-Id` middleware.'
+---
+
+# Warlock — request tracing hooks
+
+`http.tracing` gives every request a set of named phase spans and start/end
+events, delivered to plain callbacks you register in config — no
+`@opentelemetry/api` dependency in `core`, in this release or later (an OTel
+bridge is a separate, optional package that subscribes to these hooks; it
+does not exist yet). OFF by default, and a disabled app pays exactly one
+cached boolean check per call site — no context object is built, no
+`performance.now()` is called, nothing is allocated.
+
+## Enabling it
+
+```ts
+// src/config/http.ts
+export default {
+  tracing: {
+    enabled: true, // default false
+    hooks: [
+      {
+        onRequestStart(ctx) {
+          /* ctx: { traceId, requestId, method, route, path } */
+        },
+        onPhase(ctx, phase) {
+          /* phase: { name, durationMs, attrs? } */
+        },
+        onRequestEnd(ctx, result) {
+          /* result: { status?, durationMs, error? } */
+        },
+      },
+    ],
+  },
+};
+```
+
+`enabled` is resolved once at first read and cached for the process — flipping
+it requires a restart, the same trade-off as `http.maintenance.enabled` and
+`http.requestId.enabled`.
+
+## The `TracingHooks` shape
+
+```ts
+type TracingContext = {
+  traceId: string; // see "Trace id derivation" below
+  requestId: string; // request.id
+  method: string;
+  route?: string; // matched pattern, e.g. "/users/:id" — undefined before routing
+  path: string;
+};
+
+type TracingPhaseInfo = {
+  name: string;
+  durationMs: number;
+  attrs?: Record<string, unknown>;
+};
+
+type TracingRequestEndInfo = {
+  status?: number;
+  durationMs: number;
+  error?: unknown;
+};
+
+type TracingHooks = {
+  onRequestStart?(ctx: TracingContext): void;
+  onRequestEnd?(ctx: TracingContext, result: TracingRequestEndInfo): void;
+  onPhase?(ctx: TracingContext, phase: TracingPhaseInfo): void;
+};
+```
+
+Every verb is optional — a hook that only wants phase spans need not implement
+`onRequestStart`/`onRequestEnd`. Register as many hooks as you like via
+`hooks: TracingHooks[]`; each fires independently.
+
+## Phase names
+
+`core` wires five phases into the request lifecycle, in this order, for every
+HTTP request:
+
+| Phase | Fires around |
+| --- | --- |
+| `route.match` | Resolving the incoming path/method to a registered route |
+| `middleware` | Each middleware in the route's chain — one `onPhase` call per middleware, with `attrs: { name, index }` |
+| `validation` | The route's input validation (`v.object(...)` / RESTful resource validation) |
+| `handler` | The route handler itself |
+| `response.write` | The overall request span, closed once the response has settled (success or thrown error) — this is also where `onRequestEnd` fires |
+
+`@warlock.js/web` page requests report through this same `onPhase` surface
+instead of adding a separate hook API. They add three phases:
+
+| Phase | Fires around |
+| --- | --- |
+| `loader` | Each loader level, once per app/layout/page, with `attrs: { level, layoutPath? }` |
+| `render.shell` | Time from render start until React's shell is ready to stream |
+| `stream.end` | The whole streamed response, including every `defer()` value settling |
+
+## Trace id derivation
+
+`ctx.traceId` is derived once per request:
+
+1. If the inbound `traceparent` header is a valid W3C version-`00` header
+   (`00-<32 hex>-<16 hex>-<2 hex>`, trace id not all-zero), `traceId` is that
+   header's trace id — so a request already inside someone else's distributed
+   trace keeps the same id through Warlock.
+2. Otherwise `traceId` falls back to `request.id` (the framework's own
+   per-request correlation id — see
+   [`use-middleware/SKILL.md`](../use-middleware/SKILL.md#request-id-correlation)
+   for how that id is generated/inherited/echoed).
+
+`ctx.requestId` is always `request.id`, regardless of which branch produced
+`traceId` — so a hook can always join back to the same id the framework logs
+and echoes on `X-Request-Id`, even when `traceId` came from an inbound header.
+
+```ts
+import { deriveTraceId, parseTraceparentTraceId } from "@warlock.js/core";
+
+parseTraceparentTraceId("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01");
+// -> "4bf92f3577b34da6a3ce929d0e0e4736"
+
+deriveTraceId(undefined, "req-abc123");
+// -> "req-abc123" (no traceparent, falls back to requestId)
+```
+
+## Response header: no new one
+
+Tracing does **not** add a response header of its own. `core` already echoes
+`request.id` back as `X-Request-Id` on every response (see
+[`use-middleware/SKILL.md`](../use-middleware/SKILL.md#request-id-correlation)) —
+apps correlate through that existing header. When a valid inbound
+`traceparent` is present, `ctx.traceId` inside your hooks carries that trace
+id even though the response header still reflects `request.id`; if you need
+the resolved `traceId` on the wire (e.g. to hand back to a caller that sent
+`traceparent`), read it from your own `onRequestStart`/`onPhase` hook and set
+it yourself — `core` deliberately doesn't duplicate it into a second header.
+
+## A throwing hook never breaks a request
+
+Every hook call is wrapped: if a hook throws, the dispatcher catches it,
+reports it once per `(hook, verb)` pair per process to the error sink, and
+continues with the next hook. A hook that throws on every request does not
+flood your logs and never turns an observability bug into a 500 for real
+traffic.
+
+## Zero overhead when disabled
+
+`http.tracing.enabled` is resolved once (lazily, on first read) and cached —
+never re-read per request. Every instrumented call site checks that cached
+boolean **before** building a context object or calling `performance.now()`,
+so a disabled app pays exactly one boolean check per phase and allocates
+nothing extra. Don't wrap `dispatchPhase`/`buildTracingContext` calls in your
+own extra guard — the check is already there.
+
+## Example: log phases slower than a threshold
+
+```ts
+// src/config/http.ts
+import { log } from "@warlock.js/logger";
+
+const SLOW_MS = 200;
+
+export default {
+  tracing: {
+    enabled: env("TRACING_ENABLED") === "true",
+    hooks: [
+      {
+        onPhase(ctx, phase) {
+          if (phase.durationMs < SLOW_MS) return;
+
+          log.warn("http", "slow-phase", {
+            traceId: ctx.traceId,
+            requestId: ctx.requestId,
+            route: ctx.route,
+            phase: phase.name,
+            durationMs: phase.durationMs,
+            attrs: phase.attrs,
+          });
+        },
+      },
+    ],
+  },
+};
+```
+
+## Gotchas
+
+- **No OTel dependency, and none planned for `core`.** An OTel (or other
+  vendor) bridge is a separate, optional package that subscribes to these
+  hooks — never add `@opentelemetry/api` to `core` itself.
+- **`web`'s phases aren't live yet.** Don't register a hook expecting
+  `loader`/`render.shell`/`stream.end` calls today; only the five `core`
+  phases fire in this release.
+- **`route` is `undefined` until routing has matched.** There's no path where
+  a hook fires before that, but code branching on `ctx.route` for an
+  early-failing request (e.g. a 404 with no match) must handle `undefined`.
+- **`traceId` is not a second correlation id to store separately by default.**
+  It equals `requestId` unless the caller sent a valid `traceparent` — don't
+  assume it's always a 32-hex OTel-shaped value.
+- **Toggling `enabled` needs a restart.** It's resolved once per process, the
+  same trade-off as `http.maintenance.enabled`.
+
+## See also
+
+- [`use-middleware/SKILL.md`](../use-middleware/SKILL.md#request-id-correlation) — `X-Request-Id` inheritance/echo, the header tracing correlates through.
+- [`use-app-context/SKILL.md`](../use-app-context/SKILL.md) — request-scoped ALS context (`request`/`response`) tracing hooks run inside.
+- [`@warlock.js/logger/logger-basics/SKILL.md`](../../../logger/skills/logger-basics/SKILL.md) — structured logging; tracing hooks are the place to bridge phase timing into your log channel.
+
+
 ## resolve-path  `@warlock.js/core/resolve-path/SKILL.md`
 
 ---
@@ -4346,6 +4589,22 @@ These are the flags whose absence never fails a test and is fatal in production:
 
 These mutate the response in place; chain or call before the final `return response.<helper>()`.
 
+### `Content-Security-Policy` (5.12.0)
+
+Opt in via `http.csp.enabled` in `src/config/http.ts` (see
+[`configure-app/SKILL.md`](../configure-app/SKILL.md) for the full shape).
+When enabled, every response through the shared request funnel
+(`http/middleware/inject-request-context.ts`, the same seam that stamps
+`X-Request-Id`) gets a `Content-Security-Policy` header — `-Report-Only`
+instead when `reportOnly: true` — built from the framework's default policy
+merged with your `directives`, with the current request's CSP nonce always
+appended to `script-src`. It is a no-op, and adds no header, while `http.csp`
+is unset — every existing app is unaffected until it opts in.
+
+A route can still override it — call `response.header("Content-Security-Policy", ...)`
+from a controller or middleware that runs after the funnel, and your value
+wins, same as any other header.
+
 ## Common patterns
 
 ### Localized error
@@ -4777,7 +5036,7 @@ export const uploadAvatarController: GuardedRequestHandler = async ({ request, r
     return response.badRequest({ error: "missing file" });
   }
 
-  const file = await storage.put(upload, `avatars/${request.user.id}/${upload.name}`);
+  const file = await storage.put(upload, `avatars/${request.locals.user.id}/${upload.name}`);
 
   return response.successCreate({ url: file.url, hash: file.hash });
 };
@@ -5720,7 +5979,7 @@ export const uploadAvatarController: GuardedRequestHandler<UploadAvatarSchema> =
     .resize(400, 400)
     .format("webp")
     .quality(85)
-    .save(`avatars/${request.user.id}`);
+    .save(`avatars/${request.locals.user.id}`);
 
   return response.successCreate({ path: file.path, url: file.url });
 };
@@ -5938,7 +6197,7 @@ export const createUploadController: RequestHandler = async ({ request, response
 
   const saved = await Promise.all(
     files.map((file) =>
-      file.save(`uploads/${request.user.organizationId}`, {
+      file.save(`uploads/${request.locals.user.organizationId}`, {
         prefix: { as: "directory", format: "DD-MM-YYYY" },
       }),
     ),
@@ -6179,7 +6438,7 @@ app.router      // the Router singleton
 app.database    // Cascade's DataSource
 ```
 
-Each property is a getter backed by the framework's DI container (`container.get("http.server")` etc.). The container is populated by connectors during their `boot()`/`start()` phase — read these accessors only after the relevant connector has run. Every getter is a thin `container.get(...)`, so before the connector boots it returns `undefined` (it does **not** throw); chaining off an `undefined` accessor is what blows up. `http` and `socket` are *late*-phase connectors — they boot **after** app code is imported, so these accessors are not populated at the top level of a module's `main.ts`. From inside controllers, services, use-cases, or any code that runs while a request is in flight, every accessor is safe.
+Each property is a getter backed by the framework's DI container (`container.tryGet("http.server")` etc. — `router` uses `container.get(...)`, which throws instead, since it is never legitimately absent). The container is populated by connectors during their `boot()`/`start()` phase — read these accessors only after the relevant connector has run. `http`, `socket`, and `database` are thin `container.tryGet(...)` reads, so before the connector boots they return `undefined` (they do **not** throw); chaining off an `undefined` accessor is what blows up. `http` and `socket` are *late*-phase connectors — they boot **after** app code is imported, so these accessors are not populated at the top level of a module's `main.ts`. From inside controllers, services, use-cases, or any code that runs while a request is in flight, every accessor is safe.
 
 Typical uses (note: from runtime code, after bootstrap — not at module-import time):
 
@@ -6286,7 +6545,7 @@ cors: {
 
 - **`version` is `null` until the first `await`.** The version loader is async (it reads `package.json`). On a cold start before any framework code has run `getWarlockVersion()`, `Application.version` returns `null`. The framework does load it during bootstrap, so anywhere downstream of bootstrap is fine — controllers, services, connectors after `start()`. CLI commands without `preload.bootstrap` may see `null`.
 - **`Application` is static, not a DI registration.** Don't try to inject it. There's nothing to inject — it's a class with only static members.
-- **`app.*` accessors return `undefined` before their connector boots — they don't throw.** `app.socket` / `app.database` / `app.http` are populated by their respective connectors during boot; until then each getter returns `undefined` (a bare `container.get(...)`). Reading them earlier (eager module-load code, the top level of a `main.ts` for the late-phase `http`/`socket`, certain CLI commands without the right `preload.connectors`) hands you `undefined`, and chaining off it throws. Safe everywhere downstream of bootstrap — including inside `Application.onceBooted(...)`.
+- **`app.*` accessors return `undefined` before their connector boots — they don't throw.** `app.socket` / `app.database` / `app.http` are populated by their respective connectors during boot; until then each getter returns `undefined` (a bare `container.tryGet(...)`). Reading them earlier (eager module-load code, the top level of a `main.ts` for the late-phase `http`/`socket`, certain CLI commands without the right `preload.connectors`) hands you `undefined`, and chaining off it throws. Safe everywhere downstream of bootstrap — including inside `Application.onceBooted(...)`. `app.router` is the exception: it reads via `container.get(...)`, which throws a named `ContainerKeyMissingError` instead of handing back `undefined`, because the router is never a legitimate absence.
 - **`onceBooted` is a latch, not `events.on`.** A callback registered *after* boot completed still runs (next microtask) instead of silently missing the signal — so register it wherever it reads best, including module top-level in `main.ts`. A listener that throws is caught and logged; it can't break boot or the other listeners.
 - **`onShutdown` runs before connectors close, not after.** That ordering is deliberate so cleanup can still use db/cache/http — but it means a hook that hangs delays connector teardown (bounded only by your process manager's kill timeout). Keep teardown fast; for HTTP draining the framework already bounds it via `http.gracefulShutdown.timeout`.
 
@@ -6660,7 +6919,7 @@ router.post("/ai/summarize", summarizeController, {
 
 ## `idempotency` — must run after auth
 
-The cache key is `idem:{userType}:{userId|ip}:{key}` so user A can't replay user B's key. That requires `request.user` to be populated, so order it **after** `authMiddleware`:
+The cache key is `idem:{userType}:{userId|ip}:{key}` so user A can't replay user B's key. That requires `request.locals.user` to be populated, so order it **after** `authMiddleware`:
 
 ```ts
 import { authMiddleware } from "@warlock.js/auth";
@@ -6836,7 +7095,7 @@ export default {
 ## Gotchas
 
 - **Bare factory names are not exported.** Always reach for them via `middleware` (`middleware.rateLimit`, not `rateLimitMiddleware`). The internal `*Middleware`-suffixed names are an in-package code-organization detail.
-- **Idempotency must run after auth.** The cache key includes `request.user` for scope-isolation. Putting it before auth silently falls back to IP-scope for every request.
+- **Idempotency must run after auth.** The cache key includes `request.locals.user` for scope-isolation. Putting it before auth silently falls back to IP-scope for every request.
 - **In-process counters lose state on restart.** `middleware.rateLimit` and `middleware.concurrencyLimit` use module-scoped `Map`s. A redeploy resets every window/counter. For globally-shared limits, use `@fastify/rate-limit` with a Redis store.
 - **Idempotency clients must reuse the key across retries.** If your client generates a new UUID on every attempt, idempotency is a no-op. Generate once at "intent" time.
 - **`ipFilter` fail-closed.** Empty / unparseable IP = denied. Internal callers (Unix sockets, local processes) need explicit allowlisting.
@@ -7361,7 +7620,7 @@ import { listFaqsService } from "../services/list-faqs.service";
 export const listFaqsController: GuardedRequestHandler = async ({ request, response }) => {
   const { data, pagination } = await listFaqsService({
     ...request.all(),
-    organization_id: request.user.organizationId,
+    organization_id: request.locals.user.organizationId,
   });
 
   return response.success({ data, pagination });
@@ -7663,7 +7922,7 @@ Writing `request.locals.organization` does not affect `request.all()`, `request.
 - Use `request.locals` for per-request data written by middleware and read downstream.
 - Use `requestMemo(key, fn)` for lazily computed, single-flight work scoped to the active request.
 - Augment `Request` itself only for a genuine new typed member that also has a runtime implementation.
-- Augment `RequestUser` for the authenticated `request.user` shape; do not duplicate it under locals merely to work around typing.
+- The authenticated user itself already lives at `request.locals.user` — `@warlock.js/auth` augments `RequestLocals` with a `user?: RequestUser` key and its middleware writes it. Core's own `request.user` was removed in 5.12.0; do not re-add a separate `user` local outside that key.
 
 ## Gotchas
 
@@ -8477,7 +8736,7 @@ const socketOptions: SocketOptions = {
 Two ways to get the `socket.io` `Server` instance:
 
 ```ts
-// 1. Via the app runtime accessor — reads container.get("socket")
+// 1. Via the app runtime accessor — reads container.tryGet("socket")
 import { app } from "@warlock.js/core";
 
 const io = app.socket;            // → Server, or undefined before the socket connector boots
@@ -8488,7 +8747,7 @@ import { getSocketServer } from "@warlock.js/core";
 const io = getSocketServer();     // → Server | null
 ```
 
-Both read the same DI container slot. `app.socket` is a getter that returns `container.get("socket")` — that's `undefined` (it does **not** throw) until the socket connector has booted. `getSocketServer()` checks `container.has("socket")` and returns `null` if absent. Prefer `getSocketServer()` plus a null-guard at any call site that *might* run before the connector boots (module-load code, `main.ts` top level, scripts that skip bootstrap). From a controller, a service, a job — anything downstream of a completed bootstrap — `app.socket` is populated and safe to read directly.
+Both read the same DI container slot. `app.socket` is a getter that returns `container.tryGet("socket")` — that's `undefined` (it does **not** throw) until the socket connector has booted. `getSocketServer()` reads the same `container.tryGet("socket")` and returns `null` if absent. Prefer `getSocketServer()` plus a null-guard at any call site that *might* run before the connector boots (module-load code, `main.ts` top level, scripts that skip bootstrap). From a controller, a service, a job — anything downstream of a completed bootstrap — `app.socket` is populated and safe to read directly.
 
 ## Wiring `connection` handlers
 
@@ -8533,7 +8792,7 @@ import type { GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { notifyUserService } from "../services/notify-user.service";
 
 export const sendNotificationController: GuardedRequestHandler = async ({ request, response }) => {
-  await notifyUserService(request.user, request.input("payload"));
+  await notifyUserService(request.locals.user, request.input("payload"));
   return response.success({ delivered: true });
 };
 ```
@@ -9066,7 +9325,8 @@ If you short-circuit, the controller never runs. The response helper you pick (`
 You can attach arbitrary fields to `request` from a middleware, and they survive into the controller. The cleanest pattern is to extend `Request` via module augmentation in a `.d.ts` and assign in the middleware:
 
 ```ts title="src/app/feature-flags/middleware/load-feature-flag.middleware.ts"
-import type { Middleware, Request, RequestUser } from "@warlock.js/core";
+import type { Middleware, Request } from "@warlock.js/core";
+import type { RequestUser } from "@warlock.js/auth";
 import { FeatureFlag } from "../models/feature-flag";
 
 declare module "@warlock.js/core" {
@@ -9075,12 +9335,17 @@ declare module "@warlock.js/core" {
   }
 }
 
-export const loadFeatureFlag: Middleware<Request & { user: RequestUser }> = async ({ request }) => {
-  request.featureFlag = await FeatureFlag.findBy("organization_id", request.user.organizationId);
+export const loadFeatureFlag: Middleware<Request & { locals: { user: RequestUser } }> = async ({
+  request,
+}) => {
+  request.featureFlag = await FeatureFlag.findBy(
+    "organization_id",
+    request.locals.user.organizationId,
+  );
 };
 ```
 
-After this middleware runs, `request.featureFlag` is typed inside any downstream middleware or controller. The same pattern is how `@warlock.js/auth`'s `authMiddleware` attaches `request.user` and `request.decodedAccessToken`.
+After this middleware runs, `request.featureFlag` is typed inside any downstream middleware or controller. The same pattern is how `@warlock.js/auth`'s `authMiddleware` attaches `request.locals.user` and `request.decodedAccessToken`.
 
 ## Registration — three scopes
 
@@ -9221,7 +9486,7 @@ export const optionalAuth: Middleware = async ({ request, response }) => {
 
 - [`use-middleware/SKILL.md`](../use-middleware/SKILL.md) — the built-in middleware catalog (`rateLimit`, `idempotency`, `maxBodySize`, etc.) + request-id correlation.
 - [`register-route/SKILL.md`](../register-route/SKILL.md) — where middleware attaches: `router.group` and route-options.
-- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — how the controller picks up `request.user`, `request.validated()`, etc., set by upstream middleware.
+- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — how the controller picks up `request.locals.user`, `request.validated()`, etc., set by upstream middleware.
 - [`send-response/SKILL.md`](../send-response/SKILL.md) — the response helpers used to short-circuit.
 - [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — the `guarded()` / `guardedAdmin()` / `publicRoutes()` convention.
 
@@ -9803,7 +10068,7 @@ Populate `ctx` from a controller via runtime options:
 ```ts
 await cancelOrderUseCase(
   { orderId: request.input("id") },
-  { ctx: { currentUser: request.user } },
+  { ctx: { currentUser: request.locals.user } },
 );
 ```
 
@@ -17696,7 +17961,7 @@ const moved = await fs.file("a.txt").moveTo(fs.dir("archive"));  // new File han
 
 ---
 name: write-atomically
-description: 'Atomic file writes via atomicWriteAsync(path, content) — writes to a uniquely-named sibling temp + rename onto target so readers see old or complete new content, never half-written. Triggers: `atomicWriteAsync`, `atomicWriteJsonAsync`; "atomic file write", "write config file safely with concurrent readers", "manifest written by build step", "state file across runs", "avoid half-written files"; typical import `import { atomicWriteAsync, atomicWriteJsonAsync } from "@warlock.js/fs"`. Skip: plain writes — `@warlock.js/fs/read-and-write-files/SKILL.md`; read-modify-write locking — `@warlock.js/cache/use-cache-lock/SKILL.md`; competing libs `write-file-atomic`, `steno`, `fs-extra` `outputFile`.'
+description: 'Atomic file writes via atomicWriteAsync(path, content) — writes to a uniquely-named sibling temp + rename onto target so readers see old or complete new content, never half-written; the rename retries transient Windows locks with backoff and throws a named AtomicWriteError on exhaustion. Triggers: `atomicWriteAsync`, `atomicWriteJsonAsync`, `AtomicWriteError`; "atomic file write", "write config file safely with concurrent readers", "manifest written by build step", "state file across runs", "avoid half-written files", "EPERM/EBUSY on rename", "atomic write fails intermittently on Windows"; typical import `import { atomicWriteAsync, atomicWriteJsonAsync, AtomicWriteError } from "@warlock.js/fs"`. Skip: plain writes — `@warlock.js/fs/read-and-write-files/SKILL.md`; read-modify-write locking — `@warlock.js/cache/use-cache-lock/SKILL.md`; competing libs `write-file-atomic`, `steno`, `fs-extra` `outputFile`.'
 ---
 
 # Atomic file writes
@@ -17712,6 +17977,8 @@ description: 'Atomic file writes via atomicWriteAsync(path, content) — writes 
 - **State files between runs of the same script.** A crash mid-write leaves you with a corrupt file you can't read on the next run.
 
 `atomicWriteAsync` writes to a uniquely-named sibling temp file first, then `rename`s it onto the target. On most filesystems the rename is atomic — readers see the old content, then the new content, never anything in between.
+
+The rename step retries on transient Windows locks (`EPERM` / `EBUSY` / `EACCES` — antivirus or the search indexer briefly holding a just-created file) with bounded exponential backoff: 5 attempts, starting at 20ms and doubling, capping total wait under ~1s. Any other error is thrown immediately. It never falls back to a non-atomic direct write — if every retry fails, it throws a named `AtomicWriteError` naming the target path and the attempt count, with the last OS error attached as `cause`.
 
 ## Shape
 
@@ -17731,8 +17998,9 @@ await atomicWriteJsonAsync("./manifest.json", { version: "1.0.0", files: [...] }
 1. mkdir(dir, recursive)
 2. tempPath = `${dir}/.${name}.${randomHex(6)}.tmp`     ← unique sibling temp
 3. writeFile(tempPath, content)
-4. rename(tempPath, filePath)                            ← atomic on POSIX, near-atomic on NTFS
-   on failure: unlink(tempPath)
+4. rename(tempPath, filePath), retrying on EPERM/EBUSY/EACCES with backoff
+   on exhaustion: unlink(tempPath), throw AtomicWriteError
+   on any other error: unlink(tempPath), rethrow immediately
 ```
 
 The random 6-byte suffix prevents two concurrent writers from racing on the same temp file. The temp file lives in the **same directory** as the target so the rename is intra-mount (cross-mount rename would fall back to copy + unlink, which isn't atomic).
@@ -17774,6 +18042,25 @@ await atomicWriteAsync("./config.toml", config);
 ```
 
 The dev server's file watcher fires once after the rename, sees complete content. No double-event or partial-content noise.
+
+## Handling AtomicWriteError
+
+```ts
+import { atomicWriteAsync, AtomicWriteError } from "@warlock.js/fs";
+
+try {
+  await atomicWriteAsync("./manifest.json", content);
+} catch (error) {
+  if (error instanceof AtomicWriteError) {
+    // error.targetPath — the file that couldn't be replaced
+    // error.attempts   — how many rename attempts were made
+    // error.cause      — the last OS error (e.g. { code: "EBUSY" })
+  }
+  throw error;
+}
+```
+
+`AtomicWriteError` is thrown only after every retry attempt fails on a transient lock code. A non-retryable error (e.g. `ENOSPC`, or the target being an existing directory) is thrown immediately, unwrapped, after a single attempt — it is never wrapped in `AtomicWriteError`.
 
 ## What it doesn't protect against
 
@@ -20728,7 +21015,7 @@ import { type RequestHandler } from "@warlock.js/core";
 
 export const logoutController: RequestHandler = async ({ request, response }) => {
   await authService.logout(
-    request.user!,
+    request.locals.user!,
     request.authorizationValue,        // access token from the Authorization header
     request.input("refreshToken"),     // refresh token from the request body
   );
@@ -21032,7 +21319,7 @@ Start here. The `Auth` base model, `authMiddleware` gate, `authService` (login/l
 Sign up a new user and issue the first token pair — `User.create({ ...password: await hashPassword(plain) })` then `authService.createTokenPair(user)`. For `POST /register`.
 
 #### [`protect-routes`](@warlock.js/auth/protect-routes/SKILL.md)
-`authMiddleware(allowedUserType)` — the argument is required and always requires a valid token: `[]` allows any authenticated user, a user-type argument restricts to those types. Sets `request.user` + `request.decodedAccessToken`, responds 401 on failure.
+`authMiddleware(allowedUserType)` — the argument is required and always requires a valid token: `[]` allows any authenticated user, a user-type argument restricts to those types. Sets `request.locals.user` + `request.decodedAccessToken`, responds 401 on failure.
 
 ### Going deeper
 
@@ -21069,7 +21356,7 @@ Two CLI commands — `warlock jwt.generate` (strong JWT secret → `.env`) and `
 
 ---
 name: protect-routes
-description: 'Gate HTTP routes via authMiddleware(allowedUserType) — the argument is required and a valid token is always required: [] allows any authenticated user, a user-type restricts to those types. Sets request.user + request.decodedAccessToken on success, 401 on failure. Triggers: `authMiddleware`, `request.user`, `request.decodedAccessToken`, `AuthErrorCodes`, `MissingAccessToken`, `InvalidAccessToken`; "how do I protect a route", "restrict route by user type", "require any logged-in user"; typical import `import { authMiddleware } from "@warlock.js/auth"`. Skip: multi-user-type config — `@warlock.js/auth/customize-user-type/SKILL.md`; issuing the token — `@warlock.js/auth/handle-login-and-logout/SKILL.md`; competing libs `passport`, `express-jwt`, `next-auth` middleware.'
+description: 'Gate HTTP routes via authMiddleware(allowedUserType) — the argument is required and a valid token is always required: [] allows any authenticated user, a user-type restricts to those types. Sets request.locals.user + request.decodedAccessToken on success, 401 on failure. Triggers: `authMiddleware`, `request.locals.user`, `request.decodedAccessToken`, `AuthErrorCodes`, `MissingAccessToken`, `InvalidAccessToken`; "how do I protect a route", "restrict route by user type", "require any logged-in user"; typical import `import { authMiddleware } from "@warlock.js/auth"`. Skip: multi-user-type config — `@warlock.js/auth/customize-user-type/SKILL.md`; issuing the token — `@warlock.js/auth/handle-login-and-logout/SKILL.md`; competing libs `passport`, `express-jwt`, `next-auth` middleware.'
 ---
 
 # Gate routes with `authMiddleware`
@@ -21107,7 +21394,7 @@ The `userType` slug must match a key in `config.auth.userType.<name>` — see [`
 On success, before your controller runs:
 
 ```ts
-request.user = <hydrated user model instance>;
+request.locals.user = <hydrated user model instance>;
 request.decodedAccessToken = <decoded JWT payload>;
 ```
 
@@ -21151,7 +21438,7 @@ Behavior, precisely:
 
 The page-vs-API signal is `request.route.isPage`. Config is typed as `PageAuthConfig` on `AuthConfigurations` (`loginPath?: string`, `returnUrlParam?: string`, default `"returnUrl"`); read at runtime through `authConfig.pageAuth`.
 
-> The redirect approach may be revisited in a later version; this documents the shipped 5.8 behavior.
+> `auth.pageAuth` is **not a second auth mechanism** — it is a convenience *adapter* over the same "not authenticated" outcome the gate already produces. It only changes the **representation** of that outcome on a page route (a browser-friendly login redirect) instead of the JSON `401`; the decision that the request is unauthenticated is unchanged. The sanctioned *generic* way to make authentication soft is the app-owned optional-auth middleware below — `pageAuth` is the built-in adapter for the common "redirect a logged-out human to /login" case, so most apps never need to hand-roll it.
 
 ## Reading the user in a controller
 
@@ -21159,7 +21446,7 @@ The page-vs-API signal is `request.route.isPage`. Config is typed as `PageAuthCo
 import { type RequestHandler } from "@warlock.js/core";
 
 export const accountController: RequestHandler = async ({ request, response }) => {
-  const user = request.user!;          // typed via your Auth subclass
+  const user = request.locals.user!;          // typed via your Auth subclass
   return response.success({
     id: user.id,
     email: user.get("email"),
@@ -21167,7 +21454,7 @@ export const accountController: RequestHandler = async ({ request, response }) =
 };
 ```
 
-Because the middleware always requires a valid token, `request.user` is guaranteed present inside any gated controller (the middleware would have responded 401 otherwise). The `!` is safe here.
+Because the middleware always requires a valid token, `request.locals.user` is guaranteed present inside any gated controller (the middleware would have responded 401 otherwise). The `!` is safe here.
 
 ## Route-group protection
 
@@ -21180,18 +21467,30 @@ router.group({ prefix: "/admin", middleware: [authMiddleware("admin")] }, () => 
 
 Every route inside the group is gated — the group's `middleware` array applies to each route in the callback. Cleaner than repeating the middleware on each route.
 
-## No optional / fallthrough auth
+## Optional auth is an app-owned middleware (the sanctioned pattern)
 
-There is no "hydrate `request.user` if a token is present, otherwise continue" mode. `authMiddleware` always requires a valid token. If a route should be reachable anonymously, leave the middleware off — and read the token yourself in the controller if you want soft personalization:
+`authMiddleware` is a **hard gate** — it always requires a valid token and rejects when one is absent. There is deliberately no built-in "hydrate `request.locals.user` if a token is present, otherwise continue" mode, because the *sanctioned generic pattern* for soft/optional auth is a small **app-owned optional-auth middleware**: resolve the user when a valid token is present, and otherwise leave the route to decide. The app owns it because the "what to do when absent" policy is the app's, not the framework's.
 
-```ts
-import { type RequestHandler } from "@warlock.js/core";
+```ts title="src/app/middleware/optional-auth.middleware.ts"
+import { type Middleware } from "@warlock.js/core";
+import { jwt } from "@warlock.js/auth";
 
-export const feedController: RequestHandler = async ({ request, response }) => {
+// The one sanctioned optional-auth shape: resolve if present, never reject.
+// Middleware receives the context object ({ request, response }), like a handler.
+export const optionalAuth: Middleware = async ({ request }) => {
   const token = request.authorizationValue;
-  // optionally decode/hydrate manually when a token is present
+  if (!token) return; // absent → continue anonymously; the route decides
+  try {
+    const decoded = await jwt.verify(token);
+    // hydrate request.locals.user from your token/user model when valid
+  } catch {
+    // invalid token on an optional route → treat as anonymous, don't reject
+  }
+  // returning nothing (undefined) === continue to the handler
 };
 ```
+
+Wire it like any middleware (`{ middleware: [optionalAuth] }`), then branch on `request.locals.user` in the controller. Use `authMiddleware` when the route must be gated; use this when the route is public but personalizes for a signed-in user. `auth.pageAuth` (above) is the built-in **adapter** over this same "unauthenticated" outcome for the common page-redirect case — it is not a competing mechanism.
 
 ## Custom error responses
 
@@ -21220,24 +21519,82 @@ definePolicy("users.create", (actor, target, ctx) =>
   ctx.hasRole("superAdmin") || (target as User).userType === "teacher",
 );
 
-if (await can(request.user, "users.create", { resource: payload })) { /* ... */ }
+if (await can(request.locals.user, "users.create", { resource: payload })) { /* ... */ }
 ```
 
 Use `authMiddleware` to establish *who the caller is*, and `access` to decide *what they may do*. They compose — `access` reads the user `authMiddleware` put on the request.
 
-## Sessions are bearer-token, not cookie
+## Cookie sessions: `authMiddleware([], "cookie:<name>")`
 
-The token is read from the `Authorization` header (`Bearer <token>` or `Key <token>`) and nowhere else. "Session" in this package means a **refresh-token row**, not an HTTP cookie session.
+`authMiddleware`'s second argument, `tokenFrom`, selects the credential source and defaults to `"header"`. Pass `` `cookie:<name>` `` to read the credential from a named cookie instead of the `Authorization` header — the same gate, the same three checks, the same `request.locals.user` / `request.decodedAccessToken` outcome, just a different place to find the token:
 
-There is no cookie-backed guard, no session store, and no cookie strategy in `authMiddleware` — that is the intended design, not an omission. Warlock's auth optimises for API services.
+```ts
+router.get("/browser-account", accountController, {
+  middleware: [authMiddleware([], "cookie:token")],
+});
+```
 
-If you want HttpOnly cookie sessions for a server-rendered admin, that is **app-level work**: set the cookie yourself with `response.cookie` (secure by default since 4.10.0) and read it in your own middleware, then hand the token to the same `authService` rotation logic. **You also own CSRF** — the framework ships no CSRF helper, and cookie auth needs one where bearer auth does not. A synchronizer token bound to the session plus `Origin`/`Referer` checks is the usual shape.
+A route is header-only or cookie-only, never both — `tokenFrom` accepts exactly one source, so there is no header/cookie precedence to define. A route that legitimately needs to accept either composes two `authMiddleware` instances against the app's own optional-auth pattern (above).
+
+### Writing and clearing the cookie: `authService.setAuthCookie` / `clearAuthCookie`
+
+Reading a cookie is opt-in per route (above); *writing* one is a separate, explicit step your login/logout controller calls — `authService.login`/`logout` never set cookies implicitly, so upgrading never starts emitting `Set-Cookie` for an existing bearer-only app.
+
+```ts
+import { authService } from "@warlock.js/auth";
+
+// after issuing tokens
+const { user, tokens } = await authService.login(User, credentials);
+authService.setAuthCookie(response, tokens.accessToken); // Max-Age derived from tokens.accessToken.expiresAt
+
+// after revoking tokens
+await authService.logout(user, accessToken, refreshToken);
+authService.clearAuthCookie(response);
+```
+
+`setAuthCookie(response, token, options?)` accepts either the raw token string or an `AccessTokenOutput` (`{ token, expiresAt }`, e.g. `tokens.accessToken` from `login`) — passing the latter derives `Max-Age` from `expiresAt` automatically; pass `options.maxAge` (seconds) to override it, or a bare string with no `maxAge` for a session cookie. `clearAuthCookie(response, options?)` clears it.
+
+Cookie **attribute flags are not configurable** — `HttpOnly`, `SameSite=Lax`, and `Secure` outside development come from core's `secureCookieDefaults()`, the same floor every `response.cookie()` call gets. Only the cookie's `name` (default `"access_token"`) and `path` (default `"/"`) can be set, via `options` or the `auth.cookie` config block:
+
+```ts title="src/config/auth.ts"
+export default {
+  userType: { user: User },
+  cookie: {
+    name: "access_token", // must match the `cookie:<name>` a route reads
+    path: "/",
+  },
+};
+```
+
+The cookie name `setAuthCookie`/`clearAuthCookie` write **must match** the name a `cookie:<name>` token source reads — they are not linked automatically.
+
+### CSRF: an automatic Origin check on cookie-authenticated writes
+
+Cookie auth changes the CSRF picture that bearer-token auth doesn't have: a browser attaches cookies to same-site requests it didn't originate. `SameSite=Lax` already blocks the classic cross-site `<form method="post">` case, but not a same-site GET redirect chain or a client that ignores `SameSite`.
+
+To close that gap, `authMiddleware` automatically runs a CSRF Origin check on every request whose credential came from a `cookie:` source **and** whose method is unsafe (`POST`/`PUT`/`PATCH`/`DELETE`) — there is nothing to opt into, and nothing to configure to turn it on:
+
+- **Allowed** when `Origin` equals the request's own origin, or is listed in `auth.csrf.allowedOrigins` (config, default `[]`).
+- If `Origin` is absent, `Referer`'s origin is checked the same way.
+- If **both** are absent, or the check fails, the request is rejected with `403` and `errorCode: AuthErrorCodes.CsrfOriginMismatch` ("EC006") — never silently passed through.
+- **Header-token auth is completely unaffected**, as are safe methods (`GET`/`HEAD`/`OPTIONS`) under cookie auth.
+
+```ts title="src/config/auth.ts"
+export default {
+  userType: { user: User },
+  csrf: {
+    allowedOrigins: ["https://admin.example.com"], // extra trusted origins, beyond same-origin
+  },
+};
+```
+
+This is an Origin check, not a double-submit CSRF token — cheaper, and closes the gap `SameSite=Lax` leaves open, but it doesn't help a client whose privacy proxy strips both `Origin` and `Referer` (that request is rejected outright, fail-closed, rather than silently allowed). A double-submit token mechanism is deferred to a later release; track it if your threat model includes Origin-stripping clients.
 
 ## Things NOT to do
 
 - Don't call `authMiddleware` outside route definition. It returns a function — the function is what runs per-request. Calling it once per request creates a fresh middleware on every hit (wasteful) and a fresh allowed-types Set (correctness if the input changes per call).
 - Don't manually decode JWTs in the controller. The middleware already does it and exposes the decoded payload via `request.decodedAccessToken`.
-- Don't trust `request.user` set by client-supplied headers. The middleware is the only place that sets it on the server — client headers can't reach this slot.
+- Don't trust `request.locals.user` set by client-supplied headers. The middleware is the only place that sets it on the server — client headers can't reach this slot.
 - Don't pass an unknown user-type to `authMiddleware("typo")`. The middleware will reject every request because the lookup fails. Test the wire-up with a real token of each user type.
 
 ## See also
@@ -21676,7 +22033,7 @@ description: 'Check permissions in `@warlock.js/access` — `can` / `cannot` / `
 
 ## In a route — class-level gate
 
-Stack it AFTER `authMiddleware` (which sets `request.user`):
+Stack it AFTER `authMiddleware` (which sets `request.locals.user`):
 
 ```ts
 import { authMiddleware } from "@warlock.js/auth";
@@ -21731,7 +22088,7 @@ await authorize(user, "orders.update", { resource: order, tenant }); // grant AN
 ## Gotchas
 
 - **Fails closed, but config errors are loud.** A resolver or policy that throws → denied and logged (a user with no roles is denied, never allowed by accident). The one exception: `AccessConfigError` (e.g. no resolver configured) is **re-thrown**, not denied — a misconfig must surface, not hide. A cache outage is different again: it degrades to the resolver (the cache fails *open*; the decision still fails closed).
-- Stack `gate` **after** `authMiddleware` — it reads `request.user`; without an authenticated user it `403`s.
+- Stack `gate` **after** `authMiddleware` — it reads `request.locals.user`; without an authenticated user it `403`s.
 - The boolean `can*` family never throws; the `authorize*` family throws `ForbiddenError`. Pick per layer (controllers gate with middleware, services assert with `authorize`).
 
 ## See also
@@ -22090,7 +22447,7 @@ If roles live on the user (a `roles` column) or in a token claim, you don't use 
 
 ---
 name: overview
-description: 'Front-door for `@warlock.js/access` — authorization (RBAC + ABAC) for Warlock apps: `can` / `authorize` / `gate` permission checks, `definePolicy` attribute conditions, role management, and a pluggable `AccessResolver` that connects the engine to however you store roles. Depends on `@warlock.js/auth` (reads `request.user`). TRIGGER when: importing from `@warlock.js/access`; "permissions in Warlock", "RBAC", "can this user do X", "protect a route by permission", "role-based access", "ownership / policy check". Skip: authentication / login (that is `@warlock.js/auth`); a known task — load the matching skill (`check-permissions`, `define-policies`, `manage-roles`, `implement-resolver`, `configure-access`).'
+description: 'Front-door for `@warlock.js/access` — authorization (RBAC + ABAC) for Warlock apps: `can` / `authorize` / `gate` permission checks, `definePolicy` attribute conditions, role management, and a pluggable `AccessResolver` that connects the engine to however you store roles. Depends on `@warlock.js/auth` (reads `request.locals.user`). TRIGGER when: importing from `@warlock.js/access`; "permissions in Warlock", "RBAC", "can this user do X", "protect a route by permission", "role-based access", "ownership / policy check". Skip: authentication / login (that is `@warlock.js/auth`); a known task — load the matching skill (`check-permissions`, `define-policies`, `manage-roles`, `implement-resolver`, `configure-access`).'
 ---
 
 # `@warlock.js/access` — overview
@@ -22126,7 +22483,7 @@ Skip if you only need "is the user an admin" — `authMiddleware("admin")` from 
 
 ## What it deliberately doesn't do
 
-- **Authentication.** Use `@warlock.js/auth`; `access` reads `request.user`.
+- **Authentication.** Use `@warlock.js/auth`; `access` reads `request.locals.user`.
 - **Ship a permission admin UI.** The engine reads permission strings; whether the catalog is code-defined (`DefaultAccessResolver`) or DB-managed (the ejected `DatabaseAccessResolver`) is your resolver's choice — the package ships no admin screens.
 - **ReBAC graphs / row-level query scoping.** Use a policy for "own resource"; graph-scale relationships are out of scope.
 
@@ -24266,7 +24623,7 @@ The desired result is one page route at `/` and, when the stock JSON route exist
 
 ---
 name: create-a-page
-description: 'Create an SSR React page under `src/web/**`, with either a literal `route` or a filesystem-derived one, an explicit public-cache opt-in, a `validation` schema and `middleware` guards, a default component, an optional typed `loader`, page `metadata`, the `error.page.tsx` boundary, and the universal `register()` hook. Triggers: `*.page.tsx`, `route`, `route.cache`, `maxAge`, `validation`, `middleware`, `route.validate`, `route.middleware`, `PageLoader`, `PageProps`, `PageMetadata`, `error.page.tsx`, `register`, `[...slug]`; "create a page", "cache a public page", "add an SSR route", "make a React page", "type page loader data", "add an error boundary", "catch-all route", "page renders blank 200", "page has no default export", "validate route params and query", "page-level middleware"; typical import `import type { PageLoader, PageProps } from "@warlock.js/web"`. Skip: root document shell — `@warlock.js/web/write-the-root/SKILL.md`; layout wrappers and prefixes — `@warlock.js/web/use-layouts/SKILL.md`; loader lifecycle and `shared` — `@warlock.js/web/load-page-data/SKILL.md`; competing frameworks `next`, `remix`, `react-router` file routes.'
+description: 'Create an SSR React page under `src/web/**`, with either a literal `route` or a filesystem-derived one, an explicit public-cache opt-in, a `validation` schema and `middleware` guards, a default component, an optional typed `loader`, page `metadata`, the `error.page.tsx` boundary, and the universal `register()` hook. Triggers: `*.page.tsx`, `route`, `route.cache`, `maxAge`, `serverCache`, `invalidatePageCache`, `x-warlock-cache`, `validation`, `middleware`, `route.validate`, `route.middleware`, `PageLoader`, `PageProps`, `PageMetadata`, `error.page.tsx`, `register`, `[...slug]`; "create a page", "cache a public page", "server-side page cache", "invalidate a cached page", "add an SSR route", "make a React page", "type page loader data", "add an error boundary", "catch-all route", "page renders blank 200", "page has no default export", "validate route params and query", "page-level middleware"; typical import `import type { PageLoader, PageProps } from "@warlock.js/web"`. Skip: root document shell — `@warlock.js/web/write-the-root/SKILL.md`; layout wrappers and prefixes — `@warlock.js/web/use-layouts/SKILL.md`; loader lifecycle and `shared` — `@warlock.js/web/load-page-data/SKILL.md`; competing frameworks `next`, `remix`, `react-router` file routes.'
 ---
 
 # Warlock — create a page
@@ -24425,7 +24782,13 @@ export const middleware = [
 ];
 ```
 
-Returning anything other than `undefined` from a middleware short-circuits the request with that value, exactly as an app or layout middleware does.
+Returning anything other than `undefined` from a middleware short-circuits the request with that value, exactly as an app or layout middleware does. What that short-circuit actually produces differs by representation and by how the middleware answered:
+
+- **A client navigation** (a data request) always gets `{ status, body: <your returned value> }` as JSON — unchanged, regardless of status code.
+- **A full page load**, when the middleware already wrote the real reply itself — `response.redirect()`, `response.permanentRedirect()`, or a call that reaches `response.send()` (`.forbidden()`, `.unauthorized()`, `.notFound()`, `.send()` directly) — answers with exactly that reply. The pipeline renders nothing further; there is no document to add.
+- **A full page load**, when the middleware returns a value WITHOUT writing the reply itself (the `{ error: "Unauthorized" }` example above, after only `setStatusCode`) — a status `>= 400` renders the application's `error.page.tsx` boundary with that status, the returned value attached to the error; a status `< 200`–`399` (2xx) sends the returned value as the response body unchanged (JSON-stringified if it's an object) — **a page middleware returning 2xx content replaces the page.**
+
+Prefer calling a `response` method (`.forbidden()`, `.redirect()`, `.unauthorized()`, …) over returning a bare object when you want full control over the wire reply; a bare returned object is still safe on a full page load — it now always reaches the visitor, never silently dropped — but it renders through the error boundary for `>= 400`, and as raw content for `2xx`.
 
 ## Page caching
 
@@ -24454,6 +24817,80 @@ the request used authenticated state, it revokes the opt-in and emits
 
 This decision is applied once after loaders finish, to both representations.
 Setting `Cache-Control` manually in a loader cannot bypass the floor.
+
+### Server-side page cache — `serverCache`
+
+`cache.public`/`maxAge` only decide the `Cache-Control` header a downstream
+CDN/proxy should honour. `serverCache` is a second, independent opt-in on the
+SAME object: the framework itself holds the resolved bytes and serves a HIT
+without re-running the pipeline at all.
+
+```tsx
+export const route = {
+  path: "/products",
+  name: "products.index",
+  cache: {
+    public: true,
+    maxAge: 60,
+    serverCache: true,
+    tags: ["products"],
+    // or: tags: (data) => [`product:${data.id}`],
+    ttl: 300, // optional — defaults to maxAge
+  },
+} as const;
+```
+
+- `serverCache` requires `public: true` (like every `cache` opt-in) AND
+  `tags` — a stored entry with no tags could never be invalidated early, so
+  its absence is a boot-time `InvalidPageCacheOptInError`.
+- `tags` is a static list, or a function of the resolved page data, evaluated
+  right before the entry is stored.
+- `ttl` is the server cache's own freshness window in seconds, independent of
+  the CDN-facing `maxAge`; omit it to reuse `maxAge`.
+
+**Cache key**: the normalised pathname (lower-cased, trailing slash
+stripped), the sorted query string, the resolved `locale`, and the
+representation — `html` for a document request, `json` for the
+`x-warlock-data` representation. A request for the NDJSON representation on
+a `serverCache` route never streams: the values are fully resolved and
+stored/served as the `json` variant instead, since there is nothing left to
+defer.
+
+**Bypass**: a request carrying an `Authorization` header or the configured
+auth cookie (`auth.cookie.name`, default `access_token`) never consults the
+cache — this check runs before any loader, so a credentialed visitor is
+never handed a stale guest page. Store-time eligibility (checked once
+per render) requires: `GET`, `status === 200`, no `Set-Cookie`, a provably
+unauthenticated request (the same fail-closed `authDerived` rule as
+`Cache-Control` above), and — for the document representation — not a
+detected crawler request (a crawler may still read a HIT, it just never
+writes the crawler-specific render).
+
+**Response headers**: `x-warlock-cache: hit | miss | bypass`, alongside the
+usual `Cache-Control`.
+
+**Invalidation**:
+
+```ts
+import { invalidatePageCache } from "@warlock.js/web";
+
+await invalidatePageCache(["products"]);
+```
+
+Evicts every stored entry under any of the given tags, through
+`@warlock.js/cache`'s tag index. Cluster reach depends on the configured
+driver: a shared driver (redis/pg) removes the entry for every worker on
+their next read. An in-process driver (memory/LRU/memory-extended) only
+clears the CALLING worker's own heap — every other worker keeps serving its
+stale entry until `ttl`/`maxAge` expires. Enabling `serverCache` with an
+in-process driver in a clustered process logs a one-time startup warning;
+cross-process pub/sub invalidation is out of scope for this release.
+
+**`@warlock.js/cache` is an optional peer.** It is only loaded (via a lazy
+`await import(...)`) the first time some route with `serverCache: true`
+actually needs the store — an application that never opts in is never
+forced to install it. Enabling `serverCache` without the package installed
+fails loudly at boot/request time, naming `@warlock.js/cache`.
 
 ## Filesystem routing
 
@@ -24747,6 +25184,50 @@ export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
 
 `LoaderShortCircuit` values from `notFound()` and redirects are excluded from `PageProps["data"]`, so the component sees only the successful loader return.
 
+## What survives the wire
+
+`app`/`layout`/`page` loader data travels the browser wire serialized with
+[`devalue`](https://www.npmjs.com/package/devalue), not plain `JSON`. This is
+the standing serialization ruling: a `resource` or a `toJSON()` method is the
+gate on what a loader is allowed to return, never the wire format itself —
+devalue is simply capable of carrying more of what a plain object graph can
+already express.
+
+Concretely, this now arrives on the client exactly as the loader returned it:
+
+- `Date`, `Map`, `Set`, `BigInt`
+- `undefined` as an object property's value (not just at the top level)
+- a repeated reference to the SAME object (`{ first: shared, second: shared }`
+  hydrates as `result.first === result.second`, not two independent copies)
+- a cyclic structure (an object that (transitively) references itself)
+
+A class instance devalue does not recognize, a function, or a symbol is still
+refused — loudly. The build throws a `PageDataSerializationError` naming the
+loader LEVEL (`app`/`layout`/`page`), the KEY PATH devalue's own error
+reports (e.g. `.items[0].service`), and the page ROUTE, in both dev and
+production:
+
+```
+Cannot serialize page data for route "products.details" (key path: .items[0].service):
+Cannot stringify arbitrary non-POJOs. devalue cannot put a class instance, a function or a
+symbol on the hydration wire — give the offending value a resource or a toJSON() so it
+reaches the browser as a plain value. A resource / toJSON() is the serialization gate for
+page data.
+```
+
+The fix is always the same: give the offending value a `resource` (see
+[`define-resource/SKILL.md`](../../core/define-resource/SKILL.md)) or a
+`toJSON()` method so it reaches the wire as the plain value devalue already
+knows how to serialize — never work around the throw by hand-flattening the
+value in the loader.
+
+This applies to `appData`/`layoutData`/`pageData` and to a `defer()`red value's
+eventual settlement. It does **not** change `shared`, which keeps its own,
+stricter gate (scalars, arrays, plain objects, or `toJSON()` — `Date`, `Map`,
+`Set`, functions, and arbitrary class instances are rejected there
+regardless) — see [Declare the shared payload](#declare-the-shared-payload)
+below.
+
 ## Three loader levels
 
 | Module                  | Contract       | Component props              |
@@ -24898,13 +25379,14 @@ Only put browser-safe data in `shared`: scalars, arrays, plain objects, or value
 ## Gotchas
 
 - **Use `satisfies`, not a type annotation.** Preserve the return type for component props.
-- **Return client-safe data.** Components render again in the browser; models and server handles do not survive the wire.
+- **Return client-safe data.** Components render again in the browser; models and server handles do not survive the wire. `Date`/`Map`/`Set`/`BigInt` DO survive now (devalue is the wire format — see [What survives the wire](#what-survives-the-wire)); a class instance, function, or symbol still does not, and fails the build loudly instead of silently.
 - **Write `shared` in middleware only.** Loaders run after the seal.
 - **Required shared keys need unconditional writers.** The type is a promise for every request.
 - **Do not use loader return values as cross-level communication.** Levels run in order but are not wired to each other; use `shared`, written in middleware.
 - **`404.page.tsx` never runs its own loader.** The not-found page's module is registered and rendered for real — `register()` and its middleware still run — but the page loader is omitted from the request in both dev and production, so a missing URL cannot trigger application data work or fail a second time. Its ancestry contributes nothing either: the 404 page renders with an empty layout chain by construction. **The root `AppLoader` in `root.tsx` still runs** for a 404 request, so keep it cheap and make sure it tolerates a request that matched nothing.
 - **`process.env` is refused in the client/universal graph, with no `PUBLIC_` exception.** Read it in a loader and return it as page data.
 - **Server actions are not supported.** POST to an ordinary Warlock API route and call `refresh()` after success.
+- **Responses now stream via React's streaming renderer.** The response still waits for every loader, middleware short-circuit and validation to settle before the first byte goes out — status codes, headers and cookies are unchanged — so this is not an API change for apps built on the framework.
 
 ## See also
 
@@ -24912,6 +25394,7 @@ Only put browser-safe data in `shared`: scalars, arrays, plain objects, or value
 - [`write-the-root/SKILL.md`](../write-the-root/SKILL.md) — `AppLoader`, `<Head />`, and `<Scripts />`.
 - [`use-layouts/SKILL.md`](../use-layouts/SKILL.md) — `LayoutLoader` and persistent wrappers.
 - [`navigate-on-the-client/SKILL.md`](../navigate-on-the-client/SKILL.md) — re-fetch loaders with `refresh()`.
+- [`stream-deferred-data/SKILL.md`](../stream-deferred-data/SKILL.md) — stream a slow page-loader key after the shell with `defer()` and `use()`.
 
 ## navigate-on-the-client  `@warlock.js/web/navigate-on-the-client/SKILL.md`
 
@@ -25128,6 +25611,135 @@ export function CurrentProductId() {
 - [`use-layouts/SKILL.md`](../use-layouts/SKILL.md) — why layout state persists.
 - [`write-the-root/SKILL.md`](../write-the-root/SKILL.md) — the `#root` swap boundary.
 
+## render-client-only  `@warlock.js/web/render-client-only/SKILL.md`
+
+---
+name: render-client-only
+description: 'Render browser-only UI with `<ClientOnly fallback={...}>` and `useIsClient()` — fallback on the server AND during hydration, children after mount, with no hydration mismatch. Covers the split between deferring RENDERING (what `<ClientOnly>` does) and deferring MODULE LOADING (what `React.lazy` does), and the combined pattern for a component whose module touches `window` at import time. Triggers: `ClientOnly`, `useIsClient`, "browser-only component", "hydration mismatch", "window is not defined", "text content does not match server-rendered HTML", `React.lazy` inside a page. Skip: SSR page/loader lifecycle — `@warlock.js/web/create-a-page/SKILL.md`; layout composition — `@warlock.js/web/use-layouts/SKILL.md`; competing primitives `next/dynamic` with `ssr: false`, `react-no-ssr`, a hand-rolled `typeof window !== "undefined"` guard around a whole component.'
+---
+
+# Warlock — render client-only content
+
+Some UI can only run in a browser — it reads `window`, `localStorage`, a
+canvas, a third-party widget that assumes a DOM. `<ClientOnly>` renders a
+server-safe placeholder for that UI and swaps to the real thing once the page
+has mounted, without ever producing a hydration mismatch.
+
+## The shape
+
+```tsx
+import { ClientOnly } from "@warlock.js/web";
+
+function LastVisited() {
+  return (
+    <ClientOnly fallback={<span>—</span>}>
+      <span>{window.localStorage.getItem("lastVisited") ?? "first visit"}</span>
+    </ClientOnly>
+  );
+}
+```
+
+- `fallback` renders on the server, AND on the client's hydration render. It defaults to `null`.
+- `children` renders once the page has mounted in the browser — after hydration has already matched the server markup, never during it.
+- `children` may also be a function, `() => ReactNode`, for code that must not run at all until the browser render:
+
+```tsx
+<ClientOnly fallback={<p>Loading map…</p>}>
+  {() => <Map center={window.localStorage.getItem("lastCenter")} />}
+</ClientOnly>
+```
+
+The plain-node form and the function form differ only in WHEN the expression inside them runs. `<span>{window.foo}</span>` as a plain child is already constructed — `window.foo` was read — by the time it reaches `<ClientOnly>`; wrap it in a function when reading `window` must wait for the browser render too, not just the visible output.
+
+## `useIsClient()`
+
+The hook `<ClientOnly>` is built on, for cases that need the boolean directly rather than a fallback/children split:
+
+```tsx
+import { useIsClient } from "@warlock.js/web";
+
+function ThemeToggle() {
+  const isClient = useIsClient();
+  return <button disabled={!isClient}>Toggle theme</button>;
+}
+```
+
+`false` on the server and during the hydration render; `true` from the next render onward, once mounted. Never branches on `typeof window` — the initial value is a constant, so the server pass and the client's hydration pass return the identical thing by construction, and the flip to `true` only happens on a render React triggers AFTER hydration has already reconciled.
+
+## This defers RENDERING, not MODULE LOADING
+
+**The trap:** `<ClientOnly>` decides what gets RENDERED. It has no say over what gets IMPORTED. A normal `import` statement runs at module-load time, wherever that module is reached from in the import graph — including the server, if the file that imports it is part of the page's server bundle.
+
+```tsx
+// ❌ still breaks the server render
+import BrowserOnlyWidget from "./browser-only-widget"; // this import runs on the SERVER too,
+                                                         // and if browser-only-widget.tsx touches
+                                                         // `window` at its top level, the server
+                                                         // render throws before ClientOnly ever
+                                                         // gets a chance to hide it.
+
+import { ClientOnly } from "@warlock.js/web";
+
+export default function Page() {
+  return (
+    <ClientOnly fallback={<Placeholder />}>
+      <BrowserOnlyWidget />
+    </ClientOnly>
+  );
+}
+```
+
+`<ClientOnly>` only controls whether the already-imported `<BrowserOnlyWidget />` element gets rendered. The module behind it was already evaluated, top-level `window` access and all, the moment the page module itself was loaded.
+
+**The fix:** make the import itself lazy with `React.lazy`, so the dynamic `import()` only fires the first time the lazy component is actually rendered. Paired with `<ClientOnly>`, that render never happens on the server, so the import never happens on the server either:
+
+```tsx
+// ✅ the import is deferred, not just the render
+import { lazy } from "react";
+import { ClientOnly } from "@warlock.js/web";
+
+const BrowserOnlyWidget = lazy(() => import("./browser-only-widget"));
+
+export default function Page() {
+  return (
+    <ClientOnly fallback={<Placeholder />}>
+      <BrowserOnlyWidget />
+    </ClientOnly>
+  );
+}
+```
+
+`React.lazy` components suspend, so give `<ClientOnly>`'s subtree a `<Suspense>` boundary if the lazy chunk might not be cached yet:
+
+```tsx
+import { lazy, Suspense } from "react";
+import { ClientOnly } from "@warlock.js/web";
+
+const BrowserOnlyWidget = lazy(() => import("./browser-only-widget"));
+
+export default function Page() {
+  return (
+    <ClientOnly fallback={<Placeholder />}>
+      <Suspense fallback={<Placeholder />}>
+        <BrowserOnlyWidget />
+      </Suspense>
+    </ClientOnly>
+  );
+}
+```
+
+## Gotchas
+
+- **A plain child is already constructed.** `<ClientOnly>{someExpression}</ClientOnly>` evaluates `someExpression` before `<ClientOnly>` ever runs. Use the function-children form when the expression itself must not run on the server or during hydration.
+- **`<ClientOnly>` cannot save a module with a top-level side effect.** If the module throws or touches `window` at import time, wrap the import in `React.lazy`, not just the render in `<ClientOnly>`.
+- **Nothing inside `<ClientOnly>` renders during SSR.** Don't rely on it for SEO-relevant content — the fallback is what search engines and the initial paint see.
+- **The fallback must be safe to render on the server.** It is not exempt from the usual SSR rules (no `window`, no browser-only APIs).
+
+## See also
+
+- [`create-a-page/SKILL.md`](../create-a-page/SKILL.md) — the page component this typically renders inside.
+- [`write-the-root/SKILL.md`](../write-the-root/SKILL.md) — the hydration boundary `<ClientOnly>`'s mount detection relies on.
+
 ## serve-styles  `@warlock.js/web/serve-styles/SKILL.md`
 
 ---
@@ -25277,6 +25889,264 @@ The hydration entry is built from the projected client graph. CSS imports are kn
 - [`write-the-root/SKILL.md`](../write-the-root/SKILL.md) — the document `<head>` these links enter.
 - [`create-a-page/SKILL.md`](../create-a-page/SKILL.md) — page-local asset imports and projection.
 - [`navigate-on-the-client/SKILL.md`](../navigate-on-the-client/SKILL.md) — client swaps after the initial styled document.
+
+## stream-deferred-data  `@warlock.js/web/stream-deferred-data/SKILL.md`
+
+---
+name: stream-deferred-data
+description: 'Stream slow page-loader data after the shell with `defer()` and React `use()` inside `<Suspense>`, instead of blocking the first byte on it. Covers the wire contract (a deferred value settles as a chunk script after the shell, or as an NDJSON line on client navigation), errors reaching the nearest `<Suspense>` error boundary with status 200 already sent, `web.streaming.deferTimeout`, and the metadata rule (`metadata()` may read only resolved keys). Triggers: `defer()`, `use(data.`, `DeferredValueError`, `DeferTimeoutError`, `DeferredStreamClosedError`, `DeferredKeyInMetadataError`, `web.streaming.deferTimeout`, `__WARLOCK_DEFER__`; "stream part of a page", "slow loader data", "show a skeleton while reviews load", "Suspense in a page component", "defer a promise from a loader". Skip: the rest of the loader contract — `@warlock.js/web/load-page-data/SKILL.md`; re-fetching after a mutation — `@warlock.js/web/navigate-on-the-client/SKILL.md`; competing primitives Remix `defer()`/`Await`, Next.js `loading.tsx`/streaming RSC (this framework has no RSC).'
+---
+
+# Warlock — stream deferred page data
+
+A page loader normally blocks the whole response on everything it returns.
+`defer()` lets a PAGE loader (app and layout loaders cannot use it) mark some
+of its top-level keys as "send the shell now, stream this in after" — the
+first byte still waits for middleware, validation and every non-deferred
+loader value, but a slow key no longer holds up everything else.
+
+## The shape
+
+```tsx title="src/web/products/product-details.page.tsx"
+import { use, Suspense } from "react";
+import { defer } from "@warlock.js/web";
+import type { PageLoader, PageProps } from "@warlock.js/web";
+
+export const loader = (async ({ request }) => {
+  const { id } = request.validated();
+
+  return defer({
+    product: await getProduct(id), // resolved before the shell — unchanged today
+    reviews: getReviews(id), // a Promise — streamed in after the shell
+  });
+}) satisfies PageLoader;
+
+function Reviews({ reviews }: { reviews: Promise<Review[]> }) {
+  const list = use(reviews);
+  return (
+    <ul>
+      {list.map((review) => (
+        <li key={review.id}>{review.text}</li>
+      ))}
+    </ul>
+  );
+}
+
+export default function ProductDetailsPage({ data }: PageProps<typeof loader>) {
+  return (
+    <article>
+      <h1>{data.product.name}</h1>
+      <Suspense fallback={<p>Loading reviews…</p>}>
+        <Reviews reviews={data.reviews} />
+      </Suspense>
+    </article>
+  );
+}
+```
+
+- `defer(data)` takes the SAME object shape a loader always returned. Any
+  TOP-LEVEL key whose value is a promise streams in after the shell; every
+  other key goes into `pageData` exactly as before — a loader that never
+  calls `defer()` is completely unaffected.
+- Only TOP-LEVEL keys may be promises. A promise nested inside a resolved
+  key's own value (`defer({ list: { items: fetchItems() } })`) throws
+  `NestedDeferredValueError` naming the path — move it to its own top-level
+  key instead.
+- `data.reviews` types as `Promise<Review[]>` for the component, exactly the
+  type the loader declared — `PageProps`/`LoaderData` only unwrap the
+  loader's own outer promise, never a deferred key's.
+- Read a deferred key with React's own `use()`, inside a `<Suspense>`
+  boundary. `use()` is plain React, not a Warlock export.
+- `defer()` is PAGE-loader-only. An app or layout loader that returns one
+  throws `DeferredInNonPageLoaderError` — those levels compose every page
+  under them, including pages with no `<Suspense>` boundary at all, so their
+  data cannot usefully stream.
+
+## Errors go to the nearest boundary — status 200 already sent
+
+By the time a deferred value settles, the shell has already flushed with
+status 200: headers, cookies and the status code were decided before the
+first byte went out, and nothing about a LATER value can change any of that.
+So a rejected deferred value never produces a different HTTP status — it
+resolves to the nearest **`<Suspense>`**'s enclosing React error boundary,
+the same way a synchronous render throw would, while the response the
+browser already started receiving stays a 200.
+
+What `use()` throws is one of:
+
+- **`DeferredValueError`** — the loader's own promise rejected. Carries the
+  original error's `message` and, if the original error had one,
+  `statusCode`. Never a stack in production; dev may add one.
+- **`DeferTimeoutError`** — the promise did not settle within
+  `web.streaming.deferTimeout` (default 10000ms). The server treats this
+  exactly like a rejection: settle, emit, move on. The response is never
+  held open waiting for a value that times out.
+- **`DeferredStreamClosedError`** — the connection was cut (or the page
+  navigated away) while a key was still pending. The client rejects every
+  still-pending key with this on `DOMContentLoaded`.
+
+None of these trigger a hard navigation or reload — the payload the shell
+sent was already complete, and only a deferred value inside a `<Suspense>`
+boundary failed. Every rejection and every timeout is ALSO reported to the
+server's error sink unconditionally, regardless of whether any component
+ever reads the deferred key.
+
+```tsx title="src/web/products/reviews-boundary.tsx"
+import { Component, type ReactNode } from "react";
+
+export class ReviewsBoundary extends Component<
+  { children: ReactNode },
+  { error?: unknown }
+> {
+  state: { error?: unknown } = {};
+
+  static getDerivedStateFromError(error: unknown) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) return <p>Reviews are unavailable right now.</p>;
+    return this.props.children;
+  }
+}
+```
+
+Wrap the `<Suspense>` boundary (or an ancestor of it) in a boundary like this
+one when a deferred failure should degrade gracefully instead of bubbling to
+the page's own `ErrorBoundary` export.
+
+## `web.streaming.deferTimeout`
+
+```ts title="warlock.config.ts"
+export default {
+  web: {
+    streaming: {
+      deferTimeout: 15_000, // milliseconds; default 10000
+    },
+  },
+};
+```
+
+Applies per deferred key, not per request — three deferred keys on one page
+each get their own 10-second (or configured) budget, timed independently.
+
+## The metadata rule
+
+**`metadata()` may read only RESOLVED keys.** It runs before the shell
+flushes; a deferred key resolves only after. Reading one throws
+`DeferredKeyInMetadataError` — naming the key and the page — in dev AND in
+production, unconditionally:
+
+```tsx
+export const loader = (async () =>
+  defer({ product: await getProduct(id), reviews: getReviews(id) })
+) satisfies PageLoader;
+
+// Wrong — "reviews" is a defer()-ed key:
+export const metadata = (({ data }) => ({
+  title: `${data.reviews.length} reviews`, // throws DeferredKeyInMetadataError
+})) satisfies PageMetadata<typeof loader>;
+
+// Right — describe the page from what's already resolved:
+export const metadata = (({ data }) => ({
+  title: data.product.name,
+})) satisfies PageMetadata<typeof loader>;
+```
+
+There is no way to make `metadata()` wait for a deferred value — a page's
+`<head>` is part of the shell, and the shell is exactly the thing `defer()`
+exists to stop waiting on. If the description genuinely needs the deferred
+value, resolve it inside the loader instead of deferring it.
+
+## Client navigation (NDJSON) — handled automatically
+
+A client-side navigation (`<Link>`, `navigateTo()`, `refresh()`) fetches page
+data instead of a full document. When the browser's data request advertises
+NDJSON support, the response streams the same way the document did: line 1
+is the complete payload (including which keys are still pending), then one
+line per resolved deferred key as it settles. `<Suspense>` shows the fallback
+until each key's line arrives — nothing in a page component or loader has to
+know or care that this is happening; the same `use(data.reviews)` call reads
+the wire promise on both the initial document and every later client
+navigation. A client that cannot speak NDJSON gets the older contract
+instead: the server awaits every deferred value and inlines the fully
+resolved data into one JSON response.
+
+**Wire format:** devalue is the page-data wire format (the same standing
+ruling `load-page-data/SKILL.md`'s ["What survives the
+wire"](../load-page-data/SKILL.md#what-survives-the-wire) section documents),
+including a deferred value's settlement — a `Date`, `Map`, `Set`, or `BigInt`
+returned from inside `defer({ ... })` survives the chunk script and the
+NDJSON line intact, not just the page's other, non-deferred data. The
+document chunk script is `__WARLOCK_DEFER__(key, "<devalue text>")` — the
+second argument is devalue's serialized text carried as a plain JS string,
+HTML-escaped the same way the hydration payload script is, never spliced in
+as executable JS (`uneval` is not used anywhere in this pipeline). Each
+NDJSON line after line 1 is `{"defer":"<key>","settlement":"<devalue
+text>"}` — the outer object is plain JSON so a line-at-a-time reader can find
+the boundary, and `settlement` is decoded separately with devalue's `parse`.
+An unserializable settlement value (a class instance, function, or symbol)
+throws the same named `PageDataSerializationError` a synchronous loader
+return would.
+
+## Crawlers
+
+A crawler never runs the browser's defer-bootstrap script, so it has no
+chance to observe a chunk that arrives after the shell — streamed to one, a
+`defer()`-ed section would stay missing from whatever it indexes forever.
+Every FULL-DOCUMENT request from a detected crawler therefore skips streaming
+entirely: every deferred value is awaited and inlined into the page data
+before the first byte goes out (the same await-and-inline path a plain data
+request without NDJSON support already gets), and the response waits for
+React's `onAllReady` before anything flushes. A rejection takes the ordinary
+boundary/status escalation path, exactly as an ordinary synchronous loader
+throw would — nothing has flushed yet, so there is no 200 already on the
+wire to contradict.
+
+Detection is case-insensitive and, by default, matches this built-in list:
+`googlebot`, `bingbot`, `yandex`, `duckduckbot`, `baiduspider`, `slurp`,
+`applebot`, `facebookexternalhit`, `twitterbot`, `linkedinbot`, `discordbot`,
+`slackbot`, `telegrambot`, `whatsapp`, `embedly`, `pinterest`.
+
+```ts title="warlock.config.ts"
+export default {
+  web: {
+    streaming: {
+      crawlers: false, // disable detection entirely — every request streams
+      // OR customise it:
+      crawlers: {
+        userAgents: [/mybot/i], // REPLACES the built-in list, not merges with it
+        detect: (request) => request.header("x-render-mode") === "crawler", // wins outright when given
+      },
+    },
+  },
+};
+```
+
+A page that never calls `defer()` renders identically for every user agent
+and never carries a `Vary` header. A page that DOES `defer()` renders
+differently depending on the request's `User-Agent` — streamed for a
+browser, fully resolved for a detected crawler — so the document response
+carries `Vary: User-Agent` whenever the page uses `defer()`, so a shared
+cache never serves one representation to a client that asked for the other.
+
+## Gotchas
+
+- **Only page loaders may `defer()`.** App/layout loaders throw
+  `DeferredInNonPageLoaderError`.
+- **Only top-level keys may be promises.** A promise nested under a resolved
+  key throws `NestedDeferredValueError`.
+- **`metadata()` reads resolved keys only.** A deferred key throws
+  `DeferredKeyInMetadataError`, naming the key and the page.
+- **A deferred rejection never changes the response's status.** It resolves
+  to the nearest `<Suspense>` error boundary; the document (or NDJSON
+  stream) it arrived on already answered 200.
+- **`use()` is plain React**, not a Warlock export — import it from `"react"`.
+
+## See also
+
+- [`load-page-data/SKILL.md`](../load-page-data/SKILL.md) — the rest of the loader contract `defer()` builds on.
+- [`navigate-on-the-client/SKILL.md`](../navigate-on-the-client/SKILL.md) — the NDJSON data request this streams over.
 
 ## use-layouts  `@warlock.js/web/use-layouts/SKILL.md`
 
@@ -25446,6 +26316,35 @@ export default function App({ children }: AppProps) {
 
 The root component is synchronous. HTTP work belongs in an `AppLoader`; the component receives its result as `data`.
 
+## `lang` and `dir`
+
+The root owns `<html>`, so it also owns `lang` and `dir` — the framework never injects either. Read the current locale with `useLocale()` and derive the writing direction from it with `useTextDirection()`, both from `@warlock.js/web`:
+
+```tsx title="src/web/root.tsx"
+import { Head, Scripts, useLocale, useTextDirection } from "@warlock.js/web";
+import type { AppProps } from "@warlock.js/web";
+
+export default function App({ children }: AppProps) {
+  const locale = useLocale();
+
+  return (
+    <html lang={locale} dir={useTextDirection()}>
+      <head>
+        <Head />
+      </head>
+      <body>
+        <div id="root">{children}</div>
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+```
+
+`useTextDirection()` derives `"rtl"` or `"ltr"` from the same locale `useLocale()` already exposes — via `localeDirection()`, a pure function safe to call on the server or the client. No hydration payload change is involved: the direction is computed from the locale that already made the trip, not carried separately.
+
+To switch the active locale without a full reload, call `changeLocaleCode(code)`. The server persists the choice in its `locale` cookie when the resulting navigation data request carries `?locale=`, so `lang` and `dir` on the next render (and every render after) reflect the new locale.
+
 ## `#root` is the hydration boundary
 
 The server renders this document shape:
@@ -25475,7 +26374,7 @@ Do not also hard-code a `<title>` for the current page; that produces two titles
 
 ## `<Scripts />`
 
-`<Scripts />` emits the escaped `application/json` payload that hydration and client navigation consume. Put it after `#root`, normally near the end of `<body>`.
+`<Scripts />` emits the escaped `application/json` payload that hydration and client navigation consume, followed by the hydration client entry `<script type="module">` (Stage 1 streaming SSR renders both through React now, in this one component — see below). Put it after `#root`, normally near the end of `<body>`.
 
 For a Content Security Policy nonce:
 
@@ -25500,7 +26399,22 @@ export default function App({ children, shared }: AppProps) {
 
 Prefer declaring `nonce` on `SharedContext` so the cast is unnecessary; see [load-page-data](../load-page-data/SKILL.md). If no prop is supplied, `<Scripts />` falls back to the framework's request nonce slot.
 
-`<Scripts />` owns the inline data payload. The separate hydration module is appended by the page route handler. Its published `esm/hydration/index.mjs` file is a build input and must never be imported by application code.
+**This is the same nonce a `Content-Security-Policy` header would enforce.**
+`@warlock.js/core`'s opt-in `http.csp` (5.12.0 — see its `configure-app` and
+`send-response` skills) builds `script-src 'self' 'nonce-<value>'` from the
+identical per-request `request.nonce`. The framework's own emitted
+`<script>` tags — the payload script and the hydration client entry module,
+both rendered by `<Scripts />` — already carry that nonce automatically;
+nothing in an app's `root.tsx` needs to change to make those two work
+together. The prop above only matters if your root renders its OWN inline
+`<script>` tags that need to pass the same policy.
+
+`<Scripts />` owns both the inline data payload and the hydration client
+entry module — Stage 1 streaming SSR moved the entry module off a post-render
+string splice and onto real React output, read from the same document
+context the payload script already reads (`hydrationClientModuleUrl`). Its
+published `esm/hydration/index.mjs` file is a build input and must never be
+imported by application code.
 
 ## Add an application loader
 
@@ -34630,52 +35544,48 @@ These three findings (link sanitization + the two token-handling items above) ca
 
 ---
 name: create-a-warlock-project
-description: 'Scaffold a brand-new Warlock.js project with `create-warlock` — the interactive wizard and its non-interactive flag set. A single `--yes` command scaffolds the entire app from flags. Every flag (`--name`, `--db`, `--pm`, `--features`, `--ai`, `--git/--no-git`, `--jwt/--no-jwt`, `--no-db`, `--yes`), every valid database-driver / feature / AI-provider key, opting out of a database (`--db=none` / `--no-db`, which removes `src/config/database.ts`), and the directory tree the template emits. Triggers: `create-warlock`, `npm create warlock`, `npx create-warlock`; "scaffold a warlock app", "start a new warlock project", "create-warlock flags", "non-interactive warlock scaffold", "scaffold without a database", "which features can I pass to create-warlock". Skip: running an already-created project (`@warlock.js/core/run-app/SKILL.md`); adding a feature to an existing project (`warlock add`, `@warlock.js/core/add-connector/SKILL.md`); generating a module inside a project (`@warlock.js/core/create-module/SKILL.md`).'
+description: 'Scaffold a brand-new Warlock.js project with `create-warlock` — fully headless by default (at most one prompt — API-only vs full-stack web) plus `--interactive`/`--customize` for the full long-form wizard. Every flag (`--name`, `--stack`, `--db`, `--pm`, `--features`, `--ai`, `--agents`, `--git/--no-git`, `--jwt/--no-jwt`, `--no-db`, `--yes`, `--interactive`), every valid database-driver / feature / AI-provider / agent-kit-target key, opting out of a database (`--db=none` / `--no-db`, which removes `src/config/database.ts`), the post-scaffold decisions summary, and the directory tree the template emits. Triggers: `create-warlock`, `npm create warlock`, `npx create-warlock`; "scaffold a warlock app", "start a new warlock project", "create-warlock flags", "non-interactive warlock scaffold", "scaffold without a database", "which features can I pass to create-warlock", "agent-kit targets". Skip: running an already-created project (`@warlock.js/core/run-app/SKILL.md`); adding a feature to an existing project (`warlock add`, `@warlock.js/core/add-connector/SKILL.md`); generating a module inside a project (`@warlock.js/core/create-module/SKILL.md`).'
 ---
 
 # create-warlock — scaffold a new project
 
-`create-warlock` builds a fresh Warlock.js project: it copies the `warlock` template, substitutes the project name, wires the chosen database driver into `.env` (or, when you opt out with `--db=none`, removes `src/config/database.ts`), then delegates every optional package install to the project's own `warlock add` so dependency versions are never duplicated by the scaffolder.
+`create-warlock` builds a fresh Warlock.js project: it copies the `warlock` template, substitutes the project name, wires the chosen database driver into `.env` (or, when you opt out with `--db=none`, removes `src/config/database.ts`), derives `agent-kit` targets into the generated project, then delegates every optional package install to the project's own `warlock add` so dependency versions are never duplicated by the scaffolder.
 
 ## The shape
 
 ```bash
-# Interactive wizard (recommended for humans)
-npm create warlock@latest
-# or: npx create-warlock
+# Default: at most ONE prompt (API-only vs full-stack web) — everything else is a flag/default
+npx create-warlock my-app
 
-# Non-interactive (CI, agents, reproducible setups) — one command scaffolds the whole app
+# Fully headless — one command scaffolds the whole app, no prompts at all
 npx create-warlock my-app --yes --db=postgres --features=test,redis --ai=ai-openai
+
+# The one structural fork
+npx create-warlock my-web-app --yes --stack=web
 
 # No database at all
 npx create-warlock my-api --yes --no-db --features=test
+
+# The full long-form wizard, one prompt at a time
+npx create-warlock --interactive
 ```
 
 The first positional argument is the project name; it also becomes the directory created under the current working directory. If that directory already exists, the command aborts — it never overwrites.
 
-## Interactive flow
+## Three modes
 
-The wizard asks, in order:
-
-1. **Project name** — required.
-2. **Package manager** — chosen from the managers detected on the system (npm is always offered; yarn / pnpm appear if installed).
-3. **Database driver** — a single select: a driver, or **None** to scaffold without a database (see keys below).
-4. **Features** — a multiselect of optional packages (`react` is pre-checked).
-5. **AI providers** — a multiselect; picking any one pulls `@warlock.js/ai` automatically.
-6. **Initialize Git?** — yes/no.
-7. **Generate JWT secret keys?** — yes/no. If no, the cache is warmed instead.
-
-## Non-interactive flags
-
-Pass `--yes` (or `-y`) to skip every prompt and build from flags with defaults.
+1. **Default (a TTY, no `--yes`, no `--interactive`)** — asks the project name (if not already given) plus AT MOST ONE structural question: API-only or full-stack web (`--stack`). This is the only choice that changes the generated app's shape; every other choice below is reversible within minutes of scaffolding, so it is a flag with a sensible default, never a prompt.
+2. **`--yes` (or no TTY at all — CI, a script, an agent harness)** — fully headless. Every answer comes from a flag or its default; nothing is ever prompted, and stdin is never read.
+3. **`--interactive` (alias `--customize`)** — the full long-form wizard: project name, package manager, database driver, features, AI providers, git, JWT — one prompt after another, exactly like earlier `create-warlock` releases.
 
 **Without a terminal, `--yes` is not required.** When stdin is not a TTY — CI, a
-script, a container, an agent harness — the scaffolder does not try to prompt.
-If the flags already answer everything it needs, it simply scaffolds. Prompting
-is the fallback, not the precondition.
+script, a container, an agent harness — the scaffolder does not try to prompt,
+regardless of which of the three modes was requested. If the flags already
+answer everything it needs, it simply scaffolds. Prompting is the fallback,
+not the precondition.
 
 Only a question that genuinely cannot be answered stops the run, and in practice
-that is just the project name, the one prompt with no default:
+that is just the project name, the one required answer with no default:
 
 ```
 A project name is required and no terminal is available to ask for one. Pass it as
@@ -34683,21 +35593,51 @@ the first argument or --name=<name>. Non-interactive flags: --yes, --pm=<npm|yar
 --db=<driver>|--no-db, --features=<list>, --ai=<list>, --git|--no-git, --jwt|--no-jwt.
 ```
 
-| Flag                     | Takes value | Default        | Purpose                                                              |
-| ------------------------ | ----------- | -------------- | ------------------------------------------------------------------- |
-| `<positional>` / `--name`| yes         | — (required)   | Project name + target directory.                                    |
-| `--db`                   | yes         | `mongodb`      | Database driver key (`mongodb`, `postgres`, or `none`).             |
-| `--no-db`                | no          | —              | Opt out of a database — shorthand for `--db=none`.                  |
-| `--pm`                   | yes         | auto-detected  | Package manager — must be one of `npm` / `yarn` / `pnpm` / `bun`; anything else is rejected before scaffolding starts. |
-| `--features`             | yes (CSV)   | none           | Comma-separated optional feature keys.                              |
-| `--ai`                   | yes (CSV)   | none           | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`).     |
-| `--git` / `--no-git`     | no          | off            | Initialize a Git repo (`git init` + `main` branch + initial commit).|
-| `--jwt` / `--no-jwt`     | no          | off            | Generate JWT secrets via the project's `jwt` script.               |
-| `--yes` / `-y`           | no          | off            | Non-interactive mode.                                               |
+## After scaffolding: the decisions summary
 
-Value flags accept either `--db=postgres` or `--db postgres`. Unknown `--features` / `--ai` keys fail fast before any install.
+Because almost every choice defaults silently, `create-warlock` prints what it
+decided right after scaffolding, e.g.:
 
-`--help`/`-h` and `--version`/`-v` short-circuit before anything else — no prompt, filesystem write, or network call, and `--help` wins even over a positional project name. `--version` prints the installed `create-warlock` version.
+```
+Using npm · database: none · agent-kit targets: claude
+  change these — package manager: --pm, database: --db/--no-db, agents: --agents,
+  features: --features, ai: --ai, git: --git/--no-git, jwt: --jwt/--no-jwt — or
+  re-run with --interactive for the full wizard.
+```
+
+## Flags
+
+| Flag                       | Takes value | Default        | Purpose                                                              |
+| --------------------------- | ----------- | -------------- | ------------------------------------------------------------------- |
+| `<positional>` / `--name`  | yes         | — (required)   | Project name + target directory.                                    |
+| `--stack`                  | yes         | `api`          | `api` or `web` — the one structural question; `web` seeds the `web` feature by default. |
+| `--db`                     | yes         | `mongodb`      | Database driver key (`mongodb`, `postgres`, or `none`).             |
+| `--no-db`                  | no          | —              | Opt out of a database — shorthand for `--db=none`.                  |
+| `--pm`                     | yes         | inferred (`npm_config_user_agent` / system) | Package manager — must be one of `npm` / `yarn` / `pnpm` / `bun`; anything else is rejected before scaffolding starts. |
+| `--features`                | yes (CSV)   | none, or `["web"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys. An explicit `--features` always wins over the `--stack` default. |
+| `--ai`                      | yes (CSV)   | none           | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`).     |
+| `--agents`                  | yes (CSV)   | `claude`       | Comma-separated `agent-kit` targets — see below.                    |
+| `--git` / `--no-git`        | no          | off            | Initialize a Git repo (`git init` + `main` branch + initial commit).|
+| `--jwt` / `--no-jwt`        | no          | off            | Generate JWT secrets via the project's `jwt` script.               |
+| `--yes` / `-y`              | no          | off            | Fully headless mode.                                                 |
+| `--interactive`, `--customize` | no       | off            | Restore the full long-form wizard.                                   |
+
+Value flags accept either `--db=postgres` or `--db postgres`. Unknown `--features` / `--ai` / `--agents` keys fail fast before any install.
+
+`--help`/`-h` and `--version`/`-v` short-circuit before anything else — no prompt, filesystem write, or network call, and `--help` wins even over a positional project name. `--version` prints the installed `create-warlock` version. `--help` lists every flag above together with its default.
+
+## `--agents` and agent-kit targets
+
+`--agents` picks which `agent-kit` targets the generated project derives
+docs/skills for (written into the scaffolded `package.json`'s `agentKit.targets`
+when it differs from the default). The default, `claude`, is a tiny built-in
+fallback that always works — even fully offline. Any other target
+(`cursor`, `codex`, `kiro`, `copilot`, `antigravity`, `opencode`, `amp`,
+`goose`, …) is validated against the list published at
+https://mongez.js.org/agent-kit/llms.txt, fetched once and cached locally. If
+that fetch fails for an explicitly requested non-default target, the run fails
+visibly and names every target it *could* determine — it never silently
+guesses.
 
 ## Valid keys
 
@@ -34740,11 +35680,12 @@ The template ships a working auth module (login / logout / logout-all / refresh 
 
 ## Setup steps the scaffolder runs
 
-1. Copy template → substitute name → wire `DB_DRIVER` / `DB_PORT` into `.env` (or, for `--db=none`, remove `src/config/database.ts`).
+1. Copy template → substitute name → wire `DB_DRIVER` / `DB_PORT` into `.env` (or, for `--db=none`, remove `src/config/database.ts`) → record non-default `--agents` targets into `package.json`'s `agentKit.targets`.
 2. Install base dependencies (so the `warlock` binary exists).
 3. `warlock add <driver> <features...> <ai...> --no-install`, then one batched install. The `<driver>` is omitted for `--db=none`.
 4. `git init` (if `--git`).
 5. `jwt` script (if `--jwt`) — otherwise `warlock --warm-cache`.
+6. Print the decisions summary.
 
 Failures surface the error and halt; there is no rollback. After it finishes, `cd my-app` and run the dev server.
 

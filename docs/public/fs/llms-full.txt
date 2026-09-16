@@ -577,7 +577,7 @@ const moved = await fs.file("a.txt").moveTo(fs.dir("archive"));  // new File han
 
 ---
 name: write-atomically
-description: 'Atomic file writes via atomicWriteAsync(path, content) — writes to a uniquely-named sibling temp + rename onto target so readers see old or complete new content, never half-written. Triggers: `atomicWriteAsync`, `atomicWriteJsonAsync`; "atomic file write", "write config file safely with concurrent readers", "manifest written by build step", "state file across runs", "avoid half-written files"; typical import `import { atomicWriteAsync, atomicWriteJsonAsync } from "@warlock.js/fs"`. Skip: plain writes — `@warlock.js/fs/read-and-write-files/SKILL.md`; read-modify-write locking — `@warlock.js/cache/use-cache-lock/SKILL.md`; competing libs `write-file-atomic`, `steno`, `fs-extra` `outputFile`.'
+description: 'Atomic file writes via atomicWriteAsync(path, content) — writes to a uniquely-named sibling temp + rename onto target so readers see old or complete new content, never half-written; the rename retries transient Windows locks with backoff and throws a named AtomicWriteError on exhaustion. Triggers: `atomicWriteAsync`, `atomicWriteJsonAsync`, `AtomicWriteError`; "atomic file write", "write config file safely with concurrent readers", "manifest written by build step", "state file across runs", "avoid half-written files", "EPERM/EBUSY on rename", "atomic write fails intermittently on Windows"; typical import `import { atomicWriteAsync, atomicWriteJsonAsync, AtomicWriteError } from "@warlock.js/fs"`. Skip: plain writes — `@warlock.js/fs/read-and-write-files/SKILL.md`; read-modify-write locking — `@warlock.js/cache/use-cache-lock/SKILL.md`; competing libs `write-file-atomic`, `steno`, `fs-extra` `outputFile`.'
 ---
 
 # Atomic file writes
@@ -593,6 +593,8 @@ description: 'Atomic file writes via atomicWriteAsync(path, content) — writes 
 - **State files between runs of the same script.** A crash mid-write leaves you with a corrupt file you can't read on the next run.
 
 `atomicWriteAsync` writes to a uniquely-named sibling temp file first, then `rename`s it onto the target. On most filesystems the rename is atomic — readers see the old content, then the new content, never anything in between.
+
+The rename step retries on transient Windows locks (`EPERM` / `EBUSY` / `EACCES` — antivirus or the search indexer briefly holding a just-created file) with bounded exponential backoff: 5 attempts, starting at 20ms and doubling, capping total wait under ~1s. Any other error is thrown immediately. It never falls back to a non-atomic direct write — if every retry fails, it throws a named `AtomicWriteError` naming the target path and the attempt count, with the last OS error attached as `cause`.
 
 ## Shape
 
@@ -612,8 +614,9 @@ await atomicWriteJsonAsync("./manifest.json", { version: "1.0.0", files: [...] }
 1. mkdir(dir, recursive)
 2. tempPath = `${dir}/.${name}.${randomHex(6)}.tmp`     ← unique sibling temp
 3. writeFile(tempPath, content)
-4. rename(tempPath, filePath)                            ← atomic on POSIX, near-atomic on NTFS
-   on failure: unlink(tempPath)
+4. rename(tempPath, filePath), retrying on EPERM/EBUSY/EACCES with backoff
+   on exhaustion: unlink(tempPath), throw AtomicWriteError
+   on any other error: unlink(tempPath), rethrow immediately
 ```
 
 The random 6-byte suffix prevents two concurrent writers from racing on the same temp file. The temp file lives in the **same directory** as the target so the rename is intra-mount (cross-mount rename would fall back to copy + unlink, which isn't atomic).
@@ -655,6 +658,25 @@ await atomicWriteAsync("./config.toml", config);
 ```
 
 The dev server's file watcher fires once after the rename, sees complete content. No double-event or partial-content noise.
+
+## Handling AtomicWriteError
+
+```ts
+import { atomicWriteAsync, AtomicWriteError } from "@warlock.js/fs";
+
+try {
+  await atomicWriteAsync("./manifest.json", content);
+} catch (error) {
+  if (error instanceof AtomicWriteError) {
+    // error.targetPath — the file that couldn't be replaced
+    // error.attempts   — how many rename attempts were made
+    // error.cause      — the last OS error (e.g. { code: "EBUSY" })
+  }
+  throw error;
+}
+```
+
+`AtomicWriteError` is thrown only after every retry attempt fails on a transient lock code. A non-retryable error (e.g. `ENOSPC`, or the target being an existing directory) is thrown immediately, unwrapped, after a single attempt — it is never wrapped in `AtomicWriteError`.
 
 ## What it doesn't protect against
 

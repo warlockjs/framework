@@ -15,7 +15,7 @@ description: 'Check permissions in `@warlock.js/access` — `can` / `cannot` / `
 
 ## In a route — class-level gate
 
-Stack it AFTER `authMiddleware` (which sets `request.user`):
+Stack it AFTER `authMiddleware` (which sets `request.locals.user`):
 
 ```ts
 import { authMiddleware } from "@warlock.js/auth";
@@ -70,7 +70,7 @@ await authorize(user, "orders.update", { resource: order, tenant }); // grant AN
 ## Gotchas
 
 - **Fails closed, but config errors are loud.** A resolver or policy that throws → denied and logged (a user with no roles is denied, never allowed by accident). The one exception: `AccessConfigError` (e.g. no resolver configured) is **re-thrown**, not denied — a misconfig must surface, not hide. A cache outage is different again: it degrades to the resolver (the cache fails *open*; the decision still fails closed).
-- Stack `gate` **after** `authMiddleware` — it reads `request.user`; without an authenticated user it `403`s.
+- Stack `gate` **after** `authMiddleware` — it reads `request.locals.user`; without an authenticated user it `403`s.
 - The boolean `can*` family never throws; the `authorize*` family throws `ForbiddenError`. Pick per layer (controllers gate with middleware, services assert with `authorize`).
 
 ## See also
@@ -429,7 +429,7 @@ If roles live on the user (a `roles` column) or in a token claim, you don't use 
 
 ---
 name: overview
-description: 'Front-door for `@warlock.js/access` — authorization (RBAC + ABAC) for Warlock apps: `can` / `authorize` / `gate` permission checks, `definePolicy` attribute conditions, role management, and a pluggable `AccessResolver` that connects the engine to however you store roles. Depends on `@warlock.js/auth` (reads `request.user`). TRIGGER when: importing from `@warlock.js/access`; "permissions in Warlock", "RBAC", "can this user do X", "protect a route by permission", "role-based access", "ownership / policy check". Skip: authentication / login (that is `@warlock.js/auth`); a known task — load the matching skill (`check-permissions`, `define-policies`, `manage-roles`, `implement-resolver`, `configure-access`).'
+description: 'Front-door for `@warlock.js/access` — authorization (RBAC + ABAC) for Warlock apps: `can` / `authorize` / `gate` permission checks, `definePolicy` attribute conditions, role management, and a pluggable `AccessResolver` that connects the engine to however you store roles. Depends on `@warlock.js/auth` (reads `request.locals.user`). TRIGGER when: importing from `@warlock.js/access`; "permissions in Warlock", "RBAC", "can this user do X", "protect a route by permission", "role-based access", "ownership / policy check". Skip: authentication / login (that is `@warlock.js/auth`); a known task — load the matching skill (`check-permissions`, `define-policies`, `manage-roles`, `implement-resolver`, `configure-access`).'
 ---
 
 # `@warlock.js/access` — overview
@@ -465,7 +465,7 @@ Skip if you only need "is the user an admin" — `authMiddleware("admin")` from 
 
 ## What it deliberately doesn't do
 
-- **Authentication.** Use `@warlock.js/auth`; `access` reads `request.user`.
+- **Authentication.** Use `@warlock.js/auth`; `access` reads `request.locals.user`.
 - **Ship a permission admin UI.** The engine reads permission strings; whether the catalog is code-defined (`DefaultAccessResolver`) or DB-managed (the ejected `DatabaseAccessResolver`) is your resolver's choice — the package ships no admin screens.
 - **ReBAC graphs / row-level query scoping.** Use a policy for "own resource"; graph-scale relationships are out of scope.
 

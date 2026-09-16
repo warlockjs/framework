@@ -233,7 +233,7 @@ See the [Registering a connector](#registering-a-connector) section above for th
 
 - **Set `this.active = true` only on success.** If `start()` throws partway, leaving `active` true means `shutdown()` thinks it has work to do and may double-close half-initialized resources.
 - **`shutdown()` must be idempotent.** SIGINT can fire twice on Windows. The manager guards re-entry with its own flag, but individual connectors get called once per shutdown loop — guard with `if (!this.active) return`.
-- **Don't reach across connector boundaries in `start()`.** The manager's `start()` loop runs all `boot()`s first, then all `start()`s — wiring across connectors goes through the `container` (`container.get("http.server")`), not through imports.
+- **Don't reach across connector boundaries in `start()`.** The manager's `start()` loop runs all `boot()`s first, then all `start()`s — wiring across connectors goes through the `container`, not through imports. Use `container.tryGet("http.server")` when the other connector is genuinely optional (e.g. socket falls back to its own raw server when HTTP isn't configured); use `container.get("http.server")` when its absence would be a bug — it throws a named `ContainerKeyMissingError` instead of handing back `undefined`.
 - **Production build still needs config registration.** Placing the connector under `src/connectors/<name>.ts` does not auto-register it. Put the same instance in `warlock.config.ts > connectors`; that array is what build-time contribution discovery and runtime boot share.
 - **`watchedFiles` is restart-trigger, not dependency.** It says "I want to restart when this file changes." It does *not* mean the framework reloads that file first — that's the file orchestrator's job.
 
@@ -751,8 +751,8 @@ class OrdersRestful extends Restful<Order> {
   protected recordName = "order";
 
   protected async beforeCreate(request, response, order) {
-    order.set("organization_id", request.user.organizationId);
-    order.set("created_by", request.user.id);
+    order.set("organization_id", request.locals.user.organizationId);
+    order.set("created_by", request.locals.user.id);
   }
 }
 
@@ -1023,10 +1023,41 @@ const httpConfigurations: HttpConfigurations = {
       path: "/",
     },
   },
+  csp: {
+    enabled: true,
+    directives: {
+      "img-src": ["'self'", "data:", "https://cdn.example.com"],
+    },
+  },
 };
 
 export default httpConfigurations;
 ```
+
+### `csp` — Content-Security-Policy (5.12.0)
+
+Opt-in (`enabled: true`) `Content-Security-Policy` header, built per-request
+from a documented default policy plus your `directives`, with the
+framework's own per-request nonce always added to `script-src`:
+
+```
+default-src 'self'; script-src 'self' 'nonce-<request nonce>'; style-src 'self';
+img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'
+```
+
+A directive you name under `directives` **replaces** the default list for
+that directive (never merged element-wise) — declare the full value list you
+want. Set `reportOnly: true` to emit `Content-Security-Policy-Report-Only`
+instead while you observe violations without blocking anything. Absent or
+`enabled: false` (the default) emits no header at all — no behaviour change
+for apps that don't opt in.
+
+A malformed directive value (containing `;`, or with an unbalanced `'`
+count) throws `InvalidCspDirectiveError` at boot, not silently — fix the
+value in `src/config/http.ts` rather than expecting the framework to repair
+it. See [`send-response/SKILL.md`](../send-response/SKILL.md) for how the
+header lands on the response, and `@warlock.js/web`'s docs for how the
+same nonce reaches the page's `<script>` tags.
 
 ## Which layer holds what
 
@@ -1244,7 +1275,7 @@ Scaffold with: `npx warlock generate.controller <module>/<action>` (add `--with-
 | `request.input("key", default?)`  | one field                                        | reading a single param/body field by name           |
 | `request.all()`                   | full input object                                | passing the whole input straight to a service       |
 | `request.validated()`             | schema-typed object (only after schema attached) | controllers with a schema — preferred over `.all()` |
-| `request.user`                    | authenticated user                               | guarded routes (see "Typing a guarded handler")     |
+| `request.locals.user`             | authenticated user                               | guarded routes (see "Typing a guarded handler")     |
 | `request.file("key")`             | `UploadedFile`                                   | multipart uploads                                   |
 | `request.header("X-Foo")`         | header value                                     | reading request metadata                            |
 | `request.ip`, `request.userAgent` | strings                                          | logging, device info                                |
@@ -1300,7 +1331,7 @@ If validation fails, the framework returns a 400 with an `errors` payload and yo
 
 ### Typing a guarded handler
 
-Routes behind `authMiddleware` need `request.user` typed. Project conventions add a `GuardedRequest<TSchema>` (adding `user: User`) and a paired `GuardedRequestHandler<TSchema>` alias in `app/auth/requests/guarded.request`:
+Routes behind `authMiddleware` need `request.locals.user` typed. Project conventions add a `GuardedRequest<TSchema>` (overriding `locals` to `RequestLocals & { user: User }`) and a paired `GuardedRequestHandler<TSchema>` alias in `app/auth/requests/guarded.request`:
 
 ```ts
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
@@ -1310,7 +1341,7 @@ export const createProductController: GuardedRequestHandler<CreateProductSchema>
   request,
   response,
 }) => {
-  // request.user is typed
+  // request.locals.user is typed
   const product = await createProductService(request.validated());
   return response.successCreate({ product });
 };
@@ -1359,7 +1390,7 @@ import { listProductsService } from "../services/list-products.service";
 export const listProductsController: RequestHandler = async ({ request, response }) => {
   const { data: products, pagination } = await listProductsService({
     ...request.all(),
-    organization_id: request.user.organizationId,
+    organization_id: request.locals.user.organizationId,
   });
 
   return response.success({ products, pagination });
@@ -2986,6 +3017,218 @@ Reusing one key for different result types is a caller bug: TypeScript cannot co
 - [`create-controller/SKILL.md`](../create-controller/SKILL.md) — consuming request-scoped values from controllers.
 
 
+## request-tracing  `@warlock.js/core/request-tracing/SKILL.md`
+
+---
+name: request-tracing
+description: 'Vendor-neutral request tracing hooks (`http.tracing`) — observe request start/end and named phase spans (`route.match`, `middleware`, `validation`, `handler`, `response.write`) without adopting an OTel/vendor dependency in `core`. Covers the `TracingHooks` shape, trace id derivation from an inbound W3C `traceparent` vs `request.id`, that a throwing hook is caught and reported once (never breaks the request), and zero overhead when disabled. Triggers: `http.tracing`, `TracingHooks`, `onRequestStart`, `onRequestEnd`, `onPhase`, `traceparent`, `traceId`, `dispatchPhase`, "instrument requests", "trace a request", "slow phase logging", "APM / OTel bridge for Warlock". Skip: request-id header echo/inheritance (`X-Request-Id`) — `@warlock.js/core/use-middleware/SKILL.md`; app-level structured logging — `@warlock.js/logger/logger-basics/SKILL.md`; competing libs `@opentelemetry/api` direct instrumentation, `express-request-id`, hand-rolled `X-Trace-Id` middleware.'
+---
+
+# Warlock — request tracing hooks
+
+`http.tracing` gives every request a set of named phase spans and start/end
+events, delivered to plain callbacks you register in config — no
+`@opentelemetry/api` dependency in `core`, in this release or later (an OTel
+bridge is a separate, optional package that subscribes to these hooks; it
+does not exist yet). OFF by default, and a disabled app pays exactly one
+cached boolean check per call site — no context object is built, no
+`performance.now()` is called, nothing is allocated.
+
+## Enabling it
+
+```ts
+// src/config/http.ts
+export default {
+  tracing: {
+    enabled: true, // default false
+    hooks: [
+      {
+        onRequestStart(ctx) {
+          /* ctx: { traceId, requestId, method, route, path } */
+        },
+        onPhase(ctx, phase) {
+          /* phase: { name, durationMs, attrs? } */
+        },
+        onRequestEnd(ctx, result) {
+          /* result: { status?, durationMs, error? } */
+        },
+      },
+    ],
+  },
+};
+```
+
+`enabled` is resolved once at first read and cached for the process — flipping
+it requires a restart, the same trade-off as `http.maintenance.enabled` and
+`http.requestId.enabled`.
+
+## The `TracingHooks` shape
+
+```ts
+type TracingContext = {
+  traceId: string; // see "Trace id derivation" below
+  requestId: string; // request.id
+  method: string;
+  route?: string; // matched pattern, e.g. "/users/:id" — undefined before routing
+  path: string;
+};
+
+type TracingPhaseInfo = {
+  name: string;
+  durationMs: number;
+  attrs?: Record<string, unknown>;
+};
+
+type TracingRequestEndInfo = {
+  status?: number;
+  durationMs: number;
+  error?: unknown;
+};
+
+type TracingHooks = {
+  onRequestStart?(ctx: TracingContext): void;
+  onRequestEnd?(ctx: TracingContext, result: TracingRequestEndInfo): void;
+  onPhase?(ctx: TracingContext, phase: TracingPhaseInfo): void;
+};
+```
+
+Every verb is optional — a hook that only wants phase spans need not implement
+`onRequestStart`/`onRequestEnd`. Register as many hooks as you like via
+`hooks: TracingHooks[]`; each fires independently.
+
+## Phase names
+
+`core` wires five phases into the request lifecycle, in this order, for every
+HTTP request:
+
+| Phase | Fires around |
+| --- | --- |
+| `route.match` | Resolving the incoming path/method to a registered route |
+| `middleware` | Each middleware in the route's chain — one `onPhase` call per middleware, with `attrs: { name, index }` |
+| `validation` | The route's input validation (`v.object(...)` / RESTful resource validation) |
+| `handler` | The route handler itself |
+| `response.write` | The overall request span, closed once the response has settled (success or thrown error) — this is also where `onRequestEnd` fires |
+
+`@warlock.js/web` page requests report through this same `onPhase` surface
+instead of adding a separate hook API. They add three phases:
+
+| Phase | Fires around |
+| --- | --- |
+| `loader` | Each loader level, once per app/layout/page, with `attrs: { level, layoutPath? }` |
+| `render.shell` | Time from render start until React's shell is ready to stream |
+| `stream.end` | The whole streamed response, including every `defer()` value settling |
+
+## Trace id derivation
+
+`ctx.traceId` is derived once per request:
+
+1. If the inbound `traceparent` header is a valid W3C version-`00` header
+   (`00-<32 hex>-<16 hex>-<2 hex>`, trace id not all-zero), `traceId` is that
+   header's trace id — so a request already inside someone else's distributed
+   trace keeps the same id through Warlock.
+2. Otherwise `traceId` falls back to `request.id` (the framework's own
+   per-request correlation id — see
+   [`use-middleware/SKILL.md`](../use-middleware/SKILL.md#request-id-correlation)
+   for how that id is generated/inherited/echoed).
+
+`ctx.requestId` is always `request.id`, regardless of which branch produced
+`traceId` — so a hook can always join back to the same id the framework logs
+and echoes on `X-Request-Id`, even when `traceId` came from an inbound header.
+
+```ts
+import { deriveTraceId, parseTraceparentTraceId } from "@warlock.js/core";
+
+parseTraceparentTraceId("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01");
+// -> "4bf92f3577b34da6a3ce929d0e0e4736"
+
+deriveTraceId(undefined, "req-abc123");
+// -> "req-abc123" (no traceparent, falls back to requestId)
+```
+
+## Response header: no new one
+
+Tracing does **not** add a response header of its own. `core` already echoes
+`request.id` back as `X-Request-Id` on every response (see
+[`use-middleware/SKILL.md`](../use-middleware/SKILL.md#request-id-correlation)) —
+apps correlate through that existing header. When a valid inbound
+`traceparent` is present, `ctx.traceId` inside your hooks carries that trace
+id even though the response header still reflects `request.id`; if you need
+the resolved `traceId` on the wire (e.g. to hand back to a caller that sent
+`traceparent`), read it from your own `onRequestStart`/`onPhase` hook and set
+it yourself — `core` deliberately doesn't duplicate it into a second header.
+
+## A throwing hook never breaks a request
+
+Every hook call is wrapped: if a hook throws, the dispatcher catches it,
+reports it once per `(hook, verb)` pair per process to the error sink, and
+continues with the next hook. A hook that throws on every request does not
+flood your logs and never turns an observability bug into a 500 for real
+traffic.
+
+## Zero overhead when disabled
+
+`http.tracing.enabled` is resolved once (lazily, on first read) and cached —
+never re-read per request. Every instrumented call site checks that cached
+boolean **before** building a context object or calling `performance.now()`,
+so a disabled app pays exactly one boolean check per phase and allocates
+nothing extra. Don't wrap `dispatchPhase`/`buildTracingContext` calls in your
+own extra guard — the check is already there.
+
+## Example: log phases slower than a threshold
+
+```ts
+// src/config/http.ts
+import { log } from "@warlock.js/logger";
+
+const SLOW_MS = 200;
+
+export default {
+  tracing: {
+    enabled: env("TRACING_ENABLED") === "true",
+    hooks: [
+      {
+        onPhase(ctx, phase) {
+          if (phase.durationMs < SLOW_MS) return;
+
+          log.warn("http", "slow-phase", {
+            traceId: ctx.traceId,
+            requestId: ctx.requestId,
+            route: ctx.route,
+            phase: phase.name,
+            durationMs: phase.durationMs,
+            attrs: phase.attrs,
+          });
+        },
+      },
+    ],
+  },
+};
+```
+
+## Gotchas
+
+- **No OTel dependency, and none planned for `core`.** An OTel (or other
+  vendor) bridge is a separate, optional package that subscribes to these
+  hooks — never add `@opentelemetry/api` to `core` itself.
+- **`web`'s phases aren't live yet.** Don't register a hook expecting
+  `loader`/`render.shell`/`stream.end` calls today; only the five `core`
+  phases fire in this release.
+- **`route` is `undefined` until routing has matched.** There's no path where
+  a hook fires before that, but code branching on `ctx.route` for an
+  early-failing request (e.g. a 404 with no match) must handle `undefined`.
+- **`traceId` is not a second correlation id to store separately by default.**
+  It equals `requestId` unless the caller sent a valid `traceparent` — don't
+  assume it's always a 32-hex OTel-shaped value.
+- **Toggling `enabled` needs a restart.** It's resolved once per process, the
+  same trade-off as `http.maintenance.enabled`.
+
+## See also
+
+- [`use-middleware/SKILL.md`](../use-middleware/SKILL.md#request-id-correlation) — `X-Request-Id` inheritance/echo, the header tracing correlates through.
+- [`use-app-context/SKILL.md`](../use-app-context/SKILL.md) — request-scoped ALS context (`request`/`response`) tracing hooks run inside.
+- [`@warlock.js/logger/logger-basics/SKILL.md`](../../../logger/skills/logger-basics/SKILL.md) — structured logging; tracing hooks are the place to bridge phase timing into your log channel.
+
+
 ## resolve-path  `@warlock.js/core/resolve-path/SKILL.md`
 
 ---
@@ -4337,6 +4580,22 @@ These are the flags whose absence never fails a test and is fatal in production:
 
 These mutate the response in place; chain or call before the final `return response.<helper>()`.
 
+### `Content-Security-Policy` (5.12.0)
+
+Opt in via `http.csp.enabled` in `src/config/http.ts` (see
+[`configure-app/SKILL.md`](../configure-app/SKILL.md) for the full shape).
+When enabled, every response through the shared request funnel
+(`http/middleware/inject-request-context.ts`, the same seam that stamps
+`X-Request-Id`) gets a `Content-Security-Policy` header — `-Report-Only`
+instead when `reportOnly: true` — built from the framework's default policy
+merged with your `directives`, with the current request's CSP nonce always
+appended to `script-src`. It is a no-op, and adds no header, while `http.csp`
+is unset — every existing app is unaffected until it opts in.
+
+A route can still override it — call `response.header("Content-Security-Policy", ...)`
+from a controller or middleware that runs after the funnel, and your value
+wins, same as any other header.
+
 ## Common patterns
 
 ### Localized error
@@ -4768,7 +5027,7 @@ export const uploadAvatarController: GuardedRequestHandler = async ({ request, r
     return response.badRequest({ error: "missing file" });
   }
 
-  const file = await storage.put(upload, `avatars/${request.user.id}/${upload.name}`);
+  const file = await storage.put(upload, `avatars/${request.locals.user.id}/${upload.name}`);
 
   return response.successCreate({ url: file.url, hash: file.hash });
 };
@@ -5711,7 +5970,7 @@ export const uploadAvatarController: GuardedRequestHandler<UploadAvatarSchema> =
     .resize(400, 400)
     .format("webp")
     .quality(85)
-    .save(`avatars/${request.user.id}`);
+    .save(`avatars/${request.locals.user.id}`);
 
   return response.successCreate({ path: file.path, url: file.url });
 };
@@ -5929,7 +6188,7 @@ export const createUploadController: RequestHandler = async ({ request, response
 
   const saved = await Promise.all(
     files.map((file) =>
-      file.save(`uploads/${request.user.organizationId}`, {
+      file.save(`uploads/${request.locals.user.organizationId}`, {
         prefix: { as: "directory", format: "DD-MM-YYYY" },
       }),
     ),
@@ -6170,7 +6429,7 @@ app.router      // the Router singleton
 app.database    // Cascade's DataSource
 ```
 
-Each property is a getter backed by the framework's DI container (`container.get("http.server")` etc.). The container is populated by connectors during their `boot()`/`start()` phase — read these accessors only after the relevant connector has run. Every getter is a thin `container.get(...)`, so before the connector boots it returns `undefined` (it does **not** throw); chaining off an `undefined` accessor is what blows up. `http` and `socket` are *late*-phase connectors — they boot **after** app code is imported, so these accessors are not populated at the top level of a module's `main.ts`. From inside controllers, services, use-cases, or any code that runs while a request is in flight, every accessor is safe.
+Each property is a getter backed by the framework's DI container (`container.tryGet("http.server")` etc. — `router` uses `container.get(...)`, which throws instead, since it is never legitimately absent). The container is populated by connectors during their `boot()`/`start()` phase — read these accessors only after the relevant connector has run. `http`, `socket`, and `database` are thin `container.tryGet(...)` reads, so before the connector boots they return `undefined` (they do **not** throw); chaining off an `undefined` accessor is what blows up. `http` and `socket` are *late*-phase connectors — they boot **after** app code is imported, so these accessors are not populated at the top level of a module's `main.ts`. From inside controllers, services, use-cases, or any code that runs while a request is in flight, every accessor is safe.
 
 Typical uses (note: from runtime code, after bootstrap — not at module-import time):
 
@@ -6277,7 +6536,7 @@ cors: {
 
 - **`version` is `null` until the first `await`.** The version loader is async (it reads `package.json`). On a cold start before any framework code has run `getWarlockVersion()`, `Application.version` returns `null`. The framework does load it during bootstrap, so anywhere downstream of bootstrap is fine — controllers, services, connectors after `start()`. CLI commands without `preload.bootstrap` may see `null`.
 - **`Application` is static, not a DI registration.** Don't try to inject it. There's nothing to inject — it's a class with only static members.
-- **`app.*` accessors return `undefined` before their connector boots — they don't throw.** `app.socket` / `app.database` / `app.http` are populated by their respective connectors during boot; until then each getter returns `undefined` (a bare `container.get(...)`). Reading them earlier (eager module-load code, the top level of a `main.ts` for the late-phase `http`/`socket`, certain CLI commands without the right `preload.connectors`) hands you `undefined`, and chaining off it throws. Safe everywhere downstream of bootstrap — including inside `Application.onceBooted(...)`.
+- **`app.*` accessors return `undefined` before their connector boots — they don't throw.** `app.socket` / `app.database` / `app.http` are populated by their respective connectors during boot; until then each getter returns `undefined` (a bare `container.tryGet(...)`). Reading them earlier (eager module-load code, the top level of a `main.ts` for the late-phase `http`/`socket`, certain CLI commands without the right `preload.connectors`) hands you `undefined`, and chaining off it throws. Safe everywhere downstream of bootstrap — including inside `Application.onceBooted(...)`. `app.router` is the exception: it reads via `container.get(...)`, which throws a named `ContainerKeyMissingError` instead of handing back `undefined`, because the router is never a legitimate absence.
 - **`onceBooted` is a latch, not `events.on`.** A callback registered *after* boot completed still runs (next microtask) instead of silently missing the signal — so register it wherever it reads best, including module top-level in `main.ts`. A listener that throws is caught and logged; it can't break boot or the other listeners.
 - **`onShutdown` runs before connectors close, not after.** That ordering is deliberate so cleanup can still use db/cache/http — but it means a hook that hangs delays connector teardown (bounded only by your process manager's kill timeout). Keep teardown fast; for HTTP draining the framework already bounds it via `http.gracefulShutdown.timeout`.
 
@@ -6651,7 +6910,7 @@ router.post("/ai/summarize", summarizeController, {
 
 ## `idempotency` — must run after auth
 
-The cache key is `idem:{userType}:{userId|ip}:{key}` so user A can't replay user B's key. That requires `request.user` to be populated, so order it **after** `authMiddleware`:
+The cache key is `idem:{userType}:{userId|ip}:{key}` so user A can't replay user B's key. That requires `request.locals.user` to be populated, so order it **after** `authMiddleware`:
 
 ```ts
 import { authMiddleware } from "@warlock.js/auth";
@@ -6827,7 +7086,7 @@ export default {
 ## Gotchas
 
 - **Bare factory names are not exported.** Always reach for them via `middleware` (`middleware.rateLimit`, not `rateLimitMiddleware`). The internal `*Middleware`-suffixed names are an in-package code-organization detail.
-- **Idempotency must run after auth.** The cache key includes `request.user` for scope-isolation. Putting it before auth silently falls back to IP-scope for every request.
+- **Idempotency must run after auth.** The cache key includes `request.locals.user` for scope-isolation. Putting it before auth silently falls back to IP-scope for every request.
 - **In-process counters lose state on restart.** `middleware.rateLimit` and `middleware.concurrencyLimit` use module-scoped `Map`s. A redeploy resets every window/counter. For globally-shared limits, use `@fastify/rate-limit` with a Redis store.
 - **Idempotency clients must reuse the key across retries.** If your client generates a new UUID on every attempt, idempotency is a no-op. Generate once at "intent" time.
 - **`ipFilter` fail-closed.** Empty / unparseable IP = denied. Internal callers (Unix sockets, local processes) need explicit allowlisting.
@@ -7352,7 +7611,7 @@ import { listFaqsService } from "../services/list-faqs.service";
 export const listFaqsController: GuardedRequestHandler = async ({ request, response }) => {
   const { data, pagination } = await listFaqsService({
     ...request.all(),
-    organization_id: request.user.organizationId,
+    organization_id: request.locals.user.organizationId,
   });
 
   return response.success({ data, pagination });
@@ -7654,7 +7913,7 @@ Writing `request.locals.organization` does not affect `request.all()`, `request.
 - Use `request.locals` for per-request data written by middleware and read downstream.
 - Use `requestMemo(key, fn)` for lazily computed, single-flight work scoped to the active request.
 - Augment `Request` itself only for a genuine new typed member that also has a runtime implementation.
-- Augment `RequestUser` for the authenticated `request.user` shape; do not duplicate it under locals merely to work around typing.
+- The authenticated user itself already lives at `request.locals.user` — `@warlock.js/auth` augments `RequestLocals` with a `user?: RequestUser` key and its middleware writes it. Core's own `request.user` was removed in 5.12.0; do not re-add a separate `user` local outside that key.
 
 ## Gotchas
 
@@ -8468,7 +8727,7 @@ const socketOptions: SocketOptions = {
 Two ways to get the `socket.io` `Server` instance:
 
 ```ts
-// 1. Via the app runtime accessor — reads container.get("socket")
+// 1. Via the app runtime accessor — reads container.tryGet("socket")
 import { app } from "@warlock.js/core";
 
 const io = app.socket;            // → Server, or undefined before the socket connector boots
@@ -8479,7 +8738,7 @@ import { getSocketServer } from "@warlock.js/core";
 const io = getSocketServer();     // → Server | null
 ```
 
-Both read the same DI container slot. `app.socket` is a getter that returns `container.get("socket")` — that's `undefined` (it does **not** throw) until the socket connector has booted. `getSocketServer()` checks `container.has("socket")` and returns `null` if absent. Prefer `getSocketServer()` plus a null-guard at any call site that *might* run before the connector boots (module-load code, `main.ts` top level, scripts that skip bootstrap). From a controller, a service, a job — anything downstream of a completed bootstrap — `app.socket` is populated and safe to read directly.
+Both read the same DI container slot. `app.socket` is a getter that returns `container.tryGet("socket")` — that's `undefined` (it does **not** throw) until the socket connector has booted. `getSocketServer()` reads the same `container.tryGet("socket")` and returns `null` if absent. Prefer `getSocketServer()` plus a null-guard at any call site that *might* run before the connector boots (module-load code, `main.ts` top level, scripts that skip bootstrap). From a controller, a service, a job — anything downstream of a completed bootstrap — `app.socket` is populated and safe to read directly.
 
 ## Wiring `connection` handlers
 
@@ -8524,7 +8783,7 @@ import type { GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { notifyUserService } from "../services/notify-user.service";
 
 export const sendNotificationController: GuardedRequestHandler = async ({ request, response }) => {
-  await notifyUserService(request.user, request.input("payload"));
+  await notifyUserService(request.locals.user, request.input("payload"));
   return response.success({ delivered: true });
 };
 ```
@@ -9057,7 +9316,8 @@ If you short-circuit, the controller never runs. The response helper you pick (`
 You can attach arbitrary fields to `request` from a middleware, and they survive into the controller. The cleanest pattern is to extend `Request` via module augmentation in a `.d.ts` and assign in the middleware:
 
 ```ts title="src/app/feature-flags/middleware/load-feature-flag.middleware.ts"
-import type { Middleware, Request, RequestUser } from "@warlock.js/core";
+import type { Middleware, Request } from "@warlock.js/core";
+import type { RequestUser } from "@warlock.js/auth";
 import { FeatureFlag } from "../models/feature-flag";
 
 declare module "@warlock.js/core" {
@@ -9066,12 +9326,17 @@ declare module "@warlock.js/core" {
   }
 }
 
-export const loadFeatureFlag: Middleware<Request & { user: RequestUser }> = async ({ request }) => {
-  request.featureFlag = await FeatureFlag.findBy("organization_id", request.user.organizationId);
+export const loadFeatureFlag: Middleware<Request & { locals: { user: RequestUser } }> = async ({
+  request,
+}) => {
+  request.featureFlag = await FeatureFlag.findBy(
+    "organization_id",
+    request.locals.user.organizationId,
+  );
 };
 ```
 
-After this middleware runs, `request.featureFlag` is typed inside any downstream middleware or controller. The same pattern is how `@warlock.js/auth`'s `authMiddleware` attaches `request.user` and `request.decodedAccessToken`.
+After this middleware runs, `request.featureFlag` is typed inside any downstream middleware or controller. The same pattern is how `@warlock.js/auth`'s `authMiddleware` attaches `request.locals.user` and `request.decodedAccessToken`.
 
 ## Registration — three scopes
 
@@ -9212,7 +9477,7 @@ export const optionalAuth: Middleware = async ({ request, response }) => {
 
 - [`use-middleware/SKILL.md`](../use-middleware/SKILL.md) — the built-in middleware catalog (`rateLimit`, `idempotency`, `maxBodySize`, etc.) + request-id correlation.
 - [`register-route/SKILL.md`](../register-route/SKILL.md) — where middleware attaches: `router.group` and route-options.
-- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — how the controller picks up `request.user`, `request.validated()`, etc., set by upstream middleware.
+- [`create-controller/SKILL.md`](../create-controller/SKILL.md) — how the controller picks up `request.locals.user`, `request.validated()`, etc., set by upstream middleware.
 - [`send-response/SKILL.md`](../send-response/SKILL.md) — the response helpers used to short-circuit.
 - [`warlock-conventions/SKILL.md`](../warlock-conventions/SKILL.md) — the `guarded()` / `guardedAdmin()` / `publicRoutes()` convention.
 
@@ -9794,7 +10059,7 @@ Populate `ctx` from a controller via runtime options:
 ```ts
 await cancelOrderUseCase(
   { orderId: request.input("id") },
-  { ctx: { currentUser: request.user } },
+  { ctx: { currentUser: request.locals.user } },
 );
 ```
 
