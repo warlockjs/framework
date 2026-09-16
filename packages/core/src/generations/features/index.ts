@@ -17,6 +17,7 @@ import { mongodbFeature } from "./mongodb.feature";
 import { mysqlFeature } from "./mysql.feature";
 import { notificationsFeature } from "./notifications.feature";
 import { postgresFeature } from "./postgres.feature";
+import { queueFeature } from "./queue.feature";
 import { reactEmailFeature } from "./react-email.feature";
 import { reactFeature } from "./react.feature";
 import { redisFeature } from "./redis.feature";
@@ -65,6 +66,7 @@ export const featuresMap: Record<string, FeatureDefinition> = {
   // three of them are one stack a reader should meet in build order.
   shadcn: shadcnFeature,
   herald: heraldFeature,
+  queue: queueFeature,
   socket: socketFeature,
   notifications: notificationsFeature,
   access: accessFeature,

@@ -6,6 +6,7 @@ All notable changes to `@warlock.js/core` are documented in this file.
 
 ### Added
 
+- `warlock add queue` installs `@warlock.js/queue`, generates Redis-backed `src/config/queue.ts`, and registers `queueConnector()` in `warlock.config.ts`.
 - `warlock dev` generates `.warlock/typings/translations.d.ts` from literal `groupedTranslations` dictionaries, augmenting web's typed translation-key registry.
 
 ### Changed

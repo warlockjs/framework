@@ -6,12 +6,8 @@ vi.mock("node:child_process", () => ({
   execSync: (...args: unknown[]) => execSync(...args),
 }));
 
-const {
-  allowedFeatures,
-  featuresMap,
-  installDependencies,
-  resolveWarlockDependencyVersions,
-} = await import("../../../src/generations/add-command.action");
+const { allowedFeatures, featuresMap, installDependencies, resolveWarlockDependencyVersions } =
+  await import("../../../src/generations/add-command.action");
 import { INSTALLED_WARLOCK_VERSION } from "../../../src/generations/features/types";
 
 /**
@@ -25,6 +21,16 @@ describe("add command feature registry", () => {
   it("ejects config/ai.ts for the ai feature", () => {
     expect(featuresMap.ai.ejectConfig?.name).toBe("ai");
     expect(featuresMap.ai.ejectConfig?.content).toContain("@warlock.js/ai");
+  });
+
+  it("registers the durable queue with its Redis configuration", () => {
+    expect(allowedFeatures).toContain("queue");
+    expect(featuresMap.queue.dependencies).toEqual({
+      "@warlock.js/queue": INSTALLED_WARLOCK_VERSION,
+    });
+    expect(featuresMap.queue.ejectConfig).toMatchObject({ name: "queue" });
+    expect(featuresMap.queue.ejectConfig?.content).toContain('env("REDIS_HOST", "127.0.0.1")');
+    expect(featuresMap.queue.ejectConfig?.content).toContain('env("REDIS_PORT", 6379)');
   });
 
   it("namespaces the provider features under the ai- prefix", () => {
@@ -64,7 +70,7 @@ describe("add command feature registry", () => {
   });
 
   it("uses one explicit installed-Core placeholder for every Warlock feature dependency", () => {
-    const warlockDependencies = Object.values(featuresMap).flatMap(feature =>
+    const warlockDependencies = Object.values(featuresMap).flatMap((feature) =>
       Object.entries(feature.dependencies ?? {}).filter(([name]) =>
         name.startsWith("@warlock.js/"),
       ),
