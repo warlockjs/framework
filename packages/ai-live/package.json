@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/ai-live",
-  "version": "5.11.0",
+  "version": "5.12.0",
   "description": "Live & generative rich-media for @warlock.js/ai — ai.realtime() duplex voice sessions and ai.video() text-to-video. The heavy, demand-gated modalities, kept out of core so text/image/speech stay dependency-light.",
   "type": "module",
   "main": "./src/index.ts",
