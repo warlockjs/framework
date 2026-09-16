@@ -1,11 +1,15 @@
 import { get } from "@mongez/reinforcements";
 import { slugify } from "@mongez/slug";
-import { authService } from "@warlock.js/auth";
 import { Model, useModelTransformer } from "@warlock.js/cascade";
 import { type ComputedCallback, type SchemaContext } from "@warlock.js/seal";
+import { hashPassword } from "../encryption/password";
 
 /**
- * Hash password on saving if password changes
+ * Hash password on saving if password changes.
+ *
+ * Uses core's own bcrypt `hashPassword` (salt rounds from
+ * `encryption.password.salt`). Core must never import `@warlock.js/auth`:
+ * auth depends on core, and its `authService.hashPassword` only delegates here.
  */
 export const useHashedPassword = () =>
   useModelTransformer(({ value, isChanged, isNew }) => {
@@ -13,7 +17,7 @@ export const useHashedPassword = () =>
 
     if (!isNew && !isChanged) return value;
 
-    return authService.hashPassword(String(value));
+    return hashPassword(String(value));
   });
 
 type ComputedCallbackModel = (
