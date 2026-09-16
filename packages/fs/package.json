@@ -12,7 +12,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "node ../node_modules/.pnpm/typescript@5.9.3/node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -21,7 +21,8 @@
     "url": "https://github.com/warlockjs/fs"
   },
   "devDependencies": {
-    "vitest": "4.1.10"
+    "vitest": "4.1.10",
+    "typescript": "^5.9.3"
   },
   "packageManager": "pnpm@11.24.0"
 }
