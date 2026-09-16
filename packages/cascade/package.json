@@ -23,6 +23,7 @@
     "fast-glob": "^3.3.3"
   },
   "scripts": {
+    "typecheck": "node ../node_modules/.pnpm/typescript@5.9.3/node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
     "update": "npx ncu -u",
     "fix:test": "eslint --fix -c ./.eslintrc.json ./tests",
     "format:test": "prettier --write ./tests/**/*.{js,jsx,ts,tsx,css,md,json} --config ./.prettierrc.json",
