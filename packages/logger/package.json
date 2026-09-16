@@ -4,6 +4,7 @@
   "type": "module",
   "description": "A powerful logging system  for messages and errors in nodejs.",
   "scripts": {
+    "typecheck": "node ../node_modules/.pnpm/typescript@5.9.3/node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
