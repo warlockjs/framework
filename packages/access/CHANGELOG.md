@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Restored the portable `typecheck` script and compile access as ESM so workspace source imports using `import.meta` are valid.
 - An unpoliced instance-level check was fail-open (allowed via the RBAC grant alone) unless `strictPolicies` was explicitly enabled, which could silently reach a resource-scoped IDOR for a forgotten `definePolicy` call. It now fails CLOSED by default; `strictPolicies: false` still restores the old fallback and warns once per permission naming the missing policy and the config key.
 
 ## 5.12.0 - 2026-09-16

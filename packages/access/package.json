@@ -8,7 +8,8 @@
     "environment": "server"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "peerDependencies": {
     "@warlock.js/auth": "*",
