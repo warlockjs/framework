@@ -156,9 +156,9 @@ describe("check — policies", () => {
   });
 });
 
-describe("check — unpoliced instance check (RBAC-only fallback)", () => {
-  it("still grants (fail-closed semantics unchanged) but warns once when no policy is registered", async () => {
-    expect(await check(user, "orders.update", { resource: { id: 9 } })).toBe(true);
+describe("check — unpoliced instance check (no registered policy)", () => {
+  it("denies by default (strictPolicies defaults to true) and warns once naming the missing policy", async () => {
+    expect(await check(user, "orders.update", { resource: { id: 9 } })).toBe(false);
 
     expect(log.warn).toHaveBeenCalledTimes(1);
     expect(log.warn).toHaveBeenCalledWith(
@@ -175,17 +175,16 @@ describe("check — unpoliced instance check (RBAC-only fallback)", () => {
     expect(log.warn).toHaveBeenCalledTimes(1);
   });
 
-  it("does not warn for a class-level check (no resource)", async () => {
-    await check(user, "orders.update");
+  it("does not deny/warn for a class-level check (no resource)", async () => {
+    expect(await check(user, "orders.update")).toBe(true);
 
     expect(log.warn).not.toHaveBeenCalled();
   });
 
-  it("does not warn when a policy IS registered", async () => {
+  it("does not deny/warn when a policy IS registered", async () => {
     definePolicy("orders.update", () => true);
 
-    await check(user, "orders.update", { resource: { id: 9 } });
-
+    expect(await check(user, "orders.update", { resource: { id: 9 } })).toBe(true);
     expect(log.warn).not.toHaveBeenCalled();
   });
 
@@ -196,13 +195,25 @@ describe("check — unpoliced instance check (RBAC-only fallback)", () => {
     expect(log.warn).not.toHaveBeenCalled();
   });
 
-  it("strict mode throws AccessConfigError instead of warning", async () => {
-    setAccessConfig({ resolver: { resolvePermissions, resolveRoles }, strictPolicies: true });
+  it("strictPolicies: false explicitly restores the pre-5.13 RBAC-only fallback (ALLOWS) and warns once over two calls", async () => {
+    setAccessConfig({ resolver: { resolvePermissions, resolveRoles }, strictPolicies: false });
 
-    await expect(check(user, "orders.update", { resource: { id: 9 } })).rejects.toBeInstanceOf(
-      AccessConfigError,
+    expect(await check(user, "orders.update", { resource: { id: 9 } })).toBe(true);
+    expect(await check(user, "orders.update", { resource: { id: 10 } })).toBe(true);
+
+    expect(log.warn).toHaveBeenCalledTimes(1);
+    expect(log.warn).toHaveBeenCalledWith(
+      "access",
+      "unpoliced-check",
+      expect.stringContaining('"orders.update"'),
     );
-    expect(log.warn).not.toHaveBeenCalled();
+  });
+
+  it("a registered policy still decides regardless of strictPolicies", async () => {
+    setAccessConfig({ resolver: { resolvePermissions, resolveRoles }, strictPolicies: false });
+    definePolicy("orders.update", () => false);
+
+    expect(await check(user, "orders.update", { resource: { id: 9 } })).toBe(false);
   });
 });
 

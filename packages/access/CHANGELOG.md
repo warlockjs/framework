@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/access` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.13.0 - 2026-09-17
+
+### Breaking
+
+- `strictPolicies` now defaults to `true`. An instance-level check (`{ resource }`) for a permission with no registered ABAC policy now DENIES by default instead of silently falling back to the RBAC grant alone. **Upgrade:** if you rely on the old fail-open fallback anywhere, set `strictPolicies: false` in `src/config/access.ts`; otherwise register the missing `definePolicy(...)` calls the log warnings point to.
+
+### Fixed
+
+- An unpoliced instance-level check was fail-open (allowed via the RBAC grant alone) unless `strictPolicies` was explicitly enabled, which could silently reach a resource-scoped IDOR for a forgotten `definePolicy` call. It now fails CLOSED by default; `strictPolicies: false` still restores the old fallback and warns once per permission naming the missing policy and the config key.
+
 ## 5.12.0 - 2026-09-16
 
 ### Changed

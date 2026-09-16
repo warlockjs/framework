@@ -54,13 +54,17 @@ type AccessConfigurations = {
   cache?: {
     ttl?: string | number; //           resolved-set TTL, default "10m"
   };
-  strictPolicies?: boolean; //          default false — see below
+  strictPolicies?: boolean; //          default true — see below
 };
 ```
 
 ### `strictPolicies`
 
-An instance check (`{ resource }`) for a permission with no registered ABAC policy normally **warns once per permission** (`log.warn`) and falls back to the RBAC grant alone. Set `strictPolicies: true` to turn that gap into a thrown `AccessConfigError` instead — for apps that want a missing policy to fail the request/boot loudly rather than just log. See [`define-policies`](@warlock.js/access/define-policies/SKILL.md) for the full decision table.
+An instance check (`{ resource }`) for a permission with no registered ABAC policy **denies by default** (`strictPolicies: true`) — a forgotten policy must never fail open. The miss is logged once per permission (`log.warn`) either way.
+
+Set `strictPolicies: false` to explicitly restore the pre-5.13 behavior: fall back to the RBAC grant alone (ALLOWS — any holder of the permission can act on ANY resource, a plausible IDOR). See [`define-policies`](@warlock.js/access/define-policies/SKILL.md) for the full decision table.
+
+> **Breaking in 5.13:** `strictPolicies` now defaults to `true` and DENIES (it used to default to `false` and ALLOW). Set `strictPolicies: false` to keep the old fail-open fallback.
 
 A missing resolver throws `AccessConfigError` **at boot** — the framework's access connector wires `src/config/access.ts` (the same way the notifications connector wires `config/notifications.ts`), so a misconfig fails at startup, never a silent deny.
 

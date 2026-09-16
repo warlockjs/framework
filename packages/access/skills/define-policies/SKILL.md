@@ -36,7 +36,7 @@ So `gate("orders.update")` (a route gate, no resource) checks the grant; the per
 ## The decision = grant AND policy
 
 - No grant → denied (the policy never runs).
-- Grant + no policy registered → allowed (RBAC-only), and logs a one-time `log.warn` naming the permission — a typo'd permission or a forgotten `import "./policies"` degrades an instance check to a class-level one, and this is the runtime signal for it. Set `strictPolicies: true` in the access config (see [`configure-access`](@warlock.js/access/configure-access/SKILL.md)) to throw `AccessConfigError` instead of warning.
+- Grant + no policy registered → **denied by default** (`strictPolicies: true`, the 5.13+ default) — a typo'd permission or a forgotten `import "./policies"` must never silently degrade an instance check to a class-level one. Logs a one-time `log.warn` naming the permission either way. Set `strictPolicies: false` in the access config (see [`configure-access`](@warlock.js/access/configure-access/SKILL.md)) to explicitly restore the pre-5.13 RBAC-only fallback (allowed).
 - Grant + policy → the policy decides.
 
 Policies **deny**, they don't grant — a policy can't let a user past a permission they don't hold.

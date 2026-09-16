@@ -48,15 +48,17 @@ export type AccessConfigurations = {
   };
 
   /**
-   * When `true`, an instance-level check (a `resource` was supplied) for a
-   * permission with no registered ABAC policy throws {@link AccessConfigError}
-   * instead of warning and falling back to the RBAC grant alone. Off by
-   * default so existing apps aren't broken by a missing `definePolicy` call;
-   * turn it on once every ABAC-guarded permission has a policy registered, to
-   * catch the next typo/forgotten-import at the source instead of at review
-   * time.
+   * When `true` (the default), an instance-level check (a `resource` was
+   * supplied) for a permission with no registered ABAC policy DENIES instead
+   * of falling back to the RBAC grant alone — a forgotten `definePolicy` call
+   * must never fail open. The miss is logged once per permission via the
+   * package's logger.
    *
-   * @default false
+   * Set to `false` to explicitly restore the pre-5.13 behavior: fall back to
+   * the RBAC grant alone (ALLOWS — a plausible IDOR if the permission was
+   * meant to be resource-scoped). Still warns once per permission.
+   *
+   * @default true
    */
   strictPolicies?: boolean;
 };

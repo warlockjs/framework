@@ -39,6 +39,20 @@ describe("accessConfig.tenant", () => {
   });
 });
 
+describe("accessConfig.strictPolicies", () => {
+  it("defaults to true", () => {
+    setAccessConfig({ resolver });
+
+    expect(accessConfig.strictPolicies()).toBe(true);
+  });
+
+  it("reads the configured value when set", () => {
+    setAccessConfig({ resolver, strictPolicies: false });
+
+    expect(accessConfig.strictPolicies()).toBe(false);
+  });
+});
+
 describe("accessConfig.cacheTtl", () => {
   it("defaults to 10m", () => {
     setAccessConfig({ resolver });

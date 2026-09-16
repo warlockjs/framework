@@ -59,9 +59,9 @@ export const accessConfig = {
     return current?.cache?.ttl ?? "10m";
   },
 
-  /** Whether an unpoliced instance-level check should throw instead of warn. */
+  /** Whether an unpoliced instance-level check should deny instead of falling back to the RBAC grant. */
   strictPolicies(): boolean {
-    return current?.strictPolicies ?? false;
+    return current?.strictPolicies ?? true;
   },
 
   /** Ambient tenant for this user, delegated to the resolver's optional hook. */
