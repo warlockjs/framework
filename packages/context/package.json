@@ -27,6 +27,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
+    "typecheck": "node ../node_modules/.pnpm/typescript@5.9.3/node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
   "devDependencies": {
