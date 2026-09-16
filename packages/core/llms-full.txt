@@ -3109,17 +3109,14 @@ HTTP request:
 | `handler` | The route handler itself |
 | `response.write` | The overall request span, closed once the response has settled (success or thrown error) — this is also where `onRequestEnd` fires |
 
-`@warlock.js/web`'s page pipeline is designed to report through this same
-`onPhase` surface rather than defining its own hook API (one surface, per the
-71622e4a lead decision) — planned phase names are `loader` (once per
-app/layout/page level, `attrs: { level, layoutPath }`), `render.shell`, and
-`stream.end`. **These are not wired yet** — the design note
-(`releases/v5.12-tracing-design-note.md` §6) explicitly defers the `web` half
-past 5.12 because `execute-page-request.ts` / `create-page-route-handler.ts`
-are mid-refactor for streaming stage 2 in the same release. Only the five
-`core` phases above are live today; treat the `web` names as the documented
-target shape for when that wiring lands, not as something you can register a
-hook against yet.
+`@warlock.js/web` page requests report through this same `onPhase` surface
+instead of adding a separate hook API. They add three phases:
+
+| Phase | Fires around |
+| --- | --- |
+| `loader` | Each loader level, once per app/layout/page, with `attrs: { level, layoutPath? }` |
+| `render.shell` | Time from render start until React's shell is ready to stream |
+| `stream.end` | The whole streamed response, including every `defer()` value settling |
 
 ## Trace id derivation
 
