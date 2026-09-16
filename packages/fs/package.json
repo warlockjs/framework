@@ -12,6 +12,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "typecheck": "node ../node_modules/.pnpm/typescript@5.9.3/node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },
