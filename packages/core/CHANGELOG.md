@@ -8,6 +8,10 @@ All notable changes to `@warlock.js/core` are documented in this file.
 
 - `warlock dev` generates `.warlock/typings/translations.d.ts` from literal `groupedTranslations` dictionaries, augmenting web's typed translation-key registry.
 
+### Changed
+
+- `warlock dev` now uses a 12ms quiet window for isolated file saves while extending multi-file bursts up to a 60ms maximum, reducing routine HMR latency without splitting formatter or checkout reloads.
+
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**

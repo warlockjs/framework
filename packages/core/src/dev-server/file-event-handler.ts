@@ -1,5 +1,4 @@
 import events from "@mongez/events";
-import { debounce } from "@mongez/reinforcements";
 import type { DependencyGraph } from "./dependency-graph";
 import { devLogSuccess } from "./dev-logger";
 import type { FileManager } from "./file-manager";
@@ -8,6 +7,12 @@ import { FILE_PROCESSING_BATCH_SIZE, isTimingsEnabled } from "./flags";
 import type { ManifestManager } from "./manifest-manager";
 import { clearFileExistsCache } from "./parse-imports";
 import { Path } from "../utils/normalized-path";
+
+/** Lets an isolated editor save reach HMR without the former fixed 50ms delay. */
+const ISOLATED_SAVE_QUIET_WINDOW_MS = 12;
+
+/** Bounds a sustained formatter or checkout stream so it cannot postpone HMR forever. */
+const BATCH_MAX_WAIT_MS = 60;
 
 /**
  * Receives raw watcher events and processes them in a single debounced batch.
@@ -25,7 +30,8 @@ export class FileEventHandler {
   /** Slowest watcher-settle duration seen so far this batch, when `devServer.timings` is on. */
   private watcherSettleMs?: number;
 
-  private readonly processPendingEvents = debounce(() => this.processBatch(), 50);
+  private debounceTimer?: ReturnType<typeof setTimeout>;
+  private maxWaitTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
     private readonly fileOperations: FileOperations,
@@ -37,19 +43,45 @@ export class FileEventHandler {
   public handleFileChange(absolutePath: string, settleMs?: number): void {
     this.recordTimingStart(settleMs);
     this.pendingChanges.add(Path.toRelative(absolutePath));
-    this.processPendingEvents();
+    this.schedulePendingEvents();
   }
 
   public handleFileAdd(absolutePath: string, settleMs?: number): void {
     this.recordTimingStart(settleMs);
     this.pendingAdds.add(Path.toRelative(absolutePath));
-    this.processPendingEvents();
+    this.schedulePendingEvents();
   }
 
   public handleFileDelete(absolutePath: string, settleMs?: number): void {
     this.recordTimingStart(settleMs);
     this.pendingDeletes.add(Path.toRelative(absolutePath));
-    this.processPendingEvents();
+    this.schedulePendingEvents();
+  }
+
+  private schedulePendingEvents(): void {
+    if (this.debounceTimer !== undefined) {
+      clearTimeout(this.debounceTimer);
+    }
+
+    this.debounceTimer = setTimeout(() => this.flushPendingEvents(), ISOLATED_SAVE_QUIET_WINDOW_MS);
+
+    if (this.maxWaitTimer === undefined) {
+      this.maxWaitTimer = setTimeout(() => this.flushPendingEvents(), BATCH_MAX_WAIT_MS);
+    }
+  }
+
+  private flushPendingEvents(): void {
+    if (this.debounceTimer !== undefined) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = undefined;
+    }
+
+    if (this.maxWaitTimer !== undefined) {
+      clearTimeout(this.maxWaitTimer);
+      this.maxWaitTimer = undefined;
+    }
+
+    void this.processBatch();
   }
 
   /**

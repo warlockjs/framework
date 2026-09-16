@@ -12,11 +12,11 @@ function absolute(relativePath: string): string {
 /**
  * The pre-work floor for a single-file edit is chokidar's `awaitWriteFinish`
  * (stabilityThreshold 100ms) plus this handler's own debounce. The debounce
- * used to add 150ms on top of that; it is now 50ms — the multi-file 500ms
+ * used to add 150ms on top of that; it is now 12ms for isolated saves — the multi-file 500ms
  * Windows race-guard (a separate branch, hit only when 2+ code files land in
  * the same batch) is untouched.
  */
-describe("FileEventHandler — debounces a single-file batch to 50ms", () => {
+describe("FileEventHandler — adaptively debounces file-event batches", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -48,27 +48,65 @@ describe("FileEventHandler — debounces a single-file batch to 50ms", () => {
     return { handler, updateFile };
   }
 
-  it("does not flush a single change before 50ms have elapsed", async () => {
+  it("does not flush a single change before the 12ms quiet window has elapsed", async () => {
     const { handler, updateFile } = buildHandler();
 
     handler.handleFileChange("/abs/src/app/x.ts");
-    await vi.advanceTimersByTimeAsync(49);
+    await vi.advanceTimersByTimeAsync(11);
 
     expect(updateFile).not.toHaveBeenCalled();
   });
 
-  it("flushes the single change once 50ms have elapsed", async () => {
+  it("flushes a single change once the 12ms quiet window has elapsed", async () => {
     const { handler, updateFile } = buildHandler();
     const triggerSpy = vi.spyOn(events, "trigger");
 
     handler.handleFileChange("/abs/src/app/x.ts");
-    await vi.advanceTimersByTimeAsync(50);
+    await vi.advanceTimersByTimeAsync(12);
 
     expect(updateFile).toHaveBeenCalledTimes(1);
     expect(triggerSpy).toHaveBeenCalledWith(
       "dev-server:batch-complete",
       expect.objectContaining({ changed: expect.arrayContaining([expect.any(String)]) }),
     );
+  });
+
+  it("coalesces a burst into one reload containing every changed file", async () => {
+    const { handler, updateFile } = buildHandler();
+    const triggerSpy = vi.spyOn(events, "trigger");
+
+    handler.handleFileChange(absolute("src/app/one.ts"));
+    await vi.advanceTimersByTimeAsync(5);
+    handler.handleFileChange(absolute("src/app/two.ts"));
+    await vi.advanceTimersByTimeAsync(5);
+    handler.handleFileChange(absolute("src/app/three.ts"));
+    await vi.advanceTimersByTimeAsync(12);
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(updateFile).toHaveBeenCalledTimes(3);
+    expect(triggerSpy).toHaveBeenCalledTimes(1);
+    expect(triggerSpy).toHaveBeenCalledWith(
+      "dev-server:batch-complete",
+      expect.objectContaining({
+        changed: ["src/app/one.ts", "src/app/two.ts", "src/app/three.ts"],
+      }),
+    );
+  });
+
+  it("flushes continuous events at the 60ms max-wait cap", async () => {
+    const { handler, updateFile } = buildHandler();
+
+    handler.handleFileChange(absolute("src/app/zero.ts"));
+
+    for (let eventIndex = 1; eventIndex < 6; eventIndex++) {
+      await vi.advanceTimersByTimeAsync(10);
+      handler.handleFileChange(absolute(`src/app/${eventIndex}.ts`));
+    }
+
+    await vi.advanceTimersByTimeAsync(10);
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(updateFile).toHaveBeenCalledTimes(6);
   });
 });
 
@@ -119,7 +157,7 @@ describe("FileEventHandler — ENOENT during an add is treated as a removal, not
     const triggerSpy = vi.spyOn(events, "trigger");
 
     handler.handleFileAdd(absolute("src/app/welcome.page.tsx"));
-    await vi.advanceTimersByTimeAsync(50);
+    await vi.advanceTimersByTimeAsync(12);
 
     expect(errorSpy).not.toHaveBeenCalled();
     expect(deleteFile).toHaveBeenCalledWith("src/app/welcome.page.tsx");
@@ -134,9 +172,7 @@ describe("FileEventHandler — ENOENT during an add is treated as a removal, not
 
   it("(b) a rename's stale old-path add ENOENTs silently while the new path is added normally", async () => {
     const { handler, deleteFile } = buildHandler(async (path: string) =>
-      path.includes("welcome.page.tsx")
-        ? { state: "deleted" }
-        : { state: "ready" },
+      path.includes("welcome.page.tsx") ? { state: "deleted" } : { state: "ready" },
     );
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const triggerSpy = vi.spyOn(events, "trigger");
@@ -144,7 +180,7 @@ describe("FileEventHandler — ENOENT during an add is treated as a removal, not
     handler.handleFileAdd(absolute("src/app/welcome.page.tsx"));
     handler.handleFileAdd(absolute("src/app/welcome-home.page.tsx"));
     handler.handleFileDelete(absolute("src/app/welcome.page.tsx"));
-    await vi.advanceTimersByTimeAsync(550);
+    await vi.advanceTimersByTimeAsync(560);
 
     expect(errorSpy).not.toHaveBeenCalled();
     expect(deleteFile).toHaveBeenCalledWith("src/app/welcome.page.tsx");
@@ -166,7 +202,7 @@ describe("FileEventHandler — ENOENT during an add is treated as a removal, not
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     handler.handleFileAdd(absolute("src/app/locked.page.tsx"));
-    await vi.advanceTimersByTimeAsync(50);
+    await vi.advanceTimersByTimeAsync(12);
 
     expect(errorSpy).toHaveBeenCalledWith(
       "Failed to add file src/app/locked.page.tsx:",
