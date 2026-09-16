@@ -31,10 +31,12 @@ describe("connectToBroker", () => {
   // `connectToBroker` dynamically imports the rabbitmq driver on first use,
   // which drags in `@warlock.js/seal` and `@warlock.js/logger` as raw TS source
   // (see vitest.config.ts aliases). Pay that transform cost here instead of
-  // inside the first timed test body.
+  // inside the first timed test body. A cold transform measured 4.8s alone and
+  // overran the 10s default hook timeout when every package's suite runs back
+  // to back in the release gate.
   beforeAll(async () => {
     await import("../src/drivers/rabbitmq/rabbitmq-driver");
-  });
+  }, 60_000);
 
   beforeEach(() => {
     connection = new FakeConnection();
