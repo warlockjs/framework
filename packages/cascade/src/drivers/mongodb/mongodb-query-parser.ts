@@ -451,6 +451,30 @@ export class MongoQueryParser {
 
         return first === undefined ? null : { $setWindowFields: first.data.spec };
       }
+      // `$unwind`, `$addFields` and `$vectorSearch` used to fall through to
+      // `default` and vanish from the pipeline, so `similarTo()` ran as a plain
+      // scan and a recorded unwind was silently ignored.
+      case "$unwind": {
+        const [first] = operations;
+
+        if (first === undefined) return null;
+
+        const { path, ...options } = first.data as Record<string, unknown>;
+
+        return Object.keys(options).length === 0
+          ? { $unwind: path }
+          : { $unwind: { path, ...options } };
+      }
+      case "$addFields": {
+        const [first] = operations;
+
+        return first === undefined ? null : { $addFields: first.data };
+      }
+      case "$vectorSearch": {
+        const [first] = operations;
+
+        return first === undefined ? null : { $vectorSearch: first.data };
+      }
       default:
         return null;
     }
@@ -1949,6 +1973,21 @@ export class MongoQueryParser {
     if (op === undefined) return null;
 
     const options = op.data;
+
+    // Pipeline form: `join({ table, alias, pipeline })`. The pipeline used to
+    // be dropped, leaving a $lookup with neither a pipeline nor join fields.
+    // `localField`/`foreignField` are kept when given (MongoDB 5+ allows both).
+    if (Array.isArray(options.pipeline)) {
+      return {
+        $lookup: {
+          from: options.table,
+          ...(options.localField !== undefined ? { localField: options.localField } : {}),
+          ...(options.foreignField !== undefined ? { foreignField: options.foreignField } : {}),
+          as: options.alias || options.table,
+          pipeline: options.pipeline,
+        },
+      };
+    }
 
     return {
       $lookup: {

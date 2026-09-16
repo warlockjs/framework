@@ -15,6 +15,7 @@ import type {
   PaginationResult,
   QueryBuilderContract,
   RawExpression,
+  UnwindOptions,
   WhereCallback,
   WhereObject,
   WhereOperator,
@@ -2642,6 +2643,37 @@ export class MongoQueryBuilder<T = unknown>
   public whereDoesntHave(relation: string, callback: (query: QueryBuilderContract) => void): this {
     // TODO: Implement whereDoesntHave() using $lookup with pipeline
     this.operationsHelper.addMatchOperation("whereDoesntHave", { relation, callback });
+    return this;
+  }
+
+  /**
+   * Deconstruct an array field into one document per element (`$unwind`).
+   * The short form is emitted when no option is given. See
+   * `QueryBuilderContract.unwind()`.
+   */
+  public unwind(field: string, options?: UnwindOptions): this {
+    const data: Record<string, unknown> = {
+      path: field.startsWith("$") ? field : `$${field}`,
+    };
+
+    if (options?.preserveNullAndEmptyArrays !== undefined) {
+      data.preserveNullAndEmptyArrays = options.preserveNullAndEmptyArrays;
+    }
+
+    if (options?.includeArrayIndex !== undefined) {
+      data.includeArrayIndex = options.includeArrayIndex;
+    }
+
+    this.operationsHelper.addOperation("$unwind", "unwind", data, false);
+    return this;
+  }
+
+  /**
+   * Add computed fields while keeping every existing field (`$addFields`).
+   * See `QueryBuilderContract.addFields()`.
+   */
+  public addFields(fields: Record<string, unknown>): this {
+    this.operationsHelper.addOperation("$addFields", "addFields", { ...fields }, false);
     return this;
   }
 

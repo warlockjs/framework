@@ -185,6 +185,16 @@ export type DriverQuery = {
 };
 
 /**
+ * Options for `unwind()`, mirroring MongoDB's `$unwind` document form.
+ */
+export type UnwindOptions = {
+  /** Keep documents whose array is missing, null or empty (default false). */
+  preserveNullAndEmptyArrays?: boolean;
+  /** Output field that receives the element's array index. */
+  includeArrayIndex?: string;
+};
+
+/**
  * Row type of a query in lean read mode (`.lean()`).
  *
  * A Model result (anything carrying its row under `data`) becomes that plain
@@ -2082,4 +2092,31 @@ export interface QueryBuilderContract<T = unknown> {
    * ```
    */
   similarTo(column: string, embedding: number[], alias?: string): this;
+
+  // ============================================================================
+  // DOCUMENT PIPELINE STAGES
+  // ============================================================================
+
+  /**
+   * Deconstruct an array field: one output document per element (`$unwind`).
+   * Runs in call order — a `where()` after `unwind()` filters the elements.
+   *
+   * MongoDB only. SQL drivers throw `UnsupportedQueryOperationError`.
+   *
+   * @example
+   * await Post.query().unwind("tags").where("tags", "news").lean().get();
+   * await Post.query().unwind("tags", { preserveNullAndEmptyArrays: true, includeArrayIndex: "position" }).get();
+   */
+  unwind(field: string, options?: UnwindOptions): this;
+
+  /**
+   * Add computed fields while keeping every existing field (`$addFields`).
+   * Values are aggregation expressions — write them in code, never from request data.
+   *
+   * MongoDB only. SQL drivers throw `UnsupportedQueryOperationError`.
+   *
+   * @example
+   * await Post.query().addFields({ score: { $add: ["$likes", "$shares"] } }).orderBy("score", "desc").get();
+   */
+  addFields(fields: Record<string, unknown>): this;
 }

@@ -1,6 +1,6 @@
 ---
 name: aggregate-data
-description: 'Compute aggregates over a query — scalar `.count()` / `.sum(field)` / `.avg` / `.min` / `.max`, plus grouped rollups via the two-arg `.groupBy(fields, { alias: $agg.* })`, portable date-bucketing via `.groupByDate(col, unit, aggregates?)`, the `$agg` helpers (including expression-aware `$agg.sum($expr.mul("price","quantity"))` / `$agg.sumRaw`), and `.having(alias, op, value)` on computed aggregates. Triggers: `.count`, `.sum`, `.avg`, `.min`, `.max`, `.groupBy`, `.groupByDate`, `.having`, `$agg`, `$agg.sum`, `$agg.sumRaw`, `$agg.count`, `$expr`, `$expr.mul`, `$expr.col`, `$expr.lit`; "monthly revenue report", "revenue per month", "X per category", "group by status", "sum price times quantity", "dashboard rollup"; typical import `import { Model, $agg, $expr } from "@warlock.js/cascade"`. Skip: row queries — `@warlock.js/cascade/query-data/SKILL.md`; cached aggregates — `@warlock.js/cache/use-cached-hof/SKILL.md`; competing tools raw SQL `GROUP BY`, `mongoose aggregate`, `prisma` `groupBy`.'
+description: 'Compute aggregates over a query — scalar `.count()` / `.sum(field)` / `.avg` / `.min` / `.max`, plus grouped rollups via the two-arg `.groupBy(fields, { alias: $agg.* })`, portable date-bucketing via `.groupByDate(col, unit, aggregates?)`, the `$agg` helpers (including expression-aware `$agg.sum($expr.mul("price","quantity"))` / `$agg.sumRaw`), and `.having(alias, op, value)` on computed aggregates, plus MongoDB pipeline stages `.unwind(field, options?)` / `.addFields(fields)` / pipeline-form `join()` (`UnsupportedQueryOperationError` on Postgres). Triggers: `.unwind`, `.addFields`, `$unwind`, `$lookup`, `.count`, `.sum`, `.avg`, `.min`, `.max`, `.groupBy`, `.groupByDate`, `.having`, `$agg`, `$agg.sum`, `$agg.sumRaw`, `$agg.count`, `$expr`, `$expr.mul`, `$expr.col`, `$expr.lit`; "monthly revenue report", "revenue per month", "X per category", "group by status", "sum price times quantity", "dashboard rollup"; typical import `import { Model, $agg, $expr } from "@warlock.js/cascade"`. Skip: row queries — `@warlock.js/cascade/query-data/SKILL.md`; cached aggregates — `@warlock.js/cache/use-cached-hof/SKILL.md`; competing tools raw SQL `GROUP BY`, `mongoose aggregate`, `prisma` `groupBy`.'
 ---
 
 # Use aggregates and groupBy
@@ -129,6 +129,27 @@ await Order.query()
 ```
 
 The `orderBy` reference matches the alias from the aggregates object.
+
+## Pipeline stages — `.unwind()` / `.addFields()` / pipeline `join()` (MongoDB)
+
+```ts
+// One row per tag, then filter the tags (stages run in call order)
+const rows = await Post.query().unwind("tags").where("tags", "news").lean().get();
+
+// Keep posts with no tags; record each tag's position
+await Post.query().unwind("tags", { preserveNullAndEmptyArrays: true, includeArrayIndex: "position" }).get();
+
+// Computed field, existing fields kept
+await Post.query().addFields({ score: { $add: ["$likes", "$shares"] } }).orderBy("score", "desc").get();
+
+// Pipeline $lookup
+await Post.query().join({ table: "comments", localField: "id", foreignField: "postId",
+  alias: "approved", pipeline: [{ $match: { approved: true } }] }).lean().get();
+```
+
+`unwind()` returns several rows for one stored document. Use `.lean()` when you only read them. `addFields` expressions are raw aggregation expressions: write them in code, never from request data. Computed columns in the output also work with `selectRaw({ alias: expr })` (`$project`). There is no `$facet` method yet.
+
+**Postgres:** `unwind()` and `addFields()` throw `UnsupportedQueryOperationError` (`operation`, `driver`) when you call them. They are never dropped without an error. Use `selectRaw` with `jsonb_array_elements()` / `unnest()`, or a related table, instead.
 
 ## Gotchas
 

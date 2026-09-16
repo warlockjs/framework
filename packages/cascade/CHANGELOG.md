@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Postgres upsert runs as `INSERT … ON CONFLICT … DO UPDATE … RETURNING *`. The conflict target is the primary key or a unique index whose columns are all equality keys of the filter.
 - `UnsupportedUpdateOperationError` (`operation`, `driver`): what a driver throws when it cannot run part of an update.
 - `.lean()` on the query builder: `get` / `first` / `paginate` / `chunk` return plain objects typed as the model schema (`LeanDocument<T>`), with no Model hydration, no driver casting and no `fetched` event. `static hidden` fields are still removed. With `with()` / `joinWith()` it throws `UnsupportedLeanOperationError`. About 1.9x faster than a hydrated read for 10k MongoDB documents.
+- `.unwind(field, { preserveNullAndEmptyArrays?, includeArrayIndex? })` and `.addFields(fields)` on the query builder (MongoDB). Both run in call order, so a `where()` after `unwind()` filters the elements. `join({ table, alias, pipeline })` now sends a pipeline `$lookup`.
+- `UnsupportedQueryOperationError` (`operation`, `driver`): the Postgres builder throws it for `unwind()` and `addFields()`, so these stages are never dropped without an error.
 
 ### Changed
 
@@ -24,6 +26,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - `$dec` on the MongoDB driver was sent to the server as-is and rejected ("Unknown modifier"). It is now converted to a negative `$inc`.
+- The MongoDB pipeline parser dropped `$vectorSearch` and `$addFields` stages, so `similarTo()` ran with no vector search and no `score`. It now emits both.
+- On MongoDB, a `join()` with a `pipeline` sent a `$lookup` with no pipeline and no join fields.
 
 ## 5.11.0 - 2026-09-14
 

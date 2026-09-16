@@ -19,9 +19,11 @@ import type {
   PaginationResult,
   QueryBuilderContract,
   RawExpression,
+  UnwindOptions,
 } from "../../contracts/query-builder.contract";
 import type { DataSource } from "../../data-source/data-source";
 import { dataSourceRegistry } from "../../data-source/data-source-registry";
+import { UnsupportedQueryOperationError } from "../../errors/unsupported-query-operation.error";
 import { isAggregateExpression } from "../../expressions";
 import type { GlobalScopeDefinition } from "../../model/model";
 import { resolveModelClass, tryResolveModelClass, type ModelRef } from "../../model/register-model";
@@ -383,6 +385,32 @@ export class PostgresQueryBuilder<T = unknown>
    *   .get<VectorRow & { score: number }>();
    * ```
    */
+  /**
+   * MongoDB-only stage. Always throws — see `QueryBuilderContract.unwind()`.
+   *
+   * @throws UnsupportedQueryOperationError
+   */
+  public unwind(_field: string, _options?: UnwindOptions): this {
+    throw new UnsupportedQueryOperationError(
+      "unwind",
+      "postgres",
+      "Query the array column with jsonb_array_elements()/unnest() through selectRaw/joinRaw, or model the elements as a related table.",
+    );
+  }
+
+  /**
+   * MongoDB-only stage. Always throws — see `QueryBuilderContract.addFields()`.
+   *
+   * @throws UnsupportedQueryOperationError
+   */
+  public addFields(_fields: Record<string, unknown>): this {
+    throw new UnsupportedQueryOperationError(
+      "addFields",
+      "postgres",
+      'Add computed columns with selectRaw() alongside the table columns, e.g. selectRaw(\'"posts".*\').selectRaw("likes + shares AS score").',
+    );
+  }
+
   public similarTo(column: string, embedding: number[], alias = "score"): this {
     // pgvector expects the literal format: [n,n,n,...]
     const literal = `[${embedding.join(",")}]`;
