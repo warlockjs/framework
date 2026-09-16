@@ -8,6 +8,8 @@ import { aiPanopticFeature } from "./ai-panoptic.feature";
 import { aiToolsFeature } from "./ai-tools.feature";
 import { aiWorkspaceFeature } from "./ai-workspace.feature";
 import { aiFeature } from "./ai.feature";
+import { authGoogleFeature } from "./auth-google.feature";
+import { authPasskeysFeature } from "./auth-passkeys.feature";
 import { heraldFeature } from "./herald.feature";
 import { imageFeature } from "./image.feature";
 import { mailFeature } from "./mail.feature";
@@ -66,6 +68,9 @@ export const featuresMap: Record<string, FeatureDefinition> = {
   socket: socketFeature,
   notifications: notificationsFeature,
   access: accessFeature,
+  // Login methods for @warlock.js/auth — "<package>-<vendor>" like the ai-* entries.
+  "auth-google": authGoogleFeature,
+  "auth-passkeys": authPasskeysFeature,
   ai: aiFeature,
   "ai-openai": aiOpenaiFeature,
   "ai-google": aiGoogleFeature,
