@@ -114,36 +114,45 @@ describe("ProductionBuilder", () => {
     await fs.rm(tempRoot, { recursive: true, force: true }).catch(() => undefined);
   });
 
-  it("hands the emit contribution the same outFile/entryPath/singleBundle/esmShim/banner the build was configured with", async () => {
-    const seen: {
-      outFile?: string;
-      entryPath?: string;
-      singleBundle?: boolean;
-      esmShim?: boolean;
-      banner?: Record<string, string>;
-    } = {};
+  // 60s, against core's 10s default: `builder.build()` below runs a real
+  // esbuild build (transform pipeline + bundling), measured at ~9s standalone
+  // and prone to tip past 10s under load, which timed the case out (not a
+  // wrong answer) rather than the code being slow. Scoped to this test only,
+  // matching the convention in `tests/unit/mail/mailer-pool.test.ts`.
+  it(
+    "hands the emit contribution the same outFile/entryPath/singleBundle/esmShim/banner the build was configured with",
+    async () => {
+      const seen: {
+        outFile?: string;
+        entryPath?: string;
+        singleBundle?: boolean;
+        esmShim?: boolean;
+        banner?: Record<string, string>;
+      } = {};
 
-    mockConnectors = [
-      fixtureConnector("fixture-emit-recorder", {
-        emit(context) {
-          seen.outFile = context.options.outFile;
-          seen.entryPath = context.options.entryPath;
-          seen.singleBundle = context.options.singleBundle;
-          seen.esmShim = context.options.esmShim;
-          seen.banner = context.options.banner;
-        },
-      }),
-    ];
+      mockConnectors = [
+        fixtureConnector("fixture-emit-recorder", {
+          emit(context) {
+            seen.outFile = context.options.outFile;
+            seen.entryPath = context.options.entryPath;
+            seen.singleBundle = context.options.singleBundle;
+            seen.esmShim = context.options.esmShim;
+            seen.banner = context.options.banner;
+          },
+        }),
+      ];
 
-    const { ProductionBuilder } = await import("./production-builder");
-    const builder = new ProductionBuilder();
+      const { ProductionBuilder } = await import("./production-builder");
+      const builder = new ProductionBuilder();
 
-    await builder.build();
+      await builder.build();
 
-    expect(seen.outFile).toBe("app.js");
-    expect(seen.entryPath).toBe(path.resolve(tempRoot, "dist", "app.js"));
-    expect(seen.singleBundle).toBe(true);
-    expect(seen.esmShim).toBe(false);
-    expect(seen.banner).toEqual({ js: "/* fixture banner */" });
-  });
+      expect(seen.outFile).toBe("app.js");
+      expect(seen.entryPath).toBe(path.resolve(tempRoot, "dist", "app.js"));
+      expect(seen.singleBundle).toBe(true);
+      expect(seen.esmShim).toBe(false);
+      expect(seen.banner).toEqual({ js: "/* fixture banner */" });
+    },
+    60_000,
+  );
 });

@@ -150,7 +150,13 @@ describe("notificationControllersStub type-checks against the real @warlock.js/c
     // Building the ~3000-file @warlock.js/* transitive graph from source is
     // genuinely slow (see the file-level doc comment) — this is the one
     // spec in the suite allowed a timeout this large, and it exists exactly
-    // so that allowance is justified.
-    120_000,
+    // so that allowance is justified. Re-measured 2026-09-16 running core's
+    // full `test` script back-to-back (competing with ~2300 other tests for
+    // CPU): this case timed out at the previous 120_000ms bound, having
+    // taken ~142s wall under that load versus ~75-80s when the suite is
+    // otherwise idle. Raised well clear of the measured worst case rather
+    // than nudged just above it, for the same reason
+    // `add-command-process-exit.test.ts` documents for its own bound.
+    240_000,
   );
 });
