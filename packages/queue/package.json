@@ -1,0 +1,79 @@
+{
+  "name": "@warlock.js/queue",
+  "version": "5.12.0",
+  "type": "module",
+  "description": "Durable background jobs for Warlock.js on BullMQ + Redis: defineJob, dispatch with delay/priority, retries with backoff, progress, failed-job access, in-process workers with graceful shutdown.",
+  "main": "./src/index.ts",
+  "warlock": {
+    "environment": "server"
+  },
+  "module": "./src/index.ts",
+  "typings": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./notifications": {
+      "types": "./src/notifications/index.ts",
+      "import": "./src/notifications/index.ts",
+      "default": "./src/notifications/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "generate:llms": "node scripts/generate-llms.mjs"
+  },
+  "dependencies": {
+    "bullmq": "^6.3.6",
+    "ioredis": "^5.11.1"
+  },
+  "peerDependencies": {
+    "@bull-board/api": "^9.0.0",
+    "@bull-board/fastify": "^9.0.0",
+    "@warlock.js/core": "5.12.0",
+    "@warlock.js/logger": "5.12.0",
+    "@warlock.js/notifications": "5.12.0"
+  },
+  "peerDependenciesMeta": {
+    "@bull-board/api": {
+      "optional": true
+    },
+    "@bull-board/fastify": {
+      "optional": true
+    },
+    "@warlock.js/notifications": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@bull-board/api": "^9.10.1",
+    "@bull-board/fastify": "^9.10.1",
+    "@types/node": "^25.6.2",
+    "@warlock.js/cache": "workspace:^",
+    "@warlock.js/cascade": "workspace:^",
+    "@warlock.js/core": "workspace:^",
+    "@warlock.js/logger": "workspace:^",
+    "@warlock.js/notifications": "workspace:^",
+    "fastify": "^5.6.2",
+    "typescript": "^5.9.3",
+    "vitest": "4.1.10"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warlockjs/queue"
+  },
+  "keywords": [
+    "warlock.js",
+    "queue",
+    "jobs",
+    "background",
+    "bullmq",
+    "redis",
+    "worker"
+  ],
+  "author": "hassanzohdy",
+  "license": "MIT",
+  "packageManager": "pnpm@11.24.0"
+}

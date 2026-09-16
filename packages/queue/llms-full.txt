@@ -1,0 +1,229 @@
+# Warlock Queue — full skills
+
+> Package: `@warlock.js/queue`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/queue/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## configure-queue  `@warlock.js/queue/configure-queue/SKILL.md`
+
+---
+name: configure-queue
+description: 'Configure `@warlock.js/queue`: the declarative `src/config/queue.ts` (`QueueConfig` — `connection`, `prefix`, `defaultQueue`, `defaultJobOptions`, `workers: { enabled, concurrency, shutdownTimeout }`), registering `queueConnector()` in `warlock.config.ts > connectors`, running a dispatch-only process, and graceful shutdown. Programmatic `setQueueConfig` / `startWorkers` / `closeQueue` for scripts and tests. Triggers: `QueueConfig`, `queueConnector`, `setQueueConfig`, `startWorkers`, `closeQueue`, `workers.enabled`, `shutdownTimeout`; "configure the queue", "connect BullMQ to Redis", "disable workers in the web process", "graceful shutdown of jobs". Skip: writing jobs — `@warlock.js/queue/define-jobs/SKILL.md`.'
+---
+
+# Configure the queue
+
+Redis is required. The config is declarative; the connector applies it.
+
+```ts title="src/config/queue.ts"
+import type { QueueConfig } from "@warlock.js/queue";
+
+const queueConfig: QueueConfig = {
+  connection: { host: "127.0.0.1", port: 6379 }, // any BullMQ connection option, or { url }
+  prefix: "my-app", // Redis key prefix, default "warlock"
+  defaultJobOptions: { attempts: 3, backoff: { type: "exponential", delay: 1000 } },
+  workers: {
+    enabled: true, // default true
+    concurrency: 5, // jobs in parallel per queue, default 1
+    shutdownTimeout: 30_000, // ms to wait for active jobs, default 30000
+  },
+};
+
+export default queueConfig;
+```
+
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+import { queueConnector } from "@warlock.js/queue";
+
+export default defineConfig({
+  connectors: [queueConnector()],
+});
+```
+
+## What the connector does
+
+- Starts in the **late** phase — after app code is imported — so every `defineJob` has registered. One worker per queue that has a job.
+- No `queue` config → logs a warning and does nothing.
+- On SIGINT/SIGTERM: workers stop taking jobs, active jobs get up to `shutdownTimeout` ms, then Redis connections close. A job still running after that is retried by another worker once its lock expires.
+
+## Dispatch-only process
+
+Set `workers.enabled: false`. `dispatch()` still works; nothing is processed in that process. Run the workers elsewhere with the same job definitions:
+
+```ts
+import { setQueueConfig, startWorkers, closeQueue } from "@warlock.js/queue";
+import "./jobs"; // modules that call defineJob
+
+setQueueConfig({ connection: { host: "127.0.0.1", port: 6379 } });
+await startWorkers();
+process.on("SIGTERM", () => closeQueue());
+```
+
+Every process must use the same `prefix`, or they will not see each other's jobs.
+
+
+## define-jobs  `@warlock.js/queue/define-jobs/SKILL.md`
+
+---
+name: define-jobs
+description: 'Define and dispatch background jobs with `@warlock.js/queue`: `defineJob({ name, queue?, attempts?, backoff?, removeOnComplete?, removeOnFail?, handle(payload, ctx) })` returns a typed job; `job.dispatch(payload, { delay, priority, jobId, attempts, backoff })`; the handler context (`id`, `attempt`, `maxAttempts`, `progress()`, `log()`); reading a job with `job.find(id)`. Triggers: `defineJob`, `.dispatch(`, `ctx.progress`, `JobContext`, `DispatchOptions`, `backoff`, `attempts`, `priority`, `jobId`; "run this in the background", "retry with backoff", "delay a job", "job progress", "idempotent dispatch". Skip: config and workers — `@warlock.js/queue/configure-queue/SKILL.md`; failed jobs — `@warlock.js/queue/manage-failed-jobs/SKILL.md`.'
+---
+
+# Define and dispatch jobs
+
+```ts title="src/app/invoices/jobs/send-invoice.job.ts"
+import { defineJob } from "@warlock.js/queue";
+
+export const sendInvoice = defineJob({
+  name: "invoices.send", // unique across the app
+  attempts: 5, // total tries, default 1
+  backoff: { type: "exponential", delay: 2000 }, // or a number = fixed ms
+  async handle(payload: { invoiceId: string }, ctx) {
+    await ctx.log(`attempt ${ctx.attempt} of ${ctx.maxAttempts}`);
+    await ctx.progress(50);
+    // throw to fail this attempt; it is retried until attempts run out
+    return { sent: true }; // stored as the job result
+  },
+});
+```
+
+The job module must be imported by the process that runs workers — in a Warlock app, anything under `src/app` that is loaded at boot.
+
+## Dispatch
+
+```ts
+const { id } = await sendInvoice.dispatch({ invoiceId: "42" });
+
+await sendInvoice.dispatch({ invoiceId: "43" }, {
+  delay: "10m", // ms number or "500ms" | "30s" | "10m" | "2h" | "1d"
+  priority: 1, // 1 runs first; larger numbers later
+  jobId: "invoice:43", // a second dispatch with a live id is ignored
+});
+```
+
+Option precedence: dispatch options > `defineJob` > `queue.defaultJobOptions`.
+
+## Read a job
+
+```ts
+const job = await sendInvoice.find(id);
+// { id, name, queue, state, payload, progress, attemptsMade, result, failedReason, createdAt, finishedAt }
+```
+
+## Rules
+
+- A job name with no handler in the worker process fails at once, without retries.
+- Payloads are stored as JSON: pass ids, not model instances.
+- Defining the same name again replaces the handler (this is what keeps dev reloads working), so keep names unique.
+
+
+## manage-failed-jobs  `@warlock.js/queue/manage-failed-jobs/SKILL.md`
+
+---
+name: manage-failed-jobs
+description: 'Inspect and retry failed `@warlock.js/queue` jobs: `failedJobs({ queue, start, end })` returns `FailedJob[]` (`id`, `name`, `payload`, `attemptsMade`, `failedReason`, `stacktrace`, `failedAt`, `retry()`), `retryFailedJob(id, { queue })` (throws `FailedJobNotFoundError`), and the optional bull-board UI via `queueDashboard(server, { basePath, queues })` — needs `@bull-board/api` + `@bull-board/fastify`, loaded only on call, missing ones throw `QueueDashboardDependencyError`. Triggers: `failedJobs`, `retryFailedJob`, `queueDashboard`, `bull-board`; "list failed jobs", "retry a failed job", "queue dashboard", "job admin UI". Skip: defining retries — `@warlock.js/queue/define-jobs/SKILL.md`.'
+---
+
+# Failed jobs
+
+A job is failed once it has used every attempt, or failed in a way that cannot be retried (for example, no handler for its name). Failed jobs are kept unless you set `removeOnFail`.
+
+```ts
+import { failedJobs, retryFailedJob } from "@warlock.js/queue";
+
+const failed = await failedJobs({ queue: "default", start: 0, end: 49 }); // newest first
+
+for (const job of failed) {
+  console.log(job.name, job.failedReason, job.attemptsMade);
+}
+
+await failed[0]?.retry(); // back to waiting
+await retryFailedJob("invoice:43"); // by id; throws FailedJobNotFoundError if not failed
+```
+
+## Dashboard (optional)
+
+```sh
+npm install @bull-board/api @bull-board/fastify
+```
+
+```ts
+import { getHttpServer } from "@warlock.js/core";
+import { queueDashboard } from "@warlock.js/queue";
+
+await queueDashboard(getHttpServer(), { basePath: "/admin/queues" });
+```
+
+- Call it before the HTTP server starts listening.
+- Shows every queue that has a job, plus the default queue, unless you pass `queues`.
+- It has no authentication of its own, and it can retry and delete jobs. Protect the path.
+
+
+## overview  `@warlock.js/queue/overview/SKILL.md`
+
+---
+name: overview
+description: 'Front door for `@warlock.js/queue` — durable background jobs for Warlock apps on BullMQ + Redis (Redis is required): `defineJob` + `.dispatch()`, retries/backoff, delay, priority, progress, failed-job listing/retry, in-process workers started by `queueConnector()` with graceful shutdown, a BullMQ backend for notifications `.queue()`, and an optional bull-board dashboard. TRIGGER when: importing from `@warlock.js/queue`; "background job", "job queue", "run this later", "retry failed jobs", "BullMQ in Warlock", "worker process". Skip: in-memory batching inside one process — that is core''s `Queue` class (`@warlock.js/core`); cron-style schedules — `@warlock.js/scheduler/overview/SKILL.md`; a known task — load `configure-queue`, `define-jobs`, `manage-failed-jobs` or `queue-notifications`.'
+---
+
+# `@warlock.js/queue` — overview
+
+Durable background jobs. Jobs are stored in **Redis** (required), retried on failure, and processed by workers — inside the app process by default.
+
+## Mental model
+
+- **Job definition** — `defineJob({ name, handle })` registers a handler by name and returns a typed job.
+- **Dispatch** — `job.dispatch(payload, options)` stores the job in Redis. Any process with the same definition and a worker can run it.
+- **Worker** — one per queue name, started by `queueConnector()` (or `startWorkers()`); routes each job to the handler with its name.
+- **Shutdown** — workers stop taking jobs, active jobs finish (up to `workers.shutdownTimeout`), then connections close.
+
+## Not core's `Queue`
+
+`@warlock.js/core` exports `Queue` — an in-memory batcher that flushes items by size or interval inside one process. No storage, no retries, lost on exit. Use `@warlock.js/queue` when work must survive a restart or be retried.
+
+## Skills index
+
+- [`configure-queue`](@warlock.js/queue/configure-queue/SKILL.md) — `src/config/queue.ts`, `queueConnector()`, workers on/off, shutdown.
+- [`define-jobs`](@warlock.js/queue/define-jobs/SKILL.md) — `defineJob`, `dispatch` options, retries, progress, `find`.
+- [`manage-failed-jobs`](@warlock.js/queue/manage-failed-jobs/SKILL.md) — `failedJobs`, `retryFailedJob`, the bull-board dashboard.
+- [`queue-notifications`](@warlock.js/queue/queue-notifications/SKILL.md) — `queueNotificationDispatcher()` for notifications `.queue()`.
+
+
+## queue-notifications  `@warlock.js/queue/queue-notifications/SKILL.md`
+
+---
+name: queue-notifications
+description: 'Send `@warlock.js/notifications` `.queue()` deliveries through BullMQ with `queueNotificationDispatcher({ queue?, attempts?, backoff? })` from `@warlock.js/queue/notifications` — put it in the `queue` slot of `src/config/notifications.ts`; the queue workers deliver. Honours `SendOptions.delay` (number = seconds, or "10m"), retries a failing `channel.send`, and fails at once for a channel missing from the worker config. Notifications keeps no queue dependency. Triggers: `queueNotificationDispatcher`, `@warlock.js/queue/notifications`, `NotificationConfig.queue`; "queue notifications with BullMQ", "retry notification delivery", "delayed notification". Skip: the herald backend — `@warlock.js/notifications/queue-notifications/SKILL.md`.'
+---
+
+# Queue notifications with BullMQ
+
+```ts title="src/config/notifications.ts"
+import { type NotificationConfig, mailChannel } from "@warlock.js/notifications";
+import { queueNotificationDispatcher } from "@warlock.js/queue/notifications";
+
+const config: NotificationConfig = {
+  channels: { mail: mailChannel() },
+  queue: queueNotificationDispatcher({ attempts: 3, backoff: { type: "exponential", delay: 5000 } }),
+};
+
+export default config;
+```
+
+Also configure the queue itself (`configure-queue`). No separate notifications worker is needed: the delivery is an ordinary job, run by the queue workers.
+
+```ts
+await orderShipped.queue(user, { order }); // enqueued, delivered by a worker
+await orderShipped.queue(user, { order }, { delay: "10m" }); // delivered in 10 minutes
+```
+
+## Behaviour
+
+- The job carries the rendered payload and resolved route; the worker looks the channel up by name in its own notifications config and calls `channel.send`.
+- `delay`: a number is seconds (notifications' convention); a string is a duration.
+- `channel.send` throws → retried per `attempts` / `backoff`, then listed by `failedJobs()`.
+- Channel not configured in the worker → fails at once, no retries.
+- Deliveries run under the job name `warlock.notifications.deliver`.
+
+
