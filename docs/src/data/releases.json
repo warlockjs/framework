@@ -1,5 +1,17 @@
 {
   "_doc": "Release-level metadata for the unified changelog — the npm PUBLISH TIMESTAMP and the 'what shipped' SUMMARY for each version. Per-package change details (Added/Changed/Fixed/Removed) live in each package's CHANGELOG.md and are aggregated by scripts/generate-changelog.mjs; this file supplies release metadata that the per-package files don't carry. Hand-maintained: add one entry per release, keyed by the version string. `publishedAt` is the full ISO timestamp reported by npm for @warlock.js/core (e.g. \"2026-09-02T00:54:41.833Z\"); the generator derives the human UTC display date from it. Legacy entries may retain `date` as a display-string fallback. `summary` supports inline `code`, **bold**, and [links](url); `featured` (optional) is an array of package names floated to the top of that release's package list, in the listed order (the rest follow most-changed-first, then alphabetical). Keep the summary to ONE short headline — what shipped and which packages — not an API-by-API tour; the per-package list below it carries the detail. `matrix` states the zero-edit generator-matrix scope that release ran — \"none\", \"subset\" or \"full\" — and is REQUIRED on every release from 5.6.0 onward (canon e00fb7b8: the matrix is opt-in, and the record is what keeps that from degrading silently; a release whose scope is not stated must not ship). For \"subset\", `matrixRows` lists the rows that ran. Entries from before 5.6.0 carry neither, and render as nothing rather than as a claim nobody checked.",
+  "5.12.0": {
+    "publishedAt": "2026-09-16T21:02:19.568Z",
+    "matrix": "subset",
+    "matrixRows": ["baseline", "web"],
+    "summary": "**The authenticated user moves from `request.user` to `request.locals.user`** (BREAKING, `@warlock.js/core` / `@warlock.js/auth` / `@warlock.js/access`), `@warlock.js/auth` adds a CSRF Origin check for cookie-authenticated writes plus `setAuthCookie()` / `clearAuthCookie()`, and `@warlock.js/web` ships an opt-in server-side page cache, `defer()`-ed streaming data with crawler-aware inlining, scroll restoration and locale-direction (RTL) support. `@warlock.js/core` adds opt-in request tracing and a CSP header; `create-warlock` scaffolds non-interactively by default and fixes a fresh-scaffold `npm run seed` failure. Lockstep release across all 28 packages. Generator matrix ran `subset` scope (`baseline`, `web` rows) against the staged candidate, authorised by Hasan on 2026-09-16: \"Yes do it please, don't release before completing all mising points and make sure you have covered everything in the tasks board.\"",
+    "featured": [
+      "@warlock.js/web",
+      "@warlock.js/auth",
+      "@warlock.js/core",
+      "create-warlock"
+    ]
+  },
   "5.11.0": {
     "publishedAt": "2026-09-14T16:03:38.837Z",
     "matrix": "none",

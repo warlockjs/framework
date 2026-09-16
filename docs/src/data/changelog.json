@@ -116,6 +116,247 @@
   ],
   "releases": [
     {
+      "version": "5.12.0",
+      "id": "v5-12-0",
+      "date": "September 16, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>The authenticated user moves from <code>request.user</code> to <code>request.locals.user</code></strong> (BREAKING, <code>@warlock.js/core</code> / <code>@warlock.js/auth</code> / <code>@warlock.js/access</code>), <code>@warlock.js/auth</code> adds a CSRF Origin check for cookie-authenticated writes plus <code>setAuthCookie()</code> / <code>clearAuthCookie()</code>, and <code>@warlock.js/web</code> ships an opt-in server-side page cache, <code>defer()</code>-ed streaming data with crawler-aware inlining, scroll restoration and locale-direction (RTL) support. <code>@warlock.js/core</code> adds opt-in request tracing and a CSP header; <code>create-warlock</code> scaffolds non-interactively by default and fixes a fresh-scaffold <code>npm run seed</code> failure. Lockstep release across all 28 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code> rows) against the staged candidate, authorised by Hasan on 2026-09-16: \"Yes do it please, don't release before completing all mising points and make sure you have covered everything in the tasks board.\"",
+      "matrix": "subset",
+      "matrixRows": [
+        "baseline",
+        "web"
+      ],
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 14,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 9
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Emitted scripts carry the request's CSP nonce."
+            },
+            {
+              "type": "Added",
+              "html": "<code>&lt;ClientOnly&gt;</code> and <code>useIsClient()</code> — render browser-only UI with a server fallback and no hydration mismatch."
+            },
+            {
+              "type": "Added",
+              "html": "<code>defer()</code> in page loaders — stream a slow top-level loader key in after the shell instead of blocking the first byte on it, read it with React's <code>use()</code> inside <code>&lt;Suspense&gt;</code>. A rejection or a <code>web.streaming.deferTimeout</code> timeout resolves to the nearest <code>&lt;Suspense&gt;</code> error boundary with status 200 already sent, never a different HTTP status. Client navigations stream the same values as NDJSON automatically. <code>metadata()</code> may read only resolved keys — reading a deferred one throws <code>DeferredKeyInMetadataError</code>, naming the key and the page, in dev and in production. See the <code>stream-deferred-data</code> skill."
+            },
+            {
+              "type": "Added",
+              "html": "Scroll position is restored on back/forward client navigation, keyed per history entry and persisted to <code>sessionStorage</code>. New navigations scroll to the top, or to the hash fragment when there is one."
+            },
+            {
+              "type": "Added",
+              "html": "<code>localeDirection(locale)</code> and <code>useTextDirection()</code>: one locale-to-direction resolver shared by server and client. Root templates set <code>&lt;html lang={locale} dir={useTextDirection()}&gt;</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>changeLocaleCode(code)</code> switches the active locale without a full reload. The server persists the choice in its <code>locale</code> cookie when a navigation data request carries <code>?locale=</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Page requests report <code>loader</code> (per level), <code>render.shell</code> and <code>stream.end</code> phases through core's <code>http.tracing</code> hooks when tracing is enabled (off by default)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>web.streaming.crawlers</code> — a detected crawler's full-document request now receives the fully resolved document instead of the streamed shell plus deferred chunks: every <code>defer()</code>-ed value is awaited and inlined before the first byte, and a rejection renders the ordinary error boundary with its real status. Detection is case-insensitive against a documented built-in user-agent list (googlebot, bingbot, yandex, duckduckbot, baiduspider, slurp, applebot, facebookexternalhit, twitterbot, linkedinbot, discordbot, slackbot, telegrambot, whatsapp, embedly, pinterest); set <code>crawlers: false</code> to disable detection, or <code>crawlers: { userAgents, detect }</code> to customise it — <code>detect</code> wins outright when given. A page that uses <code>defer()</code> now sends <code>Vary: User-Agent</code> on its document response; a page that never defers is unaffected. See the <code>stream-deferred-data</code> skill's \"Crawlers\" section."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>A server-side page cache, opt-in per route.</strong> Extends <code>route.cache</code> with <code>serverCache?: boolean</code>, <code>tags?: string[] | ((data) =&gt; string[])</code>, and an optional <code>ttl</code> — separate from <code>public</code>/<code>maxAge</code>, which only decide the downstream CDN's <code>Cache-Control</code>. A <code>serverCache</code> route holds its resolved document AND <code>x-warlock-data</code> JSON, and serves a HIT without re-running loaders or rendering. The cache key is the normalised path, sorted query, resolved locale and representation (<code>html</code>/<code>json</code>); a request for the NDJSON representation is served the fully-resolved <code>json</code> variant instead of streaming. A request carrying an <code>Authorization</code> header or the configured auth cookie (<code>auth.cookie.name</code>, default <code>access_token</code>) always bypasses the cache, before any loader runs. Storage requires <code>GET</code>, <code>status === 200</code>, no <code>Set-Cookie</code>, and a provably unauthenticated request — the same fail-closed rule already governing <code>Cache-Control</code>. Responses carry a new <code>x-warlock-cache: hit | miss | bypass</code> header. Invalidate stored entries with <code>invalidatePageCache(tags)</code>, imported from the server-only subpath <code>@warlock.js/web/page-cache</code> (it reaches <code>@warlock.js/cache</code>, so it stays off the client-reachable root barrel). <code>@warlock.js/cache</code> is an optional peer, loaded only when a route actually opts in; enabling <code>serverCache</code> with an in-process cache driver (memory/LRU/memory-extended) in a clustered deployment logs a one-time warning, since invalidation on one worker never reaches another — use a shared driver (redis/pg) for cluster-wide invalidation. See the <code>create-a-page</code> skill's \"Server-side page cache\" section."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>The page-data wire format is now devalue, not plain JSON.</strong> Dates, Maps and Sets (and BigInts, <code>undefined</code> inside an object, repeated references, and cyclic structures) now arrive in the browser intact — as real <code>Date</code>/<code>Map</code>/<code>Set</code> instances, not flattened strings or dropped keys — for <code>appData</code>, <code>layoutData</code>, <code>pageData</code>, and a <code>defer()</code>red value's settlement, on the initial document, a client navigation's data response, and its NDJSON stream. A loader value devalue cannot serialize (a class instance it does not recognize, a function, a symbol) now fails the build loudly in dev <strong>and</strong> production, naming the loader level (<code>app</code>/<code>layout</code>/<code>page</code>), the key path, and the page route — give it a resource or a <code>toJSON()</code> instead. <code>shared</code> is unaffected: it keeps its own, stricter gate. See the <code>load-page-data</code> skill's \"What survives the wire\" section."
+            },
+            {
+              "type": "Changed",
+              "html": "The dev and production page installers now share the layout-prefix table and the not-found route's options instead of implementing each twice; parity checks cover both."
+            },
+            {
+              "type": "Changed",
+              "html": "Pages are rendered with React's streaming renderer. The response still waits for loaders, validation and middleware, so status codes, headers and cookies are unchanged — the document simply starts arriving sooner."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>document.documentElement</code>'s <code>lang</code>/<code>dir</code> now follow a client-side locale switch — <code>changeLocaleCode()</code>, and any navigation or refresh whose payload carries a different <code>locale</code>. Previously <code>useLocale()</code>/<code>useTextDirection()</code> updated in-page immediately, but <code>documentElement</code> kept the last full load's <code>lang</code>/<code>dir</code> until a reload, because <code>root.tsx</code> sits outside the hydrated subtree."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>A page middleware that short-circuits a full page load now always answers with something, never a silently empty document.</strong> Previously, a middleware that returned a value WITHOUT writing the reply itself (e.g. <code>response.setStatusCode(403); return { error }</code>, or a plain <code>return { message }</code>) produced a blank document at that status — the returned value was recorded but never used. A middleware that already wrote its own reply (<code>response.redirect()</code>, <code>.forbidden()</code>, any call reaching <code>.send()</code>) was and is unaffected: the wire already carried the real answer. Now: a <code>&gt;= 400</code> short-circuit renders your <code>error.page.tsx</code> boundary with that status and the returned value attached to the error; a <code>2xx</code> short-circuit sends the returned value as the body, unchanged (JSON-stringified if it's an object) — a page middleware returning 2xx content replaces the page. Client navigations (data requests) are byte-identical to before."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>authService.setAuthCookie(response, token, options?)</code> and <code>authService.clearAuthCookie(response, options?)</code> — the write side of the <code>cookie:&lt;name&gt;</code> token source <code>authMiddleware([], \"cookie:&lt;name&gt;\")</code> has accepted since 5.0.0 (card 50bf4f1a). <code>setAuthCookie</code> accepts a raw token string or an <code>AccessTokenOutput</code> (deriving <code>Max-Age</code> from <code>expiresAt</code> automatically); both are explicit app-controller calls — <code>login</code>/<code>logout</code> never set cookies implicitly, so upgrading never starts emitting <code>Set-Cookie</code> for an existing bearer-only app. Cookie name/path are configurable via the new <code>auth.cookie</code> config block (defaults: <code>\"access_token\"</code> / <code>\"/\"</code>); attribute flags (<code>HttpOnly</code>, <code>SameSite=Lax</code>, <code>Secure</code> outside dev) are not — they come from core's <code>secureCookieDefaults()</code>, the framework-wide floor."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> the authenticated user now lives at <code>request.locals.user</code>, declared by <code>@warlock.js/auth</code>. <code>request.user</code> is removed (in development it throws with the new location). <code>@warlock.js/auth</code>'s middleware writes <code>request.locals.user</code> after a successful token resolution and clears it (<code>= undefined</code>) on a forged, malformed, expired, or wrong-type token; <code>RequestUser</code> — the augmentable, empty-by-default interface apps narrow to their own model — moved from <code>@warlock.js/core</code> into <code>@warlock.js/auth</code> alongside it."
+            },
+            {
+              "type": "Security",
+              "html": "<strong>CSRF Origin check for cookie-authenticated writes.</strong> <code>authMiddleware</code> now automatically rejects, with <code>403</code> (<code>AuthErrorCodes.CsrfOriginMismatch</code>, <code>\"EC006\"</code>), any request whose credential came from a <code>cookie:</code> source and whose method is unsafe (<code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code>) unless <code>Origin</code> (or, absent that, <code>Referer</code>) names the request's own origin or an entry in the new <code>auth.csrf.allowedOrigins</code> config (default <code>[]</code>). A request with neither header is rejected, fail-closed. Header-token authentication and safe methods (<code>GET</code>/<code>HEAD</code>/<code>OPTIONS</code>) are completely unaffected. This closes the residual CSRF gap <code>SameSite=Lax</code> alone leaves open for cookie auth (a same-site GET redirect chain, or a client that ignores <code>SameSite</code>); a double-submit token mechanism is deferred to a later release."
+            },
+            {
+              "type": "Security",
+              "html": "The CSRF Origin check's own-origin comparison includes the request's port (read from the <code>Host</code> header, since core's <code>request.hostname</code> never carries one), with default ports (<code>:80</code> on <code>http</code>, <code>:443</code> on <code>https</code>) normalised as equivalent to no port. A same-origin cookie-authenticated write on a non-default port — e.g. every <code>warlock dev</code> session — is now correctly allowed instead of being rejected with <code>403 EC006</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 8,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Opt-in request tracing (<code>http.tracing</code>): vendor-neutral <code>onRequestStart</code> / <code>onRequestEnd</code> / <code>onPhase</code> hooks fired around <code>route.match</code>, <code>middleware</code>, <code>validation</code>, <code>handler</code>, and <code>response.write</code>, with the trace id derived from an inbound W3C <code>traceparent</code> header (falling back to <code>request.id</code>). Off by default and zero-overhead when disabled; a throwing hook is caught and reported once, never breaking the request. No new response header — apps still correlate through the existing <code>X-Request-Id</code> echo. See the <code>request-tracing</code> skill."
+            },
+            {
+              "type": "Added",
+              "html": "Opt-in <code>Content-Security-Policy</code> header (<code>http.csp</code>), using the per-request nonce the framework already generates; report-only mode supported."
+            },
+            {
+              "type": "Added",
+              "html": "<code>Response.streamReact()</code> and the underlying <code>streamReactResponse()</code> helper (<code>@warlock.js/core</code>'s Stage 1 streaming SSR seam): pipe a React server stream (<code>renderToPipeableStream</code>) onto the raw response after writing the already-committed status and headers, aborting the render if the client disconnects. <code>@warlock.js/web</code> uses this exclusively to stream a page document — it never touches the raw response itself."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong><code>container.get(key)</code> now throws a named error when the key is not registered</strong>, instead of returning <code>undefined</code> while typed as present. Use <code>container.tryGet(key)</code> where the value is genuinely optional."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> <code>request.user</code> and <code>clearCurrentUser()</code> removed from the HTTP request; <code>RequestUser</code> moved to <code>@warlock.js/auth</code>. The authenticated user now lives at <code>request.locals.user</code>, a key <code>@warlock.js/auth</code> declares via module augmentation on <code>RequestLocals</code> and writes from its middleware. Reading <code>request.user</code> in development throws a new <code>RequestUserMovedError</code> naming <code>request.locals.user</code> (kept for one release as a migration diagnostic; removal is documented, not silent). <code>decodedAccessToken</code> and its cache-mark behavior (<code>request.locals.authDerived</code>) are unchanged. <code>useCurrentUser()</code> / <code>requestContext.getUser()</code> now read <code>request.locals.user</code> and return <code>unknown</code>/the caller's generic instead of the removed <code>RequestUser</code> type — see <code>@warlock.js/auth</code>'s <code>currentUser()</code> for a typed wrapper."
+            },
+            {
+              "type": "Fixed",
+              "html": "Renaming or moving a file under <code>warlock dev</code> no longer prints a false <code>ENOENT</code> failure before the route is rewired."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock routes --json</code> now prints only JSON on stdout. The <code>› Running &lt;command&gt;...</code> header moved to stderr, like the completion banner."
+            },
+            {
+              "type": "Fixed",
+              "html": "Production build contribution hooks (<code>generate</code> / <code>emit</code>) saw <code>outFile</code>, <code>entryPath</code>, <code>singleBundle</code>, <code>esmShim</code> and <code>banner</code> as <code>undefined</code>, because bundling deleted them from the shared build options. The bundler now works on its own copy."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<code>create-warlock</code> asks at most one question (API-only or full-stack web); every other choice is a flag with a default, printed after scaffolding. Fully non-interactive with <code>--yes</code>; <code>--interactive</code> restores the long form; <code>--agents</code> picks agent-kit targets (default <code>claude</code>)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>npm run seed</code> failed on a fresh scaffold: the generated <code>userSchema</code> required <code>image</code> and <code>lastLogin</code>, but neither the seed data nor a password login ever supplies them. Both are now <code>.optional()</code> on the model — <code>image</code> is still required at registration by the controller's own <code>create-user.schema.ts</code>, and <code>lastLogin</code> is only ever written by the social-login handler, so a user who has never logged in correctly has neither."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Follows <code>@warlock.js/core</code> and <code>@warlock.js/auth</code>'s 5.12.0 move of the authenticated user from <code>request.user</code> to <code>request.locals.user</code>: <code>gate()</code> / <code>gateAny()</code> / <code>gateAll()</code> now read <code>request.locals.user</code> instead of the removed <code>request.user</code>. No change to <code>can()</code> / <code>canAny()</code> / <code>canAll()</code> themselves, and no change to the app-side contract — an app still augments <code>RequestUser</code> (now declared by <code>@warlock.js/auth</code>) to its own <code>Auth</code>-derived model."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Atomic writes on Windows no longer fail intermittently with <code>EPERM</code> / <code>EBUSY</code> when another process briefly holds the target; the rename is retried with a short backoff, and a clear <code>AtomicWriteError</code> is thrown if it never succeeds."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.11.0",
       "id": "v5-11-0",
       "date": "September 14, 2026",
