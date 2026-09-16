@@ -2,9 +2,15 @@
 
 All notable changes to `@warlock.js/core` are documented in this file.
 
+## 5.13.0
+
+### Added
+
+- `warlock dev` generates `.warlock/typings/translations.d.ts` from literal `groupedTranslations` dictionaries, augmenting web's typed translation-key registry.
+
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
-> ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an *Upgrading* section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
+> ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
 ## 5.12.0 - 2026-09-16
 
@@ -84,6 +90,7 @@ _Released in lockstep with the `@warlock.js/*` family; no package-specific chang
 - Internal type-safety hardening across the CLI, dev server and request handling; no other behaviour change.
 
 ## 5.6.0 - 2026-09-08
+
 ### Fixed
 
 - **A production build asked the APP to resolve packages only the framework declares, so a built app could not boot under a strict pnpm tree.** Every bare specifier was left external, including the `@fastify/*`, `find-my-way`, `fast-jwt` and `@mongez/*` imports that reach the bundle through the framework's own code — none of which an app has any reason to declare. Under npm/yarn hoisting they resolved by accident; under pnpm the app died with `ERR_MODULE_NOT_FOUND` at startup, after a build that reported success. Externality is now decided per import edge: a bare specifier stays external unless the importer is not the app's own code AND the specifier names a package that importer's own `dependencies` declare.
@@ -214,7 +221,7 @@ _Released in lockstep with the `@warlock.js/*` family; no package-specific chang
   first run every time.
 
   ⚠ **What a clean diff does not prove.** The manifest records what each page's route
-  name was *derived* as, not what it was *registered* as: `warlock build` boots no
+  name was _derived_ as, not what it was _registered_ as: `warlock build` boots no
   connectors, so it cannot see the API routes a page name may collide with, and the
   router appends a `.<method>` suffix to a name another method already claimed —
   which the comparison accepts rather than reporting. `Page routes match` therefore
@@ -282,14 +289,14 @@ _Released in lockstep with the `@warlock.js/*` family; no package-specific chang
   verbatim and live, and its failure summary now reports whether a cause actually arrived:
   `the cause is printed above, in the application's own output` when output was seen, and
   `no output was captured from the application process — its cause did not reach this
-  terminal` when none was. It previously pointed at "above" unconditionally, which on a
+terminal` when none was. It previously pointed at "above" unconditionally, which on a
   silent child meant pointing at an empty terminal
 
 - **The HTTP connector now preflights its port before binding.** `warlock dev` and
   `warlock start` both go through `HttpConnector.start()`, which now calls
   `assertPortIsAvailable(port, host)` immediately before `listen()`. A collision now
   surfaces as `EADDRINUSE: Port <port> is already in use on <host>. Stop the dev server
-  (or whatever else is listening on port <port>) and run again...` — the code and the
+(or whatever else is listening on port <port>) and run again...` — the code and the
   port named in the same sentence — instead of a bare `EADDRINUSE` thrown from inside
   Fastify with no indication of which port it meant. `EACCES` on the port is treated
   the same way, since "cannot bind" is one problem from the operator's side. The test
@@ -307,8 +314,8 @@ _Released in lockstep with the `@warlock.js/*` family; no package-specific chang
   `src/app/contact/controllers/contact.controller.ts` (a `POST /api/contact` route
   validated with `@warlock.js/seal`), and `src/web/home.page.tsx` ships an
   interactive, localized (en/ar) contact form wired to that route via `@mongez/http`
-  + `@mongez/react-form` + `@mongez/react-localization`. The `web` feature now also
-  installs those three packages as dependencies.
+  - `@mongez/react-form` + `@mongez/react-localization`. The `web` feature now also
+    installs those three packages as dependencies.
 
 ### Fixed
 
@@ -337,7 +344,7 @@ _Released in lockstep with the `@warlock.js/*` family; no package-specific chang
 ### Added
 
 - **`warlock add tailwind`** — installs and wires Tailwind CSS v4 through PostCSS.
-- **`warlock add shadcn`** — sets up the prerequisites shadcn/ui expects. It is *not* a
+- **`warlock add shadcn`** — sets up the prerequisites shadcn/ui expects. It is _not_ a
   wrapper around the shadcn CLI: you still run that yourself to add components, this
   only makes the project ready for it.
 
@@ -396,15 +403,15 @@ resolution pin and the `@warlock.js/web` peer narrowing — see those packages' 
 
   ⚠ **If your app runs behind a proxy and relied on `detectIp()` reading the forwarding headers without setting `http.trustProxy`, set `http.trustProxy: true`** (or a Fastify `trustProxy` value matching your edge). With `true` set, behaviour is unchanged: `X-Real-IP` first, then the leftmost `X-Forwarded-For` hop, then the peer address. Only enable `true` when your edge overwrites those headers — it trusts them wholesale
 
-- **`http.trustProxy` now accepts a hop count or a trusted-proxy list, and `detectIp()` honours them.** `true` is the wrong shape for the common topology: an edge that *appends* to `X-Forwarded-For` leaves whatever the client prepended as the leftmost entry, so "trust the leftmost hop" hands the client its own IP back. The config value is passed to Fastify untouched, and `detectIp()` now reads the resolved client off `request.ip` instead of re-parsing the header — so both agree, and every Fastify shape works:
+- **`http.trustProxy` now accepts a hop count or a trusted-proxy list, and `detectIp()` honours them.** `true` is the wrong shape for the common topology: an edge that _appends_ to `X-Forwarded-For` leaves whatever the client prepended as the leftmost entry, so "trust the leftmost hop" hands the client its own IP back. The config value is passed to Fastify untouched, and `detectIp()` now reads the resolved client off `request.ip` instead of re-parsing the header — so both agree, and every Fastify shape works:
 
-  | `http.trustProxy` | Client IP |
-  | --- | --- |
-  | `false` *(default)* | Socket peer address; forwarding headers ignored |
-  | `true` | Leftmost `X-Forwarded-For` entry (whole chain trusted) |
-  | `2` | Walks past the 2 rightmost hops — for an edge that appends |
+  | `http.trustProxy`                                                            | Client IP                                                                  |
+  | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+  | `false` _(default)_                                                          | Socket peer address; forwarding headers ignored                            |
+  | `true`                                                                       | Leftmost `X-Forwarded-For` entry (whole chain trusted)                     |
+  | `2`                                                                          | Walks past the 2 rightmost hops — for an edge that appends                 |
   | `"10.0.0.0/8"`, `"loopback, 10.0.0.0/8"`, `["10.0.0.0/8", "192.168.0.0/16"]` | Walks left while each hop is a listed proxy, stops at the first that isn't |
-  | `(address, hop) => boolean` | Your predicate |
+  | `(address, hop) => boolean`                                                  | Your predicate                                                             |
 
   Prefer the narrowest shape your topology allows: with `true`, any client that can reach the process directly picks its own IP, and an `ipFilter` allowlist in front of it is decorative
 
@@ -432,8 +439,8 @@ resolution pin and the `@warlock.js/web` peer narrowing — see those packages' 
 import { afterAll } from "vitest";
 import { setupTest, teardownTest } from "@warlock.js/core/tests";
 
-await setupTest();          // ← was setupTest({ connectors: true })
-afterAll(teardownTest);     // ← is new
+await setupTest(); // ← was setupTest({ connectors: true })
+afterAll(teardownTest); // ← is new
 ```
 
 1. **`{ connectors: true }` must become a bare `setupTest()`.** Under the new precedence it is an **explicit** value, so it now overrides your `src/config/tests.ts` where it previously deferred to it.
@@ -442,12 +449,12 @@ afterAll(teardownTest);     // ← is new
 
 **This is the migration step nobody can skip.** `warlock add test` emits the corrected file for new projects.
 
-| What changes | How you'll see it | What to do |
-|---|---|---|
+| What changes                                                                                 | How you'll see it                                                                                          | What to do                                                                                                                                              |
+| -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **`setupTest({ connectors })` now beats `tests.connectors` config** — the precedence flipped | a test file that passes `connectors` explicitly starts a **different connector set** than it did in 4.13.0 | grep for `setupTest({` — a call passing `connectors` was previously **ignored** and is now honoured. **Including the one in your generated setup file** |
-| **A second `setupTest` call with different options now REJECTS** | an error naming the active and the requested selection, where 4.13.0 silently did nothing | call `teardownTest()` first, or don't call `setupTest` again at all |
-| **The generated setup file now registers `afterAll(teardownTest)`** | your test files tear the framework down when they finish, instead of leaving it running | **add it to your existing `src/test-setup.ts`** — see below |
-| **Docs corrected: `setupTest` is called per TEST FILE, not per worker** | no runtime effect on its own — the *invocation* always worked this way | fix the comment in `src/test-setup.ts` as above |
+| **A second `setupTest` call with different options now REJECTS**                             | an error naming the active and the requested selection, where 4.13.0 silently did nothing                  | call `teardownTest()` first, or don't call `setupTest` again at all                                                                                     |
+| **The generated setup file now registers `afterAll(teardownTest)`**                          | your test files tear the framework down when they finish, instead of leaving it running                    | **add it to your existing `src/test-setup.ts`** — see below                                                                                             |
+| **Docs corrected: `setupTest` is called per TEST FILE, not per worker**                      | no runtime effect on its own — the _invocation_ always worked this way                                     | fix the comment in `src/test-setup.ts` as above                                                                                                         |
 
 ### Added
 
@@ -461,15 +468,15 @@ afterAll(teardownTest);     // ← is new
 
 - **BREAKING — an explicit `setupTest({ connectors })` now wins over `tests.connectors` config.** The order was `config > parameter > true`; it is now **`explicit parameter > config > true`**
 
-  4.13.0's changelog said this question was open, not settled: *"a per-call override is a contract decision for a later release."* This is that decision. **Call-site intent should beat a project default** — a caller who names a connector set is being specific on purpose, and silently overruling them was the wrong behaviour
+  4.13.0's changelog said this question was open, not settled: _"a per-call override is a contract decision for a later release."_ This is that decision. **Call-site intent should beat a project default** — a caller who names a connector set is being specific on purpose, and silently overruling them was the wrong behaviour
 
   **"Explicit" means a non-`undefined` value.** `setupTest()`, `setupTest({})` and `setupTest({ connectors: undefined })` **all fall through to config, then to `true`.** The `undefined` rule is deliberate: an optional variable that happens to be `undefined` must not silently erase project config
 
   ⚠ **The generated `src/test-setup.ts` now calls `setupTest()` with no argument**, where it previously passed `{ connectors: true }`. Under the new order, passing `true` explicitly would erase the `tests.connectors` layer for the entire project. **If you edit your setup file, leave the call bare**
 
-  ⚠ **This is user-visible and it is why the change is marked BREAKING:** an application that sets `tests.connectors` *and* passes `connectors` from any test file will start a different connector set after upgrading
+  ⚠ **This is user-visible and it is why the change is marked BREAKING:** an application that sets `tests.connectors` _and_ passes `connectors` from any test file will start a different connector set after upgrading
 
-- **BREAKING — a conflicting `setupTest` call rejects instead of being ignored.** While a setup is starting or ready, a call with *different* effective options now rejects with an error naming both the active and the requested selection. The same options remain a no-op, and concurrent identical calls share one startup
+- **BREAKING — a conflicting `setupTest` call rejects instead of being ignored.** While a setup is starting or ready, a call with _different_ effective options now rejects with an error naming both the active and the requested selection. The same options remain a no-op, and concurrent identical calls share one startup
 
   Through 4.13.0 this was a silent early-return on an `isSetupComplete` flag — so `setupTest({ connectors: false })` in a file whose `src/test-setup.ts` had already run **did nothing at all, reported nothing, and started every connector anyway.** Connector arrays are compared as **sets** after deduplication, so caller order never counts as a conflict
 
@@ -497,7 +504,7 @@ afterAll(teardownTest);     // ← is new
 
   ⚠ **A stranded lifecycle must fail with a message, not a dead process** — a crash mid-file is indistinguishable from an infrastructure flake, which is the worst way for a framework to report its own bug
 
-  ⚠ **Scope of the proof, stated because a green here is easy to over-read:** all nine guards were seen to fail under their own mutation, **but every spec injects its scheduler** — the default *value* is tested while the production timer, and whether its `unref` releases the worker, is not. **No spec observes a real hang**; the stuck attempt is a mock gate, not a socket that never returns
+  ⚠ **Scope of the proof, stated because a green here is easy to over-read:** all nine guards were seen to fail under their own mutation, **but every spec injects its scheduler** — the default _value_ is tested while the production timer, and whether its `unref` releases the worker, is not. **No spec observes a real hang**; the stuck attempt is a mock gate, not a socket that never returns
 
 ### Documentation
 
@@ -507,7 +514,7 @@ afterAll(teardownTest);     // ← is new
 
   **The lifetime this release commits to is FILE-SCOPED:** the setup file bootstraps the framework and its `afterAll(teardownTest)` closes it, once per test file. **One owner, one pairing, correct under every pool, every isolation setting, and watch mode**
 
-  ⚠ **This deliberately declines a faster option.** Holding lifecycle state in the worker runtime makes a worker-scoped lifetime *possible* — bootstrap once, reuse across every file in that worker — and an earlier draft of this release simply left the framework running to get it. **We are not shipping that**, for two reasons neither of which is performance:
+  ⚠ **This deliberately declines a faster option.** Holding lifecycle state in the worker runtime makes a worker-scoped lifetime _possible_ — bootstrap once, reuse across every file in that worker — and an earlier draft of this release simply left the framework running to get it. **We are not shipping that**, for two reasons neither of which is performance:
 
   1. **Under `pool: "threads"` we cannot honestly claim the runner cleans up.** Vitest tears the thread down while the process lives, and whether Node reclaims that thread's sockets and pools is **unmeasured** — so "the runner owns cleanup by termination" would be a promise we cannot observe being kept
   2. **In watch mode Vitest reuses workers between reruns**, so there is no recycle and therefore **no cleanup owner at all** between reruns. Declaring watch mode unsupported was the alternative, and a test framework whose lifecycle is undefined in the mode people use all day does not have a lifecycle
@@ -520,12 +527,12 @@ afterAll(teardownTest);     // ← is new
 
 **Four breaking changes. Every one of them fails visibly, and every one is fixed by a single line or a single config key.** Three are security defaults that were wrong; the fourth is an import path.
 
-| What breaks | How you'll see it | The fix |
-|---|---|---|
-| **`http.cors` now actually applies** — it never had any effect in any release through 4.12.0 | requests from origins you never allow-listed start being rejected | check `http.cors` before upgrading; it now means what it says |
-| **`http.bodyLimit` defaults to Fastify's 1 MB**, not 200 GB | large uploads that used to be accepted answer `413` | set `http.bodyLimit` explicitly if you need more |
-| **`http.trustProxy` defaults to `false`** | `request.ip` becomes the socket address instead of `X-Forwarded-For` | set `http.trustProxy: true` **only if** you are genuinely behind a proxy that strips the header |
-| **The package entry no longer re-exports the CLI, dev server, test helpers or Vite integration** | build fails with `has no exported member` | test helpers move to `@warlock.js/core/tests`, `lowerStage3Decorators` to `@warlock.js/core/vite` — **one line per import.** The CLI and dev-server internals are **not** public and have no replacement specifier |
+| What breaks                                                                                      | How you'll see it                                                    | The fix                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`http.cors` now actually applies** — it never had any effect in any release through 4.12.0     | requests from origins you never allow-listed start being rejected    | check `http.cors` before upgrading; it now means what it says                                                                                                                                                      |
+| **`http.bodyLimit` defaults to Fastify's 1 MB**, not 200 GB                                      | large uploads that used to be accepted answer `413`                  | set `http.bodyLimit` explicitly if you need more                                                                                                                                                                   |
+| **`http.trustProxy` defaults to `false`**                                                        | `request.ip` becomes the socket address instead of `X-Forwarded-For` | set `http.trustProxy: true` **only if** you are genuinely behind a proxy that strips the header                                                                                                                    |
+| **The package entry no longer re-exports the CLI, dev server, test helpers or Vite integration** | build fails with `has no exported member`                            | test helpers move to `@warlock.js/core/tests`, `lowerStage3Decorators` to `@warlock.js/core/vite` — **one line per import.** The CLI and dev-server internals are **not** public and have no replacement specifier |
 
 **If your app configures none of the three HTTP keys, the first three changes make it strictly safer with no action from you.** The `trustProxy` default in particular meant per-IP rate limiting was bypassable by anyone sending their own `X-Forwarded-For`.
 
@@ -561,9 +568,9 @@ Details for each are in the entries below.
 
 - **Shutdown survives a throwing log channel.** A connector whose `shutdown()` failed was reported through `log.error(...)` **from inside the catch block** — and `Logger.log()` hands each entry to `channel.log()` with no isolation, so a channel that throws synchronously (a misconfigured transport, an unserialisable payload) made that report reject. The rejection escaped `shutdown()` entirely, and the consequences went well past a missing log line: **`log.flush()` never ran, so every buffered entry from the whole run was lost; the remaining connectors were never torn down; and `process.exit(0)` — the line `gracefulShutdown` runs once `shutdown()` resolves — was never reached, leaving the process alive on the handles those connectors still held**
 
-  ⚠ **This hardens the shutdown path, not the logger.** `Logger.log()` still aborts its fan-out on the first throwing channel, so the other channels never receive that entry, and an *asynchronously* rejecting channel is not covered at all — `channel.log()` is never awaited. **Logger-wide isolation is a separate fix in a later release**
+  ⚠ **This hardens the shutdown path, not the logger.** `Logger.log()` still aborts its fan-out on the first throwing channel, so the other channels never receive that entry, and an _asynchronously_ rejecting channel is not covered at all — `channel.log()` is never awaited. **Logger-wide isolation is a separate fix in a later release**
 
-- **A test server that fails to start no longer leaves half of itself running.** `startHttpTestServer()` publishes the resolved port before the late connector phase and sets `isServerRunning` only on its last line, so a failure in between left **live early-phase connectors and a published port pointing at a server that never came up** — while `stopHttpTestServer()` in `globalTeardown` reported *"No server to stop"* and walked away from them. Startup now unwinds what it started, always withdraws the port and resets its state. ⚠ **The error you get back is unchanged — it always was.** Startup had no `catch` at all, so the original failure already propagated correctly; what was missing was the cleanup, and the new `catch` exists only to run it. A failure *during* that cleanup is reported and never substituted for the cause, which is the one propagation guarantee the wrapper had to be careful not to break
+- **A test server that fails to start no longer leaves half of itself running.** `startHttpTestServer()` publishes the resolved port before the late connector phase and sets `isServerRunning` only on its last line, so a failure in between left **live early-phase connectors and a published port pointing at a server that never came up** — while `stopHttpTestServer()` in `globalTeardown` reported _"No server to stop"_ and walked away from them. Startup now unwinds what it started, always withdraws the port and resets its state. ⚠ **The error you get back is unchanged — it always was.** Startup had no `catch` at all, so the original failure already propagated correctly; what was missing was the cleanup, and the new `catch` exists only to run it. A failure _during_ that cleanup is reported and never substituted for the cause, which is the one propagation guarantee the wrapper had to be careful not to break
 
   **`stopHttpTestServer()` withdraws the port and resets state in a `finally`.** They previously ran after the `await`, so a shutdown that threw left the published port behind and the next run in the same process inherited it
 
@@ -573,17 +580,18 @@ Details for each are in the entries below.
 
   **Why it had to change:** those five put dev-only tooling into the **static module graph of every application that imports the framework** — 39 files, reaching ESLint and, through it, ESLint's optional `jiti` import. It cost nothing while the builder kept `packages: "external"`, because esbuild never walked into the framework. **Anything that bundles walks it, and the build fails.** That is why `singleBundle` could not build a single real application
 
-  ⚠ **Making those imports lazy does not help and should not be attempted.** esbuild resolves `import()` at build time; a dynamic import defers *evaluation*, not resolution. Measured: `await import("jiti")` in an otherwise empty file still fails with `Could not resolve "jiti"`. **Only unreachability from the entry removes a module from the graph**
+  ⚠ **Making those imports lazy does not help and should not be attempted.** esbuild resolves `import()` at build time; a dynamic import defers _evaluation_, not resolution. Measured: `await import("jiti")` in an otherwise empty file still fails with `Could not resolve "jiti"`. **Only unreachability from the entry removes a module from the graph**
 
   **The two public halves are now reachable from a subpath — and in 4.12.0 and earlier they were reachable from nowhere at all.** `./tests` and `./vite` are **real build entries with their own emitted files and `exports` entries**, not reachable from the root barrel, which is the entire point:
 
   ```ts
   // before                                        // after
-  import { setupTest } from "@warlock.js/core";     import { setupTest } from "@warlock.js/core/tests";
+  import { setupTest } from "@warlock.js/core";
+  import { setupTest } from "@warlock.js/core/tests";
   import { startHttpTestServer } from "@warlock.js/core";
-                                                    import { startHttpTestServer } from "@warlock.js/core/tests";
+  import { startHttpTestServer } from "@warlock.js/core/tests";
   import { lowerStage3Decorators } from "@warlock.js/core";
-                                                    import { lowerStage3Decorators } from "@warlock.js/core/vite";
+  import { lowerStage3Decorators } from "@warlock.js/core/vite";
   ```
 
   **The CLI and dev-server internals are different — they were never a public API and have no replacement specifier.** If you were importing from those, you were reaching into framework internals; open an issue describing what you needed.
@@ -592,7 +600,7 @@ Details for each are in the entries below.
 
   `Path` is unaffected — it moved to a genuine utility module and remains exported
 
-  **Removing the five lines was necessary but not sufficient.** Three production modules — `connectors/http-connector`, `connectors/connectors-manager` and `warlock-config/warlock-config.manager` — imported the dev server's console formatter directly. In `http-connector` the dev-console call was simply **deleted**: the same error was already routed through `log.fatal` on the following line. `connectors-manager` now logs a connector's shutdown failure through `@warlock.js/logger`, **awaited and then flushed** — `process.exit(0)` follows immediately, so an un-awaited log is a log that never happens. `warlock-config.manager`'s *"`warlock.config.ts` is missing"* warning writes **straight to the console instead**: it runs during CLI bootstrap, before the logger has a single channel configured, so routing it through the logger would drop it in every application
+  **Removing the five lines was necessary but not sufficient.** Three production modules — `connectors/http-connector`, `connectors/connectors-manager` and `warlock-config/warlock-config.manager` — imported the dev server's console formatter directly. In `http-connector` the dev-console call was simply **deleted**: the same error was already routed through `log.fatal` on the following line. `connectors-manager` now logs a connector's shutdown failure through `@warlock.js/logger`, **awaited and then flushed** — `process.exit(0)` follows immediately, so an un-awaited log is a log that never happens. `warlock-config.manager`'s _"`warlock.config.ts` is missing"_ warning writes **straight to the console instead**: it runs during CLI bootstrap, before the logger has a single channel configured, so routing it through the logger would drop it in every application
 
   `tests/unit/meta/production-entry-graph.test.ts` enforces this from now on. It keys on **our own directory names** rather than a denylist of third-party packages, because a denylist rots the moment a dependency changes its imports and can only catch names someone thought of
 
@@ -634,15 +642,15 @@ Details for each are in the entries below.
 
 - **`warlock migrate --pending` — what will run next, in the order it will run.** `migrate` could report what had already run (`--list`) and what files existed on disk (`--all`), but not the one thing an operator asks before a schema change against a live database. The pending set was already computed on every migrate run; it simply had no read-only exit
 
-  The gap forced a workaround that is **unsound in the dangerous direction**. `--all` globs `src/app` only, so it cannot see migrations a *package* registers through `database.migrations` — `@warlock.js/auth` alone contributes two. `--list` reads the migrations table, which does contain them. Differencing the two counts subtracts populations that do not overlap, and it under-counts pending by roughly the number of package migrations installed — reporting "nothing else is pending" when something is
+  The gap forced a workaround that is **unsound in the dangerous direction**. `--all` globs `src/app` only, so it cannot see migrations a _package_ registers through `database.migrations` — `@warlock.js/auth` alone contributes two. `--list` reads the migrations table, which does contain them. Differencing the two counts subtracts populations that do not overlap, and it under-counts pending by roughly the number of package migrations installed — reporting "nothing else is pending" when something is
 
   **`migrate --list` now prints both sections**, executed and pending, so the question can be answered without knowing a second flag exists. The executed section prints **first and unconditionally**: it is a table read that cannot fail because of a broken file on disk, and `--list` is the command reached for while something is already wrong. `--list` always exits `0` — it is a report
 
-  **`--pending` is the gate**, and its exit code is its entire API: **`0`** computed and nothing pending, **`1`** computed and N pending, **`2`** could not be computed. Two codes would fold "three migrations are waiting" into "I could not work out what is waiting", and those demand opposite responses — the first is *run them*, the second is *stop*. `migrate --pending && deploy` behaves correctly under all three
+  **`--pending` is the gate**, and its exit code is its entire API: **`0`** computed and nothing pending, **`1`** computed and N pending, **`2`** could not be computed. Two codes would fold "three migrations are waiting" into "I could not work out what is waiting", and those demand opposite responses — the first is _run them_, the second is _stop_. `migrate --pending && deploy` behaves correctly under all three
 
-  **A failure to read the migrations never reports `0`.** Computing pending requires loading project code, and a single migration file missing its default export throws. That degrades to an explicit `Pending: unavailable — <reason>` line with the executed listing intact above it, and `--pending` exits `2`. An empty pending set means *nothing is pending*, and nothing else
+  **A failure to read the migrations never reports `0`.** Computing pending requires loading project code, and a single migration file missing its default export throws. That degrades to an explicit `Pending: unavailable — <reason>` line with the executed listing intact above it, and `--pending` exits `2`. An empty pending set means _nothing is pending_, and nothing else
 
-  `--all` deliberately does **not** gain a migration name beside each path. The only identifier available without loading is the one derived from the filename, and that derivation is a *fallback* used when a migration does not set `migrationName` — so any migration that names itself (`auth`'s do) would be listed under a name that does not exist. A wrong identifier in a listing whose purpose is cross-referencing is worse than no identifier, and `--list`'s two sections answer the comparison directly
+  `--all` deliberately does **not** gain a migration name beside each path. The only identifier available without loading is the one derived from the filename, and that derivation is a _fallback_ used when a migration does not set `migrationName` — so any migration that names itself (`auth`'s do) would be listed under a name that does not exist. A wrong identifier in a listing whose purpose is cross-referencing is worse than no identifier, and `--list`'s two sections answer the comparison directly
 
   Proven against a real Postgres: an executed package migration and a pending local one land in the correct sections, a fully-migrated database reports an empty pending list rather than an absent one, and the reporter's `files − executed` arithmetic is pinned as a test that fails if it is ever reintroduced
 
@@ -654,17 +662,17 @@ Details for each are in the entries below.
 
 ### Fixed
 
-- **A build artifact that names an entry point it does not contain is now refused before it can be packed.** An interrupted build leaves a directory that looks finished — `package.json`, `README`, `CHANGELOG`, `bin/`, `skills/` — and holds no compiled code at all. Nineteen existed in this tree at once, and nothing in the release path noticed: the only related guard compares **modification times**, so a hollow directory with a freshly written manifest is *newer than source* and passes, and it runs solely on the artifact-reuse path, which is not how the hollow directories were produced
+- **A build artifact that names an entry point it does not contain is now refused before it can be packed.** An interrupted build leaves a directory that looks finished — `package.json`, `README`, `CHANGELOG`, `bin/`, `skills/` — and holds no compiled code at all. Nineteen existed in this tree at once, and nothing in the release path noticed: the only related guard compares **modification times**, so a hollow directory with a freshly written manifest is _newer than source_ and passes, and it runs solely on the artifact-reuse path, which is not how the hollow directories were produced
 
   Each artifact is now verified immediately before `npm pack`, on the normal build path and the reuse path alike. **The manifest is the specification:** `main`, `module` and the typings field name the exact files the package promises to ship, so they are resolved against the artifact and must exist. Fields a manifest does not declare are skipped — `core` and `auth` point `main` at `esm/` while `cascade`, `ai` and `seal` point it at `cjs/`, and any check that assumed one build shape would have raised a false failure on packages that are entirely correct. A manifest declaring no entry point at all is also a failure: a published package nothing can import is not a package
 
 - **The production acceptance gate no longer inherits the environment it is supposed to be testing.** `run-pnpm-acceptance.mjs` spawned every child with `env: { ...process.env }` and set no `NODE_ENV`. It exercised the production path only because the shell it was written in happened to carry `NODE_ENV=production`; on a clean checkout, a new contributor's machine, or CI, the same gate boots the app in **development** — and does not fail, it passes while testing something other than the thing it is named after. That is the worst outcome available to a gate, and it sat underneath the proof for 4.11.0's headline fix
 
-  `NODE_ENV=production` is now set explicitly on every spawn, and — more importantly — **asserted from inside the running app**: `/acceptance` reports the environment it actually booted in, and the run fails if it is anything else. Setting a variable and never checking it arrived is how the original defect survived. The remaining `{ ...process.env }` is documented as a deliberate inheritance of `PATH` and the package-manager store paths, with everything the *verdict* depends on set after it
+  `NODE_ENV=production` is now set explicitly on every spawn, and — more importantly — **asserted from inside the running app**: `/acceptance` reports the environment it actually booted in, and the run fails if it is anything else. Setting a variable and never checking it arrived is how the original defect survived. The remaining `{ ...process.env }` is documented as a deliberate inheritance of `PATH` and the package-manager store paths, with everything the _verdict_ depends on set after it
 
   Consequence for the roadmap, recorded because the ordering matters: **CI wiring for this gate is now blocked on this fix, not parallel to it.** Wiring it up first would have produced a green from CI — which carries more weight than a local one — for a run that never touched the production path
 
-- **`warlock migrate --rollback=false` no longer drops every table.** CLI options were parsed as raw strings and nothing ever coerced them: `--rollback=false` reached the action as the string `"false"`, `if (rollback)` saw a truthy value, and the run rolled back *everything*. The declared `type: "boolean"` on the option was decorative — used only to render help. The same shape existed on every boolean option, including `warlock drop.tables --force=false`, where it turned a confirmation prompt into an unattended drop
+- **`warlock migrate --rollback=false` no longer drops every table.** CLI options were parsed as raw strings and nothing ever coerced them: `--rollback=false` reached the action as the string `"false"`, `if (rollback)` saw a truthy value, and the run rolled back _everything_. The declared `type: "boolean"` on the option was decorative — used only to render help. The same shape existed on every boolean option, including `warlock drop.tables --force=false`, where it turned a confirmation prompt into an unattended drop
 
   Its twin was worse. A bare `--flag` swallowed the following token as its value, so `warlock migrate --rollback 2024_users.ts` produced `rollback: "2024_users.ts"` — the filename was never read as a path, and every table went down while the operator believed they had named one file. **A declared boolean now never consumes the next positional**: `--rollback 2024_users.ts` is `rollback: true` plus the positional `2024_users.ts`
 
@@ -676,7 +684,7 @@ Details for each are in the entries below.
 
 - **`warlock generate.module users --force=false` no longer overwrites your files.** The coercion above is opt-in by design — it applies only to options a command declares `type: "boolean"`, so a string option whose value is genuinely the word `false` survives. The generate family and `add` never carried that declaration, so the fix reached none of them and both faces of the defect stayed live on the commands most likely to be run against existing source
 
-  `--force=false` arrived at every generator as the truthy string `"false"` and the overwrite guard (`if (exists && !force)`) let it through — a flag written to *prevent* clobbering did the clobbering. Its twin ate the target: `warlock generate.module --force users` parsed `users` as the value of `--force`, so the module name was lost entirely and the generator ran with no name
+  `--force=false` arrived at every generator as the truthy string `"false"` and the overwrite guard (`if (exists && !force)`) let it through — a flag written to _prevent_ clobbering did the clobbering. Its twin ate the target: `warlock generate.module --force users` parsed `users` as the value of `--force`, so the module name was lost entirely and the generator ran with no name
 
   Twenty-three option declarations are now typed: `--force, -f` and `--dry-run` on all eight `generate.*` commands, plus `--minimal, -m`, `--with-validation, -v`, `--with-resource, -rs`, and both `--timestamps [bool]` declarations, and `--list, -l` / `--no-install` on `add`. Options that carry real data are deliberately untouched and still take a value — `--table`, `--add`, `--drop`, `--rename` on the generators, `--package-manager` on `add`, and `seed --drop="Seed Name"`, whose value scopes which seeder is undone
 
@@ -684,17 +692,17 @@ Details for each are in the entries below.
 
   The guard drives the real command objects through the manager's own resolution path (`tests/unit/cli/generate-flag-options.test.ts`) and asserts what the action is handed. Asserting the declaration object instead would pass against a fixture while the CLI stayed broken
 
-- **`new Image(...)` no longer fails depending on how soon you call it.** The `Image` module fired `import("sharp")` at load time without awaiting it, and the constructor only checked whether that import had *failed* — never whether it was still in flight. Constructing an image in the first tick after importing the package therefore ran with an undefined sharp function and died with `TypeError: sharpFn is not a function`; the exact same code passed if something had awaited a timer first. Anything that builds an image during boot — a startup thumbnail job, a module-level warm-up — hit it, and it presented as a mysterious "works locally, breaks in prod" timing bug rather than as a missing dependency
+- **`new Image(...)` no longer fails depending on how soon you call it.** The `Image` module fired `import("sharp")` at load time without awaiting it, and the constructor only checked whether that import had _failed_ — never whether it was still in flight. Constructing an image in the first tick after importing the package therefore ran with an undefined sharp function and died with `TypeError: sharpFn is not a function`; the exact same code passed if something had awaited a timer first. Anything that builds an image during boot — a startup thumbnail job, a module-level warm-up — hit it, and it presented as a mysterious "works locally, breaks in prod" timing bug rather than as a missing dependency
 
   Sharp is now resolved **synchronously on the first construction that needs it**, via `createRequire`, and the outcome is cached for the process. There is no longer a window in which the constructor can proceed without a real sharp function: it either has the module or throws. A missing sharp still throws the same install-hint error, at the same point (construction), with the same wording
 
   Resolution stays **lazy** — importing `@warlock.js/core` still does not load sharp's native binary, so apps that never touch images pay nothing — and constructing an `Image` from an existing sharp instance short-circuits before any module load
 
-  The guard for this is a spawned fresh Node process that imports and constructs with nothing in between (`tests/unit/image/image-sharp-resolution.test.ts`). A same-process test cannot catch it: importing at collection time and constructing later *is* the delay that hides the bug
+  The guard for this is a spawned fresh Node process that imports and constructs with nothing in between (`tests/unit/image/image-sharp-resolution.test.ts`). A same-process test cannot catch it: importing at collection time and constructing later _is_ the delay that hides the bug
 
 - **A sharp that is installed but will not load no longer reports itself as "not installed".** The resolution above swallowed every failure into a single outcome, so the most common real-world sharp problem — the package present but its native binary built for another platform — arrived as `sharp is not installed.` plus instructions to run `npm install sharp`, which cannot fix it. sharp throws its own long, actionable error naming the runtime, the failing `.node` file and the exact install flags to use; that text was discarded and replaced with a different, wrong cause
 
-  Only **genuine absence** now produces the install hint: a `MODULE_NOT_FOUND` whose message names the specifier `'sharp'` exactly. Matching on the code alone is not sufficient — a dependency missing *inside* sharp raises the very same code (`Cannot find module 'color'`), and would have been reported as sharp itself being absent. Any other failure surfaces sharp's own message, inlined as `Failed to load "sharp": …` **and** chained as `cause`, so a terminal that never prints `cause` still shows the text that helps. The absent-sharp path is unchanged, wording included
+  Only **genuine absence** now produces the install hint: a `MODULE_NOT_FOUND` whose message names the specifier `'sharp'` exactly. Matching on the code alone is not sufficient — a dependency missing _inside_ sharp raises the very same code (`Cannot find module 'color'`), and would have been reported as sharp itself being absent. Any other failure surfaces sharp's own message, inlined as `Failed to load "sharp": …` **and** chained as `cause`, so a terminal that never prints `cause` still shows the text that helps. The absent-sharp path is unchanged, wording included
 
   **The failure reason is cached, not just the fact of failure.** The resolution attempt runs once per process; a second `new Image(...)` skips the load entirely, so caching only "there is no sharp function" would have re-told the same lie one call later. The guard therefore constructs **twice** in each spawned process and asserts the second error matches the first (`tests/unit/image/image-sharp-load-failure.test.ts`) — a one-shot test passes even with that bug present
 
@@ -710,7 +718,7 @@ Details for each are in the entries below.
 
   As with sharp, the failure **reason** is cached rather than only the fact of failure, so the second call cannot fall through to the "not installed" branch and re-tell a lie the first call got right
 
-  The guard is a spawned fresh Node process (`tests/unit/react/react-module-resolution.test.ts`); a same-process test cannot catch this, which is why the pre-existing suite was green against it. Against the live bug all five cases failed, and — the detail that shows how much the race hid — all five failed with the *same* `Cannot read properties of undefined` symptom, including the case that only asserts the install message. The present-but-broken states are staged by copying the module source next to a fixture `node_modules`, since resolution anchors to the importing file; the real workspace is not mutated
+  The guard is a spawned fresh Node process (`tests/unit/react/react-module-resolution.test.ts`); a same-process test cannot catch this, which is why the pre-existing suite was green against it. Against the live bug all five cases failed, and — the detail that shows how much the race hid — all five failed with the _same_ `Cannot read properties of undefined` symptom, including the case that only asserts the install message. The present-but-broken states are staged by copying the module source next to a fixture `node_modules`, since resolution anchors to the importing file; the real workspace is not mutated
 
 ## 4.11.0
 
@@ -733,17 +741,17 @@ Details for each are in the entries below.
 
 ### Fixed
 
-- **A production bundle no longer imports a package your app does not declare.** `warlock build`'s generated config loader emitted `import config from "@mongez/config"` — one of *core's* dependencies, never the app's. npm and yarn hoist flat so it resolved by accident; under pnpm's strict layout the shipped bundle died at boot with `ERR_MODULE_NOT_FOUND` for a package the app had no reason to install. The generator now emits `setConfig` from `@warlock.js/core`, which the app does declare, and Node resolves `@mongez/config` from core's own install — correct under pnpm, and portable, unlike baking absolute paths into an artifact meant to be copied between machines
+- **A production bundle no longer imports a package your app does not declare.** `warlock build`'s generated config loader emitted `import config from "@mongez/config"` — one of _core's_ dependencies, never the app's. npm and yarn hoist flat so it resolved by accident; under pnpm's strict layout the shipped bundle died at boot with `ERR_MODULE_NOT_FOUND` for a package the app had no reason to install. The generator now emits `setConfig` from `@warlock.js/core`, which the app does declare, and Node resolves `@mongez/config` from core's own install — correct under pnpm, and portable, unlike baking absolute paths into an artifact meant to be copied between machines
 
   **The rule is now enforced, not just followed.** `warlock build` fails if any specifier written into generated code is missing from the app's `dependencies`, listing every violation at once. Rewriting the one bad import fixes today's bundle; the check is what stops the next change to the generator from reintroducing it invisibly — under npm and yarn the mistake never surfaces
 
   Two scaffolding sites had the same defect and are fixed with it: `warlock generate.module` emitted `groupedTranslations` from `@mongez/localization`, and the communicators config stub emitted `env` from `@mongez/dotenv`. Both now come from `@warlock.js/core`, which already re-exports them
 
-- **`env()` inside `warlock.config.ts` no longer always returns its default.** The config module was evaluated *before* any `.env` file was read, so a project following the documented `build: { outdir: env("BUILD_OUT", "dist") }` recipe silently got `dist` no matter what the environment said — under every command, `dev` included, and under `build` and `start` env was never loaded at all. Env files are now loaded before `warlock.config.ts` is evaluated, for every command
+- **`env()` inside `warlock.config.ts` no longer always returns its default.** The config module was evaluated _before_ any `.env` file was read, so a project following the documented `build: { outdir: env("BUILD_OUT", "dist") }` recipe silently got `dist` no matter what the environment said — under every command, `dev` included, and under `build` and `start` env was never loaded at all. Env files are now loaded before `warlock.config.ts` is evaluated, for every command
 
   Loading is guarded: a project with no `.env` is legitimate and must not start failing `warlock build` now that env loads everywhere. `NODE_ENV` remains authoritative for which file is chosen — no command forces the environment, so a deliberate `NODE_ENV=staging` build still reads `.env.staging`. With `NODE_ENV` unset, plain `.env` is read
 
-- **An application without `src/config/storage.ts` can boot again.** The storage connector starts unconditionally, on the documented grounds that `storage.init()` falls back to a built-in `local` driver so file storage works out of the box. That fallback was never implemented: `init()` resolved the default driver *name* and then found nothing registered under it, so any app without a storage config died at boot with `Storage driver "local" is not configured`. A built-in `local` driver rooted at `uploadsPath()` is now registered before configured drivers — so an app defining its own `local` still overrides it, and naming a driver that genuinely does not exist still fails loudly
+- **An application without `src/config/storage.ts` can boot again.** The storage connector starts unconditionally, on the documented grounds that `storage.init()` falls back to a built-in `local` driver so file storage works out of the box. That fallback was never implemented: `init()` resolved the default driver _name_ and then found nothing registered under it, so any app without a storage config died at boot with `Storage driver "local" is not configured`. A built-in `local` driver rooted at `uploadsPath()` is now registered before configured drivers — so an app defining its own `local` still overrides it, and naming a driver that genuinely does not exist still fails loudly
 
   Only scaffolded apps hid this, because `create-warlock` always ships a storage config
 

@@ -20,7 +20,7 @@ import { groupedTranslations } from "@mongez/localization";
 
 groupedTranslations("products", {
   notFound: { en: "Product not found", ar: "المنتج غير موجود" },
-  created:  { en: "Product created",  ar: "تم إنشاء المنتج" },
+  created: { en: "Product created", ar: "تم إنشاء المنتج" },
 });
 
 // 2. Look up in a controller / service
@@ -45,11 +45,11 @@ Every module owns its translation namespace under `src/app/<module>/utils/locale
 import { groupedTranslations } from "@mongez/localization";
 
 groupedTranslations("products", {
-  notFound:    { en: "Product not found",      ar: "المنتج غير موجود" },
-  outOfStock:  { en: "Product out of stock",   ar: "المنتج غير متوفر" },
-  created:     { en: "Product created",         ar: "تم إنشاء المنتج" },
-  updated:     { en: "Product updated",         ar: "تم تحديث المنتج" },
-  deleted:     { en: "Product deleted",         ar: "تم حذف المنتج" },
+  notFound: { en: "Product not found", ar: "المنتج غير موجود" },
+  outOfStock: { en: "Product out of stock", ar: "المنتج غير متوفر" },
+  created: { en: "Product created", ar: "تم إنشاء المنتج" },
+  updated: { en: "Product updated", ar: "تم تحديث المنتج" },
+  deleted: { en: "Product deleted", ar: "تم حذف المنتج" },
 });
 ```
 
@@ -96,6 +96,10 @@ request.trans("products.notFound");
 
 All three lookups go through `@mongez/localization`'s `trans()` under the hood, with the locale pulled from the request context (or the global default).
 
+### Web `useTrans()` key checking
+
+When an app uses `@warlock.js/web`, `warlock dev` writes `.warlock/typings/translations.d.ts` from literal `groupedTranslations("group", { key: ... })` registrations. It augments web's `TranslationKeyRegistry`, so `useTrans()("products.notFound")` is checked against registered keys and a typo fails TypeScript. Before the generated file exists, `useTrans()` accepts `string` for a non-breaking first boot. Dynamic groups/keys and placeholders are not inferred.
+
 ### Locale on a specific lookup
 
 ```ts
@@ -123,7 +127,7 @@ Configure the default:
 
 ```ts title="src/config/app.ts"
 export default {
-  localeCode: "en",                       // app-wide default
+  localeCode: "en", // app-wide default
   // ...
 };
 ```
@@ -142,20 +146,19 @@ When a column stores per-locale values as an array:
 
 ```ts
 // Schema (Seal):
-name_translations: v.array(
+name_translations: (v.array(
   v.object({
-    localeCode: v.string(),  // "en", "ar", ...
+    localeCode: v.string(), // "en", "ar", ...
     value: v.string(),
-  })
+  }),
 ),
-
-// Stored row (DB):
-{
-  name_translations: [
-    { localeCode: "en", value: "Hello World" },
-    { localeCode: "ar", value: "مرحبا" },
-  ],
-}
+  // Stored row (DB):
+  {
+    name_translations: [
+      { localeCode: "en", value: "Hello World" },
+      { localeCode: "ar", value: "مرحبا" },
+    ],
+  });
 ```
 
 Pick the right one for the current request:
@@ -179,12 +182,12 @@ getLocalized(
 ```
 
 - **`values`** — the localized-array column.
-- **`localeCode`** *(optional)* — pin to a specific locale. Defaults to the current request's locale (reads via `useRequestStore()`).
-- **`key`** *(default `"value"`)* — which property of the matched entry to return. Use a different key if your localized objects store the value under a different name.
+- **`localeCode`** _(optional)_ — pin to a specific locale. Defaults to the current request's locale (reads via `useRequestStore()`).
+- **`key`** _(default `"value"`)_ — which property of the matched entry to return. Use a different key if your localized objects store the value under a different name.
 
 ```ts
 const slug = getLocalized(product.get("slug_translations"), undefined, "value");
-const tagline = getLocalized(product.get("name_translations"), "fr");  // force French
+const tagline = getLocalized(product.get("name_translations"), "fr"); // force French
 ```
 
 ### Use inside a resource for clean per-locale responses
