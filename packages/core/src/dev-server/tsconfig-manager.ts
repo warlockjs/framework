@@ -103,6 +103,10 @@ export class TSConfigManager {
     // Get the first target path (usually there's only one)
     const targetPattern = aliasTargets[0];
 
+    if (targetPattern === undefined) {
+      return null;
+    }
+
     // Replace alias pattern with target pattern
     const aliasPattern = aliasKey.replace("/*", "");
     const targetBase = targetPattern.replace("/*", "");
