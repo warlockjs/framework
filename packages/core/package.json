@@ -32,7 +32,6 @@
     "@mongez/slug": "^1.0.7",
     "@mongez/supportive-is": "^2.1.4",
     "@mongez/time-wizard": "^1.0.6",
-    "@warlock.js/auth": "workspace:^",
     "@warlock.js/cache": "workspace:^",
     "@warlock.js/cascade": "workspace:^",
     "@warlock.js/context": "workspace:^",
@@ -138,7 +137,8 @@
     "@warlock.js/ai": "workspace:^",
     "@warlock.js/herald": "workspace:^",
     "@warlock.js/notifications": "workspace:^",
-    "vitest": "4.1.10"
+    "vitest": "4.1.10",
+    "@warlock.js/auth": "workspace:^"
   },
   "packageManager": "pnpm@11.24.0"
 }

@@ -1,13 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 
-// database/utils.ts imports `authService` from @warlock.js/auth, whose barrel
-// re-imports @warlock.js/core by package name — unresolvable in this monorepo
-// checkout (no build). Stub the auth surface so utils.ts loads in isolation.
-// We only test the slug/seeder helpers, which never call authService.
-vi.mock("@warlock.js/auth", () => ({
-  authService: { hashPassword: vi.fn((value: string) => `hashed:${value}`) },
-}));
-
 import type { SchemaContext } from "@warlock.js/seal";
 import { seeder } from "../../../src/database/seeds/seeder";
 import { useComputedSlug } from "../../../src/database/utils";
