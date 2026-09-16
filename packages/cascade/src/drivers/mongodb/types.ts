@@ -14,8 +14,13 @@ export type PipelineStage =
   | "$unwind"
   | "$addFields"
   | "$setWindowFields"
-  | "$vectorSearch";
-
+  | "$vectorSearch"
+  /**
+   * Not a MongoDB stage: the raw escape hatches. `joinRaw()` records
+   * caller-built stages emitted verbatim; `raw()` records a callback that
+   * receives (and may replace) the pipeline built so far. Never mergeable.
+   */
+  | "$raw";
 
 /**
  * Represents a single operation in the query builder chain.

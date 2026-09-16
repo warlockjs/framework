@@ -50,7 +50,9 @@ describe("MongoDB pipeline stages", () => {
   });
 
   it("keeps call order around unwind: a later where filters the unwound documents", () => {
-    expect(builder().where("status", "published").unwind("tags").where("tags", "a").parse().pipeline).toEqual([
+    expect(
+      builder().where("status", "published").unwind("tags").where("tags", "a").parse().pipeline,
+    ).toEqual([
       { $match: { status: "published" } },
       { $unwind: "$tags" },
       { $match: { tags: "a" } },
@@ -88,6 +90,72 @@ describe("MongoDB pipeline stages", () => {
       },
     });
     expect(pipeline).toContainEqual({ $addFields: { score: { $meta: "vectorSearchScore" } } });
+  });
+
+  it("joinRaw(stage | stages) emits the stages verbatim in call order", () => {
+    const lookup = {
+      $lookup: { from: "comments", localField: "id", foreignField: "postId", as: "c" },
+    };
+
+    expect(
+      builder().where("id", 1).joinRaw(lookup).where("c.approved", true).parse().pipeline,
+    ).toEqual([{ $match: { id: 1 } }, lookup, { $match: { "c.approved": true } }]);
+    expect(
+      builder()
+        .joinRaw([lookup, { $unwind: "$c" }])
+        .parse().pipeline,
+    ).toEqual([lookup, { $unwind: "$c" }]);
+  });
+
+  it("joinRaw() rejects a SQL string or a non-stage object with a named error", () => {
+    expect(() => builder().joinRaw("LEFT JOIN comments ON 1 = 1")).toThrow(
+      UnsupportedQueryOperationError,
+    );
+    expect(() => builder().joinRaw({ from: "comments" })).toThrow(UnsupportedQueryOperationError);
+    expect(() => builder().joinRaw([])).toThrow(UnsupportedQueryOperationError);
+  });
+
+  it("raw() receives the pipeline so far; a returned array replaces it, later stages append", () => {
+    const pipeline = builder()
+      .where("a", 1)
+      .raw((stages) => [...(stages as object[]), { $sample: { size: 2 } }])
+      .limit(5)
+      .parse().pipeline;
+
+    expect(pipeline).toEqual([{ $match: { a: 1 } }, { $sample: { size: 2 } }, { $limit: 5 }]);
+  });
+
+  it("raw() throws a named error when the callback returns a non-pipeline", () => {
+    expect(() =>
+      builder()
+        .raw(() => ({ $match: {} }))
+        .parse(),
+    ).toThrow(UnsupportedQueryOperationError);
+  });
+
+  it("select() then orderBy(unselected) sorts before the projection", () => {
+    expect(builder().select(["title"]).orderBy("likes", "desc").limit(2).parse().pipeline).toEqual([
+      { $sort: { likes: -1 } },
+      { $project: { title: 1 } },
+      { $limit: 2 },
+    ]);
+  });
+
+  it("orderBy(computed alias) keeps the projection first; mixed keys use $addFields", () => {
+    const score = { $add: ["$likes", "$shares"] };
+
+    expect(builder().selectRaw({ score }).orderBy("score").parse().pipeline).toEqual([
+      { $project: { score } },
+      { $sort: { score: 1 } },
+    ]);
+    expect(
+      builder().select(["title"]).selectRaw({ score }).orderBy("score").orderBy("likes").parse()
+        .pipeline,
+    ).toEqual([
+      { $addFields: { score } },
+      { $sort: { score: 1, likes: 1 } },
+      { $project: { title: 1, score: 1 } },
+    ]);
   });
 });
 

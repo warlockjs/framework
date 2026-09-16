@@ -20,6 +20,7 @@ import type {
   WhereObject,
   WhereOperator,
 } from "../../contracts";
+import { UnsupportedQueryOperationError } from "../../errors/unsupported-query-operation.error";
 import { type DataSource } from "../../data-source/data-source";
 import { dataSourceRegistry } from "../../data-source/data-source-registry";
 import { assertLeanCompatible, stripHiddenFromLeanRecords } from "../../query-builder/lean-records";
@@ -29,6 +30,7 @@ import { sanitizeFilter, sanitizeFilterValue } from "../../utils/sanitize-filter
 import { type MongoDbDriver } from "./mongodb-driver";
 import { MongoQueryOperations } from "./mongodb-query-operations";
 import { MongoQueryParser } from "./mongodb-query-parser";
+import { isPipelineStageObject } from "./pipeline-stage-object";
 import type { Operation } from "./types";
 
 /**
@@ -1753,26 +1755,44 @@ export class MongoQueryBuilder<T = unknown>
   }
 
   /**
-   * Performs a raw join using a custom aggregation pipeline.
+   * Performs a raw join using caller-built aggregation stages.
    *
-   * This allows full control over the $lookup stage for complex join scenarios.
+   * The expression is one pipeline stage (typically `{ $lookup: { ... } }`) or
+   * an array of stages. They are emitted verbatim in call order, so a later
+   * `where()` / `orderBy()` can use the joined fields.
    *
-   * @param expression - Raw expression (typically a $lookup stage or pipeline)
-   * @param _bindings - Optional bindings (not used in MongoDB but kept for API consistency)
+   * @param expression - A pipeline stage object, or an array of stage objects
+   * @param _bindings - Not used on MongoDB; kept for API consistency
+   * @throws UnsupportedQueryOperationError when the expression is not a stage
+   *   object or an array of them (e.g. a SQL `JOIN` string)
    */
   public joinRaw(expression: RawExpression, _bindings?: unknown[]): this {
-    // For MongoDB, expression should be a $lookup stage object or a simple string
-    // describing the join. We add it as a raw operation.
-    this.operationsHelper.addMatchOperation("raw", { builder: () => expression }, false);
+    const stages: unknown[] = Array.isArray(expression) ? expression : [expression];
+
+    if (stages.length === 0 || !stages.every(isPipelineStageObject)) {
+      throw new UnsupportedQueryOperationError(
+        "joinRaw",
+        "mongodb",
+        "Pass a pipeline stage object such as { $lookup: { ... } }, or an array of stage objects.",
+      );
+    }
+
+    this.operationsHelper.addOperation("$raw", "joinRaw", { stages });
     return this;
   }
 
   /**
-   * Allows direct manipulation of the native MongoDB query.
-   * @param builder - Function that receives and modifies the native query
+   * Allows direct manipulation of the native MongoDB aggregation pipeline.
+   *
+   * The callback receives the pipeline array built from the operations
+   * recorded before this call. Return a new array of stages to replace it, or
+   * mutate the array in place and return nothing. Operations recorded after
+   * `raw()` are appended to that result.
+   *
+   * @param builder - Receives the pipeline array; returns a replacement or nothing
    */
   public raw(builder: (native: unknown) => unknown): this {
-    this.operationsHelper.addMatchOperation("raw", { builder }, false);
+    this.operationsHelper.addOperation("$raw", "raw", { builder });
     return this;
   }
 

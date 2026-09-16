@@ -28,6 +28,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `$dec` on the MongoDB driver was sent to the server as-is and rejected ("Unknown modifier"). It is now converted to a negative `$inc`.
 - The MongoDB pipeline parser dropped `$vectorSearch` and `$addFields` stages, so `similarTo()` ran with no vector search and no `score`. It now emits both.
 - On MongoDB, a `join()` with a `pipeline` sent a `$lookup` with no pipeline and no join fields.
+- On MongoDB, `joinRaw()` and `raw()` were silently dropped from the pipeline. `joinRaw(stage | stages)` now emits the stages verbatim in call order; `raw(pipeline => …)` receives the pipeline built so far and may return a replacement. A SQL string, a non-stage object or a non-array callback result throws `UnsupportedQueryOperationError`.
+- On MongoDB, `select([...]).orderBy(field)` did not sort when `field` was not selected, because `$project` ran before `$sort` (hydrated, lean, `first()` and `paginate()` reads). The sort now runs before the projection; sorting by a computed `selectRaw` alias still works, also mixed with unselected fields.
 
 ## 5.11.0 - 2026-09-14
 

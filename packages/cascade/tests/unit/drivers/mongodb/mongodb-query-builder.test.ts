@@ -1139,7 +1139,7 @@ describe("MongoQueryBuilder", () => {
         queryBuilder.joinRaw(expression);
 
         expect(queryBuilder.operations).toHaveLength(1);
-        expect(queryBuilder.operations[0].type).toBe("raw");
+        expect(queryBuilder.operations[0].type).toBe("joinRaw");
       });
     });
   });

@@ -2,6 +2,7 @@ import { colors } from "@mongez/copper";
 import type { Collection } from "mongodb";
 import type { GroupByInput, RawExpression, WhereOperator } from "../../contracts";
 import { UnsafeRawExpressionError } from "../../errors/unsafe-raw-expression.error";
+import { UnsupportedQueryOperationError } from "../../errors/unsupported-query-operation.error";
 import {
   isAggregateExpression,
   type AggregateExpression,
@@ -9,6 +10,7 @@ import {
 import type { ColumnExpression } from "../../expressions/column-expressions";
 import { escapeRegex, resolveLikePattern } from "../../utils/escape-regex";
 import type { MongoQueryBuilder } from "./mongodb-query-builder";
+import { isPipelineStageObject } from "./pipeline-stage-object";
 import type { Operation, PipelineStage } from "./types";
 
 /**
@@ -93,58 +95,166 @@ export class MongoQueryParser {
    * ```
    */
   public parse(): any[] {
+    this.groupFieldNames.clear();
+    this.countDistinctAliases.clear();
+
     const pipeline: any[] = [];
     let currentStage: PipelineStage | null = null;
     let currentBuffer: Operation[] = [];
+    // Index of the `$project` built from select operations while it is the
+    // last stage emitted, so a `$sort` that follows can be placed around it.
+    let trailingProjectIndex = -1;
+
+    const emit = (stage: PipelineStage, operations: Operation[]): void => {
+      if (stage === "$raw") {
+        for (const op of operations) {
+          this.applyRawOperation(pipeline, op);
+        }
+
+        trailingProjectIndex = -1;
+        return;
+      }
+
+      const builtStage = this.buildStage(stage, operations);
+
+      if (!builtStage) {
+        return;
+      }
+
+      if (
+        builtStage.$sort &&
+        trailingProjectIndex >= 0 &&
+        trailingProjectIndex === pipeline.length - 1
+      ) {
+        const projectStage = pipeline.pop();
+        pipeline.push(...this.placeSortAroundProjection(projectStage, builtStage));
+        trailingProjectIndex = -1;
+        return;
+      }
+
+      const stageIndex = pipeline.length;
+      pipeline.push(builtStage);
+      trailingProjectIndex = stage === "$project" ? stageIndex : -1;
+
+      // Rename `_id` back to the grouped field names right after the $group.
+      this.trackGroupFieldNames(stage, operations, stageIndex);
+      const renameStage = this.buildGroupRenameStage(builtStage, stageIndex);
+
+      if (renameStage) {
+        pipeline.push(renameStage);
+      }
+    };
 
     for (const op of this.orderStages(this.operations)) {
       if (op.mergeable && op.stage === currentStage) {
         // Same mergeable stage, add to buffer
         currentBuffer.push(op);
+        continue;
+      }
+
+      // Different stage or non-mergeable, flush buffer
+      if (currentBuffer.length > 0) {
+        emit(currentStage!, currentBuffer);
+        currentBuffer = [];
+      }
+
+      if (op.mergeable) {
+        currentStage = op.stage;
+        currentBuffer.push(op);
       } else {
-        // Different stage or non-mergeable, flush buffer
-        if (currentBuffer.length > 0) {
-          const builtStage = this.buildStage(currentStage!, currentBuffer);
-          if (builtStage) {
-            const stageIndex = pipeline.length;
-            pipeline.push(builtStage);
-            // Track field names for group stages with aggregates
-            this.trackGroupFieldNames(currentStage!, currentBuffer, stageIndex);
-          }
-          currentBuffer = [];
-        }
-
-        if (op.mergeable) {
-          // Start new buffer
-          currentStage = op.stage;
-          currentBuffer.push(op);
-        } else {
-          // Non-mergeable, add directly
-          const builtStage = this.buildStage(op.stage, [op]);
-          if (builtStage) {
-            const stageIndex = pipeline.length;
-            pipeline.push(builtStage);
-            // Track field names for group stages with aggregates
-            this.trackGroupFieldNames(op.stage, [op], stageIndex);
-          }
-          currentStage = null;
-        }
+        emit(op.stage, [op]);
+        currentStage = null;
       }
     }
 
-    // Flush remaining buffer
     if (currentBuffer.length > 0) {
-      const builtStage = this.buildStage(currentStage!, currentBuffer);
-      if (builtStage) {
-        const stageIndex = pipeline.length;
-        pipeline.push(builtStage);
-        // Track field names for group stages with aggregates
-        this.trackGroupFieldNames(currentStage!, currentBuffer, stageIndex);
-      }
+      emit(currentStage!, currentBuffer);
     }
 
-    // Post-process: Rename _id to actual field names after $group stages with aggregates
-    return this.postProcessGroupStages(pipeline);
+    return pipeline;
+  }
+
+  /**
+   * Apply a raw escape-hatch operation to the pipeline built so far.
+   *
+   * - `joinRaw`: appends the caller-built stages verbatim.
+   * - `raw`: calls the callback with the pipeline array. A returned array
+   *   replaces the pipeline; `undefined` keeps the (possibly mutated) array.
+   *
+   * @throws UnsupportedQueryOperationError when a `raw()` callback leaves
+   *   something other than an array of stage objects
+   */
+  private applyRawOperation(pipeline: any[], op: Operation): void {
+    if (op.type === "joinRaw") {
+      pipeline.push(...(op.data.stages as unknown[]));
+      return;
+    }
+
+    const result: unknown = op.data.builder(pipeline);
+    const next = result === undefined ? pipeline : result;
+
+    if (!Array.isArray(next) || !next.every(isPipelineStageObject)) {
+      throw new UnsupportedQueryOperationError(
+        "raw",
+        "mongodb",
+        "The raw() callback receives the aggregation pipeline array and must return an array of stage objects, or mutate that array and return nothing.",
+      );
+    }
+
+    if (next !== pipeline) {
+      pipeline.splice(0, pipeline.length, ...next);
+    }
+  }
+
+  /**
+   * Order a `$sort` against the select `$project` it follows.
+   *
+   * A `$sort` after a `$project` cannot see fields the projection dropped, so
+   * `select(["title"]).orderBy("likes")` would not sort. The sort moves before
+   * the projection, unless it sorts by a field the projection computes
+   * (`selectRaw({ score: ... }).orderBy("score")`), which only exists after it:
+   *
+   * - no computed sort key: `$sort`, `$project`
+   * - only computed or selected sort keys: `$project`, `$sort` (unchanged)
+   * - computed AND unselected sort keys: `$addFields` (the computed keys),
+   *   `$sort`, `$project` (those keys passed through)
+   */
+  private placeSortAroundProjection(projectStage: any, sortStage: any): any[] {
+    const projection: Record<string, unknown> = projectStage.$project;
+    const sortKeys = Object.keys(sortStage.$sort);
+
+    const isInclusionFlag = (value: unknown): boolean =>
+      value === 1 || value === true || value === 0 || value === false;
+
+    const computedKeys = sortKeys.filter((key) => {
+      const value = projection[key];
+
+      return value !== undefined && !isInclusionFlag(value) && value !== `$${key}`;
+    });
+
+    if (computedKeys.length === 0) {
+      return [sortStage, projectStage];
+    }
+
+    const hasUnselectedKey = sortKeys.some((key) => {
+      const value = projection[key];
+
+      return value === undefined || value === 0 || value === false;
+    });
+
+    if (!hasUnselectedKey) {
+      return [projectStage, sortStage];
+    }
+
+    const addFields: Record<string, unknown> = {};
+    const passThrough: Record<string, unknown> = { ...projection };
+
+    for (const key of computedKeys) {
+      addFields[key] = projection[key];
+      passThrough[key] = 1;
+    }
+
+    return [{ $addFields: addFields }, sortStage, { $project: passThrough }];
   }
 
   /**
@@ -154,11 +264,13 @@ export class MongoQueryParser {
    * strips the filter column would run before the `$match` and silently drop
    * every document (`select(["a"]).where("b", x)` → `[]`).
    *
-   * Only *mergeable* `$match` operations are hoisted, and only within a
-   * segment of neighboring mergeable `$match` / `$project` / `$sort`
-   * operations. Any other operation — `$group`, `$lookup`, `$limit`, `$skip`,
-   * `$setWindowFields`, or a non-mergeable op (raw escapes, having-style
-   * post-group matches, `$sample`) — is a barrier: nothing moves across it.
+   * Only *mergeable* operations move, and only within a segment of neighboring
+   * mergeable `$match` / `$project` / `$sort` operations. Inside a segment the
+   * order is `$match`, then `$project`, then `$sort` (each keeping call order),
+   * and {@link placeSortAroundProjection} then decides whether the sort runs
+   * before the projection. Any other operation — `$group`, `$lookup`,
+   * `$limit`, `$skip`, `$setWindowFields`, raw escapes, having-style
+   * post-group matches, `$sample` — is a barrier: nothing moves across it.
    * So `groupBy(...).where(...)` still filters AFTER the group, and
    * `limit(...)` / `random()` keep their call-order meaning.
    */
@@ -170,15 +282,16 @@ export class MongoQueryParser {
       if (segment.length === 0) {
         return;
       }
+
       reordered.push(...segment.filter((op) => op.stage === "$match"));
-      reordered.push(...segment.filter((op) => op.stage !== "$match"));
+      reordered.push(...segment.filter((op) => op.stage === "$project"));
+      reordered.push(...segment.filter((op) => op.stage === "$sort"));
       segment = [];
     };
 
     for (const op of operations) {
       const isReorderable =
-        op.mergeable &&
-        (op.stage === "$match" || op.stage === "$project" || op.stage === "$sort");
+        op.mergeable && (op.stage === "$match" || op.stage === "$project" || op.stage === "$sort");
 
       if (isReorderable) {
         segment.push(op);
@@ -246,65 +359,49 @@ export class MongoQueryParser {
   }
 
   /**
-   * Post-process pipeline to rename _id fields after $group stages.
+   * Build the `$project` that renames `_id` back to the grouped field name(s)
+   * right after a `$group` stage with tracked field names, so results carry
+   * the grouping columns instead of MongoDB's `_id`.
    *
-   * This automatically renames MongoDB's `_id` field to the actual field name(s)
-   * used for grouping, making the results more intuitive.
-   *
-   * @param pipeline - The aggregation pipeline
-   * @returns The processed pipeline
+   * @param stage - The stage just emitted
+   * @param stageIndex - Its index in the pipeline
+   * @returns The renaming `$project` stage, or null when none is needed
    */
-  private postProcessGroupStages(pipeline: any[]): any[] {
-    const processed: any[] = [];
+  private buildGroupRenameStage(stage: any, stageIndex: number): any {
+    if (!stage.$group || !this.groupFieldNames.has(stageIndex)) {
+      return null;
+    }
 
-    for (let i = 0; i < pipeline.length; i++) {
-      const stage = pipeline[i];
+    const fieldNames = this.groupFieldNames.get(stageIndex)!;
+    const projection: Record<string, unknown> = {};
 
-      // Check if this is a $group stage that needs _id renaming
-      if (stage.$group && this.groupFieldNames.has(i)) {
-        const fieldNames = this.groupFieldNames.get(i)!;
-
-        // Add the $group stage
-        processed.push(stage);
-
-        // Add a $project stage to rename _id
-        const projection: Record<string, unknown> = {};
-
-        if (typeof fieldNames === "string") {
-          // Single field: rename _id to field name
-          projection[fieldNames] = "$_id";
-        } else if (Array.isArray(fieldNames) && fieldNames.length > 0) {
-          // Multiple fields: _id is an object, spread it
-          for (const fieldName of fieldNames) {
-            projection[fieldName] = `$_id.${fieldName}`;
-          }
-        }
-
-        // Include all aggregate fields. countDistinct aliases are finalized
-        // with `{ $size: "$alias" }` over the set built by `$addToSet`; every
-        // other aggregate is projected through as-is.
-        const distinctAliases = this.countDistinctAliases.get(i);
-        const aggregateFields = Object.keys(stage.$group).filter((key) => key !== "_id");
-        for (const field of aggregateFields) {
-          if (distinctAliases?.has(field)) {
-            projection[field] = { $size: `$${field}` };
-          } else {
-            projection[field] = 1;
-          }
-        }
-
-        if (Object.keys(projection).length > 0) {
-          // now unselect the _id field
-          projection._id = 0;
-          processed.push({ $project: projection });
-        }
-      } else {
-        // Regular stage, add as-is
-        processed.push(stage);
+    if (typeof fieldNames === "string") {
+      // Single field: rename _id to field name
+      projection[fieldNames] = "$_id";
+    } else if (Array.isArray(fieldNames) && fieldNames.length > 0) {
+      // Multiple fields: _id is an object, spread it
+      for (const fieldName of fieldNames) {
+        projection[fieldName] = `$_id.${fieldName}`;
       }
     }
 
-    return processed;
+    // Include all aggregate fields. countDistinct aliases are finalized
+    // with `{ $size: "$alias" }` over the set built by `$addToSet`; every
+    // other aggregate is projected through as-is.
+    const distinctAliases = this.countDistinctAliases.get(stageIndex);
+    const aggregateFields = Object.keys(stage.$group).filter((key) => key !== "_id");
+
+    for (const field of aggregateFields) {
+      projection[field] = distinctAliases?.has(field) ? { $size: `$${field}` } : 1;
+    }
+
+    if (Object.keys(projection).length === 0) {
+      return null;
+    }
+
+    // now unselect the _id field
+    projection._id = 0;
+    return { $project: projection };
   }
 
   /**
@@ -860,10 +957,7 @@ export class MongoQueryParser {
 
       case "whereRaw":
       case "orWhereRaw":
-        return this.resolveRawExpression(
-          op.data.expression as RawExpression,
-          op.data.bindings,
-        );
+        return this.resolveRawExpression(op.data.expression as RawExpression, op.data.bindings);
 
       case "whereColumn":
       case "orWhereColumn":
@@ -908,11 +1002,7 @@ export class MongoQueryParser {
         return this.buildJsonContainsKeyCondition(op.data.path);
 
       case "whereJsonLength":
-        return this.buildJsonLengthCondition(
-          op.data.path,
-          op.data.operator,
-          op.data.value,
-        );
+        return this.buildJsonLengthCondition(op.data.path, op.data.operator, op.data.value);
 
       case "whereJsonIsArray":
         return this.buildJsonTypeCondition(op.data.path, "array");
@@ -921,11 +1011,7 @@ export class MongoQueryParser {
         return this.buildJsonTypeCondition(op.data.path, "object");
 
       case "whereArrayLength":
-        return this.buildArrayLengthCondition(
-          op.data.field,
-          op.data.operator,
-          op.data.value,
-        );
+        return this.buildArrayLengthCondition(op.data.field, op.data.operator, op.data.value);
 
       case "whereFullText":
       case "orWhereFullText":
@@ -1533,10 +1619,7 @@ export class MongoQueryParser {
           break;
 
         case "selectCase":
-          projection[op.data.alias] = this.buildCaseExpression(
-            op.data.cases,
-            op.data.otherwise,
-          );
+          projection[op.data.alias] = this.buildCaseExpression(op.data.cases, op.data.otherwise);
           break;
 
         case "selectWhen":
@@ -1553,9 +1636,7 @@ export class MongoQueryParser {
 
         case "selectJson": {
           const alias = op.data.alias ?? this.inferJsonAlias(op.data.path);
-          projection[alias] = this.normalizeFieldReference(
-            `$${this.normalizePath(op.data.path)}`,
-          );
+          projection[alias] = this.normalizeFieldReference(`$${this.normalizePath(op.data.path)}`);
           break;
         }
 
@@ -1639,10 +1720,7 @@ export class MongoQueryParser {
         break;
       }
       case "groupByWithAggregates": {
-        const stage = this.buildGroupByWithAggregatesStage(
-          op.data.fields,
-          op.data.aggregates,
-        );
+        const stage = this.buildGroupByWithAggregatesStage(op.data.fields, op.data.aggregates);
         if (stage) {
           return stage;
         }
