@@ -32,10 +32,10 @@
  * This function is the single funnel for both the success and throw paths
  * (the try/catch below), and it already reads the settled status via
  * `descriptor.statusCode()` after the run settles — the natural place to
- * fire `onRequestStart` / `onRequestEnd` (the "response.write" phase in the
- * design note). Gated on `isTracingEnabled()` before building any context
- * object, so a disabled app pays one boolean check and allocates nothing
- * extra.
+ * fire `onRequestStart` / `onRequestEnd`, since that is when the response is
+ * actually written and a trace can record what really happened. Gated on
+ * `isTracingEnabled()` before building any context object, so a disabled app
+ * pays one boolean check and allocates nothing extra.
  */
 import type { Request } from "../http/request";
 import { buildTracingContext, dispatchRequestEnd, dispatchRequestStart, isTracingEnabled } from "../http/tracing";
