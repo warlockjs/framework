@@ -1,8 +1,10 @@
 import type {
+  AtomicUpdate,
+  AtomicUpdateOptions,
+  FindOneAndUpdateOptions,
   PaginationOptions,
   PaginationResult,
   QueryBuilderContract,
-  UpdateOperations,
 } from "../../contracts";
 import type { DataSource } from "../../data-source/data-source";
 import { dataSourceRegistry } from "../../data-source/data-source-registry";
@@ -166,17 +168,47 @@ export function decreaseField<TModel extends Model>(
 // the driver — they never pass through where(), so they must run the same
 // operator-injection check themselves. Only the FILTER is sanitized; update
 // operators ($set/$inc/…) are the point of these APIs and stay untouched.
+//
+// `trustedFilter` is the explicit, code-authored opt-out: it lets a conditional
+// filter such as `{ used: { $lt: 10 } }` through. It is stripped before the
+// options reach the driver.
+function resolveFilter(
+  filter: Record<string, unknown>,
+  options: AtomicUpdateOptions | undefined,
+): Record<string, unknown> {
+  return options?.trustedFilter ? filter : sanitizeFilter(filter);
+}
+
+function toDriverOptions<TOptions extends AtomicUpdateOptions>(
+  options: TOptions | undefined,
+): Omit<TOptions, "trustedFilter"> | undefined {
+  if (!options) {
+    return undefined;
+  }
+
+  const { trustedFilter: _trustedFilter, ...rest } = options;
+
+  return rest;
+}
+
+/**
+ * Run an atomic update and return the number of documents modified plus the
+ * number inserted by an `upsert`.
+ */
 export async function performAtomic<TModel extends Model>(
   ModelClass: ChildModel<TModel>,
   filter: Record<string, unknown>,
-  operations: UpdateOperations,
+  operations: AtomicUpdate,
+  options?: AtomicUpdateOptions,
 ): Promise<number> {
   const result = await ModelClass.getDriver().atomic(
     ModelClass.table,
-    sanitizeFilter(filter),
+    resolveFilter(filter, options),
     operations,
+    toDriverOptions(options),
   );
-  return result.modifiedCount;
+
+  return result.modifiedCount + (result.upsertedCount ?? 0);
 }
 
 export async function updateById<TModel extends Model>(
@@ -191,21 +223,24 @@ export async function updateById<TModel extends Model>(
 export async function findAndUpdateRecords<TModel extends Model>(
   ModelClass: ChildModel<TModel>,
   filter: Record<string, unknown>,
-  update: UpdateOperations,
+  update: AtomicUpdate,
+  options?: Omit<AtomicUpdateOptions, "trustedFilter">,
 ): Promise<TModel[]> {
-  await performAtomic(ModelClass, filter, update);
+  await performAtomic(ModelClass, filter, update, { ...options, trustedFilter: false });
   return await ModelClass.query().where(filter).get();
 }
 
 export async function findOneAndUpdateRecord<TModel extends Model>(
   ModelClass: ChildModel<TModel>,
   filter: Record<string, unknown>,
-  update: UpdateOperations,
+  update: AtomicUpdate,
+  options?: FindOneAndUpdateOptions,
 ): Promise<TModel | null> {
   const result = await ModelClass.getDriver().findOneAndUpdate(
     ModelClass.table,
-    sanitizeFilter(filter),
+    resolveFilter(filter, options),
     update,
+    toDriverOptions(options),
   );
   if (!result) return null;
   const ctor = ModelClass as any;

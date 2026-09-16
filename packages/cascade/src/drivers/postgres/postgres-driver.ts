@@ -14,7 +14,9 @@ import { colors } from "@mongez/copper";
 import { log } from "@warlock.js/logger";
 import { databaseTransactionContext } from "../../context/database-transaction-context";
 import type {
+  AtomicUpdate,
   CreateDatabaseOptions,
+  DriverAtomicUpdateOptions,
   DriverContract,
   DriverEventListener,
   DriverTransactionContract,
@@ -29,6 +31,7 @@ import type { MigrationDriverContract } from "../../contracts/migration-driver.c
 import type { QueryBuilderContract } from "../../contracts/query-builder.contract";
 import type { SyncAdapterContract } from "../../contracts/sync-adapter.contract";
 import { TransactionRollbackError } from "../../errors/transaction-rollback.error";
+import { UnsupportedUpdateOperationError } from "../../errors/unsupported-update-operation.error";
 import { SQLSerializer } from "../../migration/sql-serializer";
 import { SqlDatabaseDirtyTracker } from "../../sql-database-dirty-tracker";
 import type { ModelDefaults } from "../../types";
@@ -40,7 +43,18 @@ import { PostgresMigrationDriver } from "./postgres-migration-driver";
 import { PostgresQueryBuilder } from "./postgres-query-builder";
 import { PostgresSQLSerializer } from "./postgres-sql-serializer";
 import { PostgresSyncAdapter } from "./postgres-sync-adapter";
+import { assertPostgresUpdate } from "./postgres-update-validator";
 import type { PostgresPoolConfig, PostgresQueryResult, PostgresTransactionOptions } from "./types";
+
+/**
+ * A unique index usable as an `ON CONFLICT` target.
+ */
+type UniqueKey = {
+  /** Indexed columns, in index order. */
+  columns: string[];
+  /** Whether the index backs the primary key. */
+  primary: boolean;
+};
 
 /**
  * Lazily loaded pg module types.
@@ -209,6 +223,9 @@ export class PostgresDriver implements DriverContract {
    * @see PostgresPoolConfig.nativeArrayColumns
    */
   private readonly _nativeArrayColumns: ReadonlySet<string>;
+
+  /** Unique keys per table, resolved from `pg_index` for upsert conflict targets. */
+  private readonly _uniqueKeys = new Map<string, ReadonlyArray<UniqueKey>>();
 
   /**
    * Native-array columns discovered by introspecting the live schema on
@@ -706,24 +723,227 @@ export class PostgresDriver implements DriverContract {
   }
 
   /**
-   * Find one and update a single row matching the filter and return the updated row
-   * @param table - Target table name
-   * @param filter - Filter conditions
-   * @param update - Update operations ($set, $unset, $inc)
-   * @param options - Optional update options
-   * @returns The updated row or null
+   * Find one row matching the filter, update it, and return it.
+   *
+   * - `upsert`: `INSERT … ON CONFLICT (target) DO UPDATE … RETURNING *`, where
+   *   the target is the primary key or a unique index whose columns are all
+   *   equality keys of the filter (see {@link executeUpsert}).
+   * - `returnDocument` (default `"after"`): `"before"` returns the row as it
+   *   was, and is not available together with `upsert`.
+   *
+   * The row is chosen with `SELECT … LIMIT 1 FOR UPDATE` and matched by primary
+   * key with the filter repeated, so concurrent callers re-check the filter
+   * against the latest committed row instead of overshooting it.
+   *
+   * @throws UnsupportedUpdateOperationError for pipeline updates, `arrayFilters`,
+   *   array operators, `before` + `upsert`, or an underivable conflict target
    */
   public async findOneAndUpdate<T = unknown>(
     table: string,
     filter: Record<string, unknown>,
-    update: UpdateOperations,
-    _options?: Record<string, unknown>,
+    update: AtomicUpdate,
+    options?: DriverAtomicUpdateOptions,
   ): Promise<T | null> {
-    const { sql, params } = this.buildUpdateQuery(table, filter, update, 1);
-    // Add RETURNING * to get the updated row back
-    const sqlWithReturning = `${sql} RETURNING *`;
-    const result = await this.query<T>(sqlWithReturning, params);
+    const operations = assertPostgresUpdate(update, options);
+    const returnBefore = options?.returnDocument === "before";
+
+    if (options?.upsert) {
+      if (returnBefore) {
+        throw new UnsupportedUpdateOperationError(
+          "returnDocument: before with upsert",
+          "postgres",
+          'Use returnDocument: "after", or read the row before upserting inside a transaction.',
+        );
+      }
+
+      const { row } = await this.executeUpsert(table, filter, operations);
+
+      return (row as T | undefined) ?? null;
+    }
+
+    const primaryKey = (await this.getUniqueKeys(table)).find((key) => key.primary)?.columns;
+
+    if (!primaryKey) {
+      if (returnBefore) {
+        throw new UnsupportedUpdateOperationError(
+          "returnDocument: before without a primary key",
+          "postgres",
+        );
+      }
+
+      const { sql, params } = this.buildUpdateQuery(table, filter, operations, 1);
+      const result = await this.query<T>(`${sql} RETURNING *`, params);
+
+      return result.rows[0] ?? null;
+    }
+
+    const quotedTable = this.dialect.quoteIdentifier(table);
+    const keyList = (qualifier?: string) =>
+      primaryKey
+        .map((column) => (qualifier ? `${qualifier}.` : "") + this.dialect.quoteIdentifier(column))
+        .join(", ");
+
+    const set = this.buildSetClauses(table, operations, 1, returnBefore ? quotedTable : undefined);
+
+    if (set.clauses.length === 0) {
+      throw new Error("No update operations specified");
+    }
+
+    const inner = this.buildWhereClause(filter, set.nextIndex);
+    const outer = this.buildWhereClause(
+      filter,
+      set.nextIndex + inner.whereParams.length,
+      quotedTable,
+    );
+    const params = [...set.params, ...inner.whereParams, ...outer.whereParams];
+    const outerCondition = outer.condition ? ` AND ${outer.condition}` : "";
+
+    if (returnBefore) {
+      const before = this.dialect.quoteIdentifier("__cascade_before");
+      const sql =
+        `UPDATE ${quotedTable} SET ${set.clauses.join(", ")} ` +
+        `FROM (SELECT * FROM ${quotedTable} ${inner.whereClause} LIMIT 1 FOR UPDATE) AS ${before} ` +
+        `WHERE (${keyList(quotedTable)}) = (${keyList(before)})${outerCondition} RETURNING ${before}.*`;
+      const result = await this.query<T>(sql, params);
+
+      return result.rows[0] ?? null;
+    }
+
+    const sql =
+      `UPDATE ${quotedTable} SET ${set.clauses.join(", ")} ` +
+      `WHERE (${keyList(quotedTable)}) = (SELECT ${keyList()} FROM ${quotedTable} ${inner.whereClause} LIMIT 1 FOR UPDATE)` +
+      `${outerCondition} RETURNING *`;
+    const result = await this.query<T>(sql, params);
+
     return result.rows[0] ?? null;
+  }
+
+  /**
+   * Upsert through `INSERT … ON CONFLICT (target) DO UPDATE SET … [WHERE rest] RETURNING *`.
+   *
+   * Conflict target rule: the first unique index of the table (primary key
+   * first; partial and expression indexes excluded) whose columns are ALL
+   * equality keys of the filter — a non-null value that is not an operator
+   * object. Any other filter predicate becomes the `DO UPDATE … WHERE`, so an
+   * existing row that fails it is left untouched and no row is returned.
+   *
+   * Inserted row: filter equality values, then `$setOnInsert`, then `$set`,
+   * then `$inc` (n) / `$dec` (-n); `$unset` columns are omitted.
+   *
+   * @throws UnsupportedUpdateOperationError when no conflict target can be derived
+   */
+  private async executeUpsert(
+    table: string,
+    filter: Record<string, unknown>,
+    operations: UpdateOperations,
+  ): Promise<{ row?: Record<string, unknown>; inserted: boolean }> {
+    const equalityKeys = new Set(
+      Object.entries(filter)
+        .filter(([, value]) => value !== null && value !== undefined && !this.isOperatorFilter(value))
+        .map(([key]) => key),
+    );
+    const uniqueKeys = await this.getUniqueKeys(table);
+    const target = uniqueKeys.find((key) => key.columns.every((column) => equalityKeys.has(column)));
+
+    if (!target) {
+      throw new UnsupportedUpdateOperationError(
+        "upsert without a unique conflict target",
+        "postgres",
+        `Filter on every column of the primary key or of a unique index of "${table}".`,
+      );
+    }
+
+    const insertRow: Record<string, unknown> = {};
+
+    for (const key of equalityKeys) {
+      insertRow[key] = filter[key];
+    }
+
+    Object.assign(insertRow, operations.$setOnInsert, operations.$set);
+
+    for (const [key, amount] of Object.entries(operations.$inc ?? {})) {
+      insertRow[key] = amount;
+    }
+
+    for (const [key, amount] of Object.entries(operations.$dec ?? {})) {
+      insertRow[key] = -amount;
+    }
+
+    for (const key of Object.keys(operations.$unset ?? {})) {
+      delete insertRow[key];
+    }
+
+    const columns = Object.keys(insertRow).filter((key) => insertRow[key] !== undefined);
+    const params: unknown[] = columns.map((key) => this.serializeValue(key, insertRow[key], table));
+    const quotedTable = this.dialect.quoteIdentifier(table);
+    const quotedColumns = columns.map((column) => this.dialect.quoteIdentifier(column)).join(", ");
+    const placeholders = columns.map((_, index) => this.dialect.placeholder(index + 1)).join(", ");
+
+    const set = this.buildSetClauses(table, operations, columns.length + 1, quotedTable);
+    params.push(...set.params);
+
+    const firstTargetColumn = this.dialect.quoteIdentifier(target.columns[0]!);
+    const doUpdateSet =
+      set.clauses.length > 0
+        ? set.clauses.join(", ")
+        : `${firstTargetColumn} = ${quotedTable}.${firstTargetColumn}`;
+
+    const remainingFilter = Object.fromEntries(
+      Object.entries(filter).filter(([key]) => !target.columns.includes(key)),
+    );
+    const where = this.buildWhereClause(remainingFilter, set.nextIndex, quotedTable);
+    params.push(...where.whereParams);
+
+    const conflictColumns = target.columns
+      .map((column) => this.dialect.quoteIdentifier(column))
+      .join(", ");
+    const insertedFlag = "__cascade_inserted";
+    const sql =
+      `INSERT INTO ${quotedTable} (${quotedColumns}) VALUES (${placeholders}) ` +
+      `ON CONFLICT (${conflictColumns}) DO UPDATE SET ${doUpdateSet} ${where.whereClause} ` +
+      `RETURNING *, (xmax = 0) AS "${insertedFlag}"`;
+
+    const result = await this.query<Record<string, unknown>>(sql, params);
+    const returned = result.rows[0];
+
+    if (!returned) {
+      return { inserted: false };
+    }
+
+    const { [insertedFlag]: inserted, ...row } = returned;
+
+    return { row, inserted: inserted === true };
+  }
+
+  /**
+   * Unique keys of a table (primary key first), read from `pg_index`.
+   *
+   * Partial and expression indexes are excluded — they cannot be an
+   * `ON CONFLICT (columns)` target. Non-empty results are cached per table.
+   */
+  private async getUniqueKeys(table: string): Promise<ReadonlyArray<UniqueKey>> {
+    const cached = this._uniqueKeys.get(table);
+
+    if (cached) {
+      return cached;
+    }
+
+    const result = await this.query<UniqueKey>(
+      `SELECT array_agg(a.attname::text ORDER BY k.ord) AS columns, i.indisprimary AS primary
+       FROM pg_index i
+       CROSS JOIN LATERAL unnest(i.indkey::int2[]) WITH ORDINALITY AS k(attnum, ord)
+       JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum
+       WHERE i.indrelid = to_regclass($1) AND i.indisunique AND i.indpred IS NULL AND i.indexprs IS NULL
+       GROUP BY i.indexrelid, i.indisprimary
+       ORDER BY i.indisprimary DESC, i.indexrelid`,
+      [this.dialect.quoteIdentifier(table)],
+    );
+
+    if (result.rows.length > 0) {
+      this._uniqueKeys.set(table, result.rows);
+    }
+
+    return result.rows;
   }
 
   /**
@@ -1073,10 +1293,21 @@ export class PostgresDriver implements DriverContract {
   public async atomic(
     table: string,
     filter: Record<string, unknown>,
-    operations: UpdateOperations,
-    _options?: Record<string, unknown>,
+    operations: AtomicUpdate,
+    options?: DriverAtomicUpdateOptions,
   ): Promise<UpdateResult> {
-    const { sql, params } = this.buildUpdateQuery(table, filter, operations);
+    const update = assertPostgresUpdate(operations, options);
+
+    if (options?.upsert) {
+      const { row, inserted } = await this.executeUpsert(table, filter, update);
+
+      return {
+        modifiedCount: row && !inserted ? 1 : 0,
+        upsertedCount: row && inserted ? 1 : 0,
+      };
+    }
+
+    const { sql, params } = this.buildUpdateQuery(table, filter, update);
 
     const result = await this.query(sql, params);
 
@@ -1222,13 +1453,14 @@ export class PostgresDriver implements DriverContract {
   private buildWhereClause(
     filter: Record<string, unknown>,
     startParamIndex: number,
-  ): { whereClause: string; whereParams: unknown[] } {
+    qualifier?: string,
+  ): { whereClause: string; whereParams: unknown[]; condition: string } {
     const conditions: string[] = [];
     const params: unknown[] = [];
     let paramIndex = startParamIndex;
 
     for (const [key, value] of Object.entries(filter)) {
-      const quotedKey = this.dialect.quoteIdentifier(key);
+      const quotedKey = (qualifier ? `${qualifier}.` : "") + this.dialect.quoteIdentifier(key);
 
       if (value === null) {
         conditions.push(`${quotedKey} IS NULL`);
@@ -1287,9 +1519,10 @@ export class PostgresDriver implements DriverContract {
       }
     }
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const condition = conditions.join(" AND ");
+    const whereClause = condition ? `WHERE ${condition}` : "";
 
-    return { whereClause, whereParams: params };
+    return { whereClause, whereParams: params, condition };
   }
 
   /**
@@ -1311,28 +1544,29 @@ export class PostgresDriver implements DriverContract {
   }
 
   /**
-   * Build an UPDATE query from update operations.
+   * Build the SET clauses for an update.
    *
-   * @param table - Target table name
-   * @param filter - Filter conditions
-   * @param update - Update operations
-   * @param limit - Optional limit (for single row update)
-   * @returns Object with SQL and parameters
+   * @param table - Target table name (for value serialization)
+   * @param update - Update operations (`$setOnInsert` is not part of SET)
+   * @param startIndex - First placeholder index
+   * @param qualifier - Quoted table name to qualify right-hand column references
+   *   (needed where another relation with the same columns is in scope)
    */
-  private buildUpdateQuery(
+  private buildSetClauses(
     table: string,
-    filter: Record<string, unknown>,
     update: UpdateOperations,
-    limit?: number,
-  ): { sql: string; params: unknown[] } {
-    const setClauses: string[] = [];
+    startIndex: number,
+    qualifier?: string,
+  ): { clauses: string[]; params: unknown[]; nextIndex: number } {
+    const clauses: string[] = [];
     const params: unknown[] = [];
-    let paramIndex = 1;
+    let paramIndex = startIndex;
+    const reference = (quotedKey: string) => (qualifier ? `${qualifier}.${quotedKey}` : quotedKey);
 
     // Handle $set
     if (update.$set) {
       for (const [key, value] of Object.entries(update.$set)) {
-        setClauses.push(
+        clauses.push(
           `${this.dialect.quoteIdentifier(key)} = ${this.dialect.placeholder(paramIndex++)}`,
         );
         // Apply the same json/jsonb-aware serialization used on the INSERT
@@ -1345,45 +1579,61 @@ export class PostgresDriver implements DriverContract {
     // Handle $unset (set to NULL)
     if (update.$unset) {
       for (const key of Object.keys(update.$unset)) {
-        setClauses.push(`${this.dialect.quoteIdentifier(key)} = NULL`);
+        clauses.push(`${this.dialect.quoteIdentifier(key)} = NULL`);
       }
     }
 
-    // Handle $inc
-    if (update.$inc) {
-      for (const [key, amount] of Object.entries(update.$inc)) {
+    // Handle $inc / $dec
+    const arithmetic = [
+      ["$inc", "+"],
+      ["$dec", "-"],
+    ] as const;
+
+    for (const [operator, sign] of arithmetic) {
+      for (const [key, amount] of Object.entries(update[operator] ?? {})) {
         const quotedKey = this.dialect.quoteIdentifier(key);
-        setClauses.push(
-          `${quotedKey} = COALESCE(${quotedKey}, 0) + ${this.dialect.placeholder(paramIndex++)}`,
+        clauses.push(
+          `${quotedKey} = COALESCE(${reference(quotedKey)}, 0) ${sign} ${this.dialect.placeholder(paramIndex++)}`,
         );
         params.push(amount);
       }
     }
 
-    // Handle $dec
-    if (update.$dec) {
-      for (const [key, amount] of Object.entries(update.$dec)) {
-        const quotedKey = this.dialect.quoteIdentifier(key);
-        setClauses.push(
-          `${quotedKey} = COALESCE(${quotedKey}, 0) - ${this.dialect.placeholder(paramIndex++)}`,
-        );
-        params.push(amount);
-      }
-    }
+    return { clauses, params, nextIndex: paramIndex };
+  }
 
-    if (setClauses.length === 0) {
+  /**
+   * Build an UPDATE query from update operations.
+   *
+   * @param table - Target table name
+   * @param filter - Filter conditions
+   * @param update - Update operations
+   * @param limit - Optional limit (for single row update)
+   * @returns Object with SQL and parameters
+   * @throws UnsupportedUpdateOperationError for operations SQL cannot express
+   */
+  private buildUpdateQuery(
+    table: string,
+    filter: Record<string, unknown>,
+    update: AtomicUpdate,
+    limit?: number,
+  ): { sql: string; params: unknown[] } {
+    const set = this.buildSetClauses(table, assertPostgresUpdate(update), 1);
+
+    if (set.clauses.length === 0) {
       throw new Error("No update operations specified");
     }
 
+    const params = [...set.params];
     const quotedTable = this.dialect.quoteIdentifier(table);
-    const { whereClause, whereParams } = this.buildWhereClause(filter, paramIndex);
+    const { whereClause, whereParams } = this.buildWhereClause(filter, set.nextIndex);
     params.push(...whereParams);
 
-    let sql = `UPDATE ${quotedTable} SET ${setClauses.join(", ")} ${whereClause}`;
+    let sql = `UPDATE ${quotedTable} SET ${set.clauses.join(", ")} ${whereClause}`;
 
     // For single row update, use ctid subquery
     if (limit === 1 && whereClause) {
-      sql = `UPDATE ${quotedTable} SET ${setClauses.join(", ")} WHERE ctid IN (SELECT ctid FROM ${quotedTable} ${whereClause} LIMIT 1)`;
+      sql = `UPDATE ${quotedTable} SET ${set.clauses.join(", ")} WHERE ctid IN (SELECT ctid FROM ${quotedTable} ${whereClause} LIMIT 1)`;
     }
 
     return { sql, params };

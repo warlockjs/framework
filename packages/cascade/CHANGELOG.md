@@ -4,6 +4,26 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.13.0
+
+### Added
+
+- `Model.atomic`, `Model.findOneAndUpdate` and `Model.findAndUpdate` take options: `upsert`, `arrayFilters` (MongoDB), and on `findOneAndUpdate` `returnDocument: "before" | "after"` (default stays `"after"`). A counter or quota can now be filter + `$inc`/`$setOnInsert` + upsert, returning the new document, in one call.
+- Update operators `$setOnInsert` and `$addToSet`, and pipeline (array-form) updates such as `[{ $set: { score: { $add: ["$likes", "$shares"] } } }]` (MongoDB).
+- `trustedFilter: true` lets a code-authored conditional filter (`{ used: { $lt: 10 } }`) through the operator-injection check on these statics. Filters are still checked by default.
+- Postgres upsert runs as `INSERT … ON CONFLICT … DO UPDATE … RETURNING *`. The conflict target is the primary key or a unique index whose columns are all equality keys of the filter.
+- `UnsupportedUpdateOperationError` (`operation`, `driver`): what a driver throws when it cannot run part of an update.
+
+### Changed
+
+- The Postgres driver now throws `UnsupportedUpdateOperationError` for `$push` / `$pull` / `$addToSet`, pipeline updates, `arrayFilters` and unknown operators. It used to ignore `$push` / `$pull` without saying so.
+- `Model.atomic` returns modified + upserted count.
+- Postgres `findOneAndUpdate` picks its row with `SELECT … LIMIT 1 FOR UPDATE`, matches it by primary key and checks the filter again, so concurrent callers never go past a conditional filter.
+
+### Fixed
+
+- `$dec` on the MongoDB driver was sent to the server as-is and rejected ("Unknown modifier"). It is now converted to a negative `$inc`.
+
 ## 5.11.0 - 2026-09-14
 
 ### Fixed

@@ -18,6 +18,8 @@ import type {
 import { EventEmitter } from "node:events";
 import { databaseTransactionContext } from "../../context/database-transaction-context";
 import type {
+  AtomicUpdate,
+  DriverAtomicUpdateOptions,
   DriverBlueprintContract,
   DriverContract,
   DriverEvent,
@@ -44,6 +46,7 @@ import { MongoIdGenerator } from "./mongodb-id-generator";
 import { MongoMigrationDriver } from "./mongodb-migration-driver";
 import { MongoQueryBuilder } from "./mongodb-query-builder";
 import { MongoSyncAdapter } from "./mongodb-sync-adapter";
+import { toMongoUpdate } from "./mongodb-update-translator";
 import type { MongoDriverOptions } from "./types";
 
 const DEFAULT_TRANSACTION_OPTIONS: TransactionOptions = {
@@ -478,20 +481,27 @@ export class MongoDbDriver implements DriverContract {
   }
 
   /**
-   * Find one and update a single document that matches the provided filter and return the updated document
+   * Find one and update a single document that matches the provided filter.
+   *
+   * Native `upsert`, `arrayFilters`, pipeline updates and `returnDocument`
+   * (default `"after"`).
    */
   public async findOneAndUpdate<T = unknown>(
     table: string,
     filter: Record<string, unknown>,
-    update: UpdateOperations,
-    options?: Record<string, unknown>,
+    update: AtomicUpdate,
+    options?: DriverAtomicUpdateOptions,
   ): Promise<T | null> {
     const collection = this.getDatabaseInstance().collection(table);
     const mongoOptions = this.withSession<FindOneAndUpdateOptions>(options);
-    const result = await collection.findOneAndUpdate(filter, update as Record<string, unknown>, {
-      returnDocument: "after",
-      ...mongoOptions,
-    });
+    const result = await collection.findOneAndUpdate(
+      filter,
+      toMongoUpdate(update) as UpdateFilter<Record<string, unknown>>,
+      {
+        ...mongoOptions,
+        returnDocument: options?.returnDocument ?? "after",
+      },
+    );
 
     return result as T | null;
   }
@@ -794,22 +804,24 @@ export class MongoDbDriver implements DriverContract {
    * Execute atomic operations (typically $inc/$set style updates) against documents.
    *
    * Uses `updateMany` so callers can atomically modify any set of documents.
+   * `upsert`, `arrayFilters` and pipeline updates are native.
    */
   public async atomic(
     table: string,
     filter: Record<string, unknown>,
-    operations: Record<string, unknown>,
-    options?: Record<string, unknown>,
+    operations: AtomicUpdate,
+    options?: DriverAtomicUpdateOptions,
   ): Promise<UpdateResult> {
     const collection = this.getDatabaseInstance().collection(table);
-    const mongoOptions = this.withSession<UpdateOptions>(options);
+    const { returnDocument: _returnDocument, ...updateOptions } = options ?? {};
+    const mongoOptions = this.withSession<UpdateOptions>(updateOptions);
     const result = await collection.updateMany(
       filter,
-      operations as UpdateFilter<Record<string, unknown>>,
+      toMongoUpdate(operations) as UpdateFilter<Record<string, unknown>>,
       mongoOptions,
     );
 
-    return { modifiedCount: result.modifiedCount };
+    return { modifiedCount: result.modifiedCount, upsertedCount: result.upsertedCount };
   }
 
   /**

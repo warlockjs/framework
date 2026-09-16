@@ -5,8 +5,10 @@ import type {
   PaginationOptions,
   PaginationResult,
   RawQueryResult,
+  AtomicUpdate,
+  AtomicUpdateOptions,
+  FindOneAndUpdateOptions,
   RemoverResult,
-  UpdateOperations,
   WriterOptions,
 } from "../contracts";
 import { type QueryBuilderContract, type WhereCallback, type WhereObject, type WhereOperator } from "../contracts";
@@ -1782,19 +1784,26 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   }
 
   /**
-   * Perform atomic operation
-   * Example
+   * Perform an atomic update on every document/row matching the filter.
    *
+   * @param filter - Filter conditions (operator keys rejected unless `trustedFilter`)
+   * @param operations - Update operators, or an aggregation pipeline (MongoDB only)
+   * @param options - `upsert`, `arrayFilters` (MongoDB only), `trustedFilter`
+   * @returns Number of documents modified plus the number inserted by an upsert
+   *
+   * @example
    * ```typescript
-   * const user = await User.atomic({id: 1}, {$inc: {age: 1}})
-   * Returns user model with updated age
+   * await User.atomic({ id: 1 }, { $inc: { age: 1 } });
+   * await Counter.atomic({ key: "signups" }, { $inc: { count: 1 } }, { upsert: true });
+   * ```
    */
   public static async atomic<TModel extends Model = Model>(
     this: ChildModel<TModel>,
     filter: Record<string, unknown>,
-    operations: UpdateOperations,
+    operations: AtomicUpdate,
+    options?: AtomicUpdateOptions,
   ): Promise<number> {
-    return performAtomic(this, filter, operations);
+    return performAtomic(this, filter, operations, options);
   }
 
   /**
@@ -1811,29 +1820,42 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
   /**
    * Find one and update multiple records that matches the provided filter and return the updated record
    * @param filter - Filter conditions
-   * @param update - Update operations ($set, $unset, $inc)
+   * @param update - Update operators, or an aggregation pipeline (MongoDB only)
+   * @param options - `upsert`, `arrayFilters` (MongoDB only)
    * @returns The updated records
    */
   public static async findAndUpdate<TModel extends Model = Model>(
     this: ChildModel<TModel>,
     filter: Record<string, unknown>,
-    update: UpdateOperations,
+    update: AtomicUpdate,
+    options?: Omit<AtomicUpdateOptions, "trustedFilter">,
   ): Promise<TModel[]> {
-    return findAndUpdateRecords(this, filter, update);
+    return findAndUpdateRecords(this, filter, update, options);
   }
 
   /**
    * Find one and update a single record that matches the provided filter and return the updated record
    * @param filter - Filter conditions
-   * @param update - Update operations ($set, $unset, $inc)
-   * @returns The updated record or null
+   * @param update - Update operators, or an aggregation pipeline (MongoDB only)
+   * @param options - `upsert`, `returnDocument` (default `"after"`), `arrayFilters`, `trustedFilter`
+   * @returns The record after (or before) the update, or null when nothing matched
+   *
+   * @example
+   * ```typescript
+   * const counter = await Counter.findOneAndUpdate(
+   *   { key: "signups" },
+   *   { $inc: { count: 1 }, $setOnInsert: { startedAt: new Date() } },
+   *   { upsert: true },
+   * );
+   * ```
    */
   public static async findOneAndUpdate<TModel extends Model = Model>(
     this: ChildModel<TModel>,
     filter: Record<string, unknown>,
-    update: UpdateOperations,
+    update: AtomicUpdate,
+    options?: FindOneAndUpdateOptions,
   ): Promise<TModel | null> {
-    return findOneAndUpdateRecord(this, filter, update);
+    return findOneAndUpdateRecord(this, filter, update, options);
   }
 
   /**

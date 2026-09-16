@@ -58,6 +58,8 @@ export type InsertResult<TDocument = unknown> = {
 /** Result returned after update operations. */
 export type UpdateResult = {
   modifiedCount: number;
+  /** Documents/rows inserted by an `upsert` (0 or absent when nothing was inserted). */
+  upsertedCount?: number;
 };
 
 /**
@@ -116,11 +118,57 @@ export type UpdateOperations = {
   $inc?: Record<string, number>;
   /** Decrement numeric fields */
   $dec?: Record<string, number>;
-  /** Push to arrays (NoSQL only, SQL drivers may ignore) */
+  /** Push to arrays (NoSQL only; SQL drivers throw `UnsupportedUpdateOperationError`) */
   $push?: Record<string, unknown>;
-  /** Pull from arrays (NoSQL only, SQL drivers may ignore) */
+  /** Pull from arrays (NoSQL only; SQL drivers throw `UnsupportedUpdateOperationError`) */
   $pull?: Record<string, unknown>;
+  /** Add to arrays only when absent (NoSQL only; SQL drivers throw `UnsupportedUpdateOperationError`) */
+  $addToSet?: Record<string, unknown>;
+  /** Set fields only when an `upsert` inserts; a no-op when an existing document is updated */
+  $setOnInsert?: Record<string, unknown>;
 };
+
+/**
+ * Aggregation-pipeline (array-form) update, e.g.
+ * `[{ $set: { score: { $add: ["$likes", "$shares"] } } }]`.
+ *
+ * MongoDB only — SQL drivers throw `UnsupportedUpdateOperationError`.
+ */
+export type UpdatePipeline = Record<string, unknown>[];
+
+/** An update accepted by the atomic APIs: an operator object or a pipeline. */
+export type AtomicUpdate = UpdateOperations | UpdatePipeline;
+
+/**
+ * Options for `atomic()` / `findAndUpdate()`.
+ */
+export type AtomicUpdateOptions = {
+  /** Insert a document when nothing matches the filter. Defaults to `false`. */
+  upsert?: boolean;
+  /** Filters selecting array elements for `$[identifier]` paths (MongoDB only). */
+  arrayFilters?: Record<string, unknown>[];
+  /**
+   * Skip the model layer's operator-injection check on `filter`, allowing
+   * conditions such as `{ used: { $lt: 10 } }`. Defaults to `false`.
+   *
+   * Only for code-authored filters — never pass request data with this set.
+   */
+  trustedFilter?: boolean;
+};
+
+/**
+ * Options for `findOneAndUpdate()`.
+ */
+export type FindOneAndUpdateOptions = AtomicUpdateOptions & {
+  /** Return the document as it was before or after the update. Defaults to `"after"`. */
+  returnDocument?: "before" | "after";
+};
+
+/**
+ * Options a driver receives for atomic updates: the public options plus
+ * driver-specific extras (e.g. a transaction session).
+ */
+export type DriverAtomicUpdateOptions = FindOneAndUpdateOptions & Record<string, unknown>;
 
 /**
  * Unified driver contract used by the model layer.
@@ -235,8 +283,8 @@ export interface DriverContract {
   findOneAndUpdate<T = unknown>(
     table: string,
     filter: Record<string, unknown>,
-    update: Record<string, unknown>,
-    options?: Record<string, unknown>,
+    update: AtomicUpdate,
+    options?: DriverAtomicUpdateOptions,
   ): Promise<T | null>;
 
   /**
@@ -412,8 +460,8 @@ export interface DriverContract {
   atomic(
     table: string,
     filter: Record<string, unknown>,
-    operations: UpdateOperations,
-    options?: Record<string, unknown>,
+    operations: AtomicUpdate,
+    options?: DriverAtomicUpdateOptions,
   ): Promise<UpdateResult>;
 
   /** Access the sync adapter used for bulk denormalized updates. */

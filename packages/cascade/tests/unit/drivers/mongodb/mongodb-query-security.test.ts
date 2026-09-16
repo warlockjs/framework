@@ -352,7 +352,12 @@ describe("MongoQueryBuilder — filter security", () => {
       await expect(
         performAtomic(fakeModelClass({ atomic }), { role: "member" }, { $inc: { age: 1 } }),
       ).resolves.toBe(2);
-      expect(atomic).toHaveBeenCalledWith("users", { role: "member" }, { $inc: { age: 1 } });
+      expect(atomic).toHaveBeenCalledWith(
+        "users",
+        { role: "member" },
+        { $inc: { age: 1 } },
+        undefined,
+      );
     });
 
     it("rejects operator keys in a findOneAndUpdate() filter", async () => {
@@ -382,6 +387,7 @@ describe("MongoQueryBuilder — filter security", () => {
         "users",
         { email: "a@b.c" },
         { $set: { visited: true } },
+        undefined,
       );
     });
 
