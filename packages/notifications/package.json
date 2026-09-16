@@ -23,7 +23,8 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
-    "generate:llms": "node scripts/generate-llms.mjs"
+    "generate:llms": "node scripts/generate-llms.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "repository": {
     "type": "git",
