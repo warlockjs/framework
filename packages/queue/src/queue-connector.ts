@@ -71,6 +71,12 @@ export function queueConnector(options: QueueConnectorOptions = {}): Connector {
         return;
       }
 
+      // The dashboard resolves queues through the active config, so it has to
+      // be registered here rather than only in `start()`, which runs after
+      // every late connector has booted. `start()` sets it again; the setter
+      // is idempotent for the same object.
+      setQueueConfig(queueConfig);
+
       const { getHttpServer } = await import("@warlock.js/core");
 
       await mountQueueDashboard(getHttpServer(), queueConfig);

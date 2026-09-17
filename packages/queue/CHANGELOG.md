@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The connector registers the queue config when it mounts the dashboard at boot, so an app whose only queue usage is the dashboard no longer fails to start with `QueueNotConfiguredError`.
 - `find(id)` no longer returns a completed job with `result: null` and `attemptsMade: 0` when the job finishes mid-read.
 
 ## 5.13.0 - 2026-09-17
