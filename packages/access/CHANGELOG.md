@@ -6,9 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.13.0 - 2026-09-17
 
+### Upgrading
+
+- Access checks are now deny-by-default: an instance-level check for a permission with no registered ABAC policy DENIES instead of falling back to the RBAC grant alone. If you rely on the old fail-open fallback, set `strictPolicies: false` in `src/config/access.ts`; otherwise register the `definePolicy(...)` calls the new log warnings name.
+
 ### Breaking
 
-- `strictPolicies` now defaults to `true`. An instance-level check (`{ resource }`) for a permission with no registered ABAC policy now DENIES by default instead of silently falling back to the RBAC grant alone. **Upgrade:** if you rely on the old fail-open fallback anywhere, set `strictPolicies: false` in `src/config/access.ts`; otherwise register the missing `definePolicy(...)` calls the log warnings point to.
+- **BREAKING:** `strictPolicies` now defaults to `true`. An instance-level check (`{ resource }`) for a permission with no registered ABAC policy now DENIES by default instead of silently falling back to the RBAC grant alone. Set `strictPolicies: false` in `src/config/access.ts` to restore the old fallback, or register the missing `definePolicy(...)` calls the log warnings point to.
 
 ### Fixed
 
