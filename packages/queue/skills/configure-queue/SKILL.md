@@ -53,3 +53,7 @@ process.on("SIGTERM", () => closeQueue());
 ```
 
 Every process must use the same `prefix`, or they will not see each other's jobs.
+
+## Dashboard
+
+`QueueConfig` also takes a `dashboard: { enabled, path, middleware }` block — see [`manage-failed-jobs`](../manage-failed-jobs/SKILL.md#dashboard-optional) for the `warlock add bull-board` setup and the production guard (`QueueDashboardUnguardedError`).
