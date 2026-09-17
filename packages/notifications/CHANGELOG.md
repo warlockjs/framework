@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/notifications` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## Unreleased
+
+### Added
+
+- `bullmqQueue({ queue?, attempts?, backoff? })`: a `QueueDispatcher` backed by `@warlock.js/queue`, sitting next to `heraldQueue()` in `src/queue`. Vendor integrations now live as lazy drivers inside the feature package rather than the other way around — `@warlock.js/queue` is an OPTIONAL peer, dynamically imported only when `bullmqQueue()` is actually configured. A missing package throws `QueuePackageNotInstalledError` (`warlock add queue` to install).
+- Replaces `queueNotificationDispatcher` from `@warlock.js/queue/notifications`, which is now deprecated (still works for one release, logs a one-time warning).
+
 ## 5.13.0 - 2026-09-17
 
 ### Fixed

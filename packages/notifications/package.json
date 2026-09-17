@@ -18,6 +18,14 @@
   "optionalDependencies": {
     "@warlock.js/herald": "5.13.0"
   },
+  "peerDependencies": {
+    "@warlock.js/queue": "5.13.0"
+  },
+  "peerDependenciesMeta": {
+    "@warlock.js/queue": {
+      "optional": true
+    }
+  },
   "scripts": {
     "test": "vitest",
     "test:run": "vitest run",
@@ -33,6 +41,7 @@
   "devDependencies": {
     "@types/node": "^22.10.5",
     "@vitest/coverage-v8": "4.1.10",
+    "@warlock.js/queue": "workspace:^",
     "typescript": "^5.9.3",
     "vitest": "4.1.10"
   },
