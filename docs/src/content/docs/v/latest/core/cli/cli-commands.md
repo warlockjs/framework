@@ -128,7 +128,7 @@ export default {
 14:22:07   ⏱ watcher 4ms · debounce 20ms · graph 1ms · reimport 3ms · connectors 0ms
 ```
 
-The five phases, in order: the watcher's `awaitWriteFinish` settle wait (chokidar), this handler's own debounce wait, module-graph invalidation (version bumps), re-import of the changed modules, and connector restart/rebind. Opt-in and off by default — the marks themselves are cheap `performance.now()` calls, but the raw-fs-event bookkeeping behind the watcher-settle phase is skipped entirely unless this is on, so a disabled flag costs nothing beyond one boolean check per reload.
+The five phases, in order: `watcher` (the gap between the raw fs notification and chokidar's stabilised event — its `awaitWriteFinish` window), this handler's own debounce wait, module-graph invalidation (version bumps), re-import of the changed modules, and connector restart/rebind. Opt-in and off by default — the marks themselves are cheap `performance.now()` calls, but the raw-fs-event bookkeeping behind the watcher-settle phase is skipped entirely unless this is on, so a disabled flag costs nothing beyond one boolean check per reload.
 
 The debounce wait itself is adaptive as of 5.13: an isolated save resolves after a 12ms quiet window (down from a fixed 50ms), while a sustained burst of events — a formatter rewriting several files, a branch checkout — keeps extending that window up to a 60ms cap, so it still lands in one reload instead of several.
 
