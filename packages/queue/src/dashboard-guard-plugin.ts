@@ -21,7 +21,18 @@ export function buildDashboardGuardPlugin(
   return function dashboardGuardPlugin(instance: FastifyInstance, _options, done) {
     if (middlewareList.length > 0) {
       instance.addHook("onRequest", async (request, reply) => {
-        await runDashboardMiddleware(middlewareList, request, reply);
+        const handled = await runDashboardMiddleware(middlewareList, request, reply);
+
+        if (handled) {
+          // Returning the reply is Fastify's own way for an `onRequest` hook to
+          // END the lifecycle, so bull-board's handler never runs. Relying
+          // instead on Fastify noticing the reply was already sent leaves the
+          // outcome to write ORDERING: a guard answering asynchronously can lose
+          // that race and let the dashboard render to an unauthenticated caller.
+          // The adapter returns this boolean precisely so the decision is
+          // explicit rather than emergent.
+          return reply;
+        }
       });
     }
 

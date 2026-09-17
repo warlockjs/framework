@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Removed `@warlock.js/queue/notifications` (`queueNotificationDispatcher`), deprecated in 5.14. Use `bullmqQueue()` from `@warlock.js/notifications` instead. The `@warlock.js/notifications` peer dependency is also dropped, since this was the only thing in the package that needed it.
 
+### Fixed
+
+- The dashboard guard now ends the request explicitly when a middleware short-circuits, instead of leaving it to Fastify noticing the reply was already sent. The adapter has always returned a "handled" boolean for this; the hook discarded it, so whether an unauthenticated caller reached the dashboard depended on write ordering — a guard answering asynchronously could lose that race.
+
 ## 5.14.0 - 2026-09-17
 
 ### Added
