@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `warlock add bull-board` installs `@bull-board/api` and `@bull-board/fastify`, and adds a `dashboard: { enabled: true, path: "/admin/queues", middleware: [] }` block to `src/config/queue.ts`, idempotently. Fails with a clear message ("run `warlock add queue` first") when `@warlock.js/queue` is not yet installed, rather than auto-installing it.
+- `middleware.cache(opts)` accepts a `tags` option — a static `string[]` or a function of the request — mirroring `route.cache.tags` on `@warlock.js/web`'s page cache. A tagged cached response is now evicted by `cache.tags([...]).invalidate()` from `@warlock.js/cache`, the same mechanism that already invalidates cached pages. Untagged responses are unaffected — `tags` is opt-in and their write path is unchanged.
 
 ### Fixed
 

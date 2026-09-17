@@ -49,15 +49,41 @@ export type CacheMiddlewareOptions = {
    * @default cache manager
    */
   driver?: string;
+  /**
+   * Tags this cached response is stored under, mirroring `route.cache.tags`
+   * on `@warlock.js/web`'s page cache (`PageCacheOptIn.tags`,
+   * `web/src/routing/route-identity.ts`) so the two caches share one mental
+   * model: `cache.tags([...]).invalidate()` from `@warlock.js/cache` evicts
+   * a tagged API response the same way it evicts a tagged page. Either a
+   * static list, or a function of the request — resolved once per request,
+   * right before the response is stored.
+   *
+   * @default undefined (untagged — behaves exactly as before this option existed)
+   */
+  tags?: string[] | ((request: Request) => string[]);
 };
 
 const defaultCacheOptions: Partial<CacheMiddlewareOptions> = {
   withLocale: true,
 };
 
-type ParsedCacheOptions = Required<CacheMiddlewareOptions> & {
+type ParsedCacheOptions = Required<Omit<CacheMiddlewareOptions, "tags">> & {
   cacheKey: string;
+  /** Resolved, concrete tag list — see {@link resolveCacheTags}. */
+  tags: string[];
 };
+
+/**
+ * Resolves `CacheMiddlewareOptions.tags` — a static list or a function of
+ * the request — into a concrete list at store time. Mirrors
+ * `resolveCacheTags` in `@warlock.js/web`'s `create-page-route-handler.ts`,
+ * the equivalent seam for `route.cache.tags`.
+ */
+function resolveCacheTags(tags: CacheMiddlewareOptions["tags"], request: Request): string[] {
+  if (tags === undefined) return [];
+
+  return typeof tags === "function" ? tags(request) : tags;
+}
 
 async function parseCacheOptions(cacheOptions: CacheMiddlewareOptions | string, request: Request) {
   if (typeof cacheOptions === "string") {
@@ -70,9 +96,12 @@ async function parseCacheOptions(cacheOptions: CacheMiddlewareOptions | string, 
     cacheOptions.cacheKey = await cacheOptions.cacheKey(request);
   }
 
+  const tags = resolveCacheTags(cacheOptions.tags, request);
+
   const finalCacheOptions = {
     ...defaultCacheOptions,
     ...cacheOptions,
+    tags,
   } as ParsedCacheOptions;
 
   if (finalCacheOptions.withLocale) {
@@ -93,7 +122,10 @@ export function cacheMiddleware(responseCacheOptions: CacheMiddlewareOptions | s
   // checks this factory's calling convention, which is how the positional v4
   // shape survived an earlier refactor unnoticed.
   return async function ({ request, response }) {
-    const { ttl, omit, cacheKey, driver } = await parseCacheOptions(responseCacheOptions, request);
+    const { ttl, omit, cacheKey, driver, tags } = await parseCacheOptions(
+      responseCacheOptions,
+      request,
+    );
     const cacheDriver = driver ? await cache.use(driver) : cache;
 
     const content = (await cacheDriver.get(cacheKey)) as CachedResponsePayload | null;
@@ -125,7 +157,16 @@ export function cacheMiddleware(responseCacheOptions: CacheMiddlewareOptions | s
 
       // `set` is fire-and-forget inside `onSent`; without a `.catch` a rejected
       // write (e.g. Redis down) would surface as an unhandledRejection.
-      cacheDriver.set(cacheKey, content, ttl).catch((error: unknown) => {
+      //
+      // Tagged and untagged writes go through separate calls rather than a
+      // shared branch-free path so an untagged route's write stays byte
+      // identical to what it was before `tags` existed.
+      const write =
+        tags.length > 0
+          ? cacheDriver.tags(tags).set(cacheKey, content, ttl)
+          : cacheDriver.set(cacheKey, content, ttl);
+
+      write.catch((error: unknown) => {
         log.error("cache-middleware", "set", error);
       });
     });

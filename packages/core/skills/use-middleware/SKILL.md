@@ -174,6 +174,30 @@ router.get("/analytics/summary", summaryController, {
 
 `cacheKey` can be a string OR a function `(request) => string | Promise<string>` for per-request keys. Excludes failures and omits `["user", "settings"]` from the cached body by default.
 
+### Tag-based invalidation
+
+Give it `tags` — a static list, or a function of the request — to evict the entry early with `cache.tags([...]).invalidate()` (`@warlock.js/cache`), instead of waiting out `ttl`. Mirrors `route.cache.tags` on `@warlock.js/web`'s page cache, so an API response and a page can share the same tag and be invalidated together:
+
+```ts
+import { middleware } from "@warlock.js/core";
+import { cache } from "@warlock.js/cache";
+
+router.get("/orders/:id", getOrderController, {
+  middleware: [
+    middleware.cache({
+      cacheKey: (request) => `orders.${request.params.id}`,
+      ttl: 300,
+      tags: (request) => [`order.${request.params.id}`],
+    }),
+  ],
+});
+
+// Elsewhere, after the order changes:
+await cache.tags([`order.${orderId}`]).invalidate();
+```
+
+Untagged entries (no `tags` given) behave exactly as before — they only expire via `ttl`.
+
 ## Composed example
 
 Tight cap on logins, concurrency + idempotency on AI calls:
