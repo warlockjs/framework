@@ -62,6 +62,10 @@ process.on("SIGTERM", () => closeQueue());
 
 Every process must use the same `prefix`, or they will not see each other's jobs.
 
+## Dashboard
+
+`QueueConfig` also takes a `dashboard: { enabled, path, middleware }` block — see [`manage-failed-jobs`](../manage-failed-jobs/SKILL.md#dashboard-optional) for the `warlock add bull-board` setup and the production guard (`QueueDashboardUnguardedError`).
+
 
 ## define-jobs  `@warlock.js/queue/define-jobs/SKILL.md`
 
@@ -122,7 +126,7 @@ const job = await sendInvoice.find(id);
 
 ---
 name: manage-failed-jobs
-description: 'Inspect and retry failed `@warlock.js/queue` jobs: `failedJobs({ queue, start, end })` returns `FailedJob[]` (`id`, `name`, `payload`, `attemptsMade`, `failedReason`, `stacktrace`, `failedAt`, `retry()`), `retryFailedJob(id, { queue })` (throws `FailedJobNotFoundError`), and the optional bull-board UI via `queueDashboard(server, { basePath, queues })` — needs `@bull-board/api` + `@bull-board/fastify`, loaded only on call, missing ones throw `QueueDashboardDependencyError`. Triggers: `failedJobs`, `retryFailedJob`, `queueDashboard`, `bull-board`; "list failed jobs", "retry a failed job", "queue dashboard", "job admin UI". Skip: defining retries — `@warlock.js/queue/define-jobs/SKILL.md`.'
+description: 'Inspect and retry failed `@warlock.js/queue` jobs: `failedJobs({ queue, start, end })` returns `FailedJob[]` (`id`, `name`, `payload`, `attemptsMade`, `failedReason`, `stacktrace`, `failedAt`, `retry()`), `retryFailedJob(id, { queue })` (throws `FailedJobNotFoundError`), and the bull-board UI — `warlock add bull-board` (requires: ["queue"], so it installs queue first when missing) writes a `dashboard: { enabled, path, middleware }` block to `src/config/queue.ts`; a guard middleware is required in production or boot throws `QueueDashboardUnguardedError`. Manual `queueDashboard(server, { basePath, queues, middleware })` also available — needs `@bull-board/api` + `@bull-board/fastify`, loaded only on call, missing ones throw `QueueDashboardDependencyError`. Triggers: `failedJobs`, `retryFailedJob`, `queueDashboard`, `bull-board`, `dashboard.enabled`, `QueueDashboardUnguardedError`; "list failed jobs", "retry a failed job", "queue dashboard", "job admin UI". Skip: defining retries — `@warlock.js/queue/define-jobs/SKILL.md`.'
 ---
 
 # Failed jobs
@@ -145,19 +149,48 @@ await retryFailedJob("invoice:43"); // by id; throws FailedJobNotFoundError if n
 ## Dashboard (optional)
 
 ```sh
-npm install @bull-board/api @bull-board/fastify
+warlock add bull-board
 ```
+
+This installs `@bull-board/api` + `@bull-board/fastify` and writes a `dashboard` block to `src/config/queue.ts`. It `requires: ["queue"]`, so it adds the `queue` feature first automatically when it isn't installed yet — no need to run `warlock add queue` yourself first:
+
+```ts title="src/config/queue.ts"
+import type { QueueConfig } from "@warlock.js/queue";
+import { middleware } from "@warlock.js/core";
+import { authMiddleware } from "@warlock.js/auth";
+
+const queueConfig: QueueConfig = {
+  // ...
+  dashboard: {
+    enabled: true,
+    path: "/admin/queues", // default
+    middleware: [authMiddleware("admin")], // guards every dashboard route
+  },
+};
+
+export default queueConfig;
+```
+
+- The dashboard can retry and delete jobs, so it must be guarded. In production, an empty `middleware` list throws `QueueDashboardUnguardedError` at boot instead of mounting exposed. Outside production it logs a warning and mounts anyway.
+- `queueConnector()` mounts the dashboard at boot from this config — no extra wiring needed.
+
+### Advanced: manual `queueDashboard()`
+
+For mounting outside the config-driven path (a custom server, a non-standard boot sequence), call `queueDashboard` yourself:
 
 ```ts
 import { getHttpServer } from "@warlock.js/core";
 import { queueDashboard } from "@warlock.js/queue";
 
-await queueDashboard(getHttpServer(), { basePath: "/admin/queues" });
+await queueDashboard(getHttpServer(), {
+  basePath: "/admin/queues",
+  middleware: [authMiddleware("admin")],
+});
 ```
 
 - Call it before the HTTP server starts listening.
 - Shows every queue that has a job, plus the default queue, unless you pass `queues`.
-- It has no authentication of its own, and it can retry and delete jobs. Protect the path.
+- It has no authentication of its own — pass `middleware` yourself; this path does not enforce the production guard that the `dashboard` config does.
 
 
 ## overview  `@warlock.js/queue/overview/SKILL.md`
@@ -187,29 +220,30 @@ Durable background jobs. Jobs are stored in **Redis** (required), retried on fai
 - [`configure-queue`](@warlock.js/queue/configure-queue/SKILL.md) — `src/config/queue.ts`, `queueConnector()`, workers on/off, shutdown.
 - [`define-jobs`](@warlock.js/queue/define-jobs/SKILL.md) — `defineJob`, `dispatch` options, retries, progress, `find`.
 - [`manage-failed-jobs`](@warlock.js/queue/manage-failed-jobs/SKILL.md) — `failedJobs`, `retryFailedJob`, the bull-board dashboard.
-- [`queue-notifications`](@warlock.js/queue/queue-notifications/SKILL.md) — `queueNotificationDispatcher()` for notifications `.queue()`.
+- [`queue-notifications`](@warlock.js/queue/queue-notifications/SKILL.md) — `bullmqQueue()` for notifications `.queue()`.
 
 
 ## queue-notifications  `@warlock.js/queue/queue-notifications/SKILL.md`
 
 ---
 name: queue-notifications
-description: 'Send `@warlock.js/notifications` `.queue()` deliveries through BullMQ with `queueNotificationDispatcher({ queue?, attempts?, backoff? })` from `@warlock.js/queue/notifications` — put it in the `queue` slot of `src/config/notifications.ts`; the queue workers deliver. Honours `SendOptions.delay` (number = seconds, or "10m"), retries a failing `channel.send`, and fails at once for a channel missing from the worker config. Notifications keeps no queue dependency. Triggers: `queueNotificationDispatcher`, `@warlock.js/queue/notifications`, `NotificationConfig.queue`; "queue notifications with BullMQ", "retry notification delivery", "delayed notification". Skip: the herald backend — `@warlock.js/notifications/queue-notifications/SKILL.md`.'
+description: 'Send `@warlock.js/notifications` `.queue()` deliveries through BullMQ with `bullmqQueue({ queue?, attempts?, backoff? })` from `@warlock.js/notifications` — put it in the `queue` slot of `src/config/notifications.ts`; the queue workers deliver. Honours `SendOptions.delay` (number = seconds, or "10m"), retries a failing `channel.send`, and fails at once for a channel missing from the worker config. Triggers: `bullmqQueue`, `NotificationConfig.queue`, `QueuePackageNotInstalledError`; "queue notifications with BullMQ", "retry notification delivery", "delayed notification". Skip: the herald backend — `@warlock.js/notifications/queue-notifications/SKILL.md`.'
 ---
 
 # Queue notifications with BullMQ
 
 ```ts title="src/config/notifications.ts"
-import { type NotificationConfig, mailChannel } from "@warlock.js/notifications";
-import { queueNotificationDispatcher } from "@warlock.js/queue/notifications";
+import { type NotificationConfig, bullmqQueue, mailChannel } from "@warlock.js/notifications";
 
 const config: NotificationConfig = {
   channels: { mail: mailChannel() },
-  queue: queueNotificationDispatcher({ attempts: 3, backoff: { type: "exponential", delay: 5000 } }),
+  queue: bullmqQueue({ attempts: 3, backoff: { type: "exponential", delay: 5000 } }),
 };
 
 export default config;
 ```
+
+`bullmqQueue` ships inside `@warlock.js/notifications` itself and lazy-loads `@warlock.js/queue` (an OPTIONAL peer) the first time `.queue()` runs — install it with `warlock add queue` if it isn't there yet, otherwise the first `.queue()` throws `QueuePackageNotInstalledError`.
 
 Also configure the queue itself (`configure-queue`). No separate notifications worker is needed: the delivery is an ordinary job, run by the queue workers.
 
@@ -225,3 +259,5 @@ await orderShipped.queue(user, { order }, { delay: "10m" }); // delivered in 10 
 - `channel.send` throws → retried per `attempts` / `backoff`, then listed by `failedJobs()`.
 - Channel not configured in the worker → fails at once, no retries.
 - Deliveries run under the job name `warlock.notifications.deliver`.
+
+> **Deprecated:** `queueNotificationDispatcher` from `@warlock.js/queue/notifications` still works this release (it logs a one-time deprecation warning) and is removed next release. Migrate to `bullmqQueue` above — same option names (`queue`, `attempts`, `backoff`).

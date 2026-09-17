@@ -1,4 +1,23 @@
 {
+  "5.14.0": {
+    "publishedAt": "2026-09-17T19:41:31.498Z",
+    "matrix": "subset",
+    "matrixRows": [
+      "baseline",
+      "web",
+      "queue",
+      "bull-board",
+      "auth-google",
+      "auth-passkeys"
+    ],
+    "summary": "`@warlock.js/web` renames the hydration mount from `#root` to `#vessel` (BREAKING) — `#root` collided with embeds and third-party widgets — and hardens the client-build secret scan to refuse EVERY reference to the global `process`, aliases included (BREAKING for `typeof process` feature detection). Dev SSR now externalises every installed `@warlock.js/*` package by rule instead of a hand-maintained list, closing the dual-module-instance class that split framework singletons. A cached page sends one `Vary` value on both its HTML and data representations. `@warlock.js/queue` gains a config-driven bull-board dashboard (`warlock add bull-board`) that refuses to mount unguarded in production, and `find(id)` no longer returns a finished job with a null result. `@warlock.js/notifications` takes over the BullMQ integration as `bullmqQueue()`, a lazy optional-peer driver; `@warlock.js/queue/notifications` is deprecated for one release. `@warlock.js/core` adds `middleware.cache({ tags })` so `invalidateTags()` clears cached API responses, verifies the esbuild native binary before `warlock dev` starts, and fixes a `devServer.timings` watcher phase that always reported 0ms. Lockstep release across all 29 packages. Generator matrix ran `subset` scope (`baseline`, `web`, `queue`, `bull-board`, `auth-google`, `auth-passkeys` rows) against the staged candidate, authorised by Hasan on 2026-09-17: \"Go ahead plz\".",
+    "featured": [
+      "@warlock.js/web",
+      "@warlock.js/queue",
+      "@warlock.js/notifications",
+      "@warlock.js/core"
+    ]
+  },
   "5.13.0": {
     "publishedAt": "2026-09-17T02:39:55.850Z",
     "matrix": "subset",

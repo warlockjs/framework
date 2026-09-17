@@ -120,6 +120,186 @@
   ],
   "releases": [
     {
+      "version": "5.14.0",
+      "id": "v5-14-0",
+      "date": "September 17, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<code>@warlock.js/web</code> renames the hydration mount from <code>#root</code> to <code>#vessel</code> (BREAKING) — <code>#root</code> collided with embeds and third-party widgets — and hardens the client-build secret scan to refuse EVERY reference to the global <code>process</code>, aliases included (BREAKING for <code>typeof process</code> feature detection). Dev SSR now externalises every installed <code>@warlock.js/*</code> package by rule instead of a hand-maintained list, closing the dual-module-instance class that split framework singletons. A cached page sends one <code>Vary</code> value on both its HTML and data representations. <code>@warlock.js/queue</code> gains a config-driven bull-board dashboard (<code>warlock add bull-board</code>) that refuses to mount unguarded in production, and <code>find(id)</code> no longer returns a finished job with a null result. <code>@warlock.js/notifications</code> takes over the BullMQ integration as <code>bullmqQueue()</code>, a lazy optional-peer driver; <code>@warlock.js/queue/notifications</code> is deprecated for one release. <code>@warlock.js/core</code> adds <code>middleware.cache({ tags })</code> so <code>invalidateTags()</code> clears cached API responses, verifies the esbuild native binary before <code>warlock dev</code> starts, and fixes a <code>devServer.timings</code> watcher phase that always reported 0ms. Lockstep release across all 29 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>queue</code>, <code>bull-board</code>, <code>auth-google</code>, <code>auth-passkeys</code> rows) against the staged candidate, authorised by Hasan on 2026-09-17: \"Go ahead plz\".",
+      "matrix": "subset",
+      "matrixRows": [
+        "baseline",
+        "web",
+        "queue",
+        "bull-board",
+        "auth-google",
+        "auth-passkeys"
+      ],
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            },
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> the hydration mount is <code>&lt;div id=\"vessel\"&gt;</code> (was <code>#root</code>), which no longer collides with embeds and widgets. Update custom <code>root.tsx</code> files and any <code>#root</code> CSS or tests; hydration errors name the rename when <code>#root</code> is found."
+            },
+            {
+              "type": "Changed",
+              "html": "Dev SSR externalises every installed <code>@warlock.js/*</code> package (derived, not a hand list), so no family package can load twice and split its state."
+            },
+            {
+              "type": "Fixed",
+              "html": "A local variable or parameter named <code>process</code> in client code is no longer falsely refused."
+            },
+            {
+              "type": "Fixed",
+              "html": "Cached pages send one <code>Vary</code> value on both HTML and data responses: HTML now varies on <code>x-warlock-data</code>, and deferred pages keep <code>Vary: User-Agent</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "The typed translation-key guard now actually runs as part of <code>typecheck</code>."
+            },
+            {
+              "type": "Security",
+              "html": "<strong>BREAKING:</strong> the client-build secret scan refuses every reference to the global <code>process</code>, including aliased forms (<code>const p = globalThis.process</code>, <code>const { env } = process</code>, <code>window.process</code>). Use <code>import.meta.env</code> instead of <code>typeof process</code> checks."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            },
+            {
+              "type": "Deprecated",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>dashboard: { enabled, path, middleware }</code> in <code>src/config/queue.ts</code>: the queue connector mounts Bull Board at boot, guarded by the given middleware."
+            },
+            {
+              "type": "Added",
+              "html": "<code>QueueDashboardUnguardedError</code>: in production the dashboard refuses to mount without guard middleware, since it can retry and delete jobs."
+            },
+            {
+              "type": "Added",
+              "html": "<code>queueDashboard()</code> accepts a <code>middleware</code> option."
+            },
+            {
+              "type": "Fixed",
+              "html": "The connector registers the queue config when it mounts the dashboard at boot, so an app whose only queue usage is the dashboard no longer fails to start with <code>QueueNotConfiguredError</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>find(id)</code> no longer returns a completed job with <code>result: null</code> and <code>attemptsMade: 0</code> when the job finishes mid-read."
+            },
+            {
+              "type": "Deprecated",
+              "html": "<code>@warlock.js/queue/notifications</code> (<code>queueNotificationDispatcher</code>): use <code>bullmqQueue()</code> from <code>@warlock.js/notifications</code>. It still works in 5.14, warns once, and is removed in the next release."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>bullmqQueue({ queue, attempts, backoff })</code>: a BullMQ-backed <code>.queue()</code> driver that lazy-loads <code>@warlock.js/queue</code> (optional peer); a missing package throws <code>QueuePackageNotInstalledError</code> naming <code>warlock add queue</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>warlock add bull-board</code> installs the Bull Board packages and writes a <code>dashboard</code> block to <code>src/config/queue.ts</code>; it adds the queue feature first when it is missing. The generated block enables the dashboard outside production only, since an unguarded dashboard refuses to mount in production."
+            },
+            {
+              "type": "Added",
+              "html": "<code>middleware.cache({ tags })</code>: cached API responses can be tagged and are evicted by <code>cache.tags([...]).invalidate()</code>, like cached pages."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock dev</code> checks esbuild's native binary before starting and fails with <code>EsbuildBinaryMissingError</code> naming the fix (<code>warlock build</code> already did)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>devServer.timings</code>: the <code>watcher</code> phase always reported 0ms on Windows and Linux; it now measures the real settle time."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock add</code> writes connector arrays formatted like Prettier (<code>[queueConnector(), webConnector()]</code>), including empty and multi-line arrays."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> the web starter's <code>src/web/root.tsx</code> renders the hydration mount as <code>&lt;div id=\"vessel\"&gt;</code> (was <code>#root</code>)."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.13.0",
       "id": "v5-13-0",
       "date": "September 17, 2026",
