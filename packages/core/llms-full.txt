@@ -3520,7 +3520,7 @@ const result = await measure("publish-event", () =>
 
 ---
 name: run-app
-description: 'Three operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`, `PortInUseError`, `assertPortIsAvailable`, `EADDRINUSE`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server", "port already in use"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — `@warlock.js/core/write-cli-command/SKILL.md`; config shape — `@warlock.js/core/configure-app/SKILL.md`; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
+description: 'Three operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`, `PortInUseError`, `assertPortIsAvailable`, `EADDRINUSE`, `EsbuildBinaryMissingError`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server", "port already in use"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — `@warlock.js/core/write-cli-command/SKILL.md`; config shape — `@warlock.js/core/configure-app/SKILL.md`; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
 ---
 
 # Warlock — run the app
@@ -3663,6 +3663,7 @@ export default defineConfig({
     restartOnConfigChange: true,       // restart when warlock.config.ts / .env* changes
     healthCheckers: [...] /* or false */,
     transpileCacheDebug: false,        // name cache files <slug>.<hash>.js w/ // @source markers
+    timings: false,                    // print a per-phase reload timing breakdown
   },
 });
 ```
@@ -3673,6 +3674,7 @@ export default defineConfig({
 - **`transpileCacheDebug`** — diagnostic only. Names `.warlock/transpile/*.js` files `<slug>.<hash>.js` and appends `// @source <path>` markers so you can eyeball which cache entry came from which source. Leave off in normal use.
 - **`checkForUpdates`** — on `warlock dev` start, check npm for a newer `@warlock.js/core` and print a one-line notice if one exists. Best-effort and non-blocking; auto-skipped in CI and non-TTY shells. In an interactive terminal the notice arms a **`u` shortcut** that updates every `@warlock.js/*` package, installs, and restarts the server; elsewhere it prints `npx warlock update` instead. The registry answer is cached for 24h in `.warlock/update-check.json`, so a day of restarts costs one lookup. See [`update-packages/SKILL.md`](../update-packages/SKILL.md).
 - **`restartOnConfigChange`** — restart the dev server when `warlock.config.ts` or any `.env*` changes (default `true`). Set `false` to get a warning instead and restart by hand. Neither file can be hot-reloaded, so without a restart the running services keep the old values.
+- **`timings`** — print a one-line, per-phase breakdown next to the `hmr update` line on every hot reload: `watcher`, `debounce`, `graph`, `reimport`, `connectors`. `watcher` is the raw-fs-notification-to-stabilised-event gap (chokidar's `awaitWriteFinish` window); `debounce` is the handler's own adaptive wait; the rest are self-explanatory. Opt-in, off by default — a disabled flag costs one boolean check per reload, since the watcher-settle bookkeeping only runs when this is on. Use it to see which phase a slow reload is actually spending time in.
 
 ## `warlock build` — production bundle
 
@@ -3778,7 +3780,7 @@ Means `docker stop` / `kubectl delete pod` works as expected: SIGTERM reaches th
 
 ### pnpm needs esbuild's install script allowed
 
-pnpm 10+ will not run a dependency's install script unless the app names it. esbuild's script links its platform-native binary, and `warlock build` shells out to that binary — so the app installs cleanly and then cannot build:
+pnpm 10+ will not run a dependency's install script unless the app names it. esbuild's script links its platform-native binary, and both `warlock build` and `warlock dev` shell out to that binary — so the app installs cleanly and then cannot build or start dev:
 
 ```
 [ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: esbuild@0.27.7
@@ -3792,6 +3794,8 @@ allowBuilds:
 ```
 
 Note pnpm reads this from `pnpm-workspace.yaml`, **not** from `package.json`'s `pnpm` field — pnpm 11 warns that the field is ignored and then carries on, so settings left there fail silently.
+
+`warlock dev` checks for esbuild's native binary before starting (as `warlock build` already did) and fails fast with `EsbuildBinaryMissingError`, naming the same fix, instead of surfacing an opaque low-level error later from inside the bundler.
 
 Nothing else is needed for pnpm. Warlock never requires an app to declare a package it does not import: generated code is checked at build time against the app's own `dependencies`, so `warlock build` failing over an unfamiliar package name is a framework bug, not a missing dependency.
 
@@ -7033,6 +7037,30 @@ router.get("/analytics/summary", summaryController, {
 
 `cacheKey` can be a string OR a function `(request) => string | Promise<string>` for per-request keys. Excludes failures and omits `["user", "settings"]` from the cached body by default.
 
+### Tag-based invalidation
+
+Give it `tags` — a static list, or a function of the request — to evict the entry early with `cache.tags([...]).invalidate()` (`@warlock.js/cache`), instead of waiting out `ttl`. Mirrors `route.cache.tags` on `@warlock.js/web`'s page cache, so an API response and a page can share the same tag and be invalidated together:
+
+```ts
+import { middleware } from "@warlock.js/core";
+import { cache } from "@warlock.js/cache";
+
+router.get("/orders/:id", getOrderController, {
+  middleware: [
+    middleware.cache({
+      cacheKey: (request) => `orders.${request.params.id}`,
+      ttl: 300,
+      tags: (request) => [`order.${request.params.id}`],
+    }),
+  ],
+});
+
+// Elsewhere, after the order changes:
+await cache.tags([`order.${orderId}`]).invalidate();
+```
+
+Untagged entries (no `tags` given) behave exactly as before — they only expire via `ttl`.
+
 ## Composed example
 
 Tight cap on logins, concurrency + idempotency on AI calls:
@@ -8947,7 +8975,7 @@ CLI commands, scheduled jobs, queue workers — anything running outside an HTTP
 
 ---
 name: write-cli-command
-description: 'Author a custom `warlock <my-cmd>` command via the `command()` factory — name, description, action, options, preload, then register in `warlock.config.ts > cli.commands` or drop in `src/app/<module>/commands/`. Also covers built-in `warlock add` feature scaffolding, including the Web starter and `index.register.ts`. Triggers: `command`, `CLICommand`, `CLICommandPreload`, `CLICommandOption`, `preload`, `preAction`, `persistent`, `colors`, `warlock add`, `index.register.ts`; "write a custom warlock command", "one-off maintenance task", "ship a CLI from a package", "framework built-in commands"; typical import `import { command } from "@warlock.js/core"`. Skip: framework dev/build/start — `@warlock.js/core/run-app/SKILL.md`; warlock.config.ts wiring — `@warlock.js/core/configure-app/SKILL.md`; competing libs `commander`, `yargs`, `oclif`.'
+description: 'Author a custom `warlock <my-cmd>` command via the `command()` factory — name, description, action, options, preload, then register in `warlock.config.ts > cli.commands` or drop in `src/app/<module>/commands/`. Also covers built-in `warlock add` feature scaffolding, including the Web starter and `index.register.ts`. Triggers: `command`, `CLICommand`, `CLICommandPreload`, `CLICommandOption`, `preload`, `preAction`, `persistent`, `colors`, `warlock add`, `warlock add bull-board`, `index.register.ts`; "write a custom warlock command", "one-off maintenance task", "ship a CLI from a package", "framework built-in commands"; typical import `import { command } from "@warlock.js/core"`. Skip: framework dev/build/start — `@warlock.js/core/run-app/SKILL.md`; warlock.config.ts wiring — `@warlock.js/core/configure-app/SKILL.md`; competing libs `commander`, `yargs`, `oclif`.'
 ---
 
 # Warlock — write a CLI command
@@ -9154,6 +9182,7 @@ warlock generate                         (alias: g)      — interactive picker
 | `react-email` | `react-email` + `@react-email/components` + `@react-email/render` + `@react-email/tailwind`; drops a `welcome-email.tsx` sample; patches `tsconfig.json` |
 | `web`         | Warlock Web + React stack; scaffolds the application page, localization, contact endpoint, and Web configuration                         |
 | `react`       | `react` + `react-dom` + types                                                                       |
+| `bull-board`  | `@bull-board/api` + `@bull-board/fastify`; writes a `dashboard` block to `src/config/queue.ts`. `requires: ["queue"]` — adds the `queue` feature first automatically when it's missing |
 | `image`       | `sharp` (for the `Image` class)                                                                     |
 | `mail`        | `nodemailer` + types                                                                                |
 | `ses`         | `@aws-sdk/client-sesv2`                                                                             |

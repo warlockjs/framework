@@ -12,15 +12,9 @@ type ProjectPackageJson = {
 };
 
 /**
- * Fail loudly instead of installing quietly onto a project that has never
- * had `@warlock.js/queue` added.
- *
- * Deliberately NOT a `requires: ["queue"]` entry: that mechanism (see
- * `add-command.action.ts > resolveFeatures`) auto-runs the required feature,
- * which for queue means generating a Redis config and registering a
- * connector as a silent side effect of asking for a dashboard. Queue's own
- * setup is significant enough that the user should run it — and see its own
- * output — themselves.
+ * Defensive floor: `requires: ["queue"]` normally installs queue first, so
+ * this only fires when the dashboard step runs without it (e.g. called
+ * directly), and then fails loudly instead of writing a half-wired config.
  */
 async function isQueueInstalled(): Promise<boolean> {
   const packageJson = await getJsonFileAsync<ProjectPackageJson>(rootPath("package.json"));
@@ -95,7 +89,8 @@ async function completeBullBoardInstallation(_options: CommandActionData): Promi
 /** `warlock add bull-board` — a config-driven bull-board dashboard for @warlock.js/queue. */
 export const bullBoardFeature: FeatureDefinition = {
   description:
-    "Installs @bull-board/api and @bull-board/fastify and adds a dashboard block to src/config/queue.ts. Requires @warlock.js/queue — run `warlock add queue` first.",
+    "Installs @bull-board/api and @bull-board/fastify and adds a dashboard block to src/config/queue.ts. Adds the queue feature first when it is missing.",
+  requires: ["queue"],
   dependencies: {
     "@bull-board/api": "^9.10.1",
     "@bull-board/fastify": "^9.10.1",

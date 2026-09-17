@@ -1,6 +1,6 @@
 ---
 name: run-app
-description: 'Three operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`, `PortInUseError`, `assertPortIsAvailable`, `EADDRINUSE`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server", "port already in use"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — `@warlock.js/core/write-cli-command/SKILL.md`; config shape — `@warlock.js/core/configure-app/SKILL.md`; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
+description: 'Three operational commands — `warlock dev` (HMR + type-gen + health checks), `warlock build` (esbuild bundle), `warlock start` (spawn the production bundle). All flags, all `warlock.config.ts` knobs that shape them. Triggers: `warlock dev`, `warlock build`, `warlock start`, `devServer`, `--fresh`, `--skip-typings`, `--skip-health`, `outdir`, `outFile`, `sourcemap`, `PortInUseError`, `assertPortIsAvailable`, `EADDRINUSE`, `EsbuildBinaryMissingError`; "start the dev server", "build for production", "run the bundle", "skip type generation", "tune watch globs", "dev server keyboard shortcuts", "press r to restart", "press q to quit", "restart the dev server", "port already in use"; typical config `warlock.config.ts > devServer / build`. Skip: writing a custom CLI — `@warlock.js/core/write-cli-command/SKILL.md`; config shape — `@warlock.js/core/configure-app/SKILL.md`; competing tooling `nodemon`, `tsx`, `ts-node-dev`, `esbuild` direct.'
 ---
 
 # Warlock — run the app
@@ -260,7 +260,7 @@ Means `docker stop` / `kubectl delete pod` works as expected: SIGTERM reaches th
 
 ### pnpm needs esbuild's install script allowed
 
-pnpm 10+ will not run a dependency's install script unless the app names it. esbuild's script links its platform-native binary, and `warlock build` shells out to that binary — so the app installs cleanly and then cannot build:
+pnpm 10+ will not run a dependency's install script unless the app names it. esbuild's script links its platform-native binary, and both `warlock build` and `warlock dev` shell out to that binary — so the app installs cleanly and then cannot build or start dev:
 
 ```
 [ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: esbuild@0.27.7
@@ -274,6 +274,8 @@ allowBuilds:
 ```
 
 Note pnpm reads this from `pnpm-workspace.yaml`, **not** from `package.json`'s `pnpm` field — pnpm 11 warns that the field is ignored and then carries on, so settings left there fail silently.
+
+`warlock dev` checks for esbuild's native binary before starting (as `warlock build` already did) and fails fast with `EsbuildBinaryMissingError`, naming the same fix, instead of surfacing an opaque low-level error later from inside the bundler.
 
 Nothing else is needed for pnpm. Warlock never requires an app to declare a package it does not import: generated code is checked at build time against the app's own `dependencies`, so `warlock build` failing over an unfamiliar package name is a framework bug, not a missing dependency.
 

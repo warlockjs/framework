@@ -46,6 +46,10 @@ describe("add bull-board", () => {
     });
   });
 
+  it("requires the queue feature so `warlock add bull-board` installs queue first", () => {
+    expect(bullBoardFeature.requires).toEqual(["queue"]);
+  });
+
   it("adds the dashboard block to src/config/queue.ts when queue is installed", async () => {
     await bullBoardFeature.onExecuting?.({} as never);
 

@@ -6,16 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
-## Unreleased
+## 5.14.0 - 2026-09-17
 
 ### Added
 
-- `warlock add bull-board` installs `@bull-board/api` and `@bull-board/fastify`, and adds a `dashboard: { enabled: true, path: "/admin/queues", middleware: [] }` block to `src/config/queue.ts`, idempotently. Fails with a clear message ("run `warlock add queue` first") when `@warlock.js/queue` is not yet installed, rather than auto-installing it.
-- `middleware.cache(opts)` accepts a `tags` option — a static `string[]` or a function of the request — mirroring `route.cache.tags` on `@warlock.js/web`'s page cache. A tagged cached response is now evicted by `cache.tags([...]).invalidate()` from `@warlock.js/cache`, the same mechanism that already invalidates cached pages. Untagged responses are unaffected — `tags` is opt-in and their write path is unchanged.
+- `warlock add bull-board` installs the Bull Board packages and writes a `dashboard` block to `src/config/queue.ts`; it adds the queue feature first when it is missing.
+- `middleware.cache({ tags })`: cached API responses can be tagged and are evicted by `cache.tags([...]).invalidate()`, like cached pages.
 
 ### Fixed
 
-- **`warlock dev` now checks that esbuild's native binary is installed before it starts**, as `warlock build` already did. A missing or unlinked binary now fails immediately with `EsbuildBinaryMissingError`, which names the cause and the fix, instead of an opaque error from deep in the transpile path.
+- `warlock dev` checks esbuild's native binary before starting and fails with `EsbuildBinaryMissingError` naming the fix (`warlock build` already did).
+- `devServer.timings`: the `watcher` phase always reported 0ms on Windows and Linux; it now measures the real settle time.
+- `warlock add` writes connector arrays formatted like Prettier (`[queueConnector(), webConnector()]`), including empty and multi-line arrays.
 
 ## 5.13.0 - 2026-09-17
 
