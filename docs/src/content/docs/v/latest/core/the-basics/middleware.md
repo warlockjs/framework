@@ -227,7 +227,7 @@ middleware.maxBodySize("2mb");
 | `middleware.idempotency()`                | Dedupe writes by `Idempotency-Key`; same key + same body → cached replay   | 422 on conflict        |
 | `middleware.maintenance()`                | App-wide 503 toggle via `http.maintenance.enabled` (with allowlist bypass) | 503 + `Retry-After`    |
 | `middleware.ipFilter({ allow })`          | Allowlist / denylist by client IP, IPv4 CIDRs supported, fail-closed       | 403                    |
-| `middleware.cache(opts)`                  | Cache + replay successful JSON responses                                   | n/a                    |
+| `middleware.cache(opts)`                  | Cache + replay successful JSON responses; `tags` opts into `cache.tags([...]).invalidate()` eviction | n/a                    |
 
 Composed example — a tight cap on logins, a concurrency cap + idempotency on AI calls:
 
