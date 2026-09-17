@@ -570,7 +570,7 @@ A handler that throws is logged and swallowed — the other handlers for the sam
 
 ---
 name: queue-notifications
-description: "Send notifications asynchronously through the herald backend or the BullMQ adapter. Configure a QueueDispatcher in config/notifications.ts, then use notif.queue(to, data, options?) to enqueue rendered jobs. Herald uses heraldQueue() and startNotificationsWorker(); queueNotificationDispatcher() from @warlock.js/queue/notifications uses BullMQ, supports retries, and honours SendOptions.delay. Without a queue configured, .queue() rejects NoQueueDispatcherError. Triggers: heraldQueue, startNotificationsWorker, queueNotificationDispatcher, QueueDispatcher, .queue(, async notifications, queue notifications, notification worker, background notifications, notifications.dispatch. Skip: synchronous sends - @warlock.js/notifications/define-notification/SKILL.md; herald itself - @warlock.js/herald/*."
+description: "Send notifications asynchronously through the herald backend or the BullMQ driver. Configure a QueueDispatcher in config/notifications.ts, then use notif.queue(to, data, options?) to enqueue rendered jobs. Herald uses heraldQueue() and startNotificationsWorker(); bullmqQueue({ attempts, backoff }) from @warlock.js/notifications uses BullMQ (lazy-loading the optional @warlock.js/queue peer), supports retries, and honours SendOptions.delay. Without a queue configured, .queue() rejects NoQueueDispatcherError. Triggers: heraldQueue, bullmqQueue, startNotificationsWorker, QueueDispatcher, .queue(, async notifications, queue notifications, notification worker, background notifications, notifications.dispatch. Skip: synchronous sends - @warlock.js/notifications/define-notification/SKILL.md; herald itself - @warlock.js/herald/*."
 ---
 
 # Queue notifications (async)
@@ -603,24 +603,31 @@ if that package is missing, the first `.queue()` throws an install message.
 
 ## Use BullMQ for delayed or retried delivery
 
-With `@warlock.js/queue` configured, use its notification dispatcher instead
-of the herald dispatcher:
+Use the `bullmq` driver instead of the herald dispatcher — it ships inside
+`@warlock.js/notifications` itself and lazy-loads `@warlock.js/queue` (an
+OPTIONAL peer) the first time `.queue()` runs:
 
 ```ts title="src/config/notifications.ts"
-import { type NotificationConfig, mailChannel } from "@warlock.js/notifications";
-import { queueNotificationDispatcher } from "@warlock.js/queue/notifications";
+import { type NotificationConfig, bullmqQueue, mailChannel } from "@warlock.js/notifications";
 
 const config: NotificationConfig = {
   channels: { mail: mailChannel() },
-  queue: queueNotificationDispatcher({ attempts: 3 }),
+  queue: bullmqQueue({ attempts: 3, backoff: { type: "exponential", delay: 5000 } }),
 };
 
 export default config;
 ```
 
-The BullMQ adapter honours `SendOptions.delay`: numeric delays are seconds and
+The BullMQ driver honours `SendOptions.delay`: numeric delays are seconds and
 string delays use the normal duration syntax, such as `"10m"`. It also supports
-BullMQ retries through `attempts` and `backoff`.
+BullMQ retries through `attempts` and `backoff`. If `@warlock.js/queue` isn't
+installed, the first `.queue()` throws `QueuePackageNotInstalledError` naming
+`warlock add queue`.
+
+> **Deprecated:** `queueNotificationDispatcher` from
+> `@warlock.js/queue/notifications` still works for this release (it logs a
+> one-time deprecation warning) and is removed next release. Migrate to
+> `bullmqQueue` above — same option names (`queue`, `attempts`, `backoff`).
 
 ## Run the herald worker
 
