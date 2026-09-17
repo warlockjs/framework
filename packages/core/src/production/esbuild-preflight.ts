@@ -1,4 +1,7 @@
 import esbuild from "esbuild";
+import { EsbuildBinaryMissingError } from "../errors/esbuild-binary-missing-error";
+
+export { EsbuildBinaryMissingError };
 
 /**
  * The exact substring esbuild's own loader throws when the platform-specific
@@ -13,34 +16,42 @@ import esbuild from "esbuild";
 const UNLINKED_BINARY_SIGNATURE = "could not be found, and is needed by esbuild";
 
 /**
- * Fail fast, before bundling, when esbuild's native binary is not linked.
- *
- * Runs a single trivial `transformSync` call — the cheapest operation that
- * forces esbuild to resolve its platform binary — so it adds no measurable
- * delay to `warlock build`. Only called from the production build path;
- * never from `warlock dev`.
- *
- * A healthy esbuild install is a no-op. A binary genuinely missing because
- * pnpm blocked its postinstall script is turned into a message that names
- * the cause and the fix. Any other failure (a real syntax error, a platform
- * mismatch, …) is rethrown unchanged — this preflight only owns the one
- * known failure mode.
+ * A cheap operation that forces esbuild to resolve and invoke its platform
+ * binary. Injectable so tests can simulate a missing binary without deleting
+ * anything from a real install.
  */
-export function assertEsbuildBinaryIsLinked(): void {
+export type EsbuildProbe = () => void;
+
+/**
+ * The default probe: a trivial `transformSync` call. Trivial input keeps the
+ * cost negligible while still forcing esbuild to resolve and run its native
+ * binary, which is the only way an unlinked binary actually surfaces.
+ */
+function runDefaultProbe(): void {
+  esbuild.transformSync("", { loader: "js" });
+}
+
+/**
+ * Fail fast, before dev or build does any other work, when esbuild's native
+ * binary is not linked.
+ *
+ * A healthy esbuild install is a no-op. A binary genuinely missing — because
+ * a platform package was never installed, or a package manager blocked its
+ * postinstall script — is turned into {@link EsbuildBinaryMissingError}, a
+ * message that names the cause and the fix. Any other failure (a real syntax
+ * error, an unrelated platform mismatch, …) is rethrown unchanged — this
+ * preflight only owns the one known failure mode.
+ *
+ * @param probe Overrides the default `esbuild.transformSync` invocation.
+ * Intended for tests only.
+ * @throws {EsbuildBinaryMissingError} when the platform binary is missing or unlinked.
+ */
+export function assertEsbuildBinaryIsLinked(probe: EsbuildProbe = runDefaultProbe): void {
   try {
-    esbuild.transformSync("", { loader: "js" });
+    probe();
   } catch (error) {
     if (isUnlinkedBinaryError(error)) {
-      throw new Error(
-        "esbuild's native binary is not installed for this platform, so " +
-          "`warlock build` cannot bundle.\n\n" +
-          "This usually happens when pnpm's build-script approval gate " +
-          "blocked esbuild's postinstall script, so the platform binary " +
-          "was never linked. Fix it with:\n\n" +
-          "  pnpm approve-builds\n\n" +
-          "then reinstall, or reinstall dependencies with build scripts " +
-          "enabled if esbuild was excluded on purpose.",
-      );
+      throw new EsbuildBinaryMissingError({ cause: error });
     }
 
     throw error;

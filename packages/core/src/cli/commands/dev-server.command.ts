@@ -1,6 +1,7 @@
 import { checkForFrameworkUpdate } from "../../dev-server/check-for-updates";
 import { startDevelopmentServer } from "../../dev-server/start-development-server";
 import { isDevWorker, superviseDevServer } from "../../dev-server/supervisor";
+import { assertEsbuildBinaryIsLinked } from "../../production/esbuild-preflight";
 import { command } from "../../commands/cli-command";
 import { displayStartupBanner } from "../cli-commands.utils";
 
@@ -26,6 +27,11 @@ export const devServerCommand = command({
     connectors: true,
   },
   preAction: async () => {
+    // Fail before either role (supervisor or worker) does any other work —
+    // a missing/unlinked esbuild binary would otherwise surface much later
+    // as an opaque low-level error from deep inside the transpile path.
+    assertEsbuildBinaryIsLinked();
+
     // Two roles share this command. The first `warlock dev` becomes a thin
     // supervisor that owns the terminal and (re)spawns the real server; the
     // process it spawns carries WARLOCK_DEV_WORKER and falls through to the
