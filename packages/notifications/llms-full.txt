@@ -570,85 +570,106 @@ A handler that throws is logged and swallowed — the other handlers for the sam
 
 ---
 name: queue-notifications
-description: 'Send notifications asynchronously via the herald-backed queue. `heraldQueue({ channel?, broker? })` is a `QueueDispatcher` you add to the `queue` slot of the declarative `config/notifications.ts` (the connector registers it at boot); then `notif.queue(to, data, options?)` / `notify` publish a rendered job instead of sending inline. `startNotificationsWorker({ channel?, broker? })` runs the consumer (in a worker or the web process) that pulls jobs and runs `channel.send`. Both lazy-import `@warlock.js/herald` (optional peer) — a missing package throws a curated install message at use time. `defineNotification` renders payloads + resolves routes BEFORE queuing, so the job (`{ channel, route, payload, options }`) is fully serializable — no model re-hydration. Without a queue configured, `.queue()` rejects `NoQueueDispatcherError`. Triggers: `heraldQueue`, `startNotificationsWorker`, `QueueDispatcher`, `.queue(`, "async notifications", "queue notifications", "notification worker", "background notifications", `notifications.dispatch`; typical import `import { heraldQueue, startNotificationsWorker } from "@warlock.js/notifications"`. Skip: synchronous sends — `@warlock.js/notifications/define-notification/SKILL.md`; herald itself — `@warlock.js/herald/*`.'
+description: "Send notifications asynchronously through the herald backend or the BullMQ adapter. Configure a QueueDispatcher in config/notifications.ts, then use notif.queue(to, data, options?) to enqueue rendered jobs. Herald uses heraldQueue() and startNotificationsWorker(); queueNotificationDispatcher() from @warlock.js/queue/notifications uses BullMQ, supports retries, and honours SendOptions.delay. Without a queue configured, .queue() rejects NoQueueDispatcherError. Triggers: heraldQueue, startNotificationsWorker, queueNotificationDispatcher, QueueDispatcher, .queue(, async notifications, queue notifications, notification worker, background notifications, notifications.dispatch. Skip: synchronous sends - @warlock.js/notifications/define-notification/SKILL.md; herald itself - @warlock.js/herald/*."
 ---
 
 # Queue notifications (async)
 
-Move slow channels (SMTP, HTTP) off the request path. `.queue()` publishes a
-rendered job to herald; a worker delivers it.
+Move slow channels (SMTP, HTTP) off the request path. `.queue()` renders the
+payload and resolves the route before passing a serializable job to a dispatcher.
 
-## Wire the dispatcher
+## Wire the herald dispatcher
 
 ```ts title="src/config/notifications.ts"
-import { type NotificationConfig, heraldQueue, inApp, mailChannel } from "@warlock.js/notifications";
+import {
+  type NotificationConfig,
+  heraldQueue,
+  inApp,
+  mailChannel,
+} from "@warlock.js/notifications";
 import { Notification } from "app/notifications/notification.model";
 
 const config: NotificationConfig = {
   channels: { mail: mailChannel(), database: inApp.configure({ model: Notification }) },
-  queue: heraldQueue(), // → `.queue()` now works
+  queue: heraldQueue(),
 };
 
-export default config; // the notifications connector registers it at boot
+export default config;
 ```
 
-`heraldQueue({ channel?, broker? })` publishes to `"notifications.dispatch"` on
-the default broker unless overridden. It lazy-imports `@warlock.js/herald`; if
-that package isn't installed, the first `.queue()` throws an install message.
+`heraldQueue({ channel?, broker? })` publishes to `"notifications.dispatch"`
+on the default broker unless overridden. It lazy-imports `@warlock.js/herald`;
+if that package is missing, the first `.queue()` throws an install message.
 
-Without `queue` configured, `.queue()` rejects `NoQueueDispatcherError` — a loud
-config error, not a silent no-op.
+## Use BullMQ for delayed or retried delivery
 
-## Run the worker
+With `@warlock.js/queue` configured, use its notification dispatcher instead
+of the herald dispatcher:
 
-In a worker entrypoint (or the web process), after the config + the herald
-broker are up:
+```ts title="src/config/notifications.ts"
+import { type NotificationConfig, mailChannel } from "@warlock.js/notifications";
+import { queueNotificationDispatcher } from "@warlock.js/queue/notifications";
+
+const config: NotificationConfig = {
+  channels: { mail: mailChannel() },
+  queue: queueNotificationDispatcher({ attempts: 3 }),
+};
+
+export default config;
+```
+
+The BullMQ adapter honours `SendOptions.delay`: numeric delays are seconds and
+string delays use the normal duration syntax, such as `"10m"`. It also supports
+BullMQ retries through `attempts` and `backoff`.
+
+## Run the herald worker
+
+In a worker entrypoint (or the web process), after the config and herald broker
+are up:
 
 ```ts
 import { startNotificationsWorker } from "@warlock.js/notifications";
 
-await startNotificationsWorker(); // subscribes to "notifications.dispatch"
+await startNotificationsWorker();
 ```
 
-The worker pulls each job, looks the channel up by name, and runs
-`channel.send({ payload, route, options })`. The job carries an
-ALREADY-RENDERED payload + resolved route (rendering happens at enqueue), so the
-worker needs no recipient model.
+The worker looks up the channel by name and runs
+`channel.send({ payload, route, options })`. The worker needs no recipient model
+because rendering happened at enqueue time.
 
 ## Send
 
 ```ts
-await orderShipped.queue(user, { order });               // async
+await orderShipped.queue(user, { order });
 await orderShipped.queue(buyers, { order }, { delay: "10m" });
-await notify.mail(user, payload, { /* sync — notify.* doesn't queue */ });
+await notify.mail(user, payload, {/* synchronous - notify.* does not queue */});
 ```
 
-`.queue()` renders synchronously then enqueues. Fan-out renders per recipient
-and enqueues one job each.
+`.queue()` renders per recipient and enqueues one job per recipient. Without a
+configured dispatcher, it rejects `NoQueueDispatcherError`.
 
 ## Idempotency
 
-Pass `idempotencyKey` so a redelivered/retried job doesn't create a duplicate
-in-app row — `createFor` find-or-creates on the key.
+Pass `idempotencyKey` so a redelivered or retried job does not create a duplicate
+in-app row. `createFor` finds or creates the row by that key.
 
 ```ts
 await orderShipped.queue(user, { order }, { idempotencyKey: `ship:${order.id}` });
 ```
 
-## Phase notes / current limits
+## Current limits
 
-- **`delay` is carried on the job but not yet honored** — the worker delivers
-  immediately. Delay-aware delivery lands with a scheduled worker.
-- **No retry / dead-letter yet** — a failed `channel.send` is logged + acked
-  (no poison-message loop). DLQ handling is a follow-up.
-- Rate-limit budget is consumed at ENQUEUE time for queued sends (see
-  `RateLimiter` docstring).
+- With the herald backend, `delay` is carried on the job but not honoured; the
+  worker delivers immediately. Use the BullMQ adapter for delayed delivery.
+- Herald has no retry or dead-letter handling yet; failed `channel.send` calls
+  are logged and acknowledged.
+- Rate-limit budget is consumed at enqueue time for queued sends.
 
 ## See also
 
-- [`define-notification/SKILL.md`](../define-notification/SKILL.md) — `.queue()` on a defined notification.
-- [`configure-notifications/SKILL.md`](../configure-notifications/SKILL.md) — the `queue` config slot.
-- [`@warlock.js/herald/herald-basics/SKILL.md`](../../../herald/skills/herald-basics/SKILL.md) — connecting the broker.
+- [`define-notification/SKILL.md`](../define-notification/SKILL.md) - `.queue()` on a defined notification.
+- [`configure-notifications/SKILL.md`](../configure-notifications/SKILL.md) - the `queue` config slot.
+- [`@warlock.js/herald/herald-basics/SKILL.md`](../../../herald/skills/herald-basics/SKILL.md) - connecting the broker.
 
 
 ## send-ad-hoc  `@warlock.js/notifications/send-ad-hoc/SKILL.md`
