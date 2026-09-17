@@ -2,6 +2,7 @@ import { colors } from "@mongez/copper";
 import { ensureDirectoryAsync, fileExistsAsync, getFileAsync, putFileAsync } from "@warlock.js/fs";
 import type { CommandActionData } from "../../commands/types";
 import { rootPath, srcPath } from "../../utils";
+import { insertConnectorEntry } from "./shared/insert-connector-entry";
 import { relocateConflictingHomeRoute } from "./shared/relocate-conflicting-home-route";
 import { resolveContactScaffold } from "./shared/resolve-contact-scaffold";
 import {
@@ -57,8 +58,14 @@ async function registerWebConnector(): Promise<void> {
 
   // An existing `connectors: [` gains one entry; otherwise the key is added to
   // the object `defineConfig` receives.
-  if (/connectors:\s*\[/.test(next)) {
-    next = next.replace(/connectors:\s*\[/, "connectors: [webConnector(),");
+  const insertion = insertConnectorEntry(next, "webConnector()");
+
+  if (insertion.status === "already-present") {
+    return;
+  }
+
+  if (insertion.status === "added") {
+    next = insertion.next;
   } else if (next.includes("defineConfig({")) {
     next = next.replace("defineConfig({", "defineConfig({\n  connectors: [webConnector()],");
   } else {

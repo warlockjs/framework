@@ -1,6 +1,7 @@
 import { colors } from "@mongez/copper";
 import { fileExistsAsync, getFileAsync, putFileAsync } from "@warlock.js/fs";
 import { rootPath } from "../../utils";
+import { insertConnectorEntry } from "./shared/insert-connector-entry";
 import { type FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
 
 const queueConfigStub = `import { env } from "@warlock.js/core";
@@ -51,8 +52,14 @@ async function registerQueueConnector(): Promise<void> {
   const importLine = 'import { queueConnector } from "@warlock.js/queue";';
   let next = current.includes(importLine) ? current : `${importLine}\n${current}`;
 
-  if (/connectors:\s*\[/.test(next)) {
-    next = next.replace(/connectors:\s*\[/, "connectors: [queueConnector(),");
+  const insertion = insertConnectorEntry(next, "queueConnector()");
+
+  if (insertion.status === "already-present") {
+    return;
+  }
+
+  if (insertion.status === "added") {
+    next = insertion.next;
   } else if (next.includes("defineConfig({")) {
     next = next.replace("defineConfig({", "defineConfig({\n  connectors: [queueConnector()],\n");
   } else {
