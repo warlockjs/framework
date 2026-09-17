@@ -10,6 +10,7 @@ import { aiWorkspaceFeature } from "./ai-workspace.feature";
 import { aiFeature } from "./ai.feature";
 import { authGoogleFeature } from "./auth-google.feature";
 import { authPasskeysFeature } from "./auth-passkeys.feature";
+import { bullBoardFeature } from "./bull-board.feature";
 import { heraldFeature } from "./herald.feature";
 import { imageFeature } from "./image.feature";
 import { mailFeature } from "./mail.feature";
@@ -67,6 +68,10 @@ export const featuresMap: Record<string, FeatureDefinition> = {
   shadcn: shadcnFeature,
   herald: heraldFeature,
   queue: queueFeature,
+  // Directly after `queue`, for the same reason `tailwind` follows `web`: it
+  // needs queue already installed and configured, and a reader scanning
+  // `--list` for job-queue features should meet the two together.
+  "bull-board": bullBoardFeature,
   socket: socketFeature,
   notifications: notificationsFeature,
   access: accessFeature,

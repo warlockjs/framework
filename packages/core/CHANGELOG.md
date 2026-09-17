@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+### Added
+
+- `warlock add bull-board` installs `@bull-board/api` and `@bull-board/fastify`, and adds a `dashboard: { enabled: true, path: "/admin/queues", middleware: [] }` block to `src/config/queue.ts`, idempotently. Fails with a clear message ("run `warlock add queue` first") when `@warlock.js/queue` is not yet installed, rather than auto-installing it.
+
 ### Fixed
 
 - **`warlock dev` now checks that esbuild's native binary is installed before it starts**, as `warlock build` already did. A missing or unlinked binary now fails immediately with `EsbuildBinaryMissingError`, which names the cause and the fix, instead of an opaque error from deep in the transpile path.
