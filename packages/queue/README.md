@@ -90,16 +90,25 @@ await retryFailedJob("invoice:43");
 
 ## Notifications
 
+Vendor integrations live as lazy drivers inside the feature package now:
+configure the BullMQ driver from `@warlock.js/notifications` itself.
+
 ```ts title="src/config/notifications.ts"
-import { queueNotificationDispatcher } from "@warlock.js/queue/notifications";
+import { bullmqQueue } from "@warlock.js/notifications";
 
 const config: NotificationConfig = {
   channels: { mail: mailChannel() },
-  queue: queueNotificationDispatcher({ attempts: 3 }),
+  queue: bullmqQueue({ attempts: 3 }),
 };
 ```
 
 `.queue()` notifications now go through BullMQ. `SendOptions.delay` is honoured.
+`@warlock.js/queue` is dynamically imported the first time `.queue()` runs —
+notifications never pays for it unless `bullmqQueue()` is configured.
+
+> **Deprecated:** `queueNotificationDispatcher` from `@warlock.js/queue/notifications`
+> still works for this release (it logs a one-time deprecation warning) and is
+> removed in the next one. Switch to `bullmqQueue` above.
 
 ## Dashboard (optional)
 

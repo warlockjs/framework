@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+### Deprecated
+
+- `@warlock.js/queue/notifications`'s `queueNotificationDispatcher()` is deprecated — vendor integrations now live as lazy drivers inside the feature package. Use `bullmqQueue()` from `@warlock.js/notifications` instead (same options: `queue`, `attempts`, `backoff`). `queueNotificationDispatcher()` still works for this release and logs a one-time deprecation warning; it is removed in the next release, along with the now-optional `@warlock.js/notifications` peer dependency that exists only to support it.
+
 ### Fixed
 
 - `find(id)` could return an inconsistent snapshot when a job finished between the internal state read and the job data read — e.g. `state: "completed"` alongside a `null` `result`, `attemptsMade: 0`, and no `finishedAt`. The job's state is now read first, then the job is re-fetched, so the returned fields are consistent with the reported state.

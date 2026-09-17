@@ -10,6 +10,7 @@
  * Notifications itself has no dependency on this package.
  */
 import { getNotificationConfig, type QueueDispatcher } from "@warlock.js/notifications";
+import { log } from "@warlock.js/logger";
 import { UnrecoverableError } from "bullmq";
 import { defineJob } from "../define-job";
 import { toMilliseconds } from "../duration";
@@ -39,6 +40,14 @@ export type QueueNotificationDispatcherOptions = {
  * - A channel missing from the worker's notifications config fails at once,
  *   without retries.
  *
+ * @deprecated Import `bullmqQueue` from `@warlock.js/notifications` instead —
+ * vendor integrations now live as lazy drivers inside the feature package:
+ *
+ *   queue: bullmqQueue({ attempts: 3, backoff: { type: "exponential", delay: 5000 } })
+ *
+ * This subpath keeps working for one release and then goes away. See the
+ * queue CHANGELOG.
+ *
  * @example src/config/notifications.ts
  * import { queueNotificationDispatcher } from "@warlock.js/queue/notifications";
  *
@@ -50,6 +59,7 @@ export type QueueNotificationDispatcherOptions = {
 export function queueNotificationDispatcher(
   options: QueueNotificationDispatcherOptions = {},
 ): QueueDispatcher {
+  warnDeprecatedOnce();
   const deliver = defineNotificationJob(options);
 
   return {
@@ -89,4 +99,30 @@ function defineNotificationJob(
 
 function notificationDelay(delay: number | string): Duration {
   return typeof delay === "number" ? delay * 1_000 : toMilliseconds(delay);
+}
+
+let warnedDeprecated = false;
+
+/**
+ * Warn once per process that `@warlock.js/queue/notifications` is deprecated
+ * in favour of `bullmqQueue` from `@warlock.js/notifications`. Kept thin —
+ * this file still owns the actual dispatch logic (delegating to notifications
+ * would create a runtime import cycle: notifications' `bullmqQueue` lazily
+ * imports `@warlock.js/queue`, which this file already statically imports
+ * `@warlock.js/notifications` from).
+ */
+function warnDeprecatedOnce(): void {
+  if (warnedDeprecated) {
+    return;
+  }
+
+  warnedDeprecated = true;
+  log.warn(
+    "queue",
+    "notifications.deprecated",
+    '"queueNotificationDispatcher" from "@warlock.js/queue/notifications" is deprecated and will be ' +
+      "removed in the next release. Use the notifications-owned driver instead: " +
+      'import { bullmqQueue } from "@warlock.js/notifications"; ' +
+      'queue: bullmqQueue({ attempts, backoff })',
+  );
 }
