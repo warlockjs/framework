@@ -32,7 +32,7 @@ describe("insertQueueDashboardBlock", () => {
     expect(result.status).toBe("added");
     expect(result).toMatchObject({
       next: expect.stringContaining(
-        '  dashboard: { enabled: true, path: "/admin/queues", middleware: [] },\n};',
+        '  dashboard: { enabled: process.env.NODE_ENV !== "production", path: "/admin/queues", middleware: [] },\n};',
       ),
     });
   });

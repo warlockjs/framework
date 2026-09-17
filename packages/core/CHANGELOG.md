@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- `warlock add bull-board` installs the Bull Board packages and writes a `dashboard` block to `src/config/queue.ts`; it adds the queue feature first when it is missing.
+- `warlock add bull-board` installs the Bull Board packages and writes a `dashboard` block to `src/config/queue.ts`; it adds the queue feature first when it is missing. The generated block enables the dashboard outside production only, since an unguarded dashboard refuses to mount in production.
 - `middleware.cache({ tags })`: cached API responses can be tagged and are evicted by `cache.tags([...]).invalidate()`, like cached pages.
 
 ### Fixed

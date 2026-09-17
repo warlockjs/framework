@@ -5,7 +5,16 @@ export type DashboardBlockInsertion =
   | { status: "unrecognised" };
 
 /** The property this module inserts into `src/config/queue.ts`'s `queueConfig` object. */
-const DASHBOARD_BLOCK = '  dashboard: { enabled: true, path: "/admin/queues", middleware: [] },\n';
+/**
+ * Enabled outside production only, because the dashboard can retry and delete
+ * jobs: `queueConnector()` refuses to mount it in production with an empty
+ * `middleware` list. A flat `enabled: true` would therefore stop a freshly
+ * generated app from starting in production at all — add a guard middleware,
+ * then enable it everywhere.
+ */
+const DASHBOARD_BLOCK =
+  "  // Add a guard middleware, then enable this in production too.\n" +
+  '  dashboard: { enabled: process.env.NODE_ENV !== "production", path: "/admin/queues", middleware: [] },\n';
 
 /**
  * Insert the `dashboard` property into the `queueConfig` object literal of

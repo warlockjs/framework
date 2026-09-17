@@ -55,7 +55,7 @@ describe("add bull-board", () => {
 
     expect(process.exitCode).toBeUndefined();
     expect(configText).toContain(
-      '  dashboard: { enabled: true, path: "/admin/queues", middleware: [] },\n};',
+      '  dashboard: { enabled: process.env.NODE_ENV !== "production", path: "/admin/queues", middleware: [] },\n};',
     );
   });
 
