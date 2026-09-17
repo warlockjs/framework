@@ -14,11 +14,6 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
-    },
-    "./notifications": {
-      "types": "./src/notifications/index.ts",
-      "import": "./src/notifications/index.ts",
-      "default": "./src/notifications/index.ts"
     }
   },
   "scripts": {
@@ -34,17 +29,13 @@
     "@bull-board/api": "^9.0.0",
     "@bull-board/fastify": "^9.0.0",
     "@warlock.js/core": "5.14.0",
-    "@warlock.js/logger": "5.14.0",
-    "@warlock.js/notifications": "5.14.0"
+    "@warlock.js/logger": "5.14.0"
   },
   "peerDependenciesMeta": {
     "@bull-board/api": {
       "optional": true
     },
     "@bull-board/fastify": {
-      "optional": true
-    },
-    "@warlock.js/notifications": {
       "optional": true
     }
   },
@@ -56,7 +47,6 @@
     "@warlock.js/cascade": "workspace:^",
     "@warlock.js/core": "workspace:^",
     "@warlock.js/logger": "workspace:^",
-    "@warlock.js/notifications": "workspace:^",
     "fastify": "^5.6.2",
     "typescript": "^5.9.3",
     "vitest": "4.1.10"

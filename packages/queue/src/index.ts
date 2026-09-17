@@ -1,8 +1,5 @@
 /**
  * `@warlock.js/queue` — durable background jobs on BullMQ + Redis.
- *
- * The notifications adapter lives on the `@warlock.js/queue/notifications`
- * subpath so this barrel never loads `@warlock.js/notifications`.
  */
 export * from "./config";
 export * from "./dashboard";

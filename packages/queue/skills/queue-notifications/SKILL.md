@@ -33,4 +33,3 @@ await orderShipped.queue(user, { order }, { delay: "10m" }); // delivered in 10 
 - Channel not configured in the worker → fails at once, no retries.
 - Deliveries run under the job name `warlock.notifications.deliver`.
 
-> **Deprecated:** `queueNotificationDispatcher` from `@warlock.js/queue/notifications` still works this release (it logs a one-time deprecation warning) and is removed next release. Migrate to `bullmqQueue` above — same option names (`queue`, `attempts`, `backoff`).

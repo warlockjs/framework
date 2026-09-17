@@ -106,9 +106,6 @@ const config: NotificationConfig = {
 `@warlock.js/queue` is dynamically imported the first time `.queue()` runs —
 notifications never pays for it unless `bullmqQueue()` is configured.
 
-> **Deprecated:** `queueNotificationDispatcher` from `@warlock.js/queue/notifications`
-> still works for this release (it logs a one-time deprecation warning) and is
-> removed in the next one. Switch to `bullmqQueue` above.
 
 ## Dashboard (optional)
 
