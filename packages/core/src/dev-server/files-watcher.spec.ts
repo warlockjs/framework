@@ -51,7 +51,7 @@ vi.mock("../utils", () => ({
   srcPath: () => SRC_DIR,
 }));
 
-const { FilesWatcher } = await import("./files-watcher");
+import { FilesWatcher } from "./files-watcher";
 
 describe("FilesWatcher — watcher-settle timing (devServer.timings on)", () => {
   afterEach(() => {
