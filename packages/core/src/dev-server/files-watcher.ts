@@ -1,6 +1,7 @@
 import events from "@mongez/events";
 import { Random } from "@mongez/reinforcements";
 import chokidar from "chokidar";
+import nodePath from "node:path";
 import { rootPath, srcPath } from "../utils";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 import { Path } from "../utils/normalized-path";
@@ -115,8 +116,18 @@ export class FilesWatcher {
     });
 
     if (timingsEnabled) {
-      watcher.on("raw", (_event, path) => {
-        const normalized = Path.normalize(path);
+      watcher.on("raw", (_event, evPath, details) => {
+        // On the native (non-fsevents) handler chokidar uses on Windows/Linux,
+        // `evPath` is only the changed entry's path *relative to the watched
+        // directory* (see chokidar's `handler.js` `handleEvent`/`emitRaw`),
+        // not the absolute path the later `add`/`change` event carries. Only
+        // fsevents (macOS) hands back an already-absolute path. Reconstruct
+        // the absolute path from `details.watchedPath` so the timestamp is
+        // keyed the same way the stabilised event looks it up below —
+        // otherwise the lookup always misses and the phase silently reads 0.
+        const watchedPath = (details as { watchedPath?: string } | undefined)?.watchedPath;
+        const absolutePath = watchedPath ? nodePath.resolve(watchedPath, evPath) : evPath;
+        const normalized = Path.normalize(absolutePath);
         if (!this.rawEventTimestamps.has(normalized)) {
           this.rawEventTimestamps.set(normalized, performance.now());
         }
@@ -152,7 +163,15 @@ export class FilesWatcher {
       this.rawEventTimestamps.delete(normalized);
     }
 
-    events.trigger(`file-watcher.${this.id}.${event}`, normalized, error, settleMs);
+    // `error` and `settleMs` share the same second-argument slot: an error
+    // event's subscriber reads it as `Error`, every other event's subscriber
+    // reads it as the watcher-settle duration (see the `On*Callback` types
+    // above). Passing both positionally (`normalized, error, settleMs`) used
+    // to leave `settleMs` in an unread third slot, so every change/add/delete
+    // subscriber always received `undefined` in its `settleMs` parameter —
+    // the watcher phase's timing was silently discarded here even when the
+    // raw-event timestamp above resolved correctly.
+    events.trigger(`file-watcher.${this.id}.${event}`, normalized, error ?? settleMs);
   }
 
   /**
