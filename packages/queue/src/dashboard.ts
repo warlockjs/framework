@@ -1,4 +1,6 @@
+import type { Middleware } from "@warlock.js/core";
 import { defaultQueueName } from "./config";
+import { buildDashboardGuardPlugin } from "./dashboard-guard-plugin";
 import { QueueDashboardDependencyError } from "./errors";
 import { queueOf, registeredJobs } from "./job-registry";
 import { getQueue } from "./queue-manager";
@@ -16,6 +18,12 @@ export type QueueDashboardOptions = {
   basePath?: string;
   /** Queues to show. Default: every queue with a defined job, plus the default queue. */
   queues?: string[];
+  /**
+   * Run before every dashboard route. Applied via a wrapping Fastify plugin
+   * scope, since bull-board's own plugin has no hook to splice Warlock
+   * middleware into — see `dashboard-guard-plugin.ts`.
+   */
+  middleware?: Middleware[];
 };
 
 type BullBoardModules = {
@@ -57,7 +65,9 @@ export async function queueDashboard(
     serverAdapter,
   });
 
-  await server.register(serverAdapter.registerPlugin() as never, { prefix: basePath });
+  const guardedPlugin = buildDashboardGuardPlugin(options.middleware ?? [], serverAdapter.registerPlugin());
+
+  await server.register(guardedPlugin as never, { prefix: basePath });
 }
 
 /**

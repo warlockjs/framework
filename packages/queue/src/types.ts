@@ -1,3 +1,4 @@
+import type { Middleware } from "@warlock.js/core";
 import type { ConnectionOptions } from "bullmq";
 
 /** Units accepted in a {@link Duration} string. */
@@ -62,6 +63,24 @@ export type QueueWorkersConfig = {
 };
 
 /**
+ * The bull-board dashboard, mounted automatically by `queueConnector()` when
+ * `enabled` is `true`. Equivalent to calling `queueDashboard()` yourself at
+ * boot, driven by config instead — see `warlock add bull-board`.
+ */
+export type QueueDashboardConfig = {
+  /** Mount the dashboard at boot. Default `false`. */
+  enabled?: boolean;
+  /** URL path the dashboard is mounted on. Default `"/admin/queues"`. */
+  path?: string;
+  /**
+   * Run before every dashboard route — this is how the dashboard is guarded.
+   * The dashboard can retry and delete jobs, so `NODE_ENV === "production"`
+   * with an empty list throws `QueueDashboardUnguardedError` at boot.
+   */
+  middleware?: Middleware[];
+};
+
+/**
  * The `queue` configuration key — `src/config/queue.ts`.
  */
 export type QueueConfig = {
@@ -78,6 +97,8 @@ export type QueueConfig = {
   defaultJobOptions?: JobOptions;
   /** In-process workers. */
   workers?: QueueWorkersConfig;
+  /** The bull-board job dashboard. */
+  dashboard?: QueueDashboardConfig;
 };
 
 /** A progress value: a number (e.g. a percentage) or a JSON object. */

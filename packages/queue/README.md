@@ -113,17 +113,47 @@ notifications never pays for it unless `bullmqQueue()` is configured.
 ## Dashboard (optional)
 
 ```sh
-npm install @bull-board/api @bull-board/fastify
+warlock add bull-board
 ```
+
+Installs `@bull-board/api` and `@bull-board/fastify` and adds a `dashboard` block to
+`src/config/queue.ts`:
 
 ```ts
-import { getHttpServer } from "@warlock.js/core";
-import { queueDashboard } from "@warlock.js/queue";
+import { middleware } from "@warlock.js/core";
+import { authMiddleware } from "@warlock.js/auth";
+import type { QueueConfig } from "@warlock.js/queue";
 
-await queueDashboard(getHttpServer(), { basePath: "/admin/queues" });
+const queueConfig: QueueConfig = {
+  // ...
+  dashboard: {
+    enabled: true,
+    path: "/admin/queues",
+    // Runs before every dashboard route — the dashboard can retry and delete
+    // jobs, so guard it. An empty list here throws
+    // QueueDashboardUnguardedError at boot when NODE_ENV is "production".
+    middleware: [authMiddleware("admin")],
+  },
+};
+
+export default queueConfig;
 ```
 
-The bull-board packages are loaded only when `queueDashboard` is called. If they are missing it throws `QueueDashboardDependencyError` with the install command. Protect the route yourself; the dashboard can retry and delete jobs.
+`queueConnector()` mounts the dashboard for you at boot, once the HTTP server exists.
+Outside production an empty `middleware` list is allowed — it mounts anyway and logs one
+warning, so local development stays frictionless.
+
+> **Advanced — mounting manually:** `queueDashboard(server, { basePath, middleware, queues })`
+> is still exported for scripts, worker-only processes, or a custom mount point. The
+> bull-board packages are loaded only when it is called; a missing one throws
+> `QueueDashboardDependencyError` with the install command.
+>
+> ```ts
+> import { getHttpServer } from "@warlock.js/core";
+> import { queueDashboard } from "@warlock.js/queue";
+>
+> await queueDashboard(getHttpServer(), { basePath: "/admin/queues", middleware: [authMiddleware("admin")] });
+> ```
 
 ## License
 

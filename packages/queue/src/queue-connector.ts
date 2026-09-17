@@ -9,6 +9,7 @@
 import type { Connector, ConnectorLifecyclePhase } from "@warlock.js/core";
 import { log } from "@warlock.js/logger";
 import { resetQueueConfig, setQueueConfig } from "./config";
+import { mountQueueDashboard } from "./dashboard-boot";
 import { closeQueue, startWorkers } from "./queue-manager";
 import type { QueueConfig } from "./types";
 
@@ -54,7 +55,26 @@ export function queueConnector(options: QueueConnectorOptions = {}): Connector {
     // module stays free of a runtime import of core.
     lifecyclePhase: "late" as ConnectorLifecyclePhase,
     isActive: () => active,
-    boot: () => undefined,
+    /**
+     * Mounts the dashboard, when configured, here rather than in `start()`:
+     * `boot()` runs for every late-phase connector, in priority order, before
+     * any of them `start()`s — so by the time this runs, the HTTP connector
+     * (priority 5, before queue's 11) has already built its Fastify instance
+     * and registered its own plugins, but has not yet called `listen()`.
+     * Fastify refuses new plugin registrations after `listen()`, so this is
+     * the only point in the boot sequence where mounting is possible.
+     */
+    async boot() {
+      const queueConfig = options.config ?? (await readQueueConfig());
+
+      if (!queueConfig?.dashboard?.enabled) {
+        return;
+      }
+
+      const { getHttpServer } = await import("@warlock.js/core");
+
+      await mountQueueDashboard(getHttpServer(), queueConfig);
+    },
     async start() {
       const queueConfig = options.config ?? (await readQueueConfig());
 
