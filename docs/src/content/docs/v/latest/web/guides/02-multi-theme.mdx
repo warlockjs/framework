@@ -1,0 +1,148 @@
+---
+title: Multi-theme / per-tenant themes
+slug: v/latest/web/guides/multi-theme
+description: Serve a different theme per request from one app, with render-blocking CSS for the active theme only and a cache that never mixes tenants.
+sidebar:
+  order: 2
+  label: Multi-theme
+---
+
+Warlock ships no theme engine. What it guarantees, for a theme you pick per
+request (per host or tenant), is: the choice reaches the browser without a
+hydration mismatch, only that theme's CSS is render-blocking in the first
+document, and the server page cache never serves one tenant's theme to
+another.
+
+## 1. Resolve the theme, publish it through `shared`
+
+```ts title="src/web/themes/index.ts"
+import { lazy } from "react";
+
+export const themes = {
+  alpha: lazy(() => import("./alpha/alpha-theme")),
+  beta: lazy(() => import("./beta/beta-theme")),
+};
+
+export type ThemeId = keyof typeof themes;
+
+// App-root-relative source of each theme module, for linkStylesheetsFor().
+export const themeSources: Record<ThemeId, string> = {
+  alpha: "src/web/themes/alpha/alpha-theme.tsx",
+  beta: "src/web/themes/beta/beta-theme.tsx",
+};
+
+declare module "@warlock.js/web" {
+  interface SharedContext {
+    theme: ThemeId;
+  }
+}
+```
+
+```tsx title="src/web/root.tsx"
+import { Head, Scripts, linkStylesheetsFor, shared } from "@warlock.js/web";
+import type { AppProps, HttpContext } from "@warlock.js/web";
+import { themeSources, type ThemeId } from "./themes";
+
+const selectTheme = async ({ request }: HttpContext) => {
+  const theme: ThemeId = String(request.header("host", "")).startsWith("beta.")
+    ? "beta"
+    : "alpha";
+
+  shared.theme = theme;
+  linkStylesheetsFor(request, themeSources[theme]);
+};
+
+export const middleware = [selectTheme];
+```
+
+Each theme imports its own stylesheet (`import "./alpha.css";`) — never an
+inline `<style>` tag.
+
+## 2. Render from the map
+
+```tsx title="src/web/home.page.tsx"
+import { Suspense } from "react";
+import { useShared } from "@warlock.js/web";
+import { themes } from "./themes";
+
+export default function HomePage() {
+  const Theme = themes[useShared().theme];
+
+  return (
+    <Suspense fallback={null}>
+      <Theme />
+    </Suspense>
+  );
+}
+```
+
+- Read the theme from `useShared()` only. Never re-derive it on the client
+  (`location.host`) — the client could then pick a different theme than the
+  one the server rendered.
+- Keep the map static: one literal `import()` per theme. Vite emits one chunk
+  plus one CSS file per theme this way. A computed specifier such as
+  `` import(`./themes/${id}`) `` is not supported.
+
+## 3. CSS: `linkStylesheetsFor(request, sourceFile)`
+
+A lazily imported module is never part of the handler's static CSS chain —
+production never follows `dynamicImports`, because that would ship every
+theme's CSS on every request. Without a declaration, a lazy theme's CSS only
+arrives from client JavaScript, after an unstyled first paint.
+`linkStylesheetsFor(request, sourceFile)` fixes that for this response only,
+called from middleware or a loader:
+
+- `sourceFile` is the module's app-root-relative POSIX path, matching the id
+  the manifest already uses. Absolute paths, a leading `./`, `..` segments,
+  backslashes, or a query throw `InvalidStylesheetSourceError`.
+- Development resolves the file's own CSS imports (and transitive CSS once
+  Vite's module graph is warm). Production reads the Vite manifest. An id
+  with no manifest entry throws `UnknownStylesheetSourceError` rather than
+  silently shipping unstyled.
+- The links are appended after the route's own stylesheet chain, deduped.
+  `<head>` is not hydrated, so they cannot cause a hydration mismatch.
+
+## 4. Page cache: keyed by host, plus `varyBy`
+
+```ts title="src/web/home.page.tsx"
+export const route = {
+  path: "/",
+  cache: {
+    public: true,
+    maxAge: 60,
+    serverCache: true,
+    tags: (_data, { shared }) => [`theme:${shared.theme}`],
+  },
+} as const;
+```
+
+- The server page cache key always includes the request `Host`, so tenants on
+  different hosts never share an entry.
+- If the theme depends on something other than the host (a preview cookie),
+  add `varyBy: (request) => string`. It runs before the cache lookup and
+  before middleware, so it must read the request directly —
+  `varyBy: (request) => String(request.cookie("preview_theme") ?? "")`.
+- A function-form `tags` receives `(data, { shared })` — the sealed `shared`
+  snapshot at store time — so a route can invalidate one theme's pages with
+  `invalidatePageCache(["theme:alpha"])`.
+
+See [Server-side page caching](/v/latest/web/essentials/page-caching/) for the
+rest of the `serverCache` contract.
+
+## Gotchas
+
+- **Middleware runs after the cache lookup.** Anything the key needs must come
+  from the request (`Host`, `varyBy`) — not from `shared`.
+- **Keep `themeSources` next to the map.** A path typo fails the request
+  loudly, in both development and production, rather than serving unstyled
+  HTML.
+- **`import type {} from "./types"` in `root.tsx` is refused by projection**
+  as an ambiguous side-effect import. Put the `SharedContext` augmentation in
+  a module `root.tsx` already imports (`themes/index.ts` above).
+
+## See also
+
+- [Development and production](/v/latest/web/guides/development-and-production/) —
+  global and page-local CSS delivery, which `linkStylesheetsFor()` extends.
+- [Server-side page caching](/v/latest/web/essentials/page-caching/) — `tags`,
+  `varyBy`, and invalidation.

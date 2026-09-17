@@ -33,10 +33,19 @@ export const route = {
 - `serverCache` requires `public: true` — like every `cache` opt-in — **and**
   `tags`. A stored entry with no tags could never be invalidated early, so
   `serverCache: true` with no `tags` is a boot-time `InvalidPageCacheOptInError`.
-- `tags` is a static array, or a function of the resolved page data —
-  `(data) => string[]` — called right before the entry is stored.
+- `tags` is a static array, or a function `(data, { shared }) => string[]` —
+  called right before the entry is stored. The second argument is the sealed
+  `shared` snapshot at store time, so a route can tag by something middleware
+  resolved (a tenant, a theme):
+  ``tags: (data, { shared }) => [`theme:${shared.theme}`]``.
 - `ttl` is the server cache's own freshness window in seconds, independent of
   the CDN-facing `maxAge`. Omit it to reuse `maxAge`.
+- `varyBy?: (request) => string` adds a request-derived component to the cache
+  key, for entries that split on something other than the host (a preview
+  cookie, a header). It runs before the cache lookup — and before
+  middleware — so it must read the request directly, e.g.
+  `varyBy: (request) => String(request.cookie("preview_theme") ?? "")`. A
+  non-function `varyBy` is a boot-time error naming the page file.
 
 ## What gets cached
 
@@ -59,9 +68,14 @@ handed a stale guest page.
 ## The cache key
 
 ```
-(normalised path) + "?" + (sorted query) + "|" + locale + "|" + variant
+(host) + (normalised path) + "?" + (sorted query) + "|" + locale + "|" + variant + "|vary=" + varyBy
 ```
 
+- The key always includes the request `Host` (lower-cased). Before 5.13 the
+  host was not part of the key, so two hosts (tenants) serving the same URL
+  shared one entry — a host-routed multi-tenant app could serve tenant B the
+  document and `shared` payload the cache stored for tenant A. Existing
+  entries are simply re-keyed; `tags` still invalidate them.
 - The path is normalised: lower-cased, trailing slash stripped (except the
   root `/`).
 - The query string is re-serialized with its keys sorted, so `?a=1&b=2` and
@@ -72,6 +86,15 @@ handed a stale guest page.
   a `serverCache` route never streams: the values are fully resolved and
   stored/served as the `json` variant instead, since there is nothing left to
   defer.
+- `"|vary=" + varyBy` is appended only when the route declares
+  `cache.varyBy(request)` (see above).
+
+## What gets stored, for a page with a lazy boundary
+
+On an eligible `HTML` `MISS`, Warlock stores the same streamed document bytes
+the `MISS` visitor received — including any `React.lazy` boundary that
+resolved during that render (a per-request theme, for example). A later `HIT`
+replays exactly that render, never a not-yet-resolved Suspense fallback.
 
 ## Pages that use `defer()`
 
@@ -132,3 +155,5 @@ Cross-worker reach depends on the configured `@warlock.js/cache` driver:
   storing.
 - [Crawler mode](/v/latest/web/essentials/crawler-mode/) — the other path that
   stores/serves a fully resolved render.
+- [Multi-theme](/v/latest/web/guides/multi-theme/) — `varyBy` and tag-based
+  invalidation for a per-tenant/per-theme cache.

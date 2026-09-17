@@ -88,6 +88,26 @@ The manifest records derived page names. A clean diff does not prove that no
 two routes collided during registration; discovery itself remains the source
 of that failure.
 
+## Dev SSR shares the app's framework package instances
+
+`warlock dev` runs SSR inside Vite's module graph. Before 5.13, an app
+`resolveAlias` entry naming a framework package (`@warlock.js/cache`,
+`core`, `logger`, `context`, `cascade`) made Vite bypass `ssr.external` and
+load a second, never-booted copy of that package — a route with
+`cache: { serverCache: true }` then failed with
+`CacheDriverNotInitializedError` because the module graph's copy never saw
+the connector's initialization. Dev SSR now always imports those packages
+from the instance the app booted, as production does, and drops an app alias
+that would re-inline an SSR-external package.
+
+## Failed page requests are logged
+
+A page request that fails outside the page pipeline itself — a cache
+failure, a module that fails to load — is now logged to stderr as
+`[warlock:web] page request <METHOD> <path> failed: <error>`. Before, the
+error reached only the app's `error.page.tsx`, and the server log stayed
+empty.
+
 ## Diagnose missing CSS
 
 1. Confirm the root, current layout, or page directly imports the stylesheet.

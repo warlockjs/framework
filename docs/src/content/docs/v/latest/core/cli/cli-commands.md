@@ -378,6 +378,22 @@ warlock add auth --no-install                # record deps, run setup, skip the 
 
 The command installs the npm package(s), runs their post-install hooks (configuration files, migrations, etc.), and updates your `warlock.config.ts` where needed.
 
+#### Passwordless login features
+
+`auth-google` and `auth-passkeys` each `requires: ["auth"]` and install a login method's optional peer on top of `@warlock.js/auth`:
+
+| Feature | Installs | Adds |
+| ------- | -------- | ---- |
+| `auth-google` | `jose` | Google OAuth login (`startProviderLogin`, `completeProviderLogin`). |
+| `auth-passkeys` | `@simplewebauthn/server` | WebAuthn passkey registration/login. Add `@simplewebauthn/browser` to your client bundle yourself. |
+
+```bash
+warlock add auth-google
+warlock add auth-passkeys
+```
+
+See [Login with Google, passkeys, or a phone code](/v/latest/auth/guides/login-with-providers/).
+
 #### Web feature
 
 `warlock add web` scaffolds the application-wide Web tree under `src/web/`. Its generated home page re-exports the universal `register()` hook from `src/web/index.register.ts`: Warlock still discovers the hook from the page namespace and runs it during SSR and hydration, while React Fast Refresh can update the page component without reloading it or resetting component state.
