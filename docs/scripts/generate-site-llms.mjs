@@ -40,6 +40,7 @@ const PACKAGE_ORDER = [
   "fs",
   "logger",
   "scheduler",
+  "queue",
   "auth",
   "access",
   "context",

@@ -41,6 +41,26 @@ export function Greeting() {
 `useTrans()` translates against the current request/page locale directly,
 without consulting any process-global locale.
 
+### Typed keys — new in 5.13
+
+`warlock dev` scans your app's `groupedTranslations(...)` dictionaries and
+generates `.warlock/typings/translations.d.ts`, augmenting web's
+`TranslationKeyRegistry` interface with every registered key as a literal
+union. Once that file exists, `trans("welcome")` is checked against your
+actual dictionary — a typo'd or removed key is a compile error instead of a
+silent runtime miss. Before the dev server has generated anything,
+`TranslationKey` falls back to plain `string`, so nothing breaks on a fresh
+checkout.
+
+```ts
+export type TranslationKey = keyof TranslationKeyRegistry extends never
+  ? string
+  : Extract<keyof TranslationKeyRegistry, string>;
+```
+
+No app code needs to change — the registry is populated by the dev server,
+not by hand.
+
 ## `lang` and `dir` on `<html>` — new in 5.12
 
 The root document owns `<html>`, so it also owns `lang` and `dir`. Derive the

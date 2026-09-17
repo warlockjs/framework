@@ -123,6 +123,10 @@ groupedTranslations("products", {
 
 The group name becomes the namespace: `t("products.notFound")` resolves `products → notFound → <currentLocale>`. Nested groups dot-access naturally (`t("products.errors.invalidPrice")`).
 
+:::note[Typed keys in `@warlock.js/web` — new in 5.13]
+`warlock dev` scans every `utils/locales.*` file for `groupedTranslations(group, dictionary)` calls and writes the flattened keys (`"products.notFound"`, `"products.outOfStock"`, …) to `.warlock/typings/translations.d.ts`, augmenting web's `TranslationKeyRegistry`. If your app also uses `@warlock.js/web`'s `useTrans()` in page components, its keys are then checked against this registry instead of accepting any `string` — see [Localization](/v/latest/web/essentials/localization/#typed-keys--new-in-513). `t()` / `trans()` here in core are untyped either way.
+:::
+
 ### Reading translations: `t()` vs `trans()`
 
 | Helper                              | Locale it uses                                         | Use when                                                      |

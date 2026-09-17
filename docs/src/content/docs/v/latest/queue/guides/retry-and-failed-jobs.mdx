@@ -1,0 +1,83 @@
+---
+title: "Retry & Failed Jobs"
+sidebar:
+  order: 1
+---
+
+Every job attempt can fail — a throw inside `handle`, an unknown job
+name in the worker, a downstream timeout. `attempts` and `backoff`
+control retrying; once every attempt is spent, the job is failed and
+stays in Redis (unless `removeOnFail` says otherwise) so it can be
+inspected and retried later.
+
+## Configuring retries
+
+```ts
+import { defineJob } from "@warlock.js/queue";
+
+export const syncInventory = defineJob({
+  name: "inventory.sync",
+  attempts: 5,
+  backoff: { type: "exponential", delay: 2000 }, // 2s, 4s, 8s, 16s
+  async handle() {
+    await supplierApi.pullInventory();
+  },
+});
+```
+
+`backoff` is a plain number (fixed delay in ms) or `{ type: "fixed" |
+"exponential", delay }`. `"exponential"` waits `delay * 2^(attempt - 1)`
+before each retry. Attempts and backoff can also be set app-wide in
+`queue.defaultJobOptions`, and overridden per dispatch — see
+[Defining jobs](../essentials/defining-jobs/) for the precedence order.
+
+An unrecoverable failure — no handler registered for the job's name —
+skips retries entirely and fails on the first attempt.
+
+## Listing failed jobs
+
+```ts
+import { failedJobs } from "@warlock.js/queue";
+
+const failed = await failedJobs({ queue: "default", start: 0, end: 49 }); // newest first, default end is 99
+
+for (const job of failed) {
+  console.log(job.name, job.failedReason, job.attemptsMade);
+}
+```
+
+Each `FailedJob` carries `id`, `name`, `queue`, `payload`,
+`attemptsMade`, `failedReason`, `stacktrace`, `failedAt`, and its own
+`retry()`.
+
+## Retrying
+
+```ts
+import { retryFailedJob } from "@warlock.js/queue";
+
+await failed[0]?.retry(); // move that job back to waiting
+
+await retryFailedJob("invoice:43"); // by id
+// throws FailedJobNotFoundError if no FAILED job has that id, in that queue
+```
+
+A retried job goes back to `waiting` with its attempt count reset, so
+it runs through the full retry budget again if it fails.
+
+## Keeping the failed list bounded
+
+Failed jobs are kept forever by default so `failedJobs()` has something
+to show. Set `removeOnFail` on `defineJob` (or `defaultJobOptions`) to
+bound it:
+
+```ts
+defineJob({
+  name: "webhooks.deliver",
+  removeOnFail: 200, // keep only the newest 200
+  async handle(payload) { /* ... */ },
+});
+```
+
+`removeOnFail: true` removes a failed job immediately instead — use
+that only when you never intend to inspect or retry failures for that
+job.

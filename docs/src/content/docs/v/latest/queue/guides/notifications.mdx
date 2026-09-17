@@ -1,0 +1,64 @@
+---
+title: "Notifications on BullMQ"
+sidebar:
+  order: 2
+---
+
+`@warlock.js/notifications` sends `.queue()` deliveries through a
+`QueueDispatcher` in `NotificationConfig.queue`. `@warlock.js/queue`
+ships one backed by BullMQ, on the `@warlock.js/queue/notifications`
+subpath so the main package export never pulls in
+`@warlock.js/notifications` (it stays an optional peer).
+
+## Configure
+
+```ts title="src/config/notifications.ts"
+import { type NotificationConfig, mailChannel } from "@warlock.js/notifications";
+import { queueNotificationDispatcher } from "@warlock.js/queue/notifications";
+
+const config: NotificationConfig = {
+  channels: { mail: mailChannel() },
+  queue: queueNotificationDispatcher({
+    attempts: 3,
+    backoff: { type: "exponential", delay: 5000 },
+  }),
+};
+
+export default config;
+```
+
+Configure the queue itself too (`connection`, etc. — see
+[Configuration](../essentials/configuration/)). No separate worker is
+needed: a queued delivery is an ordinary job (`warlock.notifications.deliver`)
+processed by the same workers `queueConnector()` starts.
+
+```ts
+await orderShipped.queue(user, { order }); // enqueued, delivered by a worker
+await orderShipped.queue(user, { order }, { delay: "10m" }); // delivered in 10 minutes
+```
+
+## Behaviour
+
+- The job carries the already-rendered payload and resolved route; the
+  handler looks up the channel by name in **that worker process's own**
+  notifications config and calls `channel.send`.
+- `SendOptions.delay`: a plain number is **seconds** (notifications'
+  convention), a string is a duration (`"10m"`, `"2h"`) — the dispatcher
+  converts both to the queue's millisecond delay.
+- `channel.send` throwing is retried per the dispatcher's `attempts` /
+  `backoff`, then lands in `failedJobs()` once exhausted.
+- A channel name missing from the worker's notifications config fails
+  the delivery immediately, with no retries — this usually means the
+  worker process has a different `channels` config than the process
+  that queued it.
+
+## `QueueNotificationDispatcherOptions`
+
+| Option | Default | Notes |
+|---|---|---|
+| `queue` | the default queue | which queue deliveries run on |
+| `attempts` | `queue.defaultJobOptions.attempts`, else `1` | |
+| `backoff` | — | fixed or exponential |
+
+`@warlock.js/notifications` itself gains no dependency on this package
+— it only depends on the `QueueDispatcher` shape.

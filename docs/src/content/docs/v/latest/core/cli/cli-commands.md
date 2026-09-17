@@ -130,6 +130,8 @@ export default {
 
 The five phases, in order: the watcher's `awaitWriteFinish` settle wait (chokidar), this handler's own debounce wait, module-graph invalidation (version bumps), re-import of the changed modules, and connector restart/rebind. Opt-in and off by default — the marks themselves are cheap `performance.now()` calls, but the raw-fs-event bookkeeping behind the watcher-settle phase is skipped entirely unless this is on, so a disabled flag costs nothing beyond one boolean check per reload.
 
+The debounce wait itself is adaptive as of 5.13: an isolated save resolves after a 12ms quiet window (down from a fixed 50ms), while a sustained burst of events — a formatter rewriting several files, a branch checkout — keeps extending that window up to a 60ms cap, so it still lands in one reload instead of several.
+
 ### `generate.typings`
 
 Regenerate the TypeScript ambient types in `.warlock/typings/` from your config files.
@@ -144,6 +146,8 @@ warlock generate.typings --files src/config/database.ts,src/config/storage.ts
 | `--files, -f`  | string  | Comma-separated list of files to generate typings for. Omit to regenerate everything.        |
 
 The dev server runs this automatically on every boot (unless `--skip-typings`). You'd run it manually after editing a config file in a fresh checkout or when the IDE's autocomplete is lying to you.
+
+**New in 5.13.** `.warlock/typings/translations.d.ts` is generated alongside the config types: `warlock dev` scans your app's `groupedTranslations(group, dictionary)` calls and writes the flattened keys as an augmentation of `@warlock.js/web`'s `TranslationKeyRegistry`, so `useTrans()` in page components checks its key argument against your actual dictionary. See [Localization](../the-basics/localization.md#registering-translations).
 
 ---
 

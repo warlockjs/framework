@@ -47,6 +47,7 @@ A few consequences worth remembering:
 
 - **No grant → denied**, and the policy never runs. A policy can't grant a permission the user doesn't hold — policies only *deny further*.
 - **A policy runs only when you pass a `resource`.** `gate` (a route gate, no resource) checks the grant alone; `authorize(user, perm, { resource })` runs the policy too. That's the class-level / instance-level split.
+- **A grant with no registered policy denies by default (5.13+).** `strictPolicies` defaults to `true`, so an instance-level check for a permission that was meant to be resource-scoped but has no `definePolicy(...)` fails closed instead of quietly falling back to the RBAC grant. See [define policies](../guides/define-policies.md).
 - **The decision fails closed.** Any error resolving it — the resolver throws, a policy throws, the tenant can't be determined — denies and logs. A user with no roles is denied, never allowed by accident.
 
 ## When it's just RBAC

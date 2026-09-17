@@ -156,11 +156,51 @@ await user.save();
 
 For *just* the counter under load, prefer the query-builder form.
 
+## Atomic upsert with `atomic()` / `findOneAndUpdate()` / `findAndUpdate()`
+
+`Model.atomic`, `Model.findOneAndUpdate` and `Model.findAndUpdate` take an `options` object: `upsert`, `arrayFilters` (MongoDB), and — on `findOneAndUpdate` only — `returnDocument: "before" | "after"` (default stays `"after"`, matching the pre-5.13 behaviour of both drivers). This turns "read the counter, check a limit, increment, insert if missing" into one round-trip:
+
+```ts
+const counter = await Counter.findOneAndUpdate(
+  { key: "signups" },
+  { $inc: { count: 1 }, $setOnInsert: { startedAt: new Date() } },
+  { upsert: true },
+);
+```
+
+`$setOnInsert` sets fields only when `upsert` actually inserts a new row; it is a no-op on an existing document. `$addToSet` adds an array element only when absent (MongoDB; SQL drivers throw `UnsupportedUpdateOperationError`). Pipeline (array-form) updates are also accepted wherever `AtomicUpdate` is expected — MongoDB only:
+
+```ts
+await Score.atomic({ id: 1 }, [{ $set: { total: { $add: ["$likes", "$shares"] } } }]);
+```
+
+`Model.findAndUpdate`'s options omit `trustedFilter` (it always sanitizes its filter); `atomic` and `findOneAndUpdate` accept it.
+
+### `trustedFilter` — conditional reservations
+
+The filter argument on these statics is sanitized by default (`UnsafeFilterError` on a `$`-prefixed key), which normally blocks a conditional read-and-write like "only increment if `used < 10`". `trustedFilter: true` is the explicit, code-authored opt-in:
+
+```ts
+const reserved = await Quota.atomic(
+  { id: quotaId, used: { $lt: 10 } },
+  { $inc: { used: 1 } },
+  { trustedFilter: true },
+);
+```
+
+Only pass `trustedFilter` with a filter your own code built — never with a request body. The concurrency guarantee holds on both drivers: MongoDB evaluates the filter and the modification under the document's write lock; Postgres runs it as a single `UPDATE … WHERE used < 10`, and a concurrent writer re-evaluates the `WHERE` against the committed row (READ COMMITTED's EvalPlanQual), so an 11th reservation against a limit-10 quota updates nothing.
+
+### Postgres upsert
+
+`upsert: true` on Postgres compiles to `INSERT … ON CONFLICT (target) DO UPDATE SET … RETURNING *`. The conflict target is derived from the table's own indexes (primary key first, then unique non-partial, non-expression indexes) — whichever one has every column covered by an equality key in the filter. No target found throws `UnsupportedUpdateOperationError` naming the problem, rather than guessing one. The inserted row is built from the filter's equality values, then `$setOnInsert`, then `$set`, then `$inc`/`$dec`. Any filter predicates outside the conflict target still apply as a `DO UPDATE … WHERE`: if the row exists but fails them, nothing is written and nothing is returned (MongoDB would instead raise a duplicate-key error in the same situation).
+
+`returnDocument: "before"` combined with `upsert: true`, and any unrecognised update operator, both throw `UnsupportedUpdateOperationError` on Postgres.
+
 ## Atomicity beyond increments
 
 The query-builder atomic story extends to other shapes too:
 
-- **Atomic upsert** — `Model.upsert(...)` (where supported) — single-statement insert-or-update.
+- **Atomic upsert** — `Model.atomic` / `Model.findOneAndUpdate` (above) — single-statement insert-or-update.
 - **`whereColumn` updates** — `Product.whereColumn("stock", ">", "reserved").update({...})` — update only when a row-level invariant holds.
 - **Transactions** — wrap multiple atomic operations as one unit. See [Transactions guide](./transactions.md).
 

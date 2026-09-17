@@ -15,7 +15,7 @@ import { DatabaseAccessResolver } from "app/access/services/access-resolver";
 const access: AccessConfigurations = {
   resolver: new DatabaseAccessResolver(), // REQUIRED — how the engine reads roles + permissions
   cache: { ttl: "10m" }, //                  resolved-set cache TTL (optional)
-  strictPolicies: false, //                  default false — throw instead of warn on a missing ABAC policy (optional)
+  strictPolicies: true, //                   default true (5.13+) — deny instead of fall back on a missing ABAC policy (optional)
 };
 
 export default access;
@@ -44,11 +44,15 @@ cache: { ttl: "10m" }; // string duration or a number of seconds
 
 ## `strictPolicies`
 
-An instance-level check (`{ resource }`) for a permission that has no registered ABAC policy still passes — it falls back to the RBAC grant alone — but that gap is easy to introduce by accident (a typo'd permission name, a policies module that never got imported). By default that fallback logs a one-time `log.warn` naming the permission. Set `strictPolicies: true` to throw `AccessConfigError` instead, so apps that want the gap to fail the request (or fail boot, if the policy is meant to always exist) get a hard stop rather than a log line:
+An instance-level check (`{ resource }`) for a permission that has no registered ABAC policy — a typo'd permission name, or a policies module that never got imported — **denies by default as of 5.13**. The engine logs a one-time `log.warn` naming the permission — register the missing `definePolicy(...)` call. Set `strictPolicies: false` to explicitly restore the pre-5.13 fallback (ALLOW via the RBAC grant alone — not recommended, since it can silently reach a resource-scoped IDOR):
 
 ```ts
-strictPolicies: true; // default false
+strictPolicies: false; // default true (5.13+); false restores the old fail-open fallback
 ```
+
+:::caution[Upgrading to 5.13]
+Before 5.13, an unpoliced instance-level check silently fell back to the RBAC grant (fail-open). If your app relies on that fallback anywhere, set `strictPolicies: false` in `src/config/access.ts` immediately after upgrading — otherwise those checks start denying. Better: register the `definePolicy(...)` calls the log warnings point to, and leave the new default in place.
+:::
 
 See [define policies](../guides/define-policies.md) for the full grant/policy decision table.
 

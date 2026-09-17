@@ -1,0 +1,80 @@
+---
+title: "Introduction"
+sidebar:
+  order: 1
+---
+
+`@warlock.js/queue` gives Warlock apps durable background jobs backed by
+[BullMQ](https://docs.bullmq.io) and Redis. Jobs are stored, not held in
+memory, so they survive a process restart and can retry on failure.
+
+## Installation
+
+```bash
+npm install @warlock.js/queue
+```
+
+Redis (5.0+, or any Redis-compatible server BullMQ supports — Valkey,
+Dragonfly) must already be running; this package does not start or
+bundle it.
+
+## Configure and connect
+
+```ts title="src/config/queue.ts"
+import type { QueueConfig } from "@warlock.js/queue";
+
+const queueConfig: QueueConfig = {
+  connection: { host: "127.0.0.1", port: 6379 },
+  defaultJobOptions: { attempts: 3, backoff: { type: "exponential", delay: 1000 } },
+};
+
+export default queueConfig;
+```
+
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+import { queueConnector } from "@warlock.js/queue";
+
+export default defineConfig({
+  connectors: [queueConnector()],
+});
+```
+
+The connector reads the `queue` config key, starts one worker per queue
+name that has a registered job, and stops taking new work on shutdown
+while active jobs finish. See [Configuration](../essentials/configuration/).
+
+## Define and dispatch a job
+
+```ts
+import { defineJob } from "@warlock.js/queue";
+
+export const sendInvoice = defineJob({
+  name: "invoices.send",
+  attempts: 5,
+  backoff: { type: "exponential", delay: 2000 },
+  async handle(payload: { invoiceId: string }, ctx) {
+    await ctx.progress(10);
+    // ... work ...
+    await ctx.progress(100);
+    return { sent: true };
+  },
+});
+
+await sendInvoice.dispatch({ invoiceId: "42" });
+await sendInvoice.dispatch({ invoiceId: "43" }, { delay: "10m", priority: 1, jobId: "invoice:43" });
+```
+
+`defineJob` registers the handler by `name` in a process-wide registry;
+`dispatch` enqueues a payload for any worker sharing that registry to
+run. See [Defining jobs](../essentials/defining-jobs/).
+
+## What's next
+
+| Topic | Description |
+|---|---|
+| [Defining jobs](../essentials/defining-jobs/) | `defineJob`, dispatch options, job context |
+| [Configuration](../essentials/configuration/) | `QueueConfig`, the connector, dispatch-only processes |
+| [Retry & failed jobs](../guides/retry-and-failed-jobs/) | Backoff, `failedJobs()`, `retryFailedJob()` |
+| [Notifications](../guides/notifications/) | Deliver `@warlock.js/notifications` `.queue()` through BullMQ |
+| [Dashboard](../guides/dashboard/) | The optional bull-board UI |

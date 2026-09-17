@@ -428,6 +428,7 @@ const topics = [
   pkgTopic({ label: "Auth", slug: "auth", sections: fullSections }, "latest"),
   pkgTopic({ label: "Access", slug: "access", sections: fullSections }, "latest"),
   pkgTopic({ label: "Scheduler", slug: "scheduler", sections: fullSections }, "latest"),
+  pkgTopic({ label: "Queue", slug: "queue", sections: fullSections }, "latest"),
   pkgTopic({ label: "Herald", slug: "herald", sections: fullSections }, "latest"),
   pkgTopic({ label: "Notifications", slug: "notifications", sections: fullSections }, "latest"),
 

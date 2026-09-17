@@ -92,29 +92,30 @@ const tokens = await authService.createTokenPair(user, {
 
 These land on `refresh_tokens.device_info` and surface later in `authService.getActiveSessions(user)`. Useful for "manage your sessions" UIs.
 
-## Email verification pattern
+## Email verification — new in 5.13
 
-Auth doesn't ship verification flows — you wire that on top:
+As of 5.13, auth ships the verification flow itself — hashed, single-use, expiring tokens delivered through `@warlock.js/notifications`. Call it right after `User.create`:
 
 ```ts
-import { Random } from "@mongez/reinforcements";
+import { sendEmailVerification } from "@warlock.js/auth";
 
-const user = await User.create({
-  ...data,
-  email_verified: false,
-  verification_token: Random.string(64),
-});
+const user = await User.create(data);
 
-await mailer.sendVerificationEmail(user.get("email"), user.get("verification_token"));
+await sendEmailVerification(user); // issues a token and sends it
 
 const tokens = await authService.createTokenPair(user);
 return response.successCreate({ user, tokens });
 ```
 
-Two ways to gate unverified users:
+Gate unverified users with the `requireVerifiedEmail()` middleware after `authMiddleware`, rather than hand-rolling an `email_verified` check or a separate user type:
 
-1. **Add a `email_verified` check** in your protected controllers. Simple, explicit.
-2. **Use a separate `unverified` user-type.** Issue tokens with `userType: "unverified"`; flip to `"user"` after verification. Lets you scope routes via `authMiddleware("user")` without touching every controller. See [Customize user type](./customize-user-type.md).
+```ts
+router.post("/orders", createOrder, {
+  middleware: [authMiddleware("user"), requireVerifiedEmail()],
+});
+```
+
+See [Verify email and reset password](./verify-email-and-reset-password.md) for the full flow, including the verification controller, throttling, and the required `emailVerifiedAt` schema field.
 
 ## Side effects via events
 
@@ -146,3 +147,4 @@ The cleaner alternative: emit your own `user.registered` event from the controll
 - [Handle login and logout](./handle-login-and-logout.md) — same `createTokenPair` step, with credentials verification first.
 - [User models](../essentials/02-user-models.md) — the `Auth` base class your `User` extends.
 - [Manage tokens](./manage-tokens.md) — what `createTokenPair` produces in detail.
+- [Verify email and reset password](./verify-email-and-reset-password.md) — `sendEmailVerification`, `requireVerifiedEmail()`, and the password-reset flow.

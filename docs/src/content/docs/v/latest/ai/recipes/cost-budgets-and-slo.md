@@ -167,14 +167,65 @@ async function answerWithinSLO(tenantId: string, question: string): Promise<stri
 The fallback signal is recorded in the budget's per-run state bag under its `<name>.fallback` key — pass the same `name` to `readBudgetFallbackSignal(state, name)`. Read it from an outer middleware's `execute.after` hook, which shares the same `ctx.state`. It does not survive to the next `execute()` — it's a within-run signal, so persist your own "degrade this tenant" flag (as above) if you need it to outlive the run.
 :::
 
+## Scoped budgets — a shared cap across executions
+
+The per-execution caps above reset with every `execute()` call. `budget({ scoped })` adds a **UTC day/month ledger shared across separate agent runs** — a per-user daily token cap, a per-tenant monthly cost cap — enforced atomically so concurrent runs can't jointly overshoot it:
+
+```ts
+import { ai } from "@warlock.js/ai";
+import { memoryScopedBudgetStore } from "@warlock.js/ai";
+import { ScopedBudgetExceededError } from "@warlock.js/ai";
+
+const dailyCap = ai.middleware.budget({
+  scoped: {
+    key: (ctx) => `user:${ctx.options?.sessionId}`, // string, or a resolver from middleware context
+    window: "day", // "day" | "month" — UTC boundary
+    maxTokens: 100_000,
+    store: memoryScopedBudgetStore(), // in-process ledger
+  },
+});
+
+const agent = ai.agent({ model: openai.model({ name: "gpt-4o" }), middleware: [dailyCap] });
+
+const result = await agent.execute("...", { sessionId: userId });
+
+if (result.error instanceof ScopedBudgetExceededError) {
+  // key, window, limit, used — no message parsing
+  console.warn(`${result.error.key} over its ${result.error.window} cap: ${result.error.used}`);
+}
+```
+
+Since no model exposes a portable pre-flight cost estimate, the middleware reserves each trip's **measured** usage atomically after the response — this keeps the ledger from exceeding its limit, but can't prevent the one trip that caused the rejection from having run.
+
+### Stores
+
+| Store | Scope | Notes |
+|---|---|---|
+| `memoryScopedBudgetStore()` | one process | Serializes each ledger key in-process. No setup. |
+| `cacheScopedBudgetStore({ ... })` | multi-node | Lazily loads the optional `@warlock.js/cache` peer and uses its atomic `update` primitive. Deployment-wide enforcement needs a cache driver whose `update` is cross-node atomic. |
+| `cascadeScopedBudgetStore({ model })` / `cascadeScopedBudgetStore({ table })` | multi-node, durable | Lazily loads the optional `@warlock.js/cascade` peer. Pass your own `model`, or a `table` name to have it create one. The backing table/collection needs a **unique `(key, windowStart, unit)` index** — the store upserts the ledger row with `$setOnInsert: { used: 0 }`, then conditionally increments only while `used <= limit - amount`. |
+
+```ts
+import { cascadeScopedBudgetStore } from "@warlock.js/ai";
+
+const store = await cascadeScopedBudgetStore({ table: "ai_budget_ledgers" });
+
+const monthlyTenantCap = ai.middleware.budget({
+  scoped: { key: (ctx) => `tenant:${tenantOf(ctx)}`, window: "month", maxCostUSD: 500, store },
+  pricing: { "gpt-4o": { inputPer1K: 0.0025, outputPer1K: 0.01 } },
+});
+```
+
+`ScopedBudgetExceededError` extends `BudgetExceededError` and adds `key`, `window`, and `used` (the amount already in the ledger before this reservation was rejected).
+
 ## Production notes
 
 :::note[The contract sits on top of the legacy caps]
 `maxTokens` / `maxCostUSD` (top-level) and the `contract` clauses are enforced independently — whichever trips first wins. You can run a hard top-level abort AND a soft contract fallback on the same `budget()` instance: the hard cap is your absolute ceiling, the contract is your SLO target. Keep the contract caps tighter than the hard caps so the soft path fires first.
 :::
 
-:::note[Budget is per-execution, not per-session]
-A fresh counter is created at `execute.before` and dies when the run ends. Two concurrent `execute()` calls on the same agent enforce the cap independently — the middleware holds no cross-run state. For a session-wide or daily cap, read the running spend from your ledger (see [Cost per tenant](/v/latest/ai/recipes/cost-aggregate-per-tenant/)) before kicking off the next call and short-circuit at the application layer.
+:::note[Budget is per-execution unless you add `scoped`]
+A fresh counter is created at `execute.before` and dies when the run ends; two concurrent `execute()` calls on the same agent enforce `maxTokens`/`maxCostUSD`/`contract` independently. For a cap that must hold across separate runs — a session-wide or daily/monthly limit — add `scoped` (above), backed by a store shared by every process enforcing it. For ad-hoc reporting on spend already recorded, see [Cost per tenant](/v/latest/ai/recipes/cost-aggregate-per-tenant/).
 :::
 
 :::note[Cache hits should report zero usage]

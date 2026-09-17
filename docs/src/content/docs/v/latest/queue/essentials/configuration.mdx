@@ -1,0 +1,80 @@
+---
+title: "Configuration"
+sidebar:
+  order: 1
+---
+
+`@warlock.js/queue` is configured declaratively through the `queue` key
+(`src/config/queue.ts`), applied by `queueConnector()`.
+
+## `QueueConfig`
+
+```ts title="src/config/queue.ts"
+import type { QueueConfig } from "@warlock.js/queue";
+
+const queueConfig: QueueConfig = {
+  connection: { host: "127.0.0.1", port: 6379 }, // any BullMQ connection option, or { url }
+  prefix: "my-app", // Redis key prefix, default "warlock"
+  defaultQueue: "default", // queue name used when a job does not name one
+  defaultJobOptions: { attempts: 3, backoff: { type: "exponential", delay: 1000 } },
+  workers: {
+    enabled: true, // default true
+    concurrency: 5, // jobs processed in parallel per queue, default 1
+    shutdownTimeout: 30_000, // ms to wait for active jobs on shutdown, default 30000
+  },
+};
+
+export default queueConfig;
+```
+
+`defaultJobOptions` is the bottom layer of a three-way merge: dispatch
+options override `defineJob`, which overrides `defaultJobOptions`.
+
+## The connector
+
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+import { queueConnector } from "@warlock.js/queue";
+
+export default defineConfig({
+  connectors: [queueConnector()],
+});
+```
+
+- Runs in the **late** lifecycle phase, after app code has been
+  imported — so every `defineJob` call has already registered before
+  workers start.
+- `start()`: reads `config.get("queue")`, then starts one worker per
+  queue name that has a registered job. No `queue` config logs a
+  warning and does nothing.
+- `shutdown()`: stops workers from taking new jobs, waits up to
+  `workers.shutdownTimeout` for active jobs, then closes the Redis
+  connections. A job still active past the timeout is disconnected —
+  it retries once its BullMQ lock expires.
+- `queueConnector({ config })` supplies a `QueueConfig` directly instead
+  of reading `src/config/queue.ts` (useful in tests).
+
+## Dispatch-only process
+
+Set `workers.enabled: false` to dispatch jobs from a process that never
+runs them — a web server that only enqueues work, for example. Run the
+workers elsewhere with the same job definitions and Redis connection:
+
+```ts
+import { setQueueConfig, startWorkers, closeQueue } from "@warlock.js/queue";
+import "./jobs"; // modules that call defineJob
+
+setQueueConfig({ connection: { host: "127.0.0.1", port: 6379 } });
+await startWorkers();
+process.on("SIGTERM", () => closeQueue());
+```
+
+Every process that shares jobs must use the same `prefix`, or they will
+not see each other's queues.
+
+## Programmatic API
+
+`setQueueConfig`, `startWorkers`, `closeQueue` (and `getQueue`,
+`runningWorkers`) are exported for scripts, tests, and worker-only
+processes that do not go through `queueConnector()`. See
+[Reference](../reference/api/).

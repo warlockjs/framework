@@ -300,10 +300,12 @@ enum AuthErrorCodes {
   TooManyAttempts = "EC004",
   InvalidTokenType = "EC005",
   CsrfOriginMismatch = "EC006", // New in 5.12
+  EmailNotVerified = "EC007", // New in 5.13
+  InvalidOneTimeToken = "EC008", // New in 5.13
 }
 ```
 
-The error-code values the middleware (and the login-throttle guard) return alongside the localized message. Switch on these on the client. `CsrfOriginMismatch` (`EC006`) is new in 5.12 — see [Protect routes → CSRF Origin check](../guides/protect-routes.md#csrf-origin-check-for-cookie-auth).
+The error-code values the middleware (and the login-throttle guard) return alongside the localized message. Switch on these on the client. `CsrfOriginMismatch` (`EC006`) is new in 5.12 — see [Protect routes → CSRF Origin check](../guides/protect-routes.md#csrf-origin-check-for-cookie-auth). `EmailNotVerified` (`EC007`, thrown by `requireVerifiedEmail()`) and `InvalidOneTimeToken` (`EC008`, one code for an unknown/wrong-purpose/expired/used verification or reset token) are new in 5.13 — see [Verify email and reset password](../guides/verify-email-and-reset-password.md).
 
 Source: `@warlock.js/auth/src/utils/auth-error-codes.ts`.
 

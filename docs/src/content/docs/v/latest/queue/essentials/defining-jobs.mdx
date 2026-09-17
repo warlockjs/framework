@@ -1,0 +1,87 @@
+---
+title: "Defining Jobs"
+sidebar:
+  order: 2
+---
+
+A job pairs a unique `name` with a `handle(payload, ctx)` function.
+`defineJob` registers it in a process-wide registry and returns a typed
+`QueueJob` you dispatch from anywhere.
+
+```ts title="src/app/invoices/jobs/send-invoice.job.ts"
+import { defineJob } from "@warlock.js/queue";
+
+export const sendInvoice = defineJob({
+  name: "invoices.send", // unique across the app; duplicate names replace the handler
+  queue: "invoices", // default: config.defaultQueue ("default")
+  attempts: 5, // total tries including the first; default 1 (no retry)
+  backoff: { type: "exponential", delay: 2000 }, // or a plain number = fixed delay
+  removeOnComplete: true, // retention for completed jobs
+  removeOnFail: 100, // keep the newest 100 failed jobs
+  async handle(payload: { invoiceId: string }, ctx) {
+    await ctx.log(`attempt ${ctx.attempt} of ${ctx.maxAttempts}`);
+    await ctx.progress(50);
+    // throw to fail this attempt; it retries until attempts run out
+    return { sent: true }; // stored as the job result
+  },
+});
+```
+
+The module must be imported by whatever process runs the workers — in a
+Warlock app, anything under `src/app` loaded at boot, since
+`queueConnector()` starts in the late phase after that import.
+
+`defineJob` validates at call time: an empty `name`, a missing
+`handle`, or a non-integer `attempts < 1` throws
+`InvalidJobDefinitionError` immediately, not at dispatch time.
+
+## Job context
+
+The handler's second argument:
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | `string` | The job id |
+| `name` | `string` | The name given to `defineJob` |
+| `queue` | `string` | The queue this job runs on |
+| `attempt` | `number` | Current attempt, starting at `1` |
+| `maxAttempts` | `number` | Total attempts allowed |
+| `progress(value)` | `Promise<void>` | Record progress — a number or a JSON object |
+| `log(line)` | `Promise<void>` | Append a line to the job's log |
+
+## Dispatch
+
+```ts
+const { id } = await sendInvoice.dispatch({ invoiceId: "42" });
+
+await sendInvoice.dispatch({ invoiceId: "43" }, {
+  delay: "10m", // a number of ms, or "500ms" | "30s" | "10m" | "2h" | "1d"
+  priority: 1, // 1 runs first; larger numbers later; omitted runs ahead of any prioritized job
+  jobId: "invoice:43", // dispatching again with a still-live id is a no-op — idempotent dispatch
+  attempts: 3, // overrides defineJob's attempts for this call only
+  backoff: { type: "fixed", delay: 500 },
+});
+```
+
+Option precedence for `attempts` / `backoff`: dispatch options >
+`defineJob` > `queue.defaultJobOptions`.
+
+## Read a job
+
+```ts
+const job = await sendInvoice.find(id);
+// JobSnapshot | undefined:
+// { id, name, queue, state, payload, progress, attemptsMade, result, failedReason, createdAt, finishedAt }
+```
+
+`state` is one of `"waiting" | "delayed" | "prioritized" | "active" |
+"completed" | "failed" | "waiting-children" | "unknown"`.
+
+## Rules
+
+- A dispatched job whose name has no handler registered in the worker
+  process fails immediately, with no retries.
+- Payloads are stored as JSON in Redis: pass ids, not model instances.
+- Defining the same `name` again replaces the handler for that name —
+  this is what keeps dev-server reloads working — so keep names unique
+  in production code.

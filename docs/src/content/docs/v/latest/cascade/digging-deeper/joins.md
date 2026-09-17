@@ -174,6 +174,16 @@ If you find yourself writing `{ $lookup: { from, localField, foreignField, as } 
 
 :::
 
+### `.raw()` — full pipeline control (MongoDB only)
+
+For the rare case where even a `.joinRaw()` stage isn't enough — you need to insert, reorder, or replace stages relative to the pipeline Cascade has already built — `.raw(builder)` hands you the pipeline array directly:
+
+```ts
+query.raw((pipeline) => [...(pipeline as object[]), { $sample: { size: 10 } }]);
+```
+
+Return a replacement array, or mutate the array in place and return nothing; either way, operations chained after `.raw()` are appended to the result. See the [Query Builder API reference](../reference/query-builder-api.md#rawbuilder--mongodb-only).
+
 ## Multi-table joins
 
 Chain `.join()` / `.leftJoin()` calls for queries spanning three or more tables:

@@ -39,7 +39,7 @@ So a route gate (`gate`, no resource) verifies the grant, and the per-record con
 ## The decision is an AND
 
 - No grant → denied; the policy never runs.
-- Grant, no policy registered → allowed (RBAC-only) — **and logs a one-time warning** naming the permission. A typo'd permission name, or a forgotten `import "./policies"`, silently degrades an instance check to a class-level one; the warning is the runtime signal that a permission you meant to scope per-resource isn't actually scoped. Set `strictPolicies: true` in your access config to throw `AccessConfigError` instead of warning — see [configuration](../getting-started/03-configuration.mdx).
+- Grant, no policy registered → **denied by default (5.13+)** — `strictPolicies` defaults to `true`. The engine logs a one-time warning naming the permission: a typo'd permission name, or a forgotten `import "./policies"`, is the usual cause. Register the missing `definePolicy(...)`, or set `strictPolicies: false` in your access config to restore the pre-5.13 RBAC-only fallback (allowed, not recommended) — see [configuration](../getting-started/03-configuration.mdx).
 - Grant + policy → the policy decides.
 
 Policies **deny further** — they can never let a user past a permission they don't hold.

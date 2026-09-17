@@ -75,7 +75,7 @@ Stack these after `authMiddleware` (they read `request.locals.user`).
 
 ## Decision semantics
 
-- `can` / `authorize` = **grant AND (no policy OR policy passes)**. A policy runs only when `ctx.resource` is supplied. An instance check with a grant but no registered policy is allowed and logs a one-time `log.warn` per permission — set `strictPolicies: true` to throw `AccessConfigError` instead.
+- `can` / `authorize` = **grant AND (no policy OR policy passes)**. A policy runs only when `ctx.resource` is supplied. An instance check with a grant but no registered policy **denies by default (5.13+, `strictPolicies: true`)** and logs a one-time `log.warn` per permission — set `strictPolicies: false` to restore the pre-5.13 RBAC-only fallback (allow).
 - Wildcards: `*` (super-grant), `orders.*` (prefix, nested-aware — but **not** the bare `orders`), exact.
 - **Fails closed** — any error resolving a decision denies and logs.
 - The cache is **best-effort** — a cache failure degrades to the resolver, never denies.

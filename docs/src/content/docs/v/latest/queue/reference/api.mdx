@@ -1,0 +1,278 @@
+---
+title: "API Reference"
+sidebar:
+  order: 1
+---
+
+Every public export of `@warlock.js/queue`, plus the
+`@warlock.js/queue/notifications` subpath. For the narrative version of
+any of these, follow the cross-links into the guides.
+
+```ts
+import {
+  defineJob,
+  queueConnector,
+  queueDashboard,
+  failedJobs,
+  retryFailedJob,
+  setQueueConfig,
+  getQueueConfig,
+  resetQueueConfig,
+  startWorkers,
+  closeQueue,
+  getQueue,
+  runningWorkers,
+  toMilliseconds,
+} from "@warlock.js/queue";
+
+import type {
+  QueueConfig,
+  QueueWorkersConfig,
+  JobOptions,
+  JobBackoff,
+  JobRetention,
+  JobContext,
+  JobProgress,
+  JobDefinition,
+  DispatchOptions,
+  DispatchedJob,
+  JobState,
+  JobSnapshot,
+  FailedJob,
+  QueueJob,
+  Duration,
+  DurationUnit,
+  CloseQueueOptions,
+  QueueConnectorOptions,
+  QueueDashboardOptions,
+  DashboardServer,
+} from "@warlock.js/queue";
+
+import { queueNotificationDispatcher } from "@warlock.js/queue/notifications";
+import type {
+  QueueNotificationDispatcherOptions,
+  NotificationJobPayload,
+} from "@warlock.js/queue/notifications";
+```
+
+## Jobs
+
+### `defineJob(definition)`
+
+```ts
+function defineJob<TPayload, TResult = unknown>(
+  definition: JobDefinition<TPayload, TResult>,
+): QueueJob<TPayload, TResult>;
+```
+
+Registers `definition.name` in a process-wide registry and returns a
+`QueueJob`. Throws `InvalidJobDefinitionError` for an empty `name`, a
+missing `handle`, or a non-integer `attempts < 1`. See
+[Defining jobs](../essentials/defining-jobs/).
+
+`JobDefinition<TPayload, TResult>` extends `JobOptions` with:
+
+| Field | Type | Notes |
+|---|---|---|
+| `name` | `string` | Unique job name |
+| `queue?` | `string` | Default: `queue.defaultQueue` (`"default"`) |
+| `handle` | `(payload: TPayload, context: JobContext) => Promise<TResult> \| TResult` | Throw to fail the attempt |
+
+`JobOptions` (also the shape of `queue.defaultJobOptions`):
+
+| Field | Type | Notes |
+|---|---|---|
+| `attempts?` | `number` | Total attempts including the first. Default `1` |
+| `backoff?` | `JobBackoff` | `number` (fixed ms) or `{ type: "fixed" \| "exponential", delay }` |
+| `removeOnComplete?` | `JobRetention` | `boolean \| number` — `true` removes at once, a number keeps the newest N |
+| `removeOnFail?` | `JobRetention` | Same shape, for failed jobs |
+
+### `QueueJob<TPayload, TResult>`
+
+| Member | Type | Notes |
+|---|---|---|
+| `name` | `string` | readonly |
+| `queue` | `string` | readonly, resolved queue name |
+| `dispatch(payload, options?)` | `Promise<DispatchedJob>` | `{ id, name, queue }` |
+| `find(id)` | `Promise<JobSnapshot<TPayload, TResult> \| undefined>` | `undefined` if the job no longer exists, or belongs to a different name |
+
+### `DispatchOptions`
+
+| Field | Type | Notes |
+|---|---|---|
+| `delay?` | `Duration` | `number` (ms) or `` `${number}${"ms"\|"s"\|"m"\|"h"\|"d"}` `` |
+| `priority?` | `number` | `1` is highest; omitted runs ahead of any prioritized job |
+| `jobId?` | `string` | Dispatching again with a still-live id is a no-op — idempotent |
+| `attempts?` | `number` | Overrides `defineJob` for this dispatch |
+| `backoff?` | `JobBackoff` | Overrides `defineJob` for this dispatch |
+
+Precedence: dispatch options > `defineJob` > `queue.defaultJobOptions`.
+
+### `JobContext`
+
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `name` | `string` |
+| `queue` | `string` |
+| `attempt` | `number` (1-based) |
+| `maxAttempts` | `number` |
+| `progress(value: JobProgress)` | `Promise<void>` |
+| `log(line: string)` | `Promise<void>` |
+
+### `JobSnapshot<TPayload, TResult>`
+
+```ts
+type JobSnapshot<TPayload = unknown, TResult = unknown> = {
+  id: string;
+  name: string;
+  queue: string;
+  state: JobState; // "waiting" | "delayed" | "prioritized" | "active"
+                    // | "completed" | "failed" | "waiting-children" | "unknown"
+  payload: TPayload;
+  progress: JobProgress;
+  attemptsMade: number;
+  result?: TResult;
+  failedReason?: string;
+  createdAt: Date;
+  finishedAt?: Date;
+};
+```
+
+## Failed jobs
+
+### `failedJobs(options?)`
+
+```ts
+function failedJobs(options?: {
+  queue?: string; // default: the default queue
+  start?: number; // default 0
+  end?: number; // default 99, inclusive
+}): Promise<FailedJob[]>;
+```
+
+Newest first. `FailedJob` adds `payload`, `attemptsMade`,
+`failedReason`, `stacktrace: string[]`, `failedAt?`, and `retry():
+Promise<void>`.
+
+### `retryFailedJob(id, options?)`
+
+```ts
+function retryFailedJob(id: string, options?: { queue?: string }): Promise<void>;
+```
+
+Throws `FailedJobNotFoundError` when no FAILED job in that queue has
+that id.
+
+## Configuration & lifecycle
+
+### `QueueConfig`
+
+```ts
+type QueueConfig = {
+  connection: ConnectionOptions; // any BullMQ connection option, or an ioredis instance
+  prefix?: string; // default "warlock"
+  defaultQueue?: string; // default "default"
+  defaultJobOptions?: JobOptions;
+  workers?: QueueWorkersConfig;
+};
+
+type QueueWorkersConfig = {
+  enabled?: boolean; // default true
+  concurrency?: number; // default 1
+  shutdownTimeout?: number; // ms, default 30000
+};
+```
+
+### `queueConnector(options?)`
+
+```ts
+function queueConnector(options?: { config?: QueueConfig }): Connector;
+```
+
+For `warlock.config.ts > connectors`. Runs in the **late** lifecycle
+phase. `start()` reads `config.get("queue")` (or uses `options.config`)
+and starts workers unless `workers.enabled === false`. `shutdown()`
+calls `closeQueue()`. See [Configuration](../essentials/configuration/).
+
+### `setQueueConfig` / `getQueueConfig` / `resetQueueConfig`
+
+Programmatic equivalents of the config file, for scripts, tests, and
+dispatch-only or worker-only processes.
+
+### `startWorkers()`
+
+```ts
+function startWorkers(): Promise<string[]>;
+```
+
+Starts one worker per queue that has a registered job (and keeps
+starting workers for queues whose first job is defined later). Returns
+`[]` when `workers.enabled` is `false`. Calling it again while workers
+run only starts the missing ones. Resolves once every started worker is
+ready.
+
+### `closeQueue(options?)`
+
+```ts
+function closeQueue(options?: { timeout?: number }): Promise<void>;
+```
+
+Stops workers taking new jobs, waits up to `timeout` (default
+`workers.shutdownTimeout`, else `30000`) for active jobs, then
+force-disconnects any that are still running and closes every queue
+connection. Safe to call more than once, and when nothing was started.
+
+### `getQueue(name)` / `runningWorkers()`
+
+`getQueue` returns (creating on first use) the BullMQ `Queue` for
+`name`. `runningWorkers()` lists the queue names with a running worker
+in this process.
+
+### `toMilliseconds(duration: Duration): number`
+
+Converts a `Duration` (`number` or `` `${number}${DurationUnit}` ``, where
+`DurationUnit` is `"ms" | "s" | "m" | "h" | "d"`) to milliseconds.
+
+## Dashboard
+
+### `queueDashboard(server, options?)`
+
+```ts
+function queueDashboard(
+  server: DashboardServer,
+  options?: { basePath?: string; queues?: string[] },
+): Promise<void>;
+```
+
+Mounts bull-board on a Fastify-compatible server (Warlock's
+`getHttpServer()` satisfies `DashboardServer`). Loads `@bull-board/api`
+and `@bull-board/fastify` via dynamic `import()` only when called; a
+missing one throws `QueueDashboardDependencyError`. See
+[Dashboard](../guides/dashboard/).
+
+## Notifications (`@warlock.js/queue/notifications`)
+
+### `queueNotificationDispatcher(options?)`
+
+```ts
+function queueNotificationDispatcher(options?: {
+  queue?: string;
+  attempts?: number;
+  backoff?: JobBackoff;
+}): QueueDispatcher; // from @warlock.js/notifications
+```
+
+For `NotificationConfig.queue`. Deliveries run under the job name
+`"warlock.notifications.deliver"` (exported as `NOTIFICATION_JOB_NAME`).
+See [Notifications](../guides/notifications/).
+
+## Errors
+
+| Error | Thrown when |
+|---|---|
+| `QueueNotConfiguredError` | The queue is used before `setQueueConfig()` (or the connector) supplied a `QueueConfig` |
+| `InvalidDurationError` | A malformed `Duration` string, e.g. `"10 minutes"` |
+| `InvalidJobDefinitionError` | `defineJob` called with an empty name, no `handle`, or a bad `attempts` |
+| `FailedJobNotFoundError` | `retryFailedJob(id)` finds no FAILED job with that id |
+| `QueueDashboardDependencyError` | `queueDashboard()` called without `@bull-board/api` / `@bull-board/fastify` installed |

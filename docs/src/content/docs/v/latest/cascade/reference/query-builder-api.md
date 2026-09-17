@@ -610,6 +610,48 @@ query.distinctValues(["category", "status"]);
 
 ---
 
+## Read mode & pipeline stages
+
+### `lean()`
+
+```ts
+lean(): QueryBuilder<LeanDocument<T>>
+```
+
+**What it does:** switch to lean read mode — `get()` / `first()` / `paginate()` / `chunk()` return plain objects typed as the model's schema (`LeanDocument<T>`), with no Model hydration, no driver-level casting, and no `fetched` event. `static hidden` fields are still stripped. Combining it with `with()` or `joinWith()` throws `UnsupportedLeanOperationError` — eager loading needs the hydrated model. About 1.9x faster than a hydrated read for 10k MongoDB documents.
+
+```ts
+const rows = await User.query().where("isActive", true).lean().get();
+```
+
+### `unwind(field, options?)` — MongoDB only
+
+```ts
+unwind(field: string, options?: UnwindOptions): this
+// UnwindOptions = { preserveNullAndEmptyArrays?: boolean; includeArrayIndex?: string }
+```
+
+**What it does:** deconstruct an array field into one output document per element (`$unwind`). Runs in call order, so a `where()` chained after `unwind()` filters the individual elements, not the original array. Throws `UnsupportedQueryOperationError` on the Postgres driver.
+
+```ts
+await Post.query().unwind("tags").where("tags", "news").lean().get();
+await Post.query().unwind("tags", { preserveNullAndEmptyArrays: true, includeArrayIndex: "position" }).get();
+```
+
+### `addFields(fields)` — MongoDB only
+
+```ts
+addFields(fields: Record<string, unknown>): this
+```
+
+**What it does:** add computed fields while keeping every existing field (`$addFields`) — unlike `select()`, nothing already on the document is dropped. Runs in call order alongside other stages. Throws `UnsupportedQueryOperationError` on the Postgres driver.
+
+```ts
+await Post.query().addFields({ score: { $add: ["$likes", "$shares"] } }).orderBy("score", "desc").get();
+```
+
+---
+
 ## Joins
 
 ### `join(table, localField, foreignField)` / `join(options)`
@@ -623,6 +665,13 @@ join(options: JoinOptions): this
 
 ```ts
 query.join("profiles", "id", "user_id");
+
+// MongoDB: options.pipeline sends a pipeline-form $lookup (correlated subquery)
+query.join({
+  table: "profiles",
+  alias: "profile",
+  pipeline: [{ $match: { $expr: { $eq: ["$userId", "$$userId"] } } }],
+});
 ```
 
 **See also:** [Joins guide](../digging-deeper/joins.md)
@@ -684,8 +733,29 @@ joinRaw(expression: RawExpression, bindings?: unknown[]): this
 **What it does:** raw join expression in driver-native syntax. Use for `$graphLookup`, lateral joins, anything the structured methods can't express.
 
 ```ts
+// SQL drivers
 query.joinRaw("LEFT JOIN LATERAL (...) e ON true");
+
+// MongoDB: one pipeline stage object, or an array of stage objects, emitted
+// verbatim in call order (`bindings` is unused on this driver)
+query.joinRaw({ $lookup: { from: "profiles", localField: "id", foreignField: "userId", as: "profile" } });
 ```
+
+On MongoDB a non-stage argument (a SQL string, a plain non-stage object, or an empty array) throws `UnsupportedQueryOperationError`.
+
+### `raw(builder)` — MongoDB only
+
+```ts
+raw(builder: (pipeline: unknown) => unknown): this
+```
+
+**What it does:** direct access to the native aggregation pipeline built so far. `builder` receives the pipeline array; return a replacement array, or mutate it in place and return nothing. Operations chained after `raw()` are appended to whatever the pipeline is after the call.
+
+```ts
+query.raw((pipeline) => [...(pipeline as object[]), { $sample: { size: 10 } }]);
+```
+
+A callback that returns something other than an array (when it does return) throws `UnsupportedQueryOperationError`.
 
 ---
 
