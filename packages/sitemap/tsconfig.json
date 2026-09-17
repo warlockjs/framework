@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    // Raised from the ES2020 default because the shared source in sibling packages
+    // uses ES2022 APIs (Object.hasOwn, String.replaceAll, Array.at), and a consumer
+    // compiles that source under ITS OWN lib. DOM is listed explicitly because an
+    // UNSET lib resolves to the .full variant, which bundles DOM - so naming a lib
+    // without it would silently drop DOM types this package already relied on.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "noEmit": true
+  },
+  "include": ["src", "tests"]
+}
