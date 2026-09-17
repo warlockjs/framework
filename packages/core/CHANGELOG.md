@@ -2,26 +2,26 @@
 
 All notable changes to `@warlock.js/core` are documented in this file.
 
-## 5.13.0
-
-### Added
-
-- `warlock add queue` installs `@warlock.js/queue`, generates Redis-backed `src/config/queue.ts`, and registers `queueConnector()` in `warlock.config.ts`.
-- `warlock dev` generates `.warlock/typings/translations.d.ts` from literal `groupedTranslations` dictionaries, augmenting web's typed translation-key registry.
-
-### Changed
-
-- `warlock dev` now uses a 12ms quiet window for isolated file saves while extending multi-file bursts up to a 60ms maximum, reducing routine HMR latency without splitting formatter or checkout reloads.
-
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
 ## 5.13.0 - 2026-09-17
 
+### Added
+
+- `warlock add queue` installs `@warlock.js/queue`, generates Redis-backed `src/config/queue.ts`, and registers `queueConnector()` in `warlock.config.ts`.
+- `warlock add auth-google` and `warlock add auth-passkeys` install `@warlock.js/auth`'s Google sign-in (`jose`) and passkey (`@simplewebauthn/server`) login methods.
+- `warlock dev` generates `.warlock/typings/translations.d.ts` from literal `groupedTranslations` dictionaries, augmenting web's typed translation-key registry.
+
+### Changed
+
+- `warlock dev` now uses a 12ms quiet window for isolated file saves while extending multi-file bursts up to a 60ms maximum, reducing routine HMR latency without splitting formatter or checkout reloads.
+
 ### Fixed
 
 - Safely return no alias resolution when a configured alias has no first target.
+- `@warlock.js/core` no longer imports `@warlock.js/auth`; `useHashedPassword` now calls core's own `hashPassword` directly instead of an auth-service delegate that only called back into core, and `@warlock.js/auth` moves to a dev-only dependency. A guard spec now fails the build if any `core/src` module imports `@warlock.js/auth`.
 
 ## 5.12.0 - 2026-09-16
 
