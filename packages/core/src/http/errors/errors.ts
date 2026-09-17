@@ -90,6 +90,30 @@ export class NotAllowedError extends HttpError {
 }
 
 /**
+ * Thrown by `Request.prototype.cookie` / `Request.prototype.hasCookie` when
+ * `@fastify/cookie` was never registered on this Fastify instance, so
+ * `baseRequest.cookies` is `undefined` rather than an (possibly empty) object.
+ *
+ * A by-name cookie read is a deliberate assertion by the caller — "this
+ * cookie should be readable here" — so an unavailable jar is a configuration
+ * fault, not an absent cookie, and must not be swallowed into a default
+ * value or a silent `false`. Contrast `Request.prototype.cookies`, which
+ * stays lenient because the framework's own opportunistic reads (e.g.
+ * locale resolution) must not throw on a request that simply has no jar.
+ */
+export class CookieJarUnavailableError extends Error {
+  public constructor(cookieName: string) {
+    super(
+      `Cannot read cookie "${cookieName}": the cookie jar is unavailable because ` +
+        "@fastify/cookie is not registered on this Fastify instance. " +
+        "Register the plugin (see core's http/plugins.ts) before reading cookies by name.",
+    );
+
+    this.name = "CookieJarUnavailableError";
+  }
+}
+
+/**
  * Thrown by `Request.prototype.user` in development to catch a call site
  * still reading the removed `request.user` getter/setter after the 5.12.0
  * move: the authenticated user now lives at `request.locals.user`, written

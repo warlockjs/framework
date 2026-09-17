@@ -14,7 +14,7 @@ import { config } from "../config/config-getter";
 import { LOCALE_COOKIE_NAME, resolveLocaleConfiguration } from "../config/locale-configuration";
 import type { Middleware, Route } from "../router";
 import { validateAll } from "../validation/validateAll";
-import { RequestUserMovedError } from "./errors";
+import { CookieJarUnavailableError, RequestUserMovedError } from "./errors";
 import { createRequestStore } from "./middleware/inject-request-context";
 import { Response } from "./response";
 import { buildTracingContext, deriveTraceId, dispatchPhase, isTracingEnabled } from "./tracing";
@@ -425,9 +425,24 @@ export class Request<RequestValidation = any> {
   }
 
   /**
+   * Assert the cookie jar exists before a by-name read. `get cookies()` stays
+   * lenient (returns `{}`) for the framework's own opportunistic reads, but a
+   * deliberate by-name read from application code must fail loudly when
+   * `@fastify/cookie` was never registered, rather than being indistinguishable
+   * from "the caller sent no such cookie".
+   */
+  private assertCookieJarAvailable(name: string): void {
+    if (this.baseRequest.cookies === undefined) {
+      throw new CookieJarUnavailableError(name);
+    }
+  }
+
+  /**
    * Get a particular cookie value or fallback to default
    */
   public cookie(name: string, defaultValue?: any): string | any {
+    this.assertCookieJarAvailable(name);
+
     const value = this.cookies[name] ?? defaultValue;
 
     try {
@@ -441,6 +456,8 @@ export class Request<RequestValidation = any> {
    * Determine if the request has the specified cookie
    */
   public hasCookie(name: string): boolean {
+    this.assertCookieJarAvailable(name);
+
     return this.cookies[name] !== undefined;
   }
 

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.15.0 - Unreleased
+
+### Changed
+
+- **BREAKING (fail-loud):** `request.cookie(name)` and `request.hasCookie(name)` now throw `CookieJarUnavailableError` when `@fastify/cookie` is not registered on the Fastify instance, instead of returning `undefined` / `false`. An unregistered plugin is a configuration fault, and it was previously indistinguishable from "the caller sent no such cookie" — under `authMiddleware([], "cookie:token")` it surfaced as a permanent, unexplained 401. Apps built on `createHttpApplication` are unaffected: core registers the plugin before anything mounts. The exposure is a host that mounts a guarded surface on its own Fastify instance. `request.cookies` stays lenient and still returns `{}`, so the framework's own opportunistic reads — locale resolution among them — are unchanged.
+
 ## 5.14.0 - 2026-09-17
 
 ### Added
