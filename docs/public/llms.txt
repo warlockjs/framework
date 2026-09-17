@@ -34,6 +34,9 @@ combined `llms-full.txt` below is the whole framework and is far larger.
 - [@warlock.js/scheduler](https://warlock.js.org/v/latest/scheduler/): A simple scheduler package to run jobs in scheduled times
   - llms.txt: https://warlock.js.org/scheduler/llms.txt
   - llms-full.txt: https://warlock.js.org/scheduler/llms-full.txt
+- [@warlock.js/queue](https://warlock.js.org/v/latest/queue/): Durable background jobs for Warlock.js on BullMQ + Redis: defineJob, dispatch with delay/priority, retries with backoff, progress, failed-job access, in-process workers with graceful shutdown.
+  - llms.txt: https://warlock.js.org/queue/llms.txt
+  - llms-full.txt: https://warlock.js.org/queue/llms-full.txt
 - [@warlock.js/auth](https://warlock.js.org/v/latest/auth/): Authentication system for Warlock.js applications
   - llms.txt: https://warlock.js.org/auth/llms.txt
   - llms-full.txt: https://warlock.js.org/auth/llms-full.txt

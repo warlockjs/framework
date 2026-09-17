@@ -137,13 +137,17 @@ type AccessConfigurations = {
   cache?: {
     ttl?: string | number; //           resolved-set TTL, default "10m"
   };
-  strictPolicies?: boolean; //          default false — see below
+  strictPolicies?: boolean; //          default true — see below
 };
 ```
 
 ### `strictPolicies`
 
-An instance check (`{ resource }`) for a permission with no registered ABAC policy normally **warns once per permission** (`log.warn`) and falls back to the RBAC grant alone. Set `strictPolicies: true` to turn that gap into a thrown `AccessConfigError` instead — for apps that want a missing policy to fail the request/boot loudly rather than just log. See [`define-policies`](@warlock.js/access/define-policies/SKILL.md) for the full decision table.
+An instance check (`{ resource }`) for a permission with no registered ABAC policy **denies by default** (`strictPolicies: true`) — a forgotten policy must never fail open. The miss is logged once per permission (`log.warn`) either way.
+
+Set `strictPolicies: false` to explicitly restore the pre-5.13 behavior: fall back to the RBAC grant alone (ALLOWS — any holder of the permission can act on ANY resource, a plausible IDOR). See [`define-policies`](@warlock.js/access/define-policies/SKILL.md) for the full decision table.
+
+> **Breaking in 5.13:** `strictPolicies` now defaults to `true` and DENIES (it used to default to `false` and ALLOW). Set `strictPolicies: false` to keep the old fail-open fallback.
 
 A missing resolver throws `AccessConfigError` **at boot** — the framework's access connector wires `src/config/access.ts` (the same way the notifications connector wires `config/notifications.ts`), so a misconfig fails at startup, never a silent deny.
 
@@ -208,7 +212,7 @@ So `gate("orders.update")` (a route gate, no resource) checks the grant; the per
 ## The decision = grant AND policy
 
 - No grant → denied (the policy never runs).
-- Grant + no policy registered → allowed (RBAC-only), and logs a one-time `log.warn` naming the permission — a typo'd permission or a forgotten `import "./policies"` degrades an instance check to a class-level one, and this is the runtime signal for it. Set `strictPolicies: true` in the access config (see [`configure-access`](@warlock.js/access/configure-access/SKILL.md)) to throw `AccessConfigError` instead of warning.
+- Grant + no policy registered → **denied by default** (`strictPolicies: true`, the 5.13+ default) — a typo'd permission or a forgotten `import "./policies"` must never silently degrade an instance check to a class-level one. Logs a one-time `log.warn` naming the permission either way. Set `strictPolicies: false` in the access config (see [`configure-access`](@warlock.js/access/configure-access/SKILL.md)) to explicitly restore the pre-5.13 RBAC-only fallback (allowed).
 - Grant + policy → the policy decides.
 
 Policies **deny**, they don't grant — a policy can't let a user past a permission they don't hold.
