@@ -26,6 +26,7 @@ import { s3Feature } from "./s3.feature";
 import { schedulerFeature } from "./scheduler.feature";
 import { sesFeature } from "./ses.feature";
 import { shadcnFeature } from "./shadcn.feature";
+import { sitemapFeature } from "./sitemap.feature";
 import { socketFeature } from "./socket.feature";
 import { tailwindFeature } from "./tailwind.feature";
 import { testFeature } from "./test.feature";
@@ -66,6 +67,11 @@ export const featuresMap: Record<string, FeatureDefinition> = {
   // it `requires` it, it appends to the stylesheet that feature creates, and the
   // three of them are one stack a reader should meet in build order.
   shadcn: shadcnFeature,
+  // Directly after the web/tailwind/shadcn stack, for the same reason: it
+  // `requires` web (it reads the page registry `listRoutablePages()`
+  // exposes) and a reader scanning `--list` for the page stack should meet it
+  // there rather than filed between queues and sockets.
+  sitemap: sitemapFeature,
   herald: heraldFeature,
   queue: queueFeature,
   // Directly after `queue`, for the same reason `tailwind` follows `web`: it
