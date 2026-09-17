@@ -25,6 +25,8 @@
     "@warlock.js/web": "*"
   },
   "devDependencies": {
+    "@warlock.js/core": "workspace:^",
+    "@warlock.js/web": "workspace:^",
     "vitest": "4.1.10",
     "typescript": "^5.9.3"
   },

@@ -20,3 +20,10 @@ export { describeUnresolvedDynamicRoutes } from "./diagnostic";
 export { buildSitemapXml, escapeXml } from "./xml";
 
 export { joinOrigin, MissingPublicUrlError, resolveOrigin, type ResolveOriginOptions } from "./url";
+
+export {
+  DEFAULT_SITEMAP_PATH,
+  sitemapConnector,
+  SITEMAP_CONNECTOR_PRIORITY,
+  type SitemapConnectorOptions,
+} from "./sitemap-connector";
