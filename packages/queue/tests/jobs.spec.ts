@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { Job } from "bullmq";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   closeQueue,
   defineJob,
@@ -195,5 +196,80 @@ describe("@warlock.js/queue against a real Redis", () => {
     }
 
     expect(snapshot).toMatchObject({ state: "completed", progress: 100, result: { done: true } });
+  });
+
+  it("returns a consistent snapshot even when the job finishes mid-find()", async () => {
+    let releaseHandler: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => (releaseHandler = resolve));
+    let handlerFinished = false;
+
+    const racy = defineJob({
+      name: "spec.find-race",
+      async handle(_payload: Record<string, never>) {
+        await gate;
+        return { done: true };
+      },
+    });
+
+    await startWorkers();
+    const { id } = await racy.dispatch({});
+
+    // Wait until the job is actually running (recorded as "active" in Redis).
+    let started = false;
+    const startDeadline = Date.now() + 10_000;
+    while (!started && Date.now() < startDeadline) {
+      started = (await racy.find(id))?.state === "active";
+      if (!started) {
+        await sleep(20);
+      }
+    }
+    expect(started).toBe(true);
+
+    // Simulate find() racing a job that finishes between the moment its
+    // state is read and the moment its data is read: on the *first*
+    // getState() call made anywhere in this test (the one `find()` issues),
+    // let the job's handler complete, wait for BullMQ to persist that as
+    // "completed" in Redis, and only then let the original getState() run.
+    const originalGetState = Job.prototype.getState;
+    let getStateCalls = 0;
+
+    vi.spyOn(Job.prototype, "getState").mockImplementation(async function (
+      this: Job,
+    ) {
+      getStateCalls++;
+
+      if (getStateCalls === 1) {
+        releaseHandler();
+        handlerFinished = true;
+
+        let completed = false;
+        const completeDeadline = Date.now() + 10_000;
+        while (!completed && Date.now() < completeDeadline) {
+          completed = (await originalGetState.call(this)) === "completed";
+          if (!completed) {
+            await sleep(20);
+          }
+        }
+      }
+
+      return originalGetState.call(this);
+    });
+
+    let snapshot: Awaited<ReturnType<typeof racy.find>>;
+
+    try {
+      snapshot = await racy.find(id);
+    } finally {
+      vi.restoreAllMocks();
+    }
+
+    expect(handlerFinished).toBe(true);
+    expect(snapshot).toMatchObject({
+      id,
+      state: "completed",
+      attemptsMade: 1,
+      result: { done: true },
+    });
+    expect(snapshot?.finishedAt).toBeInstanceOf(Date);
   });
 });

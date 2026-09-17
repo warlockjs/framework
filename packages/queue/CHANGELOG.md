@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/queue` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## Unreleased
+
+### Fixed
+
+- `find(id)` could return an inconsistent snapshot when a job finished between the internal state read and the job data read — e.g. `state: "completed"` alongside a `null` `result`, `attemptsMade: 0`, and no `finishedAt`. The job's state is now read first, then the job is re-fetched, so the returned fields are consistent with the reported state.
+
 ## 5.13.0 - 2026-09-17
 
 ### Added

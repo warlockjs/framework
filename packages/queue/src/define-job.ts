@@ -54,13 +54,22 @@ export function defineJob<TPayload, TResult = unknown>(
       return { id: String(job.id), name: definition.name, queue: queueName };
     },
     async find(id) {
-      const job = await getQueue(queueOf(definition)).getJob(id);
+      const queue = getQueue(queueOf(definition));
+      const initialJob = await queue.getJob(id);
 
-      if (!job || job.name !== definition.name) {
+      if (!initialJob || initialJob.name !== definition.name) {
         return undefined;
       }
 
-      return toSnapshot<TPayload, TResult>(job);
+      // Read the state first, then (re)fetch the job. BullMQ writes a job's
+      // result/attemptsMade/finishedOn fields *before* it becomes visible
+      // under a new state, so re-reading the job after the state is known
+      // guarantees those fields are consistent with the reported state
+      // (rather than reflecting a moment before the job finished).
+      const state = (await initialJob.getState()) as JobState;
+      const job = (await queue.getJob(id)) ?? initialJob;
+
+      return toSnapshot<TPayload, TResult>(job, state);
     },
   };
 }
@@ -112,17 +121,23 @@ function toBullBackoff(backoff: JobBackoff): JobsOptions["backoff"] {
 
 /**
  * A plain view of a BullMQ job.
+ *
+ * @param job The job to read fields from.
+ * @param state The job's state; pass a state read *before* `job` was
+ * fetched (or re-fetched) so the returned snapshot's fields are consistent
+ * with it. If omitted, the state is read from `job` directly.
  */
 export async function toSnapshot<TPayload, TResult>(
   job: Job,
+  state?: JobState,
 ): Promise<JobSnapshot<TPayload, TResult>> {
-  const state = (await job.getState()) as JobState;
+  const resolvedState = state ?? ((await job.getState()) as JobState);
 
   return {
     id: String(job.id),
     name: job.name,
     queue: job.queueName,
-    state,
+    state: resolvedState,
     payload: job.data as TPayload,
     progress: job.progress as JobSnapshot["progress"],
     attemptsMade: job.attemptsMade,
