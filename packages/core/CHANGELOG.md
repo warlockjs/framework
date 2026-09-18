@@ -6,7 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
-## 5.15.0 - Unreleased
+## 5.15.0 - 2026-09-18
+
+### Added
+
+- `warlock add sitemap` installs `@warlock.js/sitemap`, writes `src/config/sitemap.ts`, and registers `sitemapConnector()` in `warlock.config.ts`.
+- `app.publicUrl` config key, with a `PUBLIC_APP_URL` environment fallback: the one absolute-URL source for every consumer that needs an origin. It never falls back to a request-derived host — an absolute URL built from the wrong host is worse than a boot that refuses to start, because nothing downstream reports it.
 
 ### Changed
 
