@@ -127,10 +127,25 @@ collision between two sources is nameable. Never throws.
 Pure and repeatable: calling it twice returns the same string, and it mutates
 nothing. It is **synchronous and stays synchronous** — there is no I/O in it.
 
+`Sitemap` structurally satisfies `@warlock.js/core`'s `XMLable` contract
+(`toXML(): string`), so a Warlock controller can `return response.xml(sitemap)`
+directly — this package still depends on nothing from core to make that true.
+That path is for a single `Sitemap` under the sitemaps.org 50,000-URL / 50MB
+ceiling. `SitemapIndex` has no `toXML()` and is never passed to `response.xml()`;
+see [Very large sites](#very-large-sites) below for how its output is served instead.
+
 ### `saveTo(filePath)`
 
 Writes the document, creating parent directories. Works on a clean checkout
 with no `dist/`.
+
+### `publishTo(outDir, fileName = "sitemap.xml")`
+
+Publishes the document as the whole content of `outDir`, the same way
+`SitemapIndex.saveTo(outDir)` publishes a set: swapped in atomically and marked
+as owned (see below). Use it when the sitemap may later grow into an index: an
+index can then be published into the same directory, and publishing a single
+file again clears out old shards. Returns the published file's path.
 
 ## Language alternates
 
@@ -166,8 +181,36 @@ The `xhtml` namespace is declared only when something actually uses it.
 The protocol caps one file at **50,000 URLs or 50MB uncompressed**. `Sitemap`
 retains every entry — that is what makes `entries()` and a repeatable
 `toXML()` possible — so it is the right tool up to that ceiling and the wrong
-one above it. A streaming writer that emits shards plus an index and retains
-nothing is the companion for sites past it.
+one above it. `SitemapIndex` is the streaming writer for sites past it: it
+emits shards plus a flat master index and retains nothing but the current
+shard's buffer.
+
+`alternates` works the same way across a shard boundary — each `<xhtml:link>`
+resolves to an absolute URL, so it is invisible to where one shard ends and
+the next begins. Each shard declares `xmlns:xhtml` only when its own entries
+carry alternates, and an alternate's bytes count toward that shard's byte
+ceiling exactly like the rest of its `<url>` block.
+
+`maxBytesPerFile` is enforced at shard boundaries, not within an entry: a
+single entry (with its alternates) larger than the ceiling is written alone
+in its own shard rather than split, since an entry can't be split.
+
+### `saveTo(outDir)` owns the directory it is given
+
+`SitemapIndex.saveTo(outDir)` publishes atomically: it writes the full set
+into a sibling temp directory, then swaps it into `outDir` in one `rename` —
+a crawler never sees a partial set, and a failed run leaves the previous set
+untouched.
+
+That swap replaces the ENTIRE contents of `outDir`, so `outDir` must be a
+directory **dedicated to this sitemap set** — never an app's `public/` or
+any other directory something else writes to. Every successful publish marks
+`outDir` with `.sitemap-set.json`; a later `saveTo()` call only swaps a
+directory that either does not exist yet, is empty, or already carries that
+marker. If `outDir` exists, is non-empty, and has no marker,
+`saveTo()` throws `UnownedOutputDirectoryError` and leaves the directory
+completely untouched. Point `saveTo()` at a directory this package alone
+writes to. `Sitemap.publishTo(outDir)` follows the same rule.
 
 ## Errors
 
@@ -175,6 +218,7 @@ nothing is the companion for sites past it.
 | --- | --- |
 | `InvalidBaseUrlError` | `baseUrl` is missing, relative, or not `http(s)`. Thrown from the constructor. |
 | `InvalidSitemapEntryError` | An entry the protocol cannot represent: no path, a priority outside `0.0`–`1.0`, an unknown `changefreq`, an invalid `Date`, an alternate with no `hreflang`. |
+| `UnownedOutputDirectoryError` | `SitemapIndex.saveTo(outDir)` or `Sitemap.publishTo(outDir)`: `outDir` is a non-empty directory with no `.sitemap-set.json` marker from a previous publish, so it is refused rather than swapped or deleted. |
 
 ## Also exported
 

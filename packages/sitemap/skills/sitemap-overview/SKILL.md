@@ -127,7 +127,10 @@ build failure is the caller's decision.
    Each path is supplied explicitly, which is the only thing that works when
    slugs diverge between languages.
 
-The `xhtml` namespace is declared only when something uses it.
+The `xhtml` namespace is declared only when something uses it. `SitemapIndex`
+applies the same rule PER SHARD — a shard declares `xmlns:xhtml` only when its
+own entries carry alternates — and an alternate's `<xhtml:link>` bytes count
+toward that shard's byte ceiling exactly like the rest of its `<url>` block.
 
 ## `toXML()` is pure, repeatable and synchronous
 
@@ -142,12 +145,27 @@ retains every entry — that is what makes `entries()` and a repeatable
 site past it needs the streaming writer, which retains nothing and emits shards
 plus an index.
 
+`maxBytesPerFile` is enforced at shard boundaries, not within an entry: a
+single entry too large for the ceiling is written alone in its own shard
+rather than split — an entry can't be split.
+
+## `SitemapIndex.saveTo(outDir)` owns the whole directory
+
+It publishes atomically by swapping `outDir` for a freshly written temp
+directory in one `rename` — which means `outDir` must be a directory
+dedicated to this sitemap set, never an app's `public/` or anything else
+something else writes to. Every publish marks `outDir` with
+`.sitemap-set.json`; a later call only swaps a directory that is absent,
+empty, or already carries that marker. A non-empty, unmarked `outDir` gets
+`UnownedOutputDirectoryError` instead, and is left completely untouched.
+
 ## Errors
 
 | Error | When |
 | --- | --- |
 | `InvalidBaseUrlError` | `baseUrl` missing, relative, or not `http(s)`. From the constructor. |
 | `InvalidSitemapEntryError` | No path, priority outside `0.0`–`1.0`, unknown `changefreq`, invalid `Date`, alternate with no `hreflang`. From `add()`. |
+| `UnownedOutputDirectoryError` | `SitemapIndex.saveTo(outDir)`: `outDir` is non-empty with no `.sitemap-set.json` marker. From `saveTo()`, before anything is written. |
 
 ## Also exported
 
