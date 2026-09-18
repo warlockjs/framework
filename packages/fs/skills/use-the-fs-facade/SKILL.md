@@ -12,6 +12,10 @@ description: 'Use the ergonomic `fs` shorthand facade in `@warlock.js/fs` — `f
 ```ts
 import { fs } from "@warlock.js/fs";
 
+type Pkg = { version: string; [key: string]: unknown };
+declare const userId: string;
+declare const action: string;
+
 await fs.files.put("cache/data.json", "{}", { atomic: true });     // temp+rename; creates parents
 const cfg = await fs.files.getJson("config.json", { default: {} }); // no throw when missing
 await fs.files.editJson<Pkg>("package.json", (p) => ({ ...p, version: "4.7.0" }));
@@ -44,6 +48,7 @@ Info + housekeeping: `exists`, `isEmpty`, `size`, `stats` (→ `{ path, name, si
 `schema` is any [Standard Schema](https://standardschema.dev) validator — `@warlock.js/seal` (every seal validator qualifies), zod, valibot. fs calls the schema's own `~standard.validate`, so there's **no dependency** on any validator. A failed read throws `JsonSchemaValidationError`.
 
 ```ts
+import { fs } from "@warlock.js/fs";
 import { v } from "@warlock.js/seal";
 const cfg = await fs.files.getJson("config.json", { schema: v.object({ port: v.number() }) });
 ```

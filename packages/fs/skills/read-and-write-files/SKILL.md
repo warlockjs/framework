@@ -81,7 +81,7 @@ try {
 ## Metadata
 
 ```ts
-import { lastModified, stats } from "@warlock.js/fs";
+import { lastModifiedAsync, statsAsync } from "@warlock.js/fs";
 
 const mtime = await lastModifiedAsync("./bundle.js");      // Date
 const all = await statsAsync("./bundle.js");                // fs.Stats

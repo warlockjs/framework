@@ -24,11 +24,13 @@ The rename step retries on transient Windows locks (`EPERM` / `EBUSY` / `EACCES`
 ```ts
 import { atomicWriteAsync, atomicWriteJsonAsync } from "@warlock.js/fs";
 
+declare const configString: string;
+
 await atomicWriteAsync("./config.toml", configString);
 await atomicWriteAsync("./binary.bin", Buffer.from([0x01, 0x02]));   // accepts string OR Buffer
 
 // JSON sugar — pretty-prints at 2-space indent
-await atomicWriteJsonAsync("./manifest.json", { version: "1.0.0", files: [...] });
+await atomicWriteJsonAsync("./manifest.json", { version: "1.0.0", files: ["a.ts", "b.ts"] });
 ```
 
 ## What happens internally
@@ -86,6 +88,8 @@ The dev server's file watcher fires once after the rename, sees complete content
 
 ```ts
 import { atomicWriteAsync, AtomicWriteError } from "@warlock.js/fs";
+
+declare const content: string;
 
 try {
   await atomicWriteAsync("./manifest.json", content);

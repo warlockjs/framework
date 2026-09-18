@@ -66,6 +66,10 @@ Both sync, both default to SHA-256, both accept the algorithm override.
 ```ts
 import { hashString } from "@warlock.js/fs";
 
+declare const filters: Record<string, unknown>;
+declare const cache: { set(key: string, value: unknown, ttl: string): Promise<void> };
+declare const report: unknown;
+
 const key = `report.${hashString(JSON.stringify(filters))}`;
 await cache.set(key, report, "1h");
 ```
@@ -75,7 +79,7 @@ Stable, short, collision-resistant. JSON stringification is the gotcha — key o
 ### Bust a CDN cache when a build artifact changes
 
 ```ts
-import { hashFileAsync } from "@warlock.js/fs";
+import { hashFileAsync, renameFileAsync } from "@warlock.js/fs";
 
 const digest = await hashFileAsync("./dist/bundle.js");
 await renameFileAsync("./dist/bundle.js", `./dist/bundle.${digest.slice(0, 8)}.js`);
@@ -86,19 +90,23 @@ await renameFileAsync("./dist/bundle.js", `./dist/bundle.${digest.slice(0, 8)}.j
 ### Skip work if content hasn't changed
 
 ```ts
-import { hashFileAsync, fileExistsAsync, getFileAsync } from "@warlock.js/fs";
+import { hashFileAsync, fileExistsAsync, getFileAsync, putFileAsync } from "@warlock.js/fs";
 
-const inputDigest = await hashFileAsync("./input.json");
-const cachedDigest = (await fileExistsAsync("./.last-input-digest"))
-  ? await getFileAsync("./.last-input-digest")
-  : null;
+declare function runPipeline(): Promise<void>;
 
-if (inputDigest === cachedDigest) {
-  return;   // input unchanged — skip the expensive pipeline
+async function syncIfChanged() {
+  const inputDigest = await hashFileAsync("./input.json");
+  const cachedDigest = (await fileExistsAsync("./.last-input-digest"))
+    ? await getFileAsync("./.last-input-digest")
+    : null;
+
+  if (inputDigest === cachedDigest) {
+    return;   // input unchanged — skip the expensive pipeline
+  }
+
+  await runPipeline();
+  await putFileAsync("./.last-input-digest", inputDigest);
 }
-
-await runPipeline();
-await putFileAsync("./.last-input-digest", inputDigest);
 ```
 
 ### Compare two files for equality
