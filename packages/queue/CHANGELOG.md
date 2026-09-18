@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/queue` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.16.0 - 2026-09-18
+
+### Fixed
+
+- The failed-jobs dashboard skill sample now includes the connection config and the `authMiddleware` import.
+
 ## 5.15.0 - 2026-09-18
 
 ### BREAKING
