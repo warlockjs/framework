@@ -100,6 +100,12 @@ All three lookups go through `@mongez/localization`'s `trans()` under the hood, 
 
 When an app uses `@warlock.js/web`, `warlock dev` writes `.warlock/typings/translations.d.ts` from literal `groupedTranslations("group", { key: ... })` registrations. It augments web's `TranslationKeyRegistry`, so `useTrans()("products.notFound")` is checked against registered keys and a typo fails TypeScript. Before the generated file exists, `useTrans()` accepts `string` for a non-breaking first boot. Dynamic groups/keys and placeholders are not inferred.
 
+`useTrans()` now works correctly across hydration (5.15.0): the hydration
+payload ships a `translations` key with the active locale's keywords, and
+`@warlock.js/web` registers them into this same lookup table before the
+client hydrates — see `@warlock.js/web/write-the-root/SKILL.md`'s "`useTrans()`
+survives hydration" section for the failure this fixed.
+
 ### Locale on a specific lookup
 
 ```ts

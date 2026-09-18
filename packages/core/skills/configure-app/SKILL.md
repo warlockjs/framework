@@ -1,6 +1,6 @@
 ---
 name: configure-app
-description: 'Configure a Warlock app — the two layers (`warlock.config.ts` for framework-level wiring, `src/config/*.ts` for subsystems), `.env` + `env()`, and the `config()` getter for runtime reads. Triggers: `defineConfig`, `config.get`, `config.key`, `env`, `ConfigRegistry`, `HttpConfigurations`, `AppConfigurations`; "add a new config file", "warlock.config.ts vs src/config", "read env values", "runtime config lookup"; typical import `import { defineConfig, config, env } from "@warlock.js/core"`. Skip: cache driver registration — `@warlock.js/cache/cache-basics/SKILL.md`; mail config — `@warlock.js/core/send-mail/SKILL.md`; storage config — `@warlock.js/core/store-file/SKILL.md`; competing libs `dotenv` direct, `convict`, `node-config`.'
+description: 'Configure a Warlock app — the two layers (`warlock.config.ts` for framework-level wiring, `src/config/*.ts` for subsystems), `.env` + `env()`, the `config()` getter for runtime reads, and `app.publicUrl`/`PUBLIC_APP_URL` (the app''s public origin). Triggers: `defineConfig`, `config.get`, `config.key`, `env`, `ConfigRegistry`, `HttpConfigurations`, `AppConfigurations`, `publicUrl`, `PUBLIC_APP_URL`, `getPublicUrl`; "add a new config file", "warlock.config.ts vs src/config", "read env values", "runtime config lookup", "app public origin/URL"; typical import `import { defineConfig, config, env } from "@warlock.js/core"`. Skip: cache driver registration — `@warlock.js/cache/cache-basics/SKILL.md`; mail config — `@warlock.js/core/send-mail/SKILL.md`; storage config — `@warlock.js/core/store-file/SKILL.md`; sitemap boot-time refusal on a missing origin — `@warlock.js/sitemap/sitemap-overview/SKILL.md`; competing libs `dotenv` direct, `convict`, `node-config`.'
 ---
 
 # Warlock — configure the app
@@ -105,7 +105,7 @@ same nonce reaches the page's `<script>` tags.
 | CLI commands (registered via `warlock <cmd>`)          | `warlock.config.ts > cli`      |
 | HTTP server tuning per env (port, host, retry)         | `warlock.config.ts > server`   |
 | HTTP runtime (CORS, cookies, rate limits, upload size) | `src/config/http.ts`           |
-| App identity (name, baseUrl, timezone, locales)        | `src/config/app.ts`            |
+| App identity (name, baseUrl, publicUrl, timezone, locales) | `src/config/app.ts`        |
 | Subsystem configs (auth, mail, storage, cache, ai, …)  | `src/config/<name>.ts`         |
 
 Heuristic: if the setting changes how the framework **boots, builds, or scaffolds**, it goes in `warlock.config.ts`. If it changes how a **subsystem behaves at runtime**, it goes in `src/config/`.
@@ -238,6 +238,33 @@ const config = {
 ```
 
 Avoid scattering `process.env.NODE_ENV === "production"` checks — they don't get the same default-handling.
+
+### `app.publicUrl` — the app's public origin (5.15.0)
+
+```ts title="src/config/app.ts"
+import type { AppConfigurations } from "@warlock.js/core";
+
+const appConfigurations: AppConfigurations = {
+  appName: "My App",
+  publicUrl: "https://example.com",
+};
+
+export default appConfigurations;
+```
+
+The one absolute-URL source every consumer that needs one — the sitemap
+route, canonical links, OG tags, absolute URLs in mail — reads instead of
+keeping its own copy. Optional in general (most apps have no consumer that
+needs it yet); read it with `getPublicUrl()`, which returns `app.publicUrl`,
+falling back to the `PUBLIC_APP_URL` env var, or `undefined` when neither is
+set.
+
+`getPublicUrl()` never throws — it is a consumer's job to fail loudly when it
+requires the value. `@warlock.js/sitemap` is the first such consumer: with
+`sitemap.enabled: true` and no `app.publicUrl`/`PUBLIC_APP_URL` set, boot
+refuses to start (`MissingPublicUrlError`, naming both) rather than falling
+back to a request-derived host — a sitemap served from the wrong host is
+worse than one that never boots.
 
 ## Common patterns
 

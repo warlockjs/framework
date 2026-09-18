@@ -1,6 +1,6 @@
 ---
 name: send-response
-description: 'Send HTTP responses via @warlock.js/core''s Response helpers — success/error variants, status helpers, redirects, files, streams, and SSE. Picking the right helper carries the HTTP semantic without manual status codes. Triggers: `response.success`, `response.successCreate`, `response.notFound`, `response.forbidden`, `response.badRequest`, `response.sendFile`, `response.stream`, `response.sse`, `response.replay`, `ResourceNotFoundError`, `ForbiddenError`; "return a 201 from a controller", "send a file", "stream Server-Sent Events", "throw HTTP-shaped errors from services"; typical import `import type { RequestHandler, Response } from "@warlock.js/core"`. Skip: controller shape — `@warlock.js/core/create-controller/SKILL.md`; route registration — `@warlock.js/core/register-route/SKILL.md`; competing patterns: hand-rolled status codes via `reply.code(404).send(...)`, raw Fastify reply.'
+description: 'Send HTTP responses via @warlock.js/core''s Response helpers — success/error variants, status helpers, redirects, files, streams, and SSE. Picking the right helper carries the HTTP semantic without manual status codes. Triggers: `response.success`, `response.successCreate`, `response.notFound`, `response.forbidden`, `response.badRequest`, `response.sendFile`, `response.stream`, `response.sse`, `response.replay`, `ResourceNotFoundError`, `ForbiddenError`, `request.cookie`, `request.hasCookie`, `CookieJarUnavailableError`; "return a 201 from a controller", "send a file", "stream Server-Sent Events", "throw HTTP-shaped errors from services"; typical import `import type { RequestHandler, Response } from "@warlock.js/core"`. Skip: controller shape — `@warlock.js/core/create-controller/SKILL.md`; route registration — `@warlock.js/core/register-route/SKILL.md`; competing patterns: hand-rolled status codes via `reply.code(404).send(...)`, raw Fastify reply.'
 ---
 
 # Warlock — send a response
@@ -201,6 +201,20 @@ Every response cookie gets `httpOnly: true`, `sameSite: "lax"`, and `secure: tru
 `secure` is relaxed in development only — browsers drop a `Secure` cookie over plain http, which would silently break every local login. It stays on in test and staging.
 
 Precedence, lowest to highest: **framework defaults → `http.cookies.options` → the per-call `options` argument.** Set an app-wide policy in config, override per cookie when a specific one genuinely needs different treatment.
+
+### Reading cookies back — `request.cookie()` / `request.hasCookie()` throw when the jar is unavailable (5.15.0)
+
+`request.cookie(name)` and `request.hasCookie(name)` are a deliberate
+by-name assertion — "this cookie should be readable here" — so when
+`@fastify/cookie` is not registered on the Fastify instance, both now
+**throw `CookieJarUnavailableError`** naming the missing cookie, instead of
+silently returning `undefined` / `false`. Register the plugin (see core's
+`http/plugins.ts`) before reading cookies by name.
+
+`request.cookies` (the plain getter, no by-name assertion) is unchanged and
+stays lenient — it returns `{}` when the jar is unavailable, because the
+framework's own opportunistic reads (e.g. locale resolution) must not throw
+on a request that simply has no jar.
 
 These are the flags whose absence never fails a test and is fatal in production: the app works perfectly and is simply insecure. Opting out is now explicit and visible in review.
 
