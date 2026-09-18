@@ -129,7 +129,10 @@ function fakeResponse() {
     cookie: vi.fn((name: string, value: string, options: Record<string, unknown>) => {
       cookies.set(name, { value, options });
     }),
-    clearCookie: vi.fn((name: string) => cookies.delete(name)),
+    clearCookie: vi.fn((name: string, options: Record<string, unknown>) => {
+      cookies.delete(name);
+      return options;
+    }),
   };
 }
 
@@ -167,6 +170,20 @@ async function callback(cookie: string | undefined, query: Record<string, unknow
     fakeRequest(cookie, query) as never,
     response as never,
   );
+}
+
+/** Like {@link callback}, but also hands back the fake response, to inspect `clearCookie`'s attrs. */
+async function callbackWithResponse(cookie: string | undefined, query: Record<string, unknown>) {
+  const response = fakeResponse();
+
+  const result = await completeProviderLogin(
+    User as never,
+    "google",
+    fakeRequest(cookie, query) as never,
+    response as never,
+  );
+
+  return { result, response };
 }
 
 beforeEach(() => {
@@ -230,9 +247,14 @@ describe("startProviderLogin (google)", () => {
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");
     expect(url.searchParams.get("scope")).toBe("openid email profile");
     expect(cookie.options).toMatchObject({ raw: true, path: "/", maxAge: 600 });
+    // Google's callback is a top-level GET redirect — no SameSite/Secure override, unlike Apple's form_post.
+    expect(cookie.options).not.toHaveProperty("sameSite");
+    expect(cookie.options).not.toHaveProperty("secure");
     // The verifier itself never appears in the URL.
     expect(url.toString()).not.toContain(
-      JSON.parse(Buffer.from(defined(cookie.value.split(".")[0], "cookie payload"), "base64url").toString()).codeVerifier,
+      JSON.parse(
+        Buffer.from(defined(cookie.value.split(".")[0], "cookie payload"), "base64url").toString(),
+      ).codeVerifier,
     );
   });
 });
@@ -253,8 +275,22 @@ describe("completeProviderLogin (google)", () => {
       user_type: "user",
     });
     expect(completeLogin).toHaveBeenCalledTimes(1);
-    expect((defined(completeLogin.mock.calls[0], "first call")[0] as User).get("email")).toBe("ada@example.com");
+    expect((defined(completeLogin.mock.calls[0], "first call")[0] as User).get("email")).toBe(
+      "ada@example.com",
+    );
     expect(result.tokens.accessToken.token).toBe("t");
+  });
+
+  it("clears the state cookie without SameSite=None/Secure — query mode's cookie was never written with them", async () => {
+    const login = await startLogin();
+    tokenEndpoint.idToken = await idToken(verifiedClaims(login.nonce));
+
+    const { response } = await callbackWithResponse(login.cookie.value, {
+      code: login.code,
+      state: login.state,
+    });
+
+    expect(response.clearCookie).toHaveBeenCalledWith(PROVIDER_STATE_COOKIE, { path: "/" });
   });
 
   it("rejects a state mismatch before any token exchange", async () => {
