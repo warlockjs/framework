@@ -1,51 +1,55 @@
 ---
 title: Sitemap
-description: Runtime sitemap.xml generation from your app's own page registry — exclusion rules, a dev-mode diagnostic for unreachable dynamic routes, and one required config key.
+description: Runtime sitemap.xml generation — standalone in any Node app, in a Warlock API-only project via app-supplied entries, or from a Warlock web app's own page registry.
 ---
 
-`@warlock.js/sitemap` builds `sitemap.xml` at **runtime**, against your
-app's live page registry and each page's `metadata`/`sitemap` exports — a
-build-time walk can read neither. Generation only in this release; there is
-no remote sitemap parser.
+`@warlock.js/sitemap` builds `sitemap.xml` at **runtime**, against whatever
+source of URLs your app has — a page registry, your own data, or both — with
+exclusion rules (`noindex`, `sitemap: false`), per-entry `changefreq`/
+`priority` defaults, and a loud diagnostic when a dynamic route can't be
+enumerated. Generation only in this release; there is no remote sitemap
+parser.
 
-> This is the package's whole reason for existing: a dynamic route
-> (`[id]`, `[...slug]`) cannot be enumerated without application data. Every
-> other case is a static, mechanical rule — that one case gets a page-level
-> `sitemap` export, and a loud dev-mode warning when a dynamic route has none.
+`@warlock.js/core` and `@warlock.js/web` are **optional peers**. Only the
+connector reaches them, and only through a lazy `import()` at boot — nothing
+else in the package imports from either. There are three ways to use it.
 
-## Try it in ten lines
+## Mode 1 — Standalone, any Node app
 
-```ts
-// warlock.config.ts
-import { defineConfig } from "@warlock.js/core";
-import { sitemapConnector } from "@warlock.js/sitemap";
+No Warlock at all. Build the page list yourself and call
+`collectSitemapEntries` + `buildSitemapXml` directly — nothing on this path
+resolves `@warlock.js/core` or `@warlock.js/web`.
 
-export default defineConfig({ connectors: [sitemapConnector()] });
+→ [Standalone usage](./essentials/standalone/)
 
-// src/config/sitemap.ts
-import type { SitemapConfig } from "@warlock.js/sitemap";
+## Mode 2 — Warlock, API-only
 
-const sitemapConfig: SitemapConfig = {
-  enabled: true,
-  path: "/sitemap.xml",
-  defaults: { changefreq: "weekly", priority: 0.5 },
-};
+An API-only Warlock app has no page registry to read. Pass
+`sitemapConnector({ entries })` with your own supplier instead —
+`@warlock.js/web` is not required on this path.
 
-export default sitemapConfig;
-```
+→ [Configuration](./essentials/configuration/#mode-2--warlock-api-only)
 
-`warlock add sitemap` writes both files for you and requires `web` to
-already be installed.
+## Mode 3 — Warlock web
 
-## It needs your app's public origin
+`warlock add sitemap` wires `sitemapConnector()` against the page registry
+`@warlock.js/web` exposes, plus the page-level `sitemap` export for dynamic
+routes.
 
-The sitemap has to emit absolute URLs, so it needs `app.publicUrl` (or the
-`PUBLIC_APP_URL` environment variable) set in `src/config/app.ts`. With
-`sitemap.enabled: true` and neither set, **boot refuses to start** rather
-than guessing the host from the incoming request — see
-[Configuration](./essentials/configuration/).
+→ [Configuration](./essentials/configuration/#mode-3--warlock-web)
+
+## It needs your app's public origin (Modes 2 and 3)
+
+The sitemap emits absolute URLs, so a `sitemapConnector()`-based setup needs
+`app.publicUrl` (or the `PUBLIC_APP_URL` environment variable) set in
+`src/config/app.ts`. With `sitemap.enabled: true` and neither set, **boot
+refuses to start** rather than guessing the host from the incoming request —
+see [Configuration](./essentials/configuration/). Mode 1 has no such
+requirement: `buildSitemapXml(entries, origin)` takes the origin as an
+argument.
 
 ## Read by intent
 
-- **Understanding the mental model** → [Essentials](./essentials/configuration/) — the config shape, the page-level `sitemap` export, and the exclusion rules.
+- **Building it yourself, no Warlock** → [Standalone](./essentials/standalone/).
+- **Wiring it into a Warlock app** → [Configuration](./essentials/configuration/) — `sitemapConnector()`, the config shape, `entries`, the page-level `sitemap` export, and the exclusion rules.
 - **Method-by-method lookup** → [Reference](./reference/api/).

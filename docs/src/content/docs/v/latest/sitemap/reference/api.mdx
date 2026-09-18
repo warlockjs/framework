@@ -1,6 +1,6 @@
 ---
 title: "API reference"
-description: "The complete public surface of @warlock.js/sitemap — the connector, the config types, the page-level export types, and the building blocks it's assembled from."
+description: "The complete public surface of @warlock.js/sitemap — the connector (config- and entries-based), the config types, RoutablePage, the page-level export types, and the building blocks it's assembled from."
 sidebar:
   order: 1
   label: "API reference"
@@ -14,11 +14,28 @@ function sitemapConnector(options?: SitemapConnectorOptions): Connector;
 type SitemapConnectorOptions = {
   /** Supply the configuration directly instead of reading the `sitemap` config key. */
   config?: SitemapConfig;
+  /**
+   * App-supplied entries — the only source of entries in an API-only Warlock
+   * project (Mode 2, no `@warlock.js/web` page registry). When web IS
+   * installed, these are ADDED to the page-derived entries, not substituted
+   * — see `mergeSitemapEntries` below.
+   */
+  entries?: SitemapEntries;
 };
 
 const DEFAULT_SITEMAP_PATH = "/sitemap.xml";
 const SITEMAP_CONNECTOR_PRIORITY = 5.6; // after HTTP (5) and web (5.5)
+
+class NoPageRegistryError extends Error {}
 ```
+
+`@warlock.js/core` and `@warlock.js/web` are optional peers — the connector
+is the only module in this package that reaches either, and it does so
+through a lazy `import()` inside `boot()`, not a module-level import.
+
+`NoPageRegistryError` is thrown at `boot()` when `@warlock.js/web` is not
+installed **and** no `entries` option was supplied — there would be nothing
+to serve. See [Configuration](../essentials/configuration/#no-page-registry-no-entries).
 
 ## Config & entry types
 
@@ -47,7 +64,7 @@ type ChangeFreq =
 ## Page-level export types
 
 ```ts
-/** `export const sitemap: SitemapEntries = async () => [...]` in a *.page.tsx */
+/** `export const sitemap: SitemapEntries = async () => [...]` in a *.page.tsx, or the same shape passed as `sitemapConnector({ entries })`. */
 type SitemapEntries = () => SitemapEntry[] | Promise<SitemapEntry[]>;
 
 type SitemapEntry = {
@@ -58,14 +75,35 @@ type SitemapEntry = {
 };
 ```
 
+## `RoutablePage` — the standalone-usage input
+
+```ts
+type RoutablePage = {
+  /** Unique route identity — named in the dynamic-route diagnostic when unresolved. */
+  routeName: string;
+  /** The effective route path, `:param` for a dynamic segment (e.g. `/posts/:id`). */
+  routePath: string;
+  /** `metadata.robots`, when the page's `metadata` export is a static object. */
+  robots?: string;
+  sitemap?: SitemapPageExport;
+};
+
+/** A page's `sitemap` export: the entries function, an explicit opt-out, or absent entirely. */
+type SitemapPageExport = SitemapEntries | false | undefined;
+```
+
+Deliberately not `@warlock.js/web`'s own discovery type — this is the
+minimal shape `collectSitemapEntries` needs, whether it was adapted from a
+real page registry or built by hand for [standalone usage](../essentials/standalone/).
+
 ## Building blocks
 
 These are what `sitemapConnector()` is assembled from — reach for them
-directly only for custom wiring or tests.
+directly for standalone usage, custom wiring, or tests.
 
 ```ts
 function collectSitemapEntries(
-  pages: RoutablePage[],
+  pages: readonly RoutablePage[],
   options?: CollectSitemapEntriesOptions,
 ): Promise<CollectSitemapEntriesResult>;
 
@@ -78,10 +116,25 @@ type CollectSitemapEntriesResult = {
 function isDynamicRoutePath(routePath: string): boolean;
 ```
 
-Applies every exclusion rule (see [Configuration](../essentials/configuration/)
-for the table) against a `RoutablePage[]` — a minimal shape the runtime
-wiring adapts from `@warlock.js/web`'s page registry, not that package's own
-discovery type.
+Applies every exclusion rule (see [Configuration](../essentials/configuration/#what-ships-and-what-doesnt)
+for the table) against a `RoutablePage[]`.
+
+```ts
+function mergeSitemapEntries(
+  pageEntries: readonly SitemapEntry[],
+  appEntries: readonly SitemapEntry[],
+): SitemapEntry[];
+
+function withDefaults(entry: SitemapEntry, defaults: SitemapDefaults | undefined): SitemapEntry;
+```
+
+`mergeSitemapEntries` combines page-derived entries with app-supplied ones,
+deduplicating by `path` — where the same path appears in both, the
+app-supplied entry wins. This is how `sitemapConnector()` combines a page
+registry with an `entries` supplier; see
+[combining a page registry with `entries`](../essentials/configuration/#combining-a-page-registry-with-entries).
+`withDefaults` applies `SitemapDefaults` to one entry — shared by
+page-derived and app-supplied entries alike.
 
 ```ts
 function buildSitemapXml(entries: SitemapEntry[], origin: string): string;
@@ -122,6 +175,7 @@ Returns `undefined` when there is nothing to report.
 
 ## See also
 
-- [Configuration](../essentials/configuration/) — the connector, the config shape, and the exclusion rules.
+- [Standalone](../essentials/standalone/) — Mode 1, calling `collectSitemapEntries` and `buildSitemapXml` directly.
+- [Configuration](../essentials/configuration/) — the connector, `entries`, the config shape, and the exclusion rules.
 
 Source: [`@warlock.js/sitemap/src/`](https://github.com/warlockjs/core/tree/main/%40warlock.js/sitemap/src)

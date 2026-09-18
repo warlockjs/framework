@@ -1,0 +1,79 @@
+---
+title: Standalone usage
+description: Using @warlock.js/sitemap in any Node app, with no Warlock dependency — collectSitemapEntries and buildSitemapXml called directly.
+sidebar:
+  order: 1
+  label: "Standalone"
+---
+
+Mode 1 of 3. No Warlock at all. Build the page list yourself — from a route
+table, a database, wherever your app already knows its own URLs — and call
+`collectSitemapEntries` + `buildSitemapXml` directly. Nothing on this path
+resolves `@warlock.js/core` or `@warlock.js/web`.
+
+```ts
+import express from "express";
+import { buildSitemapXml, collectSitemapEntries, type RoutablePage } from "@warlock.js/sitemap";
+
+const app = express();
+
+app.get("/sitemap.xml", async (_req, res) => {
+  const pages: RoutablePage[] = [
+    { routeName: "home", routePath: "/" },
+    { routeName: "about", routePath: "/about" },
+    {
+      routeName: "post-details",
+      routePath: "/posts/:id",
+      sitemap: async () => (await db.posts.find()).map((post) => ({ path: `/posts/${post.slug}` })),
+    },
+  ];
+
+  const { entries } = await collectSitemapEntries(pages, {
+    defaults: { changefreq: "weekly", priority: 0.5 },
+  });
+
+  const xml = buildSitemapXml(entries, "https://example.com");
+
+  res.type("application/xml").send(xml);
+});
+```
+
+## `RoutablePage`
+
+The shape `collectSitemapEntries` walks — deliberately minimal, not the
+richer discovery type `@warlock.js/web` uses internally:
+
+```ts
+type RoutablePage = {
+  /** Unique route identity — named in the dynamic-route diagnostic when unresolved. */
+  routeName: string;
+  /** The effective route path, `:param` for a dynamic segment (e.g. `/posts/:id`). */
+  routePath: string;
+  /** `metadata.robots`, when the page's `metadata` export is a static object. */
+  robots?: string;
+  sitemap?: SitemapPageExport;
+};
+```
+
+A dynamic route path (one containing a `:param` segment) needs a `sitemap`
+function to be enumerable — the same rule as a Warlock web page's `sitemap`
+export. Give it one, or leave `sitemap` unset and it's reported as
+unresolved in `collectSitemapEntriesResult.unresolvedDynamicRoutes` rather
+than silently omitted:
+
+```ts
+const { entries, unresolvedDynamicRoutes } = await collectSitemapEntries(pages);
+
+if (unresolvedDynamicRoutes.length > 0) {
+  console.warn(describeUnresolvedDynamicRoutes(unresolvedDynamicRoutes));
+}
+```
+
+See the [exclusion rules table](./configuration/#what-ships-and-what-doesnt)
+for the full set of rules `collectSitemapEntries` applies — they're the same
+rules regardless of which mode supplied the pages.
+
+## Next
+
+- [Configuration](./configuration/) — wiring this into a Warlock app instead (Modes 2 and 3).
+- [Reference](../reference/api/) — the full exported surface.
