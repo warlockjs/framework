@@ -20,7 +20,20 @@ export function escapeXml(value: string): string {
 
 const XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
 
-function entryXml(entry: ResolvedSitemapEntry, baseUrl: string): string {
+/**
+ * The `xmlns:xhtml` attribute exactly as it appears on `<urlset>`, including
+ * its leading space. Exported so the shard writer can charge its byte length
+ * against the ceiling without duplicating the string it measures.
+ */
+export const XHTML_NAMESPACE_ATTR = ` xmlns:xhtml="${XHTML_NAMESPACE}"`;
+
+/**
+ * Renders one `<url>` block. Exported so the streaming writer can measure the
+ * exact bytes it is about to append before deciding whether the byte ceiling
+ * forces a new shard — a separate approximation could disagree with what is
+ * actually written.
+ */
+export function renderUrlBlock(entry: ResolvedSitemapEntry, baseUrl: string): string {
   const lines = [`  <url>`, `    <loc>${escapeXml(resolveAgainstBase(baseUrl, entry.path))}</loc>`];
 
   if (entry.lastmod !== undefined) {
@@ -59,8 +72,8 @@ function entryXml(entry: ResolvedSitemapEntry, baseUrl: string): string {
  */
 export function buildSitemapXml(entries: readonly ResolvedSitemapEntry[], baseUrl: string): string {
   const hasAlternates = entries.some((entry) => (entry.alternates?.length ?? 0) > 0);
-  const namespaces = hasAlternates ? ` xmlns:xhtml="${XHTML_NAMESPACE}"` : "";
-  const body = entries.map((entry) => entryXml(entry, baseUrl)).join("\n");
+  const namespaces = hasAlternates ? XHTML_NAMESPACE_ATTR : "";
+  const body = entries.map((entry) => renderUrlBlock(entry, baseUrl)).join("\n");
 
   return (
     `<?xml version="1.0" encoding="UTF-8"?>\n` +

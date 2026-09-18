@@ -59,4 +59,30 @@ describe("buildSitemapXml", () => {
     expect(xml).toContain("<loc>https://example.com/search?q=a&amp;sort=asc</loc>");
     expect(xml).not.toContain("q=a&sort=asc<");
   });
+
+  it("escapes the & in an alternate's href exactly as it escapes <loc>", () => {
+    const xml = buildSitemapXml(
+      [{ path: "/about", alternates: [{ hreflang: "en", path: "/about?ref=a&src=b" }] }],
+      "https://example.com",
+    );
+
+    expect(xml).toContain(
+      '<xhtml:link rel="alternate" hreflang="en" href="https://example.com/about?ref=a&amp;src=b"/>',
+    );
+    expect(xml).not.toContain("ref=a&src=b");
+  });
+
+  it("declares the xhtml namespace only when at least one entry has alternates", () => {
+    const withAlternates = buildSitemapXml(
+      [{ path: "/a", alternates: [{ hreflang: "en", path: "/a" }] }, { path: "/b" }],
+      "https://example.com",
+    );
+    const withoutAlternates = buildSitemapXml(
+      [{ path: "/a" }, { path: "/b" }],
+      "https://example.com",
+    );
+
+    expect(withAlternates).toContain('xmlns:xhtml="http://www.w3.org/1999/xhtml"');
+    expect(withoutAlternates).not.toContain("xmlns:xhtml");
+  });
 });

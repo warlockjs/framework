@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, open, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -93,7 +93,10 @@ describe("Sitemap — duplicates", () => {
   });
 
   it("emits exactly one <loc> for a repeated path — a duplicate makes the document invalid", () => {
-    const xml = new Sitemap({ baseUrl }).add({ path: "/posts/1" }).add({ path: "/posts/1" }).toXML();
+    const xml = new Sitemap({ baseUrl })
+      .add({ path: "/posts/1" })
+      .add({ path: "/posts/1" })
+      .toXML();
 
     expect(xml.match(/<loc>/g)).toHaveLength(1);
   });
@@ -231,5 +234,41 @@ describe("Sitemap — saveTo", () => {
     await new Sitemap({ baseUrl }).add({ path: "/a" }).saveTo(filePath);
 
     expect(await readFile(filePath, "utf8")).toContain("<loc>https://example.com/a</loc>");
+  });
+
+  it("replaces existing content byte-for-byte on a clean write", async () => {
+    dir = await mkdtemp(join(tmpdir(), "warlock-sitemap-"));
+
+    const filePath = join(dir, "sitemap.xml");
+
+    await writeFile(filePath, "<urlset><old/></urlset>", "utf8");
+
+    const xml = new Sitemap({ baseUrl }).add({ path: "/a" }).toXML();
+
+    await new Sitemap({ baseUrl }).add({ path: "/a" }).saveTo(filePath);
+
+    expect(await readFile(filePath, "utf8")).toBe(xml);
+  });
+
+  it("leaves a pre-existing sitemap byte-for-byte untouched, and no temp file behind, when the publish fails mid-write", async () => {
+    dir = await mkdtemp(join(tmpdir(), "warlock-sitemap-"));
+
+    const filePath = join(dir, "sitemap.xml");
+    const original = "<urlset><untouched/></urlset>";
+
+    await writeFile(filePath, original, "utf8");
+
+    // Holding an open read handle on the target denies the delete-sharing rename needs
+    // on Windows, so the publish's rename-over-target fails for real, every retry.
+    const handle = await open(filePath, "r");
+
+    try {
+      await expect(new Sitemap({ baseUrl }).add({ path: "/a" }).saveTo(filePath)).rejects.toThrow();
+    } finally {
+      await handle.close();
+    }
+
+    expect(await readFile(filePath, "utf8")).toBe(original);
+    expect(await readdir(dir)).toEqual(["sitemap.xml"]);
   });
 });

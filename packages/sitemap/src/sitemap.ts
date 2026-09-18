@@ -1,5 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
+import { publishAtomically } from "./atomic-publish";
+import { atomicWriteFile } from "./atomic-write-file";
 import { normalizeEntry } from "./normalize-entry";
 import type {
   DuplicateReport,
@@ -125,9 +127,33 @@ export class Sitemap {
     return buildSitemapXml(this.entries(), this.baseUrl);
   }
 
-  /** Writes the document, creating parent directories so a clean checkout works. */
+  /**
+   * Writes the document, creating parent directories so a clean checkout
+   * works. The write is atomic: a failed or interrupted publish leaves
+   * whatever was already at `filePath` untouched instead of truncating it.
+   */
   public async saveTo(filePath: string): Promise<void> {
     await mkdir(dirname(filePath), { recursive: true });
-    await writeFile(filePath, this.toXML(), "utf8");
+    await atomicWriteFile(filePath, this.toXML());
+  }
+
+  /**
+   * Publishes the document as the whole content of `outDir`, exactly the way
+   * `SitemapIndex.saveTo` publishes a set: swapped in atomically, and marked
+   * as owned. So a site that later outgrows one file can publish an index
+   * into the same directory, and a later single file removes stale shards.
+   * Refuses a non-empty directory this package did not write
+   * (`UnownedOutputDirectoryError`). Returns the published file's path.
+   */
+  public async publishTo(outDir: string, fileName = "sitemap.xml"): Promise<string> {
+    const xml = this.toXML();
+
+    await publishAtomically(outDir, async (tempDir) => {
+      await writeFile(join(tempDir, fileName), xml, "utf8");
+
+      return [fileName];
+    });
+
+    return join(outDir, fileName);
   }
 }

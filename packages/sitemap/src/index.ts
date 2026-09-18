@@ -8,8 +8,14 @@
  */
 
 export { Sitemap } from "./sitemap";
+export { SitemapIndex } from "./sitemap-index";
 
-export { InvalidBaseUrlError, InvalidSitemapEntryError } from "./errors";
+export {
+  DuplicateSourceKeyError,
+  InvalidBaseUrlError,
+  InvalidSitemapEntryError,
+  UnownedOutputDirectoryError,
+} from "./errors";
 
 export type {
   ChangeFreq,
@@ -21,6 +27,14 @@ export type {
   SitemapOptions,
 } from "./types";
 
-export { buildSitemapXml, escapeXml } from "./xml";
+export type {
+  SitemapFileResult,
+  SitemapIndexOptions,
+  SitemapSetResult,
+  SitemapSource,
+  SitemapSourceFactory,
+} from "./sitemap-index-types";
+
+export { buildSitemapXml, escapeXml, renderUrlBlock } from "./xml";
 
 export { joinOrigin } from "./url";
