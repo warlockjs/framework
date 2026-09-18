@@ -19,7 +19,7 @@ export function parseUrlencodedBody(raw: string): Record<string, string | string
 
     const values = params.getAll(key);
 
-    body[key] = values.length > 1 ? values : values[0];
+    body[key] = values.length > 1 ? values : (values[0] ?? "");
   }
 
   return body;

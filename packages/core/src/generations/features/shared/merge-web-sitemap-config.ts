@@ -173,7 +173,7 @@ function lastPropertyEnd(
 ): { index: number; needsComma: boolean } {
   let cursor = closingBraceIndex - 1;
 
-  while (cursor >= 0 && /\s/.test(source[cursor])) {
+  while (cursor >= 0 && /\s/.test(source.charAt(cursor))) {
     cursor--;
   }
 
