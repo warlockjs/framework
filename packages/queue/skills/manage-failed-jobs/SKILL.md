@@ -34,7 +34,7 @@ import { middleware } from "@warlock.js/core";
 import { authMiddleware } from "@warlock.js/auth";
 
 const queueConfig: QueueConfig = {
-  // ...
+  connection: { host: "127.0.0.1", port: 6379 },
   dashboard: {
     enabled: true,
     path: "/admin/queues", // default
@@ -55,6 +55,7 @@ For mounting outside the config-driven path (a custom server, a non-standard boo
 ```ts
 import { getHttpServer } from "@warlock.js/core";
 import { queueDashboard } from "@warlock.js/queue";
+import { authMiddleware } from "@warlock.js/auth";
 
 await queueDashboard(getHttpServer(), {
   basePath: "/admin/queues",
