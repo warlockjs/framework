@@ -13,10 +13,8 @@ import {
   type MailPayload,
   type Notifiable,
 } from "../../src";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { closeQueue, setQueueConfig, startWorkers, type QueueConfig } from "@warlock.js/queue";
-import { queueNotificationDispatcher } from "@warlock.js/queue/notifications";
-import { log } from "@warlock.js/logger";
 
 function testQueueConfig(): QueueConfig {
   return {
@@ -102,56 +100,5 @@ describe("bullmqQueue (notifications → @warlock.js/queue → channel.send)", (
     await waitFor(() => deliveries.length === 1);
     expect(deliveries[0]).toMatchObject({ payload: { subject: "Hi Ada" }, route: "ada@example.com" });
     expect(deliveries[0]!.at - queuedAt).toBeGreaterThanOrEqual(950);
-  });
-});
-
-describe("queueNotificationDispatcher (deprecated @warlock.js/queue/notifications subpath)", () => {
-  const deliveries: Delivery[] = [];
-  let warnSpy: ReturnType<typeof vi.spyOn> | undefined;
-
-  beforeEach(() => {
-    warnSpy = vi.spyOn(log, "warn").mockImplementation(() => undefined);
-
-    deliveries.length = 0;
-    setQueueConfig(testQueueConfig());
-
-    const mail: Channel<MailPayload> = {
-      name: "mail",
-      route: (notifiable) => notifiable.get("email") as string | undefined,
-      async send({ payload, route }) {
-        deliveries.push({ payload, route, at: Date.now() });
-      },
-    };
-
-    setNotificationConfig({
-      channels: { mail },
-      queue: queueNotificationDispatcher({ attempts: 2, backoff: 10 }),
-    });
-  });
-
-  afterEach(async () => {
-    await closeQueue({ timeout: 5_000 });
-    resetNotificationConfig();
-    warnSpy?.mockRestore();
-  });
-
-  const welcome = defineNotification<{ name: string }>({
-    type: "welcome-deprecated",
-    via: ["mail"],
-    mail: ({ name }) => ({ subject: `Hi ${name}`, html: "<p>welcome</p>" }) as MailPayload,
-  });
-
-  it("still delivers through BullMQ and warns once about the deprecation", async () => {
-    await startWorkers();
-    await welcome.queue(recipient(2, "bob@example.com"), { name: "Bob" });
-    await welcome.queue(recipient(3, "cy@example.com"), { name: "Cy" });
-
-    await waitFor(() => deliveries.length === 2);
-    expect(deliveries.map((d) => d.route)).toEqual(["bob@example.com", "cy@example.com"]);
-
-    // `queueNotificationDispatcher` warns once PER PROCESS, not once per
-    // dispatcher instance/call — two dispatches above, one warning.
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy!.mock.calls[0]!.join(" ")).toContain("bullmqQueue");
   });
 });
