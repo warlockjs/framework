@@ -27,6 +27,8 @@ GET /ready  → 200 {"status":"ok","checks":{"db":true}}
 ### Config
 
 ```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
 const httpConfigurations: HttpConfigurations = {
   health: {
     enabled: true,          // default; set false to remove both endpoints
@@ -34,6 +36,8 @@ const httpConfigurations: HttpConfigurations = {
     readinessPath: "/ready", // readiness path
   },
 };
+
+export default httpConfigurations;
 ```
 
 ## Readiness checks
@@ -74,12 +78,16 @@ On SIGINT/SIGTERM the framework tears down in order: **app `onShutdown` hooks �
 3. Draining is bounded by a timeout so one stuck request can't hang the deploy — after it, the server force-closes and a warning is logged.
 
 ```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
 const httpConfigurations: HttpConfigurations = {
   gracefulShutdown: {
     timeout: 10_000,              // ms to wait for in-flight drain (default 10s)
     forceCloseConnections: "idle", // close idle keep-alives, let active finish (default)
   },
 };
+
+export default httpConfigurations;
 ```
 
 `forceCloseConnections`: `"idle"` (default) closes idle keep-alive connections and lets active requests finish; `true` force-closes everything immediately; `false` waits for every connection.

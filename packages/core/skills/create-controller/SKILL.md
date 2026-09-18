@@ -41,6 +41,20 @@ Scaffold with: `npx warlock generate.controller <module>/<action>` (add `--with-
 
 Prefer `request.validated()` once a schema is attached — it's typed.
 
+### Request body content types
+
+`request.input()` / `.all()` / `.validated()` read the same way regardless of how the body arrived — every content type below feeds the same parsed bag:
+
+| Content type                         | Parsed by                       | Notes                                                                |
+| ------------------------------------ | -------------------------------- | --------------------------------------------------------------------- |
+| `application/json`                   | Fastify (built-in)               | objects/arrays parsed as-is                                           |
+| `multipart/form-data`                | `@fastify/multipart`             | fields + files; see [`upload-file`](../upload-file/SKILL.md)          |
+| `application/x-www-form-urlencoded`  | Warlock's own content-type parser (`http/parse-urlencoded-body.ts`) | plain HTML forms, OAuth `form_post` callbacks (e.g. Apple Sign in)    |
+
+For urlencoded bodies: fields decode via `URLSearchParams`. A key sent more than once (`tag=a&tag=b`) becomes an array (`request.input("tag")` → `["a", "b"]`); every other key is a plain string. Bracket-notation keys (`a[b]=1`) are **not** expanded by the urlencoded parser itself — nesting only happens through the same shared bracket-key logic every body type already goes through, so it behaves exactly like a JSON or query-string key of that shape, no differently than today.
+
+All three content types are held to the same `http.bodyLimit` — an over-limit urlencoded body is rejected with the same `413` a JSON body would get.
+
 ## Returning output
 
 Pick the helper that matches the outcome. Full surface in [send-response](../send-response/SKILL.md). Quick map:
