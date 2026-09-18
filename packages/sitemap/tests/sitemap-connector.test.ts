@@ -79,4 +79,60 @@ describe("sitemapConnector", () => {
     expect(sentContentType).toBe("application/xml");
     expect(sentBody).toContain("<loc>https://example.test/</loc>");
   });
+
+  it("adds app-supplied entries to the page-derived ones", async () => {
+    appConfig = { publicUrl: "https://example.test" };
+
+    await sitemapConnector({
+      entries: async () => [{ path: "/from-db/1" }],
+    }).boot();
+
+    const route = registeredRoutes[0];
+
+    if (route === undefined) throw new Error("expected the connector to register a route");
+
+    let sentBody: string | undefined;
+    const response = {
+      setContentType() {
+        return this;
+      },
+      async send(body: string) {
+        sentBody = body;
+        return this;
+      },
+    };
+
+    await route.handler({ response });
+
+    expect(sentBody).toContain("<loc>https://example.test/</loc>");
+    expect(sentBody).toContain("<loc>https://example.test/from-db/1</loc>");
+  });
+
+  it("lets an app-supplied entry win over a page-derived one at the same path", async () => {
+    appConfig = { publicUrl: "https://example.test" };
+
+    await sitemapConnector({
+      entries: async () => [{ path: "/", priority: 0.9 }],
+    }).boot();
+
+    const route = registeredRoutes[0];
+
+    if (route === undefined) throw new Error("expected the connector to register a route");
+
+    let sentBody: string | undefined;
+    const response = {
+      setContentType() {
+        return this;
+      },
+      async send(body: string) {
+        sentBody = body;
+        return this;
+      },
+    };
+
+    await route.handler({ response });
+
+    expect(sentBody).toMatch(/<loc>https:\/\/example\.test\/<\/loc>[\s\S]*<priority>0\.9<\/priority>/);
+    expect(sentBody?.match(/<loc>https:\/\/example\.test\/<\/loc>/g)).toHaveLength(1);
+  });
 });

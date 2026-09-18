@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collectSitemapEntries, isDynamicRoutePath } from "../src/collect-entries";
+import { collectSitemapEntries, isDynamicRoutePath, mergeSitemapEntries } from "../src/collect-entries";
 import type { RoutablePage } from "../src/routable-page";
 
 describe("isDynamicRoutePath", () => {
@@ -88,5 +88,25 @@ describe("collectSitemapEntries", () => {
     });
 
     expect(entries).toEqual([{ path: "/posts/hello-world", changefreq: "daily", priority: 0.9 }]);
+  });
+});
+
+describe("mergeSitemapEntries", () => {
+  it("adds app-supplied entries to the page-derived ones", () => {
+    const merged = mergeSitemapEntries(
+      [{ path: "/about" }],
+      [{ path: "/from-db/1" }, { path: "/from-db/2" }],
+    );
+
+    expect(merged.map((entry) => entry.path)).toEqual(["/about", "/from-db/1", "/from-db/2"]);
+  });
+
+  it("lets the app-supplied entry win when a path appears on both sides", () => {
+    const merged = mergeSitemapEntries(
+      [{ path: "/about", priority: 0.5 }],
+      [{ path: "/about", priority: 0.9 }],
+    );
+
+    expect(merged).toEqual([{ path: "/about", priority: 0.9 }]);
   });
 });

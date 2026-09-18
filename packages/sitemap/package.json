@@ -24,6 +24,14 @@
     "@warlock.js/core": "*",
     "@warlock.js/web": "*"
   },
+  "peerDependenciesMeta": {
+    "@warlock.js/core": {
+      "optional": true
+    },
+    "@warlock.js/web": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@warlock.js/core": "workspace:^",
     "@warlock.js/web": "workspace:^",

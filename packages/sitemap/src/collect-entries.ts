@@ -12,12 +12,32 @@ function isNoindex(robots: string | undefined): boolean {
   return robots !== undefined && /noindex/i.test(robots);
 }
 
-function withDefaults(entry: SitemapEntry, defaults: SitemapDefaults | undefined): SitemapEntry {
+/** Applies the config's `defaults` to any entry that omits `changefreq`/`priority` — shared by page-derived and app-supplied entries alike. */
+export function withDefaults(entry: SitemapEntry, defaults: SitemapDefaults | undefined): SitemapEntry {
   return {
     ...entry,
     changefreq: entry.changefreq ?? defaults?.changefreq,
     priority: entry.priority ?? defaults?.priority,
   };
+}
+
+/**
+ * Combines page-derived entries with app-supplied ones (`SitemapConnectorOptions.entries`),
+ * deduplicating by `path`. App-supplied entries are ADDED, not substituted — an
+ * app with both a page graph and extra URLs (e.g. rows the page graph can't
+ * see) wants both — but where the same path appears in both, the app-supplied
+ * entry wins, since it was written for that exact path on purpose.
+ */
+export function mergeSitemapEntries(
+  pageEntries: readonly SitemapEntry[],
+  appEntries: readonly SitemapEntry[],
+): SitemapEntry[] {
+  const byPath = new Map<string, SitemapEntry>();
+
+  for (const entry of pageEntries) byPath.set(entry.path, entry);
+  for (const entry of appEntries) byPath.set(entry.path, entry);
+
+  return Array.from(byPath.values());
 }
 
 export type CollectSitemapEntriesOptions = {

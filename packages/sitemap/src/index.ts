@@ -11,6 +11,8 @@ export type { RoutablePage, SitemapPageExport } from "./routable-page";
 export {
   collectSitemapEntries,
   isDynamicRoutePath,
+  mergeSitemapEntries,
+  withDefaults,
   type CollectSitemapEntriesOptions,
   type CollectSitemapEntriesResult,
 } from "./collect-entries";
@@ -23,6 +25,7 @@ export { joinOrigin, MissingPublicUrlError, resolveOrigin, type ResolveOriginOpt
 
 export {
   DEFAULT_SITEMAP_PATH,
+  NoPageRegistryError,
   sitemapConnector,
   SITEMAP_CONNECTOR_PRIORITY,
   type SitemapConnectorOptions,

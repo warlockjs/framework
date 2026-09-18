@@ -9,10 +9,10 @@
  * `boot()`, where the app has already loaded both.
  */
 import type { Connector, ConnectorLifecyclePhase, HttpContext } from "@warlock.js/core";
-import { collectSitemapEntries } from "./collect-entries";
+import { collectSitemapEntries, mergeSitemapEntries, withDefaults } from "./collect-entries";
 import { describeUnresolvedDynamicRoutes } from "./diagnostic";
 import type { RoutablePage } from "./routable-page";
-import type { SitemapConfig } from "./types";
+import type { SitemapConfig, SitemapEntries } from "./types";
 import { resolveOrigin } from "./url";
 import { buildSitemapXml } from "./xml";
 
@@ -30,7 +30,36 @@ export const SITEMAP_CONNECTOR_PRIORITY = 5.6;
 export type SitemapConnectorOptions = {
   /** Supply the configuration directly instead of reading the `sitemap` config key (`src/config/sitemap.ts`). */
   config?: SitemapConfig;
+  /**
+   * App-supplied entries — the only source of entries in a Warlock **API-only**
+   * project, which has no `@warlock.js/web` page registry for `listRoutablePages()`
+   * to read. When `@warlock.js/web` IS installed, these are ADDED to the
+   * page-derived entries (see {@link mergeSitemapEntries}), not substituted, so an
+   * app with both pages and extra URLs (e.g. rows a database holds) gets both.
+   */
+  entries?: SitemapEntries;
 };
+
+/**
+ * Raised at `boot()` when the sitemap is enabled but has no way to produce
+ * entries: `@warlock.js/web` is not installed, so there is no page registry
+ * for `listRoutablePages()` to read, AND no `entries` option was supplied.
+ * Refuses to boot rather than registering a route that would silently serve
+ * an empty `<urlset>` — the same reasoning as {@link MissingPublicUrlError}:
+ * a sitemap that looks complete while producing nothing is worse than one
+ * that never started.
+ */
+export class NoPageRegistryError extends Error {
+  public constructor() {
+    super(
+      "Sitemap is enabled but has no source of entries: `@warlock.js/web` is not installed, " +
+        "so there is no page registry to read, and no `entries` option was supplied either. " +
+        "Fix this by installing `@warlock.js/web`, or by passing " +
+        "`sitemapConnector({ entries: async () => [...] })` with your own supplier.",
+    );
+    this.name = "NoPageRegistryError";
+  }
+}
 
 /** Adapts one `listRoutablePages()` result into the package's own minimal `RoutablePage` shape. */
 function toRoutablePage(page: {
@@ -96,14 +125,34 @@ export function sitemapConnector(options: SitemapConnectorOptions = {}): Connect
       const origin = resolveOrigin({ publicUrl: appConfig?.publicUrl, env: process.env });
       const path = sitemapConfig.path || DEFAULT_SITEMAP_PATH;
 
-      router.get(path, async ({ response }: HttpContext) => {
-        const { listRoutablePages } = await import("@warlock.js/web");
-        const listed = await listRoutablePages({ appRoot: process.cwd() });
-        const pages = listed.map(toRoutablePage);
+      // Checked once, at boot: `@warlock.js/web`'s presence can't change per
+      // request, and failing here — before the route is even registered —
+      // surfaces a misconfigured app at startup instead of on its first hit.
+      let listRoutablePages: typeof import("@warlock.js/web").listRoutablePages | undefined;
+      try {
+        ({ listRoutablePages } = await import("@warlock.js/web"));
+      } catch {
+        listRoutablePages = undefined;
+      }
 
-        const { entries, unresolvedDynamicRoutes } = await collectSitemapEntries(pages, {
+      if (!listRoutablePages && !options.entries) {
+        throw new NoPageRegistryError();
+      }
+
+      router.get(path, async ({ response }: HttpContext) => {
+        const pages = listRoutablePages
+          ? (await listRoutablePages({ appRoot: process.cwd() })).map(toRoutablePage)
+          : [];
+
+        const { entries: pageEntries, unresolvedDynamicRoutes } = await collectSitemapEntries(pages, {
           defaults: sitemapConfig.defaults,
         });
+
+        const appEntries = options.entries
+          ? (await options.entries()).map((entry) => withDefaults(entry, sitemapConfig.defaults))
+          : [];
+
+        const entries = mergeSitemapEntries(pageEntries, appEntries);
 
         if (process.env.NODE_ENV !== "production") {
           const diagnostic = describeUnresolvedDynamicRoutes(unresolvedDynamicRoutes);
