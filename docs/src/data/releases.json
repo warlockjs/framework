@@ -1,4 +1,16 @@
 {
+  "5.15.0": {
+    "publishedAt": "2026-09-18T07:24:14.317Z",
+    "matrix": "subset",
+    "matrixRows": [
+      "baseline",
+      "web",
+      "sitemap",
+      "queue",
+      "bull-board"
+    ],
+    "summary": "**New package: `@warlock.js/sitemap`** — the thirtieth family member, and the first added since the family settled. Runtime `sitemap.xml` generation from the page registry, installed with `warlock add sitemap`, with **zero runtime dependencies**. It is usable three ways: standalone in any Node app, in an API-only Warlock app through `sitemapConnector({ entries })`, and in a Warlock web app from the page registry. A dynamic route that cannot be enumerated is omitted **and named in a development diagnostic** rather than silently dropped, and an enabled sitemap with no configured origin refuses to boot instead of serving absolute URLs built from a guessed host. Two silent failures are fixed in `@warlock.js/web` and `@warlock.js/core`: `useTrans()` returned the raw key after hydration — server HTML was correct, the post-hydration DOM was not, and the translated value never reached `dist/client` at all — so the hydration payload gains a seventh required key, `translations`, carrying only the active locale; and `request.cookie()` now throws `CookieJarUnavailableError` when `@fastify/cookie` is absent instead of returning `undefined`, which was indistinguishable from \"no such cookie\" and surfaced as a permanent unexplained 401. `@warlock.js/core` adds `app.publicUrl` with a `PUBLIC_APP_URL` fallback. **BREAKING:** `@warlock.js/queue/notifications` is removed (deprecated in 5.14 — use `bullmqQueue()` from `@warlock.js/notifications`), and `listRoutablePages` moved to the `@warlock.js/web/build` subpath. `@warlock.js/cache` finally declares a `test` script, so its 525 tests run in the release gate for the first time. Lockstep release across all 30 packages. Generator matrix ran `subset` scope (`baseline`, `web`, `sitemap`, `queue`, `bull-board` rows) against the staged candidate, authorised by Hasan on 2026-09-18: \"You could run the matrix if you feel it is important to this release\"."
+  },
   "5.14.0": {
     "publishedAt": "2026-09-17T19:41:31.498Z",
     "matrix": "subset",

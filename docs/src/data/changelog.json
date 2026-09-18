@@ -110,6 +110,10 @@
       "slug": "seal"
     },
     {
+      "name": "@warlock.js/sitemap",
+      "slug": "sitemap"
+    },
+    {
       "name": "@warlock.js/web",
       "slug": "web"
     },
@@ -119,6 +123,183 @@
     }
   ],
   "releases": [
+    {
+      "version": "5.15.0",
+      "id": "v5-15-0",
+      "date": "September 18, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>New package: <code>@warlock.js/sitemap</code></strong> — the thirtieth family member, and the first added since the family settled. Runtime <code>sitemap.xml</code> generation from the page registry, installed with <code>warlock add sitemap</code>, with <strong>zero runtime dependencies</strong>. It is usable three ways: standalone in any Node app, in an API-only Warlock app through <code>sitemapConnector({ entries })</code>, and in a Warlock web app from the page registry. A dynamic route that cannot be enumerated is omitted <strong>and named in a development diagnostic</strong> rather than silently dropped, and an enabled sitemap with no configured origin refuses to boot instead of serving absolute URLs built from a guessed host. Two silent failures are fixed in <code>@warlock.js/web</code> and <code>@warlock.js/core</code>: <code>useTrans()</code> returned the raw key after hydration — server HTML was correct, the post-hydration DOM was not, and the translated value never reached <code>dist/client</code> at all — so the hydration payload gains a seventh required key, <code>translations</code>, carrying only the active locale; and <code>request.cookie()</code> now throws <code>CookieJarUnavailableError</code> when <code>@fastify/cookie</code> is absent instead of returning <code>undefined</code>, which was indistinguishable from \"no such cookie\" and surfaced as a permanent unexplained 401. <code>@warlock.js/core</code> adds <code>app.publicUrl</code> with a <code>PUBLIC_APP_URL</code> fallback. <strong>BREAKING:</strong> <code>@warlock.js/queue/notifications</code> is removed (deprecated in 5.14 — use <code>bullmqQueue()</code> from <code>@warlock.js/notifications</code>), and <code>listRoutablePages</code> moved to the <code>@warlock.js/web/build</code> subpath. <code>@warlock.js/cache</code> finally declares a <code>test</code> script, so its 525 tests run in the release gate for the first time. Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>sitemap</code>, <code>queue</code>, <code>bull-board</code> rows) against the staged candidate, authorised by Hasan on 2026-09-18: \"You could run the matrix if you feel it is important to this release\".",
+      "matrix": "subset",
+      "matrixRows": [
+        "baseline",
+        "web",
+        "sitemap",
+        "queue",
+        "bull-board"
+      ],
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/sitemap",
+          "slug": "sitemap",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "New package: runtime <code>sitemap.xml</code> generation. Walks the page registry at runtime, applies the framework's exclusion rules (not-found route, error page, <code>metadata.robots: noindex</code>, <code>sitemap: false</code>), collects the entries a page's <code>sitemap</code> export returns, and reports — in development — any dynamic route left with no <code>sitemap</code> export so it is never silently dropped from the generated XML."
+            },
+            {
+              "type": "Added",
+              "html": "Zero runtime dependencies, in the same spirit as <code>@warlock.js/fs</code>: XML serialization is string-building plus escaping, and needs no library."
+            },
+            {
+              "type": "Added",
+              "html": "Usable in three ways: standalone in any Node app (<code>collectSitemapEntries</code> + <code>buildSitemapXml</code>, no Warlock at all), in an API-only Warlock app via <code>sitemapConnector({ entries })</code>, and in a Warlock web app from the page registry. <code>@warlock.js/core</code> and <code>@warlock.js/web</code> are <strong>optional</strong> peers — everything except <code>sitemapConnector()</code> imports nothing from either, and the connector reaches them only through a lazy <code>import()</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>sitemapConnector({ entries })</code> merges app-supplied entries with page-derived ones, deduplicated by path with the app-supplied entry winning. With neither source available the connector refuses to boot (<code>NoPageRegistryError</code>) instead of serving an empty <code>&lt;urlset&gt;</code> that looks correct."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>warlock add sitemap</code> installs <code>@warlock.js/sitemap</code>, writes <code>src/config/sitemap.ts</code>, and registers <code>sitemapConnector()</code> in <code>warlock.config.ts</code>. The generated config ships <strong>disabled</strong>: a sitemap needs the application public origin and a generated app cannot know it, so the block explains the two steps to turn it on rather than producing an app that refuses to boot."
+            },
+            {
+              "type": "Added",
+              "html": "<code>app.publicUrl</code> config key, with a <code>PUBLIC_APP_URL</code> environment fallback: the one absolute-URL source for every consumer that needs an origin. It never falls back to a request-derived host — an absolute URL built from the wrong host is worse than a boot that refuses to start, because nothing downstream reports it."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING (fail-loud):</strong> <code>request.cookie(name)</code> and <code>request.hasCookie(name)</code> now throw <code>CookieJarUnavailableError</code> when <code>@fastify/cookie</code> is not registered on the Fastify instance, instead of returning <code>undefined</code> / <code>false</code>. An unregistered plugin is a configuration fault, and it was previously indistinguishable from \"the caller sent no such cookie\" — under <code>authMiddleware([], \"cookie:token\")</code> it surfaced as a permanent, unexplained 401. Apps built on <code>createHttpApplication</code> are unaffected: core registers the plugin before anything mounts. The exposure is a host that mounts a guarded surface on its own Fastify instance. <code>request.cookies</code> stays lenient and still returns <code>{}</code>, so the framework's own opportunistic reads — locale resolution among them — are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> <code>listRoutablePages</code> is exported from <code>@warlock.js/web/build</code>, not the root barrel. It reaches the filesystem-walking page discovery, and on the root barrel that module joined the import graph of every page importing <code>@warlock.js/web</code> — a generated app answered 500 on every route in dev. A boundary spec now fails if the root barrel reaches <code>src/build/**</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "The hydration payload carries a seventh required key, <code>translations</code>, holding <strong>only the active locale's</strong> entries — never every locale."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>useTrans()</code> no longer silently returns the raw key after hydration. The active locale's translations now ride in the hydration payload and register on the client before <code>hydrateRoot</code>, so a translated string survives hydration instead of being reconciled away. Server-rendered HTML was always correct, which is what made this invisible."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "The feature picker offers <strong>Sitemap</strong> — runtime <code>sitemap.xml</code> generation from the page registry."
+            },
+            {
+              "type": "Added",
+              "html": "The feature picker offers <strong>Bull Board</strong>, the queue dashboard. <code>warlock add bull-board</code> shipped in 5.14 but the scaffolder never offered it, so a new app could not select it at creation time."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "This package declares a <code>test</code> script, so its 23 spec files and 525 tests actually run in the release gate. They existed and passed, but with no script to invoke them the gate reported <code>SKIPPED (no \"test\" script)</code> on every release and nothing here was ever checked before publishing."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Removed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Removed",
+              "html": "The integration spec covering the deprecated <code>@warlock.js/queue/notifications</code> dispatcher, which was removed from <code>@warlock.js/queue</code> in this release. <code>bullmqQueue()</code> is the supported path and keeps its own coverage."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "The dashboard guard now ends the request explicitly when a middleware short-circuits, instead of leaving it to Fastify noticing the reply was already sent. The adapter has always returned a \"handled\" boolean for this; the hook discarded it, so whether an unauthenticated caller reached the dashboard depended on write ordering — a guard answering asynchronously could lose that race."
+            }
+          ]
+        }
+      ]
+    },
     {
       "version": "5.14.0",
       "id": "v5-14-0",
