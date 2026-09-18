@@ -20,21 +20,7 @@
     "type": "git",
     "url": "https://github.com/warlockjs/sitemap"
   },
-  "peerDependencies": {
-    "@warlock.js/core": "*",
-    "@warlock.js/web": "*"
-  },
-  "peerDependenciesMeta": {
-    "@warlock.js/core": {
-      "optional": true
-    },
-    "@warlock.js/web": {
-      "optional": true
-    }
-  },
   "devDependencies": {
-    "@warlock.js/core": "workspace:^",
-    "@warlock.js/web": "workspace:^",
     "vitest": "4.1.10",
     "typescript": "^5.9.3"
   },

@@ -7,10 +7,6 @@
     // UNSET lib resolves to the .full variant, which bundles DOM - so naming a lib
     // without it would silently drop DOM types this package already relied on.
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    // `@warlock.js/web`'s published `types` field points straight at its own
-    // `.tsx` source (no prebuilt `.d.ts`), so resolving its types here means
-    // parsing those files — even though sitemap renders nothing itself.
-    "jsx": "react-jsx",
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "strict": true,
