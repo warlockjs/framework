@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- `warlock add sitemap` installs `@warlock.js/sitemap`, writes `src/config/sitemap.ts`, and registers `sitemapConnector()` in `warlock.config.ts`.
+- `warlock add sitemap` installs `@warlock.js/sitemap`, writes `src/config/sitemap.ts`, and registers `sitemapConnector()` in `warlock.config.ts`. The generated config ships **disabled**: a sitemap needs the application public origin and a generated app cannot know it, so the block explains the two steps to turn it on rather than producing an app that refuses to boot.
 - `app.publicUrl` config key, with a `PUBLIC_APP_URL` environment fallback: the one absolute-URL source for every consumer that needs an origin. It never falls back to a request-derived host — an absolute URL built from the wrong host is worse than a boot that refuses to start, because nothing downstream reports it.
 
 ### Changed

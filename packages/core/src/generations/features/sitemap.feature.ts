@@ -7,12 +7,22 @@ import { type FeatureDefinition, INSTALLED_WARLOCK_VERSION } from "./types";
 const sitemapConfigStub = `import type { SitemapConfig } from "@warlock.js/sitemap";
 
 /**
- * Runtime sitemap.xml generation. Requires the application's public origin —
- * set \`app.publicUrl\` in src/config/app.ts, or the PUBLIC_APP_URL
- * environment variable — or boot refuses to start while this is enabled.
+ * Runtime sitemap.xml generation.
+ *
+ * Ships DISABLED because a sitemap needs this application's public origin and
+ * a freshly generated app has no way to know it. Two steps to turn it on:
+ *
+ *   1. set \`app.publicUrl\` in src/config/app.ts, or the PUBLIC_APP_URL
+ *      environment variable;
+ *   2. flip \`enabled\` to true here.
+ *
+ * With it enabled and no origin configured, boot REFUSES rather than serving
+ * absolute URLs built from a guessed host — a sitemap pointing at the wrong
+ * domain is worse than one that never starts, because nothing downstream
+ * reports it.
  */
 const sitemapConfig: SitemapConfig = {
-  enabled: true,
+  enabled: false,
   path: "/sitemap.xml",
   defaults: { changefreq: "weekly", priority: 0.5 },
 };
