@@ -1,5 +1,5 @@
-import type { SitemapEntry } from "./types";
-import { joinOrigin } from "./url";
+import type { ResolvedSitemapEntry } from "./types";
+import { resolveAgainstBase } from "./url";
 
 const XML_ESCAPES: Record<string, string> = {
   "&": "&amp;",
@@ -18,8 +18,10 @@ export function escapeXml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => XML_ESCAPES[char] ?? char);
 }
 
-function entryXml(entry: SitemapEntry, origin: string): string {
-  const lines = [`  <url>`, `    <loc>${escapeXml(joinOrigin(origin, entry.path))}</loc>`];
+const XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
+
+function entryXml(entry: ResolvedSitemapEntry, baseUrl: string): string {
+  const lines = [`  <url>`, `    <loc>${escapeXml(resolveAgainstBase(baseUrl, entry.path))}</loc>`];
 
   if (entry.lastmod !== undefined) {
     lines.push(`    <lastmod>${escapeXml(entry.lastmod)}</lastmod>`);
@@ -33,6 +35,14 @@ function entryXml(entry: SitemapEntry, origin: string): string {
     lines.push(`    <priority>${entry.priority}</priority>`);
   }
 
+  for (const alternate of entry.alternates ?? []) {
+    const href = escapeXml(resolveAgainstBase(baseUrl, alternate.path));
+
+    lines.push(
+      `    <xhtml:link rel="alternate" hreflang="${escapeXml(alternate.hreflang)}" href="${href}"/>`,
+    );
+  }
+
   lines.push(`  </url>`);
 
   return lines.join("\n");
@@ -41,14 +51,20 @@ function entryXml(entry: SitemapEntry, origin: string): string {
 /**
  * Serialises entries into a `urlset` sitemap document — the sitemaps.org
  * namespace, `<url>` per entry, element order `loc` / `lastmod` / `changefreq`
- * / `priority` (schema order; a validator that checks order rejects any other).
+ * / `priority` (schema order; a validator that checks order rejects any other),
+ * then any `xhtml:link` alternates.
+ *
+ * The xhtml namespace is declared only when some entry actually carries an
+ * alternate — an unused namespace on every single-language sitemap is noise.
  */
-export function buildSitemapXml(entries: readonly SitemapEntry[], origin: string): string {
-  const body = entries.map((entry) => entryXml(entry, origin)).join("\n");
+export function buildSitemapXml(entries: readonly ResolvedSitemapEntry[], baseUrl: string): string {
+  const hasAlternates = entries.some((entry) => (entry.alternates?.length ?? 0) > 0);
+  const namespaces = hasAlternates ? ` xmlns:xhtml="${XHTML_NAMESPACE}"` : "";
+  const body = entries.map((entry) => entryXml(entry, baseUrl)).join("\n");
 
   return (
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${namespaces}>\n` +
     (body.length > 0 ? `${body}\n` : "") +
     `</urlset>\n`
   );

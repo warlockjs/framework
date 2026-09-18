@@ -1,32 +1,26 @@
 /**
- * @warlock.js/sitemap — runtime sitemap.xml generation.
+ * @warlock.js/sitemap — a framework-blind sitemap builder.
  *
- * Built at RUNTIME, against the application's own page registry and page
- * `metadata`/`sitemap` exports — not at build time, which can read neither.
+ * It owns the sitemap PROTOCOL and every byte it emits, and it knows nothing
+ * about Warlock: no page registry, no config module, no lifecycle. The web
+ * integration is a CALLER, which is why this package is usable from a plain
+ * Node script or an Express app just as it is from a Warlock project.
  */
 
-export type { ChangeFreq, SitemapConfig, SitemapDefaults, SitemapEntries, SitemapEntry } from "./types";
-export type { RoutablePage, SitemapPageExport } from "./routable-page";
+export { Sitemap } from "./sitemap";
 
-export {
-  collectSitemapEntries,
-  isDynamicRoutePath,
-  mergeSitemapEntries,
-  withDefaults,
-  type CollectSitemapEntriesOptions,
-  type CollectSitemapEntriesResult,
-} from "./collect-entries";
+export { InvalidBaseUrlError, InvalidSitemapEntryError } from "./errors";
 
-export { describeUnresolvedDynamicRoutes } from "./diagnostic";
+export type {
+  ChangeFreq,
+  DuplicateReport,
+  ResolvedSitemapEntry,
+  RouteSummary,
+  SitemapAlternate,
+  SitemapEntry,
+  SitemapOptions,
+} from "./types";
 
 export { buildSitemapXml, escapeXml } from "./xml";
 
-export { joinOrigin, MissingPublicUrlError, resolveOrigin, type ResolveOriginOptions } from "./url";
-
-export {
-  DEFAULT_SITEMAP_PATH,
-  NoPageRegistryError,
-  sitemapConnector,
-  SITEMAP_CONNECTOR_PRIORITY,
-  type SitemapConnectorOptions,
-} from "./sitemap-connector";
+export { joinOrigin } from "./url";

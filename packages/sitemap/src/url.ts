@@ -1,3 +1,5 @@
+import { InvalidBaseUrlError } from "./errors";
+
 /**
  * Joins a configured origin and an app-relative route path into one absolute
  * URL, with exactly one slash at the seam regardless of whether either side
@@ -11,37 +13,40 @@ export function joinOrigin(origin: string, routePath: string): string {
 }
 
 /**
- * Raised when the sitemap is enabled but no public origin is configured.
- * Refuses to boot rather than falling back to a request-derived origin: a
- * sitemap served with the wrong host is worse than one that refuses to
- * start, because nothing downstream ever tells you it was wrong.
+ * Validates a `baseUrl` and returns it without its trailing slash.
+ *
+ * `new URL()` accepts `mailto:` and `file:` happily, so the protocol is
+ * checked explicitly — a sitemap `<loc>` that is not http(s) is not a document
+ * any crawler will fetch.
  */
-export class MissingPublicUrlError extends Error {
-  public constructor() {
-    super(
-      "Sitemap is enabled but no public origin is configured. Set `app.publicUrl` " +
-        "in warlock.config.ts, or the PUBLIC_APP_URL environment variable.",
-    );
-    this.name = "MissingPublicUrlError";
+export function normalizeBaseUrl(value: string): string {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new InvalidBaseUrlError(value, "expected a non-empty string");
   }
+
+  let parsed: URL;
+
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new InvalidBaseUrlError(value, "not an absolute URL");
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new InvalidBaseUrlError(value, `unsupported protocol "${parsed.protocol}"`);
+  }
+
+  const href = parsed.href;
+
+  return href.endsWith("/") ? href.slice(0, -1) : href;
 }
 
-export type ResolveOriginOptions = {
-  /** `app.publicUrl` from the app's config, when set. */
-  publicUrl?: string;
-  /** Defaults to `process.env`; overridable for tests. */
-  env?: Record<string, string | undefined>;
-};
+/** True for a value already usable as a `<loc>` without joining an origin. */
+export function isAbsoluteUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
 
-/**
- * The origin the sitemap is served from: `app.publicUrl` first, then the
- * `PUBLIC_APP_URL` env fallback. Throws {@link MissingPublicUrlError} when
- * neither is set — this is the boot-time check, called once, not per-request.
- */
-export function resolveOrigin(options: ResolveOriginOptions = {}): string {
-  const origin = options.publicUrl ?? options.env?.PUBLIC_APP_URL;
-
-  if (!origin) throw new MissingPublicUrlError();
-
-  return origin;
+/** Resolves an entry or alternate path against the base URL, unless it is already absolute. */
+export function resolveAgainstBase(baseUrl: string, path: string): string {
+  return isAbsoluteUrl(path) ? path : joinOrigin(baseUrl, path);
 }
