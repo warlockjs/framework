@@ -54,7 +54,12 @@ describe("sitemapConnector", () => {
     await sitemapConnector().boot();
 
     expect(registeredRoutes).toHaveLength(1);
-    expect(registeredRoutes[0].path).toBe("/sitemap.xml");
+
+    const route = registeredRoutes[0];
+
+    if (route === undefined) throw new Error("expected the connector to register a route");
+
+    expect(route.path).toBe("/sitemap.xml");
 
     let sentContentType: string | undefined;
     let sentBody: string | undefined;
@@ -69,7 +74,7 @@ describe("sitemapConnector", () => {
       },
     };
 
-    await registeredRoutes[0].handler({ response });
+    await route.handler({ response });
 
     expect(sentContentType).toBe("application/xml");
     expect(sentBody).toContain("<loc>https://example.test/</loc>");

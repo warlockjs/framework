@@ -11,7 +11,11 @@ const XML_ESCAPES: Record<string, string> = {
 
 /** Escapes the five XML-significant characters. A URL's query string routinely contains `&`. */
 export function escapeXml(value: string): string {
-  return value.replace(/[&<>"']/g, (char) => XML_ESCAPES[char]);
+  // The character class and the table are written together, so the lookup can
+  // only miss if one is edited without the other; falling back to the original
+  // character keeps that editing mistake from silently emitting `undefined`
+  // into a URL.
+  return value.replace(/[&<>"']/g, (char) => XML_ESCAPES[char] ?? char);
 }
 
 function entryXml(entry: SitemapEntry, origin: string): string {
