@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.16.0 - 2026-09-18
+
+### Added
+
+- Core now parses `application/x-www-form-urlencoded` request bodies, so plain HTML forms and OAuth `form_post` callbacks (Apple) reach their routes instead of failing with `FST_ERR_CTP_INVALID_MEDIA_TYPE`. These bodies have the same `http.bodyLimit` as JSON. A key sent more than once becomes an array.
+- `response.xml()` accepts a raw string or any value with a `toXML(): string` method (such as a `@warlock.js/sitemap` `Sitemap`), and sends `application/xml`.
+
+### Changed
+
+- `warlock add sitemap` now merges a disabled `sitemap` section into `src/config/web.ts`, and creates that file when it is missing. It no longer writes `src/config/sitemap.ts` or registers `sitemapConnector()`. The merge edits only a `sitemap` key directly on the exported config object, and the result is re-parsed before it is written.
+
 ## 5.15.0 - 2026-09-18
 
 ### Added
