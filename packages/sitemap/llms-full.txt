@@ -8,14 +8,40 @@
 
 ---
 name: sitemap-overview
-description: 'Front-door orientation for `@warlock.js/sitemap` — the `sitemapConnector()` + `src/config/sitemap.ts` (`SitemapConfig`: `enabled`, `path`, `defaults.changefreq`/`defaults.priority`) wiring, exclusion rules (not-found, error page, `metadata.robots: noindex`, `sitemap: false`), the page-level `sitemap` export for dynamic routes, and the dev-mode diagnostic for a dynamic route with no `sitemap` export. TRIGGER when: code imports anything from `@warlock.js/sitemap`; user asks "what does @warlock.js/sitemap do", "how do I add a page to the sitemap", "why is my dynamic route missing from sitemap.xml", "sitemap changefreq/priority", "sitemapConnector", "SitemapConfig"; package.json adds `@warlock.js/sitemap`; user is scaffolding `warlock add sitemap`. Skip: user wants to PARSE or fetch a remote sitemap — this package only generates one, in this release; the `app.publicUrl`/`PUBLIC_APP_URL` config key itself lives in `@warlock.js/core/configure-app/SKILL.md`.'
+description: 'Front-door orientation for `@warlock.js/sitemap` — three usage modes (standalone any Node app, Warlock API-only via `sitemapConnector({ entries })`, Warlock web via the page registry), the `sitemapConnector()` + `src/config/sitemap.ts` (`SitemapConfig`: `enabled`, `path`, `defaults.changefreq`/`defaults.priority`) wiring, exclusion rules (not-found, error page, `metadata.robots: noindex`, `sitemap: false`), the page-level `sitemap` export for dynamic routes, the app-supplied/page-derived entries merge-and-dedupe rule, `NoPageRegistryError`, and the dev-mode diagnostic for a dynamic route with no `sitemap` export. TRIGGER when: code imports anything from `@warlock.js/sitemap`; user asks "what does @warlock.js/sitemap do", "how do I add a page to the sitemap", "why is my dynamic route missing from sitemap.xml", "sitemap changefreq/priority", "sitemapConnector", "SitemapConfig", "sitemap without @warlock.js/web", "NoPageRegistryError"; package.json adds `@warlock.js/sitemap`; user is scaffolding `warlock add sitemap`; user is building an API-only Warlock app or a plain Node app and wants a sitemap. Skip: user wants to PARSE or fetch a remote sitemap — this package only generates one, in this release; the `app.publicUrl`/`PUBLIC_APP_URL` config key itself lives in `@warlock.js/core/configure-app/SKILL.md`.'
 ---
 
 # `@warlock.js/sitemap` — overview
 
-Builds `sitemap.xml` at RUNTIME, against the application's live page registry
-and each page's `metadata`/`sitemap` exports — a build-time walk can read
-neither. Generation only; no remote sitemap parser in this release.
+Builds `sitemap.xml` at RUNTIME, against whatever source of URLs the app has
+— a page registry, app-supplied entries, or both — a build-time walk can
+read neither. Generation only; no remote sitemap parser in this release.
+
+## `@warlock.js/core` and `@warlock.js/web` are optional peers
+
+Both are declared in `peerDependenciesMeta` as optional. Everything in the
+package except `src/sitemap-connector.ts` imports nothing from either, and
+the connector itself only reaches them through a lazy `import()` inside
+`boot()` — never at module load. This is what makes all three modes below
+possible from one package.
+
+## Three ways to use it
+
+1. **Standalone, any Node app** — no Warlock at all. Build a
+   `RoutablePage[]` yourself and call `collectSitemapEntries` +
+   `buildSitemapXml` directly. Nothing on this path resolves
+   `@warlock.js/core` or `@warlock.js/web`.
+2. **Warlock, API-only** — an API-only app has no page registry for
+   `listRoutablePages()` to read. Pass `sitemapConnector({ entries })` with
+   an app-supplied entries function instead; `@warlock.js/web` is not
+   required on this path.
+3. **Warlock web** — `warlock add sitemap` wires `sitemapConnector()`
+   against the page registry `@warlock.js/web` exposes, plus the page-level
+   `sitemap` export for dynamic routes.
+
+Modes 2 and 3 aren't exclusive: `entries` and a page registry can both be
+present on the same connector — see "Merging page-derived and app-supplied
+entries" below.
 
 ## Server-only package
 
@@ -24,10 +50,10 @@ neither. Generation only; no remote sitemap parser in this release.
 the page registry and mounts a route; it has no reason to reach the client
 bundle.
 
-## Wiring it up — `sitemapConnector()` and `src/config/sitemap.ts`
+## Wiring it up — `sitemapConnector()` and `src/config/sitemap.ts` (Modes 2 and 3)
 
-`warlock add sitemap` (`requires: ["web"]`) writes both halves. Doing it by
-hand is the same two pieces:
+`warlock add sitemap` (`requires: ["web"]`) writes both halves for Mode 3.
+Doing it by hand is the same two pieces:
 
 ```ts
 // warlock.config.ts
@@ -60,9 +86,28 @@ it registers lands on the router web already populated) it is a no-op unless
 `enabled` is `true`. When enabled, it resolves `app.publicUrl` /
 `PUBLIC_APP_URL` **once, at boot** via `resolveOrigin()` — throwing
 `MissingPublicUrlError` and refusing to start rather than falling back to a
-request-derived host — then registers `GET <path>`. The route itself
-re-reads the page graph on every request via `listRoutablePages()`, not once
-at boot, so it never goes stale under `warlock dev`.
+request-derived host — then attempts a lazy `import("@warlock.js/web")` to
+get `listRoutablePages`. If that import fails **and** no `entries` option
+was supplied, it throws `NoPageRegistryError` — there is nothing to serve.
+Otherwise it registers `GET <path>`. The route itself re-reads the page
+graph on every request via `listRoutablePages()`, not once at boot, so it
+never goes stale under `warlock dev`.
+
+### `NoPageRegistryError`
+
+Raised at `boot()`, before the route is registered, when `@warlock.js/web`
+is not installed and no `entries` option was supplied. Refuses to boot
+rather than registering a route that would silently serve an empty
+`<urlset>` — the same reasoning as `MissingPublicUrlError` above. Fix by
+installing `@warlock.js/web`, or by passing `sitemapConnector({ entries })`.
+
+### Merging page-derived and app-supplied entries
+
+When both a page registry (Mode 3) and `entries` (Mode 2's option, usable
+alongside Mode 3) are present, `mergeSitemapEntries` (`src/collect-entries.ts`)
+combines them, deduplicated by `path` — not one replacing the other. Where
+the same `path` appears in both, the `entries` version wins, since it was
+written for that exact path on purpose.
 
 ## The exclusion rules — read these once and you know the shape
 
@@ -81,6 +126,30 @@ be enumerated without application data, so silence there would mean a
 sitemap that looks complete while it quietly omits every product page on the
 site. `describeUnresolvedDynamicRoutes` (`src/diagnostic.ts`) is the message a
 developer sees when that happens.
+
+## Standalone usage (Mode 1) — no `sitemapConnector()` at all
+
+Call the building blocks directly against a hand-built `RoutablePage[]`:
+
+```ts
+import { buildSitemapXml, collectSitemapEntries, type RoutablePage } from "@warlock.js/sitemap";
+
+const pages: RoutablePage[] = [
+  { routeName: "home", routePath: "/" },
+  {
+    routeName: "post-details",
+    routePath: "/posts/:id",
+    sitemap: async () => (await db.posts.find()).map((post) => ({ path: `/posts/${post.slug}` })),
+  },
+];
+
+const { entries } = await collectSitemapEntries(pages, { defaults: { changefreq: "weekly" } });
+const xml = buildSitemapXml(entries, "https://example.com");
+```
+
+This is the only mode where `buildSitemapXml`'s `origin` argument is
+supplied by hand instead of `resolveOrigin()` — there is no `app.publicUrl`
+to read without `@warlock.js/core`.
 
 ## The page-level `sitemap` export
 
@@ -101,11 +170,19 @@ outside a sitemap.
 ## Building blocks
 
 - `sitemapConnector(options?)` (`src/sitemap-connector.ts`) — the connector
-  `warlock.config.ts` registers; see "Wiring it up" above.
+  `warlock.config.ts` registers; `options.entries` for Mode 2; see "Wiring it
+  up" above. The only module that imports `@warlock.js/core`/`@warlock.js/web`,
+  and only lazily.
+- `NoPageRegistryError` (`src/sitemap-connector.ts`) — see above.
 - `collectSitemapEntries(pages, options)` (`src/collect-entries.ts`) — applies
   every exclusion rule above and returns `{ entries, unresolvedDynamicRoutes }`.
-  Takes a `RoutablePage[]` — a minimal shape the runtime wiring adapts from
-  `@warlock.js/web`'s page registry, not that package's own discovery type.
+  Takes a `RoutablePage[]` — a minimal shape either the runtime wiring adapts
+  from `@warlock.js/web`'s page registry (Mode 3), or an app builds by hand
+  (Mode 1) — not `@warlock.js/web`'s own discovery type.
+- `mergeSitemapEntries(pageEntries, appEntries)` / `withDefaults(entry, defaults)`
+  (`src/collect-entries.ts`) — the dedupe-by-`path` merge (app-supplied wins
+  on collision) and the per-entry default-applying helper, shared by
+  page-derived and app-supplied entries alike.
 - `buildSitemapXml(entries, origin)` (`src/xml.ts`) — serialises entries into
   the sitemaps.org `urlset` document: correct namespace, element order
   (`loc`/`lastmod`/`changefreq`/`priority`), and XML escaping of `&`, `<`,
