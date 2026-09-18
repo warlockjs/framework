@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/fs` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.16.0 - 2026-09-18
+
+### Fixed
+
+- Skill code samples are now self-contained and type-check as written.
+
 ## 5.13.0 - 2026-09-17
 
 ### Changed
