@@ -1,0 +1,51 @@
+---
+title: Sitemap
+description: Runtime sitemap.xml generation from your app's own page registry — exclusion rules, a dev-mode diagnostic for unreachable dynamic routes, and one required config key.
+---
+
+`@warlock.js/sitemap` builds `sitemap.xml` at **runtime**, against your
+app's live page registry and each page's `metadata`/`sitemap` exports — a
+build-time walk can read neither. Generation only in this release; there is
+no remote sitemap parser.
+
+> This is the package's whole reason for existing: a dynamic route
+> (`[id]`, `[...slug]`) cannot be enumerated without application data. Every
+> other case is a static, mechanical rule — that one case gets a page-level
+> `sitemap` export, and a loud dev-mode warning when a dynamic route has none.
+
+## Try it in ten lines
+
+```ts
+// warlock.config.ts
+import { defineConfig } from "@warlock.js/core";
+import { sitemapConnector } from "@warlock.js/sitemap";
+
+export default defineConfig({ connectors: [sitemapConnector()] });
+
+// src/config/sitemap.ts
+import type { SitemapConfig } from "@warlock.js/sitemap";
+
+const sitemapConfig: SitemapConfig = {
+  enabled: true,
+  path: "/sitemap.xml",
+  defaults: { changefreq: "weekly", priority: 0.5 },
+};
+
+export default sitemapConfig;
+```
+
+`warlock add sitemap` writes both files for you and requires `web` to
+already be installed.
+
+## It needs your app's public origin
+
+The sitemap has to emit absolute URLs, so it needs `app.publicUrl` (or the
+`PUBLIC_APP_URL` environment variable) set in `src/config/app.ts`. With
+`sitemap.enabled: true` and neither set, **boot refuses to start** rather
+than guessing the host from the incoming request — see
+[Configuration](./essentials/configuration/).
+
+## Read by intent
+
+- **Understanding the mental model** → [Essentials](./essentials/configuration/) — the config shape, the page-level `sitemap` export, and the exclusion rules.
+- **Method-by-method lookup** → [Reference](./reference/api/).

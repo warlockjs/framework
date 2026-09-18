@@ -41,6 +41,15 @@ export function Greeting() {
 `useTrans()` translates against the current request/page locale directly,
 without consulting any process-global locale.
 
+### Survives hydration — fixed in 5.15
+
+The hydration payload carries the active locale's translated keywords (a
+`translations` key), registered into the client's lookup table before the
+page hydrates. Before 5.15, nothing filled that table in the browser: the
+server-rendered HTML showed the correct translation, then React silently
+replaced it with the raw key the moment hydration ran. No app code needs to
+change — this was a framework-internal fix.
+
 ### Typed keys — new in 5.13
 
 `warlock dev` scans your app's `groupedTranslations(...)` dictionaries and

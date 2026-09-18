@@ -85,7 +85,7 @@ A scaffolded project has one file per subsystem in `src/config/`:
 
 ```
 src/config/
-  app.ts           app name, timezone, base URL, locale
+  app.ts           app name, timezone, base URL, public URL, locale
   auth.ts          JWT secret, token TTL, password policy
   cache.ts         driver, prefix, TTLs
   database.ts      driver (mongo|postgres), connection string, pool

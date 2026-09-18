@@ -356,6 +356,8 @@ const all = request.cookies; // full map
 
 Cookies are parsed by the framework's cookie plugin — they arrive on the request as already-decoded values. Set cookies on the **response** via `response.cookie(name, value, options)` — see [HTTP response](./http-response.md#cookies).
 
+`request.cookie(name)` and `request.hasCookie(name)` throw `CookieJarUnavailableError` when `@fastify/cookie` isn't registered on the Fastify instance, instead of quietly returning `undefined` / `false` — a by-name read is a deliberate assertion that the cookie should be readable, so a missing jar is a configuration fault, not an absent cookie. `request.cookies` (the plain map) stays lenient and returns `{}` in the same situation.
+
 ## Use-cases by example
 
 ### Reading one field

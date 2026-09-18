@@ -624,10 +624,11 @@ BullMQ retries through `attempts` and `backoff`. If `@warlock.js/queue` isn't
 installed, the first `.queue()` throws `QueuePackageNotInstalledError` naming
 `warlock add queue`.
 
-> **Deprecated:** `queueNotificationDispatcher` from
-> `@warlock.js/queue/notifications` still works for this release (it logs a
-> one-time deprecation warning) and is removed next release. Migrate to
-> `bullmqQueue` above — same option names (`queue`, `attempts`, `backoff`).
+> **Removed (5.15.0):** `queueNotificationDispatcher` from
+> `@warlock.js/queue/notifications` — deprecated in 5.14, removed this
+> release, along with the `@warlock.js/notifications` peer dependency it was
+> the only reason `@warlock.js/queue` carried. Use `bullmqQueue` above — same
+> option names (`queue`, `attempts`, `backoff`).
 
 ## Run the herald worker
 

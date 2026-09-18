@@ -5,20 +5,18 @@ sidebar:
 ---
 
 `@warlock.js/notifications` sends `.queue()` deliveries through a
-`QueueDispatcher` in `NotificationConfig.queue`. `@warlock.js/queue`
-ships one backed by BullMQ, on the `@warlock.js/queue/notifications`
-subpath so the main package export never pulls in
-`@warlock.js/notifications` (it stays an optional peer).
+`QueueDispatcher` in `NotificationConfig.queue`. `@warlock.js/notifications`
+ships one backed by BullMQ, `bullmqQueue()`, which lazily loads
+`@warlock.js/queue` (an optional peer) the first time `.queue()` runs.
 
 ## Configure
 
 ```ts title="src/config/notifications.ts"
-import { type NotificationConfig, mailChannel } from "@warlock.js/notifications";
-import { queueNotificationDispatcher } from "@warlock.js/queue/notifications";
+import { type NotificationConfig, bullmqQueue, mailChannel } from "@warlock.js/notifications";
 
 const config: NotificationConfig = {
   channels: { mail: mailChannel() },
-  queue: queueNotificationDispatcher({
+  queue: bullmqQueue({
     attempts: 3,
     backoff: { type: "exponential", delay: 5000 },
   }),
@@ -52,7 +50,7 @@ await orderShipped.queue(user, { order }, { delay: "10m" }); // delivered in 10 
   worker process has a different `channels` config than the process
   that queued it.
 
-## `QueueNotificationDispatcherOptions`
+## `bullmqQueue` options
 
 | Option | Default | Notes |
 |---|---|---|
@@ -60,5 +58,5 @@ await orderShipped.queue(user, { order }, { delay: "10m" }); // delivered in 10 
 | `attempts` | `queue.defaultJobOptions.attempts`, else `1` | |
 | `backoff` | — | fixed or exponential |
 
-`@warlock.js/notifications` itself gains no dependency on this package
-— it only depends on the `QueueDispatcher` shape.
+`@warlock.js/queue` itself gains no dependency on `@warlock.js/notifications`
+— it only ships the job primitives `bullmqQueue` dispatches through.

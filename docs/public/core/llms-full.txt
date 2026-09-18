@@ -964,7 +964,7 @@ Don't call `setBaseUrl` per request — it's process-global and races every othe
 
 ---
 name: configure-app
-description: 'Configure a Warlock app — the two layers (`warlock.config.ts` for framework-level wiring, `src/config/*.ts` for subsystems), `.env` + `env()`, and the `config()` getter for runtime reads. Triggers: `defineConfig`, `config.get`, `config.key`, `env`, `ConfigRegistry`, `HttpConfigurations`, `AppConfigurations`; "add a new config file", "warlock.config.ts vs src/config", "read env values", "runtime config lookup"; typical import `import { defineConfig, config, env } from "@warlock.js/core"`. Skip: cache driver registration — `@warlock.js/cache/cache-basics/SKILL.md`; mail config — `@warlock.js/core/send-mail/SKILL.md`; storage config — `@warlock.js/core/store-file/SKILL.md`; competing libs `dotenv` direct, `convict`, `node-config`.'
+description: 'Configure a Warlock app — the two layers (`warlock.config.ts` for framework-level wiring, `src/config/*.ts` for subsystems), `.env` + `env()`, the `config()` getter for runtime reads, and `app.publicUrl`/`PUBLIC_APP_URL` (the app''s public origin). Triggers: `defineConfig`, `config.get`, `config.key`, `env`, `ConfigRegistry`, `HttpConfigurations`, `AppConfigurations`, `publicUrl`, `PUBLIC_APP_URL`, `getPublicUrl`; "add a new config file", "warlock.config.ts vs src/config", "read env values", "runtime config lookup", "app public origin/URL"; typical import `import { defineConfig, config, env } from "@warlock.js/core"`. Skip: cache driver registration — `@warlock.js/cache/cache-basics/SKILL.md`; mail config — `@warlock.js/core/send-mail/SKILL.md`; storage config — `@warlock.js/core/store-file/SKILL.md`; sitemap boot-time refusal on a missing origin — `@warlock.js/sitemap/sitemap-overview/SKILL.md`; competing libs `dotenv` direct, `convict`, `node-config`.'
 ---
 
 # Warlock — configure the app
@@ -1069,7 +1069,7 @@ same nonce reaches the page's `<script>` tags.
 | CLI commands (registered via `warlock <cmd>`)          | `warlock.config.ts > cli`      |
 | HTTP server tuning per env (port, host, retry)         | `warlock.config.ts > server`   |
 | HTTP runtime (CORS, cookies, rate limits, upload size) | `src/config/http.ts`           |
-| App identity (name, baseUrl, timezone, locales)        | `src/config/app.ts`            |
+| App identity (name, baseUrl, publicUrl, timezone, locales) | `src/config/app.ts`        |
 | Subsystem configs (auth, mail, storage, cache, ai, …)  | `src/config/<name>.ts`         |
 
 Heuristic: if the setting changes how the framework **boots, builds, or scaffolds**, it goes in `warlock.config.ts`. If it changes how a **subsystem behaves at runtime**, it goes in `src/config/`.
@@ -1202,6 +1202,33 @@ const config = {
 ```
 
 Avoid scattering `process.env.NODE_ENV === "production"` checks — they don't get the same default-handling.
+
+### `app.publicUrl` — the app's public origin (5.15.0)
+
+```ts title="src/config/app.ts"
+import type { AppConfigurations } from "@warlock.js/core";
+
+const appConfigurations: AppConfigurations = {
+  appName: "My App",
+  publicUrl: "https://example.com",
+};
+
+export default appConfigurations;
+```
+
+The one absolute-URL source every consumer that needs one — the sitemap
+route, canonical links, OG tags, absolute URLs in mail — reads instead of
+keeping its own copy. Optional in general (most apps have no consumer that
+needs it yet); read it with `getPublicUrl()`, which returns `app.publicUrl`,
+falling back to the `PUBLIC_APP_URL` env var, or `undefined` when neither is
+set.
+
+`getPublicUrl()` never throws — it is a consumer's job to fail loudly when it
+requires the value. `@warlock.js/sitemap` is the first such consumer: with
+`sitemap.enabled: true` and no `app.publicUrl`/`PUBLIC_APP_URL` set, boot
+refuses to start (`MissingPublicUrlError`, naming both) rather than falling
+back to a request-derived host — a sitemap served from the wrong host is
+worse than one that never boots.
 
 ## Common patterns
 
@@ -4378,7 +4405,7 @@ await Mail.to(user.email)
 
 ---
 name: send-response
-description: 'Send HTTP responses via @warlock.js/core''s Response helpers — success/error variants, status helpers, redirects, files, streams, and SSE. Picking the right helper carries the HTTP semantic without manual status codes. Triggers: `response.success`, `response.successCreate`, `response.notFound`, `response.forbidden`, `response.badRequest`, `response.sendFile`, `response.stream`, `response.sse`, `response.replay`, `ResourceNotFoundError`, `ForbiddenError`; "return a 201 from a controller", "send a file", "stream Server-Sent Events", "throw HTTP-shaped errors from services"; typical import `import type { RequestHandler, Response } from "@warlock.js/core"`. Skip: controller shape — `@warlock.js/core/create-controller/SKILL.md`; route registration — `@warlock.js/core/register-route/SKILL.md`; competing patterns: hand-rolled status codes via `reply.code(404).send(...)`, raw Fastify reply.'
+description: 'Send HTTP responses via @warlock.js/core''s Response helpers — success/error variants, status helpers, redirects, files, streams, and SSE. Picking the right helper carries the HTTP semantic without manual status codes. Triggers: `response.success`, `response.successCreate`, `response.notFound`, `response.forbidden`, `response.badRequest`, `response.sendFile`, `response.stream`, `response.sse`, `response.replay`, `ResourceNotFoundError`, `ForbiddenError`, `request.cookie`, `request.hasCookie`, `CookieJarUnavailableError`; "return a 201 from a controller", "send a file", "stream Server-Sent Events", "throw HTTP-shaped errors from services"; typical import `import type { RequestHandler, Response } from "@warlock.js/core"`. Skip: controller shape — `@warlock.js/core/create-controller/SKILL.md`; route registration — `@warlock.js/core/register-route/SKILL.md`; competing patterns: hand-rolled status codes via `reply.code(404).send(...)`, raw Fastify reply.'
 ---
 
 # Warlock — send a response
@@ -4579,6 +4606,20 @@ Every response cookie gets `httpOnly: true`, `sameSite: "lax"`, and `secure: tru
 `secure` is relaxed in development only — browsers drop a `Secure` cookie over plain http, which would silently break every local login. It stays on in test and staging.
 
 Precedence, lowest to highest: **framework defaults → `http.cookies.options` → the per-call `options` argument.** Set an app-wide policy in config, override per cookie when a specific one genuinely needs different treatment.
+
+### Reading cookies back — `request.cookie()` / `request.hasCookie()` throw when the jar is unavailable (5.15.0)
+
+`request.cookie(name)` and `request.hasCookie(name)` are a deliberate
+by-name assertion — "this cookie should be readable here" — so when
+`@fastify/cookie` is not registered on the Fastify instance, both now
+**throw `CookieJarUnavailableError`** naming the missing cookie, instead of
+silently returning `undefined` / `false`. Register the plugin (see core's
+`http/plugins.ts`) before reading cookies by name.
+
+`request.cookies` (the plain getter, no by-name assertion) is unchanged and
+stays lenient — it returns `{}` when the jar is unavailable, because the
+framework's own opportunistic reads (e.g. locale resolution) must not throw
+on a request that simply has no jar.
 
 These are the flags whose absence never fails a test and is fatal in production: the app works perfectly and is simply insecure. Opting out is now explicit and visible in review.
 
@@ -6655,6 +6696,12 @@ All three lookups go through `@mongez/localization`'s `trans()` under the hood, 
 ### Web `useTrans()` key checking
 
 When an app uses `@warlock.js/web`, `warlock dev` writes `.warlock/typings/translations.d.ts` from literal `groupedTranslations("group", { key: ... })` registrations. It augments web's `TranslationKeyRegistry`, so `useTrans()("products.notFound")` is checked against registered keys and a typo fails TypeScript. Before the generated file exists, `useTrans()` accepts `string` for a non-breaking first boot. Dynamic groups/keys and placeholders are not inferred.
+
+`useTrans()` now works correctly across hydration (5.15.0): the hydration
+payload ships a `translations` key with the active locale's keywords, and
+`@warlock.js/web` registers them into this same lookup table before the
+client hydrates — see `@warlock.js/web/write-the-root/SKILL.md`'s "`useTrans()`
+survives hydration" section for the failure this fixed.
 
 ### Locale on a specific lookup
 

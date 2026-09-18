@@ -1,0 +1,127 @@
+---
+title: "API reference"
+description: "The complete public surface of @warlock.js/sitemap — the connector, the config types, the page-level export types, and the building blocks it's assembled from."
+sidebar:
+  order: 1
+  label: "API reference"
+---
+
+## Connector
+
+```ts
+function sitemapConnector(options?: SitemapConnectorOptions): Connector;
+
+type SitemapConnectorOptions = {
+  /** Supply the configuration directly instead of reading the `sitemap` config key. */
+  config?: SitemapConfig;
+};
+
+const DEFAULT_SITEMAP_PATH = "/sitemap.xml";
+const SITEMAP_CONNECTOR_PRIORITY = 5.6; // after HTTP (5) and web (5.5)
+```
+
+## Config & entry types
+
+```ts
+type SitemapConfig = {
+  enabled: boolean;
+  path: string;
+  defaults?: SitemapDefaults;
+};
+
+type SitemapDefaults = {
+  changefreq?: ChangeFreq;
+  priority?: number;
+};
+
+type ChangeFreq =
+  | "always"
+  | "hourly"
+  | "daily"
+  | "weekly"
+  | "monthly"
+  | "yearly"
+  | "never";
+```
+
+## Page-level export types
+
+```ts
+/** `export const sitemap: SitemapEntries = async () => [...]` in a *.page.tsx */
+type SitemapEntries = () => SitemapEntry[] | Promise<SitemapEntry[]>;
+
+type SitemapEntry = {
+  path: string; // app-relative; joined against the configured origin
+  lastmod?: string;
+  changefreq?: ChangeFreq;
+  priority?: number;
+};
+```
+
+## Building blocks
+
+These are what `sitemapConnector()` is assembled from — reach for them
+directly only for custom wiring or tests.
+
+```ts
+function collectSitemapEntries(
+  pages: RoutablePage[],
+  options?: CollectSitemapEntriesOptions,
+): Promise<CollectSitemapEntriesResult>;
+
+type CollectSitemapEntriesOptions = { defaults?: SitemapDefaults };
+type CollectSitemapEntriesResult = {
+  entries: SitemapEntry[];
+  unresolvedDynamicRoutes: string[];
+};
+
+function isDynamicRoutePath(routePath: string): boolean;
+```
+
+Applies every exclusion rule (see [Configuration](../essentials/configuration/)
+for the table) against a `RoutablePage[]` — a minimal shape the runtime
+wiring adapts from `@warlock.js/web`'s page registry, not that package's own
+discovery type.
+
+```ts
+function buildSitemapXml(entries: SitemapEntry[], origin: string): string;
+function escapeXml(value: string): string;
+```
+
+Serialises entries into the sitemaps.org `urlset` document: correct
+namespace, element order (`loc`/`lastmod`/`changefreq`/`priority`), and XML
+escaping of `&`, `<`, `>`, `"`, `'` in every URL.
+
+```ts
+function resolveOrigin(options?: ResolveOriginOptions): string;
+function joinOrigin(origin: string, routePath: string): string;
+
+type ResolveOriginOptions = {
+  /** `app.publicUrl` from the app's config, when set. */
+  publicUrl?: string;
+  /** Defaults to `process.env`; overridable for tests. */
+  env?: Record<string, string | undefined>;
+};
+
+class MissingPublicUrlError extends Error {}
+```
+
+`resolveOrigin()` reads `app.publicUrl` first, then the `PUBLIC_APP_URL` env
+fallback, throwing `MissingPublicUrlError` when neither is set. `joinOrigin()`
+joins an origin and an app-relative path with exactly one slash regardless of
+trailing slashes on either side.
+
+```ts
+function describeUnresolvedDynamicRoutes(
+  routeNames: readonly string[],
+): string | undefined;
+```
+
+The dev-mode diagnostic message for a dynamic route with no `sitemap` export.
+Returns `undefined` when there is nothing to report.
+
+## See also
+
+- [Configuration](../essentials/configuration/) — the connector, the config shape, and the exclusion rules.
+
+Source: [`@warlock.js/sitemap/src/`](https://github.com/warlockjs/core/tree/main/%40warlock.js/sitemap/src)

@@ -973,7 +973,7 @@ Don't call `setBaseUrl` per request — it's process-global and races every othe
 
 ---
 name: configure-app
-description: 'Configure a Warlock app — the two layers (`warlock.config.ts` for framework-level wiring, `src/config/*.ts` for subsystems), `.env` + `env()`, and the `config()` getter for runtime reads. Triggers: `defineConfig`, `config.get`, `config.key`, `env`, `ConfigRegistry`, `HttpConfigurations`, `AppConfigurations`; "add a new config file", "warlock.config.ts vs src/config", "read env values", "runtime config lookup"; typical import `import { defineConfig, config, env } from "@warlock.js/core"`. Skip: cache driver registration — `@warlock.js/cache/cache-basics/SKILL.md`; mail config — `@warlock.js/core/send-mail/SKILL.md`; storage config — `@warlock.js/core/store-file/SKILL.md`; competing libs `dotenv` direct, `convict`, `node-config`.'
+description: 'Configure a Warlock app — the two layers (`warlock.config.ts` for framework-level wiring, `src/config/*.ts` for subsystems), `.env` + `env()`, the `config()` getter for runtime reads, and `app.publicUrl`/`PUBLIC_APP_URL` (the app''s public origin). Triggers: `defineConfig`, `config.get`, `config.key`, `env`, `ConfigRegistry`, `HttpConfigurations`, `AppConfigurations`, `publicUrl`, `PUBLIC_APP_URL`, `getPublicUrl`; "add a new config file", "warlock.config.ts vs src/config", "read env values", "runtime config lookup", "app public origin/URL"; typical import `import { defineConfig, config, env } from "@warlock.js/core"`. Skip: cache driver registration — `@warlock.js/cache/cache-basics/SKILL.md`; mail config — `@warlock.js/core/send-mail/SKILL.md`; storage config — `@warlock.js/core/store-file/SKILL.md`; sitemap boot-time refusal on a missing origin — `@warlock.js/sitemap/sitemap-overview/SKILL.md`; competing libs `dotenv` direct, `convict`, `node-config`.'
 ---
 
 # Warlock — configure the app
@@ -1078,7 +1078,7 @@ same nonce reaches the page's `<script>` tags.
 | CLI commands (registered via `warlock <cmd>`)          | `warlock.config.ts > cli`      |
 | HTTP server tuning per env (port, host, retry)         | `warlock.config.ts > server`   |
 | HTTP runtime (CORS, cookies, rate limits, upload size) | `src/config/http.ts`           |
-| App identity (name, baseUrl, timezone, locales)        | `src/config/app.ts`            |
+| App identity (name, baseUrl, publicUrl, timezone, locales) | `src/config/app.ts`        |
 | Subsystem configs (auth, mail, storage, cache, ai, …)  | `src/config/<name>.ts`         |
 
 Heuristic: if the setting changes how the framework **boots, builds, or scaffolds**, it goes in `warlock.config.ts`. If it changes how a **subsystem behaves at runtime**, it goes in `src/config/`.
@@ -1211,6 +1211,33 @@ const config = {
 ```
 
 Avoid scattering `process.env.NODE_ENV === "production"` checks — they don't get the same default-handling.
+
+### `app.publicUrl` — the app's public origin (5.15.0)
+
+```ts title="src/config/app.ts"
+import type { AppConfigurations } from "@warlock.js/core";
+
+const appConfigurations: AppConfigurations = {
+  appName: "My App",
+  publicUrl: "https://example.com",
+};
+
+export default appConfigurations;
+```
+
+The one absolute-URL source every consumer that needs one — the sitemap
+route, canonical links, OG tags, absolute URLs in mail — reads instead of
+keeping its own copy. Optional in general (most apps have no consumer that
+needs it yet); read it with `getPublicUrl()`, which returns `app.publicUrl`,
+falling back to the `PUBLIC_APP_URL` env var, or `undefined` when neither is
+set.
+
+`getPublicUrl()` never throws — it is a consumer's job to fail loudly when it
+requires the value. `@warlock.js/sitemap` is the first such consumer: with
+`sitemap.enabled: true` and no `app.publicUrl`/`PUBLIC_APP_URL` set, boot
+refuses to start (`MissingPublicUrlError`, naming both) rather than falling
+back to a request-derived host — a sitemap served from the wrong host is
+worse than one that never boots.
 
 ## Common patterns
 
@@ -4387,7 +4414,7 @@ await Mail.to(user.email)
 
 ---
 name: send-response
-description: 'Send HTTP responses via @warlock.js/core''s Response helpers — success/error variants, status helpers, redirects, files, streams, and SSE. Picking the right helper carries the HTTP semantic without manual status codes. Triggers: `response.success`, `response.successCreate`, `response.notFound`, `response.forbidden`, `response.badRequest`, `response.sendFile`, `response.stream`, `response.sse`, `response.replay`, `ResourceNotFoundError`, `ForbiddenError`; "return a 201 from a controller", "send a file", "stream Server-Sent Events", "throw HTTP-shaped errors from services"; typical import `import type { RequestHandler, Response } from "@warlock.js/core"`. Skip: controller shape — `@warlock.js/core/create-controller/SKILL.md`; route registration — `@warlock.js/core/register-route/SKILL.md`; competing patterns: hand-rolled status codes via `reply.code(404).send(...)`, raw Fastify reply.'
+description: 'Send HTTP responses via @warlock.js/core''s Response helpers — success/error variants, status helpers, redirects, files, streams, and SSE. Picking the right helper carries the HTTP semantic without manual status codes. Triggers: `response.success`, `response.successCreate`, `response.notFound`, `response.forbidden`, `response.badRequest`, `response.sendFile`, `response.stream`, `response.sse`, `response.replay`, `ResourceNotFoundError`, `ForbiddenError`, `request.cookie`, `request.hasCookie`, `CookieJarUnavailableError`; "return a 201 from a controller", "send a file", "stream Server-Sent Events", "throw HTTP-shaped errors from services"; typical import `import type { RequestHandler, Response } from "@warlock.js/core"`. Skip: controller shape — `@warlock.js/core/create-controller/SKILL.md`; route registration — `@warlock.js/core/register-route/SKILL.md`; competing patterns: hand-rolled status codes via `reply.code(404).send(...)`, raw Fastify reply.'
 ---
 
 # Warlock — send a response
@@ -4588,6 +4615,20 @@ Every response cookie gets `httpOnly: true`, `sameSite: "lax"`, and `secure: tru
 `secure` is relaxed in development only — browsers drop a `Secure` cookie over plain http, which would silently break every local login. It stays on in test and staging.
 
 Precedence, lowest to highest: **framework defaults → `http.cookies.options` → the per-call `options` argument.** Set an app-wide policy in config, override per cookie when a specific one genuinely needs different treatment.
+
+### Reading cookies back — `request.cookie()` / `request.hasCookie()` throw when the jar is unavailable (5.15.0)
+
+`request.cookie(name)` and `request.hasCookie(name)` are a deliberate
+by-name assertion — "this cookie should be readable here" — so when
+`@fastify/cookie` is not registered on the Fastify instance, both now
+**throw `CookieJarUnavailableError`** naming the missing cookie, instead of
+silently returning `undefined` / `false`. Register the plugin (see core's
+`http/plugins.ts`) before reading cookies by name.
+
+`request.cookies` (the plain getter, no by-name assertion) is unchanged and
+stays lenient — it returns `{}` when the jar is unavailable, because the
+framework's own opportunistic reads (e.g. locale resolution) must not throw
+on a request that simply has no jar.
 
 These are the flags whose absence never fails a test and is fatal in production: the app works perfectly and is simply insecure. Opting out is now explicit and visible in review.
 
@@ -6664,6 +6705,12 @@ All three lookups go through `@mongez/localization`'s `trans()` under the hood, 
 ### Web `useTrans()` key checking
 
 When an app uses `@warlock.js/web`, `warlock dev` writes `.warlock/typings/translations.d.ts` from literal `groupedTranslations("group", { key: ... })` registrations. It augments web's `TranslationKeyRegistry`, so `useTrans()("products.notFound")` is checked against registered keys and a typo fails TypeScript. Before the generated file exists, `useTrans()` accepts `string` for a non-breaking first boot. Dynamic groups/keys and placeholders are not inferred.
+
+`useTrans()` now works correctly across hydration (5.15.0): the hydration
+payload ships a `translations` key with the active locale's keywords, and
+`@warlock.js/web` registers them into this same lookup table before the
+client hydrates — see `@warlock.js/web/write-the-root/SKILL.md`'s "`useTrans()`
+survives hydration" section for the failure this fixed.
 
 ### Locale on a specific lookup
 
@@ -24800,10 +24847,11 @@ BullMQ retries through `attempts` and `backoff`. If `@warlock.js/queue` isn't
 installed, the first `.queue()` throws `QueuePackageNotInstalledError` naming
 `warlock add queue`.
 
-> **Deprecated:** `queueNotificationDispatcher` from
-> `@warlock.js/queue/notifications` still works for this release (it logs a
-> one-time deprecation warning) and is removed next release. Migrate to
-> `bullmqQueue` above — same option names (`queue`, `attempts`, `backoff`).
+> **Removed (5.15.0):** `queueNotificationDispatcher` from
+> `@warlock.js/queue/notifications` — deprecated in 5.14, removed this
+> release, along with the `@warlock.js/notifications` peer dependency it was
+> the only reason `@warlock.js/queue` carried. Use `bullmqQueue` above — same
+> option names (`queue`, `attempts`, `backoff`).
 
 ## Run the herald worker
 
@@ -27190,6 +27238,21 @@ export default function App({ children }: AppProps) {
 `useTextDirection()` derives `"rtl"` or `"ltr"` from the same locale `useLocale()` already exposes — via `localeDirection()`, a pure function safe to call on the server or the client. No hydration payload change is involved: the direction is computed from the locale that already made the trip, not carried separately.
 
 To switch the active locale without a full reload, call `changeLocaleCode(code)`. The server persists the choice in its `locale` cookie when the resulting navigation data request carries `?locale=`, so `lang` and `dir` on the next render (and every render after) reflect the new locale.
+
+### `useTrans()` survives hydration via the payload's `translations` key (5.15.0)
+
+The hydration payload carries a seventh required key, `translations` — the
+active locale's registered keywords only, not every locale. It is registered
+into `@mongez/localization`'s client-side table *before* `hydrateRoot` runs
+(`hydrate-page.tsx`), because registering after the first client render would
+be too late: React would already have reconciled the DOM to the raw
+translation key. `useTrans()` reads that same table, so it now works
+identically before and after hydration — previously the server-rendered HTML
+was correctly translated but React silently replaced it with the raw key on
+hydration, with no error or warning. `isHydrationPayload()` requires
+`translations` to be present and an object; a payload built before 5.15
+(missing the key) is rejected as malformed rather than silently hydrating
+with an empty table.
 
 ## `#vessel` is the hydration boundary
 
@@ -36580,3 +36643,134 @@ Failures surface the error and halt; there is no rollback. After it finishes, `c
 - `@warlock.js/core/run-app/SKILL.md` — `warlock dev` / `build` / `start` once the project exists.
 - `@warlock.js/core/create-module/SKILL.md` — generate a new module inside the project.
 - `@warlock.js/core/add-connector/SKILL.md` — what `warlock add` wires when a feature pulls a connector.
+
+
+================================================================================
+# @warlock.js/sitemap
+================================================================================
+
+# Warlock Sitemap — full skills
+
+> Package: `@warlock.js/sitemap`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/sitemap/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## sitemap-overview  `@warlock.js/sitemap/sitemap-overview/SKILL.md`
+
+---
+name: sitemap-overview
+description: 'Front-door orientation for `@warlock.js/sitemap` — the `sitemapConnector()` + `src/config/sitemap.ts` (`SitemapConfig`: `enabled`, `path`, `defaults.changefreq`/`defaults.priority`) wiring, exclusion rules (not-found, error page, `metadata.robots: noindex`, `sitemap: false`), the page-level `sitemap` export for dynamic routes, and the dev-mode diagnostic for a dynamic route with no `sitemap` export. TRIGGER when: code imports anything from `@warlock.js/sitemap`; user asks "what does @warlock.js/sitemap do", "how do I add a page to the sitemap", "why is my dynamic route missing from sitemap.xml", "sitemap changefreq/priority", "sitemapConnector", "SitemapConfig"; package.json adds `@warlock.js/sitemap`; user is scaffolding `warlock add sitemap`. Skip: user wants to PARSE or fetch a remote sitemap — this package only generates one, in this release; the `app.publicUrl`/`PUBLIC_APP_URL` config key itself lives in `@warlock.js/core/configure-app/SKILL.md`.'
+---
+
+# `@warlock.js/sitemap` — overview
+
+Builds `sitemap.xml` at RUNTIME, against the application's live page registry
+and each page's `metadata`/`sitemap` exports — a build-time walk can read
+neither. Generation only; no remote sitemap parser in this release.
+
+## Server-only package
+
+`@warlock.js/sitemap`'s entire runtime surface is server-only — its
+`package.json` declares `"warlock": { "environment": "server" }`. It reads
+the page registry and mounts a route; it has no reason to reach the client
+bundle.
+
+## Wiring it up — `sitemapConnector()` and `src/config/sitemap.ts`
+
+`warlock add sitemap` (`requires: ["web"]`) writes both halves. Doing it by
+hand is the same two pieces:
+
+```ts
+// warlock.config.ts
+import { defineConfig } from "@warlock.js/core";
+import { sitemapConnector } from "@warlock.js/sitemap";
+
+export default defineConfig({ connectors: [sitemapConnector()] });
+```
+
+```ts
+// src/config/sitemap.ts
+import type { SitemapConfig } from "@warlock.js/sitemap";
+
+const sitemapConfig: SitemapConfig = {
+  enabled: true,
+  path: "/sitemap.xml",
+  defaults: { changefreq: "weekly", priority: 0.5 },
+};
+
+export default sitemapConfig;
+```
+
+`SitemapConfig` is `{ enabled: boolean; path: string; defaults?: SitemapDefaults }`
+— `defaults` (`changefreq`/`priority`) backs any entry that omits them.
+`sitemapConnector({ config })` accepts the config object directly instead of
+reading the `sitemap` config key, for tests or non-standard wiring.
+
+At `boot()` (priority `5.6` — after HTTP's `5` and web's `5.5`, so the route
+it registers lands on the router web already populated) it is a no-op unless
+`enabled` is `true`. When enabled, it resolves `app.publicUrl` /
+`PUBLIC_APP_URL` **once, at boot** via `resolveOrigin()` — throwing
+`MissingPublicUrlError` and refusing to start rather than falling back to a
+request-derived host — then registers `GET <path>`. The route itself
+re-reads the page graph on every request via `listRoutablePages()`, not once
+at boot, so it never goes stale under `warlock dev`.
+
+## The exclusion rules — read these once and you know the shape
+
+| case | behaviour |
+| --- | --- |
+| static route | included |
+| not-found route | excluded |
+| error page | excluded — it isn't a routable page at all |
+| page whose `metadata.robots` says `noindex` | excluded |
+| page exporting `sitemap: false` | excluded |
+| dynamic route (`[id]`, `[...slug]`) **with** a `sitemap` export | the entries that export returns |
+| dynamic route **without** a `sitemap` export | **omitted, and named in a dev-mode diagnostic** |
+
+That last row is the whole reason this package exists: a dynamic route cannot
+be enumerated without application data, so silence there would mean a
+sitemap that looks complete while it quietly omits every product page on the
+site. `describeUnresolvedDynamicRoutes` (`src/diagnostic.ts`) is the message a
+developer sees when that happens.
+
+## The page-level `sitemap` export
+
+```ts
+// any *.page.tsx — only needed for a dynamic route
+export const sitemap: SitemapEntries = async () => [
+  { path: "/posts/hello-world", lastmod: "2026-09-17", priority: 0.8 },
+];
+
+// or, to keep a page out of the sitemap deliberately
+export const sitemap = false;
+```
+
+`changefreq` and `priority` are per-entry and optional, falling back to the
+config's `defaults`. They are not part of `PageMetadata` — they mean nothing
+outside a sitemap.
+
+## Building blocks
+
+- `sitemapConnector(options?)` (`src/sitemap-connector.ts`) — the connector
+  `warlock.config.ts` registers; see "Wiring it up" above.
+- `collectSitemapEntries(pages, options)` (`src/collect-entries.ts`) — applies
+  every exclusion rule above and returns `{ entries, unresolvedDynamicRoutes }`.
+  Takes a `RoutablePage[]` — a minimal shape the runtime wiring adapts from
+  `@warlock.js/web`'s page registry, not that package's own discovery type.
+- `buildSitemapXml(entries, origin)` (`src/xml.ts`) — serialises entries into
+  the sitemaps.org `urlset` document: correct namespace, element order
+  (`loc`/`lastmod`/`changefreq`/`priority`), and XML escaping of `&`, `<`,
+  `>`, `"`, `'` in every URL (a URL with a query string contains `&`).
+- `resolveOrigin(options)` / `joinOrigin(origin, path)` (`src/url.ts`) — the
+  configured public origin (`app.publicUrl`, env fallback `PUBLIC_APP_URL`),
+  and joining it to a route path with exactly one slash regardless of
+  trailing slashes on either side. Throws `MissingPublicUrlError` when the
+  sitemap is enabled and no origin is configured — a boot-time failure, not a
+  request-time fallback.
+- `describeUnresolvedDynamicRoutes(routeNames)` (`src/diagnostic.ts`) — the
+  dev-mode message for the row above.
+
+## See also
+
+- [`@warlock.js/core/warlock-conventions/SKILL.md`](@warlock.js/core/warlock-conventions/SKILL.md) — the parent framework's conventions.
+- `mongez-agent-kit-authoring-skills` (load via agent-kit sync) — how this `sitemap-overview/SKILL.md` becomes the front-door skill in `.claude/skills/warlock-js-sitemap-overview/`.

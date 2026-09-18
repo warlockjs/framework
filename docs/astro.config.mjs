@@ -47,6 +47,13 @@ const fullSections = [
   { label: "Reference", dir: "reference", collapsed: true },
 ];
 
+// Sitemap is small enough (one connector, one config, one page export) that
+// Guides/Recipes would sit empty — Essentials + Reference cover it.
+const sitemapSections = [
+  { label: "Essentials", dir: "essentials", collapsed: false },
+  { label: "Reference", dir: "reference", collapsed: true },
+];
+
 // Laravel-style domain section list for "broad" packages (Core, Cascade,
 // AI). Inspired by Laravel's `Getting Started / Architecture Concepts /
 // The Basics / Digging Deeper / …` structure.
@@ -419,6 +426,7 @@ const topics = [
   },
   pkgTopic({ label: "Context", slug: "context", sections: contextSections }, "latest"),
   pkgTopic({ label: "File System", slug: "fs", sections: fullSections }, "latest"),
+  pkgTopic({ label: "Sitemap", slug: "sitemap", sections: sitemapSections }, "latest"),
 
   // Data
   pkgTopic({ label: "Cascade", slug: "cascade", sections: cascadeSections }, "latest"),

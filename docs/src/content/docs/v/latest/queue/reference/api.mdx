@@ -4,8 +4,7 @@ sidebar:
   order: 1
 ---
 
-Every public export of `@warlock.js/queue`, plus the
-`@warlock.js/queue/notifications` subpath. For the narrative version of
+Every public export of `@warlock.js/queue`. For the narrative version of
 any of these, follow the cross-links into the guides.
 
 ```ts
@@ -47,12 +46,6 @@ import type {
   QueueDashboardOptions,
   DashboardServer,
 } from "@warlock.js/queue";
-
-import { queueNotificationDispatcher } from "@warlock.js/queue/notifications";
-import type {
-  QueueNotificationDispatcherOptions,
-  NotificationJobPayload,
-} from "@warlock.js/queue/notifications";
 ```
 
 ## Jobs
@@ -251,21 +244,11 @@ and `@bull-board/fastify` via dynamic `import()` only when called; a
 missing one throws `QueueDashboardDependencyError`. See
 [Dashboard](../guides/dashboard/).
 
-## Notifications (`@warlock.js/queue/notifications`)
+## Notifications
 
-### `queueNotificationDispatcher(options?)`
-
-```ts
-function queueNotificationDispatcher(options?: {
-  queue?: string;
-  attempts?: number;
-  backoff?: JobBackoff;
-}): QueueDispatcher; // from @warlock.js/notifications
-```
-
-For `NotificationConfig.queue`. Deliveries run under the job name
-`"warlock.notifications.deliver"` (exported as `NOTIFICATION_JOB_NAME`).
-See [Notifications](../guides/notifications/).
+`@warlock.js/notifications` ships its own BullMQ dispatcher, `bullmqQueue()`,
+which lazily loads this package. See [Notifications](../guides/notifications/)
+and `@warlock.js/notifications`'s own API reference.
 
 ## Errors
 

@@ -1,0 +1,9 @@
+# Warlock Sitemap
+
+> Package: `@warlock.js/sitemap`
+
+> Runtime sitemap.xml generation for Warlock.js — walks the page registry, honours exclusion rules, and reports dynamic routes it cannot enumerate.
+
+## Skills
+
+- [sitemap-overview](@warlock.js/sitemap/sitemap-overview/SKILL.md): Front-door orientation for `@warlock.js/sitemap` — the `sitemapConnector()` + `src/config/sitemap.ts` (`SitemapConfig`: `enabled`, `path`, `defaults.changefreq`/`defaults.priority`) wiring, exclusion rules (not-found, error page, `metadata.robots: noindex`, `sitemap: false`), the page-level `sitemap` export for dynamic routes, and the dev-mode diagnostic for a dynamic route with no `sitemap` export. TRIGGER when: code imports anything from `@warlock.js/sitemap`; user asks "what does @warlock.js/sitemap do", "how do I add a page to the sitemap", "why is my dynamic route missing from sitemap.xml", "sitemap changefreq/priority", "sitemapConnector", "SitemapConfig"; package.json adds `@warlock.js/sitemap`; user is scaffolding `warlock add sitemap`. Skip: user wants to PARSE or fetch a remote sitemap — this package only generates one, in this release; the `app.publicUrl`/`PUBLIC_APP_URL` config key itself lives in `@warlock.js/core/configure-app/SKILL.md`.
