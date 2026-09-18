@@ -23,6 +23,7 @@ import { renderReact } from "./../react";
 import type { Request } from "./request";
 import { streamReactResponse, type PipeableReactStream } from "./stream-react-response";
 import type { ResponseEvent, ResponseSSEController, ResponseStreamController } from "./types";
+import type { XMLable } from "./xmlable";
 
 type CookieValue = string | number | boolean | Record<string, any> | Array<any>;
 
@@ -561,10 +562,26 @@ export class Response {
   }
 
   /**
-   * Send xml response
+   * Send an xml response.
+   *
+   * Accepts either a raw XML string or an `XMLable` — anything with a
+   * `toXML()` method, structurally typed so packages like
+   * `@warlock.js/sitemap` never need to import core. This is the BOUNDED
+   * path only: a very large document should be streamed from generated
+   * files instead of passed through here.
    */
-  public xml(data: string, statusCode?: number) {
-    return this.setContentType("text/xml").send(data, statusCode);
+  public xml(body: string | XMLable, statusCode?: number) {
+    if (typeof body === "string") {
+      return this.setContentType("application/xml").send(body, statusCode);
+    }
+
+    if (typeof body?.toXML !== "function") {
+      throw new TypeError(
+        "response.xml() expects a string or an XMLable value (an object with a toXML() method).",
+      );
+    }
+
+    return this.setContentType("application/xml").send(body.toXML(), statusCode);
   }
 
   /**

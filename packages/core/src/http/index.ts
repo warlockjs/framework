@@ -24,6 +24,7 @@ export * from "./ready-report";
 export * from "./request";
 // response exports
 export * from "./response";
+export * from "./xmlable";
 // Stage 1 streaming SSR pipe helper
 export * from "./stream-react-response";
 // server exports, but not recommended to beb used outside this folder
