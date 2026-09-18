@@ -1,4 +1,15 @@
 {
+  "5.16.0": {
+    "publishedAt": "2026-09-18T23:18:02.203Z",
+    "matrix": "none",
+    "summary": "**`@warlock.js/sitemap` is now framework-blind (BREAKING):** the 5.15 connector API is removed in favour of the `Sitemap` builder (`new Sitemap({ baseUrl })`, `toXML()`, atomic `saveTo()` and `publishTo()`) and a new `SitemapIndex` that streams size-capped shards behind a master index and publishes the whole directory atomically. Warlock web apps get `sitemap.xml` and `robots.txt` from the new **`@warlock.js/web/sitemap`** subpath, configured under `web.sitemap` and `web.robots` in `src/config/web.ts`, with pages controlling their own listing through `export const sitemap`. **BREAKING (`@warlock.js/web`):** in production an unexpected page error no longer sends its `message` to the browser; throw `PublicPageError` for messages visitors should see. Web also adds a default client error boundary, loader `signal` that aborts on client disconnect, and `pageCache.maxEntryBytes`. `@warlock.js/auth` adds GitHub, Discord, LinkedIn, Apple (`form_post`), Facebook and X login providers, and `@warlock.js/core` now parses urlencoded request bodies and lets `response.xml()` send anything with a `toXML()` method. Lockstep release across all 30 packages. Generator matrix scope: `none`, excluded by the owner; Hasan authorised the release on 2026-09-18: \"Go ahead please\".",
+    "featured": [
+      "@warlock.js/sitemap",
+      "@warlock.js/web",
+      "@warlock.js/auth",
+      "@warlock.js/core"
+    ]
+  },
   "5.15.0": {
     "publishedAt": "2026-09-18T07:24:14.317Z",
     "matrix": "subset",

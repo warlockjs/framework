@@ -124,6 +124,224 @@
   ],
   "releases": [
     {
+      "version": "5.16.0",
+      "id": "v5-16-0",
+      "date": "September 18, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong><code>@warlock.js/sitemap</code> is now framework-blind (BREAKING):</strong> the 5.15 connector API is removed in favour of the <code>Sitemap</code> builder (<code>new Sitemap({ baseUrl })</code>, <code>toXML()</code>, atomic <code>saveTo()</code> and <code>publishTo()</code>) and a new <code>SitemapIndex</code> that streams size-capped shards behind a master index and publishes the whole directory atomically. Warlock web apps get <code>sitemap.xml</code> and <code>robots.txt</code> from the new <strong><code>@warlock.js/web/sitemap</code></strong> subpath, configured under <code>web.sitemap</code> and <code>web.robots</code> in <code>src/config/web.ts</code>, with pages controlling their own listing through <code>export const sitemap</code>. <strong>BREAKING (<code>@warlock.js/web</code>):</strong> in production an unexpected page error no longer sends its <code>message</code> to the browser; throw <code>PublicPageError</code> for messages visitors should see. Web also adds a default client error boundary, loader <code>signal</code> that aborts on client disconnect, and <code>pageCache.maxEntryBytes</code>. <code>@warlock.js/auth</code> adds GitHub, Discord, LinkedIn, Apple (<code>form_post</code>), Facebook and X login providers, and <code>@warlock.js/core</code> now parses urlencoded request bodies and lets <code>response.xml()</code> send anything with a <code>toXML()</code> method. Lockstep release across all 30 packages. Generator matrix scope: <code>none</code>, excluded by the owner; Hasan authorised the release on 2026-09-18: \"Go ahead please\".",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/sitemap",
+          "slug": "sitemap",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>SitemapIndex</code>: streams entries into size-capped shards plus a master index, and optionally writes <code>.xml.gz</code> files. It publishes the whole output directory atomically and marks it with <code>.sitemap-set.json</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>Sitemap.publishTo(outDir, fileName?)</code>, and <code>saveTo()</code> now writes atomically (temp file, then rename, with retries on Windows <code>EPERM</code>/<code>EBUSY</code>)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>UnownedOutputDirectoryError</code>: publishing refuses to replace a non-empty directory that lacks the ownership marker."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING:</strong> the package no longer depends on any framework. The connector API is removed: <code>sitemapConnector()</code>, <code>collectSitemapEntries()</code>, the <code>SitemapConfig</code> config module, <code>MissingPublicUrlError</code>, <code>NoPageRegistryError</code> and <code>RoutablePage</code>. Use the <code>Sitemap</code> builder class instead (<code>new Sitemap({ baseUrl })</code>, <code>add</code> / <code>addMany</code> / <code>declareRoute</code>, <code>toXML</code> / <code>saveTo</code>). Warlock apps configure <code>web.sitemap</code> in <code>@warlock.js/web</code> instead."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>baseUrl</code> is validated in the constructor (<code>InvalidBaseUrlError</code>). Entries are keyed by path, and <code>duplicates()</code> reports every collision."
+            },
+            {
+              "type": "Changed",
+              "html": "Dropped the <code>@warlock.js/core</code> and <code>@warlock.js/web</code> dependencies."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 12,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 6
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>@warlock.js/web/sitemap</code>: <code>sitemap.xml</code> and <code>robots.txt</code> for web apps. Configure them under <code>web.sitemap</code> and <code>web.robots</code> in <code>src/config/web.ts</code>. Pages control their own listing with <code>export const sitemap</code> (<code>false</code>, static options, or a function that supplies URLs for dynamic routes). Locales expand into hreflang alternates, and web switches to a sharded <code>SitemapIndex</code> above 50,000 URLs. The sitemap is generated at <code>warlock build</code>, at boot, or when the app calls <code>regenerateSitemap()</code>, and never while serving a request."
+            },
+            {
+              "type": "Added",
+              "html": "Web now wraps every page in a default client error boundary. A rejected <code>defer()</code> value with no app boundary renders the app's error page, or a built-in fallback, instead of unmounting the tree. The boundary resets on every navigation, refresh and locale change."
+            },
+            {
+              "type": "Added",
+              "html": "<code>PublicPageError</code>: throw it, or reject a deferred value with it, when its <code>message</code> is meant for visitors. In production, only a <code>PublicPageError</code> message reaches the browser."
+            },
+            {
+              "type": "Added",
+              "html": "Loaders receive <code>signal</code>, an <code>AbortSignal</code> that fires when the client disconnects."
+            },
+            {
+              "type": "Added",
+              "html": "Development only: during client navigation, web checks that a page's translations were registered by <code>register()</code> before anything renders."
+            },
+            {
+              "type": "Added",
+              "html": "<code>pageCache.maxEntryBytes</code> (default 1 MiB): a cache miss larger than this is still served in full but is not cached."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING (production error disclosure):</strong> in production, an unexpected page error no longer sends its <code>message</code> to the browser. The browser gets a generic message plus an <code>errorCode</code> that matches the server's error report, and <code>stack</code> is never sent. Throw <code>PublicPageError</code> for messages visitors should see."
+            },
+            {
+              "type": "Fixed",
+              "html": "A client disconnect now aborts SSR, NDJSON navigation streams and loader work, and stream errors no longer escape as uncaught exceptions. A refresh or locale change aborts the fetches it supersedes."
+            },
+            {
+              "type": "Fixed",
+              "html": "Deferred values are scoped per navigation, so late chunks from an abandoned navigation can no longer settle the active page. Finished scopes are released from memory."
+            },
+            {
+              "type": "Fixed",
+              "html": "SSR and client navigation now fall back the same way for missing metadata fields."
+            },
+            {
+              "type": "Fixed",
+              "html": "The dev client page registry keeps a custom <code>appSrcRoot</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "In development, page discovery for unmatched requests is cached until a page file changes."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Six new login providers: GitHub, Discord, LinkedIn, Apple, Facebook and X, configured under <code>auth.providers.&lt;name&gt;</code> and used through <code>startProviderLogin</code> / <code>completeProviderLogin</code>. Apple and LinkedIn verify their id_token with <code>jose</code>. The other four use plain OAuth 2."
+            },
+            {
+              "type": "Added",
+              "html": "<code>AuthProvider.callbackMode</code> (<code>\"query\"</code> | <code>\"form_post\"</code>). Apple uses <code>form_post</code>, so its state cookie is written with <code>SameSite=None; Secure</code> (HTTPS required). Query-mode providers keep <code>SameSite=Lax</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Provider names now resolve only from <code>auth.providers</code>' own keys, so a name inherited from the object prototype, such as <code>toString</code>, is never treated as a provider."
+            },
+            {
+              "type": "Fixed",
+              "html": "The Set-Cookie that clears the provider state cookie now repeats the attributes the cookie was written with."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Core now parses <code>application/x-www-form-urlencoded</code> request bodies, so plain HTML forms and OAuth <code>form_post</code> callbacks (Apple) reach their routes instead of failing with <code>FST_ERR_CTP_INVALID_MEDIA_TYPE</code>. These bodies have the same <code>http.bodyLimit</code> as JSON. A key sent more than once becomes an array."
+            },
+            {
+              "type": "Added",
+              "html": "<code>response.xml()</code> accepts a raw string or any value with a <code>toXML(): string</code> method (such as a <code>@warlock.js/sitemap</code> <code>Sitemap</code>), and sends <code>application/xml</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock add sitemap</code> now merges a disabled <code>sitemap</code> section into <code>src/config/web.ts</code>, and creates that file when it is missing. It no longer writes <code>src/config/sitemap.ts</code> or registers <code>sitemapConnector()</code>. The merge edits only a <code>sitemap</code> key directly on the exported config object, and the result is re-parsed before it is written."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Skill code samples are now self-contained and type-check as written."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "The failed-jobs dashboard skill sample now includes the connection config and the <code>authMiddleware</code> import."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.15.0",
       "id": "v5-15-0",
       "date": "September 18, 2026",

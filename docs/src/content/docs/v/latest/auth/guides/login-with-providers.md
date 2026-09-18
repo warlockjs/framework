@@ -28,7 +28,9 @@ authService.setAuthCookie(response, tokens.accessToken); // or return tokens as 
 
 Each SDK is an optional peer, loaded with `import()` only when that method
 runs. A missing SDK throws `AuthProviderSdkMissingError` (500) naming the
-`warlock add` command to run. Run migrations after installing: `authMigrations`
+`warlock add` command to run. For Apple and LinkedIn that message names
+`auth-apple` or `auth-linkedin`, which do not exist: install `jose` with
+`warlock add auth-google` or `npm install jose` instead. Run migrations after installing: `authMigrations`
 now includes `provider_accounts` and `passkey_credentials`, and
 `one_time_tokens` gained an `attempts` column.
 
