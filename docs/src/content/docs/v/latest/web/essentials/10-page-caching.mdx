@@ -59,6 +59,12 @@ Storage is checked once per render and requires all of:
   authenticated state, it refuses to store, exactly as it refuses to emit a
   public `Cache-Control`.
 
+**One entry is capped at `pageCache.maxEntryBytes`** (default `1_048_576`,
+1 MiB). A cache miss copies the document for storage up to that size. A page
+larger than the cap is still sent to the visitor in full, but it isn't cached,
+and a `[warlock:web]` warning is logged. A value that isn't a positive integer
+fails when the config is read.
+
 **Bypass happens earlier, before storage is even considered.** A request
 carrying an `Authorization` header or the configured auth cookie
 (`auth.cookie.name`, default `access_token`) never consults the cache at

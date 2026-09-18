@@ -1,6 +1,6 @@
 ---
-title: "Login with Google, passkeys, or a phone code"
-description: Passwordless login — Google OAuth, WebAuthn passkeys, and phone OTP — every method ends in the same authService.completeLogin outcome as password login.
+title: "Login with providers, passkeys, or a phone code"
+description: Passwordless login — Google, GitHub, Discord, LinkedIn, Apple, Facebook and X sign-in, WebAuthn passkeys, and phone OTP — every method ends in the same authService.completeLogin outcome as password login.
 sidebar:
   order: 8
   label: "Login with providers"
@@ -21,6 +21,8 @@ authService.setAuthCookie(response, tokens.accessToken); // or return tokens as 
 | Method | Command | Installs |
 | --- | --- | --- |
 | Google | `warlock add auth-google` | `jose` |
+| Apple, LinkedIn | `warlock add auth-google` (or `npm install jose`). There is no separate `auth-apple` or `auth-linkedin` feature yet. | `jose` |
+| GitHub, Discord, Facebook, X | nothing. These use plain OAuth 2 over `fetch`. | nothing |
 | Passkeys | `warlock add auth-passkeys` | `@simplewebauthn/server` (add `@simplewebauthn/browser` to your client bundle) |
 | Phone code | `warlock add notifications` + your own `sms`/`whatsapp` channel | nothing else — auth ships no SMS/WhatsApp driver |
 
@@ -84,6 +86,128 @@ The button is a plain link — it must be a top-level navigation, not a
 - For another OIDC provider, implement `AuthProvider`
   (`authorizationUrl(state)`, `handleCallback({ query, expected })`) and
   register it under `auth.providers.custom.<name>`.
+
+## GitHub, Discord, LinkedIn, Facebook, X
+
+These providers work the same way as Google. Add a config block under
+`auth.providers.<name>`, a GET route that redirects to
+`startProviderLogin(response, "<name>")`, and a GET callback that calls
+`completeProviderLogin(User, "<name>", request, response)`. The state cookie,
+the rejections (`EC009`), and the linking rules (`EC010`) are the same too.
+
+```ts title="src/config/auth.ts"
+providers: {
+  github: {
+    clientId: env("GITHUB_CLIENT_ID"),
+    clientSecret: env("GITHUB_CLIENT_SECRET"),
+    redirectUri: `${env("APP_URL")}/auth/github/callback`,
+    // scopes: ["read:user", "user:email"],
+  },
+  discord: {
+    clientId: env("DISCORD_CLIENT_ID"),
+    clientSecret: env("DISCORD_CLIENT_SECRET"),
+    redirectUri: `${env("APP_URL")}/auth/discord/callback`,
+    // scopes: ["identify", "email"],
+  },
+  linkedin: {
+    clientId: env("LINKEDIN_CLIENT_ID"),
+    clientSecret: env("LINKEDIN_CLIENT_SECRET"),
+    redirectUri: `${env("APP_URL")}/auth/linkedin/callback`,
+    // scopes: ["openid", "profile", "email"],
+  },
+  facebook: {
+    clientId: env("FACEBOOK_CLIENT_ID"),
+    clientSecret: env("FACEBOOK_CLIENT_SECRET"),
+    redirectUri: `${env("APP_URL")}/auth/facebook/callback`,
+    // scopes: ["email", "public_profile"],
+  },
+  x: {
+    clientId: env("X_CLIENT_ID"),
+    clientSecret: env("X_CLIENT_SECRET"),
+    redirectUri: `${env("APP_URL")}/auth/x/callback`,
+    // scopes: ["tweet.read", "users.read"],
+  },
+},
+```
+
+```ts title="src/app/users/routes.ts"
+import { completeProviderLogin, startProviderLogin } from "@warlock.js/auth";
+
+for (const provider of ["github", "discord", "linkedin", "facebook", "x"]) {
+  router.get(`/auth/${provider}`, async ({ response }) =>
+    response.redirect(await startProviderLogin(response, provider)),
+  );
+
+  router.get(`/auth/${provider}/callback`, async ({ request, response }) => {
+    const { tokens } = await completeProviderLogin(User, provider, request, response);
+    authService.setAuthCookie(response, tokens.accessToken);
+    return response.redirect("/");
+  });
+}
+```
+
+| Provider | Protocol | Where the email comes from |
+| --- | --- | --- |
+| GitHub | OAuth 2 + PKCE | `/user/emails`, because `/user.email` is `null` unless the user made it public. Only an address that is both **primary and verified** is used. Otherwise the profile has no email. |
+| Discord | OAuth 2 + PKCE | `/users/@me`. The email counts as verified only when Discord's `verified` flag is `true`. |
+| LinkedIn | OpenID Connect + PKCE | The id_token, checked with `jose` against LinkedIn's JWKS (signature, issuer, audience, expiry, nonce). `email_verified` must be the boolean `true`. |
+| Facebook | OAuth 2 | Graph `/me?fields=id,name,email,picture`. Facebook returns only confirmed addresses, so an email that is present counts as verified. Without the `email` permission, the profile has no email. |
+| X | OAuth 2 + PKCE, with HTTP Basic client auth at the token endpoint | **None.** `/2/users/me` never returns an email. |
+
+A profile with no verified email can log in only through an existing
+`provider_accounts` link. Otherwise it is rejected with
+`ProviderEmailNotVerifiedError`, and auth never makes up an address. On X,
+this applies to every first login, so create the link another way before the
+first X login.
+
+Provider names are looked up only by the object's own keys. An inherited key
+such as `toString` never resolves to a provider.
+
+## Apple
+
+```ts title="src/config/auth.ts"
+providers: {
+  apple: {
+    clientId: env("APPLE_CLIENT_ID"), // the Services ID
+    teamId: env("APPLE_TEAM_ID"),
+    keyId: env("APPLE_KEY_ID"),
+    privateKey: env("APPLE_PRIVATE_KEY"), // the .p8 file's PKCS8 PEM contents
+    redirectUri: `${env("APP_URL")}/auth/apple/callback`,
+    // scopes: ["name", "email"],
+  },
+},
+```
+
+```ts title="src/app/users/routes.ts"
+router.get("/auth/apple", async ({ response }) =>
+  response.redirect(await startProviderLogin(response, "apple")),
+);
+
+// Apple POSTs the callback (response_mode=form_post) when name/email scopes are requested.
+router.post("/auth/apple/callback", async ({ request, response }) => {
+  const { tokens } = await completeProviderLogin(User, "apple", request, response);
+  authService.setAuthCookie(response, tokens.accessToken);
+  return response.redirect("/");
+});
+```
+
+- **The callback is a POST.** Apple sends `code`, `state`, and `user` as an
+  `application/x-www-form-urlencoded` body. Core parses that body type, so
+  `request.input()` reads the values. See
+  [HTTP request](/v/latest/core/the-basics/http-request/#body-content-types).
+- **The state cookie needs HTTPS.** A cross-site POST drops a `SameSite=Lax`
+  cookie. So for Apple, the state cookie is written `SameSite=None; Secure`.
+  Apple requires HTTPS in production anyway. For local development, use
+  `https://` or `http://localhost`, which browsers treat as secure.
+- Apple has no static client secret. On every callback, auth signs a new
+  ES256 JWT with your `.p8` key: `iss` is the team ID, `sub` is the client ID,
+  `aud` is Apple, and `kid` is the key ID.
+- Apple sends the account name only on the **first** authorization, as a
+  `user` form field (`{"name":{"firstName","lastName"}}`). Save it then,
+  because later logins don't include it.
+- The email may be a private-relay address (`@privaterelay.appleid.com`). It
+  is a real, working address and is accepted like any other.
+- Rejections and linking work the same way as for Google.
 
 ## Passkeys
 

@@ -80,7 +80,10 @@ client-navigation stream) it arrived on stays a 200.
 
 `use()` throws one of:
 
-- **`DeferredValueError`** — the loader's own promise rejected.
+- **`DeferredValueError`** — the loader's own promise rejected. In
+  development, it carries the original `message` and `stack`. In production,
+  it carries a generic message and an opaque `errorCode`, unless the promise
+  rejected with a `PublicPageError`, whose `message` is shown as written.
 - **`DeferTimeoutError`** — the promise did not settle within
   `web.streaming.deferTimeout`. Treated exactly like a rejection.
 - **`DeferredStreamClosedError`** — the connection closed, or the page
@@ -109,6 +112,19 @@ export class ReviewsBoundary extends Component<
   }
 }
 ```
+
+### No boundary above `use()`? The page still doesn't go blank
+
+The framework wraps every hydrated page in its own client-side boundary as a
+last line of defense. A rejected deferred value that no app boundary catches
+still shows a fallback, and React doesn't unmount the whole tree.
+
+- The closest boundary always handles the error. If you wrap `<Reviews>` in
+  `ReviewsBoundary`, the framework boundary never renders for that failure.
+- Each failure is reported once, by whichever boundary catches it.
+- The framework boundary first tries the route's `error.page.tsx`, with a
+  sanitized error. If there isn't one, or it throws, the framework boundary
+  shows a plain generic message.
 
 ## `web.streaming.deferTimeout`
 

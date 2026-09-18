@@ -115,9 +115,22 @@ export default function ErrorPage({ error, status }: ErrorPageProps) {
 }
 ```
 
-During SSR, `error` is the thrown value. After serialization, the browser gets
-a JSON-safe `{ name, message, stack? }` record. Error metadata may improve on
-the framework default but cannot remove `robots: "noindex"`.
+In development, `error` is the thrown value during SSR. After hydration it is
+a JSON-safe `{ name, message, stack?, errorCode? }` record. In **production**,
+SSR and hydration both receive the same sanitized record. The error's own
+`message` is replaced by a generic one, `stack` is never sent, and an opaque
+`errorCode` matches the line in the server's error report. Error metadata may
+improve on the framework default but cannot remove `robots: "noindex"`.
+
+When a message is meant for the visitor, throw a `PublicPageError`. Its
+`message` is shown as written in every environment, during SSR and after
+hydration:
+
+```ts
+import { PublicPageError } from "@warlock.js/web";
+
+throw new PublicPageError("This listing has expired.");
+```
 
 If a root or page module cannot load, or `register()` throws, Warlock tries the
 application boundary and then falls back to a minimal framework document when

@@ -1,0 +1,116 @@
+---
+title: Large sites
+description: SitemapIndex — streaming sources into size-capped shards plus a master index, gzip, one file set per source key, and an atomic publish into a directory the package owns.
+sidebar:
+  order: 2
+  label: "Large sites"
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+`Sitemap` keeps every entry in memory, so it only fits up to the protocol
+limit of **50,000 URLs or 50MB uncompressed** per file. Above that, use
+`SitemapIndex`. It works differently: it reads entries from source factories,
+writes size-capped shards and one flat master index, and keeps only the
+current shard in memory.
+
+```ts
+import { SitemapIndex } from "@warlock.js/sitemap";
+
+const index = new SitemapIndex({
+  baseUrl: "https://example.com",
+  changefreq: "daily",
+  gzip: true,
+});
+
+index
+  .addSource(() => [{ path: "/" }, { path: "/about" }])
+  .addSource("products", async function* () {
+    // streamProducts(): your own AsyncIterable over the products table
+    for await (const product of streamProducts()) {
+      yield { route: "/products/:slug", path: `/products/${product.slug}`, lastmod: product.updatedAt };
+    }
+  });
+
+const result = await index.saveTo("storage/sitemap");
+
+result.indexPath; // storage/sitemap/sitemap_index.xml
+result.totalUrls;
+result.routes; // per-route counts, as with Sitemap.routes()
+result.duplicates; // collisions across every source
+```
+
+`SitemapIndex` has no `entries()`, `size`, or `toXML()`. If you need those, the
+site is small enough for [`Sitemap`](/v/latest/sitemap/essentials/standalone/).
+
+## Options
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `baseUrl` | — | **Required.** Validated the same way `Sitemap` validates it (`InvalidBaseUrlError`). |
+| `filePrefix` | `"sitemap"` | The shard name prefix: `sitemap-0001.xml`. |
+| `indexFileName` | `"sitemap_index.xml"` | The name of the master index file. |
+| `gzip` | `false` | Writes shards as `.xml.gz` and points the index at them. |
+| `maxUrlsPerFile` | `50_000` | The URL limit per shard. A value above the protocol limit throws `RangeError`; it is never silently lowered. |
+| `maxBytesPerFile` | `50 * 1024 * 1024` | The uncompressed byte limit per shard, with the same protocol limit. |
+| `changefreq` / `priority` / `lastmod` | — | Defaults for every entry, as with `Sitemap`. |
+
+## Sources are factories
+
+`addSource(factory)` and `addSource(key, factory)` take a **function** that
+returns an iterable or an async iterable. They don't take the iterable itself.
+An async iterable can be read only once, and a factory can be called again
+for a retry or a later `saveTo()`.
+
+- Every unnamed source is merged into one group with one shard counter:
+  `sitemap-0001.xml`, `sitemap-0002.xml`, and so on.
+- A named source gets its own shards: `sitemap-products-0001.xml`. Keys may
+  contain letters, digits, `-`, and `_`. Two keys that differ only in case
+  (`en-US` and `en-us`) would write the same file on a case-insensitive
+  filesystem. The second `addSource()` throws `DuplicateSourceKeyError`.
+
+Shard numbering is stable. When a group grows past a limit, it **gains** a
+file. It never renames the first one, so a crawler that already indexed
+`sitemap-products-0001.xml` keeps it. The byte limit is checked between
+entries, never inside one. An entry bigger than the limit on its own is
+written alone in its own shard, because an entry can't be split.
+
+`alternates` work across shard boundaries because each `<xhtml:link>` is an
+absolute URL. A shard declares `xmlns:xhtml` only when its own entries have
+alternates.
+
+## `saveTo()` owns the whole directory
+
+`saveTo(outDir)` writes the complete set into a temporary directory next to
+`outDir`, then swaps it into place with a single `rename`. A crawler never sees
+a half-written set. If the run fails, the previous set stays in place.
+
+<Aside type="caution" title="Give it a directory of its own">
+The swap replaces **everything** in `outDir`. Never point it at your app's
+`public/` directory or any other directory that holds other files.
+
+Every publish writes a `.sitemap-set.json` marker into `outDir`. A later call
+replaces a directory only if it doesn't exist, is empty, or has that marker.
+A non-empty directory without the marker throws `UnownedOutputDirectoryError`
+before anything is written, and the directory is not changed.
+</Aside>
+
+`Sitemap.publishTo(outDir)` follows the same rule. That lets a site start with
+one file and later publish an index into the same directory.
+
+## Serving the result
+
+The index lists each shard as `<baseUrl>/<shard file name>`, at the site root.
+Your server must return those files at those URLs. Don't send a
+`SitemapIndex` through `response.xml()`: it has no `toXML()`, and the set
+doesn't fit in one response body. Serve the files from `outDir` instead.
+
+In a Warlock web app, this is already handled. Web writes to
+`storage/sitemap` by default, serves the index at `web.sitemap.path` and each
+shard at the site root, and uses `SitemapIndex` automatically above 50,000
+URLs or when `locales.splitByLocale` is on. See
+[Sitemap and robots.txt](/v/latest/web/guides/sitemap-and-robots/).
+
+## Next
+
+- [API reference](/v/latest/sitemap/reference/api/) — every exported type and error.

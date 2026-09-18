@@ -100,7 +100,7 @@ combined `llms-full.txt` below is the whole framework and is far larger.
 - [create-warlock](https://warlock.js.org/v/latest/create-warlock/): Project scaffolder for the Warlock.js framework — interactive wizard and non-interactive CLI for creating new apps.
   - llms.txt: https://warlock.js.org/create-warlock/llms.txt
   - llms-full.txt: https://warlock.js.org/create-warlock/llms-full.txt
-- [@warlock.js/sitemap](https://warlock.js.org/v/latest/sitemap/): Runtime sitemap.xml generation for Warlock.js — walks the page registry, honours exclusion rules, and reports dynamic routes it cannot enumerate.
+- [@warlock.js/sitemap](https://warlock.js.org/v/latest/sitemap/): A framework-blind sitemap builder: entries in, a valid sitemaps.org document out. Zero runtime dependencies.
   - llms.txt: https://warlock.js.org/sitemap/llms.txt
   - llms-full.txt: https://warlock.js.org/sitemap/llms-full.txt
 

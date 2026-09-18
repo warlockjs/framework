@@ -1,181 +1,167 @@
 ---
 title: "API reference"
-description: "The complete public surface of @warlock.js/sitemap — the connector (config- and entries-based), the config types, RoutablePage, the page-level export types, and the building blocks it's assembled from."
+description: "The complete public surface of @warlock.js/sitemap — Sitemap, SitemapIndex, the entry and result types, the errors, and the serialiser building blocks."
 sidebar:
   order: 1
   label: "API reference"
 ---
 
-## Connector
+Everything below is exported from `@warlock.js/sitemap`. The package has zero
+runtime dependencies and imports nothing from Warlock.
+
+## `Sitemap`
 
 ```ts
-function sitemapConnector(options?: SitemapConnectorOptions): Connector;
+class Sitemap {
+  constructor(options: SitemapOptions); // throws InvalidBaseUrlError
 
-type SitemapConnectorOptions = {
-  /** Supply the configuration directly instead of reading the `sitemap` config key. */
-  config?: SitemapConfig;
-  /**
-   * App-supplied entries — the only source of entries in an API-only Warlock
-   * project (Mode 2, no `@warlock.js/web` page registry). When web IS
-   * installed, these are ADDED to the page-derived entries, not substituted
-   * — see `mergeSitemapEntries` below.
-   */
-  entries?: SitemapEntries;
-};
+  add(entry: SitemapEntry): this; // throws InvalidSitemapEntryError
+  addMany(entries: Iterable<SitemapEntry>): this;
+  declareRoute(route: string): this;
 
-const DEFAULT_SITEMAP_PATH = "/sitemap.xml";
-const SITEMAP_CONNECTOR_PRIORITY = 5.6; // after HTTP (5) and web (5.5)
+  get size(): number;
+  entries(): readonly ResolvedSitemapEntry[];
+  routes(): readonly RouteSummary[];
+  duplicates(): readonly DuplicateReport[];
 
-class NoPageRegistryError extends Error {}
+  toXML(): string; // pure, synchronous, repeatable
+  saveTo(filePath: string): Promise<void>; // atomic; creates parent dirs
+  publishTo(outDir: string, fileName?: string): Promise<string>; // owned-dir publish; default "sitemap.xml"
+}
 ```
 
-`@warlock.js/core` and `@warlock.js/web` are optional peers — the connector
-is the only module in this package that reaches either, and it does so
-through a lazy `import()` inside `boot()`, not a module-level import.
+`Sitemap` keeps every entry in memory, so it is limited to the protocol
+maximum of 50,000 URLs or 50MB. It satisfies core's `XMLable` contract, so
+`response.xml(sitemap)` works. See
+[Build a sitemap](/v/latest/sitemap/essentials/standalone/).
 
-`NoPageRegistryError` is thrown at `boot()` when `@warlock.js/web` is not
-installed **and** no `entries` option was supplied — there would be nothing
-to serve. See [Configuration](../essentials/configuration/#no-page-registry-no-entries).
-
-## Config & entry types
+## `SitemapIndex`
 
 ```ts
-type SitemapConfig = {
-  enabled: boolean;
-  path: string;
-  defaults?: SitemapDefaults;
-};
+class SitemapIndex {
+  constructor(options: SitemapIndexOptions); // throws InvalidBaseUrlError, RangeError
 
-type SitemapDefaults = {
+  addSource(source: SitemapSourceFactory): this;
+  addSource(key: string, source: SitemapSourceFactory): this; // throws DuplicateSourceKeyError
+
+  saveTo(outDir: string): Promise<SitemapSetResult>; // atomic, owned-directory publish
+}
+```
+
+`SitemapIndex` streams entries and writes shards plus a master index. It has
+no `toXML()`. See [Large sites](/v/latest/sitemap/essentials/large-sites/).
+
+## Options
+
+```ts
+type SitemapOptions = {
+  baseUrl: string; // absolute http(s) origin
   changefreq?: ChangeFreq;
   priority?: number;
+  lastmod?: string | Date;
 };
 
-type ChangeFreq =
-  | "always"
-  | "hourly"
-  | "daily"
-  | "weekly"
-  | "monthly"
-  | "yearly"
-  | "never";
+type SitemapIndexOptions = {
+  baseUrl: string;
+  filePrefix?: string; // default "sitemap"
+  indexFileName?: string; // default "sitemap_index.xml"
+  gzip?: boolean; // default false
+  maxUrlsPerFile?: number; // default 50_000, never above it
+  maxBytesPerFile?: number; // default 50 * 1024 * 1024, never above it
+  changefreq?: ChangeFreq;
+  priority?: number;
+  lastmod?: string | Date;
+};
 ```
 
-## Page-level export types
+## Entries
 
 ```ts
-/** `export const sitemap: SitemapEntries = async () => [...]` in a *.page.tsx, or the same shape passed as `sitemapConnector({ entries })`. */
-type SitemapEntries = () => SitemapEntry[] | Promise<SitemapEntry[]>;
-
 type SitemapEntry = {
-  path: string; // app-relative; joined against the configured origin
-  lastmod?: string;
+  path: string; // concrete path, or an absolute URL used as given
+  name?: string; // diagnostics only; never serialised
+  route?: string; // the pattern it came from; feeds routes()/duplicates()
+  lastmod?: string | Date; // Date -> toISOString(); string passed through
   changefreq?: ChangeFreq;
-  priority?: number;
+  priority?: number; // 0.0–1.0
+  alternates?: readonly SitemapAlternate[];
 };
+
+type SitemapAlternate = {
+  hreflang: string; // any string: "en", "en-GB", "x-default"
+  path: string;
+};
+
+/** An entry after normalisation: leading slash, defaults folded in, lastmod serialised. */
+type ResolvedSitemapEntry = Omit<SitemapEntry, "lastmod"> & { lastmod?: string };
+
+type ChangeFreq = "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never";
 ```
 
-## `RoutablePage` — the standalone-usage input
+## Diagnostics and results
 
 ```ts
-type RoutablePage = {
-  /** Unique route identity — named in the dynamic-route diagnostic when unresolved. */
-  routeName: string;
-  /** The effective route path, `:param` for a dynamic segment (e.g. `/posts/:id`). */
-  routePath: string;
-  /** `metadata.robots`, when the page's `metadata` export is a static object. */
-  robots?: string;
-  sitemap?: SitemapPageExport;
+type RouteSummary = { route: string; count: number }; // count 0 = a declared route produced nothing
+
+type DuplicateReport = {
+  path: string;
+  count: number; // always >= 2
+  routes: readonly (string | undefined)[]; // the route of each add, in order
 };
 
-/** A page's `sitemap` export: the entries function, an explicit opt-out, or absent entirely. */
-type SitemapPageExport = SitemapEntries | false | undefined;
+type SitemapSource = Iterable<SitemapEntry> | AsyncIterable<SitemapEntry>;
+type SitemapSourceFactory = () => SitemapSource | Promise<SitemapSource>;
+
+type SitemapSetResult = {
+  indexPath: string;
+  files: readonly SitemapFileResult[];
+  totalUrls: number;
+  duplicates: readonly DuplicateReport[];
+  routes: readonly RouteSummary[];
+};
+
+type SitemapFileResult = {
+  path: string;
+  key?: string; // the source key, when the source was named
+  urls: number;
+  bytes: number;
+  gzipped: boolean;
+};
 ```
 
-Deliberately not `@warlock.js/web`'s own discovery type — this is the
-minimal shape `collectSitemapEntries` needs, whether it was adapted from a
-real page registry or built by hand for [standalone usage](../essentials/standalone/).
+## Errors
+
+| Error | Thrown from | When |
+| --- | --- | --- |
+| `InvalidBaseUrlError` | `new Sitemap()`, `new SitemapIndex()` | `baseUrl` is missing, relative, or not `http(s)`. |
+| `InvalidSitemapEntryError` | `add()`, and while `SitemapIndex` writes | No path, a priority outside `0.0`–`1.0`, an unknown `changefreq`, an invalid `Date`, or an alternate with no `hreflang`. |
+| `DuplicateSourceKeyError` | `SitemapIndex.addSource()` | Two source keys differ only in case, so they would overwrite each other's shard files. |
+| `UnownedOutputDirectoryError` | `SitemapIndex.saveTo()`, `Sitemap.publishTo()` | `outDir` isn't empty and has no `.sitemap-set.json` marker. Nothing is written. |
+
+`SitemapIndex` also throws `RangeError` from its constructor when
+`maxUrlsPerFile` or `maxBytesPerFile` is above the protocol limit, and from
+`addSource()` when a key isn't a valid filename fragment (letters, digits, `-`,
+and `_`).
 
 ## Building blocks
 
-These are what `sitemapConnector()` is assembled from — reach for them
-directly for standalone usage, custom wiring, or tests.
-
 ```ts
-function collectSitemapEntries(
-  pages: readonly RoutablePage[],
-  options?: CollectSitemapEntriesOptions,
-): Promise<CollectSitemapEntriesResult>;
-
-type CollectSitemapEntriesOptions = { defaults?: SitemapDefaults };
-type CollectSitemapEntriesResult = {
-  entries: SitemapEntry[];
-  unresolvedDynamicRoutes: string[];
-};
-
-function isDynamicRoutePath(routePath: string): boolean;
-```
-
-Applies every exclusion rule (see [Configuration](../essentials/configuration/#what-ships-and-what-doesnt)
-for the table) against a `RoutablePage[]`.
-
-```ts
-function mergeSitemapEntries(
-  pageEntries: readonly SitemapEntry[],
-  appEntries: readonly SitemapEntry[],
-): SitemapEntry[];
-
-function withDefaults(entry: SitemapEntry, defaults: SitemapDefaults | undefined): SitemapEntry;
-```
-
-`mergeSitemapEntries` combines page-derived entries with app-supplied ones,
-deduplicating by `path` — where the same path appears in both, the
-app-supplied entry wins. This is how `sitemapConnector()` combines a page
-registry with an `entries` supplier; see
-[combining a page registry with `entries`](../essentials/configuration/#combining-a-page-registry-with-entries).
-`withDefaults` applies `SitemapDefaults` to one entry — shared by
-page-derived and app-supplied entries alike.
-
-```ts
-function buildSitemapXml(entries: SitemapEntry[], origin: string): string;
+function buildSitemapXml(entries: readonly ResolvedSitemapEntry[], baseUrl: string): string;
+function renderUrlBlock(entry: ResolvedSitemapEntry, baseUrl: string): string;
 function escapeXml(value: string): string;
-```
-
-Serialises entries into the sitemaps.org `urlset` document: correct
-namespace, element order (`loc`/`lastmod`/`changefreq`/`priority`), and XML
-escaping of `&`, `<`, `>`, `"`, `'` in every URL.
-
-```ts
-function resolveOrigin(options?: ResolveOriginOptions): string;
 function joinOrigin(origin: string, routePath: string): string;
-
-type ResolveOriginOptions = {
-  /** `app.publicUrl` from the app's config, when set. */
-  publicUrl?: string;
-  /** Defaults to `process.env`; overridable for tests. */
-  env?: Record<string, string | undefined>;
-};
-
-class MissingPublicUrlError extends Error {}
 ```
 
-`resolveOrigin()` reads `app.publicUrl` first, then the `PUBLIC_APP_URL` env
-fallback, throwing `MissingPublicUrlError` when neither is set. `joinOrigin()`
-joins an origin and an app-relative path with exactly one slash regardless of
-trailing slashes on either side.
+`buildSitemapXml` writes the sitemaps.org `urlset` document. It uses the
+correct namespace and element order, declares the `xhtml` namespace only when
+an entry has alternates, and escapes `&`, `<`, `>`, `"`, and `'`.
+`joinOrigin` joins an origin and a path with exactly one slash between them.
 
-```ts
-function describeUnresolvedDynamicRoutes(
-  routeNames: readonly string[],
-): string | undefined;
-```
+## Not in this package
 
-The dev-mode diagnostic message for a dynamic route with no `sitemap` export.
-Returns `undefined` when there is nothing to report.
-
-## See also
-
-- [Standalone](../essentials/standalone/) — Mode 1, calling `collectSitemapEntries` and `buildSitemapXml` directly.
-- [Configuration](../essentials/configuration/) — the connector, `entries`, the config shape, and the exclusion rules.
+Page discovery, the page-level `sitemap` export, locale expansion, the
+`/sitemap.xml` route, `robots.txt`, and `MissingPublicUrlError` are part of
+`@warlock.js/web/sitemap`. See
+[Sitemap and robots.txt](/v/latest/web/guides/sitemap-and-robots/).
 
 Source: [`@warlock.js/sitemap/src/`](https://github.com/warlockjs/core/tree/main/%40warlock.js/sitemap/src)

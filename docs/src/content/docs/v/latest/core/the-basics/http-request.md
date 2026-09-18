@@ -170,6 +170,33 @@ request.setParam("id", String(canonicalId));
 
 These mutate the request's parsed payload. The merged `all()` and validated views update accordingly.
 
+### Body content types
+
+`input()`, `all()`, and `validated()` work the same way however the body
+arrived. Every supported content type is parsed into the same body object:
+
+| Content type | Parsed by | Typical sender |
+| --- | --- | --- |
+| `application/json` | Fastify (built in) | API clients, `fetch` with a JSON body |
+| `multipart/form-data` | `@fastify/multipart` | forms with files. See [Files](#files) |
+| `application/x-www-form-urlencoded` | Warlock's own parser (since 5.16) | plain HTML `<form>` posts, OAuth `form_post` callbacks such as [Sign in with Apple](/v/latest/auth/guides/login-with-providers/#apple) |
+
+For urlencoded bodies, a key sent more than once becomes an array. Every other
+key is a plain string:
+
+```ts
+// POST body: name=Hasan&tag=a&tag=b
+request.input("name"); // "Hasan"
+request.input("tag"); // ["a", "b"]
+```
+
+The urlencoded parser leaves bracket keys (`a[b]=1`) as they are. They are
+then nested by the same logic every body type goes through, so they work
+exactly as the same key would in JSON or a query string.
+
+`http.bodyLimit` applies to all three content types. An urlencoded body over
+the limit gets the same `413` as a JSON body.
+
 ### `has`, `set`, `setDefault`, `unset`
 
 Mutating the merged payload for downstream services:

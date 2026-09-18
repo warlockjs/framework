@@ -245,5 +245,5 @@ The `login.failed` event is the brute-force signal — wire it to a rate limiter
 - [Register a user](./register-user.md) — sign-up flow.
 - [Protect routes](./protect-routes.md) — where the access token gets consumed.
 - [Manage tokens](./manage-tokens.md) — rotation, family revocation, max-per-user.
-- [Login with Google, passkeys, or a phone code](./login-with-providers.md) —
-  passwordless methods that end in the same `completeLogin` outcome.
+- [Login with providers, passkeys, or a phone code](./login-with-providers.md) —
+  Google, GitHub, Discord, LinkedIn, Apple, Facebook, X, and other passwordless methods that end in the same `completeLogin` outcome.

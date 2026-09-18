@@ -1,55 +1,58 @@
 ---
 title: Sitemap
-description: Runtime sitemap.xml generation — standalone in any Node app, in a Warlock API-only project via app-supplied entries, or from a Warlock web app's own page registry.
+description: A framework-blind sitemap builder — the Sitemap class for sites up to 50,000 URLs, SitemapIndex for larger ones, and hreflang alternates. Warlock web apps get it wired through web.sitemap.
 ---
 
-`@warlock.js/sitemap` builds `sitemap.xml` at **runtime**, against whatever
-source of URLs your app has — a page registry, your own data, or both — with
-exclusion rules (`noindex`, `sitemap: false`), per-entry `changefreq`/
-`priority` defaults, and a loud diagnostic when a dynamic route can't be
-enumerated. Generation only in this release; there is no remote sitemap
-parser.
+`@warlock.js/sitemap` builds [sitemaps.org](https://www.sitemaps.org/protocol.html)
+documents. You add entries and it returns a valid XML document. It has **zero
+runtime dependencies** and knows nothing about Warlock. It has no connector,
+no config module, no lifecycle, and no page registry. It only generates
+sitemaps; it cannot parse one.
 
-`@warlock.js/core` and `@warlock.js/web` are **optional peers**. Only the
-connector reaches them, and only through a lazy `import()` at boot — nothing
-else in the package imports from either. There are three ways to use it.
+```ts
+import { Sitemap } from "@warlock.js/sitemap";
 
-## Mode 1 — Standalone, any Node app
+const sitemap = new Sitemap({ baseUrl: "https://example.com", changefreq: "weekly" });
 
-No Warlock at all. Build the page list yourself and call
-`collectSitemapEntries` + `buildSitemapXml` directly — nothing on this path
-resolves `@warlock.js/core` or `@warlock.js/web`.
+sitemap.add({ path: "/" });
+sitemap.add({ path: "/posts/hello-world", lastmod: new Date(), priority: 0.8 });
 
-→ [Standalone usage](./essentials/standalone/)
+await sitemap.saveTo("public/sitemap.xml");
+```
 
-## Mode 2 — Warlock, API-only
+Those lines work the same way in an Express handler, a cron script, a
+`node build-sitemap.mjs`, or a Warlock controller.
 
-An API-only Warlock app has no page registry to read. Pass
-`sitemapConnector({ entries })` with your own supplier instead —
-`@warlock.js/web` is not required on this path.
+## Two classes, split at the protocol ceiling
 
-→ [Configuration](./essentials/configuration/#mode-2--warlock-api-only)
+The protocol limits one file to **50,000 URLs or 50MB uncompressed**.
 
-## Mode 3 — Warlock web
+- **`Sitemap`** keeps every entry in memory. That makes `entries()`, the
+  diagnostics, and a repeatable `toXML()` possible. Use it for any site under
+  the ceiling.
+  → [Build a sitemap](/v/latest/sitemap/essentials/standalone/)
+- **`SitemapIndex`** streams from source factories. It writes size-capped
+  shards and a master index, then publishes the whole set atomically. It keeps
+  only the current shard in memory.
+  → [Large sites](/v/latest/sitemap/essentials/large-sites/)
 
-`warlock add sitemap` wires `sitemapConnector()` against the page registry
-`@warlock.js/web` exposes, plus the page-level `sitemap` export for dynamic
-routes.
+## In a Warlock web app
 
-→ [Configuration](./essentials/configuration/#mode-3--warlock-web)
+You don't call either class yourself. `@warlock.js/web` finds your pages,
+expands locales, chooses `Sitemap` or `SitemapIndex`, generates the file at
+`warlock build` and at boot, and serves `/sitemap.xml` and `/robots.txt`. You
+configure all of it under `web.sitemap` in `src/config/web.ts`:
 
-## It needs your app's public origin (Modes 2 and 3)
+```sh
+warlock add sitemap
+```
 
-The sitemap emits absolute URLs, so a `sitemapConnector()`-based setup needs
-`app.publicUrl` (or the `PUBLIC_APP_URL` environment variable) set in
-`src/config/app.ts`. With `sitemap.enabled: true` and neither set, **boot
-refuses to start** rather than guessing the host from the incoming request —
-see [Configuration](./essentials/configuration/). Mode 1 has no such
-requirement: `buildSitemapXml(entries, origin)` takes the origin as an
-argument.
+→ [In a Warlock app](/v/latest/sitemap/essentials/configuration/) and the full
+[Sitemap and robots.txt guide](/v/latest/web/guides/sitemap-and-robots/).
 
 ## Read by intent
 
-- **Building it yourself, no Warlock** → [Standalone](./essentials/standalone/).
-- **Wiring it into a Warlock app** → [Configuration](./essentials/configuration/) — `sitemapConnector()`, the config shape, `entries`, the page-level `sitemap` export, and the exclusion rules.
-- **Method-by-method lookup** → [Reference](./reference/api/).
+- **Building one yourself** → [Build a sitemap](/v/latest/sitemap/essentials/standalone/)
+- **Past 50,000 URLs, or one file per locale** → [Large sites](/v/latest/sitemap/essentials/large-sites/)
+- **Warlock web pages, `robots.txt`, locales** → [Sitemap and robots.txt](/v/latest/web/guides/sitemap-and-robots/)
+- **Method-by-method lookup** → [API reference](/v/latest/sitemap/reference/api/)

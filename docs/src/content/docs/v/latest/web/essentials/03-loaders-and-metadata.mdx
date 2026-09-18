@@ -112,6 +112,26 @@ the full ancestry.
 Each loader level writes to its own buffered response. Surviving buffers commit
 root to leaf, so a discarded level cannot leak partial headers.
 
+## Abandoned requests — `signal`
+
+Every loader context includes `signal`, an `AbortSignal` that fires when the
+client disconnects before the response is finished. Pass it to anything that
+can be cancelled:
+
+```tsx title="src/web/products/index.page.tsx"
+import type { PageLoader } from "@warlock.js/web";
+
+export const loader = (async ({ signal }) => {
+  const res = await fetch("https://api.example.com/products", { signal });
+
+  return { products: await res.json() };
+}) satisfies PageLoader;
+```
+
+A disconnect also stops SSR, NDJSON navigation streams, and the pipeline
+between loader levels (app → layout → page). A loader that is already running
+and never checks `signal` still runs to the end.
+
 ## Terminal outcomes
 
 - A core `Response` returned by any loader stops every lower loader and bypasses

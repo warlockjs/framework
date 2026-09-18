@@ -964,7 +964,7 @@ Don't call `setBaseUrl` per request — it's process-global and races every othe
 
 ---
 name: configure-app
-description: 'Configure a Warlock app — the two layers (`warlock.config.ts` for framework-level wiring, `src/config/*.ts` for subsystems), `.env` + `env()`, the `config()` getter for runtime reads, and `app.publicUrl`/`PUBLIC_APP_URL` (the app''s public origin). Triggers: `defineConfig`, `config.get`, `config.key`, `env`, `ConfigRegistry`, `HttpConfigurations`, `AppConfigurations`, `publicUrl`, `PUBLIC_APP_URL`, `getPublicUrl`; "add a new config file", "warlock.config.ts vs src/config", "read env values", "runtime config lookup", "app public origin/URL"; typical import `import { defineConfig, config, env } from "@warlock.js/core"`. Skip: cache driver registration — `@warlock.js/cache/cache-basics/SKILL.md`; mail config — `@warlock.js/core/send-mail/SKILL.md`; storage config — `@warlock.js/core/store-file/SKILL.md`; sitemap boot-time refusal on a missing origin — `@warlock.js/sitemap/sitemap-overview/SKILL.md`; competing libs `dotenv` direct, `convict`, `node-config`.'
+description: 'Configure a Warlock app — the two layers (`warlock.config.ts` for framework-level wiring, `src/config/*.ts` for subsystems), `.env` + `env()`, the `config()` getter for runtime reads, and `app.publicUrl`/`PUBLIC_APP_URL` (the app''s public origin). Triggers: `defineConfig`, `config.get`, `config.key`, `env`, `ConfigRegistry`, `HttpConfigurations`, `AppConfigurations`, `publicUrl`, `PUBLIC_APP_URL`, `getPublicUrl`; "add a new config file", "warlock.config.ts vs src/config", "read env values", "runtime config lookup", "app public origin/URL"; typical import `import { defineConfig, config, env } from "@warlock.js/core"`. Skip: cache driver registration — `@warlock.js/cache/cache-basics/SKILL.md`; mail config — `@warlock.js/core/send-mail/SKILL.md`; storage config — `@warlock.js/core/store-file/SKILL.md`; sitemap refusal on a missing origin — `@warlock.js/web/generate-sitemap/SKILL.md`; competing libs `dotenv` direct, `convict`, `node-config`.'
 ---
 
 # Warlock — configure the app
@@ -1224,11 +1224,11 @@ falling back to the `PUBLIC_APP_URL` env var, or `undefined` when neither is
 set.
 
 `getPublicUrl()` never throws — it is a consumer's job to fail loudly when it
-requires the value. `@warlock.js/sitemap` is the first such consumer: with
-`sitemap.enabled: true` and no `app.publicUrl`/`PUBLIC_APP_URL` set, boot
-refuses to start (`MissingPublicUrlError`, naming both) rather than falling
-back to a request-derived host — a sitemap served from the wrong host is
-worse than one that never boots.
+requires the value. `@warlock.js/web`'s sitemap is the first such consumer:
+with `web.sitemap.enabled: true` and no `app.publicUrl`/`PUBLIC_APP_URL` set,
+generation refuses (`MissingPublicUrlError`, naming both) rather than falling
+back to a request-derived host — a sitemap pointing at the wrong host is
+worse than none. See `@warlock.js/web/generate-sitemap/SKILL.md`.
 
 ## Common patterns
 
@@ -1308,6 +1308,20 @@ Scaffold with: `npx warlock generate.controller <module>/<action>` (add `--with-
 | `request.ip`, `request.userAgent` | strings                                          | logging, device info                                |
 
 Prefer `request.validated()` once a schema is attached — it's typed.
+
+### Request body content types
+
+`request.input()` / `.all()` / `.validated()` read the same way regardless of how the body arrived — every content type below feeds the same parsed bag:
+
+| Content type                         | Parsed by                       | Notes                                                                |
+| ------------------------------------ | -------------------------------- | --------------------------------------------------------------------- |
+| `application/json`                   | Fastify (built-in)               | objects/arrays parsed as-is                                           |
+| `multipart/form-data`                | `@fastify/multipart`             | fields + files; see [`upload-file`](../upload-file/SKILL.md)          |
+| `application/x-www-form-urlencoded`  | Warlock's own content-type parser (`http/parse-urlencoded-body.ts`) | plain HTML forms, OAuth `form_post` callbacks (e.g. Apple Sign in)    |
+
+For urlencoded bodies: fields decode via `URLSearchParams`. A key sent more than once (`tag=a&tag=b`) becomes an array (`request.input("tag")` → `["a", "b"]`); every other key is a plain string. Bracket-notation keys (`a[b]=1`) are **not** expanded by the urlencoded parser itself — nesting only happens through the same shared bracket-key logic every body type already goes through, so it behaves exactly like a JSON or query-string key of that shape, no differently than today.
+
+All three content types are held to the same `http.bodyLimit` — an over-limit urlencoded body is rejected with the same `413` a JSON body would get.
 
 ## Returning output
 
@@ -2416,6 +2430,8 @@ GET /ready  → 200 {"status":"ok","checks":{"db":true}}
 ### Config
 
 ```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
 const httpConfigurations: HttpConfigurations = {
   health: {
     enabled: true,          // default; set false to remove both endpoints
@@ -2423,6 +2439,8 @@ const httpConfigurations: HttpConfigurations = {
     readinessPath: "/ready", // readiness path
   },
 };
+
+export default httpConfigurations;
 ```
 
 ## Readiness checks
@@ -2463,12 +2481,16 @@ On SIGINT/SIGTERM the framework tears down in order: **app `onShutdown` hooks �
 3. Draining is bounded by a timeout so one stuck request can't hang the deploy — after it, the server force-closes and a warning is logged.
 
 ```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
 const httpConfigurations: HttpConfigurations = {
   gracefulShutdown: {
     timeout: 10_000,              // ms to wait for in-flight drain (default 10s)
     forceCloseConnections: "idle", // close idle keep-alives, let active finish (default)
   },
 };
+
+export default httpConfigurations;
 ```
 
 `forceCloseConnections`: `"idle"` (default) closes idle keep-alive connections and lets active requests finish; `true` force-closes everything immediately; `false` waits for every connection.
@@ -4488,6 +4510,8 @@ return response.sendBuffer(buffer, { contentType: "image/png" });
 ```
 
 `SendFileOptions` lets you set `cacheTime`, `immutable`, `inline`, `filename` (download attachment name).
+
+`response.xml(string | XMLable, statusCode?)` sends `application/xml` — pass a raw XML string, or anything with a `toXML(): string` method (structural, so core never depends on `@warlock.js/sitemap`). This is for BOUNDED values only: a raw string, or a single `@warlock.js/sitemap` `Sitemap` under the sitemaps.org 50,000-URL / 50MB ceiling. `SitemapIndex` has no `toXML()` — it is the streaming path for larger URL sets and does not fit in one response body. It writes shards plus a master index as FILES via `saveTo`/`publish`, and those files are served directly rather than passed through `xml()`. In Warlock web this is the `web.sitemap` config: `enabled`, `outputDir` (default `storagePath("sitemap")`), and `path` (default `/sitemap.xml`) — the app serves the generated files from `outputDir` at that route, it never builds a `SitemapIndex` response inline.
 
 ## Streams
 

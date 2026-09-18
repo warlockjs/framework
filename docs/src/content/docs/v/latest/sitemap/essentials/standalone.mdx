@@ -1,79 +1,198 @@
 ---
-title: Standalone usage
-description: Using @warlock.js/sitemap in any Node app, with no Warlock dependency — collectSitemapEntries and buildSitemapXml called directly.
+title: Build a sitemap
+description: The Sitemap builder class — baseUrl validation, entries and defaults, duplicates() and routes() diagnostics, declareRoute(), hreflang alternates, toXML(), saveTo() and publishTo().
 sidebar:
   order: 1
-  label: "Standalone"
+  label: "Build a sitemap"
 ---
 
-Mode 1 of 3. No Warlock at all. Build the page list yourself — from a route
-table, a database, wherever your app already knows its own URLs — and call
-`collectSitemapEntries` + `buildSitemapXml` directly. Nothing on this path
-resolves `@warlock.js/core` or `@warlock.js/web`.
+import { Aside } from "@astrojs/starlight/components";
+
+`Sitemap` is the builder for any site under the protocol limit of 50,000 URLs
+or 50MB. It keeps every entry in memory, so you can inspect it, run
+diagnostics on it, and serialise it more than once. Above that limit, use
+[`SitemapIndex`](/v/latest/sitemap/essentials/large-sites/).
 
 ```ts
-import express from "express";
-import { buildSitemapXml, collectSitemapEntries, type RoutablePage } from "@warlock.js/sitemap";
+import { Sitemap } from "@warlock.js/sitemap";
 
-const app = express();
-
-app.get("/sitemap.xml", async (_req, res) => {
-  const pages: RoutablePage[] = [
-    { routeName: "home", routePath: "/" },
-    { routeName: "about", routePath: "/about" },
-    {
-      routeName: "post-details",
-      routePath: "/posts/:id",
-      sitemap: async () => (await db.posts.find()).map((post) => ({ path: `/posts/${post.slug}` })),
-    },
-  ];
-
-  const { entries } = await collectSitemapEntries(pages, {
-    defaults: { changefreq: "weekly", priority: 0.5 },
-  });
-
-  const xml = buildSitemapXml(entries, "https://example.com");
-
-  res.type("application/xml").send(xml);
+const sitemap = new Sitemap({
+  baseUrl: "https://example.com",
+  changefreq: "weekly",
+  priority: 0.5,
 });
+
+sitemap.add({ path: "/" });
+
+for (const post of await Post.all()) {
+  sitemap.add({
+    name: "post-details",
+    route: "/posts/:id",
+    path: `/posts/${post.slug}`,
+    lastmod: post.updatedAt,
+    priority: 0.8,
+  });
+}
+
+const xml = sitemap.toXML();
+
+await sitemap.saveTo("public/sitemap.xml");
 ```
 
-## `RoutablePage`
+## `new Sitemap(options)`
 
-The shape `collectSitemapEntries` walks — deliberately minimal, not the
-richer discovery type `@warlock.js/web` uses internally:
+| Option | Meaning |
+| --- | --- |
+| `baseUrl` | **Required.** An absolute origin, such as `https://example.com` or `https://example.com/docs`. |
+| `changefreq` | The default for any entry that doesn't set its own. |
+| `priority` | The same. |
+| `lastmod` | The same. |
+
+The constructor validates `baseUrl`. A value that isn't an absolute `http(s)`
+URL throws `InvalidBaseUrlError`. That includes a missing value, a relative
+path, `mailto:`, and `file:`. The error points at the line that set the value,
+so you don't find out at the first request.
+
+## Entries — `add(entry)` / `addMany(entries)`
+
+Only `path` is required. It must be a **concrete path**, such as `/posts/123`.
+A pattern like `/posts/:id` is not a URL.
+
+| Field | Meaning |
+| --- | --- |
+| `path` | **Required.** Resolved against `baseUrl`. An absolute URL is used as given. |
+| `name` | An optional label for the route, for your own diagnostics. It is never written to the XML. |
+| `route` | The optional pattern this URL came from, such as `/posts/:id`. `routes()` and `duplicates()` use it. |
+| `lastmod` | A `Date`, written as a W3C datetime (`toISOString()`), or a string, written exactly as given. |
+| `changefreq` | `always`, `hourly`, `daily`, `weekly`, `monthly`, `yearly`, or `never`. |
+| `priority` | `0.0`–`1.0`. |
+| `alternates` | Language versions of this page. See [Alternates](#language-alternates) below. |
+
+Both methods return `this`, so you can chain them. An entry the protocol can't
+represent throws `InvalidSitemapEntryError` from `add()`: a missing path, a
+priority outside `0.0`–`1.0`, an unknown `changefreq`, an invalid `Date`, or
+an alternate with no `hreflang`. Paths are normalised with a leading slash,
+so `a` and `/a` are the same entry.
+
+`size` gives the number of URLs that will be emitted. `entries()` returns a
+copy of them, with the defaults already applied.
+
+## Duplicates are silent, but not hidden
+
+Entries are stored by `path`. If you add the same path twice, the later entry
+replaces the earlier one without an error. A duplicate `<loc>` would make the
+document invalid, and two loops that cover overlapping URLs are common.
+
+`duplicates()` lists every collision with its count and the `route` of each
+`add()`. That lets you name the two sources that collided:
 
 ```ts
-type RoutablePage = {
-  /** Unique route identity — named in the dynamic-route diagnostic when unresolved. */
-  routeName: string;
-  /** The effective route path, `:param` for a dynamic segment (e.g. `/posts/:id`). */
-  routePath: string;
-  /** `metadata.robots`, when the page's `metadata` export is a static object. */
-  robots?: string;
-  sitemap?: SitemapPageExport;
-};
+sitemap.duplicates();
+// [ { path: "/posts/1", count: 2, routes: ["/posts/:id", "/:slug"] } ]
 ```
 
-A dynamic route path (one containing a `:param` segment) needs a `sitemap`
-function to be enumerable — the same rule as a Warlock web page's `sitemap`
-export. Give it one, or leave `sitemap` unset and it's reported as
-unresolved in `collectSitemapEntriesResult.unresolvedDynamicRoutes` rather
-than silently omitted:
+## `routes()` and `declareRoute()`
+
+`routes()` counts the URLs each `route` produced. **Watch for a count of
+zero.** It means a route you expected to add URLs added none. A whole section
+of the site is then missing from a document that otherwise looks correct.
+
+A route only appears in `routes()` when an entry uses it, so its count is
+never zero on its own. `declareRoute()` registers the pattern in advance, and
+then an empty result shows up:
 
 ```ts
-const { entries, unresolvedDynamicRoutes } = await collectSitemapEntries(pages);
+sitemap.declareRoute("/products/:slug");
 
-if (unresolvedDynamicRoutes.length > 0) {
-  console.warn(describeUnresolvedDynamicRoutes(unresolvedDynamicRoutes));
+sitemap.routes();
+// [ { route: "/posts/:id", count: 400 }, { route: "/products/:slug", count: 0 } ]
+
+const empty = sitemap.routes().filter((route) => route.count === 0);
+
+if (empty.length > 0) {
+  throw new Error(`empty sitemap routes: ${empty.map((route) => route.route).join(", ")}`);
 }
 ```
 
-See the [exclusion rules table](./configuration/#what-ships-and-what-doesnt)
-for the full set of rules `collectSitemapEntries` applies — they're the same
-rules regardless of which mode supplied the pages.
+The package only reports problems. It never prints anything, and it never
+throws over a duplicate or an empty route. You decide whether a zero is a
+warning or a failed build.
 
-## Next
+## Language alternates
 
-- [Configuration](./configuration/) — wiring this into a Warlock app instead (Modes 2 and 3).
-- [Reference](../reference/api/) — the full exported surface.
+`alternates` writes `<xhtml:link rel="alternate" hreflang="…">` inside each
+`<url>`:
+
+```ts
+const alternates = [
+  { hreflang: "en", path: "/en/about" },
+  { hreflang: "ar", path: "/ar/about-us" },
+  { hreflang: "x-default", path: "/en/about" },
+];
+
+sitemap.add({ path: "/en/about", alternates });
+sitemap.add({ path: "/ar/about-us", alternates });
+```
+
+<Aside type="caution" title="Every language version is its own <url>">
+Add each language version as its own entry, and give each one the complete
+alternate set, including itself. Sitemaps often ship broken because the
+alternates are listed on only one version.
+</Aside>
+
+The package has no concept of a locale. `hreflang` accepts any string (`en`,
+`en-GB`, `x-default`), and the package never builds a `/{locale}/…` path for
+you. You supply each path yourself, which also works when slugs differ between
+languages. The `xhtml` namespace is declared only when an entry uses it.
+
+## Output
+
+### `toXML()`
+
+`toXML()` is pure and synchronous. Two calls return the same string, and it
+changes nothing. `Sitemap` satisfies core's `XMLable` contract
+(`toXML(): string`) by shape alone, so a Warlock controller can return it
+directly:
+
+```ts title="src/app/seo/controllers/sitemap.controller.ts"
+import type { RequestHandler } from "@warlock.js/core";
+import { Sitemap } from "@warlock.js/sitemap";
+
+export const sitemapController: RequestHandler = async ({ response }) => {
+  const sitemap = new Sitemap({ baseUrl: "https://example.com" });
+
+  sitemap.add({ path: "/" });
+
+  return response.xml(sitemap); // Content-Type: application/xml
+};
+```
+
+See [`response.xml()`](/v/latest/core/the-basics/http-response/#xml). A
+[Warlock web app](/v/latest/web/guides/sitemap-and-robots/) doesn't need this
+route, because web serves `/sitemap.xml` itself.
+
+### `saveTo(filePath)`
+
+Writes the document **atomically** and creates any missing parent directories.
+If the write fails or is interrupted, the existing file at `filePath` stays
+as it was. It is never left half-written.
+
+### `publishTo(outDir, fileName = "sitemap.xml")`
+
+Publishes the document as the entire contents of `outDir`, in the same way
+[`SitemapIndex.saveTo()`](/v/latest/sitemap/essentials/large-sites/#saveto-owns-the-whole-directory)
+publishes a set. The directory is swapped in atomically and marked as owned.
+Use it when the site may later need an index. The index can then be published
+to the same directory, and a later single-file publish removes old shards.
+It returns the path of the published file.
+
+`outDir` must be used only for the sitemap. A non-empty directory without the
+ownership marker throws `UnownedOutputDirectoryError`, and nothing in it is
+changed.
+
+## Also exported
+
+`buildSitemapXml(entries, baseUrl)`, `renderUrlBlock(entry, baseUrl)`,
+`escapeXml(value)`, and `joinOrigin(origin, path)` are the functions `Sitemap`
+is built from. Use them if you want the serialiser without the builder. See the
+[API reference](/v/latest/sitemap/reference/api/).

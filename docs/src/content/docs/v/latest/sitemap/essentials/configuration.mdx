@@ -1,213 +1,80 @@
 ---
-title: Configuration
-description: sitemapConnector() in a Warlock app — API-only via entries, or web via the page registry — the SitemapConfig shape, app.publicUrl, the page-level sitemap export, the exclusion rules, and NoPageRegistryError.
+title: In a Warlock app
+description: How a Warlock web app uses @warlock.js/sitemap — warlock add sitemap, the web.sitemap section in src/config/web.ts, app.publicUrl, and upgrading from the 5.15 connector.
 sidebar:
-  order: 2
-  label: "Configuration"
+  order: 3
+  label: "In a Warlock app"
 ---
 
 import { Aside } from "@astrojs/starlight/components";
 
-Modes 2 and 3 of 3 — both go through `sitemapConnector()`, which only
-differs in where its entries come from. Building a sitemap with no Warlock
-at all is [Mode 1, standalone](./standalone/).
+`@warlock.js/sitemap` doesn't import Warlock. In a Warlock app,
+`@warlock.js/web` calls the package, just as an Express handler would. Web
+handles everything that depends on the app:
 
-## The connector
+- finding pages and applying the page-level `sitemap` export;
+- expanding locales into `hreflang` alternates;
+- choosing `Sitemap` or `SitemapIndex`;
+- generating the file at `warlock build` and at boot;
+- serving `/sitemap.xml`, the shard files, and `/robots.txt`.
 
-```ts title="warlock.config.ts"
-import { defineConfig } from "@warlock.js/core";
-import { sitemapConnector } from "@warlock.js/sitemap";
-
-export default defineConfig({ connectors: [sitemapConnector()] });
-```
-
-At boot, the connector reads the `sitemap` config (a no-op unless `enabled`
-is `true`), resolves the public origin **once**, and registers
-`GET <config.path>`. It boots after the HTTP connector and after web (when
-web is installed), so the route it registers lands on the same router web
-has already populated — and the route itself re-reads the page graph on
-every request, so it never goes stale under `warlock dev`.
-
-Pass `config` directly instead of reading `src/config/sitemap.ts` — useful
-for tests or non-standard wiring:
-
-```ts
-sitemapConnector({ config: { enabled: true, path: "/sitemap.xml" } });
-```
-
-## Mode 2 — Warlock, API-only
-
-An API-only Warlock app has no page registry — there's nothing for
-`listRoutablePages()` to read. Pass `entries` and the connector uses it
-instead; `@warlock.js/web` is never required for this path:
-
-```ts title="warlock.config.ts"
-import { sitemapConnector } from "@warlock.js/sitemap";
-
-export default defineConfig({
-  connectors: [
-    sitemapConnector({
-      entries: async () => {
-        const products = await db.products.find();
-
-        return products.map((product) => ({ path: `/products/${product.slug}` }));
-      },
-    }),
-  ],
-});
-```
-
-## Mode 3 — Warlock web
+## Install
 
 ```sh
 warlock add sitemap
 ```
 
-adds the `@warlock.js/sitemap` dependency, ejects `src/config/sitemap.ts`,
-and registers `sitemapConnector()` in `warlock.config.ts`. With
-`@warlock.js/web` installed, the connector reads the page registry via
-`listRoutablePages()` on every request — not once at boot.
+This command installs `@warlock.js/sitemap`, and `@warlock.js/web` if it isn't
+installed yet. It then adds a **disabled** `sitemap` section to
+`src/config/web.ts`. If the file already exists, the section is merged in and
+nothing else in the file changes. Running the command again does nothing.
 
-Only a dynamic route needs a page-level `sitemap` export; a static route is
-included automatically at its own path. See
-[the page-level `sitemap` export](#the-page-level-sitemap-export) below.
+```ts title="src/config/web.ts"
+import type { WebSitemapConfig } from "@warlock.js/web/sitemap";
 
-`entries` still works alongside a page registry — see
-[combining a page registry with `entries`](#combining-a-page-registry-with-entries).
-
-## `src/config/sitemap.ts`
-
-```ts title="src/config/sitemap.ts"
-import type { SitemapConfig } from "@warlock.js/sitemap";
-
-const sitemapConfig: SitemapConfig = {
-  enabled: true,
-  path: "/sitemap.xml",
-  defaults: { changefreq: "weekly", priority: 0.5 },
+const webConfig: { sitemap: WebSitemapConfig } = {
+  sitemap: {
+    enabled: false,
+    path: "/sitemap.xml",
+    defaults: { changefreq: "weekly", priority: 0.5 },
+  },
 };
 
-export default sitemapConfig;
+export default webConfig;
 ```
 
-| Key | Type | Notes |
-| --- | --- | --- |
-| `enabled` | `boolean` | The connector is a no-op unless `true`. |
-| `path` | `string` | Where the sitemap is served, e.g. `/sitemap.xml`. |
-| `defaults` | `{ changefreq?, priority? }` | Fallback applied to any entry that omits them — page-derived or app-supplied. |
+It ships disabled because a sitemap needs absolute URLs, and a new app doesn't
+know its public origin yet. To turn it on:
 
-`changefreq` and `priority` are **not** part of `PageMetadata` — they mean
-nothing outside a sitemap, so they aren't added to the shared metadata type.
+1. Set `app.publicUrl` in `src/config/app.ts`, or set the `PUBLIC_APP_URL`
+   environment variable. `app.publicUrl` wins if both are set.
+2. Set `sitemap.enabled` to `true`.
 
-## The app's public origin — `app.publicUrl`
-
-The sitemap emits absolute URLs, so it needs an origin. Set it in
-`src/config/app.ts`:
-
-```ts title="src/config/app.ts"
-import type { AppConfigurations } from "@warlock.js/core";
-
-const appConfigurations: AppConfigurations = {
-  publicUrl: "https://example.com",
-};
-
-export default appConfigurations;
-```
-
-Or set the `PUBLIC_APP_URL` environment variable — `app.publicUrl` wins when
-both are set.
-
-<Aside type="caution" title="Absent while enabled is a boot-time failure">
-With `sitemap.enabled: true` and neither `app.publicUrl` nor `PUBLIC_APP_URL`
-set, boot throws `MissingPublicUrlError` naming both. It does **not** fall
-back to a request-derived origin — a sitemap served from the wrong host is
-worse than one that refuses to start, because nothing downstream would ever
-tell you it was wrong.
+<Aside type="caution" title="No origin, no sitemap">
+If the sitemap is enabled but has no origin, generation throws
+`MissingPublicUrlError`. It never builds URLs from a guessed or
+request-derived host. `warlock build` fails. At boot, the error is logged and
+`/sitemap.xml` returns `503` until a later generation succeeds.
 </Aside>
 
-## No page registry, no `entries`
+The [Sitemap and robots.txt guide](/v/latest/web/guides/sitemap-and-robots/)
+covers the rest: every `web.sitemap` key, the page-level `sitemap` export,
+locales, `robots.txt`, and regenerating after your data changes.
 
-If `@warlock.js/web` is not installed and no `entries` option is supplied,
-`sitemapConnector()` throws `NoPageRegistryError` at `boot()` — before the
-route is even registered — rather than registering a route that would
-silently serve an empty `<urlset>`:
+## Upgrading from 5.15
 
-```text
-Sitemap is enabled but has no source of entries: `@warlock.js/web` is not installed,
-so there is no page registry to read, and no `entries` option was supplied either.
-Fix this by installing `@warlock.js/web`, or by passing
-`sitemapConnector({ entries: async () => [...] })` with your own supplier.
-```
+5.16 rewrites this package, and the 5.15 API is gone. That includes the
+connector, its standalone config file, the page-registry helpers, and the
+`sitemap.path`/`defaults` config module.
 
-Fix it either way: install `@warlock.js/web`, or pass `entries`. This is the
-same reasoning as `MissingPublicUrlError` above — a sitemap that looks
-complete while producing nothing is worse than one that never started.
-
-## The page-level `sitemap` export
-
-A static route needs nothing — it is included automatically. A **dynamic**
-route (`[id]`, `[...slug]`) can't be enumerated without application data, so
-it needs one of two exports:
-
-```tsx title="src/web/posts/[slug].page.tsx"
-import type { SitemapEntries } from "@warlock.js/sitemap";
-
-export const sitemap: SitemapEntries = async () => [
-  { path: "/posts/hello-world", lastmod: "2026-09-17", priority: 0.8 },
-];
-```
-
-```tsx title="src/web/admin/[id].page.tsx"
-// Keep this route out of the sitemap deliberately.
-export const sitemap = false;
-```
-
-`lastmod`, `changefreq`, and `priority` are per-entry and optional, falling
-back to `sitemapConfig.defaults`.
-
-## What ships, and what doesn't
-
-| Case | Behaviour |
+| 5.15 | 5.16 |
 | --- | --- |
-| Static route | Included |
-| Not-found route | Excluded |
-| Error page | Excluded — it isn't a routable page at all |
-| Page with `metadata.robots` set to `noindex` | Excluded |
-| Page exporting `sitemap: false` | Excluded |
-| Dynamic route **with** a `sitemap` export | The entries that export returns |
-| Dynamic route **without** a `sitemap` export | **Omitted, and named in a dev-mode diagnostic** |
-| `sitemapConnector({ entries })` result | Added to the above — see below |
+| A connector registered in `warlock.config.ts` | Nothing to register. `@warlock.js/web` reads `web.sitemap` itself. Remove the connector entry. |
+| A standalone sitemap config file | A `sitemap` section in `src/config/web.ts`, typed as `WebSitemapConfig` from `@warlock.js/web/sitemap`. Move `enabled`, `path`, and `defaults` there. |
+| `export const sitemap = async () => [...]` on a page | The same export still works. Type it as `SitemapPageExport` from `@warlock.js/web/sitemap`. It can also be a static options object. |
+| API-only apps passing an `entries` supplier | Build a `Sitemap` yourself and return it with `response.xml(sitemap)`. See [Build a sitemap](/v/latest/sitemap/essentials/standalone/#toxml). |
+| Collecting and serialising pages yourself | `new Sitemap({ baseUrl })`, then `add()` and `toXML()`. |
+| `MissingPublicUrlError` from the sitemap package | `MissingPublicUrlError` from `@warlock.js/web/sitemap`, raised when generation runs rather than at connector boot. |
 
-That dynamic-route row is the whole reason the package exists. In
-development, an unresolved dynamic route logs a warning naming every
-affected route name and telling you to add a `sitemap` export or
-`sitemap = false`:
-
-```text
-[warlock:sitemap] 1 dynamic route has no `sitemap` export and is OMITTED from sitemap.xml:
-  - posts.show
-A dynamic route cannot be enumerated without application data. Add
-`export const sitemap: SitemapEntries = async () => [...]` to each page above,
-or `export const sitemap = false` to keep it out of the sitemap deliberately.
-```
-
-Silence here would be the same failure mode as a 404 with no diagnostic — a
-sitemap that looks complete while it quietly omits every product page on the
-site.
-
-## Combining a page registry with `entries`
-
-If a project has both a page registry (Mode 3) **and** an `entries` supplier
-(Mode 2's option, usable alongside Mode 3 too), the two are merged and
-deduplicated by `path`, not one replacing the other:
-
-- Page-derived entries and app-supplied entries are combined into one list.
-- Where the same `path` appears in both, the `entries` version wins — it was
-  written for that exact path on purpose.
-
-This is how a project with both a page graph and extra database-backed URLs
-(rows the page graph has no way to see) gets both in one sitemap.
-
-## Next
-
-- [Standalone](./standalone/) — Mode 1, no Warlock connector at all.
-- [Reference](../reference/api/) — the full exported surface.
+The builder takes its origin as the `baseUrl` argument, so the standalone
+package can no longer be missing one.

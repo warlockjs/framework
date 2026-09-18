@@ -1,6 +1,6 @@
 ---
 title: "HTTP response"
-description: The Response surface in Warlock — success and error helpers, redirects, files, streams, SSE, cookies, and headers. Picking the right helper carries the HTTP semantic.
+description: The Response surface in Warlock — success and error helpers, redirects, files, XML, streams, SSE, cookies, and headers. Picking the right helper carries the HTTP semantic.
 sidebar:
   order: 6
   label: "HTTP response"
@@ -181,6 +181,43 @@ return response.download("/abs/path/report.pdf");
 ```
 
 The framework sets `Content-Type: application/octet-stream` and `Content-Disposition: attachment; filename=...` for you.
+
+## XML
+
+`response.xml(body, statusCode?)` sends `Content-Type: application/xml`. The
+body is either a raw XML string or any **`XMLable`**, meaning any object with a
+`toXML(): string` method:
+
+```ts
+import type { XMLable } from "@warlock.js/core";
+
+return response.xml('<?xml version="1.0" encoding="UTF-8"?><ok/>');
+
+class Feed implements XMLable {
+  toXML() {
+    return '<?xml version="1.0" encoding="UTF-8"?><feed/>';
+  }
+}
+
+return response.xml(new Feed());
+```
+
+`XMLable` is matched by shape, so a package can satisfy it without importing
+core. A `@warlock.js/sitemap` `Sitemap` is one example:
+
+```ts
+import { Sitemap } from "@warlock.js/sitemap";
+
+const sitemap = new Sitemap({ baseUrl: "https://example.com" }).add({ path: "/" });
+
+return response.xml(sitemap);
+```
+
+Any other value throws. `xml()` is for **bounded** bodies only: a string or a
+single `Sitemap`, which is limited to 50,000 URLs. A `SitemapIndex` has no
+`toXML()`. It writes files that you serve directly. A Warlock web app does
+this for you through
+[`web.sitemap`](/v/latest/web/guides/sitemap-and-robots/).
 
 ## Streams
 
