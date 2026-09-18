@@ -128,9 +128,9 @@ export function sitemapConnector(options: SitemapConnectorOptions = {}): Connect
       // Checked once, at boot: `@warlock.js/web`'s presence can't change per
       // request, and failing here — before the route is even registered —
       // surfaces a misconfigured app at startup instead of on its first hit.
-      let listRoutablePages: typeof import("@warlock.js/web").listRoutablePages | undefined;
+      let listRoutablePages: typeof import("@warlock.js/web/build").listRoutablePages | undefined;
       try {
-        ({ listRoutablePages } = await import("@warlock.js/web"));
+        ({ listRoutablePages } = await import("@warlock.js/web/build"));
       } catch {
         listRoutablePages = undefined;
       }

@@ -17,8 +17,8 @@ vi.mock("@warlock.js/core", () => ({
 
 // Simulates a Warlock API-only project: `@warlock.js/web` is not installed,
 // so importing it fails the way it would in node's module resolution.
-vi.mock("@warlock.js/web", () => {
-  throw new Error("Cannot find package '@warlock.js/web'");
+vi.mock("@warlock.js/web/build", () => {
+  throw new Error("Cannot find package '@warlock.js/web/build'");
 });
 
 import { NoPageRegistryError, sitemapConnector } from "../src/sitemap-connector";

@@ -12,7 +12,7 @@
     // parsing those files — even though sitemap renders nothing itself.
     "jsx": "react-jsx",
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "Bundler",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

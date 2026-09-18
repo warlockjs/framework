@@ -78,7 +78,7 @@ it registers lands on the router web already populated) it is a no-op unless
 `enabled` is `true`. When enabled, it resolves `app.publicUrl` /
 `PUBLIC_APP_URL` **once, at boot** via `resolveOrigin()` — throwing
 `MissingPublicUrlError` and refusing to start rather than falling back to a
-request-derived host — then attempts a lazy `import("@warlock.js/web")` to
+request-derived host — then attempts a lazy `import("@warlock.js/web/build")` to
 get `listRoutablePages`. If that import fails **and** no `entries` option
 was supplied, it throws `NoPageRegistryError` — there is nothing to serve.
 Otherwise it registers `GET <path>`. The route itself re-reads the page

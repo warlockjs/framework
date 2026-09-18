@@ -15,7 +15,7 @@ vi.mock("@warlock.js/core", () => ({
   },
 }));
 
-vi.mock("@warlock.js/web", () => ({
+vi.mock("@warlock.js/web/build", () => ({
   listRoutablePages: async () => [
     { routeName: "home", routePath: "/", metadata: undefined, sitemap: undefined },
   ],
