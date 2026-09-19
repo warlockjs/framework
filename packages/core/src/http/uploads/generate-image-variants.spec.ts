@@ -11,6 +11,7 @@ import { Request } from "../request";
 import { Response } from "../response";
 import type { UploadsImagesConfigurations } from "../uploads-types";
 import { generateImageVariants } from "./generate-image-variants";
+import { ImageVariantsConfigError } from "./image-variants-config-error";
 import { uploadedFileController } from "./uploaded-file.controller";
 
 /**
@@ -242,6 +243,38 @@ describe.skipIf(!sharp)("generateImageVariants — variants filter", () => {
     await expect(generateImageVariants("unknown.jpg", { variants: ["huge"] })).rejects.toThrow(
       HttpError,
     );
+  });
+});
+
+describe.skipIf(!sharp)("generateImageVariants — server misconfiguration", () => {
+  it("throws ImageVariantsConfigError, not a plain Error, when there is no local storage root", async () => {
+    const rootSpy = vi.spyOn(storage, "root").mockImplementation(() => ".");
+
+    try {
+      await expect(generateImageVariants("whatever.jpg")).rejects.toThrow(
+        ImageVariantsConfigError,
+      );
+    } finally {
+      rootSpy.mockImplementation((appended?: string) => path.join(storageRoot, appended ?? ""));
+    }
+  });
+
+  it("throws ImageVariantsConfigError, not HttpError, when uploads.images is not configured", async () => {
+    config.set("uploads", {});
+
+    try {
+      await expect(generateImageVariants("whatever.jpg")).rejects.toThrow(
+        ImageVariantsConfigError,
+      );
+
+      try {
+        await generateImageVariants("whatever.jpg");
+      } catch (error) {
+        expect(error).not.toBeInstanceOf(HttpError);
+      }
+    } finally {
+      imagesConfig();
+    }
   });
 });
 

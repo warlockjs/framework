@@ -5,6 +5,7 @@ import { HttpError } from "../errors";
 import { uploadsConfig } from "../uploads-config";
 import type { ImageVariantDefinition, ImageVariantOutputFormat } from "../uploads-types";
 import { generateImageVariant } from "./generate-image-variant";
+import { ImageVariantsConfigError } from "./image-variants-config-error";
 import type {
   GeneratedImageDescriptor,
   GeneratedImageVariant,
@@ -91,8 +92,11 @@ function outputFormatsFor(
  *
  * @param relativePath - path of the saved upload, relative to the storage root
  * @param options.variants - limit generation to these variant names
- * @throws HttpError(400) when `uploads.images` is not configured, or a name
- * in `options.variants` is not declared in `uploads.images.variants`
+ * @throws ImageVariantsConfigError when there is no local storage root, or
+ * `uploads.images` is not configured — both are server misconfiguration, not
+ * a bad request
+ * @throws HttpError(400) when a name in `options.variants` is not declared in
+ * `uploads.images.variants`
  * @throws HttpError(404) when `relativePath` does not resolve to a file
  * inside the storage root
  * @throws HttpError(413) when the source is over `maxSourceBytes` or
@@ -106,13 +110,15 @@ export async function generateImageVariants(
   const storageRoot = storage.root();
 
   if (!storageRoot || storageRoot === ".") {
-    throw new Error("generateImageVariants needs a local storage driver with a root.");
+    throw new ImageVariantsConfigError(
+      "generateImageVariants needs a local storage driver with a root.",
+    );
   }
 
   const images = resolveImageVariantsConfig(uploadsConfig("images"), storageRoot);
 
   if (!images) {
-    throw new HttpError(400, "Image variants are not configured.");
+    throw new ImageVariantsConfigError("uploads.images is not configured.");
   }
 
   const names = options.variants ?? Object.keys(images.variants);
