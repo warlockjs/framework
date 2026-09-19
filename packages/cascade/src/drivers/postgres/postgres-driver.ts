@@ -92,7 +92,16 @@ export function buildPostgresPoolConfig(config: PostgresPoolConfig): PgPoolConfi
     max: config.max ?? 10,
     min: config.min ?? 0,
     idleTimeoutMillis: config.idleTimeoutMillis ?? 30000,
-    connectionTimeoutMillis: config.connectionTimeoutMillis ?? 2000,
+    // 2000ms was too tight under load (card ba1193b4): at concurrency 10, a
+    // pool of `max` clients queues checkout requests, and 2s is easy to blow
+    // through waiting for a client to free up — surfacing as pg-pool's
+    // "timeout exceeded when trying to connect" on a healthy database that's
+    // just briefly saturated. 10000ms gives queued callers real headroom
+    // without masking a truly wedged connection.
+    connectionTimeoutMillis: config.connectionTimeoutMillis ?? 10000,
+    // TCP keep-alive so a NAT/firewall/OS doesn't silently drop an idle
+    // connection out from under the pool — see PostgresPoolConfig.keepAlive.
+    keepAlive: config.keepAlive ?? true,
     application_name: config.application_name ?? "cascade",
     ssl: config.ssl,
   };
@@ -304,6 +313,21 @@ export class PostgresDriver implements DriverContract {
 
       this._pool = new pg.Pool(poolConfig);
 
+      // pg emits 'error' on the Pool for problems on an already-idle client
+      // (e.g. the server or a NAT/firewall closed it out from under us —
+      // exactly the "Connection terminated unexpectedly" symptom in card
+      // ba1193b4). node's EventEmitter throws if an 'error' event has no
+      // listener, which would crash the whole process on a single dropped
+      // idle connection; a listener here turns that into a log line and lets
+      // the pool prune the dead client and open a fresh one on next checkout.
+      this._pool.on("error", (error: Error) => {
+        log.error(
+          "database.postgres",
+          "pool",
+          `Unexpected error on an idle client: ${error.message}`,
+        );
+      });
+
       // Test the connection
       const client = await this._pool.connect();
       client.release();
@@ -372,10 +396,7 @@ export class PostgresDriver implements DriverContract {
    *   native arrays on that table are bound raw (see {@link serializeValue}).
    * @returns Serialized data ready for PostgreSQL
    */
-  public serialize(
-    data: Record<string, unknown>,
-    table?: string,
-  ): Record<string, unknown> {
+  public serialize(data: Record<string, unknown>, table?: string): Record<string, unknown> {
     const serialized: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(data)) {
@@ -839,11 +860,15 @@ export class PostgresDriver implements DriverContract {
   ): Promise<{ row?: Record<string, unknown>; inserted: boolean }> {
     const equalityKeys = new Set(
       Object.entries(filter)
-        .filter(([, value]) => value !== null && value !== undefined && !this.isOperatorFilter(value))
+        .filter(
+          ([, value]) => value !== null && value !== undefined && !this.isOperatorFilter(value),
+        )
         .map(([key]) => key),
     );
     const uniqueKeys = await this.getUniqueKeys(table);
-    const target = uniqueKeys.find((key) => key.columns.every((column) => equalityKeys.has(column)));
+    const target = uniqueKeys.find((key) =>
+      key.columns.every((column) => equalityKeys.has(column)),
+    );
 
     if (!target) {
       throw new UnsupportedUpdateOperationError(
@@ -1186,28 +1211,50 @@ export class PostgresDriver implements DriverContract {
   ): Promise<DriverTransactionContract<PgPoolClient>> {
     const client = await this.pool.connect();
 
-    let beginSql = "BEGIN";
-    if (options?.isolationLevel) {
-      beginSql += ` ISOLATION LEVEL ${options.isolationLevel.toUpperCase()}`;
-    }
-    if (options?.readOnly) {
-      beginSql += " READ ONLY";
-    }
-    if (options?.deferrable) {
-      beginSql += " DEFERRABLE";
-    }
+    // Every checkout above must be released on every path — including the
+    // BEGIN itself failing. Before this try/catch, a BEGIN that threw (e.g.
+    // the connection was terminated the instant it came off the pool) left
+    // the client checked out forever: under concurrency that's exactly the
+    // pool-exhaustion "timeout exceeded when trying to connect" symptom in
+    // card ba1193b4.
+    try {
+      let beginSql = "BEGIN";
+      if (options?.isolationLevel) {
+        beginSql += ` ISOLATION LEVEL ${options.isolationLevel.toUpperCase()}`;
+      }
+      if (options?.readOnly) {
+        beginSql += " READ ONLY";
+      }
+      if (options?.deferrable) {
+        beginSql += " DEFERRABLE";
+      }
 
-    await client.query(beginSql);
+      await client.query(beginSql);
+    } catch (error) {
+      // Pass the error to release() so pg destroys the client instead of
+      // returning a possibly-broken connection to the pool.
+      client.release(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
 
     return {
       context: client,
       commit: async () => {
-        await client.query("COMMIT");
-        client.release();
+        // COMMIT/ROLLBACK failing must still release the client — a bare
+        // `await client.query(...); client.release();` skips release() on
+        // that throw, which is the other leak this card describes.
+        try {
+          await client.query("COMMIT");
+        } finally {
+          client.release();
+        }
       },
       rollback: async () => {
-        await client.query("ROLLBACK");
-        client.release();
+        try {
+          await client.query("ROLLBACK");
+        } finally {
+          client.release();
+        }
       },
     };
   }
@@ -1389,7 +1436,22 @@ export class PostgresDriver implements DriverContract {
       if (txClient) {
         result = await txClient.query(sql, params);
       } else {
-        result = await this.pool.query(sql, params);
+        try {
+          result = await this.pool.query(sql, params);
+        } catch (error) {
+          // A client that looked idle-healthy to the pool can already have
+          // been dropped by the server/OS (card ba1193b4: "Connection
+          // terminated unexpectedly" after the process sat idle) — the pool
+          // only discovers this on the query that reuses it. One retry on a
+          // fresh checkout is safe here specifically because we're outside a
+          // transaction (no txClient) and the statement is a read-only
+          // SELECT: re-running it can't double-apply a write.
+          if (this.isConnectionTerminatedError(error) && this.isIdempotentSelect(sql)) {
+            result = await this.pool.query(sql, params);
+          } else {
+            throw error;
+          }
+        }
       }
 
       if (this.config.logging) {
@@ -1503,7 +1565,9 @@ export class PostgresDriver implements DriverContract {
             case "$lt":
             case "$lte": {
               const sqlOperator = { $gt: ">", $gte: ">=", $lt: "<", $lte: "<=" }[operator];
-              conditions.push(`${quotedKey} ${sqlOperator} ${this.dialect.placeholder(paramIndex++)}`);
+              conditions.push(
+                `${quotedKey} ${sqlOperator} ${this.dialect.placeholder(paramIndex++)}`,
+              );
               params.push(operand);
               break;
             }
@@ -1523,6 +1587,35 @@ export class PostgresDriver implements DriverContract {
     const whereClause = condition ? `WHERE ${condition}` : "";
 
     return { whereClause, whereParams: params, condition };
+  }
+
+  /**
+   * Whether `error` is pg's "connection terminated" family — either the
+   * pool's own `Error: Connection terminated unexpectedly` (thrown when the
+   * socket closes while idle/mid-query) or the query-time
+   * `Error: timeout exceeded when trying to connect` surfaced with that as
+   * its `cause`. Both are the one-time-retry trigger in {@link query}.
+   */
+  private isConnectionTerminatedError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+
+    const cause = (error as { cause?: unknown }).cause;
+    const messages = [error.message, cause instanceof Error ? cause.message : undefined];
+
+    return messages.some(
+      (message) => message !== undefined && /connection terminated/i.test(message),
+    );
+  }
+
+  /**
+   * Whether `sql` is a read-only `SELECT` — the only statement shape the
+   * connection-terminated retry in {@link query} may safely re-run, since
+   * re-executing it can't double-apply a write.
+   */
+  private isIdempotentSelect(sql: string): boolean {
+    return /^\s*select\b/i.test(sql);
   }
 
   /**

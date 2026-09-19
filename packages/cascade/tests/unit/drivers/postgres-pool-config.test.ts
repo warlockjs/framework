@@ -47,3 +47,51 @@ describe("buildPostgresPoolConfig — coerces env-numified fields (51639bf8)", (
     expect(config.port).toBe(5432);
   });
 });
+
+/**
+ * Card ba1193b4: under load (soak at concurrency 10), the blog hit
+ * "timeout exceeded when trying to connect" and "Connection terminated
+ * unexpectedly". The blog's database config sets no pool tuning at all, so
+ * these defaults ARE what production runs on.
+ */
+describe("buildPostgresPoolConfig — resilience defaults (ba1193b4)", () => {
+  it("defaults connectionTimeoutMillis to 10000ms, not the too-tight 2000ms", () => {
+    const config = buildPostgresPoolConfig({ database: "warlock" } as PostgresPoolConfig);
+
+    expect(config.connectionTimeoutMillis).toBe(10000);
+  });
+
+  it("defaults keepAlive to true so idle sockets survive NAT/OS pruning", () => {
+    const config = buildPostgresPoolConfig({ database: "warlock" } as PostgresPoolConfig);
+
+    expect(config.keepAlive).toBe(true);
+  });
+
+  it("defaults idleTimeoutMillis to 30000ms", () => {
+    const config = buildPostgresPoolConfig({ database: "warlock" } as PostgresPoolConfig);
+
+    expect(config.idleTimeoutMillis).toBe(30000);
+  });
+
+  it("lets the app override connectionTimeoutMillis and keepAlive", () => {
+    const config = buildPostgresPoolConfig({
+      database: "warlock",
+      connectionTimeoutMillis: 5000,
+      keepAlive: false,
+    } as PostgresPoolConfig);
+
+    expect(config.connectionTimeoutMillis).toBe(5000);
+    expect(config.keepAlive).toBe(false);
+  });
+
+  it("keeps max configurable with a documented default of 10", () => {
+    const defaulted = buildPostgresPoolConfig({ database: "warlock" } as PostgresPoolConfig);
+    const overridden = buildPostgresPoolConfig({
+      database: "warlock",
+      max: 25,
+    } as PostgresPoolConfig);
+
+    expect(defaulted.max).toBe(10);
+    expect(overridden.max).toBe(25);
+  });
+});

@@ -26,7 +26,7 @@ import { dataSourceRegistry } from "../../data-source/data-source-registry";
 import { assertLeanCompatible, stripHiddenFromLeanRecords } from "../../query-builder/lean-records";
 import { QueryBuilder } from "../../query-builder/query-builder";
 import { RelationLoader } from "../../relations/relation-loader";
-import { sanitizeFilter, sanitizeFilterValue } from "../../utils/sanitize-filter";
+import { assertDefined, sanitizeFilter, sanitizeFilterValue } from "../../utils/sanitize-filter";
 import { type MongoDbDriver } from "./mongodb-driver";
 import { MongoQueryOperations } from "./mongodb-query-operations";
 import { MongoQueryParser } from "./mongodb-query-parser";
@@ -932,11 +932,17 @@ export class MongoQueryBuilder<T = unknown>
     } else if (args.length === 3) {
       // With operator: where(field, operator, value).
       // "=" is still an equality position — sanitize like the 2-arg form.
-      this.operationsHelper.addMatchOperation(prefix, {
-        field: args[0],
-        operator: args[1],
-        value: args[1] === "=" ? sanitizeFilterValue(args[2], String(args[0])) : args[2],
-      });
+      // Every operator still binds a value, so `undefined` is rejected
+      // regardless of which operator is used.
+      const field = String(args[0]);
+      const operator = args[1];
+      const value = operator === "=" ? sanitizeFilterValue(args[2], field) : args[2];
+
+      if (operator !== "=") {
+        assertDefined(value, field);
+      }
+
+      this.operationsHelper.addMatchOperation(prefix, { field: args[0], operator, value });
     }
   }
 

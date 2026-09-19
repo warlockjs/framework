@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.17.0 - Unreleased
+
+### Fixed
+
+- `where(field, undefined)` / `where(field, operator, undefined)` / `where({ field: undefined })` (and the `orWhere` equivalents, on both the Postgres and MongoDB query builders) now throw `UndefinedWhereValueError` instead of silently reaching the driver. A bound `undefined` used to bind as `= NULL` (SQL) / "field missing" (MongoDB) — a comparison that never matches but never fails either, hiding call sites that forgot to guard a value that turned out to be missing (card 62e0e781: a blog author lookup ran `User.find(post.authorId)` with an undefined id under load). Pass `null` to match NULL explicitly; guard the call site to skip the query when there's no value.
+
 ## 5.13.0 - 2026-09-17
 
 ### Upgrading

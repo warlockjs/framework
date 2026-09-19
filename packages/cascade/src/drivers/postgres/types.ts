@@ -45,8 +45,18 @@ export type PostgresPoolConfig = PostgresConnectionConfig & {
   readonly min?: number;
   /** How long a client can sit idle before being closed (ms) */
   readonly idleTimeoutMillis?: number;
-  /** How long to wait for a client before timing out (ms) */
+  /** How long to wait for a client before timing out (ms) (default: 10000) */
   readonly connectionTimeoutMillis?: number;
+  /**
+   * Enable TCP keep-alive on socket connections (default: true).
+   *
+   * Without it, a NAT/firewall/OS can silently drop an idle TCP connection
+   * with neither side told. The next query on that connection then fails
+   * with pg's "Connection terminated unexpectedly" instead of a clean
+   * timeout, which is exactly what surfaced on first requests after the
+   * server sat idle (card ba1193b4).
+   */
+  readonly keepAlive?: boolean;
   /** Maximum times to use a connection before destroying it */
   readonly maxUses?: number;
   /** Application name for connection identification */
@@ -89,10 +99,7 @@ export type PostgresQueryResult<T = Record<string, unknown>> = {
  * PostgreSQL transaction isolation levels.
  */
 export type PostgresIsolationLevel =
-  | "read uncommitted"
-  | "read committed"
-  | "repeatable read"
-  | "serializable";
+  "read uncommitted" | "read committed" | "repeatable read" | "serializable";
 
 /**
  * PostgreSQL transaction options.
@@ -112,15 +119,7 @@ export type PostgresTransactionOptions = {
 export type PostgresOperation = {
   /** Operation stage (select, where, join, etc.) */
   readonly stage:
-    | "select"
-    | "from"
-    | "join"
-    | "where"
-    | "groupBy"
-    | "having"
-    | "orderBy"
-    | "limit"
-    | "offset";
+    "select" | "from" | "join" | "where" | "groupBy" | "having" | "orderBy" | "limit" | "offset";
   /** Operation type/name */
   readonly type: string;
   /** Operation payload/data */

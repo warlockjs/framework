@@ -19,6 +19,7 @@ export * from "./data-source/data-source-registry";
 // Errors
 export * from "./errors/missing-data-source.error";
 export * from "./errors/transaction-rollback.error";
+export * from "./errors/undefined-where-value.error";
 export * from "./errors/unsafe-filter.error";
 export * from "./errors/unsafe-raw-expression.error";
 export * from "./errors/unsupported-lean-operation.error";

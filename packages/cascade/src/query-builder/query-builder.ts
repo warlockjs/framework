@@ -39,7 +39,7 @@ import type {
   WhereObject,
   WhereOperator,
 } from "../contracts/query-builder.contract";
-import { sanitizeFilter, sanitizeFilterValue } from "../utils/sanitize-filter";
+import { assertDefined, sanitizeFilter, sanitizeFilterValue } from "../utils/sanitize-filter";
 
 // ============================================================================
 // TYPES
@@ -336,11 +336,17 @@ export class QueryBuilder<T = unknown> {
       });
     } else {
       // "=" is still an equality position — sanitize like the 2-arg form.
-      this.addOperation("where", {
-        field: args[0],
-        operator: args[1],
-        value: args[1] === "=" ? sanitizeFilterValue(args[2], String(args[0])) : args[2],
-      });
+      // Every operator still binds a value, so `undefined` is rejected
+      // regardless of which operator is used.
+      const field = String(args[0]);
+      const operator = args[1];
+      const value = operator === "=" ? sanitizeFilterValue(args[2], field) : args[2];
+
+      if (operator !== "=") {
+        assertDefined(value, field);
+      }
+
+      this.addOperation("where", { field: args[0], operator, value });
     }
     return this;
   }
@@ -372,11 +378,17 @@ export class QueryBuilder<T = unknown> {
       });
     } else {
       // "=" is still an equality position — sanitize like the 2-arg form.
-      this.addOperation("orWhere", {
-        field: args[0],
-        operator: args[1],
-        value: args[1] === "=" ? sanitizeFilterValue(args[2], String(args[0])) : args[2],
-      });
+      // Every operator still binds a value, so `undefined` is rejected
+      // regardless of which operator is used.
+      const field = String(args[0]);
+      const operator = args[1];
+      const value = operator === "=" ? sanitizeFilterValue(args[2], field) : args[2];
+
+      if (operator !== "=") {
+        assertDefined(value, field);
+      }
+
+      this.addOperation("orWhere", { field: args[0], operator, value });
     }
     return this;
   }
@@ -512,9 +524,7 @@ export class QueryBuilder<T = unknown> {
     pattern: string;
     isRegExp?: true;
   } {
-    return pattern instanceof RegExp
-      ? { pattern: pattern.source, isRegExp: true }
-      : { pattern };
+    return pattern instanceof RegExp ? { pattern: pattern.source, isRegExp: true } : { pattern };
   }
 
   /** Starts with a prefix. */
