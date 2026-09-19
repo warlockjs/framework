@@ -325,6 +325,34 @@ describe("uploadedFileController — content sniffing (security)", () => {
     },
   );
 
+  it.skipIf(!sharp)(
+    "serves jpeg-magic bytes named .html as an attachment, sandboxed, never as text/html",
+    async () => {
+      fs.writeFileSync(path.join(storageRoot, "polyglot.html"), await makeImage("jpeg"));
+
+      const result = await get("/uploads/polyglot.html");
+
+      expect(result.statusCode).toBe(200);
+      expect(result.headers["content-disposition"]).toContain("attachment");
+      expect(result.headers["content-security-policy"]).toBe("sandbox");
+      expect(result.headers["content-type"]).not.toBe("text/html");
+      expect(result.headers["content-type"]).toContain("application/octet-stream");
+    },
+  );
+
+  it.skipIf(!sharp)(
+    "serves png-magic bytes named .jpg as an attachment (raster/extension mismatch)",
+    async () => {
+      fs.writeFileSync(path.join(storageRoot, "mismatch.jpg"), await makeImage("png"));
+
+      const result = await get("/uploads/mismatch.jpg");
+
+      expect(result.statusCode).toBe(200);
+      expect(result.headers["content-disposition"]).toContain("attachment");
+      expect(result.headers["content-type"]).not.toBe("image/png");
+    },
+  );
+
   it.skipIf(!sharp)("carries nosniff on variant responses too", async () => {
     fs.writeFileSync(path.join(storageRoot, "hero-nosniff.jpg"), await makeImage("jpeg", 64, 64));
 

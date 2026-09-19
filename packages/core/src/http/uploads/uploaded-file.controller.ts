@@ -18,6 +18,7 @@ import { matchesIfNoneMatch } from "./matches-if-none-match";
 import { parseUploadedFileQuery } from "./parse-uploaded-file-query";
 import { readFileHead } from "./read-file-head";
 import { resolveImageVariantsConfig } from "./resolve-image-variants-config";
+import { resolveInlineImageContentType } from "./resolve-inline-image-content-type";
 import { resolveOriginalContentType } from "./resolve-original-content-type";
 import { resolveUploadPath, type ResolvedUploadPath } from "./resolve-upload-path";
 import { resolveVariantCandidate } from "./resolve-variant-candidate";
@@ -65,12 +66,14 @@ async function sendVariant(
 }
 
 /**
- * Serve an upload original that is not a known raster format inline: html,
- * xml and the svg family are markup a browser will parse and execute, so
- * every non-raster original goes out as a download instead of a rendered
- * response. `Content-Type` stays extension-derived, except the svg/html/xml
- * family, which is downgraded to `application/octet-stream` so the browser
- * never renders it even if it ignores the disposition.
+ * Serve an upload original that isn't safe to render inline: a non-raster
+ * format (html, xml, the svg family, anything unrecognised) is markup a
+ * browser will parse and execute, and a raster-sniffed file whose extension
+ * doesn't back that format up (see `resolveInlineImageContentType`) is a
+ * polyglot — so both go out as a download instead of a rendered response.
+ * `Content-Type` stays extension-derived, except the svg/html/xml family,
+ * which is downgraded to `application/octet-stream` so the browser never
+ * renders it even if it ignores the disposition.
  */
 async function sendOriginalAsAttachment(response: Response, absolutePath: string) {
   response.header("Content-Security-Policy", "sandbox");
@@ -81,6 +84,21 @@ async function sendOriginalAsAttachment(response: Response, absolutePath: string
     immutable: true,
     inline: false,
     filename: path.basename(absolutePath),
+  });
+}
+
+/**
+ * Serve an upload original inline, once the sniffed raster format and the
+ * extension-derived format have been confirmed to agree. The content type is
+ * always the SNIFFED image type, passed explicitly — never `sendFile`'s
+ * extension-derived guess, which is exactly what let a JPEG named `.html`
+ * out as `text/html` before this existed.
+ */
+async function sendOriginalInline(response: Response, absolutePath: string, contentType: string) {
+  return response.sendBuffer(await fs.readFile(absolutePath), {
+    contentType,
+    cacheTime: ONE_YEAR,
+    immutable: true,
   });
 }
 
@@ -145,7 +163,16 @@ export const uploadedFileController: RequestHandler = async ({ request, response
       return sendOriginalAsAttachment(response, source.absolutePath);
     }
 
-    return response.sendFile(source.absolutePath, ONE_YEAR);
+    // Inline is only safe when the extension-derived type agrees with the
+    // sniffed bytes too — otherwise `sendFile` would advertise the
+    // extension's type (e.g. text/html for JPEG bytes named `.html`).
+    const inlineContentType = resolveInlineImageContentType(source.absolutePath, sniffedFormat);
+
+    if (!inlineContentType) {
+      return sendOriginalAsAttachment(response, source.absolutePath);
+    }
+
+    return sendOriginalInline(response, source.absolutePath, inlineContentType);
   }
 
   const images = resolveImageVariantsConfig(uploadsConfig("images"), storageRoot);

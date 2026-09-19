@@ -43,4 +43,18 @@ export enum HttpErrorCodes {
    * Application is in maintenance mode and the request did not match the allowlist.
    */
   Maintenance = "EC106",
+
+  /**
+   * Default core CSRF-Origin guard (SECURITY, card 8a752ab2, `./csrf-default-guard.ts`)
+   * refused an unsafe-method, cookie-carrying request whose `Origin`/`Referer`
+   * did not name the request's own origin or an entry in
+   * `auth.csrf.allowedOrigins`.
+   *
+   * Deliberately reuses `@warlock.js/auth`'s `AuthErrorCodes.CsrfOriginMismatch`
+   * value (`EC006`), NOT a fresh `EC1xx` core code: this is the exact same
+   * failure class `authMiddleware("cookie:*")`'s own CSRF-Origin check
+   * reports — one client-visible identifier for "CSRF Origin check failed",
+   * regardless of which seam caught it.
+   */
+  CsrfOriginMismatch = "EC006",
 }

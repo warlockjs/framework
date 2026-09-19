@@ -8,10 +8,12 @@ import { trans } from "@mongez/localization";
 import { type GenericObject } from "@mongez/reinforcements";
 import { DatabaseWriterValidationError } from "@warlock.js/cascade";
 import { contextManager } from "@warlock.js/context";
+import { log } from "@warlock.js/logger";
 import config from "@mongez/config";
 import { environment } from "../../utils";
 import { requestContext as requestContextInstance } from "../context/request-context";
 import { applyCspHeader } from "../csp";
+import { runDefaultCsrfGuard } from "../csrf-default-guard";
 import { HttpError } from "../errors";
 import { type Request } from "../request";
 import { type Response } from "../response";
@@ -62,6 +64,24 @@ export function createRequestStore(
   // Run all contexts together!
   return contextManager.runAll(httpContextStore, async () => {
     try {
+      // Default CSRF-Origin guard (SECURITY, card 8a752ab2) — the earliest
+      // seam common to every request, BEFORE the route's own middleware
+      // (`request.runMiddleware()` below) and before any app handler, so it
+      // applies even to a route that never attaches
+      // `authMiddleware("cookie:*")`. See `../csrf-default-guard.ts` for the
+      // full scope rule and `{ csrf: false }` exemption.
+      const csrfGuardResponse = await runDefaultCsrfGuard(request, response, t, (reason) => {
+        log.error(
+          "http",
+          "csrf-default-guard",
+          new Error(`Default CSRF Origin guard refused request: ${reason}`),
+        );
+      });
+
+      if (csrfGuardResponse) {
+        return csrfGuardResponse as ReturnedResponse;
+      }
+
       // Run middleware chain
       const result = await request.runMiddleware();
 

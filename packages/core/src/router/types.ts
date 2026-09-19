@@ -186,6 +186,29 @@ export interface RouteOptions {
      */
     errorMessage?: string;
   };
+  /**
+   * Opt this route OUT of the default core CSRF-Origin guard
+   * (`../http/csrf-default-guard.ts`, SECURITY card 8a752ab2) by passing
+   * `{ csrf: false }`. Any other value, including leaving it unset, keeps the
+   * route in scope — there is no way to opt IN beyond the default.
+   *
+   * ⚠️ DANGEROUS. The guard is what stops a cookie-authenticated write
+   * (any unsafe-method request carrying a non-`locale` cookie) reached
+   * cross-site from succeeding without a same-origin/allowed `Origin` or
+   * `Referer`. Exempting a route removes that protection for it alone —
+   * reach for this ONLY for routes that cannot present a same-origin
+   * `Origin`/`Referer` by construction and are safe without it:
+   * - a third-party callback the browser is redirected to directly
+   *   (an OAuth `/oauth/callback`, a payment-provider webhook UI redirect);
+   * - a machine-to-machine route no browser ever calls with cookies.
+   *
+   * Never exempt a route an ordinary signed-in browser session POSTs/PUTs/
+   * PATCHes/DELETEs to.
+   *
+   * @example
+   * router.post("/oauth/callback", handler, { csrf: false });
+   */
+  csrf?: false;
 }
 
 export type RequestMethod =
